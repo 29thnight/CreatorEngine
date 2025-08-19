@@ -11,6 +11,8 @@ cbuffer ThresholdParams
 cbuffer BloomCompositeParams
 {
 	float coefficient{ 0.3f };
+    float2 texelSize{};
+    float _padding{};
 };
 
 cbuffer BlurParams

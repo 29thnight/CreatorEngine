@@ -1,9 +1,11 @@
+
 Texture2D<float4> inputTexture : register(t0);
 RWTexture2D<float4> outputTexture : register(u0);
+SamplerState linearClampToBorder : register(s3);
 
 cbuffer ThresholdParams : register(b0)
 {
-    float threshold; // 예: 1.0 (HDR 씬 기준)
+    float threshold; // 예: 1.0
     float knee; // 예: 0.5 ~ 1.0
 }
 
@@ -13,44 +15,55 @@ void main(uint3 groupID : SV_GroupID,
           uint groupIndex : SV_GroupIndex,
           uint3 dispatchID : SV_DispatchThreadID)
 {
-    uint2 pixel = dispatchID.xy; // half-res 출력 픽셀
+    uint2 pixel = dispatchID.xy;
 
-    // 입력 텍스처 크기 얻기
-    uint inW, inH;
-    inputTexture.GetDimensions(inW, inH);
-
-    // 출력 범위 체크 (안전)
     uint outW, outH;
     outputTexture.GetDimensions(outW, outH);
     if (pixel.x >= outW || pixel.y >= outH)
         return;
 
-    // 입력에서 2x 다운샘플할 소스 좌표
-    int2 inPixel = int2(pixel * 2);
+    uint inW, inH;
+    inputTexture.GetDimensions(inW, inH);
 
-    // 경계 클램프 (짝수/홀수 해상도 모두 안전)
-    int2 p00 = clamp(inPixel + int2(0, 0), int2(0, 0), int2(int(inW) - 1, int(inH) - 1));
-    int2 p10 = clamp(inPixel + int2(1, 0), int2(0, 0), int2(int(inW) - 1, int(inH) - 1));
-    int2 p01 = clamp(inPixel + int2(0, 1), int2(0, 0), int2(int(inW) - 1, int(inH) - 1));
-    int2 p11 = clamp(inPixel + int2(1, 1), int2(0, 0), int2(int(inW) - 1, int(inH) - 1));
+    // 이 출력 픽셀에 대응하는 입력 2x2 블록의 "시작" 좌표
+    int2 base = int2(pixel * 2);
 
-    // 정확한 2x2 평균(박스 필터)
-    float4 c00 = inputTexture.Load(int3(p00, 0));
-    float4 c10 = inputTexture.Load(int3(p10, 0));
-    float4 c01 = inputTexture.Load(int3(p01, 0));
-    float4 c11 = inputTexture.Load(int3(p11, 0));
-    float3 color = 0.25 * (c00.rgb + c10.rgb + c01.rgb + c11.rgb);
+    // 4x4 텐트 커널의 1D 가중치 (분리 가능)
+    const int wx[4] = { 1, 3, 3, 1 }; // 합 8
+    const int wy[4] = { 1, 3, 3, 1 }; // 합 8
+    const float norm = 1.0 / 64.0; // 8 * 8
 
-    // 밝기(Rec.709, Linear 가정)
-    float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
+    float3 sum = 0;
 
-    // 부드러운 소프트 스레숄드 (knee == 0 보호)
+    // base-1 .. base+2 범위를 커버 (총 4x4 탭)
+    // 중심은 base + (0.5, 0.5) 부근에 해당 → bilinear 텐트에 근접
+    [unroll]
+    for (int j = 0; j < 4; ++j)
+    {
+        int sy = base.y + (j - 1);
+        sy = clamp(sy, 0, int(inH) - 1);
+
+        [unroll]
+        for (int i = 0; i < 4; ++i)
+        {
+            int sx = base.x + (i - 1);
+            sx = clamp(sx, 0, int(inW) - 1);
+
+            float3 c = inputTexture.Load(int3(sx, sy, 0)).rgb;
+            sum += c * float(wx[i] * wy[j]);
+        }
+    }
+
+    float3 cTent = sum * norm;
+
+    // (선택) anti-firefly: threshold 기반 핫픽셀 억제
+    float luma = dot(cTent, float3(0.2126, 0.7152, 0.0722));
+    cTent *= min(1.0, threshold / max(luma, 1e-6));
+
+    // 소프트 스레숄드
     float t0 = threshold;
     float t1 = threshold + max(knee, 1e-6);
-    float soft = smoothstep(t0, t1, brightness);
+    float soft = smoothstep(t0, t1, luma);
 
-    // 약간 더 부드럽게 하려면 한 번 더 제곱 (선택)
-    // soft *= soft;
-
-    outputTexture[pixel] = float4(color * soft, 0.0); // 알파는 0 권장
+    outputTexture[pixel] = float4(cTent * soft, 0.0);
 }

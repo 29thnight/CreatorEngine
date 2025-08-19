@@ -45,6 +45,11 @@ public:
         return UpdateConstantBuffer(name, &data, sizeof(T));
     }
 
+	// Get the GUID of the shader PSO.
+    const FileGuid& GetShaderPSOGuid() const { return m_shaderPSOGuid; }
+    // Set the GUID of the shader PSO.
+    void SetShaderPSOGuid(const FileGuid& guid) { m_shaderPSOGuid = guid; }
+
 private:
     struct ConstantBuffer
     {
@@ -74,6 +79,8 @@ private:
     std::vector<ConstantBuffer> m_constantBuffers;
     std::vector<ShaderResource> m_shaderResources;
     std::vector<UnorderedAccess> m_unorderedAccessViews;
+
+    FileGuid m_shaderPSOGuid{};
 };
 
 #endif // !DYNAMICCPP_EXPORTS

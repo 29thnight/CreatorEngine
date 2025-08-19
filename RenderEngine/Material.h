@@ -2,6 +2,7 @@
 #include "MaterialInfomation.h"
 #include "MaterialFlowInformation.h"
 #include "Texture.h"
+#include "ShaderPSO.h"
 #include "Material.generated.h"
 
 enum class MaterialRenderingMode
@@ -48,6 +49,9 @@ public:
 	Material& SetWindVector(const Mathf::Vector4& windVector);
 	Material& SetUVScroll(const Mathf::Vector2& uvScroll);
 
+	void SetShaderPSO(std::shared_ptr<ShaderPSO> pso);
+	std::shared_ptr<ShaderPSO> GetShaderPSO() const;
+
 public:
     [[Property]]
 	std::string m_name{};
@@ -75,5 +79,9 @@ public:
     [[Property]]
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
+	std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
+	[[Property]]
+	FileGuid m_shaderPSOGuid{};
+
 };
 
