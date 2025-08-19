@@ -6,6 +6,7 @@
 #include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
+#include <fstream>
 #include "FileIO.h"
 #include "VolumeProfile.h"
 #include "Benchmark.hpp"
@@ -538,6 +539,24 @@ void DataSystem::LoadTextures()
 
 void DataSystem::LoadMaterials()
 {
+}
+
+void DataSystem::SaveMaterial(Material* material)
+{
+#ifndef BUILD_FLAG
+        if (!material)
+                return;
+
+        file::path savePath = PathFinder::Relative("Materials\\") / (material->m_name + ".asset");
+        std::ofstream fout(savePath);
+        if (fout.is_open())
+        {
+                YAML::Node node = Meta::Serialize(material);
+                fout << node;
+                fout.close();
+                ForceCreateYamlMetaFile(savePath);
+        }
+#endif // !BUILD_FLAG
 }
 
 Material* DataSystem::LoadMaterial(std::string_view name)
