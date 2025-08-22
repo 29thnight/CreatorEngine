@@ -27,26 +27,26 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::Button("No Material", ImVec2(250, 0));
 		}
 		ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_BOX))
-                {
-                        ImGui::GetContext("SelectMaterial").Open();
-                }
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_FA_ELLIPSIS))
-                {
-                        ImGui::OpenPopup("MaterialMenu");
-                }
-                if (ImGui::BeginPopup("MaterialMenu"))
-                {
-                        if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
-                        {
-                                Material* newMat = Material::Instantiate(meshRenderer->m_Material);
-                                meshRenderer->m_Material = newMat;
-                                DataSystems->SaveMaterial(newMat);
-                        }
-                        ImGui::EndPopup();
-                }
-                ImGui::PopStyleVar(2);
+            if (ImGui::Button(ICON_FA_BOX))
+            {
+                ImGui::GetContext("SelectMatarial").Open();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_FA_ELLIPSIS))
+            {
+                    ImGui::OpenPopup("MaterialMenu");
+            }
+            if (ImGui::BeginPopup("MaterialMenu"))
+            {
+                    if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
+                    {
+                            Material* newMat = Material::Instantiate(meshRenderer->m_Material);
+                            meshRenderer->m_Material = newMat;
+                            DataSystems->SaveMaterial(newMat);
+                    }
+                    ImGui::EndPopup();
+            }
+            ImGui::PopStyleVar(2);
 	}
 
 	if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))

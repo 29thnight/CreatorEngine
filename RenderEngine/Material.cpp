@@ -64,31 +64,53 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	// Create a new Material instance
 	auto cloneMaterial = std::make_shared<Material>(*origin);
 
-	// 수정된 코드
+	const std::string cloneSuffix = "_Clone";
+
+	// Determine the base name depending on whether a new name was provided
+	std::string baseName = newName.empty() ? std::string(origin->m_name) : std::string(newName);
+
+	auto stripCloneSuffix = [&](std::string& name)
+	{
+		auto pos = name.rfind(cloneSuffix);
+		if (pos != std::string::npos)
+		{
+			auto digitsPos = pos + cloneSuffix.size();
+			if (digitsPos == name.size() ||
+				std::all_of(name.begin() + digitsPos, name.end(), [](unsigned char c) { return std::isdigit(c); }))
+			{
+				name.erase(pos);
+			}
+		}
+	};
+
+	// If no name was provided, start with the base name plus the clone suffix
+	std::string finalName;
 	if (newName.empty())
 	{
-		cloneMaterial->m_name = origin->m_name + "_Clone";
+		stripCloneSuffix(baseName);
+		finalName = baseName + cloneSuffix;
 	}
 	else
 	{
-		cloneMaterial->m_name = std::string(newName);
+		finalName = baseName;
 	}
 
-	if(DataSystems->Materials.find(cloneMaterial->m_name) == DataSystems->Materials.end())
+	// Ensure the name is unique and avoid nested clone suffixes
+	if (DataSystems->Materials.contains(finalName))
 	{
-		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
-	}
-	else
-	{
-		int cloneIndex = 1;
-		while(DataSystems->Materials.find(cloneMaterial->m_name) != DataSystems->Materials.end())
+		stripCloneSuffix(baseName);
+		finalName = baseName + cloneSuffix;
+		int cloneIndex = 0;
+		while (DataSystems->Materials.contains(finalName))
 		{
-			cloneMaterial->m_name += "_Clone" + std::to_string(cloneIndex++);
+			finalName = baseName + cloneSuffix + std::to_string(++cloneIndex);
 		}
-		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 	}
 
-        DataSystems->SaveMaterial(cloneMaterial.get());
+	cloneMaterial->m_name = finalName;
+	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
+
+	DataSystems->SaveMaterial(cloneMaterial.get());
 
 	return cloneMaterial;
 }

@@ -64,7 +64,9 @@ void SSAOPass::Initialize(Managed::SharedPtr<Texture> renderTarget, ID3D11Shader
             0
         );
         sample = XMVector3Normalize(sample);
-        float scale = (float)i / 64.0;
+        //float scale = (float)i / 64.0;
+		float normInverse = 1.0f / 64.0f;
+		float scale = std::lerp(0.1f, 1.0f, normInverse * normInverse); // Scale the sample vector
         // to lerp
         sample = XMVectorScale(sample, scale);
 
