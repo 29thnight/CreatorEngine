@@ -91,10 +91,10 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				materialName = materialNode["m_name"].as<std::string>();
                 FileGuid guid = materialNode["m_fileGuid"].as<std::string>();
                 model = DataSystems->LoadModelGUID(guid);
-				if (materialNode["m_renderingMode"])
-				{
-					renderingMode = static_cast<MaterialRenderingMode>(materialNode["m_renderingMode"].as<int>());
-				}
+                                if (materialNode["m_renderingMode"])
+                                {
+                                        renderingMode = static_cast<MaterialRenderingMode>(materialNode["m_renderingMode"].as<int>());
+                                }
             }
             MetaYml::Node getMeshNode = itNode["m_Mesh"];
             if (model && getMeshNode)
@@ -115,25 +115,39 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                                                 Meta::Deserialize(meshRenderer->m_Material, materialNode);
                                                 if (!materialName.empty())
                                                         meshRenderer->m_Material->m_name = materialName;
+
+                                                auto loadTex = [](const std::string& texName, Texture*& texPtr, bool compress = false)
+                                                {
+                                                        if (!texName.empty())
+                                                        {
+                                                                texPtr = DataSystems->LoadMaterialTexture(texName, compress);
+                                                        }
+                                                };
+
+                                                loadTex(meshRenderer->m_Material->m_baseColorTexName, meshRenderer->m_Material->m_pBaseColor, true);
+                                                loadTex(meshRenderer->m_Material->m_normalTexName, meshRenderer->m_Material->m_pNormal);
+                                                loadTex(meshRenderer->m_Material->m_ORM_TexName, meshRenderer->m_Material->m_pOccRoughMetal);
+                                                loadTex(meshRenderer->m_Material->m_AO_TexName, meshRenderer->m_Material->m_AOMap);
+                                                loadTex(meshRenderer->m_Material->m_EmissiveTexName, meshRenderer->m_Material->m_pEmissive);
                                         }
                                 }
 
-				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
-				if (meshRenderer->m_Mesh)
-				{
-					MetaYml::Node getLOD_Node = getMeshNode["m_LODThresholds"];
-					if (getLOD_Node)
-					{
-						std::vector<float> lodThresholds;
-						for (const auto& threshold : getLOD_Node)
-						{
-							lodThresholds.push_back(threshold.as<float>());
-						}
-						meshRenderer->m_Mesh->GenerateLODs(lodThresholds);
-					}
-				}
+                                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+                                if (meshRenderer->m_Mesh)
+                                {
+                                        MetaYml::Node getLOD_Node = getMeshNode["m_LODThresholds"];
+                                        if (getLOD_Node)
+                                        {
+                                                std::vector<float> lodThresholds;
+                                                for (const auto& threshold : getLOD_Node)
+                                                {
+                                                        lodThresholds.push_back(threshold.as<float>());
+                                                }
+                                                meshRenderer->m_Mesh->GenerateLODs(lodThresholds);
+                                        }
+                                }
             }
-			meshRenderer->SetOwner(obj);
+                        meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);
         }
 		else if (componentType->typeID == type_guid(Animator))
