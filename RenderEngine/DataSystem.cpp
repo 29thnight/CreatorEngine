@@ -561,13 +561,42 @@ void DataSystem::SaveMaterial(Material* material)
 
 Material* DataSystem::LoadMaterial(std::string_view name)
 {
-	std::string materialName = name.data();
-	if (Materials.find(materialName) != Materials.end())
-	{
-		Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
-		return Materials[materialName].get();
-	}
-	return nullptr;
+        std::string materialName = name.data();
+        if (Materials.find(materialName) != Materials.end())
+        {
+                Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
+                return Materials[materialName].get();
+        }
+#ifndef BUILD_FLAG
+        file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
+        if (!file::exists(loadPath))
+        {
+                return nullptr;
+        }
+
+        MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
+        auto material = std::make_shared<Material>();
+        Meta::Deserialize(material.get(), node);
+
+        auto loadTex = [this](const std::string& texName, Texture*& texPtr, bool compress = false)
+        {
+                if (!texName.empty())
+                {
+                        texPtr = LoadMaterialTexture(texName, compress);
+                }
+        };
+
+        loadTex(material->m_baseColorTexName, material->m_pBaseColor, true);
+        loadTex(material->m_normalTexName, material->m_pNormal);
+        loadTex(material->m_ORM_TexName, material->m_pOccRoughMetal);
+        loadTex(material->m_AO_TexName, material->m_AOMap);
+        loadTex(material->m_EmissiveTexName, material->m_pEmissive);
+
+        Materials[material->m_name] = material;
+        return material.get();
+#else
+        return nullptr;
+#endif
 }
 
 Texture* DataSystem::LoadTextureGUID(FileGuid guid)

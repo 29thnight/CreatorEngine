@@ -64,7 +64,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	// Create a new Material instance
 	auto cloneMaterial = std::make_shared<Material>(*origin);
 
-	// ¼öÁ¤µÈ ÄÚµå
+	// ìˆ˜ì •ëœ ì½”ë“œ
 	if (newName.empty())
 	{
 		cloneMaterial->m_name = origin->m_name + "_Clone";
@@ -87,6 +87,8 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 		}
 		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 	}
+
+        DataSystems->SaveMaterial(cloneMaterial.get());
 
 	return cloneMaterial;
 }
