@@ -30,6 +30,8 @@ public:
     // Apply pipeline state and bind constant buffers and resources to the GPU.
     void Apply();
 
+	void Apply(ID3D11DeviceContext* deferredContext);
+
     // Bind a shader resource view to a specific shader stage and slot.
     void BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view);
 
@@ -51,33 +53,48 @@ public:
     void SetShaderPSOGuid(const FileGuid& guid) { m_shaderPSOGuid = guid; }
 
 private:
-    struct ConstantBuffer
-    {
-        std::string name;
+    struct CBBinding {
         ShaderStage stage;
-        uint32_t slot;
-        Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
-        uint32_t size;
+        UINT        slot;
     };
 
-    struct ShaderResource
-    {
+    struct CBEntry {
+        std::string name;
+        UINT        size = 0;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;   // 이름당 단일 버퍼
+        std::vector<CBBinding> binds;                  // (stage, slot) 목록
+    };
+
+    struct ShaderResource {
         ShaderStage stage;
-        uint32_t slot;
+        UINT        slot;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> view;
     };
 
-    struct UnorderedAccess
-    {
+    struct UnorderedAccess {
         ShaderStage stage;
-        uint32_t slot;
+        UINT        slot;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> view;
     };
 
+    // 리플렉션 세부
     void ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage);
+    void AddOrMergeCB(const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint);
 
-    std::vector<ConstantBuffer> m_constantBuffers;
-    std::vector<ShaderResource> m_shaderResources;
+    // 스테이지별 바인딩 유틸
+    static void SetCBForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11Buffer* buf);
+    static void SetSRVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11ShaderResourceView* srv);
+    static void SetUAVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11UnorderedAccessView* uav);
+
+    // SRV↔UAV 해저드 정리
+    void ResolveSrvUavHazards(ID3D11DeviceContext* ctx);
+
+private:
+    // 이름 → 단일 버퍼
+    std::unordered_map<std::string, CBEntry> m_cbByName;
+
+    // SRV/UAV 캐시
+    std::vector<ShaderResource>  m_shaderResources;
     std::vector<UnorderedAccess> m_unorderedAccessViews;
 
     FileGuid m_shaderPSOGuid{};

@@ -47,6 +47,7 @@ static const std::unordered_map<std::string_view, std::string_view> kExtensionTo
 
 	// 쉐이더, 코드 파일
 	{ ".hlsl", ICON_FA_FILE_CONTRACT " " },
+	{ ".shader", ICON_FA_FILE_CONTRACT " " },
 	{ ".cpp",  ICON_FA_FILE_CODE " " },
 	{ ".cs",   ICON_FA_FILE_CODE " " },
 
@@ -82,7 +83,7 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::MaterialTexture;
 	else if (filepath.extension() == ".terrain")
 		return DataSystem::FileType::TerrainTexture;
-	else if (filepath.extension() == ".hlsl" || filepath.extension() == ".fx")
+	else if (filepath.extension() == ".hlsl" || filepath.extension() == ".fx" || filepath.extension() == ".shader")
 		return DataSystem::FileType::Shader;
 	else if (filepath.extension() == ".cpp" || filepath.extension() == ".h")
 		return DataSystem::FileType::CppScript;
@@ -153,6 +154,7 @@ void DataSystem::Initialize()
 		{ ".dds",    { FileType::Texture,		(ImTextureID)TextureIcon->m_pSRV }	},
 		{ ".hdr",    { FileType::HDR,			(ImTextureID)TextureIcon->m_pSRV }	},
 		{ ".hlsl",   { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
+		{ ".shader", { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
 		{ ".cpp",    { FileType::CppScript,		(ImTextureID)CodeIcon->m_pSRV }		},
 		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)CodeIcon->m_pSRV }		},
 		{ ".wav",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},

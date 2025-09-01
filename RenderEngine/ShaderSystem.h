@@ -3,6 +3,7 @@
 #include "Shader.h"
 #include "Delegate.h"
 
+class ShaderPSO; // 전방 선언
 class ShaderResourceSystem final : public Singleton<ShaderResourceSystem>
 {
 private:
@@ -23,6 +24,9 @@ public:
 	bool IsReloading() const { return m_isReloading; }
 	void SetReloading(bool reloading) { m_isReloading = reloading; }
 
+	void LoadShaderAssets();
+	void ReloadShaderAssets();
+
 	std::unordered_map<std::string, VertexShader>	VertexShaders;
 	std::unordered_map<std::string, HullShader>		HullShaders;
 	std::unordered_map<std::string, DomainShader>	DomainShaders;
@@ -30,12 +34,14 @@ public:
 	std::unordered_map<std::string, PixelShader>	PixelShaders;
 	std::unordered_map<std::string, ComputeShader>	ComputeShaders;
 
+	std::unordered_map<std::string, std::shared_ptr<ShaderPSO>> ShaderAssets;
+
 	Core::Delegate<void> m_shaderReloadedDelegate;
 
-private:
 	// Shader loading
 	void AddShaderFromPath(const file::path& filepath);
 	void ReloadShaderFromPath(const file::path& filepath);
+private:
 	void AddShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
 	void ReloadShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
 	void RemoveShaders();

@@ -3,6 +3,8 @@
 #include "HLSLCompiler.h"
 #include "Benchmark.hpp"
 #include "ProgressWindow.h"
+#include "ShaderPSO.h"
+#include "ShaderDSL.h"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {
@@ -65,6 +67,8 @@ void ShaderResourceSystem::LoadShaders()
 		Debug->LogWarning("Error" + std::string(e.what()));
 		std::cout << "Error" << e.what() << std::endl;
 	}
+
+	LoadShaderAssets();
 }
 
 void ShaderResourceSystem::ReloadShaders()
@@ -138,6 +142,8 @@ void ShaderResourceSystem::ReloadShaders()
 
 	m_isReloading = false;
 
+	ReloadShaderAssets();
+
 	Debug->Log("[Shaders Reload Completed]");
 	g_progressWindow->SetStatusText(L"Reloading shaders completed");
 	g_progressWindow->SetProgress(100.0f);
@@ -204,6 +210,98 @@ void ShaderResourceSystem::CSOAllCleanup()
 			file::remove(cso);
 		}
 	}
+}
+
+static bool ExtractStageAndName(const file::path& hlsl, std::string& stage, std::string& name)
+{
+	// 규칙: <Name>.<stage>.hlsl  (예: "VertexShader.vs.hlsl")
+	if (hlsl.extension() != ".hlsl") return false;
+	file::path stem1 = hlsl.stem();         // "VertexShader.vs"
+	file::path stem2 = stem1.stem();        // "VertexShader"
+	file::path stageExt = stem1.extension();// ".vs"
+	if (stageExt.empty()) return false;
+	stage = stageExt.string();
+	if (!stage.empty() && stage[0] == '.') stage.erase(0, 1); // "vs"
+	name = stem2.string();                                 // "VertexShader"
+	return !stage.empty() && !name.empty();
+}
+
+// NEW: 개별 스크립트 처리
+static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
+{
+	auto pso = std::make_shared<ShaderPSO>();
+
+	auto bindFile = [&](const std::string& path) {
+		if (path.empty()) return;
+		file::path p = PathFinder::RelativeToShader() / path; // Shader 폴더 기준
+		// 필요시 먼저 컴파일/등록 (이미 등록돼있으면 내부에서 덮어씀)
+		try { ShaderSystem->AddShaderFromPath(p); }
+		catch (...) {}
+
+		std::string stage, base;
+		if (!ExtractStageAndName(p, stage, base)) return;
+
+		if		(stage == "vs") pso->m_vertexShader		= &ShaderSystem->VertexShaders[base];
+		else if (stage == "ps") pso->m_pixelShader		= &ShaderSystem->PixelShaders[base];
+		else if (stage == "gs") pso->m_geometryShader	= &ShaderSystem->GeometryShaders[base];
+		else if (stage == "hs") pso->m_hullShader		= &ShaderSystem->HullShaders[base];
+		else if (stage == "ds") pso->m_domainShader		= &ShaderSystem->DomainShaders[base];
+		else if (stage == "cs") pso->m_computeShader	= &ShaderSystem->ComputeShaders[base];
+	};
+
+	bindFile(desc.pass.vs);
+	bindFile(desc.pass.ps);
+	bindFile(desc.pass.gs);
+	bindFile(desc.pass.hs);
+	bindFile(desc.pass.ds);
+	bindFile(desc.pass.cs);
+
+	// 자동 리플렉션으로 cbuffer/SRV 슬롯 생성
+	pso->ReflectConstantBuffers();
+
+	// TODO: queueTag/keywords 렌더 큐/키워드 시스템과 연동(옵션)
+	return pso;
+}
+
+void ShaderResourceSystem::LoadShaderAssets()
+{
+	ShaderAssets.clear();
+	try {
+		file::path shaderpath = PathFinder::RelativeToShader();
+		for (auto& dir : file::recursive_directory_iterator(shaderpath))
+		{
+			if (dir.is_directory() || dir.path().extension() != ".shader") continue;
+
+			// 스크립트 읽기
+			std::string src;
+			{
+				std::ifstream f(dir.path());
+				if (!f) continue;
+				src.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+			}
+			ShaderAssetDesc desc{};
+			if (!ParseShaderDSL(src, desc)) continue;
+
+			// 이름 없으면 파일명에서 추출
+			std::string assetName = !desc.name.empty() ? desc.name : dir.path().stem().string();
+
+			// PSO 만들고 등록
+			ShaderAssets[assetName] = BuildPSOFromDesc(desc);
+		}
+	}
+	catch (const file::filesystem_error& e)
+	{
+		Debug->LogWarning("Could not load shader assets" + std::string(e.what()));
+	}
+	catch (const std::exception& e)
+	{
+		Debug->LogWarning("Error" + std::string(e.what()));
+	}
+}
+
+void ShaderResourceSystem::ReloadShaderAssets()
+{
+	LoadShaderAssets();
 }
 
 void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)
