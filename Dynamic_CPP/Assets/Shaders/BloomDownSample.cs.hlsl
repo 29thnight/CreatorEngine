@@ -32,7 +32,7 @@ float3 average(float3 sourceColorA, float3 sourceColorB, float3 sourceColorC, fl
 [numthreads(12, 8, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    float2 uvCoords = (DTid.xy + 0.5f) * texelSize;
+    float2 uvCoords = (DTid.xy * 2.f + 0.5f) * texelSize;
 
     float3 A = inputTexture.SampleLevel(ClampSampler, uvCoords + float2(-2.0f, -2.0f) * texelSize, inputTextureMipLevel).xyz;
     float3 B = inputTexture.SampleLevel(ClampSampler, uvCoords + float2(0.0f, -2.0f) * texelSize, inputTextureMipLevel).xyz;

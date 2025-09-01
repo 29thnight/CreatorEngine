@@ -16,10 +16,10 @@ cbuffer BloomUpSampleParams : register(b0)
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     float width, height;
-    outputCurrentUpSampleTexture.GetDimensions(width, height);
-    float2 outputTexelSize = 1.0f / float2(width, height);
+    //outputCurrentUpSampleTexture.GetDimensions(width, height);
+    //float2 outputTexelSize = 1.0f / float2(width, height);
 
-    float2 uvCoords = (DTid.xy + 0.5f) * outputTexelSize;
+    //float2 uvCoords = (DTid.xy * 2.f + 0.5f) * outputTexelSize;
 
     // Copy current downsample level
     outputCurrentUpSampleTexture[DTid.xy] = inputCurrentDownSampleTexture.Load(int3(DTid.xy, 0));
@@ -31,6 +31,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     inputPreviousUpSampleTexture.GetDimensions(width, height);
     float2 inputTexelSize = 1.0f / float2(width, height);
+    float2 uvCoords = (DTid.xy * 0.5f + 0.5f) * inputTexelSize;
 
     float3 A = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(-1.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
     float3 B = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(0.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
