@@ -8,6 +8,9 @@
 #include <string>
 #include <string_view>
 #include <cstdint>
+#include <unordered_map>
+#include <span>
+#include <cstddef>
 
 enum class ShaderStage
 {
@@ -30,7 +33,7 @@ public:
     // Apply pipeline state and bind constant buffers and resources to the GPU.
     void Apply();
 
-	void Apply(ID3D11DeviceContext* deferredContext);
+    void Apply(ID3D11DeviceContext* deferredContext);
 
     // Bind a shader resource view to a specific shader stage and slot.
     void BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view);
@@ -47,53 +50,77 @@ public:
         return UpdateConstantBuffer(name, &data, sizeof(T));
     }
 
-	// Get the GUID of the shader PSO.
+    // Update a single variable inside a constant buffer.
+    bool UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size);
+
+    template <typename T>
+    bool UpdateVariable(std::string_view cbName, std::string_view varName, const T& data)
+    {
+        return UpdateVariable(cbName, varName, &data, sizeof(T));
+    }
+
+    // Get the GUID of the shader PSO.
     const FileGuid& GetShaderPSOGuid() const { return m_shaderPSOGuid; }
     // Set the GUID of the shader PSO.
     void SetShaderPSOGuid(const FileGuid& guid) { m_shaderPSOGuid = guid; }
 
-private:
-    struct CBBinding {
+    // Expose reflected constant buffer entries.
+    const std::unordered_map<std::string, struct CBEntry>& GetConstantBuffers() const { return m_cbByName; }
+
+    struct CBBinding
+    {
         ShaderStage stage;
         UINT        slot;
     };
 
-    struct CBEntry {
-        std::string name;
-        UINT        size = 0;
-        Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;   // 이름당 단일 버퍼
-        std::vector<CBBinding> binds;                  // (stage, slot) 목록
+    struct VariableDesc
+    {
+        std::string              name;
+        UINT                     offset{};
+        UINT                     size{};
+        D3D_SHADER_VARIABLE_TYPE type{ D3D_SVT_VOID };
     };
 
-    struct ShaderResource {
+    struct CBEntry
+    {
+        std::string name;
+        UINT        size = 0;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
+        std::vector<CBBinding>  binds;
+        std::vector<VariableDesc> variables;
+        std::vector<std::byte> cpuData;
+    };
+
+private:
+    struct ShaderResource
+    {
         ShaderStage stage;
         UINT        slot;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> view;
     };
 
-    struct UnorderedAccess {
+    struct UnorderedAccess
+    {
         ShaderStage stage;
         UINT        slot;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> view;
     };
 
-    // 리플렉션 세부
+    // Reflection helpers
     void ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage);
-    void AddOrMergeCB(const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint);
+    void AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint);
 
-    // 스테이지별 바인딩 유틸
+    // Internal helpers for binding
     static void SetCBForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11Buffer* buf);
     static void SetSRVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11ShaderResourceView* srv);
     static void SetUAVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11UnorderedAccessView* uav);
 
-    // SRV↔UAV 해저드 정리
+    // Resolve SRV/UAV hazards
     void ResolveSrvUavHazards(ID3D11DeviceContext* ctx);
 
 private:
-    // 이름 → 단일 버퍼
     std::unordered_map<std::string, CBEntry> m_cbByName;
 
-    // SRV/UAV 캐시
     std::vector<ShaderResource>  m_shaderResources;
     std::vector<UnorderedAccess> m_unorderedAccessViews;
 
@@ -104,6 +131,6 @@ class ShaderPSO : public PipelineStateObject
 {
 public:
     ShaderPSO() = default;
-	~ShaderPSO() = default;
+    ~ShaderPSO() = default;
 };
 #endif // !DYNAMICCPP_EXPORTS

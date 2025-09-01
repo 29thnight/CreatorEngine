@@ -5,6 +5,8 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ExternUI.h"
+#include <d3d11shader.h>
+#include <cstring>
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
@@ -49,11 +51,11 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
             ImGui::PopStyleVar(2);
 	}
 
-	if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		const auto& mat_type = Meta::Find("Material");
-		const auto& mat_info_type = Meta::Find("MaterialInfomation");
-		if (nullptr != meshRenderer->m_Material)
+        if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+                const auto& mat_type = Meta::Find("Material");
+                const auto& mat_info_type = Meta::Find("MaterialInfomation");
+                if (nullptr != meshRenderer->m_Material)
 		{
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
 			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.x);
@@ -73,15 +75,78 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::SameLine();
 			ImGui::Button(shaderName.c_str(), ImVec2(200, 0));
 			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
-			{
-				ImGui::GetContext("SelectShader").Open();
-			}
-		}
-		else
-		{
-			ImGui::Text("No Material assigned.");
-		}
+                        if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
+                        {
+                                ImGui::GetContext("SelectShader").Open();
+                        }
+
+                        if (meshRenderer->m_Material->m_shaderPSO)
+                        {
+                                if (ImGui::TreeNode("Constants"))
+                                {
+                                        auto& pso = meshRenderer->m_Material->m_shaderPSO;
+                                        for (auto& [cbName, cb] : pso->GetConstantBuffers())
+                                        {
+                                                if (ImGui::TreeNode(cbName.c_str()))
+                                                {
+                                                        auto& storage = meshRenderer->m_Material->m_cbufferValues[cbName];
+                                                        if (storage.size() != cb.size) storage.resize(cb.size);
+                                                        for (auto& var : cb.variables)
+                                                        {
+                                                                uint8_t* data = storage.data() + var.offset;
+                                                                if (var.type == D3D_SVT_FLOAT)
+                                                                {
+                                                                        if (var.size == sizeof(float))
+                                                                        {
+                                                                                float val; std::memcpy(&val, data, sizeof(float));
+                                                                                if (ImGui::DragFloat(var.name.c_str(), &val))
+                                                                                {
+                                                                                        std::memcpy(data, &val, sizeof(float));
+                                                                                        pso->UpdateVariable(cbName, var.name, &val, sizeof(float));
+                                                                                }
+                                                                        }
+                                                                        else if (var.size == sizeof(float) * 4)
+                                                                        {
+                                                                                float vals[4]; std::memcpy(vals, data, sizeof(vals));
+                                                                                if (var.name.find("Color") != std::string::npos)
+                                                                                {
+                                                                                        if (ImGui::ColorEdit4(var.name.c_str(), vals))
+                                                                                        {
+                                                                                                std::memcpy(data, vals, sizeof(vals));
+                                                                                                pso->UpdateVariable(cbName, var.name, vals, sizeof(vals));
+                                                                                        }
+                                                                                }
+                                                                                else if (ImGui::DragFloat4(var.name.c_str(), vals))
+                                                                                {
+                                                                                        std::memcpy(data, vals, sizeof(vals));
+                                                                                        pso->UpdateVariable(cbName, var.name, vals, sizeof(vals));
+                                                                                }
+                                                                        }
+                                                                }
+                                                                else if (var.type == D3D_SVT_INT)
+                                                                {
+                                                                        if (var.size == sizeof(int))
+                                                                        {
+                                                                                int val; std::memcpy(&val, data, sizeof(int));
+                                                                                if (ImGui::DragInt(var.name.c_str(), &val))
+                                                                                {
+                                                                                        std::memcpy(data, &val, sizeof(int));
+                                                                                        pso->UpdateVariable(cbName, var.name, &val, sizeof(int));
+                                                                                }
+                                                                        }
+                                                                }
+                                                        }
+                                                        ImGui::TreePop();
+                                                }
+                                        }
+                                        ImGui::TreePop();
+                                }
+                        }
+                }
+                else
+                {
+                        ImGui::Text("No Material assigned.");
+                }
 		const auto& mat_render_type = Meta::FindEnum("MaterialRenderingMode");
 		for (auto& enumProp : mat_type->properties)
 		{
