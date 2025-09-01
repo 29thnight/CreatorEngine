@@ -4,6 +4,9 @@
 #include "Texture.h"
 #include "ShaderPSO.h"
 #include "Material.generated.h"
+#include <unordered_map>
+#include <vector>
+#include <cstdint>
 
 enum class MaterialRenderingMode
 {
@@ -79,9 +82,12 @@ public:
     [[Property]]
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
-	std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
-	[[Property]]
-	FileGuid m_shaderPSOGuid{};
+        std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
+        [[Property]]
+        FileGuid m_shaderPSOGuid{};
+        const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
+        [[Property]]
+        std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
 
 };
 

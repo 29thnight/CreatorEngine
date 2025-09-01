@@ -1,50 +1,55 @@
 #include "Material.h"
 #include "DataSystem.h"
+#include <cstring>
 
 Material::Material()
 {
 }
 
 Material::Material(const Material& material) :
-	m_name(material.m_name),
-	m_pBaseColor(material.m_pBaseColor),
-	m_pNormal(material.m_pNormal),
-	m_pOccRoughMetal(material.m_pOccRoughMetal),
-	m_AOMap(material.m_AOMap),
-	m_pEmissive(material.m_pEmissive),
-	m_materialInfo(material.m_materialInfo),
-	m_fileGuid(material.m_fileGuid),
-	m_baseColorTexName(material.m_baseColorTexName),
-	m_normalTexName(material.m_normalTexName),
-	m_ORM_TexName(material.m_ORM_TexName),
-	m_AO_TexName(material.m_AO_TexName),
-	m_EmissiveTexName(material.m_EmissiveTexName),
-	m_flowInfo(material.m_flowInfo),
-	m_shaderPSO(material.m_shaderPSO),
-	m_renderingMode(material.m_renderingMode),
-	m_shaderPSOGuid(material.m_shaderPSOGuid)
+        m_name(material.m_name),
+        m_pBaseColor(material.m_pBaseColor),
+        m_pNormal(material.m_pNormal),
+        m_pOccRoughMetal(material.m_pOccRoughMetal),
+        m_AOMap(material.m_AOMap),
+        m_pEmissive(material.m_pEmissive),
+        m_materialInfo(material.m_materialInfo),
+        m_fileGuid(material.m_fileGuid),
+        m_baseColorTexName(material.m_baseColorTexName),
+        m_normalTexName(material.m_normalTexName),
+        m_ORM_TexName(material.m_ORM_TexName),
+        m_AO_TexName(material.m_AO_TexName),
+        m_EmissiveTexName(material.m_EmissiveTexName),
+        m_flowInfo(material.m_flowInfo),
+        m_shaderPSO(material.m_shaderPSO),
+        m_renderingMode(material.m_renderingMode),
+        m_shaderPSOGuid(material.m_shaderPSOGuid),
+        m_cbMeta(material.m_cbMeta),
+        m_cbufferValues(material.m_cbufferValues)
 {
 }
 
 Material::Material(Material&& material) noexcept
 {
-	std::exchange(m_name, material.m_name);
-	std::exchange(m_pBaseColor, material.m_pBaseColor);
-	std::exchange(m_pNormal, material.m_pNormal);
-	std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
-	std::exchange(m_AOMap, material.m_AOMap);
-	std::exchange(m_pEmissive, material.m_pEmissive);
-	std::exchange(m_fileGuid, material.m_fileGuid);
-	std::exchange(m_baseColorTexName, material.m_baseColorTexName);
-	std::exchange(m_normalTexName, material.m_normalTexName);
-	std::exchange(m_ORM_TexName, material.m_ORM_TexName);
-	std::exchange(m_AO_TexName, material.m_AO_TexName);
-	std::exchange(m_EmissiveTexName, material.m_EmissiveTexName);
-	m_materialGuid = std::move(material.m_materialGuid);
-	m_shaderPSOGuid = std::move(material.m_shaderPSOGuid);
-	m_renderingMode = std::move(material.m_renderingMode);
-	m_materialInfo = std::move(material.m_materialInfo);
-	m_flowInfo = std::move(material.m_flowInfo);
+        std::exchange(m_name, material.m_name);
+        std::exchange(m_pBaseColor, material.m_pBaseColor);
+        std::exchange(m_pNormal, material.m_pNormal);
+        std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
+        std::exchange(m_AOMap, material.m_AOMap);
+        std::exchange(m_pEmissive, material.m_pEmissive);
+        std::exchange(m_fileGuid, material.m_fileGuid);
+        std::exchange(m_baseColorTexName, material.m_baseColorTexName);
+        std::exchange(m_normalTexName, material.m_normalTexName);
+        std::exchange(m_ORM_TexName, material.m_ORM_TexName);
+        std::exchange(m_AO_TexName, material.m_AO_TexName);
+        std::exchange(m_EmissiveTexName, material.m_EmissiveTexName);
+        m_materialGuid = std::move(material.m_materialGuid);
+        m_shaderPSOGuid = std::move(material.m_shaderPSOGuid);
+        m_renderingMode = std::move(material.m_renderingMode);
+        m_materialInfo = std::move(material.m_materialInfo);
+        m_flowInfo = std::move(material.m_flowInfo);
+        std::exchange(m_cbMeta, material.m_cbMeta);
+        m_cbufferValues = std::move(material.m_cbufferValues);
 }
 
 Material::~Material()
@@ -213,16 +218,26 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 
 void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
 {
-	if (pso)
-	{
-		m_shaderPSO = pso;
-		m_shaderPSOGuid = pso->GetShaderPSOGuid();
-	}
-	else
-	{
-		m_shaderPSO.reset();
-		m_shaderPSOGuid = {};
-	}
+        if (pso)
+        {
+                m_shaderPSO = pso;
+                m_shaderPSOGuid = pso->GetShaderPSOGuid();
+                m_cbMeta = &pso->GetConstantBuffers();
+                m_cbufferValues.clear();
+                for (auto& [name, cb] : pso->GetConstantBuffers())
+                {
+                        auto& storage = m_cbufferValues[name];
+                        storage.resize(cb.size);
+                        std::memcpy(storage.data(), cb.cpuData.data(), cb.size);
+                }
+        }
+        else
+        {
+                m_shaderPSO.reset();
+                m_shaderPSOGuid = {};
+                m_cbMeta = nullptr;
+                m_cbufferValues.clear();
+        }
 }
 
 std::shared_ptr<ShaderPSO> Material::GetShaderPSO() const

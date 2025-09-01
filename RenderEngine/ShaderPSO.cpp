@@ -2,25 +2,26 @@
 #include "ShaderPSO.h"
 #include <d3dcompiler.h>
 #include <algorithm>
+#include <cstring>
 
 void ShaderPSO::ReflectConstantBuffers()
 {
     m_cbByName.clear();
 
     auto reflectStage = [&](auto shaderPtr, ShaderStage stage)
-        {
-            if (!shaderPtr) return; // 셰이더가 없으면 스킵
+    {
+        if (!shaderPtr) return;
 
-            Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
-            if (FAILED(D3DReflect(shaderPtr->GetBufferPointer(),
-                shaderPtr->GetBufferSize(),
-                IID_ID3D11ShaderReflection,
-                reinterpret_cast<void**>(reflector.GetAddressOf()))))
-            {
-                return; // 리플렉션 실패 시 스킵
-            }
-            ReflectShader(reflector.Get(), stage);
-        };
+        Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
+        if (FAILED(D3DReflect(shaderPtr->GetBufferPointer(),
+                              shaderPtr->GetBufferSize(),
+                              IID_ID3D11ShaderReflection,
+                              reinterpret_cast<void**>(reflector.GetAddressOf()))))
+        {
+            return;
+        }
+        ReflectShader(reflector.Get(), stage);
+    };
 
     reflectStage(m_vertexShader, ShaderStage::Vertex);
     reflectStage(m_pixelShader, ShaderStage::Pixel);
@@ -51,20 +52,19 @@ void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage st
         if (bindDesc.Type != D3D_SIT_CBUFFER)
             continue;
 
-        AddOrMergeCB(cbDesc, stage, bindDesc.BindPoint);
+        AddOrMergeCB(cb, cbDesc, stage, bindDesc.BindPoint);
     }
 }
 
-void ShaderPSO::AddOrMergeCB(const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint)
+void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint)
 {
     auto it = m_cbByName.find(cbDesc.Name);
     if (it == m_cbByName.end())
     {
-        // 이름당 버퍼 1개 생성
         D3D11_BUFFER_DESC desc{};
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        desc.ByteWidth = cbDesc.Size;          // HLSL 컴파일러가 16B 정렬 보장
-        desc.Usage = D3D11_USAGE_DEFAULT;  // 빈번 업데이트시 DYNAMIC + Map/Unmap 옵션 고려
+        desc.ByteWidth = cbDesc.Size;
+        desc.Usage = D3D11_USAGE_DEFAULT;
         desc.CPUAccessFlags = 0;
 
         Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
@@ -75,6 +75,19 @@ void ShaderPSO::AddOrMergeCB(const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage
             entry.size = cbDesc.Size;
             entry.buffer = buffer;
             entry.binds.push_back({ stage, bindPoint });
+            entry.cpuData.resize(cbDesc.Size);
+
+            entry.variables.reserve(cbDesc.Variables);
+            for (UINT v = 0; v < cbDesc.Variables; ++v)
+            {
+                ID3D11ShaderReflectionVariable* var = cb->GetVariableByIndex(v);
+                D3D11_SHADER_VARIABLE_DESC varDesc{};
+                var->GetDesc(&varDesc);
+                ID3D11ShaderReflectionType* type = var->GetType();
+                D3D11_SHADER_TYPE_DESC typeDesc{};
+                type->GetDesc(&typeDesc);
+                entry.variables.push_back({ varDesc.Name ? varDesc.Name : "", varDesc.StartOffset, varDesc.Size, typeDesc.Type });
+            }
 
             m_cbByName.emplace(entry.name, std::move(entry));
         }
@@ -82,9 +95,6 @@ void ShaderPSO::AddOrMergeCB(const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage
     else
     {
         CBEntry& entry = it->second;
-
-        // 사이즈 불일치 시 진단용 로그/어설션 고려
-        // (여기서는 바인딩만 추가)
         auto dup = std::find_if(entry.binds.begin(), entry.binds.end(),
             [&](const CBBinding& b) { return b.stage == stage && b.slot == bindPoint; });
         if (dup == entry.binds.end())
@@ -92,21 +102,17 @@ void ShaderPSO::AddOrMergeCB(const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage
     }
 }
 
-// ---- Apply: 즉시 컨텍스트 ----
 void ShaderPSO::Apply()
 {
     Apply(DeviceState::g_pDeviceContext);
 }
 
-// ---- Apply(ctx): 지정 컨텍스트(디퍼드 포함) ----
 void ShaderPSO::Apply(ID3D11DeviceContext* ctx)
 {
     if (!ctx) return;
 
-    // 고정 파이프라인/셰이더/샘플러/스테이트 바인딩(기존 PSO 동작)
     PipelineStateObject::Apply(ctx);
 
-    // 1) Constant Buffers: 이름당 1개 버퍼를 모든 (stage,slot)에 공유 바인딩
     for (auto& kv : m_cbByName)
     {
         CBEntry& cb = kv.second;
@@ -115,17 +121,14 @@ void ShaderPSO::Apply(ID3D11DeviceContext* ctx)
             SetCBForStage(ctx, b.stage, b.slot, buf);
     }
 
-    // 2) SRVs
     for (const auto& sr : m_shaderResources)
     {
         ID3D11ShaderResourceView* view = sr.view.Get();
         SetSRVForStage(ctx, sr.stage, sr.slot, view);
     }
 
-    // 3) SRV↔UAV 해저드 정리(동일 리소스가 SRV/UAV 동시 바인딩되지 않도록)
     ResolveSrvUavHazards(ctx);
 
-    // 4) UAVs
     for (const auto& ua : m_unorderedAccessViews)
     {
         ID3D11UnorderedAccessView* view = ua.view.Get();
@@ -137,10 +140,25 @@ bool ShaderPSO::UpdateConstantBuffer(std::string_view name, const void* data, si
 {
     auto it = m_cbByName.find(std::string(name));
     if (it == m_cbByName.end()) return false;
-    if (size > it->second.size)  return false;
+    if (size > it->second.size) return false;
 
-    // 즉시 컨텍스트 업데이트 (원본 구현과 동일 정책)
-    DeviceState::g_pDeviceContext->UpdateSubresource(it->second.buffer.Get(), 0, nullptr, data, 0, 0);
+    CBEntry& cb = it->second;
+    std::memcpy(cb.cpuData.data(), data, size);
+    DeviceState::g_pDeviceContext->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
+    return true;
+}
+
+bool ShaderPSO::UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size)
+{
+    auto cbIt = m_cbByName.find(std::string(cbName));
+    if (cbIt == m_cbByName.end()) return false;
+    CBEntry& cb = cbIt->second;
+    auto varIt = std::find_if(cb.variables.begin(), cb.variables.end(),
+        [&](const VariableDesc& v) { return v.name == varName; });
+    if (varIt == cb.variables.end()) return false;
+    if (size > varIt->size) return false;
+    std::memcpy(cb.cpuData.data() + varIt->offset, data, size);
+    DeviceState::g_pDeviceContext->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
     return true;
 }
 
@@ -164,7 +182,6 @@ void ShaderPSO::BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11Unor
         m_unorderedAccessViews.push_back(UnorderedAccess{ stage, slot, view });
 }
 
-// ---- 스테이지별 바인딩 유틸 ----
 void ShaderPSO::SetCBForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11Buffer* buf)
 {
     switch (st) {
@@ -191,19 +208,16 @@ void ShaderPSO::SetUAVForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT sl
 {
     switch (st) {
     case ShaderStage::Pixel:
-        // 현재 RT/DS 유지, UAV만 갱신(슬롯 단건 호출)
         ctx->OMSetRenderTargetsAndUnorderedAccessViews(
             D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
             nullptr, nullptr,
             slot, 1, &uav, nullptr);
         break;
     default:
-        // V/G/H/D 스테이지는 UAV 미지원
         break;
     }
 }
 
-// ---- SRV↔UAV 해저드 정리 ----
 void ShaderPSO::ResolveSrvUavHazards(ID3D11DeviceContext* ctx)
 {
     for (const auto& ua : m_unorderedAccessViews)
@@ -223,7 +237,6 @@ void ShaderPSO::ResolveSrvUavHazards(ID3D11DeviceContext* ctx)
 
             if (srvRes.Get() == uavRes.Get())
             {
-                // 동일 리소스를 SRV로도 바인딩 중이라면 null 처리
                 ID3D11ShaderResourceView* nullSRV = nullptr;
                 SetSRVForStage(ctx, sr.stage, sr.slot, nullSRV);
             }

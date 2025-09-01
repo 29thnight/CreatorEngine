@@ -7,6 +7,7 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include <fstream>
+#include <yaml-cpp/yaml.h>
 #include "FileIO.h"
 #include "VolumeProfile.h"
 #include "Benchmark.hpp"
@@ -554,6 +555,18 @@ void DataSystem::SaveMaterial(Material* material)
         if (fout.is_open())
         {
                 YAML::Node node = Meta::Serialize(material);
+                if (!material->m_cbufferValues.empty())
+                {
+                        YAML::Node cbNode;
+                        for (auto& [name, data] : material->m_cbufferValues)
+                        {
+                                YAML::Node entry;
+                                entry["name"] = name;
+                                entry["data"] = YAML::Binary(data.data(), data.size());
+                                cbNode.push_back(entry);
+                        }
+                        node["constant_buffers"] = cbNode;
+                }
                 fout << node;
                 fout.close();
                 ForceCreateYamlMetaFile(savePath);
@@ -579,6 +592,16 @@ Material* DataSystem::LoadMaterial(std::string_view name)
         MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
         auto material = std::make_shared<Material>();
         Meta::Deserialize(material.get(), node);
+        if (auto cbs = node["constant_buffers"])
+        {
+                for (auto cbEntry : cbs)
+                {
+                        std::string cbName = cbEntry["name"].as<std::string>();
+                        YAML::Binary bin = cbEntry["data"].as<YAML::Binary>();
+                        std::vector<uint8_t> data(bin.data(), bin.data() + bin.size());
+                        material->m_cbufferValues.emplace(std::move(cbName), std::move(data));
+                }
+        }
 
         auto loadTex = [this](const std::string& texName, Texture*& texPtr, bool compress = false)
         {
