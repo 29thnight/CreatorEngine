@@ -19,6 +19,7 @@ AniTransition::~AniTransition()
 bool AniTransition::CheckTransiton(bool isBlend)
 {
 	auto Progress = m_ownerController->curAnimationProgress;
+	//연속전이중 progress가 제대로 초기화안되서 전이가 이상하게됨
 	if (isBlend)
 	{
 		Progress = m_ownerController->nextAnimationProgress;

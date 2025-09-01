@@ -161,7 +161,7 @@ public:
 	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
 	Mathf::Vector3 bombThrowPosition = {0,0,0};                                                                        
  	void MeleeAttack();
-	void MeleeAttack2(float tick);
+	void ShootBullet();
 	[[Method]]
 	void StartAttack();
 	[[Method]]
@@ -172,7 +172,6 @@ public:
 	void StartRay();
 	[[Method]]
 	void EndRay();
-	void ShootBullet();
 
 
 	bool startRay = false;

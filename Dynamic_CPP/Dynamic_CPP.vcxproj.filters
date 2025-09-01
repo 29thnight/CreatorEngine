@@ -1,489 +1,495 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns:ns0="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
-	<ItemGroup>
-		<Filter Include="Common">
-			<UniqueIdentifier>{6c135c64-11ba-4567-bb91-1959a29ec409}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="Script">
-			<UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-			<Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-		</Filter>
-		<Filter Include="BehaviorTree">
-			<UniqueIdentifier>{096b2d56-0948-478a-8db2-9b30a0d8f72c}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="BehaviorTree\Action">
-			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227c}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="BehaviorTree\Condition">
-			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227d}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="BehaviorTree\ConditionDecorator">
-			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f23bf63227d}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="AnimationBehavior">
-			<UniqueIdentifier>{1e668bdc-4705-49f9-bfff-68031c3321dc}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="Script\ScriptClass">
-			<UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01c}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="Script\CreateFactory">
-			<UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01f}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="Common\SourceFile">
-			<UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-			<Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-		</Filter>
-		<Filter Include="Common\HeaderFile">
-			<UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-			<Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-		</Filter>
-		<Filter Include="Script\ScriptClass\Bullet">
-			<UniqueIdentifier>{d867b0dd-5ce3-49c4-8312-b79aded8e198}</UniqueIdentifier>
-		</Filter>
-	</ItemGroup>
-	<ItemGroup>
-		<ClInclude Include="framework.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="pch.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="Export.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="CreateFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestBehavior.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\AsisMove.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Entity.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityAsis.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityItem.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Player.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="funcMain.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="BTConditionFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="BTConditionDecoratorFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="BTActionFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\GameManager.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\AsisFeed.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Rock.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\InverseKinematic.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="RaycastHelper.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEnemy.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityResource.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TweenManager.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityEnemy.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\DaedAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\AtteckAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\Idle.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\ChaseAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\DamegeAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BP003Impale.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BP004DeathWorm.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BP005Breath.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\BTEntityInitAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\GroggyAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDaed.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsAtteck.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsReteat.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsMageAttack.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsTeleport.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="AniBehaviorFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityEnemy.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEffect.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\DestroyEffect.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
-			<Filter>Script</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\CameraMove.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="CriticalMark.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="ItemType.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="PlayerBuff.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Bullet.h">
-			<Filter>Script\ScriptClass\Bullet</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\SpecialBullet.h">
-			<Filter>Script\ScriptClass\Bullet</Filter>
-		</ClInclude>
-	</ItemGroup>
-	<ItemGroup>
-		<ClCompile Include="dllmain.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="pch.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="RaycastHelper.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestBehavior.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\AsisMove.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityAsis.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityItem.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Player.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\GameManager.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\AsisFeed.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Rock.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEnemy.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityResource.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TweenManager.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClInclude Include="Assets\Script\Weapon.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClCompile Include="Assets\Script\Weapon.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\DaedAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\AtteckAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\Idle.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\ChaseAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\DamegeAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\TeleportAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\RetreatAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BP001BodyAtack.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BP002FireBall.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BP003Impale.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BP004DeathWorm.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BP005Breath.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\BTEntityInitAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\GroggyAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsDaed.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsAtteck.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsReteat.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsMageAttack.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsTeleport.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsGroggy.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase2.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEffect.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsChase.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\CameraMove.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="CriticalMark.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="PlayerBuff.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Bullet.cpp">
-			<Filter>Script\ScriptClass\Bullet</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\SpecialBullet.cpp">
-			<Filter>Script\ScriptClass\Bullet</Filter>
-		</ClCompile>
-	</ItemGroup>
+  <ItemGroup>
+    <Filter Include="Common">
+      <UniqueIdentifier>{6c135c64-11ba-4567-bb91-1959a29ec409}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Script">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="BehaviorTree">
+      <UniqueIdentifier>{096b2d56-0948-478a-8db2-9b30a0d8f72c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BehaviorTree\Action">
+      <UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BehaviorTree\Condition">
+      <UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BehaviorTree\ConditionDecorator">
+      <UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f23bf63227d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="AnimationBehavior">
+      <UniqueIdentifier>{1e668bdc-4705-49f9-bfff-68031c3321dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Script\ScriptClass">
+      <UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Script\CreateFactory">
+      <UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\SourceFile">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Common\HeaderFile">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Script\ScriptClass\Bullet">
+      <UniqueIdentifier>{d867b0dd-5ce3-49c4-8312-b79aded8e198}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="Export.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="CreateFactory.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\TestBehavior.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\AsisMove.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\Entity.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityAsis.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityItem.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\Player.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="funcMain.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="BTConditionFactory.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="BTConditionDecoratorFactory.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="BTActionFactory.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\GameManager.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\TestTreeBehavior.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\AsisFeed.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\Rock.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\InverseKinematic.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="RaycastHelper.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\TestEnemy.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityResource.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\TweenManager.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Easing.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityEnemy.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\DaedAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\AtteckAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\Idle.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\ChaseAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\DamegeAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BP003Impale.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BP004DeathWorm.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BP005Breath.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\BTEntityInitAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\GroggyAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsDaed.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsAtteck.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsReteat.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsMageAttack.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsTeleport.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="AniBehaviorFactory.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="Easing.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityEnemy.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\TestEffect.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\DestroyEffect.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\PlayerAttackAH.h">
+      <Filter>Script</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\CameraMove.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="CriticalMark.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="ItemType.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerBuff.h">
+      <Filter>Common\HeaderFile</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\Bullet.h">
+      <Filter>Script\ScriptClass\Bullet</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\SpecialBullet.h">
+      <Filter>Script\ScriptClass\Bullet</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\NormalBullet.h">
+      <Filter>Script\ScriptClass\Bullet</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Common\SourceFile</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Common\SourceFile</Filter>
+    </ClCompile>
+    <ClCompile Include="RaycastHelper.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\TestBehavior.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\AsisMove.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityAsis.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityItem.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\Player.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\GameManager.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\AsisFeed.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\Rock.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\InverseKinematic.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\TestEnemy.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityResource.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\TweenManager.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClInclude Include="Assets\Script\Weapon.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClCompile Include="Assets\Script\Weapon.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityEnemy.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\DaedAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\AtteckAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\Idle.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\ChaseAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\DamegeAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\TeleportAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\RetreatAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BP001BodyAtack.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BP002FireBall.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BP003Impale.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BP004DeathWorm.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BP005Breath.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\BTEntityInitAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\GroggyAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsDaed.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsAtteck.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsReteat.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsMageAttack.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsTeleport.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsGroggy.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase2.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityEnemy.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\TestEffect.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
+      <Filter>BehaviorTree\ConditionDecorator</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Condition\IsChase.cpp">
+      <Filter>BehaviorTree\Condition</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\DestroyEffect.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
+      <Filter>Script</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
+      <Filter>BehaviorTree\Action</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\CameraMove.cpp">
+      <Filter>Common\SourceFile</Filter>
+    </ClCompile>
+    <ClCompile Include="CriticalMark.cpp">
+      <Filter>Common\SourceFile</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerBuff.cpp">
+      <Filter>Common\SourceFile</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\Bullet.cpp">
+      <Filter>Script\ScriptClass\Bullet</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\SpecialBullet.cpp">
+      <Filter>Script\ScriptClass\Bullet</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\NormalBullet.cpp">
+      <Filter>Script\ScriptClass\Bullet</Filter>
+    </ClCompile>
+  </ItemGroup>
 </Project>
