@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "ShaderPSO.h"
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -182,3 +183,5 @@ void ShaderPSO::BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11Unor
         m_unorderedAccessViews.push_back(ua);
     }
 }
+
+#endif // !DYNAMICCPP_EXPORTS

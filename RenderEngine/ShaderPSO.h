@@ -1,5 +1,6 @@
 #pragma once
 #include "PSO.h"
+#ifndef DYNAMICCPP_EXPORTS
 #include <d3d11.h>
 #include <d3d11shader.h>
 #include <wrl/client.h>
@@ -81,3 +82,11 @@ private:
 
     FileGuid m_shaderPSOGuid{};
 };
+#else
+class ShaderPSO : public PipelineStateObject
+{
+public:
+    ShaderPSO() = default;
+	~ShaderPSO() = default;
+};
+#endif // !DYNAMICCPP_EXPORTS
