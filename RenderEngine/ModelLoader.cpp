@@ -292,49 +292,49 @@ Material* ModelLoader::GenerateMaterial(int index)
 	{
 		aiMaterial* mat = m_AIScene->mMaterials[index];
 
-                Texture* normal = GenerateTexture(mat, aiTextureType_NORMALS);
-                Texture* bump = GenerateTexture(mat, aiTextureType_HEIGHT);
-                if (normal)
-                {
-                        material->UseNormalMap(normal);
-                        material->m_normalTexName = normal->m_name;
-                }
-                else if (bump)
-                {
-                        material->UseBumpMap(bump);
-                        material->m_normalTexName = bump->m_name;
-                }
+        Texture* normal = GenerateTexture(mat, aiTextureType_NORMALS);
+        Texture* bump = GenerateTexture(mat, aiTextureType_HEIGHT);
+        if (normal)
+        {
+            material->UseNormalMap(normal);
+            material->m_normalTexName = normal->m_name;
+        }
+        else if (bump)
+        {
+            material->UseBumpMap(bump);
+            material->m_normalTexName = bump->m_name;
+        }
 
-                Texture* ao = GenerateTexture(mat, aiTextureType_LIGHTMAP);
-                if (ao)
-                {
-                        material->UseAOMap(ao);
-                        material->m_AO_TexName = ao->m_name;
-                }
+        Texture* ao = GenerateTexture(mat, aiTextureType_LIGHTMAP);
+        if (ao)
+        {
+            material->UseAOMap(ao);
+            material->m_AO_TexName = ao->m_name;
+        }
 
-                Texture* emissive = GenerateTexture(mat, aiTextureType_EMISSIVE);
-                if (emissive)
-                {
-                        material->UseEmissiveMap(emissive);
-                        material->m_EmissiveTexName = emissive->m_name;
-                }
+        Texture* emissive = GenerateTexture(mat, aiTextureType_EMISSIVE);
+        if (emissive)
+        {
+            material->UseEmissiveMap(emissive);
+            material->m_EmissiveTexName = emissive->m_name;
+        }
 
 		if (m_loadType == LoadType::GLTF)
 		{
-                        material->ConvertToLinearSpace(true);
-                        Texture* albedo = GenerateTexture(mat, AI_MATKEY_BASE_COLOR_TEXTURE);
-                        if (albedo)
-                        {
-                                material->UseBaseColorMap(albedo);
-                                material->m_baseColorTexName = albedo->m_name;
-                        }
+            material->ConvertToLinearSpace(true);
+            Texture* albedo = GenerateTexture(mat, AI_MATKEY_BASE_COLOR_TEXTURE);
+            if (albedo)
+            {
+                material->UseBaseColorMap(albedo);
+                material->m_baseColorTexName = albedo->m_name;
+            }
 
-                        Texture* occlusionMetalRough = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE);
-                        if (occlusionMetalRough)
-                        {
-                                material->UseOccRoughMetalMap(occlusionMetalRough);
-                                material->m_ORM_TexName = occlusionMetalRough->m_name;
-                        }
+            Texture* occlusionMetalRough = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE);
+            if (occlusionMetalRough)
+            {
+                material->UseOccRoughMetalMap(occlusionMetalRough);
+                material->m_ORM_TexName = occlusionMetalRough->m_name;
+            }
 
 			float metallic;
 			if (mat->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS)
@@ -349,16 +349,18 @@ Material* ModelLoader::GenerateMaterial(int index)
 		}
 		else
 		{
-                        Texture* albedo = GenerateTexture(mat, aiTextureType_DIFFUSE);
-                        if (albedo)
-                        {
-                                material->UseBaseColorMap(albedo);
-                                material->m_baseColorTexName = albedo->m_name;
-                                if (albedo->IsTextureAlpha())
-                                {
-                                        material->m_renderingMode = MaterialRenderingMode::Transparent;
-                                }
-                        }
+            material->ConvertToLinearSpace(true);
+
+            Texture* albedo = GenerateTexture(mat, aiTextureType_DIFFUSE);
+            if (albedo)
+            {
+                material->UseBaseColorMap(albedo);
+                material->m_baseColorTexName = albedo->m_name;
+                if (albedo->IsTextureAlpha())
+                {
+                    material->m_renderingMode = MaterialRenderingMode::Transparent;
+                }
+            }
 
 			aiColor3D colour;
 			aiReturn res = mat->Get(AI_MATKEY_COLOR_DIFFUSE, colour);
@@ -715,30 +717,32 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         mat->m_AO_TexName = aoName;
         mat->m_EmissiveTexName = emissiveName;
 
+		mat->ConvertToLinearSpace(true);
+
         if (mat->m_materialInfo.m_useBaseColor)
         {
-                if (Texture* tex = GenerateTexture(mat->m_baseColorTexName, true))
-                        mat->UseBaseColorMap(tex);
+            if (Texture* tex = GenerateTexture(mat->m_baseColorTexName, true))
+                mat->UseBaseColorMap(tex);
         }
         if (mat->m_materialInfo.m_useNormalMap)
         {
-                if (Texture* tex = GenerateTexture(mat->m_normalTexName))
-                        mat->UseNormalMap(tex);
+            if (Texture* tex = GenerateTexture(mat->m_normalTexName))
+                mat->UseNormalMap(tex);
         }
         if (mat->m_materialInfo.m_useOccRoughMetal)
         {
-                if (Texture* tex = GenerateTexture(mat->m_ORM_TexName))
-                        mat->UseOccRoughMetalMap(tex);
+            if (Texture* tex = GenerateTexture(mat->m_ORM_TexName))
+                mat->UseOccRoughMetalMap(tex);
         }
         if (mat->m_materialInfo.m_useAOMap)
         {
-                if (Texture* tex = GenerateTexture(mat->m_AO_TexName))
-                        mat->UseAOMap(tex);
+            if (Texture* tex = GenerateTexture(mat->m_AO_TexName))
+                mat->UseAOMap(tex);
         }
         if (mat->m_materialInfo.m_useEmissive)
         {
-                if (Texture* tex = GenerateTexture(mat->m_EmissiveTexName))
-                        mat->UseEmissiveMap(tex);
+            if (Texture* tex = GenerateTexture(mat->m_EmissiveTexName))
+                mat->UseEmissiveMap(tex);
         }
 
 		DataSystems->Materials[mat->m_name] = mat;
@@ -931,12 +935,12 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			m_isSkinnedMesh = false;
 		}
 
-                if (1 == node->m_numMeshes && 0 == node->m_numChildren)
-                {
-                        uint32 meshId = node->m_meshes[0];
-                        Mesh* mesh = m_model->m_Meshes[meshId];
-                        Material* material = m_model->m_Materials[mesh->m_materialIndex];
-                        MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
+        if (1 == node->m_numMeshes && 0 == node->m_numChildren)
+        {
+            uint32 meshId = node->m_meshes[0];
+            Mesh* mesh = m_model->m_Meshes[meshId];
+            Material* material = m_model->m_Materials[mesh->m_materialIndex];
+            MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			if (m_model->m_isMakeMeshCollider)
 			{
@@ -948,8 +952,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 				convexMesh->SetRestitution(0);
 			}
 
-                        meshRenderer->m_Mesh = mesh;
-                        meshRenderer->m_Material = material;
+            meshRenderer->m_Mesh = mesh;
+            meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;

@@ -24,49 +24,6 @@ enum class ShaderStage
 class ShaderPSO : public PipelineStateObject
 {
 public:
-    ShaderPSO() = default;
-    ~ShaderPSO() = default;
-
-    // Reflect all attached shaders and create constant buffers automatically.
-    void ReflectConstantBuffers();
-
-    // Apply pipeline state and bind constant buffers and resources to the GPU.
-    void Apply();
-
-    void Apply(ID3D11DeviceContext* deferredContext);
-
-    // Bind a shader resource view to a specific shader stage and slot.
-    void BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view);
-
-    // Bind an unordered access view to a specific shader stage and slot.
-    void BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11UnorderedAccessView* view);
-
-    // Update a reflected constant buffer by name. Returns false when not found or size mismatch.
-    bool UpdateConstantBuffer(std::string_view name, const void* data, size_t size);
-
-    template <typename T>
-    bool UpdateConstantBuffer(std::string_view name, const T& data)
-    {
-        return UpdateConstantBuffer(name, &data, sizeof(T));
-    }
-
-    // Update a single variable inside a constant buffer.
-    bool UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size);
-
-    template <typename T>
-    bool UpdateVariable(std::string_view cbName, std::string_view varName, const T& data)
-    {
-        return UpdateVariable(cbName, varName, &data, sizeof(T));
-    }
-
-    // Get the GUID of the shader PSO.
-    const FileGuid& GetShaderPSOGuid() const { return m_shaderPSOGuid; }
-    // Set the GUID of the shader PSO.
-    void SetShaderPSOGuid(const FileGuid& guid) { m_shaderPSOGuid = guid; }
-
-    // Expose reflected constant buffer entries.
-    const std::unordered_map<std::string, struct CBEntry>& GetConstantBuffers() const { return m_cbByName; }
-
     struct CBBinding
     {
         ShaderStage stage;
@@ -106,6 +63,54 @@ private:
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> view;
     };
 
+public:
+    ShaderPSO() = default;
+    ~ShaderPSO() = default;
+
+    // Reflect all attached shaders and create constant buffers automatically.
+    void ReflectConstantBuffers();
+
+    void CreateInputLayoutFromShader();
+
+    // Apply pipeline state and bind constant buffers and resources to the GPU.
+    void Apply();
+
+    void Apply(ID3D11DeviceContext* deferredContext);
+
+    // Bind a shader resource view to a specific shader stage and slot.
+    void BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view);
+
+    // Bind an unordered access view to a specific shader stage and slot.
+    void BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11UnorderedAccessView* view);
+
+    // Update a reflected constant buffer by name. Returns false when not found or size mismatch.
+    bool UpdateConstantBuffer(ID3D11DeviceContext* ctx, std::string_view name, const void* data, size_t size);
+
+    template <typename T>
+    bool UpdateConstantBuffer(ID3D11DeviceContext* ctx, std::string_view name, const T& data)
+    {
+        return UpdateConstantBuffer(ctx, name, &data, sizeof(T));
+    }
+
+    // Update a single variable inside a constant buffer.
+    bool UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size);
+
+    template <typename T>
+    bool UpdateVariable(std::string_view cbName, std::string_view varName, const T& data)
+    {
+        return UpdateVariable(cbName, varName, &data, sizeof(T));
+    }
+
+    // Get the GUID of the shader PSO.
+    const FileGuid& GetShaderPSOGuid() const { return m_shaderPSOGuid; }
+    // Set the GUID of the shader PSO.
+    void SetShaderPSOGuid(const FileGuid& guid) { m_shaderPSOGuid = guid; }
+
+    // Expose reflected constant buffer entries.
+    const std::unordered_map<std::string, CBEntry>& GetConstantBuffers() const { return m_cbByName; }
+	std::string m_shaderPSOName{ "UnnamedShaderPSO" };
+
+private:
     // Reflection helpers
     void ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage);
     void AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D11_SHADER_BUFFER_DESC& cbDesc, ShaderStage stage, UINT bindPoint);

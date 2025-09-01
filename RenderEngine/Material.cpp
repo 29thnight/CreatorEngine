@@ -216,28 +216,57 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 	return *this;
 }
 
+void Material::ApplyMaterialInfo(ID3D11DeviceContext* context)
+{
+}
+
 void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
 {
-        if (pso)
+    if (pso)
+    {
+        m_shaderPSO = pso;
+        m_shaderPSOGuid = pso->GetShaderPSOGuid();
+        m_cbMeta = &pso->GetConstantBuffers();
+        m_cbufferValues.clear();
+        for (auto& [name, cb] : pso->GetConstantBuffers())
         {
-                m_shaderPSO = pso;
-                m_shaderPSOGuid = pso->GetShaderPSOGuid();
-                m_cbMeta = &pso->GetConstantBuffers();
-                m_cbufferValues.clear();
-                for (auto& [name, cb] : pso->GetConstantBuffers())
-                {
-                        auto& storage = m_cbufferValues[name];
-                        storage.resize(cb.size);
-                        std::memcpy(storage.data(), cb.cpuData.data(), cb.size);
-                }
+            auto& storage = m_cbufferValues[name];
+            storage.resize(cb.size);
+            std::memcpy(storage.data(), cb.cpuData.data(), cb.size);
         }
-        else
-        {
-                m_shaderPSO.reset();
-                m_shaderPSOGuid = {};
-                m_cbMeta = nullptr;
-                m_cbufferValues.clear();
-        }
+
+		if (m_pBaseColor)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 0, m_pBaseColor->m_pSRV);
+		}
+
+		if (m_pNormal)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 1, m_pNormal->m_pSRV);
+		}
+
+		if (m_pOccRoughMetal)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 2, m_pOccRoughMetal->m_pSRV);
+		}
+
+		if (m_AOMap)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 3, m_AOMap->m_pSRV);
+		}
+
+		if (m_pEmissive)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 5, m_pEmissive->m_pSRV);
+		}
+    }
+    else
+    {
+        m_shaderPSO.reset();
+        m_shaderPSOGuid = {};
+        m_cbMeta = nullptr;
+        m_cbufferValues.clear();
+    }
 }
 
 std::shared_ptr<ShaderPSO> Material::GetShaderPSO() const

@@ -5,6 +5,9 @@
 #include "ProgressWindow.h"
 #include "ShaderPSO.h"
 #include "ShaderDSL.h"
+#include "DataSystem.h"
+#include "ImGuiRegister.h"
+#include "Material.h"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {
@@ -15,6 +18,7 @@ void ShaderResourceSystem::Initialize()
 	HLSLIncludeReloadShaders();
 	CSOCleanup();
 	LoadShaders();
+	RegisterSelectShaderContext();
 	m_isReloading = false;
 }
 
@@ -258,6 +262,7 @@ static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
 
 	// 자동 리플렉션으로 cbuffer/SRV 슬롯 생성
 	pso->ReflectConstantBuffers();
+	pso->CreateInputLayoutFromShader();
 
 	// TODO: queueTag/keywords 렌더 큐/키워드 시스템과 연동(옵션)
 	return pso;
@@ -286,7 +291,10 @@ void ShaderResourceSystem::LoadShaderAssets()
 			std::string assetName = !desc.name.empty() ? desc.name : dir.path().stem().string();
 
 			// PSO 만들고 등록
-			ShaderAssets[assetName] = BuildPSOFromDesc(desc);
+			auto pso = BuildPSOFromDesc(desc);
+			//pso->SetShaderPSOGuid(DataSystems->GetFileGuid(dir.path()));
+			pso->m_shaderPSOName = assetName;
+			ShaderAssets[assetName] = pso;
 		}
 	}
 	catch (const file::filesystem_error& e)
@@ -302,6 +310,35 @@ void ShaderResourceSystem::LoadShaderAssets()
 void ShaderResourceSystem::ReloadShaderAssets()
 {
 	LoadShaderAssets();
+}
+
+void ShaderResourceSystem::RegisterSelectShaderContext()
+{
+	ImGui::ContextRegister("SelectShader", true, [this]() {
+		ImGui::Text("Select Shader");
+		if (ImGui::BeginListBox("##ShaderList"))
+		{
+			for (auto& [name, pso] : ShaderAssets)
+			{
+				if (ImGui::Selectable(name.c_str()))
+				{
+					if (m_selectShaderTarget)
+					{
+						m_selectShaderTarget->SetShaderPSO(pso);
+						m_selectShaderTarget = nullptr;
+					}
+					ImGui::GetContext("SelectShader").Close();
+				}
+			}
+			ImGui::EndListBox();
+		}
+	});
+	ImGui::GetContext("SelectShader").Close();
+}
+
+void ShaderResourceSystem::SetShaderSelectionTarget(Material* material)
+{
+	m_selectShaderTarget = material;
 }
 
 void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)

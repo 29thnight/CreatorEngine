@@ -4,6 +4,7 @@
 #include "Delegate.h"
 
 class ShaderPSO; // 전방 선언
+class Material;
 class ShaderResourceSystem final : public Singleton<ShaderResourceSystem>
 {
 private:
@@ -27,6 +28,9 @@ public:
 	void LoadShaderAssets();
 	void ReloadShaderAssets();
 
+	void RegisterSelectShaderContext();
+	void SetShaderSelectionTarget(Material* material);
+
 	std::unordered_map<std::string, VertexShader>	VertexShaders;
 	std::unordered_map<std::string, HullShader>		HullShaders;
 	std::unordered_map<std::string, DomainShader>	DomainShaders;
@@ -47,6 +51,7 @@ private:
 	void RemoveShaders();
 
 	bool m_isReloading = false;
+	Material* m_selectShaderTarget = nullptr;
 };
 
 static inline auto& ShaderSystem = ShaderResourceSystem::GetInstance();

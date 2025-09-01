@@ -151,6 +151,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	// that only objects with the exact same mesh and material are instanced together.
 	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
+	std::map<std::string, std::vector<PrimitiveRenderProxy*>> shaderPSOGroups;
 	std::map<InstanceGroupKey, std::vector<PrimitiveRenderProxy*>> instanceGroups;
 
 	for (auto& proxy : data->m_deferredQueue)
@@ -158,6 +159,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		if (proxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
 		{
 			animatedProxies.push_back(proxy);
+		}
+		else if (proxy->m_Material->m_shaderPSO)
+		{
+			shaderPSOGroups[proxy->m_Material->m_shaderPSO->m_shaderPSOName].push_back(proxy);
 		}
 		else
 		{
@@ -214,6 +219,36 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		}
 
 		proxy->Draw(deferredPtr);
+	}
+
+	// --- 2.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
+	for (auto const& [psoName, proxies] : shaderPSOGroups)
+	{
+		if (proxies.empty()) continue;
+		auto firstProxy = proxies.front();
+		auto customPSO = firstProxy->m_Material->m_shaderPSO;
+		if (!customPSO) continue; // Safety check
+		customPSO->Apply(deferredPtr);
+		currentMaterialGuid = HashedGuid::INVAILD_ID; // Reset to force material update
+
+		for (auto& proxy : proxies)
+		{
+			scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
+			Material* mat = proxy->m_Material;
+			auto matinfo = mat->m_materialInfo;
+			matinfo.m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+			if (proxy->m_materialGuid != currentMaterialGuid)
+			{
+				DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
+				if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
+				if (mat->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
+				if (mat->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
+				if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
+				if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
+				currentMaterialGuid = proxy->m_materialGuid;
+			}
+			proxy->Draw(deferredPtr);
+		}
 	}
 
 	// --- 3. RENDER STATIC OBJECTS (INSTANCED) ---

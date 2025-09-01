@@ -30,6 +30,50 @@ void ShaderPSO::ReflectConstantBuffers()
     reflectStage(m_domainShader, ShaderStage::Domain);
 }
 
+void ShaderPSO::CreateInputLayoutFromShader()
+{
+    if (!m_vertexShader)
+        return;
+
+    Microsoft::WRL::ComPtr<ID3D11ShaderReflection> refl;
+    if (FAILED(D3DReflect(m_vertexShader->GetBufferPointer(),
+        m_vertexShader->GetBufferSize(),
+        IID_ID3D11ShaderReflection,
+        reinterpret_cast<void**>(refl.GetAddressOf()))))
+    {
+        return;
+    }
+
+    D3D11_SHADER_DESC shaderDesc{};
+    refl->GetDesc(&shaderDesc);
+
+    InputLayOutContainer layout;
+    layout.reserve(shaderDesc.InputParameters);
+
+    for (UINT i = 0; i < shaderDesc.InputParameters; ++i)
+    {
+        D3D11_SIGNATURE_PARAMETER_DESC paramDesc{};
+        refl->GetInputParameterDesc(i, &paramDesc);
+
+        D3D11_INPUT_ELEMENT_DESC elem{};
+        elem.SemanticName = paramDesc.SemanticName;
+        elem.SemanticIndex = paramDesc.SemanticIndex;
+        elem.InputSlot = 0;
+        elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+        elem.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+        elem.InstanceDataStepRate = 0;
+
+        if (paramDesc.Mask == 1)       elem.Format = DXGI_FORMAT_R32_FLOAT;
+        else if (paramDesc.Mask <= 3)  elem.Format = DXGI_FORMAT_R32G32_FLOAT;
+        else if (paramDesc.Mask <= 7)  elem.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+        else                           elem.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+        layout.push_back(elem);
+    }
+
+    CreateInputLayout(std::move(layout));
+}
+
 void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage)
 {
     if (!reflection) return;
@@ -136,18 +180,6 @@ void ShaderPSO::Apply(ID3D11DeviceContext* ctx)
     }
 }
 
-bool ShaderPSO::UpdateConstantBuffer(std::string_view name, const void* data, size_t size)
-{
-    auto it = m_cbByName.find(std::string(name));
-    if (it == m_cbByName.end()) return false;
-    if (size > it->second.size) return false;
-
-    CBEntry& cb = it->second;
-    std::memcpy(cb.cpuData.data(), data, size);
-    DeviceState::g_pDeviceContext->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
-    return true;
-}
-
 bool ShaderPSO::UpdateVariable(std::string_view cbName, std::string_view varName, const void* data, size_t size)
 {
     auto cbIt = m_cbByName.find(std::string(cbName));
@@ -180,6 +212,19 @@ void ShaderPSO::BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11Unor
         it->view = view;
     else
         m_unorderedAccessViews.push_back(UnorderedAccess{ stage, slot, view });
+}
+
+bool ShaderPSO::UpdateConstantBuffer(ID3D11DeviceContext* ctx, std::string_view name, const void* data, size_t size)
+{
+    if (!ctx) return false;
+    auto it = m_cbByName.find(std::string(name));
+    if (it == m_cbByName.end()) return false;
+    if (size > it->second.size) return false;
+
+    CBEntry& cb = it->second;
+    std::memcpy(cb.cpuData.data(), data, size);
+    ctx->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
+    return true;
 }
 
 void ShaderPSO::SetCBForStage(ID3D11DeviceContext* ctx, ShaderStage st, UINT slot, ID3D11Buffer* buf)

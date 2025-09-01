@@ -52,6 +52,8 @@ public:
 	Material& SetWindVector(const Mathf::Vector4& windVector);
 	Material& SetUVScroll(const Mathf::Vector2& uvScroll);
 
+	void ApplyMaterialInfo(ID3D11DeviceContext* context);
+
 	void SetShaderPSO(std::shared_ptr<ShaderPSO> pso);
 	std::shared_ptr<ShaderPSO> GetShaderPSO() const;
 
@@ -82,12 +84,12 @@ public:
     [[Property]]
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
-        std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
-        [[Property]]
-        FileGuid m_shaderPSOGuid{};
-        const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
-        [[Property]]
-        std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
+    std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
+    [[Property]]
+    FileGuid m_shaderPSOGuid{};
+    const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
+    [[Property]]
+    std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
 
 };
 
