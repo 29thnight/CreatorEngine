@@ -1,5 +1,4 @@
 #pragma once
-#ifndef DYNAMICCPP_EXPORTS
 #include "PSO.h"
 #include <d3d11.h>
 #include <d3d11shader.h>
@@ -82,5 +81,3 @@ private:
 
     FileGuid m_shaderPSOGuid{};
 };
-
-#endif // !DYNAMICCPP_EXPORTS

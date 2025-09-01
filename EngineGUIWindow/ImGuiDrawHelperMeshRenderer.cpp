@@ -63,6 +63,20 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::SliderFloat("roughness", &mat_info.m_roughness, 0.f, 1.f);
 
 			ImGui::DragScalar("bitflag", ImGuiDataType_S32, &mat_info.m_bitflag);
+
+			std::string shaderName = "No Shader";
+			if (meshRenderer->m_Material->m_shaderPSOGuid != FileGuid{})
+			{
+				shaderName = DataSystems->GetFilePath(meshRenderer->m_Material->m_shaderPSOGuid).stem().string();
+			}
+			ImGui::Text("Shader");
+			ImGui::SameLine();
+			ImGui::Button(shaderName.c_str(), ImVec2(200, 0));
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
+			{
+				ImGui::GetContext("SelectShader").Open();
+			}
 		}
 		else
 		{
@@ -319,4 +333,55 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
 		DataSystems->m_trasfarMaterial = nullptr;
 	}
+
+	if (!DataSystems->m_trasfarShader.empty())
+	{
+		if (meshRenderer->m_Material)
+		{
+			FileGuid prevGuid = meshRenderer->m_Material->m_shaderPSOGuid;
+			FileGuid newGuid = DataSystems->GetStemToGuid(DataSystems->m_trasfarShader);
+			Meta::MakeCustomChangeCommand(
+				[=]
+				{
+					if (meshRenderer->m_Material)
+						meshRenderer->m_Material->m_shaderPSOGuid = prevGuid;
+				},
+				[=]
+				{
+					if (meshRenderer->m_Material)
+						meshRenderer->m_Material->m_shaderPSOGuid = newGuid;
+				});
+
+			meshRenderer->m_Material->m_shaderPSOGuid = newGuid;
+		}
+		DataSystems->m_trasfarShader.clear();
+	}
+
+	//if (DataSystems->m_trasfarMaterial)
+	//{
+	//	std::string name{};
+	//	if (meshRenderer->m_Material)
+	//	{
+	//		name = meshRenderer->m_Material->m_name;
+	//	}
+	//	Meta::MakeCustomChangeCommand(
+	//		[=]
+	//		{
+	//			if (!name.empty() && DataSystems->Materials.find(name) != DataSystems->Materials.end())
+	//			{
+	//				meshRenderer->m_Material = DataSystems->Materials[name].get();
+	//			}
+	//			else
+	//			{
+	//				meshRenderer->m_Material = nullptr;
+	//			}
+	//		},
+	//		[=]
+	//		{
+	//			meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+	//		});
+
+	//	meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+	//	DataSystems->m_trasfarMaterial = nullptr;
+	//}
 }

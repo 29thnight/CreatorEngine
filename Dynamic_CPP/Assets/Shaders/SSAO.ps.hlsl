@@ -84,6 +84,14 @@ float2 GetDirection(uint i, float2 noise)
     float angle = (i + noise.x) * (2.0 * PI) / Nd;
     return float2(cos(angle), sin(angle));
 }
+// 2x2 회전행렬 적용 유틸
+float2 Rotate2D(float2 v, float angle)
+{
+    float s = sin(angle);
+    float c = cos(angle);
+    return float2(c * v.x - s * v.y,
+                  s * v.x + c * v.y);
+}
 float ARand21(float2 p)
 {
     return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
@@ -97,48 +105,115 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 posW = CalculateWorldFromDepth(depth, IN.texCoord);
     float3 normal = gNormalTex.Sample(PointSampler, IN.texCoord).rgb;
     normal = normalize(normal * 2.0 - 1.0);
+    
     float centerDepth = distance(posW, cameraPos.xyz);
-    float2 noiseScale = windowSize / 4.0;
-    float3 randDir = gNoise.Sample(PointSampler, IN.texCoord * noiseScale).rgb;
+    
+    // --- 노이즈 타일링 줄무늬 완화: 해시 기반 per-pixel 회전 ---
+    // 프레임 인덱스를 섞어 TBN 회전 각을 픽셀마다 무작위화
+    float randHash = ARand21(IN.texCoord * windowSize + float2(frameIndex, 0));
+    float angleTS = randHash * 2.0 * PI;
+    
+    // 랜덤 접선/비접선 축 구성(노멀 기준 직교 벡터)
+    float3 upVec = (abs(normal.z) < 0.999) ? float3(0, 0, 1) : float3(0, 1, 0);
+    float3 tangent = normalize(cross(upVec, normal));
+    float3 bitang = cross(normal, tangent);
+    float3x3 TBN = float3x3(tangent, bitang, normal); // 행-벡터 기준: mul(TBN, vTS)
+    
+    //float2 noiseScale = windowSize / 4.0;
+    //float3 randDir = gNoise.Sample(PointSampler, IN.texCoord * noiseScale).rgb;
 
-    float3 tangent = normalize(randDir - normal * dot(randDir, normal));
-    float3 bitangent = cross(normal, tangent);
-    float3x3 tbn = transpose(float3x3(tangent, bitangent, normal));
+    //float3 tangent = normalize(randDir - normal * dot(randDir, normal));
+    //float3 bitangent = cross(normal, tangent);
+    //float3x3 tbn = transpose(float3x3(tangent, bitangent, normal));
 
     float occlusion = 0.0;
+    const float eps = 1e-3;
+        
+    [unroll]
     for (int i = 0; i < 64; ++i)
     {
-        // find out a desired world position to sample
-        float3 kernelPosW = mul(tbn, kernel[i].rgb);
+        // --- 커널을 탄젠트 공간에서 z축(노멀 축)으로 랜덤 회전 ---
+        float3 k = kernel[i].xyz; // hemisphere sample in TS
+        float2 kxyRot = Rotate2D(k.xy, angleTS);
+        float3 kTS = float3(kxyRot, k.z);
+
+        // 월드 공간으로 회전/이동
+        float3 kernelPosW = mul(TBN, kTS);
         float3 samplePosW = posW + kernelPosW * radius;
-        float sampleDepth = distance(samplePosW, cameraPos.xyz);
 
-        // project it to the clip space so we know where can sample from the depth buffer
-        float4 samplePosClip = mul(viewProjection, float4(samplePosW, 1));
-        samplePosClip /= samplePosClip.w;
-
-        // invert y and put to [0 - 1]
-        float2 sampleUV = float2(samplePosClip.x, -samplePosClip.y) * 0.5f + 0.5f;
-
-        // reject samples outside of the range
-        if (sampleUV.x < 0 || sampleUV.x > 1 || sampleUV.y < 0 || sampleUV.y > 1)
-        {
-            occlusion += 0.0;
+        // 클립 공간 투영
+        float4 sampleClip = mul(viewProjection, float4(samplePosW, 1.0));
+        // 카메라 뒤쪽/비가시 샘플 배제
+        if (sampleClip.w <= 0.0)
             continue;
-        }
 
-        // sample our scene for actual depth
-        float depthFromTex = gDepthTex.Sample(PointSampler, sampleUV.xy).r;
-        float3 scenePos = CalculateWorldFromDepth(depthFromTex, sampleUV.xy);
-        float sceneDepth = distance(scenePos, cameraPos.xyz);
+        float2 sampleUV = float2(sampleClip.x, -sampleClip.y) / sampleClip.w * 0.5f + 0.5f;
 
+        // 화면 밖 샘플 배제
+        if (any(sampleUV < 0.0) || any(sampleUV > 1.0))
+            continue;
+
+        // 텍스처에서 실제 깊이 샘플
+        float depthFromTex = gDepthTex.Sample(PointSampler, sampleUV).r;
+
+        // 재구성한 월드/깊이
+        float3 scenePosW = CalculateWorldFromDepth(depthFromTex, sampleUV);
+        float sceneDepth = distance(scenePosW, cameraPos.xyz);
+
+        // 안정적인 범위 가중(0 나눗셈/포화 방지)
         float depthDiff = abs(sceneDepth - centerDepth);
-        float rangeCheck = smoothstep(0.0, 1.0, radius / depthDiff);
-        occlusion += step(sceneDepth, sampleDepth) * rangeCheck;
+        float rangeCheck = smoothstep(0.0, 1.0, saturate(radius / (depthDiff + eps)));
+
+        // bias(thickness) 적용: 같은 평면/미세 흔들림에 의한 자가가림 완화
+        // 기존: step(sceneDepth, sampleDepth)
+        float sampleDepth = distance(samplePosW, cameraPos.xyz);
+        float selfOcc = (sceneDepth < (sampleDepth - thickness)) ? 1.0 : 0.0;
+
+        occlusion += selfOcc * rangeCheck;
     }
+
     occlusion /= 64.0;
-    float factor = 1 - occlusion;
+
+    // 출력 톤(기존 유지)
+    float factor = 1.0 - occlusion;
+    factor *= factor;
+
     return float4(factor, factor, factor, factor);
+    
+    //for (int i = 0; i < 64; ++i)
+    //{
+    //    // find out a desired world position to sample
+    //    float3 kernelPosW = mul(tbn, kernel[i].rgb);
+    //    float3 samplePosW = posW + kernelPosW * radius;
+    //    float sampleDepth = distance(samplePosW, cameraPos.xyz);
+
+    //    // project it to the clip space so we know where can sample from the depth buffer
+    //    float4 samplePosClip = mul(viewProjection, float4(samplePosW, 1));
+    //    samplePosClip /= samplePosClip.w;
+
+    //    // invert y and put to [0 - 1]
+    //    float2 sampleUV = float2(samplePosClip.x, -samplePosClip.y) * 0.5f + 0.5f;
+
+    //    // reject samples outside of the range
+    //    if (sampleUV.x < 0 || sampleUV.x > 1 || sampleUV.y < 0 || sampleUV.y > 1)
+    //    {
+    //        occlusion += 0.0;
+    //        continue;
+    //    }
+
+    //    // sample our scene for actual depth
+    //    float depthFromTex = gDepthTex.Sample(PointSampler, sampleUV.xy).r;
+    //    float3 scenePos = CalculateWorldFromDepth(depthFromTex, sampleUV.xy);
+    //    float sceneDepth = distance(scenePos, cameraPos.xyz);
+
+    //    float depthDiff = abs(sceneDepth - centerDepth);
+    //    float rangeCheck = smoothstep(0.0, 1.0, radius / depthDiff);
+    //    occlusion += step(sceneDepth, sampleDepth) * rangeCheck;
+    //}
+    //occlusion /= 64.0;
+    //float factor = 1 - occlusion;
+    //factor = factor * factor;
+    //return float4(factor, factor, factor, factor);
     
     
     

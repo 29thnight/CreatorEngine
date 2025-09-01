@@ -1,4 +1,3 @@
-#ifndef DYNAMICCPP_EXPORTS
 #include "ShaderPSO.h"
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -8,18 +7,18 @@ void ShaderPSO::ReflectConstantBuffers()
     m_constantBuffers.clear();
 
     auto reflectStage = [&](auto shader, ShaderStage stage)
+    {
+        if (!shader) return;
+        Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
+        if (FAILED(D3DReflect(shader->GetBufferPointer(),
+            shader->GetBufferSize(),
+            IID_ID3D11ShaderReflection,
+            reinterpret_cast<void**>(reflector.GetAddressOf()))))
         {
-            if (!shader) return;
-            Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
-            if (FAILED(D3DReflect(shader->GetBufferPointer(),
-                shader->GetBufferSize(),
-                IID_ID3D11ShaderReflection,
-                reinterpret_cast<void**>(reflector.GetAddressOf()))))
-            {
-                return;
-            }
-            ReflectShader(reflector.Get(), stage);
-        };
+            return;
+        }
+        ReflectShader(reflector.Get(), stage);
+    };
 
     reflectStage(m_vertexShader, ShaderStage::Vertex);
     reflectStage(m_pixelShader, ShaderStage::Pixel);
@@ -183,5 +182,3 @@ void ShaderPSO::BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11Unor
         m_unorderedAccessViews.push_back(ua);
     }
 }
-
-#endif // !DYNAMICCPP_EXPORTS

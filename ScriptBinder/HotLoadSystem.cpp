@@ -28,8 +28,8 @@ void HotLoadSystem::Initialize()
 	if (msbuildPath.empty())
 	{
 		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation. [Force Load Compiled DLL]");
-		LoadForceDLL();
-		return;
+		//LoadForceDLL();
+		//return;
 	}
 
 #if defined(_DEBUG)
@@ -49,7 +49,7 @@ void HotLoadSystem::Initialize()
 	{
 		try
 		{
-			Compile();
+			LoadForceDLL();
 		}
 		catch (const std::exception& e)
 		{

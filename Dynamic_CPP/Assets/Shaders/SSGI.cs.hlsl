@@ -176,7 +176,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 float3 specular = numerator / denominator;
                 
                 lighting += (1.0 - float(countbits(indirect & ~occlusion)) / float(sectorCount)) *
-                (kD * albedo / PI + specular) * NdotL;
+                (kD * albedo / PI + specular) * NdotL * sampleLight;
                 //sampleLight * saturate(dot(normal, sampleHorizon)) *
                 //saturate(dot(sampleNormal, -sampleHorizon));
             }
