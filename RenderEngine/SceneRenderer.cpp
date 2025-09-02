@@ -202,35 +202,35 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pDecalPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get());
 
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
-		{
-			auto scene = SceneManagers->GetActiveScene();
-			auto sceneName = scene->GetSceneName();
+	{
+		auto scene = SceneManagers->GetActiveScene();
+		auto sceneName = scene->GetSceneName();
 		
-			int i = 0;
-			while (true) {
-				file::path fileName = sceneName.ToString();
-				fileName += std::to_wstring(i) + L".hdr";
-				i++;
+		int i = 0;
+		while (true) {
+			file::path fileName = sceneName.ToString();
+			fileName += std::to_wstring(i) + L".hdr";
+			i++;
 
-				Texture* texture = Texture::LoadFormPath(fileName);
-				if (texture == nullptr) break;
-				scene->m_lightmapTextures.push_back(texture);
-			}
-			
-			i = 0;
-			while (true) {
-				file::path fileName = L"Dir_";
-				fileName += sceneName.ToString();
-				fileName += std::to_wstring(i) + L".hdr";
-				i++;
-
-				Texture* texture = Texture::LoadFormPath(fileName);
-				if (texture == nullptr) break;
-				scene->m_directionalmapTextures.push_back(texture);
-			}
-
-			m_pLightMapPass->Initialize(scene->m_lightmapTextures, scene->m_directionalmapTextures);
+			Texture* texture = Texture::LoadFormPath(fileName);
+			if (texture == nullptr) break;
+			scene->m_lightmapTextures.push_back(texture);
 		}
+			
+		i = 0;
+		while (true) {
+			file::path fileName = L"Dir_";
+			fileName += sceneName.ToString();
+			fileName += std::to_wstring(i) + L".hdr";
+			i++;
+
+			Texture* texture = Texture::LoadFormPath(fileName);
+			if (texture == nullptr) break;
+			scene->m_directionalmapTextures.push_back(texture);
+		}
+
+		m_pLightMapPass->Initialize(scene->m_lightmapTextures, scene->m_directionalmapTextures);
+	}
 	);
 
 	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
@@ -466,10 +466,18 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
+	PROFILE_CPU_BEGIN("EraseRenderPassData");
 	m_renderScene->EraseRenderPassData();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("EoFUpdate");
 	m_renderScene->Update(deltaTime);
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("OnProxyDestroy");
 	m_renderScene->OnProxyDestroy();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("PrepareRender");
 	PrepareRender();
+	PROFILE_CPU_END();
 }
 
 void SceneRenderer::SceneRendering()

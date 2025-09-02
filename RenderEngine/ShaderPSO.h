@@ -36,6 +36,7 @@ public:
         UINT                     offset{};
         UINT                     size{};
         D3D_SHADER_VARIABLE_TYPE type{ D3D_SVT_VOID };
+        D3D_SHADER_VARIABLE_CLASS varClass{ D3D_SVC_SCALAR };
     };
 
     struct CBEntry
@@ -137,5 +138,7 @@ class ShaderPSO : public PipelineStateObject
 public:
     ShaderPSO() = default;
     ~ShaderPSO() = default;
+
+    struct CBEntry {};
 };
 #endif // !DYNAMICCPP_EXPORTS

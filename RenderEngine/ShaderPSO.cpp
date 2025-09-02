@@ -120,8 +120,8 @@ void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D
             entry.buffer = buffer;
             entry.binds.push_back({ stage, bindPoint });
             entry.cpuData.resize(cbDesc.Size);
-
             entry.variables.reserve(cbDesc.Variables);
+
             for (UINT v = 0; v < cbDesc.Variables; ++v)
             {
                 ID3D11ShaderReflectionVariable* var = cb->GetVariableByIndex(v);
@@ -130,7 +130,18 @@ void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D
                 ID3D11ShaderReflectionType* type = var->GetType();
                 D3D11_SHADER_TYPE_DESC typeDesc{};
                 type->GetDesc(&typeDesc);
-                entry.variables.push_back({ varDesc.Name ? varDesc.Name : "", varDesc.StartOffset, varDesc.Size, typeDesc.Type });
+                D3D_SHADER_VARIABLE_CLASS varClass = typeDesc.Class;
+                if (typeDesc.Type == D3D_SVT_FLOAT && varDesc.Size == sizeof(float) * 16)
+                {
+                    varClass = D3D_SVC_MATRIX_ROWS;
+                }
+
+                entry.variables.push_back({
+                    varDesc.Name ? varDesc.Name : "",
+                    varDesc.StartOffset,
+                    varDesc.Size,
+                    typeDesc.Type,
+                    varClass });
             }
 
             m_cbByName.emplace(entry.name, std::move(entry));

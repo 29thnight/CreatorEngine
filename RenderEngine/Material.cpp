@@ -273,3 +273,207 @@ std::shared_ptr<ShaderPSO> Material::GetShaderPSO() const
 {
 	return m_shaderPSO ? m_shaderPSO : nullptr;
 }
+
+Material::VarView Material::FindVar(std::string_view cb, std::string_view var) const
+{
+    VarView out{};
+    if (!m_cbMeta) return out;
+
+    auto itCB = m_cbMeta->find(std::string(cb));
+    if (itCB == m_cbMeta->end()) return out;
+
+    out.cb = &itCB->second;
+    auto& vars = out.cb->variables;
+    auto itVar = std::find_if(vars.begin(), vars.end(),
+        [&](const ShaderPSO::VariableDesc& d) { return d.name == var; });
+    if (itVar == vars.end()) { out.cb = nullptr; return {}; }
+    out.var = &(*itVar);
+    return out;
+}
+
+bool Material::SplitQualified(std::string_view q, std::string& outCB, std::string& outVar)
+{
+    auto dot = q.find('.');
+    if (dot == std::string_view::npos) return false;
+    outCB = std::string(q.substr(0, dot));
+    outVar = std::string(q.substr(dot + 1));
+    return (!outCB.empty() && !outVar.empty());
+}
+
+bool Material::WriteBytes(const VarView& v, const void* src, size_t size)
+{
+    if (!v.cb || !v.var) return false;
+    if (size > v.var->size) return false;
+    auto it = m_cbufferValues.find(v.cb->name);
+    if (it == m_cbufferValues.end()) return false;
+
+    auto& bytes = it->second;
+    if (v.var->offset + size > bytes.size()) return false;
+    std::memcpy(bytes.data() + v.var->offset, src, size);
+
+    m_dirtyCBs.insert(v.cb->name);
+    return true;
+}
+
+bool Material::ReadBytes(const VarView& v, void* dst, size_t size) const
+{
+    if (!v.cb || !v.var) return false;
+    if (size > v.var->size) return false;
+    auto it = m_cbufferValues.find(v.cb->name);
+    if (it == m_cbufferValues.end()) return false;
+
+    const auto& bytes = it->second;
+    if (v.var->offset + size > bytes.size()) return false;
+    std::memcpy(dst, bytes.data() + v.var->offset, size);
+    return true;
+}
+
+// ───────────────────────────────
+// 타입 안전 Setter / Getter
+// ───────────────────────────────
+bool Material::TrySetFloat(std::string_view cb, std::string_view var, float v)
+{
+    return WriteBytes(FindVar(cb, var), &v, sizeof(float));
+}
+bool Material::TryGetFloat(std::string_view cb, std::string_view var, float& out) const
+{
+    return ReadBytes(FindVar(cb, var), &out, sizeof(float));
+}
+
+bool Material::TrySetInt(std::string_view cb, std::string_view var, int32_t v)
+{
+    return WriteBytes(FindVar(cb, var), &v, sizeof(int32_t));
+}
+bool Material::TryGetInt(std::string_view cb, std::string_view var, int32_t& out) const
+{
+    return ReadBytes(FindVar(cb, var), &out, sizeof(int32_t));
+}
+
+bool Material::TrySetBool(std::string_view cb, std::string_view var, bool v)
+{
+    // HLSL cbuffer bool은 4바이트 정렬을 따르므로 int로 저장
+    int32_t iv = v ? 1 : 0;
+    return WriteBytes(FindVar(cb, var), &iv, sizeof(int32_t));
+}
+bool Material::TryGetBool(std::string_view cb, std::string_view var, bool& out) const
+{
+    int32_t iv{};
+    if (!ReadBytes(FindVar(cb, var), &iv, sizeof(int32_t))) return false;
+    out = (iv != 0);
+    return true;
+}
+
+bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector2& v)
+{
+    return WriteBytes(FindVar(cb, var), &v, sizeof(v));
+}
+bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector3& v)
+{
+    return WriteBytes(FindVar(cb, var), &v, sizeof(v));
+}
+bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector4& v)
+{
+    return WriteBytes(FindVar(cb, var), &v, sizeof(v));
+}
+bool Material::TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const
+{
+    // 최대 16바이트의 float4를 읽어서 돌려줌 (var size가 8/12면 앞부분만 유효)
+    auto v = FindVar(cb, var);
+    if (!v.cb || !v.var) return false;
+    std::memset(&out, 0, sizeof(out));
+    size_t n = std::min<size_t>(sizeof(out), v.var->size);
+    return ReadBytes(v, &out, n);
+}
+
+bool Material::TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m)
+{
+    return WriteBytes(FindVar(cb, var), &m, sizeof(m));
+}
+bool Material::TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const
+{
+    return ReadBytes(FindVar(cb, var), &out, sizeof(out));
+}
+
+// ── Qualified name sugar ("CB.Var") ──
+bool Material::TrySetFloat(std::string_view q, float v) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetFloat(cb, var, v);
+}
+bool Material::TryGetFloat(std::string_view q, float& out) const {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TryGetFloat(cb, var, out);
+}
+bool Material::TrySetInt(std::string_view q, int32_t v) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetInt(cb, var, v);
+}
+bool Material::TryGetInt(std::string_view q, int32_t& out) const {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TryGetInt(cb, var, out);
+}
+bool Material::TrySetBool(std::string_view q, bool v) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetBool(cb, var, v);
+}
+bool Material::TryGetBool(std::string_view q, bool& out) const {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TryGetBool(cb, var, out);
+}
+bool Material::TrySetVector(std::string_view q, const Mathf::Vector2& v) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetVector(cb, var, v);
+}
+bool Material::TrySetVector(std::string_view q, const Mathf::Vector3& v) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetVector(cb, var, v);
+}
+bool Material::TrySetVector(std::string_view q, const Mathf::Vector4& v) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetVector(cb, var, v);
+}
+bool Material::TryGetVector(std::string_view q, Mathf::Vector4& out) const {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TryGetVector(cb, var, out);
+}
+bool Material::TrySetMatrix(std::string_view q, const Mathf::xMatrix& m) {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TrySetMatrix(cb, var, m);
+}
+bool Material::TryGetMatrix(std::string_view q, Mathf::xMatrix& out) const {
+    std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
+    return TryGetMatrix(cb, var, out);
+}
+
+// ───────────────────────────────
+// 커스텀 PSO용: 변경된 CB만 GPU에 반영
+// ───────────────────────────────
+void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
+{
+    if (!m_shaderPSO) return;
+    if (!ctx) ctx = DeviceState::g_pDeviceContext;
+
+    // 더러워진 CB만 올려준다.
+    for (const auto& cbName : m_dirtyCBs)
+    {
+        auto it = m_cbufferValues.find(cbName);
+        if (it == m_cbufferValues.end()) continue;
+        m_shaderPSO->UpdateConstantBuffer(ctx, cbName, it->second.data(), it->second.size());
+    }
+    m_dirtyCBs.clear();
+}
+
+void Material::TrySetMaterialInfo()
+{
+    TrySetVector("PBRMaterial", "gAlbedo", m_materialInfo.m_baseColor);
+	TrySetFloat("PBRMaterial", "gMetallic", m_materialInfo.m_metallic);
+	TrySetFloat("PBRMaterial", "gRoughness", m_materialInfo.m_roughness);
+
+	TrySetInt("PBRMaterial", "gUseAlbedoMap", m_materialInfo.m_useBaseColor);
+    TrySetInt("PBRMaterial", "gUseOccMetalRough", m_materialInfo.m_useOccRoughMetal);
+    TrySetInt("PBRMaterial", "gUseAoMap", m_materialInfo.m_useAOMap);
+    TrySetInt("PBRMaterial", "gUseEmmisive", m_materialInfo.m_useEmissive);
+    TrySetInt("PBRMaterial", "gNormalState", m_materialInfo.m_useNormalMap);
+    TrySetInt("PBRMaterial", "gConvertToLinear", m_materialInfo.m_convertToLinearSpace);
+
+	TrySetInt("PBRMaterial", "bitflag", m_materialInfo.m_bitflag);
+}

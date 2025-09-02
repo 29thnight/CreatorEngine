@@ -221,36 +221,6 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		proxy->Draw(deferredPtr);
 	}
 
-	// --- 2.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
-	for (auto const& [psoName, proxies] : shaderPSOGroups)
-	{
-		if (proxies.empty()) continue;
-		auto firstProxy = proxies.front();
-		auto customPSO = firstProxy->m_Material->m_shaderPSO;
-		if (!customPSO) continue; // Safety check
-		customPSO->Apply(deferredPtr);
-		currentMaterialGuid = HashedGuid::INVAILD_ID; // Reset to force material update
-
-		for (auto& proxy : proxies)
-		{
-			scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
-			Material* mat = proxy->m_Material;
-			auto matinfo = mat->m_materialInfo;
-			matinfo.m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
-			if (proxy->m_materialGuid != currentMaterialGuid)
-			{
-				DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
-				if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
-				if (mat->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
-				if (mat->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-				if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
-				if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
-				currentMaterialGuid = proxy->m_materialGuid;
-			}
-			proxy->Draw(deferredPtr);
-		}
-	}
-
 	// --- 3. RENDER STATIC OBJECTS (INSTANCED) ---
 	m_instancePSO->Apply(deferredPtr);
 
@@ -314,6 +284,34 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[3], "00:G_BUFFER_EMISSIVE");
 	}
 
+	// --- 3.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
+	for (auto const& [psoName, proxies] : shaderPSOGroups)
+	{
+		if (proxies.empty()) continue;
+		auto firstProxy = proxies.front();
+		auto customPSO = firstProxy->m_Material->m_shaderPSO;
+		if (!customPSO) continue;
+
+		// PSO는 그룹 단위로 1회 Apply
+		customPSO->Apply(deferredPtr);
+
+		// 머티리얼은 오직 '변경된 CBuffer'만 업로드5
+		for (auto* proxy : proxies)
+		{
+			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", camera.CalculateView());
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", camera.CalculateProjection());
+			proxy->m_Material->TrySetMaterialInfo();
+			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
+			proxy->m_Material->ApplyShaderParams(deferredPtr);
+
+			//scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
+			//camera.UpdateBuffer(deferredPtr);
+			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
+			proxy->Draw(deferredPtr);
+		}
+	}
+
 	// --- 4. CLEANUP AND FINISH COMMAND LIST ---
 	ID3D11ShaderResourceView* nullSRV[] = { nullptr };
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, nullSRV); // Unbind instance buffer
@@ -363,8 +361,6 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
 			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
 			terrainMesh->Draw(deferredPtr);
-
-
 		}
 	}
 
