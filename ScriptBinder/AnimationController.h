@@ -73,6 +73,9 @@ public:
 	[[Property]]
 	bool useController = true; 
 
+	bool m_useLayer = true;
+	void SetUseLayer(bool _useLayer);
+	bool IsUseLayer() { return m_useLayer;}
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 
 	DirectX::XMMATRIX m_LocalTransforms[512]{};

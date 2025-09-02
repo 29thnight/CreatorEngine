@@ -45,6 +45,7 @@ ReflectionScriptField(Player) \
 		meta_method(CatchAndThrow) \
 		meta_method(ThrowEvent) \
 		meta_method(Dash) \
+		meta_method(ShootBullet) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \
 		meta_method(Attack1) \

@@ -426,9 +426,10 @@ void Player::Attack1()
 	{
 		isAttacking = true;
 		m_animator->SetParameter("Attack", true);
+		m_animator->SetUseLayer(1,false);
 		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
-		if (m_curWeapon->CheckDur() ==true)
+		if (m_curWeapon && m_curWeapon->CheckDur() ==true)
 		{
 			std::cout << "weapon break" << std::endl;
 		}

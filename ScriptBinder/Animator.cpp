@@ -115,6 +115,14 @@ AnimationController* Animator::GetController(std::string name)
     return nullptr;
 }
 
+void Animator::SetUseLayer(int layerindex, bool _useLayer)
+{
+	if (layerindex >= 0 && layerindex < m_animationControllers.size())
+	{
+		m_animationControllers[layerindex]->SetUseLayer(_useLayer);
+	}
+}
+
 GameObject* Animator::FindBoneRecursive(GameObject* parent, const std::string& boneName)
 {
 	if (!parent) return nullptr;

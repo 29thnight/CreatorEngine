@@ -51,6 +51,7 @@ public:
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
 
+    void SetUseLayer(int layerindex,bool _useLayer);
     GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);
     Socket* FindSocket(std::string_view socketName);

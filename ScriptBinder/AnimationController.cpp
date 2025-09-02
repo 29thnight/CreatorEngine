@@ -383,3 +383,7 @@ void AnimationController::DeleteAvatarMask()
     }
 }
 
+void AnimationController::SetUseLayer(bool _useLayer)
+{
+	m_useLayer = _useLayer;
+}
