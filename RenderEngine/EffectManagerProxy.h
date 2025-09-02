@@ -27,6 +27,28 @@ public:
         return cmd;
     }
 
+    static EffectManagerProxy CreatePauseCommand(const std::string& instanceId)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [instanceId]() {
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
+                effect->Pause();
+            }
+            };
+        return cmd;
+    }
+
+    static EffectManagerProxy CreateResumeCommand(const std::string& instanceId)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [instanceId]() {
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
+                effect->Resume();
+            }
+            };
+        return cmd;
+    }
+
     // 이펙트 위치 설정 명령
     static EffectManagerProxy CreateSetPositionCommand(const std::string& instanceId, const Mathf::Vector3& position)
     {

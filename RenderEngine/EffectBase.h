@@ -105,11 +105,21 @@ public:
         if (m_state == EffectState::Playing) {
             m_state = EffectState::Paused;
         }
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->Pause();
+            }
+        }
     }
 
     virtual void Resume() {
         if (m_state == EffectState::Paused) {
             m_state = EffectState::Playing;
+        }
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->Resume();
+            }
         }
     }
 
