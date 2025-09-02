@@ -69,9 +69,9 @@ public:
     ~ShaderPSO() = default;
 
     // Reflect all attached shaders and create constant buffers automatically.
-    void ReflectConstantBuffers();
+    bool ReflectConstantBuffers();
 
-    void CreateInputLayoutFromShader();
+    bool CreateInputLayoutFromShader();
 
     // Apply pipeline state and bind constant buffers and resources to the GPU.
     void Apply();

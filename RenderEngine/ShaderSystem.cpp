@@ -261,8 +261,14 @@ static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
 	bindFile(desc.pass.cs);
 
 	// 자동 리플렉션으로 cbuffer/SRV 슬롯 생성
-	pso->ReflectConstantBuffers();
-	pso->CreateInputLayoutFromShader();
+	if (false == pso->ReflectConstantBuffers())
+	{
+		return nullptr;
+	}
+	if (false == pso->CreateInputLayoutFromShader())
+	{
+		return nullptr;
+	}
 
 	// TODO: queueTag/keywords 렌더 큐/키워드 시스템과 연동(옵션)
 	return pso;
@@ -293,8 +299,11 @@ void ShaderResourceSystem::LoadShaderAssets()
 			// PSO 만들고 등록
 			auto pso = BuildPSOFromDesc(desc);
 			//pso->SetShaderPSOGuid(DataSystems->GetFileGuid(dir.path()));
-			pso->m_shaderPSOName = assetName;
-			ShaderAssets[assetName] = pso;
+			if(pso)
+			{
+				pso->m_shaderPSOName = assetName;
+				ShaderAssets[assetName] = pso;
+			}
 		}
 	}
 	catch (const file::filesystem_error& e)
