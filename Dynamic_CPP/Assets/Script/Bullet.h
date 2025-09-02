@@ -32,7 +32,7 @@ public:
 	virtual void OnDestroy() override  {}
 
 
-	void Initialize(Player* owner, Mathf::Vector3 dir, int _damage);
+	void Initialize(Player* owner, Mathf::Vector3 originpos, Mathf::Vector3 dir, int _damage);
 	BulletType bulletType = BulletType::Normal;
 	int m_damage = 0;
 	//float rangedProjSpd = 1.0f; //발사체 이동속도

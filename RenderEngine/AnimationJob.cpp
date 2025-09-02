@@ -111,8 +111,8 @@ void AnimationJob::Update(float deltaTime)
                     }
                     //animation.preAnimationProgress = animation.curAnimationProgress;
                     //animation.curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    /*animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
-                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;*/
+                    animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
+                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {

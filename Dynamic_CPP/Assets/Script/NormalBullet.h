@@ -26,7 +26,7 @@ public:
 
 
 	[[Property]]
-	float rangedProjSpd = 1.0f; //발사체 이동속도
+	float rangedProjSpd = 0.01f; //발사체 이동속도
 	[[Property]]
 	float rangedProjDist = 10.f; //발사체 최대 이동거리 초? 이동거리?
 };

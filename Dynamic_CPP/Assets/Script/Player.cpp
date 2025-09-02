@@ -426,7 +426,7 @@ void Player::Attack1()
 	{
 		isAttacking = true;
 		m_animator->SetParameter("Attack", true);
-		m_animator->SetUseLayer(1,false);
+		m_animator->SetUseLayer(0,false);
 		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
 		if (m_curWeapon && m_curWeapon->CheckDur() ==true)
@@ -666,7 +666,11 @@ void Player::ShootBullet()
 	{
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 		NormalBullet * bullet = bulletObj->GetComponent<NormalBullet>();
-		bullet->Initialize(this, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
+		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+		if (m_curWeapon)
+		{
+			bullet->Initialize(this, pos,-player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
+		}
 
 	}
 }
