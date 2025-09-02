@@ -276,14 +276,6 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
 
-	if(0 == data->m_index)
-	{
-		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[0], "00:G_BUFFER_BASE_COLOR");
-		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[1], "00:G_BUFFER_NORMAL");
-		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[2], "00:G_BUFFER_METAL_ROUGH");
-		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[3], "00:G_BUFFER_EMISSIVE");
-	}
-
 	// --- 3.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
 	for (auto const& [psoName, proxies] : shaderPSOGroups)
 	{
@@ -294,16 +286,13 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		//TEST: PSO가 유효하지 않다면 ShaderSystem에서 동일 이름의 PSO를 찾아 교체
 		auto& shaderPSOContainer = ShaderSystem->ShaderAssets;
 
-		if(customPSO->IsInvalidated())
+		if (customPSO->IsInvalidated())
 		{
 			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
 			{
-				//firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
-				for(auto* proxy : proxies)
-				{
-					proxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
-				}
-				continue; // 교체된 프레임은 스킵, 다음 프레임 부터 적용
+				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				customPSO = firstProxy->m_Material->m_shaderPSO;
 			}
 			else
 			{
@@ -327,6 +316,16 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
 			proxy->Draw(deferredPtr);
 		}
+
+		DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
+	}
+
+	if(0 == data->m_index)
+	{
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[0], "00:G_BUFFER_BASE_COLOR");
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[1], "00:G_BUFFER_NORMAL");
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[2], "00:G_BUFFER_METAL_ROUGH");
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[3], "00:G_BUFFER_EMISSIVE");
 	}
 
 	// --- 4. CLEANUP AND FINISH COMMAND LIST ---

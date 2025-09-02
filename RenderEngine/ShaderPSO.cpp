@@ -4,6 +4,11 @@
 #include <algorithm>
 #include <cstring>
 #include "Shader.h"
+#include "ShaderSystem.h"
+
+ShaderPSO::ShaderPSO() : PipelineStateObject(true)
+{
+}
 
 void ShaderPSO::ReflectConstantBuffers()
 {

@@ -65,7 +65,7 @@ private:
     };
 
 public:
-    ShaderPSO() = default;
+    ShaderPSO();
     ~ShaderPSO() = default;
 
     // Reflect all attached shaders and create constant buffers automatically.

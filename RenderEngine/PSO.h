@@ -27,8 +27,10 @@ public:
 
 	Core::DelegateHandle m_shaderReloadEventHandle;
 	InputLayOutContainer m_inputLayoutDescContainer;
+	bool m_isShaderPSO{ false };
 public:
 	PipelineStateObject();
+	PipelineStateObject(bool isShaderPSO);
 	~PipelineStateObject();
 
 	void Apply();
@@ -37,6 +39,7 @@ public:
 	void CreateInputLayout(InputLayOutContainer&& vertexLayoutDesc);
 	void ReloadShaders();
     void Reset();
+	void Reset(ID3D11DeviceContext* deferredContext);
 };
 #else
 class PipelineStateObject {};

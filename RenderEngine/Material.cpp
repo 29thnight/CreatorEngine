@@ -461,6 +461,8 @@ void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
         m_shaderPSO->UpdateConstantBuffer(ctx, cbName, it->second.data(), it->second.size());
     }
     m_dirtyCBs.clear();
+
+
 }
 
 void Material::TrySetMaterialInfo()
