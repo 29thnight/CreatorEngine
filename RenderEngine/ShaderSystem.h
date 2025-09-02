@@ -49,6 +49,7 @@ public:
 	void ReloadShaderFromPath(const file::path& filepath);
 private:
 	void AddShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
+	void EraseShader(const std::string& name, const std::string& ext);
 	void ReloadShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
 	void RemoveShaders();
 

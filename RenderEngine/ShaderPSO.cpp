@@ -5,15 +5,13 @@
 #include <cstring>
 #include "Shader.h"
 
-bool ShaderPSO::ReflectConstantBuffers()
+void ShaderPSO::ReflectConstantBuffers()
 {
     m_cbByName.clear();
 
-    bool result{ false };
-
-    auto reflectStage = [&](auto shaderPtr, ShaderStage stage) -> bool
+    auto reflectStage = [&](auto shaderPtr, ShaderStage stage)
     {
-        if (nullptr == shaderPtr) return false;
+        if (nullptr == shaderPtr) return;
 
         Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
         if (FAILED(D3DReflect(shaderPtr->GetBufferPointer(),
@@ -21,24 +19,27 @@ bool ShaderPSO::ReflectConstantBuffers()
                               IID_ID3D11ShaderReflection,
                               reinterpret_cast<void**>(reflector.GetAddressOf()))))
         {
-            return false;
+            return;
         }
         ReflectShader(reflector.Get(), stage);
     };
 
-    result = reflectStage(m_vertexShader, ShaderStage::Vertex);
-    result = reflectStage(m_pixelShader, ShaderStage::Pixel);
-    result = reflectStage(m_geometryShader, ShaderStage::Geometry);
-    result = reflectStage(m_hullShader, ShaderStage::Hull);
-    result = reflectStage(m_domainShader, ShaderStage::Domain);
-
-    return result;
+    reflectStage(m_vertexShader, ShaderStage::Vertex);
+    reflectStage(m_pixelShader, ShaderStage::Pixel);
+    reflectStage(m_geometryShader, ShaderStage::Geometry);
+    reflectStage(m_hullShader, ShaderStage::Hull);
+    reflectStage(m_domainShader, ShaderStage::Domain);
 }
 
-bool ShaderPSO::CreateInputLayoutFromShader()
+void ShaderPSO::CreateInputLayoutFromShader()
 {
     if (!m_vertexShader)
-        return false;
+        return;
+
+    if (!m_inputLayoutDescContainer.empty())
+    {
+        m_inputLayoutDescContainer.clear();
+    }
 
     Microsoft::WRL::ComPtr<ID3D11ShaderReflection> refl;
     if (FAILED(D3DReflect(m_vertexShader->GetBufferPointer(),
@@ -46,7 +47,7 @@ bool ShaderPSO::CreateInputLayoutFromShader()
         IID_ID3D11ShaderReflection,
         reinterpret_cast<void**>(refl.GetAddressOf()))))
     {
-        return false;
+        return;
     }
 
     D3D11_SHADER_DESC shaderDesc{};
@@ -77,8 +78,6 @@ bool ShaderPSO::CreateInputLayoutFromShader()
     }
 
     CreateInputLayout(std::move(layout));
-
-    return true;
 }
 
 void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage)

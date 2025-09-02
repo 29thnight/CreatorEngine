@@ -295,7 +295,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// PSO는 그룹 단위로 1회 Apply
 		customPSO->Apply(deferredPtr);
 
-		// 머티리얼은 오직 '변경된 CBuffer'만 업로드5
+		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
 		for (auto* proxy : proxies)
 		{
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
@@ -305,8 +305,6 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
 
-			//scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
-			//camera.UpdateBuffer(deferredPtr);
 			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
 			proxy->Draw(deferredPtr);
 		}

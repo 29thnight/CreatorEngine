@@ -142,11 +142,11 @@ void ShaderResourceSystem::ReloadShaders()
 		Debug->LogWarning("Error" + std::string(e.what()));
 	}
 
+	ReloadShaderAssets();
+
 	m_shaderReloadedDelegate.Broadcast();
 
 	m_isReloading = false;
-
-	ReloadShaderAssets();
 
 	Debug->Log("[Shaders Reload Completed]");
 	g_progressWindow->SetStatusText(L"Reloading shaders completed");
@@ -260,15 +260,16 @@ static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
 	bindFile(desc.pass.ds);
 	bindFile(desc.pass.cs);
 
+	if(!pso->m_vertexShader || !pso->m_pixelShader)
+	{
+		// 최소한 버텍스/픽셀 셰이더는 모두 유효해야 함
+		Debug->LogWarning("ShaderPSO '" + desc.name + "' has no valid vertex/pixel/compute shader.");
+		return nullptr;
+	}
+
 	// 자동 리플렉션으로 cbuffer/SRV 슬롯 생성
-	if (false == pso->ReflectConstantBuffers())
-	{
-		return nullptr;
-	}
-	if (false == pso->CreateInputLayoutFromShader())
-	{
-		return nullptr;
-	}
+	pso->ReflectConstantBuffers();
+	pso->CreateInputLayoutFromShader();
 
 	// TODO: queueTag/keywords 렌더 큐/키워드 시스템과 연동(옵션)
 	return pso;
@@ -298,11 +299,22 @@ void ShaderResourceSystem::LoadShaderAssets()
 
 			// PSO 만들고 등록
 			auto pso = BuildPSOFromDesc(desc);
-			//pso->SetShaderPSOGuid(DataSystems->GetFileGuid(dir.path()));
-			if(pso)
+			if (pso)
 			{
 				pso->m_shaderPSOName = assetName;
+				pso->SetInvalidated(false);
 				ShaderAssets[assetName] = pso;
+			}
+			else
+			{
+				auto& materials = DataSystems->Materials;
+				for (auto& [matName, mat] : materials)
+				{
+					if (mat->GetShaderPSO() && mat->GetShaderPSO()->m_shaderPSOName == assetName)
+					{
+						mat->SetShaderPSO(nullptr);
+					}
+				}
 			}
 		}
 	}
@@ -388,18 +400,24 @@ void ShaderResourceSystem::ReloadShaderFromPath(const file::path& filepath)
 	try
 	{
 		blob = HLSLCompiler::LoadFormFile(filepath.string());
+		file::path filename = filepath.filename();
+		std::string ext = filename.replace_extension().extension().string();
+		filename.replace_extension();
+		ext.erase(0, 1);
+
+		ReloadShader(filename.string(), ext, blob);
 	}
 	catch (const std::exception& e)
 	{
 		Debug->LogError("Failed to load shader: " + filepath.string() + "\n[shader compile logs] : \n" + e.what());
+		file::path filename = filepath.filename();
+		std::string ext = filename.replace_extension().extension().string();
+		filename.replace_extension();
+		ext.erase(0, 1);
+
+		EraseShader(filename.string(), ext);
 		return;
 	}
-	file::path filename = filepath.filename();
-	std::string ext = filename.replace_extension().extension().string();
-	filename.replace_extension();
-	ext.erase(0, 1);
-
-	ReloadShader(filename.string(), ext, blob);
 }
 
 void ShaderResourceSystem::AddShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob)
@@ -440,6 +458,38 @@ void ShaderResourceSystem::AddShader(const std::string& name, const std::string&
 		ComputeShader cs = ComputeShader(name, blob);
 		cs.Compile();
 		ComputeShaders[name] = cs;
+	}
+	else
+	{
+		throw std::runtime_error("Unknown shader type");
+	}
+}
+
+void ShaderResourceSystem::EraseShader(const std::string& name, const std::string& ext)
+{
+	if(ext == "vs")
+	{
+		VertexShaders.erase(name);
+	}
+	else if (ext == "hs")
+	{
+		HullShaders.erase(name);
+	}
+	else if (ext == "ds")
+	{
+		DomainShaders.erase(name);
+	}
+	else if (ext == "gs")
+	{
+		GeometryShaders.erase(name);
+	}
+	else if (ext == "ps")
+	{
+		PixelShaders.erase(name);
+	}
+	else if (ext == "cs")
+	{
+		ComputeShaders.erase(name);
 	}
 	else
 	{

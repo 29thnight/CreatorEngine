@@ -69,9 +69,9 @@ public:
     ~ShaderPSO() = default;
 
     // Reflect all attached shaders and create constant buffers automatically.
-    bool ReflectConstantBuffers();
+    void ReflectConstantBuffers();
 
-    bool CreateInputLayoutFromShader();
+    void CreateInputLayoutFromShader();
 
     // Apply pipeline state and bind constant buffers and resources to the GPU.
     void Apply();
@@ -111,6 +111,9 @@ public:
     const std::unordered_map<std::string, CBEntry>& GetConstantBuffers() const { return m_cbByName; }
 	std::string m_shaderPSOName{ "UnnamedShaderPSO" };
 
+	bool IsInvalidated() const { return m_isInvalidated; }
+	void SetInvalidated(bool val) { m_isInvalidated = val; }
+
 private:
     // Reflection helpers
     void ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage);
@@ -131,6 +134,7 @@ private:
     std::vector<UnorderedAccess> m_unorderedAccessViews;
 
 	FileGuid m_shaderPSOGuid{}; //<-- File GUID of the shader PSO
+	bool     m_isInvalidated{ false }; //<-- Set to true when shaders are reloaded and PSO needs to be reapplied
 };
 #else
 class ShaderPSO : public PipelineStateObject
@@ -139,6 +143,7 @@ public:
     ShaderPSO() = default;
     ~ShaderPSO() = default;
 
+    struct VariableDesc {};
     struct CBEntry {};
 };
 #endif // !DYNAMICCPP_EXPORTS
