@@ -29,6 +29,7 @@ ReflectionScriptField(Player) \
 		meta_property(rangedAtkCooldown) \
 		meta_property(rangedAutoAimRange) \
 		meta_property(minChargedTime) \
+		meta_property(bombMoveSpeed) \
 		meta_property(GracePeriod) \
 		meta_property(ResurrectionRange) \
 		meta_property(ResurrectionTime) \
@@ -46,6 +47,7 @@ ReflectionScriptField(Player) \
 		meta_method(ThrowEvent) \
 		meta_method(Dash) \
 		meta_method(ShootBullet) \
+		meta_method(ThrowBomb) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \
 		meta_method(Attack1) \

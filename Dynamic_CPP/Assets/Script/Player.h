@@ -159,10 +159,15 @@ public:
 	
 	void ChangeAutoTarget(Mathf::Vector2 dir); //사격중 Lstick 으로 타겟변경                 //연속사격중일때 실행 
 	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
-	Mathf::Vector3 bombThrowPosition = {0,0,0};                                                                        
+	Mathf::Vector3 bombThrowPosition = {0,0,0};
+	[[Property]]
+	float bombMoveSpeed = 0.01f;  //폭탄도착지점 
  	void MeleeAttack();
 	[[Method]]
 	void ShootBullet();
+	[[Method]]
+	void ThrowBomb();
+
 	[[Method]]
 	void StartAttack();
 	[[Method]]
@@ -220,7 +225,7 @@ public:
 	//이펙트 출력관련
 	GameObject* dashObj = nullptr;
 	EffectComponent* dashEffect = nullptr;
-
+	EffectComponent* bombIndicator = nullptr; //폭탄 떨어질위치 보여줄 이펙트
 
 
 	GameManager* GM = nullptr;

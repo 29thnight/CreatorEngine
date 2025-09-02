@@ -25,6 +25,7 @@
 #include "CameraComponent.h"
 #include "Bullet.h"
 #include "NormalBullet.h"
+#include "Bomb.h"
 void Player::Start()
 {
 
@@ -607,6 +608,11 @@ void Player::ChangeAutoTarget(Mathf::Vector2 dir)
 
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
+	bombThrowPosition.x += dir.x;
+	bombThrowPosition.z += dir.y;
+
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 targetPos = pos + bombThrowPosition;
 
 }
 
@@ -673,6 +679,13 @@ void Player::ShootBullet()
 		}
 
 	}
+}
+
+void Player::ThrowBomb()
+{
+	Bomb* bomb = new Bomb;
+	bomb->ThrowBomb(this, bombThrowPosition);
+	//bomb 을 프리팹만든걸로 받아오게끔 수정 or weaponPool 필요
 }
 
 

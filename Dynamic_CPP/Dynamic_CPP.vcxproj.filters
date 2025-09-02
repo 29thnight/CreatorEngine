@@ -282,6 +282,9 @@
 		<ClInclude Include="Assets\Script\NormalBullet.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\Bomb.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -490,6 +493,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\NormalBullet.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

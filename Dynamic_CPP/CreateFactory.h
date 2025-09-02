@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "Bomb.h"
 #include "NormalBullet.h"
 #include "SpecialBullet.h"
 #include "Bullet.h"
