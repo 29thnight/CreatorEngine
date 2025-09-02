@@ -44,7 +44,7 @@ void PlayerAttackAH::Enter()
 		eft = SceneManagers->GetActiveScene()->CreateGameObject("asd").get();
 		eft->AddComponent<EffectComponent>()->Awake();
 	}
-	eft->GetComponent<EffectComponent>()->ChangeEffect("ss");
+	eft->GetComponent<EffectComponent>()->ChangeEffect("ss1");
 
 }
 

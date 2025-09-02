@@ -91,7 +91,10 @@ void TrailGenerateModule::Update(float delta)
     // 수명 관리 로직에서 역순으로 제거
     for (int i = static_cast<int>(m_trailPoints.size()) - 1; i >= 0; --i)
     {
-        if (m_currentTime - m_trailPoints[i].timestamp > m_trailLifetime)
+        float age = m_currentTime - m_trailPoints[i].timestamp;
+
+        // 수명이 완전히 끝난 것만 삭제 (여유시간 추가)
+        if (age > m_trailLifetime * 1.2f)  // 0.5초 여유시간
         {
             m_trailPoints.erase(m_trailPoints.begin() + i);
             m_meshDirty = true;
@@ -162,9 +165,6 @@ void TrailGenerateModule::GenerateMesh()
     m_vertices.clear();
     m_indices.clear();
 
-    float totalLength = CalculateTrailLength();
-    float currentLength = 0.0f;
-
     for (size_t i = 0; i < m_trailPoints.size(); ++i)
     {
         const TrailPoint& point = m_trailPoints[i];
@@ -181,7 +181,7 @@ void TrailGenerateModule::GenerateMesh()
         Mathf::Vector4 color = Mathf::Vector4::Lerp(m_endColor, m_startColor, lifeRatio);
         color = Mathf::Vector4::Lerp(color, point.color, 0.5f);
 
-        // Forward 벡터 계산 수정
+        // Forward 벡터 계산
         Mathf::Vector3 forward = Mathf::Vector3::Zero;
         if (i == 0 && m_trailPoints.size() > 1)
         {
@@ -195,13 +195,12 @@ void TrailGenerateModule::GenerateMesh()
         {
             Mathf::Vector3 toNext = m_trailPoints[i + 1].position - point.position;
             Mathf::Vector3 fromPrev = point.position - m_trailPoints[i - 1].position;
-            forward = (toNext + fromPrev) * 0.5f;  // 평균을 구할 때 정규화 전에 스케일링
+            forward = (toNext + fromPrev) * 0.5f;
         }
 
-        // forward 벡터가 0이 아닌지 확인
         if (forward.Length() < 0.001f)
         {
-            forward = Mathf::Vector3(0.0f, 0.0f, 1.0f);  // 기본 방향
+            forward = Mathf::Vector3(0.0f, 0.0f, 1.0f);
         }
         else
         {
@@ -214,15 +213,8 @@ void TrailGenerateModule::GenerateMesh()
         right.Normalize();
         right *= width * 0.5f;
 
-        float u = 0.0f;
-        if (m_useLengthBasedUV && totalLength > 0.0f)
-        {
-            u = currentLength / totalLength;
-        }
-        else
-        {
-            u = static_cast<float>(i) / static_cast<float>(m_trailPoints.size() - 1);
-        }
+        // 수명 기반 U 좌표 사용
+        float u = lifeRatio;
 
         TrailVertex leftVertex, rightVertex;
         leftVertex.position = point.position - right;
@@ -238,18 +230,11 @@ void TrailGenerateModule::GenerateMesh()
         m_vertices.push_back(leftVertex);
         m_vertices.push_back(rightVertex);
 
-        // currentLength 계산을 버텍스 생성 후로 이동
-        if (i > 0)
-        {
-            currentLength += Mathf::Vector3::Distance(m_trailPoints[i - 1].position, point.position);
-        }
-
         // 인덱스 생성
         if (i > 0)
         {
             UINT baseIndex = static_cast<UINT>((i - 1) * 2);
 
-            // 삼각형 순서 수정 (반시계방향)
             m_indices.push_back(baseIndex);
             m_indices.push_back(baseIndex + 2);
             m_indices.push_back(baseIndex + 1);
@@ -259,9 +244,6 @@ void TrailGenerateModule::GenerateMesh()
             m_indices.push_back(baseIndex + 3);
         }
     }
-
-    // 노말 계산을 별도로 하지 않고 up 벡터 사용
-    // CalculateNormals();  // 이 함수 호출 제거
 
     UpdateBuffers();
 

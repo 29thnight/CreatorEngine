@@ -88,6 +88,10 @@ void TrailRenderModule::Initialize()
         D3D11_BIND_CONSTANT_BUFFER,
         &m_constantBufferData
     );
+
+    m_dissolveTexture = DataSystems->LoadTexture("Sword_Eft_02.png");
+    m_dissolveTexture2 = DataSystems->LoadTexture("Sword_Eft_03.png");
+    m_backgroundTexture = DataSystems->LoadTexture("Sword_Eft_04.png");
 }
 
 void TrailRenderModule::Release()
@@ -121,11 +125,18 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     UpdateConstantBuffer(world, view, projection);
     deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
 
-    // 텍스처 바인딩
+    ID3D11ShaderResourceView* srvs[4] = { nullptr };
+
     if (m_assignedTexture && m_assignedTexture->m_pSRV)
-    {
-        deviceContext->PSSetShaderResources(0, 1, &m_assignedTexture->m_pSRV);
-    }
+        srvs[0] = m_assignedTexture->m_pSRV;
+    if (m_dissolveTexture && m_dissolveTexture->m_pSRV)
+        srvs[1] = m_dissolveTexture->m_pSRV;
+    if (m_dissolveTexture2 && m_dissolveTexture2->m_pSRV)
+        srvs[2] = m_dissolveTexture2->m_pSRV;
+    if (m_backgroundTexture && m_backgroundTexture->m_pSRV)
+        srvs[3] = m_backgroundTexture->m_pSRV;
+
+    deviceContext->PSSetShaderResources(0, 4, srvs);
 
     // 정점/인덱스 버퍼 바인딩
     UINT stride = sizeof(TrailVertex);
@@ -138,8 +149,8 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     deviceContext->DrawIndexed(maxIndices, 0, 0);
 
     // 리소스 정리
-    ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-    deviceContext->PSSetShaderResources(0, 1, nullSRV);
+    ID3D11ShaderResourceView* nullSRVs[4] = { nullptr };
+    deviceContext->PSSetShaderResources(0, 4, nullSRVs);
 }
 
 void TrailRenderModule::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
