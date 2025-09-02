@@ -3,6 +3,7 @@
 #include <d3dcompiler.h>
 #include <algorithm>
 #include <cstring>
+#include "Shader.h"
 
 void ShaderPSO::ReflectConstantBuffers()
 {
@@ -10,7 +11,7 @@ void ShaderPSO::ReflectConstantBuffers()
 
     auto reflectStage = [&](auto shaderPtr, ShaderStage stage)
     {
-        if (!shaderPtr) return;
+        if (nullptr == shaderPtr) return;
 
         Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
         if (FAILED(D3DReflect(shaderPtr->GetBufferPointer(),
