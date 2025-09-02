@@ -78,6 +78,30 @@ void ShaderPSO::CreateInputLayoutFromShader()
     }
 
     CreateInputLayout(std::move(layout));
+
+    CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
+
+    if(m_rasterizerState)
+    {
+		Memory::SafeDelete(m_rasterizerState);
+    }
+
+    DirectX11::ThrowIfFailed(
+        DeviceState::g_pDevice->CreateRasterizerState(
+            &rasterizerDesc,
+            &m_rasterizerState
+        )
+    );
+
+    m_depthStencilState = DeviceState::g_pDepthStencilState;
+
+	m_samplers.clear();
+
+    auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+    auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+    m_samplers.push_back(linearSampler);
+    m_samplers.push_back(pointSampler);
 }
 
 void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage)

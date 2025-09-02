@@ -312,9 +312,12 @@ void ShaderResourceSystem::LoadShaderAssets()
 				{
 					if (mat->GetShaderPSO() && mat->GetShaderPSO()->m_shaderPSOName == assetName)
 					{
-						mat->SetShaderPSO(nullptr);
+						//mat->SetShaderPSO(nullptr);
+						mat->GetShaderPSO()->SetInvalidated(true);
 					}
 				}
+
+				ShaderAssets.erase(assetName);
 			}
 		}
 	}

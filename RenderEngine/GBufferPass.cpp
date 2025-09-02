@@ -291,6 +291,25 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		auto firstProxy = proxies.front();
 		auto customPSO = firstProxy->m_Material->m_shaderPSO;
 		if (!customPSO) continue;
+		//TEST: PSO가 유효하지 않다면 ShaderSystem에서 동일 이름의 PSO를 찾아 교체
+		auto& shaderPSOContainer = ShaderSystem->ShaderAssets;
+
+		if(customPSO->IsInvalidated())
+		{
+			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
+			{
+				//firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				for(auto* proxy : proxies)
+				{
+					proxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				}
+				continue; // 교체된 프레임은 스킵, 다음 프레임 부터 적용
+			}
+			else
+			{
+				continue; // 해당 이름의 PSO가 없다면 스킵
+			}
+		}
 
 		// PSO는 그룹 단위로 1회 Apply
 		customPSO->Apply(deferredPtr);
