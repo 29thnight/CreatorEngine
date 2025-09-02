@@ -38,4 +38,6 @@ public:
 	void ReloadShaders();
     void Reset();
 };
+#else
+class PipelineStateObject {};
 #endif // !DYNAMICCPP_EXPORTS

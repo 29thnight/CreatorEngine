@@ -1,33 +1,55 @@
 #include "Material.h"
 #include "DataSystem.h"
+#include <cstring>
 
 Material::Material()
 {
 }
 
 Material::Material(const Material& material) :
-	m_name(material.m_name),
-	m_pBaseColor(material.m_pBaseColor),
-	m_pNormal(material.m_pNormal),
-	m_pOccRoughMetal(material.m_pOccRoughMetal),
-	m_AOMap(material.m_AOMap),
-	m_pEmissive(material.m_pEmissive),
-	m_materialInfo(material.m_materialInfo),
-	m_fileGuid(material.m_fileGuid)
+        m_name(material.m_name),
+        m_pBaseColor(material.m_pBaseColor),
+        m_pNormal(material.m_pNormal),
+        m_pOccRoughMetal(material.m_pOccRoughMetal),
+        m_AOMap(material.m_AOMap),
+        m_pEmissive(material.m_pEmissive),
+        m_materialInfo(material.m_materialInfo),
+        m_fileGuid(material.m_fileGuid),
+        m_baseColorTexName(material.m_baseColorTexName),
+        m_normalTexName(material.m_normalTexName),
+        m_ORM_TexName(material.m_ORM_TexName),
+        m_AO_TexName(material.m_AO_TexName),
+        m_EmissiveTexName(material.m_EmissiveTexName),
+        m_flowInfo(material.m_flowInfo),
+        m_shaderPSO(material.m_shaderPSO),
+        m_renderingMode(material.m_renderingMode),
+        m_shaderPSOGuid(material.m_shaderPSOGuid),
+        m_cbMeta(material.m_cbMeta),
+        m_cbufferValues(material.m_cbufferValues)
 {
 }
 
 Material::Material(Material&& material) noexcept
 {
-	std::exchange(m_name, material.m_name);
-	std::exchange(m_pBaseColor, material.m_pBaseColor);
-	std::exchange(m_pNormal, material.m_pNormal);
-	std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
-	std::exchange(m_AOMap, material.m_AOMap);
-	std::exchange(m_pEmissive, material.m_pEmissive);
-	std::exchange(m_fileGuid, material.m_fileGuid);
-
-	m_materialInfo = material.m_materialInfo;
+        std::exchange(m_name, material.m_name);
+        std::exchange(m_pBaseColor, material.m_pBaseColor);
+        std::exchange(m_pNormal, material.m_pNormal);
+        std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
+        std::exchange(m_AOMap, material.m_AOMap);
+        std::exchange(m_pEmissive, material.m_pEmissive);
+        std::exchange(m_fileGuid, material.m_fileGuid);
+        std::exchange(m_baseColorTexName, material.m_baseColorTexName);
+        std::exchange(m_normalTexName, material.m_normalTexName);
+        std::exchange(m_ORM_TexName, material.m_ORM_TexName);
+        std::exchange(m_AO_TexName, material.m_AO_TexName);
+        std::exchange(m_EmissiveTexName, material.m_EmissiveTexName);
+        m_materialGuid = std::move(material.m_materialGuid);
+        m_shaderPSOGuid = std::move(material.m_shaderPSOGuid);
+        m_renderingMode = std::move(material.m_renderingMode);
+        m_materialInfo = std::move(material.m_materialInfo);
+        m_flowInfo = std::move(material.m_flowInfo);
+        std::exchange(m_cbMeta, material.m_cbMeta);
+        m_cbufferValues = std::move(material.m_cbufferValues);
 }
 
 Material::~Material()
@@ -47,29 +69,53 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	// Create a new Material instance
 	auto cloneMaterial = std::make_shared<Material>(*origin);
 
-	// 수정된 코드
+	const std::string cloneSuffix = "_Clone";
+
+	// Determine the base name depending on whether a new name was provided
+	std::string baseName = newName.empty() ? std::string(origin->m_name) : std::string(newName);
+
+	auto stripCloneSuffix = [&](std::string& name)
+	{
+		auto pos = name.rfind(cloneSuffix);
+		if (pos != std::string::npos)
+		{
+			auto digitsPos = pos + cloneSuffix.size();
+			if (digitsPos == name.size() ||
+				std::all_of(name.begin() + digitsPos, name.end(), [](unsigned char c) { return std::isdigit(c); }))
+			{
+				name.erase(pos);
+			}
+		}
+	};
+
+	// If no name was provided, start with the base name plus the clone suffix
+	std::string finalName;
 	if (newName.empty())
 	{
-		cloneMaterial->m_name = origin->m_name + "_Clone";
+		stripCloneSuffix(baseName);
+		finalName = baseName + cloneSuffix;
 	}
 	else
 	{
-		cloneMaterial->m_name = std::string(newName);
+		finalName = baseName;
 	}
 
-	if(DataSystems->Materials.find(cloneMaterial->m_name) == DataSystems->Materials.end())
+	// Ensure the name is unique and avoid nested clone suffixes
+	if (DataSystems->Materials.contains(finalName))
 	{
-		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
-	}
-	else
-	{
-		int cloneIndex = 1;
-		while(DataSystems->Materials.find(cloneMaterial->m_name) != DataSystems->Materials.end())
+		stripCloneSuffix(baseName);
+		finalName = baseName + cloneSuffix;
+		int cloneIndex = 0;
+		while (DataSystems->Materials.contains(finalName))
 		{
-			cloneMaterial->m_name += "_Clone" + std::to_string(cloneIndex++);
+			finalName = baseName + cloneSuffix + std::to_string(++cloneIndex);
 		}
-		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 	}
+
+	cloneMaterial->m_name = finalName;
+	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
+
+	DataSystems->SaveMaterial(cloneMaterial.get());
 
 	return cloneMaterial;
 }
@@ -168,4 +214,62 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 	m_flowInfo.m_uvScroll = uvScroll;
 
 	return *this;
+}
+
+void Material::ApplyMaterialInfo(ID3D11DeviceContext* context)
+{
+}
+
+void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
+{
+    if (pso)
+    {
+        m_shaderPSO = pso;
+        m_shaderPSOGuid = pso->GetShaderPSOGuid();
+        m_cbMeta = &pso->GetConstantBuffers();
+        m_cbufferValues.clear();
+        for (auto& [name, cb] : pso->GetConstantBuffers())
+        {
+            auto& storage = m_cbufferValues[name];
+            storage.resize(cb.size);
+            std::memcpy(storage.data(), cb.cpuData.data(), cb.size);
+        }
+
+		if (m_pBaseColor)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 0, m_pBaseColor->m_pSRV);
+		}
+
+		if (m_pNormal)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 1, m_pNormal->m_pSRV);
+		}
+
+		if (m_pOccRoughMetal)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 2, m_pOccRoughMetal->m_pSRV);
+		}
+
+		if (m_AOMap)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 3, m_AOMap->m_pSRV);
+		}
+
+		if (m_pEmissive)
+		{
+			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 5, m_pEmissive->m_pSRV);
+		}
+    }
+    else
+    {
+        m_shaderPSO.reset();
+        m_shaderPSOGuid = {};
+        m_cbMeta = nullptr;
+        m_cbufferValues.clear();
+    }
+}
+
+std::shared_ptr<ShaderPSO> Material::GetShaderPSO() const
+{
+	return m_shaderPSO ? m_shaderPSO : nullptr;
 }

@@ -174,8 +174,8 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
-      <MinFilesInUnityFile>10</MinFilesInUnityFile>
-      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <MinFilesInUnityFile>15</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -262,6 +262,7 @@
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderModules.cpp" />
+    <ClCompile Include="ShaderDSL.cpp" />
     <ClCompile Include="ShaderPSO.cpp" />
     <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
@@ -359,6 +360,7 @@
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="RenderModules.h" />
+    <ClInclude Include="ShaderDSL.h" />
     <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="ShadowMapPassSetting.h" />
     <ClInclude Include="SizeModuleCS.h" />
@@ -545,7 +547,17 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomThresholdDownsample.cs.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomDownSample.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomExtract.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomUpSample.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>

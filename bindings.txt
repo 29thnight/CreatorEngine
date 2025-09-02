@@ -8,7 +8,9 @@ Dynamic_CPP/Assets/Shaders\Blit.ps.hlsl: src -> t0
 Dynamic_CPP/Assets/Shaders\BloomComposite.ps.hlsl: tex0 -> t0
 Dynamic_CPP/Assets/Shaders\BloomComposite.ps.hlsl: tex1 -> t1
 Dynamic_CPP/Assets/Shaders\BloomComposite.ps.hlsl: CompositeParams -> b0
-Dynamic_CPP/Assets/Shaders\BloomThresholdDownsample.cs.hlsl: ThresholdParams -> b0
+Dynamic_CPP/Assets/Shaders\BloomExtract.cs.hlsl: BloomBuffer -> b0
+Dynamic_CPP/Assets/Shaders\BloomDownSample.cs.hlsl: BloomDownSampleParams -> b0
+Dynamic_CPP/Assets/Shaders\BloomUpsample.cs.hlsl: BloomUpSampleParams -> b0
 Dynamic_CPP/Assets/Shaders\ColorGrading.ps.hlsl: ColorGradingCBuffer -> b0
 Dynamic_CPP/Assets/Shaders\ColorModule.cs.hlsl: ColorParams -> b0
 Dynamic_CPP/Assets/Shaders\Deferred.ps.hlsl: DeferredCBuffer -> b3

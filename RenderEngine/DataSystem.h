@@ -134,6 +134,7 @@ public:
 	float tileSize = 160.0f;
 
 	Material* m_trasfarMaterial{};
+	std::string m_trasfarShader{};
 
 	std::string selectedFileName{};
 	std::string selectedMetaFilePath{};

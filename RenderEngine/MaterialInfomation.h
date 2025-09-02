@@ -20,7 +20,7 @@ cbuffer MaterialInfomation
     bool32		  m_useAOMap{};
     bool32		  m_useEmissive{};
     bool32		  m_useNormalMap{};
-    bool32		  m_convertToLinearSpace{false};
+    bool32		  m_convertToLinearSpace{ false };
     [[Property]]
     UINT          m_bitflag{};
 

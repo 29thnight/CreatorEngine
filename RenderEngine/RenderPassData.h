@@ -20,27 +20,27 @@ public:
 	Managed::UniquePtr<Texture> m_depthStencil;
 	Managed::UniquePtr<Texture> m_shadowMapTexture;
 	Managed::UniquePtr<Texture> m_SSRPrevTexture;
-	ID3D11DepthStencilView*   m_shadowMapDSVarr[cascadeCount]{};
-	ID3D11ShaderResourceView* sliceSRV[cascadeCount]{};
-	FrameProxyFindInstanceIDs m_findProxyVec[STORE_FRAME_COUNT];
-	FrameProxyFindInstanceIDs m_findShadowProxyVec[STORE_FRAME_COUNT];
-	ProxyContainer			  m_deferredQueue;
-	ProxyContainer			  m_forwardQueue;
-	ProxyContainer            m_terrainQueue;
-	ProxyContainer			  m_foliageQueue;
-	ProxyContainer			  m_shadowRenderQueue;
-	Camera					  m_shadowCamera;
+	ID3D11DepthStencilView*		m_shadowMapDSVarr[cascadeCount]{};
+	ID3D11ShaderResourceView*	sliceSRV[cascadeCount]{};
+	FrameProxyFindInstanceIDs	m_findProxyVec[STORE_FRAME_COUNT];
+	FrameProxyFindInstanceIDs	m_findShadowProxyVec[STORE_FRAME_COUNT];
+	ProxyContainer				m_deferredQueue;
+	ProxyContainer				m_forwardQueue;
+	ProxyContainer				m_terrainQueue;
+	ProxyContainer				m_foliageQueue;
+	ProxyContainer				m_shadowRenderQueue;
+	Camera						m_shadowCamera;
 	//flags
-	std::atomic_bool          m_isInitalized{ false };
-	std::atomic_bool          m_isDestroy{ false };
-	std::atomic<uint32>		  m_index{ 0 };
-	std::atomic<uint32>       m_frame{};
+	std::atomic_bool			m_isInitalized{ false };
+	std::atomic_bool			m_isDestroy{ false };
+	std::atomic<uint32>			m_index{ 0 };
+	std::atomic<uint32>			m_frame{};
 
-	Mathf::xMatrix            m_frameCalculatedView{};
-	Mathf::xMatrix            m_frameCalculatedProjection{};
+	Mathf::xMatrix				m_frameCalculatedView{};
+	Mathf::xMatrix				m_frameCalculatedProjection{};
 
-	ComPtr<ID3D11Buffer>	  m_ViewBuffer;
-	ComPtr<ID3D11Buffer>	  m_ProjBuffer;
+	ComPtr<ID3D11Buffer>		m_ViewBuffer;
+	ComPtr<ID3D11Buffer>		m_ProjBuffer;
 
 	RenderPassData();
 	~RenderPassData();
