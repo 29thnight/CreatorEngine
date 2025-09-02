@@ -23,7 +23,7 @@ Material::Material(const Material& material) :
         m_flowInfo(material.m_flowInfo),
         m_shaderPSO(material.m_shaderPSO),
         m_renderingMode(material.m_renderingMode),
-        m_shaderPSOGuid(material.m_shaderPSOGuid),
+        m_shaderPSOName(material.m_shaderPSOName),
         m_cbMeta(material.m_cbMeta),
         m_cbufferValues(material.m_cbufferValues)
 {
@@ -44,7 +44,8 @@ Material::Material(Material&& material) noexcept
         std::exchange(m_AO_TexName, material.m_AO_TexName);
         std::exchange(m_EmissiveTexName, material.m_EmissiveTexName);
         m_materialGuid = std::move(material.m_materialGuid);
-        m_shaderPSOGuid = std::move(material.m_shaderPSOGuid);
+        m_shaderPSOName = std::move(material.m_shaderPSOName);
+        m_shaderPSO = std::move(material.m_shaderPSO);
         m_renderingMode = std::move(material.m_renderingMode);
         m_materialInfo = std::move(material.m_materialInfo);
         m_flowInfo = std::move(material.m_flowInfo);
@@ -225,7 +226,7 @@ void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
     if (pso)
     {
         m_shaderPSO = pso;
-        m_shaderPSOGuid = pso->GetShaderPSOGuid();
+        m_shaderPSOName = pso->m_shaderPSOName;
         m_cbMeta = &pso->GetConstantBuffers();
         m_cbufferValues.clear();
         for (auto& [name, cb] : pso->GetConstantBuffers())
@@ -263,7 +264,7 @@ void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
     else
     {
         m_shaderPSO.reset();
-        m_shaderPSOGuid = {};
+        m_shaderPSOName = {};
         m_cbMeta = nullptr;
         m_cbufferValues.clear();
     }

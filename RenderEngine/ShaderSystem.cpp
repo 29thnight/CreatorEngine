@@ -312,6 +312,18 @@ void ShaderResourceSystem::ReloadShaderAssets()
 	LoadShaderAssets();
 }
 
+void ShaderResourceSystem::SetPSOs_GUID()
+{
+	for (auto& [name, pso] : ShaderAssets)
+	{
+		file::path shaderpath = PathFinder::RelativeToShader() / (name + ".shader");
+		if (file::exists(shaderpath))
+		{
+			pso->SetShaderPSOGuid(DataSystems->GetFileGuid(shaderpath));
+		}
+	}
+}
+
 void ShaderResourceSystem::RegisterSelectShaderContext()
 {
 	ImGui::ContextRegister("SelectShader", true, [this]() {

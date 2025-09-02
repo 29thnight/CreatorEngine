@@ -130,7 +130,7 @@ private:
     std::vector<ShaderResource>  m_shaderResources;
     std::vector<UnorderedAccess> m_unorderedAccessViews;
 
-    FileGuid m_shaderPSOGuid{};
+	FileGuid m_shaderPSOGuid{}; //<-- File GUID of the shader PSO
 };
 #else
 class ShaderPSO : public PipelineStateObject

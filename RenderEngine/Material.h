@@ -133,9 +133,8 @@ public:
 	HashedGuid m_materialGuid{ make_guid() };
     std::shared_ptr<ShaderPSO> m_shaderPSO{ nullptr };
     [[Property]]
-    FileGuid m_shaderPSOGuid{};
+    std::string m_shaderPSOName{};
     const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
-    [[Property]]
     std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
 	std::unordered_set<std::string> m_dirtyCBs;
 };

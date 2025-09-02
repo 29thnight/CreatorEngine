@@ -27,6 +27,7 @@ public:
 
 	void LoadShaderAssets();
 	void ReloadShaderAssets();
+	void SetPSOs_GUID();
 
 	void RegisterSelectShaderContext();
 	void SetShaderSelectionTarget(Material* material);
