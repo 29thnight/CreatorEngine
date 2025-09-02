@@ -2,13 +2,14 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Shader.h"
 #include "Delegate.h"
+#include "DLLAcrossSingleton.h"
 
 class ShaderPSO; // 전방 선언
 class Material;
-class ShaderResourceSystem final : public Singleton<ShaderResourceSystem>
+class ShaderResourceSystem final : public DLLCore::Singleton<ShaderResourceSystem>
 {
 private:
-	friend class Singleton;
+	friend class DLLCore::Singleton<ShaderResourceSystem>;
 
 	ShaderResourceSystem() = default;
 	~ShaderResourceSystem();
@@ -55,5 +56,5 @@ private:
 	Material* m_selectShaderTarget = nullptr;
 };
 
-static inline auto& ShaderSystem = ShaderResourceSystem::GetInstance();
+static auto ShaderSystem = ShaderResourceSystem::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

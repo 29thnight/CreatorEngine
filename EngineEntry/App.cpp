@@ -12,6 +12,7 @@
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
+#include "ShaderSystem.h"
 #include "ReflectionRegister.h"
 #include "ReflectionVectorFactory.h"
 #include "ReflectionVectorInvoker.h"
@@ -66,6 +67,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	InputManager::Destroy();
 	DataSystem::Destroy();
 	PrefabUtility::Destroy();
+	ShaderResourceSystem::Destroy();
 	Meta::RegisterClassFinalize();
 	Meta::VectorFactoryRegistry::Destroy();
 	Meta::VectorInvokerRegistry::Destroy();
@@ -79,6 +81,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	ShaderResourceSystem::GetInstance();
 	EngineSetting::GetInstance();
 	TagManager::GetInstance();
 	InputManager::GetInstance();

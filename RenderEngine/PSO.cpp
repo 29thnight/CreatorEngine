@@ -160,6 +160,11 @@ void PipelineStateObject::CreateInputLayout(InputLayOutContainer&& vertexLayoutD
 	m_inputLayoutDescContainer = vertexLayoutDesc;
 	if (!m_inputLayoutDescContainer.empty())
 	{
+		if (m_inputLayout)
+		{
+			Memory::SafeDelete(m_inputLayout);
+		}
+
 		DirectX11::ThrowIfFailed(
 			DeviceState::g_pDevice->CreateInputLayout(
 				m_inputLayoutDescContainer.data(),
