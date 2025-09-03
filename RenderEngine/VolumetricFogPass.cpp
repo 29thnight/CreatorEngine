@@ -138,15 +138,15 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	texDesc.CPUAccessFlags = 0;     // CPU 접근 안 함
 	texDesc.MiscFlags = 0;
 
-	HRESULT hr = DeviceState::g_pDevice->CreateTexture3D(&texDesc, nullptr, &mTempVoxelInjectionTexture3D[0]);
+	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateTexture3D(&texDesc, nullptr, &mTempVoxelInjectionTexture3D[0]);
 	if (FAILED(hr)) {
 		Debug->LogError("Failed to create 3D texture for volumetric fog read.");
 	}
-	hr = DeviceState::g_pDevice->CreateTexture3D(&texDesc, nullptr, &mTempVoxelInjectionTexture3D[1]);
+	hr = DirectX11::DeviceStates->g_pDevice->CreateTexture3D(&texDesc, nullptr, &mTempVoxelInjectionTexture3D[1]);
 	if (FAILED(hr)) {
 		Debug->LogError("Failed to create 3D texture for volumetric fog write.");
 	}
-	hr = DeviceState::g_pDevice->CreateTexture3D(&texDesc, nullptr, &mFinalVoxelInjectionTexture3D);
+	hr = DirectX11::DeviceStates->g_pDevice->CreateTexture3D(&texDesc, nullptr, &mFinalVoxelInjectionTexture3D);
 	if (FAILED(hr)) {
 		Debug->LogError("Failed to create 3D texture for volumetric fog final.");
 	}
@@ -158,9 +158,9 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	srvDesc.Texture3D.MipLevels = texDesc.MipLevels;
 	srvDesc.Texture3D.MostDetailedMip = 0;
 
-	DeviceState::g_pDevice->CreateShaderResourceView(mTempVoxelInjectionTexture3D[0], &srvDesc, &mTempVoxelInjectionTexture3DSRV[0]);
-	DeviceState::g_pDevice->CreateShaderResourceView(mTempVoxelInjectionTexture3D[1], &srvDesc, &mTempVoxelInjectionTexture3DSRV[1]);
-	DeviceState::g_pDevice->CreateShaderResourceView(mFinalVoxelInjectionTexture3D, &srvDesc, &mFinalVoxelInjectionTexture3DSRV);
+	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(mTempVoxelInjectionTexture3D[0], &srvDesc, &mTempVoxelInjectionTexture3DSRV[0]);
+	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(mTempVoxelInjectionTexture3D[1], &srvDesc, &mTempVoxelInjectionTexture3DSRV[1]);
+	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(mFinalVoxelInjectionTexture3D, &srvDesc, &mFinalVoxelInjectionTexture3DSRV);
 
 	// Unordered Access View (for Compute Shader 등)
 	D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -170,9 +170,9 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	uavDesc.Texture3D.FirstWSlice = 0;
 	uavDesc.Texture3D.WSize = texDesc.Depth;
 
-	DeviceState::g_pDevice->CreateUnorderedAccessView(mTempVoxelInjectionTexture3D[0], &uavDesc, &mTempVoxelInjectionTexture3DUAV[0]);
-	DeviceState::g_pDevice->CreateUnorderedAccessView(mTempVoxelInjectionTexture3D[1], &uavDesc, &mTempVoxelInjectionTexture3DUAV[1]);
-	DeviceState::g_pDevice->CreateUnorderedAccessView(mFinalVoxelInjectionTexture3D, &uavDesc, &mFinalVoxelInjectionTexture3DUAV);
+	DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(mTempVoxelInjectionTexture3D[0], &uavDesc, &mTempVoxelInjectionTexture3DUAV[0]);
+	DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(mTempVoxelInjectionTexture3D[1], &uavDesc, &mTempVoxelInjectionTexture3DUAV[1]);
+	DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(mFinalVoxelInjectionTexture3D, &uavDesc, &mFinalVoxelInjectionTexture3DUAV);
 
 	file::path path = file::path(fileName);
 	if (file::exists(path))
@@ -181,8 +181,8 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	}
 
 	m_CopiedTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -279,7 +279,7 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCon
 	m_pso->Apply(deferredPtr);
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, nullptr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	CompositeCB compositeData{};
 	compositeData.ViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
 	compositeData.InvView = camera.CalculateInverseView();

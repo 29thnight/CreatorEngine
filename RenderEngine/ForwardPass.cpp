@@ -79,7 +79,7 @@ ForwardPass::ForwardPass()
 	instanceBufferDesc.StructureByteStride = sizeof(Mathf::xMatrix);
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBuffer(&instanceBufferDesc, nullptr, &m_instanceBuffer)
+		DirectX11::DeviceStates->g_pDevice->CreateBuffer(&instanceBufferDesc, nullptr, &m_instanceBuffer)
 	);
 
 	// Create a shader resource view for the instance buffer
@@ -90,12 +90,12 @@ ForwardPass::ForwardPass()
 	srvDesc.Buffer.NumElements = MAX_INSTANCES;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
+		DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
 	);
 
 	CD3D11_DEPTH_STENCIL_DESC depthStencilDesc2(D3D11_DEFAULT);
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilState(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc2,
 			&m_depthNoWrite
 		)
@@ -112,7 +112,7 @@ ForwardPass::ForwardPass()
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBlendState1(
+		DirectX11::DeviceStates->g_pDevice->CreateBlendState1(
 			&blendDesc,
 			&m_blendPassState
 		)
@@ -188,7 +188,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, renderData->m_depthStencil->m_pDSV);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	scene.UseModel(deferredPtr);
 	DirectX11::OMSetDepthStencilState(deferredPtr, m_depthNoWrite.Get(), 1);
 	float blend_factor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -352,10 +352,10 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 
 	ID3D11RenderTargetView* view = data->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, data->m_depthStencil->m_pDSV);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	scene.UseModel(deferredPtr);
-	DirectX11::OMSetDepthStencilState(deferredPtr, DeviceState::g_pDepthStencilState, 1);
-	DirectX11::OMSetBlendState(deferredPtr, DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
+	DirectX11::OMSetBlendState(deferredPtr, DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());

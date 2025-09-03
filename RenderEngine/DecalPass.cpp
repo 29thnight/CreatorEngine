@@ -30,7 +30,7 @@ DecalPass::DecalPass()
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
@@ -45,7 +45,7 @@ DecalPass::DecalPass()
 	depthStencilDesc.StencilWriteMask = 0xFF;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilState(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc,
 			&m_NoWriteDepthStencilState
 		)
@@ -102,8 +102,8 @@ DecalPass::DecalPass()
 	DirectX::SetName(m_indexBuffer.Get(), "DecalIndexBuffer");
 
 	m_CopiedDepthTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"copiedDepthTexture",
 		DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
 		D3D11_BIND_SHADER_RESOURCE
@@ -151,12 +151,12 @@ void DecalPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Re
 	PS_CONSTANT_BUFFER cBuf;
 	cBuf.g_inverseProjectionMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedProjection);
 	cBuf.g_inverseViewMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedView);
-	cBuf.g_screenDimensions = { DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height };
+	cBuf.g_screenDimensions = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
 	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &cBuf);
 
 	camera.UpdateBuffer(deferredPtr);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, m_decalBuffer.GetAddressOf());

@@ -87,6 +87,11 @@ PipelineStateObject::PipelineStateObject()
 	});
 }
 
+PipelineStateObject::PipelineStateObject(bool isShaderPSO)
+{
+	m_isShaderPSO = isShaderPSO;
+}
+
 PipelineStateObject::~PipelineStateObject()
 {
 	ShaderSystem->m_shaderReloadedDelegate.Remove(m_shaderReloadEventHandle);
@@ -97,19 +102,19 @@ PipelineStateObject::~PipelineStateObject()
 
 void PipelineStateObject::Apply()
 {
-	DeviceState::g_pDeviceContext->IASetInputLayout(m_inputLayout);
-	DeviceState::g_pDeviceContext->IASetPrimitiveTopology(m_primitiveTopology);
+	DirectX11::DeviceStates->g_pDeviceContext->IASetInputLayout(m_inputLayout);
+	DirectX11::DeviceStates->g_pDeviceContext->IASetPrimitiveTopology(m_primitiveTopology);
 
-	PSOHelper::VSSetShader(DeviceState::g_pDeviceContext, m_vertexShader);
-	PSOHelper::PSSetShader(DeviceState::g_pDeviceContext, m_pixelShader);
-	PSOHelper::HSSetShader(DeviceState::g_pDeviceContext, m_hullShader);
-	PSOHelper::DSSetShader(DeviceState::g_pDeviceContext, m_domainShader);
-	PSOHelper::GSSetShader(DeviceState::g_pDeviceContext, m_geometryShader);
-	PSOHelper::CSSetShader(DeviceState::g_pDeviceContext, m_computeShader);
+	PSOHelper::VSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_vertexShader);
+	PSOHelper::PSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_pixelShader);
+	PSOHelper::HSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_hullShader);
+	PSOHelper::DSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_domainShader);
+	PSOHelper::GSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_geometryShader);
+	PSOHelper::CSSetShader(DirectX11::DeviceStates->g_pDeviceContext, m_computeShader);
 
-	DeviceState::g_pDeviceContext->RSSetState(m_rasterizerState);
-	DeviceState::g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
-	DeviceState::g_pDeviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
+	DirectX11::DeviceStates->g_pDeviceContext->RSSetState(m_rasterizerState);
+	DirectX11::DeviceStates->g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
+	DirectX11::DeviceStates->g_pDeviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
 	for (uint32 i = 0; i < m_samplers.size(); ++i)
 	{
@@ -143,8 +148,13 @@ void PipelineStateObject::CreateInputLayout()
 {
 	if(!m_inputLayoutDescContainer.empty())
 	{
+		if (m_inputLayout)
+		{
+			Memory::SafeDelete(m_inputLayout);
+		}
+
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateInputLayout(
+			DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
 				m_inputLayoutDescContainer.data(),
 				m_inputLayoutDescContainer.size(),
 				m_vertexShader->GetBufferPointer(),
@@ -160,8 +170,13 @@ void PipelineStateObject::CreateInputLayout(InputLayOutContainer&& vertexLayoutD
 	m_inputLayoutDescContainer = vertexLayoutDesc;
 	if (!m_inputLayoutDescContainer.empty())
 	{
+		if (m_inputLayout)
+		{
+			Memory::SafeDelete(m_inputLayout);
+		}
+
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateInputLayout(
+			DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
 				m_inputLayoutDescContainer.data(),
 				m_inputLayoutDescContainer.size(),
 				m_vertexShader->GetBufferPointer(),
@@ -206,18 +221,34 @@ void PipelineStateObject::ReloadShaders()
 
 void PipelineStateObject::Reset()
 {
-    DeviceState::g_pDeviceContext->IASetInputLayout(nullptr);
-    DeviceState::g_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    DirectX11::DeviceStates->g_pDeviceContext->IASetInputLayout(nullptr);
+    DirectX11::DeviceStates->g_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    PSOHelper::VSSetShader(DeviceState::g_pDeviceContext, nullptr);
-	PSOHelper::PSSetShader(DeviceState::g_pDeviceContext, nullptr);
-	PSOHelper::HSSetShader(DeviceState::g_pDeviceContext, nullptr);
-	PSOHelper::DSSetShader(DeviceState::g_pDeviceContext, nullptr);
-	PSOHelper::GSSetShader(DeviceState::g_pDeviceContext, nullptr);
-	PSOHelper::CSSetShader(DeviceState::g_pDeviceContext, nullptr);
+    PSOHelper::VSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
+	PSOHelper::PSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
+	PSOHelper::HSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
+	PSOHelper::DSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
+	PSOHelper::GSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
+	PSOHelper::CSSetShader(DirectX11::DeviceStates->g_pDeviceContext, nullptr);
 
-    DeviceState::g_pDeviceContext->RSSetState(nullptr);
-    DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
-    DeviceState::g_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->RSSetState(nullptr);
+    DirectX11::DeviceStates->g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+    DirectX11::DeviceStates->g_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
+}
+void PipelineStateObject::Reset(ID3D11DeviceContext* deferredContext)
+{
+	deferredContext->IASetInputLayout(nullptr);
+	deferredContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	PSOHelper::VSSetShader(deferredContext, nullptr);
+	PSOHelper::PSSetShader(deferredContext, nullptr);
+	PSOHelper::HSSetShader(deferredContext, nullptr);
+	PSOHelper::DSSetShader(deferredContext, nullptr);
+	PSOHelper::GSSetShader(deferredContext, nullptr);
+	PSOHelper::CSSetShader(deferredContext, nullptr);
+
+	deferredContext->RSSetState(nullptr);
+	deferredContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+	deferredContext->OMSetDepthStencilState(nullptr, 0);
 }
 #endif // !DYNAMICCPP_EXPORTS

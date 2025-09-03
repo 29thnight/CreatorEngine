@@ -30,10 +30,12 @@ namespace Meta
         {
             _casters[typeid(std::shared_ptr<T>)] = [](const std::any& a) -> void*
             {
-				//std::string typeName = ToString<T>();
                 const auto& sp = std::any_cast<std::shared_ptr<T>>(a);
                 return sp.get();  // 내부 raw pointer 리턴
             };
+
+            std::string typeName = ToString<T>();
+			_nameToType.emplace(typeName, typeid(T));
         }
 
         template<typename T>
@@ -54,6 +56,9 @@ namespace Meta
                     return const_cast<void*>(static_cast<const void*>(&ref));
                 };
             }
+
+            std::string typeName = ToString<T>();
+			_nameToType.emplace(typeName, typeid(T));
         }
 
         template<typename T>
@@ -83,9 +88,23 @@ namespace Meta
             return {}; // 변환 실패
         }
 
+        void UnRegister(std::string_view name)
+        {
+            auto nit = _nameToType.find(std::string(name));
+            if (nit == _nameToType.end()) return;
+
+            const auto ti = nit->second;
+            _casters.erase(ti);
+            _makeAny.erase(ti);
+            _nameToType.erase(nit);
+
+            return;
+		}
+
     private:
         std::unordered_map<std::type_index, AnyCaster> _casters;
         std::unordered_map<std::type_index, std::function<std::any(void*)>> _makeAny;
+        std::unordered_map<std::string, std::type_index> _nameToType;
     };
 
     static auto TypeCast = TypeCaster::GetInstance();
@@ -134,6 +153,12 @@ namespace Meta
             {
                 map.erase(it);
             }
+
+			auto hit = hashMap.find(it->second.typeID);
+            if (hit != hashMap.end())
+            {
+                hashMap.erase(hit);
+			}
 		}
 
         const Type* Find(const std::string& name)

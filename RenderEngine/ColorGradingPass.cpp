@@ -56,8 +56,8 @@ ColorGradingPass::ColorGradingPass()
 	m_EditBuffer = DirectX11::CreateBuffer(sizeof(ColorGradingEdit), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	m_pCopiedTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -210,7 +210,7 @@ void ColorGradingPass::ControlPanel()
 			DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
 
 			DirectX::ScratchImage image;
-			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, m_pColorGradingLUTTexture->m_pTexture, image);
+			HRESULT hr = DirectX::CaptureTexture(DirectX11::DeviceStates->g_pDevice, DirectX11::DeviceStates->g_pDeviceContext, m_pColorGradingLUTTexture->m_pTexture, image);
 
 			std::wstring path = PathFinder::Relative("ColorGrading\\");
 			if (!file::exists(path)) {

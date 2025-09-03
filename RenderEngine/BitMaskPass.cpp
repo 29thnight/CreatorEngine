@@ -30,8 +30,8 @@ BitMaskPass::BitMaskPass()
     m_pTempTexture = Texture::Create(
         2,
         2,
-        DeviceState::g_ClientRect.width,
-        DeviceState::g_ClientRect.height,
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height,
         "BitmaskDownTexture",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
@@ -40,8 +40,8 @@ BitMaskPass::BitMaskPass()
     m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     m_pTempTexture2 = Texture::Create(
-        DeviceState::g_ClientRect.width,
-        DeviceState::g_ClientRect.height,
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height,
         "BitmaskUpTexture2",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
@@ -88,11 +88,11 @@ void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	{
 		efparams.m_color[i] = m_colors[i];
 	}
-	efparams.m_screenSize = { (float)DeviceState::g_Viewport.Width, (float)DeviceState::g_Viewport.Height };
+	efparams.m_screenSize = { (float)DirectX11::DeviceStates->g_Viewport.Width, (float)DirectX11::DeviceStates->g_Viewport.Height };
     efparams.m_outlineVelocity = outlineVelocity;
 	DirectX11::UpdateBuffer(deferredPtr, m_EdgefilterBuffer.Get(), &efparams);
 	DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_EdgefilterBuffer.GetAddressOf());
-	DirectX11::Dispatch(deferredPtr, DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
+	DirectX11::Dispatch(deferredPtr, DirectX11::DeviceStates->g_Viewport.Width / 16, DirectX11::DeviceStates->g_Viewport.Height / 16, 1);
 
     ID3D11ShaderResourceView* nullsrv = nullptr;
     ID3D11UnorderedAccessView* nulluav = nullptr;
@@ -106,14 +106,14 @@ void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
         DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
 
         UownUpSamplingParams DPparams;
-        DPparams.inputTextureSize = { (float)DeviceState::g_Viewport.Width, (float)DeviceState::g_Viewport.Height };
+        DPparams.inputTextureSize = { (float)DirectX11::DeviceStates->g_Viewport.Width, (float)DirectX11::DeviceStates->g_Viewport.Height };
         DPparams.ratio = 2;
         DirectX11::UpdateBuffer(deferredPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
         DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
 
         DirectX11::Dispatch(deferredPtr,
-            (DeviceState::g_Viewport.Width + 32 - 1) / 32,
-            (DeviceState::g_Viewport.Height + 32 - 1) / 32, 1);
+            (DirectX11::DeviceStates->g_Viewport.Width + 32 - 1) / 32,
+            (DirectX11::DeviceStates->g_Viewport.Height + 32 - 1) / 32, 1);
         DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
         DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
 
@@ -121,12 +121,12 @@ void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
         DirectX11::CSSetShader(deferredPtr, m_pEdgefilterUpSamplingShader->GetShader(), nullptr, 0);
         DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
         DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
-        DPparams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / 2, (float)DeviceState::g_Viewport.Height / 2 };
+        DPparams.inputTextureSize = { (float)DirectX11::DeviceStates->g_Viewport.Width / 2, (float)DirectX11::DeviceStates->g_Viewport.Height / 2 };
         DirectX11::UpdateBuffer(deferredPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
         DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
         DirectX11::Dispatch(deferredPtr,
-            (DeviceState::g_Viewport.Width + 16 - 1) / 16,
-            (DeviceState::g_Viewport.Height + 16 - 1) / 16, 1);
+            (DirectX11::DeviceStates->g_Viewport.Width + 16 - 1) / 16,
+            (DirectX11::DeviceStates->g_Viewport.Height + 16 - 1) / 16, 1);
         DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
         DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
     }
@@ -136,8 +136,8 @@ void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
     DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture2->m_pSRV);
     DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &renderData->m_renderTarget->m_pUAV, nullptr);
     DirectX11::Dispatch(deferredPtr,
-        (DeviceState::g_Viewport.Width + 16 - 1) / 16,
-        (DeviceState::g_Viewport.Height + 16 - 1) / 16, 1);
+        (DirectX11::DeviceStates->g_Viewport.Width + 16 - 1) / 16,
+        (DirectX11::DeviceStates->g_Viewport.Height + 16 - 1) / 16, 1);
     DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
     DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
 

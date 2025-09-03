@@ -57,7 +57,7 @@ SkyBoxPass::SkyBoxPass()
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -170,7 +170,7 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
 
 	m_scaleMatrix = XMMatrixScaling(m_size, m_size, m_size);
 
-    auto deviceContext = DeviceState::g_pDeviceContext;
+    auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     D3D11_VIEWPORT viewport = { 0 };
     viewport.Width = m_cubeMapSize;
     viewport.Height = m_cubeMapSize;
@@ -240,7 +240,7 @@ void SkyBoxPass::GenerateCubeMap(std::string_view fileName, RenderScene& scene)
 
 Managed::SharedPtr<Texture> SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 {
-	auto deviceContext = DeviceState::g_pDeviceContext;
+	auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 	D3D11_VIEWPORT viewport = { 0 };
 	viewport.Width = m_cubeMapSize;
 	viewport.Height = m_cubeMapSize;
@@ -298,7 +298,7 @@ Managed::SharedPtr<Texture> SkyBoxPass::GeneratePrefilteredMap(RenderScene& scen
 
 	PrefilterCBuffer cBuffer;
 
-	auto deviceContext = DeviceState::g_pDeviceContext;
+	auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 	//Camera ortho(true, false);
 
 	deviceContext->PSSetConstantBuffers(0, 1, &buffer);
@@ -363,7 +363,7 @@ Managed::SharedPtr<Texture> SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
 
-	auto deviceContext = DeviceState::g_pDeviceContext;
+	auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 	deviceContext->RSSetViewports(1, &viewport);
 
 	ID3D11RenderTargetView* rtv = m_BRDFLUT->GetRTV();
@@ -397,7 +397,7 @@ void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
 
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	camera.UpdateBuffer(deferredPtr);
 	scene.UseModel(deferredPtr);
 

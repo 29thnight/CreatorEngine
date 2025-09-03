@@ -360,7 +360,7 @@ private:
 	std::unordered_set<std::string> m_registeredFiles{
         ".fbx", ".gltf", ".obj",
         ".png", ".dds", ".hdr",
-        ".hlsl", ".cpp", ".glb",
+        ".hlsl", ".shader", ".cpp", ".glb",
         ".cs", ".wav", ".mp3", ".ogg",
         ".terrain", ".bt", ".blackboard",
         ".prefab", ".volume", ".foliage"

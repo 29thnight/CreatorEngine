@@ -34,7 +34,7 @@ LightMapPass::LightMapPass()
 	};
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateInputLayout(
+		DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
 			vertexLayoutDesc,
 			_countof(vertexLayoutDesc),
 			m_pso->m_vertexShader->GetBufferPointer(),
@@ -46,13 +46,13 @@ LightMapPass::LightMapPass()
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
 	);
 
-	m_pso->m_depthStencilState = DeviceState::g_pDepthStencilState;
+	m_pso->m_depthStencilState = DirectX11::DeviceStates->g_pDepthStencilState;
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);

@@ -44,7 +44,7 @@ void MeshModuleGPU::Initialize()
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
+        DirectX11::DeviceStates->g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
     );
 
     // 래스터라이저 스테이트
@@ -52,7 +52,7 @@ void MeshModuleGPU::Initialize()
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
     rasterizerDesc.FillMode = D3D11_FILL_SOLID;
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)
     );
 
     // 깊이 스텐실 스테이트
@@ -60,7 +60,7 @@ void MeshModuleGPU::Initialize()
     depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
     depthDesc.DepthEnable = true;
     depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-    DeviceState::g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
+    DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
 
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
@@ -82,7 +82,7 @@ void MeshModuleGPU::Initialize()
     };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateInputLayout(
+        DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
             vertexLayoutDesc,
             _countof(vertexLayoutDesc),
             m_pso->m_vertexShader->GetBufferPointer(),
@@ -244,14 +244,14 @@ void MeshModuleGPU::CreateClippingBuffer()
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_polarClippingBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_polarClippingBuffer);
     if (FAILED(hr))
     {
         m_polarClippingBuffer.Reset();
     }
 
     bufferDesc.ByteWidth = sizeof(TimeParams);
-    hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_timeBuffer);
+    hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_timeBuffer);
     if (FAILED(hr))
     {
         m_timeBuffer.Reset();
@@ -262,10 +262,10 @@ void MeshModuleGPU::UpdateClippingBuffer()
 {
     if (!m_polarClippingBuffer)
         return;
-    if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
+    if (!DirectX11::DeviceStates->g_pDevice || !DirectX11::DeviceStates->g_pDeviceContext)
         return;
 
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr = deviceContext->Map(m_polarClippingBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
@@ -616,7 +616,7 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
     // 클리핑 버퍼 업데이트
     if (IsPolarClippingEnabled())
     {
-        if (DeviceState::g_pDevice && DeviceState::g_pDeviceContext)
+        if (DirectX11::DeviceStates->g_pDevice && DirectX11::DeviceStates->g_pDeviceContext)
         {
             UpdateClippingBuffer();
             OnClippingStateChanged();
@@ -637,7 +637,7 @@ void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT 
 
 void MeshModuleGPU::SetupRenderTarget(RenderPassData* renderData)
 {
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 }
@@ -707,7 +707,7 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         UpdateClippingBuffer();
     }
 
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffer(world, view, projection);

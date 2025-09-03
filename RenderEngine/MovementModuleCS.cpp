@@ -59,43 +59,43 @@ void MovementModuleCS::Update(float delta)
     UpdateConstantBuffers(delta);
 
     // 컴퓨트 셰이더 설정
-    DeviceState::g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
 
     // 상수 버퍼 설정
     ID3D11Buffer* constantBuffers[] = { m_movementParamsBuffer };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, constantBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 1, constantBuffers);
 
     // 셰이더에서 입력으로 사용할 버퍼 설정
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
     // Velocity Curve와 Impulse 버퍼 항상 바인드 (null이어도)
     ID3D11ShaderResourceView* curveSrvs[] = { m_velocityCurveSRV };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(1, 1, curveSrvs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(1, 1, curveSrvs);
 
     ID3D11ShaderResourceView* impulseSrvs[] = { m_impulsesSRV };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(2, 1, impulseSrvs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(2, 1, impulseSrvs);
 
     // 셰이더에서 출력으로 사용할 버퍼 설정
     ID3D11UnorderedAccessView* uavs[] = { m_outputUAV };
     UINT initCounts[] = { 0 };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
 
     // 컴퓨트 셰이더 실행
     UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
-    DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
+    DirectX11::DeviceStates->g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 해제
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
 
     ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr, nullptr };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 3, nullSRVs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 3, nullSRVs);
 
     ID3D11Buffer* nullBuffers[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
 
-    DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
     DirectX11::EndEvent();
 }
@@ -118,7 +118,7 @@ bool MovementModuleCS::InitializeCompute()
     movementParamsDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     movementParamsDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&movementParamsDesc, nullptr, &m_movementParamsBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&movementParamsDesc, nullptr, &m_movementParamsBuffer);
     if (FAILED(hr))
         return false;
 
@@ -130,7 +130,7 @@ void MovementModuleCS::UpdateConstantBuffers(float delta)
 {
     // 항상 상수 버퍼 업데이트 (시간 변수 때문에)
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    HRESULT hr = DeviceState::g_pDeviceContext->Map(m_movementParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_movementParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if (SUCCEEDED(hr))
     {
         MovementParams* params = reinterpret_cast<MovementParams*>(mappedResource.pData);
@@ -163,7 +163,7 @@ void MovementModuleCS::UpdateConstantBuffers(float delta)
         params->velocityCurveSize = static_cast<int>(m_velocityCurve.size());
         params->impulseCount = static_cast<int>(m_impulses.size());
 
-        DeviceState::g_pDeviceContext->Unmap(m_movementParamsBuffer, 0);
+        DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_movementParamsBuffer, 0);
         m_paramsDirty = false;
     }
 }
@@ -195,7 +195,7 @@ void MovementModuleCS::UpdateStructuredBuffers()
         D3D11_SUBRESOURCE_DATA initData = {};
         initData.pSysMem = m_velocityCurve.data();
 
-        DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_velocityCurveBuffer);
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_velocityCurveBuffer);
 
         // SRV 생성
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -203,7 +203,7 @@ void MovementModuleCS::UpdateStructuredBuffers()
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.NumElements = m_velocityCurve.size();
 
-        DeviceState::g_pDevice->CreateShaderResourceView(m_velocityCurveBuffer, &srvDesc, &m_velocityCurveSRV);
+        DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_velocityCurveBuffer, &srvDesc, &m_velocityCurveSRV);
     }
 
     // Impulse 버퍼 업데이트
@@ -231,7 +231,7 @@ void MovementModuleCS::UpdateStructuredBuffers()
         D3D11_SUBRESOURCE_DATA initData = {};
         initData.pSysMem = m_impulses.data();
 
-        DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_impulsesBuffer);
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_impulsesBuffer);
 
         // SRV 생성
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -239,7 +239,7 @@ void MovementModuleCS::UpdateStructuredBuffers()
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.NumElements = m_impulses.size();
 
-        DeviceState::g_pDevice->CreateShaderResourceView(m_impulsesBuffer, &srvDesc, &m_impulsesSRV);
+        DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_impulsesBuffer, &srvDesc, &m_impulsesSRV);
     }
 }
 

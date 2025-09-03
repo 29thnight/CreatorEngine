@@ -16,11 +16,11 @@ void GameViewWindow::RenderGameViewWindow()
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
 		float imageHeight = availRegion.y;
-		float imageWidth = imageHeight * DeviceState::g_aspectRatio;
+		float imageWidth = imageHeight * DirectX11::DeviceStates->g_aspectRatio;
 
 		if (imageWidth > availRegion.x) {
 			imageWidth = availRegion.x;
-			imageHeight = imageWidth / DeviceState::g_aspectRatio;
+			imageHeight = imageWidth / DirectX11::DeviceStates->g_aspectRatio;
 		}
 
 		ImVec2 imageSize = ImVec2(imageWidth, imageHeight);

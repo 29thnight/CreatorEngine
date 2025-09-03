@@ -6,6 +6,8 @@
 #include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
+#include <fstream>
+#include <yaml-cpp/yaml.h>
 #include "FileIO.h"
 #include "VolumeProfile.h"
 #include "Benchmark.hpp"
@@ -46,6 +48,7 @@ static const std::unordered_map<std::string_view, std::string_view> kExtensionTo
 
 	// 쉐이더, 코드 파일
 	{ ".hlsl", ICON_FA_FILE_CONTRACT " " },
+	{ ".shader", ICON_FA_FILE_CONTRACT " " },
 	{ ".cpp",  ICON_FA_FILE_CODE " " },
 	{ ".cs",   ICON_FA_FILE_CODE " " },
 
@@ -81,7 +84,7 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::MaterialTexture;
 	else if (filepath.extension() == ".terrain")
 		return DataSystem::FileType::TerrainTexture;
-	else if (filepath.extension() == ".hlsl" || filepath.extension() == ".fx")
+	else if (filepath.extension() == ".hlsl" || filepath.extension() == ".fx" || filepath.extension() == ".shader")
 		return DataSystem::FileType::Shader;
 	else if (filepath.extension() == ".cpp" || filepath.extension() == ".h")
 		return DataSystem::FileType::CppScript;
@@ -152,6 +155,7 @@ void DataSystem::Initialize()
 		{ ".dds",    { FileType::Texture,		(ImTextureID)TextureIcon->m_pSRV }	},
 		{ ".hdr",    { FileType::HDR,			(ImTextureID)TextureIcon->m_pSRV }	},
 		{ ".hlsl",   { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
+		{ ".shader", { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
 		{ ".cpp",    { FileType::CppScript,		(ImTextureID)CodeIcon->m_pSRV }		},
 		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)CodeIcon->m_pSRV }		},
 		{ ".wav",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
@@ -540,15 +544,84 @@ void DataSystem::LoadMaterials()
 {
 }
 
+void DataSystem::SaveMaterial(Material* material)
+{
+#ifndef BUILD_FLAG
+        if (!material)
+                return;
+
+        file::path savePath = PathFinder::Relative("Materials\\") / (material->m_name + ".asset");
+        std::ofstream fout(savePath);
+        if (fout.is_open())
+        {
+                YAML::Node node = Meta::Serialize(material);
+                if (!material->m_cbufferValues.empty())
+                {
+                        YAML::Node cbNode;
+                        for (auto& [name, data] : material->m_cbufferValues)
+                        {
+                                YAML::Node entry;
+                                entry["name"] = name;
+                                entry["data"] = YAML::Binary(data.data(), data.size());
+                                cbNode.push_back(entry);
+                        }
+                        node["constant_buffers"] = cbNode;
+                }
+                fout << node;
+                fout.close();
+                ForceCreateYamlMetaFile(savePath);
+        }
+#endif // !BUILD_FLAG
+}
+
 Material* DataSystem::LoadMaterial(std::string_view name)
 {
-	std::string materialName = name.data();
-	if (Materials.find(materialName) != Materials.end())
-	{
-		Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
-		return Materials[materialName].get();
-	}
-	return nullptr;
+        std::string materialName = name.data();
+        if (Materials.find(materialName) != Materials.end())
+        {
+                Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
+                return Materials[materialName].get();
+        }
+#ifndef BUILD_FLAG
+        file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
+        if (!file::exists(loadPath))
+        {
+                return nullptr;
+        }
+
+        MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
+        auto material = std::make_shared<Material>();
+        Meta::Deserialize(material.get(), node);
+        if (auto cbs = node["constant_buffers"])
+        {
+                for (auto cbEntry : cbs)
+                {
+                        std::string cbName = cbEntry["name"].as<std::string>();
+                        YAML::Binary bin = cbEntry["data"].as<YAML::Binary>();
+                        std::vector<uint8_t> data(bin.data(), bin.data() + bin.size());
+                        material->m_cbufferValues.emplace(std::move(cbName), std::move(data));
+                }
+        }
+
+        auto loadTex = [this](const std::string& texName, Texture*& texPtr, bool compress = false)
+        {
+                if (!texName.empty())
+                {
+                        texPtr = LoadMaterialTexture(texName, compress);
+                }
+        };
+
+        loadTex(material->m_baseColorTexName, material->m_pBaseColor, true);
+        loadTex(material->m_normalTexName, material->m_pNormal);
+        loadTex(material->m_ORM_TexName, material->m_pOccRoughMetal);
+        loadTex(material->m_AO_TexName, material->m_AOMap);
+        loadTex(material->m_EmissiveTexName, material->m_pEmissive);
+
+        Materials[material->m_name] = material;
+        return material.get();
+#else
+        return nullptr;
+#endif
 }
 
 Texture* DataSystem::LoadTextureGUID(FileGuid guid)
@@ -720,7 +793,7 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 		}
 	}
 
-	SFonts.emplace(name, std::make_shared<SpriteFont>(DeviceState::g_pDevice, destination.c_str()));
+	SFonts.emplace(name, std::make_shared<SpriteFont>(DirectX11::DeviceStates->g_pDevice, destination.c_str()));
 	
 	return SFonts[name].get();
 }

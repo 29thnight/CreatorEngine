@@ -5,14 +5,14 @@
 void RenderModules::CleanupRenderState()
 {
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DeviceState::g_pDeviceContext->PSSetShaderResources(0, 1, &nullSRV);
+	DirectX11::DeviceStates->g_pDeviceContext->PSSetShaderResources(0, 1, &nullSRV);
 
-	DeviceState::g_pDeviceContext->GSSetShader(nullptr, nullptr, 0);
+	DirectX11::DeviceStates->g_pDeviceContext->GSSetShader(nullptr, nullptr, 0);
 }
 
 void RenderModules::SaveRenderState()
 {
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
 	if (m_prevDepthState) m_prevDepthState->Release();
 	if (m_prevBlendState) m_prevBlendState->Release();
@@ -25,7 +25,7 @@ void RenderModules::SaveRenderState()
 
 void RenderModules::RestoreRenderState()
 {
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
 	deviceContext->OMSetDepthStencilState(m_prevDepthState, m_prevStencilRef);
 	deviceContext->OMSetBlendState(m_prevBlendState, m_prevBlendFactor, m_prevSampleMask);

@@ -319,7 +319,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::Text("Render Statistics");
 			ImGui::Separator();
 			ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
-			ImGui::Text("Screen Size: %d x %d", (int)DeviceState::g_ClientRect.width, (int)DeviceState::g_ClientRect.height);
+			ImGui::Text("Screen Size: %d x %d", (int)DirectX11::DeviceStates->g_ClientRect.width, (int)DirectX11::DeviceStates->g_ClientRect.height);
 			//Draw Call Count
 			ImGui::Text("Draw Call Count: %d", DirectX11::GetDrawCallCount());
 			ImGui::Separator();

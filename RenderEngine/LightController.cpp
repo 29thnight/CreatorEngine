@@ -22,7 +22,7 @@ void LightController::Initialize()
     };
 
 	DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateBuffer(
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(
             &bufferDesc, 
             nullptr, 
             &m_pLightBuffer
@@ -37,7 +37,7 @@ void LightController::Initialize()
     };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateBuffer(
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(
             &counterDesc, 
             nullptr, 
             &m_pLightCountBuffer
@@ -53,7 +53,7 @@ void LightController::Initialize()
 
 void LightController::Update()
 {
-	DeviceState::g_pDeviceContext->UpdateSubresource(
+	DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
 		m_pLightBuffer,
 		0,
 		nullptr,
@@ -63,7 +63,7 @@ void LightController::Update()
 	);
 
     m_lightCountStruct.m_lightCount = m_lightCount;
-    DeviceState::g_pDeviceContext->UpdateSubresource(
+    DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
         m_pLightCountBuffer,
         0,
         nullptr,

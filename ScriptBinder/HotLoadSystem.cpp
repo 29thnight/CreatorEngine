@@ -28,8 +28,8 @@ void HotLoadSystem::Initialize()
 	if (msbuildPath.empty())
 	{
 		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation. [Force Load Compiled DLL]");
-		LoadForceDLL();
-		return;
+		//LoadForceDLL();
+		//return;
 	}
 
 #if defined(_DEBUG)
@@ -49,7 +49,7 @@ void HotLoadSystem::Initialize()
 	{
 		try
 		{
-			Compile();
+			LoadForceDLL();
 		}
 		catch (const std::exception& e)
 		{
@@ -358,15 +358,15 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 		gameObjectSet.insert(gameObject.get());
 
 	auto findMetaNode = [this](GameObject* obj, size_t idx) -> MetaYml::Node*
+	{
+		auto it = std::find_if(m_scriptComponentMetaIndexs.begin(), m_scriptComponentMetaIndexs.end(),
+		[obj, idx](const auto& entry)
 		{
-			auto it = std::find_if(m_scriptComponentMetaIndexs.begin(), m_scriptComponentMetaIndexs.end(),
-				[obj, idx](const auto& entry)
-				{
-					const auto& [metaGameObject, metaIndex, node] = entry;
-					return metaGameObject == obj && metaIndex == idx;
-				});
-			return it != m_scriptComponentMetaIndexs.end() ? &std::get<2>(*it) : nullptr;
-		};
+			const auto& [metaGameObject, metaIndex, node] = entry;
+			return metaGameObject == obj && metaIndex == idx;
+		});
+		return it != m_scriptComponentMetaIndexs.end() ? &std::get<2>(*it) : nullptr;
+	};
 
 	for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 	{
@@ -424,8 +424,6 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 					Meta::Deserialize(scriptPtr, scriptType, *node);
 				}
 			}
-
-
 		}
 		newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 	}
@@ -850,6 +848,8 @@ void HotLoadSystem::RegisterScriptReflection(std::string_view name, ModuleBehavi
 void HotLoadSystem::UnRegisterScriptReflection(std::string_view name)
 {
 	Meta::Registry::GetInstance()->UnRegister(name.data());
+	//TODO : Test 필요한 부분
+	Meta::TypeCaster::GetInstance()->UnRegister(name.data());
 }
 
 void HotLoadSystem::CreateActionNodeScript(std::string_view name)

@@ -790,10 +790,27 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 			ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed, 90.f);
 			ImGui::TableHeadersRow();
 
+			//if (DrawVec2Row("Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
+			//	rectTransformComponent->SetAnchorMin(anchorMin);
+			//if (DrawVec2Row("Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
+			//	rectTransformComponent->SetAnchorMax(anchorMax);
+
+			//if (DrawVec2RowAbs("Pos", anchoredPos, 1.f))
+			//	rectTransformComponent->SetAnchoredPosition(anchoredPos);
+
+			//if (DrawVec2RowAbs("Width/Height", sizeDelta, 1.f))
+			//	rectTransformComponent->SetSizeDelta(sizeDelta);
+
+			//if (DrawVec2Row("Pivot", pivot, 0.01f, 0.f, 1.f))
+			//	rectTransformComponent->SetPivot(pivot);
+
+			bool anchorsChanged = false;
+			bool pivotChanged = false;
+
 			if (DrawVec2Row("Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
-				rectTransformComponent->SetAnchorMin(anchorMin);
+				anchorsChanged = true;
 			if (DrawVec2Row("Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
-				rectTransformComponent->SetAnchorMax(anchorMax);
+				anchorsChanged = true;
 
 			if (DrawVec2RowAbs("Pos", anchoredPos, 1.f))
 				rectTransformComponent->SetAnchoredPosition(anchoredPos);
@@ -802,7 +819,24 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 				rectTransformComponent->SetSizeDelta(sizeDelta);
 
 			if (DrawVec2Row("Pivot", pivot, 0.01f, 0.f, 1.f))
-				rectTransformComponent->SetPivot(pivot);
+				pivotChanged = true;
+
+			if (anchorsChanged || pivotChanged)
+			{
+				Mathf::Rect parentRect{ 0.f, 0.f, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
+				if (auto* owner = rectTransformComponent->GetOwner(); owner)
+				{
+					if (GameObject::IsValidIndex(owner->m_parentIndex))
+					{
+						if (auto* parentObj = GameObject::FindIndex(owner->m_parentIndex))
+						{
+							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+								parentRect = parentRT->GetWorldRect();
+						}
+					}
+				}
+				rectTransformComponent->SetAnchorsPivotKeepWorld(anchorMin, anchorMax, pivot, parentRect);
+			}
 
 			ImGui::EndTable();
 		}

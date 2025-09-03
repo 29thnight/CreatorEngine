@@ -42,6 +42,8 @@ void ImageComponent::Update(float tick)
                 0.0f };
         scale = { worldRect.width / uiinfo.size.x,
                   worldRect.height / uiinfo.size.y };
+
+		rect->SetSizeDelta(uiinfo.size);
     }
     auto quat = m_pOwner->m_transform.rotation;
     float pitch, yaw, roll;

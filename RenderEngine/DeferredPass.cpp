@@ -168,7 +168,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 
     ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), LightEmissiveTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(deferredPtr, 2, rtv, nullptr);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 
     camera.UpdateBuffer(deferredPtr);
     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);

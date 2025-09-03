@@ -26,7 +26,7 @@ SpritePass::SpritePass()
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -48,14 +48,14 @@ SpritePass::SpritePass()
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilState(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc,
 			&m_NoWriteDepthStencilState
 		)
 	);
 
 	m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
-	m_pso->m_blendState = DeviceState::g_pBlendState;
+	m_pso->m_blendState = DirectX11::DeviceStates->g_pBlendState;
 }
 
 SpritePass::~SpritePass()
@@ -72,14 +72,14 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	auto deviceContext = DeviceState::g_pDeviceContext;
+	auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 	m_pso->Apply();
 
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	deviceContext->OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
 
 	camera.UpdateBuffer();
     scene.UseModel();
@@ -128,7 +128,7 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 		m_QuadMesh->Draw();
 	}
 
-	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
+	DirectX11::OMSetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;

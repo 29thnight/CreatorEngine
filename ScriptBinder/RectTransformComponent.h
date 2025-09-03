@@ -38,6 +38,16 @@ public:
     // 앵커 프리셋을 설정하는 헬퍼 함수
     void SetAnchorPreset(AnchorPreset preset);
 
+    // 부모를 교체(또는 앵커/피벗 변경)하면서도 현재 worldRect를 유지하도록 역산해서 재설정
+    void SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin,
+        const Mathf::Vector2& newAnchorMax,
+        const Mathf::Vector2& newPivot,
+        const Mathf::Rect& newParentRect);
+
+    // newParent의 RectTransform(또는 화면 Rect)을 기준으로
+    // 현재 worldRect를 유지한 채 부모를 바꾸고 싶을 때 호출
+    void SetParentKeepWorldPosition(GameObject* newParent);
+
 private:
     // 부모 RectTransform의 사각형을 기준으로 한 최소/최대 앵커 위치 (0.0 ~ 1.0 비율)
     [[Property]]

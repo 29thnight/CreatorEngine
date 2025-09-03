@@ -60,21 +60,21 @@ GBufferPass::GBufferPass()
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
 	);
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_instancePSO->m_rasterizerState
 		)
 	);
 
-	m_pso->m_depthStencilState			= DeviceState::g_pDepthStencilState;
-	m_instancePSO->m_depthStencilState	= DeviceState::g_pDepthStencilState;
+	m_pso->m_depthStencilState			= DirectX11::DeviceStates->g_pDepthStencilState;
+	m_instancePSO->m_depthStencilState	= DirectX11::DeviceStates->g_pDepthStencilState;
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -107,7 +107,7 @@ GBufferPass::GBufferPass()
 	instanceBufferDesc.StructureByteStride = sizeof(Mathf::xMatrix);
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBuffer(&instanceBufferDesc, nullptr, &m_instanceBuffer)
+		DirectX11::DeviceStates->g_pDevice->CreateBuffer(&instanceBufferDesc, nullptr, &m_instanceBuffer)
 	);
 
 	// Create a shader resource view for the instance buffer
@@ -118,7 +118,7 @@ GBufferPass::GBufferPass()
 	srvDesc.Buffer.NumElements = MAX_INSTANCES;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
+		DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
 	);
 }
 
@@ -151,6 +151,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	// that only objects with the exact same mesh and material are instanced together.
 	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
+	std::map<std::string, std::vector<PrimitiveRenderProxy*>> shaderPSOGroups;
 	std::map<InstanceGroupKey, std::vector<PrimitiveRenderProxy*>> instanceGroups;
 
 	for (auto& proxy : data->m_deferredQueue)
@@ -158,6 +159,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		if (proxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
 		{
 			animatedProxies.push_back(proxy);
+		}
+		else if (proxy->m_Material->m_shaderPSO)
+		{
+			shaderPSOGroups[proxy->m_Material->m_shaderPSO->m_shaderPSOName].push_back(proxy);
 		}
 		else
 		{
@@ -178,7 +183,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::OMSetRenderTargets(deferredPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
 	camera.UpdateBuffer(deferredPtr);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 
 	// --- 2. RENDER ANIMATED OBJECTS (INDIVIDUALLY) ---
@@ -271,6 +276,50 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
 
+	// --- 3.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
+	for (auto const& [psoName, proxies] : shaderPSOGroups)
+	{
+		if (proxies.empty()) continue;
+		auto firstProxy = proxies.front();
+		auto customPSO = firstProxy->m_Material->m_shaderPSO;
+		if (!customPSO) continue;
+		//TEST: PSO가 유효하지 않다면 ShaderSystem에서 동일 이름의 PSO를 찾아 교체
+		auto& shaderPSOContainer = ShaderSystem->ShaderAssets;
+
+		if (customPSO->IsInvalidated())
+		{
+			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
+			{
+				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				customPSO = firstProxy->m_Material->m_shaderPSO;
+			}
+			else
+			{
+				continue; // 해당 이름의 PSO가 없다면 스킵
+			}
+		}
+
+		// PSO는 그룹 단위로 1회 Apply
+		customPSO->Apply(deferredPtr);
+
+		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
+		for (auto* proxy : proxies)
+		{
+			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", camera.CalculateView());
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", camera.CalculateProjection());
+			proxy->m_Material->TrySetMaterialInfo();
+			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
+			proxy->m_Material->ApplyShaderParams(deferredPtr);
+
+			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
+			proxy->Draw(deferredPtr);
+		}
+
+		DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
+	}
+
 	if(0 == data->m_index)
 	{
 		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[0], "00:G_BUFFER_BASE_COLOR");
@@ -312,7 +361,7 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 
 	camera.UpdateBuffer(deferredPtr);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 
 	for (auto& terrainProxy : data->m_terrainQueue) 
@@ -328,8 +377,6 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
 			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
 			terrainMesh->Draw(deferredPtr);
-
-
 		}
 	}
 

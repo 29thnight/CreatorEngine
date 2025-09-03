@@ -66,8 +66,8 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	m_BitflagTexture = bitflag;
 
 	m_CopiedTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -76,8 +76,8 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 	m_prevCopiedSSRTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"PreviousCopiedSSRTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -116,7 +116,7 @@ void ScreenSpaceReflectionPass::CreateRenderCommandList(ID3D11DeviceContext* def
 
 	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
 	DirectX11::OMSetRenderTargets(deferredPtr, 2, view, nullptr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
 
 	camera.UpdateBuffer(deferredPtr);

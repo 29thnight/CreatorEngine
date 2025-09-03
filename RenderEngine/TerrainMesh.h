@@ -45,7 +45,7 @@ public:
 #endif // !BUILD_FLAG
 
         DirectX11::ThrowIfFailed(
-            DeviceState::g_pDevice->CreateBuffer(&vbDesc, &vbInit, m_vertexBuffer.GetAddressOf())
+            DirectX11::DeviceStates->g_pDevice->CreateBuffer(&vbDesc, &vbInit, m_vertexBuffer.GetAddressOf())
         );
         //DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 
@@ -59,7 +59,7 @@ public:
         D3D11_SUBRESOURCE_DATA ibInit = {};
         ibInit.pSysMem = m_indices.data();
 
-        DeviceState::g_pDevice->CreateBuffer(&ibDesc, &ibInit, m_indexBuffer.GetAddressOf());
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(&ibDesc, &ibInit, m_indexBuffer.GetAddressOf());
         //DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
     }
 
@@ -92,7 +92,7 @@ public:
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
     {
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(
             m_vertexBuffer.Get(),
             0,
             D3D11_MAP_WRITE_DISCARD,
@@ -102,7 +102,7 @@ public:
         if (SUCCEEDED(hr))
         {
             memcpy(mapped.pData, srcVertices, sizeof(Vertex) * vertexCount);
-            DeviceState::g_pDeviceContext->Unmap(m_vertexBuffer.Get(), 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_vertexBuffer.Get(), 0);
         }
     }
 
@@ -110,7 +110,7 @@ public:
     void UpdateVertexBufferPatch(const Vertex* src, uint32_t offsetX, uint32_t offsetY, uint32_t patchW, uint32_t patchH)
     {
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        auto context = DeviceState::g_pDeviceContext;
+        auto context = DirectX11::DeviceStates->g_pDeviceContext;
 
         HRESULT hr = context->Map(m_vertexBuffer.Get(), 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &mapped);
         if (FAILED(hr))

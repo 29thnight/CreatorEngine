@@ -34,7 +34,7 @@ GizmoPass::GizmoPass()
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
@@ -50,14 +50,14 @@ GizmoPass::GizmoPass()
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilState(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc,
 			&m_NoWriteDepthStencilState
 		)
 	);
 
 	m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
-	m_pso->m_blendState = DeviceState::g_pBlendState;
+	m_pso->m_blendState = DirectX11::DeviceStates->g_pBlendState;
 
 	m_positionBuffer = DirectX11::CreateBuffer(sizeof(GizmoPos), D3D11_BIND_VERTEX_BUFFER, nullptr);
 	DirectX::SetName(m_positionBuffer.Get(), "GizmoPositionBuffer");
@@ -89,7 +89,7 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
 	DirectX11::OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
 
 	GizmoCameraBuffer cameraBuffer{ 
 		.VP = XMMatrixMultiply(camera.CalculateView(), camera.CalculateProjection()), 

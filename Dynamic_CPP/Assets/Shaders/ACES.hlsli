@@ -4,17 +4,17 @@
 // Converts color from Linear sRGB (Rec. 709 primaries) to ACEScg (AP1 primaries)
 static const float3x3 sRGB_2_ACEScg =
 {
-    0.575961650, 0.344143820, 0.079952030,
-     0.070806820, 0.827392350, 0.101774690,
-     0.028035252, 0.131523770, 0.840242300
+    { 0.59719, 0.35458, 0.04823 },
+    { 0.07600, 0.90834, 0.01566 },
+    { 0.02840, 0.13383, 0.83777 }
 };
 
 // Converts color from ACEScg (AP1 primaries) back to Linear sRGB (Rec. 709 primaries)
 static const float3x3 ACEScg_2_sRGB =
 {
-    1.666954300, -0.601741150, -0.065202855,
-    -0.106835220, 1.237778600, -0.130948950,
-    -0.004142626, -0.087411870, 1.091555000
+    { 1.60475, -0.53108, -0.07367 },
+    { -0.10208, 1.10813, -0.00605 },
+    { -0.00327, -0.07276, 1.07602 }
 };
 
 // -- 2. CORE ACES RRT + ODT CURVE --
@@ -77,10 +77,10 @@ float3 ApplyACES_Full(float3 linearSRGBColor)
 
     // 4. Clamp the result to the valid [0, 1] range before gamma correction.
     // This prevents negative colors or values over 1 from causing issues.
-    linearOutput = max(linearOutput, 0.0.xxx);
+    linearOutput = saturate(linearOutput);
 
-    // 5. Apply the sRGB OETF (gamma correction) for the final display color.
-    float3 displayColor = OETF_sRGB(linearOutput);
+    //// 5. Apply the sRGB OETF (gamma correction) for the final display color.
+    //float3 displayColor = OETF_sRGB(linearOutput);
 
-    return displayColor;
+    return linearOutput;
 }

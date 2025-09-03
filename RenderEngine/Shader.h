@@ -36,6 +36,11 @@ public:
 		Compile();
 	}
 
+	bool IsCompiled() const
+	{
+		return m_isCompiled;
+	}
+
 protected:
 	bool m_isCompiled{ false };
 	ComPtr<ID3DBlob> m_blob;
@@ -63,13 +68,33 @@ public:
 		return m_shader;
 	}
 
-	bool operator==(std::nullptr_t)
+	bool Invalid() const
 	{
-		return m_shader == nullptr;
+		return nullptr == m_shader || false == m_interface->IsCompiled();
+	}
+
+	// if (obj) 형태를 지원 (의미: 유효하다)
+	explicit operator bool() const noexcept { return !Invalid(); }
+
+	// !obj 형태를 지원 (의미: 유효하지 않다)
+	bool operator!() const noexcept { return Invalid(); }
+
+	// obj == nullptr, nullptr == obj 모두 지원
+	friend bool operator==(const ShaderPtr& h, std::nullptr_t) noexcept {
+		return h.Invalid();
+	}
+	friend bool operator==(std::nullptr_t, const ShaderPtr& h) noexcept {
+		return h.Invalid();
+	}
+	friend bool operator!=(const ShaderPtr& h, std::nullptr_t) noexcept {
+		return !h.Invalid();
+	}
+	friend bool operator!=(std::nullptr_t, const ShaderPtr& h) noexcept {
+		return !h.Invalid();
 	}
 
 	ShaderPtr() = default;
-	ShaderPtr(T* shader) : m_shader(shader), m_shader_identifier(m_shader->m_name) 
+	ShaderPtr(T* shader) : m_shader(shader), m_shader_identifier(m_shader->m_name), m_interface(shader)
 	{
 		if ("null" == m_shader->m_name)
 		{
@@ -81,12 +106,14 @@ public:
 	{
 		m_shader = shader;
 		m_shader_identifier = shader->m_name;
+		m_interface = shader;
 		
 		return *this;
 	}
 
 	std::string m_shader_identifier{};
-	T* m_shader{ nullptr };
+	T*			m_shader{ nullptr };
+	IShader*	m_interface{ nullptr };
 };
 
 class VertexShader final : public IShader
@@ -99,7 +126,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateVertexShader(
+			DirectX11::DeviceStates->g_pDevice->CreateVertexShader(
 				m_blob->GetBufferPointer(), 
 				m_blob->GetBufferSize(), 
 				nullptr, 
@@ -132,7 +159,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreatePixelShader(
+			DirectX11::DeviceStates->g_pDevice->CreatePixelShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -163,7 +190,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateComputeShader(
+			DirectX11::DeviceStates->g_pDevice->CreateComputeShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -193,7 +220,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateGeometryShader(
+			DirectX11::DeviceStates->g_pDevice->CreateGeometryShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -223,7 +250,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateHullShader(
+			DirectX11::DeviceStates->g_pDevice->CreateHullShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -253,7 +280,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateDomainShader(
+			DirectX11::DeviceStates->g_pDevice->CreateDomainShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,

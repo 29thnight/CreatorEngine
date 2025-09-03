@@ -79,6 +79,7 @@ void DirectX11::Dx11Main::Initialize()
 
     g_progressWindow->SetStatusText(L"Loading Assets...");
     DataSystems->Initialize();
+    ShaderSystem->SetPSOs_GUID();
     g_progressWindow->SetProgress(75);
     //CreateScene
     g_progressWindow->SetStatusText(L"Loading Project...");
@@ -335,9 +336,9 @@ void DirectX11::Dx11Main::InfoWindow()
     woss.precision(6);
     woss << L"Creator Editor - Windows"
         << L"Width: "
-        << DeviceState::g_Viewport.Width
+        << DirectX11::DeviceStates->g_Viewport.Width
         << L" Height: "
-        << DeviceState::g_Viewport.Height
+        << DirectX11::DeviceStates->g_Viewport.Height
         << L" FPS: "
         << m_timeSystem.GetFramesPerSecond()
         << L" FrameCount: "

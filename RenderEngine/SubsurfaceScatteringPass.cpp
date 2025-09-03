@@ -50,8 +50,8 @@ void SubsurfaceScatteringPass::Initialize(Texture* diffuse, Texture* metalRough)
 	m_MetalRoughTexture = metalRough;
 
 	m_CopiedTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -76,7 +76,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* defe
 	m_pso->Apply(deferredPtr);
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, nullptr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
 
 	camera.UpdateBuffer(deferredPtr);

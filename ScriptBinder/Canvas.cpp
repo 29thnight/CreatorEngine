@@ -27,7 +27,6 @@ void Canvas::OnDestroy()
 
 void Canvas::AddUIObject(GameObject* obj)
 {
-	
 	auto image = obj->GetComponent<ImageComponent>();
 	if(image)
 		image->SetCanvas(this);

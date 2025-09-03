@@ -24,7 +24,7 @@ UIPass::UIPass()
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
@@ -41,14 +41,14 @@ UIPass::UIPass()
 	depthStencilDesc.DepthEnable = true;
 	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilState(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc,
 			&m_NoWriteDepthStencilState
 		)
 	);
 
 	m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
-	m_pso->m_blendState = DeviceState::g_pBlendState;
+	m_pso->m_blendState = DirectX11::DeviceStates->g_pBlendState;
 
 	m_UIBuffer = DirectX11::CreateBuffer(sizeof(ImageInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
@@ -56,8 +56,8 @@ UIPass::UIPass()
 void UIPass::Initialize(Texture* renderTargetView)
 {
 	m_renderTarget = renderTargetView;
-	m_spriteBatch = std::make_unique<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
-	m_commonStates = std::make_unique<DirectX::CommonStates>(DeviceState::g_pDevice);
+	m_spriteBatch = std::make_unique<DirectX::SpriteBatch>(DirectX11::DeviceStates->g_pDeviceContext);
+	m_commonStates = std::make_unique<DirectX::CommonStates>(DirectX11::DeviceStates->g_pDevice);
 }
 
 void UIPass::SortUIObjects()
@@ -135,9 +135,9 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, renderData->m_renderTarget->m_pDSV);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::OMSetDepthStencilState(deferredPtr, m_NoWriteDepthStencilState.Get(), 1);
-	DirectX11::OMSetBlendState(deferredPtr, DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetBlendState(deferredPtr, DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
 	camera.UpdateBuffer(deferredPtr);
 
 	DirectX11::VSSetConstantBuffer(deferredPtr, 0, 1, m_UIBuffer.GetAddressOf());
@@ -155,7 +155,7 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 	}
 
 	spriteBatch->End();
-	DirectX11::OMSetDepthStencilState(deferredPtr, DeviceState::g_pDepthStencilState, 1);
+	DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(deferredPtr, nullptr, nullptr, 0xFFFFFFFF);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
@@ -167,6 +167,9 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 		deferredPtr->FinishCommandList(FALSE, &commandList)
 	);
 	PushQueue(camera.m_cameraIndex, commandList);
+
+	imageQueue.clear();
+	textQueue.clear();
 }
 
 void UIPass::ClearFrameQueue()

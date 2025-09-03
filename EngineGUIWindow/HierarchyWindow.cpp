@@ -11,6 +11,7 @@
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "PathFinder.h"
+#include "RectTransformComponent.h"
 #include "GameObjectCommand.h"
 #include "PrefabEditor.h"
 #include "IconsFontAwesome6.h"
@@ -202,6 +203,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 			{
+				//TODO : 불필요 로직 제거 -> DataSystem에서 LoadUITexture로 변경
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
@@ -210,9 +212,14 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (selectedSceneObject)
 				{
 					if (ImageComponent* hasSprite = selectedSceneObject->GetComponent<ImageComponent>())
+					{
 						sprite = hasSprite;
+					}
 					else
+					{
 						sprite = selectedSceneObject->AddComponent<ImageComponent>();
+					}
+
 					if (sprite)
 					{
 						sprite->Load(texture);
@@ -244,6 +251,10 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					draggedObj->m_parentIndex = 0;
 					sceneGameObject->m_childrenIndices.push_back(draggedIndex);
 					draggedObj->m_transform.SetParentID(draggedObj->m_parentIndex);
+					if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+					{
+						rect->SetParentKeepWorldPosition(sceneGameObject);
+					}
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -429,6 +440,11 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 				//Matrix처리
 				draggedObj->m_transform.SetParentID(obj->m_index);
+
+				if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+				{
+					rect->SetParentKeepWorldPosition(obj.get());
+				}
 			}
 		}
 		ImGui::EndDragDropTarget();

@@ -104,7 +104,7 @@ void ImGuiRenderer::BeginRender()
     static bool firstLoop = true;
 	ImGuiIO& io = ImGui::GetIO();
 
-	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
+	DirectX11::OMSetRenderTargets(1, &DirectX11::DeviceStates->g_backBufferRTV, nullptr);
 	
 	RECT rect;
 	HWND hWnd = m_deviceResources.lock()->GetWindow()->GetHandle();

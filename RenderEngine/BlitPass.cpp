@@ -24,7 +24,7 @@ BlitPass::BlitPass()
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
