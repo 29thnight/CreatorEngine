@@ -232,11 +232,27 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 
 void UIManager::DeleteCanvas(std::string canvasName)
 {
+	auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& canvas) 
+	{
+		auto c = canvas.lock();
+		return c && c->ToString() == canvasName;
+	});
+
+	auto curCanvasObj = (*it).lock();
+	auto canvasCom = curCanvasObj->GetComponent<Canvas>();
+	for (auto& uiObj : canvasCom->UIObjs)
+	{
+		uiObj->Destroy();
+
+	}
+
 	std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
 	{
 		auto c = canvas.lock();
 		return !c || c->ToString() == canvasName;
 	});
+
+
 }
 
 void UIManager::CheckInput()
@@ -336,4 +352,26 @@ void UIManager::SortCanvas()
 
 	}
 	needSort = false;
+}
+
+void UIManager::RegisterImageComponent(ImageComponent* image)
+{
+	if (image)
+		Images.push_back(image);
+}
+
+void UIManager::RegisterTextComponent(TextComponent* text)
+{
+	if (text)
+		Texts.push_back(text);
+}
+
+void UIManager::UnregisterImageComponent(ImageComponent* image)
+{
+	std::erase(Images, image);
+}
+
+void UIManager::UnregisterTextComponent(TextComponent* text)
+{
+	std::erase(Texts, text);
 }

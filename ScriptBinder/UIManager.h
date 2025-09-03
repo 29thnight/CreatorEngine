@@ -9,7 +9,6 @@ class Canvas;
 class Texture;
 class UIManager : public DLLCore::Singleton<UIManager>
 {
-
 public:
 	friend class DLLCore::Singleton<UIManager>;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
@@ -30,8 +29,16 @@ public:
 	void Update();
 	
 	void SortCanvas();
+	void RegisterImageComponent(ImageComponent* image);
+	void RegisterTextComponent(TextComponent* text);
+	void UnregisterImageComponent(ImageComponent* image);
+	void UnregisterTextComponent(TextComponent* text);
+
+public:
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
-	std::vector<std::weak_ptr<GameObject>> Canvases;
+	std::vector<std::weak_ptr<GameObject>>	Canvases;
+	std::vector<ImageComponent*>			Images;
+	std::vector<TextComponent*>				Texts;
 	//이정 캔버스
 	//현재 상호작용할 UI
 	std::weak_ptr<GameObject> CurCanvas;

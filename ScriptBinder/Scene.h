@@ -207,10 +207,6 @@ private:
 
 public:
     void AllUpdateWorldMatrix();
-	[[deprecated]]
-	void RegisterDirtyTransform(Transform* transform);
-	[[deprecated]]
-	void UpdateAllTransforms();
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};

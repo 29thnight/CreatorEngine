@@ -104,6 +104,7 @@ public:
 	void UnregisterCommand(TextComponent* textPtr);
 
 	PrimitiveRenderProxy* FindProxy(size_t guid);
+	UIRenderProxy* FindUIProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
 	void OnProxyDestroy();

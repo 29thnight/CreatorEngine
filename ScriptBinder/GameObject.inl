@@ -57,6 +57,29 @@ inline T* GameObject::GetComponent()
     return std::static_pointer_cast<T>(m_components[it->second]).get();
 }
 
+template<typename T>
+inline std::vector<T*> GameObject::GetComponentsInChildren()
+{
+    std::vector<T*> comps;
+    if (m_ownerScene)
+    {
+        for (auto& childIndex : m_childrenIndices)
+        {
+            auto& childObj = m_ownerScene->m_SceneObjects[childIndex];
+            if (childObj)
+            {
+                if (T* comp = childObj->GetComponent<T>())
+                {
+                    comps.push_back(comp);
+                }
+                auto childComps = childObj->GetComponentsInChildren<T>();
+                comps.insert(comps.end(), childComps.begin(), childComps.end());
+            }
+        }
+    }
+	return comps;
+}
+
 template<>
 inline Transform* GameObject::GetComponent()
 {

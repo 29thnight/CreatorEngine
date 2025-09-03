@@ -28,11 +28,17 @@ void Canvas::OnDestroy()
 void Canvas::AddUIObject(GameObject* obj)
 {
 	auto image = obj->GetComponent<ImageComponent>();
-	if(image)
+	if (image)
+	{
 		image->SetCanvas(this);
+		UIManagers->RegisterImageComponent(image);
+	}
 	auto text = obj->GetComponent<TextComponent>();
 	if (text)
+	{
 		text->SetCanvas(this);
+		UIManagers->RegisterTextComponent(text);
+	}
 	auto btn = obj->GetComponent<UIButton>();
 	if (btn)
 		btn->SetCanvas(this);
@@ -52,6 +58,10 @@ void Canvas::Update(float tick)
 	{
 		if (obj->IsDestroyMark())
 		{
+			if (auto image = obj->GetComponent<ImageComponent>())
+				UIManagers->UnregisterImageComponent(image);
+			if (auto text = obj->GetComponent<TextComponent>())
+				UIManagers->UnregisterTextComponent(text);
 			std::erase(UIObjs, obj);
 			continue;
 		}

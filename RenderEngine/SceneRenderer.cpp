@@ -845,9 +845,20 @@ void SceneRenderer::CreateCommandListPass()
 			}
 		}
 
+		for (auto& instanceID : data->GetUIRenderDataBuffer())
+		{
+			auto proxy = renderScene->FindUIProxy(instanceID);
+			if (nullptr != proxy)
+			{
+				data->PushUIRenderQueue(proxy);
+			}
+		}
+
 		data->SortRenderQueue();
+		data->SortUIRenderQueue();
 		data->SortShadowRenderQueue();
 		data->ClearCullDataBuffer();
+		data->ClearUIRenderDataBuffer();
 		data->ClearShadowRenderDataBuffer();
 		PROFILE_CPU_END();
 
@@ -966,7 +977,7 @@ void SceneRenderer::CreateCommandListPass()
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
 			PROFILE_CPU_BEGIN("UIPassCommnadList");
-			m_pUIPass->SortUIObjects();
+			//m_pUIPass->SortUIObjects();
 			m_pUIPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
@@ -977,7 +988,7 @@ void SceneRenderer::CreateCommandListPass()
 		data->ClearShadowRenderQueue();
 	}
 
-	m_pUIPass->ClearFrameQueue();
+	//m_pUIPass->ClearFrameQueue();
 
 #ifndef BUILD_FLAG
 	RenderDebugManager::GetInstance()->EndFrame();
@@ -1038,10 +1049,53 @@ void SceneRenderer::PrepareRender()
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
 	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
-	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
-	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
 	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
+	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+
+	m_threadPool->Enqueue([=, texts = std::move(textComponents)]
+	{
+		for (auto& text : texts)
+		{
+			try
+			{
+				auto owner = text->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+
+				if(scene && scene == m_currentScene)
+				{
+					renderScene->UpdateCommand(text);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating text command: " << e.what() << std::endl;
+			}
+		}
+	});
+
+	m_threadPool->Enqueue([=, images = std::move(imageComponents)]
+	{
+		for (auto& image : images)
+		{
+			try
+			{
+				auto owner = image->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+				if(scene && scene == m_currentScene)
+				{
+					renderScene->UpdateCommand(image);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating image command: " << e.what() << std::endl;
+			}
+		}
+		});
 
 	m_threadPool->Enqueue([=]
 	{
@@ -1058,9 +1112,9 @@ void SceneRenderer::PrepareRender()
 		}
 	});
 
-	m_threadPool->Enqueue([=]
+	m_threadPool->Enqueue([=, meshes = std::move(allMeshes)]
 	{
-		for (auto& mesh : allMeshes)
+		for (auto& mesh : meshes)
 		{
 			try
 			{

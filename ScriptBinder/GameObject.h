@@ -67,6 +67,9 @@ public:
 	T* GetComponent();
 
 	template<typename T>
+	std::vector<T*> GetComponentsInChildren();
+
+	template<typename T>
 	bool HasComponent();
 
 	template<typename T>

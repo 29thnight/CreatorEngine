@@ -262,6 +262,14 @@ PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
 	return m_proxyMap[guid].get();
 }
 
+UIRenderProxy* RenderScene::FindUIProxy(size_t guid)
+{
+	SpinLock lock(m_uiProxyMapFlag);
+
+	if (m_uiProxyMap.find(guid) == m_uiProxyMap.end()) return nullptr;
+	return m_uiProxyMap[guid].get();
+}
+
 void RenderScene::OnProxyDestroy()
 {
 	while (!RenderScene::RegisteredDestroyProxyGUIDs.empty())

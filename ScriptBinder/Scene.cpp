@@ -14,7 +14,10 @@
 #include "CharacterControllerComponent.h"
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
 #include "TagManager.h"
+#include "UIManager.h"
 #include "RectTransformComponent.h"
 #include <execution>
 
@@ -355,39 +358,88 @@ void Scene::LateUpdate(float deltaSecond)
 	std::vector<MeshRenderer*> skinnedMeshes = m_skinnedMeshRenderers;
 	std::vector<TerrainComponent*> terrainComponents = m_terrainComponents;
 	std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
+	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
+	std::vector<TextComponent*> textComponents = UIManagers->Texts;
 
-	for(auto camera : CameraManagement->GetCameras())
+	for (auto camera : CameraManagement->GetCameras())
 	{
 		if (!RenderPassData::VaildCheck(camera)) return;
 		auto data = RenderPassData::GetData(camera);
 
-		for (auto& mesh : allMeshes)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-			data->PushShadowRenderData(mesh->GetInstanceID());
-		}
-
-		for (auto& culledMesh : staticMeshes)
-		{
-			if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-			auto frustum = camera->GetFrustum();
-			if (frustum.Intersects(culledMesh->GetBoundingBox()))
+			for (auto& mesh : allMeshes)
 			{
-				data->PushCullData(culledMesh->GetInstanceID());
+				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+				data->PushShadowRenderData(mesh->GetInstanceID());
 			}
-		}
+		});
 
-		for (auto& skinnedMesh : skinnedMeshes)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-			auto frustum = camera->GetFrustum();
-			if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
+			for (auto& culledMesh : staticMeshes)
 			{
-				data->PushCullData(skinnedMesh->GetInstanceID());
+				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(culledMesh->GetBoundingBox()))
+				{
+					data->PushCullData(culledMesh->GetInstanceID());
+				}
 			}
-		}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& skinnedMesh : skinnedMeshes)
+			{
+				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
+				{
+					data->PushCullData(skinnedMesh->GetInstanceID());
+				}
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& image : imageComponents)
+			{
+				if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
+				
+				auto owner = image->GetOwner();
+				if (nullptr == owner) continue;
+
+				auto scene = owner->GetScene();
+
+				if (scene && scene == this)
+				{
+					data->PushUIRenderData(image->GetInstanceID());
+				}
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& text : textComponents)
+			{
+				if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
+				
+				auto owner = text->GetOwner();
+				if (nullptr == owner) continue;
+
+				auto scene = owner->GetScene();
+
+				if (scene && scene == this)
+				{
+					data->PushUIRenderData(text->GetInstanceID());
+				}
+			}
+		});
+
+		SceneManagers->m_threadPool->NotifyAllAndWait();
 	}
 }
 
@@ -1321,29 +1373,4 @@ void Scene::AllUpdateWorldMatrix()
 			}
 		}
 	}
-}
-
-void Scene::RegisterDirtyTransform(Transform* transform)
-{
-	//if (!transform) return;
-	//std::unique_lock lock(sceneMutex);
-	//m_globalDirtySet.insert(transform);
-}
-
-void Scene::UpdateAllTransforms()
-{
-	//std::unordered_set<Transform*> dirtySet;
-	//{
-	//	std::unique_lock lock(sceneMutex);
-	//	dirtySet.swap(m_globalDirtySet);
-	//}
-
-	//for (Transform* rootDirty : dirtySet)
-	//{
-	//	if (rootDirty)
-	//	{
-	//		auto rootObject = rootDirty->GetOwner();
-	//		UpdateModelRecursive(rootObject->m_index, XMMatrixIdentity());
-	//	}
-	//}
 }
