@@ -1,10 +1,24 @@
 #include "SpecialBullet.h"
 #include "pch.h"
 #include "EntityEnemy.h"
+#include "PhysicsManager.h"
+#include "Entity.h"
+#include "Player.h"
 void SpecialBullet::Start()
 {
 	bulletType = BulletType::Special;
 }
+
+
+
+void SpecialBullet::OnTriggerStay(const Collision& collision)
+{
+}
+
+void SpecialBullet::Update(float tick)
+{
+}
+
 
 void SpecialBullet::OnTriggerEnter(const Collision& collision)
 {
@@ -18,18 +32,30 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 			std::cout << "EnemyHit!" << std::endl;
 
 			hasAttacked = true;
-			GetOwner()->Destroy(); //지우지말고 BulletPool만들기
 
-			//범위공격 오브젝트 생성
+			Transform transform = GetOwner()->m_transform;
+
+			std::vector<HitResult> hits;
+			OverlapInput bulletInfo;
+			bulletInfo.layerMask = 1u; //일단 다떄림
+			bulletInfo.position = transform.GetWorldPosition();
+			bulletInfo.rotation = transform.GetWorldQuaternion();
+			PhysicsManagers->SphereOverlap(bulletInfo, explosionRadius, hits);
+
+
+			for (auto& hit : hits)
+			{
+				auto object = hit.gameObject;
+				if (object == GetOwner()) continue;
+
+				auto enemy = object->GetComponent<EntityEnemy>();
+				if (enemy)
+				{
+					enemy->SendDamage(m_owenrPlayer, 1);
+				}
+			}
+
+			GetOwner()->Destroy(); //지우지말고 BulletPool만들기
 		}
 	}
 }
-
-void SpecialBullet::OnTriggerStay(const Collision& collision)
-{
-}
-
-void SpecialBullet::Update(float tick)
-{
-}
-

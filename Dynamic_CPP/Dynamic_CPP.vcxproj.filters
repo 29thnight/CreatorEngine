@@ -285,6 +285,9 @@
 		<ClInclude Include="Assets\Script\Bomb.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\Explosion.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -495,6 +498,9 @@
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Explosion.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
