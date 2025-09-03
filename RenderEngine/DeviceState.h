@@ -739,6 +739,17 @@ namespace DirectX11
 		deferredContext->CSSetShader(computeShader, classInstances, numClassInstances);
 	}
 
+	//[unsafe]
+	inline void CSSetSamplers(UINT StartSlot, UINT NumSamplers, ID3D11SamplerState* const* ppSamplers)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->CSSetSamplers(StartSlot, NumSamplers, ppSamplers);
+	}
+
 	//[safe]
 	inline void CSSetSamplers(ID3D11DeviceContext* deferredContext, UINT StartSlot, UINT NumSamplers, ID3D11SamplerState* const* ppSamplers)
 	{

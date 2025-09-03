@@ -167,6 +167,9 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 		deferredPtr->FinishCommandList(FALSE, &commandList)
 	);
 	PushQueue(camera.m_cameraIndex, commandList);
+
+	imageQueue.clear();
+	textQueue.clear();
 }
 
 void UIPass::ClearFrameQueue()

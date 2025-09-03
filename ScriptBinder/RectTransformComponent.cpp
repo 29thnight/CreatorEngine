@@ -1,5 +1,6 @@
 #include "RectTransformComponent.h"
 #include "GameObject.h"
+#include "DeviceState.h"
 #include <unordered_set>
 
 // 생성자
@@ -91,4 +92,57 @@ void RectTransformComponent::SetAnchorPreset(AnchorPreset preset)
         case AnchorPreset::StretchAll:   { m_anchorMin = {0.0f, 0.0f}; m_anchorMax = {1.0f, 1.0f}; break; }
     }
     m_isDirty = true;
+}
+
+static inline float SolveSize(float worldSize, float parentSize, float aMin, float aMax)
+{
+    return worldSize - parentSize * (aMax - aMin);
+}
+
+static inline float SolveAnchored(float worldMin, float parentMin, float parentSize,
+    float aMin, float size, float pivot)
+{
+    // worldMin = parentMin + parentSize*aMin + (anchored - size*pivot)
+    // anchored = (worldMin - parentMin - parentSize*aMin) + size*pivot
+    return (worldMin - parentMin - parentSize * aMin) + size * pivot;
+}
+
+void RectTransformComponent::SetAnchorsPivotKeepWorld(const Mathf::Vector2& newAnchorMin, const Mathf::Vector2& newAnchorMax, const Mathf::Vector2& newPivot, const Mathf::Rect& newParentRect)
+{
+    // 1) 현재 보이는 위치/크기를 보전(타겟 worldRect)
+    const Mathf::Rect desired = m_worldRect;
+
+    // 2) 새 앵커/피벗을 먼저 적용
+    m_anchorMin = newAnchorMin;
+    m_anchorMax = newAnchorMax;
+    m_pivot = newPivot;
+
+    // 3) 역산하여 sizeDelta/anchoredPosition 재설정 (x/y 축별 독립)
+    m_sizeDelta.x = SolveSize(desired.width, newParentRect.width, m_anchorMin.x, m_anchorMax.x);
+    m_sizeDelta.y = SolveSize(desired.height, newParentRect.height, m_anchorMin.y, m_anchorMax.y);
+
+    m_anchoredPosition.x = SolveAnchored(desired.x, newParentRect.x, newParentRect.width,
+        m_anchorMin.x, m_sizeDelta.x, m_pivot.x);
+    m_anchoredPosition.y = SolveAnchored(desired.y, newParentRect.y, newParentRect.height,
+        m_anchorMin.y, m_sizeDelta.y, m_pivot.y);
+
+    m_isDirty = true;
+    UpdateLayout(newParentRect); // 부모 Rect로 다시 worldRect 갱신
+}
+
+void RectTransformComponent::SetParentKeepWorldPosition(GameObject* newParent)
+{
+    // 새 부모의 Rect를 얻고, 없으면 화면 전체 Rect를 부모로 가정
+    Mathf::Rect newParentRect{ 0, 0,
+        DeviceState::g_ClientRect.width,
+        DeviceState::g_ClientRect.height };
+
+    if (newParent)
+    {
+        if (auto* pr = newParent->GetComponent<RectTransformComponent>())
+            newParentRect = pr->GetWorldRect();
+    }
+
+    // 현재 앵커/피벗을 유지한 채로 역산 적용 (원하면 여기서 preset/pivot도 바꿀 수 있음)
+    SetAnchorsPivotKeepWorld(m_anchorMin, m_anchorMax, m_pivot, newParentRect);
 }

@@ -87,6 +87,11 @@ PipelineStateObject::PipelineStateObject()
 	});
 }
 
+PipelineStateObject::PipelineStateObject(bool isShaderPSO)
+{
+	m_isShaderPSO = isShaderPSO;
+}
+
 PipelineStateObject::~PipelineStateObject()
 {
 	ShaderSystem->m_shaderReloadedDelegate.Remove(m_shaderReloadEventHandle);
@@ -143,6 +148,11 @@ void PipelineStateObject::CreateInputLayout()
 {
 	if(!m_inputLayoutDescContainer.empty())
 	{
+		if (m_inputLayout)
+		{
+			Memory::SafeDelete(m_inputLayout);
+		}
+
 		DirectX11::ThrowIfFailed(
 			DeviceState::g_pDevice->CreateInputLayout(
 				m_inputLayoutDescContainer.data(),
@@ -160,6 +170,11 @@ void PipelineStateObject::CreateInputLayout(InputLayOutContainer&& vertexLayoutD
 	m_inputLayoutDescContainer = vertexLayoutDesc;
 	if (!m_inputLayoutDescContainer.empty())
 	{
+		if (m_inputLayout)
+		{
+			Memory::SafeDelete(m_inputLayout);
+		}
+
 		DirectX11::ThrowIfFailed(
 			DeviceState::g_pDevice->CreateInputLayout(
 				m_inputLayoutDescContainer.data(),
@@ -219,5 +234,21 @@ void PipelineStateObject::Reset()
     DeviceState::g_pDeviceContext->RSSetState(nullptr);
     DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
     DeviceState::g_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
+}
+void PipelineStateObject::Reset(ID3D11DeviceContext* deferredContext)
+{
+	deferredContext->IASetInputLayout(nullptr);
+	deferredContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	PSOHelper::VSSetShader(deferredContext, nullptr);
+	PSOHelper::PSSetShader(deferredContext, nullptr);
+	PSOHelper::HSSetShader(deferredContext, nullptr);
+	PSOHelper::DSSetShader(deferredContext, nullptr);
+	PSOHelper::GSSetShader(deferredContext, nullptr);
+	PSOHelper::CSSetShader(deferredContext, nullptr);
+
+	deferredContext->RSSetState(nullptr);
+	deferredContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+	deferredContext->OMSetDepthStencilState(nullptr, 0);
 }
 #endif // !DYNAMICCPP_EXPORTS

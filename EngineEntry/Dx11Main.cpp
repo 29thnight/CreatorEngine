@@ -79,6 +79,7 @@ void DirectX11::Dx11Main::Initialize()
 
     g_progressWindow->SetStatusText(L"Loading Assets...");
     DataSystems->Initialize();
+    ShaderSystem->SetPSOs_GUID();
     g_progressWindow->SetProgress(75);
     //CreateScene
     g_progressWindow->SetStatusText(L"Loading Project...");

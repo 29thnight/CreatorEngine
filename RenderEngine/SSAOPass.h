@@ -40,6 +40,6 @@ private:
 	std::weak_ptr<Texture>		m_RenderTarget;
 	std::weak_ptr<Texture>		m_DiffuseTexture;
 
-	float						radius = 0.1f;
-	float						thickness = 0.1f;
+	float						radius = 0.5f;
+	float						thickness = 0.5f;
 };

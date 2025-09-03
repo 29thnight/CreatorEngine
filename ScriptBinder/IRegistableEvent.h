@@ -104,8 +104,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
             else if (!isAwakeCalled)
             {
-                derived_component->Awake();
                 isAwakeCalled = true;
+                derived_component->Awake();
             }
         });
     }

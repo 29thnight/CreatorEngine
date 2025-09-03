@@ -325,11 +325,17 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
+	PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
+	PROFILE_CPU_END();
 
+	PROFILE_CPU_BEGIN("UpdateEvent");
     UpdateEvent.Broadcast(deltaSecond);
+	PROFILE_CPU_END();
 
+	PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
+	PROFILE_CPU_END();
 }
 
 void Scene::YieldNull()
@@ -1111,12 +1117,27 @@ void Scene::DestroyComponents()
 
 std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
 {
-	std::string uniqueName{ name.data() };
-	std::string baseName{ name.data() };
-	int count = 1;
-	while (m_gameObjectNameSet.find(uniqueName) != m_gameObjectNameSet.end())
+	std::string baseName{ name };
+	std::string uniqueName{ name };
+
+	// Remove trailing numeric suffix like " (1)" if present
+	const auto lparen = baseName.find_last_of('(');
+	const auto rparen = baseName.find_last_of(')');
+	if (lparen != std::string::npos && rparen == baseName.length() - 1 && lparen < rparen)
 	{
-		uniqueName = baseName + std::string(" (") + std::to_string(count++) + std::string(")");
+		const std::string_view numberPart{ baseName.data() + lparen + 1, rparen - lparen - 1 };
+		if (!numberPart.empty() && baseName[lparen - 1] == ' ' &&
+			std::ranges::all_of(numberPart, [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)); }))
+		{
+			baseName = baseName.substr(0, lparen - 1);
+			uniqueName = baseName;
+		}
+	}
+
+	int count = 1;
+	while (m_gameObjectNameSet.contains(uniqueName))
+	{
+		uniqueName = baseName + " (" + std::to_string(count++) + ")";
 	}
 	m_gameObjectNameSet.insert(uniqueName);
 	return uniqueName;

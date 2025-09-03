@@ -64,9 +64,10 @@ void SSAOPass::Initialize(Managed::SharedPtr<Texture> renderTarget, ID3D11Shader
             0
         );
         sample = XMVector3Normalize(sample);
-        float scale = (float)i / 64.0;
+        float normInverse = i / 64.f;
+        float scale = std::lerp(0.1f, 1.0f, normInverse * normInverse); // Scale the sample vector
         // to lerp
-        XMVectorScale(sample, scale);
+        sample = XMVectorScale(sample, scale);
 
         XMStoreFloat4(&m_SSAOBuffer.m_SampleKernel[i], sample);
     }
@@ -103,58 +104,6 @@ void SSAOPass::ReloadDSV(ID3D11ShaderResourceView* depth)
 void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 {
     ExecuteCommandList(scene, camera);
- //   if (!RenderPassData::VaildCheck(&camera)) return;
- //   auto renderData = RenderPassData::GetData(&camera);
-
-	//auto renderTarget = m_RenderTarget.lock();
-	//auto normalTexture = m_NormalTexture.lock();
-	//auto diffuseTexture = m_DiffuseTexture.lock();
-
- //   if (m_RenderTarget.expired() || 
- //       m_NormalTexture.expired() || 
- //       m_DiffuseTexture.expired() || 
- //       !renderTarget || 
- //       !normalTexture || 
- //       !diffuseTexture)
- //   {
- //       return; // Ensure textures are valid
-	//}
-
- //   m_pso->Apply();
-
-	//DirectX11::ClearRenderTargetView(renderTarget->GetRTV(), Colors::Transparent);
-
-	//ID3D11RenderTargetView* rtv = renderTarget->GetRTV();
- //   DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
-
-	//Mathf::xMatrix view = camera.CalculateView();
-	//Mathf::xMatrix proj = camera.CalculateProjection();
- //   m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
- //   m_SSAOBuffer.m_InverseViewProjection = XMMatrixInverse(nullptr, m_SSAOBuffer.m_ViewProjection);
- //   m_SSAOBuffer.m_InverseProjection = camera.CalculateInverseProjection();
- //   m_SSAOBuffer.m_CameraPosition = camera.m_eyePosition;
- //   m_SSAOBuffer.m_Radius = radius;
- //   m_SSAOBuffer.m_Thickness = thickness;
- //   m_SSAOBuffer.m_windowSize = { (float)DeviceState::g_ClientRect.width, (float)DeviceState::g_ClientRect.height };
- //   m_SSAOBuffer.m_frameIndex = Time->GetFrameCount();
-
- //   DirectX11::UpdateBuffer(m_Buffer.Get(), &m_SSAOBuffer);
-
- //   DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
-
- //   ID3D11ShaderResourceView* srvs[4] = { 
- //       renderData->m_depthStencil->m_pSRV, 
- //       normalTexture->m_pSRV,
- //       m_NoiseTexture->m_pSRV, 
- //       diffuseTexture->m_pSRV
- //   };
- //   DirectX11::PSSetShaderResources(0, 4, srvs);
-
- //   DirectX11::Draw(4, 0);
-
- //   ID3D11ShaderResourceView* nullSRV[4] = { nullptr, nullptr, nullptr, nullptr };
- //   DirectX11::PSSetShaderResources(0, 4, nullSRV);
- //   DirectX11::UnbindRenderTargets();
 }
 
 void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)

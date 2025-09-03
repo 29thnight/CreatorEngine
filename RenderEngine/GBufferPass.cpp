@@ -151,6 +151,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	// that only objects with the exact same mesh and material are instanced together.
 	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
+	std::map<std::string, std::vector<PrimitiveRenderProxy*>> shaderPSOGroups;
 	std::map<InstanceGroupKey, std::vector<PrimitiveRenderProxy*>> instanceGroups;
 
 	for (auto& proxy : data->m_deferredQueue)
@@ -158,6 +159,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		if (proxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
 		{
 			animatedProxies.push_back(proxy);
+		}
+		else if (proxy->m_Material->m_shaderPSO)
+		{
+			shaderPSOGroups[proxy->m_Material->m_shaderPSO->m_shaderPSOName].push_back(proxy);
 		}
 		else
 		{
@@ -271,6 +276,50 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
 
+	// --- 3.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
+	for (auto const& [psoName, proxies] : shaderPSOGroups)
+	{
+		if (proxies.empty()) continue;
+		auto firstProxy = proxies.front();
+		auto customPSO = firstProxy->m_Material->m_shaderPSO;
+		if (!customPSO) continue;
+		//TEST: PSO가 유효하지 않다면 ShaderSystem에서 동일 이름의 PSO를 찾아 교체
+		auto& shaderPSOContainer = ShaderSystem->ShaderAssets;
+
+		if (customPSO->IsInvalidated())
+		{
+			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
+			{
+				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				customPSO = firstProxy->m_Material->m_shaderPSO;
+			}
+			else
+			{
+				continue; // 해당 이름의 PSO가 없다면 스킵
+			}
+		}
+
+		// PSO는 그룹 단위로 1회 Apply
+		customPSO->Apply(deferredPtr);
+
+		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
+		for (auto* proxy : proxies)
+		{
+			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", camera.CalculateView());
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", camera.CalculateProjection());
+			proxy->m_Material->TrySetMaterialInfo();
+			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
+			proxy->m_Material->ApplyShaderParams(deferredPtr);
+
+			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
+			proxy->Draw(deferredPtr);
+		}
+
+		DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
+	}
+
 	if(0 == data->m_index)
 	{
 		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[0], "00:G_BUFFER_BASE_COLOR");
@@ -328,8 +377,6 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
 			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
 			terrainMesh->Draw(deferredPtr);
-
-
 		}
 	}
 

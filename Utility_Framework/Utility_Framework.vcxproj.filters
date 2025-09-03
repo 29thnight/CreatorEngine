@@ -309,6 +309,9 @@
     <ClInclude Include="TypeIO.h">
       <Filter>Core.definition\Type</Filter>
     </ClInclude>
+    <ClInclude Include="Paklib.hpp">
+      <Filter>Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

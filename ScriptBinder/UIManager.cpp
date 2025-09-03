@@ -52,7 +52,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* 
     if (auto* rect = newImage->GetComponent<RectTransformComponent>())
     {
 		rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
-		rect->SetPivot({ 0.0f, 0.0f });
+		rect->SetPivot({ 0.5f, 0.5f });
         rect->SetAnchoredPosition(Pos);
         rect->UpdateLayout(canvasRect->GetWorldRect());
     }
@@ -88,7 +88,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
 	GameObject* canvas = FindCanvasName(canvasname);
 	if (canvas == nullptr)
 	{
-        auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+        auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI);
         if (auto* rect = newImage->GetComponent<RectTransformComponent>())
         {
             rect->SetAnchoredPosition(Pos);
@@ -310,6 +310,7 @@ void UIManager::Update()
 		CurCanvas = canvasPtr;
 		break;
 	}
+
 	CheckInput();
 }
 
