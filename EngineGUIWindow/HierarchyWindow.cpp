@@ -207,7 +207,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
-				Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
+				auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str());
 				ImageComponent* sprite = nullptr;
 				if (selectedSceneObject)
 				{

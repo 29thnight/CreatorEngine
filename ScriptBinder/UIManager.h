@@ -16,10 +16,10 @@ public:
 	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
 
 	//오브젝이름 /쓸 정보 / 어느캔버스 기본0
-	std::shared_ptr<GameObject> MakeImage(std::string_view name, Texture* texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
-	std::shared_ptr<GameObject> MakeImage(std::string_view name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
-	std::shared_ptr<GameObject> MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 },GameObject* canvas = nullptr);
-	std::shared_ptr<GameObject> MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 },GameObject* canvas = nullptr);
+	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeText(std::string_view name, SpriteFont* Sfont, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeText(std::string_view name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 

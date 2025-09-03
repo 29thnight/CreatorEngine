@@ -97,7 +97,6 @@ public:
 public:
 	//terrain type
 	std::shared_ptr<TerrainMesh> m_terrainMesh{ nullptr };
-	//TerrainMesh*				m_terrainMesh{ nullptr };
 	TerrainMaterial*			m_terrainMaterial{ nullptr };
 	TerrainGizmoBuffer			m_terrainGizmoBuffer{};
 	TerrainLayerBuffer			m_terrainlayerBuffer{};

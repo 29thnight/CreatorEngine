@@ -4,9 +4,10 @@
 
 class FoliageComponent;
 class TerrainComponent;
+class ImageComponent;
+class TextComponent;
 class MeshRenderer;
 using Invokable = std::function<void()>;
-
 class ProxyCommand
 {
 public:
@@ -16,6 +17,8 @@ public:
     ProxyCommand(MeshRenderer* pComponent);
 	ProxyCommand(TerrainComponent* pComponent);
     ProxyCommand(FoliageComponent* pComponent);
+	ProxyCommand(ImageComponent* pComponent);
+	ProxyCommand(TextComponent* pComponent);
 
 	ProxyCommand(const ProxyCommand& other);
 	ProxyCommand(ProxyCommand&& other) noexcept;

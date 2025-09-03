@@ -291,6 +291,9 @@
     <Filter Include="Resources\PSO\ShaderPSO">
       <UniqueIdentifier>{0bbb48b0-4e85-4176-82d4-401aec0885bc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Objects\UIRenderProxy">
+      <UniqueIdentifier>{958d27bb-10a1-4527-9192-96f0f7e8f5b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -532,6 +535,9 @@
     </ClCompile>
     <ClCompile Include="ShaderDSL.cpp">
       <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClCompile>
+    <ClCompile Include="UIRenderProxy.cpp">
+      <Filter>Objects\UIRenderProxy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -876,6 +882,9 @@
     </ClInclude>
     <ClInclude Include="ShaderDSL.h">
       <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClInclude>
+    <ClInclude Include="UIRenderProxy.h">
+      <Filter>Objects\UIRenderProxy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

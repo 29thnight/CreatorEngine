@@ -16,7 +16,7 @@ class GameObject;
 class Camera;
 class RenderPassData;
 class UIPass : public IRenderPass
-{
+{//엥?? 여기 있었네???
 	using UIRenderQueue = std::array<std::vector<ImageComponent*>, FrameCount>;
 	using TextRenderQueue = std::array<std::vector<TextComponent*>, FrameCount>;
 public:

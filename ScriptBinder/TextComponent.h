@@ -27,6 +27,9 @@ public:
 	std::string message;
 
 private:
+	friend class UIRenderProxy;
+
+private:
 	Mathf::Vector2 pos{ 0,0};
 	//상위ui 위치기준 추가값
     [[Property]]

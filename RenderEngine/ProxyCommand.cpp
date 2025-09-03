@@ -2,6 +2,8 @@
 #include "MeshRenderer.h"
 #include "Terrain.h"
 #include "FoliageComponent.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "Material.h"
@@ -173,6 +175,15 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 	};
+}
+
+ProxyCommand::ProxyCommand(ImageComponent* pComponent)
+{
+
+}
+
+ProxyCommand::ProxyCommand(TextComponent* pComponent)
+{
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :

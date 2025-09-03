@@ -3,6 +3,9 @@
 #include "../RenderEngine/Texture.h"
 #include "../RenderEngine/mesh.h"
 #include "GameObject.h"
+#include "SceneManager.h"
+#include "RenderScene.h"
+#include "Scene.h"
 #include "transform.h"
 #include "RectTransformComponent.h"
 
@@ -13,16 +16,6 @@ ImageComponent::ImageComponent()
 	type = UItype::Image;
 }
 
-void ImageComponent::Load(Texture* texPtr)
-{
-	Texture* newTexture = texPtr;
-	textures.push_back(newTexture);
-	if (textures.size() == 1)
-	{
-		SetTexture(0);
-	}
-}
-
 void ImageComponent::SetTexture(int index)
 {
 	curindex = index;
@@ -30,6 +23,28 @@ void ImageComponent::SetTexture(int index)
 	uiinfo.size = textures[curindex]->GetImageSize();
 
 	origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
+}
+
+void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)
+{
+	if (nullptr == ptr)
+		return;
+
+	textures.push_back(ptr);
+	if (textures.size() == 1)
+	{
+		SetTexture(0);
+	}
+}
+
+void ImageComponent::Awake()
+{
+	auto scene = GetOwner()->m_ownerScene;
+	auto renderScene = SceneManagers->GetRenderScene();
+	if (scene)
+	{
+		renderScene->RegisterCommand(this);
+	}
 }
 
 void ImageComponent::Update(float tick)
@@ -52,6 +67,16 @@ void ImageComponent::Update(float tick)
 
 }
 
+void ImageComponent::OnDestroy()
+{
+	auto scene = GetOwner()->m_ownerScene;
+	auto renderScene = SceneManagers->GetRenderScene();
+	if (scene)
+	{
+		renderScene->UnregisterCommand(this);
+	}
+}
+
 void ImageComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
 {
 	if (_layerorder < 0) _layerorder = 0;
@@ -63,7 +88,6 @@ void ImageComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
 	}
 
 }
-
 
 void ImageComponent::UpdateTexture()
 {

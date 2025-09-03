@@ -75,6 +75,7 @@ public:
 	void LoadTextures();
 	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(std::string_view filePath);
+	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath);
 	void CopyHDRTexture(std::string_view filePath);
 	void CopyTexture(std::string_view filePath, const file::path& destination);
 	void SelectTextureType();

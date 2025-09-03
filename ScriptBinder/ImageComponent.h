@@ -12,7 +12,6 @@ struct alignas(16) ImageInfo
 	Mathf::xMatrix world;
 	float2 size;
 	float2 screenSize;
- 
 };
 
 //모든 2d이미지 기본?
@@ -27,15 +26,17 @@ public:
 	ImageComponent();
 	~ImageComponent() = default;
 
-	void Load(Texture* ptr);
+	void Load(const std::shared_ptr<Texture>& ptr);
+	virtual void Awake() override;
 	virtual void Update(float tick) override;
+	virtual void OnDestroy() override;
     [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
 	void Draw(std::unique_ptr<SpriteBatch>& sBatch);
 	
 	ImageInfo uiinfo{};
-	Texture* m_curtexture{};
+	std::shared_ptr<Texture> m_curtexture{};
     [[Property]]
 	int curindex = 0;
 
@@ -43,9 +44,10 @@ public:
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };
 private:
-	float rotate =0;
-	std::vector<Texture*> textures;
-	XMFLOAT2 origin{};
+	friend class UIRenderProxy;
+	float									rotate{ 0 };
+	std::vector<std::shared_ptr<Texture>>	textures;
+	XMFLOAT2								origin{};
 
 };
 

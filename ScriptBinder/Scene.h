@@ -15,6 +15,8 @@ class Texture;
 class RigidBodyComponent;
 class TerrainComponent;
 class FoliageComponent;
+class ImageComponent;
+class TextComponent;
 class ReferenceAssets;
 class BoxColliderComponent;
 class SphereColliderComponent;
@@ -212,7 +214,7 @@ public:
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
-	std::unordered_set<Transform*> m_globalDirtySet{};
+	std::unordered_set<Transform*>	m_globalDirtySet{};
 	std::vector<LightComponent*>    m_lightComponents;
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
@@ -220,7 +222,7 @@ private:
     std::vector<Light>              m_lights;
     std::vector<TerrainComponent*>  m_terrainComponents;
     std::vector<FoliageComponent*>  m_foliageComponents;
-	std::mutex sceneMutex{};
+	std::mutex						sceneMutex{};
 
 private:
 	friend class PhysicsManager;
@@ -235,14 +237,14 @@ private:
 	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
 	std::vector<TerrainColliderComponent*>		m_terrainColliderComponents;
 	std::vector<std::shared_ptr<Animator*>>     m_animators;
-    RigidBodyTypeLinkCallback	m_ColliderTypeLinkCallback;
-	ColliderContainerType		m_colliderContainer;
+    RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
+	ColliderContainerType						m_colliderContainer;
 
 public:
 	HashingString GetSceneName() const { return m_sceneName; }
-    std::vector<Texture*> m_lightmapTextures{};
-    std::vector<Texture*> m_directionalmapTextures{};
-    Core::DelegateHandle resetObjHandle{};
-    GameObject* m_selectedSceneObject = nullptr;
-	std::vector<GameObject*> m_selectedSceneObjects;
+    std::vector<Texture*>		m_lightmapTextures{};
+    std::vector<Texture*>		m_directionalmapTextures{};
+    Core::DelegateHandle		resetObjHandle{};
+    GameObject*					m_selectedSceneObject = nullptr;
+	std::vector<GameObject*>	m_selectedSceneObjects;
 };

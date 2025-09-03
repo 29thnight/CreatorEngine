@@ -312,6 +312,7 @@
     <ClCompile Include="AAPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
+    <ClCompile Include="UIRenderProxy.cpp" />
     <ClCompile Include="VignettePass.cpp" />
     <ClCompile Include="VolumetricFogPass.cpp" />
     <ClCompile Include="WireFramePass.cpp" />
@@ -425,6 +426,7 @@
     <ClInclude Include="AAPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />
+    <ClInclude Include="UIRenderProxy.h" />
     <ClInclude Include="VignettePass.h" />
     <ClInclude Include="VignettePassSetting.h" />
     <ClInclude Include="VolumetricFogPassSetting.h" />

@@ -647,6 +647,11 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 
 Texture* DataSystem::LoadTexture(std::string_view filePath)
 {
+	return LoadSharedTexture(filePath).get();
+}
+
+std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath)
+{
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
 	if (source != destination && file::exists(source) && !file::exists(destination))
@@ -657,15 +662,13 @@ Texture* DataSystem::LoadTexture(std::string_view filePath)
 	if (Textures.find(name) != Textures.end())
 	{
 		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
-        return Textures[name].get();
+		return Textures[name];
 	}
-
 	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
-
 	if (texture)
 	{
 		Textures[name] = texture;
-        return texture.get();
+		return texture;
 	}
 	else
 	{

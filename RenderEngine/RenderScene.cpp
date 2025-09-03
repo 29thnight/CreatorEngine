@@ -13,11 +13,13 @@
 #include "SceneManager.h"
 #include "MeshRendererProxy.h"
 #include "ImageComponent.h"
+#include "TextComponent.h"
 #include "Terrain.h"
 #include "UIManager.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
+concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyUIProxyGUIDs;
 
 ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
@@ -274,6 +276,18 @@ void RenderScene::OnProxyDestroy()
 		}
 	}
 
+	while (!RenderScene::RegisteredDestroyUIProxyGUIDs.empty())
+	{
+		HashedGuid ID;
+		if (RenderScene::RegisteredDestroyUIProxyGUIDs.try_pop(ID))
+		{
+			{
+				SpinLock lock(m_uiProxyMapFlag);
+				m_uiProxyMap.erase(ID);
+			}
+		}
+	}
+
 	for (auto& [guid, pair] : m_palleteMap)
 	{
 		auto& isUpdated = pair.first;
@@ -394,4 +408,110 @@ void RenderScene::UnregisterCommand(FoliageComponent* foliagePtr)
     if (m_proxyMap.find(guid) == m_proxyMap.end()) return;
 
     m_proxyMap[guid]->DestroyProxy();
+}
+
+void RenderScene::RegisterCommand(ImageComponent* imagePtr)
+{
+	if (nullptr == imagePtr) return;
+	HashedGuid imageGuid = imagePtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(imageGuid) != m_uiProxyMap.end()) return;
+	// Create a new proxy for the image and insert it into the map
+	auto managedCommand = std::make_shared<UIRenderProxy>(imagePtr);
+	m_uiProxyMap[imageGuid] = managedCommand;
+}
+
+bool RenderScene::InvaildCheckImage(ImageComponent* imagePtr)
+{
+	if (nullptr == imagePtr || imagePtr->IsDestroyMark()) return false;
+	auto owner = imagePtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+	HashedGuid imageGuid = imagePtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(imageGuid) == m_uiProxyMap.end()) return false;
+	auto& proxyObject = m_uiProxyMap[imageGuid];
+	if (nullptr == proxyObject) return false;
+	return true;
+}
+
+void RenderScene::UpdateCommand(ImageComponent* imagePtr)
+{
+	if (!InvaildCheckImage(imagePtr)) 
+	{
+		throw std::runtime_error("InvaildCheckImage");
+	}
+	ProxyCommand moveCommand = MakeProxyCommand(imagePtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(ImageComponent* imagePtr)
+{
+	if (!InvaildCheckImage(imagePtr)) 
+	{
+		throw std::runtime_error("InvaildCheckImage");
+	}
+	ProxyCommand command(imagePtr);
+	return command;
+}
+
+void RenderScene::UnregisterCommand(ImageComponent* imagePtr)
+{
+	if (nullptr == imagePtr) return;
+	HashedGuid imageGuid = imagePtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(imageGuid) == m_uiProxyMap.end()) return;
+	m_uiProxyMap[imageGuid]->DestroyProxy();
+}
+
+void RenderScene::RegisterCommand(TextComponent* textPtr)
+{
+	if (nullptr == textPtr) return;
+	HashedGuid textGuid = textPtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(textGuid) != m_uiProxyMap.end()) return;
+	// Create a new proxy for the text and insert it into the map
+	auto managedCommand = std::make_shared<UIRenderProxy>(textPtr);
+	m_uiProxyMap[textGuid] = managedCommand;
+}
+
+bool RenderScene::InvaildCheckText(TextComponent* textPtr)
+{
+	if (nullptr == textPtr || textPtr->IsDestroyMark()) return false;
+	auto owner = textPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+	HashedGuid textGuid = textPtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(textGuid) == m_uiProxyMap.end()) return false;
+	auto& proxyObject = m_uiProxyMap[textGuid];
+	if (nullptr == proxyObject) return false;
+	return true;
+}
+
+void RenderScene::UpdateCommand(TextComponent* textPtr)
+{
+	if (!InvaildCheckText(textPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckText");
+	}
+	ProxyCommand moveCommand = MakeProxyCommand(textPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(TextComponent* textPtr)
+{
+	if (!InvaildCheckText(textPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckText");
+	}
+	ProxyCommand command(textPtr);
+	return command;
+}
+
+void RenderScene::UnregisterCommand(TextComponent* textPtr)
+{
+	if (nullptr == textPtr) return;
+	HashedGuid textGuid = textPtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(textGuid) == m_uiProxyMap.end()) return;
+	m_uiProxyMap[textGuid]->DestroyProxy();
 }

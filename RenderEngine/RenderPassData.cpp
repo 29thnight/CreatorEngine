@@ -227,6 +227,7 @@ void RenderPassData::ClearRenderQueue()
 	m_forwardQueue.clear();
 	m_terrainQueue.clear();
 	m_foliageQueue.clear();
+	m_UIRenderQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
@@ -249,6 +250,44 @@ void RenderPassData::SortShadowRenderQueue()
 void RenderPassData::ClearShadowRenderQueue()
 {
 	m_shadowRenderQueue.clear();
+}
+
+void RenderPassData::PushUIRenderQueue(UIRenderProxy* proxy)
+{
+	m_UIRenderQueue.push_back(proxy);
+}
+
+void RenderPassData::SortUIRenderQueue()
+{
+	if (!m_UIRenderQueue.empty())
+	{
+		std::sort(
+			m_UIRenderQueue.begin(),
+			m_UIRenderQueue.end(),
+			[](UIRenderProxy* a, UIRenderProxy* b) {
+				int layerA = 0;
+				int layerB = 0;
+				if (std::holds_alternative<UIRenderProxy::ImageData>(a->m_data)) {
+					layerA = std::get<UIRenderProxy::ImageData>(a->m_data).layerOrder;
+				}
+				else if (std::holds_alternative<UIRenderProxy::TextData>(a->m_data)) {
+					layerA = std::get<UIRenderProxy::TextData>(a->m_data).layerOrder;
+				}
+				if (std::holds_alternative<UIRenderProxy::ImageData>(b->m_data)) {
+					layerB = std::get<UIRenderProxy::ImageData>(b->m_data).layerOrder;
+				}
+				else if (std::holds_alternative<UIRenderProxy::TextData>(b->m_data)) {
+					layerB = std::get<UIRenderProxy::TextData>(b->m_data).layerOrder;
+				}
+				return layerA < layerB;
+			}
+		);
+	}
+}
+
+void RenderPassData::ClearUIRenderQueue()
+{
+	m_UIRenderQueue.clear();
 }
 
 void RenderPassData::PushCullData(const HashedGuid& instanceID)
@@ -285,4 +324,22 @@ void RenderPassData::ClearShadowRenderDataBuffer()
 {
 	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
 	m_findShadowProxyVec[prevIndex].clear();
+}
+
+void RenderPassData::PushUIRenderData(const HashedGuid& instanceID)
+{
+	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
+	m_findUIProxyVec[index].push_back(instanceID);
+}
+
+RenderPassData::FrameUIProxyIDs& RenderPassData::GetUIRenderDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	return m_findUIProxyVec[prevIndex];
+}
+
+void RenderPassData::ClearUIRenderDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	m_findUIProxyVec[prevIndex].clear();
 }
