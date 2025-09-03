@@ -325,11 +325,17 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
+	PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
+	PROFILE_CPU_END();
 
+	PROFILE_CPU_BEGIN("UpdateEvent");
     UpdateEvent.Broadcast(deltaSecond);
+	PROFILE_CPU_END();
 
+	PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
+	PROFILE_CPU_END();
 }
 
 void Scene::YieldNull()

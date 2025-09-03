@@ -202,6 +202,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 			{
+				//TODO : 불필요 로직 제거 -> DataSystem에서 LoadUITexture로 변경
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
@@ -210,9 +211,14 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (selectedSceneObject)
 				{
 					if (ImageComponent* hasSprite = selectedSceneObject->GetComponent<ImageComponent>())
+					{
 						sprite = hasSprite;
+					}
 					else
+					{
 						sprite = selectedSceneObject->AddComponent<ImageComponent>();
+					}
+
 					if (sprite)
 					{
 						sprite->Load(texture);
