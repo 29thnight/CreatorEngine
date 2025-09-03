@@ -25,6 +25,7 @@
 #include "CameraComponent.h"
 #include "Bullet.h"
 #include "NormalBullet.h"
+#include "SpecialBullet.h"
 #include "Bomb.h"
 void Player::Start()
 {
@@ -427,7 +428,7 @@ void Player::Attack1()
 	{
 		isAttacking = true;
 		m_animator->SetParameter("Attack", true);
-		m_animator->SetUseLayer(0,false);
+		//m_animator->SetUseLayer(0,false);
 		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
 		if (m_curWeapon && m_curWeapon->CheckDur() ==true)
@@ -667,15 +668,36 @@ void Player::MeleeAttack()
 
 void Player::ShootBullet()
 {
-	Prefab* bulletprefab= PrefabUtilitys->LoadPrefab("NormalBullet");
+}
+
+void Player::ShootNormalBullet()
+{
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("NormalBullet");
 	if (bulletprefab && player)
 	{
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
-		NormalBullet * bullet = bulletObj->GetComponent<NormalBullet>();
+		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, pos,-player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
+			bullet->Initialize(this, pos, -player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
+		}
+
+	}
+}
+
+void Player::ShootSpecialBullet()
+{
+	//Todo:: pool에서찾고 없으면 프리팹에서 생성
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("SpecialBullet");
+	if (bulletprefab && player)
+	{
+		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
+		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
+		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+		if (m_curWeapon)
+		{
+			bullet->Initialize(this, pos, -player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
 		}
 
 	}

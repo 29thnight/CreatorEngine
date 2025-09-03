@@ -166,6 +166,10 @@ public:
 	[[Method]]
 	void ShootBullet();
 	[[Method]]
+	void ShootNormalBullet();
+	[[Method]]
+	void ShootSpecialBullet();
+	[[Method]]
 	void ThrowBomb();
 
 	[[Method]]

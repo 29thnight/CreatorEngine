@@ -17,12 +17,20 @@ void SpecialBullet::OnTriggerStay(const Collision& collision)
 
 void SpecialBullet::Update(float tick)
 {
+	Transform* transform = GetOwner()->GetComponent<Transform>();
+	transform->AddPosition(m_moveDir * rangedProjSpd);
+
+	lifeTime -= tick;
+	if (lifeTime <= 0)
+	{
+		//GetOwner()->Destroy();
+	}
 }
 
 
 void SpecialBullet::OnTriggerEnter(const Collision& collision)
 {
-	//피격된 지점 중심으로 범위 공격 //새 오브젝트 만들어서 걔가 처리
+	//피격된 지점 중심으로 범위 공격 
 	if (hasAttacked == false)
 	{
 		if (collision.otherObj->m_tag == "Enemy")
