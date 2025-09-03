@@ -654,14 +654,16 @@ void Player::MeleeAttack()
 			auto object = hit.gameObject;
 			if (object == GetOwner()) continue;
 
-			auto entity = object->GetComponent<EntityEnemy>();
-			auto [iter, inserted] = AttackTarget.insert(entity);
-			if (inserted)
+			if (auto entity = object->GetComponent<EntityEnemy>())
 			{
-				if (*iter)
-				{
-					(*iter)->SendDamage(this, 1);
-				}
+				auto [iter, inserted] = AttackTarget.insert(entity);
+				if (inserted) (*iter)->SendDamage(this, 100);
+			}
+
+			if (auto mineral = object->GetComponent<EntityResource>())
+			{
+				auto [iter, inserted] = AttackTarget.insert(mineral);
+				if (inserted) (*iter)->SendDamage(this, 100);
 			}
 		}
 }

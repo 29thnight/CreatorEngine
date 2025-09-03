@@ -10,6 +10,8 @@
 #include "RigidBodyComponent.h"
 #include "RaycastHelper.h"
 #include "Weapon.h"
+#include "EntityResource.h"
+#include "EntityItem.h"
 void GameManager::Awake()
 {
 	std::cout << "GameManager Awake" << std::endl;
@@ -20,7 +22,7 @@ void GameManager::Awake()
 	if (resourcePool) {
 		for (auto& index : resourcePool->m_childrenIndices) {
 			auto object = GameObject::FindIndex(index);
-			auto entity = object->GetComponent<Entity>();
+			auto entity = object->GetComponent<EntityItem>();
 			if (entity)
 				m_resourcePool.push_back(entity);
 		}
