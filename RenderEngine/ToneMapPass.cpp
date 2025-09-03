@@ -30,7 +30,7 @@ ToneMapPass::ToneMapPass()
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -50,7 +50,7 @@ ToneMapPass::ToneMapPass()
 
 	DirectX::SetName(m_pToneMapConstantBuffer, "ToneMapConstantBuffer");
 
-    auto& device = DeviceState::g_pDevice;
+    auto& device = DirectX11::DeviceStates->g_pDevice;
 
     D3D11_TEXTURE2D_DESC texDesc = {};
     texDesc.Width = 1;
@@ -72,7 +72,7 @@ ToneMapPass::ToneMapPass()
         device->CreateTexture2D(&readbackDesc, nullptr, &m_readbackTexture[i]);
     }
 
-    PrepareDownsampleTextures(DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height);
+    PrepareDownsampleTextures(DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height);
 }
 
 ToneMapPass::~ToneMapPass()
@@ -130,14 +130,14 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
             }
 
             ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
-            DeviceState::g_pDeviceContext->CopyResource(m_readbackTexture[m_writeIndex].Get(), lastResource);
+            DirectX11::DeviceStates->g_pDeviceContext->CopyResource(m_readbackTexture[m_writeIndex].Get(), lastResource);
             D3D11_MAPPED_SUBRESOURCE mapped{};
-            if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(
+            if (SUCCEEDED(DirectX11::DeviceStates->g_pDeviceContext->Map(
                 m_readbackTexture[m_readIndex].Get(), 0, D3D11_MAP_READ, 0, &mapped)))
             {
                 const float lumEpsilon = 0.05f;
                 float luminance = *reinterpret_cast<float*>(mapped.pData);
-                DeviceState::g_pDeviceContext->Unmap(m_readbackTexture[m_readIndex].Get(), 0);
+                DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_readbackTexture[m_readIndex].Get(), 0);
 
                 float EV100 = log2((m_fNumber * m_fNumber) / m_shutterTime * (100.0f / m_ISO));
                 float exposureManual = 1.0f / pow(2.0f, EV100 + m_exposureCompensation);

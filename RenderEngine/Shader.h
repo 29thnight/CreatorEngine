@@ -126,7 +126,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateVertexShader(
+			DirectX11::DeviceStates->g_pDevice->CreateVertexShader(
 				m_blob->GetBufferPointer(), 
 				m_blob->GetBufferSize(), 
 				nullptr, 
@@ -159,7 +159,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreatePixelShader(
+			DirectX11::DeviceStates->g_pDevice->CreatePixelShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -190,7 +190,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateComputeShader(
+			DirectX11::DeviceStates->g_pDevice->CreateComputeShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -220,7 +220,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateGeometryShader(
+			DirectX11::DeviceStates->g_pDevice->CreateGeometryShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -250,7 +250,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateHullShader(
+			DirectX11::DeviceStates->g_pDevice->CreateHullShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,
@@ -280,7 +280,7 @@ public:
 	void Compile() override
 	{
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateDomainShader(
+			DirectX11::DeviceStates->g_pDevice->CreateDomainShader(
 				m_blob->GetBufferPointer(),
 				m_blob->GetBufferSize(),
 				nullptr,

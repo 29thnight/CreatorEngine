@@ -823,7 +823,7 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 
 			if (anchorsChanged || pivotChanged)
 			{
-				Mathf::Rect parentRect{ 0.f, 0.f, DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height };
+				Mathf::Rect parentRect{ 0.f, 0.f, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
 				if (auto* owner = rectTransformComponent->GetOwner(); owner)
 				{
 					if (GameObject::IsValidIndex(owner->m_parentIndex))

@@ -22,7 +22,7 @@ Sampler::~Sampler()
 
 void Sampler::Use(uint32_t slot)
 {
-	DeviceState::g_pDeviceContext->PSSetSamplers(slot, 1, &m_SamplerState);
+	DirectX11::DeviceStates->g_pDeviceContext->PSSetSamplers(slot, 1, &m_SamplerState);
 }
 
 void Sampler::Use(ID3D11DeviceContext* deferredContext, uint32_t slot)

@@ -19,7 +19,7 @@ Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ std::string
 
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -45,7 +45,7 @@ Managed::UniquePtr<Texture> Texture::CreateManaged(uint32 width, uint32 height, 
 
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -71,7 +71,7 @@ Managed::SharedPtr<Texture> Texture::CreateShared(uint32 width, uint32 height, s
 
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -125,7 +125,7 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ std::string_view name, _In_ 
 
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -153,7 +153,7 @@ Managed::UniquePtr<Texture> Texture::CreateManagedCube(uint32 size, std::string_
 	};
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -180,7 +180,7 @@ Managed::SharedPtr<Texture> Texture::CreateSharedCube(uint32 size, std::string_v
 	};
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -206,7 +206,7 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, std::string_view name
 
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -231,7 +231,7 @@ Managed::UniquePtr<Texture> Texture::CreateManagedArray(uint32 width, uint32 hei
 	textureDesc.ArraySize = arrsize;
 	ID3D11Texture2D* texture;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D(
+		DirectX11::DeviceStates->g_pDevice->CreateTexture2D(
 			&textureDesc, data, &texture
 		)
 	);
@@ -336,7 +336,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
     Texture* texture = new Texture();
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceView(
-			DeviceState::g_pDevice,
+			DirectX11::DeviceStates->g_pDevice,
 			image.GetImages(),
 			image.GetImageCount(),
 			image.GetMetadata(),
@@ -465,7 +465,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceViewEx(
-			DeviceState::g_pDevice,
+			DirectX11::DeviceStates->g_pDevice,
 			image.GetImages(),
 			image.GetImageCount(),
 			image.GetMetadata(),
@@ -583,7 +583,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceViewEx(
-			DeviceState::g_pDevice,
+			DirectX11::DeviceStates->g_pDevice,
 			image.GetImages(),
 			image.GetImageCount(),
 			image.GetMetadata(),
@@ -685,7 +685,7 @@ void Texture::CreateSRV(_In_ DXGI_FORMAT textureFormat, _In_opt_ D3D11_SRV_DIMEN
 	m_srvDesc = srvDesc;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateShaderResourceView(
+		DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(
 			m_pTexture, &srvDesc, &m_pSRV
 		)
 	);
@@ -697,7 +697,7 @@ void Texture::CreateSRV(_In_ DXGI_FORMAT textureFormat, _In_opt_ D3D11_SRV_DIMEN
 void Texture::ResizeSRV()
 {
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateShaderResourceView(
+		DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(
 			m_pTexture, &m_srvDesc, &m_pSRV
 		)
 	);
@@ -717,7 +717,7 @@ void Texture::CreateRTV(_In_ DXGI_FORMAT textureFormat)
 
 	ID3D11RenderTargetView* rtv;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRenderTargetView(
+		DirectX11::DeviceStates->g_pDevice->CreateRenderTargetView(
 			m_pTexture, &rtvDesc, &rtv
 		)
 	);
@@ -733,7 +733,7 @@ void Texture::ResizeRTV(uint32 index)
 
 	ID3D11RenderTargetView* rtv;
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRenderTargetView(
+		DirectX11::DeviceStates->g_pDevice->CreateRenderTargetView(
 			m_pTexture, &rtvDesc, &rtv
 		)
 	);
@@ -760,7 +760,7 @@ void Texture::CreateCubeRTVs(_In_ DXGI_FORMAT textureFormat, _In_opt_ uint32 mip
 
 			ID3D11RenderTargetView* rtv;
 			DirectX11::ThrowIfFailed(
-				DeviceState::g_pDevice->CreateRenderTargetView(
+				DirectX11::DeviceStates->g_pDevice->CreateRenderTargetView(
 					m_pTexture, &rtvDesc, &rtv
 				)
 			);
@@ -792,7 +792,7 @@ void Texture::CreateDSV(_In_ DXGI_FORMAT textureFormat)
 	m_dsvDesc = dsvDesc;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilView(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilView(
 			m_pTexture, &dsvDesc, &m_pDSV
 		)
 	);
@@ -805,7 +805,7 @@ void Texture::CreateDSV(_In_ DXGI_FORMAT textureFormat)
 void Texture::ResizeDSV()
 {
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilView(
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilView(
 			m_pTexture, &m_dsvDesc, &m_pDSV
 		)
 	);
@@ -823,7 +823,7 @@ void Texture::CreateUAV(DXGI_FORMAT textureFormat)
 	m_uavDesc = uavDesc;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateUnorderedAccessView(
+		DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(
 			m_pTexture, &uavDesc, &m_pUAV
 		)
 	);
@@ -836,7 +836,7 @@ void Texture::CreateUAV(DXGI_FORMAT textureFormat)
 void Texture::ResizeUAV()
 {
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateUnorderedAccessView(
+		DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(
 			m_pTexture, &m_uavDesc, &m_pUAV
 		)
 	);
@@ -881,7 +881,7 @@ void Texture::Resize2DViews(_In_ uint32 width, _In_ uint32 height)
 {
 	//SetSize({ (float)width, (float)height });
 
-	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
+	DirectX11::ThrowIfFailed(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
 
 	if (m_hasSRV) ResizeSRV();
@@ -902,7 +902,7 @@ void Texture::ResizeCubeViews(_In_ uint32 size)
 
 	//SetSize({ (float)size, (float)size });
 
-	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
+	DirectX11::ThrowIfFailed(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
 
 	if (m_hasSRV) ResizeSRV();
@@ -915,7 +915,7 @@ void Texture::ResizeArrayViews(_In_ uint32 width, _In_ uint32 height)
 {
 	//SetSize({ (float)width, (float)height });
 
-	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
+	DirectX11::ThrowIfFailed(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
 
 	if (m_hasSRV) ResizeSRV();

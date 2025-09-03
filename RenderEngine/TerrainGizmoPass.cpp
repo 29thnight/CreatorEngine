@@ -24,15 +24,15 @@ TerrainGizmoPass::TerrainGizmoPass()
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
     );
 
     m_pTempTexture = Texture::Create(
-        DeviceState::g_ClientRect.width, 
-        DeviceState::g_ClientRect.height, 
+        DirectX11::DeviceStates->g_ClientRect.width, 
+        DirectX11::DeviceStates->g_ClientRect.height, 
         "copy", 
         DXGI_FORMAT_R16G16B16A16_FLOAT, 
         D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET);
@@ -72,7 +72,7 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
 
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, nullptr);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
     DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
     DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
 

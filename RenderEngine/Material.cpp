@@ -451,7 +451,7 @@ bool Material::TryGetMatrix(std::string_view q, Mathf::xMatrix& out) const {
 void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
 {
     if (!m_shaderPSO) return;
-    if (!ctx) ctx = DeviceState::g_pDeviceContext;
+    if (!ctx) ctx = DirectX11::DeviceStates->g_pDeviceContext;
 
     // 더러워진 CB만 올려준다.
     for (const auto& cbName : m_dirtyCBs)

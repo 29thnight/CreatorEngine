@@ -12,14 +12,14 @@ AAPass::AAPass()
 	m_pso = std::make_unique<PipelineStateObject>();
 	m_pso->m_computeShader = &ShaderSystem->ComputeShaders["FXAA"];
 
-	m_FXAAParameters.TextureSize.x = (int)DeviceState::g_ClientRect.width;
-	m_FXAAParameters.TextureSize.y = (int)DeviceState::g_ClientRect.height;
+	m_FXAAParameters.TextureSize.x = (int)DirectX11::DeviceStates->g_ClientRect.width;
+	m_FXAAParameters.TextureSize.y = (int)DirectX11::DeviceStates->g_ClientRect.height;
 
 	m_FXAAParametersBuffer = DirectX11::CreateBuffer(sizeof(FXAAParametersBuffer), D3D11_BIND_CONSTANT_BUFFER, &m_FXAAParameters);
 
 	m_AntiAliasingTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"AntiAliasing",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
@@ -27,8 +27,8 @@ AAPass::AAPass()
 	m_AntiAliasingTexture->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 	m_CopiedTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE
@@ -66,8 +66,8 @@ void AAPass::Execute(RenderScene& scene, Camera& camera)
 
 	DirectX11::CSSetConstantBuffer(0, 1, m_FXAAParametersBuffer.GetAddressOf());
 
-	uint32 threadGroupCountX = (uint32)ceilf(DeviceState::g_ClientRect.width / 16.0f);
-	uint32 threadGroupCountY = (uint32)ceilf(DeviceState::g_ClientRect.height / 16.0f);
+	uint32 threadGroupCountX = (uint32)ceilf(DirectX11::DeviceStates->g_ClientRect.width / 16.0f);
+	uint32 threadGroupCountY = (uint32)ceilf(DirectX11::DeviceStates->g_ClientRect.height / 16.0f);
 
 	DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
 

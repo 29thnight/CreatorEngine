@@ -580,7 +580,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		//ID3D11Resource* diffuseResource = nullptr;
 		//ID3D11Texture2D* diffuseTexture = nullptr;
 		//ID3D11ShaderResourceView* diffuseSRV = nullptr;
-		//if (CreateTextureFromFile(DeviceState::g_pDevice, desc.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK) {
+		//if (CreateTextureFromFile(DirectX11::DeviceStates->g_pDevice, desc.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK) {
 		//	diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
 		//	TerrainLayer newLayer;
 		//	desc.diffuseTexture = diffuseTexture;
@@ -974,7 +974,7 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-		HRESULT hr =  DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &mask.m_maskTexture);
+		HRESULT hr =  DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, &mask.m_maskTexture);
 		if (FAILED(hr)) {
 			// 오류 처리
 			Debug->LogError("Mask Textrue CreateTexture2D Failed");
@@ -985,7 +985,7 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 		srvDesc.Format = desc.Format;
 		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
-		hr  = DeviceState::g_pDevice->CreateShaderResourceView(
+		hr  = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(
 			mask.m_maskTexture, &srvDesc, &mask.m_maskSRV
 		);
 
@@ -997,7 +997,7 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 	}
 
 	D3D11_MAPPED_SUBRESOURCE M;
-	DeviceState::g_pDeviceContext->Map(
+	DirectX11::DeviceStates->g_pDeviceContext->Map(
 		mask.m_maskTexture, 0,
 		D3D11_MAP_WRITE_DISCARD,
 		0, &M
@@ -1010,7 +1010,7 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 			mask.m_maskWidth
 		);
 	}
-	DeviceState::g_pDeviceContext->Unmap(mask.m_maskTexture, 0);
+	DirectX11::DeviceStates->g_pDeviceContext->Unmap(mask.m_maskTexture, 0);
 
 	brush->m_masks.push_back(mask);	
 	std::string maskName = "mask_" + std::to_string(brush->m_masks.size() - 1);
@@ -1177,7 +1177,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 		ID3D11Texture2D* dst = arrayTex->m_pTexture;
 
 		UINT dstSub = D3D11CalcSubresource(0, slice, 1);
-		DeviceState::g_pDeviceContext->CopySubresourceRegion(
+		DirectX11::DeviceStates->g_pDeviceContext->CopySubresourceRegion(
 			dst, dstSub, 0, 0, 0,
 			src, 0, nullptr
 		);

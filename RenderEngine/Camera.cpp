@@ -10,7 +10,7 @@
 
 Camera::Camera() : m_isLinkRenderData(true)
 {
-	m_aspectRatio = DeviceState::g_aspectRatio;
+	m_aspectRatio = DirectX11::DeviceStates->g_aspectRatio;
 
 	m_cameraIndex = CameraManagement->GetCameraCount();
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -67,7 +67,7 @@ Camera::Camera(bool isTemperary) : m_isLinkRenderData(false)
 {
 	if(!isTemperary)
 	{
-		m_aspectRatio = DeviceState::g_aspectRatio;
+		m_aspectRatio = DirectX11::DeviceStates->g_aspectRatio;
 
 		m_cameraIndex = CameraManagement->GetCameraCount();
 
@@ -149,7 +149,7 @@ Mathf::xMatrix Camera::CalculateInverseProjection()
 
 DirectX11::Sizef Camera::GetScreenSize() const
 {
-	return DeviceState::g_ClientRect;
+	return DirectX11::DeviceStates->g_ClientRect;
 }
 
 DirectX::BoundingFrustum Camera::GetFrustum()

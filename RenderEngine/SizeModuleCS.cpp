@@ -79,36 +79,36 @@ void SizeModuleCS::Update(float deltaTime)
     UpdateConstantBuffers();
 
     // 컴퓨트 셰이더 바인딩
-    DeviceState::g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
 
     // 상수 버퍼 바인딩
     ID3D11Buffer* constantBuffers[] = { m_sizeParamsBuffer };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, constantBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 1, constantBuffers);
 
     // 입력 리소스 바인딩
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
     // 출력 리소스 바인딩
     ID3D11UnorderedAccessView* uavs[] = { m_outputUAV };
     UINT initCounts[] = { 0 };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
 
     // 디스패치 실행
     UINT numThreadGroups = (m_particleCapacity + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE;
-    DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
+    DirectX11::DeviceStates->g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 정리
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
 
     ID3D11ShaderResourceView* nullSRVs[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, nullSRVs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, nullSRVs);
 
     ID3D11Buffer* nullBuffers[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
 
-    DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
     DirectX11::EndEvent();
 }
@@ -144,7 +144,7 @@ bool SizeModuleCS::CreateConstantBuffers()
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_sizeParamsBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_sizeParamsBuffer);
     if (FAILED(hr))
     {
         OutputDebugStringA("Failed to create size params buffer\n");
@@ -159,12 +159,12 @@ void SizeModuleCS::UpdateConstantBuffers()
     if (m_paramsDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_sizeParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_sizeParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
         if (SUCCEEDED(hr))
         {
             memcpy(mappedResource.pData, &m_sizeParams, sizeof(SizeParams));
-            DeviceState::g_pDeviceContext->Unmap(m_sizeParamsBuffer, 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_sizeParamsBuffer, 0);
             m_paramsDirty = false;
         }
     }

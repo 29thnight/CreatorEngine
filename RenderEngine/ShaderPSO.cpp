@@ -92,13 +92,13 @@ void ShaderPSO::CreateInputLayoutFromShader()
     }
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_rasterizerState
         )
     );
 
-    m_depthStencilState = DeviceState::g_pDepthStencilState;
+    m_depthStencilState = DirectX11::DeviceStates->g_pDepthStencilState;
 
 	m_samplers.clear();
 
@@ -147,7 +147,7 @@ void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D
         desc.CPUAccessFlags = 0;
 
         Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
-        if (SUCCEEDED(DeviceState::g_pDevice->CreateBuffer(&desc, nullptr, buffer.GetAddressOf())))
+        if (SUCCEEDED(DirectX11::DeviceStates->g_pDevice->CreateBuffer(&desc, nullptr, buffer.GetAddressOf())))
         {
             CBEntry entry;
             entry.name = cbDesc.Name;
@@ -194,7 +194,7 @@ void ShaderPSO::AddOrMergeCB(ID3D11ShaderReflectionConstantBuffer* cb, const D3D
 
 void ShaderPSO::Apply()
 {
-    Apply(DeviceState::g_pDeviceContext);
+    Apply(DirectX11::DeviceStates->g_pDeviceContext);
 }
 
 void ShaderPSO::Apply(ID3D11DeviceContext* ctx)
@@ -236,7 +236,7 @@ bool ShaderPSO::UpdateVariable(std::string_view cbName, std::string_view varName
     if (varIt == cb.variables.end()) return false;
     if (size > varIt->size) return false;
     std::memcpy(cb.cpuData.data() + varIt->offset, data, size);
-    DeviceState::g_pDeviceContext->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(cb.buffer.Get(), 0, nullptr, cb.cpuData.data(), 0, 0);
     return true;
 }
 

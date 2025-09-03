@@ -60,21 +60,21 @@ GBufferPass::GBufferPass()
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
 	);
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_instancePSO->m_rasterizerState
 		)
 	);
 
-	m_pso->m_depthStencilState			= DeviceState::g_pDepthStencilState;
-	m_instancePSO->m_depthStencilState	= DeviceState::g_pDepthStencilState;
+	m_pso->m_depthStencilState			= DirectX11::DeviceStates->g_pDepthStencilState;
+	m_instancePSO->m_depthStencilState	= DirectX11::DeviceStates->g_pDepthStencilState;
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -107,7 +107,7 @@ GBufferPass::GBufferPass()
 	instanceBufferDesc.StructureByteStride = sizeof(Mathf::xMatrix);
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBuffer(&instanceBufferDesc, nullptr, &m_instanceBuffer)
+		DirectX11::DeviceStates->g_pDevice->CreateBuffer(&instanceBufferDesc, nullptr, &m_instanceBuffer)
 	);
 
 	// Create a shader resource view for the instance buffer
@@ -118,7 +118,7 @@ GBufferPass::GBufferPass()
 	srvDesc.Buffer.NumElements = MAX_INSTANCES;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
+		DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
 	);
 }
 
@@ -183,7 +183,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::OMSetRenderTargets(deferredPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
 	camera.UpdateBuffer(deferredPtr);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 
 	// --- 2. RENDER ANIMATED OBJECTS (INDIVIDUALLY) ---
@@ -361,7 +361,7 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 
 	camera.UpdateBuffer(deferredPtr);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 
 	for (auto& terrainProxy : data->m_terrainQueue) 

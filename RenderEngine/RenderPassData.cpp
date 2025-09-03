@@ -71,16 +71,16 @@ void RenderPassData::Initalize(uint32 index)
 	std::string cameraRTVName = "RenderPassData(" + std::to_string(index) + ") RTV";
 
 	auto renderTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		cameraRTVName,
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 	m_renderTarget.swap(renderTexture);
 
 	auto depthStencil = TextureHelper::CreateDepthTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"RenderPassData(" + std::to_string(index) + ") DSV"
 	);
 	m_depthStencil.swap(depthStencil);
@@ -101,8 +101,8 @@ void RenderPassData::Initalize(uint32 index)
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 
 	auto ssrTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"prevSSRTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
@@ -110,7 +110,7 @@ void RenderPassData::Initalize(uint32 index)
 
 	for (int i = 0; i < cascadeCount; ++i)
 	{
-		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DeviceState::g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
+		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DirectX11::DeviceStates->g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
 	}
 
 	for (int i = 0; i < cascadeCount; i++)
@@ -122,7 +122,7 @@ void RenderPassData::Initalize(uint32 index)
 		depthStencilViewDesc.Texture2DArray.FirstArraySlice = i;
 
 		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateDepthStencilView(
+			DirectX11::DeviceStates->g_pDevice->CreateDepthStencilView(
 				shadowMapTexture->m_pTexture,
 				&depthStencilViewDesc,
 				&m_shadowMapDSVarr[i]

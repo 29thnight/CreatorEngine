@@ -33,7 +33,7 @@ void TrailRenderModule::Initialize()
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
+        DirectX11::DeviceStates->g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
     );
 
     // 래스터라이저 스테이트
@@ -41,7 +41,7 @@ void TrailRenderModule::Initialize()
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
     rasterizerDesc.FillMode = D3D11_FILL_SOLID;
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)
     );
 
     // 깊이 스텐실 스테이트
@@ -49,7 +49,7 @@ void TrailRenderModule::Initialize()
     depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     depthDesc.DepthEnable = true;
     depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-    DeviceState::g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
+    DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
 
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
@@ -69,7 +69,7 @@ void TrailRenderModule::Initialize()
     };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateInputLayout(
+        DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
             vertexLayoutDesc,
             _countof(vertexLayoutDesc),
             m_pso->m_vertexShader->GetBufferPointer(),
@@ -115,7 +115,7 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     if (!vertexBuffer || !indexBuffer)
         return;
 
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffer(world, view, projection);
@@ -150,7 +150,7 @@ void TrailRenderModule::SetParticleData(ID3D11ShaderResourceView* particleSRV, U
 
 void TrailRenderModule::SetupRenderTarget(RenderPassData* renderData)
 {
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 }

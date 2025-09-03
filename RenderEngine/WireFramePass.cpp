@@ -34,7 +34,7 @@ WireFramePass::WireFramePass()
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -61,7 +61,7 @@ void WireFramePass::Execute(RenderScene& scene, Camera& camera)
 
     m_pso->Apply();
 
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 

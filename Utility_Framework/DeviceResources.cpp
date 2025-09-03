@@ -725,6 +725,6 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
     DirectX11::ThrowIfFailed(
         pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
     );
-    DeviceState::g_backBufferRTV = m_d3dRenderTargetView.Get();
+    DirectX11::DeviceStates->g_backBufferRTV = m_d3dRenderTargetView.Get();
 }
 #endif // !DYNAMICCPP_EXPORTS

@@ -793,7 +793,7 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 		}
 	}
 
-	SFonts.emplace(name, std::make_shared<SpriteFont>(DeviceState::g_pDevice, destination.c_str()));
+	SFonts.emplace(name, std::make_shared<SpriteFont>(DirectX11::DeviceStates->g_pDevice, destination.c_str()));
 	
 	return SFonts[name].get();
 }

@@ -37,7 +37,7 @@ PostProcessingPass::PostProcessingPass()
 
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState));
 
@@ -133,8 +133,8 @@ void PostProcessingPass::PrepaerShaderState()
 void PostProcessingPass::TextureInitialization()
 {
     m_CopiedTexture = Texture::Create(
-        DeviceState::g_ClientRect.width,
-        DeviceState::g_ClientRect.height,
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height,
         "CopiedTexture",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET);
@@ -143,8 +143,8 @@ void PostProcessingPass::TextureInitialization()
     m_CopiedTexture->m_textureType = TextureType::ImageTexture;
 
     m_bloomExtractTexture = Texture::Create(
-        DeviceState::g_ClientRect.width,
-        DeviceState::g_ClientRect.height,
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height,
         "BloomExtract",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
@@ -158,8 +158,8 @@ void PostProcessingPass::TextureInitialization()
         std::string downName = "BloomDownSample" + std::to_string(i);
         m_bloomDownSampledTextures[i] = Texture::Create(
             ratio, ratio,
-            DeviceState::g_ClientRect.width,
-            DeviceState::g_ClientRect.height,
+            DirectX11::DeviceStates->g_ClientRect.width,
+            DirectX11::DeviceStates->g_ClientRect.height,
             downName,
             DXGI_FORMAT_R16G16B16A16_FLOAT,
             D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
@@ -170,8 +170,8 @@ void PostProcessingPass::TextureInitialization()
         std::string upName = "BloomUpSample" + std::to_string(i);
         m_bloomUpSampledTextures[i] = Texture::Create(
             ratio, ratio,
-            DeviceState::g_ClientRect.width,
-            DeviceState::g_ClientRect.height,
+            DirectX11::DeviceStates->g_ClientRect.width,
+            DirectX11::DeviceStates->g_ClientRect.height,
             upName,
             DXGI_FORMAT_R16G16B16A16_FLOAT,
             D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
@@ -181,8 +181,8 @@ void PostProcessingPass::TextureInitialization()
     }
 
     m_BloomResult = Texture::Create(
-        DeviceState::g_ClientRect.width,
-        DeviceState::g_ClientRect.height,
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height,
         "BloomResult",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET);
@@ -213,8 +213,8 @@ void PostProcessingPass::BloomPass(RenderScene& /*scene*/, Camera& /*camera*/)
     DirectX11::CSSetShaderResources(0, 2, extractSRVs);
     DirectX11::CSSetUnorderedAccessViews(0, 1, &m_bloomExtractTexture->m_pUAV, offsets);
     DirectX11::CSSetConstantBuffer(0, 1, m_bloomParamBuffer.GetAddressOf());
-    UINT gx = (DeviceState::g_ClientRect.width + 11) / 12;
-    UINT gy = (DeviceState::g_ClientRect.height + 7) / 8;
+    UINT gx = (DirectX11::DeviceStates->g_ClientRect.width + 11) / 12;
+    UINT gy = (DirectX11::DeviceStates->g_ClientRect.height + 7) / 8;
     DirectX11::Dispatch(gx, gy, 1);
     DirectX11::CSSetShaderResources(0, 2, nullSRVs);
     DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
@@ -223,8 +223,8 @@ void PostProcessingPass::BloomPass(RenderScene& /*scene*/, Camera& /*camera*/)
     ID3D11ShaderResourceView* currentSRV = m_bloomExtractTexture->m_pSRV;
     for (uint32_t i = 0; i < BLOOM_MIP_LEVELS; ++i)
     {
-        uint32_t inputWidth = (uint32)DeviceState::g_ClientRect.width >> i;
-        uint32_t inputHeight = (uint32)DeviceState::g_ClientRect.height >> i;
+        uint32_t inputWidth = (uint32)DirectX11::DeviceStates->g_ClientRect.width >> i;
+        uint32_t inputHeight = (uint32)DirectX11::DeviceStates->g_ClientRect.height >> i;
         uint32_t width = inputWidth >> 1;
         uint32_t height = inputHeight >> 1;
         if (width == 0 || height == 0) break;
@@ -267,8 +267,8 @@ void PostProcessingPass::BloomPass(RenderScene& /*scene*/, Camera& /*camera*/)
         DirectX11::CSSetUnorderedAccessViews(0, 1, &m_bloomUpSampledTextures[static_cast<size_t>(i)]->m_pUAV, offsets);
         DirectX11::CSSetConstantBuffer(0, 1, m_upSampleBuffer.GetAddressOf());
 
-        uint32_t width = (uint32)DeviceState::g_ClientRect.width >> (i + 1);
-        uint32_t height = (uint32)DeviceState::g_ClientRect.height >> (i + 1);
+        uint32_t width = (uint32)DirectX11::DeviceStates->g_ClientRect.width >> (i + 1);
+        uint32_t height = (uint32)DirectX11::DeviceStates->g_ClientRect.height >> (i + 1);
         UINT ugx = (width + 11) / 12;
         UINT ugy = (height + 7) / 8;
         DirectX11::Dispatch(ugx, ugy, 1);

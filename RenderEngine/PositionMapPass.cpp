@@ -31,7 +31,7 @@ PositionMapPass::PositionMapPass()
 	};
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateInputLayout(
+		DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
 			vertexLayoutDesc,
 			_countof(vertexLayoutDesc),
 			m_pso->m_vertexShader->GetBufferPointer(),
@@ -47,7 +47,7 @@ PositionMapPass::PositionMapPass()
 	//rasterizerDesc.MultisampleEnable = true;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
@@ -92,7 +92,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 		posNormMapSize
 	);
 
-	DeviceState::g_pDeviceContext->RSSetViewports(1, &pre);
+	DirectX11::DeviceStates->g_pDeviceContext->RSSetViewports(1, &pre);
 
 	int i = 0;
 	std::vector<MeshRenderer*> renderers = scene.GetScene()->GetMeshRenderers();
@@ -126,12 +126,12 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 				m_positionMapTextures[meshName]->GetRTV(),
 				m_normalMapTextures[meshName]->GetRTV()
 			};
-			DeviceState::g_pDeviceContext->OMSetRenderTargets(2, rtv, nullptr);
+			DirectX11::DeviceStates->g_pDeviceContext->OMSetRenderTargets(2, rtv, nullptr);
 
 			renderer->m_Mesh->Draw();
 
 			//DirectX::ScratchImage image;
-			//HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, m_positionMapTextures[meshName]->m_pTexture, image);
+			//HRESULT hr = DirectX::CaptureTexture(DirectX11::DeviceStates->g_pDevice, DirectX11::DeviceStates->g_pDeviceContext, m_positionMapTextures[meshName]->m_pTexture, image);
 			//
 			//std::wstring a = std::to_wstring(i++);
 			//a += L"Lightmap.png";
@@ -139,7 +139,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 			//	GUID_ContainerFormatPng, a.c_str());
 
 			ID3D11RenderTargetView* nullRTV[2] = { nullptr, nullptr };
-			DeviceState::g_pDeviceContext->OMSetRenderTargets(2, nullRTV, nullptr);
+			DirectX11::DeviceStates->g_pDeviceContext->OMSetRenderTargets(2, nullRTV, nullptr);
 		}
 	}
 
@@ -153,7 +153,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 			if (texture != nullptr)
 			{
 				DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
-				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+				DirectX11::DeviceStates->g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr);
 				DirectX11::CSSetShaderResources(0, 1, &texture->m_pSRV);
 				DirectX11::Dispatch(posNormMapSize / 16.f, posNormMapSize / 16.f, 1);
@@ -174,7 +174,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 			if (texture != nullptr)
 			{
 				DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
-				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+				DirectX11::DeviceStates->g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr);
 				DirectX11::CSSetShaderResources(0, 1, &texture->m_pSRV);
 				DirectX11::Dispatch(posNormMapSize / 16.f, posNormMapSize / 16.f, 1);
@@ -192,7 +192,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 		}
 	}
 
-	DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
+	DirectX11::DeviceStates->g_pDeviceContext->RSSetViewports(1, &DirectX11::DeviceStates->g_Viewport);
 }
 
 void PositionMapPass::ClearTextures()

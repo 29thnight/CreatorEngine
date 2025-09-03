@@ -28,7 +28,7 @@ SSAOPass::SSAOPass()
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -133,7 +133,7 @@ void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
 
     ID3D11RenderTargetView* rtv = renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, nullptr);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
     Mathf::xMatrix view = camera.CalculateView();
     Mathf::xMatrix proj = camera.CalculateProjection();
     m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
@@ -142,7 +142,7 @@ void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     m_SSAOBuffer.m_CameraPosition = camera.m_eyePosition;
     m_SSAOBuffer.m_Radius = radius;
     m_SSAOBuffer.m_Thickness = thickness;
-    m_SSAOBuffer.m_windowSize = { (float)DeviceState::g_ClientRect.width, (float)DeviceState::g_ClientRect.height };
+    m_SSAOBuffer.m_windowSize = { (float)DirectX11::DeviceStates->g_ClientRect.width, (float)DirectX11::DeviceStates->g_ClientRect.height };
     m_SSAOBuffer.m_frameIndex = Time->GetFrameCount();
 
     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &m_SSAOBuffer);

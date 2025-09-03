@@ -47,7 +47,7 @@ ShadowMapPass::ShadowMapPass()
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
@@ -225,7 +225,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 		CreateTerrainRenderCommandList(deferredContext, scene, camera);
 	}
 
-	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::UnbindRenderTargets(deferredContextPtr1);
 
 	ID3D11ShaderResourceView* nullSRV[] = { nullptr };
@@ -280,7 +280,7 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* deferredC
 	CreateCommandListProxyToShadow(deferredContext, scene, camera);
 	CreateTerrainRenderCommandList(deferredContext, scene, camera);
 
-	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DeviceState::g_Viewport);
+	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::UnbindRenderTargets(deferredContextPtr1);
 
 	ID3D11CommandList* pd3dCommandList1;

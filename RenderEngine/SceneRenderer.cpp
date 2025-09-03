@@ -45,7 +45,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     InitializeShadowMapDesc();
 
 	m_threadPool = new ThreadPool;
-	m_commandThreadPool = std::make_unique<RenderThreadPool>(DeviceState::g_pDevice);
+	m_commandThreadPool = std::make_unique<RenderThreadPool>(DirectX11::DeviceStates->g_pDevice);
 	m_renderScene = std::make_shared<RenderScene>();
 	SceneManagers->SetRenderScene(m_renderScene.get());
 	
@@ -58,8 +58,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	ShaderSystem->Initialize();
 
 	auto ao = Texture::CreateShared(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"AmbientOcclusion",
 		//DXGI_FORMAT_R16_UNORM,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -296,15 +296,15 @@ void SceneRenderer::Finalize()
 
 	OnResizeEvent -= m_resizeEventHandle;
 
-	DeviceState::g_pDevice				= nullptr;
-	DeviceState::g_pDeviceContext		= nullptr;
-	DeviceState::g_pDepthStencilView	= nullptr;
-	DeviceState::g_pDepthStencilState	= nullptr;
-	DeviceState::g_pRasterizerState		= nullptr;
-	DeviceState::g_pBlendState			= nullptr;
-	DeviceState::g_backBufferRTV		= nullptr;
-	DeviceState::g_depthStancilSRV		= nullptr;
-	DeviceState::g_annotation			= nullptr;
+	DirectX11::DeviceStates->g_pDevice				= nullptr;
+	DirectX11::DeviceStates->g_pDeviceContext		= nullptr;
+	DirectX11::DeviceStates->g_pDepthStencilView	= nullptr;
+	DirectX11::DeviceStates->g_pDepthStencilState	= nullptr;
+	DirectX11::DeviceStates->g_pRasterizerState		= nullptr;
+	DirectX11::DeviceStates->g_pBlendState			= nullptr;
+	DirectX11::DeviceStates->g_backBufferRTV		= nullptr;
+	DirectX11::DeviceStates->g_depthStancilSRV		= nullptr;
+	DirectX11::DeviceStates->g_annotation			= nullptr;
 
 #ifndef BUILD_FLAG
 	CameraManagement->DeleteCamera(m_pEditorCamera->m_cameraIndex);
@@ -317,34 +317,34 @@ void SceneRenderer::Finalize()
 
 void SceneRenderer::InitializeDeviceState()
 {
-    DeviceState::g_pDevice				= m_deviceResources->GetD3DDevice();
-    DeviceState::g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
-    DeviceState::g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
-    DeviceState::g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
-    DeviceState::g_pRasterizerState		= m_deviceResources->GetRasterizerState();
-    DeviceState::g_pBlendState			= m_deviceResources->GetBlendState();
-    DeviceState::g_Viewport				= m_deviceResources->GetScreenViewport();
-    DeviceState::g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
-    DeviceState::g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
-    DeviceState::g_ClientRect			= m_deviceResources->GetOutputSize();
-    DeviceState::g_aspectRatio			= m_deviceResources->GetAspectRatio();
-	DeviceState::g_annotation			= m_deviceResources->GetAnnotation();
+    DirectX11::DeviceStates->g_pDevice				= m_deviceResources->GetD3DDevice();
+    DirectX11::DeviceStates->g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
+    DirectX11::DeviceStates->g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
+    DirectX11::DeviceStates->g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
+    DirectX11::DeviceStates->g_pRasterizerState		= m_deviceResources->GetRasterizerState();
+    DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
+    DirectX11::DeviceStates->g_Viewport				= m_deviceResources->GetScreenViewport();
+    DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
+    DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+    DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetOutputSize();
+    DirectX11::DeviceStates->g_aspectRatio			= m_deviceResources->GetAspectRatio();
+	DirectX11::DeviceStates->g_annotation			= m_deviceResources->GetAnnotation();
 
 	m_resizeEventHandle = OnResizeEvent.AddLambda([&](uint32_t width, uint32_t height)
 	{
-		DeviceState::g_pDevice				= m_deviceResources->GetD3DDevice();
-		DeviceState::g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
-		DeviceState::g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
-		DeviceState::g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
-		DeviceState::g_pRasterizerState		= m_deviceResources->GetRasterizerState();
-		DeviceState::g_pBlendState			= m_deviceResources->GetBlendState();
+		DirectX11::DeviceStates->g_pDevice				= m_deviceResources->GetD3DDevice();
+		DirectX11::DeviceStates->g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
+		DirectX11::DeviceStates->g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
+		DirectX11::DeviceStates->g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
+		DirectX11::DeviceStates->g_pRasterizerState		= m_deviceResources->GetRasterizerState();
+		DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
 		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
-		//DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
-		DeviceState::g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
-		DeviceState::g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
-		DeviceState::g_ClientRect			= m_deviceResources->GetLogicalSize();
-		DeviceState::g_aspectRatio			= m_deviceResources->GetAspectRatio();
-		DeviceState::g_annotation			= m_deviceResources->GetAnnotation();
+		//DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
+		DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
+		DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+		DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetLogicalSize();
+		DirectX11::DeviceStates->g_aspectRatio			= m_deviceResources->GetAspectRatio();
+		DirectX11::DeviceStates->g_annotation			= m_deviceResources->GetAnnotation();
 
 		m_pSSAOPass->ReloadDSV(m_deviceResources->GetDepthStencilViewSRV());
 
@@ -368,56 +368,56 @@ void SceneRenderer::InitializeShadowMapDesc()
 void SceneRenderer::InitializeTextures()
 {
 	auto diffuseTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"DiffuseRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_diffuseTexture.swap(diffuseTexture);
 
 	auto metalRoughTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"MetalRoughRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_metalRoughTexture.swap(metalRoughTexture);
 
 	auto normalTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"NormalRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_normalTexture.swap(normalTexture);
 
 	auto emissiveTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"EmissiveRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_emissiveTexture.swap(emissiveTexture);
 
 	auto bitmaskTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"BitmaskRTV",
 		DXGI_FORMAT_R32_UINT
 	);
 	m_bitmaskTexture.swap(bitmaskTexture);
 
 	auto toneMappedColourTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"ToneMappedColourRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
 
 	auto lightingTexture = TextureHelper::CreateSharedRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
 		"LightingRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);

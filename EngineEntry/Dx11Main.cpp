@@ -336,9 +336,9 @@ void DirectX11::Dx11Main::InfoWindow()
     woss.precision(6);
     woss << L"Creator Editor - Windows"
         << L"Width: "
-        << DeviceState::g_Viewport.Width
+        << DirectX11::DeviceStates->g_Viewport.Width
         << L" Height: "
-        << DeviceState::g_Viewport.Height
+        << DirectX11::DeviceStates->g_Viewport.Height
         << L" FPS: "
         << m_timeSystem.GetFramesPerSecond()
         << L" FrameCount: "

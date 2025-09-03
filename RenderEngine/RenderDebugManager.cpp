@@ -12,13 +12,13 @@ void RenderDebugManager::Capture(ID3D11DeviceContext* deferredContext, ID3D11Tex
     src->GetDesc(&desc);
 
     Microsoft::WRL::ComPtr<ID3D11Texture2D> copyTex;
-    if (FAILED(DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, copyTex.GetAddressOf())))
+    if (FAILED(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, copyTex.GetAddressOf())))
         return;
 
     DirectX11::CopyResource(deferredContext, copyTex.Get(), src);
 
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
-    if (FAILED(DeviceState::g_pDevice->CreateShaderResourceView(copyTex.Get(), nullptr, srv.GetAddressOf())))
+    if (FAILED(DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(copyTex.Get(), nullptr, srv.GetAddressOf())))
         return;
 
     m_capturedCallsByFrame[m_currentIndex].push_back(CapturedCall{
@@ -38,11 +38,11 @@ void RenderDebugManager::CaptureRenderPass(ID3D11DeviceContext* deferredContext,
     src->GetDesc(&desc);
 
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> copyTex;
-    if (FAILED(DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, copyTex.GetAddressOf())))
+    if (FAILED(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, copyTex.GetAddressOf())))
         return;
     DirectX11::CopyResource(deferredContext, copyTex.Get(), src);
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
-    if (FAILED(DeviceState::g_pDevice->CreateShaderResourceView(copyTex.Get(), nullptr, srv.GetAddressOf())))
+    if (FAILED(DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(copyTex.Get(), nullptr, srv.GetAddressOf())))
         return;
 
     size_t currentIndex = m_currentIndex.load(std::memory_order_relaxed) % 3;
@@ -81,7 +81,7 @@ void RenderDebugManager::CaptureRenderPass(
 
     // 동일한 크기/포맷으로 캡처용 텍스처 생성
     Microsoft::WRL::ComPtr<ID3D11Texture2D> copyTex;
-    if (FAILED(DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, copyTex.GetAddressOf())))
+    if (FAILED(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, copyTex.GetAddressOf())))
         return;
 
     // GPU copy (크기/포맷 동일해야 함)
@@ -108,7 +108,7 @@ void RenderDebugManager::CaptureRenderPass(
     }
 
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
-    if (FAILED(DeviceState::g_pDevice->CreateShaderResourceView(copyTex.Get(), &srvDesc, srv.GetAddressOf())))
+    if (FAILED(DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(copyTex.Get(), &srvDesc, srv.GetAddressOf())))
         return;
 
     size_t currentIndex = m_currentIndex.load(std::memory_order_relaxed) % 3;

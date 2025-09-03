@@ -373,7 +373,7 @@ void TrailGenerateModule::UpdateBuffers()
     if (m_vertices.empty() || m_indices.empty())
         return;
 
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     UINT requiredVertexSize = static_cast<UINT>(m_vertices.size() * sizeof(TrailVertex));
     UINT requiredIndexSize = static_cast<UINT>(m_indices.size() * sizeof(UINT));
 
@@ -391,7 +391,7 @@ void TrailGenerateModule::UpdateBuffers()
 
         ID3D11Buffer* buffer = nullptr;
         DirectX11::ThrowIfFailed(
-            DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &buffer)
+            DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &buffer)
         );
         m_vertexBuffer.Attach(buffer);
 
@@ -428,7 +428,7 @@ void TrailGenerateModule::UpdateBuffers()
 
         ID3D11Buffer* buffer = nullptr;
         DirectX11::ThrowIfFailed(
-            DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &buffer)
+            DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &buffer)
         );
         m_indexBuffer.Attach(buffer);
 

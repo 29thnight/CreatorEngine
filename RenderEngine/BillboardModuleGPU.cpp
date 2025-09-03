@@ -24,12 +24,12 @@ void BillboardModuleGPU::Initialize()
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
+		DirectX11::DeviceStates->g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
 	);
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
 			&rasterizerDesc,
 			&m_pso->m_rasterizerState
 		)
@@ -39,7 +39,7 @@ void BillboardModuleGPU::Initialize()
 	depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 	depthDesc.DepthEnable = true;
 	depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-	DeviceState::g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
+	DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
 
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
@@ -53,7 +53,7 @@ void BillboardModuleGPU::Initialize()
 	};
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateInputLayout(
+		DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
 			vertexLayoutDesc,
 			_countof(vertexLayoutDesc),
 			m_pso->m_vertexShader->GetBufferPointer(),
@@ -111,7 +111,7 @@ void BillboardModuleGPU::CreateBillboard()
 	vbData.pSysMem = m_vertices.data();
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBuffer(&vbDesc, &vbData, &billboardVertexBuffer)
+		DirectX11::DeviceStates->g_pDevice->CreateBuffer(&vbDesc, &vbData, &billboardVertexBuffer)
 	);
 
 	D3D11_BUFFER_DESC ibDesc = {};
@@ -123,7 +123,7 @@ void BillboardModuleGPU::CreateBillboard()
 	ibData.pSysMem = m_indices.data();
 
 	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateBuffer(&ibDesc, &ibData, &billboardIndexBuffer)
+		DirectX11::DeviceStates->g_pDevice->CreateBuffer(&ibDesc, &ibData, &billboardIndexBuffer)
 	);
 
 	m_ModelBuffer = DirectX11::CreateBuffer(
@@ -185,14 +185,14 @@ void BillboardModuleGPU::WaitForGPUCompletion()
 
 void BillboardModuleGPU::SetupRenderTarget(RenderPassData* renderData)
 {
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 }
 
 void BillboardModuleGPU::BindResource()
 {
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
 	// 텍스처 바인딩
 	if (m_assignedTexture) {
@@ -211,7 +211,7 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	m_isRendering = true;
 	m_gpuWorkPending = true; // GPU 작업 시작
 
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
 	m_ModelConstantBuffer.world = world;
 	m_ModelConstantBuffer.view = view;

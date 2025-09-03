@@ -204,8 +204,8 @@ public:
         }
 
         // 전체 GPU 파이프라인 플러시
-        if (DeviceState::g_pDeviceContext) {
-            DeviceState::g_pDeviceContext->Flush();
+        if (DirectX11::DeviceStates->g_pDeviceContext) {
+            DirectX11::DeviceStates->g_pDeviceContext->Flush();
 
             // 추가 동기화 (필요한 경우)
             //std::this_thread::sleep_for(std::chrono::milliseconds(1));

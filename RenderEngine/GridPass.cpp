@@ -36,14 +36,14 @@ GridPass::GridPass()
     };
     m_pso->CreateInputLayout(std::move(vertexLayoutDesc));
 
-    m_pso->m_blendState = DeviceState::g_pBlendState;
+    m_pso->m_blendState = DirectX11::DeviceStates->g_pBlendState;
 
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
     rasterizerDesc.AntialiasedLineEnable = true;
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -106,7 +106,7 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 
     m_pso->Apply();
 
-    auto deviceContext = DeviceState::g_pDeviceContext;
+    auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
 	m_gridConstant.world = XMMatrixIdentity();
 	m_gridConstant.view = camera.CalculateView();
@@ -114,7 +114,7 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 
     float blendFactor[4] = { 0.5f, 0.5f, 0.5f, 0.5f }; // 블렌드 팩터 (사용되지 않음)
     UINT sampleMask = 0xffffffff; // 샘플 마스크 (모든 샘플 활성화)
-	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, blendFactor, sampleMask);
+	DirectX11::OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, blendFactor, sampleMask);
 
 	CameraPos camPos = { camera.m_eyePosition };
     DirectX11::UpdateBuffer(m_pCamPosBuffer.Get(), &camPos);
@@ -126,7 +126,7 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_pUniformBuffer.Get(), &m_gridUniform);
 
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-    DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
+    DirectX11::DeviceStates->g_pDeviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
     UINT stride = sizeof(GridVertex);
     UINT offset = 0;

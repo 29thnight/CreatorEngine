@@ -204,7 +204,7 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 		m_usingBufferA = !m_usingBufferA;
 	}
 
-	DeviceState::g_pDeviceContext->Flush();
+	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
 
@@ -276,13 +276,13 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 		initData.SysMemSlicePitch = 0;
 
 		// 버퍼 생성
-		HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
+		HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
 		if (FAILED(hr)) {
 			OutputDebugStringA("Failed to create mesh particle buffer A\n");
 			return;
 		}
 
-		hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
+		hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
 		if (FAILED(hr)) {
 			OutputDebugStringA("Failed to create mesh particle buffer B\n");
 			return;
@@ -311,13 +311,13 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 		initData.SysMemSlicePitch = 0;
 
 		// 버퍼 생성
-		HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
+		HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
 		if (FAILED(hr)) {
 			OutputDebugStringA("Failed to create standard particle buffer A\n");
 			return;
 		}
 
-		hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
+		hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
 		if (FAILED(hr)) {
 			OutputDebugStringA("Failed to create standard particle buffer B\n");
 			return;
@@ -332,13 +332,13 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 	uavDesc.Buffer.NumElements = numParticles;
 	uavDesc.Buffer.Flags = 0;
 
-	HRESULT hr = DeviceState::g_pDevice->CreateUnorderedAccessView(m_particleBufferA, &uavDesc, &m_particleUAV_A);
+	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_particleBufferA, &uavDesc, &m_particleUAV_A);
 	if (FAILED(hr)) {
 		OutputDebugStringA("Failed to create particle UAV A\n");
 		return;
 	}
 
-	hr = DeviceState::g_pDevice->CreateUnorderedAccessView(m_particleBufferB, &uavDesc, &m_particleUAV_B);
+	hr = DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_particleBufferB, &uavDesc, &m_particleUAV_B);
 	if (FAILED(hr)) {
 		OutputDebugStringA("Failed to create particle UAV B\n");
 		return;
@@ -351,13 +351,13 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 	srvDesc.Buffer.FirstElement = 0;
 	srvDesc.Buffer.NumElements = numParticles;
 
-	hr = DeviceState::g_pDevice->CreateShaderResourceView(m_particleBufferA, &srvDesc, &m_particleSRV_A);
+	hr = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_particleBufferA, &srvDesc, &m_particleSRV_A);
 	if (FAILED(hr)) {
 		OutputDebugStringA("Failed to create particle SRV A\n");
 		return;
 	}
 
-	hr = DeviceState::g_pDevice->CreateShaderResourceView(m_particleBufferB, &srvDesc, &m_particleSRV_B);
+	hr = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_particleBufferB, &srvDesc, &m_particleSRV_B);
 	if (FAILED(hr)) {
 		OutputDebugStringA("Failed to create particle SRV B\n");
 		return;
@@ -385,7 +385,7 @@ void ParticleSystem::InitializeParticleIndices()
 	ID3D11UnorderedAccessView* particleUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
 
 	// 초기화 완료 후 GPU 동기화
-	DeviceState::g_pDeviceContext->Flush();
+	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
 void ParticleSystem::SetParticleDatatype(ParticleDataType type)
@@ -457,7 +457,7 @@ void ParticleSystem::ResizeParticleSystem(UINT newMaxParticles)
 	// 1. 파티클 시스템 일시 정지 및 GPU 작업 완료 대기
 	bool wasRunning = m_isRunning;
 	m_isRunning = false;
-	DeviceState::g_pDeviceContext->Flush();
+	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 
 	// 2. 기존 GPU 리소스 정리
 	ReleaseParticleBuffers();
@@ -582,7 +582,7 @@ bool ParticleSystem::IsReadyForReuse()
 	}
 
 	// GPU 작업 완료 대기 (추가)
-	DeviceState::g_pDeviceContext->Flush();
+	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 
 	// 모든 모듈이 재사용 준비가 되었는지 확인
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {

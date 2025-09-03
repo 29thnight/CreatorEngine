@@ -40,7 +40,7 @@ GizmoLinePass::GizmoLinePass()
 
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateRasterizerState(
+        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
             &rasterizerDesc,
             &m_pso->m_rasterizerState
         )
@@ -56,14 +56,14 @@ GizmoLinePass::GizmoLinePass()
     depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateDepthStencilState(
+        DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(
             &depthStencilDesc,
             &m_NoWriteDepthStencilState
         )
     );
 
     m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
-    m_pso->m_blendState = DeviceState::g_pBlendState;
+    m_pso->m_blendState = DirectX11::DeviceStates->g_pBlendState;
 
     m_gizmoCameraBuffer = DirectX11::CreateBuffer(sizeof(GizmoCameraBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
     DirectX::SetName(m_gizmoCameraBuffer.Get(), "GizmoCameraBuffer");
@@ -273,23 +273,23 @@ void GizmoLinePass::DrawLines(LineVertex* vertices, uint32_t vertexCount)
         D3D11_SUBRESOURCE_DATA initData = {};
         initData.pSysMem = vertices;
 
-        DeviceState::g_pDevice->CreateBuffer(&desc, &initData, m_lineVertexBuffer.GetAddressOf());
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(&desc, &initData, m_lineVertexBuffer.GetAddressOf());
         m_lineVertexCount = vertexCount;
     }
     else
     {
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        DeviceState::g_pDeviceContext->Map(m_lineVertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        DirectX11::DeviceStates->g_pDeviceContext->Map(m_lineVertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
         memcpy(mapped.pData, vertices, sizeof(LineVertex) * vertexCount);
-        DeviceState::g_pDeviceContext->Unmap(m_lineVertexBuffer.Get(), 0);
+        DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_lineVertexBuffer.Get(), 0);
     }
 
     UINT stride = sizeof(LineVertex);
     UINT offset = 0;
     ID3D11Buffer* buffers[] = { m_lineVertexBuffer.Get() };
-    DeviceState::g_pDeviceContext->IASetVertexBuffers(0, 1, buffers, &stride, &offset);
+    DirectX11::DeviceStates->g_pDeviceContext->IASetVertexBuffers(0, 1, buffers, &stride, &offset);
 
-    DeviceState::g_pDeviceContext->Draw(vertexCount, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->Draw(vertexCount, 0);
 }
 
 void GizmoLinePass::DrawWireSphere(const Mathf::Vector3& center, float radius, const Mathf::Color4& color)

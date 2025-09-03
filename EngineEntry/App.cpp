@@ -15,6 +15,7 @@
 #include "ShaderSystem.h"
 #include "ReflectionRegister.h"
 #include "ReflectionVectorFactory.h"
+#include "DeviceState.h"
 #include "ReflectionVectorInvoker.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
@@ -71,6 +72,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	Meta::RegisterClassFinalize();
 	Meta::VectorFactoryRegistry::Destroy();
 	Meta::VectorInvokerRegistry::Destroy();
+	DirectX11::DeviceResourceManager::Destroy();
 
 	Log::Finalize();
 
@@ -81,6 +83,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	DirectX11::DeviceResourceManager::GetInstance();
 	ShaderResourceSystem::GetInstance();
 	EngineSetting::GetInstance();
 	TagManager::GetInstance();

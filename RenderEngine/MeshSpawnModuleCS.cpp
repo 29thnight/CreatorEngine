@@ -133,15 +133,15 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     UpdateConstantBuffers(deltaTime);
 
     // 컴퓨트 셰이더 바인딩
-    DeviceState::g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
 
     // 상수 버퍼 바인딩
     ID3D11Buffer* constantBuffers[] = { m_spawnParamsBuffer, m_templateBuffer };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 2, constantBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 2, constantBuffers);
 
     // 입력 리소스 바인딩
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
     // 출력 리소스 바인딩
     ID3D11UnorderedAccessView* uavs[] = {
@@ -149,23 +149,23 @@ void MeshSpawnModuleCS::Update(float deltaTime)
         m_randomStateUAV    // u1: 난수 상태
     };
     UINT initCounts[] = { 0, 0 };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavs, initCounts);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavs, initCounts);
 
     // 디스패치 실행
     UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
-    DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
+    DirectX11::DeviceStates->g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 정리
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
 
     ID3D11ShaderResourceView* nullSRVs[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, nullSRVs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, nullSRVs);
 
     ID3D11Buffer* nullBuffers[] = { nullptr, nullptr };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 2, nullBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 2, nullBuffers);
 
-    DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
     DirectX11::EndEvent();
 
@@ -259,13 +259,13 @@ bool MeshSpawnModuleCS::CreateConstantBuffers()
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_spawnParamsBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_spawnParamsBuffer);
     if (FAILED(hr))
         return false;
 
     // 메시 파티클 템플릿 상수 버퍼
     bufferDesc.ByteWidth = sizeof(MeshParticleTemplateParams);
-    hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_templateBuffer);
+    hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_templateBuffer);
     if (FAILED(hr))
         return false;
 
@@ -287,7 +287,7 @@ bool MeshSpawnModuleCS::CreateUtilityBuffers()
     D3D11_SUBRESOURCE_DATA initData = {};
     initData.pSysMem = &initialSeed;
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_randomStateBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_randomStateBuffer);
     if (FAILED(hr))
         return false;
 
@@ -299,7 +299,7 @@ bool MeshSpawnModuleCS::CreateUtilityBuffers()
     uavDesc.Buffer.NumElements = 1;
     uavDesc.Buffer.Flags = 0;
 
-    hr = DeviceState::g_pDevice->CreateUnorderedAccessView(m_randomStateBuffer, &uavDesc, &m_randomStateUAV);
+    hr = DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_randomStateBuffer, &uavDesc, &m_randomStateUAV);
     if (FAILED(hr))
         return false;
 
@@ -312,12 +312,12 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
     if (m_spawnParamsDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_spawnParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_spawnParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
         if (SUCCEEDED(hr))
         {
             memcpy(mappedResource.pData, &m_spawnParams, sizeof(SpawnParams));
-            DeviceState::g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
             m_spawnParamsDirty = false;
         }
     }
@@ -326,12 +326,12 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
     if (m_templateDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_templateBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_templateBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
         if (SUCCEEDED(hr))
         {
             memcpy(mappedResource.pData, &m_meshParticleTemplate, sizeof(MeshParticleTemplateParams));
-            DeviceState::g_pDeviceContext->Unmap(m_templateBuffer, 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_templateBuffer, 0);
             m_templateDirty = false;
         }
     }

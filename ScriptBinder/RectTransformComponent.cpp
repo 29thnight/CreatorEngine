@@ -134,8 +134,8 @@ void RectTransformComponent::SetParentKeepWorldPosition(GameObject* newParent)
 {
     // 새 부모의 Rect를 얻고, 없으면 화면 전체 Rect를 부모로 가정
     Mathf::Rect newParentRect{ 0, 0,
-        DeviceState::g_ClientRect.width,
-        DeviceState::g_ClientRect.height };
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height };
 
     if (newParent)
     {
