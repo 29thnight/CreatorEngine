@@ -41,6 +41,7 @@ public:
 
 private:
     friend class RenderPassData;
+	friend class ProxyCommand;
     std::variant<ImageData, TextData> m_data;
     HashedGuid			              m_instancedID{};
 };

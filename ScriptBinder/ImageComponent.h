@@ -44,6 +44,7 @@ public:
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };
 private:
+	friend class ProxyCommand;
 	friend class UIRenderProxy;
 	float									rotate{ 0 };
 	std::vector<std::shared_ptr<Texture>>	textures;

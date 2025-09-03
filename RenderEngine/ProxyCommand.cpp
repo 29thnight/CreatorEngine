@@ -179,11 +179,78 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 
 ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 {
+	if (nullptr == pComponent) return;
+	m_proxyGUID = pComponent->GetInstanceID();
 
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	SpinLock lock(renderScene->m_uiProxyMapFlag);
+	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
+	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
+	auto proxyObject = iter->second.get();
+
+	auto textures = pComponent->textures;
+	auto curTexture = pComponent->m_curtexture;
+	DirectX::XMFLOAT2 origin{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
+	auto position = pComponent->pos;
+	auto scale = pComponent->scale;
+	float rotation = 0.f;
+	if (auto ownerObj = pComponent->GetOwner())
+	{
+		float pitch, yaw, roll;
+		Mathf::QuaternionToEular(ownerObj->m_transform.rotation, pitch, yaw, roll);
+		rotation = roll;
+	}
+	int layerOrder = pComponent->GetLayerOrder();
+
+	m_updateFunction = [proxyObject, textures = std::move(textures), curTexture, origin, position, scale, rotation, layerOrder]() mutable
+	{
+		UIRenderProxy::ImageData data{};
+		data.textures = std::move(textures);
+		data.texture = curTexture;
+		data.origin = origin;
+		data.position = position;
+		data.scale = scale;
+		data.rotation = rotation;
+		data.layerOrder = layerOrder;
+		proxyObject->m_data = std::move(data);
+	};
 }
 
 ProxyCommand::ProxyCommand(TextComponent* pComponent)
 {
+	if (nullptr == pComponent) return;
+	m_proxyGUID = pComponent->GetInstanceID();
+
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	SpinLock lock(renderScene->m_uiProxyMapFlag);
+	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
+	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
+	auto proxyObject = iter->second.get();
+
+	auto font = pComponent->font;
+	auto message = pComponent->message;
+	auto color = pComponent->color;
+	auto position = pComponent->pos;
+	float fontSize = pComponent->fontSize;
+	int layerOrder = pComponent->GetLayerOrder();
+
+	m_updateFunction = [proxyObject, font, message, color, position, fontSize, layerOrder]()
+		{
+			UIRenderProxy::TextData data{};
+			data.font = font;
+			data.message = message;
+			data.color = color;
+			data.position = position;
+			data.fontSize = fontSize;
+			data.layerOrder = layerOrder;
+			proxyObject->m_data = std::move(data);
+		};
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :

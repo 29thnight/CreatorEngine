@@ -28,7 +28,7 @@ public:
 
 private:
 	friend class UIRenderProxy;
-
+	friend class ProxyCommand;
 private:
 	Mathf::Vector2 pos{ 0,0};
 	//상위ui 위치기준 추가값
