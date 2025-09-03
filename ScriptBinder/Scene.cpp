@@ -1294,10 +1294,18 @@ void Scene::SetInternalPhysicData()
 void Scene::AllUpdateWorldMatrix()
 {
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
-	for (auto index : rootObjects)
+	//for (auto index : rootObjects)
+	//{
+	//	UpdateModelRecursive(index, XMMatrixIdentity());
+	//}
+
+	auto updateFunc = [this](GameObject::Index index)
 	{
-		UpdateModelRecursive(index, XMMatrixIdentity());
-	}
+			UpdateModelRecursive(index, XMMatrixIdentity());
+	};
+
+	std::for_each(std::execution::par_unseq, rootObjects.begin(), rootObjects.end(), updateFunc);
+
 
 	// Update DontDestroyOnLoad objects
 	size_t size = SceneManagers->GetDontDestroyOnLoadObjects().size();

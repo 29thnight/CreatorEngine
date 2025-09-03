@@ -11,6 +11,7 @@
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "PathFinder.h"
+#include "RectTransformComponent.h"
 #include "GameObjectCommand.h"
 #include "PrefabEditor.h"
 #include "IconsFontAwesome6.h"
@@ -250,6 +251,10 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					draggedObj->m_parentIndex = 0;
 					sceneGameObject->m_childrenIndices.push_back(draggedIndex);
 					draggedObj->m_transform.SetParentID(draggedObj->m_parentIndex);
+					if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+					{
+						rect->SetParentKeepWorldPosition(sceneGameObject);
+					}
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -435,6 +440,11 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 				//Matrix처리
 				draggedObj->m_transform.SetParentID(obj->m_index);
+
+				if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
+				{
+					rect->SetParentKeepWorldPosition(obj.get());
+				}
 			}
 		}
 		ImGui::EndDragDropTarget();
