@@ -1,0 +1,25 @@
+{
+    "Controllers": [
+        {
+            "controller_name": "NewLayer0",
+            "useController": 1,
+            "useMask": 0
+        },
+        {
+            "controller_name": "NewLayer1",
+            "m_curState": "Idle",
+            "useController": 1,
+            "useMask": 0
+        }
+    ],
+    "Parameters": [
+        {
+            "param_name": "NewFloat",
+            "param_vType": 0
+        },
+        {
+            "param_name": "NewInt",
+            "param_vType": 1
+        }
+    ]
+}

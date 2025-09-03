@@ -327,6 +327,9 @@
     <ClCompile Include="RectTransformComponent.cpp">
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClCompile>
+    <ClCompile Include="ConditionParameter.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">

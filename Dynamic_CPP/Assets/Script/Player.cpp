@@ -65,9 +65,6 @@ void Player::Start()
 	auto curweapon = GameObject::Find("realSword");
 
 	
-
-
-	
 	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
 	dashEffect = dashObj->AddComponent<EffectComponent>();
 	dashEffect->Awake();
@@ -95,9 +92,6 @@ void Player::Update(float tick)
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
-
-
-
 	if (isDead)
 	{
 		m_animator->SetParameter("OnDead", true);
@@ -111,8 +105,6 @@ void Player::Update(float tick)
 		XMVECTOR offsetPos = world + -forwardVec * 1.0f;
 		offsetPos.m128_f32[1] = 1.0f; 
 		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
-
-
 		//asis와 거리계속 갱신
 		auto& asiss = GM->GetAsis();
 		if (!asiss.empty())
@@ -173,7 +165,6 @@ void Player::Update(float tick)
 		m_dashElapsedTime += tick;
 		if (m_dashElapsedTime >= m_dashTime)
 		{
-
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
@@ -184,9 +175,6 @@ void Player::Update(float tick)
 			auto forward = player->m_transform.GetForward();
 			auto controller = player->GetComponent<CharacterControllerComponent>();
 			controller->Move({ -forward.x ,-forward.z });
-			
-
-
 		}
 
 	}
@@ -253,20 +241,14 @@ void Player::Move(Mathf::Vector2 dir)
 
 	//Vector2 moveDir = dir.x * Vector2(right.x, right.z) + - dir.y * Vector2(forward.x, forward.z);
 	//moveDir.Normalize();
-
-
 	controller->Move(dir);
 	if (controller->IsOnMove())
 	{
-		/*if (m_curWeapon)
-			m_curWeapon->GetOwner()->SetEnabled(false);*/
 		if (m_animator)
 			m_animator->SetParameter("OnMove", true);
 	}
 	else
 	{
-		/*if (m_curWeapon)
-			m_curWeapon->GetOwner()->SetEnabled(true);*/
 		if (m_animator)
 			m_animator->SetParameter("OnMove", false);
 	}
@@ -427,19 +409,43 @@ void Player::Attack1()
 	if (isAttacking == false)
 	{
 		isAttacking = true;
-		m_animator->SetParameter("Attack", true);
-		//m_animator->SetUseLayer(0,false);
-		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
-		if (m_curWeapon && m_curWeapon->CheckDur() ==true)
+		if (m_curWeapon)
 		{
-			std::cout << "weapon break" << std::endl;
-		}
-		m_comboCount++;
-		m_comboElapsedTime = 0;
-		attackElapsedTime = 0;
-	}
+			if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
+			{
+				m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+				//m_animator->SetUseLayer(0,false);
+				std::cout << "Melee Attack!!" << std::endl;
+			}
 
+
+			if (m_curWeapon->itemType == ItemType::Range)
+			{
+				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+				//m_animator->SetUseLayer(0,false);
+				std::cout << "RangeAttack!!" << std::endl;
+				ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
+			}
+
+			if (m_curWeapon->itemType == ItemType::Explosion)
+			{
+				m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
+				//m_animator->SetUseLayer(0,false);
+				std::cout << "BombAttack!!" << std::endl;
+			}
+
+
+			m_comboCount++;
+			m_comboElapsedTime = 0;
+			attackElapsedTime = 0;
+			if (m_curWeapon->CheckDur() == true)
+			{
+				std::cout << "weapon break" << std::endl;
+			}
+		}
+
+	}
 
 	m_chargingTime = 0.f;
 }
@@ -526,11 +532,6 @@ void Player::DeleteCurWeapon()
 		m_weaponInventory.erase(it); 
 	}
 }
-
-
-
-
-
 void Player::FindNearObject(GameObject* gameObject)
 {
 	if (gameObject->GetComponent<EntityItem>() == nullptr) return;
@@ -703,11 +704,13 @@ void Player::ShootSpecialBullet()
 		}
 
 	}
+
+	
 }
 
 void Player::ThrowBomb()
 {
-	Bomb* bomb = new Bomb;
+	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
 	bomb->ThrowBomb(this, bombThrowPosition);
 	//bomb 을 프리팹만든걸로 받아오게끔 수정 or weaponPool 필요
 }

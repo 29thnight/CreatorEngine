@@ -381,6 +381,27 @@ void AnimationController::DeleteAvatarMask()
     }
 }
 
+nlohmann::json AnimationController::Serialize()
+{
+	nlohmann::json j;
+	j["controller_name"] = name;
+	//state들 담기
+
+	j["useController"] = (int)useController; //bool 0 1
+	if (m_curState)
+	{
+		j["m_curState"] = m_curState->m_name;
+	}
+	//아바타 마스크 담기 본구조체 따라생기는건대 다른구조체는 어쩌지
+
+	j["useMask"] = (int)useMask; //bool 0 1 /
+	return j;
+}
+
+void AnimationController::Deserialize()
+{
+}
+
 void AnimationController::SetUseLayer(bool _useLayer)
 {
 	m_useLayer = _useLayer;

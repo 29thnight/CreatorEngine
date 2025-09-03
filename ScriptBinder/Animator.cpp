@@ -5,7 +5,7 @@
 #include "NodeEditor.h"
 #include "SceneManager.h"
 #include "Socket.h"
-
+#include <nlohmann/json.hpp>
 void Animator::Awake()
 {
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -114,6 +114,8 @@ AnimationController* Animator::GetController(std::string name)
     }
     return nullptr;
 }
+
+
 
 void Animator::SetUseLayer(int layerindex, bool _useLayer)
 {
@@ -230,3 +232,28 @@ ConditionParameter* Animator::FindParameter(std::string valueName)
 
 
 
+
+void Animator::SerializeControllers(std::string _jsonName)
+{
+	nlohmann::json json;
+	nlohmann::json controllerArray = nlohmann::json::array();
+	for (auto& Controller : m_animationControllers)
+	{
+		controllerArray.push_back(Controller->Serialize());
+	}
+	json["Controllers"] = controllerArray;
+	nlohmann::json paramArray = nlohmann::json::array();
+	for (auto& param : Parameters)
+	{
+		paramArray.push_back(param->Serialize());
+	}
+	json["Parameters"] = paramArray;
+	file::path filepath = PathFinder::AnimatorjsonPath(_jsonName);
+	filepath.replace_extension(".json");
+	std::ofstream file(filepath);
+	file << json.dump(4);
+}
+
+void Animator::DeserializeControllers()
+{
+}

@@ -7,7 +7,7 @@
 #include "AvatarMask.h"
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "IRegistableEvent.h"
-
+#include <nlohmann/json.hpp>
 class AniTransition;
 class AvatarMask;
 class Animator;
@@ -67,6 +67,10 @@ public:
 	bool m_isBlend = false;
 
 
+
+
+	nlohmann::json Serialize();
+	void Deserialize();
 
 
 	//컨트롤러 바꿔치기용

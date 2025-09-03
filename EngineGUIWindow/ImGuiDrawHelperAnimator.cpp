@@ -327,6 +327,11 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							animator->CreateController_UI();
 						}
+
+						if (ImGui::Button("Save Layers")) //&&&&SaveLayer
+						{
+							animator->SerializeControllers("123");
+						}
 						ImGui::EndTabItem();
 					}
 					if (ImGui::BeginTabItem("Parameters"))

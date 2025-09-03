@@ -1,4 +1,5 @@
 #pragma once
+#include "Core.Minimal.h"
 enum class EItemType
 {
 	Mushroom,
@@ -22,4 +23,12 @@ enum class BuffType
 	Range,
 	Explosion,
 	None,
+};
+
+
+class Entity;
+struct AttackContext
+{
+	Entity* target = nullptr;
+	Mathf::Vector3 targetPosition = {};
 };

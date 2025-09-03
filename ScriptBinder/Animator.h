@@ -50,7 +50,8 @@ public:
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
-
+    void SerializeControllers(std::string _jsonName);
+    void DeserializeControllers();
     void SetUseLayer(int layerindex,bool _useLayer);
     GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);

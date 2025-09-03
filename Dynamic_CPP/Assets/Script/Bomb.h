@@ -24,7 +24,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-
+	virtual void Attack(Player* _Owner, AttackContext _attackContext = {})override;
 	void ThrowBomb(Player* _owner, Mathf::Vector3 _targetPos);
 
 	[[Property]]
