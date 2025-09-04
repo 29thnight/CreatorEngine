@@ -74,7 +74,7 @@ private:
     void Reset();
 
     // 이름 충돌 방지
-    std::string MakeUniqueName(std::string_view base) const;
+    std::string MakeUniqueName(std::string_view base);
 
 public:
     //Events

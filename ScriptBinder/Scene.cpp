@@ -248,7 +248,7 @@ void Scene::DetachGameObjectHierarchy(GameObject* root)
 }
 
 // === C안 구현: 이름 충돌 방지 ===
-std::string Scene::MakeUniqueName(std::string_view base) const
+std::string Scene::MakeUniqueName(std::string_view base)
 {
     std::string name(base);
     if (name.empty()) name = "GameObject";
