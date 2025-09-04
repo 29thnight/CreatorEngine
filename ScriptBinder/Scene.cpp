@@ -12,6 +12,7 @@
 #include "CapsuleColliderComponent.h"
 #include "MeshCollider.h"
 #include "CharacterControllerComponent.h"
+#include "FoliageComponent.h"
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
 #include "ImageComponent.h"
@@ -595,16 +596,16 @@ void Scene::LateUpdate(float deltaSecond)
 				auto owner = image->GetOwner();
 				if (nullptr == owner) continue;
 
-                                auto scene = owner->GetScene();
+                auto scene = owner->GetScene();
 
-                                // (G) UI 중복 렌더 가드:
-                                //  - 같은 씬이면 렌더
-                                //  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
-                                if (scene && (scene == this ||
-                                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-                                {
-                                        data->PushUIRenderData(image->GetInstanceID());
-                                }
+                // (G) UI 중복 렌더 가드:
+                //  - 같은 씬이면 렌더
+                //  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
+                if (scene && (scene == this ||
+                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+                {
+                        data->PushUIRenderData(image->GetInstanceID());
+                }
 			}
 		});
 
@@ -617,13 +618,13 @@ void Scene::LateUpdate(float deltaSecond)
 				auto owner = text->GetOwner();
 				if (nullptr == owner) continue;
 
-                                auto scene = owner->GetScene();
+                auto scene = owner->GetScene();
 
-                                if (scene && (scene == this ||
-                                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-                                {
-                                        data->PushUIRenderData(text->GetInstanceID());
-                                }
+                if (scene && (scene == this ||
+                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+                {
+                        data->PushUIRenderData(text->GetInstanceID());
+                }
 			}
 		});
 
@@ -1236,11 +1237,6 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 
 void Scene::DestroyGameObjects()
 {
-    std::erase_if(m_SceneObjects, [](const auto& obj)
-    {
-            return obj && obj->IsDontDestroyOnLoad();
-    });
-
     std::unordered_set<uint32_t> deletedIndices;
     for (const auto& obj : m_SceneObjects)
     {
@@ -1457,6 +1453,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
+		if (childIndex == obj->m_index) continue;
 		UpdateModelRecursive(childIndex, model, recursive);
 	}
 }

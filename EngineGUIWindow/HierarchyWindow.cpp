@@ -301,7 +301,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				for (int i = 1; i < sceneObjects.size(); ++i)
 				{
 					auto& obj = sceneObjects[i];
-					if (obj && obj->m_parentIndex == 0 && obj->IsDontDestroyOnLoad())
+					if (obj && obj->IsDontDestroyOnLoad())
 					{
 						ddolObjects.push_back(obj);
 					}

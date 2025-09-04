@@ -45,10 +45,12 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     while (GameObject::IsValidIndex(go->m_parentIndex))
     {
         auto sc = go->GetScene();
-        if (!sc) break;
-        auto parent = sc->GetGameObject(go->m_parentIndex);
-        if (parent) go = parent.get();
-        else break;
+        auto parent = sc ? sc->GetGameObject(go->m_parentIndex) : nullptr;
+        if (!parent) break;
+        // 다음 부모가 씬 루트(0)거나, 부모의 부모가 INVALID면 여기서 멈춤
+        if (parent->m_index == 0 || !GameObject::IsValidIndex(parent->m_parentIndex))
+            break;
+        go = parent.get();
     }
 
     // Collect subtree & mark DDOL
@@ -57,6 +59,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
 
     auto markDdol = [&](auto&& self, GameObject* node) -> void {
         if (!node) return;
+        if (node->m_index == 0) return;
         node->m_dontDestroyOnLoad = true;
         collected.push_back(node->shared_from_this());
         if (!originScene) return;
@@ -71,42 +74,9 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     };
     markDdol(markDdol, go);
 
-    // Detach fully from origin scene containers
-    if (originScene) { originScene->DetachGameObjectHierarchy(go); }
-
-    // (E) 원 씬의 각종 컬렉션/이벤트에서 DDOL 서브트리를 완전히 분리
-    if (originScene)
-    {
-        for (auto& o : collected)
-        {
-            auto g = std::dynamic_pointer_cast<GameObject>(o);
-            if (!g) continue;
-
-            // Scene 컬렉션에서 UnCollect
-            for (auto& comp : g->m_components)
-            {
-                if (!comp) continue;
-                if (auto* c = dynamic_cast<LightComponent*>(comp.get()))              originScene->UnCollectLightComponent(c);
-                else if (auto* c = dynamic_cast<MeshRenderer*>(comp.get()))           originScene->UnCollectMeshRenderer(c);
-                else if (auto* c = dynamic_cast<TerrainComponent*>(comp.get()))       originScene->UnCollectTerrainComponent(c);
-                else if (auto* c = dynamic_cast<FoliageComponent*>(comp.get()))       originScene->UnCollectFoliageComponent(c);
-                else if (auto* c = dynamic_cast<RigidBodyComponent*>(comp.get()))     originScene->UnCollectRigidBodyComponent(c);
-                else if (auto* c = dynamic_cast<BoxColliderComponent*>(comp.get()))   originScene->UnCollectColliderComponent(c);
-                else if (auto* c = dynamic_cast<SphereColliderComponent*>(comp.get()))originScene->UnCollectColliderComponent(c);
-                else if (auto* c = dynamic_cast<CapsuleColliderComponent*>(comp.get()))originScene->UnCollectColliderComponent(c);
-                else if (auto* c = dynamic_cast<MeshColliderComponent*>(comp.get()))  originScene->UnCollectColliderComponent(c);
-                else if (auto* c = dynamic_cast<CharacterControllerComponent*>(comp.get())) originScene->UnCollectColliderComponent(c);
-                else if (auto* c = dynamic_cast<TerrainColliderComponent*>(comp.get()))    originScene->UnCollectColliderComponent(c);
-                // (참고) IRegistableEvent의 Unregister 계열 API가 있다면 여기서 호출하세요.
-            }
-            // 원 씬 포인터 끊기
-            g->m_ownerScene = nullptr;
-        }
-    }
-
     // Ensure root is detached from any parent (keep world)
-    go->m_parentIndex = GameObject::INVALID_INDEX;
-    go->m_rootIndex = GameObject::INVALID_INDEX;
+    go->m_parentIndex   = GameObject::INVALID_INDEX;
+    go->m_rootIndex     = GameObject::INVALID_INDEX;
     go->m_transform.SetParentID(-1);
 
     // Register to global DDOL bucket
@@ -114,8 +84,6 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     {
         SceneManagers->AddDontDestroyOnLoad(o);
     }
-
-    // (F) 즉시 재바인딩 제거: 씬 로드시 Rebind 처리
 }
 
 Object* Object::Instantiate(const Object* original, std::string_view newName)
