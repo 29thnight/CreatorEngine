@@ -299,6 +299,15 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         Scene* swapScene{};
         if (m_activeScene)
         {
+            for(auto& object : m_dontDestroyOnLoadObjects)
+            {
+				auto go = std::dynamic_pointer_cast<GameObject>(object);
+				if (go)
+                {
+                    m_activeScene.load()->DetachGameObjectHierarchy(go.get());
+                }
+            }
+
 			swapScene = m_activeScene.load();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
@@ -437,8 +446,6 @@ Scene* SceneManager::LoadScene(std::string_view name)
             }
             DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
         }
-
-		RebindEventDontDestroyOnLoadObjects(scene);
         scene->AllUpdateWorldMatrix();
 
 
@@ -553,6 +560,15 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
     Scene* oldScene = m_activeScene.load();
     if (oldScene)
     {
+        for (auto& object : m_dontDestroyOnLoadObjects)
+        {
+            auto go = std::dynamic_pointer_cast<GameObject>(object);
+            if (go)
+            {
+                oldScene->DetachGameObjectHierarchy(go.get());
+            }
+        }
+
         sceneUnloadedEvent.Broadcast();
         oldScene->AllDestroyMark();
         oldScene->OnDisable();
@@ -564,6 +580,8 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
     m_activeScene = sceneToActivate;
     m_scenes.push_back(m_activeScene);
     m_activeSceneIndex = m_scenes.size() - 1;
+
+    RebindEventDontDestroyOnLoadObjects(m_activeScene);
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();

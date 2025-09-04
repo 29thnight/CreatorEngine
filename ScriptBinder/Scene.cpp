@@ -657,7 +657,7 @@ void Scene::AllDestroyMark()
 {
     for (const auto& obj : m_SceneObjects)
     {
-        if (obj && !obj->IsDestroyMark())
+        if (obj && !obj->IsDestroyMark() && !obj->IsDontDestroyOnLoad())
             obj->Destroy();
     }
 }
