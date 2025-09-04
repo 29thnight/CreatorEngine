@@ -41,11 +41,11 @@ public:
 	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
-        std::shared_ptr<GameObject> TryGetGameObject(GameObject::Index index);
-        // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
-        void DetachGameObjectHierarchy(GameObject* root);
-        std::shared_ptr<GameObject> GetGameObject(std::string_view name);
-        const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
+    std::shared_ptr<GameObject> TryGetGameObject(GameObject::Index index);
+    // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
+    void DetachGameObjectHierarchy(GameObject* root);
+    std::shared_ptr<GameObject> GetGameObject(std::string_view name);
+    const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
 	void AddSelectedSceneObject(GameObject* sceneObject);
 	void RemoveSelectedSceneObject(GameObject* sceneObject);
 	void ClearSelectedSceneObjects();
