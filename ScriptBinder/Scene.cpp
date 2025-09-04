@@ -1346,33 +1346,10 @@ void Scene::AllUpdateWorldMatrix()
 {
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
 
-	//for (auto index : rootObjects)
-	//{
-	//	UpdateModelRecursive(index, XMMatrixIdentity());
-	//}
-
 	auto updateFunc = [this](GameObject::Index index)
 	{
-		if(index < m_SceneObjects.size() && !m_SceneObjects[index]->IsDontDestroyOnLoad())
-		{
-			UpdateModelRecursive(index, XMMatrixIdentity());
-		}
+		UpdateModelRecursive(index, XMMatrixIdentity());
 	};
 
 	std::for_each(std::execution::par_unseq, rootObjects.begin(), rootObjects.end(), updateFunc);
-
-	// Update DontDestroyOnLoad objects
-	size_t size = SceneManagers->GetDontDestroyOnLoadObjects().size();
-	if (0 < size)
-	{
-		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		for (auto& obj : dontDestroyObjects)
-		{
-			auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
-			if (gameObject && gameObject->IsEnabled())
-			{
-				UpdateModelRecursive(gameObject->m_index, XMMatrixIdentity());
-			}
-		}
-	}
 }
