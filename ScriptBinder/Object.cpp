@@ -2,6 +2,7 @@
 #include "GameObject.h"
 #include "ComponentFactory.h"
 #include "SceneManager.h"
+#include <algorithm>
 
 void Object::Destroy()
 {
@@ -15,66 +16,64 @@ void Object::Destroy()
 
 void Object::Destroy(Object* objPtr)
 {
-    if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad)
+    if (objPtr == nullptr)
     {
         return;
     }
 
-	objPtr->Destroy();
-
+    objPtr->Destroy();
 }
 
 void Object::SetDontDestroyOnLoad(Object* objPtr, bool setValue)
 {
-    if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad)
+    if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad == setValue)
     {
         return;
     }
-    objPtr->m_dontDestroyOnLoad = setValue;
 
-	auto scene = SceneManagers->GetActiveScene();
+    auto scene = SceneManagers->GetActiveScene();
     if (!scene)
     {
-        Debug->LogError("No active scene found to add DontDestroyOnLoad object.");
+        Debug->LogError("No active scene found to update DontDestroyOnLoad object.");
         return;
-	}
+    }
 
-	if (setValue)
+    auto gameObject = dynamic_cast<GameObject*>(objPtr);
+
+    if (setValue)
     {
-        // DontDestroyOnLoad °´Ã¼´Â ¾À¿¡ Ãß°¡ÇÏÁö ¾Ê°í, SceneManagers¿¡ µî·Ï
-        auto gameObject = dynamic_cast<GameObject*>(objPtr);
+        objPtr->m_dontDestroyOnLoad = true;
         if (gameObject)
         {
             auto sharedObj = gameObject->shared_from_this();
-			auto sceneObject = scene->m_SceneObjects[0];
+            auto sceneObject = scene->m_SceneObjects[0];
             int index = gameObject->m_index;
 
-			std::erase_if(sceneObject->m_childrenIndices, [index](int childIndex) { return childIndex == index; });
+            std::erase_if(sceneObject->m_childrenIndices, [index](int childIndex) { return childIndex == index; });
 
             SceneManagers->AddDontDestroyOnLoad(sharedObj);
+            gameObject->m_containDontDestroyOnLoad = true;
         }
     }
     else
     {
-        // DontDestroyOnLoad ÇØÁ¦ ½Ã SceneManagers¿¡¼­ Á¦°Å
-        auto gameObject = dynamic_cast<GameObject*>(objPtr);
+        objPtr->m_dontDestroyOnLoad = false;
         if (gameObject)
         {
             SceneManagers->RemoveDontDestroyOnLoad(gameObject->shared_from_this());
 
-			int lastIndex = (int)scene->m_SceneObjects.size();
-			gameObject->m_rootIndex = 0;
-			gameObject->m_parentIndex = -1;
-			gameObject->m_transform.SetParentID(-1);
-			gameObject->m_index = lastIndex;
-			gameObject->m_containDontDestroyOnLoad = false;
+            int lastIndex = static_cast<int>(scene->m_SceneObjects.size());
+            gameObject->m_rootIndex = 0;
+            gameObject->m_parentIndex = -1;
+            gameObject->m_transform.SetParentID(-1);
+            gameObject->m_index = lastIndex;
+            gameObject->m_containDontDestroyOnLoad = false;
 
-			auto sceneObject = scene->m_SceneObjects[0];
-			sceneObject->m_childrenIndices.push_back(gameObject->m_index);
-			scene->m_SceneObjects.push_back(gameObject->shared_from_this());
-
+            auto sceneObject = scene->m_SceneObjects[0];
+            sceneObject->m_childrenIndices.push_back(gameObject->m_index);
+            scene->m_SceneObjects.push_back(gameObject->shared_from_this());
         }
-	}
+    }
 }
 
 Object* Object::Instantiate(const Object* original, std::string_view newName)
@@ -86,14 +85,14 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!meta)
         return nullptr;
 
-    // »õ ÀÎ½ºÅÏ½º »ı¼º
+    // ìƒˆ ì¸ìŠ¤í„´ìŠ¤ ìƒì„±
     Object* cloneObj = Meta::MetaFactoryRegistry->Create<Object>(meta->name);
     if (!cloneObj)
         return nullptr;
 
 	cloneObj->m_instanceID = make_guid();
 	cloneObj->m_typeID = original->m_typeID;
-    // ÀÌ¸§ ¼³Á¤
+    // ì´ë¦„ ì„¤ì •
     if (!newName.empty())
         cloneObj->m_name = newName;
     else
@@ -103,7 +102,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     Object* originalObj = const_cast<Object*>(original);
     GameObject* originalGameObject = dynamic_cast<GameObject*>(originalObj);
 
-    // GameObject¶ó¸é Scene¿¡ µî·ÏÇÏ°í ÄÄÆ÷³ÍÆ® º¹Á¦
+    // GameObjectë¼ë©´ Sceneì— ë“±ë¡í•˜ê³  ì»´í¬ë„ŒíŠ¸ ë³µì œ
     if (cloneGameObject && originalGameObject)
     {
 		auto originalNode = Meta::Serialize(originalGameObject, *meta);
