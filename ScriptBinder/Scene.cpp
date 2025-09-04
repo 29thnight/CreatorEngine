@@ -173,15 +173,15 @@ std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 
 std::shared_ptr<GameObject> Scene::TryGetGameObject(GameObject::Index index)
 {
-        if (index == GameObject::INVALID_INDEX || index < 0)
-        {
-                return nullptr;
-        }
-        if (static_cast<size_t>(index) < m_SceneObjects.size())
-        {
-                return m_SceneObjects[index];
-        }
-        return nullptr;
+    if (index == GameObject::INVALID_INDEX || index < 0)
+    {
+            return nullptr;
+    }
+    if (static_cast<size_t>(index) < m_SceneObjects.size())
+    {
+            return m_SceneObjects[index];
+    }
+    return nullptr;
 }
 
 void Scene::DetachGameObjectHierarchy(GameObject* root)

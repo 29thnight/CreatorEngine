@@ -325,19 +325,23 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
-        //if(sceneNode["AssetsBundle"])
-        //{
-        //    auto assetsBundleNode = sceneNode["AssetsBundle"];
-        //    if (assetsBundleNode.IsNull())
-        //    {
-        //        Debug->LogError("AssetsBundle node is null.");
-        //    }
-        //    else
-        //    {
-        //        auto* AssetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
-        //        Meta::Deserialize(AssetBundle, assetsBundleNode);
-        //    }
-        //}
+        if(auto assetsBundleNode = sceneNode["AssetsBundle"])
+        {
+            if (assetsBundleNode.IsNull())
+            {
+                Debug->LogError("AssetsBundle node is null.");
+            }
+            else
+            {
+                auto* assetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
+                Meta::Deserialize(assetBundle, assetsBundleNode);
+                DataSystems->LoadAssetBundle(*assetBundle);
+            }
+        }
+
+        DataSystems->ClearRetainedAssets();
+        DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
+        DataSystems->RetainAssets(m_activeScene.load()->m_requiredLoadAssetsBundle);
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
@@ -410,19 +414,18 @@ Scene* SceneManager::LoadScene(std::string_view name)
         file::path sceneName = name.data();
         scene = Scene::LoadScene(sceneName.stem().string());
 
-        //if(sceneNode["AssetsBundle"])
-        //{
-        //    auto assetsBundleNode = sceneNode["AssetsBundle"];
-        //    if (assetsBundleNode.IsNull())
-        //    {
-        //        Debug->LogError("AssetsBundle node is null.");
-        //    }
-        //    else
-        //    {
-        //        auto* AssetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
-        //        Meta::Deserialize(AssetBundle, assetsBundleNode);
-        //    }
-        //}
+        if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+        {
+            if (assetsBundleNode.IsNull())
+            {
+                Debug->LogError("AssetsBundle node is null.");
+            }
+            else
+            {
+                Meta::Deserialize(&scene->m_requiredLoadAssetsBundle, assetsBundleNode);
+                DataSystems->LoadAssetBundle(scene->m_requiredLoadAssetsBundle);
+            }
+        }
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
@@ -474,6 +477,15 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
+            if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+            {
+                if (!assetsBundleNode.IsNull())
+                {
+                    Meta::Deserialize(&newScene->m_requiredLoadAssetsBundle, assetsBundleNode);
+                    DataSystems->LoadAssetBundle(newScene->m_requiredLoadAssetsBundle);
+                }
+            }
+
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -518,6 +530,15 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
+            if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+            {
+                if (!assetsBundleNode.IsNull())
+                {
+                    Meta::Deserialize(&newScene->m_requiredLoadAssetsBundle, assetsBundleNode);
+                    DataSystems->LoadAssetBundle(newScene->m_requiredLoadAssetsBundle);
+                }
+            }
+
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -557,6 +578,11 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
 {
     if (!sceneToActivate) return;
 
+    DataSystems->LoadAssetBundle(sceneToActivate->m_requiredLoadAssetsBundle);
+    DataSystems->ClearRetainedAssets();
+    DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
+    DataSystems->RetainAssets(sceneToActivate->m_requiredLoadAssetsBundle);
+
     Scene* oldScene = m_activeScene.load();
     if (oldScene)
     {
@@ -570,6 +596,7 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
         }
 
         sceneUnloadedEvent.Broadcast();
+        DataSystems->UnloadUnusedAssets();
         oldScene->AllDestroyMark();
         oldScene->OnDisable();
         oldScene->OnDestroy();

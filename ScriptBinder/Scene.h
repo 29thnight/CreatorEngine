@@ -151,7 +151,7 @@ public:
     size_t m_buildIndex{ 0 };
     [[Property]]
 	HashingString m_sceneName;
-
+    [[Property]]
 	AssetBundle m_requiredLoadAssetsBundle{};
 
 public:

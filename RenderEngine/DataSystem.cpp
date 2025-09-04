@@ -1476,3 +1476,66 @@ void DataSystem::AddModel(const file::path& filepath, const file::path& dir)
 		Models[model->name] = model;
 	}
 }
+
+void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
+{
+	for (const auto& entry : bundle.assets)
+	{
+		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
+		switch (type)
+		{
+		case ManagedAssetType::Model:
+			LoadModel(entry.assetName.string());
+			break;
+		case ManagedAssetType::Material:
+			LoadMaterial(entry.assetName.string());
+			break;
+		case ManagedAssetType::Texture:
+			LoadTexture(entry.assetName.string());
+			break;
+		case ManagedAssetType::SpriteFont:
+			LoadSFont(entry.assetName.wstring());
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+void DataSystem::RetainAssets(const AssetBundle& bundle)
+{
+	for (const auto& entry : bundle.assets)
+	{
+		m_retainedAssets[entry.assetTypeID].insert(entry.assetName.stem().string());
+	}
+}
+
+void DataSystem::ClearRetainedAssets()
+{
+	m_retainedAssets.clear();
+}
+
+void DataSystem::UnloadUnusedAssets()
+{
+	auto removeUnused = [this](auto& container, int type)
+		{
+			auto it = container.begin();
+			auto& retainSet = m_retainedAssets[type];
+			while (it != container.end())
+			{
+				if (retainSet.find(it->first) == retainSet.end())
+				{
+					it = container.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+		};
+
+	removeUnused(Models, static_cast<int>(ManagedAssetType::Model));
+	removeUnused(Materials, static_cast<int>(ManagedAssetType::Material));
+	removeUnused(Textures, static_cast<int>(ManagedAssetType::Texture));
+	removeUnused(SFonts, static_cast<int>(ManagedAssetType::SpriteFont));
+}
