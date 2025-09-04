@@ -51,7 +51,7 @@ void Player::Start()
 
 
 	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
-
+	//handSocket = m_animator->MakeSocket("handsocket", "Sword_g", aniOwner);
 	
 
 	std::string gumName = "Sword" + std::to_string(playerIndex +1);
@@ -71,7 +71,6 @@ void Player::Start()
 	dashEffect->m_effectTemplateName ="Dash";
 
 	player->m_collisionType = 2;
-
 
 
 	auto gmobj = GameObject::Find("GameManager");
@@ -134,7 +133,7 @@ void Player::Update(float tick)
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
 	}
-	if (m_comboCount != 0)
+	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
 		m_comboElapsedTime += tick;
 
@@ -382,6 +381,67 @@ void Player::Dash()
 void Player::StartAttack()
 {
 	isCharging = true;
+	//여기서 공격처리하고 차징시작 
+	if (isAttacking == false || canMeleeCancel == true)
+	{
+		isAttacking = true;
+		DropCatchItem();
+		//if (m_curWeapon)
+		//{
+		//	if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
+		//	{
+		//		m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+		//		//m_animator->SetUseLayer(0,false);
+		//		std::cout << "Melee Attack!!" << std::endl;
+		//	}
+
+
+		//	if (m_curWeapon->itemType == ItemType::Range)
+		//	{
+		//		m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+		//		//m_animator->SetUseLayer(0,false);
+		//		std::cout << "RangeAttack!!" << std::endl;
+		//		ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
+		//	}
+
+		//	if (m_curWeapon->itemType == ItemType::Explosion)
+		//	{
+		//		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
+		//		//m_animator->SetUseLayer(0,false);
+		//		std::cout << "BombAttack!!" << std::endl;
+		//	}
+
+
+		//	m_comboCount++;
+		//	m_comboElapsedTime = 0;
+		//	attackElapsedTime = 0;
+		//	if (m_curWeapon->CheckDur() == true)
+		//	{
+		//		std::cout << "weapon break" << std::endl;
+		//	}
+		//}
+
+		if (m_comboCount == 0)
+		{
+			m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+			std::cout << "MeleeAttack1" << std::endl;
+			canMeleeCancel = false;
+			//m_comboCount++;
+		}
+		else if (m_comboCount == 1)
+		{
+			m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+			std::cout << "MeleeAttack2" << std::endl;
+			canMeleeCancel = false;
+			//m_comboCount++;
+		}
+		else if (m_comboCount == 2)
+		{
+			m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+			std::cout << "MeleeAttack3" << std::endl;
+			canMeleeCancel = false;
+		}
+	}
 }
 
 void Player::Charging()
@@ -390,13 +450,14 @@ void Player::Charging()
 	{
 		std::cout << "charginggggggg" << std::endl;
 	}
-	//m_animator->SetParameter("Charging", true);
+	//m_animator->SetParameter("Charging", true); //차징중에 기모으는 이펙트 출력 Idle or Move 애니메이션 자율
 
 }
 
 void Player::Attack1()
 {
-
+	//여기선 차징시간이 넘으면 차징공격만 실행
+	//근거리는 큰이펙트 + 1,2,3타중 정한애니메이션중 하나  ,,, 원거리는 부채꼴로 여러발 발사
 	isCharging = false;
 	std::cout << m_chargingTime << " second charging" << std::endl;
 
@@ -406,46 +467,66 @@ void Player::Attack1()
 		//차지공격나감
 	}
 
-	if (isAttacking == false)
-	{
-		isAttacking = true;
-		DropCatchItem();
-		if (m_curWeapon)
-		{
-			if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
-			{
-				m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-				//m_animator->SetUseLayer(0,false);
-				std::cout << "Melee Attack!!" << std::endl;
-			}
+	//if (isAttacking == false || canMeleeCancel == true)
+	//{
+	//	isAttacking = true;
+	//	DropCatchItem();
+	//	//if (m_curWeapon)
+	//	//{
+	//	//	if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
+	//	//	{
+	//	//		m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+	//	//		//m_animator->SetUseLayer(0,false);
+	//	//		std::cout << "Melee Attack!!" << std::endl;
+	//	//	}
 
 
-			if (m_curWeapon->itemType == ItemType::Range)
-			{
-				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
-				//m_animator->SetUseLayer(0,false);
-				std::cout << "RangeAttack!!" << std::endl;
-				ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
-			}
+	//	//	if (m_curWeapon->itemType == ItemType::Range)
+	//	//	{
+	//	//		m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+	//	//		//m_animator->SetUseLayer(0,false);
+	//	//		std::cout << "RangeAttack!!" << std::endl;
+	//	//		ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
+	//	//	}
 
-			if (m_curWeapon->itemType == ItemType::Explosion)
-			{
-				m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
-				//m_animator->SetUseLayer(0,false);
-				std::cout << "BombAttack!!" << std::endl;
-			}
+	//	//	if (m_curWeapon->itemType == ItemType::Explosion)
+	//	//	{
+	//	//		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
+	//	//		//m_animator->SetUseLayer(0,false);
+	//	//		std::cout << "BombAttack!!" << std::endl;
+	//	//	}
 
 
-			m_comboCount++;
-			m_comboElapsedTime = 0;
-			attackElapsedTime = 0;
-			if (m_curWeapon->CheckDur() == true)
-			{
-				std::cout << "weapon break" << std::endl;
-			}
-		}
+	//	//	m_comboCount++;
+	//	//	m_comboElapsedTime = 0;
+	//	//	attackElapsedTime = 0;
+	//	//	if (m_curWeapon->CheckDur() == true)
+	//	//	{
+	//	//		std::cout << "weapon break" << std::endl;
+	//	//	}
+	//	//}
 
-	}
+	//	if (m_comboCount == 0)
+	//	{
+	//		m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+	//		std::cout << "MeleeAttack1" << std::endl;
+	//		canMeleeCancel = false;
+	//		//m_comboCount++;
+	//	}
+	//	else if (m_comboCount == 1)
+	//	{
+	//		m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+	//		std::cout << "MeleeAttack2" << std::endl;
+	//		canMeleeCancel = false;
+	//		//m_comboCount++;
+	//	}
+	//	else if (m_comboCount == 2)
+	//	{
+	//		m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+	//		std::cout << "MeleeAttack3" << std::endl;
+	//		canMeleeCancel = false;
+	//	}
+	//}
 
 	m_chargingTime = 0.f;
 }
@@ -575,6 +656,21 @@ void Player::Buff(Weapon* weapon)
 }
 
 
+void Player::Cancancel()
+{
+	canMeleeCancel = true;
+	if (m_comboCount < 2)
+	{
+		m_comboCount++;
+		m_comboElapsedTime = 0.f;
+	}
+	else
+	{
+		m_comboCount = 0;
+		m_comboElapsedTime = 0.f;
+	}
+}
+
 void Player::ChangeAutoTarget(Mathf::Vector2 dir)
 {
 	if (inRangeEnemy.empty()) //비었으면 단순 캐릭터 회전
@@ -671,6 +767,35 @@ void Player::MeleeAttack()
 
 void Player::ShootBullet()
 {
+	//원거리 무기 일때 에임보정후 발사
+	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
+	float distance;
+	
+	for (auto enemy : inRangeEnemy)
+	{
+		if (enemy)
+		{
+			auto enemyPos = enemy->GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR diff = XMVectorSubtract(playerPos, enemyPos);
+			XMVECTOR distSqVec = XMVector3LengthSq(diff);
+			XMStoreFloat(&distance, distSqVec);
+			
+			if (distance < nearDistance)
+			{
+				nearDistance = distance;
+				curTarget = enemy;
+				
+			}
+			
+			
+		}
+	}
+	if (curTarget)
+	{
+		//원거리 공격
+	}
+
+	nearDistance = FLT_MAX;
 }
 
 void Player::ShootNormalBullet()
@@ -711,7 +836,7 @@ void Player::ShootSpecialBullet()
 void Player::ThrowBomb()
 {
 	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
-	bomb->ThrowBomb(this, bombThrowPosition);
+	//bomb->ThrowBomb(this, bombThrowPosition);
 	//bomb 을 프리팹만든걸로 받아오게끔 수정 or weaponPool 필요
 }
 

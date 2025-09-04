@@ -19,6 +19,8 @@ void Weapon::Start()
 void Weapon::Update(float tick)
 {
 
+
+	//날아가는 로직은 weaponCapsule로 이전예정
 	if (ownerPlayer)
 	{
 		Transform* targetTransform = ownerPlayer->GetComponent<Transform>();
@@ -75,6 +77,8 @@ bool Weapon::CheckChargedDur(float chargedTime)
 
 void Weapon::Throw(Player* _player,Mathf::Vector3 statrPos)
 {
+
+	//throw나 이동등은 weapon캡슐로 옮기기
 	OwnerPlayerIndex = _player->playerIndex;
 	ownerPlayer = _player->GetOwner();
 	startPos = statrPos;

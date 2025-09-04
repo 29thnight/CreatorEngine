@@ -32,8 +32,6 @@ void PlayerAttackAH::Enter()
 	if (m_player)
 	{
 		m_player->AttackTarget.clear();
-		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
-		controller->Move({ 0,0 });
 	}
 }
 
@@ -45,10 +43,22 @@ void PlayerAttackAH::Update(float deltaTime)
 		m_player->MeleeAttack();
 	}
 
+	auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->Move({ 0,0 });
 }
 
 void PlayerAttackAH::Exit()
 {
 	m_player->isAttacking = false;
+	/*if (m_player->m_comboCount < 2)
+	{
+		m_player->m_comboCount++;
+		m_player->m_comboElapsedTime = 0.f;
+	}
+	else
+	{
+		m_player->m_comboCount = 0;
+		m_player->m_comboElapsedTime = 0.f;
+	}*/
 	std::cout << "attack end" << std::endl;
 }

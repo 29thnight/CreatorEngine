@@ -147,12 +147,16 @@ public:
 	[[Property]]
 	float minChargedTime = 0.7f; //최소 차지시간
 
+	bool canMeleeCancel = false; //밀리어택 애니메이션 진행중 캔슬가능한지 //키프레임 이벤트에서 각 시점에 true로 바꿔주고 true 일때 공격입력시 다음공격 전환
+	[[Method]]
+	void Cancancel();
 
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isAttacking = false;
 	float attackTime = 0.765f;
 	float attackElapsedTime = 0.f;
+	float nearDistance = FLT_MAX;
 	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들
 	std::vector<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
 	EntityEnemy* curTarget = nullptr;

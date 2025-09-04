@@ -46,6 +46,7 @@ ReflectionScriptField(Player) \
 		meta_method(CatchAndThrow) \
 		meta_method(ThrowEvent) \
 		meta_method(Dash) \
+		meta_method(Cancancel) \
 		meta_method(ShootBullet) \
 		meta_method(ShootNormalBullet) \
 		meta_method(ShootSpecialBullet) \
