@@ -20,6 +20,9 @@
 #include "UIManager.h"
 #include "RectTransformComponent.h"
 #include <execution>
+#include <queue>
+#include <algorithm>
+#include <queue>
 
 #include "Profiler.h"
 Scene::Scene()
@@ -242,6 +245,109 @@ void Scene::DetachGameObjectHierarchy(GameObject* root)
             m_SceneObjects[idx].reset();
         }
     }
+}
+
+// === C안 구현: 이름 충돌 방지 ===
+std::string Scene::MakeUniqueName(std::string_view base) const
+{
+    std::string name(base);
+    if (name.empty()) name = "GameObject";
+    if (!GetGameObject(name)) return name;
+    int n = 1;
+    std::string trial;
+    do {
+        trial = name + " (" + std::to_string(n++) + ")";
+    } while (GetGameObject(trial));
+    return trial;
+}
+
+// === C안 구현: 단일 객체 부착 ===
+GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObject::Index parentIndex)
+{
+    if (!go) return GameObject::INVALID_INDEX;
+
+    // 이 씬 기준 유니크 네임 보장
+    if (auto existed = GetGameObject(go->GetHashedName().ToString()); existed)
+        go->SetName(MakeUniqueName(go->GetHashedName().ToString()));
+
+    // 이 씬에 소속
+    go->m_ownerScene = this;
+
+    // 새 인덱스 할당
+    GameObject::Index newIndex = static_cast<GameObject::Index>(m_SceneObjects.size());
+    go->m_index = newIndex;
+    m_SceneObjects.push_back(go);
+
+    // Tag/Layer 재등록
+    if (!go->m_tag.ToString().empty())
+        TagManager::GetInstance()->AddTagToObject(go->m_tag.ToString(), go.get());
+    if (!go->m_layer.ToString().empty())
+        TagManager::GetInstance()->AddObjectToLayer(go->m_layer.ToString(), go.get());
+
+    // Transform 부모 세팅 (루트 규약: INVALID_INDEX == 루트)
+    if (GameObject::IsValidIndex(parentIndex))
+    {
+        go->m_parentIndex = parentIndex;
+        if (auto parent = TryGetGameObject(parentIndex))
+        {
+            if (std::find(parent->m_childrenIndices.begin(), parent->m_childrenIndices.end(), newIndex) == parent->m_childrenIndices.end())
+                parent->m_childrenIndices.push_back(newIndex);
+        }
+        go->m_transform.SetParentID(parentIndex);
+    }
+    else
+    {
+        go->m_parentIndex = GameObject::INVALID_INDEX;
+        go->m_transform.SetParentID(GameObject::INVALID_INDEX);
+        // 씬 루트 children 연결
+        if (!m_SceneObjects.empty() && m_SceneObjects[0])
+        {
+            auto& rootChildren = m_SceneObjects[0]->m_childrenIndices;
+            if (std::find(rootChildren.begin(), rootChildren.end(), newIndex) == rootChildren.end())
+                rootChildren.push_back(newIndex);
+        }
+    }
+
+    // 필요 시 컴포넌트 쪽 씬/이벤트 갱신은 호출측(매니저)에서 일괄 처리
+    return newIndex;
+}
+
+// === C안 구현: 서브트리 부착 ===
+std::unordered_map<GameObject::Index, GameObject::Index>
+Scene::AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots)
+{
+    std::unordered_map<GameObject::Index, GameObject::Index> remap;
+    if (roots.empty()) return remap;
+
+    // BFS로 루트별 서브트리 전개 (부모 → 자식 순서 보장)
+    std::vector<std::shared_ptr<GameObject>> ordered;
+    ordered.reserve(roots.size()*4);
+    std::queue<std::shared_ptr<GameObject>> q;
+    for (auto& r : roots) if (r) q.push(r);
+    while (!q.empty())
+    {
+        auto cur = q.front(); q.pop();
+        ordered.push_back(cur);
+        for (auto childIdx : cur->m_childrenIndices)
+        {
+            if (auto ch = TryGetGameObject(childIdx))
+                q.push(ch);
+        }
+    }
+
+    // oldParent → newParent 를 remap 하면서 부착
+    for (auto& node : ordered)
+    {
+        auto oldIdx = node->m_index;
+        auto oldParent = node->m_parentIndex;
+        GameObject::Index newParent =
+            remap.count(oldParent) ? remap[oldParent] :
+            GameObject::INVALID_INDEX;
+
+        auto newIdx = AttachExistingGameObject(node, newParent);
+        remap[oldIdx] = newIdx;
+    }
+    return remap;
 }
 
 std::shared_ptr<GameObject> Scene::GetGameObject(std::string_view name)

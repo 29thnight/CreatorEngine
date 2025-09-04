@@ -4,6 +4,7 @@
 #include "AssetBundle.h"
 #include "Scene.generated.h"
 #include "EBodyType.h"
+#include <unordered_map>
 
 class GameObject;
 class RenderScene;
@@ -44,6 +45,13 @@ public:
     std::shared_ptr<GameObject> TryGetGameObject(GameObject::Index index);
     // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
     void DetachGameObjectHierarchy(GameObject* root);
+    // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
+    // 단일 객체를 붙임(부모 인덱스는 이 씬 기준). 유니크 네임/Tag/Layer/루트 children/Transform 부모까지 처리.
+    GameObject::Index AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObject::Index parentIndex);
+    // DDOL 서브트리를 한꺼번에 붙임. parent/child 인덱스는 go들이 원래 갖고 있던 서브트리 상대관계를 따름.
+    // 반환: oldIndex -> newIndex 매핑(이 씬 기준)
+    std::unordered_map<GameObject::Index, GameObject::Index>
+        AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots);
     std::shared_ptr<GameObject> GetGameObject(std::string_view name);
     const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
 	void AddSelectedSceneObject(GameObject* sceneObject);
@@ -64,6 +72,9 @@ private:
     friend class SceneManager;
     //for Editor
     void Reset();
+
+    // 이름 충돌 방지
+    std::string MakeUniqueName(std::string_view base) const;
 
 public:
     //Events
