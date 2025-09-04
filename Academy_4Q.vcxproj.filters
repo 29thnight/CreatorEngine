@@ -60,6 +60,9 @@
     <Filter Include="Builder">
       <UniqueIdentifier>{05e04b99-572e-49cc-b5c8-8e1eab96363f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Window\AssetBundleWindow">
+      <UniqueIdentifier>{a8b66633-3bf2-4e64-8029-e89fe9524506}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
@@ -125,6 +128,9 @@
     <ClInclude Include="EngineEntry\GameBuilderSystem.h">
       <Filter>Builder</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
+      <Filter>Window\AssetBundleWindow</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
@@ -174,6 +180,9 @@
     </ClCompile>
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
       <Filter>Builder</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
+      <Filter>Window\AssetBundleWindow</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
