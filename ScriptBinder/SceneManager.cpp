@@ -723,7 +723,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
         }
         std::erase_if(gameObject->m_childrenIndices, GameObject::IsInvalidIndex);
 
-        if (gameObject->m_parentIndex == 0)
+        if (gameObject->m_parentIndex == GameObject::INVALID_INDEX)
         {
             auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
             if (std::find(rootChildren.begin(), rootChildren.end(), gameObject->m_index) == rootChildren.end())

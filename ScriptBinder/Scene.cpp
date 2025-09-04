@@ -169,15 +169,79 @@ std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 
 std::shared_ptr<GameObject> Scene::TryGetGameObject(GameObject::Index index)
 {
-	if (index == GameObject::INVALID_INDEX || index < 0)
-	{
-		return nullptr;
-	}
-	if (static_cast<size_t>(index) < m_SceneObjects.size())
-	{
-		return m_SceneObjects[index];
-	}
-	return nullptr;
+        if (index == GameObject::INVALID_INDEX || index < 0)
+        {
+                return nullptr;
+        }
+        if (static_cast<size_t>(index) < m_SceneObjects.size())
+        {
+                return m_SceneObjects[index];
+        }
+        return nullptr;
+}
+
+void Scene::DetachGameObjectHierarchy(GameObject* root)
+{
+    if (!root) return;
+    Scene* origin = root->GetScene();
+    if (origin != this) return;
+
+    // breadth-first (인덱스 재배열 없이 안전하게 순회)
+    std::vector<GameObject::Index> queue;
+    queue.push_back(root->m_index);
+
+    // 루트부터 부모/씬 루트 children 에서 분리
+    auto detachFromParent = [&](GameObject* node){
+        if (!node) return;
+        // 부모 children에서 제거
+        if (GameObject::IsValidIndex(node->m_parentIndex))
+        {
+            if (auto parent = TryGetGameObject(node->m_parentIndex))
+            {
+                std::erase(parent->m_childrenIndices, node->m_index);
+            }
+        }
+        // 씬 루트 children에서 제거
+        if (!m_SceneObjects.empty() && m_SceneObjects[0])
+        {
+            std::erase(m_SceneObjects[0]->m_childrenIndices, node->m_index);
+        }
+    };
+    detachFromParent(root);
+
+    for (size_t qi = 0; qi < queue.size(); ++qi)
+    {
+        auto idx = queue[qi];
+        auto node = TryGetGameObject(idx);
+        if (!node) continue;
+
+        // 자식 enqueue
+        for (auto childIdx : node->m_childrenIndices)
+        {
+            if (GameObject::IsValidIndex(childIdx))
+                queue.push_back(childIdx);
+        }
+
+        // 태그/레이어에서 분리 (원 씬 검색에서 빠지도록)
+        if (!node->m_tag.ToString().empty())
+        {
+            TagManager::GetInstance()->RemoveTagFromObject(node->m_tag.ToString(), node.get());
+        }
+        if (!node->m_layer.ToString().empty())
+        {
+            TagManager::GetInstance()->RemoveObjectFromLayer(node->m_layer.ToString(), node.get());
+        }
+
+        // 부모 링크 절단 (월드 유지)
+        node->m_transform.SetParentID(GameObject::INVALID_INDEX);
+        node->m_parentIndex = GameObject::INVALID_INDEX;
+
+        // 원 씬 소유 컨테이너에서 tombstone(null) 처리 → 중복 소유/순회 방지
+        if (static_cast<size_t>(idx) < m_SceneObjects.size())
+        {
+            m_SceneObjects[idx].reset();
+        }
+    }
 }
 
 std::shared_ptr<GameObject> Scene::GetGameObject(std::string_view name)
