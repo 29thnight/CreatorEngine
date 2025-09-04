@@ -1061,15 +1061,15 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 
 void Scene::DestroyGameObjects()
 {
-        std::erase_if(m_SceneObjects, [](const auto& obj)
-        {
-                return obj && obj->IsDontDestroyOnLoad();
-        });
+    std::erase_if(m_SceneObjects, [](const auto& obj)
+    {
+            return obj && obj->IsDontDestroyOnLoad();
+    });
 
-        std::unordered_set<uint32_t> deletedIndices;
-        for (const auto& obj : m_SceneObjects)
-        {
-                if (obj && obj->IsDestroyMark())
+    std::unordered_set<uint32_t> deletedIndices;
+    for (const auto& obj : m_SceneObjects)
+    {
+        if (obj && obj->IsDestroyMark())
 			deletedIndices.insert(obj->m_index);
 	}
 

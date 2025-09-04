@@ -290,30 +290,33 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				for (int i = 1; i < sceneObjects.size(); ++i)
 				{
 					auto& obj = sceneObjects[i];
-					if (!obj || obj->m_parentIndex > 0) continue;
+					if (!obj || obj->m_parentIndex > 0 || obj->IsDontDestroyOnLoad()) continue;
 
 					ImGui::PushID((int)&obj);
 					DrawSceneObject(obj);
 					ImGui::PopID();
 				}
 
-				auto& dontDistroyObj = SceneManagers->GetDontDestroyOnLoadObjects();
-				if (!dontDistroyObj.empty())
+				std::vector<std::shared_ptr<GameObject>> ddolObjects;
+				for (int i = 1; i < sceneObjects.size(); ++i)
+				{
+					auto& obj = sceneObjects[i];
+					if (obj && obj->m_parentIndex == 0 && obj->IsDontDestroyOnLoad())
+					{
+						ddolObjects.push_back(obj);
+					}
+				}
+
+				if (!ddolObjects.empty())
 				{
 					ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 					if (ImGui::TreeNodeEx("[ Dont Destroy On Load ]", ImGuiTreeNodeFlags_DefaultOpen))
 					{
-						for (const auto& obj : dontDistroyObj)
+						for (const auto& obj : ddolObjects)
 						{
-							if (!obj || !obj->m_containDontDestroyOnLoad) continue;
-
-							auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
-							if (gameObject)
-							{
-								ImGui::PushID((int)gameObject.get());
-								DrawSceneObject(gameObject);
-								ImGui::PopID();
-							}
+							ImGui::PushID((int)obj.get());
+							DrawSceneObject(obj);
+							ImGui::PopID();
 						}
 						ImGui::TreePop();
 					}

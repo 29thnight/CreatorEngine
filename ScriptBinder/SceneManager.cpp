@@ -590,20 +590,146 @@ void SceneManager::RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
 
 void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
 {
+    //for (const auto& obj : m_dontDestroyOnLoadObjects)
+    //{
+    //    auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+    //    if (gameObject)
+    //    {
+    //        auto components = gameObject->m_components;
+    //        for (const auto& component : components)
+    //        {
+    //            if (auto* regEvent = dynamic_cast<IRegistableEvent*>(component.get()))
+    //            {
+    //                regEvent->RegisterOverriddenEvents(scene);
+    //            }
+    //        }
+    //        gameObject->m_ownerScene = scene;
+    //    }
+    //}
+
+    if (!scene) return;
+
+    std::unordered_map<GameObject::Index, GameObject::Index> indexMap;
+
+    // Assign new indices and insert into scene list
     for (const auto& obj : m_dontDestroyOnLoadObjects)
     {
         auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
-        if (gameObject)
+        if (!gameObject) continue;
+
+        if (gameObject->m_ownerScene == scene &&
+            gameObject->m_index < scene->m_SceneObjects.size() &&
+            scene->m_SceneObjects[gameObject->m_index] == gameObject)
         {
-            auto components = gameObject->m_components;
-            for (const auto& component : components)
+            continue;
+        }
+
+        GameObject::Index oldIndex = gameObject->m_index;
+        GameObject::Index newIndex = static_cast<GameObject::Index>(scene->m_SceneObjects.size());
+        scene->m_SceneObjects.push_back(gameObject);
+        indexMap[oldIndex] = newIndex;
+        const_cast<GameObject::Index&>(gameObject->m_index) = newIndex;
+        gameObject->m_ownerScene = scene;
+
+        for (const auto& component : gameObject->m_components)
+        {
+            if (auto* regEvent = dynamic_cast<IRegistableEvent*>(component.get()))
             {
-                if (auto* regEvent = dynamic_cast<IRegistableEvent*>(component.get()))
-                {
-                    regEvent->RegisterOverriddenEvents(scene);
-                }
+                regEvent->RegisterOverriddenEvents(scene);
             }
-            gameObject->m_ownerScene = scene;
+            if (auto* comp = dynamic_cast<MeshRenderer*>(component.get()))
+            {
+                scene->CollectMeshRenderer(comp);
+            }
+            else if (auto* comp = dynamic_cast<LightComponent*>(component.get()))
+            {
+                scene->CollectLightComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<TerrainComponent*>(component.get()))
+            {
+                scene->CollectTerrainComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<FoliageComponent*>(component.get()))
+            {
+                scene->CollectFoliageComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<RigidBodyComponent*>(component.get()))
+            {
+                scene->CollectRigidBodyComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<BoxColliderComponent*>(component.get()))
+            {
+                scene->CollectColliderComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<SphereColliderComponent*>(component.get()))
+            {
+                scene->CollectColliderComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<CapsuleColliderComponent*>(component.get()))
+            {
+                scene->CollectColliderComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<MeshColliderComponent*>(component.get()))
+            {
+                scene->CollectColliderComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<CharacterControllerComponent*>(component.get()))
+            {
+                scene->CollectColliderComponent(comp);
+            }
+            else if (auto* comp = dynamic_cast<TerrainColliderComponent*>(component.get()))
+            {
+                scene->CollectColliderComponent(comp);
+            }
+        }
+    }
+
+    // Update relationships using new indices
+    for (const auto& obj : m_dontDestroyOnLoadObjects)
+    {
+        auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+        if (!gameObject) continue;
+
+        if (indexMap.contains(gameObject->m_parentIndex))
+        {
+            gameObject->m_parentIndex = indexMap[gameObject->m_parentIndex];
+        }
+        else
+        {
+            gameObject->m_parentIndex = 0;
+        }
+
+        if (indexMap.contains(gameObject->m_rootIndex))
+        {
+            gameObject->m_rootIndex = indexMap[gameObject->m_rootIndex];
+        }
+        else
+        {
+            gameObject->m_rootIndex = 0;
+        }
+
+        gameObject->m_transform.SetParentID(gameObject->m_parentIndex);
+
+        for (auto& childIndex : gameObject->m_childrenIndices)
+        {
+            if (indexMap.contains(childIndex))
+            {
+                childIndex = indexMap[childIndex];
+            }
+            else
+            {
+                childIndex = GameObject::INVALID_INDEX;
+            }
+        }
+        std::erase_if(gameObject->m_childrenIndices, GameObject::IsInvalidIndex);
+
+        if (gameObject->m_parentIndex == 0)
+        {
+            auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+            if (std::find(rootChildren.begin(), rootChildren.end(), gameObject->m_index) == rootChildren.end())
+            {
+                rootChildren.push_back(gameObject->m_index);
+            }
         }
     }
 }
