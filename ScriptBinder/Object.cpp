@@ -3,6 +3,19 @@
 #include "ComponentFactory.h"
 #include "SceneManager.h"
 #include <algorithm>
+// (E) 원 씬 컬렉션/이벤트에서 안전하게 분리하기 위해 컴포넌트 타입 참조 추가
+#include "Scene.h"
+#include "LightComponent.h"
+#include "MeshRenderer.h"
+#include "Terrain.h"
+#include "FoliageComponent.h"
+#include "RigidBodyComponent.h"
+#include "BoxColliderComponent.h"
+#include "SphereColliderComponent.h"
+#include "CapsuleColliderComponent.h"
+#include "MeshCollider.h"
+#include "CharacterControllerComponent.h"
+#include "TerrainCollider.h"
 
 void Object::Destroy()
 {
@@ -61,6 +74,36 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     // Detach fully from origin scene containers
     if (originScene) { originScene->DetachGameObjectHierarchy(go); }
 
+    // (E) 원 씬의 각종 컬렉션/이벤트에서 DDOL 서브트리를 완전히 분리
+    if (originScene)
+    {
+        for (auto& o : collected)
+        {
+            auto g = std::dynamic_pointer_cast<GameObject>(o);
+            if (!g) continue;
+
+            // Scene 컬렉션에서 UnCollect
+            for (auto& comp : g->m_components)
+            {
+                if (!comp) continue;
+                if (auto* c = dynamic_cast<LightComponent*>(comp.get()))              originScene->UnCollectLightComponent(c);
+                else if (auto* c = dynamic_cast<MeshRenderer*>(comp.get()))           originScene->UnCollectMeshRenderer(c);
+                else if (auto* c = dynamic_cast<TerrainComponent*>(comp.get()))       originScene->UnCollectTerrainComponent(c);
+                else if (auto* c = dynamic_cast<FoliageComponent*>(comp.get()))       originScene->UnCollectFoliageComponent(c);
+                else if (auto* c = dynamic_cast<RigidBodyComponent*>(comp.get()))     originScene->UnCollectRigidBodyComponent(c);
+                else if (auto* c = dynamic_cast<BoxColliderComponent*>(comp.get()))   originScene->UnCollectColliderComponent(c);
+                else if (auto* c = dynamic_cast<SphereColliderComponent*>(comp.get()))originScene->UnCollectColliderComponent(c);
+                else if (auto* c = dynamic_cast<CapsuleColliderComponent*>(comp.get()))originScene->UnCollectColliderComponent(c);
+                else if (auto* c = dynamic_cast<MeshColliderComponent*>(comp.get()))  originScene->UnCollectColliderComponent(c);
+                else if (auto* c = dynamic_cast<CharacterControllerComponent*>(comp.get())) originScene->UnCollectColliderComponent(c);
+                else if (auto* c = dynamic_cast<TerrainColliderComponent*>(comp.get()))    originScene->UnCollectColliderComponent(c);
+                // (참고) IRegistableEvent의 Unregister 계열 API가 있다면 여기서 호출하세요.
+            }
+            // 원 씬 포인터 끊기
+            g->m_ownerScene = nullptr;
+        }
+    }
+
     // Ensure root is detached from any parent (keep world)
     go->m_parentIndex = GameObject::INVALID_INDEX;
     go->m_rootIndex = GameObject::INVALID_INDEX;
@@ -71,6 +114,8 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     {
         SceneManagers->AddDontDestroyOnLoad(o);
     }
+
+    // (F) 즉시 재바인딩 제거: 씬 로드시 Rebind 처리
 }
 
 Object* Object::Instantiate(const Object* original, std::string_view newName)
