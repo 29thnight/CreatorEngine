@@ -412,12 +412,12 @@ void Scene::LateUpdate(float deltaSecond)
 				auto owner = image->GetOwner();
 				if (nullptr == owner) continue;
 
-				auto scene = owner->GetScene();
+                                auto scene = owner->GetScene();
 
-				if (scene && scene == this)
-				{
-					data->PushUIRenderData(image->GetInstanceID());
-				}
+                                if (scene && (scene == this || owner->IsDontDestroyOnLoad()))
+                                {
+                                        data->PushUIRenderData(image->GetInstanceID());
+                                }
 			}
 		});
 
@@ -430,12 +430,12 @@ void Scene::LateUpdate(float deltaSecond)
 				auto owner = text->GetOwner();
 				if (nullptr == owner) continue;
 
-				auto scene = owner->GetScene();
+                                auto scene = owner->GetScene();
 
-				if (scene && scene == this)
-				{
-					data->PushUIRenderData(text->GetInstanceID());
-				}
+                                if (scene && (scene == this || owner->IsDontDestroyOnLoad()))
+                                {
+                                        data->PushUIRenderData(text->GetInstanceID());
+                                }
 			}
 		});
 
@@ -1048,27 +1048,15 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 
 void Scene::DestroyGameObjects()
 {
-	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
-	{
-		return obj && obj->IsDontDestroyOnLoad();
-	});
-
-    if (eraseSize > 0)
-    {
-        auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-        for (auto& obj : dontDestroyObjects)
+        std::erase_if(m_SceneObjects, [](const auto& obj)
         {
-            if (obj)
-            {
-                obj->m_containDontDestroyOnLoad = true;
-            }
-        }
-    }
+                return obj && obj->IsDontDestroyOnLoad();
+        });
 
-	std::unordered_set<uint32_t> deletedIndices;
-	for (const auto& obj : m_SceneObjects)
-	{
-		if (obj && obj->IsDestroyMark())
+        std::unordered_set<uint32_t> deletedIndices;
+        for (const auto& obj : m_SceneObjects)
+        {
+                if (obj && obj->IsDestroyMark())
 			deletedIndices.insert(obj->m_index);
 	}
 

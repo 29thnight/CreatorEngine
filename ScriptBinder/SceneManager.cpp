@@ -11,6 +11,7 @@
 #include "NodeFactory.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
+#include <algorithm>
 
 void SceneManager::ManagerInitialize()
 {
@@ -38,7 +39,10 @@ void SceneManager::Editor()
 
     if (!m_isGameStart)
     {
-		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:°ÔÀÓ½ºÅ¸Æ®‹š ÇÑ¹ø¸¸ ÃÊ±âÈ­ÇÏ°í ´Ù½Ãµé¾î°¡°Ô
+
+    // Sweep DDOL bucket for destroyed objects
+    std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
+		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:ê²Œìž„ìŠ¤íƒ€íŠ¸Â‹Âš í•œë²ˆë§Œ ì´ˆê¸°í™”í•˜ê³  ë‹¤ì‹œë“¤ì–´ê°€ê²Œ
         ScriptManager->ReloadDynamicLibrary();
         m_isInitialized = false; // Reset initialization state for editor scene
 		m_activeScene.load()->Awake();
@@ -141,6 +145,9 @@ void SceneManager::EndOfFrame()
     PROFILE_CPU_BEGIN("endofframeBroadcast");
     endOfFrameEvent.Broadcast();
     PROFILE_CPU_END();
+
+    // Sweep DDOL bucket for destroyed objects
+    std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
 }
 
 void SceneManager::Pausing()
@@ -169,6 +176,10 @@ void SceneManager::Decommissioning()
             scene->OnDestroy();
         }
     }
+
+    // Destroy and clear DontDestroyOnLoad objects
+    for (auto& o : m_dontDestroyOnLoadObjects) if (o) o->Destroy();
+    m_dontDestroyOnLoadObjects.clear();
 
     Memory::SafeDelete(m_inputActionManager);
     Memory::SafeDelete(m_threadPool);
@@ -581,7 +592,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
 {
     for (const auto& obj : m_dontDestroyOnLoadObjects)
     {
-		auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+        auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
         if (gameObject)
         {
             auto components = gameObject->m_components;
@@ -592,8 +603,9 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
                     regEvent->RegisterOverriddenEvents(scene);
                 }
             }
-		}
-	}
+            gameObject->m_ownerScene = scene;
+        }
+    }
 }
 
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
@@ -748,7 +760,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             {
                 try
                 {
-                    //ÀÌ°Ô ¹®Á¦°¡ ¾ÈµÉ±î???
+                    //ì´ê²Œ ë¬¸ì œê°€ ì•ˆë ê¹Œ???
                     m_loadSceneReturn = true;
                     ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
                     m_loadSceneReturn = false;
