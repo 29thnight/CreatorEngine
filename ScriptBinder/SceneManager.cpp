@@ -609,6 +609,25 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
     auto remap = scene->AttachExistingGameObjectHierarchy(roots);
     (void)remap;
 
+    // (D) 루트 규약 통일: INVALID_INDEX(= -1)일 때 부모 없음으로 설정
+    for (auto& gameObject : roots)
+    {
+        if (!gameObject) continue;
+        gameObject->m_transform.SetParentID(GameObject::IsValidIndex(gameObject->m_parentIndex)
+            ? gameObject->m_parentIndex
+            : GameObject::INVALID_INDEX);
+
+        // (D) 루트 판정: 0이 아닌 INVALID_INDEX를 루트로 취급
+        if (gameObject->m_parentIndex == GameObject::INVALID_INDEX)
+        {
+            auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+            if (std::find(rootChildren.begin(), rootChildren.end(), gameObject->m_index) == rootChildren.end())
+            {
+                rootChildren.push_back(gameObject->m_index);
+            }
+        }
+    }
+
     // 컴포넌트 이벤트 재등록
     for (auto& obj : m_dontDestroyOnLoadObjects)
     {
