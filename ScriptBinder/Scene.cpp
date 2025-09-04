@@ -167,6 +167,19 @@ std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 	return m_SceneObjects[0];
 }
 
+std::shared_ptr<GameObject> Scene::TryGetGameObject(GameObject::Index index)
+{
+	if (index == GameObject::INVALID_INDEX || index < 0)
+	{
+		return nullptr;
+	}
+	if (static_cast<size_t>(index) < m_SceneObjects.size())
+	{
+		return m_SceneObjects[index];
+	}
+	return nullptr;
+}
+
 std::shared_ptr<GameObject> Scene::GetGameObject(std::string_view name)
 {
 	HashingString hashedName(name.data());
@@ -1192,8 +1205,14 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
 
 void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive)
 {
-	const auto& obj = GetGameObject(objIndex);
-	
+	if (objIndex == GameObject::INVALID_INDEX || objIndex < 0 ||
+		static_cast<size_t>(objIndex) >= m_SceneObjects.size())
+	{
+		return;
+	}
+
+	const auto& obj = m_SceneObjects[objIndex];
+
 	if (!obj || obj->IsDestroyMark())
 	{
 		return;
@@ -1219,7 +1238,22 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	}
 	case GameObjectType::Bone:
 	{
-		const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		//const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		//if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
+		//{
+		//	return;
+		//}
+		//const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
+		//obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
+		//	animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
+		//break;
+
+		const auto& rootObj = TryGetGameObject(obj->m_rootIndex);
+		if (!rootObj)
+		{
+			return;
+		}
+		const auto& animator = rootObj->GetComponent<Animator>();
 		if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
 		{
 			return;
