@@ -52,6 +52,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pSkyBoxPass->ControlPanel();
 		}
 
+		if (ImGui::CollapsingHeader("ForwardPass"))
+		{
+			m_sceneRenderer->m_pForwardPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("SpritePass"))
 		{
 			m_sceneRenderer->m_pSpritePass->ControlPanel();

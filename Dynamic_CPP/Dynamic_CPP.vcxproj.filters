@@ -288,6 +288,9 @@
 		<ClInclude Include="Assets\Script\MosterMeleeAni.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\CurveIndicator.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -502,6 +505,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\MosterMeleeAni.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

@@ -18,6 +18,7 @@ class TerrainComponent;
 class FoliageComponent;
 class ImageComponent;
 class TextComponent;
+class DecalComponent;
 class ReferenceAssets;
 class BoxColliderComponent;
 class SphereColliderComponent;
@@ -185,6 +186,11 @@ public:
     std::vector<FoliageComponent*>& GetFoliageComponents() { return m_foliageComponents; }
 
 public:
+	void CollectDecalComponent(DecalComponent* ptr);
+	void UnCollectDecalComponent(DecalComponent* ptr);
+	std::vector<DecalComponent*>& GetDecalComponents() { return m_decalComponents; }
+
+public:
 	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
 	void UnCollectRigidBodyComponent(RigidBodyComponent* ptr);
 
@@ -232,7 +238,8 @@ private:
     std::vector<Light>              m_lights;
     std::vector<TerrainComponent*>  m_terrainComponents;
     std::vector<FoliageComponent*>  m_foliageComponents;
-	std::mutex						sceneMutex{};
+	std::vector<DecalComponent*>	m_decalComponents;
+	std::mutex sceneMutex{};
 
 private:
 	friend class PhysicsManager;

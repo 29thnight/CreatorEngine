@@ -544,6 +544,7 @@ void Scene::LateUpdate(float deltaSecond)
 	std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+	std::vector<DecalComponent*> decalComponents = m_decalComponents;
 
 	for (auto camera : CameraManagement->GetCameras())
 	{
@@ -873,6 +874,22 @@ void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
     {
          std::erase_if(m_foliageComponents, [ptr](const auto& comp) { return comp == ptr; });
     }
+}
+
+void Scene::CollectDecalComponent(DecalComponent* ptr)
+{
+	if (ptr)
+	{
+		m_decalComponents.push_back(ptr);
+	}
+}
+
+void Scene::UnCollectDecalComponent(DecalComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_decalComponents, [ptr](const auto& comp) { return comp == ptr; });
+	}
 }
 
 void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)

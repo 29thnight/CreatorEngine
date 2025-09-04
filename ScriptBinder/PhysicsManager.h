@@ -103,6 +103,8 @@ public:
 		bool isTrigger;
 		bool isColliderEnabled;
 		bool useGravity;
+		bool movePositionDirty = false;
+		Mathf::Vector3 movePosition{};
 	};
 public:
 	// 물리엔진 초기화 및 업데이트

@@ -23,6 +23,8 @@
 #include "Entity.h"
 
 #include "CameraComponent.h"
+
+#include "CurveIndicator.h"
 void Player::Start()
 {
 
@@ -92,7 +94,16 @@ void Player::Update(float tick)
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
 
-
+	//Test
+	{
+		auto& asiss = GM->GetAsis();
+		auto asis = asiss[0]->GetOwner();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();auto indicator = GameObject::Find("TestIndicator");
+		auto curveindicator = indicator->GetComponent<CurveIndicator>();
+		curveindicator->EnableIndicator(true);
+		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+	}
 
 	if (isDead)
 	{
@@ -124,11 +135,20 @@ void Player::Update(float tick)
 			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
 			{
 				onIndicate = true;
+
+				auto indicator = GameObject::Find("TestIndicator");
+				auto curveindicator = indicator->GetComponent<CurveIndicator>();
+				curveindicator->EnableIndicator(onIndicate);
+				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+
 				std::cout << "onIndicate!!!!!!!!!" << std::endl;
 			}
 			else
 			{
 				onIndicate = false;
+				auto indicator = GameObject::Find("TestIndicator");
+				auto curveindicator = indicator->GetComponent<CurveIndicator>();
+				curveindicator->EnableIndicator(onIndicate);
 			}
 		}
 

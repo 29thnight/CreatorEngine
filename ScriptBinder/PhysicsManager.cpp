@@ -772,6 +772,8 @@ void PhysicsManager::SetPhysicData()
 			data.isKinematic = rigidbody->IsKinematic();
 			data.isDisabled = !rigidbody->IsColliderEnabled();
 
+			data.LayerNumber = static_cast<unsigned int>(colliderInfo.gameObject->GetCollisionType());
+
 			data.isDirty = rigidbody->IsRigidbodyDirty();
 			rigidbody->DevelopOnlyDirtySet(false);
 
@@ -923,6 +925,9 @@ void PhysicsManager::ApplyPendingChanges()
 		data.isColliderEnabled = change.isColliderEnabled;
 		data.useGravity = change.useGravity;
 		data.isDisabled = !change.isColliderEnabled;
+
+		data.moveDirty = change.movePositionDirty;
+		data.movePosition = change.movePosition;
 
 		Physics->SetRigidBodyData(change.id, data);
 	}

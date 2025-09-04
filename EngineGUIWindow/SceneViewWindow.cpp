@@ -136,8 +136,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
 	ImGuizmo::BeginFrame();
 	bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
+	bool rightMouse = InputManagement->IsMouseButtonPressed(MouseKey::RIGHT) || ImGui::IsMouseDown(ImGuiMouseButton_Right);
 
-	if(!ctrl)
+	if(!ctrl && !rightMouse)
 	{
 		if (ImGui::IsKeyPressed(ImGuiKey_W))
 			selectGizmoMode = SelectGuizmoMode::Translate;

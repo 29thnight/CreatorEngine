@@ -103,6 +103,12 @@ public:
 	ProxyCommand MakeProxyCommand(TextComponent* textPtr);
 	void UnregisterCommand(TextComponent* textPtr);
 
+    void RegisterCommand(DecalComponent* decalPtr);
+    bool InvaildCheckDecal(DecalComponent* decalPtr);
+    void UpdateCommand(DecalComponent* decalPtr);
+    ProxyCommand MakeProxyCommand(DecalComponent* decalPtr);
+    void UnregisterCommand(DecalComponent* decalPtr);
+
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	UIRenderProxy* FindUIProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }

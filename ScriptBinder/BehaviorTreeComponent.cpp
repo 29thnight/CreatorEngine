@@ -44,6 +44,8 @@ void BehaviorTreeComponent::Awake()
 
 void BehaviorTreeComponent::Update(float deltaSecond)
 {
+	if (GetOwner()->m_isEnabled == false) return;
+
 	if (m_root && m_pBlackboard && SceneManagers->m_isGameStart)
 	{
 		m_root->Tick(deltaSecond, *m_pBlackboard);
