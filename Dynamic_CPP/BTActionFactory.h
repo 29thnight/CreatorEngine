@@ -4,6 +4,7 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
+#include "WaitAction.h"
 #include "KnockBackAction.h"
 #include "DetectAndTargetingAction.h"
 #include "BTEntityInitAction.h"

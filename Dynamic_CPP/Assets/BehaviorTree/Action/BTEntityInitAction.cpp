@@ -1,4 +1,5 @@
 #include "BTEntityInitAction.h"
+#include "Animator.h"
 #include "pch.h"
 
 NodeStatus BTEntityInitAction::Tick(float deltatime, BlackBoard& blackBoard)
@@ -14,6 +15,8 @@ NodeStatus BTEntityInitAction::Tick(float deltatime, BlackBoard& blackBoard)
 	}
 
 	//todo : initialize other properties as needed
+
+	std::string name = blackBoard.GetValueAsString("Identity");
 
 	
 	blackBoard.SetValueAsBool("Initialized", true);

@@ -67,7 +67,7 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1558418268, 1856270841]
+    Children: [1558418268, 2341585939, 1856270841]
     Position: {x: 406, y: 269}
   - ID: 1558418268
     Type: 6
@@ -118,7 +118,7 @@ NodeList:
     ScriptName: AtteckAction
     Policy: -858993460
     Children: ~
-    Position: {x: 422, y: 616}
+    Position: {x: 470, y: 680}
   - ID: 3513064655
     Type: 8
     Name: Action
@@ -219,3 +219,13 @@ NodeList:
     Policy: -858993460
     Children: ~
     Position: {x: 854, y: 600}
+  - ID: 2341585939
+    Type: 8
+    Name: Action
+    ParentID: 0
+    IsRoot: false
+    HasScript: true
+    ScriptName: WaitAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 278, y: 680}

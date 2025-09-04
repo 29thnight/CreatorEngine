@@ -12,19 +12,19 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	bool hasAtkDelay = blackBoard.HasKey("AtkDelay");
 
 
-	if (hasState) {
-		std::string state = blackBoard.GetValueAsString("State");
-		if (state == "Atteck") {
-			if (hasAtkDelay) {
-				float AtkDelay = blackBoard.GetValueAsFloat("AtkDelay");
+	//if (hasState) {
+	//	std::string state = blackBoard.GetValueAsString("State");
+	//	if (state == "Atteck") {
+	//		if (hasAtkDelay) {
+	//			float AtkDelay = blackBoard.GetValueAsFloat("AtkDelay");
 
-				if (AtkDelay > 0.0f) {
-					std::cout << "IsAtteck ConditionCheck: Attack duration has ended." << std::endl;
-					return true; // Attack duration has ended, can attack
-				}
-			}
-		}
-	}
+	//			if (AtkDelay > 0.0f) {
+	//				std::cout << "IsAtteck ConditionCheck: Attack duration has ended." << std::endl;
+	//				return true; // Attack duration has ended, can attack
+	//			}
+	//		}
+	//	}
+	//}
 
 
 

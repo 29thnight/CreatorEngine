@@ -282,6 +282,12 @@
 		<ClInclude Include="Assets\Script\SpecialBullet.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\MosterMeleeAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -490,6 +496,12 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SpecialBullet.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MosterMeleeAni.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
