@@ -16,6 +16,7 @@ class StateMachineComponent;
 class BehaviorTreeComponent;
 class VolumeComponent;
 class RectTransformComponent;
+class DecalComponent;
 class InspectorWindow
 {
 public:
@@ -38,5 +39,6 @@ private:
 	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
 	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
 	void ImGuiDrawHelperVolume(VolumeComponent* volumeComponent);
+	void ImGuiDrawHelperDecal(DecalComponent* decalComponent);
 };
 #endif // !DYNAMICCPP_EXPORTS

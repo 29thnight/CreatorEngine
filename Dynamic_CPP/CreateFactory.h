@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "CurveIndicator.h"
 #include "SpecialBullet.h"
 #include "Bullet.h"
 #include "DestroyEffect.h"

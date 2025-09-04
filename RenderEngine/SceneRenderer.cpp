@@ -22,6 +22,7 @@
 #include "CullingManager.h"
 #include "IconsFontAwesome6.h"
 #include "FoliageComponent.h"
+#include "DecalComponent.h"
 #include "fa.h"
 #include "Trim.h"
 #include "Profiler.h"
@@ -118,6 +119,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//forwardPass
 	m_pForwardPass = std::make_unique<ForwardPass>();
+	m_pForwardPass->SetTexture(m_normalTexture.get());
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
@@ -199,7 +201,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//DecalPass
 	m_pDecalPass = std::make_unique<DecalPass>();
-	m_pDecalPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get());
+	m_pDecalPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_metalRoughTexture.get());
 
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 	{
@@ -566,6 +568,15 @@ void SceneRenderer::SceneRendering()
 			//PROFILE_CPU_END();
 		}
 
+		// DecalPass
+		{
+			DirectX11::BeginEvent(L"DecalPass");
+			Benchmark banch;
+			m_pDecalPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("DecalPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
 		//[3] SSAOPass
 		{
 			DirectX11::BeginEvent(L"SSAOPass");
@@ -587,15 +598,6 @@ void SceneRenderer::SceneRendering()
 				DirectX11::EndEvent();
 				PROFILE_CPU_END();
 			}
-		}
-
-		// DecalPass
-		{
-			DirectX11::BeginEvent(L"DecalPass");
-			Benchmark banch;
-			m_pDecalPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("DecalPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
 		}
 
 		{
@@ -1096,6 +1098,7 @@ void SceneRenderer::PrepareRender()
 			}
 		}
 		});
+	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
 
 	m_threadPool->Enqueue([=]
 	{
@@ -1142,6 +1145,21 @@ void SceneRenderer::PrepareRender()
 		}
 	});
 
+	m_threadPool->Enqueue([=]
+	{
+		for (auto& decal : decalComponents)
+		{
+			try
+			{
+				renderScene->UpdateCommand(decal);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating decal command: " << e.what() << std::endl;
+			}
+		}
+	});
+
 	EffectProxyController::GetInstance()->PrepareCommandBehavior();
 	//for (auto& mesh : staticMeshes)
 	//{
@@ -1180,6 +1198,17 @@ void SceneRenderer::PrepareRender()
 				if (foliageComponent->IsEnabled())
 				{
 					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
+					if (proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			for (auto& decalComponent : decalComponents) {
+				if (decalComponent->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(decalComponent->GetInstanceID());
 					if (proxy)
 					{
 						data->PushRenderQueue(proxy);

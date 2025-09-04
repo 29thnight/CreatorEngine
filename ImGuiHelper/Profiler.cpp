@@ -28,6 +28,7 @@ void CPUProfiler::Shutdown()
 
 void CPUProfiler::BeginEvent(const char* pName, const char* pFilePath, uint32 lineNumber)
 {
+	ccccc++;
 	if (m_EventCallback.OnEventBegin)
 		m_EventCallback.OnEventBegin(pName, m_EventCallback.pUserData);
 
@@ -56,6 +57,7 @@ void CPUProfiler::BeginEvent(const char* pName, const char* pFilePath, uint32 li
 // End and pop the last pushed event on the current thread
 void CPUProfiler::EndEvent()
 {
+	ccccc--;
 	if (m_EventCallback.OnEventEnd)
 		m_EventCallback.OnEventEnd(m_EventCallback.pUserData);
 

@@ -109,6 +109,8 @@ struct RigidBodyGetSetData
 	bool useGravity = true; // 중력 사용 여부
 
 	bool isDirty = false;
+	bool moveDirty = false;
+	DirectX::SimpleMath::Vector3 movePosition = {};
 };
 
 //CharacterController의 GetSetData를 위한 구조체

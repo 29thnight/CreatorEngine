@@ -16,6 +16,7 @@
 #include "TextComponent.h"
 #include "Terrain.h"
 #include "UIManager.h"
+#include "DecalComponent.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
@@ -416,6 +417,70 @@ void RenderScene::UnregisterCommand(FoliageComponent* foliagePtr)
     if (m_proxyMap.find(guid) == m_proxyMap.end()) return;
 
     m_proxyMap[guid]->DestroyProxy();
+}
+
+void RenderScene::RegisterCommand(DecalComponent* decalPtr)
+{
+	if (nullptr == decalPtr) return;
+
+	HashedGuid guid = decalPtr->GetInstanceID();
+
+	SpinLock lock(m_proxyMapFlag);
+
+	if (m_proxyMap.find(guid) != m_proxyMap.end()) return;
+
+	auto managed = std::make_shared<PrimitiveRenderProxy>(decalPtr);
+	m_proxyMap[guid] = managed;
+}
+
+bool RenderScene::InvaildCheckDecal(DecalComponent* decalPtr)
+{
+	if (nullptr == decalPtr || decalPtr->IsDestroyMark()) return false;
+
+	auto owner = decalPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+
+	HashedGuid guid = decalPtr->GetInstanceID();
+
+	SpinLock lock(m_proxyMapFlag);
+
+	if (m_proxyMap.find(guid) == m_proxyMap.end()) return false;
+
+	auto& proxyObject = m_proxyMap[guid];
+
+	if (nullptr == proxyObject) return false;
+
+	return true;
+}
+
+void RenderScene::UpdateCommand(DecalComponent* decalPtr)
+{
+	ProxyCommand moveCommand = MakeProxyCommand(decalPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(DecalComponent* decalPtr)
+{
+	if (!InvaildCheckDecal(decalPtr))
+	{
+		throw std::runtime_error("InvaildCheckDecal");
+	}
+
+	ProxyCommand command(decalPtr);
+	return command;
+}
+
+void RenderScene::UnregisterCommand(DecalComponent* decalPtr)
+{
+	if (nullptr == decalPtr) return;
+
+	HashedGuid guid = decalPtr->GetInstanceID();
+
+	SpinLock lock(m_proxyMapFlag);
+
+	if (m_proxyMap.find(guid) == m_proxyMap.end()) return;
+
+	m_proxyMap[guid]->DestroyProxy();
 }
 
 void RenderScene::RegisterCommand(ImageComponent* imagePtr)

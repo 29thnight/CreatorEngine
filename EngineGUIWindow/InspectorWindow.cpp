@@ -28,6 +28,7 @@
 #include "FunctionRegistry.h"
 #include "VolumeComponent.h"
 #include "RectTransformComponent.h"
+#include "DecalComponent.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -199,6 +200,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						if (nullptr != input)
 						{
 							ImGuiDrawHelperVolume(input);
+						}
+					}
+					else if (component->GetTypeID() == type_guid(DecalComponent)) {
+						DecalComponent* input = dynamic_cast<DecalComponent*>(component.get());
+						if (nullptr != input) {
+							ImGuiDrawHelperDecal(input);
 						}
 					}
 					else if (type)
@@ -1616,6 +1623,79 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		{
 			DataSystems->SaveExistVolumeProfile(volumeComponent->m_volumeProfileGuid, &profile);
 		}
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
+{
+	if (decalComponent->GetDecalTexture() == nullptr)
+		ImGui::Button("None Diffuse Texture", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)decalComponent->GetDecalTexture()->m_pSRV, ImVec2(30, 30));
+	ImVec2 minRect = ImGui::GetItemRectMin();
+	ImVec2 maxRect = ImGui::GetItemRectMax();
+	ImRect bb(minRect, maxRect);
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			HashingString path = filepath.string();
+			if (!filename.filename().empty()) {
+				decalComponent->SetDecalTexture(filename.string().c_str());
+			}
+			else {
+				Debug->Log("Empty Texture File Name");
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+	if (decalComponent->GetNormalTexture() == nullptr)
+		ImGui::Button("None Normal Texture", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)decalComponent->GetNormalTexture()->m_pSRV, ImVec2(30, 30));
+	minRect = ImGui::GetItemRectMin();
+	maxRect = ImGui::GetItemRectMax();
+	bb = { minRect, maxRect };
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			HashingString path = filepath.string();
+			if (!filename.filename().empty()) {
+				decalComponent->SetNormalTexture(filename.string().c_str());
+			}
+			else {
+				Debug->Log("Empty Texture File Name");
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+	if (decalComponent->GetORMTexture() == nullptr)
+		ImGui::Button("None OccluRoughMetal Texture", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)decalComponent->GetORMTexture()->m_pSRV, ImVec2(30, 30));
+	minRect = ImGui::GetItemRectMin();
+	maxRect = ImGui::GetItemRectMax();
+	bb = { minRect, maxRect };
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			HashingString path = filepath.string();
+			if (!filename.filename().empty()) {
+				decalComponent->SetORMTexture(filename.string().c_str());
+			}
+			else {
+				Debug->Log("Empty Texture File Name");
+			}
+		}
+		ImGui::EndDragDropTarget();
 	}
 }
 

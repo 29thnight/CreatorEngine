@@ -195,6 +195,11 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 			m_terrainQueue.push_back(proxy);
 		}
 		break;
+	case PrimitiveProxyType::DecalComponent:
+		if (proxy->m_diffuseTexture != nullptr || proxy->m_normalTexture != nullptr || proxy->m_occluroughmetalTexture != nullptr) {
+			m_decalQueue.push_back(proxy);
+		}
+		break;
 	default:
 		break;
 	}
@@ -228,6 +233,7 @@ void RenderPassData::ClearRenderQueue()
 	m_terrainQueue.clear();
 	m_foliageQueue.clear();
 	m_UIRenderQueue.clear();
+	m_decalQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)

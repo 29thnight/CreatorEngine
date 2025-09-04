@@ -140,10 +140,8 @@ void SceneManager::GUIRendering()
 
 void SceneManager::EndOfFrame()
 {
-    PROFILE_CPU_BEGIN("yield_WaitForEndOfFrame");
+    PROFILE_CPU_BEGIN("EndOfFrame");
 	CoroutineManagers->yield_WaitForEndOfFrame();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("endofframeBroadcast");
     endOfFrameEvent.Broadcast();
     PROFILE_CPU_END();
 
@@ -157,12 +155,8 @@ void SceneManager::Pausing()
 
 void SceneManager::DisableOrEnable()
 {
-    PROFILE_CPU_BEGIN("OnDisable");
     m_activeScene.load()->OnDisable();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("OnDestroy");
     m_activeScene.load()->OnDestroy();
-    PROFILE_CPU_END();
 }
 
 void SceneManager::Decommissioning()
