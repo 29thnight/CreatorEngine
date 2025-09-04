@@ -40,15 +40,25 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 			Mathf::Vector3 targetPos = closedTransform->GetWorldPosition();
 
 			dir = targetPos - pos;
+
+			std::cout << targetPos.x << "," << targetPos.y << "," << targetPos.z << std::endl;
+			std::cout << pos.x << "," << pos.y << "," << pos.z << std::endl;
+
+			std::cout << "Distance to Target: " << dir.Length() << std::endl;
 		}
 	}
+	else {
+		return false;
+	}
 
-	if (dir!= Mathf::Vector3::Zero)
+	/*if (dir!= Mathf::Vector3::Zero)
 	{
-		if (dir.Length() < chaseRange) {
-			std::cout << "closed Target in ChaseRange" << std::endl;
-			return true;
-		}
+	}*/
+	
+
+	if (dir.Length() < chaseRange) {
+		std::cout << "closed Target in ChaseRange" << std::endl;
+		return true;
 	}
 
 

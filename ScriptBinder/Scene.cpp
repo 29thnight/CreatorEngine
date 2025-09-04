@@ -1053,14 +1053,17 @@ void Scene::DestroyGameObjects()
 		return obj && obj->IsDontDestroyOnLoad();
 	});
 
-	if (eraseSize > 0)
-	{
-		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		for (auto& obj : m_SceneObjects)
-		{
-			obj->m_containDontDestroyOnLoad = true;
-		}
-	}
+    if (eraseSize > 0)
+    {
+        auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
+        for (auto& obj : dontDestroyObjects)
+        {
+            if (obj)
+            {
+                obj->m_containDontDestroyOnLoad = true;
+            }
+        }
+    }
 
 	std::unordered_set<uint32_t> deletedIndices;
 	for (const auto& obj : m_SceneObjects)

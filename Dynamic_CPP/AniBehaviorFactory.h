@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include AniScriptClass header
+#include "MosterMeleeAni.h"
 #include "PlayerAttackAH.h"
 #include "PlayerAttackAni.h"
 

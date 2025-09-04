@@ -1,6 +1,7 @@
 #include "ChaseAction.h"
 #include "pch.h"
 #include "EntityEnemy.h"
+#include "Animator.h"
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	bool isSpeed = blackBoard.HasKey("Speed");
@@ -78,6 +79,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 			//selfTransform->AddPosition(dir * Speed * deltatime);
 			if (movement) {
 				movement->Move(dir2D);
+				enemy->m_animator->SetParameter("Move", true);
 				//std::cout << "ChaseAction executed. Moving towards target." << std::endl;
 				if (HasState)
 				{
