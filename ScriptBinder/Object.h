@@ -41,8 +41,8 @@ public:
     bool IsEnabled() const { return m_isEnabled; }
 	virtual void SetEnabled(bool able) { m_isEnabled = able; }
 
-	static void Destroy(Object* objPtr);
-    static void SetDontDestroyOnLoad(Object* objPtr, bool setValue = true);
+        static void Destroy(Object* objPtr);
+    static void SetDontDestroyOnLoad(Object* objPtr);
     static Object* Instantiate(const Object* original, std::string_view newName);
 
 public:

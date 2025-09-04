@@ -16,63 +16,65 @@ void Object::Destroy()
 
 void Object::Destroy(Object* objPtr)
 {
-    if (objPtr == nullptr)
-    {
-        return;
-    }
-
+    if (objPtr == nullptr) return;
     objPtr->Destroy();
 }
 
-void Object::SetDontDestroyOnLoad(Object* objPtr, bool setValue)
+void Object::SetDontDestroyOnLoad(Object* objPtr)
 {
-    if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad == setValue)
+    auto* go = dynamic_cast<GameObject*>(objPtr);
+    if (!go) return;
+
+    // Already marked: nothing to do
+    if (go->m_dontDestroyOnLoad) return;
+
+    // Promote to root
+    while (GameObject::IsValidIndex(go->m_parentIndex))
     {
-        return;
+        auto sc = go->GetScene();
+        if (!sc) break;
+        auto parent = sc->GetGameObject(go->m_parentIndex);
+        if (parent) go = parent.get();
+        else break;
     }
 
-    auto scene = SceneManagers->GetActiveScene();
-    if (!scene)
-    {
-        Debug->LogError("No active scene found to update DontDestroyOnLoad object.");
-        return;
-    }
+    // Collect subtree & mark DDOL
+    std::vector<std::shared_ptr<Object>> collected;
+    Scene* originScene = go->GetScene();
 
-    auto gameObject = dynamic_cast<GameObject*>(objPtr);
-
-    if (setValue)
-    {
-        objPtr->m_dontDestroyOnLoad = true;
-        if (gameObject)
+    auto markDdol = [&](auto&& self, GameObject* node) -> void {
+        if (!node) return;
+        node->m_dontDestroyOnLoad = true;
+        collected.push_back(node->shared_from_this());
+        if (!originScene) return;
+        for (auto childIdx : node->m_childrenIndices)
         {
-            auto sharedObj = gameObject->shared_from_this();
-            auto sceneObject = scene->m_SceneObjects[0];
-            int index = gameObject->m_index;
-
-            std::erase_if(sceneObject->m_childrenIndices, [index](int childIndex) { return childIndex == index; });
-
-            SceneManagers->AddDontDestroyOnLoad(sharedObj);
-            gameObject->m_containDontDestroyOnLoad = true;
+            if (GameObject::IsValidIndex(childIdx))
+            {
+                auto child = originScene->GetGameObject(childIdx);
+                if (child) self(self, child.get());
+            }
         }
-    }
-    else
+    };
+    markDdol(markDdol, go);
+
+    // Detach from scene root list (if any)
+    if (originScene)
     {
-        objPtr->m_dontDestroyOnLoad = false;
-        if (gameObject)
-        {
-            SceneManagers->RemoveDontDestroyOnLoad(gameObject->shared_from_this());
+        auto sceneRoot = originScene->m_SceneObjects[0];
+        int idx = go->m_index;
+        std::erase_if(sceneRoot->m_childrenIndices, [idx](int childIndex){ return childIndex == idx; });
+    }
 
-            int lastIndex = static_cast<int>(scene->m_SceneObjects.size());
-            gameObject->m_rootIndex = 0;
-            gameObject->m_parentIndex = -1;
-            gameObject->m_transform.SetParentID(-1);
-            gameObject->m_index = lastIndex;
-            gameObject->m_containDontDestroyOnLoad = false;
+    // Ensure root is detached from any parent (keep world)
+    go->m_parentIndex = GameObject::INVALID_INDEX;
+    go->m_rootIndex = GameObject::INVALID_INDEX;
+    go->m_transform.SetParentID(-1);
 
-            auto sceneObject = scene->m_SceneObjects[0];
-            sceneObject->m_childrenIndices.push_back(gameObject->m_index);
-            scene->m_SceneObjects.push_back(gameObject->shared_from_this());
-        }
+    // Register to global DDOL bucket
+    for (auto& o : collected)
+    {
+        SceneManagers->AddDontDestroyOnLoad(o);
     }
 }
 
