@@ -58,30 +58,8 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     };
     markDdol(markDdol, go);
 
-    // Detach from scene root list (if any)
-    if (originScene)
-    {
-        // Remove from original parent before severing the relationship
-        GameObject::Index originalParent = go->m_parentIndex;
-        if (GameObject::IsValidIndex(originalParent))
-        {
-            if (auto parent = originScene->GetGameObject(originalParent))
-            {
-                std::erase(parent->m_childrenIndices, go->m_index);
-            }
-        }
-        auto sceneRoot = originScene->m_SceneObjects[0];
-        int idx = go->m_index;
-        auto removed = std::erase_if(sceneRoot->m_childrenIndices, [idx](int childIndex) { return childIndex == idx; });
-        if (removed == 0)
-        {
-            Debug->LogWarning("SetDontDestroyOnLoad: failed to detach root from scene root children");
-            assert(removed != 0);
-        }
-
-        // Purge any invalid indices to avoid recursion issues
-        std::erase_if(sceneRoot->m_childrenIndices, GameObject::IsInvalidIndex);
-    }
+    // Detach fully from origin scene containers
+    if (originScene) { originScene->DetachGameObjectHierarchy(go); }
 
     // Ensure root is detached from any parent (keep world)
     go->m_parentIndex = GameObject::INVALID_INDEX;
