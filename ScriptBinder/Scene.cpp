@@ -597,7 +597,11 @@ void Scene::LateUpdate(float deltaSecond)
 
                                 auto scene = owner->GetScene();
 
-                                if (scene && (scene == this || owner->IsDontDestroyOnLoad()))
+                                // (G) UI 중복 렌더 가드:
+                                //  - 같은 씬이면 렌더
+                                //  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
+                                if (scene && (scene == this ||
+                                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
                                 {
                                         data->PushUIRenderData(image->GetInstanceID());
                                 }
@@ -615,7 +619,8 @@ void Scene::LateUpdate(float deltaSecond)
 
                                 auto scene = owner->GetScene();
 
-                                if (scene && (scene == this || owner->IsDontDestroyOnLoad()))
+                                if (scene && (scene == this ||
+                                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
                                 {
                                         data->PushUIRenderData(text->GetInstanceID());
                                 }
