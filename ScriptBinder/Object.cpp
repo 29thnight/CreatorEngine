@@ -24,13 +24,13 @@ void Object::Destroy(Object* objPtr)
 
 }
 
-void Object::SetDontDestroyOnLoad(Object* objPtr)
+void Object::SetDontDestroyOnLoad(Object* objPtr, bool setValue)
 {
     if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad)
     {
         return;
     }
-    objPtr->m_dontDestroyOnLoad = true;
+    objPtr->m_dontDestroyOnLoad = setValue;
 
 	auto scene = SceneManagers->GetActiveScene();
     if (!scene)
@@ -39,13 +39,42 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
         return;
 	}
 
-	// DontDestroyOnLoad 객체는 씬에 추가하지 않고, SceneManagers에 등록
-	auto gameObject = dynamic_cast<GameObject*>(objPtr);
-    if (gameObject)
+	if (setValue)
     {
-        auto sharedObj = scene->m_SceneObjects[gameObject->m_index];
-        SceneManagers->AddDontDestroyOnLoad(sharedObj);
+        // DontDestroyOnLoad 객체는 씬에 추가하지 않고, SceneManagers에 등록
+        auto gameObject = dynamic_cast<GameObject*>(objPtr);
+        if (gameObject)
+        {
+            auto sharedObj = gameObject->shared_from_this();
+			auto sceneObject = scene->m_SceneObjects[0];
+            int index = gameObject->m_index;
+
+			std::erase_if(sceneObject->m_childrenIndices, [index](int childIndex) { return childIndex == index; });
+
+            SceneManagers->AddDontDestroyOnLoad(sharedObj);
+        }
     }
+    else
+    {
+        // DontDestroyOnLoad 해제 시 SceneManagers에서 제거
+        auto gameObject = dynamic_cast<GameObject*>(objPtr);
+        if (gameObject)
+        {
+            SceneManagers->RemoveDontDestroyOnLoad(gameObject->shared_from_this());
+
+			int lastIndex = (int)scene->m_SceneObjects.size();
+			gameObject->m_rootIndex = 0;
+			gameObject->m_parentIndex = -1;
+			gameObject->m_transform.SetParentID(-1);
+			gameObject->m_index = lastIndex;
+			gameObject->m_containDontDestroyOnLoad = false;
+
+			auto sceneObject = scene->m_SceneObjects[0];
+			sceneObject->m_childrenIndices.push_back(gameObject->m_index);
+			scene->m_SceneObjects.push_back(gameObject->shared_from_this());
+
+        }
+	}
 }
 
 Object* Object::Instantiate(const Object* original, std::string_view newName)

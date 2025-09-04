@@ -1048,6 +1048,20 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 
 void Scene::DestroyGameObjects()
 {
+	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
+	{
+		return obj && obj->IsDontDestroyOnLoad();
+	});
+
+	if (eraseSize > 0)
+	{
+		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
+		for (auto& obj : m_SceneObjects)
+		{
+			obj->m_containDontDestroyOnLoad = true;
+		}
+	}
+
 	std::unordered_set<uint32_t> deletedIndices;
 	for (const auto& obj : m_SceneObjects)
 	{
@@ -1112,21 +1126,6 @@ void Scene::DestroyGameObjects()
 
 		obj->m_index = indexMap[oldIndex];
 	}
-
-	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
-	{
-		return obj && obj->IsDontDestroyOnLoad();
-	});
-
-	if (eraseSize > 0)
-	{
-		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		for (auto& obj : m_SceneObjects)
-		{
-			obj->m_containDontDestroyOnLoad = true;
-		}
-	}
-
 }
 
 void Scene::DestroyComponents()
@@ -1346,6 +1345,7 @@ void Scene::SetInternalPhysicData()
 void Scene::AllUpdateWorldMatrix()
 {
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
+
 	//for (auto index : rootObjects)
 	//{
 	//	UpdateModelRecursive(index, XMMatrixIdentity());
@@ -1353,11 +1353,13 @@ void Scene::AllUpdateWorldMatrix()
 
 	auto updateFunc = [this](GameObject::Index index)
 	{
+		if(index < m_SceneObjects.size() && !m_SceneObjects[index]->IsDontDestroyOnLoad())
+		{
 			UpdateModelRecursive(index, XMMatrixIdentity());
+		}
 	};
 
 	std::for_each(std::execution::par_unseq, rootObjects.begin(), rootObjects.end(), updateFunc);
-
 
 	// Update DontDestroyOnLoad objects
 	size_t size = SceneManagers->GetDontDestroyOnLoadObjects().size();

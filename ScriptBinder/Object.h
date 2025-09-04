@@ -42,7 +42,7 @@ public:
 	virtual void SetEnabled(bool able) { m_isEnabled = able; }
 
 	static void Destroy(Object* objPtr);
-    static void SetDontDestroyOnLoad(Object* objPtr);
+    static void SetDontDestroyOnLoad(Object* objPtr, bool setValue = true);
     static Object* Instantiate(const Object* original, std::string_view newName);
 
 public:

@@ -13,9 +13,9 @@ enum class MaterialRenderingMode
 	Opaque,
 	Transparent,
 };
-
 AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
+struct ID3D11DeviceContext;
 class Material
 {
 public:

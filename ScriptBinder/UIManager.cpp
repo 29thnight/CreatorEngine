@@ -243,8 +243,8 @@ void UIManager::DeleteCanvas(std::string canvasName)
 	for (auto& uiObj : canvasCom->UIObjs)
 	{
 		uiObj->Destroy();
-
 	}
+	canvasCom->UIObjs.clear();
 
 	std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
 	{
@@ -252,7 +252,7 @@ void UIManager::DeleteCanvas(std::string canvasName)
 		return !c || c->ToString() == canvasName;
 	});
 
-
+	curCanvasObj->Destroy();
 }
 
 void UIManager::CheckInput()

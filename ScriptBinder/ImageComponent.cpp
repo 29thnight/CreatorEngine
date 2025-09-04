@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "transform.h"
 #include "RectTransformComponent.h"
+#include "UIManager.h"
 
 ImageComponent::ImageComponent()
 {
@@ -74,6 +75,7 @@ void ImageComponent::OnDestroy()
 	if (scene)
 	{
 		renderScene->UnregisterCommand(this);
+		UIManagers->UnregisterImageComponent(this);
 	}
 }
 

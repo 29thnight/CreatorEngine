@@ -572,7 +572,6 @@ void SceneManager::RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
 {
     if (objPtr)
     {
-        objPtr->Destroy();
         std::erase_if(m_dontDestroyOnLoadObjects,
 			[&](const auto& obj) { return obj == objPtr; });
 	}
