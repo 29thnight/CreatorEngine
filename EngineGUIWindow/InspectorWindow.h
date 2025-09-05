@@ -5,18 +5,7 @@
 #include <imgui_internal.h>
 
 class SceneRenderer;
-class Matarial;
 class GameObject;
-class MeshRenderer;
-class ModuleBehavior;
-class Animator;
-class PlayerInputComponent;
-class TerrainComponent;
-class StateMachineComponent;
-class BehaviorTreeComponent;
-class VolumeComponent;
-class RectTransformComponent;
-class DecalComponent;
 class InspectorWindow
 {
 public:
@@ -33,12 +22,10 @@ private:
 	bool m_openBTPopup{ false };
 
 	void ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject);
-	void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransformComponent);
 	void ImGuiDrawHelperTransformComponent(GameObject* gameObject);
-	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
-	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
-	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
-	void ImGuiDrawHelperVolume(VolumeComponent* volumeComponent);
-	void ImGuiDrawHelperDecal(DecalComponent* decalComponent);
+	void ImGuiDrawHelperFSM(class StateMachineComponent* FSMComponent);
+	void ImGuiDrawHelperBT(class BehaviorTreeComponent* BTComponent);
+	void ImGuiDrawHelperVolume(class VolumeComponent* volumeComponent);
+	void ImGuiDrawHelperDecal(class DecalComponent* decalComponent);
 };
 #endif // !DYNAMICCPP_EXPORTS

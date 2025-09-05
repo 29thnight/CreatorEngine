@@ -52,6 +52,30 @@ public:
 		return aOrder < bOrder;
 	}
 
+	void SetCustomPixelShader(std::string_view shaderPath);
+	std::string GetCustomPixelShader() const { return m_customPixelShaderPath; }
+
+	const std::vector<std::byte>& GetCustomPixelCPUBuffer() const { return m_customPixelCPUBuffer; }
+
+	// Variable accessors
+	std::optional<float> GetFloat(std::string_view name) const;
+	void SetFloat(std::string_view name, float value);
+	std::optional<float2> GetFloat2(std::string_view name) const;
+	void SetFloat2(std::string_view name, const float2& value);
+	std::optional<float3> GetFloat3(std::string_view name) const;
+	void SetFloat3(std::string_view name, const float3& value);
+	std::optional<float4> GetFloat4(std::string_view name) const;
+	void SetFloat4(std::string_view name, const float4& value);
+
+	std::optional<int> GetInt(std::string_view name) const;
+	void SetInt(std::string_view name, int value);
+	std::optional<int2> GetInt2(std::string_view name) const;
+	void SetInt2(std::string_view name, const int2& value);
+	std::optional<int3> GetInt3(std::string_view name) const;
+	void SetInt3(std::string_view name, const int3& value);
+	std::optional<int4> GetInt4(std::string_view name) const;
+	void SetInt4(std::string_view name, const int4& value);
+
 private:
 	std::unordered_map<Direction, std::weak_ptr<GameObject>> navigation;
 	Canvas* ownerCanvas = nullptr;
@@ -59,5 +83,11 @@ private:
 protected:
     [[Property]]
 	int _layerorder{};
+	[[Property]]
+	std::string				m_customPixelShaderPath{};
+	std::vector<std::byte>	m_customPixelCPUBuffer{};
+
+	struct VarInfo { UINT offset; UINT size; };
+	std::unordered_map<std::string, VarInfo> m_variables;
 };
 

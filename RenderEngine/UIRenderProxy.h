@@ -42,6 +42,18 @@ public:
     void DestroyProxy();
 
 	void SetCustomPixelShader(std::string_view shaderPath);
+	ShaderPtr<PixelShader> GetCustomPixelShader() const { return m_customPixelShader; }
+
+	void SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer);
+	ComPtr<ID3D11Buffer> GetCustomPixelBuffer() const { return m_customPixelBuffer; }
+
+	void UpdateShaderBuffer(ID3D11DeviceContext* deferredContext);
+
+	bool isCustomShader() const { return m_customPixelShader != nullptr && m_customPixelBuffer != nullptr; }
+
+    const HashedGuid& GetInstanceID() const { return m_instancedID; }
+    bool IsEnabled() const { return m_isEnabled; }
+	void SetEnabled(bool enable) { m_isEnabled = enable; }
 
 private:
     friend class RenderPassData;
@@ -50,5 +62,6 @@ private:
     HashedGuid			                m_instancedID{};
     ShaderPtr<PixelShader>              m_customPixelShader{};
 	ComPtr<ID3D11Buffer>                m_customPixelBuffer{ nullptr };
+	std::vector<std::byte>              m_customPixelCPUBuffer{};
 	bool                                m_isEnabled{ true };
 };

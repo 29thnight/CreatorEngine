@@ -77,6 +77,30 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
     //renderData->SortUIRenderQueue();
     if (renderData->m_UIRenderQueue.empty()) return;
 
+	//std::vector<UIRenderProxy*> customShaderQueue;
+    std::map<std::string, std::pair<ID3D11PixelShader*, std::vector<UIRenderProxy*>>> customShaderQueueMap;
+	std::vector<UIRenderProxy*> normalQueue;
+    for (auto* proxy : renderData->m_UIRenderQueue)
+    {
+        if (proxy->isCustomShader())
+        {
+			std::string shaderName = proxy->GetCustomPixelShader()->m_name;
+            auto* pixelShader = proxy->GetCustomPixelShader()->GetShader();
+            if (customShaderQueueMap.find(shaderName) == customShaderQueueMap.end())
+            {
+                customShaderQueueMap[shaderName] = { pixelShader, { proxy } };
+            }
+            else
+            {
+                customShaderQueueMap[shaderName].second.push_back(proxy);
+            }
+        }
+        else
+        {
+            normalQueue.push_back(proxy);
+		}
+	}
+
     ID3D11DeviceContext* deferredPtr = deferredContext;
 
     m_pso->Apply(deferredPtr);
@@ -94,12 +118,33 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
     spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack,
         m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp());
 
-    for (auto* proxy : renderData->m_UIRenderQueue)
+    for (auto* proxy : normalQueue)
     {
         proxy->Draw(spriteBatch);
     }
 
     spriteBatch->End();
+
+    for (auto& [shaderName, pair] : customShaderQueueMap)
+    {
+		auto [pixelShader, proxyList] = pair;
+        auto customShaderFunc = [deferredPtr, pixelShader]()
+        {
+            deferredPtr->PSSetShader(pixelShader, nullptr, 0);
+        };
+
+        spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, m_commonStates->NonPremultiplied(), 
+            m_commonStates->LinearClamp(), nullptr, nullptr, customShaderFunc);
+
+        for (auto* proxy : proxyList)
+        {
+            proxy->UpdateShaderBuffer(deferredPtr);
+            proxy->Draw(spriteBatch);
+        }
+
+		spriteBatch->End();
+    }
+
     DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
     DirectX11::OMSetBlendState(deferredPtr, nullptr, nullptr, 0xFFFFFFFF);
 

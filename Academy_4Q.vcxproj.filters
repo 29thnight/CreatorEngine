@@ -184,6 +184,12 @@
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
       <Filter>Window\AssetBundleWindow</Filter>
     </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EngineEntry\Academy_4Q.rc">

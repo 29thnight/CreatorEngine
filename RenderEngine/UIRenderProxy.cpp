@@ -129,3 +129,23 @@ void UIRenderProxy::SetCustomPixelShader(std::string_view shaderPath)
     DirectX11::ThrowIfFailed(
         DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_customPixelBuffer));
 }
+
+void UIRenderProxy::SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer)
+{
+    if (!m_customPixelBuffer)
+    {
+        std::cout << "Custom pixel buffer is not created." << std::endl;
+        return;
+    }
+
+	m_customPixelCPUBuffer = cpuBuffer;
+}
+
+void UIRenderProxy::UpdateShaderBuffer(ID3D11DeviceContext* deferredContext)
+{
+    if (m_customPixelBuffer && !m_customPixelCPUBuffer.empty())
+    {
+		deferredContext->PSSetConstantBuffers(1, 1, m_customPixelBuffer.GetAddressOf());
+        deferredContext->UpdateSubresource(m_customPixelBuffer.Get(), 0, nullptr, m_customPixelCPUBuffer.data(), 0, 0);
+    }
+}

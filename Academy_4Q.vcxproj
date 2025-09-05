@@ -209,6 +209,8 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperModuleBehavior.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp" />
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>

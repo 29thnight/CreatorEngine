@@ -22,6 +22,7 @@ private:
 	void DrawWireCapsule(const Mathf::Matrix& transform, float radius, float height, const Mathf::Color4& color);
 	void DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction, float height, float outerConeAngle, const Mathf::Color4& color);
 	void DrawBoundingFrustum(const DirectX::BoundingFrustum& frustum, const Mathf::Color4& color);
+	void DrawUIRect(const Mathf::Rect& rect, const Mathf::Color4& color);
 
 private:
 	ComPtr<ID3D11Buffer> m_gizmoCameraBuffer{};

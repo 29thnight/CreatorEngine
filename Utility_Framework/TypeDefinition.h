@@ -15,6 +15,7 @@ typedef FILE* File;
 
 using int2 = DirectX::XMINT2;
 using int3 = DirectX::XMINT3;
+using int4 = DirectX::XMINT4;
 using float2 = DirectX::XMFLOAT2;
 using float3 = DirectX::XMFLOAT3;
 using float4 = DirectX::XMFLOAT4;
