@@ -37,8 +37,6 @@ public:
 
 
 
-
-
 protected:
 	void UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, unsigned int* collisionMatrix, void* userData);
 
