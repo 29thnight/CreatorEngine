@@ -354,6 +354,15 @@ void ShaderResourceSystem::RegisterSelectShaderContext()
 		ImGui::Text("Select Shader");
 		if (ImGui::BeginListBox("##ShaderList"))
 		{
+			if (ImGui::Selectable("None"))
+			{
+				if (m_selectShaderTarget)
+				{
+					m_selectShaderTarget->SetShaderPSO(nullptr);
+					m_selectShaderTarget = nullptr;
+				}
+				ImGui::GetContext("SelectShader").Close();
+			}
 			for (auto& [name, pso] : ShaderAssets)
 			{
 				if (ImGui::Selectable(name.c_str()))

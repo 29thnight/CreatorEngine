@@ -306,9 +306,16 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
 		for (auto* proxy : proxies)
 		{
+			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
+			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
+			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
+			if (proxy->m_Material->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &proxy->m_Material->m_pOccRoughMetal->m_pSRV);
+			if (proxy->m_Material->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &proxy->m_Material->m_AOMap->m_pSRV);
+			if (proxy->m_Material->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &proxy->m_Material->m_pEmissive->m_pSRV);
+
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
-			proxy->m_Material->TrySetMatrix("PerFrame", "view", camera.CalculateView());
-			proxy->m_Material->TrySetMatrix("PerApplication", "projection", camera.CalculateProjection());
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
 			proxy->m_Material->TrySetMaterialInfo();
 			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
@@ -316,8 +323,6 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
 			proxy->Draw(deferredPtr);
 		}
-
-		DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
 	}
 
 	if(0 == data->m_index)

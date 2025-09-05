@@ -13,6 +13,7 @@ public:
     GENERATED_BODY(DecalComponent)
 
     void Awake() override;
+	void Update(float deltaSeconds) override;
     void OnDestroy() override;
 
     void SetDecalTexture(const std::string_view& fileName);
@@ -30,8 +31,6 @@ public:
     Texture* GetORMTexture() { return m_occluroughmetalTexture; }
 
 private:
-    void UpdateTexture();
-
     [[Property]]
     std::string m_diffusefileName{};
     [[Property]]
@@ -45,6 +44,23 @@ private:
     Texture* m_normalTexture{};
     [[Property]]
     Texture* m_occluroughmetalTexture{};
+
+public:
+    [[Property]]
+    uint32 sliceX = 1;
+	[[Property]]
+	uint32 sliceY = 1;
+	[[Property]]
+    int sliceNumber = 0;
+    [[Property]]
+    bool useAnimation = false;
+    [[Property]]
+    float slicePerSeconds = 1.f;
+    [[Property]]
+    bool isLoop = true;
+
+    float timer = 0.f;
+
 
     ////option 
     //int sliceCount = 1;

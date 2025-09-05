@@ -192,6 +192,9 @@ ProxyCommand::ProxyCommand(DecalComponent* pComponent):
 	Texture* diffuse = pComponent->GetDecalTexture();
 	Texture* normal = pComponent->GetNormalTexture();
 	Texture* orm = pComponent->GetORMTexture();
+	uint32 sliceX = pComponent->sliceX;
+	uint32 sliceY = pComponent->sliceY;
+	int sliceNum = pComponent->sliceNumber;
 
 	m_updateFunction = [=]()
 	{
@@ -199,6 +202,9 @@ ProxyCommand::ProxyCommand(DecalComponent* pComponent):
 		proxyObject->m_normalTexture = normal;
 		proxyObject->m_occluroughmetalTexture = orm;
 		proxyObject->m_worldMatrix = worldMatrix;
+		proxyObject->m_sliceX = sliceX;
+		proxyObject->m_sliceY = sliceY;
+		proxyObject->m_sliceNum = sliceNum;
 	};
 }
 

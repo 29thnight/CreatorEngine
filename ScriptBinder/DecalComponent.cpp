@@ -20,6 +20,21 @@ void DecalComponent::Awake()
     SetORMTexture(m_ormFileName.c_str());
 }
 
+void DecalComponent::Update(float deltaSeconds)
+{
+    if (GetOwner()->m_isEnabled == false || useAnimation == false) return;
+
+    timer += deltaSeconds;
+    while (timer >= slicePerSeconds) {
+        timer -= slicePerSeconds;
+		sliceNumber++;
+    }
+    if (isLoop)
+        sliceNumber = sliceNumber % (sliceX * sliceY);
+    else
+        sliceNumber = sliceX * sliceY - 1;
+}
+
 void DecalComponent::OnDestroy()
 {
     auto scene = GetOwner()->m_ownerScene;
@@ -65,9 +80,5 @@ void DecalComponent::SetORMTexture(const std::string_view& fileName)
 }
 
 void DecalComponent::SetORMTexture(const FileGuid& fileGuid)
-{
-}
-
-void DecalComponent::UpdateTexture()
 {
 }
