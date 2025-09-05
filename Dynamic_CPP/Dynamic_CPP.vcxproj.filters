@@ -255,9 +255,6 @@
 		<ClInclude Include="Assets\Script\DestroyEffect.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerAttackAni.h">
-			<Filter>Script</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
 			<Filter>Script</Filter>
 		</ClInclude>
@@ -281,6 +278,18 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\SpecialBullet.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NormalBullet.h">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\Bomb.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\Explosion.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponCapsule.h">
+      <Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -476,9 +485,6 @@
 		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
 			<Filter>Script</Filter>
 		</ClCompile>
@@ -499,6 +505,18 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SpecialBullet.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NormalBullet.cpp">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Explosion.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
+      <Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>

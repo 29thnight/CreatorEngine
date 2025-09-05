@@ -144,30 +144,51 @@ public:
 	float rangedAtkCooldown = 1.0f;   //연속공격 종료후 발사대기시간
 	[[Property]]
 	float rangedAutoAimRange = 10.f; //자동조준 거리 
+	[[Property]]
+	float minChargedTime = 0.7f; //최소 차지시간
 
-
+	bool canMeleeCancel = false; //밀리어택 애니메이션 진행중 캔슬가능한지 //키프레임 이벤트에서 각 시점에 true로 바꿔주고 true 일때 공격입력시 다음공격 전환
+	[[Method]]
+	void Cancancel();
 
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isAttacking = false;
 	float attackTime = 0.765f;
 	float attackElapsedTime = 0.f;
+	float nearDistance = FLT_MAX;
 	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들
 	std::vector<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
 	EntityEnemy* curTarget = nullptr;
 	
 	void ChangeAutoTarget(Mathf::Vector2 dir); //사격중 Lstick 으로 타겟변경                 //연속사격중일때 실행 
 	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
-	Mathf::Vector3 bombThrowPosition = {0,0,0};                                                                        
+	Mathf::Vector3 bombThrowPosition = {0,0,0};
+	[[Property]]
+	float bombMoveSpeed = 0.01f;  //폭탄도착지점 
  	void MeleeAttack();
+	[[Method]]
+	void ShootBullet();
+	[[Method]]
+	void ShootNormalBullet();
+	[[Method]]
+	void ShootSpecialBullet();
+	[[Method]]
+	void ThrowBomb();
+
 	[[Method]]
 	void StartAttack();
 	[[Method]]
 	void Charging();
 	[[Method]]
 	void Attack1();
-	
+	[[Method]]
+	void StartRay();
+	[[Method]]
+	void EndRay();
 
+
+	bool startRay = false;
 
 	//피격,죽음
 	bool isDead = false;
@@ -212,13 +233,13 @@ public:
 	//이펙트 출력관련
 	GameObject* dashObj = nullptr;
 	EffectComponent* dashEffect = nullptr;
-
+	EffectComponent* bombIndicator = nullptr; //폭탄 떨어질위치 보여줄 이펙트
 
 
 	GameManager* GM = nullptr;
 	GameObject* player = nullptr; // ==GetOwner() 스크립트 주인
 	Animator* m_animator = nullptr;
-	GameObject* aniOwener = nullptr;
+	GameObject* aniOwner = nullptr;
 	Socket* handSocket = nullptr;
 	CharacterControllerComponent* m_controller = nullptr;
 

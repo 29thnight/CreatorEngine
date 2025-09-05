@@ -32,23 +32,37 @@ void PlayerAttackAH::Enter()
 	if (m_player)
 	{
 		m_player->AttackTarget.clear();
-		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
-		controller->Move({ 0,0 });
 	}
 }
 
 void PlayerAttackAH::Update(float deltaTime)
 {
 	
-	if (m_player)
+	if (m_player && m_player->startRay)
 	{
 		m_player->MeleeAttack();
 	}
 
-	std::cout << "Attack behavior Test" << std::endl;
+	if (m_player)
+	{
+		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0,0 });
+	}
 }
 
 void PlayerAttackAH::Exit()
 {
-	m_player->isAttacking = false;
+	if (m_player)
+		m_player->isAttacking = false;
+	/*if (m_player->m_comboCount < 2)
+	{
+		m_player->m_comboCount++;
+		m_player->m_comboElapsedTime = 0.f;
+	}
+	else
+	{
+		m_player->m_comboCount = 0;
+		m_player->m_comboElapsedTime = 0.f;
+	}*/
+	std::cout << "attack end" << std::endl;
 }

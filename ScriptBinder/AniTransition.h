@@ -3,6 +3,7 @@
 #include "TransCondition.h"
 #include "AniTransition.generated.h"
 #include "ConditionParameter.h"
+#include <nlohmann/json.hpp>
 class AnimationState;
 class AnimationController;
 class AniTransition
@@ -26,7 +27,7 @@ public:
 		conditions.push_back(newTrans);
 	}
 
-	void AddConditionDefault(std::string ownerValueName, ConditionType cType, ValueType vType)
+	TransCondition* AddConditionDefault(std::string ownerValueName, ConditionType cType, ValueType vType)
 	{
 
 		TransCondition newTrans(0, cType, vType);
@@ -35,9 +36,10 @@ public:
 		newTrans.SetValue(ownerValueName);
 		newTrans.SetCondition(ownerValueName);
 		conditions.push_back(newTrans);
+
+		return &conditions.back();
 		
 	}
-
 	void DeleteCondition(int _index);
 	void SetCurState(std::string _curStateName);
 	void SetCurState(AnimationState* _curState);
@@ -70,6 +72,9 @@ public:
 	float exitTime = 0.1f;
 	[[Property]]
 	float blendTime = 0.2f;
+
+	nlohmann::json Serialize();
+	AniTransition Deserialize();
 private:
 	
 	// 전이시간이자 블렌딩될 시간

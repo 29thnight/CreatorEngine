@@ -3,6 +3,10 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "WeaponCapsule.h"
+#include "Explosion.h"
+#include "Bomb.h"
+#include "NormalBullet.h"
 #include "CurveIndicator.h"
 #include "SpecialBullet.h"
 #include "Bullet.h"

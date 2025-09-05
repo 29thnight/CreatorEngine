@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ConditionParameter.generated.h"
-
+#include <nlohmann/json.hpp>
 
 enum class ConditionType
 {
@@ -128,7 +128,9 @@ public:
 	int iValue{};
 	[[Property]]
 	bool bValue{};
-	
+	nlohmann::json Serialize();
+	void Deserialize();
+
 	//Trigger   basic = false,
 	[[Property]]
 	bool tValue{false};

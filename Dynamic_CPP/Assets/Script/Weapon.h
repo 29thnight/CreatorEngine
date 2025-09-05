@@ -5,7 +5,6 @@
 #include "ItemType.h"
 
 
-
 class Player;
 class Weapon : public ModuleBehavior
 {
@@ -27,7 +26,10 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	virtual void Attack(Player* _Owner, AttackContext _attackContext = {}) {}
 	void SetEnabled(bool able);
+	bool CheckDur();
+	bool CheckChargedDur(float chargedTime);
 	std::string itemName = "None";
 	[[Property]]
 	int itemtype = 0;

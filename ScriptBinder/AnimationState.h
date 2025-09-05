@@ -3,6 +3,7 @@
 #include "AniTransition.h"
 #include "AniBehavior.h"
 #include "AnimationState.generated.h"
+#include <nlohmann/json.hpp>
 class AnimationController;
 
 class AnimationState
@@ -29,6 +30,8 @@ public:
 	}
 	void SetBehaviour(std::string name, bool isReload = false);
 	void UpdateAnimationSpeed();
+	nlohmann::json Serialize();
+	AnimationState Deserialize();
 	[[Property]]
 	std::string m_name{};
 	[[Property]]

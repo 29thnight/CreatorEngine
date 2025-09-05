@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "TransCondition.generated.h"
 #include "ConditionParameter.h"
+#include <nlohmann/json.hpp>
 
 class AnimationController;
 class TransCondition
@@ -72,5 +73,9 @@ public:
 	ConditionParameter CompareParameter;
 
 	AnimationController* m_ownerController{};
+
+
+	nlohmann::json Serialize();
+	TransCondition Deserialize();
 };
 

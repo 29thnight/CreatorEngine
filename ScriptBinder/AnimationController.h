@@ -7,7 +7,7 @@
 #include "AvatarMask.h"
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "IRegistableEvent.h"
-
+#include <nlohmann/json.hpp>
 class AniTransition;
 class AvatarMask;
 class Animator;
@@ -49,7 +49,7 @@ public:
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
 	std::shared_ptr<AnimationState> GetAniState();
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
-	void CreateState_UI();
+	std::shared_ptr<AnimationState> CreateState_UI();
 
 	void DeleteState(std::string stateName);
 	void DeleteTransiton(const std::string& fromStateName, const std::string& toStateName);
@@ -69,10 +69,17 @@ public:
 
 
 
+	nlohmann::json Serialize();
+	void Deserialize();
+
+
 	//컨트롤러 바꿔치기용
 	[[Property]]
 	bool useController = true; 
 
+	bool m_useLayer = true;
+	void SetUseLayer(bool _useLayer);
+	bool IsUseLayer() { return m_useLayer;}
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 
 	DirectX::XMMATRIX m_LocalTransforms[512]{};

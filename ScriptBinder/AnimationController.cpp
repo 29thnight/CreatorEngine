@@ -25,7 +25,10 @@ bool AnimationController::BlendingAnimation(float tick)
 	m_owner->blendT = std::clamp(t, 0.0f, 1.0f);
 	if (blendingTime >= m_curTrans->GetBlendTime()) //블렌드 타임이 끝나면 블렌드종료 -> 다음애니메이션만 계산
 	{
-		//endAnimation = false;
+		if (m_curState->behaviour != nullptr)
+			m_curState->behaviour->Exit();
+		if (m_nextState->behaviour != nullptr)
+			m_nextState->behaviour->Enter();
 		m_curState = m_nextState;
 		m_nextState = nullptr;
 		m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
@@ -36,7 +39,7 @@ bool AnimationController::BlendingAnimation(float tick)
 		preNextAnimationProgress = 0.f;
 		m_timeElapsed = m_nextTimeElapsed;
 		m_nextTimeElapsed = 0.f;
-		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
+		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; 
 
 		m_owner->nextAnimIndex = -1;
 		m_owner->m_isBlend = false;
@@ -60,10 +63,16 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	if (!m_curState)
 	{
 		if (!StateVec.size() >= 2)   //0번은 anystate라없음
-			m_curState = StateVec[1].get();
+		{
+			if (StateVec[1].get()->m_name != "Ani State")
+				m_curState = StateVec[1].get();
+			else
+				m_curState = StateVec[0].get();
+
+			
+		}
 		else
 			return nullptr;
-		//return nullptr;//*****
 	}
 
 	if (m_curState == nullptr) return nullptr;
@@ -134,9 +143,10 @@ void AnimationController::UpdateState()
 	{
 		
 		endAnimation = false;
-		//curAnimationProgress = 0.f;
 		if (needBlend == true)
 		{
+			if (m_curState && m_curState->behaviour)
+				m_curState->behaviour->Exit();
 			m_curState = m_nextState;
 			m_nextState = nullptr;
 			m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
@@ -149,25 +159,17 @@ void AnimationController::UpdateState()
 			m_nextTimeElapsed = 0.f;
 			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
 
+			if (m_curState && m_curState->behaviour)
+				m_curState->behaviour->Enter();
 			m_owner->nextAnimIndex = -1;
 			m_owner->m_isBlend = false;
 			m_isBlend = false;
-
-
-			
 		}
-		
-
-
 		m_nextState = FindState(trans->GetNextState());
 
 		m_owner->nextAnimIndex = m_nextState->AnimationIndex;
 		m_nextAnimationIndex = m_nextState->AnimationIndex;
 
-		if (m_curState->behaviour != nullptr)
-		m_curState->behaviour->Exit();
-		if (m_nextState->behaviour != nullptr)
-		m_nextState->behaviour->Enter();
 		m_curTrans = trans.get();
 		needBlend = true;
 		m_owner->m_isBlend = true;
@@ -250,7 +252,7 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	return state.get();
 }
 
-void AnimationController::CreateState_UI()
+std::shared_ptr<AnimationState> AnimationController::CreateState_UI()
 {
 	std::string uniqueName = "NewState"; 
 	std::string baseName = "NewState";
@@ -264,6 +266,7 @@ void AnimationController::CreateState_UI()
 	StateNameSet.insert(uniqueName);
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
+	return state;
 }
 
 void AnimationController::DeleteState(std::string stateName)
@@ -386,3 +389,34 @@ void AnimationController::DeleteAvatarMask()
     }
 }
 
+nlohmann::json AnimationController::Serialize()
+{
+	nlohmann::json j;
+	j["controller_name"] = name;
+	//state들 담기
+	j["useController"] = (int)useController; //bool 0 1
+	
+	nlohmann::json stateJson = nlohmann::json::array();
+	for (auto& state : StateVec)
+	{
+		stateJson.push_back(state->Serialize());
+	}
+
+	j["StateVec"] = stateJson;
+	if (m_curState)
+	{
+		j["m_curState"] = m_curState->m_name;
+	}
+
+	j["useMask"] = (int)useMask; //bool 0 1 /
+	return j;
+}
+
+void AnimationController::Deserialize()
+{
+}
+
+void AnimationController::SetUseLayer(bool _useLayer)
+{
+	m_useLayer = _useLayer;
+}

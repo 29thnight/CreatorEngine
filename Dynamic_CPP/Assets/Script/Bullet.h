@@ -4,12 +4,18 @@
 #include "Bullet.generated.h"
 
 
+enum class BulletType
+{
+	Normal,
+	Special,
+};
+
+
+class Player;
 class EffectComponent;
 class Bullet : public ModuleBehavior
 {
 public:
-   ReflectBullet
-	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Bullet)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -26,11 +32,15 @@ public:
 	virtual void OnDestroy() override  {}
 
 
-	[[Property]]
-	float rangedProjSpd = 1.0f; //발사체 이동속도
-	[[Property]]
-	float rangedProjDist = 10.f; //발사체 최대 이동거리
+	void Initialize(Player* owner, Mathf::Vector3 originpos, Mathf::Vector3 dir, int _damage);
+	BulletType bulletType = BulletType::Normal;
+	int m_damage = 0;
+	//float rangedProjSpd = 1.0f; //발사체 이동속도
+	//float rangedProjDist = 10.f; //발사체 최대 이동거리
 
-
+	bool hasAttacked = false;
+	float lifeTime = 5.f; //임시용
+	Mathf::Vector3 m_moveDir = { 0,0,0 }; //나아갈 방향
+	Player* m_owenrPlayer = nullptr;
 	EffectComponent* m_effect = nullptr; 
 };

@@ -19,6 +19,7 @@ AniTransition::~AniTransition()
 bool AniTransition::CheckTransiton(bool isBlend)
 {
 	auto Progress = m_ownerController->curAnimationProgress;
+	//연속전이중 progress가 제대로 초기화안되서 전이가 이상하게됨
 	if (isBlend)
 	{
 		Progress = m_ownerController->nextAnimationProgress;
@@ -64,6 +65,29 @@ bool AniTransition::CheckTransiton(bool isBlend)
 std::vector<TransCondition> AniTransition::GetConditions()
 {
 	return conditions;
+}
+
+nlohmann::json AniTransition::Serialize()
+{
+	nlohmann::json j;
+	j["transName"] = m_name;
+	j["curStateName"] = curStateName;
+	j["nextStateName"] = nextStateName;
+	j["hasExitTime"] = (int)hasExitTime;
+	j["exitTime"] = exitTime;
+	j["blendTime"] = blendTime;
+	nlohmann::json conditionJson = nlohmann::json::array();
+	for (auto& condition : conditions)
+	{
+		conditionJson.push_back(condition.Serialize());
+	}
+	j["conditions"] = conditionJson;
+	return j;
+}
+
+AniTransition AniTransition::Deserialize()
+{
+	return AniTransition();
 }
 
 void AniTransition::DeleteCondition(int _index)

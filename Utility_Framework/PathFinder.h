@@ -83,6 +83,7 @@ public:
 	file::path volumeProfilePath{};
 	file::path InputMapPath{};
 	file::path GameBuildSlnPath{};
+	file::path animatorPath{};
 
     inline void Initialize()
     {
@@ -114,6 +115,7 @@ public:
 		volumeProfilePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\VolumeProfile\\").lexically_normal();
 		InputMapPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
 		GameBuildSlnPath		= file::path(base).append("..\\..\\GameBuild.sln").lexically_normal();
+		animatorPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\AnimatorController\\").lexically_normal();
 		//dir not exist -> create dir
 
 		std::vector<file::path> paths = {
@@ -133,6 +135,7 @@ public:
 			volumeProfilePath,
 			NodeEditorPath,
 			InputMapPath,
+			animatorPath,
 		};
 
 		for (const auto& path : paths)
@@ -309,5 +312,13 @@ public:
 	static inline file::path InputMapPath(std::string_view path)
 	{
 		return file::path(InternalPath::GetInstance()->InputMapPath) / path;
+	}
+	static inline file::path AnimatorjsonPath()
+	{
+		return InternalPath::GetInstance()->animatorPath;
+	}
+	static inline file::path AnimatorjsonPath(std::string_view path)
+	{
+		return file::path(InternalPath::GetInstance()->animatorPath) / path;
 	}
 };

@@ -15,6 +15,7 @@
 #include "GameObject.h"
 #include "Weapon.h"
 #include "AsisMove.h"
+#include "WeaponCapsule.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -255,16 +256,29 @@ void EntityAsis::Purification(float tick)
 			auto player = item->GetThrowOwner();
 				
 			item->SetThrowOwner(nullptr);
-			item->GetOwner()->Destroy();
-			Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
-			if (meleeweapon && player)
+			//Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
+			//if (meleeweapon && player)
+			//{
+			//	GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeWeapon");
+			//	//플레이어 방향으로 웨폰날리기
+			//	auto weaponcom = weaponObj->GetComponent<Weapon>();
+			//	weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
+
+			//}
+
+			Prefab* weaponCapsuleprefab = PrefabUtilitys->LoadPrefab("WeaponCapsule");
+			if (weaponCapsuleprefab && player)
 			{
-				GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeWeapon");
+				GameObject* weaponCapsule = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
 				//플레이어 방향으로 웨폰날리기
-				auto weaponcom = weaponObj->GetComponent<Weapon>();
-				weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
+				auto weaponcapcom = weaponCapsule->GetComponent<WeaponCapsule>();
+				weaponcapcom->weaponCode = item->itemCode;  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
+				weaponcapcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
 			}
+
+			item->GetOwner()->Destroy();
+
 			/*static int index = 1;
 			std::string weaponName = "MeleeWeapon";
 			auto curweapon = GameObject::Find(weaponName);

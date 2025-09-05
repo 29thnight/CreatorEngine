@@ -330,6 +330,9 @@
     <ClCompile Include="RectTransformComponent.cpp">
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClCompile>
+    <ClCompile Include="ConditionParameter.cpp">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+     </ClCompile>
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>

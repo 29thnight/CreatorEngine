@@ -238,11 +238,14 @@
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h" />
 		<ClInclude Include="Assets\Script\DestroyEffect.h" />
-		<ClInclude Include="Assets\Script\PlayerAttackAni.h" />
 		<ClInclude Include="Assets\Script\PlayerAttackAH.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h" />
 		<ClInclude Include="Assets\Script\Bullet.h" />
 		<ClInclude Include="Assets\Script\SpecialBullet.h" />
+		<ClInclude Include="Assets\Script\NormalBullet.h" />
+		<ClInclude Include="Assets\Script\Bomb.h" />
+		<ClInclude Include="Assets\Script\Explosion.h" />
+		<ClInclude Include="Assets\Script\WeaponCapsule.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h" />
 		<ClInclude Include="Assets\Script\MosterMeleeAni.h" />
 		<ClInclude Include="Assets\Script\CurveIndicator.h" />
@@ -471,10 +474,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAni.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -489,6 +488,22 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SpecialBullet.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NormalBullet.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Explosion.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">

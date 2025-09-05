@@ -205,6 +205,8 @@ void AnimationJob::Update(float deltaTime)
                     //auto& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     //animation.preAnimationProgress = animation.curAnimationProgress;
                    // animation.curAnimationProgress = animationcontroller->curAnimationProgress;
+                    animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
+                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
 
                     if (animator->m_isBlend)
@@ -371,14 +373,23 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
     bone->m_localTransform = nodeTransform;
     animator.m_localTransforms[bone->m_index] = bone->m_localTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    if (skeleton->HasSocket())
+ 
+
+    if (animator.HasSocket())
     {
-        for (auto& socket : skeleton->m_sockets)
+        if (SceneManagers->m_isGameStart == false || animator.GetOwner() == nullptr)
         {
-            if (bone->m_name == socket->m_ObjectName)
+
+        }
+        else
+        {
+            for (auto& socket : animator.socketvec)
             {
-                socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
-                socket->m_boneMatrix = socket->m_boneMatrix* animator.GetOwner()->m_transform.GetWorldMatrix();
+                if (bone->m_name == socket->m_ObjectName)
+                {
+                    socket->m_boneMatrix = globalTransform * socket->m_offset;
+                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                }
             }
         }
     }
@@ -424,47 +435,85 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         return;
     }
 
-
     for (auto& controller : animator.m_animationControllers)
     {
-        auto mask = controller->GetAvatarMask();
-      
 
-        if (mask != nullptr) //마스크 있으면
+        if (controller->IsUseLayer() == true)
         {
+            auto mask = controller->GetAvatarMask();
 
-            if(mask->isHumanoid)
+
+            if (mask != nullptr) //마스크 있으면
             {
-                if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+
+                if (mask->isHumanoid)
                 {
-                    //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                    if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+                    {
+                        //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                        globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                    }
+                    else
+                    {
+                        // globalTransform = parentTransform;
+                    }
                 }
                 else
                 {
-                   // globalTransform = parentTransform;
+                    if (mask->IsBoneEnabled(bone->m_name) == true)
+                    {
+                        animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                        globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+
+                    }
+                    else
+                    {
+                        //globalTransform = parentTransform;
+                    }
                 }
             }
             else
             {
-                if (mask->IsBoneEnabled(bone->m_name) == true)
-                {
-                    animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-               
-                }
-                else
-                {
-                    //globalTransform = parentTransform;
-                }
+                //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
             }
         }
-        else
-        {
-            //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-        }
     }
+
+    //int controllerSize = animator.m_animationControllers.size();
+    //for (int i = controllerSize - 1; i >= 0; --i)
+    //{
+    //    auto& controller = animator.m_animationControllers[i];
+
+    //    if (controller->IsUseLayer())
+    //    {
+    //        auto mask = controller->GetAvatarMask();
+
+    //        if (mask != nullptr) // 마스크 있으면
+    //        {
+    //            if (mask->isHumanoid)
+    //            {
+    //                if (mask->IsBoneEnabled(bone->m_region))
+    //                {
+    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+    //                }
+    //            }
+    //            else
+    //            {
+    //                if (mask->IsBoneEnabled(bone->m_name))
+    //                {
+    //                    animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+    //                }
+    //            }
+    //        }
+    //        else
+    //        {
+    //            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+    //        }
+    //    }
+    //}
+
     //bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     

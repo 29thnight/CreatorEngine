@@ -73,11 +73,11 @@
             "scpritName": "Player"
         },
         {
-            "actionName": "TestKnockBack",
+            "actionName": "NormalBullet",
             "actionType": "Button",
-            "funName": "TestKnockBack",
+            "funName": "ShootNormalBullet",
             "inputType": "KeyBoard",
-            "key0": "P",
+            "key0": "N",
             "key1": "A",
             "key2": "A",
             "key3": "A",
@@ -85,11 +85,11 @@
             "scpritName": "Player"
         },
         {
-            "actionName": "Buff",
+            "actionName": "SpecilBullet",
             "actionType": "Button",
-            "funName": "OnBuff",
+            "funName": "ShootSpecialBullet",
             "inputType": "KeyBoard",
-            "key0": "L",
+            "key0": "M",
             "key1": "Unknown",
             "key2": "Unknown",
             "key3": "Unknown",
