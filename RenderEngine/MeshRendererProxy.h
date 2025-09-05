@@ -115,6 +115,9 @@ public:
 	Texture*						m_diffuseTexture{};
 	Texture*						m_normalTexture{};
 	Texture*						m_occluroughmetalTexture{};
+	uint32							m_sliceX{ 1 };	
+	uint32							m_sliceY{ 1 };	
+	int								m_sliceNum{ 0 };
 
 private:
 	bool						m_isNeedUpdateCulling{ false };

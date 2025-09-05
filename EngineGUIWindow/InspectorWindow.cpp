@@ -1085,6 +1085,20 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 
 void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 {
+	int sliceX = decalComponent->sliceX;
+	int sliceY = decalComponent->sliceY;
+	ImGui::SliderInt("SliceX", &sliceX, 1, 20);
+	ImGui::SliderInt("SliceY", &sliceY, 1, 20);
+	ImGui::InputInt("SliceNumber", &decalComponent->sliceNumber);
+	decalComponent->sliceX = sliceX;
+	decalComponent->sliceY = sliceY;
+
+	ImGui::Checkbox("Use Animation", &decalComponent->useAnimation);
+	if (decalComponent->useAnimation) {
+		ImGui::SliderFloat("SlicePerSeconds", &decalComponent->slicePerSeconds, 0.f, 10.f, "%.5f");
+		ImGui::Checkbox("isLoop", &decalComponent->isLoop);
+	}
+
 	if (decalComponent->GetDecalTexture() == nullptr)
 		ImGui::Button("None Diffuse Texture", ImVec2(150, 20));
 	else

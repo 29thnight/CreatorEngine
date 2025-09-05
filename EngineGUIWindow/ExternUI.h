@@ -12,3 +12,5 @@ extern void ImGuiDrawHelperAnimator(class Animator* animator);
 extern void ImGuiDrawHelperPlayerInput(class PlayerInputComponent* playerInput);
 extern void ImGuiDrawHelperRectTransformComponent(class RectTransformComponent* rectTransform);
 extern void ImGuiDrawHelperTerrainComponent(class TerrainComponent* terrain);
+
+extern void TextureDropTarget(class Material* mat);

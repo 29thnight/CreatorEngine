@@ -1,3 +1,7 @@
+#define USE_DIFFUSE 1 << 0
+#define USE_NORMAL  1 << 1
+#define USE_ORM     1 << 2
+
 cbuffer PS_CONSTANT_BUFFER : register(b0)
 {
     matrix g_inverseViewMatrix; // 카메라 View-Projection의 역행렬
@@ -8,9 +12,10 @@ cbuffer PS_CONSTANT_BUFFER : register(b0)
 cbuffer PS_DECAL_BUFFER : register(b1)
 {
     matrix g_inverseDecalWorldMatrix; // 데칼 경계 상자 World의 역행렬
-    bool g_useDiffuse;
-    bool g_useNormal;
-    bool g_useORM;
+    uint g_useFlags;
+    uint sliceX;
+    uint sliceY;
+    int sliceNum;
 };
 
 struct Output
@@ -104,6 +109,10 @@ Output main(PS_INPUT input) : SV_Target
     float2 decalUV = decalLocalPos.xz + 0.5;
     decalUV.y = 1-decalUV.y;
     //return float4(decalUV, 0, 1);
+    float2 sliceUV = 1.0 / float2(sliceX, sliceY);
+    float2 sliceIndex = float2(sliceNum % sliceX, sliceNum / sliceX);
+    decalUV = (decalUV + sliceIndex) * sliceUV;
+    
     float4 decalSample = g_decalTexture.Sample(g_linearSampler, decalUV);
     decalSample.rgb = pow(decalSample.rgb, 2.2);
     
@@ -120,9 +129,9 @@ Output main(PS_INPUT input) : SV_Target
     // 데칼 텍스처의 알파 값을 이용해 기본 알베도 색상과 혼합
     float3 finalColor = lerp(baseAlbedo.rgb, decalSample.rgb, decalSample.a);
     Output output;
-    output.outDiffuse = g_useDiffuse ? float4(finalColor, baseAlbedo.a) : float4(0, 0, 0, 0);
-    output.outNormal = g_useNormal ? float4(nWS * 0.5 + 0.5, 0) : float4(0, 1, 0, 0);
-    output.outORM = g_useORM ? float4(orm, baseORM.a) : float4(0, 0, 1, 0);
+    output.outDiffuse = (g_useFlags & USE_DIFFUSE) != 0 ? float4(finalColor, baseAlbedo.a) : float4(0, 0, 0, 0);
+    output.outNormal = (g_useFlags & USE_NORMAL) != 0 ? float4(nWS * 0.5 + 0.5, 0) : float4(0, 1, 0, 0);
+    output.outORM = (g_useFlags & USE_ORM) != 0 ? float4(orm, baseORM.a) : float4(0, 0, 1, 0);
     
     return output;
     

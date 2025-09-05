@@ -12,9 +12,10 @@ cbuffer PS_CONSTANT_BUFFER
 cbuffer PS_DECAL_BUFFER
 {
 	XMMATRIX g_inverseDecalWorldMatrix; // 데칼 경계 상자 World의 역행렬
-	bool32 g_useDiffuseTexture; // 디퓨즈 텍스처 사용 여부
-	bool32 g_useNormalTexture; // 노멀 텍스처 사용 여부
-	bool32 g_useORMTexture; // ORM 텍스처 사용 여부
+	uint32 g_UseTextures;
+	uint32 sliceX = 1;
+	uint32 sliceY = 1;
+	uint32 sliceNum = 0;
 };
 
 DecalPass::DecalPass()
@@ -225,9 +226,13 @@ void DecalPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Re
 		scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
 		PS_DECAL_BUFFER decalBuf;
 		decalBuf.g_inverseDecalWorldMatrix = XMMatrixInverse(nullptr, proxy->m_worldMatrix);
-		decalBuf.g_useDiffuseTexture = proxy->m_diffuseTexture != nullptr;
-		decalBuf.g_useNormalTexture = proxy->m_normalTexture != nullptr;
-		decalBuf.g_useORMTexture = proxy->m_occluroughmetalTexture != nullptr;
+		decalBuf.g_UseTextures = 
+			(proxy->m_diffuseTexture != nullptr ? DecalChannel::dDiffuse : 0) |
+			(proxy->m_normalTexture != nullptr ? DecalChannel::dNormal : 0) |
+			(proxy->m_occluroughmetalTexture != nullptr ? DecalChannel::dORM : 0);
+		decalBuf.sliceX = proxy->m_sliceX;
+		decalBuf.sliceY = proxy->m_sliceY;
+		decalBuf.sliceNum = proxy->m_sliceNum;
 		DirectX11::UpdateBuffer(deferredPtr, m_decalBuffer.Get(), &decalBuf);
 
 		uint32 decalChannel = DecalChannel::None;
