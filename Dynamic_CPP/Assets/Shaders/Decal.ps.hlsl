@@ -8,15 +8,28 @@ cbuffer PS_CONSTANT_BUFFER : register(b0)
 cbuffer PS_DECAL_BUFFER : register(b1)
 {
     matrix g_inverseDecalWorldMatrix; // 데칼 경계 상자 World의 역행렬
+    bool g_useDiffuse;
+    bool g_useNormal;
+    bool g_useORM;
+};
+
+struct Output
+{
+    float4 outDiffuse : SV_TARGET0;
+    float4 outNormal : SV_TARGET1;
+    float4 outORM : SV_TARGET2;
 };
 
 // G-Buffer 텍스처들
 Texture2D g_depthTexture : register(t0);
 Texture2D g_albedoTexture : register(t1);
 Texture2D g_normalTexture : register(t2);
+Texture2D g_ormTexture : register(t3);
 
 // 데칼 텍스처
-Texture2D g_decalTexture : register(t3);
+Texture2D g_decalTexture : register(t4);
+Texture2D g_decalNormalTexture : register(t5);
+Texture2D g_decalORMTexture : register(t6);
 
 // 샘플러
 SamplerState g_linearSampler : register(s0); // 데칼 텍스처 샘플링용
@@ -29,7 +42,7 @@ struct PS_INPUT
 };
 
 // 최종 출력 색상
-float4 main(PS_INPUT input) : SV_Target
+Output main(PS_INPUT input) : SV_Target
 {
     // 1. 화면 UV 좌표 계산
     float2 screenUV = input.position.xy / g_screenDimensions;
@@ -68,17 +81,23 @@ float4 main(PS_INPUT input) : SV_Target
     
     // 6. G-Buffer에서 노멀과 알베도(기본 색상) 샘플링
     // 노멀은 월드 공간에 저장되어 있다고 가정
-    float3 worldNormal = g_normalTexture.Sample(g_pointSampler, screenUV).xyz;
-    float3 baseAlbedo = g_albedoTexture.Sample(g_pointSampler, screenUV).rgb;
+    float3 worldNormal = g_normalTexture.Sample(g_pointSampler, screenUV).xyz * 2 - 1;
+    float4 baseAlbedo = g_albedoTexture.Sample(g_pointSampler, screenUV);
+    float4 baseORM = g_ormTexture.Sample(g_pointSampler, screenUV);
 
     // 7. (선택 사항) 노멀을 이용한 폐기
     // 데칼의 앞 방향 (로컬 Z축)과 표면의 노멀을 비교
     // 데칼이 표면의 뒷면에 투영되는 것을 방지
     float3 decalForward = normalize(mul((float3x3) g_inverseDecalWorldMatrix, float3(0, 1, 0)));
-    if (dot(worldNormal, decalForward) < 0.1f) // 0 대신 작은 임계값을 주어 가장자리 아티팩트 방지
-    {
-        discard;
-    }
+    //if (dot(worldNormal, decalForward) < 0.1f) // 0 대신 작은 임계값을 주어 가장자리 아티팩트 방지
+    //{
+    //    discard;
+    //}
+    
+    float3 up = abs(worldNormal.y) < 0.999 ? float3(0, 1, 0) : float3(1, 0, 0);
+    float3 tangent = normalize(cross(up, worldNormal));
+    float3 bitangent = normalize(cross(worldNormal, tangent));
+    float3x3 TBN = float3x3(tangent, bitangent, worldNormal);
     
     // 8. 데칼 텍스처 샘플링
     // 데칼 로컬 좌표(-0.5 ~ 0.5)를 텍스처 UV(0 ~ 1)로 변환
@@ -87,14 +106,27 @@ float4 main(PS_INPUT input) : SV_Target
     //return float4(decalUV, 0, 1);
     float4 decalSample = g_decalTexture.Sample(g_linearSampler, decalUV);
     decalSample.rgb = pow(decalSample.rgb, 2.2);
-
+    
+    float3 nTex = g_decalNormalTexture.Sample(g_linearSampler, decalUV).xyz * 2 - 1;
+    float3 nWS = normalize(mul(nTex, TBN));
+    
+    float3 decalorm = g_decalORMTexture.Sample(g_linearSampler, decalUV).xyz;
+    float3 orm = float3(decalorm.b, decalorm.g, decalorm.r);
+    
     // 9. 색상 혼합 (Blending)
     // 틴트 적용
     //decalSample.rgb *= g_decalColorTint;
-
+    
     // 데칼 텍스처의 알파 값을 이용해 기본 알베도 색상과 혼합
-    float3 finalColor = lerp(baseAlbedo, decalSample.rgb, decalSample.a);
+    float3 finalColor = lerp(baseAlbedo.rgb, decalSample.rgb, decalSample.a);
+    Output output;
+    output.outDiffuse = g_useDiffuse ? float4(finalColor, baseAlbedo.a) : float4(0, 0, 0, 0);
+    output.outNormal = g_useNormal ? float4(nWS * 0.5 + 0.5, 0) : float4(0, 1, 0, 0);
+    output.outORM = g_useORM ? float4(orm, baseORM.a) : float4(0, 0, 1, 0);
+    
+    return output;
+    
 
     // 최종 색상 출력
-    return float4(finalColor, 1.0f);
+    //return float4(finalColor, 1.0f);
 }

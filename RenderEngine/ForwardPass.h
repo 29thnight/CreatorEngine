@@ -18,6 +18,8 @@ public:
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void CreateFoliageCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 	void ControlPanel() override;
+
+	void SetTexture(Texture* normalTexture) { m_normalTexture = normalTexture; }
 private:
 	std::unique_ptr<PipelineStateObject> m_instancePSO;
 	Managed::WeakPtr<Texture> m_EnvironmentMap{};
@@ -35,4 +37,11 @@ private:
 	ComPtr<ID3D11ShaderResourceView> m_instanceBufferSRV;
 	ComPtr<ID3D11DepthStencilState> m_depthNoWrite;
 	ComPtr<ID3D11BlendState1> m_blendPassState;
+
+	Texture* m_CopiedTexture{};
+	Texture* m_normalTexture{};
+	ComPtr<ID3D11Buffer> m_MatrixBuffer{};
+
+	float ior = 0.f;
+	float add = 0.f;
 };

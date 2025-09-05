@@ -2,6 +2,7 @@
 #define LIGHTING_COMMON
 
 #include "Sampler.hlsli"
+#include "Flags.hlsli"
 
 #define MAX_CASCADE 4
 #define MAX_LIGHTS 20
@@ -12,8 +13,6 @@
 #define LIGHT_DISABLED 0
 #define LIGHT_ENABLED 1
 #define LIGHT_ENABLED_W_SHADOWMAP 2
-
-#define USE_SHADOW_RECIVE 256
 
 //Texture2D ShadowMap : register(t4); // support 1 for now, future use array
 Texture2DArray ShadowMapArr : register(t4); //< -- t4 

@@ -8,6 +8,8 @@
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
 #include "Terrain.h"
+#include "DecalComponent.h"
+#include "Texture.h"
 
 //constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -67,6 +69,20 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
     m_proxyType = PrimitiveProxyType::TerrainComponent;
 }
 
+PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
+    m_diffuseTexture(component->GetDecalTexture()),
+    m_normalTexture(component->GetNormalTexture()),
+    m_occluroughmetalTexture(component->GetORMTexture())
+{
+    GameObject* owner = component->GetOwner();
+    if (owner)
+    {
+        //m_materialGuid = m_Material->m_materialGuid;
+        m_instancedID = component->GetInstanceID();
+    }
+    m_proxyType = PrimitiveProxyType::DecalComponent;
+}
+
 PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
     m_isSkinnedMesh(false),
 	m_foliageInstances(component->GetFoliageInstances()),
@@ -109,7 +125,10 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
 	m_isInstanced(other.m_isInstanced),
     m_terrainMesh(other.m_terrainMesh),
 	m_terrainMaterial(other.m_terrainMaterial),
-    m_isNeedUpdateCulling(other.m_isNeedUpdateCulling)
+    m_isNeedUpdateCulling(other.m_isNeedUpdateCulling),
+    m_diffuseTexture(other.m_diffuseTexture),
+    m_normalTexture(other.m_normalTexture),
+    m_occluroughmetalTexture(other.m_occluroughmetalTexture)
 {
 }
 
@@ -135,7 +154,10 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_isInstanced(other.m_isInstanced),
 	m_terrainMesh(std::exchange(other.m_terrainMesh, nullptr)),
     m_terrainMaterial(std::exchange(other.m_terrainMaterial, nullptr)),
-	m_isNeedUpdateCulling(other.m_isNeedUpdateCulling)
+	m_isNeedUpdateCulling(other.m_isNeedUpdateCulling),
+    m_diffuseTexture(std::exchange(other.m_diffuseTexture, nullptr)),
+    m_normalTexture(std::exchange(other.m_normalTexture, nullptr)),
+    m_occluroughmetalTexture(std::exchange(other.m_occluroughmetalTexture, nullptr))
 {
 }
 
@@ -167,6 +189,11 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
     case PrimitiveProxyType::FoliageComponent:
     {
 		Debug->LogError("FoliageComponent does not support normal draw function");
+        break;
+    }
+    case PrimitiveProxyType::DecalComponent:
+    {
+        Debug->LogError("DecalComponent does not support normal draw function");
         break;
     }
     default:

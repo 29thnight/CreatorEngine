@@ -311,4 +311,6 @@ namespace TextureHelper
 		return tex;
 	}
 }
+#else
+class Texture {};
 #endif // !DYNAMICCPP_EXPORTS

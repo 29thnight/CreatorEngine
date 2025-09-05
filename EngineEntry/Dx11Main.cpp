@@ -66,6 +66,7 @@ void DirectX11::Dx11Main::Initialize()
     m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
     m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
     m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
+    m_projectWindow = std::make_unique<AssetBundleWindow>();
     g_progressWindow->SetProgress(60);
 #endif // !EDITOR
 

@@ -133,3 +133,18 @@ void RigidBodyComponent::NotifyPhysicsStateChange()
 
 	PhysicsManagers->SetRigidBodyState(state);
 }
+
+void RigidBodyComponent::NotifyPhysicsStateChange(const Mathf::Vector3& position)
+{
+	PhysicsManager::RigidBodyState state;
+	state.id = GetOwner()->GetInstanceID();
+	state.isKinematic = m_setKinematic;
+	state.isTrigger = m_setTrigger;
+	state.isColliderEnabled = m_collisionEnabled;
+	state.useGravity = m_useGravity;
+
+	state.movePositionDirty = true;
+	state.movePosition = position;
+
+	PhysicsManagers->SetRigidBodyState(state);
+}

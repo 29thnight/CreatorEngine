@@ -7,6 +7,7 @@
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "Material.h"
+#include "DecalComponent.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -174,6 +175,30 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 		}
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
+	};
+}
+
+ProxyCommand::ProxyCommand(DecalComponent* pComponent):
+	m_proxyGUID(pComponent->GetInstanceID())
+{
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+
+	if (!proxyObject) return;
+
+	Texture* diffuse = pComponent->GetDecalTexture();
+	Texture* normal = pComponent->GetNormalTexture();
+	Texture* orm = pComponent->GetORMTexture();
+
+	m_updateFunction = [=]()
+	{
+		proxyObject->m_diffuseTexture = diffuse;
+		proxyObject->m_normalTexture = normal;
+		proxyObject->m_occluroughmetalTexture = orm;
+		proxyObject->m_worldMatrix = worldMatrix;
 	};
 }
 

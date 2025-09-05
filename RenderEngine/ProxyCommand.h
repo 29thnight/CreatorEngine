@@ -7,6 +7,7 @@ class TerrainComponent;
 class ImageComponent;
 class TextComponent;
 class MeshRenderer;
+class DecalComponent;
 using Invokable = std::function<void()>;
 class ProxyCommand
 {
@@ -19,6 +20,7 @@ public:
     ProxyCommand(FoliageComponent* pComponent);
 	ProxyCommand(ImageComponent* pComponent);
 	ProxyCommand(TextComponent* pComponent);
+    ProxyCommand(DecalComponent* pComponent);
 
 	ProxyCommand(const ProxyCommand& other);
 	ProxyCommand(ProxyCommand&& other) noexcept;

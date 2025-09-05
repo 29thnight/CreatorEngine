@@ -10,6 +10,7 @@
 #include "AssetJob.h"
 #include "DLLAcrossSingleton.h"
 #include "EngineSetting.h"
+#include "AssetBundle.h"
 
 // Main system for storing runtime data
 class ModelLoader;
@@ -66,6 +67,11 @@ public:
     void Finalize();
 	void RenderForEditer();
 	void MonitorFiles();
+	// Asset bundle operations
+	void LoadAssetBundle(const AssetBundle& bundle);
+	void RetainAssets(const AssetBundle& bundle);
+	void ClearRetainedAssets();
+	void UnloadUnusedAssets();
 	//Resource Model
 	void LoadModels();
 	Model* LoadModelGUID(FileGuid guid);
@@ -84,7 +90,6 @@ public:
 	void LoadMaterials();
 	void SaveMaterial(Material* material);
 	Material* LoadMaterial(std::string_view name);
-	Material* LoadMaterialGUID(FileGuid guid);
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
@@ -130,6 +135,8 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
 	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
+	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
+
 	static ImGuiTextFilter filter;
 	ContentsBrowserStyle m_ContentsBrowserStyle{ ContentsBrowserStyle::Tile };
 	float tileSize = 160.0f;

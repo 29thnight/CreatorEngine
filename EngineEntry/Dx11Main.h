@@ -17,6 +17,7 @@
 #include "HierarchyWindow.h"
 #include "InspectorWindow.h"
 #include "ProgressWindow.h"
+#include "AssetBundleWindow.h"
 
 #include <memory>
 #include <future>
@@ -62,6 +63,7 @@ namespace DirectX11
 		std::unique_ptr<MenuBarWindow> m_menuBarWindow;
 		std::unique_ptr<HierarchyWindow> m_hierarchyWindow;
 		std::unique_ptr<InspectorWindow> m_inspectorWindow;
+		std::unique_ptr<AssetBundleWindow> m_projectWindow;
 		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
         Core::DelegateHandle m_SceneRenderingEventHandle;

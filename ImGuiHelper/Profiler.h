@@ -152,6 +152,7 @@ struct CPUProfilerCallbacks
 // Also responsible for drawing HUD
 class CPUProfiler
 {
+	int ccccc = 0;
 public:
 	void Initialize(uint32 historySize, uint32 maxEvents);
 	void Shutdown();

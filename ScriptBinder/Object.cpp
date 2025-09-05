@@ -3,6 +3,19 @@
 #include "ComponentFactory.h"
 #include "SceneManager.h"
 #include <algorithm>
+// (E) 원 씬 컬렉션/이벤트에서 안전하게 분리하기 위해 컴포넌트 타입 참조 추가
+#include "Scene.h"
+#include "LightComponent.h"
+#include "MeshRenderer.h"
+#include "Terrain.h"
+#include "FoliageComponent.h"
+#include "RigidBodyComponent.h"
+#include "BoxColliderComponent.h"
+#include "SphereColliderComponent.h"
+#include "CapsuleColliderComponent.h"
+#include "MeshCollider.h"
+#include "CharacterControllerComponent.h"
+#include "TerrainCollider.h"
 
 void Object::Destroy()
 {
@@ -32,10 +45,12 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     while (GameObject::IsValidIndex(go->m_parentIndex))
     {
         auto sc = go->GetScene();
-        if (!sc) break;
-        auto parent = sc->GetGameObject(go->m_parentIndex);
-        if (parent) go = parent.get();
-        else break;
+        auto parent = sc ? sc->GetGameObject(go->m_parentIndex) : nullptr;
+        if (!parent) break;
+        // 다음 부모가 씬 루트(0)거나, 부모의 부모가 INVALID면 여기서 멈춤
+        if (parent->m_index == 0 || !GameObject::IsValidIndex(parent->m_parentIndex))
+            break;
+        go = parent.get();
     }
 
     // Collect subtree & mark DDOL
@@ -44,6 +59,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
 
     auto markDdol = [&](auto&& self, GameObject* node) -> void {
         if (!node) return;
+        if (node->m_index == 0) return;
         node->m_dontDestroyOnLoad = true;
         collected.push_back(node->shared_from_this());
         if (!originScene) return;
@@ -58,34 +74,9 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     };
     markDdol(markDdol, go);
 
-    // Detach from scene root list (if any)
-    if (originScene)
-    {
-        // Remove from original parent before severing the relationship
-        GameObject::Index originalParent = go->m_parentIndex;
-        if (GameObject::IsValidIndex(originalParent))
-        {
-            if (auto parent = originScene->GetGameObject(originalParent))
-            {
-                std::erase(parent->m_childrenIndices, go->m_index);
-            }
-        }
-        auto sceneRoot = originScene->m_SceneObjects[0];
-        int idx = go->m_index;
-        auto removed = std::erase_if(sceneRoot->m_childrenIndices, [idx](int childIndex) { return childIndex == idx; });
-        if (removed == 0)
-        {
-            Debug->LogWarning("SetDontDestroyOnLoad: failed to detach root from scene root children");
-            assert(removed != 0);
-        }
-
-        // Purge any invalid indices to avoid recursion issues
-        std::erase_if(sceneRoot->m_childrenIndices, GameObject::IsInvalidIndex);
-    }
-
     // Ensure root is detached from any parent (keep world)
-    go->m_parentIndex = GameObject::INVALID_INDEX;
-    go->m_rootIndex = GameObject::INVALID_INDEX;
+    go->m_parentIndex   = GameObject::INVALID_INDEX;
+    go->m_rootIndex     = GameObject::INVALID_INDEX;
     go->m_transform.SetParentID(-1);
 
     // Register to global DDOL bucket

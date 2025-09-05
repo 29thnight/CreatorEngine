@@ -83,6 +83,9 @@ public:
 private:
 	// 모든 상태 변경을 PhysicsManager에 알리는 헬퍼 함수
 	void NotifyPhysicsStateChange();
+public:
+	void NotifyPhysicsStateChange(const Mathf::Vector3& position);
+private:
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 

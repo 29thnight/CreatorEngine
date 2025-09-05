@@ -1,5 +1,6 @@
 #pragma once
 #include "Object.h"
+#include "AssetBundle.h"
 #include "ReflectionYml.h"
 #include "DLLAcrossSingleton.h"
 #include "Core.ThreadPool.h"
@@ -108,6 +109,7 @@ private:
 private:
     std::vector<Scene*>                 m_scenes{};
     std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};
+    AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };
 	std::string                         m_LoadSceneName{};

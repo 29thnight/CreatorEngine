@@ -17,6 +17,13 @@ struct alignas(16) ForwardBuffer
 	float m_envMapIntensity{ 1.f };
 };
 
+struct alignas(16) MatrixBuffer {
+	XMMATRIX View;
+	XMMATRIX Proj;
+	float ior;
+	float add;
+};
+
 ForwardPass::ForwardPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -70,6 +77,23 @@ ForwardPass::ForwardPass()
 	constexpr uint32 MAX_INSTANCES = 2048; // Max number of instances per draw call
 	m_maxInstanceCount = MAX_INSTANCES;
 
+	/*CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
+	rasterizerDesc.CullMode = D3D11_CULL_NONE;
+
+	DirectX11::ThrowIfFailed(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&m_pso->m_rasterizerState
+		)
+	);
+
+	DirectX11::ThrowIfFailed(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&m_instancePSO->m_rasterizerState
+		)
+	);*/
+
 	D3D11_BUFFER_DESC instanceBufferDesc{};
 	instanceBufferDesc.ByteWidth = sizeof(Mathf::xMatrix) * MAX_INSTANCES;
 	instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT; // Changed for UpdateSubresource
@@ -117,6 +141,17 @@ ForwardPass::ForwardPass()
 			&m_blendPassState
 		)
 	);
+
+	m_CopiedTexture = Texture::Create(
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
+		"CopiedTexture",
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
+	);
+	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_MatrixBuffer = DirectX11::CreateBuffer(sizeof(MatrixBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 ForwardPass::~ForwardPass()
@@ -155,6 +190,18 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	auto brdfLut = m_BrdfLut.lock();
 
 	ID3D11DeviceContext* deferredPtr = deferredContext;
+
+	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	MatrixBuffer matrixBuffer{};
+	matrixBuffer.Proj = renderData->m_frameCalculatedProjection;
+	matrixBuffer.View = renderData->m_frameCalculatedView;
+	matrixBuffer.ior = ior;
+	matrixBuffer.add = add;
+	DirectX11::UpdateBuffer(deferredPtr, m_MatrixBuffer.Get(), &matrixBuffer);
+	DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
+	DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
+	DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
+
 
 	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
@@ -319,6 +366,10 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets(deferredPtr);
 
+
+	DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &nullSRV);
+	DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &nullSRV);
+
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
@@ -448,4 +499,6 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 
 void ForwardPass::ControlPanel()
 {
+	ImGui::DragFloat("ior", &ior, 0.075f, -1.f, 1.f);
+	ImGui::DragFloat("add", &add, 0.075f, 0.f, 1000.f);
 }
