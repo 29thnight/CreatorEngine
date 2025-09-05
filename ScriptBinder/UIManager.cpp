@@ -30,7 +30,7 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 	return newObj;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* texture, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -71,7 +71,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* 
 	return newImage;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -152,7 +152,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
 
 
 
-std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -197,7 +197,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
+	newText->AddComponent<TextComponent>()->SetFont(Sfont);
 	canvasCom->AddUIObject(newText.get());
 
 	return newText;
@@ -224,7 +224,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	}
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
+	newText->AddComponent<TextComponent>()->SetFont(Sfont);
 	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());
 
 	return newText;
@@ -232,11 +232,27 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 
 void UIManager::DeleteCanvas(std::string canvasName)
 {
+	auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& canvas) 
+	{
+		auto c = canvas.lock();
+		return c && c->ToString() == canvasName;
+	});
+
+	auto curCanvasObj = (*it).lock();
+	auto canvasCom = curCanvasObj->GetComponent<Canvas>();
+	for (auto& uiObj : canvasCom->UIObjs)
+	{
+		uiObj->Destroy();
+	}
+	canvasCom->UIObjs.clear();
+
 	std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
 	{
 		auto c = canvas.lock();
 		return !c || c->ToString() == canvasName;
 	});
+
+	curCanvasObj->Destroy();
 }
 
 void UIManager::CheckInput()
@@ -336,4 +352,26 @@ void UIManager::SortCanvas()
 
 	}
 	needSort = false;
+}
+
+void UIManager::RegisterImageComponent(ImageComponent* image)
+{
+	if (image)
+		Images.push_back(image);
+}
+
+void UIManager::RegisterTextComponent(TextComponent* text)
+{
+	if (text)
+		Texts.push_back(text);
+}
+
+void UIManager::UnregisterImageComponent(ImageComponent* image)
+{
+	std::erase(Images, image);
+}
+
+void UIManager::UnregisterTextComponent(TextComponent* text)
+{
+	std::erase(Texts, text);
 }

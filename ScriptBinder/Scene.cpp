@@ -12,11 +12,18 @@
 #include "CapsuleColliderComponent.h"
 #include "MeshCollider.h"
 #include "CharacterControllerComponent.h"
+#include "FoliageComponent.h"
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
 #include "TagManager.h"
+#include "UIManager.h"
 #include "RectTransformComponent.h"
 #include <execution>
+#include <queue>
+#include <algorithm>
+#include <queue>
 
 #include "Profiler.h"
 Scene::Scene()
@@ -162,6 +169,186 @@ std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 		return m_SceneObjects[index];
 	}
 	return m_SceneObjects[0];
+}
+
+std::shared_ptr<GameObject> Scene::TryGetGameObject(GameObject::Index index)
+{
+    if (index == GameObject::INVALID_INDEX || index < 0)
+    {
+            return nullptr;
+    }
+    if (static_cast<size_t>(index) < m_SceneObjects.size())
+    {
+            return m_SceneObjects[index];
+    }
+    return nullptr;
+}
+
+void Scene::DetachGameObjectHierarchy(GameObject* root)
+{
+    if (!root) return;
+    Scene* origin = root->GetScene();
+    if (origin != this) return;
+
+    // breadth-first (인덱스 재배열 없이 안전하게 순회)
+    std::vector<GameObject::Index> queue;
+    queue.push_back(root->m_index);
+
+    // 루트부터 부모/씬 루트 children 에서 분리
+    auto detachFromParent = [&](GameObject* node){
+        if (!node) return;
+        // 부모 children에서 제거
+        if (GameObject::IsValidIndex(node->m_parentIndex))
+        {
+            if (auto parent = TryGetGameObject(node->m_parentIndex))
+            {
+                std::erase(parent->m_childrenIndices, node->m_index);
+            }
+        }
+        // 씬 루트 children에서 제거
+        if (!m_SceneObjects.empty() && m_SceneObjects[0])
+        {
+            std::erase(m_SceneObjects[0]->m_childrenIndices, node->m_index);
+        }
+    };
+    detachFromParent(root);
+
+    for (size_t qi = 0; qi < queue.size(); ++qi)
+    {
+        auto idx = queue[qi];
+        auto node = TryGetGameObject(idx);
+        if (!node) continue;
+
+        // 자식 enqueue
+        for (auto childIdx : node->m_childrenIndices)
+        {
+            if (GameObject::IsValidIndex(childIdx))
+                queue.push_back(childIdx);
+        }
+
+        // 태그/레이어에서 분리 (원 씬 검색에서 빠지도록)
+        if (!node->m_tag.ToString().empty())
+        {
+            TagManager::GetInstance()->RemoveTagFromObject(node->m_tag.ToString(), node.get());
+        }
+        if (!node->m_layer.ToString().empty())
+        {
+            TagManager::GetInstance()->RemoveObjectFromLayer(node->m_layer.ToString(), node.get());
+        }
+
+        // 부모 링크 절단 (월드 유지)
+        node->m_transform.SetParentID(GameObject::INVALID_INDEX);
+        node->m_parentIndex = GameObject::INVALID_INDEX;
+
+        // 원 씬 소유 컨테이너에서 tombstone(null) 처리 → 중복 소유/순회 방지
+        if (static_cast<size_t>(idx) < m_SceneObjects.size())
+        {
+            m_SceneObjects[idx].reset();
+        }
+    }
+}
+
+// === C안 구현: 이름 충돌 방지 ===
+std::string Scene::MakeUniqueName(std::string_view base)
+{
+    std::string name(base);
+    if (name.empty()) name = "GameObject";
+    if (!GetGameObject(name)) return name;
+    int n = 1;
+    std::string trial;
+    do {
+        trial = name + " (" + std::to_string(n++) + ")";
+    } while (GetGameObject(trial));
+    return trial;
+}
+
+// === C안 구현: 단일 객체 부착 ===
+GameObject::Index Scene::AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObject::Index parentIndex)
+{
+    if (!go) return GameObject::INVALID_INDEX;
+
+    // 이 씬 기준 유니크 네임 보장
+    if (auto existed = GetGameObject(go->GetHashedName().ToString()); existed)
+        go->SetName(MakeUniqueName(go->GetHashedName().ToString()));
+
+    // 이 씬에 소속
+    go->m_ownerScene = this;
+
+    // 새 인덱스 할당
+    GameObject::Index newIndex = static_cast<GameObject::Index>(m_SceneObjects.size());
+    go->m_index = newIndex;
+    m_SceneObjects.push_back(go);
+
+    // Tag/Layer 재등록
+    if (!go->m_tag.ToString().empty())
+        TagManager::GetInstance()->AddTagToObject(go->m_tag.ToString(), go.get());
+    if (!go->m_layer.ToString().empty())
+        TagManager::GetInstance()->AddObjectToLayer(go->m_layer.ToString(), go.get());
+
+    // Transform 부모 세팅 (루트 규약: INVALID_INDEX == 루트)
+    if (GameObject::IsValidIndex(parentIndex))
+    {
+        go->m_parentIndex = parentIndex;
+        if (auto parent = TryGetGameObject(parentIndex))
+        {
+            if (std::find(parent->m_childrenIndices.begin(), parent->m_childrenIndices.end(), newIndex) == parent->m_childrenIndices.end())
+                parent->m_childrenIndices.push_back(newIndex);
+        }
+        go->m_transform.SetParentID(parentIndex);
+    }
+    else
+    {
+        go->m_parentIndex = GameObject::INVALID_INDEX;
+        go->m_transform.SetParentID(GameObject::INVALID_INDEX);
+        // 씬 루트 children 연결
+        if (!m_SceneObjects.empty() && m_SceneObjects[0])
+        {
+            auto& rootChildren = m_SceneObjects[0]->m_childrenIndices;
+            if (std::find(rootChildren.begin(), rootChildren.end(), newIndex) == rootChildren.end())
+                rootChildren.push_back(newIndex);
+        }
+    }
+
+    // 필요 시 컴포넌트 쪽 씬/이벤트 갱신은 호출측(매니저)에서 일괄 처리
+    return newIndex;
+}
+
+// === C안 구현: 서브트리 부착 ===
+std::unordered_map<GameObject::Index, GameObject::Index>
+Scene::AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots)
+{
+    std::unordered_map<GameObject::Index, GameObject::Index> remap;
+    if (roots.empty()) return remap;
+
+    // BFS로 루트별 서브트리 전개 (부모 → 자식 순서 보장)
+    std::vector<std::shared_ptr<GameObject>> ordered;
+    ordered.reserve(roots.size()*4);
+    std::queue<std::shared_ptr<GameObject>> q;
+    for (auto& r : roots) if (r) q.push(r);
+    while (!q.empty())
+    {
+        auto cur = q.front(); q.pop();
+        ordered.push_back(cur);
+        for (auto childIdx : cur->m_childrenIndices)
+        {
+            if (auto ch = TryGetGameObject(childIdx))
+                q.push(ch);
+        }
+    }
+
+    // oldParent → newParent 를 remap 하면서 부착
+    for (auto& node : ordered)
+    {
+        auto oldIdx = node->m_index;
+        auto oldParent = node->m_parentIndex;
+        GameObject::Index newParent =
+            remap.count(oldParent) ? remap[oldParent] :
+            GameObject::INVALID_INDEX;
+
+        auto newIdx = AttachExistingGameObject(node, newParent);
+        remap[oldIdx] = newIdx;
+    }
+    return remap;
 }
 
 std::shared_ptr<GameObject> Scene::GetGameObject(std::string_view name)
@@ -355,39 +542,94 @@ void Scene::LateUpdate(float deltaSecond)
 	std::vector<MeshRenderer*> skinnedMeshes = m_skinnedMeshRenderers;
 	std::vector<TerrainComponent*> terrainComponents = m_terrainComponents;
 	std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
+	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
+	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+	std::vector<DecalComponent*> decalComponents = m_decalComponents;
 
-	for(auto camera : CameraManagement->GetCameras())
+	for (auto camera : CameraManagement->GetCameras())
 	{
 		if (!RenderPassData::VaildCheck(camera)) return;
 		auto data = RenderPassData::GetData(camera);
 
-		for (auto& mesh : allMeshes)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-			data->PushShadowRenderData(mesh->GetInstanceID());
-		}
-
-		for (auto& culledMesh : staticMeshes)
-		{
-			if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-			auto frustum = camera->GetFrustum();
-			if (frustum.Intersects(culledMesh->GetBoundingBox()))
+			for (auto& mesh : allMeshes)
 			{
-				data->PushCullData(culledMesh->GetInstanceID());
+				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+				data->PushShadowRenderData(mesh->GetInstanceID());
 			}
-		}
+		});
 
-		for (auto& skinnedMesh : skinnedMeshes)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-			auto frustum = camera->GetFrustum();
-			if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
+			for (auto& culledMesh : staticMeshes)
 			{
-				data->PushCullData(skinnedMesh->GetInstanceID());
+				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(culledMesh->GetBoundingBox()))
+				{
+					data->PushCullData(culledMesh->GetInstanceID());
+				}
 			}
-		}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& skinnedMesh : skinnedMeshes)
+			{
+				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
+				{
+					data->PushCullData(skinnedMesh->GetInstanceID());
+				}
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& image : imageComponents)
+			{
+				if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
+				
+				auto owner = image->GetOwner();
+				if (nullptr == owner) continue;
+
+                auto scene = owner->GetScene();
+
+                // (G) UI 중복 렌더 가드:
+                //  - 같은 씬이면 렌더
+                //  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
+                if (scene && (scene == this ||
+                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+                {
+                        data->PushUIRenderData(image->GetInstanceID());
+                }
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& text : textComponents)
+			{
+				if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
+				
+				auto owner = text->GetOwner();
+				if (nullptr == owner) continue;
+
+                auto scene = owner->GetScene();
+
+                if (scene && (scene == this ||
+                    (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+                {
+                        data->PushUIRenderData(text->GetInstanceID());
+                }
+			}
+		});
+
+		SceneManagers->m_threadPool->NotifyAllAndWait();
 	}
 }
 
@@ -416,7 +658,7 @@ void Scene::AllDestroyMark()
 {
     for (const auto& obj : m_SceneObjects)
     {
-        if (obj && !obj->IsDestroyMark())
+        if (obj && !obj->IsDestroyMark() && !obj->IsDontDestroyOnLoad())
             obj->Destroy();
     }
 }
@@ -632,6 +874,22 @@ void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
     {
          std::erase_if(m_foliageComponents, [ptr](const auto& comp) { return comp == ptr; });
     }
+}
+
+void Scene::CollectDecalComponent(DecalComponent* ptr)
+{
+	if (ptr)
+	{
+		m_decalComponents.push_back(ptr);
+	}
+}
+
+void Scene::UnCollectDecalComponent(DecalComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_decalComponents, [ptr](const auto& comp) { return comp == ptr; });
+	}
 }
 
 void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)
@@ -996,10 +1254,10 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 
 void Scene::DestroyGameObjects()
 {
-	std::unordered_set<uint32_t> deletedIndices;
-	for (const auto& obj : m_SceneObjects)
-	{
-		if (obj && obj->IsDestroyMark())
+    std::unordered_set<uint32_t> deletedIndices;
+    for (const auto& obj : m_SceneObjects)
+    {
+        if (obj && obj->IsDestroyMark())
 			deletedIndices.insert(obj->m_index);
 	}
 
@@ -1060,21 +1318,6 @@ void Scene::DestroyGameObjects()
 
 		obj->m_index = indexMap[oldIndex];
 	}
-
-	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
-	{
-		return obj && obj->IsDontDestroyOnLoad();
-	});
-
-	if (eraseSize > 0)
-	{
-		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		for (auto& obj : m_SceneObjects)
-		{
-			obj->m_containDontDestroyOnLoad = true;
-		}
-	}
-
 }
 
 void Scene::DestroyComponents()
@@ -1150,8 +1393,14 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
 
 void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive)
 {
-	const auto& obj = GetGameObject(objIndex);
-	
+	if (objIndex == GameObject::INVALID_INDEX || objIndex < 0 ||
+		static_cast<size_t>(objIndex) >= m_SceneObjects.size())
+	{
+		return;
+	}
+
+	const auto& obj = m_SceneObjects[objIndex];
+
 	if (!obj || obj->IsDestroyMark())
 	{
 		return;
@@ -1177,7 +1426,22 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	}
 	case GameObjectType::Bone:
 	{
-		const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		//const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		//if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
+		//{
+		//	return;
+		//}
+		//const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
+		//obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
+		//	animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
+		//break;
+
+		const auto& rootObj = TryGetGameObject(obj->m_rootIndex);
+		if (!rootObj)
+		{
+			return;
+		}
+		const auto& animator = rootObj->GetComponent<Animator>();
 		if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
 		{
 			return;
@@ -1206,6 +1470,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
+		if (childIndex == obj->m_index) continue;
 		UpdateModelRecursive(childIndex, model, recursive);
 	}
 }
@@ -1294,56 +1559,11 @@ void Scene::SetInternalPhysicData()
 void Scene::AllUpdateWorldMatrix()
 {
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
-	//for (auto index : rootObjects)
-	//{
-	//	UpdateModelRecursive(index, XMMatrixIdentity());
-	//}
 
 	auto updateFunc = [this](GameObject::Index index)
 	{
-			UpdateModelRecursive(index, XMMatrixIdentity());
+		UpdateModelRecursive(index, XMMatrixIdentity());
 	};
 
 	std::for_each(std::execution::par_unseq, rootObjects.begin(), rootObjects.end(), updateFunc);
-
-
-	// Update DontDestroyOnLoad objects
-	size_t size = SceneManagers->GetDontDestroyOnLoadObjects().size();
-	if (0 < size)
-	{
-		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		for (auto& obj : dontDestroyObjects)
-		{
-			auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
-			if (gameObject && gameObject->IsEnabled())
-			{
-				UpdateModelRecursive(gameObject->m_index, XMMatrixIdentity());
-			}
-		}
-	}
-}
-
-void Scene::RegisterDirtyTransform(Transform* transform)
-{
-	//if (!transform) return;
-	//std::unique_lock lock(sceneMutex);
-	//m_globalDirtySet.insert(transform);
-}
-
-void Scene::UpdateAllTransforms()
-{
-	//std::unordered_set<Transform*> dirtySet;
-	//{
-	//	std::unique_lock lock(sceneMutex);
-	//	dirtySet.swap(m_globalDirtySet);
-	//}
-
-	//for (Transform* rootDirty : dirtySet)
-	//{
-	//	if (rootDirty)
-	//	{
-	//		auto rootObject = rootDirty->GetOwner();
-	//		UpdateModelRecursive(rootObject->m_index, XMMatrixIdentity());
-	//	}
-	//}
 }

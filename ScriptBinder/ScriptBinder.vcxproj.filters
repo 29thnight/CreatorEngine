@@ -181,6 +181,9 @@
     <Filter Include="Classes\Components\Transform\2D">
       <UniqueIdentifier>{e6e1a773-6424-4361-9436-843af99d9eac}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\DecalComponent">
+      <UniqueIdentifier>{8240d859-d50f-4e50-a493-e2e07d3c4063}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -329,6 +332,9 @@
     </ClCompile>
     <ClCompile Include="ConditionParameter.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+     </ClCompile>
+    <ClCompile Include="DecalComponent.cpp">
+      <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -619,6 +625,9 @@
     </ClInclude>
     <ClInclude Include="AnchorPreset.h">
       <Filter>Classes\Components\Transform\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="DecalComponent.h">
+      <Filter>Classes\Components\DecalComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

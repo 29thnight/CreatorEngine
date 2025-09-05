@@ -1,5 +1,9 @@
 #include "TextComponent.h"
 #include "ImageComponent.h"
+#include "SceneManager.h"
+#include "Scene.h"
+#include "RenderScene.h"
+#include "UIManager.h"
 #include "RectTransformComponent.h"
 
 TextComponent::TextComponent()
@@ -11,26 +15,37 @@ TextComponent::TextComponent()
 	
 }
 
-void TextComponent::Update(float tick)
+void TextComponent::Awake()
 {
-        if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
-        {
-                const auto& worldRect = rect->GetWorldRect();
-                pos = { worldRect.x, worldRect.y };
-        }
-        pos += relpos;
-
-        auto  image = GetOwner()->GetComponent<ImageComponent>();
-        if (image)
-                _layerorder = image->GetLayerOrder();
+	auto scene = GetOwner()->m_ownerScene;
+	auto renderScene = SceneManagers->GetRenderScene();
+	if (scene)
+	{
+		renderScene->RegisterCommand(this);
+	}
 }
 
-void TextComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
+void TextComponent::Update(float tick)
 {
-	if (_layerorder < 0) _layerorder = 0;
-	//spriteBatch, message,pos, color, rotat,  Á¤·ÄÆ÷ÀÎÆ® ,size
-	if (font)
+    if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+    {
+            const auto& worldRect = rect->GetWorldRect();
+            pos = { worldRect.x, worldRect.y };
+    }
+    //pos += relpos;
+
+    auto  image = GetOwner()->GetComponent<ImageComponent>();
+    if (image)
+            _layerorder = image->GetLayerOrder();
+}
+
+void TextComponent::OnDestroy()
+{
+	auto scene = GetOwner()->m_ownerScene;
+	auto renderScene = SceneManagers->GetRenderScene();
+	if (scene)
 	{
-		font->DrawString(sBatch.get(), message.c_str(), pos, color, 0.0f, DirectX::XMFLOAT2(0, 0), fontSize, SpriteEffects_None, float(float(_layerorder) / MaxOreder));
+		renderScene->UnregisterCommand(this);
+		UIManagers->UnregisterTextComponent(this);
 	}
 }

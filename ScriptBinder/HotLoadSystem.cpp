@@ -57,38 +57,6 @@ void HotLoadSystem::Initialize()
 			return;
 		}
 	}
-
-	const char** scriptNames = nullptr;
-	int scriptCount = 0;
-	scriptNames = m_scriptNamesFunc(&scriptCount);
-
-	for (int i = 0; i < scriptCount; ++i)
-	{
-		std::string scriptName = scriptNames[i];
-		m_scriptNames.push_back(scriptName);
-	}
-
-	for (auto& scriptName : m_scriptNames)
-	{
-		auto tempPtr = std::shared_ptr<ModuleBehavior>(CreateMonoBehavior(scriptName.c_str()));
-		if (nullptr == tempPtr)
-		{
-			Debug->LogError("Failed to create script: " + scriptName);
-			continue;
-		}
-		RegisterScriptReflection(scriptName, tempPtr.get());
-	}
-
-	AIManagers->InitalizeBehaviorTreeSystem();
-
-	const char** aniBehaviorNames = nullptr;
-	int aniBehaviorCount = 0;
-	aniBehaviorNames = m_listAniBehaviorNamesFunc(&aniBehaviorCount);
-	for(int i = 0; i < aniBehaviorCount; ++i)
-	{
-		std::string aniBehaviorName = aniBehaviorNames[i];
-		m_aniBehaviorNames.push_back(aniBehaviorName);
-	}
 }
 
 void HotLoadSystem::Shutdown()

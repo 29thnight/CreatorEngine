@@ -704,6 +704,17 @@ void PhysicsManager::SetPhysicData()
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
 		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
+		//sleeping
+		bool enable = colliderInfo.gameObject->IsEnabled();
+
+		if (!enable) {
+			Physics->PutToSleep(id);
+			continue;
+		}
+		else {
+			Physics->WakeUp(id);
+		}
+
 		if (colliderInfo.id == m_controllerTypeId)
 		{
 			//Benchmark bm;
@@ -741,6 +752,7 @@ void PhysicsManager::SetPhysicData()
 		}
 		else
 		{
+
 			//Benchmark bm1;
 			RigidBodyGetSetData data;
 			data.transform = transform.GetWorldMatrix();
@@ -771,6 +783,8 @@ void PhysicsManager::SetPhysicData()
 			data.useGravity = rigidbody->IsUsingGravity();
 			data.isKinematic = rigidbody->IsKinematic();
 			data.isDisabled = !rigidbody->IsColliderEnabled();
+
+			data.LayerNumber = static_cast<unsigned int>(colliderInfo.gameObject->GetCollisionType());
 
 			data.isDirty = rigidbody->IsRigidbodyDirty();
 			rigidbody->DevelopOnlyDirtySet(false);
@@ -923,6 +937,9 @@ void PhysicsManager::ApplyPendingChanges()
 		data.isColliderEnabled = change.isColliderEnabled;
 		data.useGravity = change.useGravity;
 		data.isDisabled = !change.isColliderEnabled;
+
+		data.moveDirty = change.movePositionDirty;
+		data.movePosition = change.movePosition;
 
 		Physics->SetRigidBodyData(change.id, data);
 	}

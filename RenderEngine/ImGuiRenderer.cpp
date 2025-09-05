@@ -188,6 +188,7 @@ void ImGuiRenderer::BeginRender()
 			ImGui::DockBuilderDockWindow("BlackBoard Editor", dock1);
 			ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
 			ImGui::DockBuilderDockWindow(ICON_FA_BARS_STAGGERED "  Hierarchy", dock2);
+			ImGui::DockBuilderDockWindow(ICON_FA_DIAGRAM_PROJECT "  AssetBundle", dock3);
 			ImGui::DockBuilderDockWindow(ICON_FA_HARD_DRIVE "  Content Browser", dock3);
 			ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock4);
 			ImGui::DockBuilderFinish(id);

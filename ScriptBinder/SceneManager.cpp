@@ -11,6 +11,8 @@
 #include "NodeFactory.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
+#include <algorithm>
+#include "IRegistableEvent.h"
 
 void SceneManager::ManagerInitialize()
 {
@@ -38,7 +40,10 @@ void SceneManager::Editor()
 
     if (!m_isGameStart)
     {
-		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:���ӽ�ŸƮ�� �ѹ��� �ʱ�ȭ�ϰ� �ٽõ���
+
+    // Sweep DDOL bucket for destroyed objects
+    std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
+		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
         ScriptManager->ReloadDynamicLibrary();
         m_isInitialized = false; // Reset initialization state for editor scene
 		m_activeScene.load()->Awake();
@@ -135,12 +140,13 @@ void SceneManager::GUIRendering()
 
 void SceneManager::EndOfFrame()
 {
-    PROFILE_CPU_BEGIN("yield_WaitForEndOfFrame");
+    PROFILE_CPU_BEGIN("EndOfFrame");
 	CoroutineManagers->yield_WaitForEndOfFrame();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("endofframeBroadcast");
     endOfFrameEvent.Broadcast();
     PROFILE_CPU_END();
+
+    // Sweep DDOL bucket for destroyed objects
+    std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
 }
 
 void SceneManager::Pausing()
@@ -149,12 +155,8 @@ void SceneManager::Pausing()
 
 void SceneManager::DisableOrEnable()
 {
-    PROFILE_CPU_BEGIN("OnDisable");
     m_activeScene.load()->OnDisable();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("OnDestroy");
     m_activeScene.load()->OnDestroy();
-    PROFILE_CPU_END();
 }
 
 void SceneManager::Decommissioning()
@@ -169,6 +171,10 @@ void SceneManager::Decommissioning()
             scene->OnDestroy();
         }
     }
+
+    // Destroy and clear DontDestroyOnLoad objects
+    for (auto& o : m_dontDestroyOnLoadObjects) if (o) o->Destroy();
+    m_dontDestroyOnLoadObjects.clear();
 
     Memory::SafeDelete(m_inputActionManager);
     Memory::SafeDelete(m_threadPool);
@@ -287,6 +293,15 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         Scene* swapScene{};
         if (m_activeScene)
         {
+            for(auto& object : m_dontDestroyOnLoadObjects)
+            {
+				auto go = std::dynamic_pointer_cast<GameObject>(object);
+				if (go)
+                {
+                    m_activeScene.load()->DetachGameObjectHierarchy(go.get());
+                }
+            }
+
 			swapScene = m_activeScene.load();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
@@ -304,19 +319,23 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
-        //if(sceneNode["AssetsBundle"])
-        //{
-        //    auto assetsBundleNode = sceneNode["AssetsBundle"];
-        //    if (assetsBundleNode.IsNull())
-        //    {
-        //        Debug->LogError("AssetsBundle node is null.");
-        //    }
-        //    else
-        //    {
-        //        auto* AssetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
-        //        Meta::Deserialize(AssetBundle, assetsBundleNode);
-        //    }
-        //}
+        if(auto assetsBundleNode = sceneNode["AssetsBundle"])
+        {
+            if (assetsBundleNode.IsNull())
+            {
+                Debug->LogError("AssetsBundle node is null.");
+            }
+            else
+            {
+                auto* assetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
+                Meta::Deserialize(assetBundle, assetsBundleNode);
+                DataSystems->LoadAssetBundle(*assetBundle);
+            }
+        }
+
+        DataSystems->ClearRetainedAssets();
+        DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
+        DataSystems->RetainAssets(m_activeScene.load()->m_requiredLoadAssetsBundle);
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
@@ -389,19 +408,18 @@ Scene* SceneManager::LoadScene(std::string_view name)
         file::path sceneName = name.data();
         scene = Scene::LoadScene(sceneName.stem().string());
 
-        //if(sceneNode["AssetsBundle"])
-        //{
-        //    auto assetsBundleNode = sceneNode["AssetsBundle"];
-        //    if (assetsBundleNode.IsNull())
-        //    {
-        //        Debug->LogError("AssetsBundle node is null.");
-        //    }
-        //    else
-        //    {
-        //        auto* AssetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
-        //        Meta::Deserialize(AssetBundle, assetsBundleNode);
-        //    }
-        //}
+        if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+        {
+            if (assetsBundleNode.IsNull())
+            {
+                Debug->LogError("AssetsBundle node is null.");
+            }
+            else
+            {
+                Meta::Deserialize(&scene->m_requiredLoadAssetsBundle, assetsBundleNode);
+                DataSystems->LoadAssetBundle(scene->m_requiredLoadAssetsBundle);
+            }
+        }
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
@@ -425,8 +443,6 @@ Scene* SceneManager::LoadScene(std::string_view name)
             }
             DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
         }
-
-		RebindEventDontDestroyOnLoadObjects(scene);
         scene->AllUpdateWorldMatrix();
 
 
@@ -454,6 +470,15 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             // This code runs in a background thread.
             MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
+
+            if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+            {
+                if (!assetsBundleNode.IsNull())
+                {
+                    Meta::Deserialize(&newScene->m_requiredLoadAssetsBundle, assetsBundleNode);
+                    DataSystems->LoadAssetBundle(newScene->m_requiredLoadAssetsBundle);
+                }
+            }
 
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
@@ -499,6 +524,15 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
+            if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+            {
+                if (!assetsBundleNode.IsNull())
+                {
+                    Meta::Deserialize(&newScene->m_requiredLoadAssetsBundle, assetsBundleNode);
+                    DataSystems->LoadAssetBundle(newScene->m_requiredLoadAssetsBundle);
+                }
+            }
+
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -538,10 +572,25 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
 {
     if (!sceneToActivate) return;
 
+    DataSystems->LoadAssetBundle(sceneToActivate->m_requiredLoadAssetsBundle);
+    DataSystems->ClearRetainedAssets();
+    DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
+    DataSystems->RetainAssets(sceneToActivate->m_requiredLoadAssetsBundle);
+
     Scene* oldScene = m_activeScene.load();
     if (oldScene)
     {
+        for (auto& object : m_dontDestroyOnLoadObjects)
+        {
+            auto go = std::dynamic_pointer_cast<GameObject>(object);
+            if (go)
+            {
+                oldScene->DetachGameObjectHierarchy(go.get());
+            }
+        }
+
         sceneUnloadedEvent.Broadcast();
+        DataSystems->UnloadUnusedAssets();
         oldScene->AllDestroyMark();
         oldScene->OnDisable();
         oldScene->OnDestroy();
@@ -552,6 +601,8 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
     m_activeScene = sceneToActivate;
     m_scenes.push_back(m_activeScene);
     m_activeSceneIndex = m_scenes.size() - 1;
+
+    RebindEventDontDestroyOnLoadObjects(m_activeScene);
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();
@@ -572,7 +623,6 @@ void SceneManager::RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
 {
     if (objPtr)
     {
-        objPtr->Destroy();
         std::erase_if(m_dontDestroyOnLoadObjects,
 			[&](const auto& obj) { return obj == objPtr; });
 	}
@@ -580,21 +630,58 @@ void SceneManager::RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
 
 void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
 {
-    for (const auto& obj : m_dontDestroyOnLoadObjects)
+    if (!scene) return;
+    if (m_dontDestroyOnLoadObjects.empty()) return;
+
+    // DDOL 루트들을 모아 한 번에 부착(서브트리 포함).
+    std::vector<std::shared_ptr<GameObject>> roots;
+    roots.reserve(m_dontDestroyOnLoadObjects.size());
+    for (auto& obj : m_dontDestroyOnLoadObjects)
     {
-		auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
-        if (gameObject)
+        if (auto go = std::dynamic_pointer_cast<GameObject>(obj))
         {
-            auto components = gameObject->m_components;
-            for (const auto& component : components)
+            roots.push_back(go);
+        }
+    }
+
+    // 씬 공식 API로 부착(유니크 네임/Tag/Layer/루트 children/Transform 부모 세팅 포함)
+    auto remap = scene->AttachExistingGameObjectHierarchy(roots);
+    (void)remap;
+
+    // (D) 루트 규약 통일: INVALID_INDEX(= -1)일 때 부모 없음으로 설정
+    for (auto& gameObject : roots)
+    {
+        if (!gameObject) continue;
+        gameObject->m_transform.SetParentID(GameObject::IsValidIndex(gameObject->m_parentIndex)
+            ? gameObject->m_parentIndex
+            : GameObject::INVALID_INDEX);
+
+        // (D) 루트 판정: 0이 아닌 INVALID_INDEX를 루트로 취급
+        if (gameObject->m_parentIndex == GameObject::INVALID_INDEX)
+        {
+            auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+            if (std::find(rootChildren.begin(), rootChildren.end(), gameObject->m_index) == rootChildren.end())
             {
-                if (auto* regEvent = dynamic_cast<IRegistableEvent*>(component.get()))
-                {
-                    regEvent->RegisterOverriddenEvents(scene);
-                }
+                rootChildren.push_back(gameObject->m_index);
             }
-		}
-	}
+        }
+    }
+
+    // 컴포넌트 이벤트 재등록
+    for (auto& obj : m_dontDestroyOnLoadObjects)
+    {
+        auto go = std::dynamic_pointer_cast<GameObject>(obj);
+        if (!go) continue;
+
+        for (auto& comp : go->m_components)
+        {
+            if (!comp) continue;
+            if (auto reg = dynamic_cast<IRegistableEvent*>(comp.get()))
+            {
+                reg->RegisterOverriddenEvents(scene);
+            }
+        }
+    }
 }
 
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
@@ -749,7 +836,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             {
                 try
                 {
-                    //�̰� ������ �ȵɱ�???
+                    //이게 문제가 안될까???
                     m_loadSceneReturn = true;
                     ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
                     m_loadSceneReturn = false;

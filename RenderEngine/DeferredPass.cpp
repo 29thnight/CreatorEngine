@@ -138,10 +138,10 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     auto& lightManager = scene.m_LightController;
 
     cameraView cameraview{};
-    cameraview.cameraView = camera.CalculateView();
+    cameraview.cameraView = renderData->m_frameCalculatedView;
 
     DeferredBuffer buffer{};
-    buffer.m_InverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
+    buffer.m_InverseProjection = XMMatrixInverse(nullptr, renderData->m_frameCalculatedProjection);
     buffer.m_InverseView = XMMatrixInverse(nullptr, cameraview.cameraView);
     buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
     buffer.m_useEnvironmentMap = m_UseEnvironmentMap;

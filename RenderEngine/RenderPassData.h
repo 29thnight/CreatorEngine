@@ -7,12 +7,15 @@
 using namespace concurrency;
 class Camera;
 class PrimitiveRenderProxy;
+class UIRenderProxy;
 
 class RenderPassData
 {
 public:
 	using ProxyContainer = concurrent_vector<PrimitiveRenderProxy*>;
+	using UIProxyContainer = concurrent_vector<UIRenderProxy*>;
 	using FrameProxyFindInstanceIDs = concurrent_vector<HashedGuid>;
+	using FrameUIProxyIDs = concurrent_vector<HashedGuid>;
 	static constexpr int STORE_FRAME_COUNT = 3;
 	static constexpr int cascadeCount = 3;
 public:
@@ -24,11 +27,14 @@ public:
 	ID3D11ShaderResourceView*	sliceSRV[cascadeCount]{};
 	FrameProxyFindInstanceIDs	m_findProxyVec[STORE_FRAME_COUNT];
 	FrameProxyFindInstanceIDs	m_findShadowProxyVec[STORE_FRAME_COUNT];
+	FrameUIProxyIDs				m_findUIProxyVec[STORE_FRAME_COUNT];
 	ProxyContainer				m_deferredQueue;
 	ProxyContainer				m_forwardQueue;
 	ProxyContainer				m_terrainQueue;
 	ProxyContainer				m_foliageQueue;
 	ProxyContainer				m_shadowRenderQueue;
+	UIProxyContainer			m_UIRenderQueue;
+	ProxyContainer			    m_decalQueue;
 	Camera						m_shadowCamera;
 	//flags
 	std::atomic_bool			m_isInitalized{ false };
@@ -55,6 +61,10 @@ public:
 	void SortShadowRenderQueue();
 	void ClearShadowRenderQueue();
 
+	void PushUIRenderQueue(UIRenderProxy* proxy);
+	void SortUIRenderQueue();
+	void ClearUIRenderQueue();
+
 	void PushCullData(const HashedGuid& instanceID);
 	FrameProxyFindInstanceIDs& GetCullDataBuffer();
 	void ClearCullDataBuffer();
@@ -62,6 +72,10 @@ public:
 	void PushShadowRenderData(const HashedGuid& instanceID);
 	FrameProxyFindInstanceIDs& GetShadowRenderDataBuffer();
 	void ClearShadowRenderDataBuffer();
+
+	void PushUIRenderData(const HashedGuid& instanceID);
+	FrameUIProxyIDs& GetUIRenderDataBuffer();
+	void ClearUIRenderDataBuffer();
 
 	void UpdateData(Camera* pCamera) {
 		m_frameCalculatedView = pCamera->CalculateView();

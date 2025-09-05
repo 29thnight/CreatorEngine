@@ -2,6 +2,20 @@
 #include "GameObject.h"
 #include "ComponentFactory.h"
 #include "SceneManager.h"
+#include <algorithm>
+// (E) ì› ì”¬ ì»¬ë ‰ì…˜/ì´ë²¤íŠ¸ì—ì„œ ì•ˆì „í•˜ê²Œ ë¶„ë¦¬í•˜ê¸° ìœ„í•´ ì»´í¬ë„ŒíŠ¸ íƒ€ì… ì°¸ì¡° ì¶”ê°€
+#include "Scene.h"
+#include "LightComponent.h"
+#include "MeshRenderer.h"
+#include "Terrain.h"
+#include "FoliageComponent.h"
+#include "RigidBodyComponent.h"
+#include "BoxColliderComponent.h"
+#include "SphereColliderComponent.h"
+#include "CapsuleColliderComponent.h"
+#include "MeshCollider.h"
+#include "CharacterControllerComponent.h"
+#include "TerrainCollider.h"
 
 void Object::Destroy()
 {
@@ -15,36 +29,60 @@ void Object::Destroy()
 
 void Object::Destroy(Object* objPtr)
 {
-    if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad)
-    {
-        return;
-    }
-
-	objPtr->Destroy();
-
+    if (objPtr == nullptr) return;
+    objPtr->Destroy();
 }
 
 void Object::SetDontDestroyOnLoad(Object* objPtr)
 {
-    if (objPtr == nullptr || objPtr->m_dontDestroyOnLoad)
+    auto* go = dynamic_cast<GameObject*>(objPtr);
+    if (!go) return;
+
+    // Already marked: nothing to do
+    if (go->m_dontDestroyOnLoad) return;
+
+    // Promote to root
+    while (GameObject::IsValidIndex(go->m_parentIndex))
     {
-        return;
+        auto sc = go->GetScene();
+        auto parent = sc ? sc->GetGameObject(go->m_parentIndex) : nullptr;
+        if (!parent) break;
+        // ë‹¤ìŒ ë¶€ëª¨ê°€ ì”¬ ë£¨íŠ¸(0)ê±°ë‚˜, ë¶€ëª¨ì˜ ë¶€ëª¨ê°€ INVALIDë©´ ì—¬ê¸°ì„œ ë©ˆì¶¤
+        if (parent->m_index == 0 || !GameObject::IsValidIndex(parent->m_parentIndex))
+            break;
+        go = parent.get();
     }
-    objPtr->m_dontDestroyOnLoad = true;
 
-	auto scene = SceneManagers->GetActiveScene();
-    if (!scene)
-    {
-        Debug->LogError("No active scene found to add DontDestroyOnLoad object.");
-        return;
-	}
+    // Collect subtree & mark DDOL
+    std::vector<std::shared_ptr<Object>> collected;
+    Scene* originScene = go->GetScene();
 
-	// DontDestroyOnLoad °´Ã¼´Â ¾À¿¡ Ãß°¡ÇÏÁö ¾Ê°í, SceneManagers¿¡ µî·Ï
-	auto gameObject = dynamic_cast<GameObject*>(objPtr);
-    if (gameObject)
+    auto markDdol = [&](auto&& self, GameObject* node) -> void {
+        if (!node) return;
+        if (node->m_index == 0) return;
+        node->m_dontDestroyOnLoad = true;
+        collected.push_back(node->shared_from_this());
+        if (!originScene) return;
+        for (auto childIdx : node->m_childrenIndices)
+        {
+            if (GameObject::IsValidIndex(childIdx))
+            {
+                auto child = originScene->GetGameObject(childIdx);
+                if (child) self(self, child.get());
+            }
+        }
+    };
+    markDdol(markDdol, go);
+
+    // Ensure root is detached from any parent (keep world)
+    go->m_parentIndex   = GameObject::INVALID_INDEX;
+    go->m_rootIndex     = GameObject::INVALID_INDEX;
+    go->m_transform.SetParentID(-1);
+
+    // Register to global DDOL bucket
+    for (auto& o : collected)
     {
-        auto sharedObj = scene->m_SceneObjects[gameObject->m_index];
-        SceneManagers->AddDontDestroyOnLoad(sharedObj);
+        SceneManagers->AddDontDestroyOnLoad(o);
     }
 }
 
@@ -57,14 +95,14 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!meta)
         return nullptr;
 
-    // »õ ÀÎ½ºÅÏ½º »ı¼º
+    // ìƒˆ ì¸ìŠ¤í„´ìŠ¤ ìƒì„±
     Object* cloneObj = Meta::MetaFactoryRegistry->Create<Object>(meta->name);
     if (!cloneObj)
         return nullptr;
 
 	cloneObj->m_instanceID = make_guid();
 	cloneObj->m_typeID = original->m_typeID;
-    // ÀÌ¸§ ¼³Á¤
+    // ì´ë¦„ ì„¤ì •
     if (!newName.empty())
         cloneObj->m_name = newName;
     else
@@ -74,7 +112,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     Object* originalObj = const_cast<Object*>(original);
     GameObject* originalGameObject = dynamic_cast<GameObject*>(originalObj);
 
-    // GameObject¶ó¸é Scene¿¡ µî·ÏÇÏ°í ÄÄÆ÷³ÍÆ® º¹Á¦
+    // GameObjectë¼ë©´ Sceneì— ë“±ë¡í•˜ê³  ì»´í¬ë„ŒíŠ¸ ë³µì œ
     if (cloneGameObject && originalGameObject)
     {
 		auto originalNode = Meta::Serialize(originalGameObject, *meta);

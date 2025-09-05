@@ -1,4 +1,5 @@
 #include "GizmoLinePass.h"
+#include "GizmoLinePass.h"
 #include "GizmoCbuffer.h"
 #include "ShaderSystem.h"
 #include "LightComponent.h"
@@ -7,6 +8,7 @@
 #include "SphereColliderComponent.h"
 #include "CapsuleColliderComponent.h"
 #include "CharacterControllerComponent.h"
+#include "RectTransformComponent.h"
 
 float GetGizmoScale(Mathf::Vector3 gizmoPosition, const Camera& camera, float targetScreenHeightRatio)
 {
@@ -135,6 +137,11 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
             const float height = characterController->m_height * scale.y;
             DrawWireCapsule(transformMatrix, radius, height, { 0.f, 1.f, 1.f, 1.f });
 		}
+        //for (const auto& obj : activeScene->m_SceneObjects) {
+        //    if (!obj || obj->m_gameObjectType != GameObjectType::UI) continue;
+        //    if (auto* rt = obj->GetComponent<RectTransformComponent>(); rt && rt->IsEnabled())
+        //        DrawUIRect(rt->GetWorldRect(), { 1.f, 0.f, 0.f, 1.f });
+        //}
     }
 
     if (selectedObject)
@@ -447,4 +454,21 @@ void GizmoLinePass::DrawBoundingFrustum(const DirectX::BoundingFrustum& frustum,
     vertices[23] = { corners[4], color };
 
     DrawLines(vertices, 24);
+}
+
+void GizmoLinePass::DrawUIRect(const Mathf::Rect& rect, const Mathf::Color4& color)
+{
+    const float left = rect.x;
+    const float right = rect.x + rect.width;
+    const float bottom = rect.y;
+    const float top = rect.y + rect.height;
+
+    std::array<LineVertex, 8> vertices{ {
+        {{left, bottom, 0.f}, color}, {{right, bottom, 0.f}, color},
+        {{right, bottom, 0.f}, color}, {{right, top, 0.f}, color},
+        {{right, top, 0.f}, color}, {{left, top, 0.f}, color},
+        {{left, top, 0.f}, color}, {{left, bottom, 0.f}, color},
+    } };
+
+    DrawLines(vertices.data(), static_cast<uint32_t>(vertices.size()));
 }

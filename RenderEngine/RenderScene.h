@@ -17,6 +17,7 @@ struct ID3D11DeviceContext;
 #endif // !DYNAMICCPP_EXPORTS
 
 #include "MeshRendererProxy.h"
+#include "UIRenderProxy.h"
 #include "RenderPassData.h"
 #include "ProxyCommandQueue.h"
 #include "concurrent_unordered_map.h"
@@ -30,12 +31,16 @@ class HierarchyWindow;
 class InspectorWindow;
 class MeshRenderer;
 class FoliageComponent;
+class TerrainComponent;
+class ImageComponent;
+class TextComponent;
 class ProxyCommand;
 class RenderScene
 {
 public:
 	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
+	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, std::shared_ptr<Animator>>;
 	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
 	using RenderDataMap			= std::vector<std::shared_ptr<RenderPassData>>;
@@ -86,7 +91,26 @@ public:
     ProxyCommand MakeProxyCommand(FoliageComponent* foliagePtr);
     void UnregisterCommand(FoliageComponent* foliagePtr);
 
+	void RegisterCommand(ImageComponent* imagePtr);
+	bool InvaildCheckImage(ImageComponent* imagePtr);
+	void UpdateCommand(ImageComponent* imagePtr);
+	ProxyCommand MakeProxyCommand(ImageComponent* imagePtr);
+	void UnregisterCommand(ImageComponent* imagePtr);
+
+	void RegisterCommand(TextComponent* textPtr);
+	bool InvaildCheckText(TextComponent* textPtr);
+	void UpdateCommand(TextComponent* textPtr);
+	ProxyCommand MakeProxyCommand(TextComponent* textPtr);
+	void UnregisterCommand(TextComponent* textPtr);
+
+    void RegisterCommand(DecalComponent* decalPtr);
+    bool InvaildCheckDecal(DecalComponent* decalPtr);
+    void UpdateCommand(DecalComponent* decalPtr);
+    ProxyCommand MakeProxyCommand(DecalComponent* decalPtr);
+    void UnregisterCommand(DecalComponent* decalPtr);
+
 	PrimitiveRenderProxy* FindProxy(size_t guid);
+	UIRenderProxy* FindUIProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
 	void OnProxyDestroy();
@@ -94,6 +118,7 @@ public:
 	AnimatorMap& GetAnimatorMap() { return m_animatorMap; }
 
 	static concurrent_queue<HashedGuid> RegisteredDestroyProxyGUIDs;
+	static concurrent_queue<HashedGuid> RegisteredDestroyUIProxyGUIDs;
 
 private:
 	friend class HierarchyWindow;
@@ -105,10 +130,12 @@ private:
 	Scene*				m_currentScene{};
 	AnimationJob		m_animationJob{};
 	ProxyMap			m_proxyMap;
+	UIProxyMap          m_uiProxyMap;
 	AnimatorMap			m_animatorMap;
 	AnimationPalleteMap m_palleteMap;
 	RenderDataMap		m_renderDataMap{ 10, nullptr };
 	ID3D11Buffer*		m_ModelBuffer{};
 	std::atomic_flag	m_proxyMapFlag{};
+	std::atomic_flag	m_uiProxyMapFlag{};
 	bool				m_isPlaying = false;
 };

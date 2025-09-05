@@ -291,6 +291,12 @@
     <Filter Include="Resources\PSO\ShaderPSO">
       <UniqueIdentifier>{0bbb48b0-4e85-4176-82d4-401aec0885bc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Objects\UIRenderProxy">
+      <UniqueIdentifier>{958d27bb-10a1-4527-9192-96f0f7e8f5b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\TestShader">
+      <UniqueIdentifier>{712934e5-f33f-4bc3-9c9d-c40c7498ddff}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -532,6 +538,9 @@
     </ClCompile>
     <ClCompile Include="ShaderDSL.cpp">
       <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClCompile>
+    <ClCompile Include="UIRenderProxy.cpp">
+      <Filter>Objects\UIRenderProxy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -877,6 +886,9 @@
     <ClInclude Include="ShaderDSL.h">
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClInclude>
+    <ClInclude Include="UIRenderProxy.h">
+      <Filter>Objects\UIRenderProxy</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -1122,6 +1134,12 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Decal.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TestGBuffer.ps.hlsl">
+      <Filter>Shaders\TestShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TestForward.ps.hlsl">
+      <Filter>Shaders\TestShader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UIPass.h">
@@ -1154,6 +1172,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\Dynamic_CPP\Assets\Shaders\ColorGrading.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\Flags.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
   </ItemGroup>

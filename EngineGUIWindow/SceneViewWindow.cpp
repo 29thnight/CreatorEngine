@@ -10,6 +10,7 @@
 #include "GameObjectCommand.h"
 #include "CameraComponent.h"
 #include "FoliageComponent.h"
+#include "RectTransformComponent.h"
 #include "LightComponent.h"
 #include "GameObject.h"
 #include <unordered_map>
@@ -73,7 +74,19 @@ void SceneViewWindow::RenderSceneViewWindow()
 	{
 		auto mat = obj->m_transform.GetWorldMatrix();
 		XMFLOAT4X4 objMat;
-		XMStoreFloat4x4(&objMat, mat);
+		if (auto* rect = obj->GetComponent<RectTransformComponent>())
+		{
+			auto rectWorld = rect->GetWorldRect();
+			XMMATRIX mat = XMMatrixTranslation(rectWorld.x + rectWorld.width * rect->GetPivot().x,
+				rectWorld.y + rectWorld.height * rect->GetPivot().y, 0.f);
+			XMStoreFloat4x4(&objMat, mat);
+		}
+		else
+		{
+			auto mat = obj->m_transform.GetWorldMatrix();
+			XMStoreFloat4x4(&objMat, mat);
+		}
+
 		auto view = m_sceneRenderer->m_pEditorCamera->CalculateView();
 		XMFLOAT4X4 floatMatrix;
 		XMStoreFloat4x4(&floatMatrix, view);
@@ -123,8 +136,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
 	ImGuizmo::BeginFrame();
 	bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
+	bool rightMouse = InputManagement->IsMouseButtonPressed(MouseKey::RIGHT) || ImGui::IsMouseDown(ImGuiMouseButton_Right);
 
-	if(!ctrl)
+	if(!ctrl && !rightMouse)
 	{
 		if (ImGui::IsKeyPressed(ImGuiKey_W))
 			selectGizmoMode = SelectGuizmoMode::Translate;
@@ -357,68 +371,234 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
     if (obj && !selectMode)
     {
-        auto scene = SceneManagers->GetActiveScene();
-        auto& selectedObjects = scene->m_selectedSceneObjects;
-        static XMMATRIX oldLocalMatrix{};
-        static bool wasDragging = false;
-        static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
+  //      auto scene = SceneManagers->GetActiveScene();
+  //      auto& selectedObjects = scene->m_selectedSceneObjects;
+  //      static XMMATRIX oldLocalMatrix{};
+  //      static bool wasDragging = false;
+  //      static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
 	
-		bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
-		bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
-		bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+		//bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+		//bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+		//bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 	
-        if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        {
-            oldLocalMatrix = obj->m_transform.GetLocalMatrix();
-            startWorldMatrices.clear();
-            for (auto* target : selectedObjects)
-            {
-                startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
-            }
-        }
+  //      if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+  //      {
+  //          oldLocalMatrix = obj->m_transform.GetLocalMatrix();
+  //          startWorldMatrices.clear();
+  //          for (auto* target : selectedObjects)
+  //          {
+  //              startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+  //          }
+  //      }
 
-		XMMATRIX deltaMat = XMMatrixIdentity();
-		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
-			deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+		//XMMATRIX deltaMat = XMMatrixIdentity();
+		//ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
+		//	deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 
-		XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
-		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+		//XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		//XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+		//XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
-		bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
-            //실시간 변화
-        if (!XMMatrixIsIdentity(deltaMat))
-        {
-            obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-			XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
-			auto itSelf = startWorldMatrices.find(obj);
-			if (itSelf != startWorldMatrices.end())
-			{
-			    XMVECTOR oldPos = itSelf->second.r[3];
-			    XMVECTOR newPos = newWorld.r[3];
-			    XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
+		//bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
+  //          //실시간 변화
+  //      if (!XMMatrixIsIdentity(deltaMat))
+  //      {
+  //          obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
+		//	XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
+		//	auto itSelf = startWorldMatrices.find(obj);
+		//	if (itSelf != startWorldMatrices.end())
+		//	{
+		//	    XMVECTOR oldPos = itSelf->second.r[3];
+		//	    XMVECTOR newPos = newWorld.r[3];
+		//	    XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
 
-			    if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
-			    {
-			        for (auto* target : selectedObjects)
-			        {
-						if (target == obj) continue;
-						auto itStart = startWorldMatrices.find(target);
-						if (itStart == startWorldMatrices.end()) continue;
-						XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
-						XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->m_transform.GetWorldMatrix();
-						XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
-						XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
-						target->m_transform.SetLocalMatrix(targetLocal);
-			        }
-			    }
-			}
-		}
+		//	    if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
+		//	    {
+		//	        for (auto* target : selectedObjects)
+		//	        {
+		//				if (target == obj) continue;
+		//				auto itStart = startWorldMatrices.find(target);
+		//				if (itStart == startWorldMatrices.end()) continue;
+		//				XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
+		//				XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->m_transform.GetWorldMatrix();
+		//				XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
+		//				XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
+		//				target->m_transform.SetLocalMatrix(targetLocal);
+		//	        }
+		//	    }
+		//	}
+		//}
 
-		//Undo Redo 커멘드를 저장할 목적의 코드
-		if (wasDragging && mouseReleased && matrixChanged)
+		////Undo Redo 커멘드를 저장할 목적의 코드
+		//if (wasDragging && mouseReleased && matrixChanged)
+		//{
+		//	Meta::MakeCustomChangeCommand(
+		//		[=]
+		//		{
+		//			XMMATRIX copy = oldLocalMatrix;
+		//			obj->m_transform.SetLocalMatrix(copy);
+		//		},
+		//		[=]
+		//		{
+		//			XMMATRIX copy = newLocalMatrix;
+		//			obj->m_transform.SetLocalMatrix(copy);
+		//		}
+		//	);
+		//}
+
+		//wasDragging = isDragging;
+
+		auto scene = SceneManagers->GetActiveScene();
+		auto& selectedObjects = scene->m_selectedSceneObjects;
+
+		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
-			Meta::MakeCustomChangeCommand(
+			static bool wasDragging = false;
+			static std::unordered_map<GameObject*, Mathf::Vector2> startAnchors;
+			static Mathf::Vector2 startWorldPos{};
+
+			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+			bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+
+			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				startAnchors.clear();
+				for (auto* target : selectedObjects)
+				{
+					if (auto* rt = target->GetComponent<RectTransformComponent>())
+						startAnchors[target] = rt->GetAnchoredPosition();
+				}
+				auto world = rect->GetWorldRect();
+				startWorldPos = { world.x + world.width * rect->GetPivot().x,
+								  world.y + world.height * rect->GetPivot().y };
+			}
+
+			XMMATRIX deltaMat = XMMatrixIdentity();
+			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
+				deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+
+			bool matrixChanged = !XMMatrixIsIdentity(deltaMat);
+
+			if (matrixChanged)
+			{
+				XMFLOAT4X4 mat;
+				std::memcpy(&mat, matrix, sizeof(float) * 16);
+				Mathf::Vector2 newWorldPos{ mat.m[3][0], mat.m[3][1] };
+				Mathf::Vector2 offset = newWorldPos - startWorldPos;
+				if (offset.x != 0.f || offset.y != 0.f)
+				{
+					for (auto* target : selectedObjects)
+					{
+						auto it = startAnchors.find(target);
+						if (it == startAnchors.end()) continue;
+						if (auto* rt = target->GetComponent<RectTransformComponent>())
+						{
+							rt->SetAnchoredPosition(it->second + offset);
+							Mathf::Rect parentRect{ 0, 0, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
+							if (auto* parentObj = GameObject::FindIndex(target->m_parentIndex))
+								if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+									parentRect = parentRT->GetWorldRect();
+							rt->UpdateLayout(parentRect);
+						}
+					}
+				}
+			}
+
+			if (wasDragging && mouseReleased && matrixChanged)
+			{
+				auto oldPos = startAnchors[obj];
+				auto newPos = rect->GetAnchoredPosition();
+				Meta::MakeCustomChangeCommand(
+				[=]
+				{
+					if (auto* r = obj->GetComponent<RectTransformComponent>())
+					{
+						r->SetAnchoredPosition(oldPos);
+						Mathf::Rect parentRect{ 0, 0, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
+						if (auto* parentObj = GameObject::FindIndex(obj->m_parentIndex))
+							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+								parentRect = parentRT->GetWorldRect();
+						r->UpdateLayout(parentRect);
+					}
+				},
+				[=]
+				{
+					if (auto* r = obj->GetComponent<RectTransformComponent>())
+					{
+						r->SetAnchoredPosition(newPos);
+						Mathf::Rect parentRect{ 0, 0, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
+						if (auto* parentObj = GameObject::FindIndex(obj->m_parentIndex))
+							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+								parentRect = parentRT->GetWorldRect();
+						r->UpdateLayout(parentRect);
+					}
+				}
+				);
+			}
+
+			wasDragging = isDragging;
+		}
+		else
+		{
+			static XMMATRIX oldLocalMatrix{};
+			static bool wasDragging = false;
+			static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
+
+			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+			bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+
+			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				oldLocalMatrix = obj->m_transform.GetLocalMatrix();
+				startWorldMatrices.clear();
+				for (auto* target : selectedObjects)
+				{
+					startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+				}
+			}
+
+			XMMATRIX deltaMat = XMMatrixIdentity();
+			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
+				deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+
+			XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+			XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+			XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+
+			bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
+			if (!XMMatrixIsIdentity(deltaMat))
+			{
+				obj->m_transform.SetLocalMatrix(newLocalMatrix);
+				XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
+				auto itSelf = startWorldMatrices.find(obj);
+				if (itSelf != startWorldMatrices.end())
+				{
+					XMVECTOR oldPos = itSelf->second.r[3];
+					XMVECTOR newPos = newWorld.r[3];
+					XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
+
+					if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
+					{
+						for (auto* target : selectedObjects)
+						{
+							if (target == obj) continue;
+							auto itStart = startWorldMatrices.find(target);
+							if (itStart == startWorldMatrices.end()) continue;
+							XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
+							XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->m_transform.GetWorldMatrix();
+							XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
+							XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
+							target->m_transform.SetLocalMatrix(targetLocal);
+						}
+					}
+				}
+			}
+
+			if (wasDragging && mouseReleased && matrixChanged)
+			{
+				Meta::MakeCustomChangeCommand(
 				[=]
 				{
 					XMMATRIX copy = oldLocalMatrix;
@@ -429,10 +609,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					XMMATRIX copy = newLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
 				}
-			);
-		}
+				);
+			}
 
-		wasDragging = isDragging;
+			wasDragging = isDragging;
+		}
     }
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 16), ImVec2(128, 128), IM_COL32(0, 0, 0, 0));

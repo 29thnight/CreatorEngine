@@ -149,11 +149,6 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 		else
 		{
-			if (animation)
-			{
-				animation->SetParameter("IdleOn", true);
-			}
-			blackBoard.SetValueAsString("State", "Idle");
 			std::cout << "Switching to Idle state." << std::endl;
 		}
 	}

@@ -289,6 +289,15 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponCapsule.h">
+      <Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\MosterMeleeAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -507,6 +516,15 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
+      <Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MosterMeleeAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

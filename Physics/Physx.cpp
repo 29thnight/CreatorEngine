@@ -368,9 +368,9 @@ void PhysicX::Update(float fixedDeltaTime)
 			shape->setRestOffset(0.01f);
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
-			filterData.word1= 0xFFFFFFFF;
+			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			
-			//filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
+			//
 			shape->setSimulationFilterData(filterData);
 			shape->setQueryFilterData(filterData);
 			//shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
@@ -1132,6 +1132,42 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 	}
 	auto body = m_rigidBodyContainer.find(id)->second;
 
+
+	//staticBody 인 경우
+	StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+	if (staticBody)
+	{
+		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
+		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
+		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
+
+		physx::PxTransform pxTransform;
+		DirectX::SimpleMath::Vector3 position;
+		DirectX::SimpleMath::Vector3 scale;
+		DirectX::SimpleMath::Quaternion rotation;
+		dxMatrix.Decompose(scale, rotation, position);
+
+		DirectX::SimpleMath::Vector3 offPos = staticBody->GetOffsetPosition();
+		DirectX::SimpleMath::Quaternion offRot = staticBody->GetOffsetRotation();
+
+		DirectX::SimpleMath::Quaternion invOffsetRot;
+		offRot.Inverse(invOffsetRot);
+		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
+
+		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
+		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
+
+		ConvertVectorDxToPx(bodyPosition, pxTransform.p);
+		ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
+
+		//CopyMatrixDxToPx(dxMatrix, pxTransform);
+
+		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+			pxBody->setGlobalPose(pxTransform);
+		}
+		return;
+	}
+
 	//dynamicBody 인 경우
 	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 	if (dynamicBody)
@@ -1198,6 +1234,15 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 		}
 
+		if (rigidBodyData.moveDirty) {
+			pxBody->setKinematicTarget(
+				PxTransform(PxVec3(
+						rigidBodyData.movePosition.x, 
+						rigidBodyData.movePosition.y, 
+						rigidBodyData.movePosition.z))
+			);
+		}
+
 		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxTransform;
 		DirectX::SimpleMath::Vector3 position;
@@ -1232,39 +1277,6 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		}
 		else {
 			Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
-		}
-	}
-	//staticBody 인 경우
-	StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
-	if (staticBody)
-	{
-		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
-		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
-		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
-		
-		physx::PxTransform pxTransform;
-		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Vector3 scale;
-		DirectX::SimpleMath::Quaternion rotation;
-		dxMatrix.Decompose(scale, rotation, position);
-
-		DirectX::SimpleMath::Vector3 offPos = staticBody->GetOffsetPosition();
-		DirectX::SimpleMath::Quaternion offRot = staticBody->GetOffsetRotation();
-
-		DirectX::SimpleMath::Quaternion invOffsetRot;
-		offRot.Inverse(invOffsetRot);
-		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
-
-		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
-		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
-
-		ConvertVectorDxToPx(bodyPosition, pxTransform.p);
-		ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
-
-		//CopyMatrixDxToPx(dxMatrix, pxTransform);
-
-		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
-			pxBody->setGlobalPose(pxTransform);
 		}
 	}
 }
@@ -1695,6 +1707,7 @@ void PhysicX::ConnectPVD()
     pvd = PxCreatePvd(*m_foundation);
     PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
     auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
+	//auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::ePROFILE);
     std::cout << "pvd connected : " << isconnected << std::endl;
 }
 
@@ -2284,4 +2297,40 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 	}
 
 	return out;
+}
+
+void PhysicX::PutToSleep(unsigned int id)
+{
+	RigidBody* body = GetRigidBody(id);
+	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+
+	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
+
+
+	//stacit body인 경우 nullptr이므로 예외처리 
+	if (dynamicActor)
+	{
+		if (dynamicActor->isSleeping()) {
+			return;
+		}
+		dynamicActor->putToSleep();
+	}
+}
+
+void PhysicX::WakeUp(unsigned int id)
+{
+	RigidBody* body = GetRigidBody(id);
+	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+	
+	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
+
+
+	//stacit body인 경우 nullptr이므로 예외처리 
+	if (dynamicActor)
+	{
+		if (!dynamicActor->isSleeping()) {
+			return;
+		}
+		dynamicActor->wakeUp();
+	}
 }

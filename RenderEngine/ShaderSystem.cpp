@@ -8,6 +8,7 @@
 #include "DataSystem.h"
 #include "ImGuiRegister.h"
 #include "Material.h"
+#include "ImageComponent.h"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {
@@ -354,6 +355,15 @@ void ShaderResourceSystem::RegisterSelectShaderContext()
 		ImGui::Text("Select Shader");
 		if (ImGui::BeginListBox("##ShaderList"))
 		{
+			if (ImGui::Selectable("None"))
+			{
+				if (m_selectShaderTarget)
+				{
+					m_selectShaderTarget->SetShaderPSO(nullptr);
+					m_selectShaderTarget = nullptr;
+				}
+				ImGui::GetContext("SelectShader").Close();
+			}
 			for (auto& [name, pso] : ShaderAssets)
 			{
 				if (ImGui::Selectable(name.c_str()))
@@ -370,11 +380,47 @@ void ShaderResourceSystem::RegisterSelectShaderContext()
 		}
 	});
 	ImGui::GetContext("SelectShader").Close();
+
+	ImGui::ContextRegister("SelectImageCustomShader", true, [this]() {
+		ImGui::Text("Select PixelShader");
+		if (ImGui::BeginListBox("##PixelShaderList"))
+		{
+			for (auto& [name, shader] : PixelShaders)
+			{
+				if (ImGui::Selectable(name.c_str()))
+				{
+					if (m_selectImageTarget)
+					{
+						m_selectImageTarget->SetCustomPixelShader(name);
+						m_selectImageTarget = nullptr;
+					}
+					ImGui::GetContext("SelectImageCustomShader").Close();
+				}
+			}
+			ImGui::EndListBox();
+		}
+	});
+	ImGui::GetContext("SelectImageCustomShader").Close();
 }
 
 void ShaderResourceSystem::SetShaderSelectionTarget(Material* material)
 {
 	m_selectShaderTarget = material;
+}
+
+void ShaderResourceSystem::ClearShaderSelectionTarget()
+{
+	m_selectShaderTarget = nullptr;
+}
+
+void ShaderResourceSystem::SetImageSelectionTarget(ImageComponent* image)
+{
+	m_selectImageTarget = image;
+}
+
+void ShaderResourceSystem::ClearImageSelectionTarget()
+{
+	m_selectImageTarget = nullptr;
 }
 
 void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)

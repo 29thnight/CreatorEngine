@@ -361,7 +361,7 @@ private:
         ".fbx", ".gltf", ".obj",
         ".png", ".dds", ".hdr",
         ".hlsl", ".shader", ".cpp", ".glb",
-        ".cs", ".wav", ".mp3", ".ogg",
+        ".cs", ".wav", ".mp3", ".ogg", ".spritefont",
         ".terrain", ".bt", ".blackboard",
         ".prefab", ".volume", ".foliage"
     };

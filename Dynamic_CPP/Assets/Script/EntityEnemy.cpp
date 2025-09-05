@@ -30,6 +30,18 @@ void EntityEnemy::Start()
 		m_animator = enemy->GetComponent<Animator>();
 	}
 
+	bool hasid = blackBoard->HasKey("Identity");
+	if (hasid) {
+		std::string id = blackBoard->GetValueAsString("Identity");
+		if (id == "MonsterNomal") {
+			/*m_animator->SetParameter("Dead", false);
+			m_animator->SetParameter("Atteck", false);
+			m_animator->SetParameter("Move", false);*/
+		}
+	}
+
+
+
 	for (auto& child : childred)
 	{
 		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
@@ -54,6 +66,13 @@ void EntityEnemy::Update(float tick)
 		hittimer -= tick;
 		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer));
 	}
+
+	if (attackCount > 0) {
+		m_animator->SetParameter("Attack", true);
+		attackCount = 0;
+		blackBoard->SetValueAsInt("AttackCount", attackCount);
+	}
+
 	//MeleeAttack();
 	//if (isKnockBack)
 	//{

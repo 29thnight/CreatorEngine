@@ -10,6 +10,7 @@
 #include "AssetJob.h"
 #include "DLLAcrossSingleton.h"
 #include "EngineSetting.h"
+#include "AssetBundle.h"
 
 // Main system for storing runtime data
 class ModelLoader;
@@ -33,6 +34,7 @@ public:
 		Sound,
 		HDR,
 		VolumeProfile,
+		Font,
 		End,
 	};
 
@@ -42,6 +44,7 @@ public:
 		MaterialTexture,
 		TerrainTexture,
 		HDR,
+		UITexture,
 	};
 
 	enum class AssetType
@@ -66,6 +69,11 @@ public:
     void Finalize();
 	void RenderForEditer();
 	void MonitorFiles();
+	// Asset bundle operations
+	void LoadAssetBundle(const AssetBundle& bundle);
+	void RetainAssets(const AssetBundle& bundle);
+	void ClearRetainedAssets();
+	void UnloadUnusedAssets();
 	//Resource Model
 	void LoadModels();
 	Model* LoadModelGUID(FileGuid guid);
@@ -74,7 +82,8 @@ public:
 	//Resource Texture
 	void LoadTextures();
 	Texture* LoadTextureGUID(FileGuid guid);
-	Texture* LoadTexture(std::string_view filePath);
+	Texture* LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
+	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
 	void CopyHDRTexture(std::string_view filePath);
 	void CopyTexture(std::string_view filePath, const file::path& destination);
 	void SelectTextureType();
@@ -83,7 +92,6 @@ public:
 	void LoadMaterials();
 	void SaveMaterial(Material* material);
 	Material* LoadMaterial(std::string_view name);
-	Material* LoadMaterialGUID(FileGuid guid);
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
@@ -128,7 +136,10 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
+	std::unordered_map<std::string, std::shared_ptr<Texture>> UITextures;
 	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
+	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
+
 	static ImGuiTextFilter filter;
 	ContentsBrowserStyle m_ContentsBrowserStyle{ ContentsBrowserStyle::Tile };
 	float tileSize = 160.0f;
@@ -159,7 +170,6 @@ public:
 	ImFont* extraSmallFont{};
 
 	std::unordered_map<std::string_view, FileTypeIcon> kExtensionMap{};
-
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);

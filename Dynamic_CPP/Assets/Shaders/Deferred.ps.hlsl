@@ -64,6 +64,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     float metallic = matMetalRough.r;
     float roughness = matMetalRough.g;
     float occlusion = matMetalRough.b;
+    float ior = matMetalRough.a;
     float3 normal = Normals.Sample(PointSampler, IN.texCoord).rgb;
     normal = normalize(normal * 2.0 - 1.0);
     float3 emissive = Emissive.Sample(PointSampler, IN.texCoord).rgb;
@@ -76,9 +77,12 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     surf.NdotV = dot(surf.N, surf.V);
 
     float3 Lo = float3(0, 0, 0);
-    float3 F0 = float3(0.04, 0.04, 0.04);
-    F0 = lerp(F0, albedo, metallic);
+    //float3 F0 = float3(0.04, 0.04, 0.04);
+    //F0 = lerp(F0, albedo, metallic);
 
+    float3 F0_dielectric = pow((1 - ior) / (1 + ior), 2);
+    F0_dielectric = lerp(F0_dielectric, albedo, metallic);
+    
 	uint light_count = lightCount;
 
     bool useShadowRevice = (bitflag & USE_SHADOW_RECIVE) != 0;
@@ -95,7 +99,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
         // cook-torrance brdf
         float NDF = DistributionGGX(max(li.NdotH, 0.0), roughness);
         float G = GeometrySmith(NdotV, NdotL, roughness);
-        float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0);
+        float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0_dielectric);
         float3 kS = F;
         float3 kD = float3(1.0, 1.0, 1.0) - kS;
         kD *= 1.0 - metallic;
@@ -115,7 +119,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     [branch]
     if (useEnvMap)
     {
-        float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);
+        float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
         float3 kD = 1.0 - kS;
         kD *= 1.0 - metallic;
         float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;

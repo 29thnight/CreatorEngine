@@ -369,6 +369,7 @@ void EntityAsis::PathMove(float tick)
 
 	Vector3 newPosition = currentPosition + direction * moveSpeed * tick * rotDownSpeed;
 	GetOwner()->m_transform.SetPosition(newPosition);
+	//GetOwner()->GetComponent<RigidBodyComponent>()->NotifyPhysicsStateChange(newPosition);
 
 	float newDistance = Mathf::Distance(newPosition, points[nextPointIndex]);
 	if (newDistance <= m_pathEndRadius) {

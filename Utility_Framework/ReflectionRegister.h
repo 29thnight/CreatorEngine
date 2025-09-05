@@ -149,16 +149,18 @@ namespace Meta
         void UnRegister(const std::string& name)
         {
             auto it = map.find(name);
+            HashedGuid typeID{};
             if (it != map.end())
             {
+				typeID = it->second.typeID;
                 map.erase(it);
             }
 
-			auto hit = hashMap.find(it->second.typeID);
+            auto hit = hashMap.find(typeID);
             if (hit != hashMap.end())
             {
                 hashMap.erase(hit);
-			}
+            }
 		}
 
         const Type* Find(const std::string& name)

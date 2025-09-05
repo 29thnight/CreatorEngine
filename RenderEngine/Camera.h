@@ -6,15 +6,15 @@
 #include "Camera.generated.h"
 #include "BitFlag.h"
 
-#ifdef DYNAMICCPP_EXPORTS
-struct ID3D11Buffer
-{
-};
-
-struct ID3D11DeviceContext
-{
-};
-#endif // !DYNAMICCPP_EXPORTS
+//#ifdef DYNAMICCPP_EXPORTS
+//struct ID3D11Buffer
+//{
+//};
+//
+//struct ID3D11DeviceContext
+//{
+//};
+//#endif // !DYNAMICCPP_EXPORTS
 
 struct ShadowInfo
 {
@@ -29,6 +29,8 @@ struct ShadowInfo
 
 class MeshRenderer;
 class PrimitiveRenderProxy;
+struct ID3D11DeviceContext;
+struct ID3D11Buffer;
 class Camera //TODO : shadowCamera 분리가 필요
 {
 public:

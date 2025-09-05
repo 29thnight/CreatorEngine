@@ -2,9 +2,12 @@
 #include "MeshRenderer.h"
 #include "Terrain.h"
 #include "FoliageComponent.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "Material.h"
+#include "DecalComponent.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -172,6 +175,122 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 		}
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
+	};
+}
+
+ProxyCommand::ProxyCommand(DecalComponent* pComponent):
+	m_proxyGUID(pComponent->GetInstanceID())
+{
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+
+	if (!proxyObject) return;
+
+	Texture* diffuse = pComponent->GetDecalTexture();
+	Texture* normal = pComponent->GetNormalTexture();
+	Texture* orm = pComponent->GetORMTexture();
+	uint32 sliceX = pComponent->sliceX;
+	uint32 sliceY = pComponent->sliceY;
+	int sliceNum = pComponent->sliceNumber;
+
+	m_updateFunction = [=]()
+	{
+		proxyObject->m_diffuseTexture = diffuse;
+		proxyObject->m_normalTexture = normal;
+		proxyObject->m_occluroughmetalTexture = orm;
+		proxyObject->m_worldMatrix = worldMatrix;
+		proxyObject->m_sliceX = sliceX;
+		proxyObject->m_sliceY = sliceY;
+		proxyObject->m_sliceNum = sliceNum;
+	};
+}
+
+ProxyCommand::ProxyCommand(ImageComponent* pComponent)
+{
+	if (nullptr == pComponent) return;
+	m_proxyGUID = pComponent->GetInstanceID();
+
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	SpinLock lock(renderScene->m_uiProxyMapFlag);
+	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
+	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
+	auto proxyObject = iter->second.get();
+
+	DirectX::XMFLOAT2 origin{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
+	auto textures	= pComponent->textures;
+	auto curTexture	= pComponent->m_curtexture;
+	auto color		= pComponent->color;
+	auto position	= pComponent->pos;
+	auto scale		= pComponent->scale;
+	float rotation	= pComponent->rotate;
+	int layerOrder	= pComponent->GetLayerOrder();
+	auto shaderPath = pComponent->GetCustomPixelShader();
+	auto cpuBuffer = pComponent->GetCustomPixelCPUBuffer();
+
+	if (!shaderPath.empty())
+	{
+		proxyObject->SetCustomPixelShader(shaderPath);
+	}
+
+	m_updateFunction = [proxyObject, textures = std::move(textures), 
+		curTexture, origin, position, scale, 
+		rotation, layerOrder, color, buffer = std::move(cpuBuffer)]() mutable
+	{
+		UIRenderProxy::ImageData data{};
+		data.textures		= std::move(textures);
+		data.texture		= curTexture;
+		data.origin			= origin;
+		data.color			= color;
+		data.position		= position;
+		data.scale			= scale;
+		data.rotation		= rotation;
+		data.layerOrder		= layerOrder;
+		proxyObject->m_data = std::move(data);
+
+		if (!buffer.empty())
+		{
+			proxyObject->SetCustomPixelBuffer(buffer);
+		}
+	};
+}
+
+ProxyCommand::ProxyCommand(TextComponent* pComponent)
+{
+	if (nullptr == pComponent) return;
+	m_proxyGUID = pComponent->GetInstanceID();
+
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!renderScene || !owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	SpinLock lock(renderScene->m_uiProxyMapFlag);
+	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
+	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
+	auto proxyObject = iter->second.get();
+
+	auto font = pComponent->font;
+	auto message = pComponent->message;
+	auto color = pComponent->color;
+	auto position = pComponent->pos;
+	float fontSize = pComponent->fontSize;
+	int layerOrder = pComponent->GetLayerOrder();
+
+	m_updateFunction = [proxyObject, font, message, color, position, fontSize, layerOrder]()
+	{
+		UIRenderProxy::TextData data{};
+		data.font = font;
+		data.message = message;
+		data.color = color;
+		data.position = Mathf::Vector2(position);
+		data.fontSize = fontSize;
+		data.layerOrder = layerOrder;
+		proxyObject->m_data = std::move(data);
 	};
 }
 

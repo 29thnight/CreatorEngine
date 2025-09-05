@@ -17,6 +17,13 @@ struct alignas(16) ForwardBuffer
 	float m_envMapIntensity{ 1.f };
 };
 
+struct alignas(16) MatrixBuffer {
+	XMMATRIX View;
+	XMMATRIX Proj;
+	float ior;
+	float add;
+};
+
 ForwardPass::ForwardPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -70,6 +77,23 @@ ForwardPass::ForwardPass()
 	constexpr uint32 MAX_INSTANCES = 2048; // Max number of instances per draw call
 	m_maxInstanceCount = MAX_INSTANCES;
 
+	/*CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
+	rasterizerDesc.CullMode = D3D11_CULL_NONE;
+
+	DirectX11::ThrowIfFailed(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&m_pso->m_rasterizerState
+		)
+	);
+
+	DirectX11::ThrowIfFailed(
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&m_instancePSO->m_rasterizerState
+		)
+	);*/
+
 	D3D11_BUFFER_DESC instanceBufferDesc{};
 	instanceBufferDesc.ByteWidth = sizeof(Mathf::xMatrix) * MAX_INSTANCES;
 	instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT; // Changed for UpdateSubresource
@@ -117,6 +141,17 @@ ForwardPass::ForwardPass()
 			&m_blendPassState
 		)
 	);
+
+	m_CopiedTexture = Texture::Create(
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
+		"CopiedTexture",
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
+	);
+	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_MatrixBuffer = DirectX11::CreateBuffer(sizeof(MatrixBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 ForwardPass::~ForwardPass()
@@ -156,8 +191,21 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	ID3D11DeviceContext* deferredPtr = deferredContext;
 
+	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	MatrixBuffer matrixBuffer{};
+	matrixBuffer.Proj = renderData->m_frameCalculatedProjection;
+	matrixBuffer.View = renderData->m_frameCalculatedView;
+	matrixBuffer.ior = ior;
+	matrixBuffer.add = add;
+	DirectX11::UpdateBuffer(deferredPtr, m_MatrixBuffer.Get(), &matrixBuffer);
+	DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
+	DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
+	DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
+
+
 	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
+	std::map<std::string, std::vector<PrimitiveRenderProxy*>> shaderPSOGroups;
 	std::map<InstanceGroupKey, std::vector<PrimitiveRenderProxy*>> instanceGroups;
 
 	for (auto& proxy : renderData->m_forwardQueue)
@@ -165,6 +213,10 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		if (proxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
 		{
 			animatedProxies.push_back(proxy);
+		}
+		else if (proxy->m_Material->m_shaderPSO)
+		{
+			shaderPSOGroups[proxy->m_Material->m_shaderPSO->m_shaderPSOName].push_back(proxy);
 		}
 		else
 		{
@@ -300,6 +352,63 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
 
+	ID3D11ShaderResourceView* nullSRVs = { nullptr };
+
+	// --- 3.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
+	for (auto const& [psoName, proxies] : shaderPSOGroups)
+	{
+		if (proxies.empty()) continue;
+		auto firstProxy = proxies.front();
+		auto customPSO = firstProxy->m_Material->m_shaderPSO;
+		if (!customPSO) continue;
+		//TEST: PSO가 유효하지 않다면 ShaderSystem에서 동일 이름의 PSO를 찾아 교체
+		auto& shaderPSOContainer = ShaderSystem->ShaderAssets;
+
+		if (customPSO->IsInvalidated())
+		{
+			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
+			{
+				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				customPSO = firstProxy->m_Material->m_shaderPSO;
+			}
+			else
+			{
+				continue; // 해당 이름의 PSO가 없다면 스킵
+			}
+		}
+
+		// PSO는 그룹 단위로 1회 Apply
+		customPSO->Apply(deferredPtr);
+
+		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
+		for (auto* proxy : proxies)
+		{
+			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
+			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
+			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
+			if (proxy->m_Material->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &proxy->m_Material->m_pOccRoughMetal->m_pSRV);
+			if (proxy->m_Material->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &proxy->m_Material->m_AOMap->m_pSRV);
+			if (proxy->m_Material->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &proxy->m_Material->m_pEmissive->m_pSRV);
+
+			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", renderData->m_frameCalculatedView);
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", renderData->m_frameCalculatedProjection);
+			proxy->m_Material->TrySetMaterialInfo();
+			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
+			proxy->m_Material->ApplyShaderParams(deferredPtr);
+
+			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
+			proxy->Draw(deferredPtr);
+		}
+
+		DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRVs);
+		DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &nullSRVs);
+		DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &nullSRVs);
+		DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &nullSRVs);
+		DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &nullSRVs);
+	}
+
 	if (0 == renderData->m_index)
 	{
 		RenderDebugManager::GetInstance()->CaptureRenderPass(
@@ -318,6 +427,10 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets(deferredPtr);
+
+
+	DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &nullSRV);
+	DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &nullSRV);
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);
@@ -448,4 +561,6 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 
 void ForwardPass::ControlPanel()
 {
+	ImGui::DragFloat("ior", &ior, 0.075f, -1.f, 1.f);
+	ImGui::DragFloat("add", &add, 0.075f, 0.f, 1000.f);
 }

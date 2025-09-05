@@ -161,7 +161,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					}
 					if (ImGui::MenuItem("		Text"))
 					{
-						//UIManagers->MakeText("Text");
+						UIManagers->MakeText("Text", nullptr, nullptr);
 					}
 					if (ImGui::MenuItem("		Button"))
 					{
@@ -207,7 +207,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
-				Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
+				auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::UITexture);
 				ImageComponent* sprite = nullptr;
 				if (selectedSceneObject)
 				{
@@ -230,8 +230,48 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					ImGui::Text("No GameObject Selected");
 					UIManagers->MakeImage(filename.stem().string().c_str(), texture);
 				}
-
-
+			}
+			//else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Prefab"))
+			//{
+			//	const char* droppedFilePath = (const char*)payload->Data;
+			//	file::path filename = droppedFilePath;
+			//	file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
+			//	if (scene)
+			//	{
+			//		Meta::UndoCommandManager->Execute(
+			//			std::make_unique<Meta::LoadPrefabToSceneObjCommand>(
+			//				scene,
+			//				DataSystems->LoadCashedPrefab(filepath.string())));
+			//	}
+			//}
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Font"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Font\\") / filename.filename();
+				auto font = DataSystems->LoadSFont(filepath.wstring().c_str());
+				if (selectedSceneObject)
+				{
+					TextComponent* text = nullptr;
+					if (TextComponent* hasText = selectedSceneObject->GetComponent<TextComponent>())
+					{
+						text = hasText;
+					}
+					else
+					{
+						text = selectedSceneObject->AddComponent<TextComponent>();
+					}
+					if (text)
+					{
+						text->SetFont(font);
+						text->SetMessage("New Text");
+					}
+				}
+				else
+				{
+					ImGui::Text("No GameObject Selected");
+					UIManagers->MakeText(filename.stem().string().c_str(), font);
+				}
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 			{
@@ -290,30 +330,33 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				for (int i = 1; i < sceneObjects.size(); ++i)
 				{
 					auto& obj = sceneObjects[i];
-					if (!obj || obj->m_parentIndex > 0) continue;
+					if (!obj || obj->m_parentIndex > 0 || obj->IsDontDestroyOnLoad()) continue;
 
 					ImGui::PushID((int)&obj);
 					DrawSceneObject(obj);
 					ImGui::PopID();
 				}
 
-				auto& dontDistroyObj = SceneManagers->GetDontDestroyOnLoadObjects();
-				if (!dontDistroyObj.empty())
+				std::vector<std::shared_ptr<GameObject>> ddolObjects;
+				for (int i = 1; i < sceneObjects.size(); ++i)
+				{
+					auto& obj = sceneObjects[i];
+					if (obj && obj->IsDontDestroyOnLoad())
+					{
+						ddolObjects.push_back(obj);
+					}
+				}
+
+				if (!ddolObjects.empty())
 				{
 					ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 					if (ImGui::TreeNodeEx("[ Dont Destroy On Load ]", ImGuiTreeNodeFlags_DefaultOpen))
 					{
-						for (const auto& obj : dontDistroyObj)
+						for (const auto& obj : ddolObjects)
 						{
-							if (!obj || !obj->m_containDontDestroyOnLoad) continue;
-
-							auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
-							if (gameObject)
-							{
-								ImGui::PushID((int)gameObject.get());
-								DrawSceneObject(gameObject);
-								ImGui::PopID();
-							}
+							ImGui::PushID((int)obj.get());
+							DrawSceneObject(obj);
+							ImGui::PopID();
 						}
 						ImGui::TreePop();
 					}

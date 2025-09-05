@@ -7,6 +7,7 @@
 #include "Explosion.h"
 #include "Bomb.h"
 #include "NormalBullet.h"
+#include "CurveIndicator.h"
 #include "SpecialBullet.h"
 #include "Bullet.h"
 #include "DestroyEffect.h"

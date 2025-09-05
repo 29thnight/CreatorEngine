@@ -7,6 +7,8 @@ using namespace BT;
 class AtteckAction : public ActionNode
 {
 public:
-	BT_ACTION_BODY(AtteckAction)
-	virtual NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override;
+	AtteckAction() {
+		m_name = "AtteckAction"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<ActionNode>(); m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<AtteckAction>();
+	} virtual ~AtteckAction() = default;
+	virtual NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override;	
 };

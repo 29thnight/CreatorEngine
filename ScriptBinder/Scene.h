@@ -4,6 +4,7 @@
 #include "AssetBundle.h"
 #include "Scene.generated.h"
 #include "EBodyType.h"
+#include <unordered_map>
 
 class GameObject;
 class RenderScene;
@@ -15,6 +16,9 @@ class Texture;
 class RigidBodyComponent;
 class TerrainComponent;
 class FoliageComponent;
+class ImageComponent;
+class TextComponent;
+class DecalComponent;
 class ReferenceAssets;
 class BoxColliderComponent;
 class SphereColliderComponent;
@@ -39,8 +43,18 @@ public:
 	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
-	std::shared_ptr<GameObject> GetGameObject(std::string_view name);
-	const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
+    std::shared_ptr<GameObject> TryGetGameObject(GameObject::Index index);
+    // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
+    void DetachGameObjectHierarchy(GameObject* root);
+    // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
+    // 단일 객체를 붙임(부모 인덱스는 이 씬 기준). 유니크 네임/Tag/Layer/루트 children/Transform 부모까지 처리.
+    GameObject::Index AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObject::Index parentIndex);
+    // DDOL 서브트리를 한꺼번에 붙임. parent/child 인덱스는 go들이 원래 갖고 있던 서브트리 상대관계를 따름.
+    // 반환: oldIndex -> newIndex 매핑(이 씬 기준)
+    std::unordered_map<GameObject::Index, GameObject::Index>
+        AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots);
+    std::shared_ptr<GameObject> GetGameObject(std::string_view name);
+    const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
 	void AddSelectedSceneObject(GameObject* sceneObject);
 	void RemoveSelectedSceneObject(GameObject* sceneObject);
 	void ClearSelectedSceneObjects();
@@ -59,6 +73,9 @@ private:
     friend class SceneManager;
     //for Editor
     void Reset();
+
+    // 이름 충돌 방지
+    std::string MakeUniqueName(std::string_view base);
 
 public:
     //Events
@@ -135,7 +152,7 @@ public:
     size_t m_buildIndex{ 0 };
     [[Property]]
 	HashingString m_sceneName;
-
+    [[Property]]
 	AssetBundle m_requiredLoadAssetsBundle{};
 
 public:
@@ -167,6 +184,11 @@ public:
     void CollectFoliageComponent(FoliageComponent* ptr);
     void UnCollectFoliageComponent(FoliageComponent* ptr);
     std::vector<FoliageComponent*>& GetFoliageComponents() { return m_foliageComponents; }
+
+public:
+	void CollectDecalComponent(DecalComponent* ptr);
+	void UnCollectDecalComponent(DecalComponent* ptr);
+	std::vector<DecalComponent*>& GetDecalComponents() { return m_decalComponents; }
 
 public:
 	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
@@ -205,14 +227,10 @@ private:
 
 public:
     void AllUpdateWorldMatrix();
-	[[deprecated]]
-	void RegisterDirtyTransform(Transform* transform);
-	[[deprecated]]
-	void UpdateAllTransforms();
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
-	std::unordered_set<Transform*> m_globalDirtySet{};
+	std::unordered_set<Transform*>	m_globalDirtySet{};
 	std::vector<LightComponent*>    m_lightComponents;
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
@@ -220,6 +238,7 @@ private:
     std::vector<Light>              m_lights;
     std::vector<TerrainComponent*>  m_terrainComponents;
     std::vector<FoliageComponent*>  m_foliageComponents;
+	std::vector<DecalComponent*>	m_decalComponents;
 	std::mutex sceneMutex{};
 
 private:
@@ -235,14 +254,14 @@ private:
 	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
 	std::vector<TerrainColliderComponent*>		m_terrainColliderComponents;
 	std::vector<std::shared_ptr<Animator*>>     m_animators;
-    RigidBodyTypeLinkCallback	m_ColliderTypeLinkCallback;
-	ColliderContainerType		m_colliderContainer;
+    RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
+	ColliderContainerType						m_colliderContainer;
 
 public:
 	HashingString GetSceneName() const { return m_sceneName; }
-    std::vector<Texture*> m_lightmapTextures{};
-    std::vector<Texture*> m_directionalmapTextures{};
-    Core::DelegateHandle resetObjHandle{};
-    GameObject* m_selectedSceneObject = nullptr;
-	std::vector<GameObject*> m_selectedSceneObjects;
+    std::vector<Texture*>		m_lightmapTextures{};
+    std::vector<Texture*>		m_directionalmapTextures{};
+    Core::DelegateHandle		resetObjHandle{};
+    GameObject*					m_selectedSceneObject = nullptr;
+	std::vector<GameObject*>	m_selectedSceneObjects;
 };

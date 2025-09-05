@@ -39,7 +39,7 @@ extern "C"
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
 
-		return cstrs.data(); // Æ÷ÀÎÅÍ ¹è¿­ ¹İÈ¯
+		return cstrs.data(); // í¬ì¸í„° ë°°ì—´ ë°˜í™˜
 	}
 #pragma endregion
 #pragma region Behavior Tree Node Functions
@@ -77,7 +77,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // Æ÷ÀÎÅÍ ¹è¿­ ¹İÈ¯
+		return cstrs.data(); // í¬ì¸í„° ë°°ì—´ ë°˜í™˜
 	}
 
 	EXPORT_API const char** ListBTConditionNode(int* outCount)
@@ -96,7 +96,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // Æ÷ÀÎÅÍ ¹è¿­ ¹İÈ¯
+		return cstrs.data(); // í¬ì¸í„° ë°°ì—´ ë°˜í™˜
 	}
 
 	EXPORT_API const char** ListBTConditionDecoratorNode(int* outCount)
@@ -115,7 +115,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // Æ÷ÀÎÅÍ ¹è¿­ ¹İÈ¯
+		return cstrs.data(); // í¬ì¸í„° ë°°ì—´ ë°˜í™˜
 	}
 #pragma endregion
 #pragma region Animation Behavior Functions
@@ -141,7 +141,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // Æ÷ÀÎÅÍ ¹è¿­ ¹İÈ¯
+		return cstrs.data(); // í¬ì¸í„° ë°°ì—´ ë°˜í™˜
 	}
 #pragma endregion
 #pragma region Memory Management Functions
@@ -196,6 +196,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("Explosion", []() { return new Explosion(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bomb", []() { return new Bomb(); });
 		CreateFactory::GetInstance()->RegisterFactory("NormalBullet", []() { return new NormalBullet(); });
+		CreateFactory::GetInstance()->RegisterFactory("CurveIndicator", []() { return new CurveIndicator(); });
 		CreateFactory::GetInstance()->RegisterFactory("SpecialBullet", []() { return new SpecialBullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bullet", []() { return new Bullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("DestroyEffect", []() { return new DestroyEffect(); });
@@ -222,6 +223,7 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+		ActionCreateFactory::GetInstance()->RegisterFactory("WaitAction", []() { return new WaitAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("KnockBackAction", []() { return new KnockBackAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("DetectAndTargetingAction", []() { return new DetectAndTargetingAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BTEntityInitAction", []() { return new BTEntityInitAction(); });
@@ -279,6 +281,7 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("MosterMeleeAni", []() { return new MosterMeleeAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAH", []() { return new PlayerAttackAH(); });
 	}
 #pragma endregion

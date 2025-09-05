@@ -5,12 +5,12 @@
 #include <string>
 #include "yaml-cpp/yaml.h"
 
-class MeshRenderer;
-class ModuleBehavior;
-class Animator;
-class PlayerInputComponent;
 extern void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "");
-extern void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer);
-extern void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
-extern void ImGuiDrawHelperAnimator(Animator* animator);
-extern void ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInput);
+extern void ImGuiDrawHelperMeshRenderer(class MeshRenderer* meshRenderer);
+extern void ImGuiDrawHelperModuleBehavior(class ModuleBehavior* moduleBehavior);
+extern void ImGuiDrawHelperAnimator(class Animator* animator);
+extern void ImGuiDrawHelperPlayerInput(class PlayerInputComponent* playerInput);
+extern void ImGuiDrawHelperRectTransformComponent(class RectTransformComponent* rectTransform);
+extern void ImGuiDrawHelperTerrainComponent(class TerrainComponent* terrain);
+
+extern void TextureDropTarget(class Material* mat);

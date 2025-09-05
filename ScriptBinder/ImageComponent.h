@@ -12,7 +12,6 @@ struct alignas(16) ImageInfo
 	Mathf::xMatrix world;
 	float2 size;
 	float2 screenSize;
- 
 };
 
 //모든 2d이미지 기본?
@@ -27,25 +26,35 @@ public:
 	ImageComponent();
 	~ImageComponent() = default;
 
-	void Load(Texture* ptr);
+	void Load(const std::shared_ptr<Texture>& ptr);
+	virtual void Awake() override;
 	virtual void Update(float tick) override;
+	virtual void OnDestroy() override;
     [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
-	void Draw(std::unique_ptr<SpriteBatch>& sBatch);
+
+	bool isThisTextureExist(std::string_view path) const;
+
+	const std::vector<std::shared_ptr<Texture>>& GetTextures() const { return textures; }
+	const std::vector<std::string>& GetTexturePaths() const { return texturePaths; }
 	
 	ImageInfo uiinfo{};
-	Texture* m_curtexture{};
+	std::shared_ptr<Texture> m_curtexture{};
     [[Property]]
 	int curindex = 0;
-
-	//ndc좌표 {-1,1}
-	Mathf::Vector3 trans{ 0,0,0 };
-	Mathf::Vector3 rotat{ 0,0,0 };
+	[[Property]]
+	Mathf::Color4	color{ 1,1,1,1 };
+	[[Property]]
+	float			rotate{ 0 };
+	[[Property]]
+	XMFLOAT2		origin{};
 private:
-	float rotate =0;
-	std::vector<Texture*> textures;
-	XMFLOAT2 origin{};
+	friend class ProxyCommand;
+	friend class UIRenderProxy;
+	[[Property]]
+	std::vector<std::string> 				texturePaths;
+	std::vector<std::shared_ptr<Texture>>	textures;
 
 };
 

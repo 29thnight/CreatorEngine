@@ -4,9 +4,10 @@
 
 #include "BLackBoardValue.h"
 #include "AssetEntry.h"
-#include "CameraComponent.h"
-#include "TerrainCollider.h"
 #include "Animation.h"
+#include "DecalComponent.h"
+#include "TerrainCollider.h"
+#include "CameraComponent.h"
 #include "RenderPassSettings.h"
 #include "SSGIPassSetting.h"
 #include "Camera.h"
@@ -100,6 +101,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(ColorGradingPassSetting);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);
+    AUTO_REGISTER_CLASS(DecalComponent);
     AUTO_REGISTER_CLASS(DeferredPassSetting);
     AUTO_REGISTER_CLASS(EffectComponent);
     AUTO_REGISTER_CLASS(FoliageComponent);

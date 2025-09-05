@@ -173,8 +173,9 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -199,8 +200,9 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -227,8 +229,9 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -257,6 +260,7 @@
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="ConditionParameter.cpp" />
+    <ClCompile Include="DecalComponent.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
@@ -289,6 +293,7 @@
     <ClInclude Include="BTBuildNode.h" />
     <ClInclude Include="BTEnum.h" />
     <ClInclude Include="BTHeader.h" />
+    <ClInclude Include="DecalComponent.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EForceMode.h" />
     <ClInclude Include="FoliageInstance.h" />

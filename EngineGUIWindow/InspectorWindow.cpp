@@ -28,6 +28,7 @@
 #include "FunctionRegistry.h"
 #include "VolumeComponent.h"
 #include "RectTransformComponent.h"
+#include "DecalComponent.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -140,8 +141,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					{
 						selectedComponent = component.get();
 					}
-
-					if(component->GetTypeID() == type_guid(MeshRenderer))
+					auto componentTypeID = component->GetTypeID();
+					if(componentTypeID == type_guid(MeshRenderer))
 					{
 						MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
 						if (nullptr != meshRenderer)
@@ -149,7 +150,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperMeshRenderer(meshRenderer);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(TerrainComponent)) {
+					else if (componentTypeID == type_guid(TerrainComponent)) {
 
 						TerrainComponent* terrain = dynamic_cast<TerrainComponent*>(component.get());
 						if (nullptr != terrain)
@@ -161,7 +162,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					{
 						ImGuiDrawHelperModuleBehavior(moduleBehavior);
 					}
-					else if (component->GetTypeID() == type_guid(Animator))
+					else if (componentTypeID == type_guid(Animator))
 					{
 						Animator* animator = dynamic_cast<Animator*> (component.get());
 						if (nullptr != animator)
@@ -169,7 +170,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperAnimator(animator);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(StateMachineComponent))
+					else if (componentTypeID == type_guid(StateMachineComponent))
 					{
 						StateMachineComponent* fsm = dynamic_cast<StateMachineComponent*>(component.get());
 						if (nullptr != fsm)
@@ -177,7 +178,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperFSM(fsm);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(BehaviorTreeComponent))
+					else if (componentTypeID == type_guid(BehaviorTreeComponent))
 					{
 						BehaviorTreeComponent* bt = dynamic_cast<BehaviorTreeComponent*>(component.get());
 						if (nullptr != bt)
@@ -185,7 +186,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperBT(bt);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(PlayerInputComponent))
+					else if (componentTypeID == type_guid(PlayerInputComponent))
 					{
 						PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
 						if (nullptr != input)
@@ -193,12 +194,28 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperPlayerInput(input);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(VolumeComponent))
+					else if (componentTypeID == type_guid(VolumeComponent))
 					{
 						VolumeComponent* input = dynamic_cast<VolumeComponent*>(component.get());
 						if (nullptr != input)
 						{
 							ImGuiDrawHelperVolume(input);
+						}
+					}
+					else if (componentTypeID == type_guid(DecalComponent)) 
+					{
+						DecalComponent* input = dynamic_cast<DecalComponent*>(component.get());
+						if (nullptr != input) 
+						{
+							ImGuiDrawHelperDecal(input);
+						}
+					}
+					else if (componentTypeID == type_guid(ImageComponent))
+					{
+						ImageComponent* image = dynamic_cast<ImageComponent*>(component.get());
+						if (nullptr != image)
+						{
+							ImGuiDrawHelperImageComponent(image);
 						}
 					}
 					else if (type)
@@ -615,261 +632,6 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	}
 }
 
-struct PresetInfo {
-	AnchorPreset preset;
-	Mathf::Vector2 anchorMin;
-	Mathf::Vector2 anchorMax;
-	const char* name;
-};
-
-static constexpr std::array<PresetInfo, 16> presets{ {
-		{ AnchorPreset::TopLeft,      {0.f,  0.f},	{0.f,  0.f},	"TopLeft"		},
-		{ AnchorPreset::TopCenter,    {0.5f, 0.f},	{0.5f, 0.f},	"TopCenter"		},
-		{ AnchorPreset::TopRight,     {1.f,  0.f},	{1.f,  0.f},	"TopRight"		},
-		{ AnchorPreset::MiddleLeft,   {0.f,  0.5f},	{0.f,  0.5f},	"MiddleLeft"	},
-		{ AnchorPreset::MiddleCenter, {0.5f, 0.5f}, {0.5f, 0.5f},	"MiddleCenter"	},
-		{ AnchorPreset::MiddleRight,  {1.f,  0.5f},	{1.f,  0.5f},	"MiddleRight"	},
-		{ AnchorPreset::BottomLeft,   {0.f,  1.f},	{0.f,  1.f},	"BottomLeft"	},
-		{ AnchorPreset::BottomCenter, {0.5f, 1.f},	{0.5f, 1.f},	"BottomCenter"	},
-		{ AnchorPreset::BottomRight,  {1.f,  1.f},	{1.f,  1.f},	"BottomRight"	},
-		{ AnchorPreset::StretchLeft,  {0.f,  0.5f},	{1.f,  0.5f},	"StretchLeft"	},
-		{ AnchorPreset::StretchCenter,{0.f,  0.5f},	{1.f,  0.5f},	"StretchCenter"	},
-		{ AnchorPreset::StretchRight, {0.f,  0.5f},	{1.f,  0.5f},	"StretchRight"	},
-		{ AnchorPreset::StretchTop,   {0.5f, 0.f},	{0.5f, 1.f},	"StretchTop"	},
-		{ AnchorPreset::StretchMiddle,{0.5f, 0.f},	{0.5f, 1.f},	"StretchMiddle"	},
-		{ AnchorPreset::StretchBottom,{0.5f, 0.f},	{0.5f, 1.f},	"StretchBottom"	},
-		{ AnchorPreset::StretchAll,   {0.f,  0.f},	{1.f,  1.f},	"StretchAll"	},
-} };
-
-static int FindPresetIndex(AnchorPreset p) {
-	for (int i = 0; i < (int)presets.size(); ++i) if (presets[i].preset == p) return i;
-	return -1;
-}
-
-static int FindCurrentPresetIndex(RectTransformComponent* rt) {
-	auto a = rt->GetAnchorMin(), b = rt->GetAnchorMax();
-	for (int i = 0; i < (int)presets.size(); ++i)
-		if (VecEq(a, presets[i].anchorMin) && VecEq(b, presets[i].anchorMax)) return i;
-	return -1;
-}
-
-// -------------------- 프리셋 팝업: Unity 배치 --------------------
-// 3x3 포인트 프리셋 + 가로스트레치 3 + 세로스트레치 3 + 전체스트레치 1
-static void DrawAnchorPresetPopup(RectTransformComponent* rt)
-{
-	const float pad = 4.f;
-	const ImVec2 cell(28, 28);
-
-	int cur = FindCurrentPresetIndex(rt);
-
-	auto drawBtn = [&](AnchorPreset ap) {
-		int i = FindPresetIndex(ap);
-		const auto& pr = presets[i];
-		bool pressed = DrawAnchorIconButton(pr.name, pr.anchorMin, pr.anchorMax, i == cur, cell);
-		if (pressed) rt->SetAnchorPreset(pr.preset);
-		return pressed;
-		};
-
-	// 3x3 포인트
-	{
-		// TL, TC, TR
-		drawBtn(AnchorPreset::TopLeft);   ImGui::SameLine(0, pad);
-		drawBtn(AnchorPreset::TopCenter); ImGui::SameLine(0, pad);
-		drawBtn(AnchorPreset::TopRight);
-		// ML, MC, MR
-		drawBtn(AnchorPreset::MiddleLeft); ImGui::SameLine(0, pad);
-		drawBtn(AnchorPreset::MiddleCenter); ImGui::SameLine(0, pad);
-		drawBtn(AnchorPreset::MiddleRight);
-		// BL, BC, BR
-		drawBtn(AnchorPreset::BottomLeft); ImGui::SameLine(0, pad);
-		drawBtn(AnchorPreset::BottomCenter); ImGui::SameLine(0, pad);
-		drawBtn(AnchorPreset::BottomRight);
-	}
-
-	ImGui::Dummy(ImVec2(1, 6));
-	ImGui::Separator();
-	ImGui::Dummy(ImVec2(1, 6));
-
-	// 가로 스트레치 3
-	drawBtn(AnchorPreset::StretchLeft);   ImGui::SameLine(0, pad);
-	drawBtn(AnchorPreset::StretchCenter); ImGui::SameLine(0, pad);
-	drawBtn(AnchorPreset::StretchRight);
-
-	// 세로 스트레치 3
-	ImGui::Dummy(ImVec2(1, 6));
-	drawBtn(AnchorPreset::StretchTop);     ImGui::SameLine(0, pad);
-	drawBtn(AnchorPreset::StretchMiddle);  ImGui::SameLine(0, pad);
-	drawBtn(AnchorPreset::StretchBottom);
-
-	// 전체 스트레치
-	ImGui::Dummy(ImVec2(1, 6));
-	drawBtn(AnchorPreset::StretchAll);
-}
-
-void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransformComponent)
-{
-	if (!rectTransformComponent) return;
-
-	bool menuClicked = false;
-	if (ImGui::DrawCollapsingHeaderWithButton("RectTransform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
-	{
-		auto anchorMin = rectTransformComponent->GetAnchorMin();
-		auto anchorMax = rectTransformComponent->GetAnchorMax();
-		auto anchoredPos = rectTransformComponent->GetAnchoredPosition();
-		auto sizeDelta = rectTransformComponent->GetSizeDelta();
-		auto pivot = rectTransformComponent->GetPivot();
-
-		// 좌: 프리셋 팝업 버튼 (Unity처럼)
-		ImGui::BeginGroup();
-		ImGui::TextUnformatted("Anchors");
-		{
-			int curIndex = FindCurrentPresetIndex(rectTransformComponent);
-			ImVec2 btnSize(36, 36);
-
-			ImGui::PushID("CurrentPresetButton");
-			bool pressed = ImGui::InvisibleButton("##currentPreset", btnSize);
-
-			// 버튼의 실제 사각형
-			ImRect r(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-
-			// 위에 그리기: 겹침 문제가 있으면 ForegroundDrawList 사용
-			// ImDrawList* dl = ImGui::GetForegroundDrawList(); // 항상 최상위
-			ImDrawList* dl = ImGui::GetWindowDrawList();
-
-			// 배경(호버/액티브 반응)
-			ImU32 bgCol = ImGui::IsItemActive() ? IM_COL32(70, 70, 70, 255)
-				: ImGui::IsItemHovered() ? IM_COL32(80, 80, 80, 255)
-				: IM_COL32(60, 60, 60, 255);
-			dl->AddRectFilled(r.Min, r.Max, bgCol, 4.f);
-
-			//Mathf::Vector2 calcMin = { presets[curIndex].anchorMin.x , 1.f - presets[curIndex].anchorMin.y };
-			//Mathf::Vector2 calcMax = { presets[curIndex].anchorMax.x , 1.f - presets[curIndex].anchorMax.y };
-			Mathf::Vector2 calcMin = presets[curIndex].anchorMin;
-			Mathf::Vector2 calcMax = presets[curIndex].anchorMax;
-
-			if (curIndex >= 0) {
-				const auto& pr = presets[curIndex];
-				// 아이콘 비주얼만 그리기 (selected=false: 이미 현재 버튼이라 테두리 과도 방지)
-				DrawAnchorIconVisual(dl, ImRect(r.Min + ImVec2(4, 4), r.Max - ImVec2(4, 4)),
-					calcMin, calcMax, /*selected=*/false);
-			}
-			else {
-				// Custom 상태: 간단한 십자
-				dl->AddLine(ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Min.y + 4), ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Max.y - 4), IM_COL32(200, 200, 200, 255), 1.f);
-				dl->AddLine(ImVec2(r.Min.x + 4, (r.Min.y + r.Max.y) * 0.5f), ImVec2(r.Max.x - 4, (r.Min.y + r.Max.y) * 0.5f), IM_COL32(200, 200, 200, 255), 1.f);
-			}
-
-			if (pressed)
-				ImGui::OpenPopup("AnchorPresetPopup");
-
-			if (ImGui::BeginPopup("AnchorPresetPopup"))
-			{
-				DrawAnchorPresetPopup(rectTransformComponent); // 기존 프리셋 목록
-				ImGui::EndPopup();
-			}
-			ImGui::PopID();
-		}
-
-		if (ImGui::BeginPopup("AnchorPresetPopup"))
-		{
-			DrawAnchorPresetPopup(rectTransformComponent);
-			ImGui::EndPopup();
-		}
-		ImGui::EndGroup();
-
-		ImGui::SameLine();
-		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-		ImGui::SameLine();
-
-		// 우: 값 편집 테이블 (라벨 | X | Y)
-		if (ImGui::BeginTable("RectTransformTable", 3,
-			ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit, ImVec2(-1, 0)))
-		{
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed, 90.f);
-			ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed, 90.f);
-			ImGui::TableHeadersRow();
-
-			//if (DrawVec2Row("Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
-			//	rectTransformComponent->SetAnchorMin(anchorMin);
-			//if (DrawVec2Row("Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
-			//	rectTransformComponent->SetAnchorMax(anchorMax);
-
-			//if (DrawVec2RowAbs("Pos", anchoredPos, 1.f))
-			//	rectTransformComponent->SetAnchoredPosition(anchoredPos);
-
-			//if (DrawVec2RowAbs("Width/Height", sizeDelta, 1.f))
-			//	rectTransformComponent->SetSizeDelta(sizeDelta);
-
-			//if (DrawVec2Row("Pivot", pivot, 0.01f, 0.f, 1.f))
-			//	rectTransformComponent->SetPivot(pivot);
-
-			bool anchorsChanged = false;
-			bool pivotChanged = false;
-
-			if (DrawVec2Row("Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
-				anchorsChanged = true;
-			if (DrawVec2Row("Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
-				anchorsChanged = true;
-
-			if (DrawVec2RowAbs("Pos", anchoredPos, 1.f))
-				rectTransformComponent->SetAnchoredPosition(anchoredPos);
-
-			if (DrawVec2RowAbs("Width/Height", sizeDelta, 1.f))
-				rectTransformComponent->SetSizeDelta(sizeDelta);
-
-			if (DrawVec2Row("Pivot", pivot, 0.01f, 0.f, 1.f))
-				pivotChanged = true;
-
-			if (anchorsChanged || pivotChanged)
-			{
-				Mathf::Rect parentRect{ 0.f, 0.f, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
-				if (auto* owner = rectTransformComponent->GetOwner(); owner)
-				{
-					if (GameObject::IsValidIndex(owner->m_parentIndex))
-					{
-						if (auto* parentObj = GameObject::FindIndex(owner->m_parentIndex))
-						{
-							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
-								parentRect = parentRT->GetWorldRect();
-						}
-					}
-				}
-				rectTransformComponent->SetAnchorsPivotKeepWorld(anchorMin, anchorMax, pivot, parentRect);
-			}
-
-			ImGui::EndTable();
-		}
-
-		const auto& wr = rectTransformComponent->GetWorldRect();
-		ImGui::Spacing();
-		ImGui::Text("World Rect (x y w h): %.1f  %.1f  %.1f  %.1f", wr.x, wr.y, wr.width, wr.height);
-	}
-	//if (menuClicked) {
-	//	ImGui::OpenPopup("TransformMenu");
-	//	menuClicked = false;
-	//}
-
-	//ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
-	//ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-	//ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
-	//if (ImGui::BeginPopup("TransformMenu"))
-	//{
-	//	if (ImGui::MenuItem("Reset Transform"))
-	//	{
-	//		gameObject->m_transform.position = { 0, 0, 0, 1 };
-	//		gameObject->m_transform.rotation = XMQuaternionIdentity();
-	//		gameObject->m_transform.scale = { 1, 1, 1, 1 };
-	//		gameObject->m_transform.SetDirty();
-	//		gameObject->m_transform.UpdateLocalMatrix();
-	//		ImGui::CloseCurrentPopup();
-	//	}
-	//	ImGui::EndPopup();
-	//}
-	//ImGui::PopStyleVar();
-	//ImGui::PopStyleColor(2);
-}
-
 void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 {
 	// 현재 트랜스폼 값
@@ -1036,304 +798,6 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 	}
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor(2);
-}
-
-void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
-{
-	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
-
-	if (!g_CurrentBrush && !EngineSettingInstance->terrainBrush)
-	{
-		Debug->LogError("TerrainComponent::GetCurrentBrush() returned nullptr.");
-		EngineSettingInstance->terrainBrush = new TerrainBrush();
-		terrainComponent->SetTerrainBrush(EngineSettingInstance->terrainBrush);
-		return;
-	}
-	else if (!g_CurrentBrush)
-	{
-		g_CurrentBrush = EngineSettingInstance->terrainBrush;
-	}
-
-	int prewidth = terrainComponent->m_width;
-	int preheight = terrainComponent->m_height;
-	int editWidth = terrainComponent->m_width;
-	int editHeight = terrainComponent->m_height;
-	file::path terrainAssetPath = terrainComponent->m_terrainTargetPath;
-	FileGuid& terrainAssetGuid = terrainComponent->m_trrainAssetGuid;
-	if (terrainAssetGuid == nullFileGuid && !terrainAssetPath.empty())
-	{
-		terrainAssetGuid = DataSystems->GetFileGuid(terrainAssetPath);
-	}
-	
-	//bool change_edit = ImGui::IsItemDeactivatedAfterEdit();
-	ImGui::SeparatorText("Terrain Size");
-	if (ImGui::InputInt("Width", &editWidth)) {
-		if (ImGui::IsItemDeactivatedAfterEdit())
-		{
-			if(editWidth < 2)
-			{
-				editWidth = 2;
-			}
-		}
-	}
-	if (ImGui::InputInt("Height", &editHeight)) {
-		if (ImGui::IsItemDeactivatedAfterEdit())
-		{
-			if (editHeight < 2)
-			{
-				editHeight = 2;
-			}
-		}
-	}	
-
-	editWidth = editWidth > 2 ? editWidth : 2;
-	editHeight = editHeight > 2 ? editHeight : 2;
-
-	if (prewidth != editWidth || preheight != editHeight)
-	{
-		terrainComponent->Resize(editWidth, editHeight);
-	}
-
-	EngineSettingInstance->terrainBrush->m_isEditMode = false;
-	// ImGui UI 예시 (에디터 툴 패널 내부)
-	if (ImGui::CollapsingHeader("Terrain Editor", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		//inspector가 화면에 뜨는 경우 브러시가 활성화된 상태로 설정
-		EngineSettingInstance->terrainBrush->m_isEditMode = true; // 브러시가 활성화된 상태로 설정
-		// 모드 선택
-		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer", "FoliageMode" };
-		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
-		if (ImGui::Combo("Edit Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
-			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);	
-
-		if(g_CurrentBrush->m_mode != TerrainBrush::Mode::FoliageMode)
-		{
-			if (ImGui::CollapsingHeader("Paint Terrain", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
-				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
-
-				// 세기 슬라이더
-				ImGui::SliderFloat("Strength", &g_CurrentBrush->m_strength, 0.0f, 1.0f);
-
-				// Flatten 옵션일 때만 목표 높이 입력
-				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
-				{
-					//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
-					ImGui::SliderFloat("FlatHeight", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
-				}
-
-				// PaintLayer 옵션일 때만 레이어 선택
-				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::PaintLayer)
-				{
-					// 에디터가 가지고 있는 레이어 리스트에서 ID와 이름을 보여줌
-					static int selectedLayerIndex = 0;
-					std::vector<const char*> layerNames;
-
-					layerNames = terrainComponent->GetLayerNames();
-
-					if (ImGui::Combo("Layer ID", &selectedLayerIndex, layerNames.data(), (int)layerNames.size()))
-					{
-						g_CurrentBrush->m_layerID = selectedLayerIndex;
-					}
-
-					TerrainLayer* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
-					if (layer != nullptr) {
-						float tiling = layer->tilling;
-						float tempTiling = tiling;
-						ImGui::DragFloat("tiling", &tempTiling, 1.0f, 0.01, 4096.0f);
-						if (tempTiling != tiling)
-						{
-							layer->tilling = tempTiling;
-							terrainComponent->UpdateLayerDesc(selectedLayerIndex);
-						}
-					}
-
-					if (ImGui::Button("AddLayer")) {
-
-						file::path difuseFile = ShowOpenFileDialog(L"");
-						std::wstring difuseFileName = difuseFile.filename();
-						if (!difuseFile.empty())
-						{
-							terrainComponent->AddLayer(difuseFile, difuseFileName, 10.0f);
-						}
-					}
-				}
-
-				// 브러시 모양 선택
-				if (ImGui::Button("mask texture load"))
-				{
-					file::path maskTexture = ShowOpenFileDialog(L"");
-					terrainComponent->SetBrushMaskTexture(g_CurrentBrush, maskTexture);
-				}
-
-				if (!g_CurrentBrush->m_masks.empty())
-				{
-					std::vector<std::string>& maskNameVec = g_CurrentBrush->GetMaskNames();
-					std::vector<const char*> maskNames;
-					maskNames.reserve(maskNameVec.size());
-					for (const auto& name : maskNameVec) {
-						maskNames.push_back(name.c_str());
-					}
-
-					static int selectedMaskIndex = -1;
-					int maskIndex = 0;
-					for (const auto& mask : g_CurrentBrush->m_masks)
-					{
-						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f)))
-						{
-							if (selectedMaskIndex != maskIndex)
-							{
-								selectedMaskIndex = maskIndex;
-								uint32_t id = static_cast<uint32_t>(maskIndex);
-								g_CurrentBrush->SetMaskID(maskIndex); // 선택된 마스크 ID 설정
-							}
-							else
-							{
-								selectedMaskIndex = -1; // 이미 선택된 마스크를 다시 클릭하면 선택 해제
-								uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
-								g_CurrentBrush->SetMaskID(id); // No mask selected
-							}
-						}
-						maskIndex++;
-						/*ImGui::Image((ImTextureID)mask.m_maskSRV,
-							ImVec2((float)100.0f, (float)100.0f));*/
-					}
-				}
-
-				ImGui::SeparatorText("Terrain Asset");
-				//save , load
-				if (ImGui::Button("Save Terrain"))
-				{
-					file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::Relative("Terrain\\"));
-					if (savePath != L"") {
-						std::wstring folderPath = savePath.parent_path().wstring();
-						std::wstring fileName = savePath.stem().wstring();
-						terrainComponent->Save(folderPath, fileName);
-					}
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Load Terrain"))
-				{
-					//todo:
-					file::path loadPath = ShowOpenFileDialog(L"");
-					if (!loadPath.empty())
-					{
-						terrainComponent->Load(loadPath);
-					}
-				}
-			}
-		}
-		else
-		{
-			if (ImGui::CollapsingHeader("Paint Foliage", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				EngineSettingInstance->terrainBrush->m_isEditMode = true;
-				GameObject* owner = terrainComponent->GetOwner();
-				FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
-				if (!foliage)
-				{
-					foliage = owner->AddComponent<FoliageComponent>();
-				}
-
-				std::vector<const char*> typeNames;
-				for (const auto& t : foliage->GetFoliageTypes()) { typeNames.push_back(t.m_modelName.c_str()); }
-				int typeIndex = static_cast<int>(g_CurrentBrush->m_foliageTypeID);
-				if (!typeNames.empty())
-				{
-					ImGui::Combo("Type", &typeIndex, typeNames.data(), static_cast<int>(typeNames.size()));
-					g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(typeIndex);
-				}
-				// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
-				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
-				// 세기 슬라이더
-				ImGui::InputInt("Density", &g_CurrentBrush->m_foliageDensity);
-
-				ImGui::SeparatorText("Foliage Mesh");
-				ImGui::Text("Drag Model Here");
-				if (ImGui::BeginDragDropTarget())
-				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
-					{
-						const char* droppedFilePath = static_cast<const char*>(payload->Data);
-						file::path filename = file::path(droppedFilePath).filename();
-						file::path filepath = PathFinder::Relative("Models\\") / filename;
-						if (Model* model = DataSystems->LoadCashedModel(filepath.string().c_str()))
-						{
-							FoliageType type(model, true);
-							foliage->AddFoliageType(type);
-							g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
-						}
-					}
-					ImGui::EndDragDropTarget();
-				}
-				int foliageMode = static_cast<int>(g_CurrentBrush->m_foliageMode);
-				const char* fModes[] = { "Paint", "Erase" };
-				if (ImGui::Combo("Action", &foliageMode, fModes, 2))
-				{
-					g_CurrentBrush->m_foliageMode = static_cast<TerrainBrush::FoliageMode>(foliageMode);
-				}
-
-				ImGui::SeparatorText("Foliage Asset");
-				if (ImGui::Button("Save Foliage"))
-				{
-					file::path foliageDir = PathFinder::Relative("Foliage\\");
-					if (!file::exists(foliageDir))
-					{
-						if (!file::create_directories(foliageDir))
-						{
-							std::cerr << "Failed to create Foliage directory." << std::endl;
-							return;
-						}
-					}
-
-					file::path savePath = ShowSaveFileDialog(L"", L"Save File", foliageDir);
-					foliage->SaveFoliageAsset(savePath);
-				}
-
-				// 브러시 모양 선택
-				if (ImGui::Button("mask texture load"))
-				{
-					file::path maskTexture = ShowOpenFileDialog(L"");
-					terrainComponent->SetBrushMaskTexture(g_CurrentBrush, maskTexture);
-				}
-
-				if (!g_CurrentBrush->m_masks.empty())
-				{
-					std::vector<std::string>& maskNameVec = g_CurrentBrush->GetMaskNames();
-					std::vector<const char*> maskNames;
-					maskNames.reserve(maskNameVec.size());
-					for (const auto& name : maskNameVec) {
-						maskNames.push_back(name.c_str());
-					}
-
-					static int selectedMaskIndex = -1;
-					int maskIndex = 0;
-					for (const auto& mask : g_CurrentBrush->m_masks)
-					{
-						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f)))
-						{
-							if (selectedMaskIndex != maskIndex)
-							{
-								selectedMaskIndex = maskIndex;
-								uint32_t id = static_cast<uint32_t>(maskIndex);
-								g_CurrentBrush->SetMaskID(maskIndex); // 선택된 마스크 ID 설정
-							}
-							else
-							{
-								selectedMaskIndex = -1; // 이미 선택된 마스크를 다시 클릭하면 선택 해제
-								uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
-								g_CurrentBrush->SetMaskID(id); // No mask selected
-							}
-						}
-						maskIndex++;
-						/*ImGui::Image((ImTextureID)mask.m_maskSRV,
-							ImVec2((float)100.0f, (float)100.0f));*/
-					}
-				}
-			}
-		}
-	}
 }
 
 void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
@@ -1616,6 +1080,179 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		{
 			DataSystems->SaveExistVolumeProfile(volumeComponent->m_volumeProfileGuid, &profile);
 		}
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
+{
+	int sliceX = decalComponent->sliceX;
+	int sliceY = decalComponent->sliceY;
+	ImGui::SliderInt("SliceX", &sliceX, 1, 20);
+	ImGui::SliderInt("SliceY", &sliceY, 1, 20);
+	ImGui::InputInt("SliceNumber", &decalComponent->sliceNumber);
+	decalComponent->sliceX = sliceX;
+	decalComponent->sliceY = sliceY;
+
+	ImGui::Checkbox("Use Animation", &decalComponent->useAnimation);
+	if (decalComponent->useAnimation) {
+		ImGui::SliderFloat("SlicePerSeconds", &decalComponent->slicePerSeconds, 0.f, 10.f, "%.5f");
+		ImGui::Checkbox("isLoop", &decalComponent->isLoop);
+	}
+
+	if (decalComponent->GetDecalTexture() == nullptr)
+		ImGui::Button("None Diffuse Texture", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)decalComponent->GetDecalTexture()->m_pSRV, ImVec2(30, 30));
+	ImVec2 minRect = ImGui::GetItemRectMin();
+	ImVec2 maxRect = ImGui::GetItemRectMax();
+	ImRect bb(minRect, maxRect);
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			HashingString path = filepath.string();
+			if (!filename.filename().empty()) {
+				decalComponent->SetDecalTexture(filename.string().c_str());
+			}
+			else {
+				Debug->Log("Empty Texture File Name");
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+	if (decalComponent->GetNormalTexture() == nullptr)
+		ImGui::Button("None Normal Texture", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)decalComponent->GetNormalTexture()->m_pSRV, ImVec2(30, 30));
+	minRect = ImGui::GetItemRectMin();
+	maxRect = ImGui::GetItemRectMax();
+	bb = { minRect, maxRect };
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			HashingString path = filepath.string();
+			if (!filename.filename().empty()) {
+				decalComponent->SetNormalTexture(filename.string().c_str());
+			}
+			else {
+				Debug->Log("Empty Texture File Name");
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+	if (decalComponent->GetORMTexture() == nullptr)
+		ImGui::Button("None OccluRoughMetal Texture", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)decalComponent->GetORMTexture()->m_pSRV, ImVec2(30, 30));
+	minRect = ImGui::GetItemRectMin();
+	maxRect = ImGui::GetItemRectMax();
+	bb = { minRect, maxRect };
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			HashingString path = filepath.string();
+			if (!filename.filename().empty()) {
+				decalComponent->SetORMTexture(filename.string().c_str());
+			}
+			else {
+				Debug->Log("Empty Texture File Name");
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageComponent)
+{
+	auto textures = imageComponent->GetTextures();
+	int count = static_cast<int>(textures.size());
+	static int currentTextureIndex = imageComponent->curindex;
+
+	if (count > 0)
+	{
+		const char* items[64]{};
+		for (int i = 0; i < count; ++i)
+		{
+			items[i] = textures[i]->m_name.c_str();
+		}
+		ImGui::Text("Image");
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
+		if (ImGui::BeginCombo("##TextureCombo", items[currentTextureIndex]))
+		{
+			for (int i = 0; i < count; ++i)
+			{
+				bool isSelected = (currentTextureIndex == i);
+				if (ImGui::Selectable(items[i], isSelected))
+				{
+					currentTextureIndex = i;
+					imageComponent->SetTexture(i);
+				}
+				if (isSelected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+	}
+	else
+	{
+		ImGui::Text("No textures available. Please drag and drop a texture.");
+	}
+
+	ImGui::Text("Drag Texture Here");
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = static_cast<const char*>(payload->Data);
+			file::path filename = file::path(droppedFilePath).filename();
+			file::path filepath = PathFinder::Relative("UI\\") / filename;
+			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(),
+				DataSystem::TextureFileType::UITexture);
+			if (texture)
+			{
+				imageComponent->Load(texture);
+				imageComponent->SetTexture(static_cast<int>(imageComponent->GetTextures().size() - 1));
+				currentTextureIndex = static_cast<int>(imageComponent->GetTextures().size() - 1);
+			}
+			else
+			{
+				Debug->LogError("Failed to load UI Texture: " + filepath.string());
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	ImGui::ColorEdit4("color tint", &imageComponent->color.x);
+	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
+	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
+
+	std::string shaderName = "None";
+	if (!imageComponent->GetCustomPixelShader().empty())
+	{
+		shaderName = imageComponent->GetCustomPixelShader();
+	}
+	ImGui::Text("Pixel Shader");
+	ImGui::SameLine();
+	ImGui::Button(shaderName.c_str(), ImVec2(150, 20));
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
+	{
+		ShaderSystem->SetImageSelectionTarget(imageComponent);
+		ImGui::GetContext("SelectImageCustomShader").Open();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_TRASH "##RemoveShader"))
+	{
+		imageComponent->ClearCustomPixelShader();
 	}
 }
 

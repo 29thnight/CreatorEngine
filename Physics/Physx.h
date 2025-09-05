@@ -209,7 +209,9 @@ public:
 	OverlapOutput SphereOverlap(const OverlapInput& in, float radius);
 	OverlapOutput CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight);
 	//===========================================================================================
-
+	//Sleep 상태 변경
+	void PutToSleep(unsigned int id);
+	void WakeUp(unsigned int id);
 
 private:
 	physx::PxDefaultAllocator		m_allocator{};

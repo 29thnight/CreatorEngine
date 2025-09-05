@@ -27,6 +27,8 @@
 #include "NormalBullet.h"
 #include "SpecialBullet.h"
 #include "Bomb.h"
+
+#include "CurveIndicator.h"
 void Player::Start()
 {
 
@@ -91,6 +93,17 @@ void Player::Update(float tick)
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
+	//Test
+	{
+		auto& asiss = GM->GetAsis();
+		auto asis = asiss[0]->GetOwner();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();auto indicator = GameObject::Find("TestIndicator");
+		auto curveindicator = indicator->GetComponent<CurveIndicator>();
+		curveindicator->EnableIndicator(true);
+		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+	}
+
 	if (isDead)
 	{
 		m_animator->SetParameter("OnDead", true);
@@ -104,7 +117,7 @@ void Player::Update(float tick)
 		XMVECTOR offsetPos = world + -forwardVec * 1.0f;
 		offsetPos.m128_f32[1] = 1.0f; 
 		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
-		//asis¿Í °Å¸®°è¼Ó °»½Å
+		//asisì™€ ê±°ë¦¬ê³„ì† ê°±ì‹ 
 		auto& asiss = GM->GetAsis();
 		if (!asiss.empty())
 		{
@@ -119,11 +132,20 @@ void Player::Update(float tick)
 			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
 			{
 				onIndicate = true;
+
+				auto indicator = GameObject::Find("TestIndicator");
+				auto curveindicator = indicator->GetComponent<CurveIndicator>();
+				curveindicator->EnableIndicator(onIndicate);
+				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+
 				std::cout << "onIndicate!!!!!!!!!" << std::endl;
 			}
 			else
 			{
 				onIndicate = false;
+				auto indicator = GameObject::Find("TestIndicator");
+				auto curveindicator = indicator->GetComponent<CurveIndicator>();
+				curveindicator->EnableIndicator(onIndicate);
 			}
 		}
 
@@ -133,7 +155,7 @@ void Player::Update(float tick)
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
 	}
-	if (isAttacking == false && m_comboCount != 0) //&&&&& ÄŞº¸Ä«¿îÆ® ÃÊ±âÈ­½ÃÁ¡ È®ÀÎÇÊ¿ä Áö±İ 0.5ÃÊº¸´Ù ´Ê°ÔµÊ 
+	if (isAttacking == false && m_comboCount != 0) //&&&&& ì½¤ë³´ì¹´ìš´íŠ¸ ì´ˆê¸°í™”ì‹œì  í™•ì¸í•„ìš” ì§€ê¸ˆ 0.5ì´ˆë³´ë‹¤ ëŠ¦ê²Œë¨ 
 	{
 		m_comboElapsedTime += tick;
 
@@ -166,7 +188,7 @@ void Player::Update(float tick)
 		{
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
-			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  ³Ë¹éÀÌ¶û°°ÀÌ  ¾µÇÔ¼ö ÀÌ¸§¼öÁ¤ÇÒ°Å
+			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  ë„‰ë°±ì´ë‘ê°™ì´  ì“¸í•¨ìˆ˜ ì´ë¦„ìˆ˜ì •í• ê±°
 			//dashEffect->StopEffect();
 		}
 		else
@@ -192,7 +214,7 @@ void Player::LateUpdate(float tick)
 	//XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 	//float w = XMVectorGetW(clipSpacePos);
 	//if (w < 0.001f) {
-	//	// ¿ø·¡ À§Ä¡ ¹İÈ¯.
+	//	// ì›ë˜ ìœ„ì¹˜ ë°˜í™˜.
 	//	GetOwner()->m_transform.SetPosition(worldpos);
 	//	return;
 	//}
@@ -201,7 +223,7 @@ void Player::LateUpdate(float tick)
 	//float clamp_limit = 0.9f;
 	//XMVECTOR clampedNdcPos = XMVectorClamp(
 	//	ndcPos,
-	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z´Â Å¬·¥ÇÎÇÏÁö ¾ÊÀ½
+	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // ZëŠ” í´ë¨í•‘í•˜ì§€ ì•ŠìŒ
 	//	XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
 	//);
 	//XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
@@ -299,7 +321,7 @@ void Player::ThrowEvent()
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 	if (m_curWeapon)
-		m_curWeapon->SetEnabled(true); //ÀÌ°Ç ÇØ´ç»óÅÂ state ->exit ÂÊÀ¸·Î ÀÌµ¿ÇÊ¿ä
+		m_curWeapon->SetEnabled(true); //ì´ê±´ í•´ë‹¹ìƒíƒœ state ->exit ìª½ìœ¼ë¡œ ì´ë™í•„ìš”
 
 
 
@@ -327,7 +349,7 @@ void Player::ThrowEvent()
 				m_curWeapon->SetEnabled(true);
 		}
 	}
-	else //À¯µµ¾øÀÌ ÅõÃ´
+	else //ìœ ë„ì—†ì´ íˆ¬ì²™
 	{
 
 	}
@@ -345,15 +367,15 @@ void Player::DropCatchItem()
 		catchedObject = nullptr;
 		m_nearObject = nullptr; //&&&&&
 		if (m_curWeapon)
-			m_curWeapon->SetEnabled(true); //ÀÌ°Ç ÇØ´ç»óÅÂ state ->exit ÂÊÀ¸·Î ÀÌµ¿ÇÊ¿ä
+			m_curWeapon->SetEnabled(true); //ì´ê±´ í•´ë‹¹ìƒíƒœ state ->exit ìª½ìœ¼ë¡œ ì´ë™í•„ìš”
 		m_animator->SetParameter("OnDrop", true);
 	}
 }
 
 void Player::Dash()
 {
-	if (m_curDashCount >= dashAmount) return;   //ÃÖ´ë ´ë½ÃÈ½¼ö¸¸Å­ÇßÀ¸¸é ¸øÇÔ
-	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //ÀÌ¹Ì ´ë½ÃÇßÀ»‹š ´õºí´ë½ÃÅ¸ÀÓ¾È¿¡ ´Ù½Ã¾ÈÇÏ¸é ¸øÇÔ
+	if (m_curDashCount >= dashAmount) return;   //ìµœëŒ€ ëŒ€ì‹œíšŸìˆ˜ë§Œí¼í–ˆìœ¼ë©´ ëª»í•¨
+	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //ì´ë¯¸ ëŒ€ì‹œí–ˆì„Â‹Âš ë”ë¸”ëŒ€ì‹œíƒ€ì„ì•ˆì— ë‹¤ì‹œì•ˆí•˜ë©´ ëª»í•¨
 	dashEffect->Apply();
 	if (m_curDashCount == 0)
 	{
@@ -364,7 +386,7 @@ void Player::Dash()
 		std::cout << "Dubble Dash  " << std::endl;
 	}
 
-	//´ë½¬ ¾Ö´Ï¸ŞÀÌ¼ÇÁß¿£ ÀûÅë°ú
+	//ëŒ€ì‰¬ ì• ë‹ˆë©”ì´ì…˜ì¤‘ì—” ì í†µê³¼
 	m_animator->SetParameter("OnDash", true);
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 
@@ -381,7 +403,7 @@ void Player::Dash()
 void Player::StartAttack()
 {
 	isCharging = true;
-	//¿©±â¼­ °ø°İÃ³¸®ÇÏ°í Â÷Â¡½ÃÀÛ 
+	//ì—¬ê¸°ì„œ ê³µê²©ì²˜ë¦¬í•˜ê³  ì°¨ì§•ì‹œì‘ 
 	if (isAttacking == false || canMeleeCancel == true)
 	{
 		isAttacking = true;
@@ -390,7 +412,7 @@ void Player::StartAttack()
 		//{
 		//	if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
 		//	{
-		//		m_animator->SetParameter("Attack", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+		//		m_animator->SetParameter("Attack", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 		//		//m_animator->SetUseLayer(0,false);
 		//		std::cout << "Melee Attack!!" << std::endl;
 		//	}
@@ -398,15 +420,15 @@ void Player::StartAttack()
 
 		//	if (m_curWeapon->itemType == ItemType::Range)
 		//	{
-		//		m_animator->SetParameter("RangeAttack", true); //¿ø°Å¸® °ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î
+		//		m_animator->SetParameter("RangeAttack", true); //ì›ê±°ë¦¬ ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ
 		//		//m_animator->SetUseLayer(0,false);
 		//		std::cout << "RangeAttack!!" << std::endl;
-		//		ShootNormalBullet(); //¿ø°Å¸®°ø°İ Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡³Ö±â
+		//		ShootNormalBullet(); //ì›ê±°ë¦¬ê³µê²© í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ë„£ê¸°
 		//	}
 
 		//	if (m_curWeapon->itemType == ItemType::Explosion)
 		//	{
-		//		m_animator->SetParameter("BombAttack", true); //ÆøÅº °ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î
+		//		m_animator->SetParameter("BombAttack", true); //í­íƒ„ ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ
 		//		//m_animator->SetUseLayer(0,false);
 		//		std::cout << "BombAttack!!" << std::endl;
 		//	}
@@ -423,21 +445,21 @@ void Player::StartAttack()
 
 		if (m_comboCount == 0)
 		{
-			m_animator->SetParameter("MeleeAttack1", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+			m_animator->SetParameter("MeleeAttack1", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 			std::cout << "MeleeAttack1" << std::endl;
 			canMeleeCancel = false;
 			//m_comboCount++;
 		}
 		else if (m_comboCount == 1)
 		{
-			m_animator->SetParameter("MeleeAttack2", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+			m_animator->SetParameter("MeleeAttack2", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 			std::cout << "MeleeAttack2" << std::endl;
 			canMeleeCancel = false;
 			//m_comboCount++;
 		}
 		else if (m_comboCount == 2)
 		{
-			m_animator->SetParameter("MeleeAttack3", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+			m_animator->SetParameter("MeleeAttack3", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 			std::cout << "MeleeAttack3" << std::endl;
 			canMeleeCancel = false;
 		}
@@ -450,21 +472,21 @@ void Player::Charging()
 	{
 		std::cout << "charginggggggg" << std::endl;
 	}
-	//m_animator->SetParameter("Charging", true); //Â÷Â¡Áß¿¡ ±â¸ğÀ¸´Â ÀÌÆåÆ® Ãâ·Â Idle or Move ¾Ö´Ï¸ŞÀÌ¼Ç ÀÚÀ²
+	//m_animator->SetParameter("Charging", true); //ì°¨ì§•ì¤‘ì— ê¸°ëª¨ìœ¼ëŠ” ì´í™íŠ¸ ì¶œë ¥ Idle or Move ì• ë‹ˆë©”ì´ì…˜ ììœ¨
 
 }
 
 void Player::Attack1()
 {
-	//¿©±â¼± Â÷Â¡½Ã°£ÀÌ ³ÑÀ¸¸é Â÷Â¡°ø°İ¸¸ ½ÇÇà
-	//±Ù°Å¸®´Â Å«ÀÌÆåÆ® + 1,2,3Å¸Áß Á¤ÇÑ¾Ö´Ï¸ŞÀÌ¼ÇÁß ÇÏ³ª  ,,, ¿ø°Å¸®´Â ºÎÃ¤²Ã·Î ¿©·¯¹ß ¹ß»ç
+	//ì—¬ê¸°ì„  ì°¨ì§•ì‹œê°„ì´ ë„˜ìœ¼ë©´ ì°¨ì§•ê³µê²©ë§Œ ì‹¤í–‰
+	//ê·¼ê±°ë¦¬ëŠ” í°ì´í™íŠ¸ + 1,2,3íƒ€ì¤‘ ì •í•œì• ë‹ˆë©”ì´ì…˜ì¤‘ í•˜ë‚˜  ,,, ì›ê±°ë¦¬ëŠ” ë¶€ì±„ê¼´ë¡œ ì—¬ëŸ¬ë°œ ë°œì‚¬
 	isCharging = false;
 	std::cout << m_chargingTime << " second charging" << std::endl;
 
 
 	if (m_chargingTime >= minChargedTime)
 	{
-		//Â÷Áö°ø°İ³ª°¨
+		//ì°¨ì§€ê³µê²©ë‚˜ê°
 	}
 
 	//if (isAttacking == false || canMeleeCancel == true)
@@ -475,7 +497,7 @@ void Player::Attack1()
 	//	//{
 	//	//	if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
 	//	//	{
-	//	//		m_animator->SetParameter("Attack", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+	//	//		m_animator->SetParameter("Attack", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 	//	//		//m_animator->SetUseLayer(0,false);
 	//	//		std::cout << "Melee Attack!!" << std::endl;
 	//	//	}
@@ -483,15 +505,15 @@ void Player::Attack1()
 
 	//	//	if (m_curWeapon->itemType == ItemType::Range)
 	//	//	{
-	//	//		m_animator->SetParameter("RangeAttack", true); //¿ø°Å¸® °ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î
+	//	//		m_animator->SetParameter("RangeAttack", true); //ì›ê±°ë¦¬ ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ
 	//	//		//m_animator->SetUseLayer(0,false);
 	//	//		std::cout << "RangeAttack!!" << std::endl;
-	//	//		ShootNormalBullet(); //¿ø°Å¸®°ø°İ Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡³Ö±â
+	//	//		ShootNormalBullet(); //ì›ê±°ë¦¬ê³µê²© í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ë„£ê¸°
 	//	//	}
 
 	//	//	if (m_curWeapon->itemType == ItemType::Explosion)
 	//	//	{
-	//	//		m_animator->SetParameter("BombAttack", true); //ÆøÅº °ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î
+	//	//		m_animator->SetParameter("BombAttack", true); //í­íƒ„ ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ
 	//	//		//m_animator->SetUseLayer(0,false);
 	//	//		std::cout << "BombAttack!!" << std::endl;
 	//	//	}
@@ -508,21 +530,21 @@ void Player::Attack1()
 
 	//	if (m_comboCount == 0)
 	//	{
-	//		m_animator->SetParameter("MeleeAttack1", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+	//		m_animator->SetParameter("MeleeAttack1", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 	//		std::cout << "MeleeAttack1" << std::endl;
 	//		canMeleeCancel = false;
 	//		//m_comboCount++;
 	//	}
 	//	else if (m_comboCount == 1)
 	//	{
-	//		m_animator->SetParameter("MeleeAttack2", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+	//		m_animator->SetParameter("MeleeAttack2", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 	//		std::cout << "MeleeAttack2" << std::endl;
 	//		canMeleeCancel = false;
 	//		//m_comboCount++;
 	//	}
 	//	else if (m_comboCount == 2)
 	//	{
-	//		m_animator->SetParameter("MeleeAttack3", true); //±Ù°Å¸®°ø°İ ¾Ö´Ï¸ŞÀÌ¼ÇÀ¸·Î //½ÇÁ¦ °ø°İÇÔ¼ö´Â ¾Ö´Ï¸ŞÀÌ¼Ç behavior³ª Å°ÇÁ·¹ÀÓ ÀÌº¥Æ®¿¡¼­ ½ÇÇà
+	//		m_animator->SetParameter("MeleeAttack3", true); //ê·¼ê±°ë¦¬ê³µê²© ì• ë‹ˆë©”ì´ì…˜ìœ¼ë¡œ //ì‹¤ì œ ê³µê²©í•¨ìˆ˜ëŠ” ì• ë‹ˆë©”ì´ì…˜ behaviorë‚˜ í‚¤í”„ë ˆì„ ì´ë²¤íŠ¸ì—ì„œ ì‹¤í–‰
 	//		std::cout << "MeleeAttack3" << std::endl;
 	//		canMeleeCancel = false;
 	//	}
@@ -586,7 +608,7 @@ void Player::AddWeapon(Weapon* weapon)
 		return;
 
 
-		//¸®ÅÏÇÏ°í ´øÁ®Áø¹«±â Á×ÀÌ±â
+		//ë¦¬í„´í•˜ê³  ë˜ì ¸ì§„ë¬´ê¸° ì£½ì´ê¸°
 	}
 
 	if (m_curWeapon)
@@ -602,7 +624,7 @@ void Player::AddWeapon(Weapon* weapon)
 
 void Player::DeleteCurWeapon()
 {
-	if (!m_curWeapon || m_curWeapon == m_weaponInventory[0]) //±âº»¹«±â
+	if (!m_curWeapon || m_curWeapon == m_weaponInventory[0]) //ê¸°ë³¸ë¬´ê¸°
 		return;
 
 	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
@@ -673,11 +695,11 @@ void Player::Cancancel()
 
 void Player::ChangeAutoTarget(Mathf::Vector2 dir)
 {
-	if (inRangeEnemy.empty()) //ºñ¾úÀ¸¸é ´Ü¼ø Ä³¸¯ÅÍ È¸Àü
+	if (inRangeEnemy.empty()) //ë¹„ì—ˆìœ¼ë©´ ë‹¨ìˆœ ìºë¦­í„° íšŒì „
 	{
 
 	}
-	else //µé¾îÀÖÀ¸¸é ÀÔ·Â¹æÇâ¿¡µû¶ó ´ÙÀ½ °¡±î¿îÀû Å¸°ÙÀ¸·Î
+	else //ë“¤ì–´ìˆìœ¼ë©´ ì…ë ¥ë°©í–¥ì—ë”°ë¼ ë‹¤ìŒ ê°€ê¹Œìš´ì  íƒ€ê²Ÿìœ¼ë¡œ
 	{
 
 		for (auto& enemy : inRangeEnemy)
@@ -767,7 +789,7 @@ void Player::MeleeAttack()
 
 void Player::ShootBullet()
 {
-	//¿ø°Å¸® ¹«±â ÀÏ¶§ ¿¡ÀÓº¸Á¤ÈÄ ¹ß»ç
+	//ì›ê±°ë¦¬ ë¬´ê¸° ì¼ë•Œ ì—ì„ë³´ì •í›„ ë°œì‚¬
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	float distance;
 	
@@ -792,7 +814,7 @@ void Player::ShootBullet()
 	}
 	if (curTarget)
 	{
-		//¿ø°Å¸® °ø°İ
+		//ì›ê±°ë¦¬ ê³µê²©
 	}
 
 	nearDistance = FLT_MAX;
@@ -816,7 +838,7 @@ void Player::ShootNormalBullet()
 
 void Player::ShootSpecialBullet()
 {
-	//Todo:: pool¿¡¼­Ã£°í ¾øÀ¸¸é ÇÁ¸®ÆÕ¿¡¼­ »ı¼º
+	//Todo:: poolì—ì„œì°¾ê³  ì—†ìœ¼ë©´ í”„ë¦¬íŒ¹ì—ì„œ ìƒì„±
 	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("SpecialBullet");
 	if (bulletprefab && player)
 	{
@@ -837,7 +859,7 @@ void Player::ThrowBomb()
 {
 	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
 	//bomb->ThrowBomb(this, bombThrowPosition);
-	//bomb À» ÇÁ¸®ÆÕ¸¸µç°É·Î ¹Ş¾Æ¿À°Ô²û ¼öÁ¤ or weaponPool ÇÊ¿ä
+	//bomb ì„ í”„ë¦¬íŒ¹ë§Œë“ ê±¸ë¡œ ë°›ì•„ì˜¤ê²Œë” ìˆ˜ì • or weaponPool í•„ìš”
 }
 
 

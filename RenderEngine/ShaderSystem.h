@@ -6,6 +6,7 @@
 
 class ShaderPSO; // 전방 선언
 class Material;
+class ImageComponent;
 class ShaderResourceSystem final : public DLLCore::Singleton<ShaderResourceSystem>
 {
 private:
@@ -32,6 +33,10 @@ public:
 
 	void RegisterSelectShaderContext();
 	void SetShaderSelectionTarget(Material* material);
+	void ClearShaderSelectionTarget();
+
+	void SetImageSelectionTarget(ImageComponent* image);
+	void ClearImageSelectionTarget();
 
 	std::unordered_map<std::string, VertexShader>	VertexShaders;
 	std::unordered_map<std::string, HullShader>		HullShaders;
@@ -55,6 +60,7 @@ private:
 
 	bool m_isReloading = false;
 	Material* m_selectShaderTarget = nullptr;
+	ImageComponent* m_selectImageTarget = nullptr;
 };
 
 static auto ShaderSystem = ShaderResourceSystem::GetInstance();

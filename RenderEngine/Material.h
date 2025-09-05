@@ -15,9 +15,9 @@ enum class MaterialRenderingMode
 	Opaque,
 	Transparent,
 };
-
 AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
+struct ID3D11DeviceContext;
 class Material
 {
 public:
@@ -58,6 +58,7 @@ public:
 
 	void SetShaderPSO(std::shared_ptr<ShaderPSO> pso);
 	std::shared_ptr<ShaderPSO> GetShaderPSO() const;
+	void ClearShaderPSO();
 
 	// 式式 Typed setters/getters (explicit cb/var) 式式
 	bool TrySetFloat(std::string_view cb, std::string_view var, float v);

@@ -12,7 +12,8 @@ enum class PrimitiveProxyType
 {
    MeshRenderer,
    FoliageComponent,
-   TerrainComponent
+   TerrainComponent,
+   DecalComponent
 };
 
 class Material;
@@ -23,6 +24,8 @@ class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
 class FoliageComponent;
+class DecalComponent;
+class Texture;
 class PrimitiveRenderProxy
 {
 public:
@@ -43,6 +46,7 @@ public:
 	PrimitiveRenderProxy(MeshRenderer* component);
     PrimitiveRenderProxy(FoliageComponent* component);
 	PrimitiveRenderProxy(TerrainComponent* component);
+	PrimitiveRenderProxy(DecalComponent* component);
 	~PrimitiveRenderProxy();
 
 	PrimitiveRenderProxy(const PrimitiveRenderProxy& other);
@@ -97,7 +101,6 @@ public:
 public:
 	//terrain type
 	std::shared_ptr<TerrainMesh> m_terrainMesh{ nullptr };
-	//TerrainMesh*				m_terrainMesh{ nullptr };
 	TerrainMaterial*			m_terrainMaterial{ nullptr };
 	TerrainGizmoBuffer			m_terrainGizmoBuffer{};
 	TerrainLayerBuffer			m_terrainlayerBuffer{};
@@ -106,6 +109,15 @@ public:
 	//foliage type
 	std::vector<FoliageInstance>	m_foliageInstances{};
 	std::vector<FoliageType>		m_foliageTypes{};
+
+public:
+	//decal type
+	Texture*						m_diffuseTexture{};
+	Texture*						m_normalTexture{};
+	Texture*						m_occluroughmetalTexture{};
+	uint32							m_sliceX{ 1 };	
+	uint32							m_sliceY{ 1 };	
+	int								m_sliceNum{ 0 };
 
 private:
 	bool						m_isNeedUpdateCulling{ false };

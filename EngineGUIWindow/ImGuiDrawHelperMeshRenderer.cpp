@@ -43,9 +43,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         {
             if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
             {
-                    Material* newMat = Material::Instantiate(meshRenderer->m_Material);
-                    meshRenderer->m_Material = newMat;
-                    DataSystems->SaveMaterial(newMat);
+                Material* newMat = Material::Instantiate(meshRenderer->m_Material);
+                meshRenderer->m_Material = newMat;
+                DataSystems->SaveMaterial(newMat);
             }
             ImGui::EndPopup();
         }
@@ -59,6 +59,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         if (nullptr != meshRenderer->m_Material)
 		{
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
+			auto& mat = meshRenderer->m_Material;
+			TextureDropTarget(mat);
 			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.x);
 
 			ImGui::SliderFloat("metalic", &mat_info.m_metallic, 0.f, 1.f);
@@ -81,6 +83,11 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 				ShaderSystem->SetShaderSelectionTarget(meshRenderer->m_Material);
                 ImGui::GetContext("SelectShader").Open();
             }
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_TRASH_CAN "##MatClearShader"))
+			{
+				meshRenderer->m_Material->ClearShaderPSO();
+			}
 
             if (meshRenderer->m_Material->m_shaderPSO)
             {
@@ -400,4 +407,139 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
 		DataSystems->m_trasfarMaterial = nullptr;
 	}
+}
+
+void TextureDropTarget(Material* mat)
+{
+	ImVec2 minRect;
+	ImVec2 maxRect;
+	ImGui::PushID(mat);
+	{
+		if (mat->m_pBaseColor) {
+			ImGui::Image((ImTextureID)mat->m_pBaseColor->m_pSRV, ImVec2(30, 30));
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+
+			ImGui::SameLine();
+			ImGui::PushID(mat->m_pBaseColor);
+			if (ImGui::Button("delete")) {
+				mat->m_baseColorTexName = "";
+				mat->m_pBaseColor = nullptr;
+				mat->m_materialInfo.m_useBaseColor = false;
+			}
+			ImGui::PopID();
+		}
+		else {
+			ImGui::Button("No basemap texture");
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+		}
+
+		ImRect bb(minRect, maxRect);
+		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+			if (const ImGuiPayload* decalPayload = ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)decalPayload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+				HashingString path = filepath.string();
+				if (!filename.filename().empty()) {
+					//SetColorGradingTexture(filepath.string());
+					mat->UseBaseColorMap(Texture::LoadFormPath(filepath.string()));
+					mat->m_baseColorTexName = filepath.string();
+				}
+				else {
+					Debug->Log("Empty Texture File Name");
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
+
+	{
+		if (mat->m_pNormal) {
+			ImGui::Image((ImTextureID)mat->m_pNormal->m_pSRV, ImVec2(30, 30));
+
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+
+			ImGui::SameLine();
+			ImGui::PushID(mat->m_pNormal);
+			if (ImGui::Button("delete")) {
+				mat->m_normalTexName = "";
+				mat->m_pNormal = nullptr;
+				mat->m_materialInfo.m_useNormalMap = false;
+			}
+			ImGui::PopID();
+		}
+		else {
+			ImGui::Button("No Normalmap texture");
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+		}
+
+		ImRect bb(minRect, maxRect);
+		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+			if (const ImGuiPayload* decalPayload = ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)decalPayload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+				HashingString path = filepath.string();
+				if (!filename.filename().empty()) {
+					//SetColorGradingTexture(filepath.string());
+					mat->UseNormalMap(Texture::LoadFormPath(filepath.string()));
+					mat->m_normalTexName = filepath.string();
+				}
+				else {
+					Debug->Log("Empty Texture File Name");
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
+	{
+		if (mat->m_pOccRoughMetal) {
+			ImGui::Image((ImTextureID)mat->m_pOccRoughMetal->m_pSRV, ImVec2(30, 30));
+
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+
+			ImGui::SameLine();
+			ImGui::PushID(mat->m_pOccRoughMetal);
+			if (ImGui::Button("delete")) {
+				mat->m_ORM_TexName = "";
+				mat->m_pOccRoughMetal = nullptr;
+				mat->m_materialInfo.m_useOccRoughMetal = false;
+			}
+			ImGui::PopID();
+		}
+		else {
+			ImGui::Button("No ORMmap texture");
+			minRect = ImGui::GetItemRectMin();
+			maxRect = ImGui::GetItemRectMax();
+		}
+
+		ImRect bb(minRect, maxRect);
+		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+			if (const ImGuiPayload* decalPayload = ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)decalPayload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+				HashingString path = filepath.string();
+				if (!filename.filename().empty()) {
+					//SetColorGradingTexture(filepath.string());
+					mat->UseOccRoughMetalMap(Texture::LoadFormPath(filepath.string()));
+					mat->m_ORM_TexName = filepath.string();
+				}
+				else {
+					Debug->Log("Empty Texture File Name");
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
+
+	ImGui::PopID();
 }

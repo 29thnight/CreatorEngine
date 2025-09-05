@@ -101,6 +101,7 @@ GBufferOutput main(PixelShaderInput IN)
     float texAO = 1.f;
     float metallic = gMetallic;
     float roughness = gRoughness;
+    float ior = 1;
     [branch]
     if (gUseOccMetalRough)
     {
@@ -165,7 +166,7 @@ GBufferOutput main(PixelShaderInput IN)
     
     roughness = max(roughness, 0.1f);
     OUT.diffuse = float4(albedo.rgb, 1);
-    OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, 1);
+    OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, ior);
     float3 normalResult = surf.N * 0.5 + 0.5;
     OUT.normal = float4(normalResult, 1); // 여기 나중에 normal.w 까지 받아서 행렬변환한곳 오류날 가능성 있음.
     OUT.emissive = emissive;
