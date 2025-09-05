@@ -704,6 +704,17 @@ void PhysicsManager::SetPhysicData()
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
 		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
+		//sleeping
+		bool enable = colliderInfo.gameObject->IsEnabled();
+
+		if (!enable) {
+			Physics->PutToSleep(id);
+			continue;
+		}
+		else {
+			Physics->WakeUp(id);
+		}
+
 		if (colliderInfo.id == m_controllerTypeId)
 		{
 			//Benchmark bm;
@@ -741,6 +752,7 @@ void PhysicsManager::SetPhysicData()
 		}
 		else
 		{
+
 			//Benchmark bm1;
 			RigidBodyGetSetData data;
 			data.transform = transform.GetWorldMatrix();

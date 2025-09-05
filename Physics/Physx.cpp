@@ -1707,6 +1707,7 @@ void PhysicX::ConnectPVD()
     pvd = PxCreatePvd(*m_foundation);
     PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
     auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
+	//auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::ePROFILE);
     std::cout << "pvd connected : " << isconnected << std::endl;
 }
 
@@ -2296,4 +2297,40 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 	}
 
 	return out;
+}
+
+void PhysicX::PutToSleep(unsigned int id)
+{
+	RigidBody* body = GetRigidBody(id);
+	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+
+	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
+
+
+	//stacit body인 경우 nullptr이므로 예외처리 
+	if (dynamicActor)
+	{
+		if (dynamicActor->isSleeping()) {
+			return;
+		}
+		dynamicActor->putToSleep();
+	}
+}
+
+void PhysicX::WakeUp(unsigned int id)
+{
+	RigidBody* body = GetRigidBody(id);
+	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+	
+	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
+
+
+	//stacit body인 경우 nullptr이므로 예외처리 
+	if (dynamicActor)
+	{
+		if (!dynamicActor->isSleeping()) {
+			return;
+		}
+		dynamicActor->wakeUp();
+	}
 }
