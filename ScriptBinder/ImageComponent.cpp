@@ -32,7 +32,8 @@ void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)
 		return;
 
 	textures.push_back(ptr);
-	if (textures.size() == 1)
+	texturePaths.push_back(ptr->m_name);
+	if (1 == textures.size())
 	{
 		SetTexture(0);
 	}
@@ -61,11 +62,6 @@ void ImageComponent::Update(float tick)
 
 		rect->SetSizeDelta(uiinfo.size);
     }
-    auto quat = m_pOwner->m_transform.rotation;
-    float pitch, yaw, roll;
-    Mathf::QuaternionToEular(quat, pitch, yaw, roll);
-    rotate = roll;
-
 }
 
 void ImageComponent::OnDestroy()
@@ -77,18 +73,6 @@ void ImageComponent::OnDestroy()
 		renderScene->UnregisterCommand(this);
 		UIManagers->UnregisterImageComponent(this);
 	}
-}
-
-void ImageComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
-{
-	if (_layerorder < 0) _layerorder = 0;
-	//TODO : m_curtextureÀÇ expired Ã¼Å©
-	if(m_curtexture != nullptr)
-	{
-		sBatch->Draw(m_curtexture->m_pSRV, { pos.x, pos.y }, nullptr, Colors::White, rotate, origin, scale,
-			SpriteEffects_None, _layerorder / MaxOreder);
-	}
-
 }
 
 void ImageComponent::UpdateTexture()

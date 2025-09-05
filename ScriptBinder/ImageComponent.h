@@ -33,22 +33,23 @@ public:
     [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
-	void Draw(std::unique_ptr<SpriteBatch>& sBatch);
 	
 	ImageInfo uiinfo{};
 	std::shared_ptr<Texture> m_curtexture{};
     [[Property]]
 	int curindex = 0;
-
-	//ndcÁÂÇ¥ {-1,1}
-	Mathf::Vector3 trans{ 0,0,0 };
-	Mathf::Vector3 rotat{ 0,0,0 };
+	[[Property]]
+	Mathf::Color4	color{ 1,1,1,1 };
+	[[Property]]
+	float			rotate{ 0 };
+	[[Property]]
+	XMFLOAT2		origin{};
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;
-	float									rotate{ 0 };
+	[[Property]]
+	std::vector<std::string> 				texturePaths;
 	std::vector<std::shared_ptr<Texture>>	textures;
-	XMFLOAT2								origin{};
 
 };
 

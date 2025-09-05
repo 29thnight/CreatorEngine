@@ -3,22 +3,19 @@
 #include "TextComponent.h"
 #include "RenderScene.h"
 #include "Texture.h"
+#include "ShaderSystem.h"
 #include <DirectXTK/SpriteFont.h>
 
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
     ImageData data{};
-	data.textures = image->textures;
+	data.textures   = image->textures;
     data.texture    = image->m_curtexture;
     data.origin     = { image->uiinfo.size.x * 0.5f, image->uiinfo.size.y * 0.5f };
     data.position   = image->pos;
     data.scale      = image->scale;
-    if (auto owner  = image->GetOwner())
-    {
-        float pitch, yaw, roll;
-        Mathf::QuaternionToEular(owner->m_transform.rotation, pitch, yaw, roll);
-        data.rotation = roll;
-    }
+	data.color      = image->color;
+	data.rotation   = image->rotate;
     data.layerOrder = image->GetLayerOrder();
     m_data          = data;
     m_instancedID   = image->GetInstanceID();
@@ -30,7 +27,7 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.font       = text->font;
     data.message    = text->message;
     data.color      = text->color;
-    data.position   = text->pos;
+    data.position   = Mathf::Vector2(text->pos);
     data.fontSize   = text->fontSize;
     data.layerOrder = text->GetLayerOrder();
     m_data          = data;
@@ -71,7 +68,7 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         info.texture->m_pSRV,
                         { info.position.x, info.position.y },
                         nullptr,
-                        DirectX::Colors::White,
+                        info.color,
                         info.rotation,
                         { info.origin.x, info.origin.y },
                         info.scale,
@@ -102,4 +99,33 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
 void UIRenderProxy::DestroyProxy()
 {
     RenderScene::RegisteredDestroyUIProxyGUIDs.push(m_instancedID);
+}
+
+void UIRenderProxy::SetCustomPixelShader(std::string_view shaderPath)
+{
+    if(shaderPath.empty())
+    {
+        m_customPixelShader = nullptr;
+        m_customPixelBuffer = nullptr;
+        return;
+	}
+
+    auto shader = ShaderSystem->PixelShaders[shaderPath.data()];
+    if (!shader.IsCompiled() && !shader.GetShader())
+    {
+        std::cout << "Failed to load custom pixel shader: " << shaderPath << std::endl;
+        return;
+    }
+	m_customPixelShader = &shader;
+
+    D3D11_BUFFER_DESC bufferDesc{};
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    bufferDesc.ByteWidth = 16; // 최소 16바이트 단위로 할당
+    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bufferDesc.MiscFlags = 0;
+    bufferDesc.StructureByteStride = 0;
+
+    DirectX11::ThrowIfFailed(
+        DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_customPixelBuffer));
 }

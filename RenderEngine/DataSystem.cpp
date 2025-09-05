@@ -31,7 +31,8 @@ constexpr FileTypeCharArr FileTypeStringTable{{
     { DataSystem::FileType::Prefab,         "Prefab"            },
 	{ DataSystem::FileType::Sound,          "Sound"				},
 	{ DataSystem::FileType::HDR,            "HDR"				},
-	{ DataSystem::FileType::VolumeProfile , "VolumeProfile"		}
+	{ DataSystem::FileType::VolumeProfile , "VolumeProfile"		},
+	{ DataSystem::FileType::Font,           "Font"				}
 }};
 
 static const std::unordered_map<std::string_view, std::string_view> kExtensionToIcon = {
@@ -60,6 +61,9 @@ static const std::unordered_map<std::string_view, std::string_view> kExtensionTo
 	{ ".terrain", ICON_FA_MOUNTAIN " " },
 	{ ".prefab", ICON_FA_BOX_OPEN " " },
 	{ ".volume", ICON_FA_SLIDERS " " },
+
+	// 기타 파일
+	{ ".spritefont", ICON_FA_FONT " " }
 };
 
 // 검색 함수
@@ -98,6 +102,8 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::Prefab;
 	else if (filepath.extension() == ".volume")
 		return DataSystem::FileType::VolumeProfile;
+	else if (filepath.extension() == ".spritefont")
+		return DataSystem::FileType::Font;
 	return DataSystem::FileType::Unknown;
 }
 
@@ -163,6 +169,7 @@ void DataSystem::Initialize()
 		{ ".terrain",{ FileType::TerrainTexture, (ImTextureID)TextureIcon->m_pSRV } },
 		{ ".prefab", { FileType::Prefab,		(ImTextureID)AssetsIcon->m_pSRV }	},
 		{ ".volume", { FileType::VolumeProfile,	(ImTextureID)AssetsIcon->m_pSRV }	},
+		{ ".spritefont",{ FileType::Font,		(ImTextureID)AssetsIcon->m_pSRV }   }
 	};
 
 	RenderForEditer();
@@ -560,10 +567,10 @@ void DataSystem::SaveMaterial(Material* material)
                         YAML::Node cbNode;
                         for (auto& [name, data] : material->m_cbufferValues)
                         {
-                                YAML::Node entry;
-                                entry["name"] = name;
-                                entry["data"] = YAML::Binary(data.data(), data.size());
-                                cbNode.push_back(entry);
+                            YAML::Node entry;
+                            entry["name"] = name;
+                            entry["data"] = YAML::Binary(data.data(), data.size());
+                            cbNode.push_back(entry);
                         }
                         node["constant_buffers"] = cbNode;
                 }
@@ -637,6 +644,8 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 	if (texture)
 	{
 		Textures[name] = texture;
+		texture->m_name = name;
+		
 		return texture.get();
 	}
 	else
@@ -645,15 +654,28 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 	}
 }
 
-Texture* DataSystem::LoadTexture(std::string_view filePath)
+Texture* DataSystem::LoadTexture(std::string_view filePath, TextureFileType type)
 {
-	return LoadSharedTexture(filePath).get();
+	return LoadSharedTexture(filePath, type).get();
 }
 
-std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath)
+std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath, TextureFileType type)
 {
 	file::path source = filePath;
-	file::path destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
+	file::path destination{};
+	
+	switch (type)
+	{
+	case DataSystem::TextureFileType::Texture:
+		destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
+		break;
+	case DataSystem::TextureFileType::UITexture:
+		destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
+		break;
+	default:
+		break;
+	}
+		
 	if (source != destination && file::exists(source) && !file::exists(destination))
 	{
 		file::copy_file(source, destination, file::copy_options::update_existing);
@@ -667,7 +689,19 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
 	if (texture)
 	{
-		Textures[name] = texture;
+		switch (type)
+		{
+		case DataSystem::TextureFileType::Texture:
+			Textures[name] = texture;
+			break;
+		case DataSystem::TextureFileType::UITexture:
+			UITextures[name] = texture;
+			break;
+		default:
+			break;
+		}
+		texture->m_name = name;
+
 		return texture;
 	}
 	else
@@ -730,6 +764,10 @@ void DataSystem::CopyTextureSelectType(std::string_view filePath, TextureFileTyp
 	else if (type == TextureFileType::HDR)
 	{
 		destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::UITexture)
+	{
+		destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
 	}
 
 	CopyTexture(filePath, destination);
@@ -1234,6 +1272,9 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	case FileType::Sound:
 		color = IM_COL32(255, 255, 0, 255);
 		break;
+	case FileType::Font:
+		color = IM_COL32(128, 0, 128, 255);
+		break;
 	case FileType::Unknown:
 		color = IM_COL32(128, 128, 128, 255);
 		break;
@@ -1518,21 +1559,21 @@ void DataSystem::ClearRetainedAssets()
 void DataSystem::UnloadUnusedAssets()
 {
 	auto removeUnused = [this](auto& container, int type)
+	{
+		auto it = container.begin();
+		auto& retainSet = m_retainedAssets[type];
+		while (it != container.end())
 		{
-			auto it = container.begin();
-			auto& retainSet = m_retainedAssets[type];
-			while (it != container.end())
+			if (retainSet.find(it->first) == retainSet.end())
 			{
-				if (retainSet.find(it->first) == retainSet.end())
-				{
-					it = container.erase(it);
-				}
-				else
-				{
-					++it;
-				}
+				it = container.erase(it);
 			}
-		};
+			else
+			{
+				++it;
+			}
+		}
+	};
 
 	removeUnused(Models, static_cast<int>(ManagedAssetType::Model));
 	removeUnused(Materials, static_cast<int>(ManagedAssetType::Material));

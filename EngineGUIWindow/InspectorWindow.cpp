@@ -749,8 +749,6 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 				: IM_COL32(60, 60, 60, 255);
 			dl->AddRectFilled(r.Min, r.Max, bgCol, 4.f);
 
-			//Mathf::Vector2 calcMin = { presets[curIndex].anchorMin.x , 1.f - presets[curIndex].anchorMin.y };
-			//Mathf::Vector2 calcMax = { presets[curIndex].anchorMax.x , 1.f - presets[curIndex].anchorMax.y };
 			Mathf::Vector2 calcMin = presets[curIndex].anchorMin;
 			Mathf::Vector2 calcMax = presets[curIndex].anchorMax;
 
@@ -796,20 +794,6 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed, 90.f);
 			ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed, 90.f);
 			ImGui::TableHeadersRow();
-
-			//if (DrawVec2Row("Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
-			//	rectTransformComponent->SetAnchorMin(anchorMin);
-			//if (DrawVec2Row("Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
-			//	rectTransformComponent->SetAnchorMax(anchorMax);
-
-			//if (DrawVec2RowAbs("Pos", anchoredPos, 1.f))
-			//	rectTransformComponent->SetAnchoredPosition(anchoredPos);
-
-			//if (DrawVec2RowAbs("Width/Height", sizeDelta, 1.f))
-			//	rectTransformComponent->SetSizeDelta(sizeDelta);
-
-			//if (DrawVec2Row("Pivot", pivot, 0.01f, 0.f, 1.f))
-			//	rectTransformComponent->SetPivot(pivot);
 
 			bool anchorsChanged = false;
 			bool pivotChanged = false;

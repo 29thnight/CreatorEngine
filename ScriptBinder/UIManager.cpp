@@ -197,7 +197,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
+	newText->AddComponent<TextComponent>()->SetFont(Sfont);
 	canvasCom->AddUIObject(newText.get());
 
 	return newText;
@@ -224,7 +224,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	}
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
+	newText->AddComponent<TextComponent>()->SetFont(Sfont);
 	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());
 
 	return newText;

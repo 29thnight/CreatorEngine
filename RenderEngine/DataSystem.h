@@ -34,6 +34,7 @@ public:
 		Sound,
 		HDR,
 		VolumeProfile,
+		Font,
 		End,
 	};
 
@@ -43,6 +44,7 @@ public:
 		MaterialTexture,
 		TerrainTexture,
 		HDR,
+		UITexture,
 	};
 
 	enum class AssetType
@@ -80,8 +82,8 @@ public:
 	//Resource Texture
 	void LoadTextures();
 	Texture* LoadTextureGUID(FileGuid guid);
-	Texture* LoadTexture(std::string_view filePath);
-	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath);
+	Texture* LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
+	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
 	void CopyHDRTexture(std::string_view filePath);
 	void CopyTexture(std::string_view filePath, const file::path& destination);
 	void SelectTextureType();
@@ -134,6 +136,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
+	std::unordered_map<std::string, std::shared_ptr<Texture>> UITextures;
 	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 
@@ -167,7 +170,6 @@ public:
 	ImFont* extraSmallFont{};
 
 	std::unordered_map<std::string_view, FileTypeIcon> kExtensionMap{};
-
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);

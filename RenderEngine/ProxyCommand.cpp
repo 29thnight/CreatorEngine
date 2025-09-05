@@ -216,30 +216,26 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
 	auto proxyObject = iter->second.get();
 
-	auto textures = pComponent->textures;
-	auto curTexture = pComponent->m_curtexture;
 	DirectX::XMFLOAT2 origin{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
-	auto position = pComponent->pos;
-	auto scale = pComponent->scale;
-	float rotation = 0.f;
-	if (auto ownerObj = pComponent->GetOwner())
-	{
-		float pitch, yaw, roll;
-		Mathf::QuaternionToEular(ownerObj->m_transform.rotation, pitch, yaw, roll);
-		rotation = roll;
-	}
-	int layerOrder = pComponent->GetLayerOrder();
+	auto textures	= pComponent->textures;
+	auto curTexture	= pComponent->m_curtexture;
+	auto color		= pComponent->color;
+	auto position	= pComponent->pos;
+	auto scale		= pComponent->scale;
+	float rotation	= pComponent->rotate;
+	int layerOrder	= pComponent->GetLayerOrder();
 
-	m_updateFunction = [proxyObject, textures = std::move(textures), curTexture, origin, position, scale, rotation, layerOrder]() mutable
+	m_updateFunction = [proxyObject, textures = std::move(textures), curTexture, origin, position, scale, rotation, layerOrder, color]() mutable
 	{
 		UIRenderProxy::ImageData data{};
-		data.textures = std::move(textures);
-		data.texture = curTexture;
-		data.origin = origin;
-		data.position = position;
-		data.scale = scale;
-		data.rotation = rotation;
-		data.layerOrder = layerOrder;
+		data.textures		= std::move(textures);
+		data.texture		= curTexture;
+		data.origin			= origin;
+		data.color			= color;
+		data.position		= position;
+		data.scale			= scale;
+		data.rotation		= rotation;
+		data.layerOrder		= layerOrder;
 		proxyObject->m_data = std::move(data);
 	};
 }
@@ -266,16 +262,16 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	int layerOrder = pComponent->GetLayerOrder();
 
 	m_updateFunction = [proxyObject, font, message, color, position, fontSize, layerOrder]()
-		{
-			UIRenderProxy::TextData data{};
-			data.font = font;
-			data.message = message;
-			data.color = color;
-			data.position = position;
-			data.fontSize = fontSize;
-			data.layerOrder = layerOrder;
-			proxyObject->m_data = std::move(data);
-		};
+	{
+		UIRenderProxy::TextData data{};
+		data.font = font;
+		data.message = message;
+		data.color = color;
+		data.position = Mathf::Vector2(position);
+		data.fontSize = fontSize;
+		data.layerOrder = layerOrder;
+		proxyObject->m_data = std::move(data);
+	};
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :

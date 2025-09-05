@@ -37,8 +37,8 @@ public:
 	void SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI);
 	GameObject* GetNextNavi(Direction dir);
 
-	Mathf::Vector3 pos{ 960,540,0 };
-	Mathf::Vector2 scale{ 1,1};
+	Mathf::Vector3 pos{ 960, 540, 0 };
+	Mathf::Vector2 scale{ 1, 1 };
 	UItype type = UItype::None;
 
 	static bool CompareLayerOrder(UIComponent* a, UIComponent* b)

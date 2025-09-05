@@ -2,6 +2,7 @@
 #include <variant>
 #include <DirectXTK/SpriteFont.h>
 #include "Core.Minimal.h"
+#include "Shader.h"
 
 class Texture;
 class ImageComponent;
@@ -17,6 +18,7 @@ public:
         std::shared_ptr<Texture>                texture{ nullptr };
         DirectX::XMFLOAT2                       origin{};
         Mathf::Vector3                          position{};
+		Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
         float                                   rotation{ 0.f };
         int                                     layerOrder{ 0 };
@@ -26,7 +28,7 @@ public:
     {
         DirectX::SpriteFont*                    font{ nullptr };
         std::string                             message;
-        DirectX::XMVECTORF32                    color{ DirectX::Colors::Black };
+        Mathf::Color4                           color{ DirectX::Colors::Black };
         DirectX::XMFLOAT2                       position{};
         float                                   fontSize{ 5.f };
         int                                     layerOrder{ 0 };
@@ -39,9 +41,14 @@ public:
     void Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) const;
     void DestroyProxy();
 
+	void SetCustomPixelShader(std::string_view shaderPath);
+
 private:
     friend class RenderPassData;
 	friend class ProxyCommand;
-    std::variant<ImageData, TextData> m_data;
-    HashedGuid			              m_instancedID{};
+    std::variant<ImageData, TextData>   m_data;
+    HashedGuid			                m_instancedID{};
+    ShaderPtr<PixelShader>              m_customPixelShader{};
+	ComPtr<ID3D11Buffer>                m_customPixelBuffer{ nullptr };
+	bool                                m_isEnabled{ true };
 };
