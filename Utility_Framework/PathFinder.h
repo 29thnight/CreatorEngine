@@ -313,6 +313,10 @@ public:
 	{
 		return file::path(InternalPath::GetInstance()->InputMapPath) / path;
 	}
+	static inline file::path AnimatorjsonPath()
+	{
+		return InternalPath::GetInstance()->animatorPath;
+	}
 	static inline file::path AnimatorjsonPath(std::string_view path)
 	{
 		return file::path(InternalPath::GetInstance()->animatorPath) / path;

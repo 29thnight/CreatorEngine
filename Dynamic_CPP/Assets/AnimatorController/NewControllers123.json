@@ -10,7 +10,26 @@
                     "m_isAny": true,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Ani State",
-                    "transitions": [],
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 1,
+                                    "fValue": 4.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "TestFLoat"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeAttack3",
+                            "transName": "Ani State to MeleeAttack3"
+                        }
+                    ],
                     "useMultipler": 0
                 },
                 {
@@ -45,7 +64,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -63,7 +82,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -81,7 +100,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -99,7 +118,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -147,7 +166,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -165,7 +184,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -183,7 +202,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -201,7 +220,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -303,7 +322,7 @@
                 }
             ],
             "controller_name": "Main",
-            "m_curState": "Idle",
+            "m_curState": "MeleeAttack3",
             "useController": 1,
             "useMask": 1
         },
@@ -366,6 +385,10 @@
         {
             "param_name": "MeleeAttack3",
             "param_vType": 3
+        },
+        {
+            "param_name": "TestFLoat",
+            "param_vType": 0
         }
     ]
 }

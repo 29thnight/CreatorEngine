@@ -43,13 +43,17 @@ void PlayerAttackAH::Update(float deltaTime)
 		m_player->MeleeAttack();
 	}
 
-	auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->Move({ 0,0 });
+	if (m_player)
+	{
+		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0,0 });
+	}
 }
 
 void PlayerAttackAH::Exit()
 {
-	m_player->isAttacking = false;
+	if (m_player)
+		m_player->isAttacking = false;
 	/*if (m_player->m_comboCount < 2)
 	{
 		m_player->m_comboCount++;

@@ -50,8 +50,8 @@ void Player::Start()
 	}
 
 
-	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
-	//handSocket = m_animator->MakeSocket("handsocket", "Sword_g", aniOwner);
+	//handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
+	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 	
 
 	std::string gumName = "Sword" + std::to_string(playerIndex +1);

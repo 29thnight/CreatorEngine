@@ -45,7 +45,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -63,7 +63,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -81,7 +81,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -99,7 +99,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -147,7 +147,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -165,7 +165,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -183,7 +183,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -201,7 +201,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,

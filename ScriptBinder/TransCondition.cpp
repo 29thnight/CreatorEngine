@@ -94,3 +94,38 @@ void TransCondition::SetCondition(std::string _parameterName)
 		}
 	
 }
+
+nlohmann::json TransCondition::Serialize()
+{
+	nlohmann::json j;
+	j["valueName"] = valueName;
+	int ctype = 0;
+	if (cType == ConditionType::Greater)
+		ctype = 0;
+	else if (cType == ConditionType::Less)
+		ctype = 1;
+	else if (cType == ConditionType::Equal)
+		ctype = 2;
+	else if (cType == ConditionType::NotEqual)
+		ctype = 3;
+	else if (cType == ConditionType::True)
+		ctype = 4;
+	else if (cType == ConditionType::False)
+		ctype = 5;
+	else
+	{
+		ctype = 0;
+	}
+	j["cType"] = ctype;
+	j["fValue"] = CompareParameter.fValue;
+	j["iValue"] = CompareParameter.iValue;
+	j["bValue"] = CompareParameter.bValue;
+	j["tValue"] = CompareParameter.tValue;
+
+	return j;
+}
+
+TransCondition TransCondition::Deserialize()
+{
+	return TransCondition();
+}

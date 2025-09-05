@@ -73,3 +73,28 @@ void AnimationState::UpdateAnimationSpeed()
 		multiplerAnimationSpeed = parameter->fValue;
 	}
 }
+
+nlohmann::json AnimationState::Serialize()
+{
+	nlohmann::json j;
+	j["state_name"] = m_name;
+	j["behaviourName"] = behaviourName;
+	j["animationIndex"] = AnimationIndex;
+	j["animationSpeed"] = animationSpeed;
+	j["multiplerAnimationSpeed"] = multiplerAnimationSpeed;
+	j["animationSpeedParameterName"] = animationSpeedParameterName;
+	j["useMultipler"] = (int)useMultipler;
+	j["m_isAny"] = m_isAny;
+	nlohmann::json transitionsJson = nlohmann::json::array();
+	for (auto& trans : Transitions)
+	{
+		transitionsJson.push_back(trans->Serialize());
+	}
+	j["transitions"] = transitionsJson;
+	return j;
+}
+
+AnimationState AnimationState::Deserialize()
+{
+	return AnimationState();
+}

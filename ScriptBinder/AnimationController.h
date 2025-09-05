@@ -49,7 +49,7 @@ public:
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
 	std::shared_ptr<AnimationState> GetAniState();
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
-	void CreateState_UI();
+	std::shared_ptr<AnimationState> CreateState_UI();
 
 	void DeleteState(std::string stateName);
 	void DeleteTransiton(const std::string& fromStateName, const std::string& toStateName);

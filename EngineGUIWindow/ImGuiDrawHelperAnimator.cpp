@@ -7,6 +7,7 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ExternUI.h"
+#include "FileDialog.h"
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
@@ -330,7 +331,43 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 						if (ImGui::Button("Save Layers")) //&&&&SaveLayer
 						{
-							animator->SerializeControllers("123");
+							ImGui::OpenPopup("savelayer");
+							
+						}
+
+						if (ImGui::BeginPopup("savelayer"))
+						{
+							float availableWidth = ImGui::GetContentRegionAvail().x;
+							static char fileName[64] = "NewControllers";
+							ImGui::InputText("Name", fileName, sizeof(fileName));
+
+							std::string fileNameStr(fileName);
+
+							if (ImGui::Button("Save"))
+							{
+								animator->SerializeControllers(fileName);
+							}
+							
+							ImGui::EndPopup();
+						}
+						if (ImGui::Button("Load Layers")) //&&&&load 파일경로 오픈해서 찾게
+						{
+
+							file::path fileName = ShowOpenFileDialog(
+								L"JSON Files (*.json)\0*.json\0",
+								L"Load JSON File",
+								PathFinder::Relative("AnimatorController").wstring()
+							);
+							if (!fileName.empty())
+							{
+								animator->DeserializeControllers(fileName.string());
+							}
+							else
+							{
+								Debug->LogError("Failed to load json.");
+							}
+
+							
 						}
 						ImGui::EndTabItem();
 					}

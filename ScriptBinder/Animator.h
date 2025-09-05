@@ -45,13 +45,14 @@ public:
     [[Method]]
     void UpdateAnimation();
     void CreateController(std::string name);
-    void CreateController_UI();
+    std::shared_ptr<AnimationController> CreateController_UI();
+    std::shared_ptr<AnimationController> CreateController_UINoAni();
     void DeleteController(int index);
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     void SerializeControllers(std::string _jsonName);
-    void DeserializeControllers();
+    void DeserializeControllers(std::string _filename);
     void SetUseLayer(int layerindex,bool _useLayer);
     GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);
@@ -84,6 +85,7 @@ public:
     [[Property]]
     std::vector<ConditionParameter*> Parameters;
 
+    void ClearControllersAndParams();
     template<typename T>
     void AddParameter(const std::string valuename, T value, ValueType vType)
     {
@@ -97,7 +99,7 @@ public:
     }
     void DeleteParameter(int index);
 
-    void AddDefaultParameter(ValueType vType)
+    ConditionParameter* AddDefaultParameter(ValueType vType)
     {
         std::string baseName;
         switch (vType)
@@ -133,6 +135,7 @@ public:
         }
         ConditionParameter* newParameter = new ConditionParameter(0, vType, valueName);
         Parameters.push_back(newParameter);
+        return newParameter;
     }
 
     template<typename T>

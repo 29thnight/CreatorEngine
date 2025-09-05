@@ -45,7 +45,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -63,7 +63,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -81,7 +81,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -99,7 +99,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -117,7 +117,7 @@
                 },
                 {
                     "animationIndex": 11,
-                    "animationSpeed": 1.0,
+                    "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
                     "m_isAny": false,
@@ -147,7 +147,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -165,7 +165,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -183,7 +183,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -201,7 +201,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -255,6 +255,24 @@
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "MeleeAttack1 to Idle"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeAttack2"
+                                }
+                            ],
+                            "curStateName": "MeleeAttack1",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeAttack2",
+                            "transName": "MeleeAttack1 to MeleeAttack2"
                         }
                     ],
                     "useMultipler": 0
@@ -276,6 +294,24 @@
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "MeleeAttack2 to Idle"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeAttack3"
+                                }
+                            ],
+                            "curStateName": "MeleeAttack2",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeAttack3",
+                            "transName": "MeleeAttack2 to MeleeAttack3"
                         }
                     ],
                     "useMultipler": 0
@@ -317,7 +353,56 @@
                     "m_isAny": true,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Ani State",
-                    "transitions": [],
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnGrab"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Grab",
+                            "transName": "Ani State to Grab"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 5,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Idle",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnMove"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Run",
+                            "transName": "Idle to Run"
+                        }
+                    ],
                     "useMultipler": 0
                 },
                 {
@@ -327,13 +412,101 @@
                     "behaviourName": "",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
-                    "state_name": "NewState",
-                    "transitions": [],
+                    "state_name": "Throw",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Throw",
+                            "exitTime": 0.7289999723434448,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "Throw to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Grab",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnDrop"
+                                }
+                            ],
+                            "curStateName": "Grab",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Grab to Idle"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnThrow"
+                                }
+                            ],
+                            "curStateName": "Grab",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Throw",
+                            "transName": "Grab to Throw"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Run",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 5,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnMove"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Run to Idle"
+                        }
+                    ],
                     "useMultipler": 0
                 }
             ],
             "controller_name": "Upper",
-            "m_curState": "NewState",
+            "m_curState": "Idle",
             "useController": 1,
             "useMask": 1
         }
@@ -365,6 +538,10 @@
         },
         {
             "param_name": "MeleeAttack3",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnThrow",
             "param_vType": 3
         }
     ]

@@ -1,18 +1,17 @@
 m_name: MeleeWeapon_Prefab
 m_isEnabled: true
-m_instanceID: 598013178
+m_instanceID: 370103649
 m_fileGuid: 5ea20cc1-76e7-5178-bc7f-c7159a7de3eb
 PrefabNode:
   - GameObject: 2166264123
     m_name: MeleeWeapon
     m_isEnabled: true
-    m_instanceID: 2580402285
+    m_instanceID: 1720855551
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-      m_dirty: 0
     m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
@@ -27,15 +26,31 @@ PrefabNode:
     m_components:
       - ModuleBehavior: 1399118904
         itemtype: 1
+        itemAckDmg: 1
+        itemAckSpd: 1
+        itemAckRange: 2
+        itemKnockback: 0.5
+        coopCrit: 2
+        chgTime: 0.200000003
+        chgDmgscal: 2
+        chgSpd: 3
+        chgDelay: 1
+        chgRange: 4
+        chgHitbox: 4
+        chgKnockback: 1
+        durMax: 10
+        durUseAtk: 1
+        durUseChg: 1
+        durUseBuf: 100
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 1303808348
+        m_instanceID: 3547428038
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 3023548296
+        m_instanceID: 990677466
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -51,7 +66,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 2488056586
+        m_instanceID: 3769924503
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 2, y: 2, z: 2}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -60,13 +75,12 @@ PrefabNode:
       - GameObject: 2166264123
         m_name: Weapon_Sword_02
         m_isEnabled: true
-        m_instanceID: 830389187
+        m_instanceID: 895913773
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: -0.707106769, y: 0, z: 0, w: 0.707106829}
-          scale: {x: 1, y: 1.00000095, z: 1.00000095, w: 0}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
           m_parentID: 1
-          m_dirty: 0
         m_index: 2
         m_parentIndex: 1
         m_rootIndex: 0
@@ -82,10 +96,15 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3695028605
+            m_instanceID: 636426659
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_Sword_02
+              m_baseColorTexName: Weapon_sword_2_low_DefaultMaterial_BaseColor.png
+              m_normalTexName: Weapon_sword_2_low_DefaultMaterial_Normal.png
+              m_ORM_TexName: Weapon_sword_2_low_DefaultMaterial_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
               m_materialInfo:
                 m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 1
@@ -96,6 +115,7 @@ PrefabNode:
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: 9c070e4a-db90-557c-a5bd-cb75b3dafeab
               m_renderingMode: 0
+              m_shaderPSOName: ""
             m_Mesh:
               m_name: Plane.065
               m_materialIndex: 0

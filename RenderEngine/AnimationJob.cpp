@@ -435,84 +435,84 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         return;
     }
 
-    //for (auto& controller : animator.m_animationControllers)
-    //{
-
-    //    if (controller->IsUseLayer() == true)
-    //    {
-    //        auto mask = controller->GetAvatarMask();
-
-
-    //        if (mask != nullptr) //마스크 있으면
-    //        {
-
-    //            if (mask->isHumanoid)
-    //            {
-    //                if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
-    //                {
-    //                    //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-    //                }
-    //                else
-    //                {
-    //                    // globalTransform = parentTransform;
-    //                }
-    //            }
-    //            else
-    //            {
-    //                if (mask->IsBoneEnabled(bone->m_name) == true)
-    //                {
-    //                    animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-
-    //                }
-    //                else
-    //                {
-    //                    //globalTransform = parentTransform;
-    //                }
-    //            }
-    //        }
-    //        else
-    //        {
-    //            //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-    //            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-    //        }
-    //    }
-    //}
-
-    int controllerSize = animator.m_animationControllers.size();
-    for (int i = controllerSize - 1; i >= 0; --i)
+    for (auto& controller : animator.m_animationControllers)
     {
-        auto& controller = animator.m_animationControllers[i];
 
-        if (controller->IsUseLayer())
+        if (controller->IsUseLayer() == true)
         {
             auto mask = controller->GetAvatarMask();
 
-            if (mask != nullptr) // 마스크 있으면
+
+            if (mask != nullptr) //마스크 있으면
             {
+
                 if (mask->isHumanoid)
                 {
-                    if (mask->IsBoneEnabled(bone->m_region))
+                    if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
                     {
+                        //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                         globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                    }
+                    else
+                    {
+                        // globalTransform = parentTransform;
                     }
                 }
                 else
                 {
-                    if (mask->IsBoneEnabled(bone->m_name))
+                    if (mask->IsBoneEnabled(bone->m_name) == true)
                     {
                         animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                         globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+
+                    }
+                    else
+                    {
+                        //globalTransform = parentTransform;
                     }
                 }
             }
             else
             {
+                //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                 globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
             }
         }
     }
+
+    //int controllerSize = animator.m_animationControllers.size();
+    //for (int i = controllerSize - 1; i >= 0; --i)
+    //{
+    //    auto& controller = animator.m_animationControllers[i];
+
+    //    if (controller->IsUseLayer())
+    //    {
+    //        auto mask = controller->GetAvatarMask();
+
+    //        if (mask != nullptr) // 마스크 있으면
+    //        {
+    //            if (mask->isHumanoid)
+    //            {
+    //                if (mask->IsBoneEnabled(bone->m_region))
+    //                {
+    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+    //                }
+    //            }
+    //            else
+    //            {
+    //                if (mask->IsBoneEnabled(bone->m_name))
+    //                {
+    //                    animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+    //                }
+    //            }
+    //        }
+    //        else
+    //        {
+    //            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+    //        }
+    //    }
+    //}
 
     //bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;

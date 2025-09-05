@@ -63,7 +63,14 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	if (!m_curState)
 	{
 		if (!StateVec.size() >= 2)   //0번은 anystate라없음
-			m_curState = StateVec[1].get();
+		{
+			if (StateVec[1].get()->m_name != "Ani State")
+				m_curState = StateVec[1].get();
+			else
+				m_curState = StateVec[0].get();
+
+			
+		}
 		else
 			return nullptr;
 	}
@@ -245,7 +252,7 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	return state.get();
 }
 
-void AnimationController::CreateState_UI()
+std::shared_ptr<AnimationState> AnimationController::CreateState_UI()
 {
 	std::string uniqueName = "NewState"; 
 	std::string baseName = "NewState";
@@ -259,6 +266,7 @@ void AnimationController::CreateState_UI()
 	StateNameSet.insert(uniqueName);
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
+	return state;
 }
 
 void AnimationController::DeleteState(std::string stateName)
@@ -386,13 +394,19 @@ nlohmann::json AnimationController::Serialize()
 	nlohmann::json j;
 	j["controller_name"] = name;
 	//state들 담기
-
 	j["useController"] = (int)useController; //bool 0 1
+	
+	nlohmann::json stateJson = nlohmann::json::array();
+	for (auto& state : StateVec)
+	{
+		stateJson.push_back(state->Serialize());
+	}
+
+	j["StateVec"] = stateJson;
 	if (m_curState)
 	{
 		j["m_curState"] = m_curState->m_name;
 	}
-	//아바타 마스크 담기 본구조체 따라생기는건대 다른구조체는 어쩌지
 
 	j["useMask"] = (int)useMask; //bool 0 1 /
 	return j;

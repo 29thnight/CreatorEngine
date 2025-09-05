@@ -328,7 +328,7 @@
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClCompile>
     <ClCompile Include="ConditionParameter.cpp">
-      <Filter>Classes</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
