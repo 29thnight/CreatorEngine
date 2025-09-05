@@ -3,6 +3,7 @@
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
 #include <memory>
+#include <random>
 
 namespace BT
 {
@@ -116,6 +117,75 @@ namespace BT
 
 	private:
 		size_t m_currentIndex = 0;
+	};
+
+	class WeightedSelectorNode : public CompositeNode
+	{
+	public:
+		WeightedSelectorNode() = default;
+		WeightedSelectorNode(const std::string& name) : CompositeNode(name), m_runningChildIndex(-1) {}
+		~WeightedSelectorNode() override = default;
+
+		void AddChildWithWeight(NodePtr child, float weight)
+		{
+			m_children.push_back(child);
+			m_weights.push_back(weight);
+		}
+
+		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
+		{ 
+			// If a child is already running, tick it directly
+			if (m_runningChildIndex != -1) 
+			{
+				auto status = m_children[m_runningChildIndex]->Tick(deltatime, blackBoard); // Tick the running child
+				
+				if (status != NodeStatus::Running) 
+				{
+					m_runningChildIndex = -1; // Reset if not running
+				}
+				return status; // Return the status of the running child
+			}
+
+			//otherwise, select a new child based on weights
+			float totalWeight = 0.0f;
+			for (float weight : m_weights)
+			{
+				totalWeight += weight;
+			}
+
+			if (totalWeight <= 0.0f || m_children.empty())
+			{
+				return NodeStatus::Failure; // No valid children to select
+			}
+
+			std::random_device rd;
+			std::mt19937 gen(rd());
+			std::uniform_real_distribution<> dis(0.0f, totalWeight);
+			float randomPoint = dis(gen);
+
+			float currentWeightSum = 0.0f;
+			for (size_t i = 0; i < m_children.size(); ++i)
+			{
+				currentWeightSum += m_weights[i];
+				if (randomPoint <= currentWeightSum)
+				{
+					auto status = m_children[i]->Tick(deltatime, blackBoard);
+					if (status == NodeStatus::Running)
+					{
+						m_runningChildIndex = static_cast<int>(i); // Mark this child as running
+					}
+					return status; // Return the status of the selected child
+				}
+			}
+
+			return NodeStatus::Failure; // Fallback, should not reach here
+		}
+
+		BehaviorNodeType GetNodeType() const override { return BehaviorNodeType::WeightedSelector; }
+
+	private:
+		std::vector<float> m_weights;
+		int m_runningChildIndex;
 	};
 
 	class DecoratorNode : public BTNode

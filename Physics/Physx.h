@@ -110,6 +110,8 @@ public:
 	//입력값 추가
 	void AddInputMove(const CharactorControllerInputInfo& info);
 	//getter setter
+	CharacterController* GetCCT(const unsigned int& id);
+
 	CharacterControllerGetSetData GetCCTData(const unsigned int& id);
 	CharacterMovementGetSetData GetMovementData(const unsigned int& id);
 	void SetCCTData(const unsigned int& id ,const CharacterControllerGetSetData& controllerData);

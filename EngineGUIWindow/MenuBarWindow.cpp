@@ -1092,6 +1092,47 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             ImVec2 textPos = ImVec2(contentRect.GetTL().x + ((dummy_x - 8) - textSize.x) / 2, contentRect.GetTL().y + (40 - textSize.y) / 2);
             ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32_WHITE, node.Name.c_str());
 
+            if (node.Type == BehaviorNodeType::WeightedSelector)
+            {
+                // Ensure ChildWeights has the same size as Children.
+                // This is a safeguard; the main logic should be in link creation/deletion.
+                if (node.ChildWeights.size() != node.Children.size())
+                {
+                    node.ChildWeights.resize(node.Children.size(), 1.0f);
+                }
+
+                // Set a smaller width for the input boxes
+                ImGui::PushItemWidth(50.0f);
+
+                // Draw an InputFloat for each child weight
+                for (size_t i = 0; i < node.Children.size(); ++i)
+                {
+                    // Create a sequential label as requested by the user.
+                    std::string childLabel = std::to_string(i + 1) + " index Node";
+
+                    // Use a unique ID for each InputFloat to avoid conflicts
+                    std::string label = "##weight_" + std::to_string(node.ID.m_ID_Data) + "_" + std::to_string(i);
+
+                    // Center the content
+                    ImGui::Dummy(ImVec2(dummy_x, 5));
+                    ImRect weightRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+
+                    // Draw the input box and the sequential label on the same line
+                    ImGui::SetCursorPosX(weightRect.GetTL().x + 5);
+
+                    // MODIFIED for 1% precision: step=0.01, step_fast=0.1, format="%.2f" 
+                    if (ImGui::InputFloat(label.c_str(), &node.ChildWeights[i], 0.01f, 0.1f, "%.2f"))
+                    {
+                        // Optional: handle value change, e.g., ensure weight is not negative
+                        if (node.ChildWeights[i] < 0.0f) node.ChildWeights[i] = 0.0f;
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(childLabel.c_str());
+                }
+
+                ImGui::PopItemWidth();
+            }
+
             ImRect outputsRect;
             int outputAlpha = 200;
 
@@ -1206,13 +1247,42 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 					outputNodeRaw = graph.Nodes[outputNodeId.Get()];
                 }
 
-                if (inputNodeRaw && outputNodeRaw && inputNodeRaw != outputNodeRaw)
+                /*if (inputNodeRaw && outputNodeRaw && inputNodeRaw != outputNodeRaw)
                 {
                     inputNodeRaw->ParentID = 0;
                     outputNodeRaw->Children.erase(
                         std::remove(outputNodeRaw->Children.begin(), outputNodeRaw->Children.end(), inputNodeRaw->ID),
                         outputNodeRaw->Children.end()
                     );
+
+                    ed::DeleteLink(selectedLink);
+                    selectedLink = 0;
+                }*/
+                if (inputNodeRaw && outputNodeRaw && inputNodeRaw != outputNodeRaw)
+                {
+                    inputNodeRaw->ParentID = 0;
+
+                    // Find the iterator to the child to be removed
+                    auto childIter = std::find(outputNodeRaw->Children.begin(), outputNodeRaw->Children.end(), inputNodeRaw->ID);
+
+                    if (childIter != outputNodeRaw->Children.end())
+                    {
+                        // Calculate the index before erasing
+                        size_t childIndex = std::distance(outputNodeRaw->Children.begin(), childIter);
+
+                        // Erase the child from the Children vector
+                        outputNodeRaw->Children.erase(childIter);
+
+                        // If the parent is a WeightedSelector, erase the corresponding weight
+                        if (outputNodeRaw->Type == BehaviorNodeType::WeightedSelector)
+                        {
+                            // Check bounds before erasing
+                            if (childIndex < outputNodeRaw->ChildWeights.size())
+                            {
+                                outputNodeRaw->ChildWeights.erase(outputNodeRaw->ChildWeights.begin() + childIndex);
+                            }
+                        }
+                    }
 
                     ed::DeleteLink(selectedLink);
                     selectedLink = 0;
@@ -1315,9 +1385,19 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 
                             bool canAcceptChild = !BT::IsDecoratorNode(outputNodeRaw->Type) || outputNodeRaw->Children.empty();
 
+                            /*if (!inputNodeRaw->IsRoot && !hasParent && canAcceptChild)
+                            {
+                                outputNodeRaw->Children.push_back(inputNodeRaw->ID);
+                            }*/
                             if (!inputNodeRaw->IsRoot && !hasParent && canAcceptChild)
                             {
                                 outputNodeRaw->Children.push_back(inputNodeRaw->ID);
+
+                                // If the parent is a WeightedSelector, add a default weight
+                                if (outputNodeRaw->Type == BehaviorNodeType::WeightedSelector)
+                                {
+                                    outputNodeRaw->ChildWeights.push_back(1.0f);
+                                }
                             }
                         }
                     }

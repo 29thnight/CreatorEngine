@@ -5,7 +5,7 @@
 enum class NodeStatus { Success, Failure, Aborted, Running };
 AUTO_REGISTER_ENUM(NodeStatus);
 
-enum class BehaviorNodeType { Composite, Decorator, Sequence, Selector, Inverter, ConditionDecorator , Condition, Parallel, Action };
+enum class BehaviorNodeType { Composite, Decorator, Sequence, Selector, WeightedSelector, Inverter, ConditionDecorator , Condition, Parallel, Action };
 AUTO_REGISTER_ENUM(BehaviorNodeType);
 
 enum class ParallelPolicy
@@ -22,6 +22,7 @@ namespace BT
 		return type == BehaviorNodeType::Composite || 
 				type == BehaviorNodeType::Selector || 
 				type == BehaviorNodeType::Sequence || 
+				type == BehaviorNodeType::WeightedSelector ||
 				type == BehaviorNodeType::Parallel;
 	}
 
@@ -56,6 +57,7 @@ namespace BT
 	{
 		if (str == "Sequence")			 return BehaviorNodeType::Sequence;
 		if (str == "Selector")			 return BehaviorNodeType::Selector;
+		if (str == "WeightedSelector") return BehaviorNodeType::WeightedSelector;
 		if (str == "Parallel")			 return BehaviorNodeType::Parallel;
 		if (str == "Inverter")			 return BehaviorNodeType::Inverter;
 		if (str == "ConditionDecorator") return BehaviorNodeType::ConditionDecorator;
