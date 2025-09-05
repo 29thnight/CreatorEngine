@@ -66,40 +66,7 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    //{
-    //    SpinLock lock(scene.m_uiProxyMapFlag);
-    //    for (auto& [id, proxy] : scene.m_uiProxyMap)
-    //    {
-    //        if (proxy) renderData->PushUIRenderQueue(proxy.get());
-    //    }
-    //}
-
-    //renderData->SortUIRenderQueue();
     if (renderData->m_UIRenderQueue.empty()) return;
-
-	//std::vector<UIRenderProxy*> customShaderQueue;
-    std::map<std::string, std::pair<ID3D11PixelShader*, std::vector<UIRenderProxy*>>> customShaderQueueMap;
-	std::vector<UIRenderProxy*> normalQueue;
-    for (auto* proxy : renderData->m_UIRenderQueue)
-    {
-        if (proxy->isCustomShader())
-        {
-			std::string shaderName = proxy->GetCustomPixelShader().m_shader_identifier;
-            auto* pixelShader = proxy->GetCustomPixelShader()->GetShader();
-            if (customShaderQueueMap.find(shaderName) == customShaderQueueMap.end())
-            {
-                customShaderQueueMap[shaderName] = { pixelShader, { proxy } };
-            }
-            else
-            {
-                customShaderQueueMap[shaderName].second.push_back(proxy);
-            }
-        }
-        else
-        {
-            normalQueue.push_back(proxy);
-		}
-	}
 
     ID3D11DeviceContext* deferredPtr = deferredContext;
 
@@ -115,34 +82,32 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
     camera.UpdateBuffer(deferredPtr);
 
     DirectX11::VSSetConstantBuffer(deferredPtr, 0, 1, m_UIBuffer.GetAddressOf());
-    spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack,
-        m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp());
 
-    for (auto* proxy : normalQueue)
+    for (auto* proxy : renderData->m_UIRenderQueue)
     {
-        proxy->Draw(spriteBatch);
-    }
+		if (!proxy->IsEnabled()) continue;
 
-    spriteBatch->End();
-
-    for (auto [shaderName, pair] : customShaderQueueMap)
-    {
-        auto customShaderFunc = [=]()
+        if (proxy->isCustomShader())
         {
-			auto* pixelShader = pair.first;
-            deferredPtr->PSSetShader(pixelShader, nullptr, 0);
-        };
+            auto customShaderFunc = [=]()
+            {
+                auto* pixelShader = proxy->GetCustomPixelShader()->GetShader();
+				deferredPtr->PSSetShader(pixelShader, nullptr, 0);
+            };
 
-        spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, m_commonStates->NonPremultiplied(), 
-            m_commonStates->LinearClamp(), nullptr, nullptr, customShaderFunc);
-
-        for (auto* proxy : pair.second)
+            spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack,
+                m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp()
+                , nullptr, nullptr, customShaderFunc);
+        }
+        else
         {
-            proxy->UpdateShaderBuffer(deferredPtr);
-            proxy->Draw(spriteBatch);
+            spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack,
+				m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp());
         }
 
-		spriteBatch->End();
+        proxy->Draw(spriteBatch);
+
+        spriteBatch->End();
     }
 
     DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
