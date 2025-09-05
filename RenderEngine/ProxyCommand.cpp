@@ -224,8 +224,17 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	auto scale		= pComponent->scale;
 	float rotation	= pComponent->rotate;
 	int layerOrder	= pComponent->GetLayerOrder();
+	auto shaderPath = pComponent->GetCustomPixelShader();
+	auto cpuBuffer = pComponent->GetCustomPixelCPUBuffer();
 
-	m_updateFunction = [proxyObject, textures = std::move(textures), curTexture, origin, position, scale, rotation, layerOrder, color]() mutable
+	if (!shaderPath.empty())
+	{
+		proxyObject->SetCustomPixelShader(shaderPath);
+	}
+
+	m_updateFunction = [proxyObject, textures = std::move(textures), 
+		curTexture, origin, position, scale, 
+		rotation, layerOrder, color, buffer = std::move(cpuBuffer)]() mutable
 	{
 		UIRenderProxy::ImageData data{};
 		data.textures		= std::move(textures);
@@ -237,6 +246,11 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 		data.rotation		= rotation;
 		data.layerOrder		= layerOrder;
 		proxyObject->m_data = std::move(data);
+
+		if (!buffer.empty())
+		{
+			proxyObject->SetCustomPixelBuffer(buffer);
+		}
 	};
 }
 

@@ -33,6 +33,11 @@ public:
     [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
+
+	bool isThisTextureExist(std::string_view path) const;
+
+	const std::vector<std::shared_ptr<Texture>>& GetTextures() const { return textures; }
+	const std::vector<std::string>& GetTexturePaths() const { return texturePaths; }
 	
 	ImageInfo uiinfo{};
 	std::shared_ptr<Texture> m_curtexture{};

@@ -84,7 +84,7 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
     {
         if (proxy->isCustomShader())
         {
-			std::string shaderName = proxy->GetCustomPixelShader()->m_name;
+			std::string shaderName = proxy->GetCustomPixelShader().m_shader_identifier;
             auto* pixelShader = proxy->GetCustomPixelShader()->GetShader();
             if (customShaderQueueMap.find(shaderName) == customShaderQueueMap.end())
             {
@@ -125,18 +125,18 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 
     spriteBatch->End();
 
-    for (auto& [shaderName, pair] : customShaderQueueMap)
+    for (auto [shaderName, pair] : customShaderQueueMap)
     {
-		auto [pixelShader, proxyList] = pair;
-        auto customShaderFunc = [deferredPtr, pixelShader]()
+        auto customShaderFunc = [=]()
         {
+			auto* pixelShader = pair.first;
             deferredPtr->PSSetShader(pixelShader, nullptr, 0);
         };
 
         spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, m_commonStates->NonPremultiplied(), 
             m_commonStates->LinearClamp(), nullptr, nullptr, customShaderFunc);
 
-        for (auto* proxy : proxyList)
+        for (auto* proxy : pair.second)
         {
             proxy->UpdateShaderBuffer(deferredPtr);
             proxy->Draw(spriteBatch);
