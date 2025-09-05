@@ -43,9 +43,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         {
             if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
             {
-                    Material* newMat = Material::Instantiate(meshRenderer->m_Material);
-                    meshRenderer->m_Material = newMat;
-                    DataSystems->SaveMaterial(newMat);
+                Material* newMat = Material::Instantiate(meshRenderer->m_Material);
+                meshRenderer->m_Material = newMat;
+                DataSystems->SaveMaterial(newMat);
             }
             ImGui::EndPopup();
         }
@@ -83,6 +83,11 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 				ShaderSystem->SetShaderSelectionTarget(meshRenderer->m_Material);
                 ImGui::GetContext("SelectShader").Open();
             }
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_TRASH_CAN "##MatClearShader"))
+			{
+				meshRenderer->m_Material->ClearShaderPSO();
+			}
 
             if (meshRenderer->m_Material->m_shaderPSO)
             {

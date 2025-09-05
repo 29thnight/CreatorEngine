@@ -1,4 +1,5 @@
 #include "ImageComponent.h"
+#include "ImageComponent.h"
 #include "../RenderEngine/DeviceState.h"
 #include "../RenderEngine/Texture.h"
 #include "../RenderEngine/mesh.h"
@@ -24,6 +25,17 @@ void ImageComponent::SetTexture(int index)
 	uiinfo.size = textures[curindex]->GetImageSize();
 
 	origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
+}
+
+bool ImageComponent::isThisTextureExist(std::string_view path) const
+{
+	for (const auto& p : texturePaths)
+	{
+		if (p == path)
+			return true;
+	}
+
+	return false;
 }
 
 void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)

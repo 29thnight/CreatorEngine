@@ -54,6 +54,12 @@ public:
 
 	void SetCustomPixelShader(std::string_view shaderPath);
 	std::string GetCustomPixelShader() const { return m_customPixelShaderPath; }
+	void ClearCustomPixelShader() 
+	{ 
+		m_customPixelShaderPath.clear(); 
+		m_customPixelCPUBuffer.clear();
+		m_variables.clear();
+	}
 
 	const std::vector<std::byte>& GetCustomPixelCPUBuffer() const { return m_customPixelCPUBuffer; }
 

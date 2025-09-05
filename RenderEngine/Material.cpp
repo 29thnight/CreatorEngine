@@ -1,4 +1,5 @@
 #include "Material.h"
+#include "Material.h"
 #include "DataSystem.h"
 #include <cstring>
 
@@ -273,6 +274,14 @@ void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
 std::shared_ptr<ShaderPSO> Material::GetShaderPSO() const
 {
 	return m_shaderPSO ? m_shaderPSO : nullptr;
+}
+
+void Material::ClearShaderPSO()
+{
+    m_shaderPSO.reset();
+    m_shaderPSOName = {};
+    m_cbMeta = nullptr;
+	m_cbufferValues.clear();
 }
 
 Material::VarView Material::FindVar(std::string_view cb, std::string_view var) const

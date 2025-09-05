@@ -6,7 +6,7 @@ class IShader
 {
 public:
 	IShader() : m_name("null") {};
-	IShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : m_name(name), m_blob(blob), m_isCompiled(false) {};
+	IShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : m_name(name), m_blob(blob), m_isCompiled(false) {};
 	virtual ~IShader() = default;
 
 	virtual void Compile() = 0;
@@ -120,7 +120,7 @@ class VertexShader final : public IShader
 {
 public:
 	VertexShader() = default;
-	VertexShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
+	VertexShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
 	~VertexShader() = default;
 
 	void Compile() override
@@ -154,7 +154,7 @@ class PixelShader final : public IShader
 {
 public:
 	PixelShader() = default;
-	PixelShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
+	PixelShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
 	~PixelShader() = default;
 	void Compile() override
 	{
@@ -185,7 +185,7 @@ class ComputeShader final : public IShader
 {
 public:
 	ComputeShader() = default;
-	ComputeShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
+	ComputeShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
 	~ComputeShader() = default;
 	void Compile() override
 	{
@@ -215,7 +215,7 @@ class GeometryShader final : public IShader
 {
 public:
 	GeometryShader() = default;
-	GeometryShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
+	GeometryShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
 	~GeometryShader() = default;
 	void Compile() override
 	{
@@ -245,7 +245,7 @@ class HullShader final : public IShader
 {
 public:
 	HullShader() = default;
-	HullShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
+	HullShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
 	~HullShader() = default;
 	void Compile() override
 	{
@@ -275,7 +275,7 @@ class DomainShader final : public IShader
 {
 public:
 	DomainShader() = default;
-	DomainShader(std::string_view name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
+	DomainShader(const std::string& name, const ComPtr<ID3DBlob>& blob) : IShader(name, blob) {};
 	~DomainShader() = default;
 	void Compile() override
 	{

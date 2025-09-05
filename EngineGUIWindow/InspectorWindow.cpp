@@ -141,8 +141,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					{
 						selectedComponent = component.get();
 					}
-
-					if(component->GetTypeID() == type_guid(MeshRenderer))
+					auto componentTypeID = component->GetTypeID();
+					if(componentTypeID == type_guid(MeshRenderer))
 					{
 						MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
 						if (nullptr != meshRenderer)
@@ -150,7 +150,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperMeshRenderer(meshRenderer);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(TerrainComponent)) {
+					else if (componentTypeID == type_guid(TerrainComponent)) {
 
 						TerrainComponent* terrain = dynamic_cast<TerrainComponent*>(component.get());
 						if (nullptr != terrain)
@@ -162,7 +162,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					{
 						ImGuiDrawHelperModuleBehavior(moduleBehavior);
 					}
-					else if (component->GetTypeID() == type_guid(Animator))
+					else if (componentTypeID == type_guid(Animator))
 					{
 						Animator* animator = dynamic_cast<Animator*> (component.get());
 						if (nullptr != animator)
@@ -170,7 +170,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperAnimator(animator);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(StateMachineComponent))
+					else if (componentTypeID == type_guid(StateMachineComponent))
 					{
 						StateMachineComponent* fsm = dynamic_cast<StateMachineComponent*>(component.get());
 						if (nullptr != fsm)
@@ -178,7 +178,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperFSM(fsm);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(BehaviorTreeComponent))
+					else if (componentTypeID == type_guid(BehaviorTreeComponent))
 					{
 						BehaviorTreeComponent* bt = dynamic_cast<BehaviorTreeComponent*>(component.get());
 						if (nullptr != bt)
@@ -186,7 +186,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperBT(bt);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(PlayerInputComponent))
+					else if (componentTypeID == type_guid(PlayerInputComponent))
 					{
 						PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
 						if (nullptr != input)
@@ -194,7 +194,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperPlayerInput(input);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(VolumeComponent))
+					else if (componentTypeID == type_guid(VolumeComponent))
 					{
 						VolumeComponent* input = dynamic_cast<VolumeComponent*>(component.get());
 						if (nullptr != input)
@@ -202,10 +202,20 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperVolume(input);
 						}
 					}
-					else if (component->GetTypeID() == type_guid(DecalComponent)) {
+					else if (componentTypeID == type_guid(DecalComponent)) 
+					{
 						DecalComponent* input = dynamic_cast<DecalComponent*>(component.get());
-						if (nullptr != input) {
+						if (nullptr != input) 
+						{
 							ImGuiDrawHelperDecal(input);
+						}
+					}
+					else if (componentTypeID == type_guid(ImageComponent))
+					{
+						ImageComponent* image = dynamic_cast<ImageComponent*>(component.get());
+						if (nullptr != image)
+						{
+							ImGuiDrawHelperImageComponent(image);
 						}
 					}
 					else if (type)
@@ -1157,6 +1167,92 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 			}
 		}
 		ImGui::EndDragDropTarget();
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageComponent)
+{
+	auto textures = imageComponent->GetTextures();
+	int count = static_cast<int>(textures.size());
+	static int currentTextureIndex = imageComponent->curindex;
+
+	if (count > 0)
+	{
+		const char* items[64]{};
+		for (int i = 0; i < count; ++i)
+		{
+			items[i] = textures[i]->m_name.c_str();
+		}
+		ImGui::Text("Image");
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
+		if (ImGui::BeginCombo("##TextureCombo", items[currentTextureIndex]))
+		{
+			for (int i = 0; i < count; ++i)
+			{
+				bool isSelected = (currentTextureIndex == i);
+				if (ImGui::Selectable(items[i], isSelected))
+				{
+					currentTextureIndex = i;
+					imageComponent->SetTexture(i);
+				}
+				if (isSelected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+	}
+	else
+	{
+		ImGui::Text("No textures available. Please drag and drop a texture.");
+	}
+
+	ImGui::Text("Drag Texture Here");
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = static_cast<const char*>(payload->Data);
+			file::path filename = file::path(droppedFilePath).filename();
+			file::path filepath = PathFinder::Relative("UI\\") / filename;
+			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(),
+				DataSystem::TextureFileType::UITexture);
+			if (texture)
+			{
+				imageComponent->Load(texture);
+				imageComponent->SetTexture(static_cast<int>(imageComponent->GetTextures().size() - 1));
+				currentTextureIndex = static_cast<int>(imageComponent->GetTextures().size() - 1);
+			}
+			else
+			{
+				Debug->LogError("Failed to load UI Texture: " + filepath.string());
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	ImGui::ColorEdit4("color tint", &imageComponent->color.x);
+	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
+	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
+
+	std::string shaderName = "None";
+	if (!imageComponent->GetCustomPixelShader().empty())
+	{
+		shaderName = imageComponent->GetCustomPixelShader();
+	}
+	ImGui::Text("Pixel Shader");
+	ImGui::SameLine();
+	ImGui::Button(shaderName.c_str(), ImVec2(150, 20));
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
+	{
+		ShaderSystem->SetImageSelectionTarget(imageComponent);
+		ImGui::GetContext("SelectImageCustomShader").Open();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_TRASH "##RemoveShader"))
+	{
+		imageComponent->ClearCustomPixelShader();
 	}
 }
 

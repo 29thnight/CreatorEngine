@@ -27,5 +27,6 @@ private:
 	void ImGuiDrawHelperBT(class BehaviorTreeComponent* BTComponent);
 	void ImGuiDrawHelperVolume(class VolumeComponent* volumeComponent);
 	void ImGuiDrawHelperDecal(class DecalComponent* decalComponent);
+	void ImGuiDrawHelperImageComponent(class ImageComponent* imageComponent);
 };
 #endif // !DYNAMICCPP_EXPORTS
