@@ -28,6 +28,12 @@ void EntityEnemy::Start()
 	if (!m_animator)
 	{
 		m_animator = enemy->GetComponent<Animator>();
+		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
+	}
+	else {
+		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
 	}
 
 	bool hasid = blackBoard->HasKey("Identity");
@@ -64,7 +70,9 @@ void EntityEnemy::Update(float tick)
 
 	if (hittimer > 0.f) {
 		hittimer -= tick;
-		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer));
+		if (hittimer < 0.f) hittimer = 0.f;
+		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
+		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
 
 	if (attackCount > 0) {
@@ -117,11 +125,12 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
-			dir.Normalize();
-			Mathf::Vector3 p = XMVector3Rotate(dir, sender->GetOwner()->m_transform.GetWorldQuaternion());
-			hittimer = 1.f;
-			hitPos = p;
 
+			dir.Normalize();
+			Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
+			hittimer = m_MaxknockBackTime;
+			hitPos = p;
+			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
 
 			
 			blackBoard->SetValueAsInt("Damage", damage);
