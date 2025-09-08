@@ -186,7 +186,8 @@ public:
 	void StartRay();
 	[[Method]]
 	void EndRay();
-
+	[[Method]]
+	void EndAttack();
 
 	bool startRay = false;
 

@@ -34,23 +34,33 @@ void WeaponCapsule::Update(float tick)
 			}
 			else //타겟지점도착 같은타입 weapon 생성해서 player에게 주기 //
 			{
-				if (weaponCode == 0)  //지금은 meleeweapon만이지만  weaponcode 확인해서 melee,range,bomb 개별생성해서 add
+				Prefab* weaponPrefab;
+				if (weaponCode == 0)  
 				{
-
+					weaponPrefab = PrefabUtilitys->LoadPrefab("MeleeWeapon");
 				}
-				//Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
-				Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("Staff");
-				if (meleeweapon && ownerPlayer)
+				else if (weaponCode == 1)  
 				{
-					GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeWeapon");
+					weaponPrefab = PrefabUtilitys->LoadPrefab("RangeWeapon");
+				}
+				else if (weaponCode == 2)  
+				{
+					weaponPrefab = PrefabUtilitys->LoadPrefab("BombWeapon");
+				}
+				else
+				{
+					weaponPrefab = PrefabUtilitys->LoadPrefab("BasicWeapon");
+				}
+				
+				if (weaponPrefab && ownerPlayer)
+				{
+					GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(weaponPrefab, "Weapon");
 					auto weapon = weaponObj->GetComponent<Weapon>();
 					Player* player= ownerPlayer->GetComponent<Player>();
 					player->AddWeapon(weapon); 
 
 					
 				}
-
-
 				GetOwner()->Destroy();
 			}
 		}

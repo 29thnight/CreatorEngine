@@ -7,11 +7,19 @@ void Weapon::Start()
 {
 	if (itemtype == 0)
 	{
-		itemType = ItemType::Basic;
-	}
-	else
-	{
 		itemType = ItemType::Meely;
+	}
+	else if(itemtype == 1)
+	{
+		itemType = ItemType::Range;
+	}
+	else if (itemtype == 2)
+	{
+		itemType = ItemType::Bomb;
+	}
+	else 
+	{
+		itemType = ItemType::Basic;
 	}
 }
 

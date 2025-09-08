@@ -2,7 +2,7 @@
 #include "pch.h"
 void Bomb::Start()
 {
-	itemType = ItemType::Explosion;
+	itemType = ItemType::Bomb;
 }
 
 

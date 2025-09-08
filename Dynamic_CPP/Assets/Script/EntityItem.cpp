@@ -102,11 +102,12 @@ void EntityItem::Update(float tick)
 		}
 	}*/
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	if (abs(pos.y) <= 0.013f)
+	if (abs(pos.y) <= 0.05f)
 	{
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+		rigid->UseGravity(false);
 	}
 	if (m_state == EItemState::CATCHED)
 	{

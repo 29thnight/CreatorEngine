@@ -56,6 +56,7 @@ ReflectionScriptField(Player) \
 		meta_method(Attack1) \
 		meta_method(StartRay) \
 		meta_method(EndRay) \
+		meta_method(EndAttack) \
 		meta_method(OnBuff) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \

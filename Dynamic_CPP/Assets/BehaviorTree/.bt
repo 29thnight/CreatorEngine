@@ -1,5 +1,5 @@
 NodeList:
-  - ID: 101446371
+  - ID: 1239358776
     Type: 2
     Name: RootSequence
     ParentID: 0
@@ -8,4 +8,5 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 0, y: 0}

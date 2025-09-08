@@ -56,15 +56,13 @@ void Player::Start()
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 	
 
-	std::string gumName = "Sword" + std::to_string(playerIndex +1);
-	auto obj = GameObject::Find(gumName);
-	if (obj && handSocket)
+	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("BasicWeapon");
+	if (basicWeapon && player)
 	{
-		auto curweapon = obj->GetComponent<Weapon>();
-		AddWeapon(curweapon);
-
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(basicWeapon, "BasicWeapon");
+		auto weapon = weaponObj->GetComponent<Weapon>();
+		AddWeapon(weapon);
 	}
-	auto curweapon = GameObject::Find("realSword");
 
 	
 	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
@@ -95,13 +93,13 @@ void Player::Update(float tick)
 	dashObj->m_transform.SetPosition(pos);
 	//Test
 	{
-		auto& asiss = GM->GetAsis();
+		/*auto& asiss = GM->GetAsis();
 		auto asis = asiss[0]->GetOwner();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();auto indicator = GameObject::Find("TestIndicator");
 		auto curveindicator = indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(true);
-		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);*/
 	}
 
 	if (isDead)
@@ -133,19 +131,19 @@ void Player::Update(float tick)
 			{
 				onIndicate = true;
 
-				auto indicator = GameObject::Find("TestIndicator");
+				/*auto indicator = GameObject::Find("TestIndicator");
 				auto curveindicator = indicator->GetComponent<CurveIndicator>();
 				curveindicator->EnableIndicator(onIndicate);
-				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);*/
 
 				std::cout << "onIndicate!!!!!!!!!" << std::endl;
 			}
 			else
 			{
 				onIndicate = false;
-				auto indicator = GameObject::Find("TestIndicator");
+				/*auto indicator = GameObject::Find("TestIndicator");
 				auto curveindicator = indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);
+				curveindicator->EnableIndicator(onIndicate);*/
 			}
 		}
 
@@ -255,7 +253,7 @@ void Player::Move(Mathf::Vector2 dir)
 	if (isStun || isKnockBack || !m_isCallStart || isDashing || isDead || isAttacking) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
-
+	m_animator->SetUseLayer(1, true);
 	//auto worldRot = camera->m_transform.GetWorldQuaternion();
 	//Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
 	//Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
@@ -408,60 +406,61 @@ void Player::StartAttack()
 	{
 		isAttacking = true;
 		DropCatchItem();
-		//if (m_curWeapon)
-		//{
-		//	if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
-		//	{
-		//		m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-		//		//m_animator->SetUseLayer(0,false);
-		//		std::cout << "Melee Attack!!" << std::endl;
-		//	}
-
-
-		//	if (m_curWeapon->itemType == ItemType::Range)
-		//	{
-		//		m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
-		//		//m_animator->SetUseLayer(0,false);
-		//		std::cout << "RangeAttack!!" << std::endl;
-		//		ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
-		//	}
-
-		//	if (m_curWeapon->itemType == ItemType::Explosion)
-		//	{
-		//		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
-		//		//m_animator->SetUseLayer(0,false);
-		//		std::cout << "BombAttack!!" << std::endl;
-		//	}
-
-
-		//	m_comboCount++;
-		//	m_comboElapsedTime = 0;
-		//	attackElapsedTime = 0;
-		//	if (m_curWeapon->CheckDur() == true)
-		//	{
-		//		std::cout << "weapon break" << std::endl;
-		//	}
-		//}
-
-		if (m_comboCount == 0)
+		m_animator->SetUseLayer(1, false);
+		if (m_curWeapon)
 		{
-			m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-			std::cout << "MeleeAttack1" << std::endl;
-			canMeleeCancel = false;
-			//m_comboCount++;
-		}
-		else if (m_comboCount == 1)
-		{
-			m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-			std::cout << "MeleeAttack2" << std::endl;
-			canMeleeCancel = false;
-			//m_comboCount++;
-		}
-		else if (m_comboCount == 2)
-		{
-			m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-			std::cout << "MeleeAttack3" << std::endl;
-			canMeleeCancel = false;
+			if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
+			{
+
+				if (m_comboCount == 0)
+				{
+					m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+					std::cout << "MeleeAttack1" << std::endl;
+					canMeleeCancel = false;
+					//m_comboCount++;
+				}
+				else if (m_comboCount == 1)
+				{
+					m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+					std::cout << "MeleeAttack2" << std::endl;
+					canMeleeCancel = false;
+					//m_comboCount++;
+				}
+				else if (m_comboCount == 2)
+				{
+					m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
+					std::cout << "MeleeAttack3" << std::endl;
+					canMeleeCancel = false;
+				}
+
+				m_comboCount++;
+				m_comboElapsedTime = 0;
+
+
+
+
+			}
+
+
+			if (m_curWeapon->itemType == ItemType::Range)
+			{
+				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+				std::cout << "RangeAttack!!" << std::endl;
+				ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
+			}
+
+			if (m_curWeapon->itemType == ItemType::Bomb)
+			{
+				m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
+				std::cout << "BombAttack!!" << std::endl;
+			}
+
+
+			attackElapsedTime = 0;
+			if (m_curWeapon->CheckDur() == true)
+			{
+				std::cout << "weapon break" << std::endl;
+			}
 		}
 	}
 }
@@ -489,66 +488,6 @@ void Player::Attack1()
 		//차지공격나감
 	}
 
-	//if (isAttacking == false || canMeleeCancel == true)
-	//{
-	//	isAttacking = true;
-	//	DropCatchItem();
-	//	//if (m_curWeapon)
-	//	//{
-	//	//	if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
-	//	//	{
-	//	//		m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//	//		//m_animator->SetUseLayer(0,false);
-	//	//		std::cout << "Melee Attack!!" << std::endl;
-	//	//	}
-
-
-	//	//	if (m_curWeapon->itemType == ItemType::Range)
-	//	//	{
-	//	//		m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
-	//	//		//m_animator->SetUseLayer(0,false);
-	//	//		std::cout << "RangeAttack!!" << std::endl;
-	//	//		ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
-	//	//	}
-
-	//	//	if (m_curWeapon->itemType == ItemType::Explosion)
-	//	//	{
-	//	//		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
-	//	//		//m_animator->SetUseLayer(0,false);
-	//	//		std::cout << "BombAttack!!" << std::endl;
-	//	//	}
-
-
-	//	//	m_comboCount++;
-	//	//	m_comboElapsedTime = 0;
-	//	//	attackElapsedTime = 0;
-	//	//	if (m_curWeapon->CheckDur() == true)
-	//	//	{
-	//	//		std::cout << "weapon break" << std::endl;
-	//	//	}
-	//	//}
-
-	//	if (m_comboCount == 0)
-	//	{
-	//		m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//		std::cout << "MeleeAttack1" << std::endl;
-	//		canMeleeCancel = false;
-	//		//m_comboCount++;
-	//	}
-	//	else if (m_comboCount == 1)
-	//	{
-	//		m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//		std::cout << "MeleeAttack2" << std::endl;
-	//		canMeleeCancel = false;
-	//		//m_comboCount++;
-	//	}
-	//	else if (m_comboCount == 2)
-	//	{
-	//		m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//		std::cout << "MeleeAttack3" << std::endl;
-	//		canMeleeCancel = false;
-	//	}
-	//}
 
 	m_chargingTime = 0.f;
 }
@@ -561,6 +500,11 @@ void Player::StartRay()
 void Player::EndRay()
 {
 	startRay = false;
+}
+
+void Player::EndAttack()
+{
+	isAttacking = false;
 }
 
 

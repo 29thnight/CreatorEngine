@@ -300,6 +300,9 @@
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntitlyRock.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -525,6 +528,9 @@
 			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

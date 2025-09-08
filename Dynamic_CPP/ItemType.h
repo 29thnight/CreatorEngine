@@ -10,10 +10,10 @@ enum class EItemType
 
 enum class ItemType
 {
+	Basic,
 	Meely,
 	Range,
-	Explosion,
-	Basic,
+	Bomb,
 	None,
 };
 
