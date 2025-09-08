@@ -46,9 +46,9 @@
                         "trailParams": {
                             "endWidth": 1.0235999822616577,
                             "maxTrailPoints": 500,
-                            "minDistance": 0.49729999899864197,
+                            "minDistance": 0.0010000000474974513,
                             "startWidth": 1.128999948501587,
-                            "trailLifetime": 2.559999942779541,
+                            "trailLifetime": 1.0499999523162842,
                             "useLengthBasedUV": true
                         }
                     },

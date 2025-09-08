@@ -19,49 +19,62 @@ struct PixelInput
 
 float4 main(PixelInput input) : SV_TARGET
 {
-    float dissolve1 = g_dissolveTexture.Sample(g_linearSampler, input.texcoord).r;
-    float dissolve2 = g_dissolveTexture2.Sample(g_linearSampler, input.texcoord).r;
-    
     float lifeRatio = 1.0f - input.dissolveAmount;
-    
-    // 부드러운 점진적 사라짐 (threshold를 더 부드럽게)
-    float dissolveThreshold = 1.0f - lifeRatio * 0.8f; // 0.8f로 범위 조정
-    clip(dissolve2 - dissolveThreshold);
-    
+
     float4 texColor = g_trailTexture.Sample(g_linearSampler, input.texcoord);
     float4 bgColor = g_backgroundTexture.Sample(g_linearSampler, input.texcoord);
-    
-    // 하이라이트도 더 부드럽게
-    float deathEdge = smoothstep(lifeRatio - 0.15f, lifeRatio + 0.05f, dissolve1);
-    float3 highlightColor = float3(1.0f, 0.3f, 0.1f);
-    
-    float4 finalColor = input.color * texColor;
-    
-    // 백그라운드 블렌딩도 더 점진적으로
-    float dissolveEdge = smoothstep(dissolveThreshold - 0.1f, dissolveThreshold + 0.2f, dissolve2);
-    finalColor = lerp(finalColor, bgColor, (1.0f - dissolveEdge) * 0.2f);
-    
-    finalColor.rgb = lerp(finalColor.rgb, highlightColor, deathEdge * lifeRatio * 0.5f);
-    
-    // 나머지 효과들...
+
+    float4 finalColor;
+
+    if (texColor.a < 0.1f)
+    {
+        finalColor.rgb = bgColor.rgb;
+        finalColor.a = bgColor.a * 0.5f;
+    }
+    else
+    {
+        float grayValue = (texColor.r + texColor.g + texColor.b) / 3.0f;
+     
+        if (grayValue < 0.3f)
+        {
+            finalColor.rgb = float3(0.0f, 0.0f, 0.0f);
+        }
+        else
+        {
+            finalColor.rgb = float3(1.0f, 1.0f, 1.0f);
+        }
+     
+        finalColor.a = texColor.a;
+     
+       // Y=0에 가까운 부분만 빨간색 (input.color 사용)
+        if (input.texcoord.y < 0.1f)
+        {
+            finalColor.rgb = float3(2.0f, 0.3f, 0.3f) * input.color.rgb;
+        }
+        // 잔상 (input.color 사용)
+        else if (lifeRatio >= 0.3f)
+        {
+            float intensity = (0.3f - lifeRatio) / 0.3f;
+            float3 deathColor = float3(1.2f, 0.1f, 0.1f) * input.color.rgb;
+            finalColor.rgb = lerp(finalColor.rgb, deathColor, intensity * 0.8f);
+        }
+       
+    }
+
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(input.viewDir);
-    
+
     float fresnel = 1.0f - abs(dot(normal, viewDir));
     fresnel = smoothstep(0.0f, 1.0f, fresnel);
     finalColor.rgb *= (1.0f + fresnel * 0.3f);
-    
-    float vFade = smoothstep(0.0f, 0.1f, input.texcoord.y) *
-                  smoothstep(1.0f, 0.9f, input.texcoord.y);
-    finalColor.a *= vFade;
-    
+
     float distance = length(input.viewDir);
     float distanceFade = 1.0f - saturate((distance - 50.0f) / 100.0f);
     finalColor.a *= distanceFade;
-    
-    finalColor.a *= pow(lifeRatio, 0.5f); // 제곱근으로 더 부드러운 페이드
-    
+
+    finalColor.a *= pow(lifeRatio, 0.5f);
+
     clip(finalColor.a - 0.01f);
-    
+
     return finalColor;
 }

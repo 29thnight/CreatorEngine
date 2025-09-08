@@ -2909,6 +2909,10 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	if (!meshModule) return;
 
 	ImGui::Text("Mesh Render Module Settings");
+	bool isAdditive = meshModule->GetBlend();
+	if (ImGui::Checkbox("Additive Blend", &isAdditive)) {
+		meshModule->SetAdditiveBlend(isAdditive);
+	}
 
 	// 메시 타입 설정
 	MeshType currentMeshType = meshModule->GetMeshType();
@@ -2946,23 +2950,23 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	}
 
 	// 카메라 위치 설정 - 현재 모듈의 실제 값으로 초기화
-	static bool cameraInitialized = false;
-	static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
-
-	// 모듈이 바뀔 때마다 카메라 위치를 실제 값으로 업데이트
-	if (!cameraInitialized) {
-		auto currentCameraPos = meshModule->GetCameraPosition();
-		cameraPos[0] = currentCameraPos.x;
-		cameraPos[1] = currentCameraPos.y;
-		cameraPos[2] = currentCameraPos.z;
-		cameraInitialized = true;
-	}
-
-	if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
-		meshModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
-	}
-
-	ImGui::Separator();
+	//static bool cameraInitialized = false;
+	//static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
+	//
+	//// 모듈이 바뀔 때마다 카메라 위치를 실제 값으로 업데이트
+	//if (!cameraInitialized) {
+	//	auto currentCameraPos = meshModule->GetCameraPosition();
+	//	cameraPos[0] = currentCameraPos.x;
+	//	cameraPos[1] = currentCameraPos.y;
+	//	cameraPos[2] = currentCameraPos.z;
+	//	cameraInitialized = true;
+	//}
+	//
+	//if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
+	//	meshModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
+	//}
+	//
+	//ImGui::Separator();
 
 	// Model 타입일 때 모델 설정 UI
 	if (currentMeshType == MeshType::Model) {

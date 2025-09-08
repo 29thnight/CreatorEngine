@@ -45,7 +45,6 @@ void PlayerAttackAH::Enter()
 		eft->AddComponent<EffectComponent>()->Awake();
 	}
 	eft->GetComponent<EffectComponent>()->ChangeEffect("ss1");
-
 }
 
 void PlayerAttackAH::Update(float deltaTime)

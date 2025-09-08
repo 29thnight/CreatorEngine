@@ -59,6 +59,7 @@ struct VertexOutput
     float3 viewDir : VIEW_DIR;
     float alpha : ALPHA;
     uint renderMode : RENDER_MODE;
+    float particleAge : PARTICLE_AGE;
 };
 
 float3x3 CreateRotationMatrix(float3 rotation)
@@ -181,6 +182,7 @@ VertexOutput main(VertexInput input)
     output.viewDir = normalize(gCameraPosition - worldPosition.xyz);
     output.alpha = particle.color.a;
     output.renderMode = particle.renderMode;
+    output.particleAge = particle.age;
     
     return output;
 }
