@@ -13,6 +13,7 @@ public:
 		bool movementEnabled = false;
 		bool sizeEnabled = false;
 		bool meshSpawnEnabled = false;
+		bool meshColorEnabled = false;
 		bool trailGenerateEnable = false;
 
 		// RenderModule 활성화 상태

@@ -3,20 +3,15 @@
 #include "EaseInOut.h"
 #include "ISerializable.h"
 
-using namespace DirectX;
-
-// 파티클 데이터 구조체 (다른 곳에서 정의되어 있다고 가정)
-struct ParticleData;
-
 // 그라데이션 포인트 구조체 (GPU용)
-struct GradientPoint
+struct MeshGradientPoint
 {
     float time;                    // 0.0 ~ 1.0
     Mathf::Vector4 color;         // RGBA
 };
 
 // 색상 파라미터 상수 버퍼 (GPU용)
-struct ColorParams
+struct MeshColorParams
 {
     float deltaTime;              // 델타 타임
     int transitionMode;           // 색상 전환 모드
@@ -33,7 +28,7 @@ struct ColorParams
     float padding[2];             // 16바이트 정렬을 위한 패딩
 };
 
-class ColorModuleCS : public ParticleModule, public ISerializable
+class MeshColorModuleCS : public ParticleModule, public ISerializable
 {
 private:
     // 컴퓨트 셰이더 리소스
@@ -51,7 +46,7 @@ private:
     ID3D11ShaderResourceView* m_discreteColorsSRV;
 
     // 파라미터 및 상태
-    ColorParams m_colorParams;
+    MeshColorParams m_colorParams;
 
     // 색상 데이터
     std::vector<std::pair<float, Mathf::Vector4>> m_colorGradient;  // 그라데이션 데이터
@@ -69,11 +64,11 @@ private:
     EaseInOut m_easingModule;
     bool m_easingEnable;
 
-public:
-    ColorModuleCS();
-    virtual ~ColorModuleCS();
 
-    // ParticleModuleBase 인터페이스 구현
+public:
+    MeshColorModuleCS();
+    virtual ~MeshColorModuleCS();
+
     virtual void Initialize() override;
     virtual void Update(float deltaTime) override;
     virtual void Release() override;
@@ -81,7 +76,7 @@ public:
 
     virtual void ResetForReuse();
     virtual bool IsReadyForReuse() const;
-    
+
     virtual nlohmann::json SerializeData() const override;
     virtual void DeserializeData(const nlohmann::json& json) override;
     virtual std::string GetModuleType() const override;
@@ -130,3 +125,4 @@ public:
     void EnableEasing(bool enable) { m_easingEnable = enable; }
     bool IsEasingEnabled() const { return m_easingEnable; }
 };
+

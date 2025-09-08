@@ -112,44 +112,116 @@ bool shouldClipTextureBasedSword(PixelInput input)
     return false;
 }
 
+float2 getMovedTextureUV(PixelInput input)
+{
+    if (polarClippingEnabled < 0.5)
+        return input.texCoord;
+    
+    float animationDuration = 1.0f;
+    float useTriangleWave = 1.0f; // 0이 선형 1이 삼각파
+    // 셰이더 내부에서 애니메이션 계산
+    float currentTime = time;
+    float cycleDuration = animationDuration; // 초 단위
+    
+
+    
+    // 0 ~ 1 범위로 정규화된 시간
+    float normalizedTime = fmod(currentTime, cycleDuration) / cycleDuration;
+    
+    float animatedProgress;
+    if (useTriangleWave > 0.5)
+    {
+        // 삼각파: 0 -> 1 -> 0 (나타났다가 사라짐)
+        if (normalizedTime <= 0.5)
+        {
+            animatedProgress = normalizedTime * 2.0;
+        }
+        else
+        {
+            animatedProgress = (1.0 - normalizedTime) * 2.0;
+        }
+    }
+    else
+    {
+        // 선형: 0 -> 1 반복 (계속 지나감)
+        animatedProgress = normalizedTime;
+    }
+    
+    // 검기처럼 직선 이동
+    float2 movedUV = input.texCoord;
+    
+    if (polarDirection > 0.5)
+    { // 오른쪽 방향
+        movedUV.x = input.texCoord.x - (animatedProgress * 1.5 - 0.75);
+    }
+    else
+    { // 왼쪽 방향
+        movedUV.x = input.texCoord.x + (animatedProgress * 1.5 - 0.75);
+    }
+    
+    // UV 범위를 벗어나면 투명하게 처리 (래핑 방지)
+    if (movedUV.x < 0.0 || movedUV.x > 1.0)
+    {
+        // 범위를 벗어난 부분은 완전 투명한 텍스처로 처리
+        return float2(-1.0, -1.0); // 무효한 UV 반환
+    }
+    
+    return movedUV;
+}
+
 PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    if (shouldClipPolarAngle(input))
+    //if (shouldClipPolarAngle(input))
+    //{
+    //    discard;
+    //}
+    
+    float3 normal = normalize(input.normal);
+    float3 viewDir = normalize(input.viewDir);
+    
+    // 이동된 UV 좌표로 텍스처 샘플링
+    float2 movedUV = getMovedTextureUV(input);
+    
+    // 무효한 UV인 경우 투명하게 처리
+    if (movedUV.x < 0.0)
     {
         discard;
     }
     
-    float2 uv = input.texCoord;
+    float4 diffuseColor = gDiffuseTexture.Sample(gPointSampler, movedUV);
     
-    // time이 0인지 확인
-    if (time < 0.01)
+    if (diffuseColor.a < 0.1)
+        discard;
+    
+    if (input.alpha <= 0.01)
+        discard;
+    
+    float3 finalColor;
+    
+    if (input.renderMode == 0)
     {
-        output.color = float4(1.0, 0.0, 0.0, 1.0); // 빨간색으로 표시
-        return output;
+        finalColor = input.color.rgb * diffuseColor.rgb;
+    }
+    else
+    {
+        float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
+        float NdotL = max(0.0, dot(normal, lightDir));
+        
+        float3 ambient = float3(0.3, 0.3, 0.3);
+        float3 diffuse = float3(0.7, 0.7, 0.7) * NdotL;
+        
+        float3 reflectDir = reflect(-lightDir, normal);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+        float3 specular = float3(0.2, 0.2, 0.2) * spec;
+        
+        float3 lighting = ambient + diffuse + specular;
+        finalColor = input.color.rgb * diffuseColor.rgb * lighting;
     }
     
-    // 상하 구조 파동
-    //float timeOffset = uv.x * 3.0 + uv.y * 1.5;
-    float timeOffset = uv.y * 3.0 + uv.x * 1.5;
-    float animatedTime = time + timeOffset;
-    
-    //float wave1 = sin(animatedTime * 4.0 + uv.x * 10.0) * 0.5 + 0.5;
-    float wave1 = sin(animatedTime * 4.0 + uv.y * 10.0) * 0.5 + 0.5;
-    float wave2 = cos(animatedTime * 3.0 + uv.y * 8.0) * 0.5 + 0.5;
-    float wave3 = sin(animatedTime * 5.0 + (uv.x + uv.y) * 6.0) * 0.5 + 0.5;
-    
-    float wavePattern = (wave1 * 0.4 + wave2 * 0.3 + wave3 * 0.3);
-    
-    // 하늘색 기본 색상 (고정)
-    float3 baseColor = float3(0.3, 0.7, 1.0);
-    float3 brightColor = float3(0.9, 0.3, 3.0);
-    
-    // 파동에 따라 두 색상 사이를 보간
-    float3 finalColor = lerp(baseColor, brightColor, wavePattern);
-    
-    output.color = float4(finalColor, 0.8);
+    float finalAlpha = input.alpha * diffuseColor.a;
+    output.color = float4(finalColor, finalAlpha);
     
     return output;
 }

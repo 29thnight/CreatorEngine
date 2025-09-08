@@ -236,7 +236,7 @@ void EffectComponent::PauseEffect()
         //auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
         //EffectCommandQueue->PushEffectCommand(std::move(stopCommand));
         proxy->UpdateInstanceName(m_effectInstanceName);
-        proxy->PushCommand(EffectCommandType::Stop);
+        proxy->PushCommand(EffectCommandType::Pause);
         m_isPaused = true;
     }
 }
@@ -251,7 +251,7 @@ void EffectComponent::ResumeEffect()
         //auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
         //EffectCommandQueue->PushEffectCommand(std::move(playCommand));
         proxy->UpdateInstanceName(m_effectInstanceName);
-        proxy->PushCommand(EffectCommandType::Play);
+        proxy->PushCommand(EffectCommandType::Resume);
         m_isPaused = false;
     }
 }

@@ -253,6 +253,7 @@
     <ClCompile Include="EffectProxyController.cpp" />
     <ClCompile Include="EffectSerializer.cpp" />
     <ClCompile Include="LineModuleCS.cpp" />
+    <ClCompile Include="MeshColorModuleCS.cpp" />
     <ClCompile Include="MeshModuleGPU.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="MeshSpawnModuleCS.cpp" />
@@ -351,6 +352,7 @@
     <ClInclude Include="KeyFrameEvent.h" />
     <ClInclude Include="LineModuleCS.h" />
     <ClInclude Include="MaterialFlowInformation.h" />
+    <ClInclude Include="MeshColorModuleCS.h" />
     <ClInclude Include="MeshModuleGPU.h" />
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="MeshSpawnModuleCS.h" />
@@ -639,6 +641,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshColorModule.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -653,6 +660,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleTest.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSpawnModule.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -674,6 +686,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpriteAnimation.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGIComposite.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

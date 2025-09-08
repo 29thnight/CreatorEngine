@@ -5,6 +5,10 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "CharacterControllerComponent.h"
+#include "EffectComponent.h"
+#include "SceneManager.h"
+#include "Socket.h"
+
 void PlayerAttackAH::Enter()
 {
 	if (m_player == nullptr)
@@ -33,12 +37,20 @@ void PlayerAttackAH::Enter()
 	{
 		m_player->AttackTarget.clear();
 	}
+	if (!eft)
+	{
+		eft = SceneManagers->GetActiveScene()->CreateGameObject("asd").get();
+		eft->AddComponent<EffectComponent>()->Awake();
+	}
+	eft->GetComponent<EffectComponent>()->ChangeEffect("ss1");
 }
 
 void PlayerAttackAH::Update(float deltaTime)
 {
 	
 	if (m_player && m_player->startRay)
+	eft->m_transform.SetPosition(m_player->handSocket->transform.GetLocalMatrix().r[3]);
+	if (m_player)
 	{
 		m_player->MeleeAttack();
 	}

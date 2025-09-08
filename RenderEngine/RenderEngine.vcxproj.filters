@@ -542,6 +542,9 @@
     <ClCompile Include="UIRenderProxy.cpp">
       <Filter>Objects\UIRenderProxy</Filter>
     </ClCompile>
+    <ClCompile Include="MeshColorModuleCS.cpp">
+      <Filter>RenderPass\EffectPass\3.Color</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -888,6 +891,9 @@
     </ClInclude>
     <ClInclude Include="UIRenderProxy.h">
       <Filter>Objects\UIRenderProxy</Filter>
+    </ClCompile>
+    <ClInclude Include="MeshColorModuleCS.h">
+      <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1139,6 +1145,15 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TestForward.ps.hlsl">
       <Filter>Shaders\TestShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpriteAnimation.ps.hlsl">
+      <Filter>Shaders\Effect\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshColorModule.cs.hlsl">
+      <Filter>Shaders\Effect\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleTest.ps.hlsl">
+      <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
