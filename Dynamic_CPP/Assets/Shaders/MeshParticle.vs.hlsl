@@ -136,14 +136,15 @@ VertexOutput main(VertexInput input)
         output.position = float4(0, 0, 0, 0);
         output.worldPos = float3(0, 0, 0);
         output.particleCenter = float3(0, 0, 0);
-        output.localPos = float3(0, 0, 0);
+        output.localPos = input.position; // 원본 로컬 위치 유지
         output.particleScale = float3(1, 1, 1);
-        output.normal = float3(0, 0, 0);
-        output.texCoord = float2(0, 0);
+        output.normal = input.normal; // 원본 노말 유지
+        output.texCoord = input.texCoord; // 원본 텍스처 좌표 유지
         output.color = float4(0, 0, 0, 0);
         output.viewDir = float3(0, 0, 0);
         output.alpha = 0.0;
         output.renderMode = 0;
+        output.particleAge = 0.0; // 추가
         return output;
     }
     
