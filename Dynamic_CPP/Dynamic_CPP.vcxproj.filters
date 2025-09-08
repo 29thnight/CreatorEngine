@@ -289,7 +289,7 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponCapsule.h">
-      <Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -516,7 +516,7 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
-      <Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
