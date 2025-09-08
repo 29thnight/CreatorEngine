@@ -38,7 +38,8 @@ void WeaponCapsule::Update(float tick)
 				{
 
 				}
-				Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
+				//Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
+				Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("Staff");
 				if (meleeweapon && ownerPlayer)
 				{
 					GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeWeapon");
