@@ -1,8 +1,8 @@
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
+#include "Navigation.h"
 #include "UIComponent.generated.h"
 
 extern float MaxOreder;
@@ -15,13 +15,6 @@ enum class UItype
 	None,
 };
 
-enum class Direction
-{
-	Up,
-	Down,
-	Left,
-	Right
-};
 
 class UIComponent : public Component
 {
@@ -35,7 +28,11 @@ public:
 	void SetOrder(int index) { _layerorder = index; }
 	int GetLayerOrder() const { return _layerorder; }
 	void SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI);
+	void DeserializeNavi();
 	GameObject* GetNextNavi(Direction dir);
+	bool IsNavigationThis();
+
+	void DeserializeShader();
 
 	Mathf::Vector3 pos{ 960, 540, 0 };
 	Mathf::Vector2 scale{ 1, 1 };
@@ -86,9 +83,11 @@ public:
 	int _layerorder{};
 	[[Property]]
 	std::string m_ownerCanvasName{};
+	[[Property]]
+	std::vector<Navigation> navigations{};
 
 private:
-	std::unordered_map<Direction, std::weak_ptr<GameObject>> navigation;
+	std::array<std::weak_ptr<GameObject>, NavDirectionCount> navigation;
 	Canvas* ownerCanvas = nullptr;
 
 protected:

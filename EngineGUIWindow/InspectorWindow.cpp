@@ -1234,6 +1234,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::ColorEdit4("color tint", &imageComponent->color.x);
 	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
 	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
+	ImGui::DragFloat2("scale", &imageComponent->scale.x, 0.01f, 1.f, 10.f);
 	ImGui::InputInt("layer", &imageComponent->_layerorder);
 
 	std::string shaderName = "None";
@@ -1255,6 +1256,62 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		imageComponent->ClearCustomPixelShader();
 	}
+
+	ImGui::Text("Navigation");
+
+	ImGui::Button(ICON_FA_ARROW_LEFT "##Left", ImVec2(30, 20));
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			if (draggedIndex != imageComponent->GetOwner()->m_index)
+			{
+				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				imageComponent->SetNavi(Direction::Left, draggedObject->shared_from_this());
+			}
+		}
+	}
+	ImGui::Button(ICON_FA_ARROW_RIGHT "##Right", ImVec2(30, 20));
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			if (draggedIndex != imageComponent->GetOwner()->m_index)
+			{
+				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				imageComponent->SetNavi(Direction::Right, draggedObject->shared_from_this());
+			}
+		}
+	}
+	ImGui::Button(ICON_FA_ARROW_UP "##Up", ImVec2(30, 20));
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			if (draggedIndex != imageComponent->GetOwner()->m_index)
+			{
+				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				imageComponent->SetNavi(Direction::Up, draggedObject->shared_from_this());
+			}
+		}
+	}
+	ImGui::Button(ICON_FA_ARROW_DOWN "##Down", ImVec2(30, 20));
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+			if (draggedIndex != imageComponent->GetOwner()->m_index)
+			{
+				GameObject* draggedObject = GameObject::FindIndex(draggedIndex);
+				imageComponent->SetNavi(Direction::Down, draggedObject->shared_from_this());
+			}
+		}
+	}
+
 }
 
 #endif // !DYNAMICCPP_EXPORTS

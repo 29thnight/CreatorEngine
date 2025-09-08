@@ -12,17 +12,49 @@ void UIComponent::SetCanvas(Canvas* canvas)
 
 void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI)
 {
-	navigation[dir] = otherUI;
+	navigation[(int)dir] = otherUI;
+	Navigation nav;
+	nav.mode = dir;
+	nav.navObject = otherUI->GetInstanceID();
+
+    if (std::find(navigations.begin(), navigations.end(), nav) == navigations.end())
+		navigations.push_back(nav);
+}
+
+void UIComponent::DeserializeNavi()
+{
+    for (const auto& nav : navigations)
+    {
+        if (auto obj = GameObject::FindInstanceID(nav.navObject))
+        {
+            navigation[(int)nav.mode] = obj->shared_from_this();
+        }
+	}
 }
 
 GameObject* UIComponent::GetNextNavi(Direction dir)
 {
-	if (navigation.find(dir) != navigation.end() && !navigation[dir].expired())
-	{
-		std::shared_ptr<GameObject> sharedPtr = navigation[dir].lock();
-		return sharedPtr.get();
-	}
+    if (auto next = navigation[(int)dir].lock())
+		return next.get();
+
 	return nullptr;
+}
+
+bool UIComponent::IsNavigationThis()
+{
+	GameObject* thisObj = GetOwner();
+	auto selectedObj = ownerCanvas->SelectUI.lock();
+
+    if (selectedObj && thisObj == selectedObj.get())
+		return true;
+}
+
+void UIComponent::DeserializeShader()
+{
+    if (!m_customPixelShaderPath.empty())
+    {
+        SetCustomPixelShader(m_customPixelShaderPath);
+	}
 }
 
 void UIComponent::SetCustomPixelShader(std::string_view shaderPath)

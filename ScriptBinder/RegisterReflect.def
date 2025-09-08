@@ -2,8 +2,11 @@
 
 #pragma once
 
-#include "ConditionParameter.h"
-#include "ImageComponent.h"
+#include "AAPassSetting.h"
+#include "MaterialFlowInformation.h"
+#include "UIComponent.h"
+#include "BTBuildNode.h"
+#include "Canvas.h"
 #include "BLackBoardValue.h"
 #include "AssetEntry.h"
 #include "Animation.h"
@@ -11,14 +14,12 @@
 #include "TerrainCollider.h"
 #include "CameraComponent.h"
 #include "RenderPassSettings.h"
-#include "SSGIPassSetting.h"
-#include "Camera.h"
-#include "AAPassSetting.h"
-#include "MaterialFlowInformation.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
 #include "BloomSetting.h"
+#include "SSGIPassSetting.h"
+#include "Camera.h"
 #include "RigidBodyComponent.h"
 #include "ColorGradingPassSetting.h"
 #include "DeferredPassSetting.h"
@@ -33,8 +34,8 @@
 #include "ShadowMapPassSetting.h"
 #include "InvalidScriptComponent.h"
 #include "Skeleton.h"
-#include "AniTransition.h"
 #include "StateMachineComponent.h"
+#include "AniTransition.h"
 #include "SSAOPassSetting.h"
 #include "VignettePassSetting.h"
 #include "FoliageType.h"
@@ -49,10 +50,10 @@
 #include "BoxColliderComponent.h"
 #include "BTBuildGraph.h"
 #include "SphereColliderComponent.h"
-#include "Canvas.h"
-#include "BTBuildNode.h"
 #include "CharacterControllerComponent.h"
 #include "CapsuleColliderComponent.h"
+#include "ImageComponent.h"
+#include "ConditionParameter.h"
 #include "Scene.h"
 #include "EffectComponent.h"
 #include "FoliageInstance.h"
@@ -64,6 +65,7 @@
 #include "LightComponent.h"
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
+#include "Navigation.h"
 #include "Object.h"
 #include "RectTransformComponent.h"
 #include "Terrain.h"
@@ -71,7 +73,6 @@
 #include "TransCondition.h"
 #include "Transform.h"
 #include "UIButton.h"
-#include "UIComponent.h"
 #include "VolumeComponent.h"
 
 REFLECTION_REGISTER()
@@ -121,6 +122,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MeshColliderComponent);
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
+    AUTO_REGISTER_CLASS(Navigation);
     AUTO_REGISTER_CLASS(Object);
     AUTO_REGISTER_CLASS(PlayerInputComponent);
     AUTO_REGISTER_CLASS(Prefab);

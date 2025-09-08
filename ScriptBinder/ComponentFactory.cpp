@@ -498,7 +498,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto canvas = canvasObj->GetComponent<Canvas>();
 			if (canvas)
 			{
-				canvas->AddUIObject(obj);
+				canvas->AddUIObject(obj->shared_from_this());
 			}
 			else
 			{
@@ -519,6 +519,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					continue;
 				}
 				image->DeserializeTexture(texture);
+				image->DeserializeNavi();
+				image->DeserializeShader();
 			}
 
 		}
@@ -527,6 +529,20 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto text = static_cast<TextComponent*>(component);
 			Meta::Deserialize(text, itNode);
 			text->SetOwner(obj);
+
+			auto canvasObj = UIManagers->FindCanvasName(text->m_ownerCanvasName);
+			auto canvas = canvasObj->GetComponent<Canvas>();
+			if (canvas)
+			{
+				canvas->AddUIObject(obj->shared_from_this());
+			}
+			else
+			{
+				Debug->LogWarning("Image Component's parent is not Canvas");
+			}
+
+			text->DeserializeNavi();
+			text->DeserializeShader();
 		}
 		else
 		{

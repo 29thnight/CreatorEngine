@@ -302,6 +302,7 @@
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
     <ClInclude Include="MSBuildHelper.h" />
+    <ClInclude Include="Navigation.h" />
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="ScriptStringModule.h" />
     <ClInclude Include="VolumeComponent.h" />
