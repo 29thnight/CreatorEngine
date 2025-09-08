@@ -39,51 +39,54 @@ PixelOutput main(PixelInput input)
     float2 offsetUV = uv;
     float2 offsetUV2 = uv;
     float2 offsetUV3 = uv;
-    offsetUV.x *= time; // + float2(time * 0.5, 0.0f);
-    offsetUV2.x *= time;
-    
-    offsetUV3.x *= 0.7;
-    offsetUV3.y *= 0.4;
-    offsetUV3.x += time * 0.3 - 0.15;
+    float moveSpeed = 1.0;
+    offsetUV.x = uv.x * pow(time, 0.1);
     
     float2 dissolveUV1 = offsetUV;
     float2 dissolveUV2 = offsetUV;
     
     // 텍스처 샘플링
-    float4 baseTexture = gDiffuseTexture.Sample(gClampSampler, time < 0.5 ? offsetUV : offsetUV2) * float4(1.0f, 0.0f, 0.0f, 1.0f);
-    float4 dissolveColor1 = gDissolveTexture1.Sample(gClampSampler, time < 0.5 ? offsetUV : offsetUV2) * float4(3.0f, 3.0f, 3.0f, 1.0f);
-    float4 dissolveColor2 = gDissolveTexture2.Sample(gClampSampler, time < 0.5 ? offsetUV : offsetUV2);
-    float4 dissolveColor3 = gEndEffectTexture.Sample(gClampSampler, offsetUV3) * float4(0.0, 0.0, 0.0, 1.0);
+    float4 baseTexture = gDiffuseTexture.Sample(gClampSampler, offsetUV) * float4(1.0f, 0.0f, 0.0f, 1.0f);
+    float4 dissolveColor1 = gDissolveTexture1.Sample(gClampSampler, offsetUV) * float4(3.0f, 3.0f, 3.0f, 1.0f);
+    float4 dissolveColor2 = gDissolveTexture2.Sample(gClampSampler, offsetUV);
+    float4 dissolveColor3 = gEndEffectTexture.Sample(gClampSampler, offsetUV) * float4(0.0, 0.0, 0.0, 1.0);
     float4 finalColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
 
-    int debug = 4;
+    finalColor.rgb = lerp(baseTexture.rgb, dissolveColor1.rgb, dissolveColor1.a);
+    finalColor.a = baseTexture.a;
+    float delayStart = 0.2;
+    float delayEnd = 0.8;
+    float fadeAmount = smoothstep(delayStart, delayEnd, time);
 
-    switch (debug)
-    {
-        case 0:
-            finalColor.rgb = lerp(baseTexture.rgb, dissolveColor1.rgb, dissolveColor1.a);
-            finalColor.a = baseTexture.a;
-            break;
-        case 1:
-            finalColor.a *= dissolveColor2.a;
-            break;
-        case 2:
-            if (baseTexture.a < 1)
-            {
-                finalColor = dissolveColor3;
-            }
-            break;
-        default:
-            finalColor.rgb = lerp(baseTexture.rgb, dissolveColor1.rgb, dissolveColor1.a);
-            finalColor.a = baseTexture.a;
-        
-            finalColor.a *= dissolveColor2.a;
+    // 기본 디졸브 효과
+    float dissolveAlpha = lerp(1.0f, dissolveColor2.a, fadeAmount);
+
+    // 시간이 지나면서 전체적으로 페이드아웃
+    float trailFade = 1.0 - smoothstep(0.5, 1.0, time); // 60%부터 100%까지 서서히 사라짐
+
+    // 두 효과를 곱해서 적용
+    finalColor.a *= dissolveAlpha * trailFade;
     
-            if (baseTexture.a < 1)
-            {
-                finalColor = dissolveColor3;
-            }
-            break;
+    if (time > 0.4)
+    {
+        float delayedTime = max(0.0, time - 0.1); // 지연 시간 줄이기
+        float transitionTime = (delayedTime - 0.3) / 0.6;
+        transitionTime = saturate(transitionTime); // smoothstep 대신 saturate
+        float dissolve3Fade = 1.0 - smoothstep(0.8, 1.4, delayedTime); // 더 늦게 시작
+    
+        if (dissolveColor3.a > 0.05) // 임계값 낮추기
+        {
+            float2 fadingUV = offsetUV3;
+            fadingUV *= (1.0 + (1.0 - dissolve3Fade) * 2.0);
+    
+            float4 fadingColor3 = gEndEffectTexture.Sample(gClampSampler, fadingUV) * float4(0.0, 0.0, 0.0, 1.0);
+            float alphaAmount = transitionTime * fadingColor3.a * dissolve3Fade;
+        
+        // 단순한 블렌딩
+            float blendStrength = saturate(alphaAmount);
+            finalColor.rgb = lerp(finalColor.rgb, fadingColor3.rgb, blendStrength);
+            finalColor.a = max(finalColor.a, alphaAmount);
+        }
     }
     
     finalColor *= input.color;
