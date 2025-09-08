@@ -27,6 +27,7 @@ public:
 	~ImageComponent() = default;
 
 	void Load(const std::shared_ptr<Texture>& ptr);
+	void DeserializeTexture(const std::shared_ptr<Texture>& ptr);
 	virtual void Awake() override;
 	virtual void Update(float tick) override;
 	virtual void OnDestroy() override;
@@ -48,7 +49,7 @@ public:
 	[[Property]]
 	float			rotate{ 0 };
 	[[Property]]
-	XMFLOAT2		origin{};
+	Mathf::Vector2	origin{};
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;

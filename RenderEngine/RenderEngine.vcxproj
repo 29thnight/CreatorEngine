@@ -198,8 +198,8 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
-      <MinFilesInUnityFile>10</MinFilesInUnityFile>
-      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <MinFilesInUnityFile>15</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>

@@ -11,8 +11,14 @@
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
+	if( auto existingCanvas = FindCanvasName(name); existingCanvas )
+	{
+		std::cout << "Canvas with name '" << name << "' already exists." << std::endl;
+		return nullptr;
+	}
+
 	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
-	newObj->AddComponent<Canvas>();
+	auto can = newObj->AddComponent<Canvas>();
 
 	if (auto* rect = newObj->GetComponent<RectTransformComponent>())
 	{
@@ -26,14 +32,57 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 	}
 
 	Canvases.emplace_back(newObj);
+	CanvasMap[name.data()] = newObj;
+
 	needSort = true;
 	return newObj;
+}
+
+void UIManager::AddCanvas(std::shared_ptr<GameObject> canvas)
+{
+	if (!canvas)
+	{
+		std::cout << "Canvas is nullptr" << std::endl;
+		return;
+	}
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	if (!canvasCom)
+	{
+		std::cout << "This Obj Not Canvas" << std::endl;
+		return;
+	}
+
+	std::string canvasName = canvas->ToString();
+	if (CanvasMap.find(canvasName) != CanvasMap.end())
+	{
+		if (auto existingCanvas = CanvasMap[canvasName].lock())
+		{
+			std::cout << "Canvas with name '" << canvasName << "' already exists." << std::endl;
+			return;
+		}
+		else
+		{
+			CanvasMap.erase(canvasName);
+			std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& weakPtr) {
+				if (auto sharedPtr = weakPtr.lock())
+				{
+					return sharedPtr->ToString() == canvasName;
+				}
+				return true; // Remove expired weak_ptr
+			});
+		}
+	}
+
+	Canvases.emplace_back(canvas);
+	CanvasMap[canvas->ToString()] = canvas;
+	needSort = true;
 }
 
 std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
+
 	if (!canvas)
 	{
 		if (auto c = Canvases.front().lock())
@@ -294,20 +343,40 @@ void UIManager::CheckInput()
 
 GameObject* UIManager::FindCanvasName(std::string_view name)
 {
-	for (auto it = Canvases.begin(); it != Canvases.end();)
+	auto it = CanvasMap.find(name.data());
+	if (it != CanvasMap.end())
 	{
-		if (auto canvasObj = it->lock())
+		if (auto canvasObj = it->second.lock())
 		{
-			if (canvasObj->ToString() == name)
-				return canvasObj.get();
-			++it;
+			return canvasObj.get();
 		}
 		else
 		{
-			it = Canvases.erase(it);
+			CanvasMap.erase(it);
+			std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
+			{
+				auto c = canvas.lock();
+				return !c || c->ToString() == name;
+			});
+			return nullptr;
 		}
 	}
+
 	return nullptr;
+}
+
+GameObject* UIManager::FindCanvasIndex(int index)
+{
+	if (index < 0 || index >= Canvases.size())
+		return nullptr;
+	auto canvasObj = Canvases[index].lock();
+	if (canvasObj)
+		return canvasObj.get();
+	else
+	{
+		Canvases.erase(Canvases.begin() + index);
+		return nullptr;
+	}
 }
 
 void UIManager::Update()

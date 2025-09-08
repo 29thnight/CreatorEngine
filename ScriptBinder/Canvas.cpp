@@ -32,16 +32,21 @@ void Canvas::AddUIObject(GameObject* obj)
 	{
 		image->SetCanvas(this);
 		UIManagers->RegisterImageComponent(image);
+		image->m_ownerCanvasName = m_pOwner->m_name.ToString();
 	}
 	auto text = obj->GetComponent<TextComponent>();
 	if (text)
 	{
 		text->SetCanvas(this);
 		UIManagers->RegisterTextComponent(text);
+		text->m_ownerCanvasName = m_pOwner->m_name.ToString();
 	}
 	auto btn = obj->GetComponent<UIButton>();
 	if (btn)
+	{
 		btn->SetCanvas(this);
+		btn->m_ownerCanvasName = m_pOwner->m_name.ToString();
+	}
 	UIObjs.push_back(obj);
 }
 

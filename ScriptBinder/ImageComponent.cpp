@@ -44,7 +44,20 @@ void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)
 		return;
 
 	textures.push_back(ptr);
-	texturePaths.push_back(ptr->m_name);
+	std::string filename = ptr->m_name + ptr->m_extension;
+	texturePaths.push_back(filename);
+	if (1 == textures.size())
+	{
+		SetTexture(0);
+	}
+}
+
+void ImageComponent::DeserializeTexture(const std::shared_ptr<Texture>& ptr)
+{
+	if (nullptr == ptr)
+		return;
+
+	textures.push_back(ptr);
 	if (1 == textures.size())
 	{
 		SetTexture(0);

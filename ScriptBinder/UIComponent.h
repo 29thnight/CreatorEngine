@@ -30,7 +30,7 @@ public:
     [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(UIComponent)
 
-	void SetCanvas(Canvas* canvas) { ownerCanvas = canvas; }
+   void SetCanvas(Canvas* canvas);
 	Canvas* GetOwnerCanvas() { return ownerCanvas; }
 	void SetOrder(int index) { _layerorder = index; }
 	int GetLayerOrder() const { return _layerorder; }
@@ -84,6 +84,8 @@ public:
 
     [[Property]]
 	int _layerorder{};
+	[[Property]]
+	std::string m_ownerCanvasName{};
 
 private:
 	std::unordered_map<Direction, std::weak_ptr<GameObject>> navigation;

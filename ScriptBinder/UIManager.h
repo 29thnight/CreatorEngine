@@ -13,7 +13,7 @@ public:
 	friend class DLLCore::Singleton<UIManager>;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
 	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
-
+	void AddCanvas(std::shared_ptr<GameObject> canvas);
 	//오브젝이름 /쓸 정보 / 어느캔버스 기본0
 	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
@@ -26,6 +26,7 @@ public:
 	void CheckInput();
 
 	GameObject* FindCanvasName(std::string_view name);
+	GameObject* FindCanvasIndex(int index);
 	void Update();
 	
 	void SortCanvas();
@@ -34,9 +35,12 @@ public:
 	void UnregisterImageComponent(ImageComponent* image);
 	void UnregisterTextComponent(TextComponent* text);
 
+
+
 public:
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
 	std::vector<std::weak_ptr<GameObject>>	Canvases;
+	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
 	std::vector<ImageComponent*>			Images;
 	std::vector<TextComponent*>				Texts;
 	//이정 캔버스

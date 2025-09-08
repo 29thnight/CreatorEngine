@@ -13,8 +13,12 @@
 #include "InvalidScriptComponent.h"
 #include "FoliageComponent.h"
 #include "BehaviorTreeComponent.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
 #include "PlayerInput.h"
 #include "Animation.h"
+#include "Canvas.h"
+#include "UIManager.h"
 
 void ComponentFactory::Initialize()
 {
@@ -475,9 +479,55 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			Meta::Deserialize(playerinput, itNode);
 			playerinput->SetOwner(obj);
 
-			
 			//playerinput->SetActionMap(playerinput->m_actionMapName);
+		}
+		else if (componentType->typeID == type_guid(Canvas))
+		{
+			auto canvas = static_cast<Canvas*>(component);
+			Meta::Deserialize(canvas, itNode);
+			canvas->SetOwner(obj);
+			UIManagers->AddCanvas(obj->shared_from_this());
+		}
+		else if (componentType->typeID == type_guid(ImageComponent))
+		{
+			auto image = static_cast<ImageComponent*>(component);
+			Meta::Deserialize(image, itNode);
+			image->SetOwner(obj);
+
+			auto canvasObj = UIManagers->FindCanvasName(image->m_ownerCanvasName);
+			auto canvas = canvasObj->GetComponent<Canvas>();
+			if (canvas)
+			{
+				canvas->AddUIObject(obj);
 			}
+			else
+			{
+				Debug->LogWarning("Image Component's parent is not Canvas");
+			}
+
+			for(auto& imagePath : image->GetTexturePaths())
+			{
+				if(imagePath.empty())
+					continue;
+
+				auto texture = DataSystems->LoadSharedTexture(imagePath, 
+					DataSystem::TextureFileType::UITexture);
+
+				if (!texture)
+				{
+					Debug->LogError("Failed to load texture for ImageComponent: " + imagePath);
+					continue;
+				}
+				image->DeserializeTexture(texture);
+			}
+
+		}
+		else if (componentType->typeID == type_guid(TextComponent))
+		{
+			auto text = static_cast<TextComponent*>(component);
+			Meta::Deserialize(text, itNode);
+			text->SetOwner(obj);
+		}
 		else
 		{
             Meta::Deserialize(reinterpret_cast<void*>(component), *componentType, itNode);

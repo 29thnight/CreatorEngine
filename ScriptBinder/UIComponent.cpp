@@ -4,6 +4,12 @@
 
 float MaxOreder = 100.0f;
 
+void UIComponent::SetCanvas(Canvas* canvas)
+{
+   ownerCanvas = canvas;
+
+}
+
 void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI)
 {
 	navigation[dir] = otherUI;

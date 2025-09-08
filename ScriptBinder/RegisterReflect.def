@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "ConditionParameter.h"
+#include "ImageComponent.h"
 #include "BLackBoardValue.h"
 #include "AssetEntry.h"
 #include "Animation.h"
@@ -51,8 +53,6 @@
 #include "BTBuildNode.h"
 #include "CharacterControllerComponent.h"
 #include "CapsuleColliderComponent.h"
-#include "ImageComponent.h"
-#include "ConditionParameter.h"
 #include "Scene.h"
 #include "EffectComponent.h"
 #include "FoliageInstance.h"
