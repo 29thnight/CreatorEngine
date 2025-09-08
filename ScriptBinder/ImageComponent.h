@@ -40,16 +40,18 @@ public:
 	const std::vector<std::shared_ptr<Texture>>& GetTextures() const { return textures; }
 	const std::vector<std::string>& GetTexturePaths() const { return texturePaths; }
 	
-	ImageInfo uiinfo{};
-	std::shared_ptr<Texture> m_curtexture{};
+	ImageInfo								uiinfo{};
+	std::shared_ptr<Texture>				m_curtexture{};
     [[Property]]
-	int curindex = 0;
-	[[Property]]
-	Mathf::Color4	color{ 1,1,1,1 };
-	[[Property]]
-	float			rotate{ 0 };
-	[[Property]]
-	Mathf::Vector2	origin{};
+	int										curindex = 0;
+	[[Property]]							
+	Mathf::Color4							color{ 1,1,1,1 };
+	[[Property]]							
+	float									rotate{ 0 };
+	[[Property]]							
+	Mathf::Vector2							origin{};
+	[[Property]]							
+	float									unionScale{ 1.f };
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;

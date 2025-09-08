@@ -64,14 +64,7 @@ void Canvas::Update(float tick)
 		PreCanvasOrder = CanvasOrder;
 	}
 
-	//이 부분 UI Manager 에서 통합으로 처리하자
-	for (auto& obj : UIObjs)
-	{
-		auto shObj = obj.lock();
-		if (!shObj || shObj->IsDestroyMark())
-		{
-			std::erase(UIObjs, obj);
-			continue;
-		}
-	}
+	////이 부분 UI Manager 에서 통합으로 처리하자
+	std::erase_if(UIObjs, [](const std::weak_ptr<GameObject>& obj) 
+		{ return obj.expired() || (obj.lock() && obj.lock()->IsDestroyMark()); });
 }

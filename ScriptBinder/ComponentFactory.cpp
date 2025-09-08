@@ -541,6 +541,16 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				Debug->LogWarning("Image Component's parent is not Canvas");
 			}
 
+			std::string fontPath = text->GetFontPath();
+			if (!fontPath.empty())
+			{
+				text->SetFont(fontPath);
+			}
+			else
+			{
+				Debug->LogError("Text Component is missing font path");
+			}
+
 			text->DeserializeNavi();
 			text->DeserializeShader();
 		}

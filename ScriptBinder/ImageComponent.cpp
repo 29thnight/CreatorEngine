@@ -85,6 +85,8 @@ void ImageComponent::Update(float tick)
         scale = { worldRect.width / uiinfo.size.x,
                   worldRect.height / uiinfo.size.y };
 
+		scale *= unionScale;
+
 		rect->SetSizeDelta(uiinfo.size);
     }
 }

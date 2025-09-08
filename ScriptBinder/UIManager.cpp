@@ -114,7 +114,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 		newImage->AddComponent<ImageComponent>()->Load(texture);
 	}
 
-	canvasCom->AddUIObject(newImage.get());
+	canvasCom->AddUIObject(newImage);
 	
 
 	return newImage;
@@ -194,7 +194,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 	auto component = newButton->AddComponent<UIButton>();
 	//component->SetClickFunction(clickfun);
 
-	canvasCom->AddUIObject(newButton.get());
+	canvasCom->AddUIObject(newButton);
 
 	return newButton;
 }
@@ -227,12 +227,12 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
 	component->SetClickFunction(clickfun);
 
 
-	canvas->GetComponent<Canvas>()->AddUIObject(newButton.get());
+	canvas->GetComponent<Canvas>()->AddUIObject(newButton);
 
 	return newButton;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFont* Sfont, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -246,13 +246,13 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->SetFont(Sfont);
-	canvasCom->AddUIObject(newText.get());
+	newText->AddComponent<TextComponent>()->SetFont(FontName);
+	canvasCom->AddUIObject(newText);
 
 	return newText;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -273,8 +273,8 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	}
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->SetFont(Sfont);
-	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());
+	newText->AddComponent<TextComponent>()->SetFont(FontName);
+	canvas->GetComponent<Canvas>()->AddUIObject(newText);
 
 	return newText;
 }
@@ -291,7 +291,9 @@ void UIManager::DeleteCanvas(std::string canvasName)
 	auto canvasCom = curCanvasObj->GetComponent<Canvas>();
 	for (auto& uiObj : canvasCom->UIObjs)
 	{
-		uiObj->Destroy();
+		auto uiObjPtr = uiObj.lock();
+		if(uiObjPtr)
+			uiObjPtr->Destroy();
 	}
 	canvasCom->UIObjs.clear();
 
@@ -313,32 +315,38 @@ void UIManager::CheckInput()
 	{
 		for (auto& uiObj : curCanvas->UIObjs)
 		{
-			
-			UIComponent* UI = uiObj->GetComponent<UIComponent>();
-			if (UI && false == UI->IsEnabled()) continue;
-			UIButton* btn = uiObj->GetComponent<UIButton>();
-			if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
-			btn->Click();
+			auto uiObjPtr = uiObj.lock();
+			if (uiObjPtr)
+			{
+				UIComponent* UI = uiObjPtr->GetComponent<UIComponent>();
+				if (UI && false == UI->IsEnabled()) continue;
+				UIButton* btn = uiObjPtr->GetComponent<UIButton>();
+				if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
+				btn->Click();
+			}
 			break;
 		}
 	}
 
 	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
-	if (stickL.x > 0.5)
+	auto selectUI = curCanvas->SelectUI.lock();
+	if (selectUI)
 	{
-		curCanvas->SelectUI = curCanvas->SelectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
-	}
-	if (stickL.x < -0.5)
-	{
-		curCanvas->SelectUI = curCanvas->SelectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
-	}
+		if (stickL.x > 0.5)
+		{
+			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right)->shared_from_this();
+		}
+		if (stickL.x < -0.5)
+		{
+			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left)->shared_from_this();
+		}
 
-	if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
-	{
-		if (curCanvas->SelectUI == nullptr) return;
-		curCanvas->SelectUI->GetComponent<UIButton>()->Click();
-	}	
+		if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
+		{
+			selectUI->GetComponent<UIButton>()->Click();
+		}
+	}
 }
 
 GameObject* UIManager::FindCanvasName(std::string_view name)

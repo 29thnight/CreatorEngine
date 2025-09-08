@@ -49,3 +49,11 @@ void TextComponent::OnDestroy()
 		UIManagers->UnregisterTextComponent(this);
 	}
 }
+
+void TextComponent::SetFont(const file::path& path)
+{
+	file::path filepath = PathFinder::Relative("Font\\") / path.filename();
+	auto _font = DataSystems->LoadSFont(filepath.wstring().c_str());
+	font = _font;
+	fontPath = path.filename().string();
+}
