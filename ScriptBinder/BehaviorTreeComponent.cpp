@@ -102,11 +102,53 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 
 	node->SetOwner(GetOwner());
 
-	for (const auto& childID : buildNode->Children)
+	//for (const auto& childID : buildNode->Children)
+	//{
+	//	BTNode::NodePtr childNode = BuildTreeRecursively(childID, graph);
+
+	//	if (auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+	//	{
+	//		composite->AddChild(childNode);
+	//	}
+	//	else if (auto decorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
+	//	{
+	//		if (!decorator->IsOutpinConnected())
+	//		{
+	//			decorator->SetChild(childNode);
+	//		}
+	//		else
+	//		{
+	//			Debug->LogWarning("Decorator node already has a child: " + node->GetName());
+	//		}
+	//	}
+	//	else
+	//	{
+	//		// Action / Condition node → 자식 없음
+	//	}
+	//}
+
+	for (size_t i = 0; i < buildNode->Children.size(); ++i)
 	{
+		const auto& childID = buildNode->Children[i];
 		BTNode::NodePtr childNode = BuildTreeRecursively(childID, graph);
 
-		if (auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+		// NEW: Check for WeightedSelector
+		if (auto weightedSelector = std::dynamic_pointer_cast<BT::WeightedSelectorNode>(node))
+		{
+			// Ensure weights are available
+			if (i < buildNode->ChildWeights.size())
+			{
+				float weight = buildNode->ChildWeights[i];
+				weightedSelector->AddChildWithWeight(childNode, weight);
+			}
+			else
+			{
+				// Handle error or provide a default weight
+				weightedSelector->AddChildWithWeight(childNode, 1.0f);
+				Debug->LogWarning("WeightedSelector node '" + buildNode->Name + "' is missing a weight for a child. Defaulting to 1.0f.");
+			}
+		}
+		else if (auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node))
 		{
 			composite->AddChild(childNode);
 		}
@@ -121,11 +163,9 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 				Debug->LogWarning("Decorator node already has a child: " + node->GetName());
 			}
 		}
-		else
-		{
-			// Action / Condition node → 자식 없음
-		}
+		// Action / Condition nodes have no children, so no special handling needed here
 	}
+
 
 
 	return node;

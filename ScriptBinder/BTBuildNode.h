@@ -33,6 +33,9 @@ struct BTBuildNode
 	std::vector<HashedGuid> Children; // 자식 노드들
 
 	[[Property]]
+	std::vector<float>	ChildWeights; // 가중치 (WeightedSelector용)
+
+	[[Property]]
 	Mathf::Vector2	Position; // 노드 위치 (에디터용)
 	ed::PinId		InputPinId{};
 	ed::PinId		OutputPinId{};

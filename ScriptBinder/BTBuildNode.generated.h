@@ -14,6 +14,7 @@ ReflectionField(BTBuildNode) \
 		meta_property(ScriptName) \
 		meta_property(Policy) \
 		meta_property(Children) \
+		meta_property(ChildWeights) \
 		meta_property(Position) \
 	}); \
 	FieldEnd(BTBuildNode, PropertyOnly) \

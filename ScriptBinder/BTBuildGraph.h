@@ -172,6 +172,7 @@ struct BTBuildGraph
 		return {
 			"Sequence",
 			"Selector",
+			"WeightedSelector",
 			"Parallel",
 			"Inverter",
 			"ConditionDecorator",

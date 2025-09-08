@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include <variant>
 #include <DirectXTK/SpriteFont.h>
 #include "Core.Minimal.h"
@@ -65,3 +66,4 @@ private:
 	std::vector<std::byte>              m_customPixelCPUBuffer{};
 	bool                                m_isEnabled{ true };
 };
+#endif // !DYNAMICCPP_EXPORTS

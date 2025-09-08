@@ -87,6 +87,11 @@ void AIManager::InitalizeBehaviorTreeSystem()
 		return std::make_shared<BT::SelectorNode>("Selector");
 	});
 
+	BTNodeFactory->Register("WeightedSelector", []()
+	{
+		return std::make_shared<BT::WeightedSelectorNode>("WeightedSelector");
+	});
+
 	// InverterNode 같은 Decorator 등록
 	BTNodeFactory->Register("Inverter", []()
 	{

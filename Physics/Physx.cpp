@@ -1107,7 +1107,7 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 	//등록되어 있는지 검색
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
 	{
-		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		//Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
 		return nullptr;
 	}
 	RigidBody* body = m_rigidBodyContainer[id];
@@ -1117,7 +1117,7 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 	}
 	else
 	{
-		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		//Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
 		return nullptr;
 	}
 }
@@ -1409,6 +1409,18 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 
 	CharacterController* controller = m_characterControllerContainer[info.id];
 	controller->AddMovementInput(info.input, info.isDynamic);
+}
+
+CharacterController* PhysicX::GetCCT(const unsigned int& id)
+{
+	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end())
+	{
+		return m_characterControllerContainer[id];
+	}
+	else
+	{
+		return nullptr;
+	}
 }
 
 CharacterControllerGetSetData PhysicX::GetCCTData(const unsigned int& id)
@@ -2302,10 +2314,16 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 void PhysicX::PutToSleep(unsigned int id)
 {
 	RigidBody* body = GetRigidBody(id);
+
 	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 
 	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
 
+	if (!body) {
+		CharacterController* cct = GetCCT(id);
+
+		dynamicActor = cct ? cct->GetController()->getActor() : nullptr;
+	}
 
 	//stacit body인 경우 nullptr이므로 예외처리 
 	if (dynamicActor)
@@ -2324,6 +2342,11 @@ void PhysicX::WakeUp(unsigned int id)
 	
 	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
 
+	if (!body) {
+		CharacterController* cct = GetCCT(id);
+
+		dynamicActor = cct ? cct->GetController()->getActor() : nullptr;
+	}
 
 	//stacit body인 경우 nullptr이므로 예외처리 
 	if (dynamicActor)

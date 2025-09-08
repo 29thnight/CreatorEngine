@@ -53,7 +53,7 @@ void Canvas::Update(float tick)
 		UIManagers->needSort = true;
 		PreCanvasOrder = CanvasOrder;
 	}
-
+	//이 부분 UI Manager 에서 통합으로 처리하자
 	for (auto& obj : UIObjs)
 	{
 		if (obj->IsDestroyMark())

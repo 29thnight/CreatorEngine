@@ -1234,6 +1234,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::ColorEdit4("color tint", &imageComponent->color.x);
 	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
 	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
+	ImGui::InputInt("layer", &imageComponent->_layerorder);
 
 	std::string shaderName = "None";
 	if (!imageComponent->GetCustomPixelShader().empty())

@@ -82,13 +82,14 @@ public:
 	std::optional<int4> GetInt4(std::string_view name) const;
 	void SetInt4(std::string_view name, const int4& value);
 
+    [[Property]]
+	int _layerorder{};
+
 private:
 	std::unordered_map<Direction, std::weak_ptr<GameObject>> navigation;
 	Canvas* ownerCanvas = nullptr;
 
 protected:
-    [[Property]]
-	int _layerorder{};
 	[[Property]]
 	std::string				m_customPixelShaderPath{};
 	std::vector<std::byte>	m_customPixelCPUBuffer{};

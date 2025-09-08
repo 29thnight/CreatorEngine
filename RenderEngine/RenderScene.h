@@ -12,6 +12,10 @@ class RenderPassData
 {
 };
 
+class UIRenderProxy
+{
+};
+
 struct ID3D11Buffer;
 struct ID3D11DeviceContext;
 #endif // !DYNAMICCPP_EXPORTS
