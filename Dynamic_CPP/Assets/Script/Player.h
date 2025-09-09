@@ -244,6 +244,6 @@ public:
 	Socket* handSocket = nullptr;
 	CharacterControllerComponent* m_controller = nullptr;
 
-
+	GameObject* Indicator = nullptr;
 	GameObject* camera = nullptr;
 };

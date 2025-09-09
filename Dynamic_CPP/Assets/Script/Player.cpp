@@ -83,6 +83,15 @@ void Player::Start()
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
 	camera = GameObject::Find("Main Camera");
+
+
+	Prefab* IndicatorPrefab = PrefabUtilitys->LoadPrefab("Indicator");
+	if (IndicatorPrefab)
+	{
+		Indicator = PrefabUtilitys->InstantiatePrefab(IndicatorPrefab, "Indicator");
+		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+		curveindicator->EnableIndicator(false);
+	}
 }
 
 void Player::Update(float tick)
@@ -126,24 +135,27 @@ void Player::Update(float tick)
 			float distance = directionToAsis.Length();
 			directionToAsis.Normalize();
 
-			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+			float dot = directionToAsis.Dot(-GetOwner()->m_transform.GetForward());
 			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
 			{
 				onIndicate = true;
 
-				/*auto indicator = GameObject::Find("TestIndicator");
-				auto curveindicator = indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);
-				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);*/
-
+				if (Indicator)
+				{
+					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+					curveindicator->EnableIndicator(onIndicate);
+					curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+				}
 				std::cout << "onIndicate!!!!!!!!!" << std::endl;
 			}
 			else
 			{
 				onIndicate = false;
-				/*auto indicator = GameObject::Find("TestIndicator");
-				auto curveindicator = indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);*/
+				if (Indicator)
+				{
+					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+					curveindicator->EnableIndicator(onIndicate);
+				}
 			}
 		}
 
@@ -311,46 +323,38 @@ void Player::Throw()
 
 void Player::ThrowEvent()
 {
+
+	//Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+	//auto asis = GameObject::Find("Asis");
+	//Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+	//Mathf::Vector3 directionToAsis = asisPos - myPos;
+	//float distance = directionToAsis.Length();
+	//directionToAsis.Normalize();
+
+	//float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+		//if (catchedObject)
+		//{
+		//	auto item = catchedObject->GetOwner()->GetComponent<EntityItem>();
+		//	if (item) {
+		//		item->SetThrowOwner(this);
+		//	}
+		//	catchedObject = nullptr;
+		//	m_nearObject = nullptr; //&&&&&
+		//	if (m_curWeapon)
+		//		m_curWeapon->SetEnabled(true);
+		//}
+
 	std::cout << "ThrowEvent" << std::endl;
 	if (catchedObject) {
-		catchedObject->SetThrowOwner(this);
-		catchedObject->Throw(player->m_transform.GetForward(), { ThrowPowerX,ThrowPowerY });
+		//catchedObject->SetThrowOwner(this);
+		catchedObject->Throw(this,player->m_transform.GetForward(), { ThrowPowerX,ThrowPowerY }, onIndicate);
 	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 	if (m_curWeapon)
 		m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
 
-
-
-
-
-	Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-	auto asis = GameObject::Find("Asis");
-	Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-	Mathf::Vector3 directionToAsis = asisPos - myPos;
-	float distance = directionToAsis.Length();
-	directionToAsis.Normalize();
-
-	float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-	if (onIndicate)
-	{
-		if (catchedObject)
-		{
-			auto item = catchedObject->GetOwner()->GetComponent<EntityItem>();
-			if (item) {
-				item->SetThrowOwner(this);
-			}
-			catchedObject = nullptr;
-			m_nearObject = nullptr; //&&&&&
-			if (m_curWeapon)
-				m_curWeapon->SetEnabled(true);
-		}
-	}
-	else //유도없이 투척
-	{
-
-	}
+	
 }
 
 
@@ -433,12 +437,8 @@ void Player::StartAttack()
 					canMeleeCancel = false;
 				}
 
-				m_comboCount++;
-				m_comboElapsedTime = 0;
-
-
-
-
+				/*m_comboCount++;
+				m_comboElapsedTime = 0;*/
 			}
 
 
@@ -446,7 +446,7 @@ void Player::StartAttack()
 			{
 				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 				std::cout << "RangeAttack!!" << std::endl;
-				ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
+				//ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
 			}
 
 			if (m_curWeapon->itemType == ItemType::Bomb)
