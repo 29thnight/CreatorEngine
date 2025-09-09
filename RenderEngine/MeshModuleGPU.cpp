@@ -69,7 +69,7 @@ void MeshModuleGPU::Initialize()
     altBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateBlendState(&altBlendDesc, &m_alternativeBlendState)
+        DirectX11::DeviceStates->g_pDevice->CreateBlendState(&altBlendDesc, &m_alternativeBlendState)
     );
 
     // 래스터라이저 스테이트
@@ -149,7 +149,7 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
 {
     if (!m_enabled) return;
 
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
     if (!m_useAdditiveBlend) {
         deviceContext->OMSetBlendState(m_alternativeBlendState.Get(), nullptr, 0xffffffff);
@@ -294,7 +294,7 @@ void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT 
 
 void MeshModuleGPU::SetupRenderTarget(RenderPassData* renderData)
 {
-    auto& deviceContext = DeviceState::g_pDeviceContext;
+    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 }
@@ -923,239 +923,4 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
 std::string MeshModuleGPU::GetModuleType() const
 {
     return "MeshModuleGPU";
-}
-
-void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
-{
-    m_particleSRV = particleSRV;
-    m_instanceCount = instanceCount;
-}
-
-void MeshModuleGPU::SetupRenderTarget(RenderPassData* renderData)
-{
-    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
-    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-    deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
-}
-
-void MeshModuleGPU::SetCameraPosition(const Mathf::Vector3& position)
-{
-    m_constantBufferData.cameraPosition = position;
-}
-
-void MeshModuleGPU::UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf::Matrix& view,
-    const Mathf::Matrix& projection)
-{
-    m_constantBufferData.world = world;
-    m_constantBufferData.view = view;
-    m_constantBufferData.projection = projection;
-
-    DirectX11::UpdateBuffer(m_constantBuffer.Get(), &m_constantBufferData);
-}
-
-std::pair<Mathf::Vector3, Mathf::Vector3> MeshModuleGPU::GetCurrentMeshBounds() const
-{
-    auto currentMesh = GetCurrentMesh();
-    if (!currentMesh) {
-        // 메쉬가 없으면 기본 큐브 크기 반환
-        return { Mathf::Vector3(-0.5f, -0.5f, -0.5f), Mathf::Vector3(0.5f, 0.5f, 0.5f) };
-    }
-
-    // 메쉬의 바운딩 박스 가져오기
-    BoundingBox boundingBox = currentMesh->GetBoundingBox();
-
-    // Center와 Extents에서 min, max 계산
-    // min = center - extents, max = center + extents
-    Mathf::Vector3 center(boundingBox.Center.x, boundingBox.Center.y, boundingBox.Center.z);
-    Mathf::Vector3 extents(boundingBox.Extents.x, boundingBox.Extents.y, boundingBox.Extents.z);
-
-    Mathf::Vector3 minBounds = center - extents;
-    Mathf::Vector3 maxBounds = center + extents;
-
-    return { minBounds, maxBounds };
-}
-
-void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
-{
-    if (!m_enabled) return;
-
-    auto currentMesh = GetCurrentMesh();
-    if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
-        return;
-
-    m_worldMatrix = world;
-    m_invWorldMatrix = world.Invert();
-
-    // Polar 클리핑 애니메이션 처리
-    if (m_isPolarClippingAnimating && IsPolarClippingEnabled())
-    {
-        float progress = 0.f;
-        if (m_useEffectProgress) {
-            // Effect 진행률 사용
-            progress = m_effectProgress;
-        }
-        else {
-            // 기존 sin 애니메이션 사용
-            float currentTime = Time->GetTotalSeconds();
-            progress = (sin(currentTime * m_polarClippingAnimationSpeed) + 1.0f) * 0.5f;
-        }
-        SetPolarAngleProgress(progress);
-        UpdateClippingBuffer();
-    }
-
-    auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
-
-    // 상수 버퍼 업데이트
-    UpdateConstantBuffer(world, view, projection);
-    deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
-
-    // Polar 클리핑 상수 버퍼 바인딩 (register b2)
-    if (IsPolarClippingEnabled() && m_polarClippingBuffer)
-    {
-        UpdateClippingBuffer();
-        deviceContext->PSSetConstantBuffers(2, 1, m_polarClippingBuffer.GetAddressOf());
-    }
-
-    if (m_timeBuffer)
-    {
-        m_timeParams.time = Time->GetTotalSeconds();
-
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = deviceContext->Map(m_timeBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
-            TimeParams* params = static_cast<TimeParams*>(mappedResource.pData);
-            *params = m_timeParams;
-            deviceContext->Unmap(m_timeBuffer.Get(), 0);
-        }
-
-        deviceContext->PSSetConstantBuffers(3, 1, m_timeBuffer.GetAddressOf());
-    }
-
-    // 파티클 SRV 바인딩
-    deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
-
-    // 텍스처 바인딩
-    if (m_assignedTexture)
-    {
-        if (m_assignedTexture->m_pSRV)
-        {
-            deviceContext->PSSetShaderResources(0, 1, &m_assignedTexture->m_pSRV);
-        }
-    }
-    else if (m_meshType == MeshType::Model && m_model)
-    {
-        // 모델의 기본 텍스처 사용 (BaseColor 텍스처)
-        auto material = m_model->GetMaterial(m_meshIndex);
-        if (material && material->m_pBaseColor && material->m_pBaseColor->m_pSRV)
-        {
-            deviceContext->PSSetShaderResources(0, 1, &material->m_pBaseColor->m_pSRV);
-        }
-    }
-
-    // 메시의 버텍스/인덱스 버퍼 바인딩
-    UINT stride = currentMesh->GetStride();
-    UINT offset = 0;
-    auto vertexBuffer = currentMesh->GetVertexBuffer();
-    auto indexBuffer = currentMesh->GetIndexBuffer();
-
-    deviceContext->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
-    deviceContext->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-
-    // 인스턴싱 렌더링
-    const auto& indices = currentMesh->GetIndices();
-    deviceContext->DrawIndexedInstanced(indices.size(), m_instanceCount, 0, 0, 0);
-
-    // 리소스 정리
-    ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-    deviceContext->VSSetShaderResources(0, 1, nullSRV);
-    deviceContext->PSSetShaderResources(0, 1, nullSRV);
-
-    if (IsPolarClippingEnabled())
-    {
-        ID3D11Buffer* nullBuffer[1] = { nullptr };
-        deviceContext->PSSetConstantBuffers(2, 1, nullBuffer);
-    }
-}
-
-void MeshModuleGPU::SetTexture(Texture* texture)
-{
-    m_assignedTexture = texture;
-}
-
-void MeshModuleGPU::Release()
-{
-    // 임시 큐브 메시 정리
-    if (m_tempCubeMesh)
-    {
-        delete m_tempCubeMesh;
-        m_tempCubeMesh = nullptr;
-    }
-
-    m_constantBuffer.Reset();
-    m_polarClippingBuffer.Reset();
-    m_model = nullptr;
-    m_meshIndex = 0;
-    m_particleSRV = nullptr;
-    m_instanceCount = 0;
-    m_assignedTexture = nullptr;
-}
-
-void MeshModuleGPU::ResetForReuse()
-{
-    if (!m_enabled) return;
-
-    std::lock_guard<std::mutex> lock(m_resetMutex);
-
-    // 렌더 상태 초기화
-    m_instanceCount = 0;
-    m_isRendering = false;
-    m_gpuWorkPending = false;
-
-    // 리소스 참조 해제 (실제 리소스는 해제하지 않음)
-    m_particleSRV = nullptr;
-    m_assignedTexture = nullptr;
-
-    // 메시 타입을 기본값으로 리셋
-    m_meshType = MeshType::Cube;
-    m_model = nullptr;
-    m_meshIndex = 0;
-
-    // 상수 버퍼 초기화
-    if (m_constantBuffer) {
-        m_constantBufferData = {}; // 구조체 초기화
-        m_constantBufferData.world = Mathf::Matrix::Identity;
-        m_constantBufferData.view = Mathf::Matrix::Identity;
-        m_constantBufferData.projection = Mathf::Matrix::Identity;
-    }
-
-    // 클리핑 상태 초기화
-    m_polarClippingParams = {};
-    m_isPolarClippingAnimating = false;
-    m_polarClippingAnimationSpeed = 1.0f;
-    m_effectProgress = 0.0f;
-    m_useEffectProgress = false;
-
-    // 월드 매트릭스 초기화
-    m_worldMatrix = Mathf::Matrix::Identity;
-    m_invWorldMatrix = Mathf::Matrix::Identity;
-}
-
-bool MeshModuleGPU::IsReadyForReuse() const
-{
-    // GPU 작업이 완료되었고, 렌더링 중이 아닐 때만 재사용 가능
-    bool ready = !m_isRendering &&
-        !m_gpuWorkPending.load()
-        && m_instanceCount == 0;
-
-    // 필수 리소스들이 유효한지 확인
-    bool resourcesValid = m_constantBuffer != nullptr &&
-        m_pso != nullptr;
-
-    return ready && resourcesValid;
-}
-
-void MeshModuleGPU::WaitForGPUCompletion()
-{
-    m_gpuWorkPending = false;
 }

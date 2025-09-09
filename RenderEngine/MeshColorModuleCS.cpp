@@ -85,10 +85,10 @@ void MeshColorModuleCS::Update(float deltaTime)
     UpdateConstantBuffers();
     UpdateResourceBuffers();
 
-    DeviceState::g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
 
     ID3D11Buffer* constantBuffers[] = { m_colorParamsBuffer };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, constantBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 1, constantBuffers);
 
     ID3D11ShaderResourceView* srvs[3] = { nullptr, nullptr, nullptr };
 
@@ -104,25 +104,25 @@ void MeshColorModuleCS::Update(float deltaTime)
         srvs[2] = m_discreteColorsSRV;
     }
 
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 3, srvs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 3, srvs);
 
     ID3D11UnorderedAccessView* uavs[] = { m_outputUAV };
     UINT initCounts[] = { 0 };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
 
     UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
-    DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
+    DirectX11::DeviceStates->g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
 
     ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr, nullptr };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 3, nullSRVs);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 3, nullSRVs);
 
     ID3D11Buffer* nullBuffers[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
 
-    DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
     DirectX11::EndEvent();
 }
@@ -157,7 +157,7 @@ bool MeshColorModuleCS::CreateConstantBuffers()
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_colorParamsBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_colorParamsBuffer);
     return SUCCEEDED(hr);
 }
 
@@ -171,7 +171,7 @@ bool MeshColorModuleCS::CreateResourceBuffers()
     gradientDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     gradientDesc.StructureByteStride = sizeof(MeshGradientPoint);
 
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&gradientDesc, nullptr, &m_gradientBuffer);
+    HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&gradientDesc, nullptr, &m_gradientBuffer);
     if (FAILED(hr))
         return false;
 
@@ -180,7 +180,7 @@ bool MeshColorModuleCS::CreateResourceBuffers()
     gradientSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     gradientSRVDesc.Buffer.NumElements = 16;
 
-    hr = DeviceState::g_pDevice->CreateShaderResourceView(m_gradientBuffer, &gradientSRVDesc, &m_gradientSRV);
+    hr = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_gradientBuffer, &gradientSRVDesc, &m_gradientSRV);
     if (FAILED(hr))
         return false;
 
@@ -192,7 +192,7 @@ bool MeshColorModuleCS::CreateResourceBuffers()
     discreteDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     discreteDesc.StructureByteStride = sizeof(Mathf::Vector4);
 
-    hr = DeviceState::g_pDevice->CreateBuffer(&discreteDesc, nullptr, &m_discreteColorsBuffer);
+    hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&discreteDesc, nullptr, &m_discreteColorsBuffer);
     if (FAILED(hr))
         return false;
 
@@ -201,7 +201,7 @@ bool MeshColorModuleCS::CreateResourceBuffers()
     discreteSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     discreteSRVDesc.Buffer.NumElements = 32;
 
-    hr = DeviceState::g_pDevice->CreateShaderResourceView(m_discreteColorsBuffer, &discreteSRVDesc, &m_discreteColorsSRV);
+    hr = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_discreteColorsBuffer, &discreteSRVDesc, &m_discreteColorsSRV);
     return SUCCEEDED(hr);
 }
 
@@ -210,12 +210,12 @@ void MeshColorModuleCS::UpdateConstantBuffers()
     if (m_colorParamsDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_colorParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_colorParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
         if (SUCCEEDED(hr))
         {
             memcpy(mappedResource.pData, &m_colorParams, sizeof(MeshColorParams));
-            DeviceState::g_pDeviceContext->Unmap(m_colorParamsBuffer, 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_colorParamsBuffer, 0);
             m_colorParamsDirty = false;
         }
     }
@@ -226,7 +226,7 @@ void MeshColorModuleCS::UpdateResourceBuffers()
     if (m_gradientDirty && !m_colorGradient.empty())
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_gradientBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_gradientBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
         if (SUCCEEDED(hr))
         {
@@ -239,7 +239,7 @@ void MeshColorModuleCS::UpdateResourceBuffers()
                 gradientPoints[i].color = m_colorGradient[i].second;
             }
 
-            DeviceState::g_pDeviceContext->Unmap(m_gradientBuffer, 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_gradientBuffer, 0);
             m_gradientDirty = false;
         }
     }
@@ -247,7 +247,7 @@ void MeshColorModuleCS::UpdateResourceBuffers()
     if (m_discreteColorsDirty && !m_discreteColors.empty())
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_discreteColorsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_discreteColorsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
         if (SUCCEEDED(hr))
         {
@@ -259,7 +259,7 @@ void MeshColorModuleCS::UpdateResourceBuffers()
                 colors[i] = m_discreteColors[i];
             }
 
-            DeviceState::g_pDeviceContext->Unmap(m_discreteColorsBuffer, 0);
+            DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_discreteColorsBuffer, 0);
             m_discreteColorsDirty = false;
         }
     }

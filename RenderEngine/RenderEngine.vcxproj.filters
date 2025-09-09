@@ -891,7 +891,7 @@
     </ClInclude>
     <ClInclude Include="UIRenderProxy.h">
       <Filter>Objects\UIRenderProxy</Filter>
-    </ClCompile>
+	</ClInclude>
     <ClInclude Include="MeshColorModuleCS.h">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClInclude>
