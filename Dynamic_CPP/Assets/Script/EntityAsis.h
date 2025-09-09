@@ -4,6 +4,7 @@
 #include "Entity.h"
 #include "EntityAsis.generated.h"
 
+class AsisMove;
 class EntityItem;
 class EntityAsis : public Entity
 {
@@ -42,6 +43,8 @@ private:
 	GameObject* asisTail{ nullptr };
 	[[Property]]
 	GameObject* asisHead{ nullptr };
+	[[Property]]
+	AsisMove* m_asismove{ nullptr };
 	[[Property]]
 	float m_purificationAngle = 0.f;
 	[[Property]]

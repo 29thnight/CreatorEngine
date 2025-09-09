@@ -310,171 +310,26 @@ namespace Meta
                     std::string_view view = prop.typeName.c_str();
                     size_t endPos = view.rfind("*");
                     std::string name = view.data();
-
-                    if (prop.typeID == GUIDCreator::GetTypeID<GameObject>()) {
-
-                        std::string copyname = name.substr(0, endPos);
-                        if (const Type* subType = MetaDataRegistry->Find(copyname))
+                    std::string copyname = name.substr(0, endPos);
+                    if (const Type* subType = MetaDataRegistry->Find(copyname))
+                    {
+                        ImGui::PushID(prop.name);
+                        if (ImGui::CollapsingHeader(prop.name, ImGuiTreeNodeFlags_DefaultOpen))
                         {
-                            ImGui::PushID(prop.name);
-                            if (ImGui::CollapsingHeader(prop.name, ImGuiTreeNodeFlags_DefaultOpen))
-                            {
-                                ImGui::Button("#script", ImVec2(150, 20));
-
-                                if (ImGui::BeginDragDropTarget()) {
-                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-                                    {
-                                        GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-                                        auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
-                                        if (gameObject->GetTypeID() == subType->typeID) {
-                                            MakePropChangeCommand(instance, prop, gameObject);
-                                            prop.setter(instance, gameObject);
-                                        }
-                                        else {
-                                            auto it = gameObject->m_componentIds.find(subType->typeID);
-                                            if (it != gameObject->m_componentIds.end())
-                                            {
-                                                size_t index = it->second;
-                                                auto component = gameObject->m_components[index];
-                                                if (component) {
-                                                    //MakePropChangeCommand(instance, prop, component.get());
-                                                    prop.setter(instance, component.get());
-                                                }
-                                            }
-                                        }
-                                    }
-                                    ImGui::EndDragDropTarget();
-                                }
-                                DrawObject(ptr, *subType);
-                            }
-                            ImGui::PopID();
+                            DrawObject(ptr, *subType);
                         }
-                        else
-                        {
-                            //TODO : 테스트 후 제거
-                            std::string_view view = prop.typeName.c_str();
-                            size_t endPos = view.rfind("*");
-                            std::string name = view.data();
-                            std::string copyname = name.substr(0, endPos);
-                            if (const Type* subType = MetaDataRegistry->Find(copyname)) {
-                                ImGui::PushID(prop.name);
-                                ImGui::Text("%s: [Unregistered Type For GUI Debug]", prop.name);
-                                ImGui::Button("#Missing", ImVec2(150, 20));
-                                if (ImGui::BeginDragDropTarget()) {
-                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-                                    {
-                                        GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-                                        auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
-                                        if (gameObject->GetTypeID() == subType->typeID) {
-                                            MakePropChangeCommand(instance, prop, gameObject);
-                                            prop.setter(instance, gameObject);
-                                        }
-                                        else {
-                                            auto it = gameObject->m_componentIds.find(subType->typeID);
-                                            if (it != gameObject->m_componentIds.end())
-                                            {
-                                                size_t index = it->second;
-                                                auto component = gameObject->m_components[index];
-                                                if (component) {
-                                                    //MakePropChangeCommand(instance, prop, component.get());
-                                                    prop.setter(instance, component.get());
-                                                }
-                                            }
-                                        }
-                                    }
-                                    ImGui::EndDragDropTarget();
-                                }
-                                ImGui::PopID();
-                            }
-                        }
+                        ImGui::PopID();
                     }
-                    else if (prop.typeID == GUIDCreator::GetTypeID<Texture>()) {
-                        auto texture = std::any_cast<Texture*>(prop.getter(instance));
-
-                        if (texture) {
-                            if (texture->m_pSRV)
-                                ImGui::Image((ImTextureID)texture->m_pSRV, ImVec2(30, 30));
-                            else {
-                                ImGui::Button("None Texture", ImVec2(150, 20));
-                            }
-                        }
-                        if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Textures"))
-                            {
-                                const char* droppedFilePath = (const char*)payload->Data;
-                                file::path filename = droppedFilePath;
-                                file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-                                HashingString path = filepath.string();
-                                if (!filename.filename().empty()) {
-                                    prop.setter(instance, Texture::LoadManagedFromPath(filepath.string()).get());
-                                }
-                                else {
-                                    Debug->Log("Empty Texture File Name");
-                                }
-                            }
-                            ImGui::EndDragDropTarget();
-                        }
+                    else
+                    {
+                        //TODO : 테스트 후 제거
+                        ImGui::Text("%s: [Unregistered Type For GUI Debug]", prop.name);
                     }
                 }
                 else
                 {
                     //TODO : 테스트 후 제거
-                    std::string_view view = prop.typeName.c_str();
-                    size_t endPos = view.rfind("*");
-                    std::string name = view.data();
-
-                    if (prop.typeID == GUIDCreator::GetTypeID<GameObject>()) {
-                        std::string copyname = name.substr(0, endPos);
-                        if (const Type* subType = MetaDataRegistry->Find(copyname)) {
-                            ImGui::PushID(prop.name);
-                            ImGui::Text("%s: nullptr [For GUI Debug]", prop.name);
-                            ImGui::Button("#Missing", ImVec2(150, 20));
-                            if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-                                {
-                                    GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-                                    auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
-                                    if (gameObject->GetTypeID() == subType->typeID) {
-                                        MakePropChangeCommand(instance, prop, gameObject);
-                                        prop.setter(instance, gameObject);
-                                    }
-                                    else {
-                                        auto it = gameObject->m_componentIds.find(subType->typeID);
-                                        if (it != gameObject->m_componentIds.end())
-                                        {
-                                            size_t index = it->second;
-                                            auto component = gameObject->m_components[index];
-                                            if (component) {
-                                                //MakePropChangeCommand(instance, prop, component.get());
-                                                prop.setter(instance, component.get());
-                                            }
-                                        }
-                                    }
-                                }
-                                ImGui::EndDragDropTarget();
-                            }
-                            ImGui::PopID();
-                        }
-                    }
-                    else if (prop.typeID == GUIDCreator::GetTypeID<Texture>()) {
-                        ImGui::Button("None Texture", ImVec2(150, 20));
-                        if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Textures"))
-                            {
-                                const char* droppedFilePath = (const char*)payload->Data;
-                                file::path filename = droppedFilePath;
-                                file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-                                HashingString path = filepath.string();
-                                if (!filename.filename().empty()) {
-                                    prop.setter(instance, Texture::LoadManagedFromPath(filepath.string()).get());
-                                }
-                                else {
-                                    Debug->Log("Empty Texture File Name");
-                                }
-                            }
-                            ImGui::EndDragDropTarget();
-                        }
-                    }
+                    ImGui::Text("%s: nullptr [For GUI Debug]", prop.name);
                 }
             }
             else if (nullptr != MetaDataRegistry->Find(prop.typeName))

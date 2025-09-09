@@ -269,7 +269,7 @@ Mathf::xVector Transform::GetWorldQuaternion() const
 
 Mathf::Vector3 Transform::GetForward()
 {
-	auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::UnitZ, GetWorldMatrix());
+	auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, GetWorldMatrix());
 	forward.Normalize();
 	return forward;
 }

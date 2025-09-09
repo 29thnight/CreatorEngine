@@ -7,6 +7,7 @@ ReflectionScriptField(EntityAsis) \
 	({ \
 		meta_property(asisTail) \
 		meta_property(asisHead) \
+		meta_property(m_asismove) \
 		meta_property(m_purificationAngle) \
 		meta_property(m_purificationRadius) \
 		meta_property(maxHP) \

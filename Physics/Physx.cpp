@@ -2341,7 +2341,7 @@ void PhysicX::WakeUp(unsigned int id)
 	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 	
 	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
-	if (!dynamicActor->getScene()) return;
+
 	if (!body) {
 		CharacterController* cct = GetCCT(id);
 
