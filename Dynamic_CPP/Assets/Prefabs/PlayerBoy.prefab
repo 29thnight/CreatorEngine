@@ -1,22 +1,22 @@
-m_name: PlayerGirl
+m_name: PlayerBoy
 m_isEnabled: true
-m_instanceID: 3827799845
+m_instanceID: 3824535559
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: PlayerGirl
+    m_name: PlayerBoy
     m_isEnabled: true
-    m_instanceID: 2513321631
+    m_instanceID: 838569383
     m_transform:
-      position: {x: 18.2484493, y: 0, z: 16.6706924, w: 1}
-      rotation: {x: 0, y: 1, z: 0, w: -3.94253874e-08}
+      position: {x: 13.9400644, y: 0, z: 15.688076, w: 1}
+      rotation: {x: 0, y: 1, z: 0, w: 1.70024094e-07}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 62
+    m_index: 483
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [63]
-    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+    m_childrenIndices: [484]
+    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1680908004
+        m_instanceID: 1121825276
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - CharacterControllerComponent: 939015310
         m_name: CharacterControllerComponent
         m_isEnabled: true
-        m_instanceID: 2386035027
+        m_instanceID: 2370845398
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_posOffset: {x: 0, y: 1.60000002, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
@@ -53,7 +53,7 @@ PrefabNode:
         m_fFinalMultiplierSpeed: 1
         m_rotationSpeed: 5
       - ModuleBehavior: 1399118904
-        playerIndex: 0
+        playerIndex: 1
         moveSpeed: 0.0250000004
         maxHP: 100
         ThrowPowerX: 6
@@ -86,32 +86,32 @@ PrefabNode:
         SlotChangeCooldown: 2
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 2014005296
+        m_instanceID: 3662526864
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
         m_name: PlayerInputComponent
         m_isEnabled: true
-        m_instanceID: 3965894198
+        m_instanceID: 1708400835
         m_FileID: 00000000-0000-0000-0000-000000000000
-        controllerIndex: 0
+        controllerIndex: 1
         m_actionMapName: Player
         m_scriptName: ""
     children:
       - GameObject: 2166264123
-        m_name: CharGirl (2)
+        m_name: CharBoy
         m_isEnabled: true
-        m_instanceID: 1093748083
+        m_instanceID: 2324479843
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 1, z: 0, w: -4.45447199e-08}
+          rotation: {x: 0, y: 1, z: 0, w: 1.70024094e-07}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 62
-        m_index: 63
-        m_parentIndex: 62
+          m_parentID: 483
+        m_index: 484
+        m_parentIndex: 483
         m_rootIndex: 0
-        m_childrenIndices: [64, 66]
-        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+        m_childrenIndices: [485, 487]
+        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
@@ -122,95 +122,84 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 3779707262
+            m_instanceID: 471146123
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
-                - m_name: Ani_PC1_dash
+                - m_name: Ani_PC2_dash
                   m_isLoop: false
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC1_die
+                - m_name: Ani_PC2_die
                   m_isLoop: true
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC1_explosive
+                - m_name: Ani_PC2_explosive
                   m_isLoop: false
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC1_grab
+                - m_name: Ani_PC2_grab
                   m_isLoop: false
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC1_hit
-                  m_isLoop: false
-                  m_keyFrameEvent: ~
-                - m_name: Ani_PC1_Idle
+                - m_name: Ani_PC2_Idle
                   m_isLoop: true
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC1_longATK1
+                - m_name: Ani_PC2_longATK1
                   m_isLoop: false
                   m_keyFrameEvent:
-                    - m_eventName: ShootBullet
+                    - m_eventName: shoot
                       m_scriptName: Player
                       m_funName: ShootNormalBullet
                       key: 0.285714298
                       frameKey: 10
-                    - m_eventName: newEvent
+                    - m_eventName: end
                       m_scriptName: Player
                       m_funName: EndAttack
                       key: 0.857142866
                       frameKey: 30
-                - m_name: Ani_PC1_longATK2
+                - m_name: Ani_PC2_longATK2
                   m_isLoop: false
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC1_nomalATK2
+                - m_name: Ani_PC2_nomalATK2
                   m_isLoop: false
                   m_keyFrameEvent:
-                    - m_eventName: cancel
+                    - m_eventName: cancancel
                       m_scriptName: Player
                       m_funName: Cancancel
                       key: 0.560000002
                       frameKey: 14
-                    - m_eventName: StartRay
+                    - m_eventName: Startray
                       m_scriptName: Player
                       m_funName: StartRay
                       key: 0.159999996
                       frameKey: 4
-                    - m_eventName: EndRay
+                    - m_eventName: Endray
                       m_scriptName: Player
                       m_funName: EndRay
                       key: 0.479999989
                       frameKey: 12
-                - m_name: Ani_PC1_nomalATK
+                - m_name: Ani_PC2_nomalATK
                   m_isLoop: false
                   m_keyFrameEvent:
-                    - m_eventName: cancel
+                    - m_eventName: Cacncacncel
                       m_scriptName: Player
                       m_funName: Cancancel
-                      key: 0.400000006
+                      key: 0.372093022
                       frameKey: 16
-                    - m_eventName: startRay
+                    - m_eventName: StartRay
                       m_scriptName: Player
                       m_funName: StartRay
-                      key: 0.25
+                      key: 0.232558146
                       frameKey: 10
                     - m_eventName: EndRay
                       m_scriptName: Player
                       m_funName: EndRay
-                      key: 0.349999994
+                      key: 0.325581402
                       frameKey: 14
-                - m_name: Ani_PC1_throw
+                - m_name: Ani_PC2_shot
                   m_isLoop: false
-                  m_keyFrameEvent:
-                    - m_eventName: ThrowEvent
-                      m_scriptName: Player
-                      m_funName: ThrowEvent
-                      key: 0.0465116277
-                      frameKey: 2
-                - m_name: Ani_PC1_walk
-                  m_isLoop: true
                   m_keyFrameEvent: ~
-                - m_name: Ani_PC2_shortATK
+                - m_name: Ani_PC2_shotATK
                   m_isLoop: false
                   m_keyFrameEvent:
-                    - m_eventName: canCancel
+                    - m_eventName: Cancancel
                       m_scriptName: Player
                       m_funName: Cancancel
                       key: 0.474999994
@@ -220,15 +209,26 @@ PrefabNode:
                       m_funName: StartRay
                       key: 0.0500000007
                       frameKey: 2
-                    - m_eventName: Endray
+                    - m_eventName: EndRay
                       m_scriptName: Player
                       m_funName: EndRay
                       key: 0.300000012
                       frameKey: 12
+                - m_name: Ani_PC2_throw
+                  m_isLoop: false
+                  m_keyFrameEvent:
+                    - m_eventName: Throw
+                      m_scriptName: Player
+                      m_funName: NoneF
+                      key: 0.0465116277
+                      frameKey: 2
+                - m_name: Ani_PC2_walk
+                  m_isLoop: true
+                  m_keyFrameEvent: ~
               m_rootTransform: "[not suport type]"
-            m_AnimIndexChosen: 5
+            m_AnimIndexChosen: 4
             m_AnimIndex: 0
-            m_Motion: 2d88fa26-93f1-5ed1-b720-c1ea0953a854
+            m_Motion: 9fa2ba19-84ef-5932-8470-9200273a4f29
             m_animationControllers:
               - name: Main
                 m_curState:
@@ -317,7 +317,7 @@ PrefabNode:
                       blendTime: 0.200000003
                     - conditions:
                         - valueName: RangeAttack
-                          cType: 6
+                          cType: 1
                           CompareParameter:
                             vType: 2
                             name: None
@@ -332,7 +332,7 @@ PrefabNode:
                       exitTime: 0.100000001
                       blendTime: 0.200000003
                   index: 1
-                  AnimationIndex: 5
+                  AnimationIndex: 4
                   m_isAny: false
                   animationSpeed: 1
                   multiplerAnimationSpeed: 1
@@ -434,7 +434,7 @@ PrefabNode:
                         blendTime: 0.200000003
                       - conditions:
                           - valueName: RangeAttack
-                            cType: 6
+                            cType: 1
                             CompareParameter:
                               vType: 2
                               name: None
@@ -449,7 +449,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 1
-                    AnimationIndex: 5
+                    AnimationIndex: 4
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -539,7 +539,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 2
-                    AnimationIndex: 11
+                    AnimationIndex: 12
                     m_isAny: false
                     animationSpeed: 1.5
                     multiplerAnimationSpeed: 1
@@ -589,7 +589,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 4
-                    AnimationIndex: 9
+                    AnimationIndex: 8
                     m_isAny: false
                     animationSpeed: 2.5
                     multiplerAnimationSpeed: 1
@@ -622,7 +622,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 5
-                    AnimationIndex: 8
+                    AnimationIndex: 7
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -639,7 +639,7 @@ PrefabNode:
                         exitTime: 0.635999978
                         blendTime: 0.200000003
                     index: 6
-                    AnimationIndex: 12
+                    AnimationIndex: 10
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -656,7 +656,7 @@ PrefabNode:
                         exitTime: 0.975000024
                         blendTime: 0.200000003
                     index: 7
-                    AnimationIndex: 6
+                    AnimationIndex: 5
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -667,6 +667,10 @@ PrefabNode:
                 useController: true
                 m_avatarMask:
                   m_BoneMasks:
+                    - isEnabled: true
+                    - isEnabled: true
+                    - isEnabled: true
+                    - isEnabled: true
                     - isEnabled: true
                     - isEnabled: true
                     - isEnabled: true
@@ -745,7 +749,7 @@ PrefabNode:
                       exitTime: 0.100000001
                       blendTime: 0.200000003
                   index: 1
-                  AnimationIndex: 5
+                  AnimationIndex: 4
                   m_isAny: false
                   animationSpeed: 1
                   multiplerAnimationSpeed: 1
@@ -798,7 +802,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 1
-                    AnimationIndex: 5
+                    AnimationIndex: 4
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -815,7 +819,7 @@ PrefabNode:
                         exitTime: 0.728999972
                         blendTime: 0.200000003
                     index: 2
-                    AnimationIndex: 10
+                    AnimationIndex: 11
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -883,7 +887,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 4
-                    AnimationIndex: 11
+                    AnimationIndex: 12
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -894,6 +898,10 @@ PrefabNode:
                 useController: true
                 m_avatarMask:
                   m_BoneMasks:
+                    - isEnabled: true
+                    - isEnabled: true
+                    - isEnabled: true
+                    - isEnabled: true
                     - isEnabled: true
                     - isEnabled: true
                     - isEnabled: true
@@ -1007,19 +1015,19 @@ PrefabNode:
                 tValue: false
         children:
           - GameObject: 2166264123
-            m_name: Red_low (6)
+            m_name: red_low.001
             m_isEnabled: true
-            m_instanceID: 2117687835
+            m_instanceID: 4278614646
             m_transform:
               position: {x: 0, y: 0, z: -0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 63
-            m_index: 64
-            m_parentIndex: 63
+              m_parentID: 484
+            m_index: 485
+            m_parentIndex: 484
             m_rootIndex: 0
-            m_childrenIndices: [65]
-            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+            m_childrenIndices: [486]
+            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
             m_attachedSoketID: 0
             m_collisionType: 1
             m_isStatic: false
@@ -1030,13 +1038,13 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 3767927648
+                m_instanceID: 1406967453
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: UV_01.004
-                  m_baseColorTexName: Girl_L_UV_01_BaseColor.png
-                  m_normalTexName: Girl_L_UV_01_Normal.png
-                  m_ORM_TexName: Girl_L_UV_01_OcclusionRoughnessMetallic.png
+                  m_name: UV_02.001
+                  m_baseColorTexName: Cha_PC_2_UV_02_BaseColor.png
+                  m_normalTexName: Cha_PC_2_UV_02_Normal.png
+                  m_ORM_TexName: Cha_PC_2_UV_02_OcclusionRoughnessMetallic.png
                   m_AO_TexName: ""
                   m_EmissiveTexName: ""
                   m_materialInfo:
@@ -1047,11 +1055,11 @@ PrefabNode:
                   m_flowInfo:
                     m_windVector: {x: 0, y: 0, z: 0, w: 0}
                     m_uvScroll: {x: 0, y: 0}
-                  m_fileGuid: 2d88fa26-93f1-5ed1-b720-c1ea0953a854
+                  m_fileGuid: 9fa2ba19-84ef-5932-8470-9200273a4f29
                   m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Red_low-0
+                  m_name: red_low.001-0
                   m_materialIndex: 0
                   m_LODThresholds: ~
                 m_LightMapping:
@@ -1066,19 +1074,19 @@ PrefabNode:
                 m_isEnableLOD: false
             children:
               - GameObject: 2166264123
-                m_name: Red_low (7)
+                m_name: red_low.001 (1)
                 m_isEnabled: true
-                m_instanceID: 35420759
+                m_instanceID: 655703598
                 m_transform:
                   position: {x: 0, y: 0, z: -0, w: 1}
                   rotation: {x: -0, y: 0, z: -0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 0}
-                  m_parentID: 64
-                m_index: 65
-                m_parentIndex: 64
+                  m_parentID: 485
+                m_index: 486
+                m_parentIndex: 485
                 m_rootIndex: 0
                 m_childrenIndices: ~
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false
@@ -1089,13 +1097,13 @@ PrefabNode:
                   - MeshRenderer: 659998325
                     m_name: MeshRenderer
                     m_isEnabled: true
-                    m_instanceID: 4056126672
+                    m_instanceID: 749836956
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_Material:
-                      m_name: UV_02.004
-                      m_baseColorTexName: Girl_L_UV_02_BaseColor.png
-                      m_normalTexName: Girl_L_UV_02_Normal.png
-                      m_ORM_TexName: Girl_L_UV_02_OcclusionRoughnessMetallic.png
+                      m_name: UV_01.001
+                      m_baseColorTexName: Cha_PC_2_UV_01_BaseColor.png
+                      m_normalTexName: Cha_PC_2_UV_01_Normal.png
+                      m_ORM_TexName: Cha_PC_2_UV_01_OcclusionRoughnessMetallic.png
                       m_AO_TexName: ""
                       m_EmissiveTexName: ""
                       m_materialInfo:
@@ -1106,11 +1114,11 @@ PrefabNode:
                       m_flowInfo:
                         m_windVector: {x: 0, y: 0, z: 0, w: 0}
                         m_uvScroll: {x: 0, y: 0}
-                      m_fileGuid: 2d88fa26-93f1-5ed1-b720-c1ea0953a854
+                      m_fileGuid: 9fa2ba19-84ef-5932-8470-9200273a4f29
                       m_renderingMode: 0
                       m_shaderPSOName: ""
                     m_Mesh:
-                      m_name: Red_low-1
+                      m_name: red_low.001-1
                       m_materialIndex: 1
                       m_LODThresholds: ~
                     m_LightMapping:
@@ -1124,19 +1132,19 @@ PrefabNode:
                     m_shadowCast: true
                     m_isEnableLOD: false
           - GameObject: 2166264123
-            m_name: spine (4)
+            m_name: spine (2)
             m_isEnabled: true
-            m_instanceID: 3632337375
+            m_instanceID: 2756809664
             m_transform:
-              position: {x: 0, y: 0.744947731, z: -0.010512013, w: 1}
+              position: {x: 0, y: 0.744947731, z: -0.0444577374, w: 1}
               rotation: {x: -0.125819653, y: -1.23901899e-07, z: 1.57141731e-08, w: 0.992053151}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 63
-            m_index: 66
-            m_parentIndex: 63
-            m_rootIndex: 3
-            m_childrenIndices: [67, 95, 96, 97, 101, 105, 109, 112, 115]
-            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+              m_parentID: 484
+            m_index: 487
+            m_parentIndex: 484
+            m_rootIndex: 4
+            m_childrenIndices: [488, 520, 521, 522, 526, 530, 534, 537, 540]
+            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
             m_attachedSoketID: 0
             m_collisionType: 1
             m_isStatic: false
@@ -1146,19 +1154,19 @@ PrefabNode:
             m_components: ~
             children:
               - GameObject: 2166264123
-                m_name: spine.001 (4)
+                m_name: spine.001 (2)
                 m_isEnabled: true
-                m_instanceID: 4257603450
+                m_instanceID: 1412670765
                 m_transform:
-                  position: {x: -1.27090941e-16, y: 0.122045338, z: -0, w: 1}
-                  rotation: {x: 0.0872987881, y: 1.94142245e-07, z: -4.79292384e-09, w: 0.996182203}
-                  scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                  m_parentID: 66
-                m_index: 67
-                m_parentIndex: 66
-                m_rootIndex: 3
-                m_childrenIndices: [68]
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                  position: {x: 4.45113019e-15, y: 0.12204542, z: 7.4505806e-09, w: 1}
+                  rotation: {x: 0.0872987956, y: 1.56124955e-07, z: -8.12451528e-09, w: 0.996182144}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 487
+                m_index: 488
+                m_parentIndex: 487
+                m_rootIndex: 4
+                m_childrenIndices: [489]
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false
@@ -1168,19 +1176,19 @@ PrefabNode:
                 m_components: ~
                 children:
                   - GameObject: 2166264123
-                    m_name: spine.002 (4)
+                    m_name: spine.002 (2)
                     m_isEnabled: true
-                    m_instanceID: 2680468435
+                    m_instanceID: 2182323899
                     m_transform:
-                      position: {x: 5.61580515e-15, y: 0.174004599, z: -3.53902578e-08, w: 1}
-                      rotation: {x: 0.238273457, y: 4.38391901e-09, z: 3.44299522e-08, w: 0.971198082}
-                      scale: {x: 1, y: 1, z: 1, w: 0}
-                      m_parentID: 67
-                    m_index: 68
-                    m_parentIndex: 67
-                    m_rootIndex: 3
-                    m_childrenIndices: [69]
-                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                      position: {x: 2.32280575e-16, y: 0.174004734, z: -1.58324838e-08, w: 1}
+                      rotation: {x: 0.138686121, y: 2.16864091e-08, z: 1.18654002e-08, w: 0.990336418}
+                      scale: {x: 1, y: 0.999999881, z: 1, w: 0}
+                      m_parentID: 488
+                    m_index: 489
+                    m_parentIndex: 488
+                    m_rootIndex: 4
+                    m_childrenIndices: [490]
+                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                     m_attachedSoketID: 0
                     m_collisionType: 1
                     m_isStatic: false
@@ -1190,19 +1198,19 @@ PrefabNode:
                     m_components: ~
                     children:
                       - GameObject: 2166264123
-                        m_name: spine.003 (4)
+                        m_name: spine.003 (2)
                         m_isEnabled: true
-                        m_instanceID: 418526450
+                        m_instanceID: 599062072
                         m_transform:
-                          position: {x: -2.90892968e-15, y: 0.150656313, z: 4.19095159e-08, w: 1}
-                          rotation: {x: -0.186464012, y: 1.33387248e-08, z: -3.03168939e-08, w: 0.98246181}
-                          scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                          m_parentID: 68
-                        m_index: 69
-                        m_parentIndex: 68
-                        m_rootIndex: 3
-                        m_childrenIndices: [70, 79, 86, 93, 94]
-                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                          position: {x: -4.27710134e-15, y: 0.141386494, z: 8.19563866e-08, w: 1}
+                          rotation: {x: 0.021396108, y: 6.93610573e-08, z: 3.78350418e-09, w: 0.999771118}
+                          scale: {x: 1, y: 1, z: 1, w: 0}
+                          m_parentID: 489
+                        m_index: 490
+                        m_parentIndex: 489
+                        m_rootIndex: 4
+                        m_childrenIndices: [491, 518, 519]
+                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                         m_attachedSoketID: 0
                         m_collisionType: 1
                         m_isStatic: false
@@ -1212,19 +1220,19 @@ PrefabNode:
                         m_components: ~
                         children:
                           - GameObject: 2166264123
-                            m_name: spine.004 (4)
+                            m_name: spine.004 (2)
                             m_isEnabled: true
-                            m_instanceID: 3509085920
+                            m_instanceID: 813206399
                             m_transform:
-                              position: {x: -4.06824334e-15, y: 0.154404148, z: 1.95577741e-08, w: 1}
-                              rotation: {x: -0.201737657, y: -1.44650798e-07, z: -5.74509595e-09, w: 0.979439616}
-                              scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                              m_parentID: 69
-                            m_index: 70
-                            m_parentIndex: 69
-                            m_rootIndex: 3
-                            m_childrenIndices: [71]
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                              position: {x: 1.59586089e-14, y: 0.159035683, z: -9.12696123e-08, w: 1}
+                              rotation: {x: -0.305666238, y: -1.4893719e-07, z: -2.74438854e-08, w: 0.952138722}
+                              scale: {x: 1, y: 1, z: 0.999999821, w: 0}
+                              m_parentID: 490
+                            m_index: 491
+                            m_parentIndex: 490
+                            m_rootIndex: 4
+                            m_childrenIndices: [492, 504, 511]
+                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                             m_attachedSoketID: 0
                             m_collisionType: 1
                             m_isStatic: false
@@ -1234,19 +1242,19 @@ PrefabNode:
                             m_components: ~
                             children:
                               - GameObject: 2166264123
-                                m_name: spine.005 (4)
+                                m_name: spine.005 (2)
                                 m_isEnabled: true
-                                m_instanceID: 338999473
+                                m_instanceID: 2758851888
                                 m_transform:
-                                  position: {x: -6.64505309e-15, y: 0.0530481637, z: -2.23517418e-08, w: 1}
-                                  rotation: {x: 0.0948571935, y: -2.22509495e-08, z: -1.34280729e-08, w: 0.995490909}
-                                  scale: {x: 1, y: 1, z: 1, w: 0}
-                                  m_parentID: 70
-                                m_index: 71
-                                m_parentIndex: 70
-                                m_rootIndex: 3
-                                m_childrenIndices: [72]
-                                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                  position: {x: -3.77997347e-16, y: 0.0530479103, z: -2.23517418e-08, w: 1}
+                                  rotation: {x: 0.0948572829, y: 1.55718482e-07, z: 8.51664872e-09, w: 0.995490909}
+                                  scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+                                  m_parentID: 491
+                                m_index: 492
+                                m_parentIndex: 491
+                                m_rootIndex: 4
+                                m_childrenIndices: [493]
+                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                 m_attachedSoketID: 0
                                 m_collisionType: 1
                                 m_isStatic: false
@@ -1256,19 +1264,19 @@ PrefabNode:
                                 m_components: ~
                                 children:
                                   - GameObject: 2166264123
-                                    m_name: spine.006 (4)
+                                    m_name: spine.006 (2)
                                     m_isEnabled: true
-                                    m_instanceID: 360330542
+                                    m_instanceID: 86747504
                                     m_transform:
-                                      position: {x: -5.22590106e-15, y: 0.0502719805, z: 1.67638063e-08, w: 1}
-                                      rotation: {x: 0.0937120616, y: 1.25633136e-07, z: -3.53522389e-09, w: 0.995599329}
-                                      scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                                      m_parentID: 71
-                                    m_index: 72
-                                    m_parentIndex: 71
-                                    m_rootIndex: 3
-                                    m_childrenIndices: [73, 74, 75]
-                                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                      position: {x: -5.15609538e-15, y: 0.0502720438, z: -7.4505806e-09, w: 1}
+                                      rotation: {x: 0.0937119946, y: -4.94433365e-08, z: 1.84186923e-08, w: 0.995599389}
+                                      scale: {x: 1, y: 1.00000012, z: 1, w: 0}
+                                      m_parentID: 492
+                                    m_index: 493
+                                    m_parentIndex: 492
+                                    m_rootIndex: 4
+                                    m_childrenIndices: [494, 495, 496, 500]
+                                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                     m_attachedSoketID: 0
                                     m_collisionType: 1
                                     m_isStatic: false
@@ -1278,19 +1286,19 @@ PrefabNode:
                                     m_components: ~
                                     children:
                                       - GameObject: 2166264123
-                                        m_name: ear_L (4)
+                                        m_name: ear_L (1)
                                         m_isEnabled: true
-                                        m_instanceID: 3277274269
+                                        m_instanceID: 3478976067
                                         m_transform:
-                                          position: {x: 0.0944328979, y: 0.474965572, z: 0.0198037978, w: 1}
-                                          rotation: {x: 1.31684885e-09, y: -1.60233398e-07, z: -0.159779921, w: 0.987152696}
-                                          scale: {x: 1, y: 1, z: 1, w: 0}
-                                          m_parentID: 72
-                                        m_index: 73
-                                        m_parentIndex: 72
-                                        m_rootIndex: 3
+                                          position: {x: 0.197646543, y: 0.549775124, z: 0.0198037568, w: 1}
+                                          rotation: {x: -0.0431434661, y: 0.0176865999, z: -0.378909856, w: 0.924258173}
+                                          scale: {x: 1.00000012, y: 1, z: 1, w: 0}
+                                          m_parentID: 493
+                                        m_index: 494
+                                        m_parentIndex: 493
+                                        m_rootIndex: 4
                                         m_childrenIndices: ~
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                         m_attachedSoketID: 0
                                         m_collisionType: 1
                                         m_isStatic: false
@@ -1299,19 +1307,19 @@ PrefabNode:
                                         m_layer: Default
                                         m_components: ~
                                       - GameObject: 2166264123
-                                        m_name: ear_R (4)
+                                        m_name: ear_R (1)
                                         m_isEnabled: true
-                                        m_instanceID: 1053059292
+                                        m_instanceID: 739205142
                                         m_transform:
-                                          position: {x: -0.0944328979, y: 0.474965572, z: 0.0198037829, w: 1}
-                                          rotation: {x: -1.56202304e-08, y: 7.24522025e-08, z: 0.159779921, w: 0.987152696}
-                                          scale: {x: 1, y: 1, z: 1, w: 0}
-                                          m_parentID: 72
-                                        m_index: 74
-                                        m_parentIndex: 72
-                                        m_rootIndex: 3
+                                          position: {x: -0.197646543, y: 0.549775124, z: 0.0198036991, w: 1}
+                                          rotation: {x: -0.043143522, y: -0.017686734, z: 0.378909856, w: 0.924258173}
+                                          scale: {x: 1, y: 1, z: 0.99999994, w: 0}
+                                          m_parentID: 493
+                                        m_index: 495
+                                        m_parentIndex: 493
+                                        m_rootIndex: 4
                                         m_childrenIndices: ~
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                         m_attachedSoketID: 0
                                         m_collisionType: 1
                                         m_isStatic: false
@@ -1320,19 +1328,19 @@ PrefabNode:
                                         m_layer: Default
                                         m_components: ~
                                       - GameObject: 2166264123
-                                        m_name: Bone (3)
+                                        m_name: cloth01_L
                                         m_isEnabled: true
-                                        m_instanceID: 1836324981
+                                        m_instanceID: 5191593
                                         m_transform:
-                                          position: {x: -2.31936887e-08, y: 0.565667748, z: 0.262181252, w: 1}
-                                          rotation: {x: 0.350640267, y: 0.614045143, z: 0.350640178, w: 0.614045262}
-                                          scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                                          m_parentID: 72
-                                        m_index: 75
-                                        m_parentIndex: 72
-                                        m_rootIndex: 3
-                                        m_childrenIndices: [76]
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                          position: {x: 0.0670026913, y: 0.276746571, z: 0.345454156, w: 1}
+                                          rotation: {x: 0.712977111, y: -0.0124545423, z: 0.693251669, w: -0.104454651}
+                                          scale: {x: 1.00000286, y: 1.00000036, z: 1.00000489, w: 0}
+                                          m_parentID: 493
+                                        m_index: 496
+                                        m_parentIndex: 493
+                                        m_rootIndex: 4
+                                        m_childrenIndices: [497]
+                                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                         m_attachedSoketID: 0
                                         m_collisionType: 1
                                         m_isStatic: false
@@ -1342,19 +1350,19 @@ PrefabNode:
                                         m_components: ~
                                         children:
                                           - GameObject: 2166264123
-                                            m_name: Bone.001 (3)
+                                            m_name: cloth02_L
                                             m_isEnabled: true
-                                            m_instanceID: 3610601094
+                                            m_instanceID: 1685692772
                                             m_transform:
-                                              position: {x: 1.49011612e-07, y: 0.195392817, z: 7.28306304e-14, w: 1}
-                                              rotation: {x: 9.36486586e-08, y: 4.59589309e-08, z: 0.662270188, w: 0.749265194}
-                                              scale: {x: 1, y: 1, z: 1, w: 0}
-                                              m_parentID: 75
-                                            m_index: 76
-                                            m_parentIndex: 75
-                                            m_rootIndex: 3
-                                            m_childrenIndices: [77]
-                                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                              position: {x: -1.16415322e-09, y: 0.197010517, z: 6.93835318e-08, w: 1}
+                                              rotation: {x: 0.0668472201, y: 0.00300242123, z: -0.0840199366, w: 0.994214833}
+                                              scale: {x: 1, y: 0.99999994, z: 1, w: 0}
+                                              m_parentID: 496
+                                            m_index: 497
+                                            m_parentIndex: 496
+                                            m_rootIndex: 4
+                                            m_childrenIndices: [498]
+                                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                             m_attachedSoketID: 0
                                             m_collisionType: 1
                                             m_isStatic: false
@@ -1364,19 +1372,19 @@ PrefabNode:
                                             m_components: ~
                                             children:
                                               - GameObject: 2166264123
-                                                m_name: Bone.003 (3)
+                                                m_name: cloth03_L
                                                 m_isEnabled: true
-                                                m_instanceID: 2399336400
+                                                m_instanceID: 2725943450
                                                 m_transform:
-                                                  position: {x: -1.49011612e-07, y: 0.237649471, z: -2.22044605e-14, w: 1}
-                                                  rotation: {x: -0.00495853648, y: -0.00101385219, z: 0.250311375, w: 0.968152165}
-                                                  scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                                                  m_parentID: 76
-                                                m_index: 77
-                                                m_parentIndex: 76
-                                                m_rootIndex: 3
-                                                m_childrenIndices: [78]
-                                                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                                  position: {x: -1.3384124e-08, y: 0.199614421, z: -2.3512257e-08, w: 1}
+                                                  rotation: {x: 0.00655217655, y: 2.21093414e-05, z: 0.000593627046, w: 0.999978364}
+                                                  scale: {x: 0.99999994, y: 0.99999994, z: 0.999999821, w: 0}
+                                                  m_parentID: 497
+                                                m_index: 498
+                                                m_parentIndex: 497
+                                                m_rootIndex: 4
+                                                m_childrenIndices: [499]
+                                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                                 m_attachedSoketID: 0
                                                 m_collisionType: 1
                                                 m_isStatic: false
@@ -1386,19 +1394,19 @@ PrefabNode:
                                                 m_components: ~
                                                 children:
                                                   - GameObject: 2166264123
-                                                    m_name: Bone.002 (3)
+                                                    m_name: cloth04_L
                                                     m_isEnabled: true
-                                                    m_instanceID: 3455969122
+                                                    m_instanceID: 1355934937
                                                     m_transform:
-                                                      position: {x: 1.18784897e-07, y: 0.249851376, z: -1.39698386e-09, w: 1}
-                                                      rotation: {x: 0.0425796323, y: -0.000159343806, z: -0.00781985652, w: 0.999062479}
-                                                      scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
-                                                      m_parentID: 77
-                                                    m_index: 78
-                                                    m_parentIndex: 77
-                                                    m_rootIndex: 3
+                                                      position: {x: 1.63661014e-08, y: 0.200344041, z: 3.37277015e-08, w: 1}
+                                                      rotation: {x: -0.0410990492, y: -0.000745941652, z: -0.0887274146, w: 0.995207429}
+                                                      scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+                                                      m_parentID: 498
+                                                    m_index: 499
+                                                    m_parentIndex: 498
+                                                    m_rootIndex: 4
                                                     m_childrenIndices: ~
-                                                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                                     m_attachedSoketID: 0
                                                     m_collisionType: 1
                                                     m_isStatic: false
@@ -1406,42 +1414,107 @@ PrefabNode:
                                                     m_tag: Untagged
                                                     m_layer: Default
                                                     m_components: ~
-                          - GameObject: 2166264123
-                            m_name: shoulder.L (4)
-                            m_isEnabled: true
-                            m_instanceID: 2847257171
-                            m_transform:
-                              position: {x: 0.0146724498, y: 0.110020071, z: -0.0627394319, w: 1}
-                              rotation: {x: 0.605154455, y: 0.345862359, z: -0.356134385, w: 0.622362971}
-                              scale: {x: 1, y: 1.00000012, z: 0.99999994, w: 0}
-                              m_parentID: 69
-                            m_index: 79
-                            m_parentIndex: 69
-                            m_rootIndex: 3
-                            m_childrenIndices: [80]
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                            m_attachedSoketID: 0
-                            m_collisionType: 1
-                            m_isStatic: false
-                            m_gameObjectType: 4
-                            m_tag: Untagged
-                            m_layer: Default
-                            m_components: ~
-                            children:
+                                      - GameObject: 2166264123
+                                        m_name: cloth01_R
+                                        m_isEnabled: true
+                                        m_instanceID: 3286470659
+                                        m_transform:
+                                          position: {x: -0.0670027956, y: 0.276746571, z: 0.345454156, w: 1}
+                                          rotation: {x: 0.71297735, y: 0.0124545433, z: -0.693251431, w: -0.104454659}
+                                          scale: {x: 1.00000262, y: 1.00000024, z: 1.00000441, w: 0}
+                                          m_parentID: 493
+                                        m_index: 500
+                                        m_parentIndex: 493
+                                        m_rootIndex: 4
+                                        m_childrenIndices: [501]
+                                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                        m_attachedSoketID: 0
+                                        m_collisionType: 1
+                                        m_isStatic: false
+                                        m_gameObjectType: 4
+                                        m_tag: Untagged
+                                        m_layer: Default
+                                        m_components: ~
+                                        children:
+                                          - GameObject: 2166264123
+                                            m_name: cloth02_R
+                                            m_isEnabled: true
+                                            m_instanceID: 2646069880
+                                            m_transform:
+                                              position: {x: -1.74622983e-08, y: 0.197010741, z: 4.84287739e-08, w: 1}
+                                              rotation: {x: 0.0668471754, y: -0.00300242961, z: 0.084019959, w: 0.994214833}
+                                              scale: {x: 0.999999881, y: 0.999999821, z: 0.999999881, w: 0}
+                                              m_parentID: 500
+                                            m_index: 501
+                                            m_parentIndex: 500
+                                            m_rootIndex: 4
+                                            m_childrenIndices: [502]
+                                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                            m_attachedSoketID: 0
+                                            m_collisionType: 1
+                                            m_isStatic: false
+                                            m_gameObjectType: 4
+                                            m_tag: Untagged
+                                            m_layer: Default
+                                            m_components: ~
+                                            children:
+                                              - GameObject: 2166264123
+                                                m_name: cloth03_R
+                                                m_isEnabled: true
+                                                m_instanceID: 2956501567
+                                                m_transform:
+                                                  position: {x: 2.58587534e-08, y: 0.199614525, z: -3.81296559e-08, w: 1}
+                                                  rotation: {x: 0.00655217655, y: -2.2107537e-05, z: -0.000593635079, w: 0.999978364}
+                                                  scale: {x: 0.99999994, y: 0.999999881, z: 0.999999702, w: 0}
+                                                  m_parentID: 501
+                                                m_index: 502
+                                                m_parentIndex: 501
+                                                m_rootIndex: 4
+                                                m_childrenIndices: [503]
+                                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                                m_attachedSoketID: 0
+                                                m_collisionType: 1
+                                                m_isStatic: false
+                                                m_gameObjectType: 4
+                                                m_tag: Untagged
+                                                m_layer: Default
+                                                m_components: ~
+                                                children:
+                                                  - GameObject: 2166264123
+                                                    m_name: cloth04_R
+                                                    m_isEnabled: true
+                                                    m_instanceID: 2554584810
+                                                    m_transform:
+                                                      position: {x: 1.38958569e-08, y: 0.200343922, z: 3.76894604e-09, w: 1}
+                                                      rotation: {x: -0.0410991795, y: 0.00074593816, z: 0.088727437, w: 0.995207429}
+                                                      scale: {x: 1, y: 0.999999881, z: 1, w: 0}
+                                                      m_parentID: 502
+                                                    m_index: 503
+                                                    m_parentIndex: 502
+                                                    m_rootIndex: 4
+                                                    m_childrenIndices: ~
+                                                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                                    m_attachedSoketID: 0
+                                                    m_collisionType: 1
+                                                    m_isStatic: false
+                                                    m_gameObjectType: 4
+                                                    m_tag: Untagged
+                                                    m_layer: Default
+                                                    m_components: ~
                               - GameObject: 2166264123
-                                m_name: upper_arm.L (4)
+                                m_name: shoulder.L (2)
                                 m_isEnabled: true
-                                m_instanceID: 724744776
+                                m_instanceID: 2984965304
                                 m_transform:
-                                  position: {x: 0.0241840743, y: 0.150435373, z: 0.0163487364, w: 1}
-                                  rotation: {x: -0.00560499169, y: 0.745009959, z: 0.218207166, w: -0.630328774}
-                                  scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                  m_parentID: 79
-                                m_index: 80
-                                m_parentIndex: 79
-                                m_rootIndex: 3
-                                m_childrenIndices: [81]
-                                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                  position: {x: 0.0349002294, y: 0.041662585, z: -0.0523034818, w: 1}
+                                  rotation: {x: 0.718266308, y: 0.410597205, z: -0.279038936, w: 0.487484157}
+                                  scale: {x: 0.999999881, y: 1, z: 1, w: 0}
+                                  m_parentID: 491
+                                m_index: 504
+                                m_parentIndex: 491
+                                m_rootIndex: 4
+                                m_childrenIndices: [505]
+                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                 m_attachedSoketID: 0
                                 m_collisionType: 1
                                 m_isStatic: false
@@ -1451,19 +1524,19 @@ PrefabNode:
                                 m_components: ~
                                 children:
                                   - GameObject: 2166264123
-                                    m_name: forearm.L (4)
+                                    m_name: upper_arm.L (1)
                                     m_isEnabled: true
-                                    m_instanceID: 1398213093
+                                    m_instanceID: 2578677988
                                     m_transform:
-                                      position: {x: -1.14319846e-07, y: 0.216559619, z: 1.86264515e-08, w: 1}
-                                      rotation: {x: -0.117635176, y: 0.0607364997, z: 0.0873848572, w: 0.987338305}
-                                      scale: {x: 1, y: 1, z: 0.999999821, w: 0}
-                                      m_parentID: 80
-                                    m_index: 81
-                                    m_parentIndex: 80
-                                    m_rootIndex: 3
-                                    m_childrenIndices: [82, 84]
-                                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                      position: {x: -1.42681529e-08, y: 0.140560612, z: 2.13317662e-07, w: 1}
+                                      rotation: {x: 0.00255668256, y: 0.736003041, z: 0.261775196, w: -0.624313056}
+                                      scale: {x: 0.999999881, y: 0.999999821, z: 0.99999994, w: 0}
+                                      m_parentID: 504
+                                    m_index: 505
+                                    m_parentIndex: 504
+                                    m_rootIndex: 4
+                                    m_childrenIndices: [506]
+                                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                     m_attachedSoketID: 0
                                     m_collisionType: 1
                                     m_isStatic: false
@@ -1473,19 +1546,19 @@ PrefabNode:
                                     m_components: ~
                                     children:
                                       - GameObject: 2166264123
-                                        m_name: hand.L (4)
+                                        m_name: forearm.L (1)
                                         m_isEnabled: true
-                                        m_instanceID: 2698180508
+                                        m_instanceID: 4056295240
                                         m_transform:
-                                          position: {x: 6.63567334e-08, y: 0.176488891, z: -1.86264515e-09, w: 1}
-                                          rotation: {x: -0.0425384231, y: -0.012710683, z: 0.116324469, w: 0.992218494}
-                                          scale: {x: 0.999999881, y: 0.99999994, z: 0.999999881, w: 0}
-                                          m_parentID: 81
-                                        m_index: 82
-                                        m_parentIndex: 81
-                                        m_rootIndex: 3
-                                        m_childrenIndices: [83]
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                          position: {x: 1.56462193e-07, y: 0.236479491, z: -1.86264515e-08, w: 1}
+                                          rotation: {x: -0.178360641, y: 0.0441997871, z: 0.0955128074, w: 0.978320599}
+                                          scale: {x: 0.999999762, y: 1, z: 0.99999994, w: 0}
+                                          m_parentID: 505
+                                        m_index: 506
+                                        m_parentIndex: 505
+                                        m_rootIndex: 4
+                                        m_childrenIndices: [507, 509]
+                                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                         m_attachedSoketID: 0
                                         m_collisionType: 1
                                         m_isStatic: false
@@ -1495,19 +1568,19 @@ PrefabNode:
                                         m_components: ~
                                         children:
                                           - GameObject: 2166264123
-                                            m_name: hand.L.002 (4)
+                                            m_name: hand.L (1)
                                             m_isEnabled: true
-                                            m_instanceID: 617006692
+                                            m_instanceID: 1491808301
                                             m_transform:
-                                              position: {x: 3.07103619e-07, y: 0.0871344507, z: -7.4505806e-09, w: 1}
-                                              rotation: {x: 2.10711733e-08, y: 6.68224004e-07, z: -7.05360435e-07, w: 1}
-                                              scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
-                                              m_parentID: 82
-                                            m_index: 83
-                                            m_parentIndex: 82
-                                            m_rootIndex: 3
-                                            m_childrenIndices: ~
-                                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                              position: {x: -1.24331564e-07, y: 0.214574665, z: 9.31322575e-09, w: 1}
+                                              rotation: {x: 0.219729796, y: -0.00437959051, z: 0.147099063, w: 0.964397013}
+                                              scale: {x: 1, y: 0.999999762, z: 1.00000012, w: 0}
+                                              m_parentID: 506
+                                            m_index: 507
+                                            m_parentIndex: 506
+                                            m_rootIndex: 4
+                                            m_childrenIndices: [508]
+                                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                             m_attachedSoketID: 0
                                             m_collisionType: 1
                                             m_isStatic: false
@@ -1515,20 +1588,129 @@ PrefabNode:
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
+                                            children:
+                                              - GameObject: 2166264123
+                                                m_name: hand.L.002 (1)
+                                                m_isEnabled: true
+                                                m_instanceID: 1501688949
+                                                m_transform:
+                                                  position: {x: -5.6475983e-08, y: 0.0899567306, z: -3.06172296e-08, w: 1}
+                                                  rotation: {x: -0.0587563552, y: 5.65105722e-07, z: -0.00305187865, w: 0.99826771}
+                                                  scale: {x: 0.999999821, y: 0.999999821, z: 1, w: 0}
+                                                  m_parentID: 507
+                                                m_index: 508
+                                                m_parentIndex: 507
+                                                m_rootIndex: 4
+                                                m_childrenIndices: ~
+                                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                                m_attachedSoketID: 0
+                                                m_collisionType: 1
+                                                m_isStatic: false
+                                                m_gameObjectType: 4
+                                                m_tag: Untagged
+                                                m_layer: Default
+                                                m_components: ~
+                                          - GameObject: 2166264123
+                                            m_name: hand.L.001 (1)
+                                            m_isEnabled: true
+                                            m_instanceID: 3445594933
+                                            m_transform:
+                                              position: {x: -2.06520781e-07, y: 0.214574516, z: -3.91155481e-08, w: 1}
+                                              rotation: {x: 0.0552848503, y: -0.106416643, z: -0.145794973, w: 0.982019842}
+                                              scale: {x: 0.999999881, y: 0.999999881, z: 0.99999994, w: 0}
+                                              m_parentID: 506
+                                            m_index: 509
+                                            m_parentIndex: 506
+                                            m_rootIndex: 4
+                                            m_childrenIndices: [510]
+                                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                            m_attachedSoketID: 0
+                                            m_collisionType: 1
+                                            m_isStatic: false
+                                            m_gameObjectType: 4
+                                            m_tag: Untagged
+                                            m_layer: Default
+                                            m_components: ~
+                                            children:
+                                              - GameObject: 2166264123
+                                                m_name: hand.L.003 (1)
+                                                m_isEnabled: true
+                                                m_instanceID: 684217888
+                                                m_transform:
+                                                  position: {x: 9.31322575e-09, y: 0.0668574572, z: -1.86264515e-09, w: 1}
+                                                  rotation: {x: -0.292488992, y: -3.84365705e-07, z: 0.0553340688, w: 0.954666615}
+                                                  scale: {x: 1, y: 1, z: 0.999999881, w: 0}
+                                                  m_parentID: 509
+                                                m_index: 510
+                                                m_parentIndex: 509
+                                                m_rootIndex: 4
+                                                m_childrenIndices: ~
+                                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                                m_attachedSoketID: 0
+                                                m_collisionType: 1
+                                                m_isStatic: false
+                                                m_gameObjectType: 4
+                                                m_tag: Untagged
+                                                m_layer: Default
+                                                m_components: ~
+                              - GameObject: 2166264123
+                                m_name: shoulder.R (2)
+                                m_isEnabled: true
+                                m_instanceID: 1403350067
+                                m_transform:
+                                  position: {x: -0.0349002369, y: 0.041662585, z: -0.0523034744, w: 1}
+                                  rotation: {x: 0.718266368, y: -0.410597146, z: 0.279038817, w: 0.487484127}
+                                  scale: {x: 0.999999881, y: 0.999999762, z: 0.999999821, w: 0}
+                                  m_parentID: 491
+                                m_index: 511
+                                m_parentIndex: 491
+                                m_rootIndex: 4
+                                m_childrenIndices: [512]
+                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                m_attachedSoketID: 0
+                                m_collisionType: 1
+                                m_isStatic: false
+                                m_gameObjectType: 4
+                                m_tag: Untagged
+                                m_layer: Default
+                                m_components: ~
+                                children:
+                                  - GameObject: 2166264123
+                                    m_name: upper_arm.R (1)
+                                    m_isEnabled: true
+                                    m_instanceID: 1420649453
+                                    m_transform:
+                                      position: {x: 8.2218321e-09, y: 0.140560612, z: 9.95585197e-08, w: 1}
+                                      rotation: {x: -0.0025567133, y: 0.736002982, z: 0.261775285, w: 0.624313116}
+                                      scale: {x: 1, y: 0.999999821, z: 1, w: 0}
+                                      m_parentID: 511
+                                    m_index: 512
+                                    m_parentIndex: 511
+                                    m_rootIndex: 4
+                                    m_childrenIndices: [513]
+                                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                    m_attachedSoketID: 0
+                                    m_collisionType: 1
+                                    m_isStatic: false
+                                    m_gameObjectType: 4
+                                    m_tag: Untagged
+                                    m_layer: Default
+                                    m_components: ~
+                                    children:
                                       - GameObject: 2166264123
-                                        m_name: hand.L.001 (4)
+                                        m_name: forearm.R (1)
                                         m_isEnabled: true
-                                        m_instanceID: 3923598514
+                                        m_instanceID: 3400444835
                                         m_transform:
-                                          position: {x: 1.80676579e-07, y: 0.176488906, z: 7.63684511e-08, w: 1}
-                                          rotation: {x: -0.335561723, y: -0.0660399497, z: -0.129671484, w: 0.930710673}
-                                          scale: {x: 0.999999881, y: 0.99999994, z: 0.99999994, w: 0}
-                                          m_parentID: 81
-                                        m_index: 84
-                                        m_parentIndex: 81
-                                        m_rootIndex: 3
-                                        m_childrenIndices: [85]
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                          position: {x: -5.23868948e-09, y: 0.236479521, z: -1.11758709e-08, w: 1}
+                                          rotation: {x: -0.178360671, y: -0.0441997275, z: -0.0955128148, w: 0.978320599}
+                                          scale: {x: 0.999999881, y: 0.999999821, z: 1, w: 0}
+                                          m_parentID: 512
+                                        m_index: 513
+                                        m_parentIndex: 512
+                                        m_rootIndex: 4
+                                        m_childrenIndices: [514, 516]
+                                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                         m_attachedSoketID: 0
                                         m_collisionType: 1
                                         m_isStatic: false
@@ -1538,19 +1720,19 @@ PrefabNode:
                                         m_components: ~
                                         children:
                                           - GameObject: 2166264123
-                                            m_name: hand.L.003 (4)
+                                            m_name: hand.R (1)
                                             m_isEnabled: true
-                                            m_instanceID: 4226911185
+                                            m_instanceID: 699498956
                                             m_transform:
-                                              position: {x: 1.09095708e-07, y: 0.0805392116, z: -9.19681042e-08, w: 1}
-                                              rotation: {x: 1.68569386e-07, y: -5.08502126e-07, z: -7.26431608e-08, w: 1}
+                                              position: {x: 9.30158421e-08, y: 0.214574665, z: 1.11758709e-08, w: 1}
+                                              rotation: {x: 0.219729871, y: 0.00437958259, z: -0.147099063, w: 0.964396954}
                                               scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                              m_parentID: 84
-                                            m_index: 85
-                                            m_parentIndex: 84
-                                            m_rootIndex: 3
-                                            m_childrenIndices: ~
-                                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                              m_parentID: 513
+                                            m_index: 514
+                                            m_parentIndex: 513
+                                            m_rootIndex: 4
+                                            m_childrenIndices: [515]
+                                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                             m_attachedSoketID: 0
                                             m_collisionType: 1
                                             m_isStatic: false
@@ -1558,108 +1740,42 @@ PrefabNode:
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
-                          - GameObject: 2166264123
-                            m_name: shoulder.R (4)
-                            m_isEnabled: true
-                            m_instanceID: 1942417215
-                            m_transform:
-                              position: {x: -0.0146724274, y: 0.110020071, z: -0.0627394393, w: 1}
-                              rotation: {x: 0.605154514, y: -0.345862538, z: 0.356134653, w: 0.622362673}
-                              scale: {x: 1, y: 1.00000024, z: 1.00000012, w: 0}
-                              m_parentID: 69
-                            m_index: 86
-                            m_parentIndex: 69
-                            m_rootIndex: 3
-                            m_childrenIndices: [87]
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                            m_attachedSoketID: 0
-                            m_collisionType: 1
-                            m_isStatic: false
-                            m_gameObjectType: 4
-                            m_tag: Untagged
-                            m_layer: Default
-                            m_components: ~
-                            children:
-                              - GameObject: 2166264123
-                                m_name: upper_arm.R (4)
-                                m_isEnabled: true
-                                m_instanceID: 2204596499
-                                m_transform:
-                                  position: {x: -0.0241840761, y: 0.150435343, z: 0.0163488537, w: 1}
-                                  rotation: {x: 0.00560491206, y: 0.745009959, z: 0.21820721, w: 0.630328774}
-                                  scale: {x: 0.999999881, y: 0.99999994, z: 1, w: 0}
-                                  m_parentID: 86
-                                m_index: 87
-                                m_parentIndex: 86
-                                m_rootIndex: 3
-                                m_childrenIndices: [88]
-                                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                                m_attachedSoketID: 0
-                                m_collisionType: 1
-                                m_isStatic: false
-                                m_gameObjectType: 4
-                                m_tag: Untagged
-                                m_layer: Default
-                                m_components: ~
-                                children:
-                                  - GameObject: 2166264123
-                                    m_name: forearm.R (4)
-                                    m_isEnabled: true
-                                    m_instanceID: 3534243927
-                                    m_transform:
-                                      position: {x: 2.12457962e-07, y: 0.216559574, z: -3.7252903e-09, w: 1}
-                                      rotation: {x: -0.117635123, y: -0.0607365519, z: -0.08738482, w: 0.987338305}
-                                      scale: {x: 1.00000012, y: 1.00000012, z: 0.99999994, w: 0}
-                                      m_parentID: 87
-                                    m_index: 88
-                                    m_parentIndex: 87
-                                    m_rootIndex: 3
-                                    m_childrenIndices: [89, 91]
-                                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                                    m_attachedSoketID: 0
-                                    m_collisionType: 1
-                                    m_isStatic: false
-                                    m_gameObjectType: 4
-                                    m_tag: Untagged
-                                    m_layer: Default
-                                    m_components: ~
-                                    children:
-                                      - GameObject: 2166264123
-                                        m_name: hand.R (4)
-                                        m_isEnabled: true
-                                        m_instanceID: 2125849649
-                                        m_transform:
-                                          position: {x: -1.50641426e-07, y: 0.176488951, z: -5.58793545e-09, w: 1}
-                                          rotation: {x: -0.0425384343, y: 0.0127106775, z: -0.116324492, w: 0.992218494}
-                                          scale: {x: 1, y: 0.999999821, z: 0.999999881, w: 0}
-                                          m_parentID: 88
-                                        m_index: 89
-                                        m_parentIndex: 88
-                                        m_rootIndex: 3
-                                        m_childrenIndices: [90]
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                                        m_attachedSoketID: 0
-                                        m_collisionType: 1
-                                        m_isStatic: false
-                                        m_gameObjectType: 4
-                                        m_tag: Untagged
-                                        m_layer: Default
-                                        m_components: ~
-                                        children:
+                                            children:
+                                              - GameObject: 2166264123
+                                                m_name: hand.R.002 (1)
+                                                m_isEnabled: true
+                                                m_instanceID: 3260057417
+                                                m_transform:
+                                                  position: {x: 1.60165655e-07, y: 0.0899567604, z: 9.19681042e-09, w: 1}
+                                                  rotation: {x: -0.0587563217, y: -5.57190333e-07, z: 0.00305189053, w: 0.99826771}
+                                                  scale: {x: 0.999999821, y: 0.999999881, z: 1, w: 0}
+                                                  m_parentID: 514
+                                                m_index: 515
+                                                m_parentIndex: 514
+                                                m_rootIndex: 4
+                                                m_childrenIndices: ~
+                                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                                m_attachedSoketID: 0
+                                                m_collisionType: 1
+                                                m_isStatic: false
+                                                m_gameObjectType: 4
+                                                m_tag: Untagged
+                                                m_layer: Default
+                                                m_components: ~
                                           - GameObject: 2166264123
-                                            m_name: hand.R.002 (4)
+                                            m_name: hand.R.001 (1)
                                             m_isEnabled: true
-                                            m_instanceID: 1222770729
+                                            m_instanceID: 1979568167
                                             m_transform:
-                                              position: {x: -1.8090941e-07, y: 0.0871344954, z: -1.11758709e-08, w: 1}
-                                              rotation: {x: 1.62981451e-08, y: -6.64382242e-07, z: 6.9651287e-07, w: 1}
-                                              scale: {x: 1, y: 1, z: 1, w: 0}
-                                              m_parentID: 89
-                                            m_index: 90
-                                            m_parentIndex: 89
-                                            m_rootIndex: 3
-                                            m_childrenIndices: ~
-                                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                                              position: {x: 1.74972229e-07, y: 0.214574471, z: -1.86264515e-08, w: 1}
+                                              rotation: {x: 0.0552848577, y: 0.106416613, z: 0.145794973, w: 0.982019842}
+                                              scale: {x: 0.99999994, y: 0.999999821, z: 1, w: 0}
+                                              m_parentID: 513
+                                            m_index: 516
+                                            m_parentIndex: 513
+                                            m_rootIndex: 4
+                                            m_childrenIndices: [517]
+                                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                                             m_attachedSoketID: 0
                                             m_collisionType: 1
                                             m_isStatic: false
@@ -1667,63 +1783,42 @@ PrefabNode:
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
-                                      - GameObject: 2166264123
-                                        m_name: hand.R.001 (4)
-                                        m_isEnabled: true
-                                        m_instanceID: 502873293
-                                        m_transform:
-                                          position: {x: -2.72179022e-07, y: 0.176488921, z: 7.68341124e-08, w: 1}
-                                          rotation: {x: -0.335561663, y: 0.066039972, z: 0.129671499, w: 0.930710673}
-                                          scale: {x: 0.999999881, y: 0.99999994, z: 1, w: 0}
-                                          m_parentID: 88
-                                        m_index: 91
-                                        m_parentIndex: 88
-                                        m_rootIndex: 3
-                                        m_childrenIndices: [92]
-                                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                                        m_attachedSoketID: 0
-                                        m_collisionType: 1
-                                        m_isStatic: false
-                                        m_gameObjectType: 4
-                                        m_tag: Untagged
-                                        m_layer: Default
-                                        m_components: ~
-                                        children:
-                                          - GameObject: 2166264123
-                                            m_name: hand.R.003 (4)
-                                            m_isEnabled: true
-                                            m_instanceID: 2447087998
-                                            m_transform:
-                                              position: {x: -1.97949703e-07, y: 0.0805391297, z: -6.48433343e-08, w: 1}
-                                              rotation: {x: 2.08616243e-07, y: 5.19677997e-07, z: 3.35276127e-08, w: 1}
-                                              scale: {x: 1, y: 1, z: 1.00000012, w: 0}
-                                              m_parentID: 91
-                                            m_index: 92
-                                            m_parentIndex: 91
-                                            m_rootIndex: 3
-                                            m_childrenIndices: ~
-                                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                                            m_attachedSoketID: 0
-                                            m_collisionType: 1
-                                            m_isStatic: false
-                                            m_gameObjectType: 4
-                                            m_tag: Untagged
-                                            m_layer: Default
-                                            m_components: ~
+                                            children:
+                                              - GameObject: 2166264123
+                                                m_name: hand.R.003 (1)
+                                                m_isEnabled: true
+                                                m_instanceID: 3348666369
+                                                m_transform:
+                                                  position: {x: -6.65895641e-08, y: 0.0668574199, z: 3.7252903e-08, w: 1}
+                                                  rotation: {x: -0.292488903, y: 3.86316799e-07, z: -0.055334013, w: 0.954666674}
+                                                  scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+                                                  m_parentID: 516
+                                                m_index: 517
+                                                m_parentIndex: 516
+                                                m_rootIndex: 4
+                                                m_childrenIndices: ~
+                                                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                                                m_attachedSoketID: 0
+                                                m_collisionType: 1
+                                                m_isStatic: false
+                                                m_gameObjectType: 4
+                                                m_tag: Untagged
+                                                m_layer: Default
+                                                m_components: ~
                           - GameObject: 2166264123
-                            m_name: breast.L (4)
+                            m_name: breast.L (2)
                             m_isEnabled: true
-                            m_instanceID: 861590766
+                            m_instanceID: 2502684226
                             m_transform:
-                              position: {x: 0.0949298441, y: -0.00391337182, z: 0.0342812687, w: 1}
-                              rotation: {x: -1.91291676e-08, y: -0.69693619, z: 0.717133224, w: -1.356985e-07}
-                              scale: {x: 0.999999881, y: 0.999999881, z: 0.99999994, w: 0}
-                              m_parentID: 69
-                            m_index: 93
-                            m_parentIndex: 69
-                            m_rootIndex: 3
+                              position: {x: 0.0949298218, y: 0.0839940459, z: 0.0812236443, w: 1}
+                              rotation: {x: -8.76540582e-08, y: -0.615964532, z: 0.787773907, w: -1.19932707e-07}
+                              scale: {x: 0.999999881, y: 1, z: 1, w: 0}
+                              m_parentID: 490
+                            m_index: 518
+                            m_parentIndex: 490
+                            m_rootIndex: 4
                             m_childrenIndices: ~
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                             m_attachedSoketID: 0
                             m_collisionType: 1
                             m_isStatic: false
@@ -1732,19 +1827,19 @@ PrefabNode:
                             m_layer: Default
                             m_components: ~
                           - GameObject: 2166264123
-                            m_name: breast.R (4)
+                            m_name: breast.R (2)
                             m_isEnabled: true
-                            m_instanceID: 2753555673
+                            m_instanceID: 1424327375
                             m_transform:
-                              position: {x: -0.094929859, y: -0.00391337136, z: 0.0342812464, w: 1}
-                              rotation: {x: -1.91292084e-08, y: -0.69693619, z: 0.717133224, w: -1.35698514e-07}
-                              scale: {x: 0.999999881, y: 0.999999881, z: 0.99999994, w: 0}
-                              m_parentID: 69
-                            m_index: 94
-                            m_parentIndex: 69
-                            m_rootIndex: 3
+                              position: {x: -0.0949298739, y: 0.0839940459, z: 0.0812235922, w: 1}
+                              rotation: {x: -1.81563948e-07, y: -0.615964532, z: 0.787773907, w: -4.65040095e-08}
+                              scale: {x: 1, y: 1.00000012, z: 1, w: 0}
+                              m_parentID: 490
+                            m_index: 519
+                            m_parentIndex: 490
+                            m_rootIndex: 4
                             m_childrenIndices: ~
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                             m_attachedSoketID: 0
                             m_collisionType: 1
                             m_isStatic: false
@@ -1753,19 +1848,19 @@ PrefabNode:
                             m_layer: Default
                             m_components: ~
               - GameObject: 2166264123
-                m_name: pelvis.L (4)
+                m_name: pelvis.L (2)
                 m_isEnabled: true
-                m_instanceID: 2097937980
+                m_instanceID: 2798182519
                 m_transform:
-                  position: {x: 0.0743518099, y: 0.0627117157, z: 0.0161671899, w: 1}
-                  rotation: {x: 0.1524553, y: 0.793330848, z: -0.285503864, w: 0.515626967}
-                  scale: {x: 0.99999994, y: 0.999999821, z: 1, w: 0}
-                  m_parentID: 66
-                m_index: 95
-                m_parentIndex: 66
-                m_rootIndex: 3
+                  position: {x: 0.0743517354, y: 0.0627117828, z: 0.0161672384, w: 1}
+                  rotation: {x: 0.15245524, y: 0.793330848, z: -0.285504073, w: 0.515626907}
+                  scale: {x: 1.00000012, y: 0.99999994, z: 1.00000024, w: 0}
+                  m_parentID: 487
+                m_index: 520
+                m_parentIndex: 487
+                m_rootIndex: 4
                 m_childrenIndices: ~
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false
@@ -1774,19 +1869,19 @@ PrefabNode:
                 m_layer: Default
                 m_components: ~
               - GameObject: 2166264123
-                m_name: pelvis.R (4)
+                m_name: pelvis.R (2)
                 m_isEnabled: true
-                m_instanceID: 4059683896
+                m_instanceID: 142066903
                 m_transform:
-                  position: {x: -0.074351795, y: 0.0627118349, z: 0.0161672533, w: 1}
-                  rotation: {x: -0.152455345, y: 0.79333055, z: -0.285503864, w: -0.515627325}
-                  scale: {x: 1.00000024, y: 1.00000012, z: 1, w: 0}
-                  m_parentID: 66
-                m_index: 96
-                m_parentIndex: 66
-                m_rootIndex: 3
+                  position: {x: -0.0743517652, y: 0.0627119169, z: 0.0161672644, w: 1}
+                  rotation: {x: -0.152455389, y: 0.79333061, z: -0.285504043, w: -0.515627265}
+                  scale: {x: 1.00000012, y: 1.00000036, z: 1, w: 0}
+                  m_parentID: 487
+                m_index: 521
+                m_parentIndex: 487
+                m_rootIndex: 4
                 m_childrenIndices: ~
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false
@@ -1795,106 +1890,19 @@ PrefabNode:
                 m_layer: Default
                 m_components: ~
               - GameObject: 2166264123
-                m_name: thigh.L (4)
+                m_name: thigh.L (2)
                 m_isEnabled: true
-                m_instanceID: 2875510793
+                m_instanceID: 3646817448
                 m_transform:
-                  position: {x: 0.155107483, y: 0.0367968939, z: -0.00178330729, w: 1}
-                  rotation: {x: 0.985036552, y: -1.20200037e-08, z: -1.78467701e-07, w: -0.172345743}
-                  scale: {x: 1, y: 1, z: 1.00000012, w: 0}
-                  m_parentID: 66
-                m_index: 97
-                m_parentIndex: 66
-                m_rootIndex: 3
-                m_childrenIndices: [98]
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                m_attachedSoketID: 0
-                m_collisionType: 1
-                m_isStatic: false
-                m_gameObjectType: 4
-                m_tag: Untagged
-                m_layer: Default
-                m_components: ~
-                children:
-                  - GameObject: 2166264123
-                    m_name: shin.L (4)
-                    m_isEnabled: true
-                    m_instanceID: 15403167
-                    m_transform:
-                      position: {x: -1.93184171e-08, y: 0.349806458, z: 4.90194019e-09, w: 1}
-                      rotation: {x: -0.257252753, y: 0.00256737974, z: 0.00221811491, w: 0.966338158}
-                      scale: {x: 1, y: 1, z: 1, w: 0}
-                      m_parentID: 97
-                    m_index: 98
-                    m_parentIndex: 97
-                    m_rootIndex: 3
-                    m_childrenIndices: [99]
-                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                    m_attachedSoketID: 0
-                    m_collisionType: 1
-                    m_isStatic: false
-                    m_gameObjectType: 4
-                    m_tag: Untagged
-                    m_layer: Default
-                    m_components: ~
-                    children:
-                      - GameObject: 2166264123
-                        m_name: foot.L (4)
-                        m_isEnabled: true
-                        m_instanceID: 3144580369
-                        m_transform:
-                          position: {x: -2.41852831e-08, y: 0.389106512, z: 1.60653144e-08, w: 1}
-                          rotation: {x: 0.779286504, y: -0.00338268536, z: -0.00026905752, w: 0.626658618}
-                          scale: {x: 0.99999994, y: 1.00000012, z: 1.00000012, w: 0}
-                          m_parentID: 98
-                        m_index: 99
-                        m_parentIndex: 98
-                        m_rootIndex: 3
-                        m_childrenIndices: [100]
-                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                        m_attachedSoketID: 0
-                        m_collisionType: 1
-                        m_isStatic: false
-                        m_gameObjectType: 4
-                        m_tag: Untagged
-                        m_layer: Default
-                        m_components: ~
-                        children:
-                          - GameObject: 2166264123
-                            m_name: foot.L.001 (4)
-                            m_isEnabled: true
-                            m_instanceID: 1769908723
-                            m_transform:
-                              position: {x: -1.31707978e-09, y: 0.169529542, z: 2.18153673e-09, w: 1}
-                              rotation: {x: 0.121281318, y: 7.52521601e-09, z: -0.0709121302, w: 0.990082026}
-                              scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                              m_parentID: 99
-                            m_index: 100
-                            m_parentIndex: 99
-                            m_rootIndex: 3
-                            m_childrenIndices: ~
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                            m_attachedSoketID: 0
-                            m_collisionType: 1
-                            m_isStatic: false
-                            m_gameObjectType: 4
-                            m_tag: Untagged
-                            m_layer: Default
-                            m_components: ~
-              - GameObject: 2166264123
-                m_name: thigh.R (4)
-                m_isEnabled: true
-                m_instanceID: 716583321
-                m_transform:
-                  position: {x: -0.155107483, y: 0.0367968939, z: -0.00178322976, w: 1}
-                  rotation: {x: 0.985036552, y: -3.07943502e-08, z: -7.11635195e-08, w: -0.172345728}
+                  position: {x: 0.155107483, y: 0.0381922796, z: -0.00719584292, w: 1}
+                  rotation: {x: 0.985036552, y: -1.15833725e-08, z: -1.80963255e-07, w: -0.172345728}
                   scale: {x: 1, y: 1, z: 1.00000036, w: 0}
-                  m_parentID: 66
-                m_index: 101
-                m_parentIndex: 66
-                m_rootIndex: 3
-                m_childrenIndices: [102]
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                  m_parentID: 487
+                m_index: 522
+                m_parentIndex: 487
+                m_rootIndex: 4
+                m_childrenIndices: [523]
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false
@@ -1904,19 +1912,280 @@ PrefabNode:
                 m_components: ~
                 children:
                   - GameObject: 2166264123
-                    m_name: shin.R (4)
+                    m_name: shin.L (2)
                     m_isEnabled: true
-                    m_instanceID: 2307794164
+                    m_instanceID: 3650136458
                     m_transform:
-                      position: {x: 4.76544448e-09, y: 0.349806488, z: 6.00854477e-09, w: 1}
-                      rotation: {x: -0.257252693, y: -0.00256737648, z: -0.00221811468, w: 0.966338217}
+                      position: {x: 1.55923914e-08, y: 0.349806517, z: -3.33456462e-09, w: 1}
+                      rotation: {x: -0.277828634, y: 0.00252394448, z: 0.00229695765, w: 0.960624576}
+                      scale: {x: 0.99999994, y: 0.99999994, z: 0.99999994, w: 0}
+                      m_parentID: 522
+                    m_index: 523
+                    m_parentIndex: 522
+                    m_rootIndex: 4
+                    m_childrenIndices: [524]
+                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                    m_attachedSoketID: 0
+                    m_collisionType: 1
+                    m_isStatic: false
+                    m_gameObjectType: 4
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components: ~
+                    children:
+                      - GameObject: 2166264123
+                        m_name: foot.L (2)
+                        m_isEnabled: true
+                        m_instanceID: 3678192507
+                        m_transform:
+                          position: {x: 2.64262781e-08, y: 0.375213295, z: -8.14907253e-10, w: 1}
+                          rotation: {x: 0.734154522, y: -0.00334793399, z: -0.000663131766, w: 0.678973854}
+                          scale: {x: 0.99999994, y: 0.999999762, z: 0.999999881, w: 0}
+                          m_parentID: 523
+                        m_index: 524
+                        m_parentIndex: 523
+                        m_rootIndex: 4
+                        m_childrenIndices: [525]
+                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                        m_attachedSoketID: 0
+                        m_collisionType: 1
+                        m_isStatic: false
+                        m_gameObjectType: 4
+                        m_tag: Untagged
+                        m_layer: Default
+                        m_components: ~
+                        children:
+                          - GameObject: 2166264123
+                            m_name: foot.L.001 (1)
+                            m_isEnabled: true
+                            m_instanceID: 3739580902
+                            m_transform:
+                              position: {x: -3.52070231e-08, y: 0.144143298, z: -9.30877775e-09, w: 1}
+                              rotation: {x: 0.193919271, y: 0.000557727297, z: 0.0379467532, w: 0.980283201}
+                              scale: {x: 0.99999994, y: 1, z: 1, w: 0}
+                              m_parentID: 524
+                            m_index: 525
+                            m_parentIndex: 524
+                            m_rootIndex: 4
+                            m_childrenIndices: ~
+                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                            m_attachedSoketID: 0
+                            m_collisionType: 1
+                            m_isStatic: false
+                            m_gameObjectType: 4
+                            m_tag: Untagged
+                            m_layer: Default
+                            m_components: ~
+              - GameObject: 2166264123
+                m_name: thigh.R (2)
+                m_isEnabled: true
+                m_instanceID: 838525010
+                m_transform:
+                  position: {x: -0.155107453, y: 0.0381922759, z: -0.00719575817, w: 1}
+                  rotation: {x: 0.985036552, y: -3.09963823e-08, z: -7.00088023e-08, w: -0.172345713}
+                  scale: {x: 1, y: 1, z: 1.00000072, w: 0}
+                  m_parentID: 487
+                m_index: 526
+                m_parentIndex: 487
+                m_rootIndex: 4
+                m_childrenIndices: [527]
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 4
+                m_tag: Untagged
+                m_layer: Default
+                m_components: ~
+                children:
+                  - GameObject: 2166264123
+                    m_name: shin.R (2)
+                    m_isEnabled: true
+                    m_instanceID: 4212315189
+                    m_transform:
+                      position: {x: -4.4398071e-08, y: 0.349806458, z: 9.37020239e-09, w: 1}
+                      rotation: {x: -0.277828604, y: -0.00252394099, z: -0.00229695695, w: 0.960624635}
+                      scale: {x: 0.99999994, y: 0.999999881, z: 0.999999881, w: 0}
+                      m_parentID: 526
+                    m_index: 527
+                    m_parentIndex: 526
+                    m_rootIndex: 4
+                    m_childrenIndices: [528]
+                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                    m_attachedSoketID: 0
+                    m_collisionType: 1
+                    m_isStatic: false
+                    m_gameObjectType: 4
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components: ~
+                    children:
+                      - GameObject: 2166264123
+                        m_name: foot.R (2)
+                        m_isEnabled: true
+                        m_instanceID: 965509416
+                        m_transform:
+                          position: {x: -2.62807589e-08, y: 0.375213325, z: 1.07102096e-08, w: 1}
+                          rotation: {x: 0.734154463, y: 0.00334793516, z: 0.000663131243, w: 0.678973973}
+                          scale: {x: 0.99999994, y: 0.99999994, z: 0.99999994, w: 0}
+                          m_parentID: 527
+                        m_index: 528
+                        m_parentIndex: 527
+                        m_rootIndex: 4
+                        m_childrenIndices: [529]
+                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                        m_attachedSoketID: 0
+                        m_collisionType: 1
+                        m_isStatic: false
+                        m_gameObjectType: 4
+                        m_tag: Untagged
+                        m_layer: Default
+                        m_components: ~
+                        children:
+                          - GameObject: 2166264123
+                            m_name: foot.R.001 (1)
+                            m_isEnabled: true
+                            m_instanceID: 834445412
+                            m_transform:
+                              position: {x: 3.52538763e-08, y: 0.144143268, z: -1.28423352e-08, w: 1}
+                              rotation: {x: 0.193919331, y: -0.000557721534, z: -0.0379467644, w: 0.980283141}
+                              scale: {x: 0.99999994, y: 1, z: 1.00000012, w: 0}
+                              m_parentID: 528
+                            m_index: 529
+                            m_parentIndex: 528
+                            m_rootIndex: 4
+                            m_childrenIndices: ~
+                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                            m_attachedSoketID: 0
+                            m_collisionType: 1
+                            m_isStatic: false
+                            m_gameObjectType: 4
+                            m_tag: Untagged
+                            m_layer: Default
+                            m_components: ~
+              - GameObject: 2166264123
+                m_name: Bone.004 (1)
+                m_isEnabled: true
+                m_instanceID: 3513043919
+                m_transform:
+                  position: {x: 5.57324533e-08, y: 0.132139415, z: 0.223118246, w: 1}
+                  rotation: {x: 0.771547019, y: 9.84507622e-08, z: -7.33231644e-08, w: 0.636172295}
+                  scale: {x: 1, y: 1, z: 1.00000012, w: 0}
+                  m_parentID: 487
+                m_index: 530
+                m_parentIndex: 487
+                m_rootIndex: 4
+                m_childrenIndices: [531]
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 4
+                m_tag: Untagged
+                m_layer: Default
+                m_components: ~
+                children:
+                  - GameObject: 2166264123
+                    m_name: Bone.006 (1)
+                    m_isEnabled: true
+                    m_instanceID: 3574742654
+                    m_transform:
+                      position: {x: 8.89581106e-15, y: 0.16307506, z: -1.24797225e-07, w: 1}
+                      rotation: {x: 0.539087951, y: 7.83440655e-08, z: 8.23395396e-08, w: 0.842249513}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 530
+                    m_index: 531
+                    m_parentIndex: 530
+                    m_rootIndex: 4
+                    m_childrenIndices: [532]
+                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                    m_attachedSoketID: 0
+                    m_collisionType: 1
+                    m_isStatic: false
+                    m_gameObjectType: 4
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components: ~
+                    children:
+                      - GameObject: 2166264123
+                        m_name: Bone.005 (1)
+                        m_isEnabled: true
+                        m_instanceID: 3788679552
+                        m_transform:
+                          position: {x: -2.8759424e-15, y: 0.192867354, z: 2.98023224e-08, w: 1}
+                          rotation: {x: 0.0621948801, y: -3.66170716e-09, z: 1.50566137e-08, w: 0.998064041}
+                          scale: {x: 1, y: 0.99999994, z: 1, w: 0}
+                          m_parentID: 531
+                        m_index: 532
+                        m_parentIndex: 531
+                        m_rootIndex: 4
+                        m_childrenIndices: [533]
+                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                        m_attachedSoketID: 0
+                        m_collisionType: 1
+                        m_isStatic: false
+                        m_gameObjectType: 4
+                        m_tag: Untagged
+                        m_layer: Default
+                        m_components: ~
+                        children:
+                          - GameObject: 2166264123
+                            m_name: Bone.007 (1)
+                            m_isEnabled: true
+                            m_instanceID: 1054158842
+                            m_transform:
+                              position: {x: 1.77970397e-14, y: 0.223422721, z: -5.96046448e-08, w: 1}
+                              rotation: {x: -0.218129769, y: -1.82018741e-14, z: -5.20061967e-08, w: 0.975919783}
+                              scale: {x: 1, y: 0.99999994, z: 1, w: 0}
+                              m_parentID: 532
+                            m_index: 533
+                            m_parentIndex: 532
+                            m_rootIndex: 4
+                            m_childrenIndices: ~
+                            m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                            m_attachedSoketID: 0
+                            m_collisionType: 1
+                            m_isStatic: false
+                            m_gameObjectType: 4
+                            m_tag: Untagged
+                            m_layer: Default
+                            m_components: ~
+              - GameObject: 2166264123
+                m_name: clo_L (1)
+                m_isEnabled: true
+                m_instanceID: 3721302977
+                m_transform:
+                  position: {x: 0.0697601959, y: 0.154872701, z: 0.164738864, w: 1}
+                  rotation: {x: 0.556746066, y: 0.307099432, z: 0.714817941, w: -0.291134268}
+                  scale: {x: 1, y: 1.00000012, z: 1, w: 0}
+                  m_parentID: 487
+                m_index: 534
+                m_parentIndex: 487
+                m_rootIndex: 4
+                m_childrenIndices: [535]
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 4
+                m_tag: Untagged
+                m_layer: Default
+                m_components: ~
+                children:
+                  - GameObject: 2166264123
+                    m_name: clo_L.001 (1)
+                    m_isEnabled: true
+                    m_instanceID: 3137699766
+                    m_transform:
+                      position: {x: 2.98023224e-08, y: 0.170110956, z: 4.46452759e-08, w: 1}
+                      rotation: {x: -0.209342763, y: -0.0401417501, z: 0.0203382634, w: 0.976806343}
                       scale: {x: 1, y: 0.999999881, z: 0.999999881, w: 0}
-                      m_parentID: 101
-                    m_index: 102
-                    m_parentIndex: 101
-                    m_rootIndex: 3
-                    m_childrenIndices: [103]
-                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                      m_parentID: 534
+                    m_index: 535
+                    m_parentIndex: 534
+                    m_rootIndex: 4
+                    m_childrenIndices: [536]
+                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                     m_attachedSoketID: 0
                     m_collisionType: 1
                     m_isStatic: false
@@ -1926,193 +2195,19 @@ PrefabNode:
                     m_components: ~
                     children:
                       - GameObject: 2166264123
-                        m_name: foot.R (4)
+                        m_name: clo_L.002 (1)
                         m_isEnabled: true
-                        m_instanceID: 407525863
+                        m_instanceID: 2232635578
                         m_transform:
-                          position: {x: 9.92440619e-09, y: 0.389106452, z: 1.60653144e-08, w: 1}
-                          rotation: {x: 0.779286444, y: 0.00338268629, z: 0.000269059121, w: 0.626658738}
-                          scale: {x: 0.999999881, y: 0.99999994, z: 0.99999994, w: 0}
-                          m_parentID: 102
-                        m_index: 103
-                        m_parentIndex: 102
-                        m_rootIndex: 3
-                        m_childrenIndices: [104]
-                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                        m_attachedSoketID: 0
-                        m_collisionType: 1
-                        m_isStatic: false
-                        m_gameObjectType: 4
-                        m_tag: Untagged
-                        m_layer: Default
-                        m_components: ~
-                        children:
-                          - GameObject: 2166264123
-                            m_name: foot.R.001 (4)
-                            m_isEnabled: true
-                            m_instanceID: 3035313975
-                            m_transform:
-                              position: {x: 1.61150684e-08, y: 0.169529498, z: 4.61722038e-09, w: 1}
-                              rotation: {x: 0.121281348, y: -1.2228476e-08, z: 0.0709121302, w: 0.990081966}
-                              scale: {x: 1, y: 1, z: 1, w: 0}
-                              m_parentID: 103
-                            m_index: 104
-                            m_parentIndex: 103
-                            m_rootIndex: 3
-                            m_childrenIndices: ~
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                            m_attachedSoketID: 0
-                            m_collisionType: 1
-                            m_isStatic: false
-                            m_gameObjectType: 4
-                            m_tag: Untagged
-                            m_layer: Default
-                            m_components: ~
-              - GameObject: 2166264123
-                m_name: Bone.004 (4)
-                m_isEnabled: true
-                m_instanceID: 599415405
-                m_transform:
-                  position: {x: 3.95199464e-08, y: 0.0163557157, z: 0.158213422, w: 1}
-                  rotation: {x: 0.747208953, y: 8.30035276e-08, z: -9.33222211e-08, w: 0.664589167}
-                  scale: {x: 1, y: 0.99999994, z: 1, w: 0}
-                  m_parentID: 66
-                m_index: 105
-                m_parentIndex: 66
-                m_rootIndex: 3
-                m_childrenIndices: [106]
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                m_attachedSoketID: 0
-                m_collisionType: 1
-                m_isStatic: false
-                m_gameObjectType: 4
-                m_tag: Untagged
-                m_layer: Default
-                m_components: ~
-                children:
-                  - GameObject: 2166264123
-                    m_name: Bone.006 (4)
-                    m_isEnabled: true
-                    m_instanceID: 1354175421
-                    m_transform:
-                      position: {x: -5.08219768e-21, y: 0.0731240585, z: 3.35276127e-08, w: 1}
-                      rotation: {x: -0.266910017, y: -4.06178735e-08, z: 1.12494218e-08, w: 0.963721454}
-                      scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                      m_parentID: 105
-                    m_index: 106
-                    m_parentIndex: 105
-                    m_rootIndex: 3
-                    m_childrenIndices: [107]
-                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                    m_attachedSoketID: 0
-                    m_collisionType: 1
-                    m_isStatic: false
-                    m_gameObjectType: 4
-                    m_tag: Untagged
-                    m_layer: Default
-                    m_components: ~
-                    children:
-                      - GameObject: 2166264123
-                        m_name: Bone.005 (4)
-                        m_isEnabled: true
-                        m_instanceID: 2651861874
-                        m_transform:
-                          position: {x: 9.15220285e-15, y: 0.0928639174, z: 4.47034836e-08, w: 1}
-                          rotation: {x: -0.147835866, y: 1.22088863e-08, z: 1.06366658e-08, w: 0.989011943}
-                          scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                          m_parentID: 106
-                        m_index: 107
-                        m_parentIndex: 106
-                        m_rootIndex: 3
-                        m_childrenIndices: [108]
-                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                        m_attachedSoketID: 0
-                        m_collisionType: 1
-                        m_isStatic: false
-                        m_gameObjectType: 4
-                        m_tag: Untagged
-                        m_layer: Default
-                        m_components: ~
-                        children:
-                          - GameObject: 2166264123
-                            m_name: Bone.007 (4)
-                            m_isEnabled: true
-                            m_instanceID: 3919729211
-                            m_transform:
-                              position: {x: -4.09275647e-15, y: 0.128645897, z: -1.1920929e-07, w: 1}
-                              rotation: {x: 0.147835776, y: 2.94748439e-08, z: -4.40584724e-09, w: 0.989011943}
-                              scale: {x: 1, y: 1, z: 1, w: 0}
-                              m_parentID: 107
-                            m_index: 108
-                            m_parentIndex: 107
-                            m_rootIndex: 3
-                            m_childrenIndices: ~
-                            m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                            m_attachedSoketID: 0
-                            m_collisionType: 1
-                            m_isStatic: false
-                            m_gameObjectType: 4
-                            m_tag: Untagged
-                            m_layer: Default
-                            m_components: ~
-              - GameObject: 2166264123
-                m_name: clo_L (4)
-                m_isEnabled: true
-                m_instanceID: 115435554
-                m_transform:
-                  position: {x: 0.069760114, y: 0.163346857, z: 0.13186793, w: 1}
-                  rotation: {x: 0.564496934, y: 0.305361181, z: 0.65454942, w: -0.399578273}
-                  scale: {x: 0.999999702, y: 1, z: 1, w: 0}
-                  m_parentID: 66
-                m_index: 109
-                m_parentIndex: 66
-                m_rootIndex: 3
-                m_childrenIndices: [110]
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                m_attachedSoketID: 0
-                m_collisionType: 1
-                m_isStatic: false
-                m_gameObjectType: 4
-                m_tag: Untagged
-                m_layer: Default
-                m_components: ~
-                children:
-                  - GameObject: 2166264123
-                    m_name: clo_L.001 (4)
-                    m_isEnabled: true
-                    m_instanceID: 2743672447
-                    m_transform:
-                      position: {x: -7.4505806e-09, y: 0.205251694, z: -6.84522092e-08, w: 1}
-                      rotation: {x: -0.237389579, y: 0.00050396187, z: -0.00455114152, w: 0.971403718}
-                      scale: {x: 0.999999881, y: 1.00000012, z: 1.00000012, w: 0}
-                      m_parentID: 109
-                    m_index: 110
-                    m_parentIndex: 109
-                    m_rootIndex: 3
-                    m_childrenIndices: [111]
-                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-                    m_attachedSoketID: 0
-                    m_collisionType: 1
-                    m_isStatic: false
-                    m_gameObjectType: 4
-                    m_tag: Untagged
-                    m_layer: Default
-                    m_components: ~
-                    children:
-                      - GameObject: 2166264123
-                        m_name: clo_L.002 (4)
-                        m_isEnabled: true
-                        m_instanceID: 3309509149
-                        m_transform:
-                          position: {x: -1.11758709e-08, y: 0.162190184, z: -2.81900903e-08, w: 1}
-                          rotation: {x: -0.224066049, y: 1.62515519e-07, z: -0.00204998767, w: 0.974571824}
-                          scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                          m_parentID: 110
-                        m_index: 111
-                        m_parentIndex: 110
-                        m_rootIndex: 3
+                          position: {x: 3.7252903e-09, y: 0.15624404, z: 4.23751771e-08, w: 1}
+                          rotation: {x: -0.166676417, y: -0.0374276489, z: -0.0465168618, w: 0.984202385}
+                          scale: {x: 0.999999821, y: 1, z: 1.00000012, w: 0}
+                          m_parentID: 535
+                        m_index: 536
+                        m_parentIndex: 535
+                        m_rootIndex: 4
                         m_childrenIndices: ~
-                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                         m_attachedSoketID: 0
                         m_collisionType: 1
                         m_isStatic: false
@@ -2121,19 +2216,19 @@ PrefabNode:
                         m_layer: Default
                         m_components: ~
               - GameObject: 2166264123
-                m_name: clo_R (4)
+                m_name: clo_R (1)
                 m_isEnabled: true
-                m_instanceID: 2130386850
+                m_instanceID: 559050020
                 m_transform:
-                  position: {x: -0.0697600096, y: 0.163347036, z: 0.13186802, w: 1}
-                  rotation: {x: -0.564496398, y: 0.305361271, z: 0.654549897, w: 0.399578154}
-                  scale: {x: 1.00000048, y: 1.00000012, z: 1, w: 0}
-                  m_parentID: 66
-                m_index: 112
-                m_parentIndex: 66
-                m_rootIndex: 3
-                m_childrenIndices: [113]
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                  position: {x: -0.0697600767, y: 0.154872879, z: 0.164738953, w: 1}
+                  rotation: {x: -0.556746006, y: 0.307099462, z: 0.714817941, w: 0.291134119}
+                  scale: {x: 1.00000036, y: 1, z: 0.99999994, w: 0}
+                  m_parentID: 487
+                m_index: 537
+                m_parentIndex: 487
+                m_rootIndex: 4
+                m_childrenIndices: [538]
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false
@@ -2143,19 +2238,19 @@ PrefabNode:
                 m_components: ~
                 children:
                   - GameObject: 2166264123
-                    m_name: clo_R.001 (4)
+                    m_name: clo_R.001 (1)
                     m_isEnabled: true
-                    m_instanceID: 2381893394
+                    m_instanceID: 3770929369
                     m_transform:
-                      position: {x: -2.14204192e-08, y: 0.20525153, z: 9.49949026e-08, w: 1}
-                      rotation: {x: -0.237389892, y: -0.000504045631, z: 0.00455118623, w: 0.971403658}
-                      scale: {x: 0.999999881, y: 0.99999994, z: 0.999999881, w: 0}
-                      m_parentID: 112
-                    m_index: 113
-                    m_parentIndex: 112
-                    m_rootIndex: 3
-                    m_childrenIndices: [114]
-                    m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                      position: {x: -4.09781933e-08, y: 0.170111015, z: 5.24451025e-08, w: 1}
+                      rotation: {x: -0.209342673, y: 0.0401417911, z: -0.0203382745, w: 0.976806343}
+                      scale: {x: 0.99999994, y: 0.999999821, z: 0.999999821, w: 0}
+                      m_parentID: 537
+                    m_index: 538
+                    m_parentIndex: 537
+                    m_rootIndex: 4
+                    m_childrenIndices: [539]
+                    m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                     m_attachedSoketID: 0
                     m_collisionType: 1
                     m_isStatic: false
@@ -2165,19 +2260,19 @@ PrefabNode:
                     m_components: ~
                     children:
                       - GameObject: 2166264123
-                        m_name: clo_R.002 (4)
+                        m_name: clo_R.002 (1)
                         m_isEnabled: true
-                        m_instanceID: 3148094605
+                        m_instanceID: 3616622102
                         m_transform:
-                          position: {x: 4.09781933e-08, y: 0.162190109, z: 4.2489539e-08, w: 1}
-                          rotation: {x: -0.224066198, y: 1.82762765e-08, z: 0.00204994227, w: 0.974571764}
-                          scale: {x: 1, y: 1, z: 1, w: 0}
-                          m_parentID: 113
-                        m_index: 114
-                        m_parentIndex: 113
-                        m_rootIndex: 3
+                          position: {x: 4.47034836e-08, y: 0.15624401, z: 2.16532499e-08, w: 1}
+                          rotation: {x: -0.166676357, y: 0.0374275707, z: 0.0465168506, w: 0.984202385}
+                          scale: {x: 0.999999762, y: 0.999999881, z: 0.99999994, w: 0}
+                          m_parentID: 538
+                        m_index: 539
+                        m_parentIndex: 538
+                        m_rootIndex: 4
                         m_childrenIndices: ~
-                        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                        m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                         m_attachedSoketID: 0
                         m_collisionType: 1
                         m_isStatic: false
@@ -2186,19 +2281,19 @@ PrefabNode:
                         m_layer: Default
                         m_components: ~
               - GameObject: 2166264123
-                m_name: Sword (4)
+                m_name: Sword (1)
                 m_isEnabled: true
-                m_instanceID: 1234986008
+                m_instanceID: 3638406154
                 m_transform:
-                  position: {x: -0.57306987, y: 0.570056558, z: 0.157817543, w: 1}
-                  rotation: {x: 0.125819713, y: 1.19978949e-07, z: 1.52166404e-08, w: 0.992053151}
-                  scale: {x: 1, y: 0.99999994, z: 0.999999881, w: 0}
-                  m_parentID: 66
-                m_index: 115
-                m_parentIndex: 66
-                m_rootIndex: 3
+                  position: {x: -0.656294405, y: 0.852416337, z: 1.00608516, w: 1}
+                  rotation: {x: 0.125819758, y: 1.1997902e-07, z: 1.52166475e-08, w: 0.992053092}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 487
+                m_index: 540
+                m_parentIndex: 487
+                m_rootIndex: 4
                 m_childrenIndices: ~
-                m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+                m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
                 m_attachedSoketID: 0
                 m_collisionType: 1
                 m_isStatic: false

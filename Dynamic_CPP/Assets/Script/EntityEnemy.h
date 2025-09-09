@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "Entity.h"
 #include "CriticalMark.h"
+#include "EntityEnemy.generated.h"
 class BehaviorTreeComponent;
 class BlackBoard;
 class HitResult;
@@ -10,6 +11,8 @@ class EffectComponent;
 class EntityEnemy : public Entity
 {
 public:
+   ReflectEntityEnemy
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityEnemy)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -43,5 +46,14 @@ public:
 
 	float hittimer = 0.f;
 	Mathf::Vector3 hitPos;
+	Mathf::Vector3 hitBaseScale;
 	Mathf::Quaternion hitrot;
+
+
+	[[Property]]
+	float m_knockBackVelocity = 1.f;
+	[[Property]]
+	float m_knockBackScaleVelocity = 1.f;
+	[[Property]]
+	float m_MaxknockBackTime = 0.2f;
 };

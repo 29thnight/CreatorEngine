@@ -344,6 +344,8 @@ void Player::ThrowEvent()
 		//		m_curWeapon->SetEnabled(true);
 		//}
 
+
+
 	std::cout << "ThrowEvent" << std::endl;
 	if (catchedObject) {
 		//catchedObject->SetThrowOwner(this);
@@ -353,6 +355,13 @@ void Player::ThrowEvent()
 	m_nearObject = nullptr; //&&&&&
 	if (m_curWeapon)
 		m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+	onIndicate = false;
+	if (Indicator)
+	{
+		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+		curveindicator->EnableIndicator(onIndicate);
+	}
+
 
 	
 }
@@ -360,6 +369,12 @@ void Player::ThrowEvent()
 
 void Player::DropCatchItem()
 {
+	onIndicate = false;
+	if (Indicator)
+	{
+		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+		curveindicator->EnableIndicator(onIndicate);
+	}
 	if (catchedObject != nullptr)
 	{
 		if (catchedObject) {
