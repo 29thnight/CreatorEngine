@@ -297,7 +297,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             UpdateExistingParticleRotation(particle);
         }
-    
+        
         // 나이 증가
         particle.age += gDeltaTime;
     

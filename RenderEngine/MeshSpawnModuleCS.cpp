@@ -187,6 +187,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
         m_forceRotationUpdate = false;
         m_spawnParams.previousEmitterRotation = m_spawnParams.emitterRotation;
     }
+
 }
 
 void MeshSpawnModuleCS::Release()
@@ -396,6 +397,7 @@ void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 
         // 새 회전값 설정
         m_spawnParams.emitterRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
+        m_meshParticleTemplate.InitialRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
 
         m_forceRotationUpdate = 1;
         m_spawnParamsDirty = true;
