@@ -5,6 +5,7 @@
 #include "Texture.h"
 #include "ShaderSystem.h"
 #include <DirectXTK/SpriteFont.h>
+#include <algorithm>
 
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
@@ -14,9 +15,11 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
     data.origin     = { image->uiinfo.size.x * 0.5f, image->uiinfo.size.y * 0.5f };
     data.position   = image->pos;
     data.scale      = image->scale;
-	data.color      = image->color;
-	data.rotation   = image->rotate;
+    data.color      = image->color;
+    data.rotation   = image->rotate;
     data.layerOrder = image->GetLayerOrder();
+    data.clipDirection = image->clipDirection;
+    data.clipPercent   = image->clipPercent;
     m_data          = data;
     m_instancedID   = image->GetInstanceID();
 }
@@ -64,14 +67,47 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
             {
                 if (info.texture)
                 {
+                    auto size = info.texture->GetImageSize();
+                    float width = size.x * info.scale.x;
+                    float height = size.y * info.scale.y;
+                    float left = info.position.x - info.origin.x * info.scale.x;
+                    float top = info.position.y - info.origin.y * info.scale.y;
+                    float right = left + width;
+                    float bottom = top + height;
+
+                    float percent = std::clamp(info.clipPercent, 0.f, 1.f);
+                    switch (info.clipDirection)
+                    {
+                    case ClipDirection::LeftToRight:
+                        right = left + width * percent;
+                        break;
+                    case ClipDirection::RightToLeft:
+                        left = right - width * percent;
+                        break;
+                    case ClipDirection::TopToBottom:
+                        bottom = top + height * percent;
+                        break;
+                    case ClipDirection::BottomToTop:
+                        top = bottom - height * percent;
+                        break;
+                    default:
+                        break;
+                    }
+
+                    RECT destRect{
+                        static_cast<LONG>(left),
+                        static_cast<LONG>(top),
+                        static_cast<LONG>(right),
+                        static_cast<LONG>(bottom)
+                    };
+                    DirectX::XMFLOAT2 originScaled{ info.origin.x * info.scale.x, info.origin.y * info.scale.y };
                     spriteBatch->Draw(
                         info.texture->m_pSRV,
-                        { info.position.x, info.position.y },
+                        destRect,
                         nullptr,
                         info.color,
                         info.rotation,
-                        { info.origin.x, info.origin.y },
-                        info.scale,
+                        originScaled,
                         DirectX::SpriteEffects_None,
                         static_cast<float>(info.layerOrder) / MaxOreder);
                 }
@@ -113,7 +149,7 @@ void UIRenderProxy::SetCustomPixelShader(std::string_view shaderPath)
 
     D3D11_BUFFER_DESC bufferDesc{};
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-    bufferDesc.ByteWidth = 16; // √÷º“ 16πŸ¿Ã∆Æ ¥‹¿ß∑Œ «“¥Á
+    bufferDesc.ByteWidth = 16; // ÏµúÏÜå 16Î∞îÏù¥Ìä∏ Îã®ÏúÑÎ°ú Ìï†Îãπ
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     bufferDesc.MiscFlags = 0;
