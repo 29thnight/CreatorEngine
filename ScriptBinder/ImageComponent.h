@@ -8,15 +8,6 @@
 #include <DirectXTK/SpriteBatch.h>
 #include <cstdint>
 
-enum class ClipDirection : std::uint8_t
-{
-    None,
-    LeftToRight,
-    RightToLeft,
-    TopToBottom,
-    BottomToTop
-};
-
 struct alignas(16) ImageInfo
 {
 	Mathf::xMatrix world;
@@ -63,9 +54,9 @@ public:
 	[[Property]]							
 	float									unionScale{ 1.f };
 	[[Property]]
-	ClipDirection                                                    clipDirection{ ClipDirection::None };
+	ClipDirection                           clipDirection{ ClipDirection::None };
 	[[Property]]
-	float                                                                   clipPercent{ 1.f };
+	float                                   clipPercent{ 1.f };
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;
