@@ -280,6 +280,8 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerBombAttack", []() { return new PlayerBombAttack(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttack", []() { return new PlayerRangeAttack(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("MosterMeleeAni", []() { return new MosterMeleeAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAH", []() { return new PlayerAttackAH(); });
 	}

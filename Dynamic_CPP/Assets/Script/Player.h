@@ -73,7 +73,7 @@ public:
 	playerState m_state = playerState::Idle;
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
-
+	void CharacterMove(Mathf::Vector2 dir);
 	
 
 	//잡기 던지기
@@ -126,9 +126,9 @@ public:
 
 	//공격
 	[[Property]]
-	int Atk = 1;                     //기본공격력   // (기본공격력 + 무기공격력  + 버프) * 크리티컬 배율 
+	int Atk = 1;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
 	[[Property]]
-	float AttackRange = 2.5f;        //공격사거리
+	float AttackRange = 2.5f;        //공격사거리  //근접은 무기사거리  //원거리는 탄환 이속 * 살아있는 시간 // 붐은 최대거리구현 필요
 	[[Property]]
 	float AttackSpeed = 1.0f;      
 	int m_comboCount = 0;            //현재 콤보횟수
@@ -154,23 +154,30 @@ public:
 
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
+	bool isChargeAttack = false;
+	int  chargeCount = 0; //차지몇번했는지 ex 0.3초당한번
 	bool isAttacking = false;
 	float attackTime = 0.765f;
 	float attackElapsedTime = 0.f;
 	float nearDistance = FLT_MAX;
 	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들
 	[[Property]]
-	float rangeAngle = 150.f;      //원거리 유도 각  forward기준 -rangeRadius ~ + rangeRadius;
+	float rangeAngle = 150.f;      //원거리 무기공격시 유도 각
 	[[Property]]
 	float rangeDistacne = 5.f;    //원거리 유도거리 최대거리
 	std::unordered_set<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
 	EntityEnemy* curTarget = nullptr;
-	
-	void ChangeAutoTarget(Mathf::Vector2 dir); //사격중 Lstick 으로 타겟변경                 //연속사격중일때 실행 
+	int countRangeAttack = 0;
+	[[Property]]
+	int countSpecialBullet = 5;
+
+
+	bool OnMoveBomb = false;
 	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
 	Mathf::Vector3 bombThrowPosition = {0,0,0};
+	Mathf::Vector3 bombThrowPositionoffset = { 0,0,0 };
 	[[Property]]
-	float bombMoveSpeed = 0.01f;  //폭탄도착지점 
+	float bombMoveSpeed = 0.005f;  //폭탄도착지점 
  	void MeleeAttack();
 	void RangeAttack();
 	[[Method]]
@@ -194,8 +201,12 @@ public:
 	void EndRay();
 	[[Method]]
 	void EndAttack();
-
 	bool startRay = false;
+
+	float calculDamge(bool isCharge = false,int _chargeCount);
+
+
+
 
 	//피격,죽음
 	bool isStun = false;

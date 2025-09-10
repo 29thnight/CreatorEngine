@@ -9,6 +9,7 @@ ReflectionScriptField(EntityItem) \
 		meta_property(m_rigid) \
 		meta_property(indicatorDistacne) \
 		meta_property(itemCode) \
+		meta_property(itemType) \
 	}); \
 	FieldEnd(EntityItem, PropertyOnly) \
 };

@@ -3,7 +3,7 @@
 #include "DebugLog.h"
 void Bomb::Start()
 {
-	itemType = ItemType::Bomb;
+	
 }
 
 
@@ -20,7 +20,7 @@ void Bomb::Update(float tick)
 		pos.y += throwPowerY * 4.0f * t * (1 - t);
 
 		transform->SetPosition(pos);
-		//땅에 도착하면 BobmAttack 생성하고 자기자신은 죽이기?
+		//땅에 도착하면 Explosion 생성하고 자기자신은 죽이기?
 	}
 
 }
@@ -34,18 +34,12 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 	}
 }
 
-void Bomb::Attack(Player* _Owner, AttackContext _attackContext)
-{
-	isThrow = true;
-	m_ownerPlayer = _Owner;
-	m_startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-	m_targetPos = _attackContext.targetPosition;
-}
-void Bomb::ThrowBomb(Player* _owner, Mathf::Vector3 _targetPos)
+
+void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos)
 {
 	isThrow = true;
 	m_ownerPlayer = _owner;
-	m_startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+	m_startPos = _startPos;
 	m_targetPos = _targetPos;
 }
 

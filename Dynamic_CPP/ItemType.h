@@ -6,7 +6,7 @@ enum class EItemType
 	Mineral,
 	Fruit,
 };
-
+AUTO_REGISTER_ENUM(EItemType)
 
 enum class ItemType
 {
@@ -16,6 +16,7 @@ enum class ItemType
 	Bomb,
 	None,
 };
+AUTO_REGISTER_ENUM(ItemType)
 
 enum class BuffType
 {

@@ -23,7 +23,6 @@ void PlayerAttackAH::Enter()
 				GameObject* P1 = P1ani->GetOwner();
 				if (P1)
 				{
-					LOG(P1->m_name.ToString());
 					GameObject* parent = GameObject::FindIndex(P1->m_parentIndex);
 					if (parent)
 					{
@@ -67,7 +66,10 @@ void PlayerAttackAH::Update(float deltaTime)
 void PlayerAttackAH::Exit()
 {
 	if (m_player)
+	{
 		m_player->isAttacking = false;
+		m_player->sucessAttack = true;
+	}
 	/*if (m_player->m_comboCount < 2)
 	{
 		m_player->m_comboCount++;

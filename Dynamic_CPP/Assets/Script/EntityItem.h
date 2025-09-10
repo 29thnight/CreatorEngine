@@ -63,6 +63,7 @@ public:
 	bool isTargettingTail = false;
 	[[Property]]
 	int  itemCode = 0;
+	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
 
 	bool OnGround;

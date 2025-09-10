@@ -21,6 +21,7 @@ void Weapon::Start()
 	{
 		itemType = ItemType::Basic;
 	}
+	isBreak = false;
 }
 
 
@@ -67,13 +68,17 @@ void Weapon::SetEnabled(bool able)
 
 bool Weapon::CheckDur()
 {
+	if (itemType == ItemType::Basic) return false; 
 	curDur -= durUseAtk;
 	if (curDur <= 0)
+	{
+		isBreak = true;
 		return true;
+	}
 	return false;
 }
 
-bool Weapon::CheckChargedDur(float chargedTime)
+bool Weapon::CheckChargedDur(float chargedTime)  //charge count세서 리턴
 {
 	int durUsechargeAtk = chargedTime / chgTime * durUseChg;
 	curDur -= durUsechargeAtk;

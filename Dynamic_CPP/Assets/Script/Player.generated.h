@@ -31,6 +31,7 @@ ReflectionScriptField(Player) \
 		meta_property(minChargedTime) \
 		meta_property(rangeAngle) \
 		meta_property(rangeDistacne) \
+		meta_property(countSpecialBullet) \
 		meta_property(bombMoveSpeed) \
 		meta_property(GracePeriod) \
 		meta_property(ResurrectionRange) \
