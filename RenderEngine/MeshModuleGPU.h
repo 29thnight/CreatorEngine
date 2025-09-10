@@ -37,11 +37,12 @@ public:
 
 	void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount) override;
 	void SetupRenderTarget(RenderPassData* renderData) override;
-	void SetTexture(Texture* texture) override;
 
 	virtual void ResetForReuse() override;
 	virtual bool IsReadyForReuse() const override;
 	virtual void WaitForGPUCompletion() override;
+
+	void UpdatePSOShaders() override;
 
 	// 메시 타입 설정
 	void SetMeshType(MeshType type);
@@ -88,9 +89,6 @@ public:
 	bool IsPolarClippingAnimating() const { return m_isPolarClippingAnimating; }
 	float GetPolarClippingAnimationSpeed() const { return m_polarClippingAnimationSpeed; }
 	void SetPolarReferenceDirection(const Mathf::Vector3& referenceDir);
-
-	void SetAdditiveBlend(bool isAdditive) { m_useAdditiveBlend = isAdditive; }
-	bool GetBlend() const { return m_useAdditiveBlend; }
 
 public:
 	virtual nlohmann::json SerializeData() const override;
@@ -140,11 +138,4 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_timeBuffer;
 	TimeParams m_timeParams = {};
-
-	Texture* m_dissolveTex1;
-	Texture* m_dissolveTex2;
-	Texture* m_dissolveTex3;
-
-	bool m_useAdditiveBlend = true;  // 어두운 효과용 블렌드 모드
-	Microsoft::WRL::ComPtr<ID3D11BlendState> m_alternativeBlendState;
 };

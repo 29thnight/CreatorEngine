@@ -11,6 +11,7 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
     uint TexIndex : TEXCOORD1;
     float4 Color : COLOR0;
+    float Age : TEXCOORD2;
 };
 
 float4 main(VSOutput input) : SV_TARGET
