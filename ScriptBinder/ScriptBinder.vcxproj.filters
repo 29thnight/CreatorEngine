@@ -632,6 +632,9 @@
     <ClInclude Include="Navigation.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
+    <ClInclude Include="SpriteSheetComponent.h">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObject.inl">

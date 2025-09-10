@@ -17,7 +17,7 @@ class UIRenderProxy
 public:
     struct ImageData 
     {
-		std::vector< std::shared_ptr<Texture>>  textures;
+		std::vector<std::shared_ptr<Texture>>   textures;
         std::shared_ptr<Texture>                texture{ nullptr };
         DirectX::XMFLOAT2                       origin{};
         Mathf::Vector3                          position{};

@@ -291,6 +291,9 @@
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\UIGageTest.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -507,6 +510,9 @@
 			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\UIGageTest.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

@@ -305,6 +305,7 @@
     <ClInclude Include="Navigation.h" />
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="ScriptStringModule.h" />
+    <ClInclude Include="SpriteSheetComponent.h" />
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
