@@ -10,7 +10,7 @@ void SpriteSheetComponent::LoadSpriteSheet(std::string_view path)
 {
 	m_spriteSheetPath = path.data();
 	m_spriteSheetTexture = DataSystems->LoadSharedTexture(path, 
-		TextureType::SpriteSheet);
+		DataSystem::TextureFileType::SpriteSheet);
 }
 
 void SpriteSheetComponent::Awake()

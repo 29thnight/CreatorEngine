@@ -194,6 +194,4 @@ private:
 
 static auto DataSystems = DataSystem::GetInstance();
 
-using TextureType = DataSystem::TextureFileType;
-
 #endif // !DYNAMICCPP_EXPORTS

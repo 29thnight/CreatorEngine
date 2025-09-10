@@ -31,8 +31,8 @@
 #include "ShadowMapPassSetting.h"
 #include "InvalidScriptComponent.h"
 #include "Skeleton.h"
-#include "AniTransition.h"
 #include "StateMachineComponent.h"
+#include "AniTransition.h"
 #include "SSAOPassSetting.h"
 #include "VignettePassSetting.h"
 #include "FoliageType.h"
@@ -61,6 +61,7 @@
 #include "FoliageComponent.h"
 #include "GameObject.h"
 #include "InputAction.h"
+#include "SpriteSheetComponent.h"
 #include "LightComponent.h"
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
@@ -137,6 +138,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Skeleton);
     AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(SpriteRenderer);
+    AUTO_REGISTER_CLASS(SpriteSheetComponent);
     AUTO_REGISTER_CLASS(StateMachineComponent);
     AUTO_REGISTER_CLASS(TerrainColliderComponent);
     AUTO_REGISTER_CLASS(TerrainComponent);

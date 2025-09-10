@@ -5,6 +5,7 @@
 #include "IRegistableEvent.h"
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
+#include "SpriteSheetComponent.generated.h"
 
 class Texture;
 class UIMesh;
@@ -12,6 +13,7 @@ class Canvas;
 class SpriteSheetComponent : public UIComponent, public RegistableEvent<SpriteSheetComponent>
 {
 public:
+   ReflectSpriteSheetComponent
 	[[Serializable(Inheritance:UIComponent)]]
 	GENERATED_BODY(SpriteSheetComponent)
 
