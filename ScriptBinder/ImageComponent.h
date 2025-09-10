@@ -6,6 +6,16 @@
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
 #include <DirectXTK/SpriteBatch.h>
+#include <cstdint>
+
+enum class ClipDirection : std::uint8_t
+{
+    None,
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+    BottomToTop
+};
 
 struct alignas(16) ImageInfo
 {
@@ -14,7 +24,7 @@ struct alignas(16) ImageInfo
 	float2 screenSize;
 };
 
-//∏µÁ 2d¿ÃπÃ¡ˆ ±‚∫ª?
+//Î™®Îì† 2dÏù¥ÎØ∏ÏßÄ Í∏∞Î≥∏?
 class Texture;
 class UIMesh;
 class Canvas;
@@ -52,6 +62,10 @@ public:
 	Mathf::Vector2							origin{};
 	[[Property]]							
 	float									unionScale{ 1.f };
+	[[Property]]
+	ClipDirection                                                    clipDirection{ ClipDirection::None };
+	[[Property]]
+	float                                                                   clipPercent{ 1.f };
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;
