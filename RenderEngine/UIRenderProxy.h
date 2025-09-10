@@ -5,12 +5,12 @@
 #include <cstdint>
 #include "Core.Minimal.h"
 #include "Shader.h"
+#include "Navigation.h"
 
 class Texture;
 class ImageComponent;
 class TextComponent;
 enum class ClipDirection : std::uint8_t;
-
 // Proxy responsible for drawing UI elements without keeping component pointers.
 class UIRenderProxy 
 {

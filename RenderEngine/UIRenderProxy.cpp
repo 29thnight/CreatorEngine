@@ -7,6 +7,78 @@
 #include <DirectXTK/SpriteFont.h>
 #include <algorithm>
 
+// Clamps percent to [0, 1] and calculates source and destination rectangles based on the clipping direction.
+inline bool CalculateClippedRects(
+    ClipDirection dir,
+    float percent,
+    LONG texW, LONG texH,
+    float left, float top, float right, float bottom,
+    float scaleX, float scaleY,
+    RECT& outSrc, RECT& outDst)
+{
+    percent = std::clamp(percent, 0.f, 1.f);
+    LONG cutW = static_cast<LONG>(std::floor(texW * percent));
+    LONG cutH = static_cast<LONG>(std::floor(texH * percent));
+
+    switch (dir)
+    {
+    case ClipDirection::LeftToRight:
+        if (cutW <= 0) return false;
+        outSrc = { 0, 0, cutW, texH };
+        outDst = {
+            static_cast<LONG>(std::lround(left)),
+            static_cast<LONG>(std::lround(top)),
+            static_cast<LONG>(std::lround(left + cutW * scaleX)),
+            static_cast<LONG>(std::lround(top + texH * scaleY))
+        };
+        return true;
+
+    case ClipDirection::RightToLeft:
+        if (cutW <= 0) return false;
+        outSrc = { texW - cutW, 0, texW, texH };
+        outDst = {
+            static_cast<LONG>(std::lround(right - cutW * scaleX)),
+            static_cast<LONG>(std::lround(top)),
+            static_cast<LONG>(std::lround(right)),
+            static_cast<LONG>(std::lround(top + texH * scaleY))
+        };
+        return true;
+
+    case ClipDirection::TopToBottom:
+        if (cutH <= 0) return false;
+        outSrc = { 0, 0, texW, cutH };
+        outDst = {
+            static_cast<LONG>(std::lround(left)),
+            static_cast<LONG>(std::lround(top)),
+            static_cast<LONG>(std::lround(left + texW * scaleX)),
+            static_cast<LONG>(std::lround(top + cutH * scaleY))
+        };
+        return true;
+
+    case ClipDirection::BottomToTop:
+        if (cutH <= 0) return false;
+        outSrc = { 0, texH - cutH, texW, texH };
+        outDst = {
+            static_cast<LONG>(std::lround(left)),
+            static_cast<LONG>(std::lround(bottom - cutH * scaleY)),
+            static_cast<LONG>(std::lround(left + texW * scaleX)),
+            static_cast<LONG>(std::lround(bottom))
+        };
+        return true;
+
+    case ClipDirection::None:
+    default:
+        outSrc = { 0, 0, texW, texH };
+        outDst = {
+            static_cast<LONG>(std::lround(left)),
+            static_cast<LONG>(std::lround(top)),
+            static_cast<LONG>(std::lround(right)),
+            static_cast<LONG>(std::lround(bottom))
+        };
+        return true;
+    }
+}
+//==================================================================
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
     ImageData data{};
@@ -68,48 +140,35 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                 if (info.texture)
                 {
                     auto size = info.texture->GetImageSize();
-                    float width = size.x * info.scale.x;
-                    float height = size.y * info.scale.y;
+                    LONG texW = static_cast<LONG>(size.x);
+                    LONG texH = static_cast<LONG>(size.y);
+
                     float left = info.position.x - info.origin.x * info.scale.x;
                     float top = info.position.y - info.origin.y * info.scale.y;
-                    float right = left + width;
-                    float bottom = top + height;
+                    float right = left + texW * info.scale.x;
+                    float bottom = top + texH * info.scale.y;
 
-                    float percent = std::clamp(info.clipPercent, 0.f, 1.f);
-                    switch (info.clipDirection)
+                    RECT src{}, dst{};
+                    if (CalculateClippedRects(
+                        info.clipDirection,
+                        info.clipPercent,
+                        texW, texH,
+                        left, top, right, bottom,
+                        info.scale.x, info.scale.y,
+                        src, dst))
                     {
-                    case ClipDirection::LeftToRight:
-                        right = left + width * percent;
-                        break;
-                    case ClipDirection::RightToLeft:
-                        left = right - width * percent;
-                        break;
-                    case ClipDirection::TopToBottom:
-                        bottom = top + height * percent;
-                        break;
-                    case ClipDirection::BottomToTop:
-                        top = bottom - height * percent;
-                        break;
-                    default:
-                        break;
-                    }
+                        DirectX::XMFLOAT2 originZero{ 0.f, 0.f };
 
-                    RECT destRect{
-                        static_cast<LONG>(left),
-                        static_cast<LONG>(top),
-                        static_cast<LONG>(right),
-                        static_cast<LONG>(bottom)
-                    };
-                    DirectX::XMFLOAT2 originScaled{ info.origin.x * info.scale.x, info.origin.y * info.scale.y };
-                    spriteBatch->Draw(
-                        info.texture->m_pSRV,
-                        destRect,
-                        nullptr,
-                        info.color,
-                        info.rotation,
-                        originScaled,
-                        DirectX::SpriteEffects_None,
-                        static_cast<float>(info.layerOrder) / MaxOreder);
+                        spriteBatch->Draw(
+                            info.texture->m_pSRV,
+                            dst,
+                            &src,
+                            info.color,
+                            info.rotation,
+                            originZero,
+                            DirectX::SpriteEffects_None,
+                            static_cast<float>(info.layerOrder) / MaxOreder);
+                    }
                 }
             }
             else if constexpr (std::is_same_v<T, TextData>)
