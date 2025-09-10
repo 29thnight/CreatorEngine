@@ -3,6 +3,12 @@
 #include "ParticleModule.h"
 #include "ISerializable.h"
 
+enum class TrailOrientation
+{
+    HORIZONTAL = 0,  // 기존 방식 (가로)
+    VERTICAL = 1,    // 세로 방향
+};
+
 struct TrailVertex
 {
     Mathf::Vector3 position;
@@ -82,6 +88,12 @@ public:
 
     void RemoveOldPoints(float maxAge = -1.0f);
     
+    void SetOrientation(TrailOrientation orientation) { m_orientation = orientation; m_meshDirty = true; }
+    TrailOrientation GetOrientation() const { return m_orientation; }
+
+    Mathf::Vector3 CalculateForwardVector(size_t index) const;
+    Mathf::Vector3 CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position) const;
+    Mathf::Vector3 CalculateNormalVector(const Mathf::Vector3& forward, const Mathf::Vector3& right) const;
 
     const std::vector<TrailPoint>& GetTrailPoints() const { return m_trailPoints; }
     const std::vector<TrailVertex>& GetVertices() const { return m_vertices; }
@@ -132,4 +144,6 @@ private:
     bool m_autoGenerateFromPosition;
     float m_autoAddInterval;
     float m_lastAutoAddTime;
+
+    TrailOrientation m_orientation = TrailOrientation::HORIZONTAL;
 };

@@ -182,50 +182,24 @@ void TrailGenerateModule::GenerateMesh()
         color = Mathf::Vector4::Lerp(color, point.color, 0.5f);
 
         // Forward 벡터 계산
-        Mathf::Vector3 forward = Mathf::Vector3::Zero;
-        if (i == 0 && m_trailPoints.size() > 1)
-        {
-            forward = m_trailPoints[i + 1].position - point.position;
-        }
-        else if (i == m_trailPoints.size() - 1)
-        {
-            forward = point.position - m_trailPoints[i - 1].position;
-        }
-        else
-        {
-            Mathf::Vector3 toNext = m_trailPoints[i + 1].position - point.position;
-            Mathf::Vector3 fromPrev = point.position - m_trailPoints[i - 1].position;
-            forward = (toNext + fromPrev) * 0.5f;
-        }
+        Mathf::Vector3 forward = CalculateForwardVector(i);
 
-        if (forward.Length() < 0.001f)
-        {
-            forward = Mathf::Vector3(0.0f, 0.0f, 1.0f);
-        }
-        else
-        {
-            forward.Normalize();
-        }
-
-        m_lastUpVector = CalculateUpVector(forward, m_lastUpVector);
-        Mathf::Vector3 right;
-        forward.Cross(m_lastUpVector, right);
-        right.Normalize();
+        // Orientation에 따른 Right 벡터 계산
+        Mathf::Vector3 right = CalculateRightVector(forward, point.position);
         right *= width * 0.5f;
 
-        // 수명 기반 U 좌표 사용
         float u = lifeRatio;
 
         TrailVertex leftVertex, rightVertex;
         leftVertex.position = point.position - right;
         leftVertex.texcoord = Mathf::Vector2(u, 0.0f);
         leftVertex.color = color;
-        leftVertex.normal = m_lastUpVector;
+        leftVertex.normal = CalculateNormalVector(forward, right);
 
         rightVertex.position = point.position + right;
         rightVertex.texcoord = Mathf::Vector2(u, 1.0f);
         rightVertex.color = color;
-        rightVertex.normal = m_lastUpVector;
+        rightVertex.normal = leftVertex.normal;
 
         m_vertices.push_back(leftVertex);
         m_vertices.push_back(rightVertex);
@@ -350,6 +324,104 @@ void TrailGenerateModule::RemoveOldPoints(float maxAge)
     }
 }
 
+Mathf::Vector3 TrailGenerateModule::CalculateForwardVector(size_t index) const
+{
+    Mathf::Vector3 forward = Mathf::Vector3::Zero;
+
+    if (index == 0 && m_trailPoints.size() > 1)
+    {
+        forward = m_trailPoints[index + 1].position - m_trailPoints[index].position;
+    }
+    else if (index == m_trailPoints.size() - 1)
+    {
+        forward = m_trailPoints[index].position - m_trailPoints[index - 1].position;
+    }
+    else
+    {
+        Mathf::Vector3 toNext = m_trailPoints[index + 1].position - m_trailPoints[index].position;
+        Mathf::Vector3 fromPrev = m_trailPoints[index].position - m_trailPoints[index - 1].position;
+        forward = (toNext + fromPrev) * 0.5f;
+    }
+
+    if (forward.Length() < 0.001f)
+    {
+        forward = Mathf::Vector3(0.0f, 0.0f, 1.0f);
+    }
+    else
+    {
+        forward.Normalize();
+    }
+
+    return forward;
+}
+
+Mathf::Vector3 TrailGenerateModule::CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position) const
+{
+    Mathf::Vector3 right;
+    switch (m_orientation)
+    {
+    case TrailOrientation::HORIZONTAL:
+    {
+        Mathf::Vector3 up = CalculateUpVector(forward, m_lastUpVector);
+        forward.Cross(up, right);
+        break;
+    }
+    case TrailOrientation::VERTICAL:
+    {
+        // Y축 방향으로 확장하도록 수정
+        Mathf::Vector3 worldRight = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+
+        if (abs(forward.Dot(worldRight)) > 0.99f)
+        {
+            // Forward가 X축과 평행하면 Y축 사용
+            right = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            // Y축 방향으로 확장되도록 계산
+            Mathf::Vector3 worldUp = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+            right = worldUp;
+        }
+        break;
+    }
+    }
+
+    if (right.Length() < 0.001f)
+    {
+        right = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        right.Normalize();
+    }
+    return right;
+}
+
+Mathf::Vector3 TrailGenerateModule::CalculateNormalVector(const Mathf::Vector3& forward, const Mathf::Vector3& right) const
+{
+    Mathf::Vector3 normal;
+    switch (m_orientation)
+    {
+    case TrailOrientation::HORIZONTAL:
+        normal = m_lastUpVector;
+        break;
+    case TrailOrientation::VERTICAL:
+        // 세로 트레일의 법선은 forward와 right에 수직
+        right.Cross(forward, normal);
+        break;
+    }
+
+    if (normal.Length() < 0.001f)
+    {
+        normal = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+    }
+    else
+    {
+        normal.Normalize();
+    }
+    return normal;
+}
+
 void TrailGenerateModule::UpdateBuffers()
 {
     if (m_vertices.empty() || m_indices.empty())
@@ -464,6 +536,10 @@ nlohmann::json TrailGenerateModule::SerializeData() const
 {
     nlohmann::json json;
 
+    json["orientation"] = {
+    {"type", static_cast<int>(m_orientation)}
+    };
+
     json["trailParams"] = {
         {"maxTrailPoints", m_maxTrailPoints},
         {"trailLifetime", m_trailLifetime},
@@ -496,6 +572,13 @@ void TrailGenerateModule::DeserializeData(const nlohmann::json& json)
 {
     try
     {
+        if (json.contains("orientation"))
+        {
+            const auto& orientation = json["orientation"];
+            if (orientation.contains("type"))
+                m_orientation = static_cast<TrailOrientation>(orientation["type"]);
+        }
+
         if (json.contains("trailParams"))
         {
             const auto& trailParams = json["trailParams"];

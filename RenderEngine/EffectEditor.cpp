@@ -3478,16 +3478,6 @@ void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailMod
 		if (ImGui::SliderFloat("Min Distance", &minDistance, 0.001f, 1.0f, "%.4f")) {
 			trailModule->SetMinDistance(minDistance);
 		}
-
-		// 현재 시간 표시 및 조정
-		float currentTime = trailModule->GetCurrentTime();
-		if (ImGui::SliderFloat("Current Time", &currentTime, 0.0f, 100.0f, "%.2f")) {
-			trailModule->SetCurrentTime(currentTime);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Reset Time")) {
-			trailModule->SetCurrentTime(0.0f);
-		}
 	}
 
 	// 자동 생성 설정
@@ -3570,6 +3560,22 @@ void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailMod
 		if (ImGui::Button("Gold Trail")) {
 			trailModule->SetColorCurve(Mathf::Vector4(1, 0.8f, 0, 1), Mathf::Vector4(1, 0.5f, 0, 0));
 		}
+	}
+
+	const char* orientationNames[] = { "Horizontal", "Vertical" };
+	int currentOrientation = static_cast<int>(trailModule->GetOrientation());
+	if (ImGui::Combo("Trail Orientation", &currentOrientation, orientationNames, IM_ARRAYSIZE(orientationNames))) {
+		trailModule->SetOrientation(static_cast<TrailOrientation>(currentOrientation));
+	}
+
+	// 방향별 도움말 텍스트
+	switch (currentOrientation) {
+	case 0: // HORIZONTAL
+		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Horizontal: Trail expands using up vector (default)");
+		break;
+	case 1: // VERTICAL  
+		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Vertical: Trail expands horizontally, stays upright");
+		break;
 	}
 
 	// UV 및 렌더링 설정
