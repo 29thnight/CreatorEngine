@@ -52,11 +52,22 @@ void PhysicsManager::Update(float fixedDeltaTime)
 	Physics->Update(fixedDeltaTime);
 	//std::cout << " Physics->Update" << bm.GetElapsedTime() << std::endl;
 	
-	// 물리 엔진에서 씬 데이터 가져오기
+	// 1순위: GetPhysicData()
+	// 물리 시뮬레이션의 결과를 모든 게임오브젝트의 Transform에 먼저 동기화합니다.
+	// 이렇게 해야 세상의 모든 객체가 물리적으로 올바른 최신 위치에 있게 됩니다.
 	GetPhysicData();
-	// 콜백 이벤트 처리
+
+	// 2순위: ProcessCallback()
+	// 모든 객체의 위치가 최신 상태로 동기화되었으므로, 이제 이 위치를 기준으로
+	// OnCollisionEnter, OnTriggerEnter 등의 이벤트 스크립트를 실행하는 것이 안전하고 정확합니다.
+	// 만약 이 순서가 반대가 되면, 스크립트는 '이전 프레임의 위치'를 기준으로 로직을 실행하는 오류가 발생할 수 있습니다.
 	ProcessCallback();
-	
+
+	// 3순위: ApplyPendingControllerPositionChanges()
+	// 해당 프레임의 모든 물리적 상호작용과 이벤트 처리가 완전히 끝났습니다.
+	// 이제 모든 정산이 끝난 상태에서, '무한 복도'와 같은 특수한 게임플레이 효과(순간이동)를
+	// 맨 마지막에 적용하여 다음 프레임을 준비시킵니다.
+	ApplyPendingControllerPositionChanges();
 }
 void PhysicsManager::Shutdown()
 {
@@ -901,6 +912,18 @@ void PhysicsManager::GetPhysicData()
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
+// 펜딩된 CCT 위치 변경 요청을 일괄 처리하는 함수
+void PhysicsManager::ApplyPendingControllerPositionChanges()
+{
+	if (!Physics || m_pendingControllerPositions.empty()) return;
+
+	for (const auto& change : m_pendingControllerPositions)
+	{
+		Physics->SetControllerPosition(change.id, change.position);
+	}
+	m_pendingControllerPositions.clear();
+}
+
 void PhysicsManager::SetRigidBodyState(const RigidBodyState& state)
 {
 	m_pendingChanges.push_back(state);
@@ -924,6 +947,11 @@ bool PhysicsManager::IsRigidBodyColliderEnabled(unsigned int id) const
 bool PhysicsManager::IsRigidBodyUseGravity(unsigned int id) const 
 {
 	return Physics->IsUseGravity(id);
+}
+
+void PhysicsManager::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)
+{
+	m_pendingControllerPositions.push_back({ id, pos });
 }
 
 void PhysicsManager::ApplyPendingChanges()

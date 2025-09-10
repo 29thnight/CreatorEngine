@@ -1242,42 +1242,42 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 						rigidBodyData.movePosition.z))
 			);
 		}
-
-		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
-		physx::PxTransform pxTransform;
-		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Vector3 scale;
-		DirectX::SimpleMath::Quaternion rotation;
-		dxMatrix.Decompose(scale, rotation, position);
-		
-		DirectX::SimpleMath::Vector3 offPos = dynamicBody->GetOffsetPosition();
-		DirectX::SimpleMath::Quaternion offRot = dynamicBody->GetOffsetRotation();
-		
-		DirectX::SimpleMath::Quaternion invOffsetRot;
-		offRot.Inverse(invOffsetRot);
-		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
-
-		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos,bodyRotation);
-		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
-
-		ConvertVectorDxToPx(bodyPosition,pxTransform.p);
-		ConvertQuaternionDxToPx(bodyRotation,pxTransform.q);
-
-		//CopyMatrixDxToPx(dxMatrix, pxTransform);
-		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
-		/*if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
-			pxBody->setGlobalPose(pxTransform);
-		}*/
-		pxBody->setGlobalPose(pxTransform);
-		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
-
-		if (scale.x>0.0f&&scale.y>0.0f&&scale.z>0.0f)
-		{
-			dynamicBody->SetConvertScale(scale, m_physics, m_collisionMatrix);
-		}
 		else {
-			Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
+			DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
+			physx::PxTransform pxTransform;
+			DirectX::SimpleMath::Vector3 position;
+			DirectX::SimpleMath::Vector3 scale;
+			DirectX::SimpleMath::Quaternion rotation;
+			dxMatrix.Decompose(scale, rotation, position);
+
+			DirectX::SimpleMath::Vector3 offPos = dynamicBody->GetOffsetPosition();
+			DirectX::SimpleMath::Quaternion offRot = dynamicBody->GetOffsetRotation();
+
+			DirectX::SimpleMath::Quaternion invOffsetRot;
+			offRot.Inverse(invOffsetRot);
+			DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
+
+			DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
+			DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
+
+			ConvertVectorDxToPx(bodyPosition, pxTransform.p);
+			ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
+
+			//CopyMatrixDxToPx(dxMatrix, pxTransform);
+			physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
+			/*if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+				pxBody->setGlobalPose(pxTransform);
+			}*/
+			pxBody->setGlobalPose(pxTransform);
+			if (scale.x > 0.0f && scale.y > 0.0f && scale.z > 0.0f)
+			{
+				dynamicBody->SetConvertScale(scale, m_physics, m_collisionMatrix);
+			}
+			else {
+				Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
+			}
 		}
+		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
 	}
 }
 
@@ -1409,6 +1409,36 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 
 	CharacterController* controller = m_characterControllerContainer[info.id];
 	controller->AddMovementInput(info.input, info.isDynamic);
+}
+
+void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)
+{
+	// 1. 컨테이너에서 ID를 기반으로 CharacterController 래퍼 클래스를 찾습니다.
+	auto it = m_characterControllerContainer.find(id);
+	if (it == m_characterControllerContainer.end())
+	{
+		Debug->LogError("PhysicX::SetControllerPosition() : CharacterController wrapper for ID not found: " + std::to_string(id));
+		return;
+	}
+
+	CharacterController* controllerWrapper = it->second;
+	if (!controllerWrapper)
+	{
+		Debug->LogError("PhysicX::SetControllerPosition() : CharacterController wrapper is null for ID: " + std::to_string(id));
+		return;
+	}
+
+	// 2. 래퍼 클래스에서 실제 physx::PxController 포인터를 가져옵니다.
+	// (CharacterController 클래스에 GetController() 함수가 구현되어 있어야 합니다.)
+	physx::PxController* pxController = controllerWrapper->GetController();
+	if (!pxController)
+	{
+		Debug->LogError("PhysicX::SetControllerPosition() : Raw PxController is null for ID: " + std::to_string(id));
+		return;
+	}
+
+	// 3. PhysX 컨트롤러의 위치를 강제로 설정합니다.
+	pxController->setPosition(physx::PxExtendedVec3(pos.x, pos.y, pos.z));
 }
 
 CharacterController* PhysicX::GetCCT(const unsigned int& id)

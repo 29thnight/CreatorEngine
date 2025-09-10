@@ -109,6 +109,10 @@ public:
 	void RemoveAllCCT();
 	//입력값 추가
 	void AddInputMove(const CharactorControllerInputInfo& info);
+
+	// CharacterController의 위치를 강제로 설정합니다.
+	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
+
 	//getter setter
 	CharacterController* GetCCT(const unsigned int& id);
 

@@ -94,7 +94,7 @@ void Player::Update(float tick)
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
 	//Test
-	{
+	/*{
 		auto& asiss = GM->GetAsis();
 		auto asis = asiss[0]->GetOwner();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
@@ -102,7 +102,7 @@ void Player::Update(float tick)
 		auto curveindicator = indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(true);
 		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
-	}
+	}*/
 
 	if (isDead)
 	{
