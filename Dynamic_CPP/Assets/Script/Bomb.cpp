@@ -1,5 +1,6 @@
 #include "Bomb.h"
 #include "pch.h"
+#include "DebugLog.h"
 void Bomb::Start()
 {
 	itemType = ItemType::Bomb;
@@ -29,7 +30,7 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 	//벽에 부딪히면 반대로 튕기기
 	if (collision.otherObj->m_tag == "Wall")
 	{
-		std::cout << "bomb trigger wall" << std::endl;
+		LOG("bomb trigger wall");
 	}
 }
 

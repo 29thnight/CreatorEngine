@@ -1,6 +1,6 @@
 #include "Idle.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	bool isP1 = blackBoard.HasKey("Player1");
@@ -14,7 +14,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	if (movement)
 	{
 		movement->Move(Mathf::Vector2(0.0f, 0.0f)); // Stop movement during idle
-		//std::cout << "Idle action executed. Stopping movement." << std::endl;
+		//LOG("Idle action executed. Stopping movement.");
 	}
 	// Return success to indicate that the idle action completed successfully
 	// In a real implementation, you might check conditions or perform actions here
@@ -22,7 +22,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	//idle state Retargeting 
 	//init Target;
 	GameObject* Target = nullptr;
-	//std::cout << "Idle action: Starting retargeting process." << std::endl;
+	//LOG("Idle action: Starting retargeting process.");
 	blackBoard.SetValueAsGameObject("ClosedTarget","");
 
 	//self
@@ -69,11 +69,11 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	{
 		if (p1dir.Length() < p2dir.Length()) {
 			Target = Player1;
-			//std::cout << "Idle action: Target set to Player1." << std::endl;
+			//LOG("Idle action: Target set to Player1.");
 		}
 		else {
 			Target = Player2;
-			//std::cout << "Idle action: Target set to Player2." << std::endl;
+			//LOG("Idle action: Target set to Player2.");
 		}
 	}
 
@@ -103,32 +103,32 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		if (Target == Player1) 
 		{
 			if (asisdir.Length() < p1dir.Length()) {
-				//std::cout << "Idle action: Target set to Asis based on Player1 distance." << std::endl;
+				//LOG("Idle action: Target set to Asis based on Player1 distance.");
 				Target = asis;
 			}
 		}
 		else if(Target == Player2)
 		{
 			if (asisdir.Length() < p2dir.Length()) {
-				//std::cout << "Idle action: Target set to Asis based on Player2 distance." << std::endl;
+				//LOG("Idle action: Target set to Asis based on Player2 distance.");
 				Target = asis;
 			}
 		}
 		else 
 		{
-			//std::cout << "Idle action: Target set to Asis as no player targets are closer." << std::endl;
+			//LOG("Idle action: Target set to Asis as no player targets are closer.");
 			Target = asis;
 		}
 	}
 		
 	if (Target)
 	{
-		//std::cout << "Idle action: Target is set to " << Target->ToString() << std::endl;
+		//LOG("Idle action: Target is set to " << Target->ToString());
 		blackBoard.SetValueAsGameObject("ClosedTarget", Target->ToString());
 	}
 	else
 	{
-		//std::cout << "Idle action: No valid target found. Setting ClosedTarget to empty." << std::endl;
+		//LOG("Idle action: No valid target found. Setting ClosedTarget to empty.");
 		blackBoard.SetValueAsGameObject("ClosedTarget", "");
 	}
 
@@ -141,7 +141,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("State");
 		if (state == "Idle")
 		{
-			//std::cout << "Idle action already in progress." << std::endl;
+			//LOG("Idle action already in progress.");
 			//return NodeStatus::Running; // Continue running if already in idle state
 			//dead test code
 			//blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
@@ -149,16 +149,16 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 		else
 		{
-			//std::cout << "Switching to Idle state." << std::endl;
+			//LOG("Switching to Idle state.");
 		}
 	}
 	else
 	{
 		blackBoard.SetValueAsString("State", "Idle");
-		//std::cout << "Setting Idle state for the first time." << std::endl;
+		//LOG("Setting Idle state for the first time.");
 	}
 
-	//std::cout << "Idle action executed." << std::endl;
+	//LOG("Idle action executed.");
 
 	return NodeStatus::Success;
 }

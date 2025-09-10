@@ -1,6 +1,7 @@
 #include "IsDamege.h"
 #include "pch.h"
 #include "TestEnemy.h"
+#include "DebugLog.h"
 bool IsDamege::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	bool isAnime = blackBoard.HasKey("AnimeState");
@@ -34,19 +35,19 @@ bool IsDamege::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("AnimeState");
 		if (state == "Damege")
 		{
-			std::cout << "Atteck action already in progress." << std::endl;
+			LOG("Atteck action already in progress.");
 			//return NodeStatus::Running; // Continue running if already in attack state
 			if (delayDamageTime > 0) {
-				std::cout << "Delay damage action in progress for " << delayDamageTime << " seconds." << std::endl;
+				LOG("Delay damage action in progress for " << delayDamageTime << " seconds.");
 				return true; // Continue running if delay damage action is in progress
 			}
 			else {
-				std::cout << "Delay damage action not in progress." << std::endl;
+				LOG("Delay damage action not in progress.");
 				return false; // No delay damage action, so condition not met
 			}
 		}		
 	}
 	
-	std::cout << "IsDamege condition not met." << std::endl;
+	LOG("IsDamege condition not met.");
 	return false;
 }

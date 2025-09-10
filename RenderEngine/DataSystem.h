@@ -45,6 +45,7 @@ public:
 		TerrainTexture,
 		HDR,
 		UITexture,
+		SpriteSheet,
 	};
 
 	enum class AssetType
@@ -192,4 +193,5 @@ private:
 };
 
 static auto DataSystems = DataSystem::GetInstance();
+
 #endif // !DYNAMICCPP_EXPORTS

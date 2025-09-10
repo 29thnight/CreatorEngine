@@ -11,6 +11,16 @@ enum class Direction
 };
 AUTO_REGISTER_ENUM(Direction)
 
+enum class ClipDirection : std::uint8_t
+{
+	None,
+	LeftToRight,
+	RightToLeft,
+	TopToBottom,
+	BottomToTop
+};
+AUTO_REGISTER_ENUM(ClipDirection)
+
 struct Navigation
 {
 	[[Property]]
@@ -35,3 +45,10 @@ struct Navigation
 };
 
 constexpr int NavDirectionCount = 4;
+
+cbuffer ImageInfo
+{
+	Mathf::xMatrix world;
+	float2 size;
+	float2 screenSize;
+};

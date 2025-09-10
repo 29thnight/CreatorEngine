@@ -2,6 +2,14 @@
 #include "RenderModules.h"
 #include "ISerializable.h"
 
+struct SpriteAnimationBuffer
+{
+    uint32 frameCount;      // 총 프레임 수
+    float animationDuration;
+    uint32 gridColumns;     // 스프라이트 시트 격자 크기 - 열
+    uint32 gridRows;        // 스프라이트 시트 격자 크기 - 행
+};
+
 class BillboardModuleGPU : public RenderModules, public ISerializable
 {
 public:
@@ -16,18 +24,19 @@ public:
 
     void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount) override;
     void SetupRenderTarget(RenderPassData* renderData) override;
-    void SetTexture(Texture* texture) override;
 
     virtual void ResetForReuse() override;
     virtual bool IsReadyForReuse() const override;
     virtual void WaitForGPUCompletion() override;
+
+    void UpdatePSOShaders() override;
 
     BillBoardType GetBillboardType() const { return m_BillBoardType; }
     PipelineStateObject* GetPSO() { return m_pso.get(); }
 
     void BindResource() override;
 
-    void SetBillboardType(BillBoardType type) { m_BillBoardType = type; }
+    void SetBillboardType(BillBoardType type);
 
     // ISerializable 인터페이스 구현
     virtual nlohmann::json SerializeData() const override;
@@ -49,8 +58,12 @@ public:
         // 필요하다면 Initialize() 호출
     }
 
+    void SetSpriteAnimation(uint32 frameCount, float duration, uint32 gridColumns, uint32 gridRows);
+
+    const SpriteAnimationBuffer& GetSpriteAnimationBuffer() const { return m_SpriteAnimationConstantBuffer; }
+
 private:
-    BillBoardType m_BillBoardType;
+    BillBoardType m_BillBoardType = BillBoardType::None;
     UINT m_maxCount;
     BillboardVertex* mVertex;
 
@@ -75,5 +88,8 @@ private:
     std::vector<uint32> m_indices;
 
     std::mutex m_resetMutex;
+
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_SpriteAnimationBuffer;
+    SpriteAnimationBuffer m_SpriteAnimationConstantBuffer;
 };
 

@@ -8,7 +8,7 @@
 #include "EffectComponent.h"
 #include "SceneManager.h"
 #include "Socket.h"
-
+#include "DebugLog.h"
 void PlayerAttackAH::Enter()
 {
 	std::cout << "attack start" << std::endl;
@@ -23,7 +23,7 @@ void PlayerAttackAH::Enter()
 				GameObject* P1 = P1ani->GetOwner();
 				if (P1)
 				{
-					std::cout << P1->m_name.ToString() << std::endl;
+					LOG(P1->m_name.ToString());
 					GameObject* parent = GameObject::FindIndex(P1->m_parentIndex);
 					if (parent)
 					{
@@ -78,5 +78,5 @@ void PlayerAttackAH::Exit()
 		m_player->m_comboCount = 0;
 		m_player->m_comboElapsedTime = 0.f;
 	}*/
-	std::cout << "attack end" << std::endl;
+	LOG("attack end");
 }

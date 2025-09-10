@@ -1,6 +1,6 @@
 #include "IsUseAsis.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool IsUseAsis::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	bool isUseAsis = blackBoard.HasKey("eAsis");
@@ -13,7 +13,7 @@ bool IsUseAsis::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	}
 	else 
 	{
-		std::cout << "IsUseAsis: eAsis key does not exist in blackboard." << std::endl;
+		LOG("IsUseAsis: eAsis key does not exist in blackboard.");
 		return false;
 	}
 
@@ -22,12 +22,12 @@ bool IsUseAsis::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (isTarget) {
 		Target = blackBoard.GetValueAsGameObject("Target");
 		if (Target == nullptr) {
-			std::cout << "IsUseAsis: Target is not set in blackboard." << std::endl;
+			LOG("IsUseAsis: Target is not set in blackboard.");
 			return false; // If Target is not set, return false
 		}
 	}
 	else {
-		std::cout << "IsUseAsis: Target key does not exist in blackboard." << std::endl;
+		LOG("IsUseAsis: Target key does not exist in blackboard.");
 		return false; // If Target key does not exist, return false
 	}
 	GameObject* Asis = nullptr;
@@ -35,12 +35,12 @@ bool IsUseAsis::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (isAsis) {
 		Asis = blackBoard.GetValueAsGameObject("Asis");
 		if (Asis == nullptr) {
-			std::cout << "IsUseAsis: Asis is not set in blackboard." << std::endl;
+			LOG("IsUseAsis: Asis is not set in blackboard.");
 			return false; // If Asis is not set, return false
 		}
 	}
 	else {
-		std::cout << "IsUseAsis: Asis key does not exist in blackboard." << std::endl;
+		LOG("IsUseAsis: Asis key does not exist in blackboard.");
 		return false; // If Asis key does not exist, return false
 	}
 
@@ -48,12 +48,12 @@ bool IsUseAsis::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	{
 		if (Target==Asis)
 		{
-			std::cout << "IsUseAsis: Target is the same as Asis." << std::endl;
+			LOG("IsUseAsis: Target is the same as Asis.");
 			return true;
 		}
 	}	
 
-	std::cout << "Asis None Action or target not Asis" << std::endl;
+	LOG("Asis None Action or target not Asis");
 	
 	return false;
 }

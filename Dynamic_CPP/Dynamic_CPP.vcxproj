@@ -191,6 +191,7 @@
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="CriticalMark.h" />
+		<ClInclude Include="DebugLog.h" />
 		<ClInclude Include="Easing.h" />
 		<ClInclude Include="ItemType.h" />
 		<ClInclude Include="PlayerBuff.h" />
@@ -246,6 +247,7 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h" />
 		<ClInclude Include="Assets\Script\MosterMeleeAni.h" />
 		<ClInclude Include="Assets\Script\CurveIndicator.h" />
+		<ClInclude Include="Assets\Script\UIGageTest.h" />
 		<ClInclude Include="Assets\Script\EntitlyRock.h" />
 	</ItemGroup>
 	<ItemGroup>
@@ -504,6 +506,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\UIGageTest.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
