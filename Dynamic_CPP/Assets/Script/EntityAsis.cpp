@@ -15,7 +15,6 @@
 #include "GameManager.h"
 #include "GameObject.h"
 #include "Weapon.h"
-#include "AsisMove.h"
 #include "WeaponCapsule.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
@@ -174,9 +173,6 @@ void EntityAsis::Update(float tick)
 	m_animator->SetParameter("OnMove", true);
 	if (asisTail) {
 		Debug->Log(asisTail->m_name.data());
-	}
-	if (m_asismove) {
-		Debug->Log(m_asismove->m_name.data());
 	}
 
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
@@ -392,8 +388,8 @@ void EntityAsis::PathMove(float tick)
 	}
 
 	Vector3 newPosition = currentPosition + direction * moveSpeed * tick * rotDownSpeed;
-	GetOwner()->m_transform.SetPosition(newPosition);
-	//GetOwner()->GetComponent<RigidBodyComponent>()->NotifyPhysicsStateChange(newPosition);
+	//GetOwner()->m_transform.SetPosition(newPosition);
+	GetOwner()->GetComponent<RigidBodyComponent>()->NotifyPhysicsStateChange(newPosition);
 
 	float newDistance = Mathf::Distance(newPosition, points[nextPointIndex]);
 	if (newDistance <= m_pathEndRadius) {

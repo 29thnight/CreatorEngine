@@ -25,6 +25,7 @@ struct VertexOutput
     float3 normal : NORMAL;
     float3 viewDir : TEXCOORD2;
     float depth : TEXCOORD3; // 깊이 기반 효과용
+    float dissolveAmount : TEXCOORD4;
 };
 
 VertexOutput main(VertexInput input)
@@ -48,6 +49,10 @@ VertexOutput main(VertexInput input)
     
     // 선형 깊이 (0~1)
     output.depth = output.position.z / output.position.w;
+    
+    float trailProgress = input.texcoord.x; // 0이 트레일 시작, 1이 끝
+    
+    output.dissolveAmount = trailProgress;
     
     return output;
 }

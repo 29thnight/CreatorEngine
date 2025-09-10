@@ -51,4 +51,8 @@ private:
     TrailGenerateModule* m_trailModule;
     ID3D11ShaderResourceView* m_particleSRV;
     UINT m_instanceCount;
+
+    Texture* m_dissolveTexture;      // 하이라이트용 디졸브
+    Texture* m_dissolveTexture2;     // 사라짐용 디졸브  
+    Texture* m_backgroundTexture;    // 백그라운드
 };

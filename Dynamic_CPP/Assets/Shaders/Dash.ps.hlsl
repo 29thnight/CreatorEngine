@@ -1,5 +1,8 @@
 // TrailPixel.hlsl
 Texture2D g_trailTexture : register(t0);
+Texture2D g_dissolveTexture : register(t1);
+Texture2D g_dissolveTexture2 : register(t2);
+Texture2D g_backgroundTexture : register(t3);
 SamplerState g_linearSampler : register(s0);
 
 struct PixelInput
@@ -11,6 +14,7 @@ struct PixelInput
     float3 normal : NORMAL;
     float3 viewDir : TEXCOORD2;
     float depth : TEXCOORD3;
+    float dissolveAmount : TEXCOORD4;
 };
 
 float4 main(PixelInput input) : SV_TARGET

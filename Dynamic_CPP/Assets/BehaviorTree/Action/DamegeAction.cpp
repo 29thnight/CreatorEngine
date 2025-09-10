@@ -31,7 +31,7 @@ NodeStatus DamegeAction::Tick(float deltatime, BlackBoard& blackBoard)
 			{
 				auto forward = m_owner->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
 				auto controller = m_owner->GetComponent<CharacterControllerComponent>();
-				controller->Move({ forward.x ,forward.z });
+				controller->Move({ -forward.x , -forward.z });
 				
 				return NodeStatus::Running; //넉백중
 			}

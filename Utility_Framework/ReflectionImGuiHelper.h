@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "ReflectionFunction.h"
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
@@ -8,14 +8,14 @@
 using namespace TypeTrait;
 namespace Meta
 {
-	// Äİ¹é ÇÔ¼ö: ÀÔ·Â ÅØ½ºÆ® ¹öÆÛ Å©±â°¡ ºÎÁ·ÇÒ ¶§ std::stringÀ» ÀçÁ¶Á¤
+	// ì½œë°± í•¨ìˆ˜: ì…ë ¥ í…ìŠ¤íŠ¸ ë²„í¼ í¬ê¸°ê°€ ë¶€ì¡±í•  ë•Œ std::stringì„ ì¬ì¡°ì •
 	inline int InputTextCallback(ImGuiInputTextCallbackData* data)
 	{
 		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
 		{
-			// UserData¿¡ ÀúÀåµÈ std::string Æ÷ÀÎÅÍ¸¦ °¡Á®¿È
+			// UserDataì— ì €ì¥ëœ std::string í¬ì¸í„°ë¥¼ ê°€ì ¸ì˜´
 			std::string* str = static_cast<std::string*>(data->UserData);
-			// »õ·Î¿î ±æÀÌ¿¡ ¸ÂÃç std::stringÀÇ Å©±â ÀçÁ¶Á¤
+			// ìƒˆë¡œìš´ ê¸¸ì´ì— ë§ì¶° std::stringì˜ í¬ê¸° ì¬ì¡°ì •
 			str->resize(data->BufTextLen);
 			data->Buf = const_cast<char*>(str->c_str());
 		}
@@ -128,7 +128,7 @@ namespace Meta
                /* std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));*/
                 if (value.empty()) return;
 
-                int selectedIndex = 0; // ¾ÈÀüÇÏ°Ô °ü¸®ÇÒ ¹æ¹ıÀÌ ÀÖ´Ù¸é ¿ÜºÎ¿¡¼­ °¡Á®¿Íµµ µÊ
+                int selectedIndex = 0; // ì•ˆì „í•˜ê²Œ ê´€ë¦¬í•  ë°©ë²•ì´ ìˆë‹¤ë©´ ì™¸ë¶€ì—ì„œ ê°€ì ¸ì™€ë„ ë¨
 
                 if (selectedIndex >= value.size())
                     selectedIndex = 0;
@@ -279,12 +279,12 @@ namespace Meta
                     prop.setter(instance, value);
                 }
 				ImGui::PopID();
-            }// ´Ù¸¥ Å¸ÀÔ Ãß°¡ °¡´É
+            }// ë‹¤ë¥¸ íƒ€ì… ì¶”ê°€ ê°€ëŠ¥
             else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
             {
-                // ÇöÀç enum °ªÀ» Á¤¼ö·Î ¾ò¾î¿É´Ï´Ù.
+                // í˜„ì¬ enum ê°’ì„ ì •ìˆ˜ë¡œ ì–»ì–´ì˜µë‹ˆë‹¤.
                 int value = std::any_cast<int>(prop.getter(instance));
-                // enumÀÇ ¸ğµç ÀÌ¸§À» ¹è¿­¿¡ ÀúÀåÇÕ´Ï´Ù.
+                // enumì˜ ëª¨ë“  ì´ë¦„ì„ ë°°ì—´ì— ì €ì¥í•©ë‹ˆë‹¤.
                 std::vector<const char*> items;
                 int current_index = 0;
                 for (size_t i = 0; i < enumType->values.size(); i++)
@@ -293,11 +293,11 @@ namespace Meta
                     if (enumType->values[i].value == value)
                         current_index = static_cast<int>(i);
                 }
-                // ÄŞº¸ ¹Ú½º·Î enum °ªÀ» ¼±ÅÃÇÒ ¼ö ÀÖµµ·Ï ÇÕ´Ï´Ù.
+                // ì½¤ë³´ ë°•ìŠ¤ë¡œ enum ê°’ì„ ì„ íƒí•  ìˆ˜ ìˆë„ë¡ í•©ë‹ˆë‹¤.
 				ImGui::PushID(prop.name);
                 if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
                 {
-                    // ¼±ÅÃµÈ ÀÎµ¦½º¿¡ ÇØ´çÇÏ´Â enum °ªÀ¸·Î ¾÷µ¥ÀÌÆ®ÇÕ´Ï´Ù.
+                    // ì„ íƒëœ ì¸ë±ìŠ¤ì— í•´ë‹¹í•˜ëŠ” enum ê°’ìœ¼ë¡œ ì—…ë°ì´íŠ¸í•©ë‹ˆë‹¤.
                     prop.setter(instance, enumType->values[current_index].value);
                 }
 				ImGui::PopID();
@@ -322,19 +322,17 @@ namespace Meta
                     }
                     else
                     {
-                        //TODO : Å×½ºÆ® ÈÄ Á¦°Å
                         ImGui::Text("%s: [Unregistered Type For GUI Debug]", prop.name);
                     }
                 }
                 else
                 {
-                    //TODO : Å×½ºÆ® ÈÄ Á¦°Å
                     ImGui::Text("%s: nullptr [For GUI Debug]", prop.name);
                 }
             }
             else if (nullptr != MetaDataRegistry->Find(prop.typeName))
             {                
-                // ±âÁ¸ ÀÎ½ºÅÏ½ºÀÇ ÁÖ¼Ò¿¡¼­ ÇØ´ç ¿ÀÇÁ¼ÂÀ» ´õÇÕ´Ï´Ù.
+                // ê¸°ì¡´ ì¸ìŠ¤í„´ìŠ¤ì˜ ì£¼ì†Œì—ì„œ í•´ë‹¹ ì˜¤í”„ì…‹ì„ ë”í•©ë‹ˆë‹¤.
                 void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 
                 if (const Meta::Type* subType = MetaDataRegistry->Find(prop.typeName))
@@ -353,7 +351,7 @@ namespace Meta
 
     inline void DrawMethods(void* instance, const Type& type)
     {
-        // ÇÏ³ªÀÇ Á¤Àû ÄÁÅ×ÀÌ³Ê·Î ¸ğµç ¸Å°³º¯¼ö¸¦ °ü¸®ÇÕ´Ï´Ù.
+        // í•˜ë‚˜ì˜ ì •ì  ì»¨í…Œì´ë„ˆë¡œ ëª¨ë“  ë§¤ê°œë³€ìˆ˜ë¥¼ ê´€ë¦¬í•©ë‹ˆë‹¤.
         static std::unordered_map<std::string, std::any> paramValues;
 
         for (const auto& method : type.methods)
@@ -378,13 +376,13 @@ namespace Meta
             {
                 if (ImGui::TreeNode(method.name))
                 {
-                    // °¢ ¸Å°³º¯¼ö¿¡ ´ëÇØ °íÀ¯ÇÑ Å° »ı¼º
+                    // ê° ë§¤ê°œë³€ìˆ˜ì— ëŒ€í•´ ê³ ìœ í•œ í‚¤ ìƒì„±
                     for (size_t i = 0; i < method.parameters.size(); i++)
                     {
                         const auto& param = method.parameters[i];
                         std::string key = std::string(method.name) + "_param_" + std::to_string(i);
 
-                        // ÇØ´ç Å°°¡ ÄÁÅ×ÀÌ³Ê¿¡ ¾ø´Ù¸é, ±âº»°ªÀ» ¼³Á¤
+                        // í•´ë‹¹ í‚¤ê°€ ì»¨í…Œì´ë„ˆì— ì—†ë‹¤ë©´, ê¸°ë³¸ê°’ì„ ì„¤ì •
                         if (paramValues.find(key) == paramValues.end())
                         {
                             if (std::string(param.typeName) == "int")
@@ -395,10 +393,10 @@ namespace Meta
                                 paramValues[key] = false;
                             else if (param.typeID == GUIDCreator::GetTypeID<std::string>())
                                 paramValues[key] = std::string();
-                            // ¿©±â¼­ ´Ù¸¥ Áö¿ø Å¸ÀÔ¿¡ ´ëÇÑ ±âº»°ªÀ» Ãß°¡ÇÒ ¼ö ÀÖÀ½
+                            // ì—¬ê¸°ì„œ ë‹¤ë¥¸ ì§€ì› íƒ€ì…ì— ëŒ€í•œ ê¸°ë³¸ê°’ì„ ì¶”ê°€í•  ìˆ˜ ìˆìŒ
                         }
 
-                        // °¢ Å¸ÀÔº°·Î UI À§Á¬À» Ãâ·ÂÇÕ´Ï´Ù.
+                        // ê° íƒ€ì…ë³„ë¡œ UI ìœ„ì ¯ì„ ì¶œë ¥í•©ë‹ˆë‹¤.
                         if (std::string(param.typeName) == "int")
                         {
                             int value = std::any_cast<int>(paramValues[key]);
@@ -420,9 +418,9 @@ namespace Meta
                         else if (param.typeID == GUIDCreator::GetTypeID<std::string>())
                         {
                             std::string value = std::any_cast<std::string>(paramValues[key]);
-                            // C ½ºÅ¸ÀÏ ¹öÆÛ°¡ ÇÊ¿äÇÏ¹Ç·Î ÀÓ½Ã ¹öÆÛ »ç¿ë
+                            // C ìŠ¤íƒ€ì¼ ë²„í¼ê°€ í•„ìš”í•˜ë¯€ë¡œ ì„ì‹œ ë²„í¼ ì‚¬ìš©
                             char buf[128];
-                            // strncpy_s¸¦ »ç¿ëÇÏ¿© ¾ÈÀüÇÏ°Ô ¹®ÀÚ¿­ º¹»ç (_TRUNCATE: Ãâ·Â ¹öÆÛ Å©±â¸¦ ³Ñ¾î°¡¸é Àß¶ó³¿)
+                            // strncpy_së¥¼ ì‚¬ìš©í•˜ì—¬ ì•ˆì „í•˜ê²Œ ë¬¸ìì—´ ë³µì‚¬ (_TRUNCATE: ì¶œë ¥ ë²„í¼ í¬ê¸°ë¥¼ ë„˜ì–´ê°€ë©´ ì˜ë¼ëƒ„)
                             strncpy_s(buf, sizeof(buf), value.c_str(), _TRUNCATE);
                             buf[sizeof(buf) - 1] = '\0';
                             if (ImGui::InputText(param.name.c_str(), buf, sizeof(buf)))

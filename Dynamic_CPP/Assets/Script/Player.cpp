@@ -52,8 +52,8 @@ void Player::Start()
 	}
 
 
-	//handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
-	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
+	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
+	//handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 	
 
 	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("BasicWeapon");
@@ -121,7 +121,7 @@ void Player::Update(float tick)
 		auto forward = GetOwner()->m_transform.GetForward();
 		auto world = GetOwner()->m_transform.GetWorldPosition(); 
 		XMVECTOR forwardVec = XMLoadFloat3(&forward); 
-		XMVECTOR offsetPos = world + -forwardVec * 1.0f;
+		XMVECTOR offsetPos = world + forwardVec * 1.0f;
 		offsetPos.m128_f32[1] = 1.0f; 
 		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 		//asis와 거리계속 갱신
@@ -205,7 +205,7 @@ void Player::Update(float tick)
 		{
 			auto forward = player->m_transform.GetForward();
 			auto controller = player->GetComponent<CharacterControllerComponent>();
-			controller->Move({ -forward.x ,-forward.z });
+			controller->Move({ forward.x ,forward.z });
 		}
 
 	}
@@ -774,7 +774,7 @@ void Player::ShootNormalBullet()
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, pos, -player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
+			bullet->Initialize(this, pos, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
 		}
 
 	}
@@ -791,7 +791,7 @@ void Player::ShootSpecialBullet()
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, pos, -player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
+			bullet->Initialize(this, pos, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
 		}
 
 	}

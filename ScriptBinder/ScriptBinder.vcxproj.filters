@@ -332,7 +332,7 @@
     </ClCompile>
     <ClCompile Include="ConditionParameter.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-     </ClCompile>
+    </ClCompile>
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>
@@ -628,6 +628,9 @@
     </ClInclude>
     <ClInclude Include="DecalComponent.h">
       <Filter>Classes\Components\DecalComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="Navigation.h">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -56,6 +56,7 @@ private:
 
 	Mathf::Vector3 m_previousEmitterPosition;
 	bool m_forcePositionUpdate;
+	bool m_forceRotationUpdate;
 
 	std::mutex m_resetMutex;
 

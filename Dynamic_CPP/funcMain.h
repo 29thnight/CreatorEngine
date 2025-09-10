@@ -209,15 +209,12 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("TestEnemy", []() { return new TestEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("InverseKinematic", []() { return new InverseKinematic(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });
-		CreateFactory::GetInstance()->RegisterFactory("Rock", []() { return new Rock(); });
-		CreateFactory::GetInstance()->RegisterFactory("AsisFeed", []() { return new AsisFeed(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
 		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });
 		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
-		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
 		CreateFactory::GetInstance()->RegisterFactory("CameraMove", []() { return new CameraMove(); });
 	}
 

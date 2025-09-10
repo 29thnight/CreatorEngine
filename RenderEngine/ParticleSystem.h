@@ -11,6 +11,7 @@
 #include "MeshModuleGPU.h"
 #include "TrailGenerateModule.h"
 #include "TrailRenderModule.h"
+#include "MeshColorModuleCS.h"
 
 enum class ParticleDataType
 {
@@ -102,7 +103,13 @@ public:
 
 	void Play();
 
+	void Pause() { m_isPaused = true; }
+
+	void Resume() { m_isPaused = false; }
+
 	void Stop() { m_isRunning = false; }
+
+	bool IsPaused() const { return m_isPaused; }
 
 	virtual void Update(float delta);
 
@@ -192,6 +199,7 @@ protected:
 	// 렌더 초기화 메소드는 rendermodule에서 정의.
 	float m_effectProgress = 0.0f;
 	bool m_isRunning;
+	bool m_isPaused = false;
 	std::vector<ParticleData> m_particleData;
 	LinkedList<ParticleModule> m_moduleList;
 	int m_activeParticleCount = 0;

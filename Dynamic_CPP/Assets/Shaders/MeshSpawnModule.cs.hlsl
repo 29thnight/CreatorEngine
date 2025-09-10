@@ -327,14 +327,21 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             UpdateExistingMeshParticlePosition(particle);
         }
-        // else 블록 제거 - 위치 고정 문제 해결
+        else
+        {
+            particle.position = gEmitterPosition;
+        }
 
         // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트  
         if (gForceRotationUpdate == 1)
         {
             UpdateExistingMeshParticleRotation(particle);
         }
-        // else 블록 제거 - 회전 고정 문제 해결
+        else
+        {
+            // 항상 에미터 회전을 따라가도록 유지
+            particle.rotation = gEmitterRotation;
+        }
 
         // 나이 증가
         particle.age += gDeltaTime;

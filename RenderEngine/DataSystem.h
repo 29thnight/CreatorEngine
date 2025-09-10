@@ -128,9 +128,7 @@ public:
 	void SaveExistVolumeProfile(FileGuid guid, VolumeProfile* volume);
 	
 	void AddSupportExtension(std::string_view ext);
-
 	void RemoveSupportExtension(std::string_view ext);
-
 	bool IsSupportExtension(std::string_view ext) const;
 
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;

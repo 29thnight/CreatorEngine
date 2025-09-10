@@ -15,18 +15,22 @@ public:
 
 	void OnDestroy() override;
 
-	void AddUIObject(GameObject* obj);
+	void AddUIObject(std::shared_ptr<GameObject> obj);
 	virtual void Update(float tick) override;
 	void SetCanvasOrder(int order) { CanvasOrder = order; }
 	int GetCanvasOrder() const { return CanvasOrder; }
 
+	void SetCanvasName(std::string_view name) { CanvasName = name.data(); }
+	std::string GetCanvasName() const { return CanvasName; }
+
 	int PreCanvasOrder = 0;
     [[Property]]
 	int CanvasOrder = 0;
-	std::vector<GameObject*> UIObjs;
-
+	std::vector<std::weak_ptr<GameObject>> UIObjs;
+	[[Property]]
+	std::string CanvasName = "Canvas";
 
 	//현재 선택중인 UI
-	GameObject* SelectUI = nullptr;
+	std::weak_ptr<GameObject> SelectUI;
 };
 

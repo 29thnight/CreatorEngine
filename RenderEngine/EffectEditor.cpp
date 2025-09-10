@@ -228,8 +228,10 @@ void EffectEditor::RenderModuleDetailEditor()
 	else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(targetModule)) {
 		RenderMeshSpawnModuleEditor(meshSpawnModule);
 	}
-	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule))
-	{
+	else if (auto* meshSpawnModule = dynamic_cast<MeshColorModuleCS*>(targetModule)) {
+		RenderMeshColorModuleEditor(meshSpawnModule);
+	}
+	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule)){
 		RenderTrailGenerateModuleEditor(trailGenModule);
 	}
 }
@@ -834,7 +836,9 @@ void EffectEditor::RenderExistingModules()
 			else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
 				ImGui::Text("Mesh Spawn Module Settings");
 			}
-
+			else if (auto* meshColorModule = dynamic_cast<MeshColorModuleCS*>(&module)) {
+				ImGui::Text("Mesh Color Module Settings");
+			}
 			ImGui::Unindent();
 			ImGui::Separator();
 		}
@@ -900,7 +904,13 @@ void EffectEditor::AddSelectedModule()
 	case EffectModuleType::TrailModule:
 		m_editingEmitter->AddModule<TrailGenerateModule>();
 		m_editingEmitter->GetModule<TrailGenerateModule>()->Initialize();
+		break;
+	case EffectModuleType::MeshColorModule:
+		m_editingEmitter->AddModule<MeshColorModuleCS>();
+		m_editingEmitter->GetModule<MeshColorModuleCS>()->Initialize();
+		break;
 	}
+
 }
 
 void EffectEditor::AddSelectedRender()
@@ -2576,11 +2586,333 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 	}
 }
 
+void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
+{
+	if (!colorModule) return;
+
+	if (ImGui::CollapsingHeader("Color Module", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		// 모듈 활성화 체크박스
+		bool enabled = colorModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Color Module", &enabled))
+		{
+			colorModule->SetEnabled(enabled);
+		}
+
+		if (!enabled) return;
+
+		ImGui::Separator();
+
+		// 색상 전환 모드 선택
+		static const char* transitionModes[] = {
+			"Gradient",
+			"Discrete",
+			"Custom"
+		};
+
+		static int currentTransitionMode = 0;
+		if (ImGui::Combo("Transition Mode", &currentTransitionMode, transitionModes, IM_ARRAYSIZE(transitionModes)))
+		{
+			colorModule->SetTransitionMode(static_cast<ColorTransitionMode>(currentTransitionMode));
+		}
+
+		ImGui::Separator();
+
+		// 그라데이션 모드
+		if (currentTransitionMode == 0)
+		{
+			if (ImGui::TreeNode("Gradient Settings"))
+			{
+				static std::vector<std::pair<float, Mathf::Vector4>> gradientPoints = {
+					{0.0f, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f)},
+					{0.3f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 0.9f)},
+					{0.7f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 0.7f)},
+					{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.0f, 0.0f)}
+				};
+
+				for (int i = 0; i < gradientPoints.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Point %d", i);
+
+					if (ImGui::TreeNode(label))
+					{
+						ImGui::SliderFloat("Time", &gradientPoints[i].first, 0.0f, 1.0f);
+
+						float color[4] = {
+							gradientPoints[i].second.x,
+							gradientPoints[i].second.y,
+							gradientPoints[i].second.z,
+							gradientPoints[i].second.w
+						};
+
+						if (ImGui::ColorEdit4("Color", color))
+						{
+							gradientPoints[i].second = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						}
+
+						if (gradientPoints.size() > 2)
+						{
+							if (ImGui::Button("Delete Point"))
+							{
+								gradientPoints.erase(gradientPoints.begin() + i);
+								ImGui::TreePop();
+								ImGui::PopID();
+								break;
+							}
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Point") && gradientPoints.size() < 16)
+				{
+					float newTime = gradientPoints.empty() ? 0.5f :
+						(gradientPoints.back().first + 0.1f > 1.0f ? 0.5f : gradientPoints.back().first + 0.1f);
+					gradientPoints.emplace_back(newTime, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+				}
+
+				if (ImGui::Button("Apply Gradient"))
+				{
+					std::sort(gradientPoints.begin(), gradientPoints.end(),
+						[](const auto& a, const auto& b) { return a.first < b.first; });
+
+					colorModule->SetColorGradient(gradientPoints);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// 이산 색상 모드
+		else if (currentTransitionMode == 1)
+		{
+			if (ImGui::TreeNode("Discrete Colors"))
+			{
+				static std::vector<Mathf::Vector4> discreteColors = {
+					Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+					Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+					Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
+				};
+
+				for (int i = 0; i < discreteColors.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Color %d", i);
+
+					float color[4] = {
+						discreteColors[i].x,
+						discreteColors[i].y,
+						discreteColors[i].z,
+						discreteColors[i].w
+					};
+
+					if (ImGui::ColorEdit4(label, color))
+					{
+						discreteColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+					}
+
+					ImGui::SameLine();
+					if (ImGui::Button("Remove") && discreteColors.size() > 1)
+					{
+						discreteColors.erase(discreteColors.begin() + i);
+						ImGui::PopID();
+						break;
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Color") && discreteColors.size() < 32)
+				{
+					discreteColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+				}
+
+				if (ImGui::Button("Apply Colors"))
+				{
+					colorModule->SetDiscreteColors(discreteColors);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// 커스텀 함수 모드
+		else if (currentTransitionMode == 2)
+		{
+			if (ImGui::TreeNode("Custom Function"))
+			{
+				static const char* functionTypes[] = {
+					"Pulse",
+					"Sine Wave",
+					"Flicker"
+				};
+
+				static int currentFunction = 0;
+				ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes));
+
+				if (currentFunction == 0) // Pulse
+				{
+					static float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+					static float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					static float frequency = 1.0f;
+
+					ImGui::ColorEdit4("Base Color", baseColor);
+					ImGui::ColorEdit4("Pulse Color", pulseColor);
+					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+
+					if (ImGui::Button("Apply Pulse"))
+					{
+						colorModule->SetPulseColor(
+							Mathf::Vector4(baseColor[0], baseColor[1], baseColor[2], baseColor[3]),
+							Mathf::Vector4(pulseColor[0], pulseColor[1], pulseColor[2], pulseColor[3]),
+							frequency
+						);
+					}
+				}
+				else if (currentFunction == 1) // Sine Wave
+				{
+					static float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					static float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+					static float frequency = 1.0f;
+					static float phase = 0.0f;
+
+					ImGui::ColorEdit4("Color 1", color1);
+					ImGui::ColorEdit4("Color 2", color2);
+					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+
+					if (ImGui::Button("Apply Sine Wave"))
+					{
+						colorModule->SetSineWaveColor(
+							Mathf::Vector4(color1[0], color1[1], color1[2], color1[3]),
+							Mathf::Vector4(color2[0], color2[1], color2[2], color2[3]),
+							frequency,
+							phase
+						);
+					}
+				}
+				else if (currentFunction == 2) // Flicker
+				{
+					static std::vector<Mathf::Vector4> flickerColors = {
+						Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+						Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+						Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
+					};
+					static float speed = 5.0f;
+
+					for (int i = 0; i < flickerColors.size(); ++i)
+					{
+						ImGui::PushID(i);
+
+						char label[32];
+						sprintf_s(label, "Flicker Color %d", i);
+
+						float color[4] = {
+							flickerColors[i].x,
+							flickerColors[i].y,
+							flickerColors[i].z,
+							flickerColors[i].w
+						};
+
+						if (ImGui::ColorEdit4(label, color))
+						{
+							flickerColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						}
+
+						ImGui::SameLine();
+						if (ImGui::Button("Remove") && flickerColors.size() > 1)
+						{
+							flickerColors.erase(flickerColors.begin() + i);
+							ImGui::PopID();
+							break;
+						}
+
+						ImGui::PopID();
+					}
+
+					if (ImGui::Button("Add Flicker Color") && flickerColors.size() < 32)
+					{
+						flickerColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+					}
+
+					ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f);
+
+					if (ImGui::Button("Apply Flicker"))
+					{
+						colorModule->SetFlickerColor(flickerColors, speed);
+					}
+				}
+
+				ImGui::TreePop();
+			}
+		}
+
+		ImGui::Separator();
+
+		// 이징 설정
+		if (ImGui::TreeNode("Easing Settings"))
+		{
+			static bool easingEnabled = false;
+			ImGui::Checkbox("Enable Easing", &easingEnabled);
+
+			if (easingEnabled)
+			{
+				static const char* easingTypes[] = {
+					"Linear", "InSine", "OutSine", "InOutSine",
+					"InQuad", "OutQuad", "InOutQuad",
+					"InCubic", "OutCubic", "InOutCubic",
+					"InQuart", "OutQuart", "InOutQuart",
+					"InQuint", "OutQuint", "InOutQuint",
+					"InExpo", "OutExpo", "InOutExpo",
+					"InCirc", "OutCirc", "InOutCirc",
+					"InBack", "OutBack", "InOutBack",
+					"InElastic", "OutElastic", "InOutElastic",
+					"InBounce", "OutBounce", "InOutBounce"
+				};
+
+				static const char* animationTypes[] = {
+					"Once Forward", "Once Back", "Once PingPong",
+					"Loop Forward", "Loop Back", "Loop PingPong"
+				};
+
+				static int currentEasingType = 0;
+				static int currentAnimationType = 0;
+				static float duration = 1.0f;
+
+				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+
+				if (ImGui::Button("Apply Easing"))
+				{
+					colorModule->SetEasing(
+						static_cast<EasingEffect>(currentEasingType),
+						static_cast<StepAnimation>(currentAnimationType),
+						duration
+					);
+				}
+			}
+
+			ImGui::TreePop();
+		}
+	}
+}
+
 void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 {
 	if (!meshModule) return;
 
 	ImGui::Text("Mesh Render Module Settings");
+	bool isAdditive = meshModule->GetBlend();
+	if (ImGui::Checkbox("Additive Blend", &isAdditive)) {
+		meshModule->SetAdditiveBlend(isAdditive);
+	}
 
 	// 메시 타입 설정
 	MeshType currentMeshType = meshModule->GetMeshType();
@@ -2618,23 +2950,23 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	}
 
 	// 카메라 위치 설정 - 현재 모듈의 실제 값으로 초기화
-	static bool cameraInitialized = false;
-	static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
-
-	// 모듈이 바뀔 때마다 카메라 위치를 실제 값으로 업데이트
-	if (!cameraInitialized) {
-		auto currentCameraPos = meshModule->GetCameraPosition();
-		cameraPos[0] = currentCameraPos.x;
-		cameraPos[1] = currentCameraPos.y;
-		cameraPos[2] = currentCameraPos.z;
-		cameraInitialized = true;
-	}
-
-	if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
-		meshModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
-	}
-
-	ImGui::Separator();
+	//static bool cameraInitialized = false;
+	//static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
+	//
+	//// 모듈이 바뀔 때마다 카메라 위치를 실제 값으로 업데이트
+	//if (!cameraInitialized) {
+	//	auto currentCameraPos = meshModule->GetCameraPosition();
+	//	cameraPos[0] = currentCameraPos.x;
+	//	cameraPos[1] = currentCameraPos.y;
+	//	cameraPos[2] = currentCameraPos.z;
+	//	cameraInitialized = true;
+	//}
+	//
+	//if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
+	//	meshModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
+	//}
+	//
+	//ImGui::Separator();
 
 	// Model 타입일 때 모델 설정 UI
 	if (currentMeshType == MeshType::Model) {

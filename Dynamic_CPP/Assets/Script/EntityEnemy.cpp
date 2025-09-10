@@ -124,12 +124,12 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
+
 			dir.Normalize();
 			Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
 			hittimer = m_MaxknockBackTime;
 			hitPos = p;
 			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
-
 
 			
 			blackBoard->SetValueAsInt("Damage", damage);

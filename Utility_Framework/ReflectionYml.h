@@ -127,6 +127,17 @@ namespace Meta
 			vecNode["w"] = quat.w;
 			node[prop.name] = vecNode;
 		}
+		else if (typeID == type_guid(Mathf::Rect))
+		{
+			Mathf::Rect rect = std::any_cast<Mathf::Rect>(value);
+			MetaYml::Node rectNode;
+			rectNode.SetStyle(MetaYml::EmitterStyle::Flow);
+			rectNode["x"] = rect.x;
+			rectNode["y"] = rect.y;
+			rectNode["width"] = rect.width;
+			rectNode["height"] = rect.height;
+			node[prop.name] = rectNode;
+		}
 		else if (typeID == type_guid(FileGuid))
 		{
 			FileGuid fileGuid = std::any_cast<FileGuid>(value);
@@ -222,6 +233,16 @@ namespace Meta
 						node[prop.name]["y"].as<float>(),
 						node[prop.name]["z"].as<float>(), 
 						node[prop.name]["w"].as<float>()
+					)
+				);
+			}
+			else if (prop.typeID == type_guid(Mathf::Rect))
+			{
+				prop.setter(instance, Mathf::Rect(
+						node[prop.name]["x"].as<float>(), 
+						node[prop.name]["y"].as<float>(), 
+						node[prop.name]["width"].as<float>(), 
+						node[prop.name]["height"].as<float>()
 					)
 				);
 			}

@@ -31,6 +31,7 @@ ParticleSystem::~ParticleSystem()
 void ParticleSystem::Play()
 {
 	m_isRunning = true;
+	m_isPaused = false;
 	m_activeParticleCount = 0;
 
 	for (auto& particle : m_particleData)
@@ -42,7 +43,7 @@ void ParticleSystem::Play()
 
 void ParticleSystem::Update(float delta)
 {
-	if (!m_isRunning)
+	if (!m_isRunning || m_isPaused)
 		return;
 
 	// 모듈 연결

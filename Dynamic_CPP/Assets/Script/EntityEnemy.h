@@ -49,7 +49,6 @@ public:
 	Mathf::Vector3 hitBaseScale;
 	Mathf::Quaternion hitrot;
 
-
 	[[Property]]
 	float m_knockBackVelocity = 1.f;
 	[[Property]]
