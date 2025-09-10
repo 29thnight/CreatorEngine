@@ -37,19 +37,19 @@ void WeaponCapsule::Update(float tick)
 				Prefab* weaponPrefab;
 				if (weaponCode == 0)  
 				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("MeleeWeapon");
+					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
 				}
 				else if (weaponCode == 1)  
 				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("RangeWeapon");
+					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
 				}
 				else if (weaponCode == 2)  
 				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("BombWeapon");
+					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBomb");
 				}
 				else
 				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("BasicWeapon");
+					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBasic");
 				}
 				
 				if (weaponPrefab && ownerPlayer)

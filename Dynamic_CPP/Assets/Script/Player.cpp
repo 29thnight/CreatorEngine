@@ -52,11 +52,11 @@ void Player::Start()
 	}
 
 
-	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
-	//handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
+	//handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
+	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 	
 
-	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("BasicWeapon");
+	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("WeaponBasic");
 	if (basicWeapon && player)
 	{
 		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(basicWeapon, "BasicWeapon");
@@ -111,9 +111,9 @@ void Player::Update(float tick)
 		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);*/
 	}
 
-	if (isDead)
+	if (isStun)
 	{
-		m_animator->SetParameter("OnDead", true);
+		m_animator->SetParameter("OnStrun", true);   //피0
 	}
 
 	if (catchedObject)
@@ -135,7 +135,7 @@ void Player::Update(float tick)
 			float distance = directionToAsis.Length();
 			directionToAsis.Normalize();
 
-			float dot = directionToAsis.Dot(-GetOwner()->m_transform.GetForward());
+			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
 			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
 			{
 				onIndicate = true;
@@ -215,31 +215,31 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	auto cam = camComponent->GetCamera();
-	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//auto cam = camComponent->GetCamera();
+	//auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	float w = XMVectorGetW(clipSpacePos);
-	if (w < 0.001f) {
-		// 원래 위치 반환.
-		GetOwner()->m_transform.SetPosition(worldpos);
-		return;
-	}
-	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//float w = XMVectorGetW(clipSpacePos);
+	//if (w < 0.001f) {
+	//	// 원래 위치 반환.
+	//	GetOwner()->m_transform.SetPosition(worldpos);
+	//	return;
+	//}
+	//XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	float clamp_limit = 0.9f;
-	XMVECTOR clampedNdcPos = XMVectorClamp(
-		ndcPos,
-		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	);
-	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+	//float clamp_limit = 0.9f;
+	//XMVECTOR clampedNdcPos = XMVectorClamp(
+	//	ndcPos,
+	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+	//	XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	//);
+	//XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	//XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-	GetOwner()->m_transform.SetPosition(newWorldPos);
+	//GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
 void Player::SendDamage(Entity* sender, int damage)
@@ -254,7 +254,7 @@ void Player::SendDamage(Entity* sender, int damage)
 			DropCatchItem();
 			if (m_currentHP <= 0)
 			{
-				isDead = true;
+				isStun = true;
 			}
 		}
 	}
@@ -262,7 +262,7 @@ void Player::SendDamage(Entity* sender, int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
-	if (isStun || isKnockBack || !m_isCallStart || isDashing || isDead || isAttacking) return;
+	if (isStun || isKnockBack || !m_isCallStart || isDashing || isAttacking) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 	m_animator->SetUseLayer(1, true);
@@ -323,29 +323,6 @@ void Player::Throw()
 
 void Player::ThrowEvent()
 {
-
-	//Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-	//auto asis = GameObject::Find("Asis");
-	//Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-	//Mathf::Vector3 directionToAsis = asisPos - myPos;
-	//float distance = directionToAsis.Length();
-	//directionToAsis.Normalize();
-
-	//float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-		//if (catchedObject)
-		//{
-		//	auto item = catchedObject->GetOwner()->GetComponent<EntityItem>();
-		//	if (item) {
-		//		item->SetThrowOwner(this);
-		//	}
-		//	catchedObject = nullptr;
-		//	m_nearObject = nullptr; //&&&&&
-		//	if (m_curWeapon)
-		//		m_curWeapon->SetEnabled(true);
-		//}
-
-
-
 	std::cout << "ThrowEvent" << std::endl;
 	if (catchedObject) {
 		//catchedObject->SetThrowOwner(this);
@@ -421,6 +398,7 @@ void Player::StartAttack()
 {
 	isCharging = true;
 	//여기서 공격처리하고 차징시작 
+
 	if (isAttacking == false || canMeleeCancel == true)
 	{
 		isAttacking = true;
@@ -435,25 +413,18 @@ void Player::StartAttack()
 				{
 					m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
 					std::cout << "MeleeAttack1" << std::endl;
-					canMeleeCancel = false;
-					//m_comboCount++;
 				}
 				else if (m_comboCount == 1)
 				{
 					m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
 					std::cout << "MeleeAttack2" << std::endl;
-					canMeleeCancel = false;
-					//m_comboCount++;
 				}
 				else if (m_comboCount == 2)
 				{
 					m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-					std::cout << "MeleeAttack3" << std::endl;
-					canMeleeCancel = false;
+					std::cout << "MeleeAttack3" << std::endl; 
 				}
-
-				/*m_comboCount++;
-				m_comboElapsedTime = 0;*/
+				canMeleeCancel = false;
 			}
 
 
@@ -461,6 +432,7 @@ void Player::StartAttack()
 			{
 				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 				std::cout << "RangeAttack!!" << std::endl;
+				RangeAttack();
 				//ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
 			}
 
@@ -484,7 +456,7 @@ void Player::Charging()
 {
 	if (m_chargingTime >= minChargedTime)
 	{
-		std::cout << "charginggggggg" << std::endl;
+		//std::cout << "charginggggggg" << std::endl;
 	}
 	//m_animator->SetParameter("Charging", true); //차징중에 기모으는 이펙트 출력 Idle or Move 애니메이션 자율
 
@@ -495,7 +467,7 @@ void Player::Attack1()
 	//여기선 차징시간이 넘으면 차징공격만 실행
 	//근거리는 큰이펙트 + 1,2,3타중 정한애니메이션중 하나  ,,, 원거리는 부채꼴로 여러발 발사
 	isCharging = false;
-	std::cout << m_chargingTime << " second charging" << std::endl;
+	//std::cout << m_chargingTime << " second charging" << std::endl;
 
 
 	if (m_chargingTime >= minChargedTime)
@@ -625,16 +597,37 @@ void Player::FindNearObject(GameObject* gameObject)
 void Player::Cancancel()
 {
 	canMeleeCancel = true;
-	if (m_comboCount < 2)
+
+
+	if (m_curWeapon->itemType == ItemType::Basic)
 	{
-		m_comboCount++;
-		m_comboElapsedTime = 0.f;
+		//1콤보까지만 올라가게
+		if (m_comboCount < 1)
+		{
+			m_comboCount++;
+			m_comboElapsedTime = 0.f;
+		}
+		else
+		{
+			m_comboCount = 0;
+			m_comboElapsedTime = 0.f;
+		}
 	}
-	else
+	else if (m_curWeapon->itemType == ItemType::Meely)
 	{
-		m_comboCount = 0;
-		m_comboElapsedTime = 0.f;
+		//2콤보까지 가능
+		if (m_comboCount < 2)
+		{
+			m_comboCount++;
+			m_comboElapsedTime = 0.f;
+		}
+		else
+		{
+			m_comboCount = 0;
+			m_comboElapsedTime = 0.f;
+		}
 	}
+	
 }
 
 void Player::ChangeAutoTarget(Mathf::Vector2 dir)
@@ -731,12 +724,46 @@ void Player::MeleeAttack()
 		}
 }
 
-void Player::ShootBullet()
+void Player::RangeAttack()
 {
 	//원거리 무기 일때 에임보정후 발사
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	float distance;
-	
+
+	inRangeEnemy.clear();
+	curTarget = nullptr;
+	nearDistance = FLT_MAX;
+	//inRangeEnemy 담기
+	//
+
+	std::vector<HitResult> hits;
+	OverlapInput RangeInfo;
+	RangeInfo.layerMask = 1u; //일단 다떄림
+	Transform transform = GetOwner()->m_transform;
+	RangeInfo.position = transform.GetWorldPosition();
+	RangeInfo.rotation = transform.GetWorldQuaternion();
+	PhysicsManagers->SphereOverlap(RangeInfo, rangeDistacne, hits);
+
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+		if (auto enemy = object->GetComponent<EntityEnemy>())
+		{
+
+
+			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 enemyPos = object->m_transform.GetWorldPosition();
+			Mathf::Vector3 directionToEnemy = enemyPos - myPos;
+			directionToEnemy.Normalize();
+			float dot = directionToEnemy.Dot(GetOwner()->m_transform.GetForward());
+			if (dot > cosf(Mathf::Deg2Rad * rangeAngle * 0.5f))
+			{
+				auto [iter, inserted] = inRangeEnemy.insert(enemy);
+			}
+		}
+	}
+
 	for (auto enemy : inRangeEnemy)
 	{
 		if (enemy)
@@ -745,28 +772,56 @@ void Player::ShootBullet()
 			XMVECTOR diff = XMVectorSubtract(playerPos, enemyPos);
 			XMVECTOR distSqVec = XMVector3LengthSq(diff);
 			XMStoreFloat(&distance, distSqVec);
-			
+
 			if (distance < nearDistance)
 			{
 				nearDistance = distance;
 				curTarget = enemy;
-				
+
 			}
-			
-			
 		}
 	}
 	if (curTarget)
 	{
 		//원거리 공격
+		Transform* transform = GetOwner()->GetComponent<Transform>();
+
+		Mathf::Vector3 myPos = transform->GetWorldPosition();
+		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+		DirectX::SimpleMath::Vector3 dir = targetPos - myPos;
+		dir.y = 0; // 상하 회전 무시
+		dir.Normalize();
+		float targetYaw = std::atan2(dir.z, dir.x) - (XM_PI / 2.0);
+		targetYaw = -targetYaw;
+		DirectX::SimpleMath::Quaternion lookQuat = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0, 0);
+		transform->SetRotation(lookQuat);
+
 	}
+	else
+	{
+		//ShootSpecialBullet();
+
+	}
+
 
 	nearDistance = FLT_MAX;
 }
 
+void Player::ShootBullet()
+{
+	if (m_curWeapon) //1~4발째
+	{
+		ShootNormalBullet();
+	}
+	else   //5발째면
+	{
+		ShootSpecialBullet();
+	}
+}
+
 void Player::ShootNormalBullet()
 {
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("NormalBullet");
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
 	if (bulletprefab && player)
 	{
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
@@ -783,7 +838,7 @@ void Player::ShootNormalBullet()
 void Player::ShootSpecialBullet()
 {
 	//Todo:: pool에서찾고 없으면 프리팹에서 생성
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("SpecialBullet");
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
 	if (bulletprefab && player)
 	{
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
@@ -801,7 +856,7 @@ void Player::ShootSpecialBullet()
 
 void Player::ThrowBomb()
 {
-	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
+	//Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
 	//bomb->ThrowBomb(this, bombThrowPosition);
 	//bomb 을 프리팹만든걸로 받아오게끔 수정 or weaponPool 필요
 }

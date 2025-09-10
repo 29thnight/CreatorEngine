@@ -1,6 +1,6 @@
 m_name: PlayerGirl
 m_isEnabled: true
-m_instanceID: 2066583837
+m_instanceID: 2490581292
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -77,6 +77,8 @@ PrefabNode:
         rangedAtkCooldown: 1
         rangedAutoAimRange: 10
         minChargedTime: 0.699999988
+        rangeAngle: 90
+        rangeDistacne: 5
         bombMoveSpeed: 0.00999999978
         GracePeriod: 1
         ResurrectionRange: 5
@@ -86,7 +88,7 @@ PrefabNode:
         SlotChangeCooldown: 2
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 1261445697
+        m_instanceID: 3797207822
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -122,7 +124,7 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 3885400992
+            m_instanceID: 2413518439
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -637,6 +639,22 @@ PrefabNode:
                         nextStateName: Idle
                         hasExitTime: true
                         exitTime: 0.635999978
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: MeleeAttack1
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: MeleeAttack3 to MeleeAttack1
+                        curStateName: MeleeAttack3
+                        nextStateName: MeleeAttack1
+                        hasExitTime: false
+                        exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 6
                     AnimationIndex: 12

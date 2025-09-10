@@ -69,11 +69,11 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	{
 		if (p1dir.Length() < p2dir.Length()) {
 			Target = Player1;
-			std::cout << "Idle action: Target set to Player1." << std::endl;
+			//std::cout << "Idle action: Target set to Player1." << std::endl;
 		}
 		else {
 			Target = Player2;
-			std::cout << "Idle action: Target set to Player2." << std::endl;
+			//std::cout << "Idle action: Target set to Player2." << std::endl;
 		}
 	}
 
@@ -103,32 +103,32 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		if (Target == Player1) 
 		{
 			if (asisdir.Length() < p1dir.Length()) {
-				std::cout << "Idle action: Target set to Asis based on Player1 distance." << std::endl;
+				//std::cout << "Idle action: Target set to Asis based on Player1 distance." << std::endl;
 				Target = asis;
 			}
 		}
 		else if(Target == Player2)
 		{
 			if (asisdir.Length() < p2dir.Length()) {
-				std::cout << "Idle action: Target set to Asis based on Player2 distance." << std::endl;
+				//std::cout << "Idle action: Target set to Asis based on Player2 distance." << std::endl;
 				Target = asis;
 			}
 		}
 		else 
 		{
-			std::cout << "Idle action: Target set to Asis as no player targets are closer." << std::endl;
+			//std::cout << "Idle action: Target set to Asis as no player targets are closer." << std::endl;
 			Target = asis;
 		}
 	}
 		
 	if (Target)
 	{
-		std::cout << "Idle action: Target is set to " << Target->ToString() << std::endl;
+		//std::cout << "Idle action: Target is set to " << Target->ToString() << std::endl;
 		blackBoard.SetValueAsGameObject("ClosedTarget", Target->ToString());
 	}
 	else
 	{
-		std::cout << "Idle action: No valid target found. Setting ClosedTarget to empty." << std::endl;
+		//std::cout << "Idle action: No valid target found. Setting ClosedTarget to empty." << std::endl;
 		blackBoard.SetValueAsGameObject("ClosedTarget", "");
 	}
 
@@ -141,7 +141,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("State");
 		if (state == "Idle")
 		{
-			std::cout << "Idle action already in progress." << std::endl;
+			//std::cout << "Idle action already in progress." << std::endl;
 			//return NodeStatus::Running; // Continue running if already in idle state
 			//dead test code
 			//blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
@@ -149,13 +149,13 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 		else
 		{
-			std::cout << "Switching to Idle state." << std::endl;
+			//std::cout << "Switching to Idle state." << std::endl;
 		}
 	}
 	else
 	{
 		blackBoard.SetValueAsString("State", "Idle");
-		std::cout << "Setting Idle state for the first time." << std::endl;
+		//std::cout << "Setting Idle state for the first time." << std::endl;
 	}
 
 	//std::cout << "Idle action executed." << std::endl;

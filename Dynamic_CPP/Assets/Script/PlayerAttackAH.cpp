@@ -11,6 +11,7 @@
 
 void PlayerAttackAH::Enter()
 {
+	std::cout << "attack start" << std::endl;
 	if (m_player == nullptr)
 	{
 		AnimationController* P1uppercontroller = m_ownerController;
@@ -49,7 +50,7 @@ void PlayerAttackAH::Update(float deltaTime)
 {
 	
 	if (m_player && m_player->startRay)
-	eft->m_transform.SetPosition(m_player->handSocket->transform.GetLocalMatrix().r[3]);
+		eft->m_transform.SetPosition(m_player->handSocket->transform.GetLocalMatrix().r[3]);
 	if (m_player)
 	{
 		m_player->MeleeAttack();
@@ -57,6 +58,7 @@ void PlayerAttackAH::Update(float deltaTime)
 
 	if (m_player)
 	{
+		m_player->isAttacking = true;
 		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0,0 });
 	}

@@ -74,6 +74,7 @@ public:
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 
+	
 
 	//잡기 던지기
 	[[Property]]
@@ -158,7 +159,11 @@ public:
 	float attackElapsedTime = 0.f;
 	float nearDistance = FLT_MAX;
 	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들
-	std::vector<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
+	[[Property]]
+	float rangeAngle = 150.f;      //원거리 유도 각  forward기준 -rangeRadius ~ + rangeRadius;
+	[[Property]]
+	float rangeDistacne = 5.f;    //원거리 유도거리 최대거리
+	std::unordered_set<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
 	EntityEnemy* curTarget = nullptr;
 	
 	void ChangeAutoTarget(Mathf::Vector2 dir); //사격중 Lstick 으로 타겟변경                 //연속사격중일때 실행 
@@ -167,6 +172,7 @@ public:
 	[[Property]]
 	float bombMoveSpeed = 0.01f;  //폭탄도착지점 
  	void MeleeAttack();
+	void RangeAttack();
 	[[Method]]
 	void ShootBullet();
 	[[Method]]
@@ -192,7 +198,6 @@ public:
 	bool startRay = false;
 
 	//피격,죽음
-	bool isDead = false;
 	bool isStun = false;
 	float stunTime = 0.f;
 	//bool isKnockBack = false;
@@ -208,8 +213,7 @@ public:
 	float ResurrectionHP = 50.f;   //부활시 회복하는 HP &비율
 	[[Property]]
 	float ResurrectionGracePeriod = 3.0f;  //부활시 무적시간
-	
-
+	bool sucessAttack = false;
 
 
 	//무기

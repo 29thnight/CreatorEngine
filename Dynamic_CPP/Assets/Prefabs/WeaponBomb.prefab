@@ -1,22 +1,22 @@
-m_name: BombWeapon
+m_name: WeaponBomb
 m_isEnabled: true
-m_instanceID: 770419270
+m_instanceID: 1055428418
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: BombWeapon
+    m_name: WeaponBomb
     m_isEnabled: true
-    m_instanceID: 156131981
+    m_instanceID: 2146935678
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 542
+    m_index: 7
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [543]
-    m_prefabFileGuid: 5d91a7d3-9cce-569a-9e78-936301333bd4
+    m_childrenIndices: [8]
+    m_prefabFileGuid: b36eaafe-5dcb-5db8-9dc6-ea16bd478322
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -44,24 +44,24 @@ PrefabNode:
         durUseBuf: 100
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 1845939456
+        m_instanceID: 2236944763
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
-        m_name: Weapon_sword01
+        m_name: Weapon_sword01 (1)
         m_isEnabled: true
-        m_instanceID: 3127242256
+        m_instanceID: 3686482014
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 2, y: 2, z: 1, w: 0}
-          m_parentID: 542
-        m_index: 543
-        m_parentIndex: 542
+          m_parentID: 7
+        m_index: 8
+        m_parentIndex: 7
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 5d91a7d3-9cce-569a-9e78-936301333bd4
+        m_prefabFileGuid: b36eaafe-5dcb-5db8-9dc6-ea16bd478322
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
@@ -72,7 +72,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1491447127
+            m_instanceID: 2895410820
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_sword01

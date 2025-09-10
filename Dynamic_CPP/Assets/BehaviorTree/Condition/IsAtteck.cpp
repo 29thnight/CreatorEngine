@@ -3,7 +3,7 @@
 
 bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
-	std::cout << "IsAtteck ConditionCheck: Checking if entity is in attack range." << std::endl;
+	//std::cout << "IsAtteck ConditionCheck: Checking if entity is in attack range." << std::endl;
 
 	//this based target logic
 	bool isTarget = blackBoard.HasKey("Target");
@@ -30,13 +30,13 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (!useAttack)
 	{
-		std::cout << "Not found AtkRange None used Attack Entity : " + m_owner->GetHashedName().ToString() << std::endl;
+		//std::cout << "Not found AtkRange None used Attack Entity : " + m_owner->GetHashedName().ToString() << std::endl;
 		return false; // No attack range defined, cannot attack
 	}
 
 	if (!isTarget)
 	{
-		std::cout << "IsAtteck ConditionCheck: No target found." << std::endl;
+		//std::cout << "IsAtteck ConditionCheck: No target found." << std::endl;
 		return false; // No target to attack
 	}
 
@@ -51,7 +51,7 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (dir.Length() < atkRange)
 	{
-		std::cout << "IsAtteck ConditionCheck: Entity is within attack range." << std::endl;
+		//std::cout << "IsAtteck ConditionCheck: Entity is within attack range." << std::endl;
 		return true; // Entity is within attack range, condition met
 	}
 
@@ -123,6 +123,6 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 dir = asispos - pos;*/
 		
-	std::cout << "IsAtteck ConditionCheck: Entity is out of attack range." << std::endl;
+	//std::cout << "IsAtteck ConditionCheck: Entity is out of attack range." << std::endl;
 	return false;
 }

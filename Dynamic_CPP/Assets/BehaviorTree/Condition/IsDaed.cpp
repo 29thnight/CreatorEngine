@@ -7,7 +7,7 @@ bool IsDaed::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	
 	if (!HasIdentity)
 	{
-		std::cout << "IsDaed ConditionCheck: No Identity key found in blackboard." << std::endl;
+		//std::cout << "IsDaed ConditionCheck: No Identity key found in blackboard." << std::endl;
 		return false; // No Identity key, cannot determine if it's a dead entity
 	}
 
@@ -22,10 +22,10 @@ bool IsDaed::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		}
 		else 
 		{
-			std::cout << "IsDaed ConditionCheck: Entity is alive, HP: " << hp << std::endl;
+			//std::cout << "IsDaed ConditionCheck: Entity is alive, HP: " << hp << std::endl;
 			return false; // Entity is alive
 		}
 	}
-	std::cout << "IsDaed ConditionCheck: Entity is not dead, HP: " << blackBoard.GetValueAsInt("HP") << std::endl;
+	//std::cout << "IsDaed ConditionCheck: Entity is not dead, HP: " << blackBoard.GetValueAsInt("HP") << std::endl;
 	return false;
 }

@@ -41,10 +41,10 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 			dir = targetPos - pos;
 
-			std::cout << targetPos.x << "," << targetPos.y << "," << targetPos.z << std::endl;
-			std::cout << pos.x << "," << pos.y << "," << pos.z << std::endl;
+			//std::cout << targetPos.x << "," << targetPos.y << "," << targetPos.z << std::endl;
+			//std::cout << pos.x << "," << pos.y << "," << pos.z << std::endl;
 
-			std::cout << "Distance to Target: " << dir.Length() << std::endl;
+			//std::cout << "Distance to Target: " << dir.Length() << std::endl;
 		}
 	}
 	else {
@@ -57,7 +57,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	
 
 	if (dir.Length() < chaseRange) {
-		std::cout << "closed Target in ChaseRange" << std::endl;
+		//std::cout << "closed Target in ChaseRange" << std::endl;
 		return true;
 	}
 
@@ -69,14 +69,14 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		if (state == "Chase")
 		{
 			if (chaseOutTime > 0) {
-				std::cout << "closed Target Out ranage but chace remain time :" << chaseOutTime << std::endl;
+				//std::cout << "closed Target Out ranage but chace remain time :" << chaseOutTime << std::endl;
 				return true;
 			}	
 		}
 	}
 
 
-	std::cout << "closed Target Out ranage" << std::endl;
+	//std::cout << "closed Target Out ranage" << std::endl;
 
 	return false;
 }
