@@ -52,6 +52,10 @@ public:
     void CancelModifyEmitter();
 
     // 렌더 모듈용 설정 메서드
+    void RenderShaderSelectionUI(RenderModules* renderModule);
+    void RenderTextureSelectionUI(RenderModules* renderModule);
+    void RenderStateSelectionUI(RenderModules* renderModule);
+
     void RenderModuleDetailEditor();            // 2d
     void RenderRenderModuleDetailEditor();      // 3d
 

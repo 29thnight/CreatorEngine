@@ -264,6 +264,7 @@
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
+    <ClCompile Include="SpriteSheetComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
@@ -305,6 +306,7 @@
     <ClInclude Include="Navigation.h" />
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="ScriptStringModule.h" />
+    <ClInclude Include="SpriteSheetComponent.h" />
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />

@@ -19,64 +19,21 @@ void TrailRenderModule::Initialize()
 {
     m_pso = std::make_unique<PipelineStateObject>();
 
-    // 블렌드 스테이트 (알파 블렌딩)
-    D3D11_BLEND_DESC blendDesc = {};
-    blendDesc.AlphaToCoverageEnable = FALSE;
-    blendDesc.IndependentBlendEnable = FALSE;
-    blendDesc.RenderTarget[0].BlendEnable = TRUE;
-    blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-    blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-    blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-    blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    // 기본 셰이더 설정
+    m_vertexShaderName = "TrailVertex";
+    m_pixelShaderName = "Dash";
 
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
-    );
+    // 렌더 상태 프리셋 설정
+    m_blendPreset = BlendPreset::Alpha;
+    m_depthPreset = DepthPreset::ReadOnly;
+    m_rasterizerPreset = RasterizerPreset::NoCull;
 
-    // 래스터라이저 스테이트
-    CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-    rasterizerDesc.CullMode = D3D11_CULL_NONE;
-    rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)
-    );
-
-    // 깊이 스텐실 스테이트
-    CD3D11_DEPTH_STENCIL_DESC depthDesc{ CD3D11_DEFAULT() };
-    depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    depthDesc.DepthEnable = true;
-    depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-    DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
-
+    // 프리미티브 토폴로지 설정
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
-    // 셰이더 설정 (TrailVertex를 렌더링하는 셰이더)
-    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["TrailVertex"];
-
-    // 나중에 이펙트 별로 셰이더 설정할수있게하는 함수 추가할것 (현재는 그냥 고정)
-    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Dash"];
-
-    // 입력 레이아웃 (TrailVertex 구조체)
-    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-    {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-    };
-
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
-            vertexLayoutDesc,
-            _countof(vertexLayoutDesc),
-            m_pso->m_vertexShader->GetBufferPointer(),
-            m_pso->m_vertexShader->GetBufferSize(),
-            &m_pso->m_inputLayout
-        )
-    );
+    // 부모의 함수들로 모든 상태 업데이트
+    UpdatePSOShaders();
+    UpdatePSORenderStates();
 
     // 샘플러 설정
     auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
@@ -88,10 +45,6 @@ void TrailRenderModule::Initialize()
         D3D11_BIND_CONSTANT_BUFFER,
         &m_constantBufferData
     );
-
-    m_dissolveTexture = DataSystems->LoadTexture("Sword_Eft_02.png");
-    m_dissolveTexture2 = DataSystems->LoadTexture("Sword_Eft_03.png");
-    m_backgroundTexture = DataSystems->LoadTexture("Sword_Eft_04.png");
 }
 
 void TrailRenderModule::Release()
@@ -100,7 +53,9 @@ void TrailRenderModule::Release()
     m_trailModule = nullptr;
     m_particleSRV = nullptr;
     m_instanceCount = 0;
-    m_assignedTexture = nullptr;
+
+    // 다중 텍스처 정리
+    ClearTextures();
 }
 
 void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
@@ -108,14 +63,11 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     if (!m_enabled || !m_trailModule)
         return;
 
-    // TrailGenerateModule에서 생성된 메쉬 데이터 가져오기
     ID3D11Buffer* vertexBuffer = m_trailModule->GetVertexBuffer();
     ID3D11Buffer* indexBuffer = m_trailModule->GetIndexBuffer();
     UINT maxIndices = m_trailModule->GetMaxIndexCount();
     if (maxIndices == 0) return;
 
-
-    // 렌더링할 데이터가 없으면 리턴
     if (!vertexBuffer || !indexBuffer)
         return;
 
@@ -125,18 +77,10 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     UpdateConstantBuffer(world, view, projection);
     deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
 
-    ID3D11ShaderResourceView* srvs[4] = { nullptr };
-
-    if (m_assignedTexture && m_assignedTexture->m_pSRV)
-        srvs[0] = m_assignedTexture->m_pSRV;
-    if (m_dissolveTexture && m_dissolveTexture->m_pSRV)
-        srvs[1] = m_dissolveTexture->m_pSRV;
-    if (m_dissolveTexture2 && m_dissolveTexture2->m_pSRV)
-        srvs[2] = m_dissolveTexture2->m_pSRV;
-    if (m_backgroundTexture && m_backgroundTexture->m_pSRV)
-        srvs[3] = m_backgroundTexture->m_pSRV;
-
-    deviceContext->PSSetShaderResources(0, 4, srvs);
+    // 다중 텍스처 바인딩 사용
+    if (GetTextureCount() > 0) {
+        BindTextures();
+    }
 
     // 정점/인덱스 버퍼 바인딩
     UINT stride = sizeof(TrailVertex);
@@ -144,13 +88,14 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
     deviceContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 
-
     // 렌더링 실행
     deviceContext->DrawIndexed(maxIndices, 0, 0);
 
-    // 리소스 정리
-    ID3D11ShaderResourceView* nullSRVs[4] = { nullptr };
-    deviceContext->PSSetShaderResources(0, 4, nullSRVs);
+    // 리소스 정리 (다중 텍스처 대응)
+    if (GetTextureCount() > 0) {
+        std::vector<ID3D11ShaderResourceView*> nullSRVs(GetTextureCount(), nullptr);
+        deviceContext->PSSetShaderResources(0, nullSRVs.size(), nullSRVs.data());
+    }
 }
 
 void TrailRenderModule::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
@@ -164,11 +109,6 @@ void TrailRenderModule::SetupRenderTarget(RenderPassData* renderData)
     auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
-}
-
-void TrailRenderModule::SetTexture(Texture* texture)
-{
-    m_assignedTexture = texture;
 }
 
 void TrailRenderModule::SetTrailGenerateModule(TrailGenerateModule* trailModule)
@@ -200,11 +140,21 @@ void TrailRenderModule::ResetForReuse()
     m_isRendering = false;
     m_gpuWorkPending = false;
     m_particleSRV = nullptr;
-    m_assignedTexture = nullptr;
 
-    // 상수 버퍼 초기화
-    if (m_constantBuffer)
-    {
+    // 다중 텍스처 초기화
+    ClearTextures();
+
+    // 렌더 상태를 기본값으로 리셋
+    m_vertexShaderName = "TrailVertex";
+    m_pixelShaderName = "Dash";
+    m_blendPreset = BlendPreset::Alpha;
+    m_depthPreset = DepthPreset::ReadOnly;
+    m_rasterizerPreset = RasterizerPreset::NoCull;
+
+    UpdatePSOShaders();
+    UpdatePSORenderStates();
+
+    if (m_constantBuffer) {
         m_constantBufferData = {};
         m_constantBufferData.world = Mathf::Matrix::Identity;
         m_constantBufferData.view = Mathf::Matrix::Identity;
@@ -225,20 +175,43 @@ void TrailRenderModule::WaitForGPUCompletion()
     m_gpuWorkPending = false;
 }
 
+void TrailRenderModule::UpdatePSOShaders()
+{
+    RenderModules::UpdatePSOShaders();
+
+    if (m_pso && m_pso->m_vertexShader) {
+        if (m_pso->m_inputLayout) {
+            m_pso->m_inputLayout = nullptr;
+        }
+
+        D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+        };
+
+        DirectX11::ThrowIfFailed(
+            DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
+                vertexLayoutDesc,
+                _countof(vertexLayoutDesc),
+                m_pso->m_vertexShader->GetBufferPointer(),
+                m_pso->m_vertexShader->GetBufferSize(),
+                &m_pso->m_inputLayout
+            )
+        );
+    }
+}
+
 nlohmann::json TrailRenderModule::SerializeData() const
 {
     nlohmann::json json;
 
-    // 텍스처 정보
-    json["texture"] = {
-        {"hasTexture", m_assignedTexture != nullptr}
-    };
+    // 부모의 렌더 상태 직렬화 사용
+    json.merge_patch(SerializeRenderStates());
 
-    if (m_assignedTexture)
-    {
-        json["texture"]["name"] = m_assignedTexture->m_name;
-        json["texture"]["assigned"] = true;
-    }
+    // 다중 텍스처 직렬화
+    json["textures"] = SerializeTextures();
 
     // 상수 버퍼 데이터
     json["constantBuffer"] = {
@@ -265,36 +238,17 @@ nlohmann::json TrailRenderModule::SerializeData() const
 
 void TrailRenderModule::DeserializeData(const nlohmann::json& json)
 {
-    // 텍스처 정보 복원
-    if (json.contains("texture"))
-    {
-        const auto& textureJson = json["texture"];
+    // 부모의 렌더 상태 역직렬화 사용
+    DeserializeRenderStates(json);
 
-        if (textureJson.contains("name"))
-        {
-            std::string textureName = textureJson["name"];
-
-            if (textureName.find('.') == std::string::npos)
-            {
-                textureName += ".png";
-            }
-
-            m_assignedTexture = DataSystems->LoadTexture(textureName);
-
-            if (m_assignedTexture) {
-                std::string nameWithoutExtension = file::path(textureName).stem().string();
-                m_assignedTexture->m_name = nameWithoutExtension;
-            }
-        }
-    }
+    // 다중 텍스처 역직렬화
+    DeserializeTextures(json);
 
     // 상수 버퍼 데이터 복원
-    if (json.contains("constantBuffer"))
-    {
+    if (json.contains("constantBuffer")) {
         const auto& cbJson = json["constantBuffer"];
 
-        if (cbJson.contains("cameraPosition"))
-        {
+        if (cbJson.contains("cameraPosition")) {
             const auto& camPosJson = cbJson["cameraPosition"];
             Mathf::Vector3 cameraPosition(
                 camPosJson.value("x", 0.0f),
@@ -304,19 +258,16 @@ void TrailRenderModule::DeserializeData(const nlohmann::json& json)
             SetCameraPosition(cameraPosition);
         }
 
-        if (cbJson.contains("time"))
-        {
+        if (cbJson.contains("time")) {
             m_constantBufferData.time = cbJson["time"];
         }
     }
 
     // 렌더링 상태 복원
-    if (json.contains("renderState"))
-    {
+    if (json.contains("renderState")) {
         const auto& renderJson = json["renderState"];
 
-        if (renderJson.contains("instanceCount"))
-        {
+        if (renderJson.contains("instanceCount")) {
             m_instanceCount = renderJson["instanceCount"];
         }
     }
@@ -325,6 +276,7 @@ void TrailRenderModule::DeserializeData(const nlohmann::json& json)
         Initialize();
     }
 }
+
 
 std::string TrailRenderModule::GetModuleType() const
 {

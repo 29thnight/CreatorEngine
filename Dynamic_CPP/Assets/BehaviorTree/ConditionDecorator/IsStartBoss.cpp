@@ -1,6 +1,6 @@
 #include "IsStartBoss.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool IsStartBoss::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	// Check boos stage Bettle start 
@@ -9,12 +9,12 @@ bool IsStartBoss::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (!HasIdentity)
 	{
-		std::cout << "IsStartBoss: No Identity key found in blackboard." << std::endl;
+		LOG("IsStartBoss: No Identity key found in blackboard.");
 		return false; // No Identity key, cannot determine if it's a boss stage
 	}
 	if (!HasIsStart)
 	{
-		std::cout << "IsStartBoss: No IsStart key found in blackboard." << std::endl;
+		LOG("IsStartBoss: No IsStart key found in blackboard.");
 		return false; // No IsStart key, cannot determine if the boss stage has started
 	}
 
@@ -22,17 +22,17 @@ bool IsStartBoss::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	auto Identity = blackBoard.GetValueAsString("Identity");
 	if (Identity != "Boss1")
 	{
-		std::cout << "IsStartBoss: Not a boss stage, Identity: " << Identity << std::endl;
+		LOG("IsStartBoss: Not a boss stage, Identity: " << Identity);
 		return false; // Not a boss stage
 	}
 
 	auto IsStart = blackBoard.GetValueAsBool("IsStart");
 	if (IsStart)
 	{
-		//std::cout << "IsStartBoss: Boss stage has started, Identity: " << Identity << std::endl;
+		//LOG("IsStartBoss: Boss stage has started, Identity: " << Identity);
 		return true; // Boss stage has started
 	}
 
-	std::cout << "IsStartBoss: Boss stage has not started yet, Identity: " << Identity << std::endl;
+	LOG("IsStartBoss: Boss stage has not started yet, Identity: " << Identity);
 	return false;
 }

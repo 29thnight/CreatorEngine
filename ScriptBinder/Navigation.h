@@ -45,3 +45,10 @@ struct Navigation
 };
 
 constexpr int NavDirectionCount = 4;
+
+cbuffer ImageInfo
+{
+	Mathf::xMatrix world;
+	float2 size;
+	float2 screenSize;
+};

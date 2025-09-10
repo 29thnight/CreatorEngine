@@ -189,6 +189,147 @@ void EffectEditor::AssignTextureToEmitter(int emitterIndex, int textureIndex)
 	}
 }
 
+void EffectEditor::RenderShaderSelectionUI(RenderModules* renderModule)
+{
+	if (!renderModule) return;
+
+	ImGui::Separator();
+	ImGui::Text("Shader Settings:");
+
+	auto availableVS = RenderModules::GetAvailableVertexShaders();
+	if (!availableVS.empty()) {
+		std::string currentVS = renderModule->GetVertexShaderName();
+		if (ImGui::BeginCombo("Vertex Shader", currentVS.c_str())) {
+			for (const auto& shaderName : availableVS) {
+				bool isSelected = (currentVS == shaderName);
+				if (ImGui::Selectable(shaderName.c_str(), isSelected)) {
+					renderModule->SetVertexShader(shaderName);
+				}
+				if (isSelected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+	}
+
+	auto availablePS = RenderModules::GetAvailablePixelShaders();
+	if (!availablePS.empty()) {
+		std::string currentPS = renderModule->GetPixelShaderName();
+		if (ImGui::BeginCombo("Pixel Shader", currentPS.c_str())) {
+			for (const auto& shaderName : availablePS) {
+				bool isSelected = (currentPS == shaderName);
+				if (ImGui::Selectable(shaderName.c_str(), isSelected)) {
+					renderModule->SetPixelShader(shaderName);
+				}
+				if (isSelected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+	}
+
+	ImGui::Separator();
+}
+
+void EffectEditor::RenderTextureSelectionUI(RenderModules* renderModule)
+{
+	if (!renderModule) return;
+
+	ImGui::Separator();
+	ImGui::Text("Texture Settings:");
+
+	// 현재 텍스처 슬롯들 표시
+	size_t textureCount = renderModule->GetTextureCount();
+	for (size_t i = 0; i < std::max(textureCount, size_t(4)); ++i) {
+		ImGui::PushID(i);
+
+		std::string slotLabel = "Slot " + std::to_string(i);
+		Texture* currentTexture = renderModule->GetTexture(i);
+		std::string currentName = currentTexture ? currentTexture->m_name : "None";
+
+		if (ImGui::BeginCombo(slotLabel.c_str(), currentName.c_str())) {
+			// None 옵션
+			if (ImGui::Selectable("None", currentTexture == nullptr)) {
+				renderModule->RemoveTexture(i);
+			}
+
+			// 사용 가능한 텍스처들
+			for (int t = 0; t < m_textures.size(); ++t) {
+				bool isSelected = (currentTexture == m_textures[t]);
+				std::string textureLabel = m_textures[t]->m_name;
+				if (textureLabel.empty()) {
+					textureLabel = "Texture " + std::to_string(t);
+				}
+
+				if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
+					renderModule->SetTexture(i, m_textures[t]);
+				}
+
+				if (isSelected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		ImGui::PopID();
+	}
+
+	if (ImGui::Button("Add Texture Slot")) {
+		renderModule->EnsureTextureSlots(textureCount + 1);
+	}
+
+	ImGui::Separator();
+}
+
+void EffectEditor::RenderStateSelectionUI(RenderModules* renderModule)
+{
+	if (!renderModule) return;
+
+	ImGui::Separator();
+	ImGui::Text("Render State Settings:");
+
+	// Blend State 설정
+	const char* blendPresetNames[] = {
+		"None", "Alpha", "Additive", "Multiply", "Subtractive", "Custom"
+	};
+
+	BlendPreset currentBlend = renderModule->GetBlendPreset();
+	int currentBlendIndex = static_cast<int>(currentBlend);
+
+	if (ImGui::Combo("Blend State", &currentBlendIndex, blendPresetNames, IM_ARRAYSIZE(blendPresetNames))) {
+		renderModule->SetBlendPreset(static_cast<BlendPreset>(currentBlendIndex));
+	}
+
+	// Depth State 설정
+	const char* depthPresetNames[] = {
+		"None", "Default", "Read Only", "Write Only", "Disabled", "Custom"
+	};
+
+	DepthPreset currentDepth = renderModule->GetDepthPreset();
+	int currentDepthIndex = static_cast<int>(currentDepth);
+
+	if (ImGui::Combo("Depth State", &currentDepthIndex, depthPresetNames, IM_ARRAYSIZE(depthPresetNames))) {
+		renderModule->SetDepthPreset(static_cast<DepthPreset>(currentDepthIndex));
+	}
+
+	// Rasterizer State 설정
+	const char* rasterizerPresetNames[] = {
+		"None", "Default", "No Cull", "Wireframe", "Wireframe No Cull", "Custom"
+	};
+
+	RasterizerPreset currentRasterizer = renderModule->GetRasterizerPreset();
+	int currentRasterizerIndex = static_cast<int>(currentRasterizer);
+
+	if (ImGui::Combo("Rasterizer State", &currentRasterizerIndex, rasterizerPresetNames, IM_ARRAYSIZE(rasterizerPresetNames))) {
+		renderModule->SetRasterizerPreset(static_cast<RasterizerPreset>(currentRasterizerIndex));
+	}
+
+	ImGui::Separator();
+}
+
 void EffectEditor::RenderModuleDetailEditor()
 {
 	if (!m_modifyingSystem || m_selectedModuleForEdit < 0) return;
@@ -614,42 +755,43 @@ void EffectEditor::RenderJsonSaveLoadUI()
 
 void EffectEditor::RenderEffectPlaybackSettings()
 {
-	if (ImGui::CollapsingHeader("Effect Playback Settings")) {
-		ImGui::DragFloat("Time Scale", &m_effectTimeScale, 0.01f, 0.1f, 5.0f);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Controls the playback speed of the entire effect");
-		}
+	ImGui::Text("Effect Playback Settings");
+	ImGui::Separator();
 
-		if (ImGui::Checkbox("Loop", &m_effectLoop)) {
-			// 루프가 켜지면 duration을 -1로 설정
-			if (m_effectLoop) {
-				m_effectDuration = -1.0f;
-			}
-			// 루프가 꺼지면 기본 duration 값으로 설정
-			else {
-				m_effectDuration = 1.0f; 
-			}
-		}
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Whether the effect should loop when it finishes");
-		}
+	ImGui::DragFloat("Time Scale", &m_effectTimeScale, 0.01f, 0.1f, 5.0f);
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("Controls the playback speed of the entire effect");
+	}
 
-		// 루프가 꺼져있을 때만 duration 설정 가능
-		if (!m_effectLoop) {
-			ImGui::DragFloat("Duration", &m_effectDuration, 0.1f, 0.1f, 100.0f);
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip("How long the effect should play (seconds)");
-			}
+	if (ImGui::Checkbox("Loop", &m_effectLoop)) {
+		// 루프가 켜지면 duration을 -1로 설정
+		if (m_effectLoop) {
+			m_effectDuration = -1.0f;
 		}
+		// 루프가 꺼지면 기본 duration 값으로 설정
 		else {
-			// 루프가 켜져있으면 duration을 비활성화 상태로 표시
-			ImGui::BeginDisabled();
-			float disabledDuration = -1.0f;
-			ImGui::DragFloat("Duration", &disabledDuration, 0.1f, -1.0f, 100.0f);
-			ImGui::EndDisabled();
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip("Duration is infinite when loop is enabled");
-			}
+			m_effectDuration = 1.0f;
+		}
+	}
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("Whether the effect should loop when it finishes");
+	}
+
+	// 루프가 꺼져있을 때만 duration 설정 가능
+	if (!m_effectLoop) {
+		ImGui::DragFloat("Duration", &m_effectDuration, 0.1f, 0.1f, 100.0f);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("How long the effect should play (seconds)");
+		}
+	}
+	else {
+		// 루프가 켜져있으면 duration을 비활성화 상태로 표시
+		ImGui::BeginDisabled();
+		float disabledDuration = -1.0f;
+		ImGui::DragFloat("Duration", &disabledDuration, 0.1f, -1.0f, 100.0f);
+		ImGui::EndDisabled();
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Duration is infinite when loop is enabled");
 		}
 	}
 }
@@ -2421,54 +2563,98 @@ void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 void EffectEditor::RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule)
 {
 	if (!billboardModule) return;
-
 	ImGui::Text("Billboard Render Module Settings");
-
-	// 텍스처 설정 UI
-	ImGui::Text("Texture Assignment:");
-
-	if (!m_textures.empty()) {
-		static int selectedTextureIndex = 0;
-
-		std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
-			? m_textures[selectedTextureIndex]->m_name
-			: "None";
-
-		if (ImGui::BeginCombo("Select Texture", currentTextureName.c_str())) {
-			for (int t = 0; t < m_textures.size(); ++t) {
-				bool isSelected = (selectedTextureIndex == t);
-				std::string textureLabel = m_textures[t]->m_name;
-
-				if (textureLabel.empty()) {
-					textureLabel = "Texture " + std::to_string(t);
-				}
-
-				if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
-					selectedTextureIndex = t;
-				}
-				if (isSelected) {
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button("Assign Texture")) {
-			if (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size()) {
-				billboardModule->SetTexture(m_textures[selectedTextureIndex]);
-			}
-		}
-	}
-	else {
-		ImGui::Text("No textures available");
-		ImGui::Text("Drag and drop texture files to add them");
-	}
-
+	// 셰이더 선택 UI
+	RenderShaderSelectionUI(billboardModule);
+	// 렌더 상태 선택 UI
+	RenderStateSelectionUI(billboardModule);
+	// 다중 텍스처 선택 UI
+	RenderTextureSelectionUI(billboardModule);
 	ImGui::Separator();
+	ImGui::Text("Billboard Specific Settings:");
 
-	// 빌보드 관련 추가 설정들이 있다면 여기에 추가
-	ImGui::Text("Additional billboard settings can be added here");
+	// 빌보드 타입 선택
+	const char* billboardTypes[] = { "None", "Basic", "SpriteAnimation"};
+	int currentType = static_cast<int>(billboardModule->GetBillboardType());
+	if (ImGui::Combo("Billboard Type", &currentType, billboardTypes, IM_ARRAYSIZE(billboardTypes)))
+	{
+		billboardModule->SetBillboardType(static_cast<BillBoardType>(currentType));
+	}
+
+	// 스프라이트 애니메이션 설정 (SpriteAnimation 타입일 때만 표시)
+	if (billboardModule->GetBillboardType() == BillBoardType::SpriteAnimation)
+	{
+		ImGui::Separator();
+		ImGui::Text("Sprite Animation Settings:");
+
+		auto spriteAnimCB = billboardModule->GetSpriteAnimationBuffer();
+		uint32 frameCount = spriteAnimCB.frameCount;
+		float animationDuration = spriteAnimCB.animationDuration;
+		uint32 gridColumns = spriteAnimCB.gridColumns;
+		uint32 gridRows = spriteAnimCB.gridRows;
+
+		bool changed = false;
+
+		if (ImGui::InputScalar("Frame Count", ImGuiDataType_U32, &frameCount))
+		{
+			changed = true;
+		}
+
+		if (ImGui::InputFloat("Animation Duration", &animationDuration, 0.1f, 1.0f, "%.2f"))
+		{
+			if (animationDuration < 0.1f) animationDuration = 0.1f;
+			changed = true;
+		}
+
+		if (ImGui::InputScalar("Grid Columns", ImGuiDataType_U32, &gridColumns))
+		{
+			changed = true;
+		}
+
+		if (ImGui::InputScalar("Grid Rows", ImGuiDataType_U32, &gridRows))
+		{
+			changed = true;
+		}
+
+		if (changed)
+		{
+			billboardModule->SetSpriteAnimation(frameCount, animationDuration, gridColumns, gridRows);
+		}
+
+		// 애니메이션 정보 표시
+		ImGui::Separator();
+		ImGui::Text("Animation Info:");
+		ImGui::Text("Total Frames: %u", frameCount);
+		ImGui::Text("Animation Duration: %.2f seconds", animationDuration);
+		if (frameCount > 0)
+		{
+			float frameRate = frameCount / animationDuration;
+			ImGui::Text("Frame Rate: %.1f FPS", frameRate);
+		}
+
+		// 프리뷰 컨트롤 (시뮬레이션용)
+		ImGui::Separator();
+		ImGui::Text("Preview Control:");
+		static float previewTime = 0.0f;
+
+		if (ImGui::SliderFloat("Preview Time", &previewTime, 0.0f, animationDuration, "%.2f"))
+		{
+			// 프리뷰 시간 변경 - 실제로는 파티클 시스템에서 자동으로 처리됨
+		}
+
+		if (ImGui::Button("Reset Preview"))
+		{
+			previewTime = 0.0f;
+		}
+
+		// 현재 프리뷰 프레임 표시
+		if (animationDuration > 0.0f && frameCount > 0)
+		{
+			float normalizedTime = fmod(previewTime, animationDuration) / animationDuration;
+			uint32 currentPreviewFrame = static_cast<uint32>(normalizedTime * frameCount) % frameCount;
+			ImGui::Text("Current Preview Frame: %u", currentPreviewFrame);
+		}
+	}
 }
 
 void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModule)
@@ -2909,10 +3095,18 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	if (!meshModule) return;
 
 	ImGui::Text("Mesh Render Module Settings");
-	bool isAdditive = meshModule->GetBlend();
-	if (ImGui::Checkbox("Additive Blend", &isAdditive)) {
-		meshModule->SetAdditiveBlend(isAdditive);
-	}
+
+	// 셰이더 선택 UI
+	RenderShaderSelectionUI(meshModule);
+
+	// 렌더 상태 선택 UI  
+	RenderStateSelectionUI(meshModule);
+
+	// 다중 텍스처 선택 UI
+	RenderTextureSelectionUI(meshModule);
+
+	ImGui::Separator();
+	ImGui::Text("Mesh Specific Settings:");
 
 	// 메시 타입 설정
 	MeshType currentMeshType = meshModule->GetMeshType();
@@ -2948,25 +3142,6 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 			ImGui::Separator();
 		}
 	}
-
-	// 카메라 위치 설정 - 현재 모듈의 실제 값으로 초기화
-	//static bool cameraInitialized = false;
-	//static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
-	//
-	//// 모듈이 바뀔 때마다 카메라 위치를 실제 값으로 업데이트
-	//if (!cameraInitialized) {
-	//	auto currentCameraPos = meshModule->GetCameraPosition();
-	//	cameraPos[0] = currentCameraPos.x;
-	//	cameraPos[1] = currentCameraPos.y;
-	//	cameraPos[2] = currentCameraPos.z;
-	//	cameraInitialized = true;
-	//}
-	//
-	//if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
-	//	meshModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
-	//}
-	//
-	//ImGui::Separator();
 
 	// Model 타입일 때 모델 설정 UI
 	if (currentMeshType == MeshType::Model) {
@@ -3086,59 +3261,6 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 
 	ImGui::Separator();
 
-	// 텍스처 설정 UI
-	ImGui::Text("Texture Assignment:");
-
-	// 현재 할당된 텍스처 정보 표시
-	Texture* currentTexture = meshModule->GetAssignedTexture();
-	if (currentTexture) {
-		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "Current Texture: %s", currentTexture->m_name.c_str());
-	}
-	else {
-		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "No Texture Assigned");
-	}
-
-	if (!m_textures.empty()) {
-		static int selectedTextureIndex = 0;
-
-		std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
-			? m_textures[selectedTextureIndex]->m_name
-			: "None";
-
-		if (ImGui::BeginCombo("Select Texture", currentTextureName.c_str())) {
-			for (int t = 0; t < m_textures.size(); ++t) {
-				bool isSelected = (selectedTextureIndex == t);
-				std::string textureLabel = m_textures[t]->m_name;
-
-				if (textureLabel.empty()) {
-					textureLabel = "Texture " + std::to_string(t);
-				}
-
-				if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
-					selectedTextureIndex = t;
-				}
-				if (isSelected) {
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button("Assign Texture")) {
-			if (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size()) {
-				meshModule->SetTexture(m_textures[selectedTextureIndex]);
-			}
-		}
-	}
-	else {
-		ImGui::Text("No textures available");
-		ImGui::Text("Drag and drop texture files to add them");
-	}
-
-	// 나머지 UI는 기존과 동일...
-	ImGui::Separator();
-
 	// 파티클 데이터 설정 정보 표시
 	ImGui::Text("Particle Data Info:");
 
@@ -3179,7 +3301,6 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 		ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "No mesh selected");
 	}
 
-
 	// 클리핑 설정 UI
 	ImGui::Separator();
 	ImGui::Text("Polar Clipping Settings:");
@@ -3217,7 +3338,7 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 				meshModule->SetPolarCenter(Mathf::Vector3(polarCenter[0], polarCenter[1], polarCenter[2]));
 			}
 
-			// 기준 방향 설정 (새로 추가)
+			// 기준 방향 설정
 			float polarReferenceDir[3] = {
 				polarParams.polarReferenceDir.x,
 				polarParams.polarReferenceDir.y,
@@ -3616,6 +3737,14 @@ void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderM
 
 	ImGui::Text("Trail Render Module Settings");
 
+	// 새로운 통합 UI들
+	RenderShaderSelectionUI(trailRenderModule);
+	RenderStateSelectionUI(trailRenderModule);
+	RenderTextureSelectionUI(trailRenderModule);
+
+	ImGui::Separator();
+	ImGui::Text("Trail Specific Settings:");
+
 	// 트레일 생성 모듈 연결 상태
 	TrailGenerateModule* connectedTrailModule = trailRenderModule->GetTrailGenerateModule();
 	if (connectedTrailModule) {
@@ -3631,76 +3760,11 @@ void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderM
 	// 카메라 위치 설정
 	ImGui::Text("Camera Settings");
 
-	static bool cameraInitialized = false;
-	static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
-
-	if (!cameraInitialized) {
-		auto currentCameraPos = trailRenderModule->GetCameraPosition();
-		cameraPos[0] = currentCameraPos.x;
-		cameraPos[1] = currentCameraPos.y;
-		cameraPos[2] = currentCameraPos.z;
-		cameraInitialized = true;
-	}
+	auto currentCameraPos = trailRenderModule->GetCameraPosition();
+	float cameraPos[3] = { currentCameraPos.x, currentCameraPos.y, currentCameraPos.z };
 
 	if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
 		trailRenderModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
-	}
-
-	ImGui::Separator();
-
-	// 텍스처 설정
-	ImGui::Text("Texture Assignment");
-
-	Texture* currentTexture = trailRenderModule->GetAssignedTexture();
-	if (currentTexture) {
-		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "Current Texture: %s", currentTexture->m_name.c_str());
-	}
-	else {
-		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "No Texture Assigned");
-		ImGui::Text("Trail will use default white texture");
-	}
-
-	if (!m_textures.empty()) {
-		static int selectedTextureIndex = 0;
-
-		std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
-			? m_textures[selectedTextureIndex]->m_name
-			: "None";
-
-		if (ImGui::BeginCombo("Select Texture", currentTextureName.c_str())) {
-			for (int t = 0; t < m_textures.size(); ++t) {
-				bool isSelected = (selectedTextureIndex == t);
-				std::string textureLabel = m_textures[t]->m_name;
-
-				if (textureLabel.empty()) {
-					textureLabel = "Texture " + std::to_string(t);
-				}
-
-				if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
-					selectedTextureIndex = t;
-				}
-				if (isSelected) {
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button("Assign Texture")) {
-			if (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size()) {
-				trailRenderModule->SetTexture(m_textures[selectedTextureIndex]);
-			}
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button("Clear Texture")) {
-			trailRenderModule->SetTexture(nullptr);
-		}
-	}
-	else {
-		ImGui::Text("No textures available");
-		ImGui::Text("Drag and drop texture files to add them");
 	}
 
 	ImGui::Separator();
@@ -3731,7 +3795,6 @@ void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderM
 		if (connectedTrailModule) {
 			ImGui::Text("Trail Vertex Buffer: %p", connectedTrailModule->GetVertexBuffer());
 			ImGui::Text("Trail Index Buffer: %p", connectedTrailModule->GetIndexBuffer());
-			//ImGui::Text("Vertex Stride: %u bytes", connectedTrailModule->GetVertexStride());
 		}
 	}
 
@@ -3740,8 +3803,9 @@ void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderM
 		ImGui::BulletText("Trail Render Module displays trails generated by Trail Generate Module");
 		ImGui::BulletText("Both modules must be added to the same ParticleSystem");
 		ImGui::BulletText("Connection happens automatically when both modules are present");
-		ImGui::BulletText("Assign textures for better visual effects");
+		ImGui::BulletText("Use texture slots to assign different textures for trail effects");
 		ImGui::BulletText("Camera position affects lighting calculations");
+		ImGui::BulletText("Adjust shader and render states for different visual effects");
 	}
 }
 

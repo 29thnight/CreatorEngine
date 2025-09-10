@@ -245,17 +245,17 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 		rotation, layerOrder, color, clipDirection, clipPercent, buffer = std::move(cpuBuffer)]() mutable
 	{
 		UIRenderProxy::ImageData data{};
-		data.textures		= std::move(textures);
-		data.texture		= curTexture;
-		data.origin			= origin;
-		data.color			= color;
-		data.position		= position;
-		data.scale			= scale;
-		data.rotation		= rotation;
-		data.layerOrder		= layerOrder;
+		data.textures			= std::move(textures);
+		data.texture			= curTexture;
+		data.origin				= origin;
+		data.color				= color;
+		data.position			= position;
+		data.scale				= scale;
+		data.rotation			= rotation;
+		data.layerOrder			= layerOrder;
 		data.clipDirection      = clipDirection;
 		data.clipPercent        = clipPercent;
-		proxyObject->m_data = std::move(data);
+		proxyObject->m_data		= std::move(data);
 
 		if (!buffer.empty())
 		{
@@ -331,4 +331,6 @@ void ProxyCommand::ProxyCommandExecute()
 	if (!m_updateFunction) throw std::runtime_error("proxy invokable empty");
 
 	m_updateFunction();
+
+	m_updateFunction = nullptr;
 }

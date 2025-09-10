@@ -1,5 +1,5 @@
 // PieSprite_PS.hlsl
-cbuffer PieParams : register(b1)
+cbuffer UIBuffer : register(b1)
 {
     float2 centerUV; // 원 중심 (0~1, 텍스처 UV 기준)
     float radiusUV; // 외곽 반지름 (UV 단위, 0~1)
@@ -33,39 +33,37 @@ float4 main(float4 color : COLOR0, float2 texCoord : TEXCOORD0) : SV_TARGET
     float2 d = texCoord - centerUV;
     float r = length(d);
 
-    // 반경 커버리지 (도넛 지원 + 페더)
-    float outerEdge = smoothstep(radiusUV, max(radiusUV - radiusUV * 0.01, 1e-5), r); // 살짝 부드럽게
+    // 반경 커버리지 (도넛 + 페더)
+    float rFeather = max(radiusUV * 0.01, 1e-5);
+    float outerEdge = 1.0 - smoothstep(radiusUV - rFeather, radiusUV, r); // 안쪽=1, 바깥=0
     float innerEdge = (innerRadius <= 0.0)
-        ? 1.0
-        : 1.0 - smoothstep(innerRadius, max(innerRadius - radiusUV * 0.01, 1e-5), r);
-
+    ? 1.0 // 꽉 찬 원
+    : smoothstep(innerRadius - rFeather, innerRadius, r); // r<inner=0, r>=inner=1
     float radialMask = saturate(innerEdge * outerEdge);
 
-    // 각도 계산: atan2(y,x) ∈ (-π, π] → [0, 2π)로
-    float ang = atan2(d.y, d.x);
-    ang = normAngle(ang);
+// 각도 계산
+    float ang = atan2(d.y, d.x); // (-π, π]
+    ang = normAngle(ang); // [0, 2π)
 
-    // 시작각 기준으로 회전 보정
-    float rel = normAngle(ang - startAngle); // 0에서 시작
-    if (clockwise == 0)
-    {
-        // 반시계방향: 시계로 계산하고 싶으면 대칭 변환
-        rel = (rel > 0) ? (TWO_PI - rel) : 0; // rel ∈ (0, 2π] → (2π-rel)
-    }
+// 12시 기준 방향별 "한쪽으로만" 증가하는 상대각
+    float relCW = normAngle(startAngle - ang); // 시계방향으로 증가
+    float relCCW = normAngle(ang - startAngle); // 반시계방향으로 증가
+    float rel = (clockwise != 0) ? relCW : relCCW;
 
-    // 잘라낼 목표 각도
+// 잘라낼 목표 각도
     float cut = saturate(percent) * TWO_PI;
 
-    // 각도 페더(부드러운 에지)
-    float angleMask = (featherAngle <= 0.0f)
-        ? step(rel, cut)
-        : smoothstep(cut, max(cut - featherAngle, 0.0), rel); // rel <= cut일 때 1, 경계는 부드럽게
+// 각도 페더(부드러운 경계)
+    float fa = min(max(featherAngle, 0.0), cut); // 과한 페더 방지
+    float angleMask = (fa <= 0.0)
+    ? step(rel, cut) // rel <= cut → 1
+    : (1.0 - smoothstep(cut - fa, cut, rel)); // cut-fa ~ cut에서만 부드럽게 1→0
 
     float coverage = radialMask * angleMask;
-
+    
     // 배경색과의 프리멀티플라이드 블렌딩
     float a = coverage * base.a;
     float3 rgb = base.rgb * coverage + bgColor.rgb * (1.0 - coverage);
 
-    return float4(1,0,0,1);
+    return float4(rgb,a);
 }

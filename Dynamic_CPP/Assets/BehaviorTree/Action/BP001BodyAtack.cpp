@@ -1,9 +1,9 @@
 #include "BP001BodyAtack.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 NodeStatus BP001BodyAtack::Tick(float deltatime, BlackBoard& blackBoard)
 {
-	std::cout << "BP001BodyAtack call" << std::endl;
+	LOG("BP001BodyAtack call");
 
 	float actionDuration = 5.0f;
 
@@ -23,14 +23,14 @@ NodeStatus BP001BodyAtack::Tick(float deltatime, BlackBoard& blackBoard)
 	
 
 	if (time > actionDuration) {
-		std::cout << "attack action running" << std::endl;
+		LOG("attack action running");
 		return NodeStatus::Running;
 	}
 	
 
 	
 	//
-	std::cout << "attack action Success end" << std::endl;
+	LOG("attack action Success end");
 	blackBoard.SetValueAsFloat("IdleTime", 5.0f); //body atteck is add to IdleTime 5secend
 	return NodeStatus::Success;
 }

@@ -1,11 +1,11 @@
 #include "GroggyAction.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 NodeStatus GroggyAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	float groggyTime = blackBoard.GetValueAsFloat("GroggyTime");
 	
-	std::cout << "GroggyAction Tick: Current GroggyTime: " << groggyTime << std::endl;
+	LOG("GroggyAction Tick: Current GroggyTime: " << groggyTime);
 
 	//todo 
 	//animation play or State Set 
