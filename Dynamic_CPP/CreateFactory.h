@@ -8,6 +8,7 @@
 #include "Explosion.h"
 #include "Bomb.h"
 #include "NormalBullet.h"
+#include "TBoss1.h"
 #include "CurveIndicator.h"
 #include "SpecialBullet.h"
 #include "Bullet.h"

@@ -47,7 +47,7 @@ void EntityEnemy::Start()
 		}
 	}
 
-
+	m_pOwner->m_collisionType = 3;
 
 	for (auto& child : childred)
 	{
@@ -59,6 +59,88 @@ void EntityEnemy::Start()
 			break;
 		}
 
+	}
+}
+
+void EntityEnemy::OnTriggerEnter(const Collision& collision)
+{
+	bool hasAsis = blackBoard->HasKey("Asis");
+	GameObject* asis = nullptr;
+	std::string asisname = "";
+	if (hasAsis) {
+		asis = blackBoard->GetValueAsGameObject("Asis");
+		asisname = asis->GetHashedName().ToString();
+	}
+	std::string colname = collision.otherObj->GetHashedName().ToString();
+
+	if (colname == asisname)
+	{
+		SimpleMath::Vector3 p0 = collision.contactPoints[0]; //충돌지점 
+		Transform* m_transform = GetOwner()->GetComponent<Transform>();
+		SimpleMath::Vector3 p1 = m_transform->GetWorldPosition(); //이 오브젝트 위치
+		//asis가 부딫히면 밀려나는 방향
+		SimpleMath::Vector3 invDir = p1 - p0;
+
+		//현제 위치에서 밀려나는 방향으로 이동된 세로운 위치
+		invDir.y = 0.f;
+		invDir.Normalize();
+
+		SimpleMath::Vector3 newPos = p1 + invDir * 0.5f; //현제는 0.5f만 밀려나게 설정 
+		//더 깔끔하게 혹은 겹쳐지는 거리 판단 방법 필요
+		//부딫히면 반대 방향으로 자연스럽게 밀려나도록 케릭터 컨트롤러에 설정
+		auto controllerComp = m_pOwner->GetComponent<CharacterControllerComponent>();
+		if (controllerComp)
+		{
+			UINT cctID = controllerComp->GetControllerInfo().id;
+			if (cctID != 0)
+			{
+				//CCT로 밀려나는 위치로 이동 추가적으로 GameObject 위치도 변경
+				m_transform->SetPosition(newPos);
+				PhysicsManagers->SetControllerPosition(cctID, newPos);
+				std::cout << m_pOwner->GetHashedName().ToString() << " Asis OnTriggerEnter CCT Move" << std::endl;
+			}
+		}
+	}
+}
+
+void EntityEnemy::OnCollisionEnter(const Collision& collision)
+{
+	bool hasAsis = blackBoard->HasKey("Asis");
+	GameObject* asis = nullptr;
+	std::string asisname = "";
+	if (hasAsis) {
+		asis = blackBoard->GetValueAsGameObject("Asis");
+		asisname = asis->GetHashedName().ToString();
+	}
+	std::string colname = collision.otherObj->GetHashedName().ToString();
+
+	if (colname == asisname)
+	{
+	   SimpleMath::Vector3 p0 = collision.contactPoints[0]; //충돌지점 
+	   Transform* m_transform = GetOwner()->GetComponent<Transform>();
+	   SimpleMath::Vector3 p1 = m_transform->GetWorldPosition(); //이 오브젝트 위치
+	   //asis가 부딫히면 밀려나는 방향
+	   SimpleMath::Vector3 invDir =p1 - p0;
+
+		//현제 위치에서 밀려나는 방향으로 이동된 세로운 위치
+	   invDir.y = 0.f;
+	   invDir.Normalize();
+
+	   SimpleMath::Vector3 newPos = p1 + invDir * 0.5f; //현제는 0.5f만 밀려나게 설정 
+		//더 깔끔하게 혹은 겹쳐지는 거리 판단 방법 필요
+		//부딫히면 반대 방향으로 자연스럽게 밀려나도록 케릭터 컨트롤러에 설정
+	   auto controllerComp = m_pOwner->GetComponent<CharacterControllerComponent>();
+	   if (controllerComp)
+	   {
+		   UINT cctID = controllerComp->GetControllerInfo().id;
+		   if (cctID != 0)
+		   {
+			   //CCT로 밀려나는 위치로 이동 추가적으로 GameObject 위치도 변경
+			   m_transform->SetPosition(newPos);
+			   PhysicsManagers->SetControllerPosition(cctID, newPos);
+			   std::cout << m_pOwner->GetHashedName().ToString() << " Asis onCollisionEnter CCT Move" << std::endl;
+		   }
+	   }
 	}
 }
 
@@ -110,6 +192,8 @@ void EntityEnemy::Update(float tick)
 	{
 		//이펙트 위치를 오브젝트의 회전과 상관없이 카메라쪽에서 보이게끔 옮기기
 	}
+
+	
 }
 
 
