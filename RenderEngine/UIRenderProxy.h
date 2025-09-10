@@ -68,6 +68,7 @@ private:
     ShaderPtr<PixelShader>              m_customPixelShader{};
 	ComPtr<ID3D11Buffer>                m_customPixelBuffer{ nullptr };
 	std::vector<std::byte>              m_customPixelCPUBuffer{};
+    uint32                              m_customPixelBufferSize{};
 	bool                                m_isEnabled{ true };
 };
 #endif // !DYNAMICCPP_EXPORTS

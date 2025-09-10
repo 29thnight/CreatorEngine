@@ -206,11 +206,34 @@ void UIRenderProxy::SetCustomPixelShader(std::string_view shaderPath)
     }
 	m_customPixelShader = &shader;
 
+    Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflector;
+    if (FAILED(D3DReflect(shader.GetBufferPointer(),
+        shader.GetBufferSize(),
+        IID_ID3D11ShaderReflection,
+        reinterpret_cast<void**>(reflector.GetAddressOf()))))
+    {
+        std::cout << "Failed to reflect pixel shader: " << shaderPath << std::endl;
+        return;
+    }
+
+    auto* constantBuffer = reflector->GetConstantBufferByIndex(0);
+    D3D11_SHADER_BUFFER_DESC cbDesc{};
+    if (constantBuffer && SUCCEEDED(constantBuffer->GetDesc(&cbDesc)))
+    {
+        m_customPixelBufferSize = cbDesc.Size;
+    }
+    else
+    {
+        m_customPixelBufferSize = 16; // 기본 최소 크기
+    }
+
+    m_customPixelBufferSize = ((m_customPixelBufferSize + 15) / 16) * 16;
+
     D3D11_BUFFER_DESC bufferDesc{};
-    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-    bufferDesc.ByteWidth = 16; // 최소 16바이트 단위로 할당
+    bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    bufferDesc.ByteWidth = m_customPixelBufferSize; // 최소 16바이트 단위로 할당
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bufferDesc.CPUAccessFlags = 0;
     bufferDesc.MiscFlags = 0;
     bufferDesc.StructureByteStride = 0;
 
@@ -225,13 +248,13 @@ void UIRenderProxy::SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer
         std::cout << "Custom pixel buffer is not created." << std::endl;
         return;
     }
-
+    //?????
 	m_customPixelCPUBuffer = cpuBuffer;
 }
 
 void UIRenderProxy::UpdateShaderBuffer(ID3D11DeviceContext* deferredContext)
 {
-    if (m_customPixelBuffer && !m_customPixelCPUBuffer.empty())
+    if (m_customPixelBuffer && m_customPixelCPUBuffer.size() == m_customPixelBufferSize)
     {
 		deferredContext->PSSetConstantBuffers(1, 1, m_customPixelBuffer.GetAddressOf());
         deferredContext->UpdateSubresource(m_customPixelBuffer.Get(), 0, nullptr, m_customPixelCPUBuffer.data(), 0, 0);

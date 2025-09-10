@@ -90,12 +90,19 @@ void UIComponent::SetCustomPixelShader(std::string_view shaderPath)
                 bindDesc.BindPoint == slot)
             {
                 m_customPixelCPUBuffer.resize(cbDesc.Size);
+                std::span<std::byte> bufferSpan{ m_customPixelCPUBuffer };
+                std::fill(bufferSpan.begin(), bufferSpan.end(), std::byte{ 0 });
                 for (UINT v = 0; v < cbDesc.Variables; ++v)
                 {
                     auto var = cb->GetVariableByIndex(v);
                     D3D11_SHADER_VARIABLE_DESC vDesc;
                     var->GetDesc(&vDesc);
                     m_variables.emplace(vDesc.Name, VarInfo{ vDesc.StartOffset, vDesc.Size });
+                    if (const void* defaultValue = vDesc.DefaultValue)
+                    {
+                        std::span<std::byte> dest = bufferSpan.subspan(vDesc.StartOffset, vDesc.Size);
+                        std::memcpy(dest.data(), defaultValue, vDesc.Size);
+                    }
                 }
                 return;
             }

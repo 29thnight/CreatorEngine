@@ -253,8 +253,8 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 		data.scale			= scale;
 		data.rotation		= rotation;
 		data.layerOrder		= layerOrder;
-	data.clipDirection      = clipDirection;
-	data.clipPercent        = clipPercent;
+		data.clipDirection      = clipDirection;
+		data.clipPercent        = clipPercent;
 		proxyObject->m_data = std::move(data);
 
 		if (!buffer.empty())

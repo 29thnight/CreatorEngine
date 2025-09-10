@@ -93,6 +93,7 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
             {
                 auto* pixelShader = proxy->GetCustomPixelShader()->GetShader();
 				deferredPtr->PSSetShader(pixelShader, nullptr, 0);
+                proxy->UpdateShaderBuffer(deferredPtr);
             };
 
             spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack,
