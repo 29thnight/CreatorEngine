@@ -285,7 +285,6 @@ extern "C"
 		// Register the factory function for AniBehavior Automation
 		AniBehaviorFactory::GetInstance()->RegisterFactory("MosterMeleeAni", []() { return new MosterMeleeAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAH", []() { return new PlayerAttackAH(); });
-		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAni", []() { return new PlayerAttackAni(); });
 
 	}
 #pragma endregion

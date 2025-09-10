@@ -171,6 +171,8 @@ public:
 	// CharacterController의 위치를 강제로 설정하는 인터페이스 (이제 큐에 작업을 추가합니다)
 	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
 
+	//geometry 검사
+	//bool IsPenetrating();
 
 private:
 	using PendingChange = RigidBodyState;

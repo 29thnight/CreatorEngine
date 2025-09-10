@@ -247,7 +247,6 @@ bool PhysicX::Initialize()
 
 	m_characterControllerManager = PxCreateControllerManager(*m_scene);
 
-
 	//======================================================================
 	//debug용 plane 생성 --> triangle mesh로 객체 생성
 	
@@ -342,7 +341,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			physx::PxCapsuleControllerDesc desc;
 
 			CharacterController* controller = new CharacterController();
-			controller->Initialize(contrllerInfo, movementInfo, m_characterControllerManager, m_defaultMaterial, collisionData, m_collisionMatrix);
+			controller->Initialize(contrllerInfo, movementInfo, m_characterControllerManager, m_defaultMaterial, collisionData, m_collisionMatrix, m_collisionCallback);
 
 			desc.height = contrllerInfo.height;
 			desc.radius = contrllerInfo.radius;
@@ -356,7 +355,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
 			desc.material = m_defaultMaterial;
-		
+			desc.reportCallback = controller->GetHitReportCallback();
 			physx::PxController* pxController = m_characterControllerManager->createController(desc);
 			
 			physx::PxRigidDynamic* body = pxController->getActor();
@@ -445,9 +444,10 @@ void PhysicX::FinalUpdate()
 	//딱 한번만 불린다. 아마도 씬이 끝날때
 }
 
-void PhysicX::SetCallBackCollisionFunction(std::function<void(CollisionData, ECollisionEventType)> func)
+void PhysicX::SetCallBackCollisionFunction(std::function<void(const CollisionData&, ECollisionEventType)> func)
 {
 	m_eventCallback->SetCallbackFunction(func);
+	m_collisionCallback = func;
 }
 
 void PhysicX::SetPhysicsInfo()
@@ -2343,48 +2343,82 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 
 void PhysicX::PutToSleep(unsigned int id)
 {
+	// 1. 전달받은 ID로 PxRigidDynamic 포인터를 찾습니다. (RigidBody 또는 CCT)
+	physx::PxRigidDynamic* dynamicActor = nullptr;
+
 	RigidBody* body = GetRigidBody(id);
-
-	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
-
-	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
-
-	if (!body) {
+	if (body)
+	{
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(body))
+		{
+			dynamicActor = dynamicBody->GetRigidDynamic();
+		}
+	}
+	else
+	{
 		CharacterController* cct = GetCCT(id);
-
-		dynamicActor = cct ? cct->GetController()->getActor() : nullptr;
+		if (cct)
+		{
+			dynamicActor = cct->GetController()->getActor();
+		}
 	}
 
-	//stacit body인 경우 nullptr이므로 예외처리 
-	if (dynamicActor)
+	// 2. 유효한 액터를 찾았는지, 그리고 씬에 속해있는지 확인합니다.
+	if (dynamicActor && dynamicActor->getScene())
 	{
-		if (dynamicActor->isSleeping()) {
+		// 3. 가장 중요: 액터가 키네마틱이 아닌지 확인합니다.
+		if (dynamicActor->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC)
+		{
+			// 키네마틱 액터는 putToSleep()을 호출할 수 없으므로 아무것도 하지 않습니다.
 			return;
 		}
-		dynamicActor->putToSleep();
+
+		// 4. 이미 잠들어있지 않다면 putToSleep()을 호출합니다.
+		if (!dynamicActor->isSleeping())
+		{
+			dynamicActor->putToSleep();
+		}
 	}
 }
 
 void PhysicX::WakeUp(unsigned int id)
 {
-	RigidBody* body = GetRigidBody(id);
-	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
-	
-	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
-	
-	if (!body) {
-		CharacterController* cct = GetCCT(id);
+	// 1. 전달받은 ID로 PxRigidDynamic 포인터를 찾습니다. (RigidBody 또는 CCT)
+	physx::PxRigidDynamic* dynamicActor = nullptr;
 
-		dynamicActor = cct ? cct->GetController()->getActor() : nullptr;
+	RigidBody* body = GetRigidBody(id);
+	if (body)
+	{
+		// RigidBody인 경우
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(body))
+		{
+			dynamicActor = dynamicBody->GetRigidDynamic();
+		}
+	}
+	else
+	{
+		// RigidBody가 아니면 CCT일 수 있습니다.
+		CharacterController* cct = GetCCT(id);
+		if (cct)
+		{
+			dynamicActor = cct->GetController()->getActor();
+		}
 	}
 
-	//stacit body인 경우 nullptr이므로 예외처리 
-	if (dynamicActor)
+	// 2. 유효한 액터를 찾았는지, 그리고 씬에 속해있는지 확인합니다.
+	if (dynamicActor && dynamicActor->getScene())
 	{
-		if (!dynamicActor->isSleeping()) {
+		// 3. 가장 중요: 액터가 키네마틱이 아닌지 확인합니다.
+		if (dynamicActor->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC)
+		{
+			// 키네마틱 액터는 wakeUp()을 호출할 수 없으므로 아무것도 하지 않습니다.
 			return;
 		}
-		if (!dynamicActor->getScene()) return;
-		dynamicActor->wakeUp();
+
+		// 4. 이미 깨어있지 않다면 wakeUp()을 호출합니다.
+		if (dynamicActor->isSleeping())
+		{
+			dynamicActor->wakeUp();
+		}
 	}
 }

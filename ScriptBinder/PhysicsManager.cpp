@@ -26,7 +26,7 @@ void PhysicsManager::Initialize()
 	m_OnChangeSceneHandle	= SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
 
 	// 물리 엔진 콜백 함수 설정
-	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
+	Physics->SetCallBackCollisionFunction([this](const CollisionData& data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
 	});
 	
@@ -109,7 +109,11 @@ void PhysicsManager::OnUnloadScene()
 void PhysicsManager::ProcessCallback()
 {
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	std::cout << " ProcessCallback size :" << m_callbacks.size() << std::endl;
+	std::cout << " ColliderContainer size :" << Container.size() << std::endl;
 	for (auto& [data, type] : m_callbacks) {
+
+	
 
 		auto lhs = Container.find(data.thisId);
 		auto rhs = Container.find(data.otherId);
@@ -127,6 +131,8 @@ void PhysicsManager::ProcessCallback()
 		auto rhsObj = rhs->second.gameObject;
 
 		Collision collision{ lhsObj,rhsObj,data.contactPoints };
+		
+		std::cout << " ProcessCallback thisId :" << lhsObj->GetHashedName().ToString() << " , otherId : " << rhsObj->GetHashedName().ToString() << " , type : " << static_cast<int>(type) << std::endl;
 
 		switch (type)
 		{
@@ -694,6 +700,7 @@ void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 
 void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 {
+	std::cout << "PhysicsManager::CallbackEvent - ThisID: " << data.thisId << ", OtherID: " << data.otherId << ", EventType: " << static_cast<int>(type) << std::endl;
 	m_callbacks.push_back({ data,type });
 }
 

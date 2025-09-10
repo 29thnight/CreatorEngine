@@ -45,7 +45,7 @@ public:
 	void FinalUpdate();
 
 	//콜리전 이벤트 등록
-	void SetCallBackCollisionFunction(std::function<void(CollisionData, ECollisionEventType)> func);
+	void SetCallBackCollisionFunction(std::function<void(const CollisionData&, ECollisionEventType)> func);
 
 	//물리엔진 정보 수정
 	void SetPhysicsInfo();
@@ -219,6 +219,10 @@ public:
 	void PutToSleep(unsigned int id);
 	void WakeUp(unsigned int id);
 
+	//Geometry 쿼리 콜백
+	
+
+
 private:
 	physx::PxDefaultAllocator		m_allocator{};
 	physx::PxDefaultErrorCallback	m_errorCallback{};
@@ -279,7 +283,7 @@ private:
 
 	void extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* shape,std::vector<std::vector<DirectX::SimpleMath::Vector3>>& debuPolygon);
 
-
+	std::function<void(CollisionData, ECollisionEventType)> m_collisionCallback;
 
 public:
 	bool recordMemoryAllocations = true; // 디버그용 메모리 할당 추적

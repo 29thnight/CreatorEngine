@@ -3,14 +3,43 @@
 //#include "../Utility_Framework/Core.Minimal.h"
 #include "PhysicsCommon.h"
 #include "CharacterMovement.h"
+#include <functional>
+#include <set>
 using namespace physx;
+
+enum class ECollisionEventType;
+struct CollisionData;
+
+class PhysicsControllerHitReport : public PxUserControllerHitReport
+{
+public:
+	PhysicsControllerHitReport(std::function<void(const CollisionData&, ECollisionEventType)> callback);
+	~PhysicsControllerHitReport();
+
+	void onShapeHit(const PxControllerShapeHit& hit) override;
+	void onControllerHit(const PxControllersHit& hit) override;
+	void onObstacleHit(const PxControllerObstacleHit& hit) override;
+
+	void UpdateAndDispatchEndEvents();
+
+	void SetController(physx::PxController* controller) { m_controller = controller; }
+
+private:
+	physx::PxController* m_controller;
+	std::function<void(const CollisionData&, ECollisionEventType)> m_callbackFunction;
+
+	std::set<physx::PxActor*> m_currentContacts;
+	std::set<physx::PxActor*> m_previousContacts;
+};
+
+
 class CharacterController
 {
 public:
 	CharacterController();
 	~CharacterController();
 
-	void Initialize(const CharacterControllerInfo& info,const CharacterMovementInfo& moveInfo,physx::PxControllerManager* CCTManager,physx::PxMaterial* material,CollisionData* collisionData, unsigned int* collisionMatrix);
+	void Initialize(const CharacterControllerInfo& info,const CharacterMovementInfo& moveInfo,physx::PxControllerManager* CCTManager,physx::PxMaterial* material,CollisionData* collisionData, unsigned int* collisionMatrix, std::function<void(CollisionData, ECollisionEventType)> callback);
 	void Update(float deltaTime);
 
 	void AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic);
@@ -23,6 +52,9 @@ public:
 
 	inline physx::PxController* GetController() { return m_controller; }
 	inline void SetController(physx::PxController* controller) { m_controller = controller; }
+
+	inline PhysicsControllerHitReport* GetHitReportCallback() { return m_hitReportCallback; }
+
 	inline const unsigned int& GetID() const { return m_id; }
 	inline const unsigned int& GetLayerNumber() const { return m_layerNumber; }
 	inline CharacterMovement* GetCharacterMovement() { return m_characterMovement; }
@@ -46,9 +78,8 @@ protected:
 	std::array<bool, 4> m_bMoveRestrict;
 
 	CharacterMovement* m_characterMovement; //캐릭터 이동 정보
-	//todo : 케릭터 컨트롤러 충돌에 관한 필터 설정 -> 차후 추가
-	//CharacterQueryFilterCallback* m_characterQueryFilterCallback; //쿼리 필터 콜백
-	//CharacterControllerHitCallback* m_characterHitCallback; //히트 콜백
+	
+	PhysicsControllerHitReport* m_hitReportCallback;
 
 	physx::PxControllerFilters* m_filters;
 	physx::PxFilterData* m_filterData;
