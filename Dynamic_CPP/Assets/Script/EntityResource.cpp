@@ -6,6 +6,7 @@
 #include "EntityItem.h"
 #include "SceneManager.h"
 #include "EffectComponent.h"
+#include "DebugLog.h"
 void EntityResource::Start()
 {
 }
@@ -15,7 +16,7 @@ void EntityResource::Update(float tick)
 }
 void EntityResource::SendDamage(Entity* sender, int damage)
 {
-	//std::cout << "EntityResource Attack" << std::endl;
+	//LOG("EntityResource Attack");
 	if (sender)
 	{
 		auto player = dynamic_cast<Player*>(sender);
@@ -62,7 +63,7 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 	}
 	else
 	{
-		std::cout << "EntityResource Attack sender is nullptr" << std::endl;
+		LOG("EntityResource Attack sender is nullptr");
 	}
 }
 

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "MageActtack.h"
 #include "RigidBodyComponent.h"
-
+#include "DebugLog.h"
 NodeStatus MageActtack::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	auto Identity = blackBoard.GetValueAsString("Identity");
@@ -44,7 +44,7 @@ NodeStatus MageActtack::Tick(float deltatime, BlackBoard& blackBoard)
 		// 
 		// 
 		//발사이후 
-		std::cout << "Mage Attack: Firing projectile" << std::endl;
+		LOG("Mage Attack: Firing projectile");
 		blackBoard.SetValueAsFloat("AtkCooldown", coolTime); // 공격 쿨타임 설정
 		//쿨타임 설정 되어 이곳으로 안들어옴 
 		

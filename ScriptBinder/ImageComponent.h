@@ -5,16 +5,8 @@
 #include "IRegistableEvent.h"
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
-#include <DirectXTK/SpriteBatch.h>
 
-struct alignas(16) ImageInfo
-{
-	Mathf::xMatrix world;
-	float2 size;
-	float2 screenSize;
-};
-
-//¸ğµç 2dÀÌ¹ÌÁö ±âº»?
+//ëª¨ë“  2dì´ë¯¸ì§€ ê¸°ë³¸?
 class Texture;
 class UIMesh;
 class Canvas;
@@ -52,6 +44,10 @@ public:
 	Mathf::Vector2							origin{};
 	[[Property]]							
 	float									unionScale{ 1.f };
+	[[Property]]
+	ClipDirection                           clipDirection{ ClipDirection::None };
+	[[Property]]
+	float                                   clipPercent{ 1.f };
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;

@@ -11,7 +11,7 @@
 
 #include "GameObject.h"
 #include "TweenManager.h"
-
+#include "DebugLog.h"
 using namespace Mathf;
 void EntityItem::Start()
 {
@@ -66,16 +66,16 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 		m_state = EItemState::FALLED;
-		std::cout << collision.otherObj->m_name.ToString() << "OnTriggerEnter Item" << std::endl;
+		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
 	}
 
 	
-	//std::cout << "OnTriggerEnter Item" << std::endl;
+	//LOG("OnTriggerEnter Item");
 }
 
 void EntityItem::OnTriggerExit(const Collision& collision)
 {
-	//std::cout << "OnCollisionEnter Item" << std::endl;
+	//LOG("OnCollisionEnter Item");
 }
 
 void EntityItem::OnCollisionEnter(const Collision& collision)
@@ -129,7 +129,7 @@ void EntityItem::Update(float tick)
 				{
 					isTargettingTail = true;
 					//인디케이터 출력? 플레이어가출력?
-					//std::cout << "On indicator " << std::endl;
+					//LOG("On indicator ");
 					
 				}
 				else

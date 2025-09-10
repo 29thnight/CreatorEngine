@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "EntityEnemy.h"
 #include "Player.h"
+#include "DebugLog.h"
 void NormalBullet::Start()
 {
 	bulletType = BulletType::Normal;
@@ -33,7 +34,7 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 
 			if (enemy)
 			{
-				std::cout << "EnemyHit!" << std::endl;
+				LOG("EnemyHit!");
 				enemy->SendDamage(m_owenrPlayer, 1);
 				hasAttacked = true;
 				GetOwner()->Destroy(); //지우지말고 BulletPool만들기

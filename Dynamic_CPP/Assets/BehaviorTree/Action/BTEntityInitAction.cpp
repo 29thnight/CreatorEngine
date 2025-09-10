@@ -1,7 +1,7 @@
 #include "BTEntityInitAction.h"
 #include "Animator.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 NodeStatus BTEntityInitAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	//initialize the Behavior Tree Entity
@@ -20,6 +20,6 @@ NodeStatus BTEntityInitAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 	
 	blackBoard.SetValueAsBool("Initialized", true);
-	std::cout << "Behavior Tree Entity Initialized : "<< m_owner->GetHashedName().ToString() << std::endl;
+	LOG("Behavior Tree Entity Initialized : "<< m_owner->GetHashedName().ToString());
 	return NodeStatus::Success;
 }

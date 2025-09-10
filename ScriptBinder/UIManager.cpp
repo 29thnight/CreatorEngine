@@ -287,23 +287,26 @@ void UIManager::DeleteCanvas(std::string canvasName)
 		return c && c->ToString() == canvasName;
 	});
 
-	auto curCanvasObj = (*it).lock();
-	auto canvasCom = curCanvasObj->GetComponent<Canvas>();
-	for (auto& uiObj : canvasCom->UIObjs)
+	if (it != Canvases.end())
 	{
-		auto uiObjPtr = uiObj.lock();
-		if(uiObjPtr)
-			uiObjPtr->Destroy();
+		auto curCanvasObj = (*it).lock();
+		auto canvasCom = curCanvasObj->GetComponent<Canvas>();
+		for (auto& uiObj : canvasCom->UIObjs)
+		{
+			auto uiObjPtr = uiObj.lock();
+			if (uiObjPtr)
+				uiObjPtr->Destroy();
+		}
+		canvasCom->UIObjs.clear();
+
+		std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas)
+			{
+				auto c = canvas.lock();
+				return !c || c->ToString() == canvasName;
+			});
+
+		curCanvasObj->Destroy();
 	}
-	canvasCom->UIObjs.clear();
-
-	std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
-	{
-		auto c = canvas.lock();
-		return !c || c->ToString() == canvasName;
-	});
-
-	curCanvasObj->Destroy();
 }
 
 void UIManager::CheckInput()

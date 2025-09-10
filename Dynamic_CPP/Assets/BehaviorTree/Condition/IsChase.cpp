@@ -1,6 +1,6 @@
 #include "IsChase.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	bool hasClosedTarget = blackBoard.HasKey("ClosedTarget");
@@ -41,10 +41,10 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 			dir = targetPos - pos;
 
-			std::cout << targetPos.x << "," << targetPos.y << "," << targetPos.z << std::endl;
-			std::cout << pos.x << "," << pos.y << "," << pos.z << std::endl;
+			LOG(targetPos.x << "," << targetPos.y << "," << targetPos.z);
+			LOG(pos.x << "," << pos.y << "," << pos.z);
 
-			std::cout << "Distance to Target: " << dir.Length() << std::endl;
+			LOG("Distance to Target: " << dir.Length());
 		}
 	}
 	else {
@@ -57,7 +57,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	
 
 	if (dir.Length() < chaseRange) {
-		std::cout << "closed Target in ChaseRange" << std::endl;
+		LOG("closed Target in ChaseRange");
 		return true;
 	}
 
@@ -69,14 +69,14 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		if (state == "Chase")
 		{
 			if (chaseOutTime > 0) {
-				std::cout << "closed Target Out ranage but chace remain time :" << chaseOutTime << std::endl;
+				LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
 				return true;
 			}	
 		}
 	}
 
 
-	std::cout << "closed Target Out ranage" << std::endl;
+	LOG("closed Target Out ranage");
 
 	return false;
 }

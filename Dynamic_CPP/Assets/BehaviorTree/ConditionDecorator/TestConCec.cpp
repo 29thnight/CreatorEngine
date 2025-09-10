@@ -1,6 +1,6 @@
 #include "TestConCec.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool TestConCec::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	bool condition = blackBoard.HasKey("Cond1");
@@ -8,12 +8,12 @@ bool TestConCec::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		int a = blackBoard.GetValueAsInt("Cond1");
 		if (a>10)
 		{
-			std::cout << "ConditionCheck: a is greater than 10" << std::endl;
+			LOG("ConditionCheck: a is greater than 10");
 			return false;
 		}
 		else
 		{
-			std::cout << "ConditionCheck: a is not greater than 10" << std::endl;
+			LOG("ConditionCheck: a is not greater than 10");
 		}
 	}
 
