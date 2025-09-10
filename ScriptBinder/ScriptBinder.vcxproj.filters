@@ -336,6 +336,9 @@
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>
+    <ClCompile Include="SpriteSheetComponent.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">

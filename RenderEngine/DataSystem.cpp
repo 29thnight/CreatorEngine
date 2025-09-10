@@ -673,6 +673,9 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 	case DataSystem::TextureFileType::UITexture:
 		destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
 		break;
+	case DataSystem::TextureFileType::SpriteSheet:
+		destination = PathFinder::Relative("SpriteSheets\\") / file::path(filePath).filename();
+		break;
 	default:
 		break;
 	}

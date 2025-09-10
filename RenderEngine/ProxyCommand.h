@@ -8,6 +8,7 @@ class ImageComponent;
 class TextComponent;
 class MeshRenderer;
 class DecalComponent;
+class SpriteSheetComponent;
 using Invokable = std::function<void()>;
 class ProxyCommand
 {
