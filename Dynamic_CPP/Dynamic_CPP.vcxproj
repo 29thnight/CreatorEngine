@@ -191,6 +191,7 @@
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="CriticalMark.h" />
+		<ClInclude Include="DebugLog.h" />
 		<ClInclude Include="Easing.h" />
 		<ClInclude Include="ItemType.h" />
 		<ClInclude Include="PlayerBuff.h" />

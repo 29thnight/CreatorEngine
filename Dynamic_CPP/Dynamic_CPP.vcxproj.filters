@@ -291,6 +291,9 @@
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="DebugLog.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\UIGageTest.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>

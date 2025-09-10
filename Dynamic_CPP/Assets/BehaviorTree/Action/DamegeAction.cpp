@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "EntityEnemy.h"
 #include "CharacterControllerComponent.h"
+#include "DebugLog.h"
 NodeStatus DamegeAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	
@@ -48,11 +49,15 @@ NodeStatus DamegeAction::Tick(float deltatime, BlackBoard& blackBoard)
 		blackBoard.SetValueAsFloat("DelayDamageAction", delayDamageTime);
 	}
 	else {
-		std::cout << "No delay damage action found." << std::endl;
+		
+		
+		
+		
+		"No delay damage action found.");
 		blackBoard.SetValueAsFloat("DelayDamageAction", 2.0f);
 	}
 
-	std::cout << "Damege action executed successfully." << std::endl;*/
+	LOG("Damege action executed successfully.");*/
 	//return NodeStatus::Success;
 	return NodeStatus::Running;
 }

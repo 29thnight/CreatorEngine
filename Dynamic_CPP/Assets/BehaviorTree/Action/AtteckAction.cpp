@@ -1,5 +1,6 @@
 #include "AtteckAction.h"
 #include "pch.h"
+#include "DebugLog.h"
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
@@ -46,8 +47,8 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
     {
         //스테이트가 공격일시 에니메이션 종료 여부 확인
         // === 두 번째 Tick 이후: 공격 종료 확인 ===
-        std::cout << "AtteckAction Running..." << std::endl;
-        std::cout << "IsAttacking: " << blackBoard.GetValueAsBool("IsAttacking") << std::endl;
+        LOG("AtteckAction Running...");
+        LOG("IsAttacking: " << blackBoard.GetValueAsBool("IsAttacking"));
         // Blackboard의 "IsAttacking" 플래그를 계속 확인합니다.
         if (blackBoard.GetValueAsBool("IsAttacking"))
         {
@@ -62,7 +63,7 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
             //m_isActionRunning = false;
 
             // 2. BT에 Success를 반환하여 행동이 성공적으로 끝났음을 알립니다.
-			std::cout << "AtteckAction: Attack animation completed." << std::endl;
+			LOG("AtteckAction: Attack animation completed.");
 			//스테이트를 Idle로 변경
 			blackBoard.SetValueAsString("State", "Idle");
             return NodeStatus::Success;

@@ -12,9 +12,10 @@
 #include "Weapon.h"
 #include "EntityResource.h"
 #include "EntityItem.h"
+#include "DebugLog.h"
 void GameManager::Awake()
 {
-	std::cout << "GameManager Awake" << std::endl;
+	LOG("GameManager Awake");
 	
 	auto resourcePool = GameObject::Find("ResourcePool");
 	auto weaponPiecePool = GameObject::Find("WeaponPiecePool");
@@ -28,7 +29,7 @@ void GameManager::Awake()
 		}
 	}
 	else {
-		std::cout << "not assigned resourcePool" << std::endl;
+		LOG("not assigned resourcePool");
 	}
 	if (weaponPiecePool) {
 		for (auto& index : weaponPiecePool->m_childrenIndices) {
@@ -39,16 +40,16 @@ void GameManager::Awake()
 		}
 	}
 	else {
-		std::cout << "not assigned weaponPiecePool" << std::endl;
+		LOG("not assigned weaponPiecePool");
 	}
 }
 
 inline static void Loaderererer() {
-	std::cout << "Loader" << std::endl;
+	LOG("Loader");
 }
 void GameManager::Start()
 {
-	std::cout << "GameManager Start" << std::endl;
+	LOG("GameManager Start");
 	//playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
 	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::N), KeyState::Down, [this]() { Inputblabla(); });
 	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, Loaderererer);
@@ -72,7 +73,7 @@ void GameManager::Update(float tick)
 
 void GameManager::OnDisable()
 {
-	std::cout << "GameManager OnDisable" << std::endl;
+	LOG("GameManager OnDisable");
 	playerMap->DeleteAction("LoadScene");
 	for (auto& entity : m_entities)
 	{
@@ -101,7 +102,7 @@ void GameManager::PushEntity(Entity* entity)
 	}
 	else
 	{
-		std::cout << "Entity is null, cannot push to GameManager." << std::endl;
+		LOG("Entity is null, cannot push to GameManager.");
 	}
 }
 
@@ -154,7 +155,7 @@ void GameManager::CheatMiningResource()
 
 	bool size = Raycast(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1, hit);
 	for (int i = 0; i < size; i++) {
-		std::cout << hit.gameObject->m_name.data() << std::endl;
+		LOG(hit.gameObject->m_name.data());
 	}
 
 	/*for (auto& resource : m_resourcePool) {
