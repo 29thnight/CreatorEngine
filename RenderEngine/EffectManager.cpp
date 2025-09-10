@@ -343,6 +343,10 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	meshSpawnModule->Initialize();
 	meshSpawnModule->SetEnabled(false);
 
+	auto meshColorModule = particleSystem->AddModule<MeshColorModuleCS>();
+	meshColorModule->Initialize();
+	meshColorModule->SetEnabled(false);
+
 	auto trailGenerateModule = particleSystem->AddModule<TrailGenerateModule>();
 	trailGenerateModule->Initialize();
 	trailGenerateModule->SetEnabled(false);
@@ -435,6 +439,9 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 							else if (moduleType == "MeshSpawnModuleCS") {
 								psConfig.moduleConfig.meshSpawnEnabled = true;
 							}
+							else if (moduleType == "MeshColorModuleCS") {
+								psConfig.moduleConfig.meshColorEnabled = true;
+							}
 							else if (moduleType == "TrailGenerateModule") {
 								psConfig.moduleConfig.trailGenerateEnable = true;
 							}
@@ -525,6 +532,12 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 
 		if (psConfig.moduleConfig.meshSpawnEnabled) {
 			if (auto* module = ps->GetModule<MeshSpawnModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.meshColorEnabled) {
+			if (auto* module = ps->GetModule<MeshColorModuleCS>()) {
 				module->SetEnabled(true);
 			}
 		}

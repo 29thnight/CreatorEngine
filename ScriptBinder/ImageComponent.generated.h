@@ -9,6 +9,9 @@ ReflectionFieldInheritance(ImageComponent, UIComponent) \
 		meta_property(color) \
 		meta_property(rotate) \
 		meta_property(origin) \
+		meta_property(unionScale) \
+		meta_property(clipDirection) \
+		meta_property(clipPercent) \
 		meta_property(texturePaths) \
 	}); \
 	MethodField \

@@ -93,7 +93,7 @@ void CharacterControllerComponent::Stun(float stunTime)
 
 void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKnockBackPower)
 {
-	preRotation = m_transform->GetForward();
+	//preRotation = m_transform->GetForward();
 	PreSpeed = m_fBaseSpeed;
 	m_fFinalMultiplierSpeed = KnockBackPower;
 	//m_fBaseSpeed = KnockBackPower;

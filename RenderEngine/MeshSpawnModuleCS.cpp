@@ -15,6 +15,7 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     , m_randomGenerator(m_randomDevice())
     , m_uniform(0.0f, 1.0f)
     , m_forcePositionUpdate(false)
+    , m_forceRotationUpdate(false)
 {
     // 스폰 파라미터 기본값
     m_spawnParams.spawnRate = 1.0f;
@@ -115,6 +116,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     m_spawnParams.currentTime = currentTime;
 
     m_spawnParams.forcePositionUpdate = m_forcePositionUpdate ? 1 : 0;
+    m_spawnParams.forceRotationUpdate = m_forceRotationUpdate ? 1 : 0;
 
     m_spawnParamsDirty = true;
 
@@ -180,10 +182,12 @@ void MeshSpawnModuleCS::Update(float deltaTime)
         m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
     }
 
-    if (m_spawnParams.forceRotationUpdate)
+    if (m_forceRotationUpdate)
     {
-        m_spawnParams.forceRotationUpdate = 0;
+        m_forceRotationUpdate = false;
+        m_spawnParams.previousEmitterRotation = m_spawnParams.emitterRotation;
     }
+
 }
 
 void MeshSpawnModuleCS::Release()
@@ -217,6 +221,7 @@ void MeshSpawnModuleCS::ResetForReuse()
     m_spawnParams.currentTime = 0.0f;
     m_spawnParams.deltaTime = 0.0f;
     m_forcePositionUpdate = true;
+    m_forceRotationUpdate = true;
     m_spawnParamsDirty = true;
     m_templateDirty = true;
 
@@ -392,8 +397,9 @@ void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 
         // 새 회전값 설정
         m_spawnParams.emitterRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
+        m_meshParticleTemplate.InitialRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
 
-        m_spawnParams.forceRotationUpdate = 1;
+        m_forceRotationUpdate = 1;
         m_spawnParamsDirty = true;
     }
 }

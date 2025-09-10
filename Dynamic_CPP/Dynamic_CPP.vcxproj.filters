@@ -57,9 +57,6 @@
 		<ClInclude Include="Assets\Script\TestBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\AsisMove.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\Entity.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -88,12 +85,6 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\AsisFeed.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Rock.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\InverseKinematic.h">
@@ -289,7 +280,7 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponCapsule.h">
-      <Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -332,9 +323,6 @@
 		<ClCompile Include="Assets\Script\TestBehavior.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\AsisMove.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityAsis.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -348,12 +336,6 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\AsisFeed.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Rock.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
@@ -534,7 +516,7 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
-      <Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>

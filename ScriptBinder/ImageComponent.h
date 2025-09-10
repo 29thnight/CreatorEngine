@@ -6,6 +6,7 @@
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
 #include <DirectXTK/SpriteBatch.h>
+#include <cstdint>
 
 struct alignas(16) ImageInfo
 {
@@ -14,7 +15,7 @@ struct alignas(16) ImageInfo
 	float2 screenSize;
 };
 
-//∏µÁ 2d¿ÃπÃ¡ˆ ±‚∫ª?
+//Î™®Îì† 2dÏù¥ÎØ∏ÏßÄ Í∏∞Î≥∏?
 class Texture;
 class UIMesh;
 class Canvas;
@@ -27,6 +28,7 @@ public:
 	~ImageComponent() = default;
 
 	void Load(const std::shared_ptr<Texture>& ptr);
+	void DeserializeTexture(const std::shared_ptr<Texture>& ptr);
 	virtual void Awake() override;
 	virtual void Update(float tick) override;
 	virtual void OnDestroy() override;
@@ -39,16 +41,22 @@ public:
 	const std::vector<std::shared_ptr<Texture>>& GetTextures() const { return textures; }
 	const std::vector<std::string>& GetTexturePaths() const { return texturePaths; }
 	
-	ImageInfo uiinfo{};
-	std::shared_ptr<Texture> m_curtexture{};
+	ImageInfo								uiinfo{};
+	std::shared_ptr<Texture>				m_curtexture{};
     [[Property]]
-	int curindex = 0;
+	int										curindex = 0;
+	[[Property]]							
+	Mathf::Color4							color{ 1,1,1,1 };
+	[[Property]]							
+	float									rotate{ 0 };
+	[[Property]]							
+	Mathf::Vector2							origin{};
+	[[Property]]							
+	float									unionScale{ 1.f };
 	[[Property]]
-	Mathf::Color4	color{ 1,1,1,1 };
+	ClipDirection                           clipDirection{ ClipDirection::None };
 	[[Property]]
-	float			rotate{ 0 };
-	[[Property]]
-	XMFLOAT2		origin{};
+	float                                   clipPercent{ 1.f };
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;

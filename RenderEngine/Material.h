@@ -8,7 +8,6 @@
 #include <vector>
 #include <cstdint>
 
-
 class ID3D11DeviceContext;
 enum class MaterialRenderingMode
 {

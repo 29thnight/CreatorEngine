@@ -1,0 +1,71 @@
+// PieSprite_PS.hlsl
+cbuffer PieParams : register(b1)
+{
+    float2 centerUV; // 원 중심 (0~1, 텍스처 UV 기준)
+    float radiusUV; // 외곽 반지름 (UV 단위, 0~1)
+    float percent; // 0~1 (그릴 비율)
+    float startAngle; // 라디안 단위. 0 = +X축, PI/2 = +Y축 방향
+    int clockwise; // 1이면 시계방향, 0이면 반시계
+    float featherAngle; // 각도 페더(라디안). 0.005~0.05 정도
+    float innerRadius; // 0이면 꽉 찬 원, (0~radiusUV)로 링 두께 설정
+    float4 tint; // 곱색
+    float4 bgColor; // 배경색(프리멀티플라이드 알파 가정)
+}
+
+Texture2D Diffuse : register(t0);
+SamplerState Samp : register(s0);
+
+
+// 유틸: 각도 [0,2π) 정규화
+static const float TWO_PI = 6.283185307179586f;
+float normAngle(float a)
+{
+    a = fmod(a, TWO_PI);
+    return (a < 0) ? a + TWO_PI : a;
+}
+
+float4 main(float4 color : COLOR0, float2 texCoord : TEXCOORD0) : SV_TARGET
+{
+    // 기본 텍스처 색(프리멀티플라이드 알파 권장)
+    float4 base = Diffuse.Sample(Samp, texCoord) * color * tint;
+
+    // 중심/반지름 기반 좌표
+    float2 d = texCoord - centerUV;
+    float r = length(d);
+
+    // 반경 커버리지 (도넛 지원 + 페더)
+    float outerEdge = smoothstep(radiusUV, max(radiusUV - radiusUV * 0.01, 1e-5), r); // 살짝 부드럽게
+    float innerEdge = (innerRadius <= 0.0)
+        ? 1.0
+        : 1.0 - smoothstep(innerRadius, max(innerRadius - radiusUV * 0.01, 1e-5), r);
+
+    float radialMask = saturate(innerEdge * outerEdge);
+
+    // 각도 계산: atan2(y,x) ∈ (-π, π] → [0, 2π)로
+    float ang = atan2(d.y, d.x);
+    ang = normAngle(ang);
+
+    // 시작각 기준으로 회전 보정
+    float rel = normAngle(ang - startAngle); // 0에서 시작
+    if (clockwise == 0)
+    {
+        // 반시계방향: 시계로 계산하고 싶으면 대칭 변환
+        rel = (rel > 0) ? (TWO_PI - rel) : 0; // rel ∈ (0, 2π] → (2π-rel)
+    }
+
+    // 잘라낼 목표 각도
+    float cut = saturate(percent) * TWO_PI;
+
+    // 각도 페더(부드러운 에지)
+    float angleMask = (featherAngle <= 0.0f)
+        ? step(rel, cut)
+        : smoothstep(cut, max(cut - featherAngle, 0.0), rel); // rel <= cut일 때 1, 경계는 부드럽게
+
+    float coverage = radialMask * angleMask;
+
+    // 배경색과의 프리멀티플라이드 블렌딩
+    float a = coverage * base.a;
+    float3 rgb = base.rgb * coverage + bgColor.rgb * (1.0 - coverage);
+
+    return float4(1,0,0,1);
+}

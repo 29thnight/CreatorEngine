@@ -89,6 +89,9 @@ public:
 	float GetPolarClippingAnimationSpeed() const { return m_polarClippingAnimationSpeed; }
 	void SetPolarReferenceDirection(const Mathf::Vector3& referenceDir);
 
+	void SetAdditiveBlend(bool isAdditive) { m_useAdditiveBlend = isAdditive; }
+	bool GetBlend() const { return m_useAdditiveBlend; }
+
 public:
 	virtual nlohmann::json SerializeData() const override;
 	virtual void DeserializeData(const nlohmann::json& json) override;
@@ -137,4 +140,11 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_timeBuffer;
 	TimeParams m_timeParams = {};
+
+	Texture* m_dissolveTex1;
+	Texture* m_dissolveTex2;
+	Texture* m_dissolveTex3;
+
+	bool m_useAdditiveBlend = true;  // 어두운 효과용 블렌드 모드
+	Microsoft::WRL::ComPtr<ID3D11BlendState> m_alternativeBlendState;
 };

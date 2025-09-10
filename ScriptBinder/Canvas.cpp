@@ -25,24 +25,34 @@ void Canvas::OnDestroy()
 	}
 }
 
-void Canvas::AddUIObject(GameObject* obj)
+void Canvas::AddUIObject(std::shared_ptr<GameObject> obj)
 {
 	auto image = obj->GetComponent<ImageComponent>();
 	if (image)
 	{
 		image->SetCanvas(this);
 		UIManagers->RegisterImageComponent(image);
+		image->m_ownerCanvasName = m_pOwner->m_name.ToString();
 	}
 	auto text = obj->GetComponent<TextComponent>();
 	if (text)
 	{
 		text->SetCanvas(this);
 		UIManagers->RegisterTextComponent(text);
+		text->m_ownerCanvasName = m_pOwner->m_name.ToString();
 	}
 	auto btn = obj->GetComponent<UIButton>();
 	if (btn)
+	{
 		btn->SetCanvas(this);
+		btn->m_ownerCanvasName = m_pOwner->m_name.ToString();
+	}
 	UIObjs.push_back(obj);
+	//맨처음 추가되는 UI를 선택된 UI로 지정
+	if (SelectUI.expired())
+	{
+		SelectUI = obj;
+	}
 }
 
 
@@ -53,17 +63,8 @@ void Canvas::Update(float tick)
 		UIManagers->needSort = true;
 		PreCanvasOrder = CanvasOrder;
 	}
-	//이 부분 UI Manager 에서 통합으로 처리하자
-	for (auto& obj : UIObjs)
-	{
-		if (obj->IsDestroyMark())
-		{
-			if (auto image = obj->GetComponent<ImageComponent>())
-				UIManagers->UnregisterImageComponent(image);
-			if (auto text = obj->GetComponent<TextComponent>())
-				UIManagers->UnregisterTextComponent(text);
-			std::erase(UIObjs, obj);
-			continue;
-		}
-	}
+
+	////이 부분 UI Manager 에서 통합으로 처리하자
+	std::erase_if(UIObjs, [](const std::weak_ptr<GameObject>& obj) 
+		{ return obj.expired() || (obj.lock() && obj.lock()->IsDestroyMark()); });
 }

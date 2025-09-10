@@ -645,7 +645,8 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 	{
 		Textures[name] = texture;
 		texture->m_name = name;
-		
+		texture->m_extension = file::path(texturePath).extension().string();
+
 		return texture.get();
 	}
 	else
@@ -701,6 +702,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 			break;
 		}
 		texture->m_name = name;
+		texture->m_extension = file::path(filePath).extension().string();
 
 		return texture;
 	}

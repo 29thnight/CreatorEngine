@@ -1,13 +1,16 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include <variant>
 #include <DirectXTK/SpriteFont.h>
+#include <cstdint>
 #include "Core.Minimal.h"
 #include "Shader.h"
+#include "Navigation.h"
 
 class Texture;
 class ImageComponent;
 class TextComponent;
-
+enum class ClipDirection : std::uint8_t;
 // Proxy responsible for drawing UI elements without keeping component pointers.
 class UIRenderProxy 
 {
@@ -18,10 +21,12 @@ public:
         std::shared_ptr<Texture>                texture{ nullptr };
         DirectX::XMFLOAT2                       origin{};
         Mathf::Vector3                          position{};
-		Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
+        Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
         float                                   rotation{ 0.f };
         int                                     layerOrder{ 0 };
+        ClipDirection                           clipDirection{ ClipDirection::None };
+        float                                   clipPercent{ 1.f };
     };
 
     struct TextData 
@@ -63,5 +68,7 @@ private:
     ShaderPtr<PixelShader>              m_customPixelShader{};
 	ComPtr<ID3D11Buffer>                m_customPixelBuffer{ nullptr };
 	std::vector<std::byte>              m_customPixelCPUBuffer{};
+    uint32                              m_customPixelBufferSize{};
 	bool                                m_isEnabled{ true };
 };
+#endif // !DYNAMICCPP_EXPORTS

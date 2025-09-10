@@ -161,7 +161,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					}
 					if (ImGui::MenuItem("		Text"))
 					{
-						UIManagers->MakeText("Text", nullptr, nullptr);
+						UIManagers->MakeText("Text", "null", nullptr);
 					}
 					if (ImGui::MenuItem("		Button"))
 					{
@@ -263,14 +263,14 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					}
 					if (text)
 					{
-						text->SetFont(font);
+						text->SetFont(filepath);
 						text->SetMessage("New Text");
 					}
 				}
 				else
 				{
 					ImGui::Text("No GameObject Selected");
-					UIManagers->MakeText(filename.stem().string().c_str(), font);
+					UIManagers->MakeText(filename.stem().string().c_str(), filepath);
 				}
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))

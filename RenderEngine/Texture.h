@@ -179,6 +179,7 @@ public:
 	bool m_hasUAV{ false };
 
 	std::string m_name;
+	std::string m_extension;
 
 	float2 GetImageSize() const;
 

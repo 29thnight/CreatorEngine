@@ -5,6 +5,9 @@
 
 using namespace DirectX;
 
+// 파티클 데이터 구조체 (다른 곳에서 정의되어 있다고 가정)
+struct ParticleData;
+
 // 그라데이션 포인트 구조체 (GPU용)
 struct GradientPoint
 {
@@ -29,9 +32,6 @@ struct ColorParams
     UINT maxParticles;            // 최대 파티클 수
     float padding[2];             // 16바이트 정렬을 위한 패딩
 };
-
-// 파티클 데이터 구조체 (다른 곳에서 정의되어 있다고 가정)
-struct ParticleData;
 
 class ColorModuleCS : public ParticleModule, public ISerializable
 {

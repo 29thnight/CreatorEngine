@@ -11,8 +11,14 @@
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
+	if( auto existingCanvas = FindCanvasName(name); existingCanvas )
+	{
+		std::cout << "Canvas with name '" << name << "' already exists." << std::endl;
+		return nullptr;
+	}
+
 	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
-	newObj->AddComponent<Canvas>();
+	auto can = newObj->AddComponent<Canvas>();
 
 	if (auto* rect = newObj->GetComponent<RectTransformComponent>())
 	{
@@ -26,14 +32,57 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 	}
 
 	Canvases.emplace_back(newObj);
+	CanvasMap[name.data()] = newObj;
+
 	needSort = true;
 	return newObj;
+}
+
+void UIManager::AddCanvas(std::shared_ptr<GameObject> canvas)
+{
+	if (!canvas)
+	{
+		std::cout << "Canvas is nullptr" << std::endl;
+		return;
+	}
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	if (!canvasCom)
+	{
+		std::cout << "This Obj Not Canvas" << std::endl;
+		return;
+	}
+
+	std::string canvasName = canvas->ToString();
+	if (CanvasMap.find(canvasName) != CanvasMap.end())
+	{
+		if (auto existingCanvas = CanvasMap[canvasName].lock())
+		{
+			std::cout << "Canvas with name '" << canvasName << "' already exists." << std::endl;
+			return;
+		}
+		else
+		{
+			CanvasMap.erase(canvasName);
+			std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& weakPtr) {
+				if (auto sharedPtr = weakPtr.lock())
+				{
+					return sharedPtr->ToString() == canvasName;
+				}
+				return true; // Remove expired weak_ptr
+			});
+		}
+	}
+
+	Canvases.emplace_back(canvas);
+	CanvasMap[canvas->ToString()] = canvas;
+	needSort = true;
 }
 
 std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
+
 	if (!canvas)
 	{
 		if (auto c = Canvases.front().lock())
@@ -65,7 +114,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 		newImage->AddComponent<ImageComponent>()->Load(texture);
 	}
 
-	canvasCom->AddUIObject(newImage.get());
+	canvasCom->AddUIObject(newImage);
 	
 
 	return newImage;
@@ -145,7 +194,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 	auto component = newButton->AddComponent<UIButton>();
 	//component->SetClickFunction(clickfun);
 
-	canvasCom->AddUIObject(newButton.get());
+	canvasCom->AddUIObject(newButton);
 
 	return newButton;
 }
@@ -178,12 +227,12 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
 	component->SetClickFunction(clickfun);
 
 
-	canvas->GetComponent<Canvas>()->AddUIObject(newButton.get());
+	canvas->GetComponent<Canvas>()->AddUIObject(newButton);
 
 	return newButton;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFont* Sfont, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -197,13 +246,13 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->SetFont(Sfont);
-	canvasCom->AddUIObject(newText.get());
+	newText->AddComponent<TextComponent>()->SetFont(FontName);
+	canvasCom->AddUIObject(newText);
 
 	return newText;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -224,8 +273,8 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	}
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->SetFont(Sfont);
-	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());
+	newText->AddComponent<TextComponent>()->SetFont(FontName);
+	canvas->GetComponent<Canvas>()->AddUIObject(newText);
 
 	return newText;
 }
@@ -238,21 +287,26 @@ void UIManager::DeleteCanvas(std::string canvasName)
 		return c && c->ToString() == canvasName;
 	});
 
-	auto curCanvasObj = (*it).lock();
-	auto canvasCom = curCanvasObj->GetComponent<Canvas>();
-	for (auto& uiObj : canvasCom->UIObjs)
+	if (it != Canvases.end())
 	{
-		uiObj->Destroy();
+		auto curCanvasObj = (*it).lock();
+		auto canvasCom = curCanvasObj->GetComponent<Canvas>();
+		for (auto& uiObj : canvasCom->UIObjs)
+		{
+			auto uiObjPtr = uiObj.lock();
+			if (uiObjPtr)
+				uiObjPtr->Destroy();
+		}
+		canvasCom->UIObjs.clear();
+
+		std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas)
+			{
+				auto c = canvas.lock();
+				return !c || c->ToString() == canvasName;
+			});
+
+		curCanvasObj->Destroy();
 	}
-	canvasCom->UIObjs.clear();
-
-	std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
-	{
-		auto c = canvas.lock();
-		return !c || c->ToString() == canvasName;
-	});
-
-	curCanvasObj->Destroy();
 }
 
 void UIManager::CheckInput()
@@ -264,50 +318,76 @@ void UIManager::CheckInput()
 	{
 		for (auto& uiObj : curCanvas->UIObjs)
 		{
-			
-			UIComponent* UI = uiObj->GetComponent<UIComponent>();
-			if (UI && false == UI->IsEnabled()) continue;
-			UIButton* btn = uiObj->GetComponent<UIButton>();
-			if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
-			btn->Click();
+			auto uiObjPtr = uiObj.lock();
+			if (uiObjPtr)
+			{
+				UIComponent* UI = uiObjPtr->GetComponent<UIComponent>();
+				if (UI && false == UI->IsEnabled()) continue;
+				UIButton* btn = uiObjPtr->GetComponent<UIButton>();
+				if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
+				btn->Click();
+			}
 			break;
 		}
 	}
 
 	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
-	if (stickL.x > 0.5)
+	auto selectUI = curCanvas->SelectUI.lock();
+	if (selectUI)
 	{
-		curCanvas->SelectUI = curCanvas->SelectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
-	}
-	if (stickL.x < -0.5)
-	{
-		curCanvas->SelectUI = curCanvas->SelectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
-	}
+		if (stickL.x > 0.5)
+		{
+			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right)->shared_from_this();
+		}
+		if (stickL.x < -0.5)
+		{
+			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left)->shared_from_this();
+		}
 
-	if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
-	{
-		if (curCanvas->SelectUI == nullptr) return;
-		curCanvas->SelectUI->GetComponent<UIButton>()->Click();
-	}	
+		if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
+		{
+			selectUI->GetComponent<UIButton>()->Click();
+		}
+	}
 }
 
 GameObject* UIManager::FindCanvasName(std::string_view name)
 {
-	for (auto it = Canvases.begin(); it != Canvases.end();)
+	auto it = CanvasMap.find(name.data());
+	if (it != CanvasMap.end())
 	{
-		if (auto canvasObj = it->lock())
+		if (auto canvasObj = it->second.lock())
 		{
-			if (canvasObj->ToString() == name)
-				return canvasObj.get();
-			++it;
+			return canvasObj.get();
 		}
 		else
 		{
-			it = Canvases.erase(it);
+			CanvasMap.erase(it);
+			std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
+			{
+				auto c = canvas.lock();
+				return !c || c->ToString() == name;
+			});
+			return nullptr;
 		}
 	}
+
 	return nullptr;
+}
+
+GameObject* UIManager::FindCanvasIndex(int index)
+{
+	if (index < 0 || index >= Canvases.size())
+		return nullptr;
+	auto canvasObj = Canvases[index].lock();
+	if (canvasObj)
+		return canvasObj.get();
+	else
+	{
+		Canvases.erase(Canvases.begin() + index);
+		return nullptr;
+	}
 }
 
 void UIManager::Update()

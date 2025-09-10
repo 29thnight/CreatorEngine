@@ -95,7 +95,7 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 			case EffectCommandType::Pause:
 				if (!proxy->GetInstanceName().empty())
 				{
-					command = EffectManagerProxy::CreateStopCommand(proxy->GetInstanceName());
+					command = EffectManagerProxy::CreatePauseCommand(proxy->GetInstanceName());
 					PushEffectCommand(std::move(command));
 				}
 				break;
@@ -103,7 +103,7 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 			{
 				if (!proxy->GetInstanceName().empty())
 				{
-					command = EffectManagerProxy::CreatePlayCommand(proxy->GetInstanceName());
+					command = EffectManagerProxy::CreateResumeCommand(proxy->GetInstanceName());
 					PushEffectCommand(std::move(command));
 				}
 				break;

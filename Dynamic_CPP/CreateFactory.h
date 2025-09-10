@@ -20,15 +20,12 @@
 #include "TestEnemy.h"
 #include "InverseKinematic.h"
 #include "TestTreeBehavior.h"
-#include "Rock.h"
-#include "AsisFeed.h"
 #include "GameManager.h"
 #include "EntityItem.h"
 #include "EntityAsis.h"
 #include "Entity.h"
 #include "Player.h"
 #include "TestBehavior.h"
-#include "AsisMove.h"
 #include "CameraMove.h"
 
 class CreateFactory : public Singleton<CreateFactory>
