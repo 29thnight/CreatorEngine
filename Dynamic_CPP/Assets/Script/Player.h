@@ -210,12 +210,6 @@ public:
 	float ResurrectionGracePeriod = 3.0f;  //부활시 무적시간
 	
 
-	//버프
-	BuffType curBuffType = BuffType::None;
-	int buffHitCount = 0; //남은 버프공격횟수
-	[[Method]]
-	void OnBuff();
-	void Buff(Weapon* weapon);
 
 
 	//무기
