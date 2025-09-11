@@ -1,14 +1,14 @@
-m_name: ResourceMineral
+m_name: ResourceMushroom
 m_isEnabled: true
-m_instanceID: 1406152817
+m_instanceID: 3555951682
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: ResourceMineral
+    m_name: ResourceMushroom
     m_isEnabled: true
-    m_instanceID: 700186522
+    m_instanceID: 412313310
     m_transform:
-      position: {x: -2, y: 0, z: 0, w: 1}
+      position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
@@ -16,7 +16,7 @@ PrefabNode:
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: [4]
-    m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
+    m_prefabFileGuid: ab7122ab-afa9-5118-9b9d-9b7e04d6d50c
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 571107856
+        m_instanceID: 139061904
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -43,34 +43,34 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 4169150160
+        m_instanceID: 3580052275
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 0.5, y: 1, z: 0.5}
-        m_posOffset: {x: 0, y: 0, z: 0}
+        m_boxExtent: {x: 1.20000005, y: 1.5, z: 1.20000005}
+        m_posOffset: {x: 0, y: 1.5, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        itemCode: 1
-        itemType: 1
+        itemCode: 0
+        itemType: 0
         m_name: EntityResource
         m_isEnabled: true
-        m_instanceID: 111765161
+        m_instanceID: 1390145098
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
     children:
       - GameObject: 2166264123
-        m_name: Obj_Inter_stone
+        m_name: Obj_Inter_mushroom2
         m_isEnabled: true
-        m_instanceID: 559881475
+        m_instanceID: 2024938101
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
         m_index: 4
         m_parentIndex: 3
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
+        m_prefabFileGuid: ab7122ab-afa9-5118-9b9d-9b7e04d6d50c
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
@@ -81,13 +81,13 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 539395906
+            m_instanceID: 215083435
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material.003
-              m_baseColorTexName: Obj_Inter_stone_Material_BaseColor.png
-              m_normalTexName: Obj_Inter_stone_Material_Normal.png
-              m_ORM_TexName: Obj_Inter_stone_Material_OcclusionRoughnessMetallic.png
+              m_name: Mushroom
+              m_baseColorTexName: Obj_Inter_mushroom_L_DefaultMaterial_BaseColor.png
+              m_normalTexName: Obj_Inter_mushroom_L_DefaultMaterial_Normal.png
+              m_ORM_TexName: Obj_Inter_mushroom_L_DefaultMaterial_OcclusionRoughnessMetallic.png
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
@@ -98,11 +98,11 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 048e2897-6ef6-5fca-a947-305db40c30cd
+              m_fileGuid: 52a63799-a19b-58e6-bacd-b9b7cb7ca849
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
-              m_name: Plane.009
+              m_name: Cube.005
               m_materialIndex: 0
               m_LODThresholds: ~
             m_LightMapping:

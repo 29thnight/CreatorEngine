@@ -54,18 +54,22 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 					}
 					tempidx++;
 				}*/
-				Prefab* itemPrefab;
-				if (itemCode == 0)
+				Prefab* itemPrefab = nullptr;
+				if (itemType == EItemType::Mushroom)
 				{
 					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom");
 				}
-				else if (itemCode == 1)
+				else if (itemType == EItemType::Mineral)
 				{
 					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMineral");
 				}
-				else
+				else if(itemType == EItemType::Fruit)
 				{
 					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFruit");
+				}
+				else if (itemType == EItemType::Flower)
+				{
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom"); //BoxFlower(힐 아이템 아직 없음)
 				}
 				
 				if (itemPrefab)

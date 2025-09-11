@@ -1,21 +1,21 @@
-m_name: NormalRock
+m_name: Map_BigRock_Green
 m_isEnabled: true
-m_instanceID: 1402426174
+m_instanceID: 4086835763
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: NormalRock
+    m_name: Map_BigRock_Green
     m_isEnabled: true
-    m_instanceID: 4090536546
+    m_instanceID: 1037690088
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1103
+    m_index: 543
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [1104]
+    m_childrenIndices: [542]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 3978446979
+        m_instanceID: 2619086552
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 0
         LinearDamping: 0.00999999978
@@ -43,29 +43,29 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 3565761939
+        m_instanceID: 3111736706
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 7, y: 7, z: 7}
+        m_boxExtent: {x: 8, y: 7, z: 7.5}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        m_name: EntitlyRock
+        m_name: EntityRock
         m_isEnabled: true
-        m_instanceID: 3005883938
+        m_instanceID: 1961611483
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 364fac66-6027-5cb0-a392-9ea8ff7a42e5
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
     children:
       - GameObject: 2166264123
-        m_name: Map_obj_rock_1 (5)
+        m_name: Map_obj_rock_1 (6)
         m_isEnabled: true
-        m_instanceID: 2500133245
+        m_instanceID: 1397016876
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 0.800000012, y: 0.800000012, z: 0.800000012, w: 1}
-          m_parentID: 1103
-        m_index: 1104
-        m_parentIndex: 1103
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 543
+        m_index: 542
+        m_parentIndex: 543
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -79,7 +79,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 2516631919
+            m_instanceID: 3844097382
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Map_obj_rock_1

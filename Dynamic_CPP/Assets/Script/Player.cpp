@@ -52,6 +52,20 @@ void Player::Start()
 		m_animator = player->GetComponent<Animator>();
 	}
 
+	std::string ShootPosObjName = "RangeShootPos";
+	for (auto& child : childred)
+	{
+		GameObject* childObj = GameObject::FindIndex(child);
+		if (childObj)
+		{
+			if (childObj->RemoveSuffixNumberTag() == ShootPosObjName)
+			{
+				shootPosObj = childObj;
+				break;
+			}
+		}
+	}
+
 
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 	
@@ -63,7 +77,20 @@ void Player::Start()
 		auto weapon = weaponObj->GetComponent<Weapon>();
 		AddWeapon(weapon);
 	}
-
+	Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
+	if (meleeweapon && player)
+	{
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "BasicWeapon");
+		auto weapon = weaponObj->GetComponent<Weapon>();
+		AddWeapon(weapon);
+	}
+	Prefab* rangeweapon = PrefabUtilitys->LoadPrefab("WeaponWand");
+	if (rangeweapon && player)
+	{
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(rangeweapon, "BasicWeapon");
+		auto weapon = weaponObj->GetComponent<Weapon>();
+		AddWeapon(weapon);
+	}
 	
 	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
 	dashEffect = dashObj->AddComponent<EffectComponent>();
@@ -223,41 +250,41 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	auto cam = camComponent->GetCamera();
-	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//auto cam = camComponent->GetCamera();
+	//auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	float w = XMVectorGetW(clipSpacePos);
-	if (w < 0.001f) {
-		// 원래 위치 반환.
-		GetOwner()->m_transform.SetPosition(worldpos);
-		return;
-	}
-	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//float w = XMVectorGetW(clipSpacePos);
+	//if (w < 0.001f) {
+	//	// 원래 위치 반환.
+	//	GetOwner()->m_transform.SetPosition(worldpos);
+	//	return;
+	//}
+	//XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	float x = XMVectorGetX(ndcPos);
-	float y = XMVectorGetY(ndcPos);
-	x = abs(x);
-	y = abs(y);
+	//float x = XMVectorGetX(ndcPos);
+	//float y = XMVectorGetY(ndcPos);
+	//x = abs(x);
+	//y = abs(y);
 
-	float clamp_limit = 0.9f;
-	if(x < clamp_limit && y < clamp_limit)
-	{
-		return;
-	}
+	//float clamp_limit = 0.9f;
+	//if(x < clamp_limit && y < clamp_limit)
+	//{
+	//	return;
+	//}
 
-	XMVECTOR clampedNdcPos = XMVectorClamp(
-		ndcPos,
-		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	);
-	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+	//XMVECTOR clampedNdcPos = XMVectorClamp(
+	//	ndcPos,
+	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+	//	XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	//);
+	//XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	//XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-	GetOwner()->m_transform.SetPosition(newWorldPos);
+	//GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
 void Player::SendDamage(Entity* sender, int damage)
@@ -490,16 +517,18 @@ void Player::StartAttack()
 void Player::Charging()
 {
 
+	//차징을 애니메이션 끝난순간부터 재기? 기본은 차징X
 		if (m_chargingTime >= minChargedTime)
 		{
 			//std::cout << "charginggggggg" << std::endl;
 			//LOG("charginggggggg");
+			//어택 끝났는대도 처징중이면 이속감소 and 이펙트 출력
 		}
-		//m_animator->SetParameter("Charging", true); //차징중에 기모으는 이펙트 출력 Idle or Move 애니메이션 자율
+		
 
 }
 
-void Player::Attack1()
+void Player::Attack1()  //정리되면 ChargeAttack() 으로 이름바꿀예정
 {
 	//여기선 차징시간이 넘으면 차징공격만 실행
 	//근거리는 큰이펙트 + 1,2,3타중 정한애니메이션중 하나  ,,, 원거리는 부채꼴로 여러발 발사
@@ -513,13 +542,13 @@ void Player::Attack1()
 		OnMoveBomb = false;
 
 	}
-	else
+	else //근거리 and 원거리 
 	{
-		if (m_chargingTime >= minChargedTime)
+		if (m_chargingTime >= minChargedTime)  //최소 차징시간 넘었으면
 		{
 			//차지공격나감
 			isChargeAttack = true;
-			m_curWeapon->CheckChargedDur(m_chargingTime);  //여기서 chargeCount 갱신해주기
+			m_curWeapon->CheckChargedDur(m_chargingTime);  //차징은 무조건  무기부숨 -> 내구도 상관없음 
 			std::cout << "Charged Attack!!" << std::endl;
 		}
 	}
@@ -869,6 +898,11 @@ void Player::ShootNormalBullet()
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+		if (shootPosObj)
+		{
+			pos = shootPosObj->m_transform.GetWorldPosition();
+		}
+		
 		if (m_curWeapon)
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
@@ -886,6 +920,11 @@ void Player::ShootSpecialBullet()
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+
+		if (shootPosObj)
+		{
+			pos = shootPosObj->m_transform.GetWorldPosition();
+		}
 		if (m_curWeapon)
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);

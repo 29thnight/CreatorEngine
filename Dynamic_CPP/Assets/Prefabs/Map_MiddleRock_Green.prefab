@@ -1,21 +1,21 @@
-m_name: GrassRock
+m_name: Map_MiddleRock_Green
 m_isEnabled: true
-m_instanceID: 1523538314
+m_instanceID: 338562066
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: GrassRock
+    m_name: Map_MiddleRock_Green
     m_isEnabled: true
-    m_instanceID: 3072059067
+    m_instanceID: 2352339899
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1103
+    m_index: 546
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [1104]
+    m_childrenIndices: [541]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2714271222
+        m_instanceID: 3926415668
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 0
         LinearDamping: 0.00999999978
@@ -43,29 +43,23 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 175646960
+        m_instanceID: 79701062
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 7, y: 7, z: 7}
+        m_boxExtent: {x: 3, y: 2, z: 3}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
-      - ModuleBehavior: 1399118904
-        m_name: EntitlyRock
-        m_isEnabled: true
-        m_instanceID: 1560389088
-        m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 364fac66-6027-5cb0-a392-9ea8ff7a42e5
     children:
       - GameObject: 2166264123
-        m_name: Map_obj_rock_1_G (10)
+        m_name: Map_obj_rock_2 (1)
         m_isEnabled: true
-        m_instanceID: 4118742565
+        m_instanceID: 319672547
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.800000012, y: 0.800000012, z: 0.800000012, w: 0}
-          m_parentID: 1103
-        m_index: 1104
-        m_parentIndex: 1103
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 546
+        m_index: 541
+        m_parentIndex: 546
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -79,13 +73,13 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3860466544
+            m_instanceID: 1919351180
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Map_obj_rock_1_G
-              m_baseColorTexName: Map_obj_rock_1_G_DefaultMaterial_BaseColor.png
-              m_normalTexName: Map_obj_rock_1_G_DefaultMaterial_Normal.png
-              m_ORM_TexName: Map_obj_rock_1_G_DefaultMaterial_OcclusionRoughnessMetallic.png
+              m_name: Map_obj_rock_2
+              m_baseColorTexName: Map_obj_rock_2_DefaultMaterial_BaseColor.png
+              m_normalTexName: Map_obj_rock_2_DefaultMaterial_Normal.png
+              m_ORM_TexName: Map_obj_rock_2_DefaultMaterial_OcclusionRoughnessMetallic.png
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
@@ -96,11 +90,11 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 11b7b103-b001-5890-8bed-c70fb5cd6411
+              m_fileGuid: 1eba5498-c501-5271-a486-7b6d1607d339
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
-              m_name: Plane.002
+              m_name: Plane.001
               m_materialIndex: 0
               m_LODThresholds: ~
             m_LightMapping:

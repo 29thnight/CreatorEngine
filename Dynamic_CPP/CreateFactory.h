@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EntityRock.h"
 #include "EntitySpiritStone.h"
 #include "UIGageTest.h"
 #include "EntitlyRock.h"

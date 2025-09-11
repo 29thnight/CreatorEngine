@@ -26,7 +26,7 @@ public:
 	virtual void OnRay() {};
 	virtual void AttakRay() {};
 	[[Property]]
-	int m_currentHP{ 100 };
+	int m_currentHP{ 1 };
 	[[Property]]
 	int m_maxHP{ 100 };
 

@@ -1,21 +1,21 @@
-m_name: RedRock
+m_name: Map_BigRock_Green_Re
 m_isEnabled: true
-m_instanceID: 3757626773
+m_instanceID: 3839267844
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: RedRock
+    m_name: Map_BigRock_Green_Re
     m_isEnabled: true
-    m_instanceID: 1796110394
+    m_instanceID: 148762010
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
-      rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-    m_index: 607
+    m_index: 542
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [230]
+    m_childrenIndices: [541]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2707929128
+        m_instanceID: 2147639181
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 0
         LinearDamping: 0.00999999978
@@ -43,29 +43,29 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 2047612750
+        m_instanceID: 468292230
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 7, y: 7, z: 7}
+        m_boxExtent: {x: 8, y: 7, z: 7.5}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        m_name: EntitlyRock
+        m_name: EntityRock
         m_isEnabled: true
-        m_instanceID: 3897381482
+        m_instanceID: 3313065628
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 364fac66-6027-5cb0-a392-9ea8ff7a42e5
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
     children:
       - GameObject: 2166264123
-        m_name: Map_obj_rock_Red (3)
+        m_name: RE_Map_obj_rock_1
         m_isEnabled: true
-        m_instanceID: 2996213113
+        m_instanceID: 2628464506
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 0.800000012, y: 0.800000012, z: 0.800000012, w: 1}
-          m_parentID: 607
-        m_index: 230
-        m_parentIndex: 607
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 542
+        m_index: 541
+        m_parentIndex: 542
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -73,19 +73,19 @@ PrefabNode:
         m_collisionType: 1
         m_isStatic: false
         m_gameObjectType: 3
-        m_tag: Rock
+        m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3652842311
+            m_instanceID: 2224972834
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Map_obj_rock_Red
-              m_baseColorTexName: Map_obj_rock_1_Red_DefaultMaterial_BaseColor.png
-              m_normalTexName: Map_obj_rock_1_Red_DefaultMaterial_Normal.png
-              m_ORM_TexName: Map_obj_rock_1_Red_DefaultMaterial_OcclusionRoughnessMetallic.png
+              m_name: Material.001
+              m_baseColorTexName: re_Map_obj_rock_1_DefaultMaterial_BaseColor.png
+              m_normalTexName: re_Map_obj_rock_1_DefaultMaterial_Normal.png
+              m_ORM_TexName: re_Map_obj_rock_1_DefaultMaterial_OcclusionRoughnessMetallic.png
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
@@ -96,11 +96,11 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 70409eed-f107-5442-9e10-16ddf43183f2
+              m_fileGuid: 49c06594-10e8-518b-91a2-1fcb72bf52db
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
-              m_name: Plane.022
+              m_name: Plane
               m_materialIndex: 0
               m_LODThresholds: ~
             m_LightMapping:

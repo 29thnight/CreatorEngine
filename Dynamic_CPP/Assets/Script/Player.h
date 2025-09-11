@@ -68,6 +68,9 @@ public:
 	[[Property]]
 	float  moveSpeed= 0.025f;
 	[[Property]]
+	float  chargingMoveSpeed = 0.0125f; // 차징중 이동속도
+	float  baseMoveSpeed = 0.025f;  //기본 이동속도
+	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
 	playerState m_state = playerState::Idle;
@@ -246,6 +249,7 @@ public:
 	EffectComponent* bombIndicator = nullptr; //폭탄 떨어질위치 보여줄 이펙트
 
 
+
 	GameManager* GM = nullptr;
 	GameObject* player = nullptr; // ==GetOwner() 스크립트 주인
 	Animator* m_animator = nullptr;
@@ -253,6 +257,7 @@ public:
 	Socket* handSocket = nullptr;
 	CharacterControllerComponent* m_controller = nullptr;
 
+	GameObject* shootPosObj = nullptr;
 	GameObject* Indicator = nullptr;
 	GameObject* camera = nullptr;
 };
