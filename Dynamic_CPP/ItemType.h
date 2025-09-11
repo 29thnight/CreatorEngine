@@ -6,16 +6,17 @@ enum class EItemType
 	Mineral,
 	Fruit,
 };
-
+AUTO_REGISTER_ENUM(EItemType)
 
 enum class ItemType
 {
+	Basic,
 	Meely,
 	Range,
-	Explosion,
-	Basic,
+	Bomb,
 	None,
 };
+AUTO_REGISTER_ENUM(ItemType)
 
 enum class BuffType
 {
@@ -24,7 +25,7 @@ enum class BuffType
 	Explosion,
 	None,
 };
-
+AUTO_REGISTER_ENUM(BuffType)
 
 class Entity;
 struct AttackContext

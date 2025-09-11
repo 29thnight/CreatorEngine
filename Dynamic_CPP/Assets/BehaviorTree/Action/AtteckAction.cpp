@@ -47,8 +47,8 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
     {
         //스테이트가 공격일시 에니메이션 종료 여부 확인
         // === 두 번째 Tick 이후: 공격 종료 확인 ===
-        LOG("AtteckAction Running...");
-        LOG("IsAttacking: " << blackBoard.GetValueAsBool("IsAttacking"));
+        //LOG("AtteckAction Running...");
+        //LOG("IsAttacking: " << blackBoard.GetValueAsBool("IsAttacking"));
         // Blackboard의 "IsAttacking" 플래그를 계속 확인합니다.
         if (blackBoard.GetValueAsBool("IsAttacking"))
         {

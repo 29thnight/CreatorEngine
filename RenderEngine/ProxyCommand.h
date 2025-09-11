@@ -2,14 +2,15 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "MeshRendererProxy.h"
 
+using Invokable = std::function<void()>;
 class FoliageComponent;
 class TerrainComponent;
+class SpriteRenderer;
 class ImageComponent;
 class TextComponent;
 class MeshRenderer;
 class DecalComponent;
 class SpriteSheetComponent;
-using Invokable = std::function<void()>;
 class ProxyCommand
 {
 public:
@@ -22,7 +23,8 @@ public:
 	ProxyCommand(ImageComponent* pComponent);
 	ProxyCommand(TextComponent* pComponent);
     ProxyCommand(DecalComponent* pComponent);
-
+	ProxyCommand(SpriteSheetComponent* pComponent);
+	ProxyCommand(SpriteRenderer* pComponent);
 	ProxyCommand(const ProxyCommand& other);
 	ProxyCommand(ProxyCommand&& other) noexcept;
 

@@ -6,10 +6,12 @@
 #include "Core.Minimal.h"
 #include "Shader.h"
 #include "Navigation.h"
+#include "SpriteSheet.h"
 
 class Texture;
 class ImageComponent;
 class TextComponent;
+class SpriteSheetComponent;
 enum class ClipDirection : std::uint8_t;
 // Proxy responsible for drawing UI elements without keeping component pointers.
 class UIRenderProxy 
@@ -39,8 +41,23 @@ public:
         int                                     layerOrder{ 0 };
     };
 
+    struct SpriteSheetData
+    {
+        std::string                             spriteSheetPath{};
+        DirectX::XMFLOAT2                       origin{};
+        Mathf::Vector3                          position{};
+        Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
+        Mathf::Vector2                          scale{ 1.f, 1.f };
+        float                                   rotation{ 0.f };
+        int                                     layerOrder{ 0 };
+        float                                   deltaTime{};
+		float                                   frameDuration{ 0.1f };
+		bool                                    isPreview{ false };
+	};
+
     explicit UIRenderProxy(ImageComponent* image) noexcept;
     explicit UIRenderProxy(TextComponent* text) noexcept;
+	explicit UIRenderProxy(SpriteSheetComponent* sprite) noexcept;
     ~UIRenderProxy();
 
     void Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) const;
@@ -63,12 +80,15 @@ public:
 private:
     friend class RenderPassData;
 	friend class ProxyCommand;
-    std::variant<ImageData, TextData>   m_data;
-    HashedGuid			                m_instancedID{};
-    ShaderPtr<PixelShader>              m_customPixelShader{};
-	ComPtr<ID3D11Buffer>                m_customPixelBuffer{ nullptr };
-	std::vector<std::byte>              m_customPixelCPUBuffer{};
-    uint32                              m_customPixelBufferSize{};
-	bool                                m_isEnabled{ true };
+    std::variant<ImageData, TextData, SpriteSheetData>   m_data;
+    std::shared_ptr<Texture>                             m_texture{ nullptr };
+    std::shared_ptr<SpriteSheet>                         m_spriteSheet{ nullptr };
+    mutable SpriteSheet::SequenceState                   m_sequenceState{};
+    HashedGuid			                                 m_instancedID{};
+    ShaderPtr<PixelShader>                               m_customPixelShader{};
+	ComPtr<ID3D11Buffer>                                 m_customPixelBuffer{ nullptr };
+	std::vector<std::byte>                               m_customPixelCPUBuffer{};
+    uint32                                               m_customPixelBufferSize{};
+	bool                                                 m_isEnabled{ true };
 };
 #endif // !DYNAMICCPP_EXPORTS

@@ -9,6 +9,7 @@
 #include "Scene.h"
 #include "RenderableComponents.h"
 #include "ImageComponent.h"
+#include "SpriteSheetComponent.h"
 #include "UIManager.h"
 #include "UIButton.h"
 #include "TextComponent.h"
@@ -1055,6 +1056,7 @@ void SceneRenderer::PrepareRender()
 	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+	std::vector<SpriteSheetComponent*> spriteComponents = UIManagers->SpriteSheets;
 
 	m_threadPool->Enqueue([=, texts = std::move(textComponents)]
 	{
@@ -1097,7 +1099,29 @@ void SceneRenderer::PrepareRender()
 				std::cerr << "Error updating image command: " << e.what() << std::endl;
 			}
 		}
-		});
+	});
+
+	m_threadPool->Enqueue([=, sprites = std::move(spriteComponents)]
+	{
+		for (auto& sprite : sprites)
+		{
+			try
+			{
+				auto owner = sprite->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+				if(scene && scene == m_currentScene)
+				{
+					renderScene->UpdateCommand(sprite);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+			}
+		}
+	});
+
 	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
 
 	m_threadPool->Enqueue([=]

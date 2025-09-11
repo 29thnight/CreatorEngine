@@ -27,5 +27,6 @@ public:
 
 	[[Property]]
 	int  itemCode = 0;
+	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
 };

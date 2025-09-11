@@ -12,6 +12,7 @@
 #include "DataSystem.h"
 #include "PathFinder.h"
 #include "RectTransformComponent.h"
+#include "SpriteSheetComponent.h"
 #include "GameObjectCommand.h"
 #include "PrefabEditor.h"
 #include "IconsFontAwesome6.h"
@@ -271,6 +272,33 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					ImGui::Text("No GameObject Selected");
 					UIManagers->MakeText(filename.stem().string().c_str(), filepath);
+				}
+			}
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SPRITESHEET"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("SpriteSheets\\") / filename.filename();
+				if(selectedSceneObject)
+				{
+					SpriteSheetComponent* spriteSheet = nullptr;
+					if (SpriteSheetComponent* hasSpriteSheet = selectedSceneObject->GetComponent<SpriteSheetComponent>())
+					{
+						spriteSheet = hasSpriteSheet;
+					}
+					else
+					{
+						spriteSheet = selectedSceneObject->AddComponent<SpriteSheetComponent>();
+					}
+					if (spriteSheet)
+					{
+						spriteSheet->LoadSpriteSheet(filepath.string());
+					}
+				}
+				else
+				{
+					ImGui::Text("No GameObject Selected");
+					UIManagers->MakeSpriteSheet(filename.stem().string().c_str(), filepath.string());
 				}
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))

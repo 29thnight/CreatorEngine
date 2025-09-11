@@ -2,12 +2,14 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Canvas.h"
-#include "ImageComponent.h"	
+#include "ImageComponent.h"
 #include "UIButton.h"
 #include "InputManager.h"
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
+#include "SpriteSheetComponent.h"
 #include "../RenderEngine/DeviceState.h"
+#include <algorithm>
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
@@ -279,34 +281,83 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
 	return newText;
 }
 
-void UIManager::DeleteCanvas(std::string canvasName)
+std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas, Mathf::Vector2 Pos)
 {
-	auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& canvas) 
+	if (Canvases.empty())
+		MakeCanvas();
+	if (!canvas)
 	{
-		auto c = canvas.lock();
-		return c && c->ToString() == canvasName;
-	});
-
-	if (it != Canvases.end())
-	{
-		auto curCanvasObj = (*it).lock();
-		auto canvasCom = curCanvasObj->GetComponent<Canvas>();
-		for (auto& uiObj : canvasCom->UIObjs)
-		{
-			auto uiObjPtr = uiObj.lock();
-			if (uiObjPtr)
-				uiObjPtr->Destroy();
-		}
-		canvasCom->UIObjs.clear();
-
-		std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas)
-			{
-				auto c = canvas.lock();
-				return !c || c->ToString() == canvasName;
-			});
-
-		curCanvasObj->Destroy();
+		if (auto c = Canvases.front().lock())
+			canvas = c.get();
+		else
+			return nullptr;
 	}
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newSpriteSheet->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
+	newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
+	canvasCom->AddUIObject(newSpriteSheet);
+	return newSpriteSheet;
+}
+
+std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
+{
+	if (Canvases.empty())
+		MakeCanvas();
+	int canvasIndex = 0;
+	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
+	{
+		if (auto c = Canvases[canvasIndex].lock())
+		{
+			if (c->ToString() == canvasname)
+				break;
+		}
+	}
+	GameObject* canvas = FindCanvasName(canvasname);
+	if (canvas == nullptr)
+	{
+		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+		return nullptr;
+	}
+	auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newSpriteSheet->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
+	newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
+	canvas->GetComponent<Canvas>()->AddUIObject(newSpriteSheet);
+	return newSpriteSheet;
+}
+
+void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
+{
+        if (!canvas) return;
+
+        auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& c)
+        {
+                return !c.expired() && c.lock() == canvas;
+        });
+
+        if (it != Canvases.end())
+        {
+                auto canvasCom = canvas->GetComponent<Canvas>();
+                for (auto& uiObj : canvasCom->UIObjs)
+                {
+                        if (auto uiObjPtr = uiObj.lock())
+                                uiObjPtr->Destroy();
+                }
+                canvasCom->UIObjs.clear();
+
+                std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& c)
+                        {
+                                return c.expired() || c.lock() == canvas;
+                        });
+
+                std::erase_if(CanvasMap, [&](auto& pair)
+                        {
+                                auto sp = pair.second.lock();
+                                return !sp || sp == canvas;
+                        });
+
+                canvas->Destroy();
+        }
 }
 
 void UIManager::CheckInput()
@@ -332,22 +383,33 @@ void UIManager::CheckInput()
 	}
 
 	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
+	//TODO : 추가로 특정 상황일때 비활성화 할 수 있도록 처리도 해야할 거 같은데?
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
 	auto selectUI = curCanvas->SelectUI.lock();
 	if (selectUI)
 	{
 		if (stickL.x > 0.5)
 		{
-			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right)->shared_from_this();
+			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
+			if (navi)
+			{
+				curCanvas->SelectUI = navi->shared_from_this();
+			}
 		}
 		if (stickL.x < -0.5)
 		{
-			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left)->shared_from_this();
+			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
+			if (navi)
+			{
+				curCanvas->SelectUI = navi->shared_from_this();
+			}
 		}
 
 		if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
 		{
-			selectUI->GetComponent<UIButton>()->Click();
+			auto button = selectUI->GetComponent<UIButton>();
+			if(button)
+				button->Click();
 		}
 	}
 }
@@ -446,6 +508,12 @@ void UIManager::RegisterTextComponent(TextComponent* text)
 		Texts.push_back(text);
 }
 
+void UIManager::RegisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet)
+{
+	if (spriteSheet)
+		SpriteSheets.push_back(spriteSheet);
+}
+
 void UIManager::UnregisterImageComponent(ImageComponent* image)
 {
 	std::erase(Images, image);
@@ -454,4 +522,9 @@ void UIManager::UnregisterImageComponent(ImageComponent* image)
 void UIManager::UnregisterTextComponent(TextComponent* text)
 {
 	std::erase(Texts, text);
+}
+
+void UIManager::UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet)
+{
+	std::erase(SpriteSheets, spriteSheet);
 }

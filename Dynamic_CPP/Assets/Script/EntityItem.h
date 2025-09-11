@@ -39,7 +39,7 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void Drop(Mathf::Vector3 ownerForward,Mathf::Vector2 distacne);
-	void Throw(Mathf::Vector3 ownerForward,Mathf::Vector2 distacne);
+	void Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2 distacne,bool indicate);
 	void SetThrowOwner(Player* player);
 	Player* GetThrowOwner();
 	void ClearThrowOwner();
@@ -63,6 +63,7 @@ public:
 	bool isTargettingTail = false;
 	[[Property]]
 	int  itemCode = 0;
+	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
 
 	bool OnGround;

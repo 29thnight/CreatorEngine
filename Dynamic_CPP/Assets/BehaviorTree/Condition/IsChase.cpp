@@ -41,10 +41,10 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 			dir = targetPos - pos;
 
-			LOG(targetPos.x << "," << targetPos.y << "," << targetPos.z);
-			LOG(pos.x << "," << pos.y << "," << pos.z);
+			//LOG(targetPos.x << "," << targetPos.y << "," << targetPos.z);
+			//LOG(pos.x << "," << pos.y << "," << pos.z);
 
-			LOG("Distance to Target: " << dir.Length());
+			//LOG("Distance to Target: " << dir.Length());
 		}
 	}
 	else {
@@ -57,7 +57,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	
 
 	if (dir.Length() < chaseRange) {
-		LOG("closed Target in ChaseRange");
+		//LOG("closed Target in ChaseRange");
 		return true;
 	}
 
@@ -69,14 +69,14 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		if (state == "Chase")
 		{
 			if (chaseOutTime > 0) {
-				LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
+				//LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
 				return true;
 			}	
 		}
 	}
 
 
-	LOG("closed Target Out ranage");
+	//LOG("closed Target Out ranage");
 
 	return false;
 }

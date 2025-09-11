@@ -69,11 +69,11 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	{
 		if (p1dir.Length() < p2dir.Length()) {
 			Target = Player1;
-			LOG("Idle action: Target set to Player1.");
+			//LOG("Idle action: Target set to Player1.");
 		}
 		else {
 			Target = Player2;
-			LOG("Idle action: Target set to Player2.");
+			//LOG("Idle action: Target set to Player2.");
 		}
 	}
 
@@ -103,32 +103,32 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		if (Target == Player1) 
 		{
 			if (asisdir.Length() < p1dir.Length()) {
-				LOG("Idle action: Target set to Asis based on Player1 distance.");
+				//LOG("Idle action: Target set to Asis based on Player1 distance.");
 				Target = asis;
 			}
 		}
 		else if(Target == Player2)
 		{
 			if (asisdir.Length() < p2dir.Length()) {
-				LOG("Idle action: Target set to Asis based on Player2 distance.");
+				//LOG("Idle action: Target set to Asis based on Player2 distance.");
 				Target = asis;
 			}
 		}
 		else 
 		{
-			LOG("Idle action: Target set to Asis as no player targets are closer.");
+			//LOG("Idle action: Target set to Asis as no player targets are closer.");
 			Target = asis;
 		}
 	}
 		
 	if (Target)
 	{
-		LOG("Idle action: Target is set to " << Target->ToString());
+		//LOG("Idle action: Target is set to " << Target->ToString());
 		blackBoard.SetValueAsGameObject("ClosedTarget", Target->ToString());
 	}
 	else
 	{
-		LOG("Idle action: No valid target found. Setting ClosedTarget to empty.");
+		//LOG("Idle action: No valid target found. Setting ClosedTarget to empty.");
 		blackBoard.SetValueAsGameObject("ClosedTarget", "");
 	}
 
@@ -141,7 +141,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("State");
 		if (state == "Idle")
 		{
-			LOG("Idle action already in progress.");
+			//LOG("Idle action already in progress.");
 			//return NodeStatus::Running; // Continue running if already in idle state
 			//dead test code
 			//blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
@@ -149,13 +149,13 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 		else
 		{
-			LOG("Switching to Idle state.");
+			//LOG("Switching to Idle state.");
 		}
 	}
 	else
 	{
 		blackBoard.SetValueAsString("State", "Idle");
-		LOG("Setting Idle state for the first time.");
+		//LOG("Setting Idle state for the first time.");
 	}
 
 	//LOG("Idle action executed.");

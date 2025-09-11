@@ -247,7 +247,6 @@ bool PhysicX::Initialize()
 
 	m_characterControllerManager = PxCreateControllerManager(*m_scene);
 
-
 	//======================================================================
 	//debug용 plane 생성 --> triangle mesh로 객체 생성
 	
@@ -342,7 +341,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			physx::PxCapsuleControllerDesc desc;
 
 			CharacterController* controller = new CharacterController();
-			controller->Initialize(contrllerInfo, movementInfo, m_characterControllerManager, m_defaultMaterial, collisionData, m_collisionMatrix);
+			controller->Initialize(contrllerInfo, movementInfo, m_characterControllerManager, m_defaultMaterial, collisionData, m_collisionMatrix, m_collisionCallback);
 
 			desc.height = contrllerInfo.height;
 			desc.radius = contrllerInfo.radius;
@@ -356,7 +355,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
 			desc.material = m_defaultMaterial;
-		
+			desc.reportCallback = controller->GetHitReportCallback();
 			physx::PxController* pxController = m_characterControllerManager->createController(desc);
 			
 			physx::PxRigidDynamic* body = pxController->getActor();
@@ -364,8 +363,8 @@ void PhysicX::Update(float fixedDeltaTime)
 			int shapeSize = body->getNbShapes();
 			body->getShapes(&shape, shapeSize);
 			body->setSolverIterationCounts(8, 4);
-			shape->setContactOffset(0.02f);
-			shape->setRestOffset(0.01f);
+			shape->setContactOffset(0.3f);
+			shape->setRestOffset(0.02f);
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
 			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
@@ -445,9 +444,10 @@ void PhysicX::FinalUpdate()
 	//딱 한번만 불린다. 아마도 씬이 끝날때
 }
 
-void PhysicX::SetCallBackCollisionFunction(std::function<void(CollisionData, ECollisionEventType)> func)
+void PhysicX::SetCallBackCollisionFunction(std::function<void(const CollisionData&, ECollisionEventType)> func)
 {
 	m_eventCallback->SetCallbackFunction(func);
+	m_collisionCallback = func;
 }
 
 void PhysicX::SetPhysicsInfo()
@@ -1242,42 +1242,42 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 						rigidBodyData.movePosition.z))
 			);
 		}
-
-		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
-		physx::PxTransform pxTransform;
-		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Vector3 scale;
-		DirectX::SimpleMath::Quaternion rotation;
-		dxMatrix.Decompose(scale, rotation, position);
-		
-		DirectX::SimpleMath::Vector3 offPos = dynamicBody->GetOffsetPosition();
-		DirectX::SimpleMath::Quaternion offRot = dynamicBody->GetOffsetRotation();
-		
-		DirectX::SimpleMath::Quaternion invOffsetRot;
-		offRot.Inverse(invOffsetRot);
-		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
-
-		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos,bodyRotation);
-		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
-
-		ConvertVectorDxToPx(bodyPosition,pxTransform.p);
-		ConvertQuaternionDxToPx(bodyRotation,pxTransform.q);
-
-		//CopyMatrixDxToPx(dxMatrix, pxTransform);
-		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
-		/*if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
-			pxBody->setGlobalPose(pxTransform);
-		}*/
-		pxBody->setGlobalPose(pxTransform);
-		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
-
-		if (scale.x>0.0f&&scale.y>0.0f&&scale.z>0.0f)
-		{
-			dynamicBody->SetConvertScale(scale, m_physics, m_collisionMatrix);
-		}
 		else {
-			Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
+			DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
+			physx::PxTransform pxTransform;
+			DirectX::SimpleMath::Vector3 position;
+			DirectX::SimpleMath::Vector3 scale;
+			DirectX::SimpleMath::Quaternion rotation;
+			dxMatrix.Decompose(scale, rotation, position);
+
+			DirectX::SimpleMath::Vector3 offPos = dynamicBody->GetOffsetPosition();
+			DirectX::SimpleMath::Quaternion offRot = dynamicBody->GetOffsetRotation();
+
+			DirectX::SimpleMath::Quaternion invOffsetRot;
+			offRot.Inverse(invOffsetRot);
+			DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
+
+			DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
+			DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
+
+			ConvertVectorDxToPx(bodyPosition, pxTransform.p);
+			ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
+
+			//CopyMatrixDxToPx(dxMatrix, pxTransform);
+			physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
+			/*if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+				pxBody->setGlobalPose(pxTransform);
+			}*/
+			pxBody->setGlobalPose(pxTransform);
+			if (scale.x > 0.0f && scale.y > 0.0f && scale.z > 0.0f)
+			{
+				dynamicBody->SetConvertScale(scale, m_physics, m_collisionMatrix);
+			}
+			else {
+				Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
+			}
 		}
+		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
 	}
 }
 
@@ -1409,6 +1409,36 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 
 	CharacterController* controller = m_characterControllerContainer[info.id];
 	controller->AddMovementInput(info.input, info.isDynamic);
+}
+
+void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)
+{
+	// 1. 컨테이너에서 ID를 기반으로 CharacterController 래퍼 클래스를 찾습니다.
+	auto it = m_characterControllerContainer.find(id);
+	if (it == m_characterControllerContainer.end())
+	{
+		Debug->LogError("PhysicX::SetControllerPosition() : CharacterController wrapper for ID not found: " + std::to_string(id));
+		return;
+	}
+
+	CharacterController* controllerWrapper = it->second;
+	if (!controllerWrapper)
+	{
+		Debug->LogError("PhysicX::SetControllerPosition() : CharacterController wrapper is null for ID: " + std::to_string(id));
+		return;
+	}
+
+	// 2. 래퍼 클래스에서 실제 physx::PxController 포인터를 가져옵니다.
+	// (CharacterController 클래스에 GetController() 함수가 구현되어 있어야 합니다.)
+	physx::PxController* pxController = controllerWrapper->GetController();
+	if (!pxController)
+	{
+		Debug->LogError("PhysicX::SetControllerPosition() : Raw PxController is null for ID: " + std::to_string(id));
+		return;
+	}
+
+	// 3. PhysX 컨트롤러의 위치를 강제로 설정합니다.
+	pxController->setPosition(physx::PxExtendedVec3(pos.x, pos.y, pos.z));
 }
 
 CharacterController* PhysicX::GetCCT(const unsigned int& id)
@@ -2313,48 +2343,82 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 
 void PhysicX::PutToSleep(unsigned int id)
 {
+	// 1. 전달받은 ID로 PxRigidDynamic 포인터를 찾습니다. (RigidBody 또는 CCT)
+	physx::PxRigidDynamic* dynamicActor = nullptr;
+
 	RigidBody* body = GetRigidBody(id);
-
-	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
-
-	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
-
-	if (!body) {
+	if (body)
+	{
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(body))
+		{
+			dynamicActor = dynamicBody->GetRigidDynamic();
+		}
+	}
+	else
+	{
 		CharacterController* cct = GetCCT(id);
-
-		dynamicActor = cct ? cct->GetController()->getActor() : nullptr;
+		if (cct)
+		{
+			dynamicActor = cct->GetController()->getActor();
+		}
 	}
 
-	//stacit body인 경우 nullptr이므로 예외처리 
-	if (dynamicActor)
+	// 2. 유효한 액터를 찾았는지, 그리고 씬에 속해있는지 확인합니다.
+	if (dynamicActor && dynamicActor->getScene())
 	{
-		if (dynamicActor->isSleeping()) {
+		// 3. 가장 중요: 액터가 키네마틱이 아닌지 확인합니다.
+		if (dynamicActor->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC)
+		{
+			// 키네마틱 액터는 putToSleep()을 호출할 수 없으므로 아무것도 하지 않습니다.
 			return;
 		}
-		dynamicActor->putToSleep();
+
+		// 4. 이미 잠들어있지 않다면 putToSleep()을 호출합니다.
+		if (!dynamicActor->isSleeping())
+		{
+			dynamicActor->putToSleep();
+		}
 	}
 }
 
 void PhysicX::WakeUp(unsigned int id)
 {
-	RigidBody* body = GetRigidBody(id);
-	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
-	
-	physx::PxRigidDynamic* dynamicActor = dynamicBody ? dynamicBody->GetRigidDynamic() : nullptr;
-	
-	if (!body) {
-		CharacterController* cct = GetCCT(id);
+	// 1. 전달받은 ID로 PxRigidDynamic 포인터를 찾습니다. (RigidBody 또는 CCT)
+	physx::PxRigidDynamic* dynamicActor = nullptr;
 
-		dynamicActor = cct ? cct->GetController()->getActor() : nullptr;
+	RigidBody* body = GetRigidBody(id);
+	if (body)
+	{
+		// RigidBody인 경우
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(body))
+		{
+			dynamicActor = dynamicBody->GetRigidDynamic();
+		}
+	}
+	else
+	{
+		// RigidBody가 아니면 CCT일 수 있습니다.
+		CharacterController* cct = GetCCT(id);
+		if (cct)
+		{
+			dynamicActor = cct->GetController()->getActor();
+		}
 	}
 
-	//stacit body인 경우 nullptr이므로 예외처리 
-	if (dynamicActor)
+	// 2. 유효한 액터를 찾았는지, 그리고 씬에 속해있는지 확인합니다.
+	if (dynamicActor && dynamicActor->getScene())
 	{
-		if (!dynamicActor->isSleeping()) {
+		// 3. 가장 중요: 액터가 키네마틱이 아닌지 확인합니다.
+		if (dynamicActor->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC)
+		{
+			// 키네마틱 액터는 wakeUp()을 호출할 수 없으므로 아무것도 하지 않습니다.
 			return;
 		}
-		if (!dynamicActor->getScene()) return;
-		dynamicActor->wakeUp();
+
+		// 4. 이미 깨어있지 않다면 wakeUp()을 호출합니다.
+		if (dynamicActor->isSleeping())
+		{
+			dynamicActor->wakeUp();
+		}
 	}
 }

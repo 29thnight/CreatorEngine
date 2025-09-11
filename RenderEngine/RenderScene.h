@@ -36,6 +36,7 @@ class InspectorWindow;
 class MeshRenderer;
 class FoliageComponent;
 class TerrainComponent;
+class SpriteRenderer;
 class ImageComponent;
 class TextComponent;
 class ProxyCommand;
@@ -96,6 +97,12 @@ public:
     ProxyCommand MakeProxyCommand(FoliageComponent* foliagePtr);
     void UnregisterCommand(FoliageComponent* foliagePtr);
 
+	void RegisterCommand(SpriteRenderer* spriteRendererPtr);
+	bool InvaildCheckSpriteRenderer(SpriteRenderer* spriteRendererPtr);
+	void UpdateCommand(SpriteRenderer* spriteRendererPtr);
+	ProxyCommand MakeProxyCommand(SpriteRenderer* spriteRendererPtr);
+	void UnregisterCommand(SpriteRenderer* spriteRendererPtr);
+
 	void RegisterCommand(ImageComponent* imagePtr);
 	bool InvaildCheckImage(ImageComponent* imagePtr);
 	void UpdateCommand(ImageComponent* imagePtr);
@@ -113,6 +120,12 @@ public:
     void UpdateCommand(DecalComponent* decalPtr);
     ProxyCommand MakeProxyCommand(DecalComponent* decalPtr);
     void UnregisterCommand(DecalComponent* decalPtr);
+
+	void RegisterCommand(SpriteSheetComponent* spriteSheetPtr);
+	bool InvaildCheckSpriteSheet(SpriteSheetComponent* spriteSheetPtr);
+	void UpdateCommand(SpriteSheetComponent* spriteSheetPtr);
+	ProxyCommand MakeProxyCommand(SpriteSheetComponent* spriteSheetPtr);
+	void UnregisterCommand(SpriteSheetComponent* spriteSheetPtr);
 
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	UIRenderProxy* FindUIProxy(size_t guid);

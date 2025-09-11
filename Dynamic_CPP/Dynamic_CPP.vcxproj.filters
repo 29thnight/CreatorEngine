@@ -291,11 +291,38 @@
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Boss1.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0031.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0032.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0033.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0034.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TBoss1.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="DebugLog.h">
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\UIGageTest.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntitlyRock.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
+			<Filter>Script</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -515,8 +542,35 @@
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Boss1.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0031.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0032.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0033.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0034.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TBoss1.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\UIGageTest.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
