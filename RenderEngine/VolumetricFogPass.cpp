@@ -5,6 +5,9 @@
 #include "ShadowMapPass.h"
 #include "TimeSystem.h"
 
+#include "LightProperty.h"
+
+#define MAX_LIGHT 20
 #define VOXEL_VOLUME_SIZE_Z 128
 struct alignas(16) MainCB
 {
@@ -78,6 +81,7 @@ VolumetricFogPass::VolumetricFogPass()
 
 	//m_pso->m_samplers.push_back(linearSampler);
 	m_Buffer = DirectX11::CreateBuffer(sizeof(MainCB), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_lightBuffer = DirectX11::CreateBuffer(sizeof(LightProperties), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	m_pso = std::make_unique<PipelineStateObject>();
 
@@ -243,7 +247,9 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCon
 		lightManager->CSBindCloudShadowMap(deferredPtr);
 	}
 	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &data);
+	DirectX11::UpdateBuffer(deferredPtr, m_lightBuffer.Get(), &lightManager->GetProperties());
 	DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
+	DirectX11::CSSetConstantBuffer(deferredPtr, 2, 1, m_lightBuffer.GetAddressOf());
 	DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &renderData->m_shadowMapTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(deferredPtr, 1, 1, &m_pBlueNoiseTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);

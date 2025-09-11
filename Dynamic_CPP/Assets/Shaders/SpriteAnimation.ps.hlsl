@@ -7,7 +7,7 @@ SamplerState linearSampler : register(s0);
 cbuffer SpriteAnimationBuffer : register(b0)
 {
     uint frameCount; // 총 프레임 수
-    uint currentFrame; // 현재 프레임 인덱스
+    float animationDuration;
     uint2 gridSize; // 스프라이트 시트 격자 크기 (columns, rows)
 };
 
@@ -18,10 +18,15 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
     uint TexIndex : TEXCOORD1;
     float4 Color : COLOR0;
+    float Age : TEXCOORD2;
 };
 
 float4 main(VSOutput input) : SV_TARGET
 {
+    // age를 기반으로 현재 프레임 계산
+    float normalizedTime = fmod(input.Age, animationDuration) / animationDuration;
+    uint currentFrame = (uint) (normalizedTime * frameCount) % frameCount;
+    
     // 스프라이트 애니메이션을 위한 UV 좌표 계산
     float2 frameSize = float2(1.0f / gridSize.x, 1.0f / gridSize.y);
     uint frameX = currentFrame % gridSize.x;
@@ -33,7 +38,7 @@ float4 main(VSOutput input) : SV_TARGET
     // 기본 텍스처 색상 가져오기 (애니메이션된 UV 사용)
     float4 texColor = gTexture.Sample(linearSampler, animatedUV);
     
-    // 텍스처의 알파값이 너무 낮으면 픽셀 폐기 (원본 형태 유지)
+    // 텍스처의 알파값이 너무 낮으면 픽셀 폐기
     if (texColor.a < 0.01f)
         discard;
     

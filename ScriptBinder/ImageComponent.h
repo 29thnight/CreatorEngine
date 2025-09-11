@@ -5,15 +5,6 @@
 #include "IRegistableEvent.h"
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
-#include <DirectXTK/SpriteBatch.h>
-#include <cstdint>
-
-struct alignas(16) ImageInfo
-{
-	Mathf::xMatrix world;
-	float2 size;
-	float2 screenSize;
-};
 
 //모든 2d이미지 기본?
 class Texture;

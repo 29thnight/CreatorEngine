@@ -1,9 +1,9 @@
 #include "IsAtteck.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
-	std::cout << "IsAtteck ConditionCheck: Checking if entity is in attack range." << std::endl;
+	LOG("IsAtteck ConditionCheck: Checking if entity is in attack range.");
 
 	//this based target logic
 	bool isTarget = blackBoard.HasKey("Target");
@@ -19,7 +19,7 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	//			float AtkDelay = blackBoard.GetValueAsFloat("AtkDelay");
 
 	//			if (AtkDelay > 0.0f) {
-	//				std::cout << "IsAtteck ConditionCheck: Attack duration has ended." << std::endl;
+	//				LOG("IsAtteck ConditionCheck: Attack duration has ended.");
 	//				return true; // Attack duration has ended, can attack
 	//			}
 	//		}
@@ -30,13 +30,13 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (!useAttack)
 	{
-		std::cout << "Not found AtkRange None used Attack Entity : " + m_owner->GetHashedName().ToString() << std::endl;
+		LOG("Not found AtkRange None used Attack Entity : " + m_owner->GetHashedName().ToString());
 		return false; // No attack range defined, cannot attack
 	}
 
 	if (!isTarget)
 	{
-		std::cout << "IsAtteck ConditionCheck: No target found." << std::endl;
+		LOG("IsAtteck ConditionCheck: No target found.");
 		return false; // No target to attack
 	}
 
@@ -51,7 +51,7 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (dir.Length() < atkRange)
 	{
-		std::cout << "IsAtteck ConditionCheck: Entity is within attack range." << std::endl;
+		LOG("IsAtteck ConditionCheck: Entity is within attack range.");
 		return true; // Entity is within attack range, condition met
 	}
 
@@ -61,7 +61,7 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	//bool isP2 = blackBoard.HasKey("Player2");
 
 	//if (!isP1 && !isP2) {
-	//	std::cout << "IsAtteck ConditionCheck: No player found." << std::endl;
+	//	LOG("IsAtteck ConditionCheck: No player found.");
 	//	return false; // No player to attack
 	//}
 
@@ -123,6 +123,6 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 dir = asispos - pos;*/
 		
-	std::cout << "IsAtteck ConditionCheck: Entity is out of attack range." << std::endl;
+	LOG("IsAtteck ConditionCheck: Entity is out of attack range.");
 	return false;
 }

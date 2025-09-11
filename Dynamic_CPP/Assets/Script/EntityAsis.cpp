@@ -15,6 +15,7 @@
 #include "GameObject.h"
 #include "Weapon.h"
 #include "WeaponCapsule.h"
+#include "DebugLog.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -109,7 +110,7 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 	if (item) {
 		if (item->m_state != EItemState::THROWN) return;
 		if (item->canEat == false) return;
-		std::cout << "OnCollision Item: " << collision.otherObj->m_name.data() << std::endl;
+		LOG("OnCollision Item: " << collision.otherObj->m_name.data());
 		auto owner = item->GetThrowOwner();
 		if (owner) {
 			bool result = AddItem(item);
@@ -130,7 +131,7 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 	if (item) {
 		if (item->m_state != EItemState::THROWN) return; 
 		if (item->canEat == false) return;
-		std::cout << "OnCollision Item: " << collision.otherObj->m_name.data() << std::endl;
+		LOG("OnCollision Item: " << collision.otherObj->m_name.data());
 		auto owner = item->GetThrowOwner();
 		if (owner) {
 			bool result = AddItem(item);
@@ -178,7 +179,7 @@ void EntityAsis::Attack(Entity* sender, int damage)
 	m_currentHP -= damage;
 	m_currentStaggerDuration = staggerDuration;
 	m_currentGracePeriod = graceperiod;
-	std::cout << "EntityAsis: Current HP: " << m_currentHP << std::endl;
+	LOG("EntityAsis: Current HP: " << m_currentHP);
 	if(m_currentHP <= 0)
 	{
 		// 스턴
@@ -189,13 +190,13 @@ bool EntityAsis::AddItem(EntityItem* item)
 {
 	if (m_currentEntityItemCount >= maxTailCapacity)
 	{
-		std::cout << "EntityAsis: Max item count reached, cannot add more items." << std::endl;
+		LOG("EntityAsis: Max item count reached, cannot add more items.");
 		return false;
 	}
 
 	if (item == nullptr)
 	{
-		std::cout << "EntityAsis: Cannot add a null item." << std::endl;
+		LOG("EntityAsis: Cannot add a null item.");
 		return false;
 	}
 	
@@ -204,7 +205,7 @@ bool EntityAsis::AddItem(EntityItem* item)
 		auto i = queue.dequeue();
 		if (item == i)
 		{
-			std::cout << "EntityAsis: Item already exists in the queue." << std::endl;
+			LOG("EntityAsis: Item already exists in the queue.");
 			return false; // 이미 큐에 존재하는 아이템은 추가하지 않음.
 		}
 	}
@@ -213,7 +214,7 @@ bool EntityAsis::AddItem(EntityItem* item)
 	m_currentEntityItemCount++;
 	item->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 
-	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemCount << std::endl;
+	LOG("EntityAsis: Adding item at index " << m_currentEntityItemCount);
 	return true;
 }
 

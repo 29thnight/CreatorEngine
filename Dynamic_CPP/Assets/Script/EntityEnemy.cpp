@@ -7,6 +7,7 @@
 #include "RaycastHelper.h"
 #include "Animator.h"
 #include "CharacterControllerComponent.h"
+#include "DebugLog.h"
 void EntityEnemy::Start()
 {
 	enemy = GetOwner();
@@ -146,7 +147,7 @@ void EntityEnemy::OnCollisionEnter(const Collision& collision)
 void EntityEnemy::Update(float tick)
 {
 	Mathf::Vector3 forward = enemy->m_transform.GetForward();
-	//std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
+	//LOG("Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z);
 
 	attackCount = blackBoard->GetValueAsInt("AttackCount");
 
@@ -311,8 +312,8 @@ void EntityEnemy::MeleeAttack()
 	hits.insert(hits.end(), hits2.begin(), hits2.end());
 
 
-	//std::cout << dir.x << " " << dir.y << " " << dir.z << std::endl;
-	//std::cout << "Hit Count: " << size << std::endl;
+	//LOG(dir.x << " " << dir.y << " " << dir.z);
+	//LOG("Hit Count: " << size);
 	m_animator->SetParameter("Attack", true);
 	/*GameObject* gumgiobj=nullptr;
 	EffectComponent* gumgi = nullptr;
@@ -351,7 +352,7 @@ void EntityEnemy::MeleeAttack()
 	{
 		auto object = hit.gameObject;
 		if (object == GetOwner()) continue;
-		std::cout << object->m_name.data() << std::endl;
+		LOG(object->m_name.data());
 
 		bool hasdmg = blackBoard->HasKey("Damage");
 		if (!hasdmg) continue;

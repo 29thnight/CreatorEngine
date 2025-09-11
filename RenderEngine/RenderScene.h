@@ -39,6 +39,7 @@ class TerrainComponent;
 class ImageComponent;
 class TextComponent;
 class ProxyCommand;
+class SpriteSheetComponent;
 class RenderScene
 {
 public:

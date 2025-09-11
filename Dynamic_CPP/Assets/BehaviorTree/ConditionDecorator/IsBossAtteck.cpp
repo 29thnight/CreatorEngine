@@ -1,6 +1,6 @@
 #include "IsBossAtteck.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool IsBossAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 
@@ -9,20 +9,20 @@ bool IsBossAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (isProcessed) {
 		// atteack is add IdleTime to ActionNode
 		idleTime = blackBoard.GetValueAsFloat("IdleTime");
-		std::cout << "IdleTime is : " << idleTime << std::endl;
+		LOG("IdleTime is : " << idleTime);
 	}
 	else 
 	{
 		// If IdleTime is not found, boss is not yet attacking
 		idleTime = 0.0f; // Default value if not found
-		std::cout << "IdleTime is not found, default to 0.0f" << std::endl;
+		LOG("IdleTime is not found, default to 0.0f");
 	}
 
 	if (idleTime > 0) {
-		std::cout << "Boss is Idle, not attacking" << std::endl;
+		LOG("Boss is Idle, not attacking");
 		return false; // Boss is Idle, not attacking
 	}
 
-	std::cout << "Boss is send attack node" << std::endl;
+	LOG("Boss is send attack node");
 	return true; // Boss is attacking
 }

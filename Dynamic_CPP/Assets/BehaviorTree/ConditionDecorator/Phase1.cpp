@@ -1,6 +1,6 @@
 #include "Phase1.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool Phase1::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	auto Identity = blackBoard.GetValueAsString("Identity");
@@ -13,7 +13,7 @@ bool Phase1::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	float hpRatio = static_cast<float>(hp) / static_cast<float>(maxHp);
 
 
-	std::cout << "HPRatio is : "<< hpRatio << " Phase1 is " << ((bool)(hpRatio > 0.7f) ? "True" : "False") << std::endl;
+	LOG("HPRatio is : "<< hpRatio << " Phase1 is " << ((bool)(hpRatio > 0.7f) ? "True" : "False"));
 	if (hpRatio > 0.7f) {
 		// 100% ~ 70% HP 
 

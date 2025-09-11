@@ -297,6 +297,9 @@
     <Filter Include="Shaders\TestShader">
       <UniqueIdentifier>{712934e5-f33f-4bc3-9c9d-c40c7498ddff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\SpriteSheet">
+      <UniqueIdentifier>{a94062ae-a711-4028-835d-4f8b3a7b0c5a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -891,9 +894,12 @@
     </ClInclude>
     <ClInclude Include="UIRenderProxy.h">
       <Filter>Objects\UIRenderProxy</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="MeshColorModuleCS.h">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteSheet.h">
+      <Filter>Resources\SpriteSheet</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

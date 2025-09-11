@@ -4,6 +4,7 @@
 #include "PhysicsManager.h"
 #include "Entity.h"
 #include "Player.h"
+#include "DebugLog.h"
 void SpecialBullet::Start()
 {
 	bulletType = BulletType::Special;
@@ -37,7 +38,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 		{
 			EntityEnemy* enemy = collision.otherObj->GetComponent<EntityEnemy>();
 
-			std::cout << "EnemyHit!" << std::endl;
+			LOG("EnemyHit!");
 
 			hasAttacked = true;
 

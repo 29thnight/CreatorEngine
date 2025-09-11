@@ -387,6 +387,7 @@
     <ClInclude Include="LightMapPass.h" />
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="RenderState.h" />
+    <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="SSAOPassSetting.h" />
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SSGIPassSetting.h" />

@@ -35,7 +35,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("State");
 		if (state == "PreDelete") 
 		{
-			//std::cout << "waiting delete" << std::endl;
+			//LOG("waiting delete");
 			return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
 		}
 		else if (state == "Daed")

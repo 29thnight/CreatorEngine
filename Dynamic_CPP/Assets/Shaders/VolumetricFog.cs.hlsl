@@ -1,6 +1,11 @@
 #include "VolumetricFog.hlsli"
 #define PI 3.14159265358
 #define EPSILON 0.000001
+#define LIGHT_DISABLED 0
+#define DIRECTIONAL_LIGHT 0
+#define POINT_LIGHT 1
+#define SPOT_LIGHT 2
+#define MAX_LIGHTS 20
 
 SamplerState SamplerLinearClamp : register(s0);
 SamplerState SamplerLinearWrap : register(s1);
@@ -12,6 +17,23 @@ Texture2DArray<float> ShadowTexture : register(t0);
 Texture2D<float4> BlueNoiseTexture : register(t1);
 Texture3D<float4> VoxelReadTexture : register(t2);
 Texture2D<float4> CloudShadowMap : register(t3);
+
+struct Light
+{
+    float4 position;
+    float4 direction;
+    float4 color;
+
+    float constantAtt;
+    float linearAtt;
+    float quadAtt;
+    float spotAngle;
+
+    int lightType;
+    int status;
+    float range;
+    float intencity;
+};
 
 cbuffer VolumetricFogCBuffer : register(b0)
 {
@@ -39,6 +61,13 @@ cbuffer CloudShadowMapConstants : register(b1)
     float moveSpeed;
     float alpha;
     int isOn;
+}
+
+cbuffer LightProperties : register(b2)
+{
+    float4 eyePosition;
+    float4 globalAmbient;
+    Light Lights[MAX_LIGHTS];
 }
 
 float HenyeyGreensteinPhaseFunction(float3 viewDir, float3 lightDir, float g)
@@ -83,6 +112,31 @@ float GetCloudVisibility(float4 worldPosition)
     return shadow * alpha;
 }
 
+// 거리에 따른 빛의 감쇠 계산
+float GetDistanceAttenuation(float distance, float lightRange)
+{
+      // 거리가 라이트의 최대 범위를 넘어서면 빛이 없음
+    if (distance > lightRange)
+        return 0.0f;
+
+      // 간단한 선형 감쇠 또는 1/d^2 기반의 감쇠 사용 가능
+    float attenuation = 1.0f - saturate(distance / lightRange);
+    return attenuation * attenuation; // 제곱하여 좀 더 자연스러운 감쇠 곡선 생성
+}
+
+  // 스포트라이트 원뿔 각도에 따른 감쇠 계산
+float GetSpotAttenuation(float3 lightDir, float3 spotDir, float2 spotAngles)
+{
+    float cosOuter = spotAngles.x; // cos(outerAngle)
+    float cosInner = spotAngles.y; // cos(innerAngle)
+
+    //float cosAngle = dot(spotDir, lightDir);
+    float cosAngle = dot(lightDir, spotDir);
+
+      // smoothstep을 사용하여 내부 원뿔과 외부 원뿔 사이를 부드럽게 보간
+    return smoothstep(cosOuter, cosInner, cosAngle);
+}
+
 [numthreads(8, 8, 1)]
 void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID)
 {
@@ -99,8 +153,54 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV
         float visibility = GetVisibility(voxelWorldPos, ShadowMatrix) * GetCloudVisibility(float4(voxelWorldPos, 1.0));
         //float visibility2 = GetVisibility(voxelWorldPosNoJitter, ShadowMatrix);
 
-        if (visibility > EPSILON)
-            lighting += visibility * SunColor.xyz * HenyeyGreensteinPhaseFunction(viewDir, -SunDirection.xyz, Anisotropy);
+        //if (visibility > EPSILON)
+        //    lighting += visibility * SunColor.xyz * HenyeyGreensteinPhaseFunction(viewDir, -SunDirection.xyz, Anisotropy);
+        
+        for (int i = 0; i < MAX_LIGHTS; i++)
+        {
+            Light light = Lights[i];
+            if (light.status == LIGHT_DISABLED)
+                continue;
+            
+            float3 lightDir;
+            float attenuation = 1.0f;
+            switch (abs(light.lightType))
+            {
+                case DIRECTIONAL_LIGHT:
+                    {
+                    lightDir = normalize(light.direction.xyz);
+                    attenuation = 1.0f; // 방향 광원은 감쇠 없음
+                    break;
+                    }
+                case POINT_LIGHT:
+                    {
+                    float3 lightVec = light.position.xyz - voxelWorldPos;
+                    float distanceToLight = length(lightVec);
+                    lightDir = normalize(lightVec);
+                    attenuation = GetDistanceAttenuation(distanceToLight, light.range);
+                    break;
+                    }
+                case SPOT_LIGHT:
+                    {
+                    float3 lightVec = light.position.xyz - voxelWorldPos;
+                    float distanceToLight = length(lightVec);
+                    lightDir = normalize(lightVec);
+                    float minCos = cos(light.spotAngle);
+                    float maxCos = (minCos + 1.0f) / 2.0f; // squash between [0, 1]
+                    float distAtt = GetDistanceAttenuation(distanceToLight, light.range);
+                    float spotAtt = GetSpotAttenuation(-lightDir, normalize(light.direction.xyz), float2(minCos, maxCos));
+                    attenuation = distAtt * spotAtt;
+                    break;
+                    }
+                default:
+                    break;
+            }
+            if (attenuation > EPSILON)
+            {
+                float phase = HenyeyGreensteinPhaseFunction(viewDir, -lightDir, Anisotropy);
+                lighting += light.color.rgb * phase * attenuation;
+            }
+        }
         
         float4 result = float4(lighting * Strength * Density, visibility * Density);
         

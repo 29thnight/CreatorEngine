@@ -193,6 +193,7 @@ extern "C"
 	{
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterA", []() { return new EntityMonsterA(); });
+		CreateFactory::GetInstance()->RegisterFactory("UIGageTest", []() { return new UIGageTest(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponCapsule", []() { return new WeaponCapsule(); });
 		CreateFactory::GetInstance()->RegisterFactory("Explosion", []() { return new Explosion(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bomb", []() { return new Bomb(); });

@@ -3,19 +3,19 @@
 #include "BehaviorTreeComponent.h"
 #include "AnimationController.h"
 #include "Animator.h"
-
+#include "DebugLog.h"
 void MosterMeleeAni::Enter()
 {
 }
 
 void MosterMeleeAni::Update(float deltaTime)
 {
-    std::cout << "attacking" << std::endl;
+    LOG("attacking");
 }
 
 void MosterMeleeAni::Exit()
 {
-    std::cout << "attacking Exit" << std::endl;
+    LOG("attacking Exit");
     AnimationController* controller = m_ownerController;
     if (controller)
     {
@@ -41,7 +41,7 @@ void MosterMeleeAni::Exit()
         if (!blackboard) return;
 
         // 5. Blackboard에 "IsAttacking" 상태를 false로 설정하여, BT가 다음 행동을 결정할 수 있도록 합니다.
-		std::cout << "MosterMeleeAni Exit: Setting IsAttacking to false in Blackboard." << std::endl;
+		LOG("MosterMeleeAni Exit: Setting IsAttacking to false in Blackboard.");
         blackboard->SetValueAsBool("IsAttacking", false);
     }
 }

@@ -23,11 +23,12 @@ public:
     void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) override;
     void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount) override;
     void SetupRenderTarget(RenderPassData* renderData) override;
-    void SetTexture(Texture* texture) override;
 
     void ResetForReuse() override;
     bool IsReadyForReuse() const override;
     void WaitForGPUCompletion() override;
+
+    void UpdatePSOShaders() override;
 
     // TrailGenerateModule ¿¬°á
     void SetTrailGenerateModule(TrailGenerateModule* trailModule);

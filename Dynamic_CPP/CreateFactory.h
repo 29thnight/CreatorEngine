@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "UIGageTest.h"
 #include "EntityMonsterA.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"

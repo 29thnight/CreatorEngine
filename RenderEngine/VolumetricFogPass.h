@@ -83,6 +83,8 @@ public:
 	ComPtr<ID3D11Buffer> m_Buffer{};
 	ComPtr<ID3D11Buffer> m_CompositeBuffer{};
 
+	ComPtr<ID3D11Buffer> m_lightBuffer{};
+
 	XMMATRIX mPrevViewProj;
 
 	bool mCurrentTexture3DRead = false;

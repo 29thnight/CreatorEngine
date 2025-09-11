@@ -291,6 +291,7 @@
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+
 		<ClInclude Include="Boss1.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -307,6 +308,13 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TBoss1.h">
+		<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="DebugLog.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\UIGageTest.h">
+
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityMonsterA.h">
@@ -530,6 +538,7 @@
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+
 		<ClCompile Include="Boss1.cpp">
 			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
@@ -546,6 +555,9 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TBoss1.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\UIGageTest.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">

@@ -103,14 +103,39 @@
                             "name": "Eff_PC_charge"
                         },
                         "renderState": {
-                            "instanceCount": 1,
-                            "useAlternativeBlend": false
+                            "instanceCount": 1
                         },
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "Sword_Eft_01"
-                        }
+                        "renderStates": {
+                            "blendPreset": 1,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 2
+                        },
+                        "shaders": {
+                            "pixelShader": "MeshParticleTest",
+                            "vertexShader": "MeshParticle"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_01",
+                                "slot": 0
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_02",
+                                "slot": 1
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_03",
+                                "slot": 2
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_04",
+                                "slot": 3
+                            }
+                        ]
                     },
                     "type": "MeshModuleGPU"
                 }

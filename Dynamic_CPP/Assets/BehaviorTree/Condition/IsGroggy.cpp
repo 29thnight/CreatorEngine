@@ -1,13 +1,13 @@
 #include "IsGroggy.h"
 #include "pch.h"
-
+#include "DebugLog.h"
 bool IsGroggy::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	bool HasIdentity = blackBoard.HasKey("Identity");
 
 	if (!HasIdentity)
 	{
-		std::cout << "IsDaed ConditionCheck: No Identity key found in blackboard." << std::endl;
+		LOG("IsDaed ConditionCheck: No Identity key found in blackboard.");
 		return false; // No Identity key, cannot determine if it's a dead entity
 	}
 
@@ -15,7 +15,7 @@ bool IsGroggy::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (!HasGroggyTime)
 	{
-		std::cout << "IsGroggy ConditionCheck: No GroggyTime key found in blackboard." << std::endl;
+		LOG("IsGroggy ConditionCheck: No GroggyTime key found in blackboard.");
 		return false; // No GroggyTime key, cannot determine if it's groggy
 	}
 
@@ -23,12 +23,12 @@ bool IsGroggy::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (groggyTime > 0.0f)
 	{
-		std::cout << "IsGroggy ConditionCheck: Entity is groggy, GroggyTime: " << groggyTime << std::endl;
+		LOG("IsGroggy ConditionCheck: Entity is groggy, GroggyTime: " << groggyTime);
 		return true; // Entity is groggy
 	}
 	else
 	{
-		std::cout << "IsGroggy ConditionCheck: Entity is not groggy, GroggyTime: " << groggyTime << std::endl;
+		LOG("IsGroggy ConditionCheck: Entity is not groggy, GroggyTime: " << groggyTime);
 		return false; // Entity is not groggy
 	}
 

@@ -8,63 +8,46 @@ void BillboardModuleGPU::Initialize()
 	m_indices = Indices;
 
 	m_pso = std::make_unique<PipelineStateObject>();
-	m_BillBoardType = BillBoardType::Basic;
+
+	if (m_BillBoardType == BillBoardType::None) {
+		m_BillBoardType = BillBoardType::Basic;
+	}
+
 	m_instanceCount = 0;
 
-	D3D11_BLEND_DESC blendDesc = {};
-	blendDesc.AlphaToCoverageEnable = FALSE;
-	blendDesc.IndependentBlendEnable = FALSE;
-	blendDesc.RenderTarget[0].BlendEnable = TRUE;
-	blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-	blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-	blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-	blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-	blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	// 셰이더 이름 설정
+	if (m_vertexShaderName == "None") {
+		m_vertexShaderName = "BillBoard";
+	}
 
-	DirectX11::ThrowIfFailed(
-		DirectX11::DeviceStates->g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
-	);
+	if (m_pixelShaderName == "None")
+	{
+		m_pixelShaderName = "BillBoard";
+	}
 
-	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-	DirectX11::ThrowIfFailed(
-		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(
-			&rasterizerDesc,
-			&m_pso->m_rasterizerState
-		)
-	);
+	// 렌더 상태 프리셋 설정 (PSO 생성 후에)
+	if (m_blendPreset == BlendPreset::None) {
+		m_blendPreset = BlendPreset::Alpha;
+	}
+	if (m_depthPreset == DepthPreset::None)
+	{
+		m_depthPreset = DepthPreset::Default;
+	}
+	if (m_rasterizerPreset == RasterizerPreset::None)
+	{
+		m_rasterizerPreset = RasterizerPreset::Default;
+	}
 
-	CD3D11_DEPTH_STENCIL_DESC depthDesc{ CD3D11_DEFAULT() };
-	depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-	depthDesc.DepthEnable = true;
-	depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-	DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
-
+	// 프리미티브 토폴로지 설정
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
-	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["BillBoard"];
-	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["BillBoard"];
+	// 부모의 함수들로 모든 상태 업데이트
+	UpdatePSOShaders();
+	UpdatePSORenderStates();
 
-	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-
-	DirectX11::ThrowIfFailed(
-		DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
-			vertexLayoutDesc,
-			_countof(vertexLayoutDesc),
-			m_pso->m_vertexShader->GetBufferPointer(),
-			m_pso->m_vertexShader->GetBufferSize(),
-			&m_pso->m_inputLayout
-		)
-	);
-
+	// 샘플러 설정
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
-
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 
@@ -73,7 +56,6 @@ void BillboardModuleGPU::Initialize()
 
 void BillboardModuleGPU::Release()
 {
-	// ComPtr 리소스들 자동 해제
 	if (billboardVertexBuffer) {
 		billboardVertexBuffer.Reset();
 	}
@@ -86,16 +68,18 @@ void BillboardModuleGPU::Release()
 		m_ModelBuffer.Reset();
 	}
 
-	// 일반 포인터들 초기화
+	// 스프라이트 애니메이션 버퍼 해제 추가
+	if (m_SpriteAnimationBuffer) {
+		m_SpriteAnimationBuffer.Reset();
+	}
+
 	m_particleSRV = nullptr;
 	m_assignedTexture = nullptr;
 
-	// 기본값 복원
 	m_instanceCount = 0;
-	m_BillBoardType = BillBoardType::Basic;
+	m_BillBoardType = BillBoardType::None;
 	m_maxCount = 0;
 
-	// 벡터 클리어
 	m_vertices.clear();
 	m_indices.clear();
 }
@@ -131,35 +115,51 @@ void BillboardModuleGPU::CreateBillboard()
 		D3D11_BIND_CONSTANT_BUFFER,
 		&m_ModelConstantBuffer
 	);
-}
 
-void BillboardModuleGPU::SetTexture(Texture* texture)
-{
-	m_assignedTexture = texture;
+	if (m_BillBoardType == BillBoardType::SpriteAnimation)
+	{
+		m_SpriteAnimationBuffer = DirectX11::CreateBuffer(
+			sizeof(SpriteAnimationBuffer),
+			D3D11_BIND_CONSTANT_BUFFER,
+			&m_SpriteAnimationConstantBuffer
+		);
+	}
 }
 
 void BillboardModuleGPU::ResetForReuse()
 {
 	std::lock_guard<std::mutex> lock(m_resetMutex);
 
-	// 논리적 상태만 리셋
 	m_instanceCount = 0;
 	m_maxCount = 0;
 	m_isRendering = false;
-	m_BillBoardType = BillBoardType::Basic;
-
-	// 리소스 참조만 해제
 	m_particleSRV = nullptr;
-	m_assignedTexture = nullptr;
 
-	// 상수 버퍼 데이터만 리셋
+	// 다중 텍스처 초기화
+	ClearTextures();
+
 	m_ModelConstantBuffer = {};
 	m_ModelConstantBuffer.world = Mathf::Matrix::Identity;
 	m_ModelConstantBuffer.view = Mathf::Matrix::Identity;
 	m_ModelConstantBuffer.projection = Mathf::Matrix::Identity;
 
-	// GPU 플래그 리셋
+	//if (m_vertexShaderName == "None") {
+	//	m_vertexShaderName = "BillBoard";
+	//}
+	//
+	//if (m_pixelShaderName == "None") {
+	//	m_pixelShaderName = "BillBoard";
+	//}
+	//
+	//m_blendPreset = BlendPreset::Alpha;
+	//m_depthPreset = DepthPreset::Default;
+	//m_rasterizerPreset = RasterizerPreset::Default;
+
+	UpdatePSOShaders();
+	UpdatePSORenderStates();
+
 	m_gpuWorkPending = false;
+
 }
 
 bool BillboardModuleGPU::IsReadyForReuse() const
@@ -183,6 +183,32 @@ void BillboardModuleGPU::WaitForGPUCompletion()
 	m_gpuWorkPending = false;
 }
 
+void BillboardModuleGPU::UpdatePSOShaders()
+{
+	RenderModules::UpdatePSOShaders();
+
+	if (m_pso && m_pso->m_vertexShader) {
+		if (m_pso->m_inputLayout) {
+			m_pso->m_inputLayout = nullptr;
+		}
+
+		D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] = {
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		};
+
+		DirectX11::ThrowIfFailed(
+			DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
+				vertexLayoutDesc,
+				_countof(vertexLayoutDesc),
+				m_pso->m_vertexShader->GetBufferPointer(),
+				m_pso->m_vertexShader->GetBufferSize(),
+				&m_pso->m_inputLayout
+			)
+		);
+	}
+}
+
 void BillboardModuleGPU::SetupRenderTarget(RenderPassData* renderData)
 {
 	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
@@ -194,14 +220,26 @@ void BillboardModuleGPU::BindResource()
 {
 	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
-	// 텍스처 바인딩
-	if (m_assignedTexture) {
-		ID3D11ShaderResourceView* srv = m_assignedTexture->m_pSRV;
-		DirectX11::PSSetShaderResources(0, 1, &srv);
-	}
+	// 부모의 다중 텍스처 바인딩 사용
+	BindTextures();
 
 	// 파티클 SRV 바인딩
 	deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
+}
+
+void BillboardModuleGPU::SetBillboardType(BillBoardType type)
+{
+	m_BillBoardType = type;
+
+	// SpriteAnimation 타입으로 변경될 때 버퍼 생성
+	if (type == BillBoardType::SpriteAnimation && !m_SpriteAnimationBuffer)
+	{
+		m_SpriteAnimationBuffer = DirectX11::CreateBuffer(
+			sizeof(SpriteAnimationBuffer),
+			D3D11_BIND_CONSTANT_BUFFER,
+			&m_SpriteAnimationConstantBuffer
+		);
+	}
 }
 
 void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
@@ -209,7 +247,7 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	if (!m_enabled) return;
 
 	m_isRendering = true;
-	m_gpuWorkPending = true; // GPU 작업 시작
+	m_gpuWorkPending = true;
 
 	auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
@@ -220,25 +258,33 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	deviceContext->VSSetConstantBuffers(0, 1, m_ModelBuffer.GetAddressOf());
 	DirectX11::UpdateBuffer(m_ModelBuffer.Get(), &m_ModelConstantBuffer);
 
+	// 스프라이트 애니메이션 타입일 때 추가 버퍼 바인딩
+	if (m_BillBoardType == BillBoardType::SpriteAnimation && m_SpriteAnimationBuffer)
+	{
+		deviceContext->PSSetConstantBuffers(0, 1, m_SpriteAnimationBuffer.GetAddressOf());
+		DirectX11::UpdateBuffer(m_SpriteAnimationBuffer.Get(), &m_SpriteAnimationConstantBuffer);
+	}
+
 	BindResource();
 
-	// 버텍스 및 인덱스 버퍼 설정
 	UINT stride = sizeof(BillboardVertex);
 	UINT offset = 0;
 	deviceContext->IASetVertexBuffers(0, 1, billboardVertexBuffer.GetAddressOf(), &stride, &offset);
 	deviceContext->IASetIndexBuffer(billboardIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 
-	// 인스턴스 렌더링
 	deviceContext->DrawIndexedInstanced(m_indices.size(), m_instanceCount, 0, 0, 0);
 
-	// 리소스 해제
 	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 	deviceContext->VSSetShaderResources(0, 1, nullSRV);
 
 	DirectX11::UnbindRenderTargets();
 
 	m_isRendering = false;
-	// GPU 작업은 비동기이므로 m_gpuWorkPending은 WaitForGPUCompletion에서 해제
+
+	if (GetTextureCount() > 0) {
+		std::vector<ID3D11ShaderResourceView*> nullSRVs(GetTextureCount(), nullptr);
+		deviceContext->PSSetShaderResources(0, nullSRVs.size(), nullSRVs.data());
+	}
 }
 
 void BillboardModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
@@ -247,9 +293,17 @@ void BillboardModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, 
 	m_instanceCount = instanceCount;
 }
 
+void BillboardModuleGPU::SetSpriteAnimation(uint32 frameCount, float duration, uint32 gridColumns, uint32 gridRows)
+{
+	m_SpriteAnimationConstantBuffer.frameCount = frameCount;
+	m_SpriteAnimationConstantBuffer.animationDuration = duration;
+	m_SpriteAnimationConstantBuffer.gridColumns = gridColumns;
+	m_SpriteAnimationConstantBuffer.gridRows = gridRows;
+}
 
 
 // 직렬화 함수
+
 
 nlohmann::json BillboardModuleGPU::SerializeData() const
 {
@@ -261,10 +315,21 @@ nlohmann::json BillboardModuleGPU::SerializeData() const
 		{"maxCount", m_maxCount}
 	};
 
-	// 텍스처 정보 (텍스처 파일 경로나 이름 저장)
-	json["texture"] = {
-		{"hasTexture", m_assignedTexture != nullptr}
-	};
+	// 스프라이트 애니메이션 설정 (SpriteAnimation 타입일 때만 저장)
+	if (m_BillBoardType == BillBoardType::SpriteAnimation)
+	{
+		json["spriteAnimation"] = {
+			{"frameCount", m_SpriteAnimationConstantBuffer.frameCount},
+			{"animationDuration", m_SpriteAnimationConstantBuffer.animationDuration},
+			{"gridColumns", m_SpriteAnimationConstantBuffer.gridColumns},
+			{"gridRows", m_SpriteAnimationConstantBuffer.gridRows}
+		};
+	}
+
+	json.merge_patch(SerializeRenderStates());
+
+	// 텍스처 정보
+	json["textures"] = SerializeTextures();
 
 	if (m_assignedTexture)
 	{
@@ -304,6 +369,10 @@ nlohmann::json BillboardModuleGPU::SerializeData() const
 
 void BillboardModuleGPU::DeserializeData(const nlohmann::json& json)
 {
+	if (!m_pso) {
+		Initialize();
+	}
+
 	// 빌보드 설정 복원
 	if (json.contains("billboard"))
 	{
@@ -320,26 +389,45 @@ void BillboardModuleGPU::DeserializeData(const nlohmann::json& json)
 		}
 	}
 
-	// 텍스처 정보 복원
-	if (json.contains("texture"))
+	// 스프라이트 애니메이션 설정 복원
+	if (json.contains("spriteAnimation") && m_BillBoardType == BillBoardType::SpriteAnimation)
 	{
-		const auto& textureJson = json["texture"];
+		const auto& spriteAnimJson = json["spriteAnimation"];
 
-		if (textureJson.contains("name"))
+		if (spriteAnimJson.contains("frameCount"))
 		{
-			std::string textureName = textureJson["name"];
-			if (textureName.find('.') == std::string::npos)
-			{
-				textureName += ".png";
-			}
-			m_assignedTexture = DataSystems->LoadTexture(textureName);
+			m_SpriteAnimationConstantBuffer.frameCount = spriteAnimJson["frameCount"];
+		}
 
-			if (m_assignedTexture) {
-				std::string nameWithoutExtension = file::path(textureName).stem().string();
-				m_assignedTexture->m_name = nameWithoutExtension;
-			}
+		if (spriteAnimJson.contains("animationDuration"))
+		{
+			m_SpriteAnimationConstantBuffer.animationDuration = spriteAnimJson["animationDuration"];
+		}
+
+		if (spriteAnimJson.contains("gridColumns"))
+		{
+			m_SpriteAnimationConstantBuffer.gridColumns = spriteAnimJson["gridColumns"];
+		}
+
+		if (spriteAnimJson.contains("gridRows"))
+		{
+			m_SpriteAnimationConstantBuffer.gridRows = spriteAnimJson["gridRows"];
+		}
+
+		if (!m_SpriteAnimationBuffer)
+		{
+			m_SpriteAnimationBuffer = DirectX11::CreateBuffer(
+				sizeof(SpriteAnimationBuffer),
+				D3D11_BIND_CONSTANT_BUFFER,
+				&m_SpriteAnimationConstantBuffer
+			);
 		}
 	}
+
+	DeserializeRenderStates(json);
+
+	// 텍스처 정보 복원
+	DeserializeTextures(json);
 
 	// 정점 데이터 복원
 	if (json.contains("vertices"))
@@ -373,10 +461,6 @@ void BillboardModuleGPU::DeserializeData(const nlohmann::json& json)
 	if (json.contains("indices"))
 	{
 		m_indices = json["indices"].get<std::vector<uint32>>();
-	}
-
-	if (!m_pso) {
-		Initialize();
 	}
 }
 
