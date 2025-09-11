@@ -114,7 +114,6 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	};
 }
 
-
 ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 {
 	m_proxyGUID = pComponent->GetInstanceID();

@@ -378,22 +378,33 @@ void UIManager::CheckInput()
 	}
 
 	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
+	//TODO : 추가로 특정 상황일때 비활성화 할 수 있도록 처리도 해야할 거 같은데?
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
 	auto selectUI = curCanvas->SelectUI.lock();
 	if (selectUI)
 	{
 		if (stickL.x > 0.5)
 		{
-			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right)->shared_from_this();
+			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
+			if (navi)
+			{
+				curCanvas->SelectUI = navi->shared_from_this();
+			}
 		}
 		if (stickL.x < -0.5)
 		{
-			curCanvas->SelectUI = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left)->shared_from_this();
+			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
+			if (navi)
+			{
+				curCanvas->SelectUI = navi->shared_from_this();
+			}
 		}
 
 		if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
 		{
-			selectUI->GetComponent<UIButton>()->Click();
+			auto button = selectUI->GetComponent<UIButton>();
+			if(button)
+				button->Click();
 		}
 	}
 }
