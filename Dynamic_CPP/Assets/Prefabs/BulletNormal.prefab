@@ -1,21 +1,34 @@
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
 m_name: BulletNormal
 m_isEnabled: true
 m_instanceID: 1359403537
 m_fileGuid: 00000000-0000-0000-0000-000000000000
+========
+m_name: NormalBullet_Prefab
+m_isEnabled: true
+m_instanceID: 463944777
+m_fileGuid: d14d2e8a-19d7-5d0d-bdaf-3b584c1d828d
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
 PrefabNode:
   - GameObject: 2166264123
     m_name: BulletNormal
     m_isEnabled: true
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
     m_instanceID: 762241007
     m_transform:
       position: {x: 1, y: 0, z: 0, w: 1}
+========
+    m_instanceID: 1332273422
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1.5, y: 1.5, z: 1.5, w: 0}
       m_parentID: 0
-    m_index: 3
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4]
+    m_childrenIndices: [2]
     m_prefabFileGuid: d14d2e8a-19d7-5d0d-bdaf-3b584c1d828d
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +40,11 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
         m_instanceID: 2707615762
+========
+        m_instanceID: 2380069520
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,9 +60,15 @@ PrefabNode:
       - SphereColliderComponent: 1490099576
         m_name: SphereColliderComponent
         m_isEnabled: true
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
         m_instanceID: 3178496471
         m_FileID: 00000000-0000-0000-0000-000000000000
         radius: 0.150000006
+========
+        m_instanceID: 331055703
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        radius: 0.100000001
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
@@ -53,13 +76,18 @@ PrefabNode:
         rangedProjDist: 10
         m_name: NormalBullet
         m_isEnabled: true
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
         m_instanceID: 3277077739
+========
+        m_instanceID: 4073583095
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: b47d7c83-bf1b-559d-8291-012e15bcb689
     children:
       - GameObject: 2166264123
         m_name: NormalBullet (1)
         m_isEnabled: true
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
         m_instanceID: 594510556
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
@@ -68,6 +96,16 @@ PrefabNode:
           m_parentID: 3
         m_index: 4
         m_parentIndex: 3
+========
+        m_instanceID: 2800087185
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00200000009, y: 0.00200000009, z: 0.00200000009, w: 0}
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: d14d2e8a-19d7-5d0d-bdaf-3b584c1d828d
@@ -81,7 +119,11 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
+<<<<<<<< HEAD:Dynamic_CPP/Assets/Prefabs/BulletNormal.prefab
             m_instanceID: 1825524407
+========
+            m_instanceID: 106534416
+>>>>>>>> master:Dynamic_CPP/Assets/Prefabs/NormalBullet.prefab
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Material

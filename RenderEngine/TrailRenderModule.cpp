@@ -19,14 +19,28 @@ void TrailRenderModule::Initialize()
 {
     m_pso = std::make_unique<PipelineStateObject>();
 
-    // 기본 셰이더 설정
-    m_vertexShaderName = "TrailVertex";
-    m_pixelShaderName = "Dash";
+    // 셰이더 이름 설정
+    if (m_vertexShaderName == "None") {
+        m_vertexShaderName = "TrailVertex";
+    }
 
-    // 렌더 상태 프리셋 설정
-    m_blendPreset = BlendPreset::Alpha;
-    m_depthPreset = DepthPreset::ReadOnly;
-    m_rasterizerPreset = RasterizerPreset::NoCull;
+    if (m_pixelShaderName == "None")
+    {
+        m_pixelShaderName = "Dash";
+    }
+
+    // 렌더 상태 프리셋 설정 (PSO 생성 후에)
+    if (m_blendPreset == BlendPreset::None) {
+        m_blendPreset = BlendPreset::Alpha;
+    }
+    if (m_depthPreset == DepthPreset::None)
+    {
+        m_depthPreset = DepthPreset::ReadOnly;
+    }
+    if (m_rasterizerPreset == RasterizerPreset::None)
+    {
+        m_rasterizerPreset = RasterizerPreset::Default;
+    }
 
     // 프리미티브 토폴로지 설정
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -143,13 +157,6 @@ void TrailRenderModule::ResetForReuse()
 
     // 다중 텍스처 초기화
     ClearTextures();
-
-    // 렌더 상태를 기본값으로 리셋
-    m_vertexShaderName = "TrailVertex";
-    m_pixelShaderName = "Dash";
-    m_blendPreset = BlendPreset::Alpha;
-    m_depthPreset = DepthPreset::ReadOnly;
-    m_rasterizerPreset = RasterizerPreset::NoCull;
 
     UpdatePSOShaders();
     UpdatePSORenderStates();

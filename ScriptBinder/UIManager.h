@@ -7,6 +7,9 @@
 
 class Canvas;
 class Texture;
+class ImageComponent;
+class TextComponent;
+class SpriteSheetComponent;
 class UIManager : public DLLCore::Singleton<UIManager>
 {
 public:
@@ -14,13 +17,16 @@ public:
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
 	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
 	void AddCanvas(std::shared_ptr<GameObject> canvas);
-	//¿ÀºêÁ§ÀÌ¸§ /¾µ Á¤º¸ / ¾î´ÀÄµ¹ö½º ±âº»0
+	void DeleteCanvas(const std::shared_ptr<GameObject>& canvas);
 	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 },GameObject* canvas = nullptr);
 	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+
+	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
 	void DeleteCanvas(std::string canvasName);
 	void CheckInput();
@@ -32,19 +38,20 @@ public:
 	void SortCanvas();
 	void RegisterImageComponent(ImageComponent* image);
 	void RegisterTextComponent(TextComponent* text);
+	void RegisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet);
 	void UnregisterImageComponent(ImageComponent* image);
 	void UnregisterTextComponent(TextComponent* text);
-
-
+	void UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet);
 
 public:
-	//Äµ¹ö½º ÄÄÆ÷³ÍÆ®°¡ µé¾îÀÖ´Â°Í¸¸ µé¾î°¡°Ô²û
+	//ìº”ë²„ìŠ¤ ì»´í¬ë„ŒíŠ¸ê°€ ë“¤ì–´ìˆëŠ”ê²ƒë§Œ ë“¤ì–´ê°€ê²Œë”
 	std::vector<std::weak_ptr<GameObject>>	Canvases;
 	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
 	std::vector<ImageComponent*>			Images;
 	std::vector<TextComponent*>				Texts;
-	//ÀÌÁ¤ Äµ¹ö½º
-	//ÇöÀç »óÈ£ÀÛ¿ëÇÒ UI
+	std::vector<SpriteSheetComponent*>      SpriteSheets;
+	//ì´ì • ìº”ë²„ìŠ¤
+	//í˜„ì¬ ìƒí˜¸ì‘ìš©í•  UI
 	std::weak_ptr<GameObject> CurCanvas;
 	GameObject* SelectUI = nullptr;
 
@@ -71,7 +78,7 @@ interface ICollision2D
 	virtual void CheckClick(Mathf::Vector2 _mousePos) = 0;
 	Core::DelegateHandle m_clickEventHandle{};
 };
-//btn clilc -> colliderµé È®ÀÎ -> °¡Àå¸Â´Â  uiÇÔ¼ö ½ÇÇà
-//ÇöÀç ¼±ÅÃ canvas -> ÇöÀç ¼±ÅÃ°¡´ÉÇÑ  uiÁß ÇÏ³ª °í¸£°Ô²û
-//canvas¾ø´Â ´ÜÀÏÀº?
+//btn clilc -> colliderë“¤ í™•ì¸ -> ê°€ì¥ë§ëŠ”  uií•¨ìˆ˜ ì‹¤í–‰
+//í˜„ì¬ ì„ íƒ canvas -> í˜„ì¬ ì„ íƒê°€ëŠ¥í•œ  uiì¤‘ í•˜ë‚˜ ê³ ë¥´ê²Œë”
+//canvasì—†ëŠ” ë‹¨ì¼ì€?
 

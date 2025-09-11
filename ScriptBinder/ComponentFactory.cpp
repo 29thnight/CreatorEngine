@@ -15,6 +15,7 @@
 #include "BehaviorTreeComponent.h"
 #include "ImageComponent.h"
 #include "TextComponent.h"
+#include "SpriteSheetComponent.h"
 #include "PlayerInput.h"
 #include "Animation.h"
 #include "Canvas.h"
@@ -553,6 +554,33 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 			text->DeserializeNavi();
 			text->DeserializeShader();
+		}
+		else if (componentType->typeID == type_guid(SpriteSheetComponent))
+		{
+			auto spriteSheet = static_cast<SpriteSheetComponent*>(component);
+			Meta::Deserialize(spriteSheet, itNode);
+			spriteSheet->SetOwner(obj);
+			spriteSheet->m_isPreview = false;
+
+			auto canvasObj = UIManagers->FindCanvasName(spriteSheet->m_ownerCanvasName);
+			auto canvas = canvasObj->GetComponent<Canvas>();
+			if (canvas)
+			{
+				canvas->AddUIObject(obj->shared_from_this());
+			}
+			else
+			{
+				Debug->LogWarning("Image Component's parent is not Canvas");
+			}
+
+			if (!spriteSheet->m_spriteSheetPath.empty())
+			{
+				spriteSheet->LoadSpriteSheet(spriteSheet->m_spriteSheetPath);
+			}
+			else
+			{
+				Debug->LogError("SpriteSheetComponent is missing m_spriteSheetPath");
+			}
 		}
 		else
 		{

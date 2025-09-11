@@ -400,7 +400,6 @@ void Player::ThrowEvent()
 	
 }
 
-
 void Player::DropCatchItem()
 {
 	onIndicate = false;
@@ -684,12 +683,12 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
+void Player::OnBuff()
 
 
-
-void Player::Cancancel()
 {
-	canMeleeCancel = true;
+	
+	if (weapon)
 
 
 	if (m_curWeapon->itemType == ItemType::Basic)
@@ -718,6 +717,18 @@ void Player::Cancancel()
 		{
 			m_comboCount = 0;
 			m_comboElapsedTime = 0.f;
+			if (dir.x < -0.1f)
+			{
+				//
+			}
+			if (dir.y > 0.1f)
+			{
+				//
+			}
+			if (dir.y < -0.1f)
+			{
+				//
+			}
 		}
 	}
 	

@@ -10,6 +10,7 @@
 #include "Terrain.h"
 #include "DecalComponent.h"
 #include "Texture.h"
+#include "SpriteRenderer.h"
 
 //constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -84,6 +85,16 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
         m_instancedID = component->GetInstanceID();
     }
     m_proxyType = PrimitiveProxyType::DecalComponent;
+}
+
+PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
+	m_spriteTexture(component->m_Sprite)
+{
+	m_quadMesh = std::make_shared<Mesh>(
+        component->GetOwner()->m_name.ToString(),
+        PrimitiveCreator::QuadVertices(),
+        PrimitiveCreator::QuadIndices()
+    );
 }
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :

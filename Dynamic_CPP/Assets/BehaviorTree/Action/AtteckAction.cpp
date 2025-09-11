@@ -1,9 +1,49 @@
 #include "AtteckAction.h"
 #include "pch.h"
-#include "DebugLog.h"
+#include "EntityMonsterA.h"
+#include "Animator.h"
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+
+    bool hasIdentity = blackBoard.HasKey("Identity");
+
+    std::string identity = "";
+    if (hasIdentity)
+    {
+        identity = blackBoard.GetValueAsString("Identity");
+    }
+
+    if (identity == "MonsterNomal")
+    {
+        EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
+		bool isAttack = script->isAttack;
+		bool isAttackAnimation = script->isAttackAnimation;
+        if (!isAttack) {
+			//공격중이 아닐시 공격 시작
+			script->isAttack = true;
+            script->isAttackAnimation = true;
+			script->m_animator->SetParameter("Attack", true);
+            blackBoard.SetValueAsBool("IsAttacking", true);
+            return NodeStatus::Running;
+        }
+        else {
+			//공격중일시 에니메이션 종료 여부 확인
+            if (isAttackAnimation) {
+				//에니메이션이 실행중이면 계속 실행
+				return NodeStatus::Running;
+			}
+            else 
+            {
+				//완료시 모든 변수 초기화하고 성공 반환
+				script->isAttack = false;
+				script->isAttackAnimation = false;
+				script->m_state = "Idle";
+				return NodeStatus::Success;
+            }
+        }
+    }
+
 	bool hasAttackState = blackBoard.HasKey("IsAttacking");
 	bool hasState = blackBoard.HasKey("State");
 	bool isActionRunning = false;
@@ -29,10 +69,10 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
         //}
 
         //// 4. 애니메이터에 'Attack' 트리거를 전달하여 애니메이션을 재생시킵니다. // entityenemy 에서
-        //if (auto* animator = m_owner->GetComponent<Animator>())
-        //{
-        //    animator->SetParameter("Attack", true);
-        //}
+        /*if (auto* animator = m_owner->GetComponent<Animator>())
+        {
+            animator->SetParameter("Attack", true);
+        }*/
 
         // attack count를 증가 시켜 공격 시작
         blackBoard.SetValueAsInt("AttackCount", 1); // --> 이건 엔티티에서 공격 확인후 0으로 바꿔줘야함
@@ -63,7 +103,7 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
             //m_isActionRunning = false;
 
             // 2. BT에 Success를 반환하여 행동이 성공적으로 끝났음을 알립니다.
-			LOG("AtteckAction: Attack animation completed.");
+			std::cout << "AtteckAction: Attack animation completed." << std::endl;
 			//스테이트를 Idle로 변경
 			blackBoard.SetValueAsString("State", "Idle");
             return NodeStatus::Success;

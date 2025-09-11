@@ -42,7 +42,7 @@ void PlayerAttackAH::Enter()
 		eft = SceneManagers->GetActiveScene()->CreateGameObject("asd").get();
 		eft->AddComponent<EffectComponent>()->Awake();
 	}
-	eft->GetComponent<EffectComponent>()->ChangeEffect("ss1");
+	eft->GetComponent<EffectComponent>()->ChangeEffect("test2");
 }
 
 void PlayerAttackAH::Update(float deltaTime)
