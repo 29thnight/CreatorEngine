@@ -3,7 +3,7 @@
 #include "Mesh.h"
 #include "RenderScene.h"
 #include "Material.h"
-#include "Camera.h" // [NEW] Camera Á¤ÀÇ Æ÷ÇÔ
+#include "Camera.h" // [NEW] Camera ì •ì˜ í¬í•¨
 #include "FoliageComponent.h"
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
@@ -88,13 +88,16 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
 }
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
-	m_spriteTexture(component->m_Sprite)
+    m_spriteTexture(component->GetSprite().get()),
+    m_vertexShaderName(component->GetVertexShaderName()),
+    m_pixelShaderName(component->GetPixelShaderName())
 {
-	m_quadMesh = std::make_shared<Mesh>(
+    m_quadMesh = std::make_shared<Mesh>(
         component->GetOwner()->m_name.ToString(),
         PrimitiveCreator::QuadVertices(),
         PrimitiveCreator::QuadIndices()
     );
+    m_proxyType = PrimitiveProxyType::SpriteRenderer;
 }
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
@@ -226,35 +229,35 @@ void PrimitiveRenderProxy::DestroyProxy()
     RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
 }
 
-// [CHANGED] LOD »ı¼º ¿äÃ» ÇÔ¼ö ±¸Çö
+// [CHANGED] LOD ìƒì„± ìš”ì²­ í•¨ìˆ˜ êµ¬í˜„
 void PrimitiveRenderProxy::InitializeLODs(const std::vector<float>& lodScreenSpaceThresholds)
 {
     if (nullptr == m_Mesh || false == m_isShadowCast) return;
 
-    // ½ºÅ°´× ¸Ş½¬´Â LOD¸¦ »ı¼ºÇÏÁö ¾Ê½À´Ï´Ù.
+    // ìŠ¤í‚¤ë‹ ë©”ì‰¬ëŠ” LODë¥¼ ìƒì„±í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤.
     if (m_isSkinnedMesh)
     {
         return;
     }
 
-    // ¸Ş½¬¿¡ ¾ÆÁ÷ LOD°¡ »ı¼ºµÇÁö ¾Ê¾ÒÀ» °æ¿ì¿¡¸¸ »ı¼ºÀ» ¿äÃ»ÇÕ´Ï´Ù.
+    // ë©”ì‰¬ì— ì•„ì§ LODê°€ ìƒì„±ë˜ì§€ ì•Šì•˜ì„ ê²½ìš°ì—ë§Œ ìƒì„±ì„ ìš”ì²­í•©ë‹ˆë‹¤.
     if (!m_Mesh->HasLODs())
     {
         m_Mesh->GenerateLODs(lodScreenSpaceThresholds);
     }
 }
 
-// [NEW] ·»´õ¸µ ½Ã½ºÅÛÀÌ »ç¿ëÇÒ LOD ·¹º§ °áÁ¤ ÇÔ¼ö
+// [NEW] ë Œë”ë§ ì‹œìŠ¤í…œì´ ì‚¬ìš©í•  LOD ë ˆë²¨ ê²°ì • í•¨ìˆ˜
 uint32_t PrimitiveRenderProxy::GetLODLevel(Camera* camera)
 {
     if (nullptr == m_Mesh || nullptr == camera || false == m_EnableLOD)
     {
-        return 0; // À¯È¿ÇÏÁö ¾ÊÀº °æ¿ì, ¿øº» ¸Ş½¬(LOD 0) ¹İÈ¯
+        return 0; // ìœ íš¨í•˜ì§€ ì•Šì€ ê²½ìš°, ì›ë³¸ ë©”ì‰¬(LOD 0) ë°˜í™˜
     }
 
 	m_currLOD = m_Mesh->SelectLOD(camera, m_worldMatrix);
 
-    // ½ÇÁ¦ °è»êÀº Mesh Å¬·¡½º¿¡ À§ÀÓÇÕ´Ï´Ù.
+    // ì‹¤ì œ ê³„ì‚°ì€ Mesh í´ë˜ìŠ¤ì— ìœ„ì„í•©ë‹ˆë‹¤.
     return m_currLOD;
 }
 

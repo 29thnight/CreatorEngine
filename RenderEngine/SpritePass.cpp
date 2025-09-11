@@ -1,8 +1,6 @@
 #include "SpritePass.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
-#include "RenderableComponents.h"
-#include "Scene.h"
 
 SpritePass::SpritePass()
 {
@@ -38,13 +36,7 @@ SpritePass::SpritePass()
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 
-	m_QuadMesh = std::make_unique<Mesh>(
-		"Quad", 
-		PrimitiveCreator::QuadVertices(), 
-		PrimitiveCreator::QuadIndices()
-	);
-
-	CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
+        CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 
 	DirectX11::ThrowIfFailed(
@@ -64,76 +56,12 @@ SpritePass::~SpritePass()
 
 void SpritePass::Execute(RenderScene& scene, Camera& camera)
 {
-	if (camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::SpritePass))
-	{
-		return;
-	}
+        if (camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::SpritePass))
+        {
+                return;
+        }
 
-	if (!RenderPassData::VaildCheck(&camera)) return;
-	auto renderData = RenderPassData::GetData(&camera);
-
-	auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
-	m_pso->Apply();
-
-	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
-
-	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	deviceContext->OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
-
-	camera.UpdateBuffer();
-    scene.UseModel();
-
-    std::vector<std::shared_ptr<GameObject>> sprites;
-	bool isGizmoRendering = m_isGizmoRendering;
-	std::copy_if(
-		scene.GetScene()->m_SceneObjects.begin(),
-		scene.GetScene()->m_SceneObjects.end(),
-		std::back_inserter(sprites),
-		[&isGizmoRendering](const std::shared_ptr<GameObject>& object)
-		{
-			return nullptr != object->GetComponent<SpriteRenderer>() 
-				&& object->GetComponent<SpriteRenderer>()->IsEnabled();
-		}
-	);
-
-	std::vector<std::tuple<Transform*, SpriteRenderer*, float>> spriteInfos;
-	Mathf::xVector& eyePosition = camera.m_eyePosition;
-	std::transform(
-		sprites.begin(),
-		sprites.end(),
-		std::back_inserter(spriteInfos),
-		[&eyePosition](const std::shared_ptr<GameObject>& object)
-		{
-			Transform* pTransform = &(object->m_transform);
-			float squaredLength{};
-			XMVectorGetByIndexPtr(&squaredLength, XMVector3LengthSq(eyePosition - pTransform->GetWorldPosition()), 0);
-			return std::make_tuple(pTransform, object->GetComponent<SpriteRenderer>(), squaredLength);
-		}
-	);
-
-	std::sort(
-		spriteInfos.begin(),
-		spriteInfos.end(),
-		[](auto& lhs, auto& rhs)
-		{
-			return std::get<float>(lhs) < std::get<float>(rhs);
-		}
-	);
-
-	for (auto& [transform, spriteRenderer, squaredLength] : spriteInfos)
-	{
-		scene.UpdateModel(transform->GetWorldMatrix());
-		DirectX11::PSSetShaderResources(0,1,&spriteRenderer->GetSprite()->m_pSRV);
-		m_QuadMesh->Draw();
-	}
-
-	DirectX11::OMSetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
-	DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-
-	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets();
+        ExecuteCommandList(scene, camera);
 }
 
 void SpritePass::ControlPanel()
@@ -142,6 +70,48 @@ void SpritePass::ControlPanel()
 
 void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
+        if (!RenderPassData::VaildCheck(&camera)) return;
+        auto renderData = RenderPassData::GetData(&camera);
+        ID3D11DeviceContext* deferredPtr = deferredContext;
+
+        m_pso->Apply(deferredPtr);
+        ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+        DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
+
+        deferredPtr->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+        deferredPtr->OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
+        DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+
+        camera.UpdateBuffer(deferredPtr);
+        scene.UseModel(deferredPtr);
+
+        for (auto& proxy : renderData->m_spriteRenderQueue)
+        {
+                if (!proxy || !proxy->m_quadMesh || !proxy->m_spriteTexture) continue;
+                if (ShaderSystem->VertexShaders.find(proxy->m_vertexShaderName) == ShaderSystem->VertexShaders.end()) continue;
+                if (ShaderSystem->PixelShaders.find(proxy->m_pixelShaderName) == ShaderSystem->PixelShaders.end()) continue;
+
+                m_pso->m_vertexShader = &ShaderSystem->VertexShaders[proxy->m_vertexShaderName];
+                m_pso->m_pixelShader = &ShaderSystem->PixelShaders[proxy->m_pixelShaderName];
+                m_pso->Apply(deferredPtr);
+
+                scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
+                ID3D11ShaderResourceView* srv = proxy->m_spriteTexture->m_pSRV;
+                DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &srv);
+                proxy->m_quadMesh->Draw(deferredPtr);
+        }
+
+        ID3D11ShaderResourceView* nullSRV = nullptr;
+        DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
+        ID3D11RenderTargetView* nullRTV = nullptr;
+        deferredPtr->OMSetRenderTargets(1, &nullRTV, nullptr);
+        ID3D11BlendState* nullBlend = nullptr;
+        DirectX11::OMSetBlendState(deferredPtr, nullBlend, nullptr, 0xFFFFFFFF);
+        DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
+
+        ID3D11CommandList* commandList{};
+        deferredPtr->FinishCommandList(false, &commandList);
+        PushQueue(camera.m_cameraIndex, commandList);
 }
 
 void SpritePass::Resize(uint32_t width, uint32_t height)

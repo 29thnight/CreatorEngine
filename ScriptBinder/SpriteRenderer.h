@@ -20,6 +20,10 @@ public:
    void DeserializeSprite(const std::shared_ptr<Texture>& ptr);
 
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
+   void SetVertexShaderName(const std::string& name) { m_VertexShaderName = name; }
+   void SetPixelShaderName(const std::string& name) { m_PixelShaderName = name; }
+   const std::string& GetVertexShaderName() const { return m_VertexShaderName; }
+   const std::string& GetPixelShaderName() const { return m_PixelShaderName; }
 
 private:
     [[Property]]
