@@ -10,20 +10,20 @@ AUTO_REGISTER_ENUM(EItemType)
 
 enum class ItemType
 {
+	None,
 	Basic,
-	Meely,
+	Melee,
 	Range,
 	Bomb,
-	None,
 };
 AUTO_REGISTER_ENUM(ItemType)
 
 enum class BuffType
 {
-	Meely,
+	None,
+	Melee,
 	Range,
 	Explosion,
-	None,
 };
 AUTO_REGISTER_ENUM(BuffType)
 

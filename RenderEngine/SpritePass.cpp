@@ -124,7 +124,7 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 	for (auto& [transform, spriteRenderer, squaredLength] : spriteInfos)
 	{
 		scene.UpdateModel(transform->GetWorldMatrix());
-		DirectX11::PSSetShaderResources(0,1,&spriteRenderer->m_Sprite->m_pSRV);
+		DirectX11::PSSetShaderResources(0,1,&spriteRenderer->GetSprite()->m_pSRV);
 		m_QuadMesh->Draw();
 	}
 

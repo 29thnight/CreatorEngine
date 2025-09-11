@@ -200,6 +200,12 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 			m_decalQueue.push_back(proxy);
 		}
 		break;
+	case PrimitiveProxyType::SpriteRenderer:
+		if (proxy->m_quadMesh != nullptr && proxy->m_spriteTexture != nullptr)
+		{
+			m_spriteRenderQueue.push_back(proxy);
+		}
+		break;
 	default:
 		break;
 	}

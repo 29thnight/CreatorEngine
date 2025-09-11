@@ -255,7 +255,7 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	SpinLock lock(renderScene->m_uiProxyMapFlag);
 	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
-	auto proxyObject = iter->second.get();
+	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
 	auto origin			= DirectX::XMFLOAT2{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
 	auto position		= pComponent->pos;
@@ -271,36 +271,43 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 
 	if (!shaderPath.empty())
 	{
-		proxyObject->SetCustomPixelShader(shaderPath);
+		auto shaderObject = weakProxyObject.lock();
+		if (shaderObject)
+		{
+			shaderObject->SetCustomPixelShader(shaderPath);
+		}
 	}
 
-	m_updateFunction = [proxyObject, isPreview, isEnable, origin, position, scale, layerOrder, frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
+	m_updateFunction = [weakProxyObject, isPreview, isEnable, origin, position, scale, layerOrder, frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
 	{
-		// texture는 imutable처럼 관리(한번 설정되면 이후 변경되지 않음)
-		UIRenderProxy::SpriteSheetData data{};
-		data.origin = origin;
-		data.position = position;
-		data.scale = scale;
-		data.layerOrder = layerOrder;
-		data.frameDuration = frameDuration;
-		data.isPreview = isPreview;
-		if (!isEnable)
+		if (auto proxyObject = weakProxyObject.lock())
 		{
-			proxyObject->m_sequenceState.frameIndex = 0;
-			proxyObject->m_sequenceState.timeAccum = 0.f;
-			data.deltaTime = 0;
-		}
-		else
-		{
-			data.deltaTime = deltaTime;
-		}
-		proxyObject->m_sequenceState.loop = isLoop;
+			// texture는 imutable처럼 관리(한번 설정되면 이후 변경되지 않음)
+			UIRenderProxy::SpriteSheetData data{};
+			data.origin = origin;
+			data.position = position;
+			data.scale = scale;
+			data.layerOrder = layerOrder;
+			data.frameDuration = frameDuration;
+			data.isPreview = isPreview;
+			if (!isEnable)
+			{
+				proxyObject->m_sequenceState.frameIndex = 0;
+				proxyObject->m_sequenceState.timeAccum = 0.f;
+				data.deltaTime = 0;
+			}
+			else
+			{
+				data.deltaTime = deltaTime;
+			}
+			proxyObject->m_sequenceState.loop = isLoop;
 
-		proxyObject->m_data = std::move(data);
-		proxyObject->m_isEnabled = isEnable;
-		if (!buffer.empty())
-		{
-			proxyObject->SetCustomPixelBuffer(buffer);
+			proxyObject->m_data = std::move(data);
+			proxyObject->m_isEnabled = isEnable;
+			if (!buffer.empty())
+			{
+				proxyObject->SetCustomPixelBuffer(buffer);
+			}
 		}
 
 	};
@@ -319,7 +326,7 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	SpinLock lock(renderScene->m_uiProxyMapFlag);
 	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
-	auto proxyObject = iter->second.get();
+	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
 	DirectX::XMFLOAT2 origin{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
 	auto textures	= pComponent->textures;
@@ -337,30 +344,34 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 
 	if (!shaderPath.empty())
 	{
-		proxyObject->SetCustomPixelShader(shaderPath);
+		auto sh_ptr = weakProxyObject.lock();
+		sh_ptr->SetCustomPixelShader(shaderPath);
 	}
 
-	m_updateFunction = [proxyObject, textures = std::move(textures), 
+	m_updateFunction = [weakProxyObject, textures = std::move(textures),
 		curTexture, origin, position, scale, isEnable,
 		rotation, layerOrder, color, clipDirection, clipPercent, buffer = std::move(cpuBuffer)]() mutable
 	{
-		UIRenderProxy::ImageData data{};
-		data.textures				= std::move(textures);
-		data.texture				= curTexture;
-		data.origin					= origin;
-		data.color					= color;
-		data.position				= position;
-		data.scale					= scale;
-		data.rotation				= rotation;
-		data.layerOrder				= layerOrder;
-		data.clipDirection			= clipDirection;
-		data.clipPercent			= clipPercent;
-		proxyObject->m_data			= std::move(data);
-		proxyObject->m_isEnabled	= isEnable;
-
-		if (!buffer.empty())
+		if (auto proxyObject = weakProxyObject.lock())
 		{
-			proxyObject->SetCustomPixelBuffer(buffer);
+			UIRenderProxy::ImageData data{};
+			data.textures = std::move(textures);
+			data.texture = curTexture;
+			data.origin = origin;
+			data.color = color;
+			data.position = position;
+			data.scale = scale;
+			data.rotation = rotation;
+			data.layerOrder = layerOrder;
+			data.clipDirection = clipDirection;
+			data.clipPercent = clipPercent;
+			proxyObject->m_data = std::move(data);
+			proxyObject->m_isEnabled = isEnable;
+
+			if (!buffer.empty())
+			{
+				proxyObject->SetCustomPixelBuffer(buffer);
+			}
 		}
 	};
 }
@@ -377,7 +388,7 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	SpinLock lock(renderScene->m_uiProxyMapFlag);
 	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
-	auto proxyObject = iter->second.get();
+	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
 	auto font = pComponent->font;
 	auto message = pComponent->message;
@@ -387,17 +398,20 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	int layerOrder = pComponent->GetLayerOrder();
 	bool isEnable = owner->IsEnabled();
 
-	m_updateFunction = [proxyObject, isEnable, font, message, color, position, fontSize, layerOrder]()
+	m_updateFunction = [weakProxyObject, isEnable, font, message, color, position, fontSize, layerOrder]()
 	{
-		UIRenderProxy::TextData data{};
-		data.font = font;
-		data.message = message;
-		data.color = color;
-		data.position = Mathf::Vector2(position);
-		data.fontSize = fontSize;
-		data.layerOrder = layerOrder;
-		proxyObject->m_data = std::move(data);
-		proxyObject->m_isEnabled = isEnable;
+		if (auto proxyObject = weakProxyObject.lock())
+		{
+			UIRenderProxy::TextData data{};
+			data.font = font;
+			data.message = message;
+			data.color = color;
+			data.position = Mathf::Vector2(position);
+			data.fontSize = fontSize;
+			data.layerOrder = layerOrder;
+			proxyObject->m_data = std::move(data);
+			proxyObject->m_isEnabled = isEnable;
+		}
 	};
 }
 

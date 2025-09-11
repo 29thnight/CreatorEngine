@@ -861,6 +861,22 @@ void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 	}
 }
 
+void Scene::CollectSpriteRenderer(SpriteRenderer* ptr)
+{
+	if (ptr)
+	{
+		m_spriteRenderers.push_back(ptr);
+	}
+}
+
+void Scene::UnCollectSpriteRenderer(SpriteRenderer* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_spriteRenderers, [ptr](const auto& sprite) { return sprite == ptr; });
+	}
+}
+
 void Scene::CollectTerrainComponent(TerrainComponent* ptr)
 {
 	if (ptr)

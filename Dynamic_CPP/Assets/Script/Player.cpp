@@ -26,13 +26,14 @@
 #include "Bullet.h"
 #include "NormalBullet.h"
 #include "SpecialBullet.h"
+#include "WeaponSlotController.h"
 #include "Bomb.h"
 
 #include "CurveIndicator.h"
 #include "DebugLog.h"
+
 void Player::Start()
 {
-
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
 	for (auto& child : childred)
@@ -54,24 +55,37 @@ void Player::Start()
 
 
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
-	
+
+	//TEST : UIController 현재는 테스트라 P1_UIController로 고정
+	//TODO : 관련해서 플레이어 컴포넌트가 본인 인덱스를 알아야 함.
+	GameObject* uiController = GameObject::Find("P1_UIController");
+	if (uiController)
+	{
+		auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+		if (weaponSlotController)
+		{
+			weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+			weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
+			weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+		}
+	}
+	//~TEST
 
 	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("WeaponBasic");
+	Weapon* weapon = nullptr;
 	if (basicWeapon && player)
 	{
 		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(basicWeapon, "BasicWeapon");
-		auto weapon = weaponObj->GetComponent<Weapon>();
+		weapon = weaponObj->GetComponent<Weapon>();
 		AddWeapon(weapon);
 	}
 
-	
 	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
 	dashEffect = dashObj->AddComponent<EffectComponent>();
 	dashEffect->Awake();
-	dashEffect->m_effectTemplateName ="Dash";
+	dashEffect->m_effectTemplateName = "Dash";
 
 	player->m_collisionType = 2;
-
 
 	auto gmobj = GameObject::Find("GameManager");
 	if (gmobj)
@@ -83,7 +97,6 @@ void Player::Start()
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
 	camera = GameObject::Find("Main Camera");
-
 
 	Prefab* IndicatorPrefab = PrefabUtilitys->LoadPrefab("Indicator");
 	if (IndicatorPrefab)
@@ -208,7 +221,7 @@ void Player::Update(float tick)
 
 	}
 
-	if (m_curWeapon->isBreak == true && sucessAttack ==true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
+	if (m_curWeapon->IsBroken() && sucessAttack == true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
 	{
 		DeleteCurWeapon();
 	}
@@ -217,8 +230,6 @@ void Player::Update(float tick)
 	{
 		sucessAttack = false;
 	}
-
-
 }
 
 void Player::LateUpdate(float tick)
@@ -368,9 +379,6 @@ void Player::ThrowEvent()
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(onIndicate);
 	}
-
-
-	
 }
 
 
@@ -438,7 +446,7 @@ void Player::StartAttack()
 		if (m_curWeapon)
 		{
 			if (m_curWeapon->isBreak == true) return; //현재무기 부서졌으면 리턴 -> Update에서 무기바꾸기로직으로
-			if (m_curWeapon->itemType == ItemType::Meely || m_curWeapon->itemType == ItemType::Basic)
+			if (m_curWeapon->itemType == ItemType::Melee || m_curWeapon->itemType == ItemType::Basic)
 			{
 
 				if (m_comboCount == 0)
@@ -478,10 +486,10 @@ void Player::StartAttack()
 				//현재무기 감추거나 attach떼고 손에붙여서 날아가게?
 			}
 			attackElapsedTime = 0;
-			if (m_curWeapon->CheckDur() == true)
+			if (!m_curWeapon->IsBasic())
 			{
-				
-				std::cout << "weapon break" << std::endl;
+				m_curWeapon->DecreaseDur();
+				m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
 			}
 		}
 	}
@@ -555,8 +563,6 @@ float Player::calculDamge(bool isCharge,int _chargeCount)
 	return finalDamge; //여기에 크리티컬있으면 곱해주기 
 }
 
-
-
 void Player::SwapWeaponLeft()
 {
 	m_weaponIndex--;
@@ -569,6 +575,8 @@ void Player::SwapWeaponLeft()
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
+		m_SetActiveEvent.Broadcast(m_weaponIndex);
+		m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
 	}
 	countRangeAttack = 0;
 }
@@ -590,30 +598,73 @@ void Player::SwapWeaponRight()
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
+		m_SetActiveEvent.Broadcast(m_weaponIndex);
+		m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
 	}
 	countRangeAttack = 0;
 }
 
+void Player::SwapBasicWeapon()
+{
+	m_weaponIndex = 0;
+	if (m_curWeapon != nullptr)
+	{
+		m_curWeapon->SetEnabled(false);
+		m_curWeapon = m_weaponInventory[m_weaponIndex];
+		m_SetActiveEvent.Broadcast(m_weaponIndex);
+		m_curWeapon->SetEnabled(true);
+	}
+	countRangeAttack = 0;
+}
+
+void Player::AddMeleeWeapon()
+{
+	Prefab* meleeWeapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
+	if (meleeWeapon)
+	{
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeWeapon, "MeleeWeapon");
+		if(weaponObj)
+		{
+			auto weapon = weaponObj->GetComponent<Weapon>();
+			if (weapon)
+			{
+				AddWeapon(weapon);
+			}
+		}
+	}
+}
+
 void Player::AddWeapon(Weapon* weapon)
 {
+	if (!weapon) return;
+
 	if (m_weaponInventory.size() >= 4)
 	{
 		weapon->GetOwner()->Destroy();
 		return;
 
-
-		//리턴하고 던져진무기 땅에떨구기 지금은 Destory인대 바꿔야함&&&&&
+		//TODO : 리턴하고 던져진무기 땅에떨구기 지금은 Destory인대 바꿔야함&&&&&
 	}
 
-	if (m_curWeapon)
-	{
-		m_curWeapon->SetEnabled(false);
-	}
+	weapon->SetEnabled(false);
+	int prevSize = m_weaponInventory.size();
 	m_weaponInventory.push_back(weapon);
-	m_curWeapon = weapon;
-	m_curWeapon->SetEnabled(true);
-	handSocket->AttachObject(m_curWeapon->GetOwner());
+	m_AddWeaponEvent.Broadcast(weapon, m_weaponInventory.size() - 1);
+	m_UpdateDurabilityEvent.Broadcast(weapon, m_weaponIndex);
+	handSocket->AttachObject(weapon->GetOwner());
 
+	if (1 >= prevSize)
+	{
+		if (m_curWeapon)
+		{
+			m_curWeapon->SetEnabled(false);
+		}
+
+		m_curWeapon = weapon;
+		m_curWeapon->SetEnabled(true);
+		m_SetActiveEvent.Broadcast(m_weaponInventory.size() - 1);
+		m_weaponIndex = m_weaponInventory.size() - 1;
+	}
 }
 
 void Player::DeleteCurWeapon()
@@ -625,8 +676,19 @@ void Player::DeleteCurWeapon()
 
 	if (it != m_weaponInventory.end())
 	{
-		SwapWeaponLeft();
-		m_weaponInventory.erase(it); 
+		SwapBasicWeapon();
+		m_weaponInventory.erase(it);
+		for (int i = 1; i < 4; ++i)
+		{
+			if (i < m_weaponInventory.size())
+			{
+				m_AddWeaponEvent.Broadcast(m_weaponInventory[i], i);
+			}
+			else
+			{
+				m_AddWeaponEvent.Broadcast(nullptr, i);
+			}
+		}
 	}
 }
 
@@ -655,13 +717,9 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
-
-
-
 void Player::Cancancel()
 {
 	canMeleeCancel = true;
-
 
 	if (m_curWeapon->itemType == ItemType::Basic)
 	{
@@ -677,7 +735,7 @@ void Player::Cancancel()
 			m_comboElapsedTime = 0.f;
 		}
 	}
-	else if (m_curWeapon->itemType == ItemType::Meely)
+	else if (m_curWeapon->itemType == ItemType::Melee)
 	{
 		//2콤보까지 가능
 		if (m_comboCount < 2)
@@ -710,62 +768,60 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 		curveindicator->EnableIndicator(onIndicate);
 		curveindicator->SetIndicator(pos, bombThrowPosition, ThrowPowerY);
 	}
-
 }
 
 void Player::MeleeAttack()
 {
-		Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
-		XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
-		Mathf::Vector3 handPos = handlocal.r[3];
-		Mathf::Vector3 direction = handPos - rayOrigin;
-		direction.y = 0;
-		direction.Normalize();
-		std::vector<HitResult> hits;
-		rayOrigin.y = 0.5f;
+	Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+	XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
+	Mathf::Vector3 handPos = handlocal.r[3];
+	Mathf::Vector3 direction = handPos - rayOrigin;
+	direction.y = 0;
+	direction.Normalize();
+	std::vector<HitResult> hits;
+	rayOrigin.y = 0.5f;
+	
+	float distacne = 2.0f;
+	if (m_curWeapon)
+	{
+		distacne = m_curWeapon->itemAckRange; //사거리도 차지면 다름
+	}
+	float damage = calculDamge(isChargeAttack, chargeCount);
+
+	int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
+
+	constexpr float angle = XMConvertToRadians(15.0f);
+	Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+	leftDir.Normalize();
+	Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
+	rightDir.Normalize();
+	std::vector<HitResult> leftHits;
+	int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+	std::vector<HitResult> rightHits;
+	int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+	std::vector<HitResult> allHits;
+	allHits.reserve(size + leftSize + rightSize);
+	allHits.insert(allHits.end(), hits.begin(), hits.end());
+	allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
+	allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
 		
-		float distacne = 2.0f;
-		if (m_curWeapon)
+	for (auto& hit : allHits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+
+		if (auto entity = object->GetComponent<EntityEnemy>())
 		{
-			distacne = m_curWeapon->itemAckRange; //사거리도 차지면 다름
+			auto [iter, inserted] = AttackTarget.insert(entity);
+			if (inserted) (*iter)->SendDamage(this, damage);
 		}
-		float damage = calculDamge(isChargeAttack, chargeCount);
 
-		int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
-
-		constexpr float angle = XMConvertToRadians(15.0f);
-		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
-		leftDir.Normalize();
-		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
-		rightDir.Normalize();
-		std::vector<HitResult> leftHits;
-		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
-		std::vector<HitResult> rightHits;
-		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
-		std::vector<HitResult> allHits;
-		allHits.reserve(size + leftSize + rightSize);
-		allHits.insert(allHits.end(), hits.begin(), hits.end());
-		allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
-		allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
-
-		
-		for (auto& hit : allHits)
+		if (auto resource = object->GetComponent<EntityResource>())
 		{
-			auto object = hit.gameObject;
-			if (object == GetOwner()) continue;
-
-			if (auto entity = object->GetComponent<EntityEnemy>())
-			{
-				auto [iter, inserted] = AttackTarget.insert(entity);
-				if (inserted) (*iter)->SendDamage(this, damage);
-			}
-
-			if (auto resource = object->GetComponent<EntityResource>())
-			{
-				auto [iter, inserted] = AttackTarget.insert(resource);
-				if (inserted) (*iter)->SendDamage(this, damage);
-			}
+			auto [iter, inserted] = AttackTarget.insert(resource);
+			if (inserted) (*iter)->SendDamage(this, damage);
 		}
+	}
 }
 
 void Player::RangeAttack()

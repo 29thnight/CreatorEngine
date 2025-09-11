@@ -16,8 +16,10 @@ public:
 	friend class DLLCore::Singleton<UIManager>;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
 	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
+
 	void AddCanvas(std::shared_ptr<GameObject> canvas);
 	void DeleteCanvas(const std::shared_ptr<GameObject>& canvas);
+
 	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 },GameObject* canvas = nullptr);
@@ -28,7 +30,6 @@ public:
 	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
-	void DeleteCanvas(std::string canvasName);
 	void CheckInput();
 
 	GameObject* FindCanvasName(std::string_view name);
