@@ -2,13 +2,14 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Canvas.h"
-#include "ImageComponent.h"	
+#include "ImageComponent.h"
 #include "UIButton.h"
 #include "InputManager.h"
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include "../RenderEngine/DeviceState.h"
+#include <algorithm>
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
@@ -325,34 +326,38 @@ std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, co
 	return newSpriteSheet;
 }
 
-void UIManager::DeleteCanvas(std::string canvasName)
+void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
 {
-	auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& canvas) 
-	{
-		auto c = canvas.lock();
-		return c && c->ToString() == canvasName;
-	});
+        if (!canvas) return;
 
-	if (it != Canvases.end())
-	{
-		auto curCanvasObj = (*it).lock();
-		auto canvasCom = curCanvasObj->GetComponent<Canvas>();
-		for (auto& uiObj : canvasCom->UIObjs)
-		{
-			auto uiObjPtr = uiObj.lock();
-			if (uiObjPtr)
-				uiObjPtr->Destroy();
-		}
-		canvasCom->UIObjs.clear();
+        auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& c)
+        {
+                return !c.expired() && c.lock() == canvas;
+        });
 
-		std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas)
-			{
-				auto c = canvas.lock();
-				return !c || c->ToString() == canvasName;
-			});
+        if (it != Canvases.end())
+        {
+                auto canvasCom = canvas->GetComponent<Canvas>();
+                for (auto& uiObj : canvasCom->UIObjs)
+                {
+                        if (auto uiObjPtr = uiObj.lock())
+                                uiObjPtr->Destroy();
+                }
+                canvasCom->UIObjs.clear();
 
-		curCanvasObj->Destroy();
-	}
+                std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& c)
+                        {
+                                return c.expired() || c.lock() == canvas;
+                        });
+
+                std::erase_if(CanvasMap, [&](auto& pair)
+                        {
+                                auto sp = pair.second.lock();
+                                return !sp || sp == canvas;
+                        });
+
+                canvas->Destroy();
+        }
 }
 
 void UIManager::CheckInput()
