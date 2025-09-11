@@ -1,14 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Entity.h"
-#include "ItemType.h"
-#include "EntityResource.generated.h"
-class EntityResource : public Entity
+#include "EntitySpiritStone.generated.h"
+
+class EntitySpiritStone : public Entity
 {
 public:
-   ReflectEntityResource
-	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(EntityResource)
+   ReflectEntitySpiritStone
+	[[ScriptReflectionField(Inheritance:Entity)]]
+	MODULE_BEHAVIOR_BODY(EntitySpiritStone)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -23,10 +23,6 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void SendDamage(Entity* sender, int damage) override;
-
 	[[Property]]
-	int  itemCode = 0;
-	[[Property]]
-	EItemType itemType = EItemType::Mushroom;
+	int m_stoneReward = 0;
 };
