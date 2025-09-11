@@ -66,10 +66,17 @@ void Weapon::SetEnabled(bool able)
 	}
 }
 
+
+
+
+
 bool Weapon::CheckDur()
 {
 	if (itemType == ItemType::Basic) return false; 
+
+
 	curDur -= durUseAtk;
+
 	if (curDur <= 0)
 	{
 		isBreak = true;

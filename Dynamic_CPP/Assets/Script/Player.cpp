@@ -629,6 +629,7 @@ void Player::DeleteCurWeapon()
 		m_weaponInventory.erase(it); 
 	}
 }
+
 void Player::FindNearObject(GameObject* gameObject)
 {
 	if (gameObject->GetComponent<EntityItem>() == nullptr) return;
@@ -732,7 +733,7 @@ void Player::MeleeAttack()
 
 		int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
 
-		float angle = XMConvertToRadians(15.0f);
+		constexpr float angle = XMConvertToRadians(15.0f);
 		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
 		leftDir.Normalize();
 		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));

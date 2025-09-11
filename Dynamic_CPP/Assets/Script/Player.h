@@ -203,7 +203,7 @@ public:
 	void EndAttack();
 	bool startRay = false;
 
-	float calculDamge(bool isCharge = false,int _chargeCount);
+	float calculDamge(bool isCharge = false,int _chargeCount = 0);
 
 
 
