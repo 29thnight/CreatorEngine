@@ -3,7 +3,7 @@
 #include "DebugLog.h"
 bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
-	LOG("IsAtteck ConditionCheck: Checking if entity is in attack range.");
+	//LOG("IsAtteck ConditionCheck: Checking if entity is in attack range.");
 
 	//this based target logic
 	bool isTarget = blackBoard.HasKey("Target");
@@ -30,13 +30,13 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (!useAttack)
 	{
-		LOG("Not found AtkRange None used Attack Entity : " + m_owner->GetHashedName().ToString());
+		//LOG("Not found AtkRange None used Attack Entity : " + m_owner->GetHashedName().ToString());
 		return false; // No attack range defined, cannot attack
 	}
 
 	if (!isTarget)
 	{
-		LOG("IsAtteck ConditionCheck: No target found.");
+		//LOG("IsAtteck ConditionCheck: No target found.");
 		return false; // No target to attack
 	}
 
@@ -51,7 +51,7 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (dir.Length() < atkRange)
 	{
-		LOG("IsAtteck ConditionCheck: Entity is within attack range.");
+		//LOG("IsAtteck ConditionCheck: Entity is within attack range.");
 		return true; // Entity is within attack range, condition met
 	}
 
@@ -123,6 +123,6 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 dir = asispos - pos;*/
 		
-	LOG("IsAtteck ConditionCheck: Entity is out of attack range.");
+	//LOG("IsAtteck ConditionCheck: Entity is out of attack range.");
 	return false;
 }

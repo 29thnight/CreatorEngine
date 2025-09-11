@@ -102,43 +102,44 @@ void EntityItem::Update(float tick)
 		}
 	}*/
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	if (abs(pos.y) <= 0.013f)
+	if (abs(pos.y) <= 0.05f)
 	{
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+		rigid->UseGravity(false);
 	}
-	if (m_state == EItemState::CATCHED)
-	{
-		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-		//여기서 아이템을 플레이어 손위에 가게하기?
-		if (asisTail != nullptr)
-		{
-			Transform* tailTransform = asisTail->GetComponent<Transform>();
-			if (tailTransform)
-			{
-				Vector3 tailPos = tailTransform->GetWorldPosition();
-				Vector3 ownerPos = GetOwner()->m_transform.GetWorldPosition();
+	//if (m_state == EItemState::CATCHED)
+	//{
+	//	auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+	//	rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+	//	rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+	//	//여기서 아이템을 플레이어 손위에 가게하기?
+	//	if (asisTail != nullptr)
+	//	{
+	//		Transform* tailTransform = asisTail->GetComponent<Transform>();
+	//		if (tailTransform)
+	//		{
+	//			Vector3 tailPos = tailTransform->GetWorldPosition();
+	//			Vector3 ownerPos = GetOwner()->m_transform.GetWorldPosition();
 
-				// XZ 평면 거리 계산
-				float dx = tailPos.x - ownerPos.x;
-				float dz = tailPos.z - ownerPos.z;
-				if (abs(dx) < indicatorDistacne && abs(dz) < indicatorDistacne)
-				{
-					isTargettingTail = true;
-					//인디케이터 출력? 플레이어가출력?
-					//LOG("On indicator ");
-					
-				}
-				else
-				{
-					isTargettingTail = false;
-				}
-			}
-		}
-	}
+	//			// XZ 평면 거리 계산
+	//			float dx = tailPos.x - ownerPos.x;
+	//			float dz = tailPos.z - ownerPos.z;
+	//			if (abs(dx) < indicatorDistacne && abs(dz) < indicatorDistacne)
+	//			{
+	//				isTargettingTail = true;
+	//				//인디케이터 출력? 플레이어가출력?
+	//				//std::cout << "On indicator " << std::endl;
+	//				
+	//			}
+	//			else
+	//			{
+	//				isTargettingTail = false;
+	//			}
+	//		}
+	//	}
+	//}
 
 	if (m_state == EItemState::THROWN)
 	{
@@ -267,8 +268,19 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)
 	endPos = startPos + offset;
 	endPos.y = 0.2f;
 }
-void EntityItem::Throw(Mathf::Vector3 ownerForward,Mathf::Vector2 distance)
+void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2 distance,bool indicate)
 {
+	isTargettingTail = false;
+	if (indicate)
+	{
+		auto GMobj = GameObject::Find("GameManager");
+		GameManager* GM = GMobj->GetComponent<GameManager>();
+		auto& asis = GM->GetAsis()[0];
+		asisTail = asis->GetOwner();  //일단 아시스 위치로 테스트
+		isTargettingTail = true;
+		
+	}
+	throwOwner = player;
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::THROWN;
 	timer = 0.f;
@@ -281,9 +293,9 @@ void EntityItem::Throw(Mathf::Vector3 ownerForward,Mathf::Vector2 distance)
 void EntityItem::SetThrowOwner(Player* player)
 {
 	throwOwner = player;
-	asisTail = GameObject::Find("AsisTail");
-	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-	m_state = EItemState::CATCHED;
+	//asisTail = GameObject::Find("AsisTail");
+	//startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+	//m_state = EItemState::CATCHED;
 	
 	/*auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
 		auto pos = GetOwner()->m_transform.GetWorldPosition();

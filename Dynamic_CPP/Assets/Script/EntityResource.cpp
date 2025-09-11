@@ -7,6 +7,7 @@
 #include "SceneManager.h"
 #include "EffectComponent.h"
 #include "DebugLog.h"
+#include "PrefabUtility.h"
 void EntityResource::Start()
 {
 }
@@ -38,7 +39,7 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 					item->GetOwner()->m_transform.SetPosition(spawnPos);
 					item->GetComponent<RigidBodyComponent>().AddForce({ 0.f, 300.f, 300.f }, EForceMode::IMPULSE);
 				}*/
-				int tempidx = 0;
+				/*int tempidx = 0;   //리소스풀쓸때
 				for (auto& resource : resources)
 				{
 					auto item = dynamic_cast<EntityItem*>(resource);
@@ -52,7 +53,30 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 						break;
 					}
 					tempidx++;
+				}*/
+				Prefab* itemPrefab;
+				if (itemCode == 0)
+				{
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom");
 				}
+				else if (itemCode == 1)
+				{
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMineral");
+				}
+				else
+				{
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFruit");
+				}
+				
+				if (itemPrefab)
+				{
+					GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
+					Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+					spawnPos.y += 3.f;
+					itemObj->m_transform.SetPosition(spawnPos);
+					itemObj->GetComponent<RigidBodyComponent>()->AddForce({ 0.f, 30.f, 300.f }, EForceMode::IMPULSE);
+				}
+
 				GetOwner()->Destroy();
 				auto pung = GameObject::Find("Pung2");
 				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();

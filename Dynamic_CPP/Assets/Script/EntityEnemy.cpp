@@ -157,7 +157,6 @@ void EntityEnemy::Update(float tick)
 		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
 		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
-
 	if (attackCount > 0) {
 		m_animator->SetParameter("Attack", true);
 		attackCount = 0;

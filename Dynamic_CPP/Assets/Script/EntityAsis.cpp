@@ -9,6 +9,7 @@
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
 
+#include "Animator.h"
 #include "Player.h"
 #include "PrefabUtility.h"
 #include "GameManager.h"
@@ -74,6 +75,27 @@ void EntityAsis::Start()
 			m_fakeItemQueue.push_back(object);
 		}
 	}*/
+
+
+	auto childred = GetOwner()->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
+
+		if (animator)
+		{
+			m_animator = animator;
+			break;
+		}
+
+	}
+	if (!m_animator)
+	{
+		m_animator = GetOwner()->GetComponent<Animator>();
+	}
+
+
+
 
 
 
@@ -148,6 +170,8 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
+
+	m_animator->SetParameter("OnMove", true);
 	if (asisTail) {
 		Debug->Log(asisTail->m_name.data());
 	}

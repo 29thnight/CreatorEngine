@@ -7,7 +7,7 @@ bool IsDaed::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	
 	if (!HasIdentity)
 	{
-		LOG("IsDaed ConditionCheck: No Identity key found in blackboard.");
+		//LOG("IsDaed ConditionCheck: No Identity key found in blackboard.");
 		return false; // No Identity key, cannot determine if it's a dead entity
 	}
 
@@ -22,10 +22,10 @@ bool IsDaed::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		}
 		else 
 		{
-			LOG("IsDaed ConditionCheck: Entity is alive, HP: " << hp);
+			//LOG("IsDaed ConditionCheck: Entity is alive, HP: " << hp);
 			return false; // Entity is alive
 		}
 	}
-	LOG("IsDaed ConditionCheck: Entity is not dead, HP: " << blackBoard.GetValueAsInt("HP"));
+	//LOG("IsDaed ConditionCheck: Entity is not dead, HP: " << blackBoard.GetValueAsInt("HP"));
 	return false;
 }
