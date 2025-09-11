@@ -3,6 +3,19 @@
 #include "ParticleModule.h"
 #include "ISerializable.h"
 
+enum class TrailOrientation
+{
+    HORIZONTAL = 0,  // 가로 방향
+    VERTICAL = 1,    // 세로 방향
+    CUSTOM = 2,      // 사용자 지정 방향
+};
+
+enum class TrailRenderMode
+{
+    RIBBON = 0,     // 기존 리본 형태 (2D)
+    TUBE = 1        // 원통형 (3D)
+};
+
 struct TrailVertex
 {
     Mathf::Vector3 position;
@@ -33,6 +46,8 @@ public:
 
     void AddPoint(const Mathf::Vector3& position, float width = 1.0f, const Mathf::Vector4& color = Mathf::Vector4(1, 1, 1, 1));
     void GenerateMesh();
+    void GenerateRibbonMesh();
+    void GenerateTubeMesh();
     void Clear();
 
     void SetTrailLifetime(float lifetime) { m_trailLifetime = lifetime; }
@@ -82,6 +97,21 @@ public:
 
     void RemoveOldPoints(float maxAge = -1.0f);
     
+    void SetOrientation(TrailOrientation orientation) { m_orientation = orientation; m_meshDirty = true; }
+    TrailOrientation GetOrientation() const { return m_orientation; }
+
+    void SetCustomUpVector(const Mathf::Vector3& up) { m_customUpVector = up; m_meshDirty = true; }
+    Mathf::Vector3 GetCustomUpVector() const { return m_customUpVector; }
+
+    Mathf::Vector3 CalculateForwardVector(size_t index) const;
+    Mathf::Vector3 CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position) const;
+    Mathf::Vector3 CalculateNormalVector(const Mathf::Vector3& forward, const Mathf::Vector3& right) const;
+    Mathf::Vector3 GetTubeUpVector(const Mathf::Vector3& forward) const;
+
+    void SetRenderMode(TrailRenderMode mode) { m_renderMode = mode; m_meshDirty = true; }
+    TrailRenderMode GetRenderMode() const { return m_renderMode; }
+    void SetTubeSegments(int segments) { m_tubeSegments = segments; m_meshDirty = true; }
+    int GetTubeSegments() const { return m_tubeSegments; }
 
     const std::vector<TrailPoint>& GetTrailPoints() const { return m_trailPoints; }
     const std::vector<TrailVertex>& GetVertices() const { return m_vertices; }
@@ -132,4 +162,11 @@ private:
     bool m_autoGenerateFromPosition;
     float m_autoAddInterval;
     float m_lastAutoAddTime;
+
+    TrailOrientation m_orientation = TrailOrientation::HORIZONTAL;
+
+    Mathf::Vector3 m_customUpVector = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+
+    TrailRenderMode m_renderMode = TrailRenderMode::RIBBON;
+    int m_tubeSegments = 8;
 };

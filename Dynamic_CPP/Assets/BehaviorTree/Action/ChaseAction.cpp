@@ -2,9 +2,26 @@
 #include "pch.h"
 #include "EntityEnemy.h"
 #include "Animator.h"
-#include "DebugLog.h"
+#include "EntityMonsterA.h"
+#include "CharacterControllerComponent.h"
+
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+	bool hasIdentity = blackBoard.HasKey("Identity");
+	std::string identity = "";
+	if (hasIdentity)
+	{
+		identity = blackBoard.GetValueAsString("Identity");
+	}
+
+	if (identity == "MonsterNomal")
+	{
+		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
+		script->ChaseTarget();
+		return NodeStatus::Success;
+	}
+
+
 	bool isSpeed = blackBoard.HasKey("Speed");
 	bool HasState = blackBoard.HasKey("State");
 
@@ -23,7 +40,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 			targetpos = closedTransform->GetWorldPosition();
 		}
 		else {
-			//LOG("ChaseAction: ClosedTarget Transform not found.");
+			//std::cout << "ChaseAction: ClosedTarget Transform not found." << std::endl;
 			return NodeStatus::Failure; // Handle case where closedTarget Transform is not found
 		}
 	}
@@ -35,7 +52,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 	}
 	else {
-		LOG("not found Speed don`t move";
+		std::cout << "not found Speed don`t move";
 	}*/
 	bool useChase = blackBoard.HasKey("ChaseRange");
 	bool useChaseOutTime = blackBoard.HasKey("ChaseOutTime");
@@ -81,19 +98,19 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 			if (movement) {
 				movement->Move(dir2D);
 				enemy->m_animator->SetParameter("Move", true);
-				//LOG("ChaseAction executed. Moving towards target.");
+				//std::cout << "ChaseAction executed. Moving towards target." << std::endl;
 				if (HasState)
 				{
 					std::string state = blackBoard.GetValueAsString("State");
 					if (state == "Chase")
 					{
-						//LOG("Chase action already in progress.");
+						//std::cout << "Chase action already in progress." << std::endl;
 						//return NodeStatus::Running; // Continue running if already in chase state
 					}
 					else
 					{
 						blackBoard.SetValueAsString("State", "Chase");
-						//LOG("Switching to Move state.");
+						//std::cout << "Switching to Move state." << std::endl;
 					}
 				}
 			}
@@ -104,7 +121,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 	//setting Target
 	if (closedTarget)
 	{
-		//LOG("ChaseAction: Setting Target to " << closedTarget->ToString());
+		//std::cout << "ChaseAction: Setting Target to " << closedTarget->ToString() << std::endl;
 		blackBoard.SetValueAsGameObject("Target", closedTarget->ToString());
 	}
 

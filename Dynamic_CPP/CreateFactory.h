@@ -8,6 +8,7 @@
 #include "EntitySpiritStone.h"
 #include "UIGageTest.h"
 #include "EntitlyRock.h"
+#include "EntityMonsterA.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"
 #include "Bomb.h"

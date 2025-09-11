@@ -106,7 +106,7 @@
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 3,
                             "depthPreset": 2,
                             "rasterizerPreset": 2
                         },

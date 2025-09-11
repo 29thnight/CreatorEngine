@@ -6,11 +6,11 @@ NodeStatus BTEntityInitAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	//initialize the Behavior Tree Entity
 	
-	bool useDead = blackBoard.HasKey("HP");
+	bool useDead = blackBoard.HasKey("MaxHP");
 	if (useDead)
 	{
 		//set the current HP to the initial HP
-		int hp = blackBoard.GetValueAsInt("HP");
+		int hp = blackBoard.GetValueAsInt("MaxHP");
 		blackBoard.SetValueAsInt("CurrHP", hp);
 	}
 

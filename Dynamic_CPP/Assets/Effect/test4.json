@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
-    "name": "test3",
+    "name": "test4",
     "particleSystems": [
         {
             "isRunning": true,
@@ -30,8 +30,8 @@
                             "minVerticalVelocity": 0.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 0.10000000149011612,
-                                "y": 0.10000000149011612
+                                "x": 0.30000001192092896,
+                                "y": 0.30000001192092896
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -97,14 +97,14 @@
                         },
                         "spriteAnimation": {
                             "animationDuration": 1.0,
-                            "frameCount": 9,
-                            "gridColumns": 3,
-                            "gridRows": 3
+                            "frameCount": 4,
+                            "gridColumns": 2,
+                            "gridRows": 2
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Smoke1_White_Sheet",
+                                "name": "Smoke3_White_Sheet",
                                 "slot": 0
                             }
                         ],
