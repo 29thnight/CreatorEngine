@@ -145,8 +145,10 @@ void AnimationController::UpdateState()
 		endAnimation = false;
 		if (needBlend == true)
 		{
-			if (m_curState && m_curState->behaviour)
+			if (m_curState->behaviour != nullptr)
 				m_curState->behaviour->Exit();
+			if (m_nextState->behaviour != nullptr)
+				m_nextState->behaviour->Enter();
 			m_curState = m_nextState;
 			m_nextState = nullptr;
 			m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
@@ -157,10 +159,10 @@ void AnimationController::UpdateState()
 			preNextAnimationProgress = 0.f;
 			m_timeElapsed = m_nextTimeElapsed;
 			m_nextTimeElapsed = 0.f;
-			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
+			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; 
 
-			if (m_curState && m_curState->behaviour)
-				m_curState->behaviour->Enter();
+			/*if (m_curState && m_curState->behaviour)
+				m_curState->behaviour->Enter();*/
 			m_owner->nextAnimIndex = -1;
 			m_owner->m_isBlend = false;
 			m_isBlend = false;

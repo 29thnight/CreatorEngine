@@ -1,13 +1,13 @@
 {
     "currentTime": 0.0,
-    "duration": -1.0,
+    "duration": 1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": true,
+    "loop": false,
     "name": "test3",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -25,13 +25,13 @@
                                 "z": 1.0
                             },
                             "horizontalVelocityRange": 0.0,
-                            "lifeTime": 10.0,
+                            "lifeTime": 1.0,
                             "maxVerticalVelocity": 0.0,
                             "minVerticalVelocity": 0.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612
                             },
                             "velocity": {
                                 "x": 0.0,

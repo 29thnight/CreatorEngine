@@ -276,7 +276,7 @@ struct CharacterControllerInfo
 	float radius = 0.55f;	//반지름
 	float stepOffset = 0.001f;	//오를 수 있는 계단 높이 (코사인)
 	float slopeLimit = 0.7f;	//오를 수 있는 최대 경사각
-	float contactOffset = 0.001f;	//충돌 감지를 위한 여유 거리
+	float contactOffset = 0.1f;	//충돌 감지를 위한 여유 거리
 };
 
 struct CharactorControllerInputInfo {

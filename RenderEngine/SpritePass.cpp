@@ -140,6 +140,10 @@ void SpritePass::ControlPanel()
 {
 }
 
+void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+{
+}
+
 void SpritePass::Resize(uint32_t width, uint32_t height)
 {
 }

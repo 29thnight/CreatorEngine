@@ -20,10 +20,10 @@
 #include "TagManager.h"
 #include "UIManager.h"
 #include "RectTransformComponent.h"
+#include "SpriteSheetComponent.h"
 #include <execution>
 #include <queue>
 #include <algorithm>
-#include <queue>
 
 #include "Profiler.h"
 Scene::Scene()
@@ -544,6 +544,7 @@ void Scene::LateUpdate(float deltaSecond)
 	std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+	std::vector<SpriteSheetComponent*> spriteSheetComponents = UIManagers->SpriteSheets;
 	std::vector<DecalComponent*> decalComponents = m_decalComponents;
 
 	for (auto camera : CameraManagement->GetCameras())
@@ -624,8 +625,24 @@ void Scene::LateUpdate(float deltaSecond)
                 if (scene && (scene == this ||
                     (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
                 {
-                        data->PushUIRenderData(text->GetInstanceID());
+                    data->PushUIRenderData(text->GetInstanceID());
                 }
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& spriteSheet : spriteSheetComponents)
+			{
+				if (false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
+				auto owner = spriteSheet->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+				if (scene && (scene == this ||
+					(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+				{
+					data->PushUIRenderData(spriteSheet->GetInstanceID());
+				}
 			}
 		});
 

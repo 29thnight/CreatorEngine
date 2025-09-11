@@ -136,6 +136,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> UITextures;
+	std::unordered_map<std::string, std::shared_ptr<Texture>> SpriteSheets;
 	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 

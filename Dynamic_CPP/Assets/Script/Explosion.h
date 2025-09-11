@@ -1,10 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "Explosion.generated.h"
 
+class Player;
 class Explosion : public ModuleBehavior
 {
 public:
+   ReflectExplosion
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Explosion)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -19,4 +23,12 @@ public:
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
+
+	void Init(Player* _owner);
+	Player* m_ownerPlayer = nullptr;
+	bool endAttack = false;
+
+	
+	[[Property]]
+	float explosionRadius = 3.0f; //범위공격 반경
 };

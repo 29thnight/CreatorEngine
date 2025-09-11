@@ -60,18 +60,17 @@ void TrailGenerateModule::Update(float delta)
 
     m_currentTime += delta;
 
+    // 자동 생성 로직
     if (m_autoGenerateFromPosition)
     {
         bool shouldAdd = false;
 
-        // 첫 번째 포인트이거나 시간 간격 조건을 만족하는 경우
         if (m_trailPoints.empty())
         {
             shouldAdd = true;
         }
         else if ((m_currentTime - m_lastAutoAddTime) >= m_autoAddInterval)
         {
-            // 위치가 충분히 변했는지 확인
             Mathf::Vector3 currentPos = m_position + m_positionOffset;
             if (Mathf::Vector3::Distance(currentPos, m_lastPosition) >= m_minDistance)
             {
@@ -88,19 +87,30 @@ void TrailGenerateModule::Update(float delta)
         }
     }
 
-    // 수명 관리 로직에서 역순으로 제거
-    for (int i = static_cast<int>(m_trailPoints.size()) - 1; i >= 0; --i)
+    // 수명 관리 - 순차적 제거로 변경 (앞쪽부터)
+    bool pointsRemoved = false;
+    while (!m_trailPoints.empty())
     {
-        float age = m_currentTime - m_trailPoints[i].timestamp;
+        float age = m_currentTime - m_trailPoints[0].timestamp;
 
-        // 수명이 완전히 끝난 것만 삭제 (여유시간 추가)
-        if (age > m_trailLifetime * 1.2f)  // 0.5초 여유시간
+        // 수명이 다한 포인트를 앞에서부터 순차 제거
+        if (age > m_trailLifetime * 1.1f)
         {
-            m_trailPoints.erase(m_trailPoints.begin() + i);
-            m_meshDirty = true;
+            m_trailPoints.erase(m_trailPoints.begin());
+            pointsRemoved = true;
+        }
+        else
+        {
+            break; // 첫 번째가 살아있으면 나머지도 살아있음
         }
     }
 
+    if (pointsRemoved)
+    {
+        m_meshDirty = true;
+    }
+
+    // 이징 효과 적용
     if (m_useEasing && !m_trailPoints.empty())
     {
         float normalizedTime = fmod(m_currentTime, m_easingDuration) / m_easingDuration;
@@ -110,12 +120,18 @@ void TrailGenerateModule::Update(float delta)
         {
             float age = m_currentTime - point.timestamp;
             float lifeRatio = 1.0f - (age / m_trailLifetime);
-            point.width *= (1.0f + easedValue * 0.2f);
-            point.color.w *= lifeRatio;
+
+            // 이징 효과 적용
+            float easingEffect = 1.0f + easedValue * 0.2f;
+            point.width *= easingEffect;
+
+            // 수명에 따른 투명도 조절
+            point.color.w *= std::max(0.0f, lifeRatio);
         }
         m_meshDirty = true;
     }
 
+    // 메쉬 업데이트
     if (m_meshDirty && m_trailPoints.size() >= 2)
     {
         GenerateMesh();
@@ -165,6 +181,22 @@ void TrailGenerateModule::GenerateMesh()
     m_vertices.clear();
     m_indices.clear();
 
+    if (m_renderMode == TrailRenderMode::RIBBON)
+    {
+        GenerateRibbonMesh();
+    }
+    else if (m_renderMode == TrailRenderMode::TUBE)
+    {
+        GenerateTubeMesh();
+    }
+
+    UpdateBuffers();
+    m_vertexCount = static_cast<UINT>(m_vertices.size());
+    m_indexCount = static_cast<UINT>(m_indices.size());
+}
+
+void TrailGenerateModule::GenerateRibbonMesh()
+{
     for (size_t i = 0; i < m_trailPoints.size(); ++i)
     {
         const TrailPoint& point = m_trailPoints[i];
@@ -175,57 +207,39 @@ void TrailGenerateModule::GenerateMesh()
             float age = m_currentTime - point.timestamp;
             lifeRatio = 1.0f - (age / m_trailLifetime);
             lifeRatio = std::max(0.0f, std::min(1.0f, lifeRatio));
+
+            // 끝부분에서 더 빠르게 페이드아웃
+            if (lifeRatio < 0.3f)
+            {
+                float fadeRatio = lifeRatio / 0.3f;
+                lifeRatio = fadeRatio * fadeRatio;
+            }
         }
 
         float width = Mathf::Lerp(m_endWidth, m_startWidth, lifeRatio) * point.width;
         Mathf::Vector4 color = Mathf::Vector4::Lerp(m_endColor, m_startColor, lifeRatio);
         color = Mathf::Vector4::Lerp(color, point.color, 0.5f);
 
-        // Forward 벡터 계산
-        Mathf::Vector3 forward = Mathf::Vector3::Zero;
-        if (i == 0 && m_trailPoints.size() > 1)
-        {
-            forward = m_trailPoints[i + 1].position - point.position;
-        }
-        else if (i == m_trailPoints.size() - 1)
-        {
-            forward = point.position - m_trailPoints[i - 1].position;
-        }
-        else
-        {
-            Mathf::Vector3 toNext = m_trailPoints[i + 1].position - point.position;
-            Mathf::Vector3 fromPrev = point.position - m_trailPoints[i - 1].position;
-            forward = (toNext + fromPrev) * 0.5f;
-        }
+        // 투명도 추가 조정으로 부드러운 페이드
+        color.w *= lifeRatio;
 
-        if (forward.Length() < 0.001f)
-        {
-            forward = Mathf::Vector3(0.0f, 0.0f, 1.0f);
-        }
-        else
-        {
-            forward.Normalize();
-        }
-
-        m_lastUpVector = CalculateUpVector(forward, m_lastUpVector);
-        Mathf::Vector3 right;
-        forward.Cross(m_lastUpVector, right);
-        right.Normalize();
+        Mathf::Vector3 forward = CalculateForwardVector(i);
+        Mathf::Vector3 right = CalculateRightVector(forward, point.position);
         right *= width * 0.5f;
 
-        // 수명 기반 U 좌표 사용
-        float u = lifeRatio;
+        // UV 좌표 개선 - 포인트 인덱스 기반
+        float u = (m_trailPoints.size() > 1) ? (float(i) / float(m_trailPoints.size() - 1)) : 0.0f;
 
         TrailVertex leftVertex, rightVertex;
         leftVertex.position = point.position - right;
         leftVertex.texcoord = Mathf::Vector2(u, 0.0f);
         leftVertex.color = color;
-        leftVertex.normal = m_lastUpVector;
+        leftVertex.normal = CalculateNormalVector(forward, right);
 
         rightVertex.position = point.position + right;
         rightVertex.texcoord = Mathf::Vector2(u, 1.0f);
         rightVertex.color = color;
-        rightVertex.normal = m_lastUpVector;
+        rightVertex.normal = leftVertex.normal;
 
         m_vertices.push_back(leftVertex);
         m_vertices.push_back(rightVertex);
@@ -235,20 +249,113 @@ void TrailGenerateModule::GenerateMesh()
         {
             UINT baseIndex = static_cast<UINT>((i - 1) * 2);
 
+            // 첫 번째 삼각형
             m_indices.push_back(baseIndex);
             m_indices.push_back(baseIndex + 2);
             m_indices.push_back(baseIndex + 1);
 
+            // 두 번째 삼각형
             m_indices.push_back(baseIndex + 1);
             m_indices.push_back(baseIndex + 2);
             m_indices.push_back(baseIndex + 3);
         }
     }
+}
 
-    UpdateBuffers();
+void TrailGenerateModule::GenerateTubeMesh()
+{
+    for (size_t i = 0; i < m_trailPoints.size(); ++i)
+    {
+        const TrailPoint& point = m_trailPoints[i];
 
-    m_vertexCount = static_cast<UINT>(m_vertices.size());
-    m_indexCount = static_cast<UINT>(m_indices.size());
+        float lifeRatio = 1.0f;
+        if (m_trailLifetime > 0.0f)
+        {
+            float age = m_currentTime - point.timestamp;
+            lifeRatio = 1.0f - (age / m_trailLifetime);
+            lifeRatio = std::max(0.0f, std::min(1.0f, lifeRatio));
+
+            // 끝부분에서 더 빠르게 페이드아웃
+            if (lifeRatio < 0.3f)
+            {
+                float fadeRatio = lifeRatio / 0.3f;
+                lifeRatio = fadeRatio * fadeRatio;
+            }
+        }
+
+        float radius = (Mathf::Lerp(m_endWidth, m_startWidth, lifeRatio) * point.width) * 0.5f;
+        Mathf::Vector4 color = Mathf::Vector4::Lerp(m_endColor, m_startColor, lifeRatio);
+        color = Mathf::Vector4::Lerp(color, point.color, 0.5f);
+
+        // 투명도 추가 조정
+        color.w *= lifeRatio;
+
+        Mathf::Vector3 forward = CalculateForwardVector(i);
+        Mathf::Vector3 up = GetTubeUpVector(forward);
+        Mathf::Vector3 right = forward.Cross(up);
+        right.Normalize();
+        up = right.Cross(forward);
+        up.Normalize();
+
+        // UV 좌표 개선
+        float u = (m_trailPoints.size() > 1) ? (float(i) / float(m_trailPoints.size() - 1)) : 0.0f;
+
+        // 원 둘레에 정점들 생성
+        for (int seg = 0; seg < m_tubeSegments; ++seg)
+        {
+            float angle = (seg / float(m_tubeSegments)) * 6.28318530718f; // 2 * PI
+            float cosAngle = cosf(angle);
+            float sinAngle = sinf(angle);
+
+            Mathf::Vector3 offset = (right * cosAngle + up * sinAngle) * radius;
+            Mathf::Vector3 vertexPos = point.position + offset;
+
+            TrailVertex vertex;
+            vertex.position = vertexPos;
+            vertex.texcoord = Mathf::Vector2(u, seg / float(m_tubeSegments));
+            vertex.color = color;
+
+            // 법선 벡터는 중심에서 바깥쪽으로
+            vertex.normal = offset;
+            if (vertex.normal.Length() > 0.001f)
+            {
+                vertex.normal.Normalize();
+            }
+            else
+            {
+                vertex.normal = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+            }
+
+            m_vertices.push_back(vertex);
+        }
+
+        // 인덱스 생성 (이전 링과 현재 링을 연결)
+        if (i > 0)
+        {
+            UINT prevRingStart = static_cast<UINT>((i - 1) * m_tubeSegments);
+            UINT currRingStart = static_cast<UINT>(i * m_tubeSegments);
+
+            for (int seg = 0; seg < m_tubeSegments; ++seg)
+            {
+                int nextSeg = (seg + 1) % m_tubeSegments;
+
+                UINT prevCurr = prevRingStart + seg;
+                UINT prevNext = prevRingStart + nextSeg;
+                UINT currCurr = currRingStart + seg;
+                UINT currNext = currRingStart + nextSeg;
+
+                // 첫 번째 삼각형 (시계 반대 방향)
+                m_indices.push_back(prevCurr);
+                m_indices.push_back(currCurr);
+                m_indices.push_back(prevNext);
+
+                // 두 번째 삼각형 (시계 반대 방향)
+                m_indices.push_back(prevNext);
+                m_indices.push_back(currCurr);
+                m_indices.push_back(currNext);
+            }
+        }
+    }
 }
 
 // CalculateUpVector 함수 수정
@@ -348,6 +455,165 @@ void TrailGenerateModule::RemoveOldPoints(float maxAge)
             ++it;
         }
     }
+}
+
+Mathf::Vector3 TrailGenerateModule::CalculateForwardVector(size_t index) const
+{
+    Mathf::Vector3 forward = Mathf::Vector3::Zero;
+
+    if (index == 0 && m_trailPoints.size() > 1)
+    {
+        forward = m_trailPoints[index + 1].position - m_trailPoints[index].position;
+    }
+    else if (index == m_trailPoints.size() - 1)
+    {
+        forward = m_trailPoints[index].position - m_trailPoints[index - 1].position;
+    }
+    else
+    {
+        Mathf::Vector3 toNext = m_trailPoints[index + 1].position - m_trailPoints[index].position;
+        Mathf::Vector3 fromPrev = m_trailPoints[index].position - m_trailPoints[index - 1].position;
+        forward = (toNext + fromPrev) * 0.5f;
+    }
+
+    if (forward.Length() < 0.001f)
+    {
+        forward = Mathf::Vector3(0.0f, 0.0f, 1.0f);
+    }
+    else
+    {
+        forward.Normalize();
+    }
+
+    return forward;
+}
+
+Mathf::Vector3 TrailGenerateModule::CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position) const
+{
+    Mathf::Vector3 right;
+
+    switch (m_orientation)
+    {
+    case TrailOrientation::HORIZONTAL:
+    {
+        Mathf::Vector3 up = CalculateUpVector(forward, m_lastUpVector);
+        forward.Cross(up, right);
+        break;
+    }
+
+    case TrailOrientation::VERTICAL:
+    {
+        Mathf::Vector3 worldRight = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+        if (abs(forward.Dot(worldRight)) > 0.99f)
+        {
+            right = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            Mathf::Vector3 worldUp = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+            right = worldUp;
+        }
+        break;
+    }
+
+    case TrailOrientation::CUSTOM:
+    {
+        Mathf::Vector3 customUp = m_customUpVector;
+        customUp.Normalize();
+
+        // forward와 customUp이 평행한지 확인
+        if (abs(forward.Dot(customUp)) > 0.99f)
+        {
+            // 평행하면 fallback 벡터 사용
+            Mathf::Vector3 fallback = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+            if (abs(forward.Dot(fallback)) > 0.99f)
+            {
+                fallback = Mathf::Vector3(0.0f, 0.0f, 1.0f);
+            }
+            forward.Cross(fallback, right);
+        }
+        else
+        {
+            // forward와 customUp의 외적으로 right 계산
+            forward.Cross(customUp, right);
+        }
+        break;
+    }
+    }
+
+    if (right.Length() < 0.001f)
+    {
+        right = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        right.Normalize();
+    }
+    return right;
+}
+
+Mathf::Vector3 TrailGenerateModule::CalculateNormalVector(const Mathf::Vector3& forward, const Mathf::Vector3& right) const
+{
+    Mathf::Vector3 normal;
+
+    switch (m_orientation)
+    {
+    case TrailOrientation::HORIZONTAL:
+        normal = m_lastUpVector;
+        break;
+
+    case TrailOrientation::VERTICAL:
+        right.Cross(forward, normal);
+        break;
+
+    case TrailOrientation::CUSTOM:
+        // 커스텀 Up 벡터를 normal로 사용
+        normal = m_customUpVector;
+        normal.Normalize();
+        break;
+    }
+
+    if (normal.Length() < 0.001f)
+    {
+        normal = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+    }
+    else
+    {
+        normal.Normalize();
+    }
+    return normal;
+}
+
+Mathf::Vector3 TrailGenerateModule::GetTubeUpVector(const Mathf::Vector3& forward) const
+{
+    Mathf::Vector3 up;
+
+    if (m_orientation == TrailOrientation::CUSTOM)
+    {
+        up = m_customUpVector;
+    }
+    else
+    {
+        up = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+    }
+
+    // forward와 평행하지 않은지 확인
+    if (abs(forward.Dot(up)) > 0.99f)
+    {
+        up = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+        if (abs(forward.Dot(up)) > 0.99f)
+        {
+            up = Mathf::Vector3(0.0f, 0.0f, 1.0f);
+        }
+    }
+
+    // 올바른 up 벡터 계산
+    Mathf::Vector3 right = forward.Cross(up);
+    right.Normalize();
+    up = right.Cross(forward);
+    up.Normalize();
+
+    return up;
 }
 
 void TrailGenerateModule::UpdateBuffers()
@@ -464,6 +730,16 @@ nlohmann::json TrailGenerateModule::SerializeData() const
 {
     nlohmann::json json;
 
+    json["orientation"] = {
+       {"type", static_cast<int>(m_orientation)},
+       {"customUpVector", EffectSerializer::SerializeVector3(m_customUpVector)}
+    };
+
+    json["renderSettings"] = {
+        {"renderMode", static_cast<int>(m_renderMode)},
+        {"tubeSegments", m_tubeSegments}
+    };
+
     json["trailParams"] = {
         {"maxTrailPoints", m_maxTrailPoints},
         {"trailLifetime", m_trailLifetime},
@@ -496,6 +772,24 @@ void TrailGenerateModule::DeserializeData(const nlohmann::json& json)
 {
     try
     {
+        if (json.contains("orientation"))
+        {
+            const auto& orientation = json["orientation"];
+            if (orientation.contains("type"))
+                m_orientation = static_cast<TrailOrientation>(orientation["type"]);
+            if (orientation.contains("customUpVector"))
+                m_customUpVector = EffectSerializer::DeserializeVector3(orientation["customUpVector"]);
+        }
+
+        if (json.contains("renderSettings"))
+        {
+            const auto& renderSettings = json["renderSettings"];
+            if (renderSettings.contains("renderMode"))
+                m_renderMode = static_cast<TrailRenderMode>(renderSettings["renderMode"]);
+            if (renderSettings.contains("tubeSegments"))
+                m_tubeSegments = renderSettings["tubeSegments"];
+        }
+
         if (json.contains("trailParams"))
         {
             const auto& trailParams = json["trailParams"];

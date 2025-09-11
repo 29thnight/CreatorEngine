@@ -4,6 +4,8 @@
 #include "RenderScene.h"
 #include "Texture.h"
 #include "ShaderSystem.h"
+#include "SpriteSheet.h"
+#include "SpriteSheetComponent.h"
 #include <DirectXTK/SpriteFont.h>
 #include <algorithm>
 
@@ -109,6 +111,38 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     m_instancedID   = text->GetInstanceID();
 }
 
+UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
+{
+    SpriteSheetData data{};
+    m_texture               = sprite->m_spriteSheetTexture;
+    m_spriteSheet           = std::make_shared<SpriteSheet>();
+	data.spriteSheetPath    = sprite->m_spriteSheetPath;
+    data.origin             = { sprite->uiinfo.size.x * 0.5f, sprite->uiinfo.size.y * 0.5f };
+    data.position           = sprite->pos;
+    data.scale              = sprite->scale;
+    data.layerOrder         = sprite->GetLayerOrder();
+    m_sequenceState.loop    = sprite->m_isLoop;
+	data.frameDuration      = sprite->m_frameDuration;
+
+    if (m_texture && !data.spriteSheetPath.empty())
+    {
+        try
+        {
+		    file::path path = PathFinder::Relative("SpriteSheets\\") / 
+                file::path(data.spriteSheetPath).filename().replace_extension(".txt");
+
+            m_spriteSheet->Load(m_texture->m_pSRV, path.c_str());
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "Failed to load sprite sheet from path: " << data.spriteSheetPath << "\nError: " << e.what() << std::endl;
+		}
+    }
+
+    m_data                  = data;
+	m_instancedID           = sprite->GetInstanceID();
+}
+
 UIRenderProxy::~UIRenderProxy()
 {
     std::visit(
@@ -125,8 +159,15 @@ UIRenderProxy::~UIRenderProxy()
                 info.font = nullptr;
                 info.message.clear();
             }
+            else if constexpr (std::is_same_v<T, SpriteSheetData>)
+            {
+                info.spriteSheetPath.clear();
+			}
         },
         m_data);
+
+    m_spriteSheet.reset();
+	m_texture.reset();
 }
 
 void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) const
@@ -187,6 +228,26 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         static_cast<float>(info.layerOrder) / MaxOreder);
                 }
             }
+            else if constexpr (std::is_same_v<T, SpriteSheetData>)
+            {
+                if (m_texture && m_spriteSheet)
+                {
+                    DirectX::XMFLOAT2 pos{ info.position.x, info.position.y };
+                    auto size = m_texture->GetImageSize();
+					float deltaTime = info.isPreview ? Time->GetElapsedSeconds() : info.deltaTime;
+                    m_spriteSheet->DrawSequential(spriteBatch.get(),
+                        pos,
+                        deltaTime,
+						info.frameDuration,
+                        m_sequenceState,
+                        DirectX::Colors::White,
+                        0.f,
+                        1.f,
+                        DirectX::SpriteEffects_None,
+						static_cast<float>(info.layerOrder) / MaxOreder
+                    );
+                }
+			}
         },
         m_data);
 }

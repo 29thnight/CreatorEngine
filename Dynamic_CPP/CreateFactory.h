@@ -3,7 +3,9 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EntitySpiritStone.h"
 #include "UIGageTest.h"
+#include "EntitlyRock.h"
 #include "EntityMonsterA.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"

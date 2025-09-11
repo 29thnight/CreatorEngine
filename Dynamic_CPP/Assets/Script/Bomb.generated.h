@@ -1,7 +1,7 @@
 #pragma once
 
 #define ReflectBomb \
-ReflectionScriptFieldInheritance(Bomb, Weapon) \
+ReflectionScriptField(Bomb) \
 { \
 	PropertyField \
 	({ \
@@ -9,5 +9,5 @@ ReflectionScriptFieldInheritance(Bomb, Weapon) \
 		meta_property(throwPowerY) \
 		meta_property(duration) \
 	}); \
-	FieldEnd(Bomb, PropertyOnlyScriptInheritance) \
+	FieldEnd(Bomb, PropertyOnly) \
 };

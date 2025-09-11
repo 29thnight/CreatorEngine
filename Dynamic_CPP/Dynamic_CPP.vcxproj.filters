@@ -291,7 +291,6 @@
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-
 		<ClInclude Include="Boss1.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -308,14 +307,22 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TBoss1.h">
-		<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="DebugLog.h">
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\UIGageTest.h">
-
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntitlyRock.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
+			<Filter>Script</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityMonsterA.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -538,7 +545,6 @@
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-
 		<ClCompile Include="Boss1.cpp">
 			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
@@ -562,6 +568,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

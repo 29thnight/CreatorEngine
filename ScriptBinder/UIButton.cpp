@@ -64,3 +64,11 @@ bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 	isClick = false;
 	return false;
 }
+
+void UIButton::Click()
+{
+	if (m_clickFunction)
+	{
+		m_clickFunction();
+	}
+}

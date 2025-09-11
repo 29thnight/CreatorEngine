@@ -13,7 +13,8 @@ enum class PrimitiveProxyType
    MeshRenderer,
    FoliageComponent,
    TerrainComponent,
-   DecalComponent
+   DecalComponent,
+   SpriteRenderer,
 };
 
 class Material;
@@ -25,8 +26,9 @@ class TerrainMaterial;
 class TerrainComponent;
 class FoliageComponent;
 class DecalComponent;
+class SpriteRenderer;
 class Texture;
-class PrimitiveRenderProxy
+class PrimitiveRenderProxy //아 각 타입별로 분리하고 싶다...
 {
 public:
 	struct ProxyFilter
@@ -47,6 +49,7 @@ public:
     PrimitiveRenderProxy(FoliageComponent* component);
 	PrimitiveRenderProxy(TerrainComponent* component);
 	PrimitiveRenderProxy(DecalComponent* component);
+	PrimitiveRenderProxy(SpriteRenderer* component);
 	~PrimitiveRenderProxy();
 
 	PrimitiveRenderProxy(const PrimitiveRenderProxy& other);
@@ -73,37 +76,37 @@ public:
 
 public:
 	// Common properties
-	PrimitiveProxyType	m_proxyType{ PrimitiveProxyType::MeshRenderer };
-	Mathf::Vector3		m_worldPosition{ 0.0f, 0.0f, 0.0f };
-	Mathf::xMatrix		m_worldMatrix{ XMMatrixIdentity() };
-	HashedGuid			m_instancedID{};
-	bool				m_isCulled{ false };
-	bool				m_isStatic{ false };
+	PrimitiveProxyType				m_proxyType{ PrimitiveProxyType::MeshRenderer };
+	Mathf::Vector3					m_worldPosition{ 0.0f, 0.0f, 0.0f };
+	Mathf::xMatrix					m_worldMatrix{ XMMatrixIdentity() };
+	HashedGuid						m_instancedID{};
+	bool							m_isCulled{ false };
+	bool							m_isStatic{ false };
 
 public:
 	//meshRenderer type
-	Material*					m_Material{ nullptr };
-	Mesh*						m_Mesh{ nullptr };
-	HashedGuid					m_animatorGuid{};
-	HashedGuid					m_materialGuid{};
-	Mathf::xMatrix*				m_finalTransforms{};
-	LightMapping				m_LightMapping;
-	uint32						m_currLOD{ 0 };
+	Material*						m_Material{ nullptr };
+	Mesh*							m_Mesh{ nullptr };
+	HashedGuid						m_animatorGuid{};
+	HashedGuid						m_materialGuid{};
+	Mathf::xMatrix*					m_finalTransforms{};
+	LightMapping					m_LightMapping;
+	uint32							m_currLOD{ 0 };
 
-	bool                        m_isEnableShadow{ true };
-	bool						m_isShadowCast{ true };
-	bool						m_isShadowRecive{ true };
-	bool						m_isSkinnedMesh{ false };
-	bool						m_isAnimationEnabled{ false };
-	bool						m_isInstanced{ false };
-	bool						m_EnableLOD{ false };
+	bool							m_isEnableShadow{ true };
+	bool							m_isShadowCast{ true };
+	bool							m_isShadowRecive{ true };
+	bool							m_isSkinnedMesh{ false };
+	bool							m_isAnimationEnabled{ false };
+	bool							m_isInstanced{ false };
+	bool							m_EnableLOD{ false };
 
 public:
 	//terrain type
-	std::shared_ptr<TerrainMesh> m_terrainMesh{ nullptr };
-	TerrainMaterial*			m_terrainMaterial{ nullptr };
-	TerrainGizmoBuffer			m_terrainGizmoBuffer{};
-	TerrainLayerBuffer			m_terrainlayerBuffer{};
+	std::shared_ptr<TerrainMesh>	m_terrainMesh{ nullptr };
+	TerrainMaterial*				m_terrainMaterial{ nullptr };
+	TerrainGizmoBuffer				m_terrainGizmoBuffer{};
+	TerrainLayerBuffer				m_terrainlayerBuffer{};
 
 public:
 	//foliage type
@@ -119,8 +122,13 @@ public:
 	uint32							m_sliceY{ 1 };	
 	int								m_sliceNum{ 0 };
 
+public:
+	//sprite type
+	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
+	Texture*						m_spriteTexture{ nullptr };
+
 private:
-	bool						m_isNeedUpdateCulling{ false };
+	bool							m_isNeedUpdateCulling{ false };
 };
 
 inline bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRenderProxy* b)

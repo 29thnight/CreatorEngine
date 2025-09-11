@@ -35,6 +35,7 @@ public:
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
 private:
+	Animator* m_animator = nullptr;
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
 
 	int								m_currentEntityItemCount = 0;

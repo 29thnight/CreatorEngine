@@ -17,14 +17,21 @@ public:
 	[[Serializable(Inheritance:UIComponent)]]
 	GENERATED_BODY(SpriteSheetComponent)
 
-	void LoadSpriteSheet(std::string_view path);
+	void LoadSpriteSheet(const file::path& path);
 
 	virtual void Awake() override;
 	virtual void Update(float tick) override;
 	virtual void OnDestroy() override;
 
-	ImageInfo	uiinfo{};
+	ImageInfo				 uiinfo{};
 	std::shared_ptr<Texture> m_spriteSheetTexture{};
 	[[Property]]
-	std::string m_spriteSheetPath{};
+	std::string				 m_spriteSheetPath{};
+	[[Property]]
+	float                    m_frameDuration{ 0.1f };
+	[[Property]]
+	bool                     m_isLoop{ true };
+	[[Property]]
+	bool                     m_isPreview{ false };
+	float                    m_deltaTime{};
 };

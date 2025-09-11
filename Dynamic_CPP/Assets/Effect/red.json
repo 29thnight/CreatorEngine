@@ -12,88 +12,6 @@
             "modules": [
                 {
                     "data": {
-                        "colorGradient": [
-                            {
-                                "color": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
-                                },
-                                "time": 0.0
-                            },
-                            {
-                                "color": {
-                                    "w": 0.8999999761581421,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.30000001192092896
-                            },
-                            {
-                                "color": {
-                                    "w": 0.699999988079071,
-                                    "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.699999988079071
-                            },
-                            {
-                                "color": {
-                                    "w": 0.0,
-                                    "x": 0.5,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 1.0
-                            }
-                        ],
-                        "colorParams": {
-                            "customFunctionType": 2,
-                            "customParam1": 20.0,
-                            "customParam2": 0.0,
-                            "customParam3": 0.0,
-                            "customParam4": 0.0,
-                            "discreteColorsSize": 3,
-                            "gradientSize": 4,
-                            "transitionMode": 2
-                        },
-                        "discreteColors": [
-                            {
-                                "w": 1.0,
-                                "x": 1.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            {
-                                "w": 1.0,
-                                "x": 0.0958404541015625,
-                                "y": 0.0,
-                                "z": 1.0
-                            },
-                            {
-                                "w": 1.0,
-                                "x": 0.9963834285736084,
-                                "y": 1.0,
-                                "z": 0.0
-                            }
-                        ],
-                        "easing": {
-                            "enabled": false
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 1
-                        }
-                    },
-                    "stage": 2,
-                    "type": "ColorModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
                         "particleTemplate": {
                             "acceleration": {
                                 "x": 0.0,
@@ -103,11 +21,11 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "horizontalVelocityRange": 0.0,
-                            "lifeTime": 10.0,
+                            "lifeTime": 1.0,
                             "maxVerticalVelocity": 0.0,
                             "minVerticalVelocity": 0.0,
                             "rotateSpeed": 0.0,
@@ -158,7 +76,7 @@
                     "data": {
                         "billboard": {
                             "maxCount": 0,
-                            "type": 0
+                            "type": 1
                         },
                         "indices": [
                             0,
@@ -168,11 +86,22 @@
                             2,
                             3
                         ],
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "red"
+                        "renderStates": {
+                            "blendPreset": 1,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 1
                         },
+                        "shaders": {
+                            "pixelShader": "BillBoard",
+                            "vertexShader": "BillBoard"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "red",
+                                "slot": 0
+                            }
+                        ],
                         "vertices": [
                             {
                                 "position": {

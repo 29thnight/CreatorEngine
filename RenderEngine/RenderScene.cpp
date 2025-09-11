@@ -17,6 +17,8 @@
 #include "Terrain.h"
 #include "UIManager.h"
 #include "DecalComponent.h"
+#include "SpriteRenderer.h"
+#include "SpriteSheetComponent.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
@@ -587,4 +589,109 @@ void RenderScene::UnregisterCommand(TextComponent* textPtr)
 	SpinLock lock(m_uiProxyMapFlag);
 	if (m_uiProxyMap.find(textGuid) == m_uiProxyMap.end()) return;
 	m_uiProxyMap[textGuid]->DestroyProxy();
+}
+
+void RenderScene::RegisterCommand(SpriteSheetComponent* spriteSheetPtr)
+{
+	if (nullptr == spriteSheetPtr) return;
+	HashedGuid guid = spriteSheetPtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(guid) != m_uiProxyMap.end()) return;
+	auto managed = std::make_shared<UIRenderProxy>(spriteSheetPtr);
+	m_uiProxyMap[guid] = managed;
+}
+
+void RenderScene::UnregisterCommand(SpriteSheetComponent* spriteSheetPtr)
+{
+	if (nullptr == spriteSheetPtr) return;
+	HashedGuid guid = spriteSheetPtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(guid) == m_uiProxyMap.end()) return;
+	m_uiProxyMap[guid]->DestroyProxy();
+}
+
+void RenderScene::UpdateCommand(SpriteSheetComponent* spriteSheetPtr)
+{
+	if (!InvaildCheckSpriteSheet(spriteSheetPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckSpriteSheet");
+	}
+	ProxyCommand moveCommand = MakeProxyCommand(spriteSheetPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(SpriteSheetComponent* spriteSheetPtr)
+{
+	if (!InvaildCheckSpriteSheet(spriteSheetPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckSpriteSheet");
+	}
+	ProxyCommand command(spriteSheetPtr);
+	return command;
+}
+
+bool RenderScene::InvaildCheckSpriteSheet(SpriteSheetComponent* spriteSheetPtr)
+{
+	if (nullptr == spriteSheetPtr || spriteSheetPtr->IsDestroyMark()) return false;
+	auto owner = spriteSheetPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+	HashedGuid guid = spriteSheetPtr->GetInstanceID();
+	SpinLock lock(m_uiProxyMapFlag);
+	if (m_uiProxyMap.find(guid) == m_uiProxyMap.end()) return false;
+	auto& proxyObject = m_uiProxyMap[guid];
+	if (nullptr == proxyObject) return false;
+	return true;
+}
+
+void RenderScene::RegisterCommand(SpriteRenderer* spriteRendererPtr)
+{
+	if (nullptr == spriteRendererPtr) return;
+	HashedGuid spriteRendererGuid = spriteRendererPtr->GetInstanceID();
+	SpinLock lock(m_proxyMapFlag);
+	if (m_proxyMap.find(spriteRendererGuid) != m_proxyMap.end()) return;
+	// Create a new proxy for the sprite renderer and insert it into the map
+	auto managedCommand = std::make_shared<PrimitiveRenderProxy>(spriteRendererPtr);
+	m_proxyMap[spriteRendererGuid] = managedCommand;
+}
+
+bool RenderScene::InvaildCheckSpriteRenderer(SpriteRenderer* spriteRendererPtr)
+{
+	if (nullptr == spriteRendererPtr || spriteRendererPtr->IsDestroyMark()) return false;
+	auto owner = spriteRendererPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+	HashedGuid spriteRendererGuid = spriteRendererPtr->GetInstanceID();
+	SpinLock lock(m_proxyMapFlag);
+	if (m_proxyMap.find(spriteRendererGuid) == m_proxyMap.end()) return false;
+	auto& proxyObject = m_proxyMap[spriteRendererGuid];
+	if (nullptr == proxyObject) return false;
+	return true;
+}
+
+void RenderScene::UpdateCommand(SpriteRenderer* spriteRendererPtr)
+{
+	if (!InvaildCheckSpriteRenderer(spriteRendererPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckSpriteRenderer");
+	}
+	ProxyCommand moveCommand = MakeProxyCommand(spriteRendererPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(SpriteRenderer* spriteRendererPtr)
+{
+	if (!InvaildCheckSpriteRenderer(spriteRendererPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckSpriteRenderer");
+	}
+	ProxyCommand command(spriteRendererPtr);
+	return command;
+}
+
+void RenderScene::UnregisterCommand(SpriteRenderer* spriteRendererPtr)
+{
+	if (nullptr == spriteRendererPtr) return;
+	HashedGuid spriteRendererGuid = spriteRendererPtr->GetInstanceID();
+	SpinLock lock(m_proxyMapFlag);
+	if (m_proxyMap.find(spriteRendererGuid) == m_proxyMap.end()) return;
+	m_proxyMap[spriteRendererGuid]->DestroyProxy();
 }
