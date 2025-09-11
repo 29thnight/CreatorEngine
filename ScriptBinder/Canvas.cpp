@@ -21,7 +21,7 @@ void Canvas::OnDestroy()
 		{
 			UIManagers->CurCanvas.reset();
 		}
-		UIManagers->DeleteCanvas(m_pOwner->ToString());
+		UIManagers->DeleteCanvas(m_pOwner->shared_from_this());
 	}
 }
 
@@ -48,7 +48,7 @@ void Canvas::AddUIObject(std::shared_ptr<GameObject> obj)
 		btn->m_ownerCanvasName = m_pOwner->m_name.ToString();
 	}
 	UIObjs.push_back(obj);
-	//¸ÇÃ³À½ Ãß°¡µÇ´Â UI¸¦ ¼±ÅÃµÈ UI·Î ÁöÁ¤
+	//ë§¨ì²˜ìŒ ì¶”ê°€ë˜ëŠ” UIë¥¼ ì„ íƒëœ UIë¡œ ì§€ì •
 	if (SelectUI.expired())
 	{
 		SelectUI = obj;
@@ -64,7 +64,7 @@ void Canvas::Update(float tick)
 		PreCanvasOrder = CanvasOrder;
 	}
 
-	////ÀÌ ºÎºĞ UI Manager ¿¡¼­ ÅëÇÕÀ¸·Î Ã³¸®ÇÏÀÚ
+	////ì´ ë¶€ë¶„ UI Manager ì—ì„œ í†µí•©ìœ¼ë¡œ ì²˜ë¦¬í•˜ì
 	std::erase_if(UIObjs, [](const std::weak_ptr<GameObject>& obj) 
 		{ return obj.expired() || (obj.lock() && obj.lock()->IsDestroyMark()); });
 }
