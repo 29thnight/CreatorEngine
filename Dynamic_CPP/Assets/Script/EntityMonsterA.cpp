@@ -75,9 +75,23 @@ void EntityMonsterA::Start()
 
 void EntityMonsterA::Update(float tick)
 {
-	GameObject* Asis = blackBoard->GetValueAsGameObject("Asis");
-	GameObject* player1 = blackBoard->GetValueAsGameObject("Player1");
-	GameObject* player2 = blackBoard->GetValueAsGameObject("Player2");
+
+	bool hasAsis = blackBoard->HasKey("Asis");
+	bool hasP1 = blackBoard->HasKey("Player1");
+	bool hasP2 = blackBoard->HasKey("Player2");
+
+	GameObject* Asis = nullptr;
+	if (hasAsis) {
+		Asis = blackBoard->GetValueAsGameObject("Asis");
+	}
+	GameObject* player1 = nullptr;
+	if (hasP1){
+		player1 = blackBoard->GetValueAsGameObject("Player1");
+	}
+	GameObject* player2 = nullptr;
+	if (hasP2) {
+		player2 = blackBoard->GetValueAsGameObject("Player2");
+	}
 	
 	Transform* m_transform = m_pOwner->GetComponent<Transform>();
 	Mathf::Vector3 pos = m_transform->GetWorldPosition();
@@ -126,20 +140,43 @@ void EntityMonsterA::Update(float tick)
 		blackBoard->SetValueAsGameObject("Target", closedTarget->ToString());
 	}
 
-	if (isAttack) {
-		m_state = "Attack";
-		if (!isAttackAnimation) {
-			isAttackAnimation = true;
-			m_animator->SetParameter("Attack", true);	
-		}
-		else {
-			bool haskey = blackBoard->HasKey("IsAttacking");
-			if (haskey) {
-				isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
+	if (isBoxAttack) {
+		SweepInput sweepInput;
+		sweepInput.startPosition = pos + Vector3(0, 0.5f, 0);
+		sweepInput.startRotation = SimpleMath::Quaternion::Identity;
+		sweepInput.distance = m_attackRange;
+		sweepInput.direction = m_pOwner->m_transform.GetForward();
+
+		SimpleMath::Vector3 boxHalfExtents = { 0.5f,0.5f,0.5f };
+		std::vector<HitResult> hitResults;
+		int count = PhysicsManagers->BoxSweep(sweepInput, boxHalfExtents, hitResults);
+		if (count > 0) {
+			for (auto& hit : hitResults) {
+				std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
+				if (hit.gameObject->GetHashedName().ToString() == player1->GetHashedName().ToString()
+					|| hit.gameObject->GetHashedName().ToString()== player2->GetHashedName().ToString()) //player
+				{
+					std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
+					auto entity = hit.gameObject->GetComponent<Entity>();
+					if (entity) {
+						entity->SendDamage(this, m_attackDamage);	
+					}
+				}
 			}
 		}
 	}
+	
+	
+	if (isAttack) {
+		m_state = "Attack";
+	}
+	
 
+	bool haskey = blackBoard->HasKey("IsAttacking");
+	if (haskey) {
+		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
+	}
+	
 
 	if (m_state == "Chase") {
 		m_animator->SetParameter("Move", true);
@@ -161,17 +198,20 @@ void EntityMonsterA::Update(float tick)
 void EntityMonsterA::AttackBoxOn()
 {
 	std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
+	isBoxAttack = true;
 }
 
 void EntityMonsterA::AttackBoxOff()
 {
 	std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
+	isBoxAttack = false;
 }
 
 void EntityMonsterA::ChaseTarget()
 {
 	if (target && !isDead)
 	{
+		if (m_state == "Attack") return;
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
 		CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
@@ -195,6 +235,28 @@ void EntityMonsterA::ChaseTarget()
 void EntityMonsterA::Dead()
 {
 	m_animator->SetParameter("Dead", true);
+}
+
+void EntityMonsterA::RotateToTarget()
+{
+	SimpleMath::Quaternion rot = m_pOwner->m_transform.GetWorldQuaternion();
+	if (target)
+	{
+		Transform* m_transform = m_pOwner->GetComponent<Transform>();
+		Mathf::Vector3 pos = m_transform->GetWorldPosition();
+		Transform* targetTransform = target->GetComponent<Transform>();
+		if (targetTransform) {
+			Mathf::Vector3 targetpos = targetTransform->GetWorldPosition();
+			Mathf::Vector3 dir = targetpos - pos;
+			dir.y = 0.f;
+			dir.Normalize();
+			SimpleMath::Quaternion lookRot = SimpleMath::Quaternion::CreateFromRotationMatrix(SimpleMath::Matrix::CreateLookAt(Mathf::Vector3::Zero, -dir, Mathf::Vector3::Up));
+			lookRot.Inverse(lookRot);
+			//rot = SimpleMath::Quaternion::Slerp(rot, lookRot, 0.2f);
+			//m_pOwner->m_transform.SetRotation(rot);
+			m_pOwner->m_transform.SetRotation(lookRot);
+		}
+	}
 }
 
 void EntityMonsterA::SendDamage(Entity* sender, int damage)

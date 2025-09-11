@@ -254,7 +254,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\BP0034.h" />
 		<ClInclude Include="Assets\Script\TBoss1.h" />
 		<ClInclude Include="Assets\Script\UIGageTest.h" />
-
 		<ClInclude Include="Assets\Script\EntityMonsterA.h" />
 		<ClInclude Include="Assets\Script\EntitlyRock.h" />
 		<ClInclude Include="Assets\Script\PlayerRangeAttack.h" />

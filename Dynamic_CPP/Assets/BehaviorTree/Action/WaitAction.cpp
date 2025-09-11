@@ -11,15 +11,23 @@ NodeStatus WaitAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 	Animator* animator = nullptr;
 	std::string identity = "";
-	if (!hasIdentity)
+	float waitTime = 0.5f; // Default wait time if not set in blackboard
+	static float elapsedTime = 0.0f;
+	elapsedTime += deltatime;
+
+	if (hasIdentity)
 	{
 		identity = blackBoard.GetValueAsString("Identity");
 	}
 
-	if (identity != "MonsterNomal")
+	if (identity == "MonsterNomal")
 	{
 		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
 		animator = script->m_animator;
+		script->m_state = "Idle";
+		if (elapsedTime < 0.1f) {
+			script->RotateToTarget(); // Rotate to face target at the start of the wait
+		}
 	}
 	else {
 		EntityEnemy* enemy = m_owner->GetComponent<EntityEnemy>();
@@ -35,9 +43,7 @@ NodeStatus WaitAction::Tick(float deltatime, BlackBoard& blackBoard)
 		animator->SetParameter("Attack", false);
 		animator->SetParameter("Dead", false);
 	}
-	float waitTime = 0.5f; // Default wait time if not set in blackboard
-	static float elapsedTime = 0.0f;
-	elapsedTime += deltatime;
+	
 
 	if (elapsedTime >= waitTime)
 	{

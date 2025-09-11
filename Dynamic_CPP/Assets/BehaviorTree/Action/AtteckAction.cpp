@@ -1,6 +1,7 @@
 #include "AtteckAction.h"
 #include "pch.h"
 #include "EntityMonsterA.h"
+#include "Animator.h"
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
@@ -8,12 +9,12 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
     bool hasIdentity = blackBoard.HasKey("Identity");
 
     std::string identity = "";
-    if (!hasIdentity)
+    if (hasIdentity)
     {
         identity = blackBoard.GetValueAsString("Identity");
     }
 
-    if (identity != "MonsterNomal")
+    if (identity == "MonsterNomal")
     {
         EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
 		bool isAttack = script->isAttack;
@@ -21,6 +22,9 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
         if (!isAttack) {
 			//공격중이 아닐시 공격 시작
 			script->isAttack = true;
+            script->isAttackAnimation = true;
+			script->m_animator->SetParameter("Attack", true);
+            blackBoard.SetValueAsBool("IsAttacking", true);
             return NodeStatus::Running;
         }
         else {
@@ -34,11 +38,10 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 				//완료시 모든 변수 초기화하고 성공 반환
 				script->isAttack = false;
 				script->isAttackAnimation = false;
+				script->m_state = "Idle";
 				return NodeStatus::Success;
             }
         }
-
-
     }
 
 	bool hasAttackState = blackBoard.HasKey("IsAttacking");
@@ -66,10 +69,10 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
         //}
 
         //// 4. 애니메이터에 'Attack' 트리거를 전달하여 애니메이션을 재생시킵니다. // entityenemy 에서
-        //if (auto* animator = m_owner->GetComponent<Animator>())
-        //{
-        //    animator->SetParameter("Attack", true);
-        //}
+        /*if (auto* animator = m_owner->GetComponent<Animator>())
+        {
+            animator->SetParameter("Attack", true);
+        }*/
 
         // attack count를 증가 시켜 공격 시작
         blackBoard.SetValueAsInt("AttackCount", 1); // --> 이건 엔티티에서 공격 확인후 0으로 바꿔줘야함

@@ -9,12 +9,12 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	bool hasIdentity = blackBoard.HasKey("Identity");
 	std::string identity = "";
-	if (!hasIdentity)
+	if (hasIdentity)
 	{
 		identity = blackBoard.GetValueAsString("Identity");
 	}
 
-	if (identity != "MonsterNomal")
+	if (identity == "MonsterNomal")
 	{
 		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
 		script->ChaseTarget();

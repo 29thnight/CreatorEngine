@@ -10,12 +10,12 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 	bool hasState = blackBoard.HasKey("State");
 	bool hasIdentity = blackBoard.HasKey("Identity");
 	std::string identity = "";
-	if (!hasIdentity)
+	if (hasIdentity)
 	{
 		identity = blackBoard.GetValueAsString("Identity");
 	}
 
-	if (identity != "MonsterNomal")
+	if (identity == "MonsterNomal")
 	{
 		EntityMonsterA* script = dynamic_cast<EntityMonsterA*>(m_owner->GetComponent<ModuleBehavior>());
 		script->isDead = true;

@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Entity.h"
+#include "EntityMonsterA.generated.h"
 class BehaviorTreeComponent;
 class BlackBoard;
 class Animator;
@@ -10,6 +11,8 @@ class CharacterControllerComponent;
 class EntityMonsterA : public Entity
 {
 public:
+   ReflectEntityMonsterA
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityMonsterA)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -66,6 +69,8 @@ public:
 
 	void ChaseTarget(); //Å¸°Ù ÃßÀû
 	void Dead(); //Á×À½ Ã³¸®
+
+	void RotateToTarget(); //Å¸°Ù ¹Ù¶óº¸±â
 
 	void SendDamage(Entity* sender, int damage) override;
 
