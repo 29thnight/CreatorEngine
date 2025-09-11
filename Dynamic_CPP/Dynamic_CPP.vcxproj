@@ -186,11 +186,13 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h" />
 		<ClInclude Include="Assets\Script\CameraMove.h" />
+		<ClInclude Include="Assets\Script\EntitySpiritStone.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
 		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="CriticalMark.h" />
+		<ClInclude Include="DebugLog.h" />
 		<ClInclude Include="Easing.h" />
 		<ClInclude Include="ItemType.h" />
 		<ClInclude Include="PlayerBuff.h" />
@@ -246,10 +248,19 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\WaitAction.h" />
 		<ClInclude Include="Assets\Script\MosterMeleeAni.h" />
 		<ClInclude Include="Assets\Script\CurveIndicator.h" />
+
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0031.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0032.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0033.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP0034.h" />
+		<ClInclude Include="Assets\Script\TBoss1.h" />
+
 		<ClInclude Include="Assets\Script\UIGageTest.h" />
+
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\CameraMove.cpp" />
+		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
 		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
@@ -507,7 +518,29 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0031.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0032.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0033.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP0034.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TBoss1.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+
 		<ClCompile Include="Assets\Script\UIGageTest.cpp">
+
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

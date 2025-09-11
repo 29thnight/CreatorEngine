@@ -29,6 +29,7 @@
 #include "Bomb.h"
 
 #include "CurveIndicator.h"
+#include "DebugLog.h"
 void Player::Start()
 {
 
@@ -94,7 +95,7 @@ void Player::Update(float tick)
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
 	//Test
-	{
+	/*{
 		auto& asiss = GM->GetAsis();
 		auto asis = asiss[0]->GetOwner();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
@@ -102,7 +103,7 @@ void Player::Update(float tick)
 		auto curveindicator = indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(true);
 		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
-	}
+	}*/
 
 	if (isDead)
 	{
@@ -138,7 +139,7 @@ void Player::Update(float tick)
 				curveindicator->EnableIndicator(onIndicate);
 				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
 
-				std::cout << "onIndicate!!!!!!!!!" << std::endl;
+				LOG("onIndicate!!!!!!!!!");
 			}
 			else
 			{
@@ -205,31 +206,41 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-	//CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	//auto cam = camComponent->GetCamera();
-	//auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	//auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	auto cam = camComponent->GetCamera();
+	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	//XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	//XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	//float w = XMVectorGetW(clipSpacePos);
-	//if (w < 0.001f) {
-	//	// 원래 위치 반환.
-	//	GetOwner()->m_transform.SetPosition(worldpos);
-	//	return;
-	//}
-	//XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	float w = XMVectorGetW(clipSpacePos);
+	if (w < 0.001f) {
+		// 원래 위치 반환.
+		GetOwner()->m_transform.SetPosition(worldpos);
+		return;
+	}
+	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	//float clamp_limit = 0.9f;
-	//XMVECTOR clampedNdcPos = XMVectorClamp(
-	//	ndcPos,
-	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-	//	XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	//);
-	//XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	//XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+	float x = XMVectorGetX(ndcPos);
+	float y = XMVectorGetY(ndcPos);
+	x = abs(x);
+	y = abs(y);
 
-	//GetOwner()->m_transform.SetPosition(newWorldPos);
+	float clamp_limit = 0.9f;
+	if(x < clamp_limit && y < clamp_limit)
+	{
+		return;
+	}
+
+	XMVECTOR clampedNdcPos = XMVectorClamp(
+		ndcPos,
+		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	);
+	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+
+	GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
 void Player::SendDamage(Entity* sender, int damage)
@@ -313,7 +324,7 @@ void Player::Throw()
 
 void Player::ThrowEvent()
 {
-	std::cout << "ThrowEvent" << std::endl;
+	LOG("ThrowEvent");
 	if (catchedObject) {
 		catchedObject->SetThrowOwner(this);
 		catchedObject->Throw(player->m_transform.GetForward(), { ThrowPowerX,ThrowPowerY });
@@ -379,11 +390,11 @@ void Player::Dash()
 	dashEffect->Apply();
 	if (m_curDashCount == 0)
 	{
-		std::cout << "Dash  " << std::endl;
+		LOG("Dash  ");
 	}
 	else if (m_curDashCount == 1)
 	{
-		std::cout << "Dubble Dash  " << std::endl;
+		LOG("Dubble Dash  ");
 	}
 
 	//대쉬 애니메이션중엔 적통과
@@ -414,7 +425,7 @@ void Player::StartAttack()
 		//	{
 		//		m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
 		//		//m_animator->SetUseLayer(0,false);
-		//		std::cout << "Melee Attack!!" << std::endl;
+		//		LOG("Melee Attack!!");
 		//	}
 
 
@@ -422,7 +433,7 @@ void Player::StartAttack()
 		//	{
 		//		m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 		//		//m_animator->SetUseLayer(0,false);
-		//		std::cout << "RangeAttack!!" << std::endl;
+		//		LOG("RangeAttack!!");
 		//		ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
 		//	}
 
@@ -430,7 +441,7 @@ void Player::StartAttack()
 		//	{
 		//		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
 		//		//m_animator->SetUseLayer(0,false);
-		//		std::cout << "BombAttack!!" << std::endl;
+		//		LOG("BombAttack!!");
 		//	}
 
 
@@ -439,28 +450,28 @@ void Player::StartAttack()
 		//	attackElapsedTime = 0;
 		//	if (m_curWeapon->CheckDur() == true)
 		//	{
-		//		std::cout << "weapon break" << std::endl;
+		//		LOG("weapon break");
 		//	}
 		//}
 
 		if (m_comboCount == 0)
 		{
 			m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-			std::cout << "MeleeAttack1" << std::endl;
+			LOG("MeleeAttack1");
 			canMeleeCancel = false;
 			//m_comboCount++;
 		}
 		else if (m_comboCount == 1)
 		{
 			m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-			std::cout << "MeleeAttack2" << std::endl;
+			LOG("MeleeAttack2");
 			canMeleeCancel = false;
 			//m_comboCount++;
 		}
 		else if (m_comboCount == 2)
 		{
 			m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-			std::cout << "MeleeAttack3" << std::endl;
+			LOG("MeleeAttack3");
 			canMeleeCancel = false;
 		}
 	}
@@ -470,6 +481,7 @@ void Player::Charging()
 {
 	if (m_chargingTime >= minChargedTime)
 	{
+		//LOG("charginggggggg");
 		std::cout << "charginggggggg" << std::endl;
 	}
 	//m_animator->SetParameter("Charging", true); //차징중에 기모으는 이펙트 출력 Idle or Move 애니메이션 자율
@@ -481,12 +493,13 @@ void Player::Attack1()
 	//여기선 차징시간이 넘으면 차징공격만 실행
 	//근거리는 큰이펙트 + 1,2,3타중 정한애니메이션중 하나  ,,, 원거리는 부채꼴로 여러발 발사
 	isCharging = false;
-	std::cout << m_chargingTime << " second charging" << std::endl;
+	LOG(m_chargingTime << " second charging");
 
 
 	if (m_chargingTime >= minChargedTime)
 	{
 		//차지공격나감
+		std::cout << "Charged Attack!!" << std::endl;
 	}
 
 	//if (isAttacking == false || canMeleeCancel == true)
@@ -499,7 +512,7 @@ void Player::Attack1()
 	//	//	{
 	//	//		m_animator->SetParameter("Attack", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
 	//	//		//m_animator->SetUseLayer(0,false);
-	//	//		std::cout << "Melee Attack!!" << std::endl;
+	//	//		LOG("Melee Attack!!");
 	//	//	}
 
 
@@ -507,7 +520,7 @@ void Player::Attack1()
 	//	//	{
 	//	//		m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 	//	//		//m_animator->SetUseLayer(0,false);
-	//	//		std::cout << "RangeAttack!!" << std::endl;
+	//	//		LOG("RangeAttack!!");
 	//	//		ShootNormalBullet(); //원거리공격 키프레임 이벤트에넣기
 	//	//	}
 
@@ -515,7 +528,7 @@ void Player::Attack1()
 	//	//	{
 	//	//		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
 	//	//		//m_animator->SetUseLayer(0,false);
-	//	//		std::cout << "BombAttack!!" << std::endl;
+	//	//		LOG("BombAttack!!");
 	//	//	}
 
 
@@ -524,28 +537,28 @@ void Player::Attack1()
 	//	//	attackElapsedTime = 0;
 	//	//	if (m_curWeapon->CheckDur() == true)
 	//	//	{
-	//	//		std::cout << "weapon break" << std::endl;
+	//	//		LOG("weapon break");
 	//	//	}
 	//	//}
 
 	//	if (m_comboCount == 0)
 	//	{
 	//		m_animator->SetParameter("MeleeAttack1", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//		std::cout << "MeleeAttack1" << std::endl;
+	//		LOG("MeleeAttack1");
 	//		canMeleeCancel = false;
 	//		//m_comboCount++;
 	//	}
 	//	else if (m_comboCount == 1)
 	//	{
 	//		m_animator->SetParameter("MeleeAttack2", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//		std::cout << "MeleeAttack2" << std::endl;
+	//		LOG("MeleeAttack2");
 	//		canMeleeCancel = false;
 	//		//m_comboCount++;
 	//	}
 	//	else if (m_comboCount == 2)
 	//	{
 	//		m_animator->SetParameter("MeleeAttack3", true); //근거리공격 애니메이션으로 //실제 공격함수는 애니메이션 behavior나 키프레임 이벤트에서 실행
-	//		std::cout << "MeleeAttack3" << std::endl;
+	//		LOG("MeleeAttack3");
 	//		canMeleeCancel = false;
 	//	}
 	//}
@@ -886,7 +899,7 @@ void Player::OnTriggerEnter(const Collision& collision)
 }
 void Player::OnTriggerStay(const Collision& collision)
 {
-	//std::cout << "player muunga boodit him trigger" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+	//LOG("player muunga boodit him trigger" << collision.otherObj->m_name.ToString().c_str());
 	FindNearObject(collision.otherObj);
 }
 

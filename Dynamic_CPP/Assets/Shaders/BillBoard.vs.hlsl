@@ -18,6 +18,7 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
     uint TexIndex : TEXCOORD1;
     float4 Color : COLOR0;
+    float Age : TEXCOORD2;
 };
 
 struct ParticleData
@@ -93,6 +94,7 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID)
     output.TexCoord = input.TexCoord;
     output.TexIndex = 0; // 필요하다면 particle에서 텍스처 인덱스 가져오기
     output.Color = particle.color;
+    output.Age = particle.age;
     
     return output;
 }

@@ -168,6 +168,12 @@ public:
 	bool IsRigidBodyColliderEnabled(unsigned int id) const;
 	bool IsRigidBodyUseGravity(unsigned int id) const;
 
+	// CharacterController의 위치를 강제로 설정하는 인터페이스 (이제 큐에 작업을 추가합니다)
+	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
+
+	//geometry 검사
+	//bool IsPenetrating();
+
 private:
 	using PendingChange = RigidBodyState;
 
@@ -230,6 +236,14 @@ private:
 
 	std::vector<std::vector<uint8_t>> m_collisionMatrix = std::vector<std::vector<uint8_t>>(32, std::vector<uint8_t>(32, true)); //기본 값은 모든 레이어가 충돌하는 것으로 설정
 	
+	// CCT 위치 변경을 위한 펜딩 큐
+	struct PendingControllerPosition
+	{
+		UINT id;
+		DirectX::SimpleMath::Vector3 position;
+	};
+	std::vector<PendingControllerPosition> m_pendingControllerPositions;
+	void ApplyPendingControllerPositionChanges(); // 펜딩된 CCT 위치 변경을 적용하는 함수
 
 
 	

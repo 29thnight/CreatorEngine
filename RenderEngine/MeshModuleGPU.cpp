@@ -30,91 +30,31 @@ void MeshModuleGPU::Initialize()
     m_instanceCount = 0;
     m_particleSRV = nullptr;
 
-    // 블렌드 스테이트 (알파 블렌딩)
-    D3D11_BLEND_DESC blendDesc = {};
-    blendDesc.AlphaToCoverageEnable = FALSE;
-    blendDesc.IndependentBlendEnable = FALSE;
-    blendDesc.RenderTarget[0].BlendEnable = TRUE;
-    blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-    blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-    blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-    blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    // 기본 셰이더 설정
+    if (m_vertexShaderName == "None") {
+        m_vertexShaderName = "MeshParticle";
+    }
+    if (m_pixelShaderName == "None") {
+        m_pixelShaderName = "MeshParticle";
+    }
 
-    //blendDesc.RenderTarget[0].BlendEnable = TRUE;
-    //blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-    //blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-    //blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    //blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    //blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-    //blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    //blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    // 렌더 상태 프리셋 설정
+    if (m_blendPreset == BlendPreset::None) { // 부모 기본값
+        m_blendPreset = BlendPreset::Additive;
+    }
+    if (m_depthPreset == DepthPreset::None) { // 부모 기본값  
+        m_depthPreset = DepthPreset::ReadOnly;
+    }
+    if (m_rasterizerPreset == RasterizerPreset::None) { // 부모 기본값
+        m_rasterizerPreset = RasterizerPreset::NoCull;
+    }
 
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
-    );
-
-    D3D11_BLEND_DESC altBlendDesc = {};
-    altBlendDesc.AlphaToCoverageEnable = FALSE;
-    altBlendDesc.IndependentBlendEnable = FALSE;
-    altBlendDesc.RenderTarget[0].BlendEnable = TRUE;
-    altBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_DEST_COLOR;
-    altBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ZERO;
-    altBlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    altBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    altBlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-    altBlendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    altBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateBlendState(&altBlendDesc, &m_alternativeBlendState)
-    );
-
-    // 래스터라이저 스테이트
-    CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-    rasterizerDesc.CullMode = D3D11_CULL_NONE;
-    rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)
-    );
-
-    // 깊이 스텐실 스테이트
-    CD3D11_DEPTH_STENCIL_DESC depthDesc{ CD3D11_DEFAULT() };
-    depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    depthDesc.DepthEnable = true;
-    depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-    DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
-
+    // 프리미티브 토폴로지 설정
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
-    // 셰이더 설정
-    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["MeshParticle"];
-    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["MeshParticleTest"];
-
-    // 입력 레이아웃 (기존 Vertex 구조체 사용)
-    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-    {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-    };
-
-    DirectX11::ThrowIfFailed(
-        DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
-            vertexLayoutDesc,
-            _countof(vertexLayoutDesc),
-            m_pso->m_vertexShader->GetBufferPointer(),
-            m_pso->m_vertexShader->GetBufferSize(),
-            &m_pso->m_inputLayout
-        )
-    );
+    // 부모의 함수들로 모든 상태 업데이트
+    UpdatePSOShaders();
+    UpdatePSORenderStates();
 
     // 샘플러 설정
     auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
@@ -131,6 +71,7 @@ void MeshModuleGPU::Initialize()
     );
 
     CreateClippingBuffer();
+
     // 기본 큐브 메시 설정
     if (m_meshType == MeshType::None) {
         SetMeshType(MeshType::Cube);
@@ -139,10 +80,6 @@ void MeshModuleGPU::Initialize()
     if (IsPolarClippingEnabled()) {
         OnClippingStateChanged();
     }
-
-    m_dissolveTex1 = DataSystems->LoadTexture("Sword_Eft_02.png");
-    m_dissolveTex2 = DataSystems->LoadTexture("Sword_Eft_03.png");
-    m_dissolveTex3 = DataSystems->LoadTexture("Sword_Eft_04.png");
 }
 
 void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
@@ -150,10 +87,6 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     if (!m_enabled) return;
 
     auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
-
-    if (!m_useAdditiveBlend) {
-        deviceContext->OMSetBlendState(m_alternativeBlendState.Get(), nullptr, 0xffffffff);
-    }
 
     auto currentMesh = GetCurrentMesh();
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
@@ -163,15 +96,12 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     m_invWorldMatrix = world.Invert();
 
     // Polar 클리핑 애니메이션 처리
-    if (m_isPolarClippingAnimating && IsPolarClippingEnabled())
-    {
+    if (m_isPolarClippingAnimating && IsPolarClippingEnabled()) {
         float progress = 0.f;
         if (m_useEffectProgress) {
-            // Effect 진행률 사용
             progress = m_effectProgress;
         }
         else {
-            // 기존 sin 애니메이션 사용
             float currentTime = Time->GetTotalSeconds();
             progress = (sin(currentTime * m_polarClippingAnimationSpeed) + 1.0f) * 0.5f;
         }
@@ -183,21 +113,18 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     UpdateConstantBuffer(world, view, projection);
     deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
 
-    // Polar 클리핑 상수 버퍼 바인딩 (register b2)
-    if (IsPolarClippingEnabled() && m_polarClippingBuffer)
-    {
+    // Polar 클리핑 상수 버퍼 바인딩
+    if (IsPolarClippingEnabled() && m_polarClippingBuffer) {
         UpdateClippingBuffer();
         deviceContext->PSSetConstantBuffers(2, 1, m_polarClippingBuffer.GetAddressOf());
     }
 
-    if (m_timeBuffer)
-    {
+    if (m_timeBuffer) {
         m_timeParams.time = Time->GetTotalSeconds();
 
         D3D11_MAPPED_SUBRESOURCE mappedResource;
         HRESULT hr = deviceContext->Map(m_timeBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
+        if (SUCCEEDED(hr)) {
             TimeParams* params = static_cast<TimeParams*>(mappedResource.pData);
             *params = m_timeParams;
             deviceContext->Unmap(m_timeBuffer.Get(), 0);
@@ -209,36 +136,14 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     // 파티클 SRV 바인딩
     deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
 
-    // 텍스처 바인딩
-    if (m_assignedTexture)
-    {
-        //if (m_assignedTexture->m_pSRV)
-        //{
-        //    deviceContext->PSSetShaderResources(0, 1, &m_assignedTexture->m_pSRV);
-        //}
-        ID3D11ShaderResourceView* srvs[4] = { nullptr };
-
-        // 텍스처가 있으면 넣고, 없으면 null 유지
-        if (m_assignedTexture && m_assignedTexture->m_pSRV)
-            srvs[0] = m_assignedTexture->m_pSRV;
-
-        if (m_dissolveTex1 && m_dissolveTex1->m_pSRV)
-            srvs[1] = m_dissolveTex1->m_pSRV;
-
-        if (m_dissolveTex2 && m_dissolveTex2->m_pSRV)
-            srvs[2] = m_dissolveTex2->m_pSRV;
-
-        if (m_dissolveTex3 && m_dissolveTex3->m_pSRV)
-            srvs[3] = m_dissolveTex3->m_pSRV;
-
-        deviceContext->PSSetShaderResources(0, 4, srvs);
+    // 다중 텍스처 바인딩 사용
+    if (GetTextureCount() > 0) {
+        BindTextures();
     }
-    else if (m_meshType == MeshType::Model && m_model)
-    {
-        // 모델의 기본 텍스처 사용 (BaseColor 텍스처)
+    else if (m_meshType == MeshType::Model && m_model) {
+        // 모델의 기본 텍스처 사용 (fallback)
         auto material = m_model->GetMaterial(m_meshIndex);
-        if (material && material->m_pBaseColor && material->m_pBaseColor->m_pSRV)
-        {
+        if (material && material->m_pBaseColor && material->m_pBaseColor->m_pSRV) {
             deviceContext->PSSetShaderResources(0, 1, &material->m_pBaseColor->m_pSRV);
         }
     }
@@ -256,23 +161,20 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     const auto& indices = currentMesh->GetIndices();
     deviceContext->DrawIndexedInstanced(indices.size(), m_instanceCount, 0, 0, 0);
 
-    // 리소스 정리
-    ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-    deviceContext->VSSetShaderResources(0, 1, nullSRV);
-    deviceContext->PSSetShaderResources(0, 1, nullSRV);
-
-    if (IsPolarClippingEnabled())
-    {
+    if (IsPolarClippingEnabled()) {
         ID3D11Buffer* nullBuffer[1] = { nullptr };
         deviceContext->PSSetConstantBuffers(2, 1, nullBuffer);
+    }
+
+    if (GetTextureCount() > 0) {
+        std::vector<ID3D11ShaderResourceView*> nullSRVs(GetTextureCount(), nullptr);
+        deviceContext->PSSetShaderResources(0, nullSRVs.size(), nullSRVs.data());
     }
 }
 
 void MeshModuleGPU::Release()
 {
-    // 임시 큐브 메시 정리
-    if (m_tempCubeMesh)
-    {
+    if (m_tempCubeMesh) {
         delete m_tempCubeMesh;
         m_tempCubeMesh = nullptr;
     }
@@ -283,7 +185,9 @@ void MeshModuleGPU::Release()
     m_meshIndex = 0;
     m_particleSRV = nullptr;
     m_instanceCount = 0;
-    m_assignedTexture = nullptr;
+
+    // 다중 텍스처 정리
+    ClearTextures();
 }
 
 void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
@@ -336,50 +240,60 @@ std::pair<Mathf::Vector3, Mathf::Vector3> MeshModuleGPU::GetCurrentMeshBounds() 
     return { minBounds, maxBounds };
 }
 
-
-void MeshModuleGPU::SetTexture(Texture* texture)
-{
-    m_assignedTexture = texture;
-}
-
-
-
 void MeshModuleGPU::ResetForReuse()
 {
     if (!m_enabled) return;
 
     std::lock_guard<std::mutex> lock(m_resetMutex);
 
-    // 렌더 상태 초기화
     m_instanceCount = 0;
     m_isRendering = false;
     m_gpuWorkPending = false;
 
-    // 리소스 참조 해제 (실제 리소스는 해제하지 않음)
     m_particleSRV = nullptr;
-    m_assignedTexture = nullptr;
 
-    // 메시 타입을 기본값으로 리셋
+    // 다중 텍스처 초기화
+    ClearTextures();
+
     m_meshType = MeshType::Cube;
     m_model = nullptr;
     m_meshIndex = 0;
 
-    // 상수 버퍼 초기화
+    // 렌더 상태를 기본값으로 리셋
+    //if (m_vertexShaderName == "None") {
+    //    m_vertexShaderName = "MeshParticle";
+    //}
+    //
+    //if (m_pixelShaderName == "None") {
+    //    m_pixelShaderName = "MeshParticle";
+    //}
+    //
+    //if (m_blendPreset == BlendPreset::Alpha) { // 부모 기본값
+    //    m_blendPreset = BlendPreset::Additive;
+    //}
+    //if (m_depthPreset == DepthPreset::Default) { // 부모 기본값  
+    //    m_depthPreset = DepthPreset::ReadOnly;
+    //}
+    //if (m_rasterizerPreset == RasterizerPreset::Default) { // 부모 기본값
+    //    m_rasterizerPreset = RasterizerPreset::NoCull;
+    //}
+
+    UpdatePSOShaders();
+    UpdatePSORenderStates();
+
     if (m_constantBuffer) {
-        m_constantBufferData = {}; // 구조체 초기화
+        m_constantBufferData = {};
         m_constantBufferData.world = Mathf::Matrix::Identity;
         m_constantBufferData.view = Mathf::Matrix::Identity;
         m_constantBufferData.projection = Mathf::Matrix::Identity;
     }
 
-    // 클리핑 상태 초기화
     m_polarClippingParams = {};
     m_isPolarClippingAnimating = false;
     m_polarClippingAnimationSpeed = 1.0f;
     m_effectProgress = 0.0f;
     m_useEffectProgress = false;
 
-    // 월드 매트릭스 초기화
     m_worldMatrix = Mathf::Matrix::Identity;
     m_invWorldMatrix = Mathf::Matrix::Identity;
 }
@@ -401,6 +315,38 @@ bool MeshModuleGPU::IsReadyForReuse() const
 void MeshModuleGPU::WaitForGPUCompletion()
 {
     m_gpuWorkPending = false;
+}
+
+void MeshModuleGPU::UpdatePSOShaders()
+{
+    RenderModules::UpdatePSOShaders();
+
+    if (m_pso && m_pso->m_vertexShader) {
+        if (m_pso->m_inputLayout) {
+            m_pso->m_inputLayout = nullptr;
+        }
+
+        D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+        };
+
+        DirectX11::ThrowIfFailed(
+            DirectX11::DeviceStates->g_pDevice->CreateInputLayout(
+                vertexLayoutDesc,
+                _countof(vertexLayoutDesc),
+                m_pso->m_vertexShader->GetBufferPointer(),
+                m_pso->m_vertexShader->GetBufferSize(),
+                &m_pso->m_inputLayout
+            )
+        );
+    }
 }
 
 void MeshModuleGPU::CreateCubeMesh()
@@ -635,44 +581,32 @@ void MeshModuleGPU::SetPolarReferenceDirection(const Mathf::Vector3& referenceDi
     }
 }
 
-
-
 nlohmann::json MeshModuleGPU::SerializeData() const
 {
     nlohmann::json json;
 
-    // 메시 타입 정보
+    // 부모의 렌더 상태 직렬화 사용
+    json.merge_patch(SerializeRenderStates());
+
+    // 다중 텍스처 직렬화
+    json["textures"] = SerializeTextures();
+
     json["mesh"] = {
         {"type", static_cast<int>(m_meshType)},
         {"meshIndex", m_meshIndex}
     };
 
-    // 모델 정보
     json["model"] = {
         {"hasModel", m_model != nullptr}
     };
 
-    if (m_model)
-    {
+    if (m_model) {
         json["model"]["name"] = m_model->name;
         json["model"]["assigned"] = true;
         json["model"]["meshIndex"] = m_meshIndex;
     }
 
-    // 텍스처 정보
-    json["texture"] = {
-        {"hasTexture", m_assignedTexture != nullptr}
-    };
-
-    if (m_assignedTexture)
-    {
-        json["texture"]["name"] = m_assignedTexture->m_name;
-        json["texture"]["assigned"] = true;
-    }
-
-
-    if (IsPolarClippingEnabled())
-    {
+    if (IsPolarClippingEnabled()) {
         json["polarClipping"] = {
             {"enabled", IsPolarClippingEnabled()},
             {"animating", m_isPolarClippingAnimating},
@@ -700,7 +634,6 @@ nlohmann::json MeshModuleGPU::SerializeData() const
         };
     }
 
-    // 상수 버퍼 데이터
     json["constantBuffer"] = {
         {"cameraPosition", {
             {"x", m_constantBufferData.cameraPosition.x},
@@ -709,10 +642,8 @@ nlohmann::json MeshModuleGPU::SerializeData() const
         }}
     };
 
-    // 렌더링 상태
     json["renderState"] = {
         {"instanceCount", m_instanceCount},
-        {"useAlternativeBlend", m_useAdditiveBlend}
     };
 
     return json;
@@ -720,23 +651,26 @@ nlohmann::json MeshModuleGPU::SerializeData() const
 
 void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
 {
+    if (!m_pso) {
+        Initialize();
+    }
+
+    // 부모의 렌더 상태 역직렬화 사용
+    DeserializeRenderStates(json);
+
+    // 다중 텍스처 역직렬화
+    DeserializeTextures(json);
+
     // 모델 정보 복원
-    if (json.contains("model"))
-    {
+    if (json.contains("model")) {
         const auto& modelJson = json["model"];
-        if (modelJson.contains("name"))
-        {
+        if (modelJson.contains("name")) {
             std::string modelName = modelJson["name"];
 
-            // 확장자가 없는 경우에만 기본 확장자 추가
-            // 다양한 모델 형식 지원 (fbx, gltf, obj, dae)
-            if (modelName.find('.') == std::string::npos)
-            {
-                // 여러 확장자를 순서대로 시도
+            if (modelName.find('.') == std::string::npos) {
                 std::vector<std::string> extensions = { ".gltf", ".fbx" };
 
-                for (const auto& ext : extensions)
-                {
+                for (const auto& ext : extensions) {
                     std::string testName = modelName + ext;
                     m_model = DataSystems->LoadCashedModel(testName);
                     if (m_model) break;
@@ -749,95 +683,57 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 m_meshType = MeshType::Model;
             }
         }
-        if (modelJson.contains("meshIndex"))
-        {
+        if (modelJson.contains("meshIndex")) {
             m_meshIndex = modelJson["meshIndex"];
         }
     }
 
     // 메시 타입 정보 복원
-    if (json.contains("mesh"))
-    {
+    if (json.contains("mesh")) {
         const auto& meshJson = json["mesh"];
-        if (meshJson.contains("type"))
-        {
+        if (meshJson.contains("type")) {
             MeshType jsonType = static_cast<MeshType>(meshJson["type"]);
-            // 모델이 로드되지 않았거나, JSON에서 명시적으로 다른 타입을 지정한 경우에만 변경
             if (!m_model || jsonType != MeshType::Model) {
                 SetMeshType(jsonType);
             }
         }
-        if (meshJson.contains("meshIndex"))
-        {
+        if (meshJson.contains("meshIndex")) {
             m_meshIndex = meshJson["meshIndex"];
         }
     }
 
-    // 텍스처 정보 복원
-    if (json.contains("texture"))
-    {
-        const auto& textureJson = json["texture"];
-
-        if (textureJson.contains("name"))
-        {
-            std::string textureName = textureJson["name"];
-
-            // 텍스처도 마찬가지로 확장자가 없는 경우만 png 추가
-            if (textureName.find('.') == std::string::npos)
-            {
-                textureName += ".png";
-            }
-
-            m_assignedTexture = DataSystems->LoadTexture(textureName);
-
-            if (m_assignedTexture) {
-                std::string nameWithoutExtension = file::path(textureName).stem().string();
-                m_assignedTexture->m_name = nameWithoutExtension;
-            }
-        }
-    }
-
-    if (json.contains("polarClipping"))
-    {
+    if (json.contains("polarClipping")) {
         const auto& polarClippingJson = json["polarClipping"];
 
-        if (polarClippingJson.contains("enabled"))
-        {
+        if (polarClippingJson.contains("enabled")) {
             bool enabled = polarClippingJson["enabled"];
             EnablePolarClipping(enabled);
         }
 
-        if (polarClippingJson.contains("animating"))
-        {
+        if (polarClippingJson.contains("animating")) {
             m_isPolarClippingAnimating = polarClippingJson["animating"];
         }
 
-        if (polarClippingJson.contains("animationSpeed"))
-        {
+        if (polarClippingJson.contains("animationSpeed")) {
             m_polarClippingAnimationSpeed = polarClippingJson["animationSpeed"];
         }
 
-        if (polarClippingJson.contains("params"))
-        {
+        if (polarClippingJson.contains("params")) {
             const auto& paramsJson = polarClippingJson["params"];
 
-            if (paramsJson.contains("polarAngleProgress"))
-            {
+            if (paramsJson.contains("polarAngleProgress")) {
                 SetPolarAngleProgress(paramsJson["polarAngleProgress"]);
             }
 
-            if (paramsJson.contains("polarStartAngle"))
-            {
+            if (paramsJson.contains("polarStartAngle")) {
                 SetPolarStartAngle(paramsJson["polarStartAngle"]);
             }
 
-            if (paramsJson.contains("polarDirection"))
-            {
+            if (paramsJson.contains("polarDirection")) {
                 SetPolarDirection(paramsJson["polarDirection"]);
             }
 
-            if (paramsJson.contains("polarCenter"))
-            {
+            if (paramsJson.contains("polarCenter")) {
                 const auto& centerJson = paramsJson["polarCenter"];
                 Mathf::Vector3 center(
                     centerJson.value("x", 0.0f),
@@ -847,8 +743,7 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 SetPolarCenter(center);
             }
 
-            if (paramsJson.contains("polarUpAxis"))
-            {
+            if (paramsJson.contains("polarUpAxis")) {
                 const auto& upAxisJson = paramsJson["polarUpAxis"];
                 Mathf::Vector3 upAxis(
                     upAxisJson.value("x", 0.0f),
@@ -858,8 +753,7 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 SetPolarUpAxis(upAxis);
             }
 
-            if (paramsJson.contains("polarReferenceDir"))
-            {
+            if (paramsJson.contains("polarReferenceDir")) {
                 const auto& refDirJson = paramsJson["polarReferenceDir"];
                 Mathf::Vector3 referenceDir(
                     refDirJson.value("x", 1.0f),
@@ -871,13 +765,10 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         }
     }
 
-    // 상수 버퍼 데이터 복원
-    if (json.contains("constantBuffer"))
-    {
+    if (json.contains("constantBuffer")) {
         const auto& cbJson = json["constantBuffer"];
 
-        if (cbJson.contains("cameraPosition"))
-        {
+        if (cbJson.contains("cameraPosition")) {
             const auto& camPosJson = cbJson["cameraPosition"];
             Mathf::Vector3 cameraPosition(
                 camPosJson.value("x", 0.0f),
@@ -888,37 +779,21 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         }
     }
 
-    // 렌더링 상태 복원
-    if (json.contains("renderState"))
-    {
+    if (json.contains("renderState")) {
         const auto& renderJson = json["renderState"];
 
-        if (renderJson.contains("instanceCount"))
-        {
+        if (renderJson.contains("instanceCount")) {
             m_instanceCount = renderJson["instanceCount"];
         }
-
-        if (renderJson.contains("useAlternativeBlend"))
-        {
-            m_useAdditiveBlend = renderJson["useAlternativeBlend"];
-        }
     }
 
-    if (!m_pso) {
-        Initialize();
-    }
-
-    // 클리핑 버퍼 업데이트
-    if (IsPolarClippingEnabled())
-    {
-        if (DirectX11::DeviceStates->g_pDevice && DirectX11::DeviceStates->g_pDeviceContext)
-        {
+    if (IsPolarClippingEnabled()) {
+        if (DirectX11::DeviceStates->g_pDevice && DirectX11::DeviceStates->g_pDeviceContext) {
             UpdateClippingBuffer();
             OnClippingStateChanged();
         }
     }
 }
-
 
 std::string MeshModuleGPU::GetModuleType() const
 {

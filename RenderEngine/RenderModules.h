@@ -8,9 +8,9 @@
 class ParticleSystem;
 enum class BillBoardType
 {
+    None,
     Basic,
-    YAxs,
-    AxisAligned
+    SpriteAnimation,
 };
 
 struct BillboardVertex
@@ -52,6 +52,36 @@ struct PolarClippingParams
 
 };
 
+enum class BlendPreset
+{
+    None,           // 블렌딩 비활성화
+    Alpha,          // 표준 알파 블렌딩
+    Additive,       // 가산 블렌딩
+    Multiply,       // 곱셈 블렌딩
+    Subtractive,    // 감산 블렌딩
+    Custom          // 사용자 정의
+};
+
+enum class DepthPreset
+{
+    None,
+    Default,        // 읽기/쓰기 모두 활성화, LESS 비교
+    ReadOnly,       // 읽기만 활성화, 쓰기 비활성화
+    WriteOnly,      // 쓰기만 활성화, 비교 비활성화
+    Disabled,       // 깊이 테스트 완전 비활성화
+    Custom          // 사용자 정의
+};
+
+enum class RasterizerPreset
+{
+    None,
+    Default,        // SOLID, BACK 컬링
+    NoCull,         // SOLID, 컬링 없음
+    Wireframe,      // WIREFRAME, BACK 컬링
+    WireframeNoCull,// WIREFRAME, 컬링 없음
+    Custom          // 사용자 정의
+};
+
 class RenderModules
 {
 public:
@@ -59,8 +89,6 @@ public:
     virtual void Initialize() {}
     virtual void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) {}
     virtual void Release() {}
-    virtual void SetTexture(Texture* texture) {}
-    virtual void SetDissolveTexture(Texture* texture) {}
     virtual void BindResource() {}
     virtual void SetupRenderTarget(RenderPassData* renderData) {}
 
@@ -110,12 +138,104 @@ public:
 
     bool IsSystemRunning() const;
 
+    // 셰이더 관리
+    void SetVertexShader(const std::string& shaderName);
+    void SetPixelShader(const std::string& shaderName);
+    void SetShaders(const std::string& vertexShader, const std::string& pixelShader);
 
+    const std::string& GetVertexShaderName() const { return m_vertexShaderName; }
+    const std::string& GetPixelShaderName() const { return m_pixelShaderName; }
+
+    static std::vector<std::string> GetAvailableVertexShaders();
+    static std::vector<std::string> GetAvailablePixelShaders();
+
+    // 블렌드 상태 관리
+    void SetBlendPreset(BlendPreset preset);
+    void SetCustomBlendState(const D3D11_BLEND_DESC& desc);
+    BlendPreset GetBlendPreset() const { return m_blendPreset; }
+
+    // 깊이 스텐실 상태 관리
+    void SetDepthPreset(DepthPreset preset);
+    void SetCustomDepthStencilState(const D3D11_DEPTH_STENCIL_DESC& desc);
+    DepthPreset GetDepthPreset() const { return m_depthPreset; }
+
+    // 래스터라이저 상태 관리
+    void SetRasterizerPreset(RasterizerPreset preset);
+    void SetCustomRasterizerState(const D3D11_RASTERIZER_DESC& desc);
+    RasterizerPreset GetRasterizerPreset() const { return m_rasterizerPreset; }
+
+    // 직렬화
+    nlohmann::json SerializeRenderStates() const;
+    void DeserializeRenderStates(const nlohmann::json& json);
+
+    virtual void UpdatePSOShaders();
+    virtual void UpdatePSORenderStates();
+    virtual void OnShadersChanged() {}
+    virtual void OnRenderStatesChanged() {}
+
+    // 다중 텍스처 관리
+    void SetTexture(int slot, Texture* texture);
+    void SetTexture(Texture* texture) { SetTexture(0, texture); }
+    void AddTexture(Texture* texture);
+    void RemoveTexture(int slot);
+    void ClearTextures();
+
+    // 텍스처 접근
+    Texture* GetTexture(int slot) const;
+    size_t GetTextureCount() const { return m_textures.size(); }
+    const std::vector<Texture*>& GetTextures() const { return m_textures; }
+
+    // 자동 크기 조정
+    void EnsureTextureSlots(size_t count);
+
+    // 직렬화
+    nlohmann::json SerializeTextures() const;
+    void DeserializeTextures(const nlohmann::json& json);
+
+    virtual void BindTextures();
 protected:
+    std::vector<Texture*> m_textures;
+    // 모듈 상태
+    bool m_enabled = true;
+    bool m_isRendering = false;
+    mutable std::atomic<bool> m_gpuWorkPending = false;
+
+    // owner
     ParticleSystem* m_ownerSystem;
 
+    // 텍스처
+    Texture* m_assignedTexture;
+    Texture* m_dissolveTexture;
+
+    // pso
     std::unique_ptr<PipelineStateObject> m_pso;
 
+    // 렌더 상태 생성 헬퍼 함수들
+    void CreateBlendState(BlendPreset preset);
+    void CreateDepthStencilState(DepthPreset preset);
+    void CreateRasterizerState(RasterizerPreset preset);
+
+    // 프리셋을 D3D11 구조체로 변환하는 함수들
+    D3D11_BLEND_DESC GetBlendDesc(BlendPreset preset) const;
+    D3D11_DEPTH_STENCIL_DESC GetDepthStencilDesc(DepthPreset preset) const;
+    D3D11_RASTERIZER_DESC GetRasterizerDesc(RasterizerPreset preset) const;
+    
+    // 셰이더 설정
+    std::string m_vertexShaderName = "None";
+    std::string m_pixelShaderName = "None";
+
+    // 렌더 상태 설정
+    BlendPreset m_blendPreset = BlendPreset::None;
+    DepthPreset m_depthPreset = DepthPreset::None;
+    RasterizerPreset m_rasterizerPreset = RasterizerPreset::None;
+
+    // 커스텀 상태 저장
+    D3D11_BLEND_DESC m_customBlendDesc = {};
+    D3D11_DEPTH_STENCIL_DESC m_customDepthDesc = {};
+    D3D11_RASTERIZER_DESC m_customRasterizerDesc = {};
+
+protected:
+    // 안쓰지만 일단 유지
     // 클리핑 관련 데이터를 부모에서 관리
     PolarClippingParams m_clippingParams = {};
     bool m_clippingEnabled = false;
@@ -125,16 +245,8 @@ protected:
     virtual void CreateClippingBuffer() {}
     virtual void UpdateClippingBuffer() {}
 
-    Texture* m_assignedTexture;
-    Texture* m_dissolveTexture;
-
     float m_effectProgress = 0.0f;
     bool m_useEffectProgress = false;
-
-    bool m_enabled = true;
-
-    bool m_isRendering = false;
-    mutable std::atomic<bool> m_gpuWorkPending = false;
 
 private:
     ID3D11DepthStencilState* m_prevDepthState = nullptr;

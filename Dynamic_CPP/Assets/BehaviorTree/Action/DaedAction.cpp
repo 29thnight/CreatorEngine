@@ -1,7 +1,7 @@
 #include "DaedAction.h"
 #include "pch.h"
 #include "EffectComponent.h"
-
+#include "DebugLog.h"
 
 NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
@@ -20,19 +20,19 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("State");
 		if (state == "PreDelete") 
 		{
-			//std::cout << "waiting delete" << std::endl;
+			//LOG("waiting delete");
 			return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
 		}
 		else if (state == "Daed")
 		{
 			float dot = rotation.Dot(finalRotation);
-			std::cout << dot << std::endl;
+			LOG(dot);
 			// 회전 근사치 확인
 			if (std::abs(dot) > 0.9999f)
 			{
 				// 1. 회전이 끝났으면 최종 위치로 정확히 맞춰줍니다.
 				selfTransform->SetRotation(finalRotation);
-				std::cout << "DieAction: OnUpdate - Target reached. Finishing." << std::endl;
+				LOG("DieAction: OnUpdate - Target reached. Finishing.");
 				effcomponent->StopEffect(); // Stop the effect component if needed
 				blackBoard.SetValueAsString("State", "PreDelete");
 				return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
@@ -41,7 +41,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 			// 2. 회전이 끝나지 않았으면 회전 속도에 따라 회전합니다.
 			Mathf::Quaternion newRotation = Mathf::Quaternion::Slerp(rotation, finalRotation, rotationSpeed * deltatime);
 			selfTransform->SetRotation(newRotation);
-			std::cout << "Daed action already in progress." << std::endl;
+			LOG("Daed action already in progress.");
 			return NodeStatus::Running; // Continue running if already in daed state
 		}
 		else
@@ -54,7 +54,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 
 			blackBoard.SetValueAsString("State", "Daed");
-			std::cout << "Switching to Daed state." << std::endl;
+			LOG("Switching to Daed state.");
 
 			return NodeStatus::Running; // Start the daed action
 		}
@@ -62,7 +62,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 	}
 	
 
-	std::cout << "DaedAction executed!" << m_owner->GetHashedName().ToString() << std::endl;
+	LOG("DaedAction executed!" << m_owner->GetHashedName().ToString());
 	//애니메이션 행동  mowner eney-scropt -> isdead =true  // scrpit에서 죽이기
 	
 	// You can access and modify the blackboard data here if needed

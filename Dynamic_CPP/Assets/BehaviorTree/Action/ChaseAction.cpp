@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "EntityEnemy.h"
 #include "Animator.h"
+#include "DebugLog.h"
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	bool isSpeed = blackBoard.HasKey("Speed");
@@ -22,7 +23,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 			targetpos = closedTransform->GetWorldPosition();
 		}
 		else {
-			//std::cout << "ChaseAction: ClosedTarget Transform not found." << std::endl;
+			//LOG("ChaseAction: ClosedTarget Transform not found.");
 			return NodeStatus::Failure; // Handle case where closedTarget Transform is not found
 		}
 	}
@@ -34,7 +35,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 	}
 	else {
-		std::cout << "not found Speed don`t move";
+		LOG("not found Speed don`t move";
 	}*/
 	bool useChase = blackBoard.HasKey("ChaseRange");
 	bool useChaseOutTime = blackBoard.HasKey("ChaseOutTime");
@@ -80,19 +81,19 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 			if (movement) {
 				movement->Move(dir2D);
 				enemy->m_animator->SetParameter("Move", true);
-				//std::cout << "ChaseAction executed. Moving towards target." << std::endl;
+				//LOG("ChaseAction executed. Moving towards target.");
 				if (HasState)
 				{
 					std::string state = blackBoard.GetValueAsString("State");
 					if (state == "Chase")
 					{
-						//std::cout << "Chase action already in progress." << std::endl;
+						//LOG("Chase action already in progress.");
 						//return NodeStatus::Running; // Continue running if already in chase state
 					}
 					else
 					{
 						blackBoard.SetValueAsString("State", "Chase");
-						//std::cout << "Switching to Move state." << std::endl;
+						//LOG("Switching to Move state.");
 					}
 				}
 			}
@@ -103,7 +104,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 	//setting Target
 	if (closedTarget)
 	{
-		//std::cout << "ChaseAction: Setting Target to " << closedTarget->ToString() << std::endl;
+		//LOG("ChaseAction: Setting Target to " << closedTarget->ToString());
 		blackBoard.SetValueAsGameObject("Target", closedTarget->ToString());
 	}
 
