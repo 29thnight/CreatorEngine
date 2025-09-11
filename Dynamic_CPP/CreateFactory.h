@@ -31,7 +31,7 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "CameraMove.h"
-
+#include "EntitlyRock.h"
 class CreateFactory : public Singleton<CreateFactory>
 {
 private:

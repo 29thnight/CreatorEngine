@@ -683,57 +683,13 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
-void Player::OnBuff()
 
 
+
+void Player::Cancancel()
 {
-	
-	if (weapon)
-
-
-	if (m_curWeapon->itemType == ItemType::Basic)
-	{
-		//1콤보까지만 올라가게
-		if (m_comboCount < 1)
-		{
-			m_comboCount++;
-			m_comboElapsedTime = 0.f;
-		}
-		else
-		{
-			m_comboCount = 0;
-			m_comboElapsedTime = 0.f;
-		}
-	}
-	else if (m_curWeapon->itemType == ItemType::Meely)
-	{
-		//2콤보까지 가능
-		if (m_comboCount < 2)
-		{
-			m_comboCount++;
-			m_comboElapsedTime = 0.f;
-		}
-		else
-		{
-			m_comboCount = 0;
-			m_comboElapsedTime = 0.f;
-			if (dir.x < -0.1f)
-			{
-				//
-			}
-			if (dir.y > 0.1f)
-			{
-				//
-			}
-			if (dir.y < -0.1f)
-			{
-				//
-			}
-		}
-	}
-	
+	canMeleeCancel = true;
 }
-
 
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
