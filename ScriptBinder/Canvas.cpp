@@ -6,6 +6,7 @@
 #include "UIButton.h"
 #include "SceneManager.h"
 #include "RectTransformComponent.h"
+#include "SpriteSheetComponent.h"
 
 Canvas::Canvas()
 {
@@ -47,6 +48,14 @@ void Canvas::AddUIObject(std::shared_ptr<GameObject> obj)
 		btn->SetCanvas(this);
 		btn->m_ownerCanvasName = m_pOwner->m_name.ToString();
 	}
+	auto spriteSheet = obj->GetComponent<SpriteSheetComponent>();
+	if (spriteSheet)
+	{
+		spriteSheet->SetCanvas(this);
+		UIManagers->RegisterSpriteSheetComponent(spriteSheet);
+		spriteSheet->m_ownerCanvasName = m_pOwner->m_name.ToString();
+	}
+
 	UIObjs.push_back(obj);
 	//맨처음 추가되는 UI를 선택된 UI로 지정
 	if (SelectUI.expired())

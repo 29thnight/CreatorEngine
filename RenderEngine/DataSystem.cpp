@@ -701,6 +701,9 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 		case DataSystem::TextureFileType::UITexture:
 			UITextures[name] = texture;
 			break;
+		case DataSystem::TextureFileType::SpriteSheet:
+			SpriteSheets[name] = texture;
+			break;
 		default:
 			break;
 		}
@@ -1118,7 +1121,15 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 				if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 				{
-					ImGui::SetDragDropPayload(FileTypeToString(selectedFileType), entry.path().string().c_str(), entry.path().string().size() + 1);
+					auto find = entry.path().parent_path();
+					if (find == PathFinder::Relative("SpriteSheets"))
+					{
+						ImGui::SetDragDropPayload("SPRITESHEET", entry.path().string().c_str(), entry.path().string().size() + 1);
+					}
+					else
+					{
+						ImGui::SetDragDropPayload(FileTypeToString(selectedFileType), entry.path().string().c_str(), entry.path().string().size() + 1);
+					}
 					ImGui::Text("Dragging %s", entry.path().filename().string().c_str());
 					ImGui::EndDragDropSource();
 				}
@@ -1301,7 +1312,14 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 	{
-		ImGui::SetDragDropPayload(FileTypeToString(fileType), fileName.c_str(), fileName.size() + 1);
+		if (directory.parent_path() == PathFinder::Relative("SpriteSheets"))
+		{
+			ImGui::SetDragDropPayload("SPRITESHEET", directory.string().c_str(), directory.string().size() + 1);
+		}
+		else
+		{
+			ImGui::SetDragDropPayload(FileTypeToString(fileType), fileName.c_str(), fileName.size() + 1);
+		}
 		ImGui::Text("Dragging %s", fileName.c_str());
 		ImGui::EndDragDropSource();
 	}

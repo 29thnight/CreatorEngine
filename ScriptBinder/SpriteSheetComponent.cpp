@@ -6,27 +6,31 @@
 #include "RectTransformComponent.h"
 #include "UIManager.h"
 
-void SpriteSheetComponent::LoadSpriteSheet(std::string_view path)
+void SpriteSheetComponent::LoadSpriteSheet(const file::path& path)
 {
-	m_spriteSheetPath = path.data();
-	m_spriteSheetTexture = DataSystems->LoadSharedTexture(path, 
+	m_spriteSheetPath = path.filename().string();
+	m_spriteSheetTexture = DataSystems->LoadSharedTexture(m_spriteSheetPath,
 		DataSystem::TextureFileType::SpriteSheet);
+	uiinfo.size = m_spriteSheetTexture->GetImageSize();
+
+	//origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
 }
 
 void SpriteSheetComponent::Awake()
 {
-	//auto scene = GetOwner()->m_ownerScene;
-	//auto renderScene = SceneManagers->GetRenderScene();
-	//if (scene)
-	//{
-	//	renderScene->RegisterCommand(this);
-	//}
+	auto scene = GetOwner()->m_ownerScene;
+	auto renderScene = SceneManagers->GetRenderScene();
+	if (scene)
+	{
+		renderScene->RegisterCommand(this);
+	}
 }
 
 void SpriteSheetComponent::Update(float tick)
 {
 	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
 	{
+		m_deltaTime = tick;
 		const auto& worldRect = rect->GetWorldRect();
 		pos = { worldRect.x + worldRect.width * 0.5f,
 				worldRect.y + worldRect.height * 0.5f,
@@ -40,11 +44,11 @@ void SpriteSheetComponent::Update(float tick)
 
 void SpriteSheetComponent::OnDestroy()
 {
-	//auto scene = GetOwner()->m_ownerScene;
-	//auto renderScene = SceneManagers->GetRenderScene();
-	//if (scene)
-	//{
-	//	renderScene->UnregisterCommand(this);
-	//	UIManagers->UnregisterSpriteSheetComponent(this);
-	//}
+	auto scene = GetOwner()->m_ownerScene;
+	auto renderScene = SceneManagers->GetRenderScene();
+	if (scene)
+	{
+		renderScene->UnregisterCommand(this);
+		UIManagers->UnregisterSpriteSheetComponent(this);
+	}
 }

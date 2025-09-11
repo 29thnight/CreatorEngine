@@ -3,10 +3,12 @@
 #include "Terrain.h"
 #include "FoliageComponent.h"
 #include "ImageComponent.h"
+#include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "Material.h"
+#include "SpriteRenderer.h"
 #include "DecalComponent.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
@@ -112,6 +114,41 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	};
 }
 
+
+ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
+{
+	m_proxyGUID = pComponent->GetInstanceID();
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto componentPtr = pComponent;
+	auto owner = componentPtr->GetOwner();
+	bool isStatic = owner->IsStatic();
+	bool isEnabled = owner->IsEnabled();
+	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	if (!proxyObject) return;
+	Texture* originTexture = pComponent->m_Sprite;
+	if (!originTexture)
+	{
+		m_updateFunction = [=]
+		{
+			// If the texture is null, we do not need to update anything.
+		};
+		return;
+	}
+
+	m_updateFunction = [=]()
+	{
+		proxyObject->m_worldMatrix = worldMatrix;
+		proxyObject->m_worldPosition = worldPosition;
+		proxyObject->m_isStatic = isStatic;
+		proxyObject->m_isEnableShadow = isEnabled;
+		proxyObject->m_spriteTexture = originTexture;
+	};
+}
+
+
 ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 {
 	m_proxyGUID = pComponent->GetInstanceID();
@@ -208,6 +245,69 @@ ProxyCommand::ProxyCommand(DecalComponent* pComponent):
 	};
 }
 
+ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
+	m_proxyGUID(pComponent->GetInstanceID())
+{
+	//TODO : implement SpriteSheetComponent proxy command
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	SpinLock lock(renderScene->m_uiProxyMapFlag);
+	auto iter = renderScene->m_uiProxyMap.find(m_proxyGUID);
+	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
+	auto proxyObject = iter->second.get();
+
+	auto origin			= DirectX::XMFLOAT2{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
+	auto position		= pComponent->pos;
+	auto scale			= pComponent->scale;
+	int layerOrder		= pComponent->GetLayerOrder();
+	float frameDuration = pComponent->m_frameDuration;
+	auto cpuBuffer		= pComponent->GetCustomPixelCPUBuffer();
+	auto shaderPath		= pComponent->GetCustomPixelShader();
+	bool isLoop			= pComponent->m_isLoop;
+	float deltaTime		= pComponent->m_deltaTime;
+	bool isEnable		= owner->IsEnabled();
+	bool isPreview		= pComponent->m_isPreview;
+
+	if (!shaderPath.empty())
+	{
+		proxyObject->SetCustomPixelShader(shaderPath);
+	}
+
+	m_updateFunction = [proxyObject, isPreview, isEnable, origin, position, scale, layerOrder, frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
+	{
+		// texture는 imutable처럼 관리(한번 설정되면 이후 변경되지 않음)
+		UIRenderProxy::SpriteSheetData data{};
+		data.origin = origin;
+		data.position = position;
+		data.scale = scale;
+		data.layerOrder = layerOrder;
+		data.frameDuration = frameDuration;
+		data.isPreview = isPreview;
+		if (!isEnable)
+		{
+			proxyObject->m_sequenceState.frameIndex = 0;
+			proxyObject->m_sequenceState.timeAccum = 0.f;
+			data.deltaTime = 0;
+		}
+		else
+		{
+			data.deltaTime = deltaTime;
+		}
+		proxyObject->m_sequenceState.loop = isLoop;
+
+		proxyObject->m_data = std::move(data);
+		proxyObject->m_isEnabled = isEnable;
+		if (!buffer.empty())
+		{
+			proxyObject->SetCustomPixelBuffer(buffer);
+		}
+
+	};
+
+}
+
 ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 {
 	if (nullptr == pComponent) return;
@@ -234,6 +334,7 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	auto clipPercent   = pComponent->clipPercent;
 	auto shaderPath = pComponent->GetCustomPixelShader();
 	auto cpuBuffer = pComponent->GetCustomPixelCPUBuffer();
+	bool isEnable = owner->IsEnabled();
 
 	if (!shaderPath.empty())
 	{
@@ -241,21 +342,22 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	}
 
 	m_updateFunction = [proxyObject, textures = std::move(textures), 
-		curTexture, origin, position, scale, 
+		curTexture, origin, position, scale, isEnable,
 		rotation, layerOrder, color, clipDirection, clipPercent, buffer = std::move(cpuBuffer)]() mutable
 	{
 		UIRenderProxy::ImageData data{};
-		data.textures			= std::move(textures);
-		data.texture			= curTexture;
-		data.origin				= origin;
-		data.color				= color;
-		data.position			= position;
-		data.scale				= scale;
-		data.rotation			= rotation;
-		data.layerOrder			= layerOrder;
-		data.clipDirection      = clipDirection;
-		data.clipPercent        = clipPercent;
-		proxyObject->m_data		= std::move(data);
+		data.textures				= std::move(textures);
+		data.texture				= curTexture;
+		data.origin					= origin;
+		data.color					= color;
+		data.position				= position;
+		data.scale					= scale;
+		data.rotation				= rotation;
+		data.layerOrder				= layerOrder;
+		data.clipDirection			= clipDirection;
+		data.clipPercent			= clipPercent;
+		proxyObject->m_data			= std::move(data);
+		proxyObject->m_isEnabled	= isEnable;
 
 		if (!buffer.empty())
 		{
@@ -284,8 +386,9 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	auto position = pComponent->pos;
 	float fontSize = pComponent->fontSize;
 	int layerOrder = pComponent->GetLayerOrder();
+	bool isEnable = owner->IsEnabled();
 
-	m_updateFunction = [proxyObject, font, message, color, position, fontSize, layerOrder]()
+	m_updateFunction = [proxyObject, isEnable, font, message, color, position, fontSize, layerOrder]()
 	{
 		UIRenderProxy::TextData data{};
 		data.font = font;
@@ -295,6 +398,7 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 		data.fontSize = fontSize;
 		data.layerOrder = layerOrder;
 		proxyObject->m_data = std::move(data);
+		proxyObject->m_isEnabled = isEnable;
 	};
 }
 

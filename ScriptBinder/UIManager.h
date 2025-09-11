@@ -7,6 +7,9 @@
 
 class Canvas;
 class Texture;
+class ImageComponent;
+class TextComponent;
+class SpriteSheetComponent;
 class UIManager : public DLLCore::Singleton<UIManager>
 {
 public:
@@ -22,6 +25,9 @@ public:
 	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
+	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+
 	void DeleteCanvas(std::string canvasName);
 	void CheckInput();
 
@@ -32,10 +38,10 @@ public:
 	void SortCanvas();
 	void RegisterImageComponent(ImageComponent* image);
 	void RegisterTextComponent(TextComponent* text);
+	void RegisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet);
 	void UnregisterImageComponent(ImageComponent* image);
 	void UnregisterTextComponent(TextComponent* text);
-
-
+	void UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet);
 
 public:
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
@@ -43,6 +49,7 @@ public:
 	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
 	std::vector<ImageComponent*>			Images;
 	std::vector<TextComponent*>				Texts;
+	std::vector<SpriteSheetComponent*>      SpriteSheets;
 	//이정 캔버스
 	//현재 상호작용할 UI
 	std::weak_ptr<GameObject> CurCanvas;

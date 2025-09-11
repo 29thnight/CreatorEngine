@@ -7,6 +7,7 @@
 #include "InputManager.h"
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
+#include "SpriteSheetComponent.h"
 #include "../RenderEngine/DeviceState.h"
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
@@ -279,6 +280,51 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
 	return newText;
 }
 
+std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas, Mathf::Vector2 Pos)
+{
+	if (Canvases.empty())
+		MakeCanvas();
+	if (!canvas)
+	{
+		if (auto c = Canvases.front().lock())
+			canvas = c.get();
+		else
+			return nullptr;
+	}
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newSpriteSheet->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
+	newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
+	canvasCom->AddUIObject(newSpriteSheet);
+	return newSpriteSheet;
+}
+
+std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
+{
+	if (Canvases.empty())
+		MakeCanvas();
+	int canvasIndex = 0;
+	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
+	{
+		if (auto c = Canvases[canvasIndex].lock())
+		{
+			if (c->ToString() == canvasname)
+				break;
+		}
+	}
+	GameObject* canvas = FindCanvasName(canvasname);
+	if (canvas == nullptr)
+	{
+		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+		return nullptr;
+	}
+	auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newSpriteSheet->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
+	newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
+	canvas->GetComponent<Canvas>()->AddUIObject(newSpriteSheet);
+	return newSpriteSheet;
+}
+
 void UIManager::DeleteCanvas(std::string canvasName)
 {
 	auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& canvas) 
@@ -446,6 +492,12 @@ void UIManager::RegisterTextComponent(TextComponent* text)
 		Texts.push_back(text);
 }
 
+void UIManager::RegisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet)
+{
+	if (spriteSheet)
+		SpriteSheets.push_back(spriteSheet);
+}
+
 void UIManager::UnregisterImageComponent(ImageComponent* image)
 {
 	std::erase(Images, image);
@@ -454,4 +506,9 @@ void UIManager::UnregisterImageComponent(ImageComponent* image)
 void UIManager::UnregisterTextComponent(TextComponent* text)
 {
 	std::erase(Texts, text);
+}
+
+void UIManager::UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet)
+{
+	std::erase(SpriteSheets, spriteSheet);
 }
