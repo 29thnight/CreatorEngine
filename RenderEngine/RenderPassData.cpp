@@ -131,7 +131,7 @@ void RenderPassData::Initalize(uint32 index)
 
 	}
 
-	//¾È¿¡¼­ ¹è¿­Àº 3À¸·Î °íÁ¤Áß ÇÊ¿äÇÏ¸é ¼öÁ¤
+	//ì•ˆì—ì„œ ë°°ì—´ì€ 3ìœ¼ë¡œ ê³ ì •ì¤‘ í•„ìš”í•˜ë©´ ìˆ˜ì •
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 	m_shadowMapTexture.swap(shadowMapTexture);
@@ -240,6 +240,7 @@ void RenderPassData::ClearRenderQueue()
 	m_foliageQueue.clear();
 	m_UIRenderQueue.clear();
 	m_decalQueue.clear();
+        m_spriteRenderQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)

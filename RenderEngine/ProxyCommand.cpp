@@ -124,10 +124,12 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 	bool isEnabled = owner->IsEnabled();
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+        std::string vertexShaderName = componentPtr->GetVertexShaderName();
+        std::string pixelShaderName = componentPtr->GetPixelShaderName();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
-	Texture* originTexture = pComponent->m_Sprite;
+	Texture* originTexture = pComponent->GetSprite().get();
 	if (!originTexture)
 	{
 		m_updateFunction = [=]
@@ -144,7 +146,9 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 		proxyObject->m_isStatic = isStatic;
 		proxyObject->m_isEnableShadow = isEnabled;
 		proxyObject->m_spriteTexture = originTexture;
-	};
+                proxyObject->m_vertexShaderName = vertexShaderName;
+                proxyObject->m_pixelShaderName = pixelShaderName;
+        };
 }
 
 
@@ -282,7 +286,7 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	{
 		if (auto proxyObject = weakProxyObject.lock())
 		{
-			// texture´Â imutableÃ³·³ °ü¸®(ÇÑ¹ø ¼³Á¤µÇ¸é ÀÌÈÄ º¯°æµÇÁö ¾ÊÀ½)
+			// textureëŠ” imutableì²˜ëŸ¼ ê´€ë¦¬(í•œë²ˆ ì„¤ì •ë˜ë©´ ì´í›„ ë³€ê²½ë˜ì§€ ì•ŠìŒ)
 			UIRenderProxy::SpriteSheetData data{};
 			data.origin = origin;
 			data.position = position;
