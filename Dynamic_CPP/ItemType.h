@@ -10,10 +10,10 @@ AUTO_REGISTER_ENUM(EItemType)
 
 enum class ItemType
 {
+	Basic,
 	Meely,
 	Range,
-	Explosion,
-	Basic,
+	Bomb,
 	None,
 };
 AUTO_REGISTER_ENUM(ItemType)

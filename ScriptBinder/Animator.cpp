@@ -343,9 +343,9 @@ void Animator::DeserializeControllers(std::string _filename)
 		if (contorllerJson["useController"] == 1)
 			usecontroller = true;
 		curController->useController = usecontroller;
-		if (contorllerJson["useMask"] == 1)
-			usemask = true;
-		curController->useMask = usemask;
+		/*if (contorllerJson["useMask"] == 1)
+			usemask = true;*/
+		//curController->useMask = usemask;
 
 		for (auto& stateJson : contorllerJson["StateVec"])
 		{

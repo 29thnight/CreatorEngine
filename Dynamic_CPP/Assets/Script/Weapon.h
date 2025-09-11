@@ -33,6 +33,7 @@ public:
 	std::string itemName = "None";
 	[[Property]]
 	int itemtype = 0;
+	[[Property]]
 	ItemType itemType = ItemType::Basic;
 
 	//공격
@@ -73,7 +74,7 @@ public:
 	[[Property]]
 	int durUseBuf = 100; //버프사용시 소모 내구도(보류)
 	int curDur = durMax;  //현재 내구도
-
+	bool isBreak = false;   //무기 부서짐확인용
 	
 
 

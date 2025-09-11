@@ -20,6 +20,6 @@ NodeStatus BTEntityInitAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 	
 	blackBoard.SetValueAsBool("Initialized", true);
-	LOG("Behavior Tree Entity Initialized : "<< m_owner->GetHashedName().ToString());
+	//LOG("Behavior Tree Entity Initialized : "<< m_owner->GetHashedName().ToString());
 	return NodeStatus::Success;
 }

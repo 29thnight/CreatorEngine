@@ -1,0 +1,439 @@
+m_name: Indicator
+m_isEnabled: true
+m_instanceID: 3619625368
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: Indicator
+    m_isEnabled: true
+    m_instanceID: 3022777488
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 542
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [543, 544, 545, 546, 547, 548, 549]
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_attachedSoketID: 0
+    m_collisionType: 1
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - ModuleBehavior: 1399118904
+        m_name: CurveIndicator
+        m_isEnabled: true
+        m_instanceID: 1670720837
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 31c289f0-7df1-560d-9910-443653dc4520
+    children:
+      - GameObject: 2166264123
+        m_name: sphere
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 543
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 2829438996
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: sphere (1)
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 544
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 533421993
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: sphere (2)
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 545
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 4116938787
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: sphere (3)
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 546
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 771036205
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: sphere (4)
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 547
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 251742079
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: sphere (5)
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 548
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 3041206624
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: sphere (6)
+        m_isEnabled: true
+        m_instanceID: 4068053679
+        m_transform:
+          position: {x: 3.89787889, y: 0, z: -5.17458534, w: 0}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 542
+        m_index: 549
+        m_parentIndex: 542
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 1790983219
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: DefaultMaterial
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 0.128177255}
+                m_metallic: 0
+                m_roughness: 0.301511347
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Sphere
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false

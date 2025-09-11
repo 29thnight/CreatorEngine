@@ -4,11 +4,11 @@
 #include "Weapon.h"
 #include "Bomb.generated.h"
 class Player;
-class Bomb : public Weapon
+class Bomb : public ModuleBehavior
 {
 public:
    ReflectBomb
-	[[ScriptReflectionField(Inheritance:Weapon)]]
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Bomb)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -24,8 +24,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void Attack(Player* _Owner, AttackContext _attackContext = {})override;
-	void ThrowBomb(Player* _owner, Mathf::Vector3 _targetPos);
+	void ThrowBomb(Player* _owner, Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos);
 
 	[[Property]]
 	float throwSpeed = 0.01f;

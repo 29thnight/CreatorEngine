@@ -6,6 +6,7 @@ ReflectionScriptField(Weapon) \
 	PropertyField \
 	({ \
 		meta_property(itemtype) \
+		meta_property(itemType) \
 		meta_property(itemAckDmg) \
 		meta_property(itemAckSpd) \
 		meta_property(itemAckRange) \

@@ -5,6 +5,7 @@
 // Automation include ScriptClass header
 #include "EntitySpiritStone.h"
 #include "UIGageTest.h"
+#include "EntitlyRock.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"
 #include "Bomb.h"

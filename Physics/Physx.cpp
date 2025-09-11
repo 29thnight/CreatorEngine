@@ -363,8 +363,8 @@ void PhysicX::Update(float fixedDeltaTime)
 			int shapeSize = body->getNbShapes();
 			body->getShapes(&shape, shapeSize);
 			body->setSolverIterationCounts(8, 4);
-			shape->setContactOffset(0.02f);
-			shape->setRestOffset(0.01f);
+			shape->setContactOffset(0.3f);
+			shape->setRestOffset(0.02f);
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
 			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
