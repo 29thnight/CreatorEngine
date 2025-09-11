@@ -25,7 +25,7 @@ enum class BuffType
 	Explosion,
 	None,
 };
-
+AUTO_REGISTER_ENUM(BuffType)
 
 class Entity;
 struct AttackContext

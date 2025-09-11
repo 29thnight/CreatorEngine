@@ -34,13 +34,13 @@ public:
 
 	void CountTrigger(unsigned int triggerId, unsigned int otherId, const ECollisionEventType& eventType);
 
-	inline void SetCallbackFunction(std::function<void(CollisionData, ECollisionEventType)> callbackFunction)
+	inline void SetCallbackFunction(std::function<void(const CollisionData&, ECollisionEventType)> callbackFunction)
 	{
 		m_callbackFunction = callbackFunction;
 	}
 
 private:
-	std::function<void(CollisionData, ECollisionEventType)> m_callbackFunction;
+	std::function<void(const CollisionData&, ECollisionEventType)> m_callbackFunction;
 
 	std::unordered_map<unsigned int, std::set<unsigned int>> m_triggerMap; //Æ®¸®°Å ¸Ê
 };

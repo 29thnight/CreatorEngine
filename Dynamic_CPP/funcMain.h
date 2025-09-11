@@ -39,7 +39,7 @@ extern "C"
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
 
-		return cstrs.data(); // 포인터 배열 반환
+		return cstrs.data(); // ������ �迭 ��ȯ
 	}
 #pragma endregion
 #pragma region Behavior Tree Node Functions
@@ -77,7 +77,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // 포인터 배열 반환
+		return cstrs.data(); // ������ �迭 ��ȯ
 	}
 
 	EXPORT_API const char** ListBTConditionNode(int* outCount)
@@ -96,7 +96,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // 포인터 배열 반환
+		return cstrs.data(); // ������ �迭 ��ȯ
 	}
 
 	EXPORT_API const char** ListBTConditionDecoratorNode(int* outCount)
@@ -115,7 +115,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // 포인터 배열 반환
+		return cstrs.data(); // ������ �迭 ��ȯ
 	}
 #pragma endregion
 #pragma region Animation Behavior Functions
@@ -141,7 +141,7 @@ extern "C"
 		}
 		if (outCount)
 			*outCount = static_cast<int>(cstrs.size());
-		return cstrs.data(); // 포인터 배열 반환
+		return cstrs.data(); // ������ �迭 ��ȯ
 	}
 #pragma endregion
 #pragma region Memory Management Functions
@@ -192,12 +192,14 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EntitySpiritStone", []() { return new EntitySpiritStone(); });
 		CreateFactory::GetInstance()->RegisterFactory("UIGageTest", []() { return new UIGageTest(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntitlyRock", []() { return new EntitlyRock(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponCapsule", []() { return new WeaponCapsule(); });
 		CreateFactory::GetInstance()->RegisterFactory("Explosion", []() { return new Explosion(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bomb", []() { return new Bomb(); });
 		CreateFactory::GetInstance()->RegisterFactory("NormalBullet", []() { return new NormalBullet(); });
+		CreateFactory::GetInstance()->RegisterFactory("TBoss1", []() { return new TBoss1(); });
 		CreateFactory::GetInstance()->RegisterFactory("CurveIndicator", []() { return new CurveIndicator(); });
 		CreateFactory::GetInstance()->RegisterFactory("SpecialBullet", []() { return new SpecialBullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bullet", []() { return new Bullet(); });
@@ -222,6 +224,10 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0034", []() { return new BP0034(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0033", []() { return new BP0033(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0032", []() { return new BP0032(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0031", []() { return new BP0031(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("WaitAction", []() { return new WaitAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("KnockBackAction", []() { return new KnockBackAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("DetectAndTargetingAction", []() { return new DetectAndTargetingAction(); });
@@ -284,6 +290,7 @@ extern "C"
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttack", []() { return new PlayerRangeAttack(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("MosterMeleeAni", []() { return new MosterMeleeAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAH", []() { return new PlayerAttackAH(); });
+
 	}
 #pragma endregion
 }

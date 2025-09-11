@@ -3,12 +3,14 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EntitySpiritStone.h"
 #include "UIGageTest.h"
 #include "EntitlyRock.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"
 #include "Bomb.h"
 #include "NormalBullet.h"
+#include "TBoss1.h"
 #include "CurveIndicator.h"
 #include "SpecialBullet.h"
 #include "Bullet.h"
