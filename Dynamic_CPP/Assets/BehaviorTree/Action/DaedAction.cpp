@@ -1,13 +1,28 @@
 #include "DaedAction.h"
 #include "pch.h"
 #include "EffectComponent.h"
+#include "EntityMonsterA.h"
 
 
 NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	// Example action: Print a message to the console
 	bool hasState = blackBoard.HasKey("State");
-	
+	bool hasIdentity = blackBoard.HasKey("Identity");
+	std::string identity = "";
+	if (!hasIdentity)
+	{
+		identity = blackBoard.GetValueAsString("Identity");
+	}
+
+	if (identity != "MonsterNomal")
+	{
+		EntityMonsterA* script = dynamic_cast<EntityMonsterA*>(m_owner->GetComponent<ModuleBehavior>());
+		script->isDead = true;
+		return NodeStatus::Success;
+	}
+
+
 	//calculate final rotation
 	Transform* selfTransform = m_owner->GetComponent<Transform>();
 	Mathf::Quaternion rotation = selfTransform->GetWorldQuaternion();

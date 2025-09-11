@@ -1,8 +1,46 @@
 #include "AtteckAction.h"
 #include "pch.h"
+#include "EntityMonsterA.h"
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+
+    bool hasIdentity = blackBoard.HasKey("Identity");
+
+    std::string identity = "";
+    if (!hasIdentity)
+    {
+        identity = blackBoard.GetValueAsString("Identity");
+    }
+
+    if (identity != "MonsterNomal")
+    {
+        EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
+		bool isAttack = script->isAttack;
+		bool isAttackAnimation = script->isAttackAnimation;
+        if (!isAttack) {
+			//공격중이 아닐시 공격 시작
+			script->isAttack = true;
+            return NodeStatus::Running;
+        }
+        else {
+			//공격중일시 에니메이션 종료 여부 확인
+            if (isAttackAnimation) {
+				//에니메이션이 실행중이면 계속 실행
+				return NodeStatus::Running;
+			}
+            else 
+            {
+				//완료시 모든 변수 초기화하고 성공 반환
+				script->isAttack = false;
+				script->isAttackAnimation = false;
+				return NodeStatus::Success;
+            }
+        }
+
+
+    }
+
 	bool hasAttackState = blackBoard.HasKey("IsAttacking");
 	bool hasState = blackBoard.HasKey("State");
 	bool isActionRunning = false;

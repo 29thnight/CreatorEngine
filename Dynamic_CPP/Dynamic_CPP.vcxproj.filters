@@ -309,6 +309,9 @@
 		<ClInclude Include="Assets\Script\TBoss1.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityMonsterA.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -543,6 +546,9 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TBoss1.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

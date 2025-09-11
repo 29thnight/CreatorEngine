@@ -1,0 +1,81 @@
+#pragma once
+#include "Core.Minimal.h"
+#include "ModuleBehavior.h"
+#include "Entity.h"
+class BehaviorTreeComponent;
+class BlackBoard;
+class Animator;
+class EffectComponent;
+class CharacterControllerComponent;
+class EntityMonsterA : public Entity
+{
+public:
+	MODULE_BEHAVIOR_BODY(EntityMonsterA)
+	virtual void Awake() override {}
+	virtual void Start() override;
+	virtual void FixedUpdate(float fixedTick) override {}
+	virtual void OnTriggerEnter(const Collision& collision) override {}
+	virtual void OnTriggerStay(const Collision& collision) override {}
+	virtual void OnTriggerExit(const Collision& collision) override {}
+	virtual void OnCollisionEnter(const Collision& collision) override {}
+	virtual void OnCollisionStay(const Collision& collision) override {}
+	virtual void OnCollisionExit(const Collision& collision) override {}
+	virtual void Update(float tick) override;
+	virtual void LateUpdate(float tick) override {}
+	virtual void OnDisable() override  {}
+	virtual void OnDestroy() override  {}
+
+
+	BehaviorTreeComponent* enemyBT = nullptr;
+	BlackBoard* blackBoard = nullptr;
+	Animator* m_animator = nullptr;
+	EffectComponent* markEffect = nullptr; //크리티컬 마크 
+
+	GameObject* target = nullptr;
+	bool isDead = false;
+
+	bool isAttack = false; //공격중인지 여부
+	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
+	bool isBoxAttack = false; //박스 공격중인지 여부
+
+	[[Property]]
+	bool isAsisAction = false; //asis 행동중인지 여부
+	[[Property]]
+	float m_moveSpeed = 0.02f;
+	[[Property]]
+	int m_maxHP = 100;
+	int m_currHP = m_maxHP;
+	[[Property]]
+	float m_attackRange = 2.f;
+	[[Property]]
+	int m_attackDamage = 10;
+	[[Property]]
+	float m_chaseRange = 10.f;
+	[[Property]]
+	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
+
+	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
+	std::string m_identity = "MonsterNomal";
+
+
+
+	[[Method]]
+	void AttackBoxOn(); //공격 박스 활성화
+	[[Method]]
+	void AttackBoxOff(); //공격 박스 비활성화
+
+	void ChaseTarget(); //타겟 추적
+	void Dead(); //죽음 처리
+
+	void SendDamage(Entity* sender, int damage) override;
+
+
+	//넥백처리 -> 차후 에니메이션 이벤트로 처리
+	float hittimer = 0.f;
+	Mathf::Vector3 hitPos;
+	Mathf::Vector3 hitBaseScale;
+	Mathf::Quaternion hitrot;
+	float m_knockBackVelocity = 1.f;
+	float m_knockBackScaleVelocity = 1.f;
+	float m_MaxknockBackTime = 0.2f;
+};

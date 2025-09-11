@@ -10,7 +10,7 @@
 void EntityEnemy::Start()
 {
 	enemy = GetOwner();
-	enemyBT = enemy->GetComponent<BehaviorTreeComponent>();
+	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
 	auto childred = enemy->m_childrenIndices;
 	for (auto& child : childred)
@@ -353,11 +353,15 @@ void EntityEnemy::MeleeAttack()
 		if (object == GetOwner()) continue;
 		std::cout << object->m_name.data() << std::endl;
 
+		bool hasdmg = blackBoard->HasKey("Damage");
+		if (!hasdmg) continue;
+		int damage = blackBoard->GetValueAsInt("Damage");
+
 		//todo : 알아서 바꾸셈 player 인지 확인 하고 데미지를 주든 알아서하셈
 		Player* player = object->GetComponent<Player>();
 		if (player)
 		{
-			player->SendDamage(this, 0);
+			player->SendDamage(this, damage);
 		}
 	}
 	

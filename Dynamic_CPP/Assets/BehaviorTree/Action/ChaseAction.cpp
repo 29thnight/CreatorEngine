@@ -2,8 +2,26 @@
 #include "pch.h"
 #include "EntityEnemy.h"
 #include "Animator.h"
+#include "EntityMonsterA.h"
+#include "CharacterControllerComponent.h"
+
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+	bool hasIdentity = blackBoard.HasKey("Identity");
+	std::string identity = "";
+	if (!hasIdentity)
+	{
+		identity = blackBoard.GetValueAsString("Identity");
+	}
+
+	if (identity != "MonsterNomal")
+	{
+		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
+		script->ChaseTarget();
+		return NodeStatus::Success;
+	}
+
+
 	bool isSpeed = blackBoard.HasKey("Speed");
 	bool HasState = blackBoard.HasKey("State");
 
