@@ -106,7 +106,7 @@
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
@@ -250,8 +250,8 @@
                             "type": 0
                         },
                         "position": {
-                            "x": -1.0,
-                            "y": -0.25,
+                            "x": 0.0,
+                            "y": 0.0,
                             "z": 0.0
                         },
                         "positionOffset": {
@@ -295,7 +295,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "time": 202.6021270751953
+                            "time": 0.0
                         },
                         "renderState": {
                             "instanceCount": 1
@@ -351,7 +351,7 @@
                         "position": {
                             "x": 0.0,
                             "y": 0.0,
-                            "z": -0.25
+                            "z": 0.0
                         },
                         "positionOffset": {
                             "x": -1.0,
@@ -370,105 +370,6 @@
                             "minDistance": 0.10000000149011612,
                             "startWidth": 1.0,
                             "trailLifetime": 0.9900000095367432,
-                            "useLengthBasedUV": true
-                        }
-                    },
-                    "stage": 4,
-                    "type": "TrailGenerateModule",
-                    "useEasing": false
-                }
-            ],
-            "name": "NewEmitter",
-            "particleDataType": 2,
-            "position": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 0.0
-            },
-            "renderModules": [
-                {
-                    "data": {
-                        "constantBuffer": {
-                            "cameraPosition": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "time": 0.0
-                        },
-                        "renderState": {
-                            "instanceCount": 0
-                        },
-                        "renderStates": {
-                            "blendPreset": 1,
-                            "depthPreset": 2,
-                            "rasterizerPreset": 2
-                        },
-                        "shaders": {
-                            "pixelShader": "Dash",
-                            "vertexShader": "TrailVertex"
-                        },
-                        "textures": [
-                            {
-                                "hasTexture": true,
-                                "name": "testDash",
-                                "slot": 0
-                            }
-                        ],
-                        "trailModule": {
-                            "connected": false
-                        }
-                    },
-                    "type": "TrailRenderModule"
-                }
-            ]
-        },
-        {
-            "isRunning": false,
-            "maxParticles": 1,
-            "modules": [
-                {
-                    "data": {
-                        "autoGeneration": {
-                            "autoAddInterval": 0.05000000074505806,
-                            "autoGenerateFromPosition": true
-                        },
-                        "easing": {
-                            "easingDuration": 0.0,
-                            "easingType": 0,
-                            "useEasing": false
-                        },
-                        "endColor": {
-                            "w": 0.0,
-                            "x": 1.0,
-                            "y": 1.0,
-                            "z": 1.0
-                        },
-                        "orientation": {
-                            "type": 1
-                        },
-                        "position": {
-                            "x": 0.0,
-                            "y": 0.0,
-                            "z": 0.0
-                        },
-                        "positionOffset": {
-                            "x": -1.0,
-                            "y": 0.0,
-                            "z": 0.25
-                        },
-                        "startColor": {
-                            "w": 1.0,
-                            "x": 1.0,
-                            "y": 1.0,
-                            "z": 1.0
-                        },
-                        "trailParams": {
-                            "endWidth": 0.10000000149011612,
-                            "maxTrailPoints": 100,
-                            "minDistance": 0.10000000149011612,
-                            "startWidth": 1.0,
-                            "trailLifetime": 0.9599999785423279,
                             "useLengthBasedUV": true
                         }
                     },

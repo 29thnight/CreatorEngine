@@ -3562,7 +3562,44 @@ void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailMod
 		}
 	}
 
-	const char* orientationNames[] = { "Horizontal", "Vertical" };
+	// 렌더 모드 설정
+	ImGui::Separator();
+	const char* renderModeNames[] = { "Ribbon", "Tube" };
+	int currentRenderMode = static_cast<int>(trailModule->GetRenderMode());
+	if (ImGui::Combo("Render Mode", &currentRenderMode, renderModeNames, IM_ARRAYSIZE(renderModeNames))) {
+		trailModule->SetRenderMode(static_cast<TrailRenderMode>(currentRenderMode));
+	}
+
+	// 렌더 모드별 도움말
+	switch (currentRenderMode) {
+	case 0: // RIBBON
+		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Ribbon: Traditional 2D trail (faster)");
+		break;
+	case 1: // TUBE
+		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Tube: 3D cylindrical trail (more polygons)");
+
+		// 원통형 모드일 때만 세그먼트 설정 표시
+		int tubeSegments = trailModule->GetTubeSegments();
+		if (ImGui::SliderInt("Tube Segments", &tubeSegments, 3, 16)) {
+			trailModule->SetTubeSegments(tubeSegments);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Low Quality")) {
+			trailModule->SetTubeSegments(6);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("High Quality")) {
+			trailModule->SetTubeSegments(12);
+		}
+
+		// 다각형 수 표시
+		size_t pointCount = trailModule->GetActivePointCount();
+		int totalPolygons = (pointCount > 1) ? (pointCount - 1) * tubeSegments * 2 : 0;
+		ImGui::Text("Polygons: %d", totalPolygons);
+		break;
+	}
+
+	const char* orientationNames[] = { "Horizontal", "Vertical", "Custom" };
 	int currentOrientation = static_cast<int>(trailModule->GetOrientation());
 	if (ImGui::Combo("Trail Orientation", &currentOrientation, orientationNames, IM_ARRAYSIZE(orientationNames))) {
 		trailModule->SetOrientation(static_cast<TrailOrientation>(currentOrientation));
@@ -3576,162 +3613,53 @@ void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailMod
 	case 1: // VERTICAL  
 		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Vertical: Trail expands horizontally, stays upright");
 		break;
-	}
+	case 2: // CUSTOM
+		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Custom: Trail expands using custom up vector");
 
-	// UV 및 렌더링 설정
-	if (ImGui::CollapsingHeader("Rendering Settings"))
-	{
-		bool useLengthBasedUV = trailModule->IsUsingLengthBasedUV();
-		if (ImGui::Checkbox("Use Length Based UV", &useLengthBasedUV)) {
-			trailModule->SetUVMode(useLengthBasedUV);
+		// 커스텀 Up 벡터 설정
+		Mathf::Vector3 customUp = trailModule->GetCustomUpVector();
+		float customUpArray[3] = { customUp.x, customUp.y, customUp.z };
+		if (ImGui::DragFloat3("Custom Up Vector", customUpArray, 0.1f, -1.0f, 1.0f)) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(customUpArray[0], customUpArray[1], customUpArray[2]));
 		}
 
-		// Up Vector 설정
-		Mathf::Vector3 upVector = trailModule->GetLastUpVector();
-		float upArray[3] = { upVector.x, upVector.y, upVector.z };
-		if (ImGui::DragFloat3("Up Vector", upArray, 0.1f, -1.0f, 1.0f)) {
-			trailModule->SetLastUpVector(Mathf::Vector3(upArray[0], upArray[1], upArray[2]));
+		// 프리셋 버튼들
+		if (ImGui::Button("X-Axis")) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(1.0f, 0.0f, 0.0f));
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Reset Up")) {
-			trailModule->SetLastUpVector(Mathf::Vector3(0.0f, 1.0f, 0.0f));
+		if (ImGui::Button("Y-Axis")) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(0.0f, 1.0f, 0.0f));
 		}
-
-		// 메시 상태
-		bool isDirty = trailModule->IsMeshDirty();
-		ImGui::Text("Mesh Status: %s", isDirty ? "Dirty (needs update)" : "Clean");
-		if (isDirty && ImGui::Button("Force Update Mesh")) {
-			trailModule->ForceUpdateMesh();
-		}
-	}
-
-	// 수동 제어
-	if (ImGui::CollapsingHeader("Manual Control"))
-	{
-		static float testPos[3] = { 0.0f, 0.0f, 0.0f };
-		static float testWidth = 1.0f;
-		static float testColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-		ImGui::DragFloat3("Test Position", testPos, 0.1f);
-		ImGui::SliderFloat("Test Width", &testWidth, 0.1f, 10.0f);
-		ImGui::ColorEdit4("Test Color", testColor);
-
-		if (ImGui::Button("Add Point")) {
-			trailModule->AddPoint(
-				Mathf::Vector3(testPos[0], testPos[1], testPos[2]),
-				testWidth,
-				Mathf::Vector4(testColor[0], testColor[1], testColor[2], testColor[3])
-			);
-		}
-
 		ImGui::SameLine();
-		if (ImGui::Button("Add Random Point")) {
-			static float time = 0.0f;
-			time += 1.0f;
-			float x = sinf(time * 0.5f) * 5.0f;
-			float y = cosf(time * 0.3f) * 3.0f;
-			float z = sinf(time * 0.7f) * 2.0f;
-
-			trailModule->AddPoint(
-				Mathf::Vector3(x, y, z),
-				testWidth,
-				Mathf::Vector4(testColor[0], testColor[1], testColor[2], testColor[3])
-			);
+		if (ImGui::Button("Z-Axis")) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(0.0f, 0.0f, 1.0f));
 		}
 
-		if (ImGui::Button("Add Line Trail")) {
-			trailModule->Clear();
-			for (int i = 0; i < 10; ++i) {
-				trailModule->AddPoint(
-					Mathf::Vector3(i * 0.5f, 0.0f, 0.0f),
-					testWidth,
-					Mathf::Vector4(testColor[0], testColor[1], testColor[2], testColor[3])
-				);
+		if (ImGui::Button("Diagonal XY")) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(1.0f, 1.0f, 0.0f));
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Diagonal XZ")) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(1.0f, 0.0f, 1.0f));
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Diagonal YZ")) {
+			trailModule->SetCustomUpVector(Mathf::Vector3(0.0f, 1.0f, 1.0f));
+		}
+
+		// 현재 설정된 벡터의 크기 표시
+		float magnitude = customUp.Length();
+		ImGui::Text("Vector Length: %.3f", magnitude);
+		if (magnitude > 0.001f) {
+			ImGui::SameLine();
+			if (ImGui::Button("Normalize")) {
+				Mathf::Vector3 normalized = customUp;
+				normalized.Normalize();
+				trailModule->SetCustomUpVector(normalized);
 			}
 		}
-
-		ImGui::SameLine();
-		if (ImGui::Button("Add Circle Trail")) {
-			trailModule->Clear();
-			for (int i = 0; i < 20; ++i) {
-				float angle = (i / 20.0f) * 6.28318f;
-				trailModule->AddPoint(
-					Mathf::Vector3(cosf(angle) * 3.0f, sinf(angle) * 3.0f, 0.0f),
-					testWidth,
-					Mathf::Vector4(testColor[0], testColor[1], testColor[2], testColor[3])
-				);
-			}
-		}
-
-		// 수명 관리
-		ImGui::Separator();
-		if (ImGui::Button("Remove Old Points")) {
-			trailModule->RemoveOldPoints();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Remove Very Old")) {
-			trailModule->RemoveOldPoints(1.0f);  // 1초 이상된 포인트만 제거
-		}
-	}
-
-	// 디버그 정보
-	if (ImGui::CollapsingHeader("Debug Info"))
-	{
-		ImGui::Text("Active Points: %zu", trailModule->GetActivePointCount());
-		ImGui::Text("Vertex Count: %d", trailModule->GetVertexCount());
-		ImGui::Text("Index Count: %d", trailModule->GetIndexCount());
-		ImGui::Text("Has Valid Mesh: %s", trailModule->HasValidMesh() ? "Yes" : "No");
-		ImGui::Text("Is Initialized: %s", trailModule->IsInitialized() ? "Yes" : "No");
-
-		// 마지막 위치 표시
-		Mathf::Vector3 lastPos = trailModule->GetLastPosition();
-		ImGui::Text("Last Position: (%.2f, %.2f, %.2f)", lastPos.x, lastPos.y, lastPos.z);
-
-		ImGui::Separator();
-
-		if (ImGui::Button("Clear Trail")) {
-			trailModule->Clear();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Reset Module")) {
-			trailModule->ResetForReuse();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Force Mesh Dirty")) {
-			trailModule->SetMeshDirty(true);
-		}
-
-		// 설정 프리셋
-		ImGui::Separator();
-		ImGui::Text("Quick Presets:");
-
-		if (ImGui::Button("Dash Trail")) {
-			trailModule->SetTrailLifetime(0.5f);
-			trailModule->SetMinDistance(0.01f);
-			trailModule->SetWidthCurve(3.0f, 0.1f);
-			trailModule->SetColorCurve(Mathf::Vector4(0, 0.7f, 1, 1), Mathf::Vector4(0, 0.3f, 1, 0));
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Long Trail")) {
-			trailModule->SetTrailLifetime(5.0f);
-			trailModule->SetMinDistance(0.05f);
-			trailModule->SetWidthCurve(1.0f, 0.3f);
-			trailModule->SetColorCurve(Mathf::Vector4(1, 1, 1, 0.8f), Mathf::Vector4(1, 1, 1, 0));
-		}
-
-		if (ImGui::Button("Thick Trail")) {
-			trailModule->SetTrailLifetime(2.0f);
-			trailModule->SetMinDistance(0.1f);
-			trailModule->SetWidthCurve(5.0f, 2.0f);
-			trailModule->SetColorCurve(Mathf::Vector4(1, 0.5f, 0, 1), Mathf::Vector4(1, 0, 0, 0));
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Thin Trail")) {
-			trailModule->SetTrailLifetime(1.0f);
-			trailModule->SetMinDistance(0.01f);
-			trailModule->SetWidthCurve(0.5f, 0.1f);
-			trailModule->SetColorCurve(Mathf::Vector4(1, 1, 0, 1), Mathf::Vector4(1, 1, 0, 0));
-		}
+		break;
 	}
 
 	ImGui::PopID();

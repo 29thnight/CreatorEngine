@@ -46,10 +46,10 @@ PixelOutput main(PixelInput input)
     float2 dissolveUV2 = offsetUV;
     
     // 텍스처 샘플링
-    float4 baseTexture = gDiffuseTexture.Sample(gClampSampler, offsetUV) * float4(1.0f, 0.0f, 0.0f, 1.0f);
-    float4 dissolveColor1 = gDissolveTexture1.Sample(gClampSampler, offsetUV) * float4(3.0f, 3.0f, 3.0f, 1.0f);
+    float4 baseTexture = gDiffuseTexture.Sample(gClampSampler, offsetUV);
+    float4 dissolveColor1 = gDissolveTexture1.Sample(gClampSampler, offsetUV);
     float4 dissolveColor2 = gDissolveTexture2.Sample(gClampSampler, offsetUV);
-    float4 dissolveColor3 = gEndEffectTexture.Sample(gClampSampler, offsetUV) * float4(0.0, 0.0, 0.0, 1.0);
+    float4 dissolveColor3 = gEndEffectTexture.Sample(gClampSampler, offsetUV);
     float4 finalColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
 
     finalColor.rgb = lerp(baseTexture.rgb, dissolveColor1.rgb, dissolveColor1.a);

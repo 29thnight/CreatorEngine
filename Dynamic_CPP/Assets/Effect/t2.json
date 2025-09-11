@@ -4,11 +4,11 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "testdash",
+    "name": "t2",
     "particleSystems": [
         {
-            "isRunning": true,
-            "maxParticles": 14,
+            "isRunning": false,
+            "maxParticles": 1,
             "modules": [
                 {
                     "data": {
@@ -33,10 +33,10 @@
                                 "y": 1.0,
                                 "z": 0.0
                             },
-                            "type": 1
+                            "type": 0
                         },
                         "position": {
-                            "x": 3.700000047683716,
+                            "x": 0.0,
                             "y": 0.0,
                             "z": 0.0
                         },
@@ -56,11 +56,11 @@
                             "z": 1.0
                         },
                         "trailParams": {
-                            "endWidth": 0.10000000149011612,
+                            "endWidth": 0.0010000000474974513,
                             "maxTrailPoints": 500,
                             "minDistance": 0.0010000000474974513,
-                            "startWidth": 1.0,
-                            "trailLifetime": 0.75,
+                            "startWidth": 3.2820000648498535,
+                            "trailLifetime": 1.0399999618530273,
                             "useLengthBasedUV": true
                         }
                     },
@@ -72,7 +72,7 @@
             "name": "NewEmitter",
             "particleDataType": 2,
             "position": {
-                "x": 3.700000047683716,
+                "x": 0.0,
                 "y": 0.0,
                 "z": 0.0
             },
@@ -85,10 +85,10 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "time": 119.36621856689453
+                            "time": 267.1144714355469
                         },
                         "renderState": {
-                            "instanceCount": 14
+                            "instanceCount": 1
                         },
                         "renderStates": {
                             "blendPreset": 2,
@@ -107,7 +107,7 @@
                             }
                         ],
                         "trailModule": {
-                            "connected": true
+                            "connected": false
                         }
                     },
                     "type": "TrailRenderModule"
