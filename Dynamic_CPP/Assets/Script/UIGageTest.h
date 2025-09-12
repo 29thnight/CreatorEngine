@@ -4,6 +4,7 @@
 #include "UIGageTest.generated.h"
 
 class ImageComponent;
+class WeaponSlot;
 class UIGageTest : public ModuleBehavior
 {
 public:
@@ -41,4 +42,5 @@ public:
 
 private:
 	ImageComponent* m_imageComponent = nullptr;
+	WeaponSlot* m_weaponSlot = nullptr;
 };

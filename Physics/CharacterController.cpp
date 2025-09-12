@@ -181,7 +181,7 @@ void PhysicsControllerHitReport::onShapeHit(const PxControllerShapeHit& hit)
 	secondActor.otherLayerNumber = controllerData->thisLayerNumber;
 	secondActor.contactPoints = contactPoints;
 
-	std::cout << "PhysicsControllerHitReport::onShapeHit - thisId: " << firstActor.thisId << ", otherId: " << firstActor.otherId << ", EventType: " << static_cast<int>(eventType) << std::endl;
+	//std::cout << "PhysicsControllerHitReport::onShapeHit - thisId: " << firstActor.thisId << ", otherId: " << firstActor.otherId << ", EventType: " << static_cast<int>(eventType) << std::endl;
 
 	m_callbackFunction(firstActor, eventType);
 	m_callbackFunction(secondActor, eventType);
@@ -272,7 +272,7 @@ void PhysicsControllerHitReport::UpdateAndDispatchEndEvents()
 
 	m_previousContacts = m_currentContacts;
 
-	std::cout << "PhysicsControllerHitReport::UpdateAndDispatchEndEvents - Current Contacts Size: " << m_currentContacts.size() << std::endl;
+	//std::cout << "PhysicsControllerHitReport::UpdateAndDispatchEndEvents - Current Contacts Size: " << m_currentContacts.size() << std::endl;
 
 	m_currentContacts.clear();
 }

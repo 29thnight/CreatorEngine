@@ -324,6 +324,18 @@
 		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponSlot.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponSlotController.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityMonsterA.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntitySpiritStone.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -563,6 +575,9 @@
 		<ClCompile Include="Assets\Script\UIGageTest.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -571,6 +586,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponSlot.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponSlotController.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

@@ -109,8 +109,8 @@ void PhysicsManager::OnUnloadScene()
 void PhysicsManager::ProcessCallback()
 {
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
-	std::cout << " ProcessCallback size :" << m_callbacks.size() << std::endl;
-	std::cout << " ColliderContainer size :" << Container.size() << std::endl;
+	//std::cout << " ProcessCallback size :" << m_callbacks.size() << std::endl;
+	//std::cout << " ColliderContainer size :" << Container.size() << std::endl;
 	for (auto& [data, type] : m_callbacks) {
 
 	
