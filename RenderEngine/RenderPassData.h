@@ -35,6 +35,7 @@ public:
 	ProxyContainer				m_shadowRenderQueue;
 	UIProxyContainer			m_UIRenderQueue;
 	ProxyContainer			    m_decalQueue;
+	ProxyContainer              m_spriteRenderQueue;
 	Camera						m_shadowCamera;
 	//flags
 	std::atomic_bool			m_isInitalized{ false };

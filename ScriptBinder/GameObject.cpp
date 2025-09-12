@@ -119,9 +119,10 @@ void GameObject::Destroy()
 
 std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 {
-    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == type.typeID; }) != m_components.end())
+    if (auto it = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
     {
-        return nullptr;
+		Debug->LogWarning("Component of type " + type.name + " already exists on GameObject " + m_name.ToString() + ". Only one instance allowed.");
+		return *it;
     }
 
     std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->CreateShared<Component>(type.name));

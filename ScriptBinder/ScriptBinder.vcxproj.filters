@@ -339,6 +339,9 @@
     <ClCompile Include="SpriteSheetComponent.cpp">
       <Filter>Classes</Filter>
     </ClCompile>
+    <ClCompile Include="SpriteRenderer.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">

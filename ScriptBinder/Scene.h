@@ -6,12 +6,13 @@
 #include "EBodyType.h"
 #include <unordered_map>
 
+#pragma region forward_decl
+struct ICollider;
 class GameObject;
 class RenderScene;
 class SceneManager;
 class LightComponent;
 class MeshRenderer;
-struct ICollider;
 class Texture;
 class RigidBodyComponent;
 class TerrainComponent;
@@ -28,6 +29,8 @@ class CharacterControllerComponent;
 class TerrainColliderComponent;
 class Transform;
 class Animator;
+class SpriteRenderer;
+#pragma endregion forward_decl
 class Scene
 {
 public:
@@ -176,6 +179,11 @@ public:
 	std::vector<MeshRenderer*>& GetStaticMeshRenderers() { return m_staticMeshRenderers; }
 
 public:
+	void CollectSpriteRenderer(SpriteRenderer* ptr);
+	void UnCollectSpriteRenderer(SpriteRenderer* ptr);
+	std::vector<SpriteRenderer*>& GetSpriteRenderers() { return m_spriteRenderers; }
+
+public:
     void CollectTerrainComponent(TerrainComponent* ptr);
     void UnCollectTerrainComponent(TerrainComponent* ptr);
     std::vector<TerrainComponent*>& GetTerrainComponent() { return m_terrainComponents; }
@@ -239,6 +247,7 @@ private:
     std::vector<TerrainComponent*>  m_terrainComponents;
     std::vector<FoliageComponent*>  m_foliageComponents;
 	std::vector<DecalComponent*>	m_decalComponents;
+	std::vector<SpriteRenderer*>	m_spriteRenderers;
 	std::mutex sceneMutex{};
 
 private:

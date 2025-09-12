@@ -28,11 +28,23 @@ public:
 
 	virtual void Attack(Player* _Owner, AttackContext _attackContext = {}) {}
 	void SetEnabled(bool able);
-	bool CheckDur();
+	ItemType GetItemType() { return itemType; }
+	//기본무기 검사(내구도 없음)
+	bool IsBasic() { return itemType == ItemType::Basic; }
+	//내구도 감소
+	void DecreaseDur();
+	//내구도 검사관련 제공 메서드
+	bool IsBroken() { return isBreak; }
+	int GetCurDur() { return curDur; }
+	int GetMaxDur() { return durMax; }
+
 	bool CheckChargedDur(float chargedTime);
+
+	int ItemTypeToInt() { return static_cast<int>(itemType); }
+	ItemType IntToItemType(int type) { return static_cast<ItemType>(type); }
+
+public:
 	std::string itemName = "None";
-	[[Property]]
-	int itemtype = 0;
 	[[Property]]
 	ItemType itemType = ItemType::Basic;
 
@@ -76,9 +88,6 @@ public:
 	int curDur = durMax;  //현재 내구도
 	bool isBreak = false;   //무기 부서짐확인용
 	
-
-
-
 	//아시스 -> 플레이어 날아올떄쓰는것들
 	void Throw(Player* _player,Mathf::Vector3 statrPos);
 	Mathf::Vector3 startPos{};
@@ -87,9 +96,6 @@ public:
 	float speed = 3.0f;
 	int OwnerPlayerIndex = -1;
 	GameObject* ownerPlayer = nullptr; //날아갈 경로찾는ㅇ요
-
-
-
 
 	BuffType buffType = BuffType::None;
 	int buffHitCount = 3;  //버프묻는 공격횟수

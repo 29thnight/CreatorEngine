@@ -31,7 +31,7 @@ public:
    ReflectPlayer
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Player)
-	virtual void Awake() override {}
+	virtual void Awake() override {};
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 
@@ -53,10 +53,18 @@ public:
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override {}
 
+	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
+	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
+	Core::Delegate<void, int> m_SetActiveEvent;
+
 	[[Method]]
 	void SwapWeaponLeft();
 	[[Method]]
 	void SwapWeaponRight();
+	[[Method]]
+	void SwapBasicWeapon();
+	[[Method]]
+	void AddMeleeWeapon();
 	void AddWeapon(Weapon* weapon);
 	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
