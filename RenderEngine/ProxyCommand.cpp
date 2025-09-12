@@ -10,6 +10,7 @@
 #include "Material.h"
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
+#include "ShaderSystem.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -124,8 +125,7 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 	bool isEnabled = owner->IsEnabled();
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-        std::string vertexShaderName = componentPtr->GetVertexShaderName();
-        std::string pixelShaderName = componentPtr->GetPixelShaderName();
+        std::string customPSOName = componentPtr->GetCustomPSOName();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
@@ -145,9 +145,17 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 		proxyObject->m_worldPosition = worldPosition;
 		proxyObject->m_isStatic = isStatic;
 		proxyObject->m_isEnableShadow = isEnabled;
-		proxyObject->m_spriteTexture = originTexture;
-                proxyObject->m_vertexShaderName = vertexShaderName;
-                proxyObject->m_pixelShaderName = pixelShaderName;
+                proxyObject->m_spriteTexture = originTexture;
+                proxyObject->m_customPSOName = customPSOName;
+                if (!customPSOName.empty())
+                {
+                        auto it = ShaderSystem->ShaderAssets.find(customPSOName);
+                        proxyObject->m_customPSO = (it != ShaderSystem->ShaderAssets.end()) ? it->second : nullptr;
+                }
+                else
+                {
+                        proxyObject->m_customPSO = nullptr;
+                }
         };
 }
 
