@@ -48,7 +48,7 @@ private:
         [[Property]]
         float fontSize{ 1.f };
 
-        // Calculated in Update: maximum render area from RectTransform's stretch
+        // Calculated in Update: maximum render area from parent RectTransform
         Mathf::Vector2 stretchSize{ 0.f, 0.f };
         bool isStretchX{ false };
         bool isStretchY{ false };
