@@ -794,38 +794,30 @@ void Player::MeleeAttack()
 
 	int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
 
-	constexpr float angle = XMConvertToRadians(15.0f);
-	Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
-	leftDir.Normalize();
-	Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
-	rightDir.Normalize();
-	std::vector<HitResult> leftHits;
-	int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
-	std::vector<HitResult> rightHits;
-	int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
-	std::vector<HitResult> allHits;
-	allHits.reserve(size + leftSize + rightSize);
-	allHits.insert(allHits.end(), hits.begin(), hits.end());
-	allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
-	allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
-		
-	for (auto& hit : allHits)
-	{
-		auto object = hit.gameObject;
-		if (object == GetOwner()) continue;
-
-		if (auto entity = object->GetComponent<EntityEnemy>())
+		float angle = XMConvertToRadians(15.0f);
+		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+		leftDir.Normalize();
+		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
+		rightDir.Normalize();
+		std::vector<HitResult> leftHits;
+		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+		std::vector<HitResult> rightHits;
+		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+		std::vector<HitResult> allHits;
+		allHits.reserve(size + leftSize + rightSize);
+		allHits.insert(allHits.end(), hits.begin(), hits.end());
+		allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
+		allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
+		for (auto& hit : allHits)
 		{
-			auto [iter, inserted] = AttackTarget.insert(entity);
-			if (inserted) (*iter)->SendDamage(this, damage);
+			auto object = hit.gameObject;
+			if (object == GetOwner()) continue;
+			auto entity = object->GetComponent<Entity>();
+			if (entity) {
+				auto [iter, inserted] = AttackTarget.insert(entity);
+				if (inserted) (*iter)->SendDamage(this, 100);
+			}
 		}
-
-		if (auto resource = object->GetComponent<EntityResource>())
-		{
-			auto [iter, inserted] = AttackTarget.insert(resource);
-			if (inserted) (*iter)->SendDamage(this, damage);
-		}
-	}
 }
 
 void Player::RangeAttack()

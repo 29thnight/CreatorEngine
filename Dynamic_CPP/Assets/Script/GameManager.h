@@ -24,7 +24,6 @@ public:
 	virtual void OnDestroy() override  {}
 
 public:
-	void Inputblabla();
 	void LoadScene(const std::string& sceneName);
 
 public:
@@ -47,4 +46,22 @@ private:
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 private:
 	void CheatMiningResource();
+
+private:
+	static int m_RewardAmount;
+	static int m_player1DeviceID;
+	static int m_player2DeviceID;
+public:
+	static void InitReward(int amount) { m_RewardAmount = amount; }	// 게임 시작 시 또는 치트용.
+	inline void AddReward(int amount) { 
+		GameManager::m_RewardAmount += amount; 
+		std::cout << "Current Reward: " << m_RewardAmount << std::endl;
+	}
+	static void SetPlayer1DeviceID(int id) { m_player1DeviceID = id; }
+	static void SetPlayer2DeviceID(int id) { m_player2DeviceID = id; }
+	static void SwitchPlayerInputDevice() {
+		auto temp = m_player1DeviceID;
+		m_player1DeviceID = m_player2DeviceID;
+		m_player2DeviceID = temp;
+	}
 };
