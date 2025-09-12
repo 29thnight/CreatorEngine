@@ -28,11 +28,18 @@ void TextComponent::Awake()
 
 void TextComponent::Update(float tick)
 {
-    if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+    if (useManualRect)
+    {
+            pos = { manualRect.x, manualRect.y };
+            stretchSize = { manualRect.width, manualRect.height };
+            isStretchX = true;
+            isStretchY = true;
+    }
+    else if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
             const auto& worldRect = rect->GetWorldRect();
             pos = { worldRect.x, worldRect.y };
-            stretchSize = { worldRect.w, worldRect.h };
+            stretchSize = { worldRect.width, worldRect.height };
 
             if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
             {
@@ -41,7 +48,7 @@ void TextComponent::Update(float tick)
                             if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
                             {
                                     const auto& pRect = parentRect->GetWorldRect();
-                                    stretchSize = { pRect.w, pRect.h };
+                                    stretchSize = { pRect.width, pRect.height };
                             }
                     }
             }
