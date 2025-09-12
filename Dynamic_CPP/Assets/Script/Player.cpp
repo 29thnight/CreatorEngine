@@ -30,6 +30,7 @@
 
 #include "CurveIndicator.h"
 #include "DebugLog.h"
+#include "EntityMonsterA.h"
 void Player::Start()
 {
 
@@ -459,9 +460,9 @@ void Player::StartAttack()
 
 	if (isAttacking == false || canMeleeCancel == true)
 	{
-		isAttacking = true;
-		DropCatchItem();
-		m_animator->SetUseLayer(1, false);
+		//isAttacking = true;
+		//DropCatchItem();
+		//m_animator->SetUseLayer(1, false);
 		if (m_curWeapon)
 		{
 			if (m_curWeapon->isBreak == true) return; //현재무기 부서졌으면 리턴 -> Update에서 무기바꾸기로직으로
@@ -491,7 +492,6 @@ void Player::StartAttack()
 			{
 				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 				std::cout << "RangeAttack!!" << std::endl;
-				RangeAttack();
 			}
 
 	
@@ -600,6 +600,7 @@ void Player::SwapWeaponLeft()
 		m_curWeapon->SetEnabled(true);
 	}
 	countRangeAttack = 0;
+	m_comboCount = 0;
 }
 
 void Player::SwapWeaponRight()
@@ -621,6 +622,7 @@ void Player::SwapWeaponRight()
 		m_curWeapon->SetEnabled(true);
 	}
 	countRangeAttack = 0;
+	m_comboCount = 0;
 }
 
 void Player::AddWeapon(Weapon* weapon)
@@ -652,6 +654,7 @@ void Player::DeleteCurWeapon()
 
 	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
 
+	m_curWeapon->GetOwner()->Destroy();
 	if (it != m_weaponInventory.end())
 	{
 		SwapWeaponLeft();
@@ -690,6 +693,10 @@ void Player::FindNearObject(GameObject* gameObject)
 void Player::Cancancel()
 {
 	canMeleeCancel = true;
+
+	int maxCombo = (m_curWeapon->itemType == ItemType::Basic) ? 2 : 3;
+
+	m_comboCount = (m_comboCount + 1) % maxCombo;
 }
 
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
@@ -789,7 +796,7 @@ void Player::RangeAttack()
 	{
 		auto object = hit.gameObject;
 		if (object == GetOwner()) continue;
-		if (auto enemy = object->GetComponent<EntityEnemy>())
+		if (auto enemy = object->GetComponent<EntityMonsterA>())  //entity로 묶어서 받아지는지 확인필요 --- 자원오브젝트,몬스터 A B C 등 묶어서
 		{
 
 

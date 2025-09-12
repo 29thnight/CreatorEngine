@@ -168,8 +168,8 @@ public:
 	float rangeAngle = 150.f;      //원거리 무기공격시 유도 각
 	[[Property]]
 	float rangeDistacne = 5.f;    //원거리 유도거리 최대거리
-	std::unordered_set<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
-	EntityEnemy* curTarget = nullptr;
+	std::unordered_set<Entity*>   inRangeEnemy; //내 공격 사거리안 적들
+	Entity* curTarget = nullptr;
 	int countRangeAttack = 0;
 	[[Property]]
 	int countSpecialBullet = 5;

@@ -36,6 +36,9 @@ void PlayerAttackAH::Enter()
 	if (m_player)
 	{
 		m_player->AttackTarget.clear();
+		m_player->isAttacking = true;
+		m_player->DropCatchItem();
+		m_player->m_animator->SetUseLayer(1, false);
 	}
 	if (!eft)
 	{
