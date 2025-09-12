@@ -5,6 +5,7 @@
 #include "RenderScene.h"
 #include "UIManager.h"
 #include "RectTransformComponent.h"
+#include "GameObject.h"
 
 TextComponent::TextComponent()
 {
@@ -32,8 +33,21 @@ void TextComponent::Update(float tick)
             const auto& worldRect = rect->GetWorldRect();
             pos = { worldRect.x, worldRect.y };
             stretchSize = { worldRect.w, worldRect.h };
-            isStretchX = rect->GetAnchorMin().x != rect->GetAnchorMax().x;
-            isStretchY = rect->GetAnchorMin().y != rect->GetAnchorMax().y;
+
+            if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+            {
+                    if (auto* parent = GameObject::FindIndex(m_pOwner->m_parentIndex))
+                    {
+                            if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
+                            {
+                                    const auto& pRect = parentRect->GetWorldRect();
+                                    stretchSize = { pRect.w, pRect.h };
+                            }
+                    }
+            }
+
+            isStretchX = true;
+            isStretchY = true;
     }
     //pos += relpos;
 
