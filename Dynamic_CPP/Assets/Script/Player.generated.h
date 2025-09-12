@@ -7,6 +7,7 @@ ReflectionScriptField(Player) \
 	({ \
 		meta_property(playerIndex) \
 		meta_property(moveSpeed) \
+		meta_property(chargingMoveSpeed) \
 		meta_property(maxHP) \
 		meta_property(ThrowPowerX) \
 		meta_property(ThrowPowerY) \

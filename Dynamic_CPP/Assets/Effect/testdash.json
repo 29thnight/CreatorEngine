@@ -7,7 +7,7 @@
     "name": "testdash",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 14,
             "modules": [
                 {
@@ -36,7 +36,7 @@
                             "type": 1
                         },
                         "position": {
-                            "x": 3.700000047683716,
+                            "x": 0.0,
                             "y": 0.0,
                             "z": 0.0
                         },
@@ -60,7 +60,7 @@
                             "maxTrailPoints": 500,
                             "minDistance": 0.0010000000474974513,
                             "startWidth": 1.0,
-                            "trailLifetime": 0.75,
+                            "trailLifetime": 1.0,
                             "useLengthBasedUV": true
                         }
                     },
@@ -72,7 +72,7 @@
             "name": "NewEmitter",
             "particleDataType": 2,
             "position": {
-                "x": 3.700000047683716,
+                "x": 0.0,
                 "y": 0.0,
                 "z": 0.0
             },
@@ -91,7 +91,7 @@
                             "instanceCount": 14
                         },
                         "renderStates": {
-                            "blendPreset": 2,
+                            "blendPreset": 1,
                             "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
@@ -107,7 +107,7 @@
                             }
                         ],
                         "trailModule": {
-                            "connected": true
+                            "connected": false
                         }
                     },
                     "type": "TrailRenderModule"

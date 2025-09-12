@@ -7,9 +7,9 @@
 #include "RewardObserver.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
+#include "EntityRock.h"
 #include "EntitySpiritStone.h"
 #include "UIGageTest.h"
-#include "EntitlyRock.h"
 #include "EntityMonsterA.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"
@@ -35,7 +35,7 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "CameraMove.h"
-
+#include "EntitlyRock.h"
 class CreateFactory : public Singleton<CreateFactory>
 {
 private:

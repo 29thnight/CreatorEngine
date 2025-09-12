@@ -330,6 +330,9 @@
 		<ClInclude Include="Assets\Script\WeaponSlotController.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityRock.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityMonsterA.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -606,6 +609,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EventSelector.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityRock.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

@@ -62,7 +62,7 @@ void EffectComponent::Update(float tick)
 
         float pitch, yaw, roll;
         Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
-        Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
+        Mathf::Vector3 currentRot = Mathf::Vector3(-pitch, -yaw, -roll);
 
         float posThreshold = 0.01f;
         float posDistance = (m_lastPosition - currentPos).Length();
