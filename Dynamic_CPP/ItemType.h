@@ -22,7 +22,7 @@ AUTO_REGISTER_ENUM(ItemType)
 
 constexpr ItemType EToIMap[] = {
 	ItemType::Basic,   
-	ItemType::Meely,   
+	ItemType::Melee,
 	ItemType::Range,   
 	ItemType::Bomb,   
 	ItemType::None    
