@@ -126,8 +126,8 @@ public:
 	//sprite type
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
 	Texture*						m_spriteTexture{ nullptr };
-        std::string m_vertexShaderName{ "VertexShader" };
-        std::string m_pixelShaderName{ "Sprite" };
+    std::string						m_vertexShaderName{ "VertexShader" };
+    std::string						m_pixelShaderName{ "Sprite" };
 
 private:
 	bool							m_isNeedUpdateCulling{ false };
