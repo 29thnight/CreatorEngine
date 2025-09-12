@@ -7,7 +7,7 @@
     "name": "q1",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -37,8 +37,8 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 0.0,
-                                "y": 0.2839059829711914,
-                                "z": 1.0
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
