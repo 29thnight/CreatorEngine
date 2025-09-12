@@ -27,14 +27,17 @@ public:
 			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
 			if (m_pCamera == nullptr)
 			{
-				m_pCamera = new Camera;
+				m_pCamera = std::make_shared<Camera>();
 				m_pCamera->RegisterContainer();
 				m_cameraIndex = m_pCamera->m_cameraIndex;
 			}
 		}
 		else
 		{
-			m_pCamera = new Camera;
+			if (m_pCamera == nullptr)
+			{
+				m_pCamera = std::make_shared<Camera>();
+			}
 			m_pCamera->RegisterContainer();
 			m_cameraIndex = m_pCamera->m_cameraIndex;
 		}		
@@ -64,15 +67,13 @@ public:
 		Scene* scene = SceneManagers->GetActiveScene();
 		if("PlayScene" != scene->m_sceneName.ToString())
 		{
-			delete m_pCamera;
 			m_cameraIndex = -1;
-			m_pCamera = nullptr;
 		}
 	}
 
 	Camera* GetCamera() const
 	{
-		return m_pCamera;
+		return m_pCamera.get();
 	}
 
 	DirectX::BoundingFrustum GetFrustum() const
@@ -92,7 +93,7 @@ public:
 
 private:
 	[[Property]]
-	Camera* m_pCamera{ nullptr };
+	std::shared_ptr<Camera> m_pCamera{ nullptr };
 	[[Property]]
 	int m_cameraIndex{ -1 };
 	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };

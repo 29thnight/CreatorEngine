@@ -102,26 +102,26 @@ void ShadowMapPass::ControlPanel()
         setting.useCascade = g_useCascade;
     }
 
-        if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
-        {
-                setting.isCloudOn = isCloudOn;
-        }
-        if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
-        {
-                setting.cloudSize = cloudSize;
-        }
-        if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
-        {
-                setting.cloudDirection = cloudDirection;
-        }
-        if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
-        {
-                setting.cloudMoveSpeed = cloudMoveSpeed;
-        }
-		if (ImGui::DragFloat("CloudAlpha", &cloudAlpha, 0.01f, 0.f, 10.f, "%.2f"))
-		{
-				setting.cloudAlpha = cloudAlpha;
-		}
+    if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
+    {
+        setting.isCloudOn = isCloudOn;
+    }
+    if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
+    {
+        setting.cloudSize = cloudSize;
+    }
+    if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
+    {
+        setting.cloudDirection = cloudDirection;
+    }
+    if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
+    {
+        setting.cloudMoveSpeed = cloudMoveSpeed;
+    }
+	if (ImGui::DragFloat("CloudAlpha", &cloudAlpha, 0.01f, 0.f, 10.f, "%.2f"))
+	{
+		setting.cloudAlpha = cloudAlpha;
+	}
 
 	static auto& cameras = CameraManagement->m_cameras;
 	static std::vector<RenderPassData*> dataPtrs{};
@@ -139,7 +139,7 @@ void ShadowMapPass::ControlPanel()
 		{
 			if (nullptr != cam)
 			{
-				auto data = RenderPassData::GetData(cam);
+				auto data = RenderPassData::GetData(cam.get());
 				dataPtrs.push_back(data);
 			}
 		}
@@ -157,10 +157,10 @@ void ShadowMapPass::ControlPanel()
 		ImGui::Image((ImTextureID)selectedData->sliceSRV[i], ImVec2(256, 256));
 	}
 
-        if (ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f))
-        {
-                setting.epsilon = m_settingConstant._epsilon;
-        }
+    if (ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f))
+    {
+        setting.epsilon = m_settingConstant._epsilon;
+    }
 }
 
 void ShadowMapPass::Resize(uint32_t width, uint32_t height)
@@ -187,7 +187,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 
 	auto  lightdir	= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc		= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
-	auto& constant	= renderData->m_shadowCamera.m_shadowMapConstant;						//type = ShadowMapConstant
+	auto& constant	= renderData->m_shadowCamera.m_shadowMapConstant;	//type = ShadowMapConstant
 	auto  projMat	= camera.CalculateProjection();						//type = Mathf::xMatrix
 
 	DevideCascadeEnd(camera);

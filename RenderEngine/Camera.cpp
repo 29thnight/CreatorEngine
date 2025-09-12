@@ -41,26 +41,6 @@ Camera::~Camera()
 		auto renderScene = SceneManagers->GetRenderScene();
 		renderScene->RemoveRenderPassData(m_cameraIndex);
 	}
-
-	if (m_ViewBuffer)
-	{
-		m_ViewBuffer.Reset();
-	}
-
-	if (m_ProjBuffer)
-	{
-		m_ProjBuffer.Reset();
-	}
-
-	if (m_CascadeViewBuffer)
-	{
-		m_CascadeViewBuffer.Reset();
-	}
-
-	if (m_CascadeProjBuffer)
-	{
-		m_CascadeProjBuffer.Reset();
-	}
 }
 
 Camera::Camera(bool isTemperary) : m_isLinkRenderData(false)
@@ -171,7 +151,7 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 
 void Camera::RegisterContainer()
 {
-	m_cameraIndex = CameraManagement->AddCamera(this);
+	m_cameraIndex = CameraManagement->AddCamera(shared_from_this());
 }
 
 void Camera::HandleMovement(float deltaTime)

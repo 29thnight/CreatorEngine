@@ -17,6 +17,7 @@
 #include "ReflectionVectorFactory.h"
 #include "DeviceState.h"
 #include "ReflectionVectorInvoker.h"
+#include "ComponentFactory.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -57,6 +58,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		app.Finalize();
 	}
 
+	ComponentFactory::Destroy();
 	HotLoadSystem::Destroy();
 	SceneManager::Destroy();
 	PhysicsManager::Destroy();
@@ -96,6 +98,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	PhysicsManager::GetInstance();
 	SceneManager::GetInstance();
 	HotLoadSystem::GetInstance();
+	ComponentFactory::GetInstance();
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
     g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);

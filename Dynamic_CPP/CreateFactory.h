@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EventSelector.h"
+#include "RewardObserver.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
 #include "EntitySpiritStone.h"

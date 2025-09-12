@@ -482,23 +482,41 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
 
             for (const auto& objNode : sceneNode["m_SceneObjects"])
             {
-                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-                if (!type) {
-                    Debug->LogError("Failed to extract type from YAML node.");
+                try
+                {
+                    const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                    if (!type)
+                    {
+                        Debug->LogError("Failed to extract type from YAML node.");
+                        continue;
+                    }
+
+                    DesirealizeGameObject(newScene, type, objNode);
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError(std::string("Failed to deserialize GameObject: ") + e.what());
                     continue;
                 }
-                DesirealizeGameObject(newScene, type, objNode);
             }
 
             for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
             {
-                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-                if (!type)
+                try
                 {
-                    Debug->LogError("Failed to extract type from YAML node.");
+                    const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                    if (!type)
+                    {
+                        Debug->LogError("Failed to extract type from YAML node.");
+                        continue;
+                    }
+                    DesirealizeDontDestroyOnLoadObjects(newScene, type, objNode);
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError(std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
                     continue;
                 }
-                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
             }
 
             RebindEventDontDestroyOnLoadObjects(newScene);
@@ -571,44 +589,49 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 void SceneManager::ActivateScene(Scene* sceneToActivate)
 {
     if (!sceneToActivate) return;
-
-    DataSystems->LoadAssetBundle(sceneToActivate->m_requiredLoadAssetsBundle);
-    DataSystems->ClearRetainedAssets();
-    DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
-    DataSystems->RetainAssets(sceneToActivate->m_requiredLoadAssetsBundle);
-
+    Benchmark debugTimer;
     Scene* oldScene = m_activeScene.load();
-    if (oldScene)
+    if (m_activeScene)
     {
         for (auto& object : m_dontDestroyOnLoadObjects)
         {
             auto go = std::dynamic_pointer_cast<GameObject>(object);
             if (go)
             {
-                oldScene->DetachGameObjectHierarchy(go.get());
+                m_activeScene.load()->DetachGameObjectHierarchy(go.get());
             }
         }
 
         sceneUnloadedEvent.Broadcast();
-        DataSystems->UnloadUnusedAssets();
-        oldScene->AllDestroyMark();
-        oldScene->OnDisable();
-        oldScene->OnDestroy();
+        m_activeScene.load()->AllDestroyMark();
+        m_activeScene.load()->OnDisable();
+        m_activeScene.load()->OnDestroy();
+
+        m_activeScene = nullptr;
+
         std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+
+        delete oldScene;
     }
 
     resourceTrimEvent.Broadcast();
     m_activeScene = sceneToActivate;
-    m_scenes.push_back(m_activeScene);
+    m_scenes.push_back(sceneToActivate);
     m_activeSceneIndex = m_scenes.size() - 1;
+	// Debug log the time taken to activate the scene
+	Debug->Log(std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
+
+    Benchmark debugTimer1;
 
     RebindEventDontDestroyOnLoadObjects(m_activeScene);
+    m_activeScene.load()->AllUpdateWorldMatrix();
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();
+
     m_activeScene.load()->Reset();
 
-    delete oldScene;
+	Debug->Log(std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
 }
 
 void SceneManager::AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr)

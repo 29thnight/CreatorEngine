@@ -31,7 +31,7 @@ class MeshRenderer;
 class PrimitiveRenderProxy;
 struct ID3D11DeviceContext;
 struct ID3D11Buffer;
-class Camera //TODO : shadowCamera 분리가 필요
+class Camera : public std::enable_shared_from_this<Camera>
 {
 public:
    ReflectCamera
@@ -148,19 +148,11 @@ private:
 public:
 	void Finalize()
 	{
-		for (auto& camera : m_cameras)
-		{
-			if (nullptr != camera)
-			{
-				delete camera;
-				camera = nullptr;
-			}
-		}
 		m_cameras.clear();
 	}
 
 public:
-	int AddCamera(Camera* camera)
+	int AddCamera(std::shared_ptr<Camera> camera)
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
@@ -180,21 +172,16 @@ public:
 		}
 	}
 
-	void ReplaceCamera(uint32 index, Camera* camera)
+	void ReplaceCamera(uint32 index, std::shared_ptr<Camera> camera)
 	{
 		if (index < m_cameras.size())
 		{
-			if (nullptr != m_cameras[index])
-			{
-				delete m_cameras[index];
-			}
-
-			m_cameras[index] = camera;
+			m_cameras[index].swap(camera);
 			m_cameras[index]->m_cameraIndex = index;
 		}
 	}
 
-	Camera* GetCamera(uint32 index)
+	std::shared_ptr<Camera> GetCamera(uint32 index)
 	{
 		if (index < m_cameras.size())
 		{
@@ -204,12 +191,12 @@ public:
 		return nullptr;
 	}
 
-	std::vector<Camera*>& GetCameras()
+	std::vector<std::shared_ptr<Camera>>& GetCameras()
 	{
 		return m_cameras;
 	}
 
-	Camera* GetLastCamera()
+	std::shared_ptr<Camera> GetLastCamera()
 	{
 		for (int i = m_cameras.size() - 1; i >= 0; --i)
 		{
@@ -240,7 +227,7 @@ public:
 private:
 	friend class SceneRenderer;
 	friend class ShadowMapPass;
-	std::vector<Camera*> m_cameras;
+	std::vector<std::shared_ptr<Camera>> m_cameras;
 };
 
 inline auto& CameraManagement = CameraContainer::GetInstance();

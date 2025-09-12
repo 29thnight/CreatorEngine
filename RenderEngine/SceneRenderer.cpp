@@ -509,11 +509,11 @@ void SceneRenderer::SceneRendering()
 
 	for (auto& camera : CameraManagement->m_cameras)
 	{
-		if (!RenderPassData::VaildCheck(camera)) continue;
-		auto renderData = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) continue;
+		auto renderData = RenderPassData::GetData(camera.get());
 
 #ifndef BUILD_FLAG
-		if (camera != m_pEditorCamera.get())
+		if (camera.get() != m_pEditorCamera.get())
 		{
 			if (EngineSettingInstance->IsGameView())
 			{
@@ -611,7 +611,7 @@ void SceneRenderer::SceneRendering()
 			//PROFILE_CPU_END();
 		}
 
-		if(camera == m_pEditorCamera.get())
+		if(camera.get() == m_pEditorCamera.get())
 		{
 			PROFILE_CPU_BEGIN("TerrainGizmoPass");
 			DirectX11::BeginEvent(L"TerrainGizmoPass");
@@ -665,7 +665,7 @@ void SceneRenderer::SceneRendering()
 		DirectX11::EndEvent();
 		PROFILE_CPU_END();
 		
-		if (m_pEditorCamera.get() != camera)
+		if (m_pEditorCamera.get() != camera.get())
 		{
 			//VolumetricFog or VolumetricLight
 			PROFILE_CPU_BEGIN("VolumetricFogPass");
@@ -721,7 +721,7 @@ void SceneRenderer::SceneRendering()
 		}
 
 		//Vignette
-		if (m_pEditorCamera.get() != camera)
+		if (m_pEditorCamera.get() != camera.get())
 		{
 			PROFILE_CPU_BEGIN("VignettePass");
 			DirectX11::BeginEvent(L"VignettePass");
@@ -826,8 +826,8 @@ void SceneRenderer::CreateCommandListPass()
 
 	for (auto& camera : CameraManagement->m_cameras)
 	{
-		if (!RenderPassData::VaildCheck(camera)) return;
-		auto data = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) return;
+		auto data = RenderPassData::GetData(camera.get());
 
 		PROFILE_CPU_BEGIN("PrepareCommandBuilding");
 		for (auto& instanceID : data->GetShadowRenderDataBuffer())
@@ -958,7 +958,7 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_END();
 		});
 
-		if (m_pEditorCamera.get() != camera)
+		if (m_pEditorCamera.get() != camera.get())
 		{
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 			{
@@ -1041,6 +1041,10 @@ void SceneRenderer::ApplyVolumeProfile()
 	if (m_pToneMapPass)
 	{
 		m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
+	}
+	if (m_pSkyBoxPass)
+	{
+		m_pSkyBoxPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().m_isSkyboxEnabled);
 	}
 }
 
@@ -1197,8 +1201,8 @@ void SceneRenderer::PrepareRender()
 	{
 		if (nullptr == camera) continue;
 
-		if (!RenderPassData::VaildCheck(camera)) return;
-		auto data = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) return;
+		auto data = RenderPassData::GetData(camera.get());
 
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
@@ -1240,7 +1244,7 @@ void SceneRenderer::PrepareRender()
 				}
 			}
 
-			data->UpdateData(camera);
+			data->UpdateData(camera.get());
 
 			data->AddFrame();
 		});

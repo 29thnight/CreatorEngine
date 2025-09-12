@@ -957,6 +957,8 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 
 		if (ImGui::CollapsingHeader("SkyBoxPass"))
 		{
+			ImGui::Checkbox("Use SkyBox", &profile.settings.m_isSkyboxEnabled);
+
 			file::path HDRPath = PathFinder::Relative("HDR\\");
 			std::string_view profileTextureName = profile.settings.skyboxTextureName;
 			std::string_view settingsTextureName = EngineSettingInstance->GetRenderPassSettings().skyboxTextureName;

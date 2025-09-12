@@ -3,5 +3,10 @@
 #define ReflectGameManager \
 ReflectionScriptField(GameManager) \
 { \
-	FieldEnd(GameManager, None) \
+	MethodField \
+	({ \
+		meta_method(LoadTestScene) \
+		meta_method(SwitchTestScene) \
+	}); \
+	FieldEnd(GameManager, MethodOnly) \
 };
