@@ -2,18 +2,18 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Entity.h"
-#include "EntityMonsterA.generated.h"
+#include "TestMonsterB.generated.h"
+
 class BehaviorTreeComponent;
 class BlackBoard;
 class Animator;
 class EffectComponent;
-class CharacterControllerComponent;
-class EntityMonsterA : public Entity
+class TestMonsterB : public Entity
 {
 public:
-   ReflectEntityMonsterA
+   ReflectTestMonsterB
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(EntityMonsterA)
+	MODULE_BEHAVIOR_BODY(TestMonsterB)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -27,7 +27,6 @@ public:
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
-
 
 	BehaviorTreeComponent* enemyBT = nullptr;
 	BlackBoard* blackBoard = nullptr;
@@ -56,33 +55,49 @@ public:
 	float m_chaseRange = 10.f; //감지 범위
 	[[Property]]
 	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
-	//근접 공격 방식
-	[[Property]]
-	float m_attackRange = 2.f;
-	[[Property]]
-	int m_attackDamage = 10;
 
+	//근접 공격 방식
+	/*
+	float m_attackRange = 2.f;
+	
+	int m_attackDamage = 10;
+	*/
+
+	//원거리 공격 방식 - 투사체 공격
+	[[Property]]
+	int m_rangedAttackDamage = 10; //원거리 공격 데미지
+	[[Property]]
+	float m_projectileSpeed = 0.1f; //투사체 속도
+	[[Property]]
+	float m_projectileRange = 20.f; //투사체 최대 사거리
+	[[Property]]
+	float m_projectileArcHeight = 5.0f;//투사체 최대 높이
+	[[Property]]
+	float m_rangedAttackCoolTime = 2.f; //원거리 공격 쿨타임
 
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
-	std::string m_identity = "MonsterNomal";
-
-
-
-	[[Method]]
-	void AttackBoxOn(); //공격 박스 활성화
-	[[Method]]
-	void AttackBoxOff(); //공격 박스 비활성화
-
-	void ChaseTarget(); //타겟 추적
+	std::string m_identity = "MonsterRange";
 
 	void Dead(); //죽음 처리
 
+	void ChaseTarget(); //타겟 추적
+
 	void RotateToTarget(); //타겟 바라보기
 
-	void SendDamage(Entity* sender, int damage) override;
+	//근접 공격 방식 - 박스 공격
+	//
+	//void AttackBoxOn(); //공격 박스 활성화
+	//
+	//void AttackBoxOff(); //공격 박스 비활성화
+
+	//void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
+
+	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사
 
 
-	//넥백처리 -> 차후 에니메이션 이벤트로 처리
+
+
+	//넥백처리 
 	float hittimer = 0.f;
 	Mathf::Vector3 hitPos;
 	Mathf::Vector3 hitBaseScale;

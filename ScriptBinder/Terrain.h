@@ -25,9 +25,9 @@ public:
     virtual ~TerrainComponent() = default;
 
     [[Property]] 
-    int m_width{ 1000 };
+    int m_width{ 100 };
     [[Property]] 
-    int m_height{ 1000 };
+    int m_height{ 100 };
 
     // √ ±‚»≠
     void Initialize();
