@@ -5,14 +5,13 @@
 #include "RenderScene.h"
 #include "UIManager.h"
 #include "RectTransformComponent.h"
+#include "GameObject.h"
 
 TextComponent::TextComponent()
 {
 	m_name = "TextComponent";
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<TextComponent>();
 	type = UItype::Text;
-
-	
 }
 
 void TextComponent::Awake()
@@ -32,14 +31,27 @@ void TextComponent::Update(float tick)
         const auto& worldRect = rect->GetWorldRect();
         pos = { worldRect.x, worldRect.y };
         stretchSize = { worldRect.width, worldRect.height };
-        isStretchX = rect->GetAnchorMin().x != rect->GetAnchorMax().x;
-        isStretchY = rect->GetAnchorMin().y != rect->GetAnchorMax().y;
+
+        if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+        {
+            if (auto* parent = GameObject::FindIndex(m_pOwner->m_parentIndex))
+            {
+                if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
+                {
+                    const auto& pRect = parentRect->GetWorldRect();
+                    stretchSize = { pRect.width, pRect.height };
+                }
+            }
+        }
+
+        isStretchX = true;
+        isStretchY = true;
     }
     //pos += relpos;
 
     auto  image = GetOwner()->GetComponent<ImageComponent>();
     if (image)
-            _layerorder = image->GetLayerOrder();
+        _layerorder = image->GetLayerOrder();
 }
 
 void TextComponent::OnDestroy()
