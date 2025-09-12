@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "test2",
+    "name": "q1",
     "particleSystems": [
         {
             "isRunning": true,
@@ -37,7 +37,7 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 0.0,
-                                "y": 0.12115740776062012,
+                                "y": 0.2839059829711914,
                                 "z": 1.0
                             },
                             "horizontalVelocityRange": 0.0,
@@ -100,39 +100,39 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "Eff_PC_charge"
+                            "name": "Slash3"
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 3,
+                            "blendPreset": 2,
                             "depthPreset": 2,
-                            "rasterizerPreset": 2
+                            "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "MeshParticleTest",
+                            "pixelShader": "gg",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Sword_Eft_01",
+                                "name": "Trail70",
                                 "slot": 0
                             },
                             {
                                 "hasTexture": true,
-                                "name": "Sword_Eft_02",
+                                "name": "Crater62",
                                 "slot": 1
                             },
                             {
                                 "hasTexture": true,
-                                "name": "Sword_Eft_03",
+                                "name": "Noise43b",
                                 "slot": 2
                             },
                             {
                                 "hasTexture": true,
-                                "name": "Sword_Eft_04",
+                                "name": "Smoke12",
                                 "slot": 3
                             }
                         ]
