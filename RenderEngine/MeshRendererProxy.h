@@ -28,6 +28,7 @@ class FoliageComponent;
 class DecalComponent;
 class SpriteRenderer;
 class Texture;
+class ShaderPSO;
 class PrimitiveRenderProxy //아 각 타입별로 분리하고 싶다...
 {
 public:
@@ -126,8 +127,8 @@ public:
 	//sprite type
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
 	Texture*						m_spriteTexture{ nullptr };
-    std::string						m_vertexShaderName{ "VertexShader" };
-    std::string						m_pixelShaderName{ "Sprite" };
+        std::string m_customPSOName{};
+        std::shared_ptr<ShaderPSO>      m_customPSO{ nullptr };
 
 private:
 	bool							m_isNeedUpdateCulling{ false };

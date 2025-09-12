@@ -20,18 +20,14 @@ public:
    void DeserializeSprite(const std::shared_ptr<Texture>& ptr);
 
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
-   void SetVertexShaderName(const std::string& name) { m_VertexShaderName = name; }
-   void SetPixelShaderName(const std::string& name) { m_PixelShaderName = name; }
-   const std::string& GetVertexShaderName() const { return m_VertexShaderName; }
-   const std::string& GetPixelShaderName() const { return m_PixelShaderName; }
+   void SetCustomPSOName(const std::string& name) { m_CustomPSOName = name; }
+   const std::string& GetCustomPSOName() const { return m_CustomPSOName; }
 
 private:
     [[Property]]
     std::string m_SpritePath{};
     [[Property]]
-	std::string m_VertexShaderName{ "VertexShader" };
-    [[Property]]
-	std::string m_PixelShaderName{ "Sprite" };
+    std::string m_CustomPSOName{};
     [[Property]]
     int m_orderInLayer{ 0 };
 

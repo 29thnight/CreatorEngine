@@ -88,12 +88,14 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
     for (auto& proxy : renderData->m_spriteRenderQueue)
     {
         if (!proxy || !proxy->m_quadMesh || !proxy->m_spriteTexture) continue;
-        if (ShaderSystem->VertexShaders.find(proxy->m_vertexShaderName) == ShaderSystem->VertexShaders.end()) continue;
-        if (ShaderSystem->PixelShaders.find(proxy->m_pixelShaderName) == ShaderSystem->PixelShaders.end()) continue;
-
-        m_pso->m_vertexShader = &ShaderSystem->VertexShaders[proxy->m_vertexShaderName];
-        m_pso->m_pixelShader = &ShaderSystem->PixelShaders[proxy->m_pixelShaderName];
-        m_pso->Apply(deferredPtr);
+        if (proxy->m_customPSO)
+        {
+            proxy->m_customPSO->Apply(deferredPtr);
+        }
+        else
+        {
+            m_pso->Apply(deferredPtr);
+        }
 
         scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
         ID3D11ShaderResourceView* srv = proxy->m_spriteTexture->m_pSRV;
