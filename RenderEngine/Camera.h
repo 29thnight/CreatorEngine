@@ -135,7 +135,7 @@ public:
 
 class SceneRenderer;
 class ShadowMapPass;
-class CameraContainer : public Singleton<CameraContainer>
+class CameraContainer : public DLLCore::Singleton<CameraContainer>
 {
 private:
 	CameraContainer()
@@ -143,7 +143,7 @@ private:
 		m_cameras.resize(10);
 	}
 	~CameraContainer() = default;
-	friend class Singleton<CameraContainer>;
+	friend class DLLCore::Singleton<CameraContainer>;
 
 public:
 	void Finalize()
@@ -156,7 +156,7 @@ public:
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
-			if (nullptr == m_cameras[i])
+			if (nullptr == m_cameras[i].lock())
 			{
 				m_cameras[i] = camera;
 				return i;
@@ -168,7 +168,7 @@ public:
 	{
 		if (index < m_cameras.size())
 		{
-			m_cameras[index] = nullptr;
+			m_cameras[index].reset();
 		}
 	}
 
@@ -176,8 +176,8 @@ public:
 	{
 		if (index < m_cameras.size())
 		{
-			m_cameras[index].swap(camera);
-			m_cameras[index]->m_cameraIndex = index;
+			m_cameras[index] = camera;
+			camera->m_cameraIndex = index;
 		}
 	}
 
@@ -185,7 +185,7 @@ public:
 	{
 		if (index < m_cameras.size())
 		{
-			return m_cameras[index];
+			return m_cameras[index].lock();
 		}
 
 		return nullptr;
@@ -193,16 +193,25 @@ public:
 
 	std::vector<std::shared_ptr<Camera>>& GetCameras()
 	{
-		return m_cameras;
+		static thread_local std::vector<std::shared_ptr<Camera>> cameras;
+		cameras.clear();
+		for (auto& camera : m_cameras)
+		{
+			if (nullptr != camera.lock())
+			{
+				cameras.push_back(camera.lock());
+			}
+		}
+		return cameras;
 	}
 
 	std::shared_ptr<Camera> GetLastCamera()
 	{
 		for (int i = m_cameras.size() - 1; i >= 0; --i)
 		{
-			if (nullptr != m_cameras[i] && m_cameras[i]->m_isActive)
+			if (nullptr != m_cameras[i].lock() && m_cameras[i].lock()->m_isActive)
 			{
-				return m_cameras[i];
+				return m_cameras[i].lock();
 			}
 		}
 		return nullptr;
@@ -213,7 +222,7 @@ public:
 		size_t count = 0;
 		for (auto& camera : m_cameras)
 		{
-			if (nullptr != camera)
+			if (nullptr != camera.lock())
 			{
 				count++;
 			}
@@ -227,7 +236,7 @@ public:
 private:
 	friend class SceneRenderer;
 	friend class ShadowMapPass;
-	std::vector<std::shared_ptr<Camera>> m_cameras;
+	std::vector<std::weak_ptr<Camera>> m_cameras;
 };
 
-inline auto& CameraManagement = CameraContainer::GetInstance();
+inline auto CameraManagement = CameraContainer::GetInstance();

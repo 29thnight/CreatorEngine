@@ -21,11 +21,11 @@ std::unordered_map<std::string, Scene*> GameManager::m_loadedScenes;
 
 void GameManager::Awake()
 {
-	if (!GetOwner()->IsDontDestroyOnLoad())
-	{
-		SetDontDestroyOnLoad(GetOwner());
-		LOG("GameManager set DontDestroyOnLoad");
-	}
+	//if (!GetOwner()->IsDontDestroyOnLoad())
+	//{
+	//	SetDontDestroyOnLoad(GetOwner());
+	//	LOG("GameManager set DontDestroyOnLoad");
+	//}
 
 	LOG("GameManager Awake");
 	
@@ -92,6 +92,10 @@ void GameManager::Update(float tick)
 		}
 	}
 
+	if (m_isTestReward)
+	{
+		AddReward(1);
+	}
 }
 
 void GameManager::OnDisable()

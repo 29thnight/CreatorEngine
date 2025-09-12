@@ -22,9 +22,9 @@ public:
 	void Awake() override
 	{
 		//이 부분은 원하는 로직 정리해서 다시 작성
-		if (m_cameraIndex != -1)
+/*		if (m_cameraIndex != -1)
 		{
-			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
+			m_pCamera = CameraManagement->GetCamera(1);
 			if (m_pCamera == nullptr)
 			{
 				m_pCamera = std::make_shared<Camera>();
@@ -37,10 +37,23 @@ public:
 			if (m_pCamera == nullptr)
 			{
 				m_pCamera = std::make_shared<Camera>();
+				m_pCamera->RegisterContainer();
 			}
-			m_pCamera->RegisterContainer();
 			m_cameraIndex = m_pCamera->m_cameraIndex;
-		}		
+		}*/		//로직 오류로 인한 주석
+		auto camera = CameraManagement->GetCamera(1);
+
+		if(m_pCamera != camera)
+		{
+			m_pCamera.swap(camera); //임시로 1번 카메라 고정
+		}
+
+		if (m_pCamera == nullptr)
+		{
+			m_pCamera = std::make_shared<Camera>();
+			m_pCamera->RegisterContainer();
+		}
+		m_cameraIndex = m_pCamera->m_cameraIndex;
 	}
 
 	void Update(float deltaSeconds) override
@@ -67,6 +80,7 @@ public:
 		Scene* scene = SceneManagers->GetActiveScene();
 		if("PlayScene" != scene->m_sceneName.ToString())
 		{
+			m_pCamera = nullptr;
 			m_cameraIndex = -1;
 		}
 	}

@@ -123,7 +123,7 @@ void ShadowMapPass::ControlPanel()
 		setting.cloudAlpha = cloudAlpha;
 	}
 
-	static auto& cameras = CameraManagement->m_cameras;
+	static auto& cameras = CameraManagement->GetCameras();
 	static std::vector<RenderPassData*> dataPtrs{};
 	static RenderPassData* selectedData{};
 	static int selectedIndex = 0;

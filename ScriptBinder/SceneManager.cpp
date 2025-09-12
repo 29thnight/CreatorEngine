@@ -607,11 +607,10 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
         m_activeScene.load()->OnDisable();
         m_activeScene.load()->OnDestroy();
 
-        m_activeScene = nullptr;
+        //m_activeScene = nullptr;
 
         std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
 
-        delete oldScene;
     }
 
     resourceTrimEvent.Broadcast();
@@ -623,13 +622,15 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
 
     Benchmark debugTimer1;
 
-    RebindEventDontDestroyOnLoadObjects(m_activeScene);
+    RebindEventDontDestroyOnLoadObjects(sceneToActivate);
     m_activeScene.load()->AllUpdateWorldMatrix();
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();
 
     m_activeScene.load()->Reset();
+
+    delete oldScene;
 
 	Debug->Log(std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
 }

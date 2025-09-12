@@ -507,7 +507,7 @@ void SceneRenderer::SceneRendering()
 		}
 	}
 
-	for (auto& camera : CameraManagement->m_cameras)
+	for (auto& camera : CameraManagement->GetCameras())
 	{
 		if (!RenderPassData::VaildCheck(camera.get())) continue;
 		auto renderData = RenderPassData::GetData(camera.get());
@@ -824,7 +824,7 @@ void SceneRenderer::CreateCommandListPass()
 		SceneManagers->ResetVolumeProfileApply();
 	}
 
-	for (auto& camera : CameraManagement->m_cameras)
+	for (auto& camera : CameraManagement->GetCameras())
 	{
 		if (!RenderPassData::VaildCheck(camera.get())) return;
 		auto data = RenderPassData::GetData(camera.get());
@@ -947,9 +947,9 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
-				PROFILE_CPU_BEGIN("BitMaskPassCommandList");
-				m_pBitMaskPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
-				PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("BitMaskPassCommandList");
+			m_pBitMaskPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
 		});
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
@@ -1197,7 +1197,7 @@ void SceneRenderer::PrepareRender()
 	//	CullingManagers->UpdateMesh(mesh);
 	//}
 
-	for (auto camera : CameraManagement->m_cameras)
+	for (auto camera : CameraManagement->GetCameras())
 	{
 		if (nullptr == camera) continue;
 

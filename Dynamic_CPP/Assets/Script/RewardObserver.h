@@ -22,4 +22,5 @@ public:
 
 private:
 	class TextComponent* rewardText = nullptr;
+	class ImageComponent* rewardImage = nullptr;
 };

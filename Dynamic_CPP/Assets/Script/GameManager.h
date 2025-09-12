@@ -36,6 +36,8 @@ public:
 	void LoadTestScene();
 	[[Method]]
 	void SwitchTestScene();
+	[[Property]]
+	bool m_isTestReward{ false };
 
 public:
 	void PushEntity(Entity* entity);
@@ -55,7 +57,7 @@ private:
 	std::vector<Weapon*> m_weaponPiecePool;
 	std::vector<Entity*> m_players;
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
-	std::future<Scene*> m_loadingSceneFuture;
+	std::future<Scene*>  m_loadingSceneFuture;
 
 private:
 	void CheatMiningResource();
@@ -71,6 +73,10 @@ public:
 	inline void AddReward(int amount) { 
 		GameManager::m_RewardAmount += amount; 
 		std::cout << "Current Reward: " << m_RewardAmount << std::endl;
+		if (m_RewardAmount > 99)
+		{
+			m_RewardAmount = 99; // 최대 보상 제한
+		}
 	}
 	static int GetReward() { return m_RewardAmount; }
 	static void SetPlayer1DeviceID(int id) { m_player1DeviceID = id; }

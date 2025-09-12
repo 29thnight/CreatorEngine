@@ -29,11 +29,11 @@ void TextComponent::Update(float tick)
 {
     if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
-            const auto& worldRect = rect->GetWorldRect();
-            pos = { worldRect.x, worldRect.y };
-            stretchSize = { worldRect.w, worldRect.h };
-            isStretchX = rect->GetAnchorMin().x != rect->GetAnchorMax().x;
-            isStretchY = rect->GetAnchorMin().y != rect->GetAnchorMax().y;
+        const auto& worldRect = rect->GetWorldRect();
+        pos = { worldRect.x, worldRect.y };
+        stretchSize = { worldRect.width, worldRect.height };
+        isStretchX = rect->GetAnchorMin().x != rect->GetAnchorMax().x;
+        isStretchY = rect->GetAnchorMin().y != rect->GetAnchorMax().y;
     }
     //pos += relpos;
 
