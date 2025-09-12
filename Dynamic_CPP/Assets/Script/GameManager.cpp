@@ -13,6 +13,11 @@
 #include "EntityResource.h"
 #include "EntityItem.h"
 #include "DebugLog.h"
+
+int GameManager::m_RewardAmount = 0;
+int GameManager::m_player1DeviceID = -1;
+int GameManager::m_player2DeviceID = -1;
+
 void GameManager::Awake()
 {
 	LOG("GameManager Awake");
@@ -44,9 +49,6 @@ void GameManager::Awake()
 	}
 }
 
-inline static void Loaderererer() {
-	LOG("Loader");
-}
 void GameManager::Start()
 {
 	LOG("GameManager Start");
@@ -165,9 +167,3 @@ void GameManager::CheatMiningResource()
 		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 300.f, EForceMode::IMPULSE);
 	}*/
 }
-
-void GameManager::Inputblabla()
-{
-	LoadScene("SponzaTest.creator");
-}
-

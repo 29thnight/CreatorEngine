@@ -11,7 +11,7 @@ public:
    ReflectEntityAsis
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityAsis)
-		virtual void Awake() override {}
+	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 	virtual void OnTriggerEnter(const Collision& collision) override;
@@ -91,6 +91,11 @@ private:
 	float	m_currentGracePeriod{ 0 };	// 현재 무적 시간
 
 
+	// Reward 관련.
+private:
+	int		m_currentPollutionGauge{ 0 }; // 현재 오염도 게이지
+public:
+	void AddPollutionGauge(int amount);
 
 	// Move (Path)
 private:
