@@ -3,6 +3,7 @@
 #include "Transform.h"
 #include "LightMapping.h"
 #include "Animator.h"
+#include "BillboardType.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"
 #include "FoliageType.h"
@@ -129,6 +130,8 @@ public:
 	Texture*						m_spriteTexture{ nullptr };
         std::string m_customPSOName{};
         std::shared_ptr<ShaderPSO>      m_customPSO{ nullptr };
+       BillboardType                          m_billboardType{ BillboardType::None };
+       Mathf::Vector3                         m_billboardAxis{ 0.f, 1.f, 0.f };
 
 private:
 	bool							m_isNeedUpdateCulling{ false };

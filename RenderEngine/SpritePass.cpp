@@ -1,6 +1,7 @@
 #include "SpritePass.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
+#include "BillboardType.h"
 
 SpritePass::SpritePass()
 {
@@ -97,7 +98,20 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
             m_pso->Apply(deferredPtr);
         }
 
-        scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
+        auto world = proxy->m_worldMatrix;
+        if (proxy->m_billboardType != BillboardType::None)
+        {
+            const auto& pos = proxy->m_worldPosition;
+            if (proxy->m_billboardType == BillboardType::Spherical)
+            {
+                world = Mathf::Matrix::CreateBillboard(pos, camera.m_eyePosition, proxy->m_billboardAxis);
+            }
+            else if (proxy->m_billboardType == BillboardType::Cylindrical)
+            {
+                world = Mathf::Matrix::CreateConstrainedBillboard(pos, camera.m_eyePosition, proxy->m_billboardAxis);
+            }
+        }
+        scene.UpdateModel(world, deferredPtr);
         ID3D11ShaderResourceView* srv = proxy->m_spriteTexture->m_pSRV;
         DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &srv);
         proxy->m_quadMesh->Draw(deferredPtr);
