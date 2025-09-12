@@ -77,6 +77,7 @@ void Player::Start()
 		auto weapon = weaponObj->GetComponent<Weapon>();
 		AddWeapon(weapon);
 	}
+
 	Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
 	if (meleeweapon && player)
 	{
