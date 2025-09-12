@@ -9,6 +9,7 @@
 #include "SceneManager.h"
 #include "Socket.h"
 #include "DebugLog.h"
+#include "Weapon.h"
 void PlayerAttackAH::Enter()
 {
 	std::cout << "attack start" << std::endl;
@@ -70,8 +71,14 @@ void PlayerAttackAH::Exit()
 {
 	if (m_player)
 	{
+		if (!m_player->m_curWeapon->IsBasic())
+		{
+			m_player->m_curWeapon->DecreaseDur(m_player->isChargeAttack);
+			m_player->m_UpdateDurabilityEvent.Broadcast(m_player->m_curWeapon, m_player->m_weaponIndex);
+		}
 		m_player->isAttacking = false;
 		m_player->sucessAttack = true;
+
 	}
 	/*if (m_player->m_comboCount < 2)
 	{

@@ -1,12 +1,12 @@
-m_name: WeaponWand
+m_name: BoxFlower
 m_isEnabled: true
-m_instanceID: 4152356142
+m_instanceID: 82697861
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: WeaponWand
+    m_name: BoxFlower
     m_isEnabled: true
-    m_instanceID: 254366008
+    m_instanceID: 2399188623
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -16,7 +16,7 @@ PrefabNode:
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: [4]
-    m_prefabFileGuid: daa1d7b2-8722-5501-917a-6e205a13a46f
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -24,34 +24,44 @@ PrefabNode:
     m_tag: Untagged
     m_layer: Default
     m_components:
-      - ModuleBehavior: 1399118904
-        itemType: 3
-        itemAckDmg: 1
-        itemAckSpd: 1
-        itemAckRange: 2
-        itemKnockback: 0.5
-        coopCrit: 2
-        chgTime: 0.200000003
-        chgDmgscal: 2
-        chgSpd: 3
-        chgDelay: 1
-        chgRange: 4
-        chgHitbox: 4
-        chgKnockback: 1
-        durMax: 10
-        durUseAtk: 1
-        durUseChg: 1
-        durUseBuf: 100
-        m_name: Weapon
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1258351226
+        m_instanceID: 2787033595
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
+        m_bodyType: 1
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: true
+        m_setTrigger: true
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_isEnabled: true
+        m_instanceID: 3610095880
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 0.300000012, y: 0.300000012, z: 0.300000012}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        itemCode: 0
+        itemType: 4
+        healAmount: 10
+        m_name: EntityItemHeal
+        m_isEnabled: true
+        m_instanceID: 1356914512
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 1c8b5983-b84f-5ef9-bb70-55b5f4e0776a
     children:
       - GameObject: 2166264123
-        m_name: Weapon_wand
+        m_name: Obj_Inter_flower_low
         m_isEnabled: true
-        m_instanceID: 117465477
+        m_instanceID: 2898923101
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -72,13 +82,13 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1964862181
+            m_instanceID: 497012300
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material.001
-              m_baseColorTexName: Weapon_wand_Low_DefaultMaterial_BaseColor.png
-              m_normalTexName: Weapon_wand_Low_DefaultMaterial_Normal.png
-              m_ORM_TexName: Weapon_wand_Low_DefaultMaterial_OcclusionRoughnessMetallic.png
+              m_name: Material
+              m_baseColorTexName: Obj_Inter_flower_low_DefaultMaterial_BaseColor.png
+              m_normalTexName: Obj_Inter_flower_low_DefaultMaterial_Normal.png
+              m_ORM_TexName: Obj_Inter_flower_low_DefaultMaterial_OcclusionRoughnessMetallic.png
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
@@ -89,11 +99,11 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 193d2b6f-bdcc-5856-8d5b-b9077179017d
+              m_fileGuid: a028fe9c-5d0b-51e8-b6b9-26ebdc8a63de
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
-              m_name: Cylinder.035
+              m_name: Plane.040
               m_materialIndex: 0
               m_LODThresholds: ~
             m_LightMapping:

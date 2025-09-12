@@ -3,6 +3,7 @@
 #include "Animator.h"
 #include "Player.h"
 #include "CharacterControllerComponent.h"
+#include "Weapon.h"
 void PlayerRangeAttack::Enter()
 {
 	if (m_player == nullptr)
@@ -49,7 +50,13 @@ void PlayerRangeAttack::Exit()
 {
 	if (m_player)
 	{
+		if (!m_player->m_curWeapon->IsBasic())
+		{
+			m_player->m_curWeapon->DecreaseDur(m_player->isChargeAttack);
+			m_player->m_UpdateDurabilityEvent.Broadcast(m_player->m_curWeapon, m_player->m_weaponIndex);
+		}
 		m_player->isAttacking = false;
 		m_player->sucessAttack = true;
+
 	}
 }

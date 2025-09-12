@@ -32,7 +32,7 @@ public:
 	//기본무기 검사(내구도 없음)
 	bool IsBasic() { return itemType == ItemType::Basic; }
 	//내구도 감소
-	void DecreaseDur();
+	void DecreaseDur(bool isCharge = false);
 	//내구도 검사관련 제공 메서드
 	bool IsBroken() { return isBreak; }
 	int GetCurDur() { return curDur; }
@@ -75,6 +75,11 @@ public:
 	float chgHitbox = 4.0f; //차징공격 넓이?
 	[[Property]]
 	float chgKnockback = 1.0f; //차징공격 넉백거리
+	[[Property]]
+	int ChargeAttackBulletCount = 5;
+	[[Property]]
+	int ChargeAttackBulletAngle = 15;
+
 
 	//내구도
 	[[Property]]
@@ -89,20 +94,9 @@ public:
 	bool isBreak = false;   //무기 부서짐확인용
 	
 	//아시스 -> 플레이어 날아올떄쓰는것들
-	void Throw(Player* _player,Mathf::Vector3 statrPos);
-	Mathf::Vector3 startPos{};
-	Mathf::Vector3 endPos{};
-	float timer = 0.f;
-	float speed = 3.0f;
 	int OwnerPlayerIndex = -1;
-	GameObject* ownerPlayer = nullptr; //날아갈 경로찾는ㅇ요
+	GameObject* ownerPlayer = nullptr; //
 
-	BuffType buffType = BuffType::None;
-	int buffHitCount = 3;  //버프묻는 공격횟수
-	float buffSpeed = 0.5f; 
-	float buffRange = 1.0f; //아군에게 같이?
-	float buffKnockbackPower = 0.15f; //일반공격 + 버프넉백
-	int buffStackMax = 30; 
 	
 	
 };

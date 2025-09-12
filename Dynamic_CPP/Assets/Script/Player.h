@@ -3,7 +3,7 @@
 #include "Entity.h"
 #include "Player.generated.h"
 #include "ItemType.h"
-
+#include "BitFlag.h"
 class Animator;
 class Socket;
 class EffectComponent;
@@ -25,6 +25,10 @@ enum class playerState
 	Hit,
 	Stun, //부활가능한 상태
 };
+
+class PlayerState();
+
+
 class Player : public Entity
 {
 public:
@@ -51,6 +55,7 @@ public:
 
 
 	virtual void SendDamage(Entity* sender, int damage) override;
+	void Heal(int healAmount);
 	virtual void OnRay() override {}
 
 	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
@@ -81,7 +86,10 @@ public:
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
-	playerState m_state = playerState::Idle;
+	std::string curStateName = "Idle";
+	std::unordered_map<std::string, BitFlag> playerState;
+	bool CheckState(flag _flag);  //현재 상태에서 가능한 행동인지
+	//playerState m_state = playerState::Idle;
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	void CharacterMove(Mathf::Vector2 dir);
@@ -197,6 +205,7 @@ public:
 	void ShootNormalBullet();
 	[[Method]]
 	void ShootSpecialBullet();
+	void ShootChargeBullet();
 	[[Method]]
 	void ThrowBomb();
 
@@ -231,11 +240,14 @@ public:
 	float ResurrectionRange = 5.f;   //부활가능한 트리거 콜라이더 크기 다른플레이어가 이범위안이면 부활  // 콜라이더 or 스크립트에서 범위계산으로 구현예정
 	[[Property]]
 	float ResurrectionTime = 3.f;   //부활거리안에 머물러야할 시간
+	float ResurrectionElapsedTime = 0.f;
 	[[Property]]
 	float ResurrectionHP = 50.f;   //부활시 회복하는 HP &비율
 	[[Property]]
 	float ResurrectionGracePeriod = 3.0f;  //부활시 무적시간
 	bool sucessAttack = false;
+	bool CheckResurrectionByOther();
+	void Resurrection();
 
 
 	//무기
@@ -268,4 +280,9 @@ public:
 	GameObject* shootPosObj = nullptr;
 	GameObject* Indicator = nullptr;
 	GameObject* camera = nullptr;
+
+
+	[[Method]]
+	void TestKillPlayer();
+
 };

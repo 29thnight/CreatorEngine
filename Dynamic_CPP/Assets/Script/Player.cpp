@@ -32,6 +32,8 @@
 #include "CurveIndicator.h"
 #include "DebugLog.h"
 #include "EntityMonsterA.h"
+#include "EntityItemHeal.h"
+#include "PlayerState.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -134,6 +136,28 @@ void Player::Start()
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(false);
 	}
+
+	BitFlag idleBit;
+	idleBit.Set(PlayerStateFlag::CanMove);
+	idleBit.Set(PlayerStateFlag::CanAttack);
+	idleBit.Set(PlayerStateFlag::CanGrab);
+	idleBit.Set(PlayerStateFlag::CanSwap);
+	playerState["Idle"] = idleBit;
+	if (playerState[curStateName].Test(PlayerStateFlag::CanMove) == true)
+	{
+		//이동가능
+	}
+	if (playerState[curStateName].Test(PlayerStateFlag::CanAttack) == true)
+	{
+		//공격가능
+	}
+	playerState["Attack"];
+	playerState["Stun"];
+	playerState["Grab"];
+	playerState["Throw"];
+	playerState["Hit"];
+	playerState["Dash"];
+
 }
 
 void Player::Update(float tick)
@@ -151,11 +175,6 @@ void Player::Update(float tick)
 		auto curveindicator = indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(true);
 		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);*/
-	}
-
-	if (isStun)
-	{
-		m_animator->SetParameter("OnStrun", true);   //피0
 	}
 
 	if (catchedObject)
@@ -264,6 +283,11 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
+
+	if (isStun)
+	{
+
+	}
 	//CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
 	//auto cam = camComponent->GetCamera();
 	//auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
@@ -299,12 +323,27 @@ void Player::LateUpdate(float tick)
 	//XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
 	//GetOwner()->m_transform.SetPosition(newWorldPos);
+
+	
 }
 
 void Player::SendDamage(Entity* sender, int damage)
 {
+	//test sehwan
+	{
+		m_currentHP -= std::max(damage, 0);
+		if (m_currentHP <= 0)
+		{
+			isStun = true;
+			m_animator->SetParameter("OnStun", true);
+		}
+	}
+
+	
+	//엘리트 보스몹에게 피격시에만 피격 애니메이션 출력 및DropCatchItem();  그외는 단순 HP깍기 + 캐릭터 깜빡거리는 연출등
 	if (sender)
 	{
+		
 		auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		if (enemy)
 		{
@@ -314,9 +353,15 @@ void Player::SendDamage(Entity* sender, int damage)
 			if (m_currentHP <= 0)
 			{
 				isStun = true;
+				m_animator->SetParameter("OnStun", true);
 			}
 		}
 	}
+}
+
+void Player::Heal(int healAmount)
+{
+	m_currentHP = std::max(m_currentHP + healAmount, m_maxHP);
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -463,8 +508,7 @@ void Player::Dash()
 
 void Player::StartAttack()
 {
-	isCharging = true;
-	isChargeAttack = false;
+	//isCharging = true;
 	//여기서 공격처리하고 차징시작 
 
 	if (isAttacking == false || canMeleeCancel == true)
@@ -472,6 +516,7 @@ void Player::StartAttack()
 		//isAttacking = true;
 		//DropCatchItem();
 		//m_animator->SetUseLayer(1, false);
+		isChargeAttack = false;
 		if (m_curWeapon)
 		{
 			if (m_curWeapon->isBreak == true) return; //현재무기 부서졌으면 리턴 -> Update에서 무기바꾸기로직으로
@@ -498,7 +543,14 @@ void Player::StartAttack()
 
 			if (m_curWeapon->itemType == ItemType::Range)
 			{
-				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+				if (countRangeAttack == 4)
+				{
+					m_animator->SetParameter("RangeSpecialAttack", true); //원거리 공격 애니메이션으로 
+				}
+				else
+				{
+					m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+				}
 				std::cout << "RangeAttack!!" << std::endl;
 			}
 
@@ -513,39 +565,40 @@ void Player::StartAttack()
 				//현재무기 감추거나 attach떼고 손에붙여서 날아가게?
 			}
 			attackElapsedTime = 0;
-			if (!m_curWeapon->IsBasic())
-			{
-				m_curWeapon->DecreaseDur();
-				m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
-			}
 		}
 	}
 }
 
 void Player::Charging()
 {
+	//폭탄이나 기본무기는 차징없음
+	if (m_curWeapon->itemType == ItemType::Bomb || m_curWeapon->IsBasic()) return;
+	//isAttacking이 false인대도 charging이 실행되면 차징중 --> chargeTime 상승
+	if (isAttacking == false)
+	{
+		isCharging = true;    //true 일동안 chargeTime 상승중
+	}
+	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
+
 
 	//차징을 애니메이션 끝난순간부터 재기? 기본은 차징X
-		if (m_chargingTime >= minChargedTime)
-		{
-			//std::cout << "charginggggggg" << std::endl;
-			//LOG("charginggggggg");
-			//어택 끝났는대도 처징중이면 이속감소 and 이펙트 출력
-		}
+	//if (m_chargingTime >= minChargedTime)
+	//{
+	//		//std::cout << "charginggggggg" << std::endl;
+	//		//LOG("charginggggggg");
+	//		//어택 끝났는대도 처징중이면 이속감소 and 이펙트 출력
+	//}
 		
 
 }
 
 void Player::Attack1()  //정리되면 ChargeAttack() 으로 이름바꿀예정
 {
-	//여기선 차징시간이 넘으면 차징공격만 실행
-	//근거리는 큰이펙트 + 1,2,3타중 정한애니메이션중 하나  ,,, 원거리는 부채꼴로 여러발 발사
-	isCharging = false;
-	//LOG(m_chargingTime << " second charging");
-
+	//여기선 차징시간이 넘으면 차징공격실행 아니면 아무것도없음 폭탄은 예외
+	isCharging = false; 
 	if (m_curWeapon->itemType == ItemType::Bomb)
 	{
-		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로
+		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로 //폭탄 내구도소모는 애니메이션 keyframe으로 삽입예정 -- 
 		std::cout << "BombAttack!!" << std::endl;
 		OnMoveBomb = false;
 
@@ -556,8 +609,16 @@ void Player::Attack1()  //정리되면 ChargeAttack() 으로 이름바꿀예정
 		{
 			//차지공격나감
 			isChargeAttack = true;
-			m_curWeapon->CheckChargedDur(m_chargingTime);  //차징은 무조건  무기부숨 -> 내구도 상관없음 
-			std::cout << "Charged Attack!!" << std::endl;
+			if (m_curWeapon->itemType == ItemType::Melee || m_curWeapon->itemType == ItemType::Basic)
+			{
+				m_animator->SetParameter("MeleeChargeAttack", true);
+				std::cout << "MeleeChargeAttack" << std::endl;
+				//canMeleeCancel = false; //차지어택 캔슬여부 
+			}
+			else if (m_curWeapon->itemType == ItemType::Range)
+			{
+					m_animator->SetParameter("RangeChargeAttack", true); //원거리 공격 애니메이션으로 
+			}
 		}
 	}
 
@@ -591,6 +652,43 @@ float Player::calculDamge(bool isCharge,int _chargeCount)
 	}
 	return finalDamge; //여기에 크리티컬있으면 곱해주기 
 }
+
+bool Player::CheckResurrectionByOther()
+{
+
+	std::vector<HitResult> hits;
+	OverlapInput reviveInfo;
+	Transform transform = GetOwner()->m_transform;
+	reviveInfo.layerMask = 1u; //&&&&& Player만 체크하게 바꾸기
+	reviveInfo.position = transform.GetWorldPosition();
+	reviveInfo.rotation = transform.GetWorldQuaternion();
+	PhysicsManagers->SphereOverlap(reviveInfo, ResurrectionRange, hits);
+
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+
+		auto otehrPlayer = object->GetComponent<Player>();
+		if (otehrPlayer)
+			return true;
+
+	}
+
+	return false;
+}
+
+void Player::Resurrection()
+{
+	isStun = false;
+	m_animator->SetParameter("OnResurrection", true);
+	Heal(ResurrectionHP);
+	ResurrectionElapsedTime = 0;
+	
+	//m_currentHP = ResurrectionHP;
+}
+
+
 
 void Player::SwapWeaponLeft()
 {
@@ -683,7 +781,6 @@ void Player::AddWeapon(Weapon* weapon)
 	m_AddWeaponEvent.Broadcast(weapon, m_weaponInventory.size() - 1);
 	m_UpdateDurabilityEvent.Broadcast(weapon, m_weaponIndex);
 	handSocket->AttachObject(weapon->GetOwner());
-
 	if (1 >= prevSize)
 	{
 		if (m_curWeapon)
@@ -709,6 +806,7 @@ void Player::DeleteCurWeapon()
 	if (it != m_weaponInventory.end())
 	{
 		SwapBasicWeapon();
+		handSocket->DetachObject((*it)->GetOwner());
 		m_weaponInventory.erase(it);
 		for (int i = 1; i < 4; ++i)
 		{
@@ -751,6 +849,8 @@ void Player::FindNearObject(GameObject* gameObject)
 
 void Player::Cancancel()
 {
+	if (isChargeAttack) return; 
+
 	canMeleeCancel = true;
 
 	int maxCombo = (m_curWeapon->itemType == ItemType::Basic) ? 2 : 3;
@@ -906,15 +1006,24 @@ void Player::RangeAttack()
 
 void Player::ShootBullet()
 {
-	if (countRangeAttack != 0 && (countRangeAttack + 1) % countSpecialBullet == 0)
+
+	if (isChargeAttack)  //차지어택은 1 , 3 , 5 등 홀수갯수 발사 메인타겟 좌우 각도로 한발씩
 	{
-		ShootSpecialBullet();
+		ShootChargeBullet();
 		countRangeAttack = 0;
 	}
 	else
 	{
-		ShootNormalBullet();
-		countRangeAttack++;
+		if (countRangeAttack != 0 && (countRangeAttack + 1) % countSpecialBullet == 0)
+		{
+			ShootSpecialBullet();
+			countRangeAttack = 0;
+		}
+		else
+		{
+			ShootNormalBullet();
+			countRangeAttack++;
+		}
 	}
 	
 }
@@ -964,6 +1073,35 @@ void Player::ShootSpecialBullet()
 	
 }
 
+void Player::ShootChargeBullet()
+{
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	if (bulletprefab && player)
+	{
+		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
+		if (shootPosObj)
+		{
+			pos = shootPosObj->m_transform.GetWorldPosition();
+		}
+		Mathf::Vector3 OrgionShootDir = player->m_transform.GetForward();
+
+		if (m_curWeapon)
+		{
+			for (int i = -halfCount; i <= halfCount; i++)
+			{
+				GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
+				NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
+				int Shootangle = m_curWeapon->ChargeAttackBulletAngle * i;
+				Mathf::Vector3 ShootDir = XMVector3TransformNormal(OrgionShootDir,
+					XMMatrixRotationY(XMConvertToRadians(Shootangle)));
+				bullet->Initialize(this, pos, ShootDir, m_curWeapon->chgDmgscal);
+			}
+		}
+	}
+
+}
+
 void Player::ThrowBomb()
 {
 	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
@@ -992,17 +1130,13 @@ void Player::OnTriggerEnter(const Collision& collision)
 	if (collision.thisObj == collision.otherObj)
 		return;
 
-	auto weapon = collision.otherObj->GetComponent<Weapon>();
-	if (weapon && weapon->OwnerPlayerIndex == playerIndex)
+	auto healItem = collision.otherObj->GetComponent<EntityItemHeal>();
+	if (healItem && healItem->CanHeal() ==true)
 	{
-		AddWeapon(weapon);
-		weapon->ownerPlayer = nullptr;
-		auto weaponrigid = weapon->GetOwner()->GetComponent<RigidBodyComponent>();
-		if (weaponrigid)
-		{
-			weaponrigid->SetEnabled(false);
-		}
+		Heal(healItem->GetHealAmount());
+		healItem->Use();
 	}
+	
 
 
 }
@@ -1042,4 +1176,10 @@ void Player::OnCollisionExit(const Collision& collision)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
+}
+
+
+void Player::TestKillPlayer()
+{
+	SendDamage(nullptr,100);
 }

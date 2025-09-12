@@ -69,7 +69,7 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 				}
 				else if (itemType == EItemType::Flower)
 				{
-					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom"); //BoxFlower(힐 아이템 아직 없음)
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFlower"); //BoxFlower(힐 아이템 아직 없음)
 				}
 				
 				if (itemPrefab)

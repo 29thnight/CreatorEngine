@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EntityItemHeal.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
 #include "EntityRock.h"
@@ -33,7 +34,6 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "CameraMove.h"
-#include "EntitlyRock.h"
 class CreateFactory : public Singleton<CreateFactory>
 {
 private:
