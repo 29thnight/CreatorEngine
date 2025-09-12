@@ -296,7 +296,7 @@ void EntityAsis::Purification(float tick)
 				GameObject* weaponCapsule = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
 				//플레이어 방향으로 웨폰날리기
 				auto weaponcapcom = weaponCapsule->GetComponent<WeaponCapsule>();
-				weaponcapcom->weaponCode = item->itemCode;  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
+				weaponcapcom->weaponCode = static_cast<int>(item->itemType);  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
 				weaponcapcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
 			}

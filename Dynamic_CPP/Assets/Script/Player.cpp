@@ -31,7 +31,7 @@
 
 #include "CurveIndicator.h"
 #include "DebugLog.h"
-
+#include "EntityMonsterA.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -51,6 +51,20 @@ void Player::Start()
 	if (!m_animator)
 	{
 		m_animator = player->GetComponent<Animator>();
+	}
+
+	std::string ShootPosObjName = "RangeShootPos";
+	for (auto& child : childred)
+	{
+		GameObject* childObj = GameObject::FindIndex(child);
+		if (childObj)
+		{
+			if (childObj->RemoveSuffixNumberTag() == ShootPosObjName)
+			{
+				shootPosObj = childObj;
+				break;
+			}
+		}
 	}
 
 
@@ -80,10 +94,25 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
-	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
+	Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
+	if (meleeweapon && player)
+	{
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "BasicWeapon");
+		auto weapon = weaponObj->GetComponent<Weapon>();
+		AddWeapon(weapon);
+	}
+	Prefab* rangeweapon = PrefabUtilitys->LoadPrefab("WeaponWand");
+	if (rangeweapon && player)
+	{
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(rangeweapon, "BasicWeapon");
+		auto weapon = weaponObj->GetComponent<Weapon>();
+		AddWeapon(weapon);
+	}
+	
+	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
 	dashEffect = dashObj->AddComponent<EffectComponent>();
 	dashEffect->Awake();
-	dashEffect->m_effectTemplateName = "Dash";
+	dashEffect->m_effectTemplateName = "testdash";
 
 	player->m_collisionType = 2;
 
@@ -210,7 +239,8 @@ void Player::Update(float tick)
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
-			//dashEffect->StopEffect();
+			if(dashEffect)
+				dashEffect->StopEffect();
 		}
 		else
 		{
@@ -381,7 +411,6 @@ void Player::ThrowEvent()
 	}
 }
 
-
 void Player::DropCatchItem()
 {
 	onIndicate = false;
@@ -440,9 +469,9 @@ void Player::StartAttack()
 
 	if (isAttacking == false || canMeleeCancel == true)
 	{
-		isAttacking = true;
-		DropCatchItem();
-		m_animator->SetUseLayer(1, false);
+		//isAttacking = true;
+		//DropCatchItem();
+		//m_animator->SetUseLayer(1, false);
 		if (m_curWeapon)
 		{
 			if (m_curWeapon->isBreak == true) return; //현재무기 부서졌으면 리턴 -> Update에서 무기바꾸기로직으로
@@ -471,7 +500,6 @@ void Player::StartAttack()
 			{
 				m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 				std::cout << "RangeAttack!!" << std::endl;
-				RangeAttack();
 			}
 
 	
@@ -497,16 +525,18 @@ void Player::StartAttack()
 void Player::Charging()
 {
 
+	//차징을 애니메이션 끝난순간부터 재기? 기본은 차징X
 		if (m_chargingTime >= minChargedTime)
 		{
 			//std::cout << "charginggggggg" << std::endl;
 			//LOG("charginggggggg");
+			//어택 끝났는대도 처징중이면 이속감소 and 이펙트 출력
 		}
-		//m_animator->SetParameter("Charging", true); //차징중에 기모으는 이펙트 출력 Idle or Move 애니메이션 자율
+		
 
 }
 
-void Player::Attack1()
+void Player::Attack1()  //정리되면 ChargeAttack() 으로 이름바꿀예정
 {
 	//여기선 차징시간이 넘으면 차징공격만 실행
 	//근거리는 큰이펙트 + 1,2,3타중 정한애니메이션중 하나  ,,, 원거리는 부채꼴로 여러발 발사
@@ -520,13 +550,13 @@ void Player::Attack1()
 		OnMoveBomb = false;
 
 	}
-	else
+	else //근거리 and 원거리 
 	{
-		if (m_chargingTime >= minChargedTime)
+		if (m_chargingTime >= minChargedTime)  //최소 차징시간 넘었으면
 		{
 			//차지공격나감
 			isChargeAttack = true;
-			m_curWeapon->CheckChargedDur(m_chargingTime);  //여기서 chargeCount 갱신해주기
+			m_curWeapon->CheckChargedDur(m_chargingTime);  //차징은 무조건  무기부숨 -> 내구도 상관없음 
 			std::cout << "Charged Attack!!" << std::endl;
 		}
 	}
@@ -578,6 +608,7 @@ void Player::SwapWeaponLeft()
 		m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
 	}
 	countRangeAttack = 0;
+	m_comboCount = 0;
 }
 
 void Player::SwapWeaponRight()
@@ -614,6 +645,7 @@ void Player::SwapBasicWeapon()
 		m_curWeapon->SetEnabled(true);
 	}
 	countRangeAttack = 0;
+	m_comboCount = 0;
 }
 
 void Player::AddMeleeWeapon()
@@ -673,6 +705,7 @@ void Player::DeleteCurWeapon()
 
 	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
 
+	m_curWeapon->GetOwner()->Destroy();
 	if (it != m_weaponInventory.end())
 	{
 		SwapBasicWeapon();
@@ -720,37 +753,10 @@ void Player::Cancancel()
 {
 	canMeleeCancel = true;
 
-	if (m_curWeapon->itemType == ItemType::Basic)
-	{
-		//1콤보까지만 올라가게
-		if (m_comboCount < 1)
-		{
-			m_comboCount++;
-			m_comboElapsedTime = 0.f;
-		}
-		else
-		{
-			m_comboCount = 0;
-			m_comboElapsedTime = 0.f;
-		}
-	}
-	else if (m_curWeapon->itemType == ItemType::Melee)
-	{
-		//2콤보까지 가능
-		if (m_comboCount < 2)
-		{
-			m_comboCount++;
-			m_comboElapsedTime = 0.f;
-		}
-		else
-		{
-			m_comboCount = 0;
-			m_comboElapsedTime = 0.f;
-		}
-	}
-	
-}
+	int maxCombo = (m_curWeapon->itemType == ItemType::Basic) ? 2 : 3;
 
+	m_comboCount = (m_comboCount + 1) % maxCombo;
+}
 
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
@@ -789,30 +795,35 @@ void Player::MeleeAttack()
 
 	int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
 
-		float angle = XMConvertToRadians(15.0f);
-		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
-		leftDir.Normalize();
-		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
-		rightDir.Normalize();
-		std::vector<HitResult> leftHits;
-		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
-		std::vector<HitResult> rightHits;
-		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
-		std::vector<HitResult> allHits;
-		allHits.reserve(size + leftSize + rightSize);
-		allHits.insert(allHits.end(), hits.begin(), hits.end());
-		allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
-		allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
-		for (auto& hit : allHits)
-		{
-			auto object = hit.gameObject;
-			if (object == GetOwner()) continue;
-			auto entity = object->GetComponent<Entity>();
-			if (entity) {
-				auto [iter, inserted] = AttackTarget.insert(entity);
-				if (inserted) (*iter)->SendDamage(this, 100);
-			}
+	constexpr float angle = XMConvertToRadians(15.0f);
+	Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+	leftDir.Normalize();
+	Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
+	rightDir.Normalize();
+	std::vector<HitResult> leftHits;
+	int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+	std::vector<HitResult> rightHits;
+	int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+	std::vector<HitResult> allHits;
+	allHits.reserve(size + leftSize + rightSize);
+	allHits.insert(allHits.end(), hits.begin(), hits.end());
+	allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
+	allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
+	for (auto& hit : allHits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+		auto entity = object->GetComponent<EntityMonsterA>();
+		if (entity) {
+			auto [iter, inserted] = AttackTarget.insert(entity);
+			if (inserted) (*iter)->SendDamage(this, 100);
 		}
+		auto entity2 = object->GetComponent<EntityResource>();   //나중에 수정 통합 Entity 받기
+		if (entity2) {
+			auto [iter, inserted] = AttackTarget.insert(entity2);
+			if (inserted) (*iter)->SendDamage(this, 100);
+		}
+	}
 }
 
 void Player::RangeAttack()
@@ -839,7 +850,7 @@ void Player::RangeAttack()
 	{
 		auto object = hit.gameObject;
 		if (object == GetOwner()) continue;
-		if (auto enemy = object->GetComponent<EntityEnemy>())
+		if (auto enemy = object->GetComponent<EntityMonsterA>())  //entity로 묶어서 받아지는지 확인필요 --- 자원오브젝트,몬스터 A B C 등 묶어서
 		{
 
 
@@ -916,6 +927,11 @@ void Player::ShootNormalBullet()
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+		if (shootPosObj)
+		{
+			pos = shootPosObj->m_transform.GetWorldPosition();
+		}
+		
 		if (m_curWeapon)
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);
@@ -933,6 +949,11 @@ void Player::ShootSpecialBullet()
 		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+
+		if (shootPosObj)
+		{
+			pos = shootPosObj->m_transform.GetWorldPosition();
+		}
 		if (m_curWeapon)
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), m_curWeapon->itemAckDmg);

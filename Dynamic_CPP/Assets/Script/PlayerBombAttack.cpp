@@ -25,6 +25,14 @@ void PlayerBombAttack::Enter()
 			}
 		}
 	}
+
+
+	if (m_player)
+	{
+		m_player->isAttacking = true;
+		m_player->DropCatchItem();
+		m_player->m_animator->SetUseLayer(1, false);
+	}
 }
 
 void PlayerBombAttack::Update(float deltaTime)
