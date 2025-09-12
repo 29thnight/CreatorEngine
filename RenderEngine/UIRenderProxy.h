@@ -31,7 +31,7 @@ public:
         float                                   clipPercent{ 1.f };
     };
 
-    struct TextData 
+    struct TextData
     {
         DirectX::SpriteFont*                    font{ nullptr };
         std::string                             message;
@@ -39,6 +39,9 @@ public:
         DirectX::XMFLOAT2                       position{};
         float                                   fontSize{ 5.f };
         int                                     layerOrder{ 0 };
+        Mathf::Vector2                          maxSize{};
+        bool                                    stretchX{ false };
+        bool                                    stretchY{ false };
     };
 
     struct SpriteSheetData

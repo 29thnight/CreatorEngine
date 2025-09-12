@@ -43,9 +43,14 @@ private:
 	std::string message{};
     [[Property]]
 	Mathf::Vector2 relpos{ 0, 0 };
-	[[Property]]
-	Mathf::Color4 color{};
-	[[Property]]
-	float fontSize{ 1.f };
+        [[Property]]
+        Mathf::Color4 color{};
+        [[Property]]
+        float fontSize{ 1.f };
+
+        // Calculated in Update: maximum render area from RectTransform's stretch
+        Mathf::Vector2 stretchSize{ 0.f, 0.f };
+        bool isStretchX{ false };
+        bool isStretchY{ false };
 };
 

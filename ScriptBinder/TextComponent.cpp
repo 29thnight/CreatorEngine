@@ -31,6 +31,9 @@ void TextComponent::Update(float tick)
     {
             const auto& worldRect = rect->GetWorldRect();
             pos = { worldRect.x, worldRect.y };
+            stretchSize = { worldRect.w, worldRect.h };
+            isStretchX = rect->GetAnchorMin().x != rect->GetAnchorMax().x;
+            isStretchY = rect->GetAnchorMin().y != rect->GetAnchorMax().y;
     }
     //pos += relpos;
 
