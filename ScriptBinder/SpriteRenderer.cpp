@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
+#include "BillboardType.h"
 
 void SpriteRenderer::Awake()
 {
