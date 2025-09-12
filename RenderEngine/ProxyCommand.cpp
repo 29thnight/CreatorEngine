@@ -396,27 +396,33 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 
 	auto font = pComponent->font;
 	auto message = pComponent->message;
-	auto color = pComponent->color;
-	auto position = pComponent->pos;
-	float fontSize = pComponent->fontSize;
-	int layerOrder = pComponent->GetLayerOrder();
+        auto color = pComponent->color;
+        auto position = pComponent->pos;
+        float fontSize = pComponent->fontSize;
+        int layerOrder = pComponent->GetLayerOrder();
+        auto maxSize = pComponent->stretchSize;
+        bool stretchX = pComponent->isStretchX;
+        bool stretchY = pComponent->isStretchY;
 	bool isEnable = owner->IsEnabled();
 
-	m_updateFunction = [weakProxyObject, isEnable, font, message, color, position, fontSize, layerOrder]()
-	{
-		if (auto proxyObject = weakProxyObject.lock())
-		{
-			UIRenderProxy::TextData data{};
-			data.font = font;
-			data.message = message;
-			data.color = color;
-			data.position = Mathf::Vector2(position);
-			data.fontSize = fontSize;
-			data.layerOrder = layerOrder;
-			proxyObject->m_data = std::move(data);
-			proxyObject->m_isEnabled = isEnable;
-		}
-	};
+        m_updateFunction = [weakProxyObject, isEnable, font, message, color, position, fontSize, layerOrder, maxSize, stretchX, stretchY]()
+        {
+                if (auto proxyObject = weakProxyObject.lock())
+                {
+                        UIRenderProxy::TextData data{};
+                        data.font = font;
+                        data.message = message;
+                        data.color = color;
+                        data.position = Mathf::Vector2(position);
+                        data.fontSize = fontSize;
+                        data.layerOrder = layerOrder;
+                        data.maxSize = maxSize;
+                        data.stretchX = stretchX;
+                        data.stretchY = stretchY;
+                        proxyObject->m_data = std::move(data);
+                        proxyObject->m_isEnabled = isEnable;
+                }
+        };
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :
