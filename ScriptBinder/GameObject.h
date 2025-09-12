@@ -67,7 +67,13 @@ public:
 	T* GetComponent();
 
 	template<typename T>
+	T* GetComponentDynamicCast();
+
+	template<typename T>
 	std::vector<T*> GetComponentsInChildren();
+
+	template<typename T>
+	std::vector<T*> GetComponentsInchildrenDynamicCast();
 
 	template<typename T>
 	bool HasComponent();
