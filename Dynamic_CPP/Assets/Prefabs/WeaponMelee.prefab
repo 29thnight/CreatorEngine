@@ -25,7 +25,7 @@ PrefabNode:
     m_layer: Default
     m_components:
       - ModuleBehavior: 1399118904
-        itemtype: 0
+        itemType: 2
         itemAckDmg: 1
         itemAckSpd: 1
         itemAckRange: 2

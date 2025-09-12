@@ -17,7 +17,6 @@ public:
 	void Resize(uint32_t width, uint32_t height) override;
 
 private:
-	bool m_isGizmoRendering{ false };
-	std::unique_ptr<Mesh> m_QuadMesh{};
-	ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
+        bool m_isGizmoRendering{ false };
+        ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
 };

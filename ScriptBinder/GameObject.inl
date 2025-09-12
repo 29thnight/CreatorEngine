@@ -58,6 +58,18 @@ inline T* GameObject::GetComponent()
 }
 
 template<typename T>
+inline T* GameObject::GetComponentDynamicCast()
+{
+    for (auto& component : m_components)
+    {
+        std::shared_ptr<T> castedComponent = std::dynamic_pointer_cast<T>(component);
+        if (nullptr != castedComponent.get())
+            return castedComponent.get();
+    }
+    return nullptr;
+}
+
+template<typename T>
 inline std::vector<T*> GameObject::GetComponentsInChildren()
 {
     std::vector<T*> comps;
@@ -78,6 +90,28 @@ inline std::vector<T*> GameObject::GetComponentsInChildren()
         }
     }
 	return comps;
+}
+
+template<typename T>
+inline std::vector<T*> GameObject::GetComponentsInchildrenDynamicCast() {
+    std::vector<T*> comps;
+    if (m_ownerScene)
+    {
+        for (auto& childIndex : m_childrenIndices)
+        {
+            auto& childObj = m_ownerScene->m_SceneObjects[childIndex];
+            if (childObj)
+            {
+                if (T* comp = childObj->GetComponentDynamicCast<T>())
+                {
+                    comps.push_back(comp);
+                }
+                auto childComps = childObj->GetComponentsInchildrenDynamicCast<T>();
+                comps.insert(comps.end(), childComps.begin(), childComps.end());
+            }
+        }
+    }
+    return comps;
 }
 
 template<>

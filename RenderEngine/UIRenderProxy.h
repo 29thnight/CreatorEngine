@@ -14,7 +14,7 @@ class TextComponent;
 class SpriteSheetComponent;
 enum class ClipDirection : std::uint8_t;
 // Proxy responsible for drawing UI elements without keeping component pointers.
-class UIRenderProxy 
+class UIRenderProxy : public std::enable_shared_from_this<UIRenderProxy>
 {
 public:
     struct ImageData 

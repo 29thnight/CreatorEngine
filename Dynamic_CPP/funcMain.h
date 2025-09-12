@@ -192,6 +192,8 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotController", []() { return new WeaponSlotController(); });
+		CreateFactory::GetInstance()->RegisterFactory("WeaponSlot", []() { return new WeaponSlot(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityRock", []() { return new EntityRock(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntitySpiritStone", []() { return new EntitySpiritStone(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterA", []() { return new EntityMonsterA(); });

@@ -45,6 +45,8 @@ ReflectionScriptField(Player) \
 	({ \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
+		meta_method(SwapBasicWeapon) \
+		meta_method(AddMeleeWeapon) \
 		meta_method(DeleteCurWeapon) \
 		meta_method(Move, "dir") \
 		meta_method(CatchAndThrow) \

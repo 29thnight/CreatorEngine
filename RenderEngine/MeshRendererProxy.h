@@ -28,7 +28,7 @@ class FoliageComponent;
 class DecalComponent;
 class SpriteRenderer;
 class Texture;
-class PrimitiveRenderProxy //¾Æ °¢ Å¸ÀÔº°·Î ºĞ¸®ÇÏ°í ½Í´Ù...
+class PrimitiveRenderProxy //ì•„ ê° íƒ€ì…ë³„ë¡œ ë¶„ë¦¬í•˜ê³  ì‹¶ë‹¤...
 {
 public:
 	struct ProxyFilter
@@ -126,6 +126,8 @@ public:
 	//sprite type
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
 	Texture*						m_spriteTexture{ nullptr };
+    std::string						m_vertexShaderName{ "VertexShader" };
+    std::string						m_pixelShaderName{ "Sprite" };
 
 private:
 	bool							m_isNeedUpdateCulling{ false };

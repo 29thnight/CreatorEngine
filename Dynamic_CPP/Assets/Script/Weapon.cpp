@@ -3,32 +3,13 @@
 #include "Player.h"
 #include "Transform.h"
 using namespace Mathf;
+
 void Weapon::Start()
 {
-	if (itemtype == 0)
-	{
-		itemType = ItemType::Meely;
-	}
-	else if(itemtype == 1)
-	{
-		itemType = ItemType::Range;
-	}
-	else if (itemtype == 2)
-	{
-		itemType = ItemType::Bomb;
-	}
-	else 
-	{
-		itemType = ItemType::Basic;
-	}
-	isBreak = false;
 }
-
 
 void Weapon::Update(float tick)
 {
-
-
 	//날아가는 로직은 weaponCapsule로 이전예정
 	if (ownerPlayer)
 	{
@@ -66,23 +47,16 @@ void Weapon::SetEnabled(bool able)
 	}
 }
 
-
-
-
-
-bool Weapon::CheckDur()
+void Weapon::DecreaseDur()
 {
-	if (itemType == ItemType::Basic) return false; 
-
+	if (itemType == ItemType::Basic) return; 
 
 	curDur -= durUseAtk;
-
-	if (curDur <= 0)
+	if (curDur <= 0) 
 	{
+		curDur = 0;
 		isBreak = true;
-		return true;
 	}
-	return false;
 }
 
 bool Weapon::CheckChargedDur(float chargedTime)  //charge count세서 리턴
@@ -97,7 +71,6 @@ bool Weapon::CheckChargedDur(float chargedTime)  //charge count세서 리턴
 
 void Weapon::Throw(Player* _player,Mathf::Vector3 statrPos)
 {
-
 	//throw나 이동등은 weapon캡슐로 옮기기
 	OwnerPlayerIndex = _player->playerIndex;
 	ownerPlayer = _player->GetOwner();

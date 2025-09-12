@@ -264,6 +264,7 @@
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
+    <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="SpriteSheetComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
     <ClCompile Include="GameObject.cpp" />

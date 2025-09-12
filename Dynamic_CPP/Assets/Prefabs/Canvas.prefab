@@ -1,0 +1,1465 @@
+m_name: Canvas
+m_isEnabled: true
+m_instanceID: 4260110904
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: Canvas
+    m_isEnabled: true
+    m_instanceID: 2682726578
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_parentID: 4294967295
+    m_index: 3
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [4, 6, 8, 9, 10, 11, 12, 13, 14]
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_attachedSoketID: 0
+    m_collisionType: 1
+    m_isStatic: false
+    m_gameObjectType: 6
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RectTransformComponent: 3002078429
+        m_name: RectTransformComponent
+        m_isEnabled: true
+        m_instanceID: 3028612795
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_anchorMin: {x: 0.5, y: 0.5}
+        m_anchorMax: {x: 0.5, y: 0.5}
+        m_anchoredPosition: {x: -960, y: -540}
+        m_sizeDelta: {x: 1920, y: 1080}
+        m_pivot: {x: 0.5, y: 0.5}
+        m_worldRect: {x: -960, y: -540, width: 1920, height: 1080}
+      - Canvas: 2773063417
+        m_name: Component
+        m_isEnabled: true
+        m_instanceID: 1696527923
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        CanvasOrder: 0
+        CanvasName: Canvas
+    children:
+      - GameObject: 2166264123
+        m_name: QuestBg
+        m_isEnabled: true
+        m_instanceID: 393220877
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 4
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: [5]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 3079394104
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 178, y: 101}
+            m_sizeDelta: {x: 384, y: 62}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: -14, y: 70, width: 384, height: 62}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 3580196983
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 192, y: 31}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [QuestBg.png]
+        children:
+          - GameObject: 2166264123
+            m_name: QuestIcon
+            m_isEnabled: true
+            m_instanceID: 4169714840
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 4
+            m_index: 5
+            m_parentIndex: 4
+            m_rootIndex: 0
+            m_childrenIndices: ~
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: true
+                m_instanceID: 3889197421
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: -131, y: 1}
+                m_sizeDelta: {x: 48, y: 38}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 23, y: 83, width: 48, height: 38}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: true
+                m_instanceID: 1294674600
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 24, y: 19}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [QuestIcon.png]
+      - GameObject: 2166264123
+        m_name: GemBg
+        m_isEnabled: true
+        m_instanceID: 3464202397
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 6
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: [7]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 2053460604
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 940, y: 87}
+            m_sizeDelta: {x: 120, y: 74}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 880, y: 50, width: 120, height: 74}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 243041742
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 60, y: 37}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [GemBg.png]
+        children:
+          - GameObject: 2166264123
+            m_name: GamFill
+            m_isEnabled: true
+            m_instanceID: 2657681187
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 6
+            m_index: 7
+            m_parentIndex: 6
+            m_rootIndex: 0
+            m_childrenIndices: ~
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: true
+                m_instanceID: 3594446687
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 120, y: 74}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 880, y: 50, width: 120, height: 74}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: true
+                m_instanceID: 3663288938
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 60, y: 37}
+                unionScale: 1
+                clipDirection: 4
+                clipPercent: 0.600000024
+                texturePaths: [GamFill.png]
+      - GameObject: 2166264123
+        m_name: SettingButton
+        m_isEnabled: true
+        m_instanceID: 926961059
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 8
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 3057982594
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 1894, y: 103}
+            m_sizeDelta: {x: 78, y: 68}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 1855, y: 69, width: 78, height: 68}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 3310039867
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 39, y: 34}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [SettingButton.png]
+      - GameObject: 2166264123
+        m_name: P1_UIController
+        m_isEnabled: true
+        m_instanceID: 2181456804
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 9
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 4204415205
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 88, y: 919}
+            m_sizeDelta: {x: 116, y: 122}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 30, y: 858, width: 116, height: 122}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 3804474791
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 58, y: 61}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [P1.png]
+          - ModuleBehavior: 1399118904
+            m_playerIndex: 0
+            m_name: WeaponSlotController
+            m_isEnabled: true
+            m_instanceID: 3504117377
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 95f39a7d-dfda-55cc-b847-770fe20c1e1d
+      - GameObject: 2166264123
+        m_name: P2_UIController
+        m_isEnabled: true
+        m_instanceID: 1461373797
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 10
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 193813059
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 1787, y: 919}
+            m_sizeDelta: {x: 116, y: 122}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 1729, y: 858, width: 116, height: 122}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 3676306260
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 58, y: 61}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [P2.png]
+      - GameObject: 2166264123
+        m_name: P1_WeaponSlot(0)
+        m_isEnabled: true
+        m_instanceID: 1777437272
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 11
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: [69, 71]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 3588302080
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 261, y: 980}
+            m_sizeDelta: {x: 110, y: 110}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 206, y: 925, width: 110, height: 110}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 4048256586
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 55, y: 55}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [0_NonWeapon.png, 1_BasicWeapon.png, 2_MeleeWeapon.png]
+          - ModuleBehavior: 1399118904
+            m_name: WeaponSlot
+            m_isEnabled: true
+            m_instanceID: 3301701456
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
+        children:
+          - GameObject: 2166264123
+            m_name: 1_BasicWeaponGage
+            m_isEnabled: false
+            m_instanceID: 3788117471
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 11
+            m_index: 69
+            m_parentIndex: 11
+            m_rootIndex: 0
+            m_childrenIndices: [70]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 2467243848
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 206, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 3220660075
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [1_BasicWeaponGage.png]
+            children:
+              - GameObject: 2166264123
+                m_name: 1_BasicWeaponTextBg
+                m_isEnabled: false
+                m_instanceID: 272900
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 69
+                m_index: 70
+                m_parentIndex: 69
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 947124533
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 206, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 2095950038
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [1_BasicWeaponTextBg.png]
+          - GameObject: 2166264123
+            m_name: 2_MeleeWeaponGage (2)
+            m_isEnabled: false
+            m_instanceID: 47129241
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 11
+            m_index: 71
+            m_parentIndex: 11
+            m_rootIndex: 0
+            m_childrenIndices: [72]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 3293385107
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 206, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 4235234203
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: CustomUIShader
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [2_MeleeWeaponGage.png]
+              - ModuleBehavior: 1399118904
+                centerUV: "[not suport type]"
+                radiusUV: 1
+                percent: 1
+                startAngle: 9.80000019
+                clockwise: 1
+                featherAngle: 0.5
+                tint: "[not suport type]"
+                m_name: UIGageTest
+                m_isEnabled: true
+                m_instanceID: 189788804
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
+            children:
+              - GameObject: 2166264123
+                m_name: 2_MeleeWeaponTextBg (2)
+                m_isEnabled: false
+                m_instanceID: 4263427930
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 71
+                m_index: 72
+                m_parentIndex: 71
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 3995139816
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 206, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 1466628627
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [2_MeleeWeaponTextBg.png]
+      - GameObject: 2166264123
+        m_name: P1_WeaponSlot(1)
+        m_isEnabled: true
+        m_instanceID: 1460802741
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 12
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: [73, 75]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 667418058
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 378, y: 980}
+            m_sizeDelta: {x: 110, y: 110}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 323, y: 925, width: 110, height: 110}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 672183178
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 55, y: 55}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [0_NonWeapon.png, 1_BasicWeapon.png, 2_MeleeWeapon.png]
+          - ModuleBehavior: 1399118904
+            m_name: WeaponSlot
+            m_isEnabled: true
+            m_instanceID: 3973147019
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
+        children:
+          - GameObject: 2166264123
+            m_name: 1_BasicWeaponGage (1)
+            m_isEnabled: false
+            m_instanceID: 2421132089
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 12
+            m_index: 73
+            m_parentIndex: 12
+            m_rootIndex: 0
+            m_childrenIndices: [74]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 942342673
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 323, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 2632049203
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [1_BasicWeaponGage.png]
+            children:
+              - GameObject: 2166264123
+                m_name: 1_BasicWeaponTextBg (1)
+                m_isEnabled: false
+                m_instanceID: 3000311161
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 73
+                m_index: 74
+                m_parentIndex: 73
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 3759514013
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 323, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 903749269
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [1_BasicWeaponTextBg.png]
+          - GameObject: 2166264123
+            m_name: 2_MeleeWeaponGage (3)
+            m_isEnabled: false
+            m_instanceID: 2932315329
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 12
+            m_index: 75
+            m_parentIndex: 12
+            m_rootIndex: 0
+            m_childrenIndices: [76]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 1200913739
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 323, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 4197368383
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: CustomUIShader
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [2_MeleeWeaponGage.png]
+              - ModuleBehavior: 1399118904
+                centerUV: "[not suport type]"
+                radiusUV: 1
+                percent: 1
+                startAngle: 9.80000019
+                clockwise: 1
+                featherAngle: 0.5
+                tint: "[not suport type]"
+                m_name: UIGageTest
+                m_isEnabled: true
+                m_instanceID: 3221647386
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
+            children:
+              - GameObject: 2166264123
+                m_name: 2_MeleeWeaponTextBg (3)
+                m_isEnabled: false
+                m_instanceID: 703401794
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 75
+                m_index: 76
+                m_parentIndex: 75
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 194726088
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 323, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 3350353308
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [2_MeleeWeaponTextBg.png]
+      - GameObject: 2166264123
+        m_name: P1_WeaponSlot(2)
+        m_isEnabled: true
+        m_instanceID: 4117278979
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 13
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: [77, 79]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 827749499
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 496, y: 980}
+            m_sizeDelta: {x: 110, y: 110}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 441, y: 925, width: 110, height: 110}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 378001799
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 55, y: 55}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [0_NonWeapon.png, 1_BasicWeapon.png, 2_MeleeWeapon.png]
+          - ModuleBehavior: 1399118904
+            m_name: WeaponSlot
+            m_isEnabled: true
+            m_instanceID: 2311600138
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
+        children:
+          - GameObject: 2166264123
+            m_name: 1_BasicWeaponGage (2)
+            m_isEnabled: false
+            m_instanceID: 716351570
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 13
+            m_index: 77
+            m_parentIndex: 13
+            m_rootIndex: 0
+            m_childrenIndices: [78]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 151386346
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 441, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 2407709541
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [1_BasicWeaponGage.png]
+            children:
+              - GameObject: 2166264123
+                m_name: 1_BasicWeaponTextBg (2)
+                m_isEnabled: false
+                m_instanceID: 550789673
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 77
+                m_index: 78
+                m_parentIndex: 77
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 368235270
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 441, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 4176872443
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [1_BasicWeaponTextBg.png]
+          - GameObject: 2166264123
+            m_name: 2_MeleeWeaponGage (4)
+            m_isEnabled: false
+            m_instanceID: 1497397011
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 13
+            m_index: 79
+            m_parentIndex: 13
+            m_rootIndex: 0
+            m_childrenIndices: [80]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 1267355512
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 441, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 659690686
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: CustomUIShader
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [2_MeleeWeaponGage.png]
+              - ModuleBehavior: 1399118904
+                centerUV: "[not suport type]"
+                radiusUV: 1
+                percent: 1
+                startAngle: 9.80000019
+                clockwise: 1
+                featherAngle: 0.5
+                tint: "[not suport type]"
+                m_name: UIGageTest
+                m_isEnabled: true
+                m_instanceID: 218589778
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
+            children:
+              - GameObject: 2166264123
+                m_name: 2_MeleeWeaponTextBg (4)
+                m_isEnabled: false
+                m_instanceID: 4125728025
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 79
+                m_index: 80
+                m_parentIndex: 79
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 1030490932
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 441, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 4147040562
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [2_MeleeWeaponTextBg.png]
+      - GameObject: 2166264123
+        m_name: P1_WeaponSlot(3)
+        m_isEnabled: true
+        m_instanceID: 2211460799
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 14
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_childrenIndices: [81, 83]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 2556460098
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 613, y: 980}
+            m_sizeDelta: {x: 110, y: 110}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 558, y: 925, width: 110, height: 110}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 2306492956
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 55, y: 55}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [0_NonWeapon.png, 1_BasicWeapon.png, 2_MeleeWeapon.png]
+          - ModuleBehavior: 1399118904
+            m_name: WeaponSlot
+            m_isEnabled: true
+            m_instanceID: 2925801638
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
+        children:
+          - GameObject: 2166264123
+            m_name: 1_BasicWeaponGage (3)
+            m_isEnabled: false
+            m_instanceID: 2006039647
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 14
+            m_index: 81
+            m_parentIndex: 14
+            m_rootIndex: 0
+            m_childrenIndices: [82]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 2505074995
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 558, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 2698839847
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [1_BasicWeaponGage.png]
+            children:
+              - GameObject: 2166264123
+                m_name: 1_BasicWeaponTextBg (3)
+                m_isEnabled: false
+                m_instanceID: 1608009990
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 81
+                m_index: 82
+                m_parentIndex: 81
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 3911700315
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 558, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 485020931
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [1_BasicWeaponTextBg.png]
+          - GameObject: 2166264123
+            m_name: 2_MeleeWeaponGage (5)
+            m_isEnabled: false
+            m_instanceID: 3738755143
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 14
+            m_index: 83
+            m_parentIndex: 14
+            m_rootIndex: 0
+            m_childrenIndices: [84]
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 1
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: false
+                m_instanceID: 2081967807
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 110, y: 110}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 558, y: 925, width: 110, height: 110}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: false
+                m_instanceID: 3121067838
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: Canvas
+                navigations: ~
+                m_customPixelShaderPath: CustomUIShader
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 55, y: 55}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [2_MeleeWeaponGage.png]
+              - ModuleBehavior: 1399118904
+                centerUV: "[not suport type]"
+                radiusUV: 1
+                percent: 1
+                startAngle: 9.80000019
+                clockwise: 1
+                featherAngle: 0.5
+                tint: "[not suport type]"
+                m_name: UIGageTest
+                m_isEnabled: true
+                m_instanceID: 2204865880
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
+            children:
+              - GameObject: 2166264123
+                m_name: 2_MeleeWeaponTextBg (5)
+                m_isEnabled: false
+                m_instanceID: 759116089
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 83
+                m_index: 84
+                m_parentIndex: 83
+                m_rootIndex: 0
+                m_childrenIndices: ~
+                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_attachedSoketID: 0
+                m_collisionType: 1
+                m_isStatic: false
+                m_gameObjectType: 5
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - RectTransformComponent: 3002078429
+                    m_name: RectTransformComponent
+                    m_isEnabled: false
+                    m_instanceID: 649484128
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_anchorMin: {x: 0.5, y: 0.5}
+                    m_anchorMax: {x: 0.5, y: 0.5}
+                    m_anchoredPosition: {x: 0, y: 0}
+                    m_sizeDelta: {x: 110, y: 110}
+                    m_pivot: {x: 0.5, y: 0.5}
+                    m_worldRect: {x: 558, y: 925, width: 110, height: 110}
+                  - ImageComponent: 1187169862
+                    m_name: ImageComponent
+                    m_isEnabled: false
+                    m_instanceID: 4096803447
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    _layerorder: 0
+                    m_ownerCanvasName: Canvas
+                    navigations: ~
+                    m_customPixelShaderPath: ""
+                    curindex: 0
+                    color: {r: 1, g: 1, b: 1, a: 1}
+                    rotate: 0
+                    origin: {x: 55, y: 55}
+                    unionScale: 1
+                    clipDirection: 0
+                    clipPercent: 1
+                    texturePaths: [2_MeleeWeaponTextBg.png]
