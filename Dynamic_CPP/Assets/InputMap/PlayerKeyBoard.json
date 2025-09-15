@@ -39,7 +39,7 @@
         {
             "actionName": "Attack",
             "actionType": "Button",
-            "funName": "Attack1",
+            "funName": "ChargeAttack",
             "inputType": "KeyBoard",
             "key0": "J",
             "key1": "A",
@@ -90,9 +90,9 @@
             "funName": "ShootSpecialBullet",
             "inputType": "KeyBoard",
             "key0": "M",
-            "key1": "Unknown",
-            "key2": "Unknown",
-            "key3": "Unknown",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
             "keystate": "Down",
             "scpritName": "Player"
         }

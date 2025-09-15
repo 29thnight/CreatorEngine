@@ -6,6 +6,7 @@
 #include "DebugLog.h"
 void MosterMeleeAni::Enter()
 {
+
 }
 
 void MosterMeleeAni::Update(float deltaTime)

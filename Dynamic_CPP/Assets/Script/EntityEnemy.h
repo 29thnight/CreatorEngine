@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Entity.h"
-#include "CriticalMark.h"
+//#include "CriticalMark.h"
 #include "EntityEnemy.generated.h"
 class BehaviorTreeComponent;
 class BlackBoard;
@@ -29,7 +29,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	CriticalMark criticalMark;
+	//CriticalMark criticalMark;
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce);
 	bool isDead;

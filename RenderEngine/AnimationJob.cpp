@@ -226,6 +226,11 @@ void AnimationJob::Update(float deltaTime)
                         UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
                     }
                    // skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
+                    if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
+                    {
+                        skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
+                    }
                 }
                 
             }
@@ -437,12 +442,52 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
 
     for (auto& controller : animator.m_animationControllers)
     {
+        if (controller->m_isBlend == false)
+        {
+            if (controller->IsUseLayer() == true)
+            {
+                auto mask = controller->GetAvatarMask();
 
-        if (controller->IsUseLayer() == true)
+
+                if (mask != nullptr) //마스크 있으면
+                {
+
+                    if (mask->isHumanoid)
+                    {
+                        if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+                        {
+                            //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                        }
+                        else
+                        {
+                            // globalTransform = parentTransform;
+                        }
+                    }
+                    else
+                    {
+                        if (mask->IsBoneEnabled(bone->m_name) == true)
+                        {
+                            animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+
+                        }
+                        else
+                        {
+                            //globalTransform = parentTransform;
+                        }
+                    }
+                }
+                else
+                {
+                    //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                }
+            }
+        }
+        else
         {
             auto mask = controller->GetAvatarMask();
-
-
             if (mask != nullptr) //마스크 있으면
             {
 
@@ -453,10 +498,6 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                         //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                         globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
                     }
-                    else
-                    {
-                        // globalTransform = parentTransform;
-                    }
                 }
                 else
                 {
@@ -465,10 +506,6 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                         animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                         globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
 
-                    }
-                    else
-                    {
-                        //globalTransform = parentTransform;
                     }
                 }
             }
