@@ -12,7 +12,7 @@
 #include "TerrainMaterial.h"
 
 //-----------------------------------------------------------------------------
-// TerrainComponent: ApplyBrush ÃÖÀûÈ­ ¹öÀü
+// TerrainComponent: ApplyBrush ìµœì í™” ë²„ì „
 //-----------------------------------------------------------------------------
 class ComponentFactory;
 class ProxyCommand;
@@ -29,36 +29,36 @@ public:
     [[Property]] 
     int m_height{ 1000 };
 
-    // ÃÊ±âÈ­
+    // ì´ˆê¸°í™”
     void Initialize();
     
-	// °¡·Î ¼¼·Î Å©±â º¯°æ
+	// ê°€ë¡œ ì„¸ë¡œ í¬ê¸° ë³€ê²½
     void Resize(int newWidth, int newHeight);
 
     virtual void Awake() override;
     virtual void OnDestroy() override;
 
-	//¿¡µğÅÍ save/load
+	//ì—ë””í„° save/load
     void Save(const std::wstring& assetRoot, const std::wstring& name);
     bool Load(const std::wstring& filePath);
 
-    //Build½Ã ÀúÀå/¹İÈ¯
+    //Buildì‹œ ì €ì¥/ë°˜í™˜
     void BuildOutTrrain(const std::wstring& buildPath, const std::wstring& terrainName);
     bool LoadRunTimeTerrain(const std::wstring& filePath);
 
-    // ºê·¯½Ã Àû¿ë
+    // ë¸ŒëŸ¬ì‹œ ì ìš©
     void ApplyBrush(const TerrainBrush& brush);
 
-    // º¯°æµÈ ¿µ¿ª(minX..maxX, minY..maxY) ÁÖº¯ ³ë¸ÖÀÌ ¿Ã¹Ù¸£°Ô º¸ÀÌµµ·Ï +1 ÇÈ¼¿ È®Àå ÇÏ¿© ³ë¸» Àç°è»ê
+    // ë³€ê²½ëœ ì˜ì—­(minX..maxX, minY..maxY) ì£¼ë³€ ë…¸ë©€ì´ ì˜¬ë°”ë¥´ê²Œ ë³´ì´ë„ë¡ +1 í”½ì…€ í™•ì¥ í•˜ì—¬ ë…¸ë§ ì¬ê³„ì‚°
     void RecalculateNormalsPatch(int minX, int minY, int maxX, int maxY);
 
-    // ·¹ÀÌ¾î ÆäÀÎÆÃ => splat ¸Ê ¾÷µ¥ÀÌÆ®
+    // ë ˆì´ì–´ í˜ì¸íŒ… => splat ë§µ ì—…ë°ì´íŠ¸
     void PaintLayer(uint32_t layerId, int x, int y, float strength);
 
-    //·¹ÀÌ¾î Á¤º¸ ¾÷µ¥ÀÌÆ®
-    void UpdateLayerDesc(uint32_t layerID);
+    //ë ˆì´ì–´ ì •ë³´ ì—…ë°ì´íŠ¸
+    void UpdateLayerDesc();
 
-	//layer °ü·Ã ÇÔ¼ö -> m_layers º¤ÅÍ¿¡ Ãß°¡/»èÁ¦ m_pMaterial->´Ù½Ã·Îµå
+	//layer ê´€ë ¨ í•¨ìˆ˜ -> m_layers ë²¡í„°ì— ì¶”ê°€/ì‚­ì œ m_pMaterial->ë‹¤ì‹œë¡œë“œ
 	void AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling);
     void RemoveLayer(uint32_t layerID);
 	void ClearLayers();
@@ -73,13 +73,13 @@ public:
 				return &desc;
 			}
 		}
-		return nullptr; // ÇØ´ç ·¹ÀÌ¾î ID°¡ ¾øÀ» °æ¿ì nullptr ¹İÈ¯
+		return nullptr; // í•´ë‹¹ ë ˆì´ì–´ IDê°€ ì—†ì„ ê²½ìš° nullptr ë°˜í™˜
 		//throw std::runtime_error("Layer ID not found");
 	}
 
 	std::vector<const char*> GetLayerNames()
 	{
-		m_layerNames.clear(); // ÀÌÀü ÀÌ¸§µé ÃÊ±âÈ­
+		m_layerNames.clear(); // ì´ì „ ì´ë¦„ë“¤ ì´ˆê¸°í™”
 		for (const auto& desc : m_layers)
 		{
 			m_layerNames.push_back(desc.layerName.c_str());
@@ -87,20 +87,20 @@ public:
 		return m_layerNames;
 	}
     	
-    // ÇöÀç ºê·¯½Ã Á¤º¸ ÀúÀå/¹İÈ¯
+    // í˜„ì¬ ë¸ŒëŸ¬ì‹œ ì •ë³´ ì €ì¥/ë°˜í™˜
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
 
-    //ºê·¯½Ã ¸¶½ºÅ© °ü·Ã
+    //ë¸ŒëŸ¬ì‹œ ë§ˆìŠ¤í¬ ê´€ë ¨
     bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);
     void SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path);
 
-    // Collider¿ë Á¢±ÙÀÚ
+    // Colliderìš© ì ‘ê·¼ì
     int GetWidth()  const { return m_width; }
     int GetHeight() const { return m_height; }
     float* GetHeightMap() { return m_heightMap.data(); }
 
-    // Mesh Á¢±ÙÀÚ
+    // Mesh ì ‘ê·¼ì
     std::shared_ptr<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }
 	TerrainMaterial* GetMaterial() const { return m_pMaterial; }
 
@@ -108,42 +108,43 @@ public:
     void SetSelectedLayerId(uint32 layerId) { m_selectedLayerID = layerId; }
 
     [[Property]]
-	FileGuid m_trrainAssetGuid{};// ¿¡¼Â °¡ÀÌµå
+	FileGuid m_trrainAssetGuid{};// ì—ì…‹ ê°€ì´ë“œ
     std::wstring m_terrainTargetPath{};
 
 private:
     friend class ProxyCommand;
 
-	uint32 m_terrainID{ 0 }; // ÁöÇü ID
+	uint32 m_terrainID{ 0 }; // ì§€í˜• ID
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;
-    std::vector<TerrainLayer>            m_layers; // ·¹ÀÌ¾î Á¤º¸µé
-    std::vector<std::vector<float>>      m_layerHeightMap; // ·¹ÀÌ¾îº° ³ôÀÌ ¸Ê °¡ÁßÄ¡ (°¢ ·¹ÀÌ¾î¸¶´Ù m_width * m_height Å©±âÀÇ º¤ÅÍ¸¦ °¡Áü)
+    std::vector<TerrainLayer>            m_layers; // ë ˆì´ì–´ ì •ë³´ë“¤
+    std::vector<std::vector<float>>      m_layerHeightMap; // ë ˆì´ì–´ë³„ ë†’ì´ ë§µ ê°€ì¤‘ì¹˜ (ê° ë ˆì´ì–´ë§ˆë‹¤ m_width * m_height í¬ê¸°ì˜ ë²¡í„°ë¥¼ ê°€ì§)
 
-    // ÁöÇü ¸Ş½Ã¸¦ ÇÑ µ¢¾î¸®·Î °¡Áø´Ù¸é, ÇÊ¿ä ½Ã ºĞÇÒ ´ëÀÀ °¡´É
+    // ì§€í˜• ë©”ì‹œë¥¼ í•œ ë©ì–´ë¦¬ë¡œ ê°€ì§„ë‹¤ë©´, í•„ìš” ì‹œ ë¶„í•  ëŒ€ì‘ ê°€ëŠ¥
     
-	std::shared_ptr<TerrainMesh> m_pTerrainMesh; // ÁöÇü ¸Ş½Ã (ÇÑ µ¢¾î¸®·Î °ü¸®)
+	std::shared_ptr<TerrainMesh> m_pTerrainMesh; // ì§€í˜• ë©”ì‹œ (í•œ ë©ì–´ë¦¬ë¡œ ê´€ë¦¬)
     //TerrainMesh* m_pMesh{ nullptr };
-    TerrainMaterial* m_pMaterial{ nullptr }; // ÁöÇü ÀçÁú layerÀÇ => texture, ¼ÎÀÌ´õ µî
+    TerrainMaterial* m_pMaterial{ nullptr }; // ì§€í˜• ì¬ì§ˆ layerì˜ => texture, ì…°ì´ë” ë“±
     TerrainBrush* m_currentBrush{ nullptr };
 
-    float m_minHeight{ -100.0f }; // ÃÖ¼Ò ³ôÀÌ 
-    float m_maxHeight{ 500.0f }; // ÃÖ´ë ³ôÀÌ
-    //todo: ÀÎ½ºÆåÅÍ ¹× ³ôÀÌ ¼öÁ¤¿¡ Àû¿ë ¾ÈÇÔ ¼¼ÀÌºê·Îµå ÀÛ¾÷ ÀÌÈÄ Àû¿ë
+    float m_minHeight{ -100.0f }; // ìµœì†Œ ë†’ì´ 
+    float m_maxHeight{ 500.0f }; // ìµœëŒ€ ë†’ì´
+    //todo: ì¸ìŠ¤í™í„° ë° ë†’ì´ ìˆ˜ì •ì— ì ìš© ì•ˆí•¨ ì„¸ì´ë¸Œë¡œë“œ ì‘ì—… ì´í›„ ì ìš©
 
-    ThreadPool<std::function<void()>> m_threadPool; //ÀÌ¹ÌÁö ¼¼ÀÌºê,·Îµù½Ã »ç¿ëÇÒ ¾²·¹µå Ç®//component »ı¼º½Ã 4°³ 
+    ThreadPool<std::function<void()>> m_threadPool; //ì´ë¯¸ì§€ ì„¸ì´ë¸Œ,ë¡œë”©ì‹œ ì‚¬ìš©í•  ì“°ë ˆë“œ í’€//component ìƒì„±ì‹œ 4ê°œ 
 
-    //== ¿¡µğÅÍ Àü¿ë
-    //== window °ø¿ëÀ¸·Î »ç¿ë°¡´É
-    uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // ¼±ÅÃµÈ ·¹ÀÌ¾î ID (0xFFFFFFFF´Â ¼±ÅÃ ¾ÈµÊÀ» ÀÇ¹Ì)
-    //== window °ø¿ëÀ¸·Î »ç¿ë ºÒ°¡´É
-	std::vector<const char*>             m_layerNames; // ·¹ÀÌ¾î ÀÌ¸§µé (µğ¹ö±ë¿ë)
-    //== ¿¡µğÅÍ Àü¿ë
-    uint32                               m_nextLayerID{ 0 }; // ´ÙÀ½ ·¹ÀÌ¾î ID
+    //== ì—ë””í„° ì „ìš©
+    //== window ê³µìš©ìœ¼ë¡œ ì‚¬ìš©ê°€ëŠ¥
+    uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // ì„ íƒëœ ë ˆì´ì–´ ID (0xFFFFFFFFëŠ” ì„ íƒ ì•ˆë¨ì„ ì˜ë¯¸)
+    //== window ê³µìš©ìœ¼ë¡œ ì‚¬ìš© ë¶ˆê°€ëŠ¥
+	std::vector<const char*>             m_layerNames; // ë ˆì´ì–´ ì´ë¦„ë“¤ (ë””ë²„ê¹…ìš©)
+    //== ì—ë””í„° ì „ìš©
+    uint32                               m_nextLayerID{ 0 }; // ë‹¤ìŒ ë ˆì´ì–´ ID
 
     void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
     bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
-    void SaveEditorSplatMap(const std::wstring& pngPath);
-    bool LoadEditorSplatMap(file::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out);
+    void SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex);
+    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
+    bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
 };

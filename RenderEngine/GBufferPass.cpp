@@ -376,17 +376,23 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 
 		if (terrainMesh && terrainMaterial)
 		{
+			// 1. 레이어 버퍼 바인딩
 			DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, terrainMaterial->GetLayerBuffer());
 			scene.UpdateModel(terrainProxy->m_worldMatrix, deferredPtr);
 
+			// 2. 레이어 Albedo 텍스처 배열 바인딩 (t6)
 			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
+
+			// 3. [수정] Splat Map '배열' 텍스처 바인딩 (t7)
 			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
+
 			terrainMesh->Draw(deferredPtr);
+
+			// --- 리소스 정리 ---
+			ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
+			DirectX11::PSSetShaderResources(deferredPtr, 6, 2, nullSRVs);
 		}
 	}
-
-	ID3D11ShaderResourceView* nullSRV[2] = { nullptr, nullptr };
-	DirectX11::PSSetShaderResources(deferredPtr, 6, 2, nullSRV);
 
 	DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
 

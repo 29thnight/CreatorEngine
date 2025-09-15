@@ -169,7 +169,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							if (ImGui::DragFloat("Tiling", &tiling, 0.1f, 0.1f, 4096.0f))
 							{
 								selectedLayer->tilling = tiling;
-								terrainComponent->UpdateLayerDesc(terrainComponent->GetSelectedLayerId());
+								terrainComponent->UpdateLayerDesc();
 							}
 						}
 					}
