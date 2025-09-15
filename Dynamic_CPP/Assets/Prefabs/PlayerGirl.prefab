@@ -1,6 +1,6 @@
 m_name: PlayerGirl
 m_isEnabled: true
-m_instanceID: 3812065105
+m_instanceID: 3628107214
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -89,10 +89,10 @@ PrefabNode:
         ResurrectionGracePeriod: 3
         SlotChangeCooldown: 2
         testHitPowerX: 1.5
-        testHitPowerY: 0.100000001
+        testHitPowerY: 0
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 1577526719
+        m_instanceID: 3889589182
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -128,7 +128,7 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 3097322261
+            m_instanceID: 1047426164
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -988,13 +988,13 @@ PrefabNode:
                         m_name: Hit to Idle
                         curStateName: Hit
                         nextStateName: Idle
-                        hasExitTime: false
-                        exitTime: 0.100000001
+                        hasExitTime: true
+                        exitTime: 0.69599998
                         blendTime: 0.200000003
                     index: 12
-                    AnimationIndex: 0
+                    AnimationIndex: 4
                     m_isAny: false
-                    animationSpeed: 1
+                    animationSpeed: 4
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -1018,7 +1018,7 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                     index: 13
-                    AnimationIndex: 0
+                    AnimationIndex: 1
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -2613,9 +2613,9 @@ PrefabNode:
       - GameObject: 2166264123
         m_name: RangeShootPos
         m_isEnabled: true
-        m_instanceID: 3241416835
+        m_instanceID: 2501384123
         m_transform:
-          position: {x: 0.398000002, y: 1.10000002, z: 2.25699997, w: 1}
+          position: {x: 0.397999763, y: 1.10000002, z: 2.25700092, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 390

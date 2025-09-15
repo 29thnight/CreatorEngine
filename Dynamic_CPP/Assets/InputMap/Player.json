@@ -95,6 +95,18 @@
             "key3": "A",
             "keystate": "Down",
             "scpritName": "Player"
+        },
+        {
+            "actionName": "TestStun",
+            "actionType": "Button",
+            "funName": "TestHit",
+            "inputType": "GamePad",
+            "key0": "Y",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
         }
     ],
     "mapName": "Player"

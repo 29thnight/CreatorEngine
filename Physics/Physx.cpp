@@ -1411,6 +1411,8 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 	controller->AddMovementInput(info.input, info.isDynamic);
 }
 
+
+
 void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)
 {
 	// 1. 컨테이너에서 ID를 기반으로 CharacterController 래퍼 클래스를 찾습니다.

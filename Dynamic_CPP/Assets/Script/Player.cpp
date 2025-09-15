@@ -200,16 +200,6 @@ void Player::Update(float tick)
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
-	//Test
-	{
-		/*auto& asiss = GM->GetAsis();
-		auto asis = asiss[0]->GetOwner();
-		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-		Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();auto indicator = GameObject::Find("TestIndicator");
-		auto curveindicator = indicator->GetComponent<CurveIndicator>();
-		curveindicator->EnableIndicator(true);
-		curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);*/
-	}
 
 	if (catchedObject)
 	{
@@ -256,6 +246,7 @@ void Player::Update(float tick)
 		}
 
 	}
+
 	if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
@@ -285,26 +276,7 @@ void Player::Update(float tick)
 			m_dubbleDashElapsedTime = 0.f;
 		}
 	}
-	//if (isDashing)
-	//{
-	//	m_dashElapsedTime += tick;
-	//	if (m_dashElapsedTime >= m_dashTime)
-	//	{
-	//		isDashing = false;
-	//		m_dashElapsedTime = 0.f;
-	//		player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
-	//		if(dashEffect)
-	//			dashEffect->StopEffect();
-	//	}
-	//	else
-	//	{
-	//		auto forward = player->m_transform.GetForward();
-	//		auto controller = player->GetComponent<CharacterControllerComponent>();
-	//		controller->Move({ forward.x ,forward.z });
-	//	}
-
-	//}
-
+	
 	if (m_curWeapon->IsBroken() && sucessAttack == true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
 	{
 		DeleteCurWeapon();
@@ -738,10 +710,26 @@ void Player::Resurrection()
 	//m_currentHP = ResurrectionHP;
 }
 
+void Player::OnHit()
+{
+	DropCatchItem();
+	if (m_animator)
+	{
+		m_animator->SetParameter("OnHit", true);
+	}
+}
+
+void Player::Knockback(Mathf::Vector2 KnockbackpowerXY)
+{
+	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetKnockBack(KnockbackpowerXY.x, KnockbackpowerXY.y);
+}
+
 
 
 void Player::SwapWeaponLeft()
 {
+	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
 	m_weaponIndex--;
 	if (m_weaponIndex <= 0)
 	{
@@ -761,6 +749,7 @@ void Player::SwapWeaponLeft()
 
 void Player::SwapWeaponRight()
 {
+	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
 	m_weaponIndex++;
 	if (m_weaponIndex >= 3)
 	{
@@ -1239,6 +1228,5 @@ void Player::TestHit()
 
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->SetKnockBack(testHitPowerX, testHitPowerY);
-
 
 }
