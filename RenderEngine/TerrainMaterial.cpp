@@ -1,5 +1,7 @@
 #include "TerrainMaterial.h"
 #include "Texture.h"
+#include <algorithm> // for std::min
+
 void TerrainMaterial::Initialize(UINT width, UINT height)
 {
 	m_width = static_cast<int>(width);
@@ -13,298 +15,182 @@ void TerrainMaterial::Initialize(UINT width, UINT height)
 	);
 	m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
-	//레이어 텍스처 배열 초기화
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = 512;
-	desc.Height = 512;
-	desc.MipLevels = 1;
-	desc.ArraySize = 4; //최대 레이어 수
-	desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-
-	DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, &m_layerTextureArray);
-
-	D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.Format = desc.Format;
-	uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
-	uavDesc.Texture2DArray.MipSlice = 0;
-	uavDesc.Texture2DArray.FirstArraySlice = 0;
-	uavDesc.Texture2DArray.ArraySize = desc.ArraySize;
-
-	DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_layerTextureArray, &uavDesc, &p_outTextureUAV);
-
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = desc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-	srvDesc.Texture2DArray.MipLevels = 1;
-	srvDesc.Texture2DArray.ArraySize = 4; // 최대 레이어 수
-	srvDesc.Texture2DArray.FirstArraySlice = 0;
-
-	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_layerTextureArray, &srvDesc, &m_layerSRV);
-
-	InitSplatMapTexture(width, height);
-}
-
-
-void TerrainMaterial::AddLayer(TerrainLayer& newLayer)
-{
-	float tillingFactor[4] = { m_layerBufferData.layerTilling0, m_layerBufferData.layerTilling1, m_layerBufferData.layerTilling2, m_layerBufferData.layerTilling3 };
-
-	tillingFactor[newLayer.m_layerID] = newLayer.tilling;
-
-	m_layerBufferData.useLayer = true; // 레이어 사용 여부를 true로 설정
-	m_layerBufferData.layerTilling0 = tillingFactor[0];
-	m_layerBufferData.layerTilling1 = tillingFactor[1];
-	m_layerBufferData.layerTilling2 = tillingFactor[2];
-	m_layerBufferData.layerTilling3 = tillingFactor[3];
-
-	DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
-
-	//ID3D11Resource* diffuseResource = nullptr;
-	//ID3D11Texture2D* diffuseTexture = nullptr;
-	//ID3D11ShaderResourceView* diffuseSRV = nullptr;
-	if (newLayer.diffuseTexturePath.empty()) {
-		Debug->LogError("Diffuse texture path is empty for layer: " + newLayer.layerName);
-		return; // diffuseTexturePath가 비어있으면 레이어 추가를 중단
-	}
-
-	file::path path = file::path(newLayer.diffuseTexturePath);
-	if (file::exists(path))
-	{
-		newLayer.diffuseTexture = Texture::LoadFormPath(newLayer.diffuseTexturePath);
-	}
-	else {
-		Debug->LogError("Failed to load diffuse texture: " + newLayer.layerName);
-		return; // 로드 실패시 해당 레이어는 무시
-	}
-
-	//if (CreateTextureFromFile(DirectX11::DeviceStates->g_pDevice, newLayer.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK)
-	//{
-	//	diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
-	//	newLayer.diffuseTexture = diffuseTexture;
-	//	newLayer.diffuseSRV = diffuseSRV;
-	//}
-	//else {
-	//	Debug->LogError("Failed to load diffuse texture: " + newLayer.layerName);
-	//	return; // 로드 실패시 해당 레이어는 무시
-	//}
-
-
-	DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
-	TerrainAddLayerBuffer addLayerBuffer;
-	addLayerBuffer.slice = newLayer.m_layerID;
-	DirectX11::UpdateBuffer(m_AddLayerBuffer.Get(), &addLayerBuffer);
-	DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
-
-	const UINT offsets[]{ 0 };
-
-	ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
-	ID3D11UnorderedAccessView* nullUAVs[]{ nullptr };
-	DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
-	//ID3D11ShaderResourceView* srvs = { m_layers[newLayer.m_layerID].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
-	ID3D11ShaderResourceView* nullSRVs[]{ nullptr };
-	DirectX11::CSSetShaderResources(0, 1, &newLayer.diffuseTexture->m_pSRV);
-	DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
-
-	uint32 threadGroupCountX = (uint32)ceilf(512 / 16.0f);
-	uint32 threadGroupCountY = (uint32)ceilf(512 / 16.0f);
-
-	//(512 + 15) / 16, (512 + 15) / 16, 4
-	DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
-
-	DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
-	DirectX11::CSSetShaderResources(0, 1, nullSRVs);
-
+	// 초기에는 스플랫맵 1개 레이어용으로 생성
+	InitSplatMapTextureArray(width, height, 1);
 
 }
 
-void TerrainMaterial::RemoveLayer(uint32_t layerID)
-{
-	//해당 레이어의 텍스처 제거 
-	//p_outTextureUAV 를 통해 컴퓨트 셰이더로 집어 넣은 텍스처를 제거하는 로직이 필요함
-	float clearValue[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	DirectX11::DeviceStates->g_pDeviceContext->ClearUnorderedAccessViewFloat(
-		&p_outTextureUAV[layerID],
-		clearValue
-	);
-
-	D3D11_MAPPED_SUBRESOURCE mapped = {};
-	DirectX11::DeviceStates->g_pDeviceContext->Map(m_splatMapTexture.Get(), 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &mapped);
-
-	BYTE* rowPtr = reinterpret_cast<BYTE*>(mapped.pData);
-	for (UINT y = 0; y < m_height; ++y)
-	{
-		// 각 픽셀 RGBA 순서, 1바이트씩
-		BYTE* pixel = rowPtr + y * mapped.RowPitch;
-		for (UINT x = 0; x < m_width; ++x, pixel += 4)
-		{
-			pixel[layerID] = 0; // 해당 채널 0
-		}
-	}
-	
-	DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_splatMapTexture.Get(), 0);
-}
 
 void TerrainMaterial::ClearLayers()
 {
-	m_layerBufferData.useLayer = false; // 레이어 사용 여부를 false로 설정
-	m_layerBufferData.layerTilling0 = 1.0f;
-	m_layerBufferData.layerTilling1 = 1.0f;
-	m_layerBufferData.layerTilling2 = 1.0f;
-	m_layerBufferData.layerTilling3 = 1.0f;
+    m_layerBufferData.useLayer = false;
+    m_layerBufferData.numLayers = 0;
+    for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i) { m_layerBufferData.layerTilling[i] = { 1.0f, 0.0f, 0.0f, 0.0f }; }
+    UpdateBuffer(m_layerBufferData);
 
-	DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
+    // ComPtr은 Reset()으로 안전하게 해제합니다.
+    m_splatMapTextureArray.Reset();
+    m_splatMapSRV.Reset();
 
-	m_splatMapTexture.Reset();
-	m_splatMapSRV.Reset();
-	m_layerTextureArray = nullptr; // 레이어 텍스처 배열 초기화
-	p_outTextureUAV = nullptr; // UAV 초기화
-	m_layerSRV = nullptr; // SRV 초기화
+    // Raw 포인터는 수동으로 해제하고 nullptr로 설정합니다.
+    if (m_layerTextureArray) m_layerTextureArray->Release();
+    if (p_outTextureUAV) p_outTextureUAV->Release();
+    if (m_layerSRV) m_layerSRV->Release();
+    m_layerTextureArray = nullptr;
+    p_outTextureUAV = nullptr;
+    m_layerSRV = nullptr;
 }
 
-void TerrainMaterial::InitSplatMapTexture(UINT width, UINT height)
-{
-	m_splatMapTexture.Reset();
-	m_splatMapSRV.Reset();
 
-	// 스플랫맵 텍스처 초기화
+void TerrainMaterial::InitSplatMapTextureArray(UINT width, UINT height, UINT layerCount)
+{
+    m_splatMapTextureArray.Reset();
+    m_splatMapSRV.Reset();
+
+	if (layerCount == 0) return;
+
 	D3D11_TEXTURE2D_DESC desc = {};
 	desc.Width = width;
 	desc.Height = height;
 	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // RGBA 8-bit format
+	desc.ArraySize = layerCount;
+	desc.Format = DXGI_FORMAT_R8_UNORM; // 8-bit 단일 채널 (Grayscale)
 	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DYNAMIC; // 동적 업데이트 가능
+	desc.Usage = D3D11_USAGE_DEFAULT; // UpdateSubresource를 위해 DEFAULT로 변경
 	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // CPU에서 쓰기 가능
+	desc.CPUAccessFlags = 0;
 	desc.MiscFlags = 0;
 
-	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, m_splatMapTexture.GetAddressOf());
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to create splat map texture");
-	}
-	DirectX::SetName(m_splatMapTexture.Get(), "Splat_Map_Texture");
+	DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, m_splatMapTextureArray.GetAddressOf());
+	DirectX::SetName(m_splatMapTextureArray.Get(), "SplatMapTextureArray");
 
-	// SRV 생성
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = desc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = 1;
-	hr = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_splatMapTexture.Get(), &srvDesc, m_splatMapSRV.GetAddressOf());
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to create splat map SRV");
-	}
-	DirectX::SetName(m_splatMapTexture.Get(), "Splat_Map_SRV");
-
-	// 초기 스플랫맵 데이터 설정
-	D3D11_MAPPED_SUBRESOURCE mapped = {};
-	hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_splatMapTexture.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-
-	{
-		BYTE* pData = static_cast<BYTE*>(mapped.pData);
-
-		for (UINT y = 0; y < height; ++y)
-		{
-			// 현재 행(row)의 시작 주소를 계산합니다.
-			BYTE* pRow = pData + y * mapped.RowPitch;
-
-			for (UINT x = 0; x < width; ++x)
-			{
-				// 현재 픽셀의 주소를 계산합니다.
-				// DXGI_FORMAT_R8G8B8A8_UNORM은 픽셀당 4바이트입니다.
-				BYTE* pPixel = pRow + x * 4;
-
-				// 픽셀 값을 설정합니다 (R, G, B, A 순서)
-				pPixel[0] = 255; // R
-				pPixel[1] = 0;   // G
-				pPixel[2] = 0;   // B
-				pPixel[3] = 0;   // A
-			}
-		}
-	}
-
-	DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_splatMapTexture.Get(), 0);
+	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+	srvDesc.Texture2DArray.MostDetailedMip = 0;
+	srvDesc.Texture2DArray.MipLevels = 1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = layerCount;
+	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_splatMapTextureArray.Get(), &srvDesc, m_splatMapSRV.GetAddressOf());
+	DirectX::SetName(m_splatMapSRV.Get(), "SplatMapSRV_Array");
 }
 
-void TerrainMaterial::UpdateSplatMapPatch(int offsetX, int offsetY, int patchW, int patchH, std::vector<BYTE>& patchData)
+void TerrainMaterial::UpdateSplatMapPatch(UINT layerIndex, int offsetX, int offsetY, int patchW, int patchH, std::vector<BYTE>& patchData)
 {
+	if (!m_splatMapTextureArray) return;
 
-	D3D11_MAPPED_SUBRESOURCE mapped = {};
-	HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_splatMapTexture.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-	if (FAILED(hr)) {
-		throw std::runtime_error("Failed to map splat map texture");
-		return;
-	}
+	D3D11_BOX destBox;
+	destBox.left = offsetX;
+	destBox.right = offsetX + patchW;
+	destBox.top = offsetY;
+	destBox.bottom = offsetY + patchH;
+	destBox.front = 0;
+	destBox.back = 1;
 
-	for (int row = 0; row < patchH; ++row)
-	{
-		BYTE* destRow = reinterpret_cast<BYTE*>(mapped.pData) + (size_t)(offsetY + row) * mapped.RowPitch + (size_t)(offsetX * 4);
-		const BYTE* srcPtr = patchData.data() + (size_t)row * patchW * 4;
-		memcpy(destRow, srcPtr, patchW * 4); // RGBA 4채널이므로 4바이트씩 복사
-	}
+	UINT subresourceIndex = D3D11CalcSubresource(0, layerIndex, 1);
+	UINT rowPitch = patchW * 1; // R8_UNORM 이므로 픽셀 당 1바이트
+	UINT depthPitch = 0; // 2D 텍스처이므로 0
 
-	DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_splatMapTexture.Get(), 0);
+	DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
+		m_splatMapTextureArray.Get(),
+		subresourceIndex,
+		&destBox,
+		patchData.data(),
+		rowPitch,
+		depthPitch
+	);
 }
 
-void TerrainMaterial::UpdateBuffer(TerrainLayerBuffer layers)
+
+// 상수 버퍼만 업데이트하는 가벼운 함수
+void TerrainMaterial::UpdateBuffer(const TerrainLayerBuffer& layers)
 {
-	// 레이어 정보를 기반으로 버퍼 업데이트
 	m_layerBufferData = layers;
 	DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
 }
 
+
 void TerrainMaterial::MateialDataUpdate(int width, int height, std::vector<TerrainLayer>& layers, std::vector<std::vector<float>>& layerHeightMap)
 {
-	//size 변경 부터
-	m_width = static_cast<float>(width);
-	m_height = static_cast<float>(height);
-	
-	//사이즈에 맞게 스	플렛맵 텍스처 초기화
-	InitSplatMapTexture(width, height);
+    m_width = width;
+    m_height = height;
 
-	//불러오기 전 layer data 정리
-	
-	
+    // 1. 레이어 Albedo 텍스처 배열 재구성
+    if (m_layerTextureArray) { m_layerTextureArray->Release(); m_layerTextureArray = nullptr; }
+    if (m_layerSRV) { m_layerSRV->Release(); m_layerSRV = nullptr; }
+    if (p_outTextureUAV) { p_outTextureUAV->Release(); p_outTextureUAV = nullptr; }
 
-	float tilefector[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	//받은 레이어 정보로 텍스처를 불러와 m_layerSRV 반영
-	for (auto& layer : layers)
-	{
-		AddLayer(layer);
-		if (layer.m_layerID < 4) // 최대 4개 레이어만 사용
-		{
-			tilefector[layer.m_layerID] = layer.tilling;
-		}
-	}
-	m_layerBufferData.useLayer = !layers.empty();
-	m_layerBufferData.layerTilling0 = tilefector[0];
-	m_layerBufferData.layerTilling1 = tilefector[1];
-	m_layerBufferData.layerTilling2 = tilefector[2];
-	m_layerBufferData.layerTilling3 = tilefector[3];
-	
-	DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
+    if (!layers.empty())
+    {
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Width = 512; desc.Height = 512; desc.MipLevels = 1;
+        desc.ArraySize = std::min((UINT)layers.size(), (UINT)MAX_TERRAIN_LAYERS);
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+        DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, &m_layerTextureArray);
 
-	std::vector<BYTE> patchData(m_width * m_height * 4, 0);
-	//레이어 높이맵을 기반으로 splat맵 업데이트
-	for (int y = 0; y < height; ++y)
-	{
-		for (int x = 0; x < width; ++x)
-		{
-			int idx = y * width + x;
-			for (int layerIdx = 0; layerIdx < (int)layers.size() && layerIdx < 4; ++layerIdx) // 최대 4개 레이어만 사용
-			{
-				float w = std::clamp(layerHeightMap[layerIdx][idx], 0.0f, 1.0f);
-				int dstOffset = (y * width + x) * 4 + layerIdx; // RGBA 4채널
-				patchData[dstOffset] = static_cast<BYTE>(w * 255.0f); // RGBA 채널에 값 저장
-			}
-		}
-	}
+        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = desc.Format; uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
+        uavDesc.Texture2DArray.MipSlice = 0; uavDesc.Texture2DArray.FirstArraySlice = 0;
+        uavDesc.Texture2DArray.ArraySize = desc.ArraySize;
+        DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_layerTextureArray, &uavDesc, &p_outTextureUAV);
 
-	//layerHeightMap으로 splat맵 업데이트
-	UpdateSplatMapPatch(0, 0, m_width, m_height, patchData);
+        DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
+        ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
+        DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+
+        for (size_t i = 0; i < layers.size() && i < MAX_TERRAIN_LAYERS; ++i)
+        {
+            if (layers[i].diffuseTexture && layers[i].diffuseTexture->m_pSRV)
+            {
+                TerrainAddLayerBuffer addLayerBuffer; addLayerBuffer.slice = i;
+                DirectX11::UpdateBuffer(m_AddLayerBuffer.Get(), &addLayerBuffer);
+                DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
+                ID3D11ShaderResourceView* srvs[] = { layers[i].diffuseTexture->m_pSRV };
+                DirectX11::CSSetShaderResources(0, 1, srvs);
+                uint32 tgX = (uint32)ceilf(512 / 16.0f), tgY = (uint32)ceilf(512 / 16.0f);
+                DirectX11::Dispatch(tgX, tgY, 1);
+            }
+        }
+        ID3D11UnorderedAccessView* nullUAVs[]{ nullptr }; DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
+        ID3D11ShaderResourceView* nullSRVs[]{ nullptr }; DirectX11::CSSetShaderResources(0, 1, nullSRVs);
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format; srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MipLevels = 1; srvDesc.Texture2DArray.ArraySize = desc.ArraySize;
+        srvDesc.Texture2DArray.FirstArraySlice = 0;
+        DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_layerTextureArray, &srvDesc, &m_layerSRV);
+    }
+
+    // 2. 스플랫맵 텍스처 배열 재구성
+    UINT numLayers = static_cast<UINT>(layers.size());
+    InitSplatMapTextureArray(width, height, std::min(numLayers, (UINT)MAX_TERRAIN_LAYERS));
+
+    for (UINT i = 0; i < numLayers && i < MAX_TERRAIN_LAYERS; ++i)
+    {
+        std::vector<BYTE> splatData(width * height, 0);
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; ++x)
+            {
+                int pixelIndex = y * width + x;
+                float weight = std::clamp(layerHeightMap[i][pixelIndex], 0.0f, 1.0f);
+                splatData[pixelIndex] = static_cast<BYTE>(weight * 255.0f);
+            }
+        }
+        UpdateSplatMapPatch(i, 0, 0, width, height, splatData);
+    }
+
+    // 3. 상수 버퍼 업데이트
+    m_layerBufferData.useLayer = !layers.empty();
+    m_layerBufferData.numLayers = static_cast<int>(layers.size());
+    for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
+    {
+        if (i < layers.size())
+            m_layerBufferData.layerTilling[i] = { layers[i].tilling, 0.f, 0.f, 0.f };
+        else
+            m_layerBufferData.layerTilling[i] = { 1.0f, 0.f, 0.f, 0.f };
+    }
+    UpdateBuffer(m_layerBufferData);
 }

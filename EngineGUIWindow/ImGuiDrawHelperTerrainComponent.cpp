@@ -94,39 +94,83 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					ImGui::SliderFloat("FlatHeight", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
 				}
 
-				// PaintLayer 옵션일 때만 레이어 선택
+				// [MODIFIED] 통합된 레이어 관리 UI
 				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::PaintLayer)
 				{
-					// 에디터가 가지고 있는 레이어 리스트에서 ID와 이름을 보여줌
-					static int selectedLayerIndex = 0;
-					std::vector<const char*> layerNames;
+					ImGui::SeparatorText("Layers");
 
-					layerNames = terrainComponent->GetLayerNames();
-
-					if (ImGui::Combo("Layer ID", &selectedLayerIndex, layerNames.data(), (int)layerNames.size()))
+					// --- 추가/삭제 버튼 ---
+					if (ImGui::Button(ICON_FA_PLUS " Add"))
 					{
-						g_CurrentBrush->m_layerID = selectedLayerIndex;
+						file::path diffuseFile = ShowOpenFileDialog(L"");
+						if (!diffuseFile.empty())
+						{
+							std::wstring diffuseFileName = diffuseFile.filename();
+							terrainComponent->AddLayer(diffuseFile, diffuseFileName, 10.0f);
+						}
+					}
+					ImGui::SameLine();
+
+					// 선택된 레이어가 없을 경우 삭제 버튼 비활성화
+					bool isLayerSelected = terrainComponent->GetSelectedLayerId() != 0xFFFFFFFF;
+					if (!isLayerSelected)
+					{
+						ImGui::BeginDisabled();
+					}
+					if (ImGui::Button(ICON_FA_TRASH_CAN " Remove"))
+					{
+						if (isLayerSelected)
+						{
+							uint32_t layerToDelete = terrainComponent->GetSelectedLayerId();
+							// 삭제 후 선택 해제
+							terrainComponent->SetSelectedLayerId(0xFFFFFFFF);
+							g_CurrentBrush->m_layerID = 0; // 브러시 타겟 초기화
+							terrainComponent->RemoveLayer(layerToDelete);
+						}
+					}
+					if (!isLayerSelected)
+					{
+						ImGui::EndDisabled();
 					}
 
-					TerrainLayer* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
-					if (layer != nullptr) {
-						float tiling = layer->tilling;
-						float tempTiling = tiling;
-						ImGui::DragFloat("tiling", &tempTiling, 1.0f, 0.01, 4096.0f);
-						if (tempTiling != tiling)
+					// --- 레이어 목록 리스트 박스 ---
+					std::vector<const char*> layerNames = terrainComponent->GetLayerNames();
+					int currentSelection = static_cast<int>(terrainComponent->GetSelectedLayerId());
+
+					if (ImGui::ListBox("##LayerList", &currentSelection, layerNames.data(), (int)layerNames.size(), 4))
+					{
+						if (currentSelection >= 0 && currentSelection < layerNames.size())
 						{
-							layer->tilling = tempTiling;
-							terrainComponent->UpdateLayerDesc(selectedLayerIndex);
+							// 관리용 선택과 브러시 페인트 타겟을 동시 업데이트
+							terrainComponent->SetSelectedLayerId(static_cast<uint32>(currentSelection));
+							g_CurrentBrush->m_layerID = currentSelection;
 						}
 					}
 
-					if (ImGui::Button("AddLayer")) {
-
-						file::path difuseFile = ShowOpenFileDialog(L"");
-						std::wstring difuseFileName = difuseFile.filename();
-						if (!difuseFile.empty())
+					// --- 선택된 레이어 속성 편집 ---
+					if (terrainComponent->GetSelectedLayerId() != 0xFFFFFFFF)
+					{
+						TerrainLayer* selectedLayer = terrainComponent->GetLayerDesc(terrainComponent->GetSelectedLayerId());
+						if (selectedLayer)
 						{
-							terrainComponent->AddLayer(difuseFile, difuseFileName, 10.0f);
+							ImGui::SeparatorText("Properties");
+
+							// 텍스처 썸네일 표시
+							if (selectedLayer->diffuseTexture && selectedLayer->diffuseTexture->m_pSRV)
+							{
+								ImGui::Image((ImTextureID)selectedLayer->diffuseTexture->m_pSRV, ImVec2(64, 64));
+								ImGui::SameLine();
+							}
+							
+							ImGui::Text("Name: %s", selectedLayer->layerName.c_str());
+
+							// 타일링 수정
+							float tiling = selectedLayer->tilling;
+							if (ImGui::DragFloat("Tiling", &tiling, 0.1f, 0.1f, 4096.0f))
+							{
+								selectedLayer->tilling = tiling;
+								terrainComponent->UpdateLayerDesc();
+							}
 						}
 					}
 				}
