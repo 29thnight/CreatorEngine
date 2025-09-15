@@ -507,13 +507,13 @@ void SceneRenderer::SceneRendering()
 		}
 	}
 
-	for (auto& camera : CameraManagement->m_cameras)
+	for (auto& camera : CameraManagement->GetCameras())
 	{
-		if (!RenderPassData::VaildCheck(camera)) continue;
-		auto renderData = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) continue;
+		auto renderData = RenderPassData::GetData(camera.get());
 
 #ifndef BUILD_FLAG
-		if (camera != m_pEditorCamera.get())
+		if (camera.get() != m_pEditorCamera.get())
 		{
 			if (EngineSettingInstance->IsGameView())
 			{
@@ -611,7 +611,7 @@ void SceneRenderer::SceneRendering()
 			//PROFILE_CPU_END();
 		}
 
-		if(camera == m_pEditorCamera.get())
+		if(camera.get() == m_pEditorCamera.get())
 		{
 			PROFILE_CPU_BEGIN("TerrainGizmoPass");
 			DirectX11::BeginEvent(L"TerrainGizmoPass");
@@ -665,7 +665,7 @@ void SceneRenderer::SceneRendering()
 		DirectX11::EndEvent();
 		PROFILE_CPU_END();
 		
-		if (m_pEditorCamera.get() != camera)
+		if (m_pEditorCamera.get() != camera.get())
 		{
 			//VolumetricFog or VolumetricLight
 			PROFILE_CPU_BEGIN("VolumetricFogPass");
@@ -721,7 +721,7 @@ void SceneRenderer::SceneRendering()
 		}
 
 		//Vignette
-		if (m_pEditorCamera.get() != camera)
+		if (m_pEditorCamera.get() != camera.get())
 		{
 			PROFILE_CPU_BEGIN("VignettePass");
 			DirectX11::BeginEvent(L"VignettePass");
@@ -824,10 +824,10 @@ void SceneRenderer::CreateCommandListPass()
 		SceneManagers->ResetVolumeProfileApply();
 	}
 
-	for (auto& camera : CameraManagement->m_cameras)
+	for (auto& camera : CameraManagement->GetCameras())
 	{
-		if (!RenderPassData::VaildCheck(camera)) return;
-		auto data = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) return;
+		auto data = RenderPassData::GetData(camera.get());
 
 		PROFILE_CPU_BEGIN("PrepareCommandBuilding");
 		for (auto& instanceID : data->GetShadowRenderDataBuffer())
@@ -947,9 +947,9 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
-				PROFILE_CPU_BEGIN("BitMaskPassCommandList");
-				m_pBitMaskPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
-				PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("BitMaskPassCommandList");
+			m_pBitMaskPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
 		});
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
@@ -958,7 +958,7 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_END();
 		});
 
-		if (m_pEditorCamera.get() != camera)
+		if (m_pEditorCamera.get() != camera.get())
 		{
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 			{
@@ -976,6 +976,14 @@ void SceneRenderer::CreateCommandListPass()
 				PROFILE_CPU_END();
 			});
 		}
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
+		{
+			PROFILE_CPU_BEGIN("SpritePassCommnadList");
+			//m_pUIPass->SortUIObjects();
+			m_pSpritePass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
@@ -1042,6 +1050,10 @@ void SceneRenderer::ApplyVolumeProfile()
 	{
 		m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
 	}
+	if (m_pSkyBoxPass)
+	{
+		m_pSkyBoxPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().m_isSkyboxEnabled);
+	}
 }
 
 void SceneRenderer::PrepareRender()
@@ -1054,6 +1066,7 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
 	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+	std::vector<SpriteRenderer*> spriteRenderers = m_currentScene->GetSpriteRenderers();
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
 	std::vector<SpriteSheetComponent*> spriteComponents = UIManagers->SpriteSheets;
@@ -1184,6 +1197,27 @@ void SceneRenderer::PrepareRender()
 		}
 	});
 
+	m_threadPool->Enqueue([=]
+	{
+		for (auto& sprite : spriteRenderers)
+		{
+			try
+			{
+				auto owner = sprite->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+				if(scene && scene == m_currentScene)
+				{
+					renderScene->UpdateCommand(sprite);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+			}
+		}
+	});
+
 	EffectProxyController::GetInstance()->PrepareCommandBehavior();
 	//for (auto& mesh : staticMeshes)
 	//{
@@ -1193,12 +1227,12 @@ void SceneRenderer::PrepareRender()
 	//	CullingManagers->UpdateMesh(mesh);
 	//}
 
-	for (auto camera : CameraManagement->m_cameras)
+	for (auto camera : CameraManagement->GetCameras())
 	{
 		if (nullptr == camera) continue;
 
-		if (!RenderPassData::VaildCheck(camera)) return;
-		auto data = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) return;
+		auto data = RenderPassData::GetData(camera.get());
 
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
@@ -1240,7 +1274,19 @@ void SceneRenderer::PrepareRender()
 				}
 			}
 
-			data->UpdateData(camera);
+			for (auto& sprite : spriteRenderers)
+			{
+				if (sprite->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(sprite->GetInstanceID());
+					if (proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			data->UpdateData(camera.get());
 
 			data->AddFrame();
 		});

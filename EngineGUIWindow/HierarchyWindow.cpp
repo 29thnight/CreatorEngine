@@ -202,7 +202,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 							DataSystems->LoadCashedModel(filepath.string())));
 				}
 			}
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 			{
 				//TODO : 불필요 로직 제거 -> DataSystem에서 LoadUITexture로 변경
 				const char* droppedFilePath = (const char*)payload->Data;
@@ -230,6 +230,26 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					ImGui::Text("No GameObject Selected");
 					UIManagers->MakeImage(filename.stem().string().c_str(), texture);
+				}
+			}
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+				auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::Texture);
+
+				if (scene)
+				{
+					auto obj = scene->CreateGameObject(filename.stem().string().c_str(), GameObjectType::Empty);
+					if (obj)
+					{
+						auto spriteRenderer = obj->AddComponent<SpriteRenderer>();
+						if (spriteRenderer)
+						{
+							spriteRenderer->SetSprite(texture);
+						}
+					}
 				}
 			}
 			//else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Prefab"))

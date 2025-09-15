@@ -22,6 +22,7 @@ public:
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize(uint32_t width, uint32_t height) override;
+	void ApplySettings(bool isAble) { m_abled = isAble; }
 
 	file::path CurrentSkyBoxTextureName() const { return m_fileName; }
 

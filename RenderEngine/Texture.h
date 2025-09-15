@@ -216,6 +216,7 @@ public:
 
 	float GetWidth() const { return m_desc.Width; }
 	float GetHeight() const { return m_desc.Height; }
+	float2 GetSize() const { return m_size; }
 
 private:
 	float2 m_size{};

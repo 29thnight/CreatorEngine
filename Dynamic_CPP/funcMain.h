@@ -192,6 +192,9 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EventSelector", []() { return new EventSelector(); });
+		CreateFactory::GetInstance()->RegisterFactory("RewardObserver", []() { return new RewardObserver(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityBigWood", []() { return new EntityBigWood(); });
 		CreateFactory::GetInstance()->RegisterFactory("CriticalMark", []() { return new CriticalMark(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItemHeal", []() { return new EntityItemHeal(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotController", []() { return new WeaponSlotController(); });

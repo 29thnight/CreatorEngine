@@ -549,8 +549,8 @@ void Scene::LateUpdate(float deltaSecond)
 
 	for (auto camera : CameraManagement->GetCameras())
 	{
-		if (!RenderPassData::VaildCheck(camera)) return;
-		auto data = RenderPassData::GetData(camera);
+		if (!RenderPassData::VaildCheck(camera.get())) return;
+		auto data = RenderPassData::GetData(camera.get());
 
 		SceneManagers->m_threadPool->Enqueue([=]
 		{

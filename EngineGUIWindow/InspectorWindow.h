@@ -28,5 +28,6 @@ private:
 	void ImGuiDrawHelperVolume(class VolumeComponent* volumeComponent);
 	void ImGuiDrawHelperDecal(class DecalComponent* decalComponent);
 	void ImGuiDrawHelperImageComponent(class ImageComponent* imageComponent);
+	void ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRenderer);
 };
 #endif // !DYNAMICCPP_EXPORTS

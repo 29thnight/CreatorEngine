@@ -43,9 +43,20 @@ private:
 	std::string message{};
     [[Property]]
 	Mathf::Vector2 relpos{ 0, 0 };
-	[[Property]]
-	Mathf::Color4 color{};
-	[[Property]]
-	float fontSize{ 1.f };
+        [[Property]]
+        Mathf::Color4 color{};
+        [[Property]]
+        float fontSize{ 1.f };
+
+        // When true, message bounds are taken from manualRect instead of the parent's RectTransform
+        [[Property]]
+        bool useManualRect{ false };
+        [[Property]]
+        Mathf::Rect manualRect{};
+
+        // Calculated in Update: maximum render area from parent RectTransform
+        Mathf::Vector2 stretchSize{ 0.f, 0.f };
+        bool isStretchX{ false };
+        bool isStretchY{ false };
 };
 

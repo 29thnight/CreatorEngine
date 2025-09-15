@@ -1,9 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "DLLAcrossSingleton.h"
 #include "ReflectionYml.h"
 
 class GameObject;
-class ComponentFactory : public Singleton<ComponentFactory>
+class ComponentFactory : public DLLCore::Singleton<ComponentFactory>
 {
 private:
 	friend class Singleton;
@@ -17,4 +18,4 @@ public:
 	std::map<std::string, const Meta::Type*> m_componentTypes{};
 };
 
-static auto& ComponentFactorys = ComponentFactory::GetInstance();
+static auto ComponentFactorys = ComponentFactory::GetInstance();

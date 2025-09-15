@@ -348,6 +348,15 @@
 		<ClInclude Include="Assets\Script\CriticalMark.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\RewardObserver.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventSelector.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityBigWood.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayerHit.h">
 			<Filter>Script</Filter>
 		</ClInclude>
@@ -608,6 +617,12 @@
 		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\RewardObserver.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventSelector.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityRock.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -621,6 +636,9 @@
 			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CriticalMark.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityBigWood.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerHit.cpp">

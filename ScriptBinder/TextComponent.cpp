@@ -5,14 +5,13 @@
 #include "RenderScene.h"
 #include "UIManager.h"
 #include "RectTransformComponent.h"
+#include "GameObject.h"
 
 TextComponent::TextComponent()
 {
 	m_name = "TextComponent";
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<TextComponent>();
 	type = UItype::Text;
-
-	
 }
 
 void TextComponent::Awake()
@@ -27,16 +26,39 @@ void TextComponent::Awake()
 
 void TextComponent::Update(float tick)
 {
-    if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+    if (useManualRect)
+    {
+            pos = { manualRect.x, manualRect.y };
+            stretchSize = { manualRect.width, manualRect.height };
+            isStretchX = true;
+            isStretchY = true;
+    }
+    else if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
             const auto& worldRect = rect->GetWorldRect();
             pos = { worldRect.x, worldRect.y };
+            stretchSize = { worldRect.width, worldRect.height };
+
+            if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+            {
+                    if (auto* parent = GameObject::FindIndex(m_pOwner->m_parentIndex))
+                    {
+                            if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
+                            {
+                                    const auto& pRect = parentRect->GetWorldRect();
+                                    stretchSize = { pRect.width, pRect.height };
+                            }
+                    }
+            }
+
+        isStretchX = true;
+        isStretchY = true;
     }
     //pos += relpos;
 
     auto  image = GetOwner()->GetComponent<ImageComponent>();
     if (image)
-            _layerorder = image->GetLayerOrder();
+        _layerorder = image->GetLayerOrder();
 }
 
 void TextComponent::OnDestroy()

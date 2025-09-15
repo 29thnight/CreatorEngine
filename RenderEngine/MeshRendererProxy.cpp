@@ -11,6 +11,7 @@
 #include "DecalComponent.h"
 #include "Texture.h"
 #include "SpriteRenderer.h"
+#include "ShaderSystem.h"
 
 //constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -89,9 +90,18 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
     m_spriteTexture(component->GetSprite().get()),
-    m_vertexShaderName(component->GetVertexShaderName()),
-    m_pixelShaderName(component->GetPixelShaderName())
+    m_customPSOName(component->GetCustomPSOName()),
+   m_billboardType(component->GetBillboardType()),
+   m_billboardAxis(component->GetBillboardAxis())
 {
+    if (!m_customPSOName.empty())
+    {
+        auto it = ShaderSystem->ShaderAssets.find(m_customPSOName);
+        if (it != ShaderSystem->ShaderAssets.end())
+        {
+            m_customPSO = it->second;
+        }
+    }
     m_quadMesh = std::make_shared<Mesh>(
         component->GetOwner()->m_name.ToString(),
         PrimitiveCreator::QuadVertices(),
@@ -146,9 +156,15 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_diffuseTexture(other.m_diffuseTexture),
     m_normalTexture(other.m_normalTexture),
     m_occluroughmetalTexture(other.m_occluroughmetalTexture),
-	m_sliceX(other.m_sliceX),
-	m_sliceY(other.m_sliceY),
-	m_sliceNum(other.m_sliceNum)
+        m_sliceX(other.m_sliceX),
+        m_sliceY(other.m_sliceY),
+        m_sliceNum(other.m_sliceNum),
+        m_quadMesh(other.m_quadMesh),
+        m_spriteTexture(other.m_spriteTexture),
+        m_customPSOName(other.m_customPSOName),
+        m_customPSO(other.m_customPSO),
+       m_billboardType(other.m_billboardType),
+       m_billboardAxis(other.m_billboardAxis)
 {
 }
 
@@ -178,9 +194,15 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_diffuseTexture(std::exchange(other.m_diffuseTexture, nullptr)),
     m_normalTexture(std::exchange(other.m_normalTexture, nullptr)),
     m_occluroughmetalTexture(std::exchange(other.m_occluroughmetalTexture, nullptr)),
-	m_sliceX(other.m_sliceX),
-	m_sliceY(other.m_sliceY),
-	m_sliceNum(other.m_sliceNum)
+        m_sliceX(other.m_sliceX),
+        m_sliceY(other.m_sliceY),
+        m_sliceNum(other.m_sliceNum),
+        m_quadMesh(std::move(other.m_quadMesh)),
+        m_spriteTexture(std::exchange(other.m_spriteTexture, nullptr)),
+        m_customPSOName(std::move(other.m_customPSOName)),
+        m_customPSO(std::move(other.m_customPSO)),
+       m_billboardType(other.m_billboardType),
+       m_billboardAxis(other.m_billboardAxis)
 {
 }
 

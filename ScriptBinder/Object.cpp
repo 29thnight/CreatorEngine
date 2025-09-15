@@ -36,7 +36,10 @@ void Object::Destroy(Object* objPtr)
 void Object::SetDontDestroyOnLoad(Object* objPtr)
 {
     auto* go = dynamic_cast<GameObject*>(objPtr);
-    if (!go) return;
+    if (!go)
+    {
+        return;
+    }
 
     // Already marked: nothing to do
     if (go->m_dontDestroyOnLoad) return;
@@ -100,7 +103,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!cloneObj)
         return nullptr;
 
-	cloneObj->m_instanceID = make_guid();
+	
 	cloneObj->m_typeID = original->m_typeID;
     // 이름 설정
     if (!newName.empty())
@@ -118,6 +121,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 		auto originalNode = Meta::Serialize(originalGameObject, *meta);
 
 		Meta::Deserialize(cloneGameObject, originalNode);
+        cloneObj->m_instanceID = make_guid();
         cloneGameObject->m_childrenIndices.clear();
 
         Scene* scene = SceneManagers->GetActiveScene();

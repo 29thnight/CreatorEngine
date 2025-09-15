@@ -895,35 +895,30 @@ void Player::MeleeAttack()
 
 	int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
 
-	constexpr float angle = XMConvertToRadians(15.0f);
-	Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
-	leftDir.Normalize();
-	Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
-	rightDir.Normalize();
-	std::vector<HitResult> leftHits;
-	int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
-	std::vector<HitResult> rightHits;
-	int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
-	std::vector<HitResult> allHits;
-	allHits.reserve(size + leftSize + rightSize);
-	allHits.insert(allHits.end(), hits.begin(), hits.end());
-	allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
-	allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
-	for (auto& hit : allHits)
-	{
-		auto object = hit.gameObject;
-		if (object == GetOwner()) continue;
-		auto entity = object->GetComponent<EntityMonsterA>();
-		if (entity) {
-			auto [iter, inserted] = AttackTarget.insert(entity);
-			if (inserted) (*iter)->SendDamage(this, 100);
+		float angle = XMConvertToRadians(15.0f);
+		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+		leftDir.Normalize();
+		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
+		rightDir.Normalize();
+		std::vector<HitResult> leftHits;
+		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+		std::vector<HitResult> rightHits;
+		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+		std::vector<HitResult> allHits;
+		allHits.reserve(size + leftSize + rightSize);
+		allHits.insert(allHits.end(), hits.begin(), hits.end());
+		allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
+		allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
+		for (auto& hit : allHits)
+		{
+			auto object = hit.gameObject;
+			if (object == nullptr || object == GetOwner()) continue;
+			auto entity = object->GetComponentDynamicCast<Entity>();
+			if (entity) {
+				auto [iter, inserted] = AttackTarget.insert(entity);
+				if (inserted) (*iter)->SendDamage(this, 100);
+			}
 		}
-		auto entity2 = object->GetComponent<EntityResource>();   //나중에 수정 통합 Entity 받기
-		if (entity2) {
-			auto [iter, inserted] = AttackTarget.insert(entity2);
-			if (inserted) (*iter)->SendDamage(this, 100);
-		}
-	}
 }
 
 void Player::RangeAttack()

@@ -242,7 +242,7 @@ void EffectEditor::RenderTextureSelectionUI(RenderModules* renderModule)
 
 	// 현재 텍스처 슬롯들 표시
 	size_t textureCount = renderModule->GetTextureCount();
-	for (size_t i = 0; i < std::max(textureCount, size_t(4)); ++i) {
+	for (size_t i = 0; i < std::max(textureCount, size_t(1)); ++i) {
 		ImGui::PushID(i);
 
 		std::string slotLabel = "Slot " + std::to_string(i);

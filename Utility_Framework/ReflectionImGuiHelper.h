@@ -279,6 +279,17 @@ namespace Meta
                     prop.setter(instance, value);
                 }
                 ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Rect>())
+            {
+                auto value = std::any_cast<Mathf::Rect>(prop.getter(instance));
+                ImGui::PushID(prop.name);
+                if (ImGui::DragFloat4(prop.name, &value.x))
+                {
+                    MakePropChangeCommand(instance, prop, value);
+                    prop.setter(instance, value);
+				}
+                ImGui::PopID();
             }// 다른 타입 추가 가능
             else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
             {
