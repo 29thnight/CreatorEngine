@@ -25,10 +25,6 @@ bool AnimationController::BlendingAnimation(float tick)
 	m_owner->blendT = std::clamp(t, 0.0f, 1.0f);
 	if (blendingTime >= m_curTrans->GetBlendTime()) //블렌드 타임이 끝나면 블렌드종료 -> 다음애니메이션만 계산
 	{
-		if (m_curState->behaviour != nullptr)
-			m_curState->behaviour->Exit();
-		if (m_nextState->behaviour != nullptr)
-			m_nextState->behaviour->Enter();
 		m_curState = m_nextState;
 		m_nextState = nullptr;
 		m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
@@ -168,6 +164,12 @@ void AnimationController::UpdateState()
 			m_isBlend = false;
 		}
 		m_nextState = FindState(trans->GetNextState());
+
+		if (m_curState->behaviour != nullptr)
+			m_curState->behaviour->Exit();
+		if (m_nextState->behaviour != nullptr)
+			m_nextState->behaviour->Enter();
+
 
 		m_owner->nextAnimIndex = m_nextState->AnimationIndex;
 		m_nextAnimationIndex = m_nextState->AnimationIndex;
