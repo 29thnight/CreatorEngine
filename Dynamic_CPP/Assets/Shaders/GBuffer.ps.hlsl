@@ -156,6 +156,11 @@ GBufferOutput main(PixelShaderInput IN)
         float3 color = layer0 * splat.r + layer1 * splat.g + layer2 * splat.b + layer3 * splat.a;
 
         albedo = float4(color, 1.0);
+        
+        if (isnan(color.x) || isnan(color.y) || isnan(color.z))
+        {
+            discard;
+        }
 
         occlusion = 1;
         metallic = 0.0;

@@ -858,58 +858,113 @@ void TerrainComponent::OnDestroy()
 	}
 }
 
+//void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling)
+//{
+//	TerrainLayer newLayer;
+//	newLayer.m_layerID = m_nextLayerID++;
+//	newLayer.tilling = tilling;
+//	newLayer.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
+//	newLayer.diffuseTexturePath = path;
+//	newLayer.tilling = tilling;
+//	// diffuseTexture 로드
+//
+//	m_pMaterial->AddLayer(newLayer); // 머티리얼에 레이어 추가
+//	m_layers.push_back(newLayer);
+//	m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
+//	std::vector<BYTE> splatMapData(m_width * m_height * 4, 0); // RGBA 4채널 초기화
+//
+//	for (int y = 0; y < m_height; ++y)
+//	{
+//		for (int x = 0; x < m_width; ++x)
+//		{
+//			int idx = y * m_width + x;
+//			int dstOffset = (y * m_width + x) * 4; // RGBA 4채널
+//
+//			// 레이어 가중치 계산
+//			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // 최대 4개 레이어만 사용
+//			{
+//				float w = std::clamp(m_layerHeightMap[layerIdx][idx], 0.0f, 1.0f);
+//				splatMapData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A 채널에 가중치 저장
+//			}
+//		}
+//	}
+//
+//	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, splatMapData); // layer 추가 후 스플랫맵 업데이트
+//}
+
 void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling)
 {
+	// 최대 4개 레이어 제한
+	if (m_layers.size() >= 4)
+	{
+		Debug->LogWarning("Cannot add more than 4 layers.");
+		return;
+	}
+
 	TerrainLayer newLayer;
-	newLayer.m_layerID = m_nextLayerID++;
+	newLayer.m_layerID = m_nextLayerID;
 	newLayer.tilling = tilling;
 	newLayer.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
 	newLayer.diffuseTexturePath = path;
-	newLayer.tilling = tilling;
-	// diffuseTexture 로드
 
-	m_pMaterial->AddLayer(newLayer); // 머티리얼에 레이어 추가
-	m_layers.push_back(newLayer);
-	m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
-	std::vector<BYTE> splatMapData(m_width * m_height * 4, 0); // RGBA 4채널 초기화
-
-	for (int y = 0; y < m_height; ++y)
+	// 1. TerrainComponent가 직접 텍스처를 로드합니다.
+	file::path texturePath = file::path(newLayer.diffuseTexturePath);
+	if (file::exists(texturePath))
 	{
-		for (int x = 0; x < m_width; ++x)
-		{
-			int idx = y * m_width + x;
-			int dstOffset = (y * m_width + x) * 4; // RGBA 4채널
-
-			// 레이어 가중치 계산
-			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // 최대 4개 레이어만 사용
-			{
-				float w = std::clamp(m_layerHeightMap[layerIdx][idx], 0.0f, 1.0f);
-				splatMapData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A 채널에 가중치 저장
-			}
-		}
+		newLayer.diffuseTexture = Texture::LoadFormPath(newLayer.diffuseTexturePath);
+	}
+	else
+	{
+		Debug->LogError("Failed to load diffuse texture: " + newLayer.layerName);
+		return;
 	}
 
-	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, splatMapData); // layer 추가 후 스플랫맵 업데이트
+	// 텍스처 로딩 성공 여부 확인
+	if (!newLayer.diffuseTexture)
+	{
+		Debug->LogError("Texture object is null after loading: " + newLayer.layerName);
+		return;
+	}
+
+	// 2. 컴포넌트의 CPU 측 데이터 구조를 업데이트합니다.
+	m_layers.push_back(newLayer);
+	m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
+	m_nextLayerID++;
+
+	// 3. 메인 업데이트 함수를 호출하여 GPU 상태 전체를 동기화합니다.
+	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
 }
+
 
 void TerrainComponent::RemoveLayer(uint32_t layerID)
 {
-	if (layerID >= m_layers.size()) {
+	if (layerID >= m_layers.size())
+	{
 		Debug->LogError("Invalid layer ID: " + std::to_string(layerID));
 		return;
 	}
-	// 레이어 제거
+
+	// 1. CPU 데이터에서 레이어와 가중치 맵을 제거합니다.
 	m_layers.erase(m_layers.begin() + layerID);
 	m_layerHeightMap.erase(m_layerHeightMap.begin() + layerID);
-	// 레이어 ID 업데이트
-	for (uint32_t i = layerID; i < m_layers.size(); ++i) {
+
+	// 2. 나머지 레이어들의 ID를 순차적으로 재정렬합니다.
+	for (uint32_t i = 0; i < m_layers.size(); ++i)
+	{
 		m_layers[i].m_layerID = i;
 	}
-	// 다음 레이어 ID 업데이트
-	if (m_nextLayerID > layerID) {
-		m_nextLayerID--;
+
+	// 3. 다음 레이어 ID를 업데이트합니다.
+	m_nextLayerID = static_cast<uint32_t>(m_layers.size());
+
+	// 4. TerrainMaterial의 전체 데이터 업데이트 함수를 호출하여
+	//    GPU 리소스(스플랫맵, 텍스처 배열 등)를 한 번에 갱신합니다.
+	//    사용자 요청에 따라 가중치 재정규화는 생략하며,
+	//    셰이더의 normalize(splat) 연산이 최종 블렌딩을 처리합니다.
+	if (m_pMaterial)
+	{
+		m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
 	}
-	UpdateLayerDesc(layerID);
 }
 
 void TerrainComponent::ClearLayers()

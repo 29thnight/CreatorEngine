@@ -104,6 +104,8 @@ public:
     std::shared_ptr<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }
 	TerrainMaterial* GetMaterial() const { return m_pMaterial; }
 
+    uint32 GetSelectedLayerId() const { return m_selectedLayerID; }
+    void SetSelectedLayerId(uint32 layerId) { m_selectedLayerID = layerId; }
 
     [[Property]]
 	FileGuid m_trrainAssetGuid{};// 에셋 가이드
