@@ -28,6 +28,7 @@
 #include "SpecialBullet.h"
 #include "WeaponSlotController.h"
 #include "Bomb.h"
+#include "HPBar.h"
 
 #include "CurveIndicator.h"
 #include "DebugLog.h"
@@ -67,7 +68,6 @@ void Player::Start()
 		}
 	}
 
-
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 
 	//TEST : UIController 현재는 테스트라 P1_UIController로 고정
@@ -81,6 +81,19 @@ void Player::Start()
 			weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 			weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 			weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+		}
+	}
+
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->targetIndex = player->m_index;
+			m_currentHP = m_maxHP;
+			hpbar->SetMaxHP(m_maxHP);
+			hpbar->SetCurHP(m_currentHP);
 		}
 	}
 	//~TEST

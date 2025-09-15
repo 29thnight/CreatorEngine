@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EventManager.h"
+#include "HPBar.h"
 #include "EventSelector.h"
 #include "RewardObserver.h"
 #include "EntityBigWood.h"

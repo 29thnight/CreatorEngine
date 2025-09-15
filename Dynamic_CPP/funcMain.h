@@ -192,6 +192,8 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EventManager", []() { return new EventManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("HPBar", []() { return new HPBar(); });
 		CreateFactory::GetInstance()->RegisterFactory("EventSelector", []() { return new EventSelector(); });
 		CreateFactory::GetInstance()->RegisterFactory("RewardObserver", []() { return new RewardObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityBigWood", []() { return new EntityBigWood(); });
