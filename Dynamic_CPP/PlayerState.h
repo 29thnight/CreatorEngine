@@ -5,7 +5,8 @@ enum PlayerStateFlag : flag {
     CanMove,
     CanAttack,
     CanGrab,
-    CanDrop,
+    CanThrow,
     CanSwap,
+    CanDash,
     MAX
 };

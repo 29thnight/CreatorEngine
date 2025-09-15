@@ -39,7 +39,7 @@
         {
             "actionName": "Attack",
             "actionType": "Button",
-            "funName": "Attack1",
+            "funName": "ChargeAttack",
             "inputType": "GamePad",
             "key0": "X",
             "key1": "A",

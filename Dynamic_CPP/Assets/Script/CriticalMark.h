@@ -1,15 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Entity.h"
-#include "ItemType.h"
-#include "EntityResource.generated.h"
-class CriticalMark;
-class EntityResource : public Entity
+#include "ModuleBehavior.h"
+
+class EffectComponent;
+class CriticalMark : public ModuleBehavior
 {
 public:
-   ReflectEntityResource
-	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(EntityResource)
+	MODULE_BEHAVIOR_BODY(CriticalMark)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -24,13 +21,13 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void SendDamage(Entity* sender, int damage) override;
-
-	[[Property]]
-	int  itemCode = 0;
-	[[Property]]
-	EItemType itemType = EItemType::Mushroom;
-
+	void ResetMark();
+	bool UpdateMark(int _playerindex);
 private:
-	CriticalMark* m_criticalMark;
+	EffectComponent* markEffect = nullptr;
+	bool OnMark = false;
+	bool canMark = true;  //마크 생성가능
+	float markDuration = 5.0f; //마크지속시간
+	float markElaspedTime = 0.f;
+	int markIndex = -1;
 };

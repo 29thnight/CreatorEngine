@@ -16,17 +16,7 @@ class Entity;
 class EntityItem;
 class EntityEnemy;
 
-enum class playerState 
-{
-	Idle,
-	Attack,
-	Dead,
-	Dash,
-	Hit,
-	Stun, //부활가능한 상태
-};
 
-class PlayerState();
 
 
 class Player : public Entity
@@ -55,9 +45,8 @@ public:
 
 
 	virtual void SendDamage(Entity* sender, int damage) override;
-	void Heal(int healAmount);
 	virtual void OnRay() override {}
-
+	void Heal(int healAmount);
 	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
 	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
 	Core::Delegate<void, int> m_SetActiveEvent;
@@ -88,6 +77,7 @@ public:
 	float curHP = maxHP;
 	std::string curStateName = "Idle";
 	std::unordered_map<std::string, BitFlag> playerState;
+	void ChangeState(std::string _stateName);
 	bool CheckState(flag _flag);  //현재 상태에서 가능한 행동인지
 	//playerState m_state = playerState::Idle;
 	[[Method]]
@@ -214,7 +204,7 @@ public:
 	[[Method]]
 	void Charging();
 	[[Method]]
-	void Attack1();
+	void ChargeAttack();
 	[[Method]]
 	void StartRay();
 	[[Method]]
@@ -285,4 +275,10 @@ public:
 	[[Method]]
 	void TestKillPlayer();
 
+	[[Property]]
+	float testHitPowerX = 1.5f;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
+	[[Property]]
+	float testHitPowerY = 0.1f;
+	[[Method]]
+	void TestHit();
 };

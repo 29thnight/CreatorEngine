@@ -40,6 +40,8 @@ ReflectionScriptField(Player) \
 		meta_property(ResurrectionHP) \
 		meta_property(ResurrectionGracePeriod) \
 		meta_property(SlotChangeCooldown) \
+		meta_property(testHitPowerX) \
+		meta_property(testHitPowerY) \
 	}); \
 	MethodField \
 	({ \
@@ -59,11 +61,12 @@ ReflectionScriptField(Player) \
 		meta_method(ThrowBomb) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \
-		meta_method(Attack1) \
+		meta_method(ChargeAttack) \
 		meta_method(StartRay) \
 		meta_method(EndRay) \
 		meta_method(EndAttack) \
 		meta_method(TestKillPlayer) \
+		meta_method(TestHit) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };

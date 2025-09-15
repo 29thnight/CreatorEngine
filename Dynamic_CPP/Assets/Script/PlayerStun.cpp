@@ -3,6 +3,7 @@
 #include "Player.h"
 #include "AnimationController.h"
 #include "Animator.h"
+#include "Weapon.h"
 void PlayerStun::Enter()
 {
 	if (m_player == nullptr)
@@ -25,26 +26,39 @@ void PlayerStun::Enter()
 			}
 		}
 	}
+
+	if (m_player)
+	{
+		m_player->ChangeState("Stun");
+		m_player->m_curWeapon->SetEnabled(false);
+	}
 }
 
 void PlayerStun::Update(float deltaTime)
 {
-
-	if (m_player->CheckResurrectionByOther() == true)
+	if (m_player)
 	{
-		//tick올려서 몇초당 한번씩 부활게이지 올리기
-		m_player->ResurrectionElapsedTime += deltaTime;
-		if (m_player->ResurrectionElapsedTime >= m_player->ResurrectionTime)
+		if (m_player->CheckResurrectionByOther() == true)
 		{
-			m_player->Resurrection();
+			//tick올려서 몇초당 한번씩 부활게이지 올리기
+			m_player->ResurrectionElapsedTime += deltaTime;
+			if (m_player->ResurrectionElapsedTime >= m_player->ResurrectionTime)
+			{
+				m_player->Resurrection();
+			}
 		}
-	}
-	else  //아닐떄는 게이지 내리기?
-	{
+		else  //아닐떄는 게이지 내리기?
+		{
 
+		}
 	}
 }
 
 void PlayerStun::Exit()
 {
+	if (m_player)
+	{
+		m_player->ChangeState("Idle");
+		m_player->m_curWeapon->SetEnabled(true);
+	}
 }

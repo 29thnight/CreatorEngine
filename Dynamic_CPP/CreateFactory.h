@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "CriticalMark.h"
 #include "EntityItemHeal.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"

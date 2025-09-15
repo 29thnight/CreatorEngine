@@ -137,26 +137,47 @@ void Player::Start()
 		curveindicator->EnableIndicator(false);
 	}
 
+	//idle에 move 도포함
 	BitFlag idleBit;
 	idleBit.Set(PlayerStateFlag::CanMove);
 	idleBit.Set(PlayerStateFlag::CanAttack);
 	idleBit.Set(PlayerStateFlag::CanGrab);
 	idleBit.Set(PlayerStateFlag::CanSwap);
+	idleBit.Set(PlayerStateFlag::CanDash);
 	playerState["Idle"] = idleBit;
-	if (playerState[curStateName].Test(PlayerStateFlag::CanMove) == true)
-	{
-		//이동가능
-	}
-	if (playerState[curStateName].Test(PlayerStateFlag::CanAttack) == true)
-	{
-		//공격가능
-	}
-	playerState["Attack"];
-	playerState["Stun"];
-	playerState["Grab"];
-	playerState["Throw"];
-	playerState["Hit"];
-	playerState["Dash"];
+
+	BitFlag attackBit;
+	attackBit.Set(PlayerStateFlag::CanAttack);
+	playerState["Attack"] = attackBit;
+
+	//피0 되서 스턴중에는 아무조작도 못함  //스턴일때 화면밖으로(스턴중에는 late update의 화면가두기 제외) 나가면 n초후 아시스 옆으로 위치이동
+	BitFlag stunBit;
+	playerState["Stun"] = stunBit;
+
+	//grab은 폭탄잡기는 말고 단순 item 들고있을때
+	BitFlag grabBit;
+	playerState["Grab"] = grabBit;
+	grabBit.Set(PlayerStateFlag::CanMove);
+	grabBit.Set(PlayerStateFlag::CanAttack);
+	grabBit.Set(PlayerStateFlag::CanThrow);
+	grabBit.Set(PlayerStateFlag::CanSwap);
+	grabBit.Set(PlayerStateFlag::CanDash);
+
+	//throw는 폭탄던지기는 제외하고 단순 item 던질때
+	BitFlag throwBit;
+	playerState["Throw"] =throwBit;
+	throwBit.Set(PlayerStateFlag::CanMove);
+	throwBit.Set(PlayerStateFlag::CanSwap);
+
+	//맞는중에는 아무조작도 불가능
+	BitFlag hitBit;
+	playerState["Hit"] =hitBit;
+
+	//대쉬중에는 아무조작도 불가능
+	BitFlag dashBit;
+	playerState["Dash"] = dashBit;
+
+	ChangeState("Idle");
 
 }
 
@@ -184,6 +205,7 @@ void Player::Update(float tick)
 		XMVECTOR forwardVec = XMLoadFloat3(&forward); 
 		XMVECTOR offsetPos = world + forwardVec * 1.0f;
 		offsetPos.m128_f32[1] = 1.0f; 
+		//&&&&& 포지션 소켓에 붙여서 옮겨야 할수도
 		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 		//asis와 거리계속 갱신
 		auto& asiss = GM->GetAsis();
@@ -250,25 +272,25 @@ void Player::Update(float tick)
 			m_dubbleDashElapsedTime = 0.f;
 		}
 	}
-	if (isDashing)
-	{
-		m_dashElapsedTime += tick;
-		if (m_dashElapsedTime >= m_dashTime)
-		{
-			isDashing = false;
-			m_dashElapsedTime = 0.f;
-			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
-			if(dashEffect)
-				dashEffect->StopEffect();
-		}
-		else
-		{
-			auto forward = player->m_transform.GetForward();
-			auto controller = player->GetComponent<CharacterControllerComponent>();
-			controller->Move({ forward.x ,forward.z });
-		}
+	//if (isDashing)
+	//{
+	//	m_dashElapsedTime += tick;
+	//	if (m_dashElapsedTime >= m_dashTime)
+	//	{
+	//		isDashing = false;
+	//		m_dashElapsedTime = 0.f;
+	//		player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
+	//		if(dashEffect)
+	//			dashEffect->StopEffect();
+	//	}
+	//	else
+	//	{
+	//		auto forward = player->m_transform.GetForward();
+	//		auto controller = player->GetComponent<CharacterControllerComponent>();
+	//		controller->Move({ forward.x ,forward.z });
+	//	}
 
-	}
+	//}
 
 	if (m_curWeapon->IsBroken() && sucessAttack == true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
 	{
@@ -364,6 +386,16 @@ void Player::Heal(int healAmount)
 	m_currentHP = std::max(m_currentHP + healAmount, m_maxHP);
 }
 
+void Player::ChangeState(std::string _stateName)
+{
+	curStateName = _stateName;
+}
+
+bool Player::CheckState(flag _flag)
+{
+	return playerState[curStateName].Test(_flag);
+}
+
 void Player::Move(Mathf::Vector2 dir)
 {
 
@@ -379,9 +411,10 @@ void Player::Move(Mathf::Vector2 dir)
 
 void Player::CharacterMove(Mathf::Vector2 dir)
 {
-	if (isStun || isKnockBack || !m_isCallStart || isDashing || isAttacking) return;
+	if (!m_isCallStart) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
+	if (false == CheckState(PlayerStateFlag::CanMove)) return;
 	m_animator->SetUseLayer(1, true);
 	//auto worldRot = camera->m_transform.GetWorldQuaternion();
 	//Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
@@ -482,24 +515,14 @@ void Player::Dash()
 {
 	if (m_curDashCount >= dashAmount) return;   //최대 대시횟수만큼했으면 못함
 	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //이미 대시했을 더블대시타임안에 다시안하면 못함
-	dashEffect->Apply();
-	if (m_curDashCount == 0)
-	{
-		LOG("Dash  ");
-	}
-	else if (m_curDashCount == 1)
-	{
-		LOG("Dubble Dash  ");
-	}
-
+	if (false == CheckState(PlayerStateFlag::CanDash))  return;
+	DropCatchItem();
 	//대쉬 애니메이션중엔 적통과
 	m_animator->SetParameter("OnDash", true);
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-
-	DropCatchItem();
-	isDashing = true;
-
 	controller->SetKnockBack(dashDistacne, 0.f);
+
+	//isDashing = true;
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
 	m_dashElapsedTime = 0.f;
@@ -510,12 +533,9 @@ void Player::StartAttack()
 {
 	//isCharging = true;
 	//여기서 공격처리하고 차징시작 
-
+	if (false == CheckState(PlayerStateFlag::CanAttack)) return;
 	if (isAttacking == false || canMeleeCancel == true)
 	{
-		//isAttacking = true;
-		//DropCatchItem();
-		//m_animator->SetUseLayer(1, false);
 		isChargeAttack = false;
 		if (m_curWeapon)
 		{
@@ -525,36 +545,28 @@ void Player::StartAttack()
 				if (m_comboCount == 0)
 				{
 					m_animator->SetParameter("MeleeAttack1", true);
-					std::cout << "MeleeAttack1" << std::endl;
 				}
 				else if (m_comboCount == 1)
 				{
 					m_animator->SetParameter("MeleeAttack2", true); 
-					std::cout << "MeleeAttack2" << std::endl;
 				}
 				else if (m_comboCount == 2)
 				{
 					m_animator->SetParameter("MeleeAttack3", true);
-					std::cout << "MeleeAttack3" << std::endl; 
 				}
 				canMeleeCancel = false;
 			}
-
-
 			if (m_curWeapon->itemType == ItemType::Range)
 			{
-				if (countRangeAttack == 4)
+				if (countRangeAttack != 0 && (countRangeAttack + 1) % countSpecialBullet == 0)
 				{
-					m_animator->SetParameter("RangeSpecialAttack", true); //원거리 공격 애니메이션으로 
+					m_animator->SetParameter("RangeSpecialAttack", true); //원거리 스페셜공격 애니메이션으로 
 				}
 				else
 				{
 					m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
 				}
-				std::cout << "RangeAttack!!" << std::endl;
 			}
-
-	
 			if (m_curWeapon->itemType == ItemType::Bomb)
 			{
 				OnMoveBomb = true;
@@ -564,7 +576,6 @@ void Player::StartAttack()
 
 				//현재무기 감추거나 attach떼고 손에붙여서 날아가게?
 			}
-			attackElapsedTime = 0;
 		}
 	}
 }
@@ -580,40 +591,29 @@ void Player::Charging()
 	}
 	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
 
-
-	//차징을 애니메이션 끝난순간부터 재기? 기본은 차징X
-	//if (m_chargingTime >= minChargedTime)
-	//{
-	//		//std::cout << "charginggggggg" << std::endl;
-	//		//LOG("charginggggggg");
-	//		//어택 끝났는대도 처징중이면 이속감소 and 이펙트 출력
-	//}
 		
 
 }
 
-void Player::Attack1()  //정리되면 ChargeAttack() 으로 이름바꿀예정
+void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀예정
 {
 	//여기선 차징시간이 넘으면 차징공격실행 아니면 아무것도없음 폭탄은 예외
 	isCharging = false; 
 	if (m_curWeapon->itemType == ItemType::Bomb)
 	{
-		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로 //폭탄 내구도소모는 애니메이션 keyframe으로 삽입예정 -- 
-		std::cout << "BombAttack!!" << std::endl;
+		m_animator->SetParameter("BombAttack", true); //폭탄 공격 애니메이션으로 //폭탄 내구도소모는 애니메이션 keyframe or bombAttack exit()로
 		OnMoveBomb = false;
 
 	}
 	else //근거리 and 원거리 
 	{
-		if (m_chargingTime >= minChargedTime)  //최소 차징시간 넘었으면
+		if (m_chargingTime >= m_curWeapon->chgTime)  //무기별 차징시간 넘었으면
 		{
 			//차지공격나감
 			isChargeAttack = true;
-			if (m_curWeapon->itemType == ItemType::Melee || m_curWeapon->itemType == ItemType::Basic)
+			if (m_curWeapon->itemType == ItemType::Melee)
 			{
 				m_animator->SetParameter("MeleeChargeAttack", true);
-				std::cout << "MeleeChargeAttack" << std::endl;
-				//canMeleeCancel = false; //차지어택 캔슬여부 
 			}
 			else if (m_curWeapon->itemType == ItemType::Range)
 			{
@@ -852,10 +852,10 @@ void Player::Cancancel()
 	if (isChargeAttack) return; 
 
 	canMeleeCancel = true;
-
 	int maxCombo = (m_curWeapon->itemType == ItemType::Basic) ? 2 : 3;
 
 	m_comboCount = (m_comboCount + 1) % maxCombo;
+	std::cout << "CobmoCount =====" << m_comboCount  << std::endl;
 }
 
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
@@ -1182,4 +1182,18 @@ void Player::OnCollisionExit(const Collision& collision)
 void Player::TestKillPlayer()
 {
 	SendDamage(nullptr,100);
+}
+
+void Player::TestHit()
+{
+	DropCatchItem();
+	if (m_animator)
+	{
+		m_animator->SetParameter("OnHit", true);
+	}
+
+	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetKnockBack(testHitPowerX, testHitPowerY);
+
+
 }

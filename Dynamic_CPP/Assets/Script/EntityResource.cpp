@@ -8,8 +8,26 @@
 #include "EffectComponent.h"
 #include "DebugLog.h"
 #include "PrefabUtility.h"
+#include "CriticalMark.h"
 void EntityResource::Start()
 {
+
+
+	m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
+
+
+	auto owner = GetOwner();
+	auto childred = owner->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		m_criticalMark = GameObject::FindIndex(child)->GetComponent<CriticalMark>();
+	}
+	if (!m_criticalMark)
+	{
+		m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
+	}
+
+
 }
 
 void EntityResource::Update(float tick)
@@ -24,6 +42,11 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 		if (player)
 		{
 			// hit
+ 			if (m_criticalMark != nullptr && true == m_criticalMark->UpdateMark(player->playerIndex))
+			{
+				//크리티컬 성공
+			}
+			damage = 0;
 			m_currentHP -= std::max(damage, 0);
 
 			if (m_currentHP <= 0) {
