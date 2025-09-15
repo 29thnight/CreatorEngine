@@ -7,7 +7,7 @@
     "name": "q2",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -36,9 +36,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.046339668333530426,
-                                "y": 0.032946210354566574,
-                                "z": 0.1726943850517273
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
@@ -116,7 +116,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "gg",
+                            "pixelShader": "ggg",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
@@ -152,7 +152,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -181,9 +181,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.046339668333530426,
-                                "y": 0.032946210354566574,
-                                "z": 0.1726943850517273
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
@@ -261,7 +261,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "gg",
+                            "pixelShader": "ggg",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
