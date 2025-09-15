@@ -240,7 +240,7 @@ void RenderPassData::ClearRenderQueue()
 	m_foliageQueue.clear();
 	m_UIRenderQueue.clear();
 	m_decalQueue.clear();
-        m_spriteRenderQueue.clear();
+    m_spriteRenderQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)

@@ -8,19 +8,19 @@
 using namespace TypeTrait;
 namespace Meta
 {
-	// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
-	inline int InputTextCallback(ImGuiInputTextCallbackData* data)
-	{
-		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-		{
-			// UserData에 저장된 std::string 포인터를 가져옴
-			std::string* str = static_cast<std::string*>(data->UserData);
-			// 새로운 길이에 맞춰 std::string의 크기 재조정
-			str->resize(data->BufTextLen);
-			data->Buf = const_cast<char*>(str->c_str());
-		}
-		return 0;
-	}
+    // 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
+    inline int InputTextCallback(ImGuiInputTextCallbackData* data)
+    {
+        if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+        {
+            // UserData에 저장된 std::string 포인터를 가져옴
+            std::string* str = static_cast<std::string*>(data->UserData);
+            // 새로운 길이에 맞춰 std::string의 크기 재조정
+            str->resize(data->BufTextLen);
+            data->Buf = const_cast<char*>(str->c_str());
+        }
+        return 0;
+    }
 
     inline void DrawObject(void* instance, const Type& type);
 
@@ -29,7 +29,7 @@ namespace Meta
         for (const auto& prop : type.properties)
         {
             if (prop.name == "m_isEnabled" || (prop.typeID == type_guid(Object) && prop.name == "m_name"))
-				continue;
+                continue;
 
             const HashedGuid hash = prop.typeID;
             if (hash == GUIDCreator::GetTypeID<int>())
@@ -38,79 +38,79 @@ namespace Meta
                 ImGui::PushID(prop.name);
                 if (ImGui::DragInt(prop.name, &value))
                 {
-					MakePropChangeCommand(instance, prop, value);
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<unsigned int>() || prop.typeName == "UINT")
             {
                 unsigned int value = std::any_cast<unsigned int>(prop.getter(instance));
-				ImGui::PushID(prop.name);
-                if (ImGui::DragScalar(prop.name, ImGuiDataType_S32, &value))
+                ImGui::PushID(prop.name);
+                if (ImGui::DragScalar(prop.name, ImGuiDataType_U32, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<long long>())
             {
                 long long value = std::any_cast<long long>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragScalar(prop.name, ImGuiDataType_S64, &value))
                 {
-					MakePropChangeCommand(instance, prop, value);
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float>())
             {
                 float value = std::any_cast<float>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat(prop.name, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
-            else if (hash == GUIDCreator::GetTypeID<bool>()|| prop.typeName == "bool32")
+            else if (hash == GUIDCreator::GetTypeID<bool>() || prop.typeName == "bool32")
             {
                 bool value = std::any_cast<bool>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::Checkbox(prop.name, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<std::string>())
             {
                 std::string value = std::any_cast<std::string>(prop.getter(instance));
-				ImGui::PushID(prop.name);
-				if (ImGui::InputText(prop.name, 
-                    value.data(), 
-                    value.size() + 1, 
+                ImGui::PushID(prop.name);
+                if (ImGui::InputText(prop.name,
+                    value.data(),
+                    value.size() + 1,
                     ImGuiInputTextFlags_CallbackResize,
-					Meta::InputTextCallback,
-					static_cast<void*>(&value)))
+                    Meta::InputTextCallback,
+                    static_cast<void*>(&value)))
                 {
-                    if(InputManagement->IsKeyPressed(VK_RETURN))
+                    if (InputManagement->IsKeyPressed(VK_RETURN))
                     {
                         MakePropChangeCommand(instance, prop, value);
                         prop.setter(instance, value);
                     }
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<const char*>())
             {
                 const char* value = std::any_cast<const char*>(prop.getter(instance));
                 ImGui::PushID(prop.name);
-				ImGui::Text(value);
+                ImGui::Text(value);
                 ImGui::PopID();
             }//[OverWatching]
             else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
@@ -125,7 +125,7 @@ namespace Meta
                     iter->Next();
                 }
 
-               /* std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));*/
+                /* std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));*/
                 if (value.empty()) return;
 
                 int selectedIndex = 0; // 안전하게 관리할 방법이 있다면 외부에서 가져와도 됨
@@ -152,7 +152,7 @@ namespace Meta
                         {
 
                         }
-                            //ImGui::SetItemDefaultFocus();
+                        //ImGui::SetItemDefaultFocus();
                     }
 
                     ImGui::EndCombo();
@@ -162,46 +162,46 @@ namespace Meta
             else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {
                 HashingString value = std::any_cast<HashingString>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Vector2>())
             {
                 auto value = std::any_cast<Mathf::Vector2>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat2(prop.name, &value.x, 0.1f))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Vector3>())
             {
                 auto value = std::any_cast<Mathf::Vector3>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat3(prop.name, &value.x, 0.1f))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>())
             {
                 auto value = std::any_cast<Mathf::Vector4>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat4(prop.name, &value.x, 0.1f))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Quaternion>())
             {
@@ -217,68 +217,79 @@ namespace Meta
             else if (hash == GUIDCreator::GetTypeID<Mathf::Color4>())
             {
                 auto value = std::any_cast<Mathf::Color4>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::ColorEdit4(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float2>())
             {
                 auto value = std::any_cast<float2>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat2(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float3>())
             {
                 auto value = std::any_cast<float3>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat3(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float4>())
             {
                 auto value = std::any_cast<float4>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragFloat4(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<int2>())
             {
                 auto value = std::any_cast<int2>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragInt2(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<int3>())
             {
                 auto value = std::any_cast<int3>(prop.getter(instance));
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::DragInt3(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Rect>())
+            {
+                auto value = std::any_cast<Mathf::Rect>(prop.getter(instance));
+                ImGui::PushID(prop.name);
+                if (ImGui::DragFloat4(prop.name, &value.x))
+                {
+                    MakePropChangeCommand(instance, prop, value);
+                    prop.setter(instance, value);
+				}
+                ImGui::PopID();
             }// 다른 타입 추가 가능
             else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
             {
@@ -294,13 +305,13 @@ namespace Meta
                         current_index = static_cast<int>(i);
                 }
                 // 콤보 박스로 enum 값을 선택할 수 있도록 합니다.
-				ImGui::PushID(prop.name);
+                ImGui::PushID(prop.name);
                 if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
                 {
                     // 선택된 인덱스에 해당하는 enum 값으로 업데이트합니다.
                     prop.setter(instance, enumType->values[current_index].value);
                 }
-				ImGui::PopID();
+                ImGui::PopID();
             }
             else if (prop.isPointer)
             {
@@ -310,28 +321,175 @@ namespace Meta
                     std::string_view view = prop.typeName.c_str();
                     size_t endPos = view.rfind("*");
                     std::string name = view.data();
-                    std::string copyname = name.substr(0, endPos);
-                    if (const Type* subType = MetaDataRegistry->Find(copyname))
-                    {
-                        ImGui::PushID(prop.name);
-                        if (ImGui::CollapsingHeader(prop.name, ImGuiTreeNodeFlags_DefaultOpen))
+
+                    if (prop.typeID == GUIDCreator::GetTypeID<GameObject>()) {
+
+                        std::string copyname = name.substr(0, endPos);
+                        if (const Type* subType = MetaDataRegistry->Find(copyname))
                         {
-                            DrawObject(ptr, *subType);
+                            ImGui::PushID(prop.name);
+                            if (ImGui::CollapsingHeader(prop.name, ImGuiTreeNodeFlags_DefaultOpen))
+                            {
+                                ImGui::Button("#script", ImVec2(150, 20));
+
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+                                    {
+                                        GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+                                        auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
+                                        if (gameObject->GetTypeID() == subType->typeID) {
+                                            MakePropChangeCommand(instance, prop, gameObject);
+                                            prop.setter(instance, gameObject);
+                                        }
+                                        else {
+                                            auto it = gameObject->m_componentIds.find(subType->typeID);
+                                            if (it != gameObject->m_componentIds.end())
+                                            {
+                                                size_t index = it->second;
+                                                auto component = gameObject->m_components[index];
+                                                if (component) {
+                                                    //MakePropChangeCommand(instance, prop, component.get());
+                                                    prop.setter(instance, component.get());
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                                DrawObject(ptr, *subType);
+                            }
+                            ImGui::PopID();
                         }
-                        ImGui::PopID();
+                        else
+                        {
+                            //TODO : 테스트 후 제거
+                            std::string_view view = prop.typeName.c_str();
+                            size_t endPos = view.rfind("*");
+                            std::string name = view.data();
+                            std::string copyname = name.substr(0, endPos);
+                            if (const Type* subType = MetaDataRegistry->Find(copyname)) {
+                                ImGui::PushID(prop.name);
+                                ImGui::Text("%s: [Unregistered Type For GUI Debug]", prop.name);
+                                ImGui::Button("#Missing", ImVec2(150, 20));
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+                                    {
+                                        GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+                                        auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
+                                        if (gameObject->GetTypeID() == subType->typeID) {
+                                            MakePropChangeCommand(instance, prop, gameObject);
+                                            prop.setter(instance, gameObject);
+                                        }
+                                        else {
+                                            auto it = gameObject->m_componentIds.find(subType->typeID);
+                                            if (it != gameObject->m_componentIds.end())
+                                            {
+                                                size_t index = it->second;
+                                                auto component = gameObject->m_components[index];
+                                                if (component) {
+                                                    //MakePropChangeCommand(instance, prop, component.get());
+                                                    prop.setter(instance, component.get());
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                                ImGui::PopID();
+                            }
+                        }
                     }
-                    else
-                    {
-                        ImGui::Text("%s: [Unregistered Type For GUI Debug]", prop.name);
+                    else if (prop.typeID == GUIDCreator::GetTypeID<Texture>()) {
+                        auto texture = std::any_cast<Texture*>(prop.getter(instance));
+
+                        if (texture) {
+                            if (texture->m_pSRV)
+                                ImGui::Image((ImTextureID)texture->m_pSRV, ImVec2(30, 30));
+                            else {
+                                ImGui::Button("None Texture", ImVec2(150, 20));
+                            }
+                        }
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Textures"))
+                            {
+                                const char* droppedFilePath = (const char*)payload->Data;
+                                file::path filename = droppedFilePath;
+                                file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+                                HashingString path = filepath.string();
+                                if (!filename.filename().empty()) {
+                                    prop.setter(instance, Texture::LoadManagedFromPath(filepath.string()).get());
+                                }
+                                else {
+                                    Debug->Log("Empty Texture File Name");
+                                }
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
                     }
                 }
                 else
                 {
-                    ImGui::Text("%s: nullptr [For GUI Debug]", prop.name);
+                    //TODO : 테스트 후 제거
+                    std::string_view view = prop.typeName.c_str();
+                    size_t endPos = view.rfind("*");
+                    std::string name = view.data();
+
+                    if (prop.typeID == GUIDCreator::GetTypeID<GameObject>()) {
+                        std::string copyname = name.substr(0, endPos);
+                        if (const Type* subType = MetaDataRegistry->Find(copyname)) {
+                            ImGui::PushID(prop.name);
+                            ImGui::Text("%s: nullptr [For GUI Debug]", prop.name);
+                            ImGui::Button("#Missing", ImVec2(150, 20));
+                            if (ImGui::BeginDragDropTarget()) {
+                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+                                {
+                                    GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+                                    auto gameObject = SceneManagers->GetActiveScene()->GetGameObject(draggedIndex).get();
+                                    if (gameObject->GetTypeID() == subType->typeID) {
+                                        MakePropChangeCommand(instance, prop, gameObject);
+                                        prop.setter(instance, gameObject);
+                                    }
+                                    else {
+                                        auto it = gameObject->m_componentIds.find(subType->typeID);
+                                        if (it != gameObject->m_componentIds.end())
+                                        {
+                                            size_t index = it->second;
+                                            auto component = gameObject->m_components[index];
+                                            if (component) {
+                                                //MakePropChangeCommand(instance, prop, component.get());
+                                                prop.setter(instance, component.get());
+                                            }
+                                        }
+                                    }
+                                }
+                                ImGui::EndDragDropTarget();
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+                    else if (prop.typeID == GUIDCreator::GetTypeID<Texture>()) {
+                        ImGui::Button("None Texture", ImVec2(150, 20));
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Textures"))
+                            {
+                                const char* droppedFilePath = (const char*)payload->Data;
+                                file::path filename = droppedFilePath;
+                                file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+                                HashingString path = filepath.string();
+                                if (!filename.filename().empty()) {
+                                    prop.setter(instance, Texture::LoadManagedFromPath(filepath.string()).get());
+                                }
+                                else {
+                                    Debug->Log("Empty Texture File Name");
+                                }
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+                    }
                 }
             }
             else if (nullptr != MetaDataRegistry->Find(prop.typeName))
-            {                
+            {
                 // 기존 인스턴스의 주소에서 해당 오프셋을 더합니다.
                 void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 
@@ -457,12 +615,12 @@ namespace Meta
         }
     }
 
-	inline void DrawEnumProperty(int* instance, const EnumType* _enumType, const Property& prop)
-	{
+    inline void DrawEnumProperty(int* instance, const EnumType* _enumType, const Property& prop)
+    {
         if (const EnumType* enumType = MetaEnumRegistry->Find(_enumType->name))
         {
             std::vector<const char*> items;
-			int prevValue = *instance;
+            int prevValue = *instance;
             int current_index = 0;
             for (size_t i = 0; i < enumType->values.size(); i++)
             {
@@ -474,16 +632,16 @@ namespace Meta
             ImGui::PushID(prop.name);
             if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
             {
-				Meta::MakeCustomChangeCommand(
-					[=]
-					{
-						*instance = prevValue;
-					},
+                Meta::MakeCustomChangeCommand(
+                    [=]
+                    {
+                        *instance = prevValue;
+                    },
                     [=]
                     {
                         *instance = enumType->values[current_index].value;
                     }
-				);
+                );
                 *instance = enumType->values[current_index].value;
 
             }
@@ -493,7 +651,7 @@ namespace Meta
 
     inline void DrawObject(void* instance, const Type& type)
     {
-		ImGui::PushID(type.name.data());
+        ImGui::PushID(type.name.data());
         if (type.parent)
         {
             DrawObject(instance, *type.parent);

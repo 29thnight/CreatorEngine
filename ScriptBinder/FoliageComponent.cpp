@@ -29,7 +29,7 @@ void FoliageComponent::Update(float deltaTime)
         auto camera = CameraManagement->GetLastCamera();
         if (camera)
         {
-            UpdateFoliageCullingData(camera);
+            UpdateFoliageCullingData(camera.get());
 		}
 	}
 }

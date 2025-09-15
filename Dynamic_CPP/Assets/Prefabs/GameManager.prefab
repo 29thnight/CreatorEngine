@@ -1,19 +1,18 @@
-m_name: EffectDeath
+m_name: GameManager
 m_isEnabled: true
-m_instanceID: 1377058026
+m_instanceID: 671234891
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: EffectDeath
+    m_name: GameManager
     m_isEnabled: true
-    m_instanceID: 4242074761
+    m_instanceID: 3608352357
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-      m_dirty: 0
-    m_index: 1
+    m_index: 59
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
@@ -26,21 +25,14 @@ PrefabNode:
     m_layer: Default
     m_components:
       - ModuleBehavior: 1399118904
-        m_name: DestroyEffect
+        m_name: GameManager
         m_isEnabled: true
-        m_instanceID: 2007939026
+        m_instanceID: 1102905133
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 2295a65f-12aa-564d-b51c-9d56ddd4e7c0
-      - EffectComponent: 3131036541
-        m_name: EffectComponent
+        m_scriptGuid: 43eba570-3946-5cc3-a3a5-e27244333fdb
+      - ModuleBehavior: 1399118904
+        m_name: TweenManager
         m_isEnabled: true
-        m_instanceID: 2120976031
+        m_instanceID: 28933523
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_effectTemplateName: Death2
-        m_isPlaying: true
-        m_isPaused: false
-        m_timeScale: 1
-        m_loop: false
-        m_duration: 2
-        m_useAbsolutePosition: false
-        m_effectInstanceName: Death2_obj4242074761
+        m_scriptGuid: 4c46804a-2b01-5d5c-a154-5e66877f5fe3

@@ -17,7 +17,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 
 	if (identity == "MonsterNomal")
 	{
-		EntityMonsterA* script = dynamic_cast<EntityMonsterA*>(m_owner->GetComponent<ModuleBehavior>());
+		EntityMonsterA* script =m_owner->GetComponent<EntityMonsterA>();
 		script->isDead = true;
 		return NodeStatus::Success;
 	}

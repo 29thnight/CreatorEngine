@@ -25,6 +25,14 @@ void PlayerRangeAttack::Enter()
 			}
 		}
 	}
+
+	if (m_player)
+	{
+		m_player->isAttacking = true;
+		m_player->DropCatchItem();
+		m_player->m_animator->SetUseLayer(1, false);
+		m_player->RangeAttack();
+	}
 }
 
 void PlayerRangeAttack::Update(float deltaTime)

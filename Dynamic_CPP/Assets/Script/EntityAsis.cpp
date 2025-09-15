@@ -273,6 +273,9 @@ void EntityAsis::Purification(float tick)
 			auto item = GetPurificationItemInEntityItemQueue();
 			m_currentTailPurificationDuration = 0;
 
+			// 재화 지급
+			AddPollutionGauge(item->itemReward);
+
 			// 이부분은 아이템에 등록된 정화무기가 될것.
 			auto player = item->GetThrowOwner();
 				
@@ -293,7 +296,7 @@ void EntityAsis::Purification(float tick)
 				GameObject* weaponCapsule = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
 				//플레이어 방향으로 웨폰날리기
 				auto weaponcapcom = weaponCapsule->GetComponent<WeaponCapsule>();
-				weaponcapcom->weaponCode = item->itemCode;  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
+				weaponcapcom->weaponCode = static_cast<int>(item->itemType);  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
 				weaponcapcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
 			}
@@ -411,4 +414,25 @@ EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 	EntityItem* purificationItem = m_EntityItemQueue.dequeue();
 
 	return purificationItem;
+}
+
+void EntityAsis::AddPollutionGauge(int amount)
+{
+	m_currentPollutionGauge += amount;
+	int reward = 0;
+	while (m_currentPollutionGauge >= maxPollutionGauge) {
+		m_currentPollutionGauge -= maxPollutionGauge;
+		reward += pollutionCoreAmount;
+	}
+	std::cout << "Current Pollution Gauge: " << m_currentPollutionGauge << std::endl;
+	std::cout << "Total Reward to give: " << reward << std::endl;
+
+	auto gameManager = GameObject::Find("GameManager");
+	if (gameManager) {
+		auto gm = gameManager->GetComponent<GameManager>();
+		if (gm)
+		{
+			gm->AddReward(reward);
+		}
+	}
 }

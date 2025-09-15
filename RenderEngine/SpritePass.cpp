@@ -1,6 +1,7 @@
 #include "SpritePass.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
+#include "BillboardType.h"
 
 SpritePass::SpritePass()
 {
@@ -37,6 +38,8 @@ SpritePass::SpritePass()
 	m_pso->m_samplers.push_back(pointSampler);
 
     CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
+    depthStencilDesc.DepthEnable = false;
+    depthStencilDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 
 	DirectX11::ThrowIfFailed(
@@ -88,14 +91,84 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
     for (auto& proxy : renderData->m_spriteRenderQueue)
     {
         if (!proxy || !proxy->m_quadMesh || !proxy->m_spriteTexture) continue;
-        if (ShaderSystem->VertexShaders.find(proxy->m_vertexShaderName) == ShaderSystem->VertexShaders.end()) continue;
-        if (ShaderSystem->PixelShaders.find(proxy->m_pixelShaderName) == ShaderSystem->PixelShaders.end()) continue;
+        if (proxy->m_customPSO)
+        {
+            proxy->m_customPSO->Apply(deferredPtr);
+        }
+        else
+        {
+            m_pso->Apply(deferredPtr);
+        }
 
-        m_pso->m_vertexShader = &ShaderSystem->VertexShaders[proxy->m_vertexShaderName];
-        m_pso->m_pixelShader = &ShaderSystem->PixelShaders[proxy->m_pixelShaderName];
-        m_pso->Apply(deferredPtr);
+        auto world = proxy->m_worldMatrix;
+        if (proxy->m_billboardType != BillboardType::None)
+        {
+            const auto& pos = proxy->m_worldPosition;
+            if (proxy->m_billboardType == BillboardType::Spherical)
+            {
+				Mathf::Vector3 forward = camera.m_forward;
+                world = Mathf::Matrix::CreateBillboard(pos, 
+                    camera.m_eyePosition, proxy->m_billboardAxis, &forward);
+            }
+            else if (proxy->m_billboardType == BillboardType::Cylindrical)
+            {
+                // 0) 축(롤 고정용)과 스케일/위치만 기존 월드에서 유지
+                Mathf::Vector3 axis = proxy->m_billboardAxis; // 예: (0,1,0)
+                axis.Normalize();
 
-        scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
+                Mathf::Vector3 scl; Mathf::Quaternion q; Mathf::Vector3 t;
+                Mathf::Matrix(world).Decompose(scl, q, t);   // t가 pos라면 pos로 바꿔 쓰세요
+                const Mathf::Vector3 pos = t;                // 기존 위치 유지
+
+                // 1) "카메라의 방향의 역방향"을 정면으로 사용 (위치 무관, 항상 -Forward)
+                Mathf::Vector3 facing = -camera.m_forward;   // ★ 핵심: look-at 금지, -forward 고정
+                facing.Normalize();
+
+                // 2) Cylindrical 제약: 축에 수직한 평면으로 투영(롤 고정)
+                facing = facing - axis * facing.Dot(axis);
+                float len2 = facing.LengthSquared();
+
+                // 3) 축과 거의 평행해 생기는 특이상황 보정(카메라 Right를 권장)
+                if (len2 < 1e-8f)
+                {
+                    // camera.m_right가 있다면 우선 사용
+                    Mathf::Vector3 alt = Mathf::Vector3(camera.m_right).LengthSquared() > 0 ? Mathf::Vector3(camera.m_right) : Mathf::Vector3::Right;
+                    alt.Normalize();
+                    facing = alt - axis * alt.Dot(axis);
+                    if (facing.LengthSquared() < 1e-8f)
+                    {
+                        // 최후 보정
+                        alt = Mathf::Vector3::Forward;
+                        facing = alt - axis * alt.Dot(axis);
+                    }
+                }
+                facing.Normalize();
+
+                // 4) 직교기저 구성: Y=axis(롤 고정), Z=facing(정면), X=Y×Z
+                const Mathf::Vector3 yAxis = axis;
+                Mathf::Vector3 zAxis = facing;               // 쿼드가 바라볼 로컬 정면
+                Mathf::Vector3 xAxis = yAxis.Cross(zAxis);
+                xAxis.Normalize();
+                // 수치 안정화를 위해 Z 재정규화
+                zAxis = xAxis.Cross(yAxis);
+                zAxis.Normalize();
+
+                // 5) 회전 행렬(컬럼 메이저 가정). 엔진 행렬 규약에 맞게 필요시 전치/배치 변경
+                const Mathf::Matrix R(
+                    xAxis.x, yAxis.x, zAxis.x, 0.0f,
+                    xAxis.y, yAxis.y, zAxis.y, 0.0f,
+                    xAxis.z, yAxis.z, zAxis.z, 0.0f,
+                    0.0f, 0.0f, 0.0f, 1.0f
+                );
+
+                const Mathf::Matrix S = Mathf::Matrix::CreateScale(scl);
+                const Mathf::Matrix Tm = Mathf::Matrix::CreateTranslation(pos);
+
+                // 쿼드 로컬 전면축이 엔진과 다르면 여기서 보정 회전 곱해도 됨 (예: Z->Y 보정 등)
+                world = S * R * Tm;
+            }
+        }
+        scene.UpdateModel(world, deferredPtr);
         ID3D11ShaderResourceView* srv = proxy->m_spriteTexture->m_pSRV;
         DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &srv);
         proxy->m_quadMesh->Draw(deferredPtr);
