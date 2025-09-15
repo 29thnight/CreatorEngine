@@ -68,6 +68,7 @@ nlohmann::json EffectSerializer::SerializeParticleSystem(ParticleSystem& system)
     json["maxParticles"] = system.GetMaxParticles();
     json["particleDataType"] = static_cast<int>(system.GetParticleDataType());
     json["position"] = SerializeVector3(system.GetPosition());
+    json["rotation"] = SerializeVector3(system.GetRotation());
     json["isRunning"] = system.IsRunning();
 
     json["modules"] = nlohmann::json::array();
@@ -105,6 +106,11 @@ std::shared_ptr<ParticleSystem> EffectSerializer::DeserializeParticleSystem(cons
     if (json.contains("position"))
     {
         system->SetPosition(DeserializeVector3(json["position"]));
+    }
+
+    if (json.contains("rotation"))
+    {
+        system->SetRotation(DeserializeVector3(json["rotation"]));
     }
 
     if (json.contains("modules"))

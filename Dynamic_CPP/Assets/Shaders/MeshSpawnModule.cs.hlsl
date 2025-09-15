@@ -267,9 +267,9 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.acceleration = gAcceleration;
     
     // Range 제거 - 단일 값 사용
-    particle.scale = gScale; // RandomRange3D 제거
-    particle.rotationSpeed = gRotationSpeed; // RandomRange3D 제거  
-    particle.rotation = gInitialRotation; // RandomRange3D 제거
+    particle.scale = gScale; 
+    particle.rotationSpeed = gRotationSpeed;
+    particle.rotation = gInitialRotation; 
     
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;

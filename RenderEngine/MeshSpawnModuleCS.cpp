@@ -541,7 +541,8 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
         {"emitterType", m_spawnParams.emitterType},
         {"emitterSize", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterSize)},
         {"emitterRadius", m_spawnParams.emitterRadius},
-        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)}
+        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)},
+        {"emitterRotation", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterRotation)}
     };
 
     // MeshParticleTemplateParams 직렬화
@@ -592,6 +593,9 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
 
         if (spawnJson.contains("emitterPosition"))
             m_spawnParams.emitterPosition = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterPosition"]);
+
+        if (spawnJson.contains("emitterRotation"))
+            m_spawnParams.emitterRotation = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterRotation"]);
     }
 
     // MeshParticleTemplateParams 복원

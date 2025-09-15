@@ -117,6 +117,8 @@ public:
 
 	void UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition);
 
+	void UpdateEffectBaseRotation(const Mathf::Vector3& newBaseRotation);
+
 	void UpdateGenerateModule(float delta);
 
 	void SetPosition(const Mathf::Vector3& position);
@@ -208,6 +210,7 @@ protected:
 	Mathf::Vector3 m_position = { 0, 0, 0 };
 	Mathf::Vector3 m_effectBasePosition = { 0, 0, 0 };
 	Mathf::Vector3 m_rotation = { 0, 0, 0 };
+	Mathf::Vector3 m_effectBaseRotation = { 0, 0, 0 };
 	Mathf::Vector3 m_scale = { 0, 0, 0 };
 	std::vector<RenderModules*> m_renderModules;
 

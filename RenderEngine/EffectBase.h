@@ -141,7 +141,7 @@ public:
         // 모든 ParticleSystem에 회전 적용
         for (auto& ps : m_particleSystems) {
             if (ps) {
-                ps->SetRotation(m_rotation);
+                ps->UpdateEffectBaseRotation(newRotation);
             }
         }
     }

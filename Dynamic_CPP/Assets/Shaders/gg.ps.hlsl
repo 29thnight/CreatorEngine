@@ -13,6 +13,8 @@ struct PixelInput
     float alpha : ALPHA;
     uint renderMode : RENDER_MODE;
     float particleAge : PARTICLE_AGE;
+    float particleLifeTime : PARTICLE_LIFETIME;
+
 };
 
 struct PixelOutput
@@ -24,6 +26,7 @@ Texture2D gDiffuseTexture : register(t0);
 Texture2D gEmissionTexture : register(t1);
 Texture2D gDissolveTexture : register(t2);
 Texture2D gSmokeTexture : register(t3);
+
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
 
@@ -31,33 +34,55 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    // 공간적 마스킹 - 특정 구역을 파티클 나이에 따라 제거
-    float2 centeredUV = input.texCoord - float2(0.5, 0.5);
-    float angle = atan2(centeredUV.y, centeredUV.x);
-    float normalizedAngle = (angle + 3.14159) / (2.0 * 3.14159); // 0~1 범위
-    
-    // 파티클 나이가 0.75 이상일 때 270도까지만 보이게 (나머지 90도 제거)
-    if (input.particleAge >= 0.75)
-    {
-        // 0.75(270도) 이상 각도 범위 제거, 0~0.75 범위만 유지
-        if (normalizedAngle > 0.75)
-            discard;
-    }
+    float normalizedAge = input.particleAge / input.particleLifeTime;
     
     // UV 애니메이션 계산
     float2 dissolveUV = input.texCoord * float2(1.0, 2.0);
+    dissolveUV.x *= normalizedAge * 5;
     float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
+
     float2 tempUV = input.texCoord;
-    tempUV.x += (dissolveData.z) * input.particleAge * 0.8;
+
+    // 원하는 구간 설정 (예: 0.25~1.0)
+    float Umin = 0.00;
+    float Umax = 0.65;
+
+    float edgeFade = 1.0;
+    float fadeWidth = 0.1;
+    
+    // 왼쪽 가장자리
+    if (tempUV.x < Umin + fadeWidth)
+        edgeFade *= smoothstep(Umin, Umin + fadeWidth, tempUV.x);
+
+    // 오른쪽 가장자리  
+    if (tempUV.x > Umax - fadeWidth)
+        edgeFade *= smoothstep(Umax, Umax - fadeWidth, tempUV.x);
+
+    // 완전히 범위 밖이면 버리기
+    if (tempUV.x < Umin || tempUV.x > Umax)
+        discard;
+    
+    // 선택한 구간을 다시 0~1로 정규화
+    float2 clippedUV;
+    clippedUV.x = (tempUV.x - Umin) / (Umax - Umin);
+    clippedUV.y = tempUV.y;
+    
     
     // 텍스처 샘플링
-    float4 smokeColor = gSmokeTexture.Sample(gLinearSampler, tempUV);
-    float4 emissionColor = gEmissionTexture.Sample(gLinearSampler, tempUV);
-    float dissolveValue = dissolveData.a;
+    float4 smokeColor = gSmokeTexture.Sample(gLinearSampler, clippedUV);
+    float4 emissionColor = gEmissionTexture.Sample(gLinearSampler, clippedUV);
     
-    if (dissolveValue < 0.8)
-        discard;
-        
+    float dissolveValue = dissolveData.r;
+    
+    float dissolveOutStart = 0.4; // 60%부터 dissolve-out 시작
+    
+    float globalFade = 1.0;
+    if (normalizedAge > dissolveOutStart)
+    {
+        float fadeProgress = (normalizedAge - dissolveOutStart) / (1.0 - dissolveOutStart);
+        globalFade = 1.0 - smoothstep(0.0, 1.0, fadeProgress);
+    }
+    
     // Emission 리맵핑
     float emissionStrength = 2.0;
     float remapMin = -0.3;
@@ -65,14 +90,30 @@ PixelOutput main(PixelInput input)
     float remappedEmission = saturate((emissionColor.r - remapMin) / (remapMax - remapMin));
     
     // 최종 색상 계산
-    float3 baseColor = input.color;
-    float3 emissionContrib = emissionColor.rgb * emissionStrength * remappedEmission;
-    float3 finalColor = baseColor + emissionContrib;
-    float finalAlpha = input.alpha * smokeColor.a * dissolveValue;
+    float smokeThreshold = 0.01;
+    float3 adjustedSmoke = input.color.rgb;
+    float smokeIntensity = (smokeColor.r + smokeColor.g + smokeColor.b) / 3.0;
+
+    // smoke texture의 검은 부분의 알파값도 함께 줄이기
+    float smokeAlphaMultiplier = saturate(smokeIntensity / smokeThreshold);
+
+    float dissolveAlpha = step(0.5, dissolveValue);
+
+    float3 baseColor = adjustedSmoke;
+    float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);
+    finalColor *= 3.0 * globalFade;
     
-    if (finalAlpha < 0.1)
+    float finalAlpha = input.alpha * smokeColor.a * smokeAlphaMultiplier * edgeFade * dissolveAlpha * globalFade;
+    
+    clip(finalAlpha - 0.01);
+    
+    float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
+    if (colorBrightness < 0.1)
         discard;
-        
+    
+    finalColor = pow(finalColor, 0.7);
+    
     output.color = float4(finalColor, finalAlpha);
+    
     return output;
 }

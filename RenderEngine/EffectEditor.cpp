@@ -468,6 +468,15 @@ void EffectEditor::RenderMainEditor()
 						ImGui::SameLine();
 						ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Relative to Effect Center)");
 
+						Mathf::Vector3 currentRot = m_tempEmitters[i].particleSystem->GetRotation();
+						float rot[3] = { currentRot.x, currentRot.y, currentRot.z };
+
+						if (ImGui::DragFloat3("Emitter Rotation", rot, 1.0f)) {
+							m_tempEmitters[i].particleSystem->SetRotation(Mathf::Vector3(rot[0], rot[1], rot[2]));
+						}
+
+						ImGui::SameLine();
+						ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Relative to Effect Rotation)");
 
 						// 최대 파티클 수 설정
 						UINT currentMaxParticles = m_tempEmitters[i].particleSystem->GetMaxParticles();
@@ -1143,10 +1152,9 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 
 		auto loadedEffect = EffectSerializer::DeserializeEffect(effectJson);
 		if (loadedEffect) {
-			m_tempEmitters.clear();
-			m_emitterTextureSelections.clear();
 
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
+			size_t startIndex = m_tempEmitters.size();
 
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
