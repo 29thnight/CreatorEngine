@@ -5,6 +5,7 @@
 // Automation include ScriptClass header
 #include "EventSelector.h"
 #include "RewardObserver.h"
+#include "EntityBigWood.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
 #include "EntityRock.h"
