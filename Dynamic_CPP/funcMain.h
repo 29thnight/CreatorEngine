@@ -199,6 +199,8 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("EntityBigWood", []() { return new EntityBigWood(); });
 		CreateFactory::GetInstance()->RegisterFactory("CriticalMark", []() { return new CriticalMark(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItemHeal", []() { return new EntityItemHeal(); });
+		CreateFactory::GetInstance()->RegisterFactory("MonsterProjectile", []() { return new MonsterProjectile(); });
+		CreateFactory::GetInstance()->RegisterFactory("TestMonsterB", []() { return new TestMonsterB(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotController", []() { return new WeaponSlotController(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlot", []() { return new WeaponSlot(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityRock", []() { return new EntityRock(); });

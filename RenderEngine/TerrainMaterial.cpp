@@ -15,6 +15,14 @@ void TerrainMaterial::Initialize(UINT width, UINT height)
 	);
 	m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
+    m_layerBufferData.useLayer = false;
+    m_layerBufferData.numLayers = 0;
+    for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i) {
+        m_layerBufferData.layerTilling[i] = { 1.0f, 0.f, 0.f, 0.f };
+    }
+
+    UpdateBuffer(m_layerBufferData);
+
 	// 초기에는 스플랫맵 1개 레이어용으로 생성
 	InitSplatMapTextureArray(width, height, 1);
 
