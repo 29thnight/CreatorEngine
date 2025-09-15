@@ -47,6 +47,11 @@ public:
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override {}
 	void Heal(int healAmount);
+	[[Method]]
+	void SetCurHP(int hp);
+	[[Method]]
+	void Damage(int damage);
+
 	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
 	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
 	Core::Delegate<void, int> m_SetActiveEvent;

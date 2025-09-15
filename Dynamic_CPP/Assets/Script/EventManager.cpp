@@ -13,6 +13,7 @@ void EventManager::Awake()
             def.id = row["ID"].as<int>();
             def.triggerType = static_cast<TriggerType>(row["TriggerType"].as<int>());
             def.targetType = static_cast<TargetType>(row["TargetType"].as<int>());
+			def.parameters["EventTitle"] = row["EventTitle"].as<std::string>();
             m_definitions.emplace_back(std::move(def));
         }
     }

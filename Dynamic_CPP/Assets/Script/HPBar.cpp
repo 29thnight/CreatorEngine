@@ -2,6 +2,7 @@
 #include "RectTransformComponent.h"
 #include "SceneManager.h"
 #include "Camera.h"
+#include "ImageComponent.h"
 #include "pch.h"
 
 void HPBar::Start()
@@ -17,11 +18,19 @@ void HPBar::Start()
             }
         }
     }
+
+	auto childIndex = m_pOwner->m_childrenIndices[0];
+    auto childObj = GameObject::FindIndex(childIndex);
+    auto imageComp = childObj->GetComponent<ImageComponent>();
+    if (imageComp)
+    {
+        m_image = imageComp;
+    }
 }
 
 void HPBar::LateUpdate(float)
 {
-    if (nullptr == m_target || nullptr == m_rect)
+    if (nullptr == m_target || nullptr == m_rect || nullptr == m_image)
     {
         m_rect = m_pOwner->GetComponent<RectTransformComponent>();
         if (GameObject::IsValidIndex(targetIndex))
@@ -34,9 +43,18 @@ void HPBar::LateUpdate(float)
                 }
             }
         }
+
+        auto childIndex = m_pOwner->m_childrenIndices[0];
+        auto childObj = GameObject::FindIndex(childIndex);
+        auto imageComp = childObj->GetComponent<ImageComponent>();
+        if (imageComp)
+        {
+            m_image = imageComp;
+        }
         return;
     }
 
+    //rectTransform update
     auto cameraPtr = CameraManagement->GetLastCamera();
     if (!cameraPtr)
         return;
@@ -61,5 +79,12 @@ void HPBar::LateUpdate(float)
     float screenY = (1.0f - y_ndc) * 0.5f * screenSize.height;
 
     m_rect->SetAnchoredPosition({ screenX + screenOffset.x, screenY + screenOffset.y });
+
+	//hpbar update
+	auto ratio = static_cast<float>(m_currentHP) / static_cast<float>(m_maxHP);
+	while (ratio < 0.0f) ratio = 0.0f;
+	while (ratio > 1.0f) ratio = 1.0f;
+
+	m_image->clipPercent = ratio;
 }
 

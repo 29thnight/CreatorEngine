@@ -366,12 +366,7 @@ void Player::SendDamage(Entity* sender, int damage)
 {
 	//test sehwan
 	{
-		m_currentHP -= std::max(damage, 0);
-		if (m_currentHP <= 0)
-		{
-			isStun = true;
-			m_animator->SetParameter("OnStun", true);
-		}
+		Damage(damage);
 	}
 
 	
@@ -383,13 +378,8 @@ void Player::SendDamage(Entity* sender, int damage)
 		if (enemy)
 		{
 			// hit
-			m_currentHP -= std::max(damage, 0);
 			DropCatchItem();
-			if (m_currentHP <= 0)
-			{
-				isStun = true;
-				m_animator->SetParameter("OnStun", true);
-			}
+			Damage(damage);
 		}
 	}
 }
@@ -397,6 +387,15 @@ void Player::SendDamage(Entity* sender, int damage)
 void Player::Heal(int healAmount)
 {
 	m_currentHP = std::max(m_currentHP + healAmount, m_maxHP);
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->SetCurHP(m_currentHP);
+		}
+	}
 }
 
 void Player::ChangeState(std::string _stateName)
@@ -407,6 +406,44 @@ void Player::ChangeState(std::string _stateName)
 bool Player::CheckState(flag _flag)
 {
 	return playerState[curStateName].Test(_flag);
+}
+
+void Player::SetCurHP(int hp)
+{
+	m_currentHP = hp;
+	if (m_currentHP <= 0)
+	{
+		isStun = true;
+		m_animator->SetParameter("OnStun", true);
+	}
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->SetCurHP(m_currentHP);
+		}
+	}
+}
+
+void Player::Damage(int damage)
+{
+	m_currentHP -= std::max(damage, 0);
+	if (m_currentHP <= 0)
+	{
+		isStun = true;
+		m_animator->SetParameter("OnStun", true);
+	}
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->SetCurHP(m_currentHP);
+		}
+	}
 }
 
 void Player::Move(Mathf::Vector2 dir)

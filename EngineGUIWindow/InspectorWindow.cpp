@@ -29,6 +29,7 @@
 #include "VolumeComponent.h"
 #include "RectTransformComponent.h"
 #include "DecalComponent.h"
+#include "SpriteRenderer.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -223,6 +224,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
 						if (nullptr != sprite)
 						{
+							//이건 뭔 버그죠?
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}

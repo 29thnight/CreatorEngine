@@ -45,6 +45,8 @@ ReflectionScriptField(Player) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(SetCurHP, "hp") \
+		meta_method(Damage, "damage") \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(SwapBasicWeapon) \

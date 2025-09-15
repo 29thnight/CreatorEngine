@@ -50,6 +50,7 @@ public:
 private:
 	class GameObject* m_target = nullptr;
 	class RectTransformComponent* m_rect = nullptr;
+	class ImageComponent* m_image = nullptr;
 
 	int m_currentHP{};
 	int m_maxHP{};
