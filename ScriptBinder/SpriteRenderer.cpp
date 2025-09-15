@@ -38,16 +38,3 @@ void SpriteRenderer::SetSprite(const std::shared_ptr<Texture>& ptr)
 		m_SpritePath.clear();
 	}
 }
-
-void SpriteRenderer::DeserializeSprite(const std::shared_ptr<Texture>& ptr)
-{
-	m_Sprite = ptr;
-	if (m_Sprite)
-	{
-		m_SpritePath = m_Sprite->m_name;
-	}
-	else
-	{
-		m_SpritePath.clear();
-	}
-}

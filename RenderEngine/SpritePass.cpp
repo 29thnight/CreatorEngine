@@ -38,6 +38,8 @@ SpritePass::SpritePass()
 	m_pso->m_samplers.push_back(pointSampler);
 
     CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
+    depthStencilDesc.DepthEnable = false;
+    depthStencilDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 
 	DirectX11::ThrowIfFailed(
@@ -110,27 +112,7 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
             }
             else if (proxy->m_billboardType == BillboardType::Cylindrical)
             {
-    //            Mathf::Vector3 axis = proxy->m_billboardAxis;
-				//Mathf::Vector3 camPos = camera.m_eyePosition;
-
-				//Mathf::Vector3 toCam = camPos - pos;
-				//float dp = fabsf(axis.Dot(toCam));
-    //            if (dp > 0.99f)
-    //            {
-				//	axis = Mathf::Vector3::Right;
-    //            }
-
-    //            Mathf::Vector3 scl; Mathf::Quaternion q; Mathf::Vector3 t;
-    //            Mathf::Matrix(world).Decompose(scl, q, t);
-
-    //            Mathf::Matrix bb = Mathf::Matrix::CreateConstrainedBillboard(
-				//	pos, camPos, axis);
-
-				//Mathf::Matrix finalWorld = Mathf::Matrix::CreateScale(scl) * bb;
-
-				//world = finalWorld;
-
-    // 0) 축(롤 고정용)과 스케일/위치만 기존 월드에서 유지
+                // 0) 축(롤 고정용)과 스케일/위치만 기존 월드에서 유지
                 Mathf::Vector3 axis = proxy->m_billboardAxis; // 예: (0,1,0)
                 axis.Normalize();
 

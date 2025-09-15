@@ -18,7 +18,6 @@ public:
    virtual void OnDestroy() override;
 
    void SetSprite(const std::shared_ptr<Texture>& ptr);
-   void DeserializeSprite(const std::shared_ptr<Texture>& ptr);
 
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
    void SetCustomPSOName(const std::string& name) { m_CustomPSOName = name; }
@@ -29,16 +28,17 @@ public:
    const Mathf::Vector3& GetBillboardAxis() const noexcept { return m_billboardAxis; }
 
 private:
+	friend class ComponentFactory;
     [[Property]]
     std::string m_SpritePath{};
     [[Property]]
     std::string m_CustomPSOName{};
     [[Property]]
     int m_orderInLayer{ 0 };
-   [[Property]]
-   BillboardType m_billboardType{ BillboardType::None };
-   [[Property]]
-   Mathf::Vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
+    [[Property]]
+    BillboardType m_billboardType{ BillboardType::None };
+    [[Property]]
+    Mathf::Vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
 
     std::shared_ptr<Texture> m_Sprite = nullptr;
 };
