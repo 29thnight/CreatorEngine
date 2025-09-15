@@ -29,26 +29,23 @@ void PlayerBombAttack::Enter()
 
 	if (m_player)
 	{
+		m_player->ChangeState("Attack");
 		m_player->isAttacking = true;
-		m_player->DropCatchItem();
+		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0 ,0 });
 		m_player->m_animator->SetUseLayer(1, false);
 	}
 }
 
 void PlayerBombAttack::Update(float deltaTime)
 {
-	if (m_player)
-	{
-		m_player->isAttacking = true;
-		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
-		controller->Move({ 0,0 });
-	}
 }
 
 void PlayerBombAttack::Exit()
 {
 	if (m_player)
 	{
+		m_player->ChangeState("Idle");
 		m_player->isAttacking = false;
 		m_player->sucessAttack = true;
 	}

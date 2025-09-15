@@ -18,6 +18,8 @@ ReflectionScriptField(Weapon) \
 		meta_property(chgRange) \
 		meta_property(chgHitbox) \
 		meta_property(chgKnockback) \
+		meta_property(ChargeAttackBulletCount) \
+		meta_property(ChargeAttackBulletAngle) \
 		meta_property(durMax) \
 		meta_property(durUseAtk) \
 		meta_property(durUseChg) \

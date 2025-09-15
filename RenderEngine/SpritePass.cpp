@@ -121,7 +121,7 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
                 const Mathf::Vector3 pos = t;                // 기존 위치 유지
 
                 // 1) "카메라의 방향의 역방향"을 정면으로 사용 (위치 무관, 항상 -Forward)
-                Mathf::Vector3 facing = -camera.m_forward;   // ★ 핵심: look-at 금지, -forward 고정
+                Mathf::Vector3 facing = -camera.m_forward;   // 핵심: look-at 금지, -forward 고정
                 facing.Normalize();
 
                 // 2) Cylindrical 제약: 축에 수직한 평면으로 투영(롤 고정)
@@ -161,11 +161,42 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
                     0.0f, 0.0f, 0.0f, 1.0f
                 );
 
-                const Mathf::Matrix S = Mathf::Matrix::CreateScale(scl);
+                //const Mathf::Matrix S = Mathf::Matrix::CreateScale(scl);
+                //const Mathf::Matrix Tm = Mathf::Matrix::CreateTranslation(pos);
+
+                //// 쿼드 로컬 전면축이 엔진과 다르면 여기서 보정 회전 곱해도 됨 (예: Z->Y 보정 등)
+                //world = S * R * Tm;
+                //------------------------------------------------------------
+                // 1) 깊이 z (카메라 전방 방향 성분)
+                float z = (pos - Mathf::Vector3(camera.m_eyePosition)).Dot(camera.m_forward);
+                z = std::max(z, 1e-3f); // 0/음수 방지
+
+                // 2) 원하는 화면 높이(px) -> 필요한 월드 높이
+                const float targetPx = std::max(1.0f, proxy->m_spriteTexture->GetSize().y);
+                const float vpH = std::max(1.0f, (float)DirectX11::GetHeight());
+
+                float requiredWorldHeight = 0.0f;
+                // 퍼스펙티브: 수직 프러스텀 높이 = 2*z*tan(fovY/2)
+                const float frustumH = 2.0f * z * tanf(camera.m_fov * 0.5f);
+                requiredWorldHeight = frustumH * (targetPx / vpH);
+
+                // 3) 로컬 기준 높이로 나눠서 스케일 인자 도출
+                const float baseHeight = std::max(1e-6f, 1.f); // 유닛 쿼드면 1.0
+                const float s = requiredWorldHeight / baseHeight;
+
+                // (선택) 기존 scl의 비율(가로세로 비)만 유지하고 크기 자체는 s로 맞추고 싶다면:
+                // 가장 큰 축을 기준으로 정규화해서 비율만 남김
+                 float maxc = std::max({scl.x, scl.y, scl.z, 1e-6f});
+                 Mathf::Vector3 scaleVec = s * (scl / maxc);
+
+                //// 단순/권장: 균등 스케일로 덮어써 픽셀 고정 효과 극대화
+                //Mathf::Vector3 scaleVec(s, s, s);
+
+                // 4) 최종 행렬 조립 (회전은 네가 구성한 R을 그대로 사용)
+                const Mathf::Matrix S = Mathf::Matrix::CreateScale(scaleVec);
                 const Mathf::Matrix Tm = Mathf::Matrix::CreateTranslation(pos);
 
-                // 쿼드 로컬 전면축이 엔진과 다르면 여기서 보정 회전 곱해도 됨 (예: Z->Y 보정 등)
-                world = S * R * Tm;
+                world = S * R * Tm; //------------------------------------
             }
         }
         scene.UpdateModel(world, deferredPtr);

@@ -315,9 +315,6 @@
 		<ClInclude Include="Assets\Script\UIGageTest.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\EntitlyRock.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
 			<Filter>Script</Filter>
 		</ClInclude>
@@ -339,6 +336,18 @@
 		<ClInclude Include="Assets\Script\EntitySpiritStone.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityItemHeal.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerStun.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerDash.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\CriticalMark.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\RewardObserver.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -347,6 +356,9 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityBigWood.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerHit.h">
+			<Filter>Script</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TestMonsterB.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -596,9 +608,6 @@
 		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
 			<Filter>Script</Filter>
 		</ClCompile>
@@ -629,8 +638,23 @@
 		<ClCompile Include="Assets\Script\EntityRock.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityItemHeal.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerStun.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerDash.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CriticalMark.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityBigWood.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerHit.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

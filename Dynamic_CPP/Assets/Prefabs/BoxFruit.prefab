@@ -1,21 +1,21 @@
 m_name: BoxFruit
 m_isEnabled: true
-m_instanceID: 3102255785
+m_instanceID: 3410104491
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: BoxFruit
     m_isEnabled: true
-    m_instanceID: 73151650
+    m_instanceID: 939461380
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 7
+    m_index: 4
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [3]
+    m_childrenIndices: [5]
     m_prefabFileGuid: 7db9e133-c111-5255-999a-96f4389c2d89
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 3495774992
+        m_instanceID: 4277956386
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,37 +43,36 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 3581681429
+        m_instanceID: 2815661871
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.5, y: 0.5, z: 0.5}
         m_posOffset: {x: 0, y: 0.200000003, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        asisTail: ~
-        m_rigid: ~
         indicatorDistacne: 15
-        itemCode: 2
-        itemType: 2
+        itemCode: 3
+        itemType: 3
+        itemReward: 0
         m_name: EntityItem
         m_isEnabled: true
-        m_instanceID: 1614841572
+        m_instanceID: 2663464552
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 2170a86b-cda4-5c0c-ab27-ebb53252ee19
     children:
       - GameObject: 2166264123
         m_name: Obj_block_3
         m_isEnabled: true
-        m_instanceID: 48114182
+        m_instanceID: 2000417965
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 7
-        m_index: 3
-        m_parentIndex: 7
+          m_parentID: 4
+        m_index: 5
+        m_parentIndex: 4
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: 7db9e133-c111-5255-999a-96f4389c2d89
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
@@ -84,7 +83,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3647551251
+            m_instanceID: 1848749220
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Obj_block_3

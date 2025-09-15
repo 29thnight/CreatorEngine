@@ -191,11 +191,11 @@
 		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
-		<ClInclude Include="CriticalMark.h" />
 		<ClInclude Include="DebugLog.h" />
 		<ClInclude Include="Easing.h" />
 		<ClInclude Include="ItemType.h" />
 		<ClInclude Include="PlayerBuff.h" />
+		<ClInclude Include="PlayerState.h" />
 		<ClInclude Include="RaycastHelper.h" />
 		<ClInclude Include="BTActionFactory.h" />
 		<ClInclude Include="BTConditionFactory.h" />
@@ -255,7 +255,6 @@
 		<ClInclude Include="Assets\Script\TBoss1.h" />
 		<ClInclude Include="Assets\Script\UIGageTest.h" />
 		<ClInclude Include="Assets\Script\EntityMonsterA.h" />
-		<ClInclude Include="Assets\Script\EntitlyRock.h" />
 		<ClInclude Include="Assets\Script\PlayerRangeAttack.h" />
 		<ClInclude Include="Assets\Script\PlayerBombAttack.h" />
 		<ClInclude Include="Assets\Script\WeaponSlot.h" />
@@ -264,6 +263,11 @@
 		<ClInclude Include="Assets\Script\EventSelector.h" />
 		<ClInclude Include="Assets\Script\EntityRock.h" />
 		<ClInclude Include="Assets\Script\EntityBigWood.h" />
+		<ClInclude Include="Assets\Script\EntityItemHeal.h" />
+		<ClInclude Include="Assets\Script\PlayerStun.h" />
+		<ClInclude Include="Assets\Script\PlayerDash.h" />
+		<ClInclude Include="Assets\Script\CriticalMark.h" />
+		<ClInclude Include="Assets\Script\PlayerHit.h" />
 		<ClInclude Include="Assets\Script\TestMonsterB.h" />
 		<ClInclude Include="Assets\Script\MonsterProjectile.h" />
 	</ItemGroup>
@@ -273,7 +277,6 @@
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
 		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
-		<ClCompile Include="CriticalMark.cpp" />
 		<ClCompile Include="PlayerBuff.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />
@@ -551,10 +554,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -596,6 +595,26 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityBigWood.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityItemHeal.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerStun.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerDash.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CriticalMark.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerHit.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

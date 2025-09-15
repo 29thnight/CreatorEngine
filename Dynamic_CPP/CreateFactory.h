@@ -8,6 +8,8 @@
 #include "EventSelector.h"
 #include "RewardObserver.h"
 #include "EntityBigWood.h"
+#include "CriticalMark.h"
+#include "EntityItemHeal.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
 #include "EntityRock.h"
@@ -38,7 +40,6 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "CameraMove.h"
-
 class CreateFactory : public Singleton<CreateFactory>
 {
 private:
