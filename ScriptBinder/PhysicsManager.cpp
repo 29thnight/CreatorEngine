@@ -132,7 +132,7 @@ void PhysicsManager::ProcessCallback()
 
 		Collision collision{ lhsObj,rhsObj,data.contactPoints };
 		
-		std::cout << " ProcessCallback thisId :" << lhsObj->GetHashedName().ToString() << " , otherId : " << rhsObj->GetHashedName().ToString() << " , type : " << static_cast<int>(type) << std::endl;
+		//std::cout << " ProcessCallback thisId :" << lhsObj->GetHashedName().ToString() << " , otherId : " << rhsObj->GetHashedName().ToString() << " , type : " << static_cast<int>(type) << std::endl;
 
 		switch (type)
 		{
@@ -700,7 +700,7 @@ void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 
 void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 {
-	std::cout << "PhysicsManager::CallbackEvent - ThisID: " << data.thisId << ", OtherID: " << data.otherId << ", EventType: " << static_cast<int>(type) << std::endl;
+	//std::cout << "PhysicsManager::CallbackEvent - ThisID: " << data.thisId << ", OtherID: " << data.otherId << ", EventType: " << static_cast<int>(type) << std::endl;
 	m_callbacks.push_back({ data,type });
 }
 

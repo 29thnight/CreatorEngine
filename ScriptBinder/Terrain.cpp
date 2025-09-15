@@ -185,6 +185,11 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	int minY = std::max(0, int(localPos.z - brush.m_radius));
 	int maxY = std::min(m_height - 1, int(localPos.z + brush.m_radius));
 
+	// [수정] 브러시가 터레인 영역을 벗어났을 경우, 아무 작업도 하지 않고 즉시 리턴합니다.
+	if (minX > maxX || minY > maxY) {
+		return;
+	}
+
 	// 2) 높이 맵 갱신: 브러시 원 내부만
 	for (int i = minY; i <= maxY; ++i)
 	{
