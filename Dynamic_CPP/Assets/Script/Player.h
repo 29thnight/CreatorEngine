@@ -238,7 +238,8 @@ public:
 	bool sucessAttack = false;
 	bool CheckResurrectionByOther();
 	void Resurrection();
-
+	void OnHit(); //히트 애니메이션이 발동될떄만 씀 
+	void Knockback(Mathf::Vector2 KnockbackpowerXY);
 
 	//무기
 	[[Property]]

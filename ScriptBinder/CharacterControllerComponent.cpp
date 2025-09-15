@@ -36,7 +36,6 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	CharactorControllerInputInfo inputInfo;
 	inputInfo.id = m_controllerInfo.id;
 	inputInfo.input = input;
-
 	auto component = GetOwner()->GetComponent<RigidBodyComponent>();
 	if (!component) return;
 
@@ -93,13 +92,11 @@ void CharacterControllerComponent::Stun(float stunTime)
 
 void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKnockBackPower)
 {
-	//preRotation = m_transform->GetForward();
-	PreSpeed = m_fBaseSpeed;
 	m_fFinalMultiplierSpeed = KnockBackPower;
-	//m_fBaseSpeed = KnockBackPower;
 	JumpPower = yKnockBackPower;
 	m_isKnockBack = true;
-	
+
+
 
 }
 
@@ -107,19 +104,9 @@ void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKno
 
 void CharacterControllerComponent::EndKnockBack()
 {
-	m_fBaseSpeed = PreSpeed;
 	m_moveInput.y = 0;
 	m_isKnockBack = false;
 	m_fFinalMultiplierSpeed = 1.0f;
-
-
-	/*if (preRotation == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f })
-	{
-		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,-1.0f,0.0f }));
-	}
-	else if (preRotation != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
-		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,1.0f,0.0f }));
-	} */
 
 }
 

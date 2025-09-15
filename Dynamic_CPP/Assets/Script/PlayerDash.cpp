@@ -59,6 +59,8 @@ void PlayerDash::Exit()
 			m_player->dashEffect->StopEffect();
 		m_player->m_dashElapsedTime = 0.f;
 		m_player->player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
+		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0 ,0 });
 	}
 
 }
