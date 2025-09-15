@@ -126,6 +126,8 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
         std::string customPSOName = componentPtr->GetCustomPSOName();
+       BillboardType billboardType = componentPtr->GetBillboardType();
+       auto billboardAxis = componentPtr->GetBillboardAxis();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
@@ -147,6 +149,8 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 		proxyObject->m_isEnableShadow = isEnabled;
                 proxyObject->m_spriteTexture = originTexture;
                 proxyObject->m_customPSOName = customPSOName;
+               proxyObject->m_billboardType = billboardType;
+               proxyObject->m_billboardAxis = billboardAxis;
                 if (!customPSOName.empty())
                 {
                         auto it = ShaderSystem->ShaderAssets.find(customPSOName);

@@ -90,7 +90,9 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
     m_spriteTexture(component->GetSprite().get()),
-    m_customPSOName(component->GetCustomPSOName())
+    m_customPSOName(component->GetCustomPSOName()),
+   m_billboardType(component->GetBillboardType()),
+   m_billboardAxis(component->GetBillboardAxis())
 {
     if (!m_customPSOName.empty())
     {
@@ -160,7 +162,9 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
         m_quadMesh(other.m_quadMesh),
         m_spriteTexture(other.m_spriteTexture),
         m_customPSOName(other.m_customPSOName),
-        m_customPSO(other.m_customPSO)
+        m_customPSO(other.m_customPSO),
+       m_billboardType(other.m_billboardType),
+       m_billboardAxis(other.m_billboardAxis)
 {
 }
 
@@ -196,7 +200,9 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
         m_quadMesh(std::move(other.m_quadMesh)),
         m_spriteTexture(std::exchange(other.m_spriteTexture, nullptr)),
         m_customPSOName(std::move(other.m_customPSOName)),
-        m_customPSO(std::move(other.m_customPSO))
+        m_customPSO(std::move(other.m_customPSO)),
+       m_billboardType(other.m_billboardType),
+       m_billboardAxis(other.m_billboardAxis)
 {
 }
 

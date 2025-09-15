@@ -8,6 +8,8 @@ ReflectionFieldInheritance(SpriteRenderer, Component) \
 		meta_property(m_SpritePath) \
 		meta_property(m_CustomPSOName) \
 		meta_property(m_orderInLayer) \
+		meta_property(m_billboardType) \
+		meta_property(m_billboardAxis) \
 	}); \
 	FieldEnd(SpriteRenderer, PropertyOnlyInheritance) \
 };

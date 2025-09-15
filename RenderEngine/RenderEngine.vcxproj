@@ -330,6 +330,7 @@
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="BeamModule.h" />
+    <ClInclude Include="BillboardType.h" />
     <ClInclude Include="BitMaskPass.h" />
     <ClInclude Include="BloomSetting.h" />
     <ClInclude Include="ColorGradingPass.h" />

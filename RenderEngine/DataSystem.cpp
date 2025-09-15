@@ -1126,6 +1126,10 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 					{
 						ImGui::SetDragDropPayload("SPRITESHEET", entry.path().string().c_str(), entry.path().string().size() + 1);
 					}
+					else if (find == PathFinder::Relative("UI"))
+					{
+						ImGui::SetDragDropPayload("UI_TEXTURE", entry.path().string().c_str(), entry.path().string().size() + 1);
+					}
 					else
 					{
 						ImGui::SetDragDropPayload(FileTypeToString(selectedFileType), entry.path().string().c_str(), entry.path().string().size() + 1);
@@ -1315,6 +1319,10 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 		if (directory.parent_path() == PathFinder::Relative("SpriteSheets"))
 		{
 			ImGui::SetDragDropPayload("SPRITESHEET", directory.string().c_str(), directory.string().size() + 1);
+		}
+		else if (directory.parent_path() == PathFinder::Relative("UI"))
+		{
+			ImGui::SetDragDropPayload("UI_TEXTURE", directory.string().c_str(), directory.string().size() + 1);
 		}
 		else
 		{
