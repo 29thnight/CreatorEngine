@@ -979,6 +979,14 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			PROFILE_CPU_BEGIN("SpritePassCommnadList");
+			//m_pUIPass->SortUIObjects();
+			m_pSpritePass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
+		{
 			PROFILE_CPU_BEGIN("UIPassCommnadList");
 			//m_pUIPass->SortUIObjects();
 			m_pUIPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
@@ -1058,6 +1066,7 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
 	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+	std::vector<SpriteRenderer*> spriteRenderers = m_currentScene->GetSpriteRenderers();
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
 	std::vector<SpriteSheetComponent*> spriteComponents = UIManagers->SpriteSheets;
@@ -1188,6 +1197,27 @@ void SceneRenderer::PrepareRender()
 		}
 	});
 
+	m_threadPool->Enqueue([=]
+	{
+		for (auto& sprite : spriteRenderers)
+		{
+			try
+			{
+				auto owner = sprite->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+				if(scene && scene == m_currentScene)
+				{
+					renderScene->UpdateCommand(sprite);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+			}
+		}
+	});
+
 	EffectProxyController::GetInstance()->PrepareCommandBehavior();
 	//for (auto& mesh : staticMeshes)
 	//{
@@ -1237,6 +1267,18 @@ void SceneRenderer::PrepareRender()
 				if (decalComponent->IsEnabled())
 				{
 					auto proxy = renderScene->FindProxy(decalComponent->GetInstanceID());
+					if (proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			for (auto& sprite : spriteRenderers)
+			{
+				if (sprite->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(sprite->GetInstanceID());
 					if (proxy)
 					{
 						data->PushRenderQueue(proxy);
