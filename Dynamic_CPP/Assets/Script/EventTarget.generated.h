@@ -9,5 +9,9 @@ ReflectionScriptField(EventTarget) \
 		meta_property(m_varName) \
 		meta_property(m_value) \
 	}); \
-	FieldEnd(EventTarget, PropertyOnly) \
+	MethodField \
+	({ \
+		meta_method(Apply) \
+	}); \
+	FieldEnd(EventTarget, PropertyAndMethod) \
 };

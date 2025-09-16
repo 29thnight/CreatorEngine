@@ -22,6 +22,7 @@ class EventManager : public ModuleBehavior
 public:
 	MODULE_BEHAVIOR_BODY(EventManager)
 	void Awake() override;
+	void Update(float tick) override;
 	void OnDestroy() override;
 
 	// --- Runtime control ---
@@ -34,7 +35,6 @@ public:
 	void PushSignal(int eventId, const EventSignal& sig);
 
 	// Registration APIs
-	void RegisterTarget(int id, EventTarget* target);
 	void RegisterTrigger(int id, ITriggerCondition* trig);
 
 	// Lookup
@@ -47,6 +47,8 @@ public:
 	// --- Runtime variables (late binding) ---
 	void SetEventVar(int id, const std::string& key, const std::string& value);
 	const EventDefinition* GetRuntimeDef(int id) const;
+
+	std::vector<int> GetActiveEventIds() const;
 
 private:
 	// Loading & mapping
@@ -70,8 +72,8 @@ private:
 	std::unordered_map<int, size_t> m_indexById; // id->index in m_definitions
 
 	std::unordered_map<int, EventRuntime> m_runtime; // active or visited runtime data
-	std::unordered_map<int, EventTarget*> m_targets; // legacy
 	std::unordered_map<int, ITriggerCondition*> m_triggers; // bound triggers per event
 
 	std::vector<int> m_activePlayers{ 0, 1 }; // default two players (0,1)
+
 };

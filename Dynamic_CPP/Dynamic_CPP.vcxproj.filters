@@ -363,9 +363,6 @@
 		<ClInclude Include="GameInstance.h">
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\EventTrigger.h">
-			<Filter>Script\ScriptClass\Event</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EventTarget.h">
 			<Filter>Script\ScriptClass\Event</Filter>
 		</ClInclude>
@@ -668,9 +665,6 @@
 		<ClCompile Include="Assets\Script\EventManager.cpp">
 			<Filter>Script\ScriptClass\Event</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EventTrigger.cpp">
-			<Filter>Script\ScriptClass\Event</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\HPBar.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -681,6 +675,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ITriggerCondition.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventTarget.cpp">
 			<Filter>Script\ScriptClass\Event</Filter>
 		</ClCompile>
 	</ItemGroup>

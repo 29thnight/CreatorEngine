@@ -29,6 +29,34 @@ void EventManager::Awake()
     }
 }
 
+void EventManager::Update(float tick)
+{
+    if (m_runtime.empty()) return;
+
+    EventSignal tickSignal{ EventSignalType::TickTimer };
+    tickSignal.f = tick;
+
+    for (auto& kv : m_runtime)
+    {
+        const int id = kv.first;
+        auto& rt = kv.second;
+        if (rt.status != EventStatus::Active) continue;
+
+        bool touched = false;
+        for (size_t i = 0; i < rt.def.objectives.size(); ++i)
+        {
+            const auto& o = rt.def.objectives[i];
+            if (o.type == ObjectiveType::Timer)
+            {
+                if (ObjectiveEvaluator::OnSignal(o, rt.objectives[i], tickSignal))
+                    touched = true;
+            }
+        }
+        if (touched) EvaluateAndMaybeComplete(id);
+    }
+
+}
+
 void EventManager::OnDestroy()
 {
 	GameInstance::GetInstance()->ClearActiveEventManager();
@@ -96,12 +124,6 @@ void EventManager::PushSignal(int eventId, const EventSignal& sig)
     if (anyChanged) EvaluateAndMaybeComplete(eventId);
 }
 
-void EventManager::RegisterTarget(int id, EventTarget* target)
-{
-    if (!target) return;
-    m_targets[id] = target;
-}
-
 void EventManager::RegisterTrigger(int id, ITriggerCondition* trig)
 {
     if (!trig) return;
@@ -129,6 +151,20 @@ const EventDefinition* EventManager::GetRuntimeDef(int id) const
     auto it = m_runtime.find(id);
     if (it == m_runtime.end()) return nullptr;
     return &it->second.def;
+}
+
+std::vector<int> EventManager::GetActiveEventIds() const
+{
+    std::vector<int> out;
+    out.reserve(m_runtime.size());
+    for (const auto& kv : m_runtime)
+    {
+        if (kv.second.status == EventStatus::Active)
+            out.push_back(kv.first);
+    }
+    // (선택) 일정한 출력 순서를 원하면 정렬
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 void EventManager::LoadDefinitions()

@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EventTarget.h"
 #include "MonsterProjectile.h"
 #include "TestMonsterB.h"
 #include "EventManager.h"
