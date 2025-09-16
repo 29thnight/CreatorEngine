@@ -105,7 +105,9 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.font       = text->font;
     data.message    = text->message;
     data.color      = text->color;
-    data.position   = Mathf::Vector2(text->pos);
+
+    const auto centeredPosition = Mathf::Vector2(text->pos) + text->stretchSize * 0.5f;
+    data.position   = { centeredPosition.x, centeredPosition.y };
     data.fontSize   = text->fontSize;
     data.layerOrder = text->GetLayerOrder();
     data.maxSize    = text->stretchSize;
@@ -218,12 +220,13 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
             {
                 if (info.font)
                 {
+                    DirectX::XMVECTOR sizeVec = info.font->MeasureString(info.message.c_str());
+                    DirectX::XMFLOAT2 size{};
+                    DirectX::XMStoreFloat2(&size, sizeVec);
+
                     float scale = info.fontSize;
                     if (info.stretchX || info.stretchY)
                     {
-                        DirectX::XMVECTOR sizeVec = info.font->MeasureString(info.message.c_str());
-                        DirectX::XMFLOAT2 size{};
-                        DirectX::XMStoreFloat2(&size, sizeVec);
                         float width = size.x * scale;
                         float height = size.y * scale;
                         float factor = 1.f;
@@ -234,13 +237,15 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         scale *= factor;
                     }
 
+                    DirectX::XMFLOAT2 origin{ size.x * 0.5f, size.y * 0.5f };
+
                     info.font->DrawString(
                         spriteBatch.get(),
                         info.message.c_str(),
                         { info.position.x, info.position.y },
                         info.color,
                         0.0f,
-                        DirectX::XMFLOAT2(0, 0),
+                        origin,
                         scale,
                         DirectX::SpriteEffects_None,
                         static_cast<float>(info.layerOrder) / MaxOreder);
