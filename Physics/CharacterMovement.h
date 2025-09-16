@@ -41,7 +41,8 @@ public:
 	inline void SetJumpXZDeceleration(const float& jumpXZDeceleration) { m_jumpXZDeceleration = jumpXZDeceleration; }
 	inline void SetGravityWeight(const float& gravityWeight) { m_gravityWeight = gravityWeight; }
 
-
+	inline void SetKnockback(bool _onKnockback) { onKnockback = _onKnockback; }
+	inline void SetKnockbackVeloicy(DirectX::SimpleMath::Vector3 _velocity) { knockbackVelocity = _velocity; };
 private:
 	bool m_isFall;
 
@@ -58,6 +59,11 @@ private:
 	float m_jumpXZDeceleration;
 	float m_gravityWeight;
 	float m_minDistance;
+
+
+
+	bool onKnockback = false;
+	DirectX::SimpleMath::Vector3 knockbackVelocity;  //항상 delta 비례해서 줄어듬 or 지속시간동안 항상 이속도로 움직임 
 
 };
 

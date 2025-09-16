@@ -21,10 +21,10 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
 	input.x = m_moveInput.x;
 	input.z = m_moveInput.y;
-	if(m_isKnockBack)
+	/*if(m_isKnockBack)
 	{ 
 		input.y = JumpPower;
-	}
+	}*/
 
 	//케릭터 컨트롤러
 	//todo : 이동 불가한 스턴 상태 체크 필요 --> 필요시 추가
@@ -42,6 +42,8 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	inputInfo.isDynamic = component->GetBodyType() == EBodyType::DYNAMIC;
 	Physics->AddInputMove(inputInfo);
 
+
+	Physics->SetCharacterMovementMaxSpeed(inputInfo, m_movementInfo.maxSpeed);
 
 	constexpr float rotationOffsetSquare = 0.5f * 0.5f;
 
@@ -79,7 +81,6 @@ void CharacterControllerComponent::OnLateUpdate(float fixedDeltaTime)
 {
 	m_movementInfo.maxSpeed = m_fBaseSpeed * m_fFinalMultiplierSpeed;
 	m_movementInfo.acceleration = m_fBaseAcceleration * m_fFinalMultiplierSpeed;
-
 	//m_fFinalMultiplierSpeed = 1.0f; 
 }
 
@@ -90,13 +91,15 @@ void CharacterControllerComponent::Stun(float stunTime)
 	stunElapsedTime = 0.f;
 }
 
-void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKnockBackPower)
+void CharacterControllerComponent::SetKnockBack(Mathf::Vector3 knockbackVelocity)
 {
-	m_fFinalMultiplierSpeed = KnockBackPower;
-	JumpPower = yKnockBackPower;
+	//m_fFinalMultiplierSpeed = KnockBackPower;
+	//JumpPower = yKnockBackPower;
 	m_isKnockBack = true;
+	CharactorControllerInputInfo inputInfo;
+	inputInfo.id = m_controllerInfo.id;
 
-
+	Physics->SetKnockBack(inputInfo, true, knockbackVelocity);
 
 }
 
@@ -104,10 +107,13 @@ void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKno
 
 void CharacterControllerComponent::EndKnockBack()
 {
-	m_moveInput.y = 0;
+	//m_moveInput.y = 0;
 	m_isKnockBack = false;
-	m_fFinalMultiplierSpeed = 1.0f;
+	//m_fFinalMultiplierSpeed = 1.0f;
+	CharactorControllerInputInfo inputInfo;
+	inputInfo.id = m_controllerInfo.id;
 
+	Physics->SetKnockBack(inputInfo, false);
 }
 
 void CharacterControllerComponent::OnTriggerEnter(ICollider* other)

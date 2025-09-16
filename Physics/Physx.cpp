@@ -54,7 +54,7 @@ public:
 		//auto data = shape->getSimulationFilterData();
 		auto data = shape->getQueryFilterData();
 
-		if (filterData.word1 & (1 << data.word0)) {
+		if (filterData.word0 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eBLOCK;
 		}
 
@@ -70,7 +70,7 @@ public:
 		//auto data = shape->getSimulationFilterData();
 		auto data = shape->getQueryFilterData();
 
-		if (filterData.word1 & (1 << data.word0)) {
+		if (filterData.word0 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eBLOCK;
 		}
 		return physx::PxQueryHitType::eNONE;
@@ -89,7 +89,7 @@ public:
 		//auto data = shape->getSimulationFilterData();
 		auto data = shape->getQueryFilterData();
 
-		if (filterData.word1 & (1 << data.word0)) {
+		if (filterData.word0 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eTOUCH;
 		}
 
@@ -105,7 +105,7 @@ public:
 		//auto data = shape->getSimulationFilterData();
 		auto data = shape->getQueryFilterData();
 
-		if (filterData.word1 & (1 << data.word0)) {
+		if (filterData.word0 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eTOUCH;
 		}
 		return physx::PxQueryHitType::eNONE;
@@ -120,7 +120,7 @@ public:
 	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
 	{
 		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
-		if (queryFilterData.word1 & shapeFilterData.word0) return physx::PxQueryHitType::eBLOCK;
+		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eBLOCK;
 		return physx::PxQueryHitType::eNONE;
 	}
 	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eBLOCK; }
@@ -132,7 +132,7 @@ public:
 	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
 	{
 		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
-		if (queryFilterData.word1 & shapeFilterData.word0) return physx::PxQueryHitType::eTOUCH;
+		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eTOUCH;
 		return physx::PxQueryHitType::eNONE;
 	}
 	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eTOUCH; }
@@ -261,6 +261,7 @@ bool PhysicX::Initialize()
 	physx::PxFilterData filterData;
 	filterData.word0 = 0;
 	filterData.word1 = 0xFFFFFFFF;
+	filterData.word2 = 1 << 0;
 	planeShape->setSimulationFilterData(filterData);
 	planeShape->setQueryFilterData(filterData);
 	plane->attachShape(*planeShape);
@@ -368,7 +369,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
 			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
-			
+			filterData.word2 = 1 << contrllerInfo.layerNumber;
 			//
 			shape->setSimulationFilterData(filterData);
 			shape->setQueryFilterData(filterData);
@@ -516,8 +517,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 	//충돌 필터 데이터
 	physx::PxQueryFilterData filterData;
 	filterData.data.word0 = in.layerNumber;
-	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
-
+	//filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+	//filterData.data.word2 = 1 << in.layerNumber;
 	if (isStatic)
 	{
 		filterData.flags = physx::PxQueryFlag::eSTATIC
@@ -612,11 +613,13 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 	if (in.layerNumber == ALL_LAYER) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		filterData.data.word1 = 0xFFFFFFFF;
+		filterData.data.word2 = 0xFFFFFFFF;
 	}
 	else {
 		// 특정 레이어에 대해서만 raycast
 		filterData.data.word0 = in.layerNumber;
-		filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+		//filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+		//filterData.data.word2 = 1 << in.layerNumber;
 	}
 
 	BlockRaycastQueryFilter queryFilter;
@@ -676,11 +679,13 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 	if (in.layerNumber == ALL_LAYER) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		filterData.data.word1 = 0xFFFFFFFF;
+		filterData.data.word2 = 0xFFFFFFFF;
 	}
 	else {
 		// 특정 레이어에 대해서만 raycast
 		filterData.data.word0 = in.layerNumber;
-		filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+		//filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+		//filterData.data.word2 = 1 << in.layerNumber;
 	}
 
 	
@@ -905,6 +910,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
 	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	filterData.word2 = 1 << colInfo.layerNumber;
 	//filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
@@ -942,6 +948,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
 	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	filterData.word2 = 1 << colInfo.layerNumber;
 	//filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
@@ -1409,6 +1416,43 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 
 	CharacterController* controller = m_characterControllerContainer[info.id];
 	controller->AddMovementInput(info.input, info.isDynamic);
+}
+
+void PhysicX::SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& info,float maxSpeed)
+{
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetMaxSpeed(maxSpeed);
+
+}
+
+void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity)
+{
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetVelocity(velocity);
+}
+
+void PhysicX::SetKnockBack(const CharactorControllerInputInfo& info,bool _isknockback, DirectX::SimpleMath::Vector3 velocity)
+{
+
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetVelocity({0,0,0});
+	controller->GetCharacterMovement()->SetKnockback(_isknockback);
+	controller->GetCharacterMovement()->SetKnockbackVeloicy(velocity);
 }
 
 
@@ -2015,6 +2059,7 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::V
 	// 어떤 레이어와 충돌할지 비트마스크로 지정합니다.
 	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	filterData.data.word2 = 1 << in.layerMask;
 
 	// --- 5. 스윕 실행 ---
 	bool isHit = m_scene->sweep(
@@ -2086,6 +2131,7 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
 	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	filterData.data.word2 = 1 << in.layerMask;
 
 	bool isHit = m_scene->sweep(sphereGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
 
@@ -2144,6 +2190,7 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
 	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	filterData.data.word2 = 1 << in.layerMask;
 
 	bool isHit = m_scene->sweep(capsuleGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
 
@@ -2202,6 +2249,7 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleM
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
 	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	filterData.data.word2 = 1 << in.layerMask;
 
 	// --- 5. 오버랩 실행 ---
 	bool isHit = m_scene->overlap(
@@ -2264,11 +2312,13 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 	if (in.layerMask == ALL_LAYER) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		filterData.data.word1 = 0xFFFFFFFF;
+		filterData.data.word2 = 0xFFFFFFFF;
 	}
 	else {
 		// 특정 레이어에 대해서만 raycast
 		filterData.data.word0 = in.layerMask;
 		filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;
 	}
 
 	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData, m_touchCallback);
@@ -2319,6 +2369,7 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
 	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	filterData.data.word2 = 1 << in.layerMask;
 
 	bool isHit = m_scene->overlap(capsuleGeometry, pose, overlapResult, filterData);
 

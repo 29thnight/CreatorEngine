@@ -36,8 +36,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 	{
 		//if (collision.otherObj->m_tag == "Enemy")
 		{
-			EntityEnemy* enemy = collision.otherObj->GetComponent<EntityEnemy>();
-
+			Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
 			if (enemy)
 			{
 				LOG("EnemyHit!");
@@ -59,7 +58,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 					auto object = hit.gameObject;
 					if (object == GetOwner()) continue;
 
-					auto enemy = object->GetComponent<EntityEnemy>();
+					auto enemy = object->GetComponentDynamicCast<Entity>();
 					if (enemy)
 					{
 						enemy->SendDamage(m_owenrPlayer, m_damage);

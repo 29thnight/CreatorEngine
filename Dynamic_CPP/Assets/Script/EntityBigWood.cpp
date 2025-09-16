@@ -5,12 +5,23 @@
 #include "RigidBodyComponent.h"
 #include "Core.Random.h"
 #include "TweenManager.h"
+#include "EntityAsis.h"
+#include "InputManager.h"
+
 void EntityBigWood::Start()
 {
 }
 
-void EntityBigWood::Update(float tick)
+void EntityBigWood::OnTriggerEnter(const Collision& collision)
 {
+	// 아시스가 부딪히면 아시스에게 데미지를 줌.
+	//HitAsis();
+}
+
+void EntityBigWood::OnCollisionEnter(const Collision& collision)
+{
+	// 아시스가 부딪히면 아시스에게 데미지를 줌.
+	//HitAsis();
 }
 
 void EntityBigWood::SendDamage(Entity* sender, int damage)
@@ -155,6 +166,14 @@ void EntityBigWood::SendDamage(Entity* sender, int damage)
 				m_onDamageEvent.Invoke();
 			}*/
 		}
+	}
+}
+
+void EntityBigWood::HitAsis(EntityAsis* asis)
+{
+	if (asis)
+	{
+		asis->SendDamage(this, m_logDamage);
 	}
 }
 

@@ -46,7 +46,6 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 			{
 				//크리티컬 성공
 			}
-			damage = 0;
 			m_currentHP -= std::max(damage, 0);
 
 			if (m_currentHP <= 0) {

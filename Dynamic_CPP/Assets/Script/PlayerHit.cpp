@@ -37,12 +37,6 @@ void PlayerHit::Enter()
 
 void PlayerHit::Update(float deltaTime)
 {
-	if (m_player)
-	{
-		auto forward = m_player->player->m_transform.GetForward();
-		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
-		controller->Move({ -forward.x ,-forward.z }); //보는방향 거꾸로밀리기 //&&&&& hit 전에 맞은방향쪽으로 캐릭회전필요
-	}
 }
 
 void PlayerHit::Exit()
