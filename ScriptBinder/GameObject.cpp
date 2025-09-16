@@ -86,7 +86,9 @@ void GameObject::SetLayer(std::string_view layer)
 
     if (TagManager::GetInstance()->HasLayer(layer))
     {
+		size_t layerIndex = TagManager::GetInstance()->GetTagIndex(layer); // Ensure layer is registered
         m_layer = layer.data();
+		m_collisionType = (uint32)layerIndex;
     }
 }
 
