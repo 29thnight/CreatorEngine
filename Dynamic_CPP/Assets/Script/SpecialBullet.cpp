@@ -61,7 +61,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 					auto enemy = object->GetComponentDynamicCast<Entity>();
 					if (enemy)
 					{
-						enemy->SendDamage(m_owenrPlayer, m_damage);
+						enemy->SendDamage(m_ownerPlayer, m_damage);
 					}
 				}
 

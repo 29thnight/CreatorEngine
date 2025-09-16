@@ -51,7 +51,7 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 			if (m_currentHP <= 0) {
 				// dead
 
-				auto& resources = GameObject::Find("GameManager")->GetComponent<GameManager>()->GetResourcePool();
+				//auto& resources = GameObject::Find("GameManager")->GetComponent<GameManager>()->GetResourcePool();
 				/*if (!resources.empty()) {
 					int tempidx = 0;
 					auto item = resources[tempidx];
@@ -105,9 +105,12 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 
 				GetOwner()->Destroy();
 				auto pung = GameObject::Find("Pung2");
-				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-				pung->m_transform.SetPosition(pos);
-				pung->GetComponent<EffectComponent>()->Apply();
+				if (pung)
+				{
+					Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+					pung->m_transform.SetPosition(pos);
+					pung->GetComponent<EffectComponent>()->Apply();
+				}
 			}
 		}
 	}
