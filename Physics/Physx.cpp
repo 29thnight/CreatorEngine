@@ -1411,6 +1411,42 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 	controller->AddMovementInput(info.input, info.isDynamic);
 }
 
+void PhysicX::SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& info,float maxSpeed)
+{
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetMaxSpeed(maxSpeed);
+
+}
+
+void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity)
+{
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetVelocity(velocity);
+}
+
+void PhysicX::SetKnockBack(const CharactorControllerInputInfo& info,bool _isknockback, DirectX::SimpleMath::Vector3 velocity)
+{
+
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetKnockback(_isknockback);
+	controller->GetCharacterMovement()->SetKnockbackVeloicy(velocity);
+}
+
 
 
 void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)

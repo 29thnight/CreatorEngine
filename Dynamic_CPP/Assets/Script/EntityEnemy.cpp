@@ -258,7 +258,7 @@ void EntityEnemy::SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce)
 		{
 			isKnockBack = true;
 			KnockBackTime = 0.1f;
-			GetOwner()->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce.x, KnockBackForce.y);
+			//GetOwner()->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce.x, KnockBackForce.y);
 		}
 	}
 }

@@ -16,7 +16,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -34,7 +34,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -51,7 +51,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 5,
+                    "animationIndex": 4,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -154,7 +154,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -172,7 +172,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -190,7 +190,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -208,7 +208,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -226,7 +226,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -243,7 +243,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 11,
+                    "animationIndex": 12,
                     "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -346,7 +346,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -364,7 +364,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -382,7 +382,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -400,7 +400,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -438,7 +438,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 9,
+                    "animationIndex": 8,
                     "animationSpeed": 2.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerAttackAH",
@@ -477,7 +477,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 8,
+                    "animationIndex": 7,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerAttackAH",
@@ -516,7 +516,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 12,
+                    "animationIndex": 10,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerAttackAH",
@@ -538,7 +538,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -555,7 +555,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 6,
+                    "animationIndex": 5,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerRangeAttack",
@@ -597,7 +597,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 9,
+                    "animationIndex": 10,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerAttackAH",
@@ -618,7 +618,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 7,
+                    "animationIndex": 6,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerRangeAttack",
@@ -639,7 +639,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 7,
+                    "animationIndex": 6,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerRangeAttack",
@@ -660,7 +660,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 4,
+                    "animationIndex": 9,
                     "animationSpeed": 4.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerHit",
@@ -694,7 +694,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -749,7 +749,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 5,
+                    "animationIndex": 4,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -779,7 +779,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 10,
+                    "animationIndex": 11,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -848,7 +848,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 11,
+                    "animationIndex": 12,
                     "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",

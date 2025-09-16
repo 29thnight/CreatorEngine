@@ -3,6 +3,7 @@
 #include "EntityEnemy.h"
 #include "Player.h"
 #include "DebugLog.h"
+#include "Entity.h"
 void NormalBullet::Start()
 {
 	bulletType = BulletType::Normal;
@@ -30,7 +31,7 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 	{
 		//if (collision.otherObj->m_tag == "Enemy")
 		{
-			EntityEnemy* enemy = collision.otherObj->GetComponent<EntityEnemy>();
+			Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
 
 			if (enemy)
 			{

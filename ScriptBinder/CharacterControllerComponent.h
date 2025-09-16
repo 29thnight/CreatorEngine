@@ -199,7 +199,7 @@ public:
 	}
 
 	void Stun(float stunTime);
-	void SetKnockBack(float KnockBackPower, float yKnockBackPower);
+	void SetKnockBack(Mathf::Vector3 knockbackVelocity);
 	void EndKnockBack();
 private: 
 

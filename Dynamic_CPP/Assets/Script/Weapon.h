@@ -52,11 +52,9 @@ public:
 	[[Property]]
 	int itemAckDmg = 1;      //일반공격 데미지
 	[[Property]]
-	float itemAckSpd = 1.0f; //일반공격 속도
-	[[Property]]
 	float itemAckRange = 2.0f; //일반공격 사정거리
 	[[Property]]
-	float itemKnockback = 0.5f; //일반 공격 넉백거리 (보류)
+	float itemKnockback = 0.05f; //일반 공격 넉백거리 (보류)
 	[[Property]]
 	float coopCrit = 2.0f;   //협동공격 데미지 배율
 	
@@ -64,21 +62,15 @@ public:
 	[[Property]]
 	float chgTime = 0.2f; //키다운 유지시 n초당 내구도 감소
 	[[Property]]
-	float chgDmgscal = 2.0f; //차징 공격시 딜보정값(합적용) //차징시간당 +=n?
-	[[Property]]
-	float chgSpd = 3.0f;  //차징공격속도  n초간 차징 다시못하는시간?
-	[[Property]]
-	float chgDelay = 1.0f; //차징공격 후딜레이 n초간 동작불가
+	int chgAckDmg = 5; //차징 공격시 데미지값  // 원거리무기는 이게 특수탄 데미지?
 	[[Property]]
 	float chgRange = 4.0f; //차징공격 사거리
 	[[Property]]
-	float chgHitbox = 4.0f; //차징공격 넓이?
+	float chgKnockback = 0.05f; //차징공격 넉백거리
 	[[Property]]
-	float chgKnockback = 1.0f; //차징공격 넉백거리
-	[[Property]]
-	int ChargeAttackBulletCount = 5;
-	[[Property]]
-	int ChargeAttackBulletAngle = 15;
+	int ChargeAttackBulletCount = 5;  //차지어택시 날아갈 탄환수
+	[[Property]] 
+	int ChargeAttackBulletAngle = 15;  //차지어택시 날아갈 탄환 사이의 각도
 
 
 	//내구도
@@ -86,16 +78,9 @@ public:
 	int durMax = 10; //최대 내구도
 	[[Property]]
 	int durUseAtk = 1; //일반 공격시 소모 내구도
-	[[Property]]
-	int durUseChg = 1; //차징시 시간당 소모 내구도
-	[[Property]]
-	int durUseBuf = 100; //버프사용시 소모 내구도(보류)
 	int curDur = durMax;  //현재 내구도
 	bool isBreak = false;   //무기 부서짐확인용
 	
-	//아시스 -> 플레이어 날아올떄쓰는것들
-	int OwnerPlayerIndex = -1;
-	GameObject* ownerPlayer = nullptr; //
 
 	
 	
