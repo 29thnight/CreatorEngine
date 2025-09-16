@@ -36,10 +36,6 @@ void GameInstance::AsyncSceneLoadUpdate()
 
 void GameInstance::LoadScene(const std::string& sceneName)
 {
-	if (m_loadedScenes.find(sceneName) != m_loadedScenes.end()) {
-		LOG("Scene already loaded: " + sceneName);
-		return;
-	}
 	file::path fullPath = PathFinder::Relative("Scenes\\") / std::string(sceneName + ".creator");
 	m_loadingSceneFuture = SceneManagers->LoadSceneAsync(fullPath.string());
 }

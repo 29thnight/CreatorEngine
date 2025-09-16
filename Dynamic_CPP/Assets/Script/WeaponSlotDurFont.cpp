@@ -44,12 +44,13 @@ void WeaponSlotDurFont::Update(float tick)
 	//내구도 format으로 message 설정
 	int curDur = m_weaponSlot->GetCurrentDurability();
 	int weapon_type = m_weaponSlot->GetCurrentWeaponType();
+	std::string durStr = std::format("{}", curDur);
 	switch (weapon_type)
 	{
 	case (int)ItemType::Melee:
 	case (int)ItemType::Range:
 	case (int)ItemType::Bomb:
-		m_textComponent->SetMessage(std::to_string(curDur));
+		m_textComponent->SetMessage(durStr);
 		break;
 	case (int)ItemType::Basic:
 	case (int)ItemType::None:

@@ -171,6 +171,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		else if (componentType->typeID == type_guid(Animator))
 		{
 			auto animator = static_cast<Animator*>(component);
+			Meta::Deserialize(animator, itNode);
 			Model* model = nullptr;
 			std::vector<bool> animationBools;
 			std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;

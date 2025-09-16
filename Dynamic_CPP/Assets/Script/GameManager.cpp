@@ -129,12 +129,12 @@ void GameManager::SetPlayerInputDevice(int playerIndex, CharType charType, Playe
 
 void GameManager::LoadTestScene()
 {
-	LoadScene("Test");
+	LoadScene("CreateUIPrefabV2");
 }
 
 void GameManager::SwitchTestScene()
 {
-	SwitchScene("Test");
+	SwitchScene("CreateUIPrefabV2");
 }
 
 void GameManager::PushEntity(Entity* entity)

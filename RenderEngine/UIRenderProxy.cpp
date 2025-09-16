@@ -202,15 +202,13 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         info.scale.x, info.scale.y,
                         src, dst))
                     {
-                        DirectX::XMFLOAT2 originZero{ 0.f, 0.f };
-
                         spriteBatch->Draw(
                             info.texture->m_pSRV,
                             dst,
                             &src,
                             info.color,
                             info.rotation,
-                            originZero,
+                            info.origin,
                             DirectX::SpriteEffects_None,
                             static_cast<float>(info.layerOrder) / MaxOreder);
                     }
