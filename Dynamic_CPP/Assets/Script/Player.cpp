@@ -420,7 +420,6 @@ void Player::Damage(int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
-
 	if (OnMoveBomb)
 	{
 		MoveBombThrowPosition(dir);

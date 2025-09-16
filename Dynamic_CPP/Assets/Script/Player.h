@@ -16,9 +16,6 @@ class Entity;
 class EntityItem;
 class EntityEnemy;
 
-
-
-
 class Player : public Entity
 {
 public:
@@ -219,9 +216,6 @@ public:
 	bool startRay = false;
 
 	float calculDamge(bool isCharge = false,int _chargeCount = 0);
-
-
-
 
 	//ÇÇ°Ý,Á×À½
 	bool isStun = false;

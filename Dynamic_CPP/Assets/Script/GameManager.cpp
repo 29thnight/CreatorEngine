@@ -14,20 +14,11 @@
 #include "EntityItem.h"
 #include "DebugLog.h"
 
-int GameManager::m_RewardAmount = 0;
-int GameManager::m_player1DeviceID = -1;
-int GameManager::m_player2DeviceID = -1;
-std::unordered_map<std::string, Scene*> GameManager::m_loadedScenes;
-
 void GameManager::Awake()
 {
-	//if (!GetOwner()->IsDontDestroyOnLoad())
-	//{
-	//	SetDontDestroyOnLoad(GetOwner());
-	//	LOG("GameManager set DontDestroyOnLoad");
-	//}
-
 	LOG("GameManager Awake");
+	//앞으론 언리얼 처럼 게임인스턴스를 활용해서 전역 설정값 관리
+	GameInstance::GetInstance();
 	
 	auto resourcePool = GameObject::Find("ResourcePool");
 	auto weaponPiecePool = GameObject::Find("WeaponPiecePool");
@@ -59,11 +50,6 @@ void GameManager::Awake()
 void GameManager::Start()
 {
 	LOG("GameManager Start");
-	//playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
-	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::N), KeyState::Down, [this]() { Inputblabla(); });
-	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, Loaderererer);
-	//playerMap->AddButtonAction("CheatMineResource", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::M), KeyState::Down, [this]() { CheatMiningResource();});
-	//playerMap->AddValueAction("LoadScene", 0, InputValueType::Float, InputType::KeyBoard, { 'N', 'M' }, [this](float value) {Inputblabla(value);});
 }
 
 void GameManager::Update(float tick)
@@ -78,30 +64,26 @@ void GameManager::Update(float tick)
 
 	int size = RaycastAll(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1u, hits);
 
-	if (m_loadingSceneFuture.valid() && m_loadingSceneFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) 
-	{
-		Scene* loadedScene = m_loadingSceneFuture.get();
-		if (loadedScene) 
-		{
-			std::string sceneName = loadedScene->m_sceneName.ToString();
-			m_loadedScenes[sceneName] = loadedScene;
-			LOG("Scene loaded: " + sceneName);
-		}
-		else {
-			LOG("Failed to load scene.");
-		}
-	}
+	GameInstance::GetInstance()->AsyncSceneLoadUpdate();
 
-	if (m_isTestReward)
+	//테스트용 보상 코드
+	static float rewardTimer = 0.f;
+	rewardTimer += tick;
+
+	if(rewardTimer >= 1.f)
 	{
-		AddReward(1);
+		rewardTimer = 0.f;
+		//1초마다 보상
+		if (m_isTestReward)
+		{
+			AddReward(1);
+		}
 	}
 }
 
 void GameManager::OnDisable()
 {
 	LOG("GameManager OnDisable");
-	playerMap->DeleteAction("LoadScene");
 	for (auto& entity : m_entities)
 	{
 		auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();
@@ -118,26 +100,23 @@ void GameManager::OnDisable()
 
 void GameManager::LoadScene(const std::string& sceneName)
 {
-	if (m_loadedScenes.find(sceneName) != m_loadedScenes.end()) {
-		LOG("Scene already loaded: " + sceneName);
-		return;
-	}
-
-	file::path fullPath = PathFinder::Relative("Scenes\\") / std::string(sceneName + ".creator");
-	m_loadingSceneFuture = SceneManagers->LoadSceneAsync(fullPath.string());
+	GameInstance::GetInstance()->LoadScene(sceneName);
 }
 
 void GameManager::SwitchScene(const std::string& sceneName)
 {
-	if (m_loadedScenes.find(sceneName) == m_loadedScenes.end()) {
-		LOG("Scene not loaded: " + sceneName);
-		return;
-	}
-	SceneManagers->ActivateScene(m_loadedScenes[sceneName]);
+	GameInstance::GetInstance()->SwitchScene(sceneName);
 }
 
 void GameManager::UnloadScene(const std::string& sceneName)
 {
+	GameInstance::GetInstance()->UnloadScene(sceneName);
+}
+
+void GameManager::SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)
+{
+	if (playerIndex < 0 || playerIndex >= MAX_INPUT_DEVICE) return;
+	GameInstance::GetInstance()->SetPlayerInputDevice(playerIndex, charType, dir);
 }
 
 void GameManager::LoadTestScene()
@@ -220,4 +199,18 @@ void GameManager::CheatMiningResource()
 		
 		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 300.f, EForceMode::IMPULSE);
 	}*/
+}
+
+void GameManager::InitReward(int amount)
+{
+
+}
+
+void GameManager::AddReward(int amount)
+{
+}
+
+int GameManager::GetReward()
+{
+	return 0;
 }
