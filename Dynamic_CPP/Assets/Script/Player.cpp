@@ -390,18 +390,6 @@ void Player::LateUpdate(float tick)
 
 void Player::SendDamage(Entity* sender, int damage)
 {
-	//test sehwan
-	{
-		Damage(damage);
-	}
-
-	
-	m_currentHP -= std::max(damage, 0);
-	if (m_currentHP <= 0)
-	{
-		isStun = true;
-		m_animator->SetParameter("OnStun", true);
-	}
 	
 	//엘리트 보스몹에게 피격시에만 피격 애니메이션 출력 및DropCatchItem();  그외는 단순 HP깍기 + 캐릭터 깜빡거리는 연출등
 	//OnHit();
@@ -421,7 +409,7 @@ void Player::SendDamage(Entity* sender, int damage)
 
 void Player::Heal(int healAmount)
 {
-	m_currentHP = std::max(m_currentHP + healAmount, m_maxHP);
+	m_currentHP = std::min(m_currentHP + healAmount, m_maxHP);
 	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
 	if (HPbar)
 	{
@@ -431,7 +419,6 @@ void Player::Heal(int healAmount)
 			hpbar->SetCurHP(m_currentHP);
 		}
 	}
-	m_currentHP = std::min(m_currentHP + healAmount, m_maxHP);
 }
 
 void Player::ChangeState(std::string _stateName)
