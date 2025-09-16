@@ -86,6 +86,8 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
 	uint light_count = lightCount;
 
     bool useShadowRevice = (bitflag & USE_SHADOW_RECIVE) != 0;
+    
+    float3 radianceForIndirectLight = float3(0, 0, 0);
 
     for (int i = 0; i < light_count; ++i)
     {
@@ -110,8 +112,11 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
         
         //light.color.rgb *= light.intencity;
 
-        Lo += (kD * albedo / PI + specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
-
+        float3 incomingLight =  light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
+        float3 diffuseBRDF = (kD * albedo / PI) * incomingLight;
+        float3 specularBRDF = specular * incomingLight;
+        Lo += diffuseBRDF + specularBRDF;
+        radianceForIndirectLight += diffuseBRDF;
     }
     
     float3 ambient = globalAmbient.rgb * albedo;
@@ -142,7 +147,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     
     gOutput output;
     output.Default = float4(colour.rgb, 1.0);
-    output.LightEmissive = float4(Lo + emissive, 1.0);
+    output.LightEmissive = float4(radianceForIndirectLight + emissive, 1.0);
     return output;
     //return float4(colour, 1.0);
 }

@@ -931,7 +931,9 @@ void Player::MeleeAttack()
 	}
 	float damage = calculDamge(isChargeAttack, chargeCount);
 
-	int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
+	unsigned int layerMask = 1 << 0 | 1 << 3 | 1 << 4;
+
+	int size = RaycastAll(rayOrigin, direction, distacne, layerMask, hits);
 
 		float angle = XMConvertToRadians(15.0f);
 		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
@@ -939,9 +941,9 @@ void Player::MeleeAttack()
 		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
 		rightDir.Normalize();
 		std::vector<HitResult> leftHits;
-		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, layerMask, leftHits);
 		std::vector<HitResult> rightHits;
-		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, layerMask, rightHits);
 		std::vector<HitResult> allHits;
 		allHits.reserve(size + leftSize + rightSize);
 		allHits.insert(allHits.end(), hits.begin(), hits.end());
