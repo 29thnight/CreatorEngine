@@ -6,6 +6,7 @@ static constexpr int MAX_INPUT_DEVICE = 2;
 enum class CharType { None = 0, Man = 1, Woman = 2 };
 enum class PlayerDir { None = 0, Left = 1, Right = 2 };
 
+class EventManager;
 class GameInstance : public DLLCore::Singleton<GameInstance>
 {
 private:
@@ -26,7 +27,12 @@ public:
 	void AddRewardAmount(int amount);
 	int GetRewardAmount() const { return m_RewardAmount; }
 
+	EventManager* GetActiveEventManager() const { return m_eventManager; }
+	void SetActiveEventManager(EventManager* mgr) { m_eventManager = mgr; }
+	void ClearActiveEventManager() { m_eventManager = nullptr; }
+
 private:
+	EventManager* m_eventManager{ nullptr };
 	int m_RewardAmount{};
 	// 로드된 씬들을 저장하는 맵
 	std::unordered_map<std::string, class Scene*> m_loadedScenes;

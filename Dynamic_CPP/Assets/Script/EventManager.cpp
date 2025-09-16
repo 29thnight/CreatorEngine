@@ -1,52 +1,331 @@
 #include "EventManager.h"
 #include "EventTarget.h"
+#include "CSVLoader.h"
+#include "GameInstance.h"
+#include "ITriggerCondition.h"
+#include "StringHelper.h"
 #include "pch.h"
+
+static bool HasColumn(const CSVReader::Row& row, const char* name)
+{
+    try { (void)row[name]; return true; }
+    catch (...) { return false; }
+}
 
 void EventManager::Awake()
 {
-    try
+	GameInstance::GetInstance()->SetActiveEventManager(this);
+
+    LoadDefinitions();
+
+    // Optionally auto-start the first event that has priorId==0
+    for (auto& def : m_definitions)
     {
-        CSVReader reader("events.csv");
-        for (const auto& row : reader)
+        if (def.priorId == 0)
         {
-            EventDefinition def;
-            def.id = row["ID"].as<int>();
-            def.triggerType = static_cast<TriggerType>(row["TriggerType"].as<int>());
-            def.targetType = static_cast<TargetType>(row["TargetType"].as<int>());
-			def.parameters["EventTitle"] = row["EventTitle"].as<std::string>();
-            m_definitions.emplace_back(std::move(def));
+            StartEvent(def.id);
+            break;
         }
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << "EventManager::Awake - " << e.what() << '\n';
     }
 }
 
-void EventManager::Notify(int id)
+void EventManager::OnDestroy()
 {
-    auto targetIt = m_targets.find(id);
-    if (targetIt == m_targets.end())
-    {
-        std::cerr << "EventManager::Notify - target not found for id " << id << '\n';
-        return;
-    }
+	GameInstance::GetInstance()->ClearActiveEventManager();
+}
 
-    auto defIt = std::find_if(m_definitions.begin(), m_definitions.end(),
-        [id](const EventDefinition& def) { return def.id == id; });
-    if (defIt == m_definitions.end())
-    {
-        std::cerr << "EventManager::Notify - definition not found for id " << id << '\n';
-        return;
-    }
+void EventManager::StartEvent(int id)
+{
+    EnsureRuntime(id);
+    auto& rt = m_runtime[id];
+    if (rt.status == EventStatus::Active) return;
+    rt.status = EventStatus::Active;
 
-    targetIt->second->Execute(*defIt);
+    // Bind trigger if any registered for this event
+    auto itT = m_triggers.find(id);
+    if (itT != m_triggers.end() && itT->second)
+        itT->second->Bind(id, this);
+
+    // If this is a pure UI step and auto-advance, we can complete immediately or on confirm
+    if (rt.def.category == EventCategory::UI && rt.def.objectives.empty())
+    {
+        if (rt.def.advance == AdvancePolicy::AutoAdvance)
+            CompleteEvent(id);
+        else if (rt.def.advance == AdvancePolicy::WaitForNextTrigger)
+            ; // wait for external confirm
+    }
+}
+
+void EventManager::CompleteEvent(int id)
+{
+    EnsureRuntime(id);
+    auto& rt = m_runtime[id];
+    rt.status = EventStatus::Completed;
+
+    // Auto advance if configured
+    if (rt.def.advance == AdvancePolicy::AutoAdvance && rt.def.nextId != 0)
+        StartEvent(rt.def.nextId);
+}
+
+void EventManager::FailEvent(int id)
+{
+    EnsureRuntime(id);
+    m_runtime[id].status = EventStatus::Failed;
+}
+
+void EventManager::AdvanceFrom(int id)
+{
+    EnsureRuntime(id);
+    auto& rt = m_runtime[id];
+    if (rt.def.nextId != 0) StartEvent(rt.def.nextId);
+}
+
+void EventManager::PushSignal(int eventId, const EventSignal& sig)
+{
+    EnsureRuntime(eventId);
+    auto& rt = m_runtime[eventId];
+    if (rt.status != EventStatus::Active) return;
+
+
+    bool anyChanged = false;
+    for (size_t i = 0; i < rt.def.objectives.size(); ++i)
+    {
+        if (ObjectiveEvaluator::OnSignal(rt.def.objectives[i], rt.objectives[i], sig))
+            anyChanged = true;
+    }
+    if (anyChanged) EvaluateAndMaybeComplete(eventId);
 }
 
 void EventManager::RegisterTarget(int id, EventTarget* target)
 {
-    if (target == nullptr)
-        return;
+    if (!target) return;
     m_targets[id] = target;
+}
+
+void EventManager::RegisterTrigger(int id, ITriggerCondition* trig)
+{
+    if (!trig) return;
+    m_triggers[id] = trig;
+}
+
+EventDefinition* EventManager::GetEventDefinition(int id)
+{
+    auto it = m_indexById.find(id);
+    if (it == m_indexById.end()) return nullptr;
+    return &m_definitions[it->second];
+}
+
+void EventManager::SetEventVar(int id, const std::string& key, const std::string& value)
+{
+    EnsureRuntime(id);
+    auto& rt = m_runtime[id];
+    rt.vars[key] = value;
+    // Re-apply if already active or about to start
+    ResolveVariables(id);
+}
+
+const EventDefinition* EventManager::GetRuntimeDef(int id) const
+{
+    auto it = m_runtime.find(id);
+    if (it == m_runtime.end()) return nullptr;
+    return &it->second.def;
+}
+
+void EventManager::LoadDefinitions()
+{
+    m_definitions.clear();
+    m_indexById.clear();
+
+    // Try new tutorial csv first
+    bool loaded = false;
+    try
+    {
+		//TODO : 올바른 경로 설정 필요
+        CSVReader rdrNew("Tutorial_Quest_Events.csv");
+        for (const auto& row : rdrNew)
+        {
+            EventDefinition def;
+            def.id = row["ID"].as<int>();
+            def.name = HasColumn(row, "QuestName") ? row["QuestName"].as<std::string>() : std::string{};
+            def.scene = HasColumn(row, "Scene") ? row["Scene"].as<std::string>() : std::string{};
+            def.category = ParseCategory(HasColumn(row, "Category") ? row["Category"].as<std::string>() : "Quest");
+            def.playerScope = ParsePlayerScope(HasColumn(row, "PlayerScope") ? row["PlayerScope"].as<std::string>() : "Shared");
+            def.priorId = HasColumn(row, "PriorQuestID") ? row["PriorQuestID"].as<int>() : 0;
+            def.nextId = HasColumn(row, "NextQuestID") ? row["NextQuestID"].as<int>() : 0;
+            def.uiText = HasColumn(row, "Description") ? row["Description"].as<std::string>() : std::string{};
+
+            // objectives left empty for tutorial CSV; fill from scripting or separate table
+
+            m_indexById[def.id] = m_definitions.size();
+            m_definitions.emplace_back(std::move(def));
+        }
+        loaded = !m_definitions.empty();
+    }
+    catch (...) { /* fall back */ }
+
+    if (!loaded)
+    {
+        // Fallback to legacy events.csv
+        try
+        {
+            //TODO : 올바른 경로 설정 필요
+            CSVReader rdr("events.csv");
+            for (const auto& row : rdr)
+            {
+                EventDefinition def;
+                def.id = row["ID"].as<int>();
+                def.name = HasColumn(row, "EventTitle") ? row["EventTitle"].as<std::string>() : std::string{};
+                def.category = EventCategory::Quest;
+                def.playerScope = PlayerScope::Shared;
+                // Keep any legacy fields if needed via parameters
+                def.parameters["TriggerType"] = HasColumn(row, "TriggerType") ? row["TriggerType"].as<std::string>() : "";
+                def.parameters["TargetType"] = HasColumn(row, "TargetType") ? row["TargetType"].as<std::string>() : "";
+
+                m_indexById[def.id] = m_definitions.size();
+                m_definitions.emplace_back(std::move(def));
+            }
+        }
+        catch (...) {}
+    }
+}
+
+void EventManager::ResolveVariables(int id)
+{
+    auto it = m_runtime.find(id);
+    if (it == m_runtime.end()) return;
+    auto& rt = it->second;
+
+
+    auto subst = [&](std::string& s)
+        {
+            if (s.empty()) return;
+            std::string key;
+            if (s.size() >= 3 && s[0] == '$' && s[1] == '{' && s.back() == '}') key = s.substr(2, s.size() - 3);
+            else if (s[0] == '$') key = s.substr(1);
+            if (!key.empty()) {
+                auto kv = rt.vars.find(key);
+                if (kv != rt.vars.end()) s = kv->second;
+            }
+        };
+
+
+    for (auto& obj : rt.def.objectives)
+    {
+        subst(obj.targetTag);
+        subst(obj.targetActor);
+        subst(obj.ability);
+        // triggerIndex via var (optional): allow $triggerIndex in params
+        if (!obj.params.empty()) {
+            auto itVar = obj.params.find("triggerIndex");
+            if (itVar != obj.params.end()) {
+                std::string s = itVar->second; subst(s);
+                try { obj.triggerIndex = std::stoi(s); }
+                catch (...) {}
+            }
+        }
+    }
+}
+
+EventCategory EventManager::ParseCategory(const std::string& s)
+{
+    if (s == "UI") return EventCategory::UI;
+    if (s == "Trigger") return EventCategory::Trigger;
+    if (s == "non") return EventCategory::Non;
+    return EventCategory::Quest;
+}
+
+PlayerScope EventManager::ParsePlayerScope(const std::string& s)
+{
+    if (s == "O") return PlayerScope::AllPlayersIndividually;
+    if (s == "X") return PlayerScope::AnyPlayer;
+    if (s == "non") return PlayerScope::None;
+    return PlayerScope::Shared;
+}
+
+ObjectiveType EventManager::ParseObjectiveType(const std::string& s)
+{
+    std::string t = s; std::transform(t.begin(), t.end(), t.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+    if (t == "destroy") return ObjectiveType::Destroy;
+    if (t == "interact") return ObjectiveType::Interact;
+    if (t == "eliminateall" || t == "eliminate" || t == "clear") return ObjectiveType::EliminateAll;
+    if (t == "kill" || t == "killcount") return ObjectiveType::KillCount;
+    if (t == "collect" || t == "collectcount") return ObjectiveType::CollectCount;
+    if (t == "deliver") return ObjectiveType::Deliver;
+    if (t == "survivenodebuff" || t == "survive") return ObjectiveType::SurviveNoDebuff;
+    if (t == "useabilitytodestroy" || t == "abilitydestroy") return ObjectiveType::UseAbilityToDestroy;
+    if (t == "reachtrigger" || t == "reach") return ObjectiveType::ReachTrigger;
+    if (t == "purchase" || t == "buy") return ObjectiveType::Purchase;
+    if (t == "timer" || t == "wait") return ObjectiveType::Timer;
+    if (t == "changescene" || t == "scene") return ObjectiveType::ChangeScene;
+    return ObjectiveType::Custom;
+}
+
+bool EventManager::ParseObjectivesDSL(const std::string& dsl, EventDefinition& out)
+{
+    auto parts = Split(dsl, ';');
+    for (auto& raw : parts)
+    {
+        auto line = Trim(raw);
+        if (line.empty()) continue;
+        auto toks = TokenizePreserveQuotes(line);
+        if (toks.empty()) continue;
+
+        ObjectiveDef obj; obj.type = ParseObjectiveType(toks[0]);
+        for (size_t i = 1; i < toks.size(); ++i)
+        {
+            auto t = toks[i];
+            auto eq = t.find('=');
+            if (eq == std::string::npos) continue;
+            std::string k = Trim(t.substr(0, eq));
+            std::string v = Trim(t.substr(eq + 1)); v = Unquote(v);
+            std::string lk = k; std::transform(lk.begin(), lk.end(), lk.begin(), [](unsigned char c) {return (char)std::tolower(c); });
+
+            if (lk == "tag" || lk == "target" || lk == "targettag") obj.targetTag = v;
+            else if (lk == "actor" || lk == "actortag") obj.targetActor = v;
+            else if (lk == "ability" || lk == "skill") obj.ability = v;
+            else if (lk == "required" || lk == "req" || lk == "count") { try { obj.requiredCount = std::stoi(v); } catch (...) {} }
+            else if (lk == "duration" || lk == "time" || lk == "seconds") { try { obj.durationSeconds = std::stof(v); } catch (...) {} }
+            else if (lk == "index" || lk == "idx" || lk == "trigger" || lk == "triggerindex") { try { obj.triggerIndex = std::stoi(v); } catch (...) {} }
+            else obj.params[k] = v;
+        }
+        out.objectives.push_back(std::move(obj));
+    }
+    return !out.objectives.empty();
+}
+
+void EventManager::EnsureRuntime(int id)
+{
+    if (m_runtime.find(id) != m_runtime.end()) return;
+
+    auto* def = GetEventDefinition(id);
+    if (!def) return;
+
+    EventRuntime rt{};
+    rt.def = *def;
+    rt.status = EventStatus::NotStarted;
+    rt.objectives.resize(def->objectives.size());
+
+
+    m_runtime.emplace(id, std::move(rt));
+}
+
+bool EventManager::EvaluateAndMaybeComplete(int id)
+{
+    auto it = m_runtime.find(id);
+    if (it == m_runtime.end()) return false;
+    auto& rt = it->second;
+    if (rt.status != EventStatus::Active) return false;
+
+    const auto& players = m_activePlayers;
+
+    // All objectives must be completed for this step
+    for (size_t i = 0; i < rt.def.objectives.size(); ++i)
+    {
+        if (!ObjectiveEvaluator::IsCompleted(rt.def.objectives[i], rt.objectives[i], rt.def.playerScope, players))
+            return false;
+    }
+
+    CompleteEvent(id);
+    return true;
 }
 

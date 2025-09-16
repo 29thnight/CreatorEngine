@@ -70,10 +70,10 @@ public:
 	[[Property]]
 	int playerIndex = 0;
 	[[Property]]
-	float  moveSpeed= 0.025f;
+	float moveSpeed= 0.025f;
 	[[Property]]
-	float  chargingMoveSpeed = 0.0125f; // 차징중 이동속도
-	float  baseMoveSpeed = 0.025f;  //기본 이동속도
+	float chargingMoveSpeed = 0.0125f; // 차징중 이동속도
+	float baseMoveSpeed = 0.025f;  //기본 이동속도
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
@@ -86,7 +86,6 @@ public:
 	void Move(Mathf::Vector2 dir);
 	void CharacterMove(Mathf::Vector2 dir);
 	
-
 	//잡기 던지기
 	[[Property]]
 	float ThrowPowerX = 6.f;
@@ -103,7 +102,7 @@ public:
 	EntityItem* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
-	bool    onIndicate = false;
+	bool onIndicate = false;
 	[[Method]]
 	void CatchAndThrow();
 	void Catch();
@@ -122,7 +121,7 @@ public:
 	[[Property]]
 	float dashGracePeriod = 1.f; //대시 무적시간
 	[[Property]]
-	int   dashAmount = 1;   //최대대시가능 횟수
+	int  dashAmount = 1;   //최대대시가능 횟수
 	bool isDashing = false; //대쉬중
 	float m_dashElapsedTime = 0.f;
 	float m_dashCoolElapsedTime = 0.f; //
