@@ -5,9 +5,6 @@
 #include "CharacterControllerComponent.h"
 void PlayerHit::Enter()
 {
-
-
-
 	if (m_player == nullptr)
 	{
 		AnimationController* ownerController = m_ownerController;
@@ -29,7 +26,6 @@ void PlayerHit::Enter()
 		}
 	}
 
-
 	if (m_player)
 	{
 		m_player->ChangeState("Hit");
@@ -37,7 +33,6 @@ void PlayerHit::Enter()
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 	}
-
 }
 
 void PlayerHit::Update(float deltaTime)

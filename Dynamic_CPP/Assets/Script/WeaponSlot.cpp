@@ -44,6 +44,7 @@ void WeaponSlot::ApplyWeapon(Weapon* weapon)
 		m_curWeaponType = (int)ItemType::None;
 		m_curDurability = 0;
 		m_curMaxDurability = 0;
+		m_slotImage->unionScale = 0.7f;
 		SetActive(false);
 
 		return;
@@ -64,6 +65,11 @@ void WeaponSlot::ApplyWeapon(Weapon* weapon)
 	if (m_curWeaponType >= size)
 	{
 		m_curWeaponType = (int)ItemType::Basic;
+	}
+
+	if (!m_isActive)
+	{
+		m_slotImage->unionScale = 0.7f;
 	}
 
 	switch (m_curWeaponType)
@@ -87,6 +93,8 @@ void WeaponSlot::ApplyWeapon(Weapon* weapon)
 		m_slotImage->SetTexture((int)ItemType::None);
 		break;
 	}
+
+
 }
 
 void WeaponSlot::UpdateDurability(Weapon* weapon)
@@ -113,6 +121,7 @@ void WeaponSlot::SetActive(bool active)
 	if(m_curWeaponType == (int)ItemType::None)
 	{
 		//무기 타입이 None이면 활성화 시키지 않음
+		m_slotImage->unionScale = 0.7f;
 		return;
 	}
 
@@ -124,6 +133,7 @@ void WeaponSlot::SetActive(bool active)
 		{
 			if (!m_slotGage[i]) break;
 			m_slotGage[i]->SetEnabled(false);
+			m_slotImage->unionScale = 0.7f;
 		}
 	}
 	else
@@ -142,6 +152,7 @@ void WeaponSlot::SetActive(bool active)
 			{
 				m_slotGage[i]->SetEnabled(false);
 			}
+			m_slotImage->unionScale = 1.0f;
 		}
 	}
 }

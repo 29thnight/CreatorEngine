@@ -381,6 +381,9 @@
 		<ClInclude Include="Assets\Script\ITriggerCondition.h">
 			<Filter>Script\ScriptClass\Event</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponSlotDurFont.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -679,6 +682,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EventTarget.cpp">
 			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponSlotDurFont.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
