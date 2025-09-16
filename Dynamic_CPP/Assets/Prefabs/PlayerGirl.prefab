@@ -1,6 +1,6 @@
 m_name: PlayerGirl
 m_isEnabled: true
-m_instanceID: 316880746
+m_instanceID: 2248444186
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -18,7 +18,7 @@ PrefabNode:
     m_childrenIndices: [391, 542]
     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
     m_attachedSoketID: 0
-    m_collisionType: 1
+    m_collisionType: 0
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
@@ -62,26 +62,21 @@ PrefabNode:
         DropPowerX: 2
         DropPowerY: 0
         detectAngle: 30
-        dashDistacne: 5
+        dashDistacne: 0.100000001
         m_dashTime: 0.150000006
         dashCooldown: 0.5
         dashGracePeriod: 1
         dashAmount: 1
         dubbleDashTime: 0.5
         Atk: 1
-        AttackRange: 2.5
-        AttackSpeed: 1
         comboDuration: 0.5
-        atkFwDistacne: 2
-        rangedAtkCountMax: 5
-        rangedAtkDelay: 0.300000012
-        rangedAtkCooldown: 1
         rangedAutoAimRange: 10
-        minChargedTime: 0.699999988
         rangeAngle: 150
-        rangeDistacne: 5
         countSpecialBullet: 5
         bombMoveSpeed: 0.00999999978
+        MeleeAttackSpeed: 1
+        RangeAttackSpeed: 1
+        BombAttackSpeed: 1
         stunRespawnTime: 5
         GracePeriod: 1
         ResurrectionRange: 5
@@ -89,11 +84,11 @@ PrefabNode:
         ResurrectionHP: 50
         ResurrectionGracePeriod: 3
         SlotChangeCooldown: 2
-        testHitPowerX: 1.5
-        testHitPowerY: 0
+        testHitPowerX: 0.0399999991
+        testHitPowerY: 0.0280000009
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 2559769739
+        m_instanceID: 4055200106
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -120,7 +115,7 @@ PrefabNode:
         m_childrenIndices: [392, 394]
         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -129,7 +124,7 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 3919362822
+            m_instanceID: 2592905100
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -433,7 +428,7 @@ PrefabNode:
                         nextStateName: Hit
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.200000003
+                        blendTime: 0.00999999978
                       - conditions:
                           - valueName: OnStun
                             cType: 6
@@ -990,12 +985,12 @@ PrefabNode:
                         curStateName: Hit
                         nextStateName: Idle
                         hasExitTime: true
-                        exitTime: 0.790000021
-                        blendTime: 0.200000003
+                        exitTime: 0.699999988
+                        blendTime: 0.300000012
                     index: 12
                     AnimationIndex: 4
                     m_isAny: false
-                    animationSpeed: 4
+                    animationSpeed: 3
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -1426,7 +1421,7 @@ PrefabNode:
             m_childrenIndices: [393]
             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
             m_attachedSoketID: 0
-            m_collisionType: 1
+            m_collisionType: 0
             m_isStatic: false
             m_gameObjectType: 3
             m_tag: Untagged
@@ -1485,7 +1480,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 3
                 m_tag: Untagged
@@ -1543,7 +1538,7 @@ PrefabNode:
             m_childrenIndices: [395, 423, 424, 425, 429, 433, 437, 440, 443]
             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
             m_attachedSoketID: 0
-            m_collisionType: 1
+            m_collisionType: 0
             m_isStatic: false
             m_gameObjectType: 4
             m_tag: Untagged
@@ -1565,7 +1560,7 @@ PrefabNode:
                 m_childrenIndices: [396]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -1587,7 +1582,7 @@ PrefabNode:
                     m_childrenIndices: [397]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -1609,7 +1604,7 @@ PrefabNode:
                         m_childrenIndices: [398, 407, 414, 421, 422]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -1631,7 +1626,7 @@ PrefabNode:
                             m_childrenIndices: [399]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1653,7 +1648,7 @@ PrefabNode:
                                 m_childrenIndices: [400]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 1
+                                m_collisionType: 0
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1675,7 +1670,7 @@ PrefabNode:
                                     m_childrenIndices: [401, 402, 403]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 1
+                                    m_collisionType: 0
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1697,7 +1692,7 @@ PrefabNode:
                                         m_childrenIndices: ~
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1718,7 +1713,7 @@ PrefabNode:
                                         m_childrenIndices: ~
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1739,7 +1734,7 @@ PrefabNode:
                                         m_childrenIndices: [404]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1761,7 +1756,7 @@ PrefabNode:
                                             m_childrenIndices: [405]
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1783,7 +1778,7 @@ PrefabNode:
                                                 m_childrenIndices: [406]
                                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                                 m_attachedSoketID: 0
-                                                m_collisionType: 1
+                                                m_collisionType: 0
                                                 m_isStatic: false
                                                 m_gameObjectType: 4
                                                 m_tag: Untagged
@@ -1805,7 +1800,7 @@ PrefabNode:
                                                     m_childrenIndices: ~
                                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                                     m_attachedSoketID: 0
-                                                    m_collisionType: 1
+                                                    m_collisionType: 0
                                                     m_isStatic: false
                                                     m_gameObjectType: 4
                                                     m_tag: Untagged
@@ -1826,7 +1821,7 @@ PrefabNode:
                             m_childrenIndices: [408]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1848,7 +1843,7 @@ PrefabNode:
                                 m_childrenIndices: [409]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 1
+                                m_collisionType: 0
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1870,7 +1865,7 @@ PrefabNode:
                                     m_childrenIndices: [410, 412]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 1
+                                    m_collisionType: 0
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1892,7 +1887,7 @@ PrefabNode:
                                         m_childrenIndices: [411]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1914,7 +1909,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1935,7 +1930,7 @@ PrefabNode:
                                         m_childrenIndices: [413]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1957,7 +1952,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1978,7 +1973,7 @@ PrefabNode:
                             m_childrenIndices: [415]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2000,7 +1995,7 @@ PrefabNode:
                                 m_childrenIndices: [416]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 1
+                                m_collisionType: 0
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -2022,7 +2017,7 @@ PrefabNode:
                                     m_childrenIndices: [417, 419]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 1
+                                    m_collisionType: 0
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -2044,7 +2039,7 @@ PrefabNode:
                                         m_childrenIndices: [418]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -2066,7 +2061,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -2087,7 +2082,7 @@ PrefabNode:
                                         m_childrenIndices: [420]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -2109,7 +2104,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -2130,7 +2125,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2151,7 +2146,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2172,7 +2167,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2193,7 +2188,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2214,7 +2209,7 @@ PrefabNode:
                 m_childrenIndices: [426]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2236,7 +2231,7 @@ PrefabNode:
                     m_childrenIndices: [427]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2258,7 +2253,7 @@ PrefabNode:
                         m_childrenIndices: [428]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2280,7 +2275,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2301,7 +2296,7 @@ PrefabNode:
                 m_childrenIndices: [430]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2323,7 +2318,7 @@ PrefabNode:
                     m_childrenIndices: [431]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2345,7 +2340,7 @@ PrefabNode:
                         m_childrenIndices: [432]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2367,7 +2362,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2388,7 +2383,7 @@ PrefabNode:
                 m_childrenIndices: [434]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2410,7 +2405,7 @@ PrefabNode:
                     m_childrenIndices: [435]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2432,7 +2427,7 @@ PrefabNode:
                         m_childrenIndices: [436]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2454,7 +2449,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2475,7 +2470,7 @@ PrefabNode:
                 m_childrenIndices: [438]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2497,7 +2492,7 @@ PrefabNode:
                     m_childrenIndices: [439]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2519,7 +2514,7 @@ PrefabNode:
                         m_childrenIndices: ~
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2540,7 +2535,7 @@ PrefabNode:
                 m_childrenIndices: [441]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2562,7 +2557,7 @@ PrefabNode:
                     m_childrenIndices: [442]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2584,7 +2579,7 @@ PrefabNode:
                         m_childrenIndices: ~
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2605,7 +2600,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2626,7 +2621,7 @@ PrefabNode:
         m_childrenIndices: ~
         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 0
         m_tag: Untagged
