@@ -10,5 +10,5 @@ public:
 	virtual void Update(float tick) override;
 
 private:
-	int m_currentID{ -1 };
+	class TextComponent* m_textComponent{ nullptr };
 };

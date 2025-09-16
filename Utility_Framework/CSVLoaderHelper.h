@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <stdexcept>
 #include <optional>
+#include "StringHelper.h"
 
 // Helper for static_assert fallback
 template<typename>
@@ -34,7 +35,7 @@ T convertFromString(const std::string& str)
     }
     else if constexpr (std::is_same_v<T, std::string>)
     {
-        return str;
+        return std::string(AnsiToUtf8(str));
     }
     else
     {
@@ -69,7 +70,7 @@ std::optional<T> tryConvertFromString(const std::string& str)
     }
     else if constexpr (std::is_same_v<T, std::string>)
     {
-        return str;
+        return std::string(AnsiToUtf8(str));
     }
     else
     {

@@ -167,6 +167,91 @@ std::vector<int> EventManager::GetActiveEventIds() const
     return out;
 }
 
+void EventManager::BroadcastSignal(const EventSignal& sig)
+{
+    for (auto& kv : m_runtime)
+    {
+        const int id = kv.first;
+        auto& rt = kv.second;
+        if (rt.status != EventStatus::Active) continue;
+
+        bool anyChanged = false;
+        for (size_t i = 0; i < rt.def.objectives.size(); ++i)
+        {
+            if (ObjectiveEvaluator::OnSignal(rt.def.objectives[i], rt.objectives[i], sig))
+                anyChanged = true;
+        }
+        if (anyChanged) EvaluateAndMaybeComplete(id);
+    }
+}
+
+void EventManager::EmitObjectDestroyed(const std::string& tag, int playerId)
+{
+    EventSignal s{ EventSignalType::ObjectDestroyed };
+    s.playerId = playerId;
+    s.a = tag;
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitEnemyKilled(const std::string& groupOrTag, int playerId)
+{
+    EventSignal s{ EventSignalType::EnemyKilled };
+    s.playerId = playerId;
+    s.b = groupOrTag;          // EliminateAll에서 sig.b 사용
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitInteracted(const std::string& actorTag, const std::string& withTag, int playerId)
+{
+    EventSignal s{ EventSignalType::Interacted };
+    s.playerId = playerId;
+    s.a = actorTag;
+    s.b = withTag;
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitAbilityUsed(const std::string& ability, const std::string& contextTag, int playerId)
+{
+    EventSignal s{ EventSignalType::AbilityUsed };
+    s.playerId = playerId;
+    s.a = ability;
+    s.b = contextTag;
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitReachedTrigger(const std::string& actorTag, int triggerIndex)
+{
+    EventSignal s{ EventSignalType::ReachedTrigger };
+    s.a = actorTag;
+    s.i = triggerIndex;
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitPurchased(const std::string& itemTag, int count, int playerId)
+{
+    EventSignal s{ EventSignalType::Purchased };
+    s.playerId = playerId;
+    s.a = itemTag;
+    s.i = count;
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitDebuffApplied(int playerId, const std::string& debuffTag)
+{
+    EventSignal s{ EventSignalType::DebuffApplied };
+    s.playerId = playerId;
+    s.a = debuffTag;
+    BroadcastSignal(s);
+}
+
+void EventManager::EmitDebuffRemoved(int playerId, const std::string& debuffTag)
+{
+    EventSignal s{ EventSignalType::DebuffRemoved };
+    s.playerId = playerId;
+    s.a = debuffTag;
+    BroadcastSignal(s);
+}
+
 void EventManager::LoadDefinitions()
 {
     m_definitions.clear();
@@ -177,7 +262,8 @@ void EventManager::LoadDefinitions()
     try
     {
 		//TODO : 올바른 경로 설정 필요
-        CSVReader rdrNew("Tutorial_Quest_Events.csv");
+		auto path = PathFinder::Relative("CSV\\EventDesign_Template.csv");
+        CSVReader rdrNew(path.string());
         for (const auto& row : rdrNew)
         {
             EventDefinition def;
@@ -186,6 +272,7 @@ void EventManager::LoadDefinitions()
             def.scene = HasColumn(row, "Scene") ? row["Scene"].as<std::string>() : std::string{};
             def.category = ParseCategory(HasColumn(row, "Category") ? row["Category"].as<std::string>() : "Quest");
             def.playerScope = ParsePlayerScope(HasColumn(row, "PlayerScope") ? row["PlayerScope"].as<std::string>() : "Shared");
+			def.advance = AdvancePolicy::Manual; // 테스트 default
             def.priorId = HasColumn(row, "PriorQuestID") ? row["PriorQuestID"].as<int>() : 0;
             def.nextId = HasColumn(row, "NextQuestID") ? row["NextQuestID"].as<int>() : 0;
             def.uiText = HasColumn(row, "Description") ? row["Description"].as<std::string>() : std::string{};
@@ -198,31 +285,6 @@ void EventManager::LoadDefinitions()
         loaded = !m_definitions.empty();
     }
     catch (...) { /* fall back */ }
-
-    if (!loaded)
-    {
-        // Fallback to legacy events.csv
-        try
-        {
-            //TODO : 올바른 경로 설정 필요
-            CSVReader rdr("events.csv");
-            for (const auto& row : rdr)
-            {
-                EventDefinition def;
-                def.id = row["ID"].as<int>();
-                def.name = HasColumn(row, "EventTitle") ? row["EventTitle"].as<std::string>() : std::string{};
-                def.category = EventCategory::Quest;
-                def.playerScope = PlayerScope::Shared;
-                // Keep any legacy fields if needed via parameters
-                def.parameters["TriggerType"] = HasColumn(row, "TriggerType") ? row["TriggerType"].as<std::string>() : "";
-                def.parameters["TargetType"] = HasColumn(row, "TargetType") ? row["TargetType"].as<std::string>() : "";
-
-                m_indexById[def.id] = m_definitions.size();
-                m_definitions.emplace_back(std::move(def));
-            }
-        }
-        catch (...) {}
-    }
 }
 
 void EventManager::ResolveVariables(int id)
@@ -231,19 +293,17 @@ void EventManager::ResolveVariables(int id)
     if (it == m_runtime.end()) return;
     auto& rt = it->second;
 
-
     auto subst = [&](std::string& s)
-        {
-            if (s.empty()) return;
-            std::string key;
-            if (s.size() >= 3 && s[0] == '$' && s[1] == '{' && s.back() == '}') key = s.substr(2, s.size() - 3);
-            else if (s[0] == '$') key = s.substr(1);
-            if (!key.empty()) {
-                auto kv = rt.vars.find(key);
-                if (kv != rt.vars.end()) s = kv->second;
-            }
-        };
-
+    {
+        if (s.empty()) return;
+        std::string key;
+        if (s.size() >= 3 && s[0] == '$' && s[1] == '{' && s.back() == '}') key = s.substr(2, s.size() - 3);
+        else if (s[0] == '$') key = s.substr(1);
+        if (!key.empty()) {
+            auto kv = rt.vars.find(key);
+            if (kv != rt.vars.end()) s = kv->second;
+        }
+    };
 
     for (auto& obj : rt.def.objectives)
     {

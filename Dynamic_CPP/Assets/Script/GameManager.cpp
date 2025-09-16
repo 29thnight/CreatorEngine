@@ -76,7 +76,15 @@ void GameManager::Update(float tick)
 		//1초마다 보상
 		if (m_isTestReward)
 		{
-			AddReward(1);
+			int reward = GetReward();
+			if (reward < 99)
+			{
+				AddReward(1);
+			}
+			else
+			{
+				InitReward(0);
+			}
 		}
 	}
 }
@@ -203,14 +211,15 @@ void GameManager::CheatMiningResource()
 
 void GameManager::InitReward(int amount)
 {
-
+	GameInstance::GetInstance()->SetRewardAmount(amount);
 }
 
 void GameManager::AddReward(int amount)
 {
+	GameInstance::GetInstance()->AddRewardAmount(amount);
 }
 
 int GameManager::GetReward()
 {
-	return 0;
+	return GameInstance::GetInstance()->GetRewardAmount();
 }

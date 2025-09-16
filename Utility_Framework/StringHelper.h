@@ -1,5 +1,8 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <sstream>
 #include <Windows.h>
 
 inline std::string AnsiToUtf8(const std::string& ansiStr)
@@ -15,6 +18,42 @@ inline std::string AnsiToUtf8(const std::string& ansiStr)
     WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &utf8[0], utf8Len, nullptr, nullptr);
 
     return utf8;
+}
+
+inline std::string Utf8ToAnsi(const std::string& utf8Str)
+{
+    if (utf8Str.empty()) return {};
+
+    // UTF-8 -> Wide
+    int wideLen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        utf8Str.c_str(), -1, nullptr, 0);
+    if (wideLen <= 0) return {};
+
+    std::wstring wide(wideLen, 0);
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        utf8Str.c_str(), -1, &wide[0], wideLen) <= 0)
+        return {};
+
+    // Wide -> ANSI (ACP)
+    BOOL usedDefault = FALSE; // true면 일부 문자가 치환(손실)됨
+    int ansiLen = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS,
+        wide.c_str(), -1,
+        nullptr, 0, nullptr, &usedDefault);
+    if (ansiLen <= 0) return {};
+
+    std::string ansi(ansiLen, 0);
+    if (WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS,
+        wide.c_str(), -1,
+        &ansi[0], ansiLen, nullptr, &usedDefault) <= 0)
+        return {};
+
+    // std::string은 널 종료가 필요없으니 끝의 '\0' 제거
+    if (!ansi.empty() && ansi.back() == '\0') ansi.pop_back();
+
+    // 필요하다면 usedDefault를 확인해서 로깅/경고 가능
+    // if (usedDefault) { /* 일부 문자가 치환됨 */ }
+
+    return ansi;
 }
 
 inline std::string WstringToString(const std::wstring& w) 

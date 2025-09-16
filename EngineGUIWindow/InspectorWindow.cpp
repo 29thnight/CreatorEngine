@@ -1222,7 +1222,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::Text("Drag Texture Here");
 	if (ImGui::BeginDragDropTarget())
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 		{
 			const char* droppedFilePath = static_cast<const char*>(payload->Data);
 			file::path filename = file::path(droppedFilePath).filename();
