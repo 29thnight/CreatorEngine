@@ -22,7 +22,7 @@ public:
 	virtual void OnDestroy() override;
 
 	//한글이 안나올시 sfont 제대로 만들었는지 확인
-	void SetMessage(const std::string& _message) { message = _message; }
+	void SetMessage(std::string _message) { message = _message; }
 	void SetFont(const file::path& path);
 	void SetFont(const file::path& path, SpriteFont* _font)
 	{
@@ -43,20 +43,20 @@ private:
 	std::string message{};
     [[Property]]
 	Mathf::Vector2 relpos{ 0, 0 };
-        [[Property]]
-        Mathf::Color4 color{};
-        [[Property]]
-        float fontSize{ 1.f };
+    [[Property]]
+    Mathf::Color4 color{};
+    [[Property]]
+    float fontSize{ 1.f };
 
-        // When true, message bounds are taken from manualRect instead of the parent's RectTransform
-        [[Property]]
-        bool useManualRect{ false };
-        [[Property]]
-        Mathf::Rect manualRect{};
+    // When true, message bounds are taken from manualRect instead of the parent's RectTransform
+    [[Property]]
+    bool useManualRect{ false };
+    [[Property]]
+    Mathf::Rect manualRect{};
 
-        // Calculated in Update: maximum render area from parent RectTransform
-        Mathf::Vector2 stretchSize{ 0.f, 0.f };
-        bool isStretchX{ false };
-        bool isStretchY{ false };
+    // Calculated in Update: maximum render area from parent RectTransform
+    Mathf::Vector2 stretchSize{ 0.f, 0.f };
+    bool isStretchX{ false };
+    bool isStretchY{ false };
 };
 

@@ -16,9 +16,6 @@ class Entity;
 class EntityItem;
 class EntityEnemy;
 
-
-
-
 class Player : public Entity
 {
 public:
@@ -47,6 +44,11 @@ public:
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override {}
 	void Heal(int healAmount);
+	[[Method]]
+	void SetCurHP(int hp);
+	[[Method]]
+	void Damage(int damage);
+
 	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
 	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
 	Core::Delegate<void, int> m_SetActiveEvent;
@@ -68,7 +70,7 @@ public:
 	[[Property]]
 	int playerIndex = 0;
 	[[Property]]
-	float  moveSpeed= 0.025f;
+	float moveSpeed= 0.025f;
 	[[Property]]
 	float  chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
 	float  baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
@@ -84,7 +86,6 @@ public:
 	void Move(Mathf::Vector2 dir);
 	void CharacterMove(Mathf::Vector2 dir);
 	
-
 	//잡기 던지기
 	[[Property]]
 	float ThrowPowerX = 6.f;      //들고있던물체 던져서 움직일량
@@ -101,7 +102,7 @@ public:
 	EntityItem* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
-	bool    onIndicate = false;
+	bool onIndicate = false;
 	[[Method]]
 	void CatchAndThrow();
 	void Catch();
@@ -122,7 +123,7 @@ public:
 	[[Property]]
 	float dashGracePeriod = 1.f; //대시 무적시간
 	[[Property]]
-	int   dashAmount = 1;   //최대대시가능 횟수
+	int  dashAmount = 1;   //최대대시가능 횟수
 	bool isDashing = false; //대쉬중
 	float m_dashElapsedTime = 0.f;  //미사용중
 	float m_dashCoolElapsedTime = 0.f; //
@@ -205,9 +206,6 @@ public:
 	float RangeAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
 	[[Property]]
 	float BombAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
-
-
-
 
 	//피격,죽음
 	bool isStun = false;

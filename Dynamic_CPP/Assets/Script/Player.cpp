@@ -28,6 +28,7 @@
 #include "SpecialBullet.h"
 #include "WeaponSlotController.h"
 #include "Bomb.h"
+#include "HPBar.h"
 
 #include "CurveIndicator.h"
 #include "DebugLog.h"
@@ -70,7 +71,6 @@ void Player::Start()
 		}
 	}
 
-
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 
 	//TEST : UIController 현재는 테스트라 P1_UIController로 고정
@@ -84,6 +84,19 @@ void Player::Start()
 			weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 			weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 			weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+		}
+	}
+
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->targetIndex = player->m_index;
+			m_currentHP = m_maxHP;
+			hpbar->SetMaxHP(m_maxHP);
+			hpbar->SetCurHP(m_currentHP);
 		}
 	}
 	//~TEST
@@ -377,6 +390,12 @@ void Player::LateUpdate(float tick)
 
 void Player::SendDamage(Entity* sender, int damage)
 {
+	//test sehwan
+	{
+		Damage(damage);
+	}
+
+	
 	m_currentHP -= std::max(damage, 0);
 	if (m_currentHP <= 0)
 	{
@@ -394,19 +413,24 @@ void Player::SendDamage(Entity* sender, int damage)
 		if (enemy)
 		{
 			// hit
-			m_currentHP -= std::max(damage, 0);
 			DropCatchItem();
-			if (m_currentHP <= 0)
-			{
-				isStun = true;
-				m_animator->SetParameter("OnStun", true);
-			}
+			Damage(damage);
 		}
 	}
 }
 
 void Player::Heal(int healAmount)
 {
+	m_currentHP = std::max(m_currentHP + healAmount, m_maxHP);
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->SetCurHP(m_currentHP);
+		}
+	}
 	m_currentHP = std::min(m_currentHP + healAmount, m_maxHP);
 }
 
@@ -420,9 +444,46 @@ bool Player::CheckState(flag _flag)
 	return playerState[curStateName].Test(_flag);
 }
 
+void Player::SetCurHP(int hp)
+{
+	m_currentHP = hp;
+	if (m_currentHP <= 0)
+	{
+		isStun = true;
+		m_animator->SetParameter("OnStun", true);
+	}
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->SetCurHP(m_currentHP);
+		}
+	}
+}
+
+void Player::Damage(int damage)
+{
+	m_currentHP -= std::max(damage, 0);
+	if (m_currentHP <= 0)
+	{
+		isStun = true;
+		m_animator->SetParameter("OnStun", true);
+	}
+	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
+	if (HPbar)
+	{
+		auto hpbar = HPbar->GetComponent<HPBar>();
+		if (hpbar)
+		{
+			hpbar->SetCurHP(m_currentHP);
+		}
+	}
+}
+
 void Player::Move(Mathf::Vector2 dir)
 {
-
 	if (OnMoveBomb)
 	{
 		MoveBombThrowPosition(dir);
@@ -1007,7 +1068,9 @@ void Player::MeleeAttack()
 	}
 	float damage = calculDamge(isChargeAttack);
 
-	int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
+	unsigned int layerMask = 1 << 0 | 1 << 3 | 1 << 4;
+
+	int size = RaycastAll(rayOrigin, direction, distacne, layerMask, hits);
 
 	constexpr float angle = XMConvertToRadians(15.0f);
 	Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
@@ -1015,9 +1078,9 @@ void Player::MeleeAttack()
 	Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
 	rightDir.Normalize();
 	std::vector<HitResult> leftHits;
-	int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+	int leftSize = RaycastAll(rayOrigin, leftDir, distacne, layerMask, leftHits);
 	std::vector<HitResult> rightHits;
-	int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+	int rightSize = RaycastAll(rayOrigin, rightDir, distacne, layerMask, rightHits);
 	std::vector<HitResult> allHits;
 	allHits.reserve(size + leftSize + rightSize);
 	allHits.insert(allHits.end(), hits.begin(), hits.end());

@@ -171,7 +171,9 @@ void DirectX11::DeviceResources::Present()
     // 모든 디바이스 리소스를 다시 만들어야 합니다.
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET || hr == DXGI_ERROR_DEVICE_HUNG)
     {
-        HandleDeviceLost();
+        //HandleDeviceLost();
+
+        HandleLostSwapChain();
     }
     else
     {

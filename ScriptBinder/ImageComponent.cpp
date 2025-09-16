@@ -20,6 +20,9 @@ ImageComponent::ImageComponent()
 
 void ImageComponent::SetTexture(int index)
 {
+	if (index < 0 || index >= textures.size())
+		return;
+
 	curindex = index;
 	m_curtexture = textures[curindex];
 	uiinfo.size = textures[curindex]->GetImageSize();

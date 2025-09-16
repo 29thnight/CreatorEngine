@@ -177,7 +177,10 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV
                     float3 lightVec = light.position.xyz - voxelWorldPos;
                     float distanceToLight = length(lightVec);
                     lightDir = normalize(lightVec);
-                    attenuation = GetDistanceAttenuation(distanceToLight, light.range);
+                    //attenuation = GetDistanceAttenuation(distanceToLight, light.range);
+                    attenuation = 1.0 / (light.constantAtt + (light.linearAtt * distanceToLight) + light.quadAtt * (distanceToLight * distanceToLight));
+                    attenuation *= pow(saturate(1 - pow((pow(distanceToLight, 2) / pow(light.range, 2)), 2)), 2);
+    
                     break;
                     }
                 case SPOT_LIGHT:
@@ -185,11 +188,18 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV
                     float3 lightVec = light.position.xyz - voxelWorldPos;
                     float distanceToLight = length(lightVec);
                     lightDir = normalize(lightVec);
+                    //float minCos = cos(light.spotAngle);
+                    //float maxCos = (minCos + 1.0f) / 2.0f; // squash between [0, 1]
+                    //float distAtt = GetDistanceAttenuation(distanceToLight, light.range);
+                    //float spotAtt = GetSpotAttenuation(-lightDir, normalize(light.direction.xyz), float2(minCos, maxCos));
+                    //attenuation = distAtt * spotAtt;
+                    attenuation = 1.0 / (light.constantAtt + (light.linearAtt * distanceToLight) + light.quadAtt * (distanceToLight * distanceToLight));
+                    attenuation *= pow(saturate(1 - pow((pow(distanceToLight, 2) / pow(light.range, 2)), 2)), 2);
                     float minCos = cos(light.spotAngle);
                     float maxCos = (minCos + 1.0f) / 2.0f; // squash between [0, 1]
-                    float distAtt = GetDistanceAttenuation(distanceToLight, light.range);
-                    float spotAtt = GetSpotAttenuation(-lightDir, normalize(light.direction.xyz), float2(minCos, maxCos));
-                    attenuation = distAtt * spotAtt;
+                    float cosAngle = dot(light.direction.xyz, -lightDir);
+                    float intensity = smoothstep(minCos, maxCos, cosAngle);
+                    attenuation = intensity * attenuation;
                     break;
                     }
                 default:

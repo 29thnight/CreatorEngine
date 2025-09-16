@@ -28,28 +28,28 @@ void TextComponent::Update(float tick)
 {
     if (useManualRect)
     {
-            pos = { manualRect.x, manualRect.y };
-            stretchSize = { manualRect.width, manualRect.height };
-            isStretchX = true;
-            isStretchY = true;
+        pos = { manualRect.x, manualRect.y };
+        stretchSize = { manualRect.width, manualRect.height };
+        isStretchX = true;
+        isStretchY = true;
     }
     else if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
-            const auto& worldRect = rect->GetWorldRect();
-            pos = { worldRect.x, worldRect.y };
-            stretchSize = { worldRect.width, worldRect.height };
+        const auto& worldRect = rect->GetWorldRect();
+        pos = { worldRect.x, worldRect.y };
+        stretchSize = { worldRect.width, worldRect.height };
 
-            if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+        if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+        {
+            if (auto* parent = GameObject::FindIndex(m_pOwner->m_parentIndex))
             {
-                    if (auto* parent = GameObject::FindIndex(m_pOwner->m_parentIndex))
-                    {
-                            if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
-                            {
-                                    const auto& pRect = parentRect->GetWorldRect();
-                                    stretchSize = { pRect.width, pRect.height };
-                            }
-                    }
+                if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
+                {
+                        const auto& pRect = parentRect->GetWorldRect();
+                        stretchSize = { pRect.width, pRect.height };
+                }
             }
+        }
 
         isStretchX = true;
         isStretchY = true;

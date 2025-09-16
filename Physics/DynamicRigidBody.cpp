@@ -104,6 +104,7 @@ void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, unsign
 
 		newFilterData.word0 = layerNumber;
 		newFilterData.word1 = collisionMatrix[layerNumber];
+		newFilterData.word2 = 1 << layerNumber;
 
 		shape->setSimulationFilterData(newFilterData);
 		shape->setQueryFilterData(newFilterData);

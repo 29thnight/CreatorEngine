@@ -192,11 +192,16 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EventTarget", []() { return new EventTarget(); });
+		CreateFactory::GetInstance()->RegisterFactory("EventManager", []() { return new EventManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("HPBar", []() { return new HPBar(); });
 		CreateFactory::GetInstance()->RegisterFactory("EventSelector", []() { return new EventSelector(); });
 		CreateFactory::GetInstance()->RegisterFactory("RewardObserver", []() { return new RewardObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityBigWood", []() { return new EntityBigWood(); });
 		CreateFactory::GetInstance()->RegisterFactory("CriticalMark", []() { return new CriticalMark(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItemHeal", []() { return new EntityItemHeal(); });
+		CreateFactory::GetInstance()->RegisterFactory("MonsterProjectile", []() { return new MonsterProjectile(); });
+		CreateFactory::GetInstance()->RegisterFactory("TestMonsterB", []() { return new TestMonsterB(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotController", []() { return new WeaponSlotController(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlot", []() { return new WeaponSlot(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityRock", []() { return new EntityRock(); });

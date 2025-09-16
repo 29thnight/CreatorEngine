@@ -138,6 +138,7 @@ GBufferOutput main(PixelShaderInput IN)
         float totalWeight = 0.0f;
 
         // 루프를 통해 모든 레이어를 순회하며 색상을 계산하고 가중치를 합산
+        [loop]
         for (int i = 0; i < numLayers; ++i)
         {
             float2 uv = IN.texCoord * gLayerTiling[i];

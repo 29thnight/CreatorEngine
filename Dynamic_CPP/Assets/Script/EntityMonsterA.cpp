@@ -62,15 +62,18 @@ void EntityMonsterA::Start()
 	}
 
 	//blackboard initialize
-	blackBoard->SetValueAsString("State", m_state);
-	blackBoard->SetValueAsString("Identity", m_identity);
-	blackBoard->SetValueAsFloat("MoveSpeed", m_moveSpeed);
-	blackBoard->SetValueAsInt("MaxHP", m_maxHP);
-	blackBoard->SetValueAsInt("CurrHP", m_currHP);
-	blackBoard->SetValueAsFloat("AttackRange", m_attackRange);
-	blackBoard->SetValueAsInt("AttackDamage", m_attackDamage);
-	blackBoard->SetValueAsFloat("ChaseRange", m_chaseRange);
-	blackBoard->SetValueAsFloat("ChaseOutTime", m_rangeOutDuration);
+	blackBoard->SetValueAsString("State", m_state); //현제 상태
+	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
+
+	blackBoard->SetValueAsInt("MaxHP", m_maxHP); //최대 체력
+	blackBoard->SetValueAsInt("CurrHP", m_currHP); //현재 체력
+
+	blackBoard->SetValueAsFloat("MoveSpeed", m_moveSpeed); //이동 속도
+	blackBoard->SetValueAsFloat("ChaseRange", m_chaseRange); // 추적 거리
+	blackBoard->SetValueAsFloat("ChaseOutTime", m_rangeOutDuration); //추적 지속 시간
+
+	blackBoard->SetValueAsFloat("AttackRange", m_attackRange); //근접 공격 거리
+	blackBoard->SetValueAsInt("AttackDamage", m_attackDamage); //근접 공격 데미지
 }
 
 void EntityMonsterA::Update(float tick)
@@ -235,6 +238,7 @@ void EntityMonsterA::ChaseTarget()
 void EntityMonsterA::Dead()
 {
 	m_animator->SetParameter("Dead", true);
+	//todo : Dead entity remove or disable
 }
 
 void EntityMonsterA::RotateToTarget()

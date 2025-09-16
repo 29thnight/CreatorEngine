@@ -14,8 +14,9 @@ void RewardObserver::Update(float tick)
 {
 	if (!rewardText || !rewardImage) return;
 
-	std::string rewardStr = std::format("{:02}", GameManager::GetReward());
+	int reward = GameInstance::GetInstance()->GetRewardAmount();
+	std::string rewardStr = std::format("{:02}", reward);
 	rewardText->SetMessage(rewardStr);
-	rewardImage->clipPercent = GameManager::GetReward() / 99.f;
+	rewardImage->clipPercent = reward / 99.f;
 }
 

@@ -60,6 +60,12 @@ void WeaponSlot::ApplyWeapon(Weapon* weapon)
 		m_slotImage = GetOwner()->GetComponent<ImageComponent>();
 	}
 
+	int size = m_slotImage->GetTextures().size();
+	if (m_curWeaponType >= size)
+	{
+		m_curWeaponType = (int)ItemType::Basic;
+	}
+
 	switch (m_curWeaponType)
 	{
 	case (int)ItemType::None:

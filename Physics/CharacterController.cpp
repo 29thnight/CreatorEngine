@@ -31,7 +31,8 @@ void CharacterController::Initialize(const CharacterControllerInfo& info, const 
 
 	//케릭터 충돌 필터 설정
 	m_filterData = new physx::PxFilterData();
-	m_filterData->word0 = 0;
+	m_filterData->word0 = 0;		//layer number
+	m_filterData->word2 = 1 << 0;	// layer bitmask
 	m_filters = new physx::PxControllerFilters(m_filterData);
 	m_filters->mFilterCallback = new PhysicsControllerFilterCallback(m_layerNumber, collisionMatrix); //&&&&&filter
 	m_characterMovement = new CharacterMovement();
@@ -122,7 +123,7 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
-
+	filterData.word2 = 1 << m_layerNumber;
 	//
 }
 

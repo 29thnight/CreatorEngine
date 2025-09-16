@@ -86,6 +86,7 @@ void StaticRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* co
 		physx::PxFilterData filterData;
 		filterData.word0 = layerNumber;
 		filterData.word1 = collisionMatrix[layerNumber];
+		filterData.word2 = 1 << layerNumber;
 		shape->setSimulationFilterData(filterData);
 		shape->setQueryFilterData(filterData);
 		auto userData = static_cast<CollisionData*>(shape->userData);

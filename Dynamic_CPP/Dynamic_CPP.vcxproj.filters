@@ -40,6 +40,9 @@
 		<Filter Include="Script\ScriptClass\Bullet">
 			<UniqueIdentifier>{d867b0dd-5ce3-49c4-8312-b79aded8e198}</UniqueIdentifier>
 		</Filter>
+		<Filter Include="Script\ScriptClass\Event">
+			<UniqueIdentifier>{afa374f5-8fbf-4b6c-b6ff-9d225e54e2e2}</UniqueIdentifier>
+		</Filter>
 	</ItemGroup>
 	<ItemGroup>
 		<ClInclude Include="framework.h">
@@ -252,15 +255,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\CameraMove.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="CriticalMark.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="ItemType.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
 		<ClInclude Include="PlayerBuff.h">
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
@@ -289,9 +283,6 @@
 			<Filter>Script</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Boss1.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\BP0031.h">
@@ -359,6 +350,36 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayerHit.h">
 			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestMonsterB.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\MonsterProjectile.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="PlayerState.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="GameInstance.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventTarget.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventManager.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\CameraMove.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\HPBar.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="ItemType.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\ITriggerCondition.h">
+			<Filter>Script\ScriptClass\Event</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -542,15 +563,6 @@
 		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\CameraMove.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="CriticalMark.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="PlayerBuff.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\Bullet.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
@@ -577,9 +589,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Boss1.cpp">
-			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\BP0031.cpp">
 			<Filter>BehaviorTree\Action</Filter>
@@ -614,6 +623,12 @@
 		<ClCompile Include="Assets\Script\WeaponSlotController.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\TestMonsterB.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MonsterProjectile.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -643,6 +658,27 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerHit.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="GameInstance.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventManager.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\HPBar.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="PlayerBuff.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CameraMove.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ITriggerCondition.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventTarget.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
