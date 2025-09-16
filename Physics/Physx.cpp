@@ -1450,6 +1450,7 @@ void PhysicX::SetKnockBack(const CharactorControllerInputInfo& info,bool _isknoc
 	}
 
 	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->GetCharacterMovement()->SetVelocity({0,0,0});
 	controller->GetCharacterMovement()->SetKnockback(_isknockback);
 	controller->GetCharacterMovement()->SetKnockbackVeloicy(velocity);
 }

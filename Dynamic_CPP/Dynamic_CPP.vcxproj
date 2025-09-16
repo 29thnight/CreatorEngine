@@ -289,7 +289,6 @@
 		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
 		<ClCompile Include="GameInstance.cpp" />
-		<ClCompile Include="PlayerBuff.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />
 		<ClCompile Include="pch.cpp">
