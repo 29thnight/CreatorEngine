@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotDurFont", []() { return new WeaponSlotDurFont(); });
 		CreateFactory::GetInstance()->RegisterFactory("EventTarget", []() { return new EventTarget(); });
 		CreateFactory::GetInstance()->RegisterFactory("EventManager", []() { return new EventManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("HPBar", []() { return new HPBar(); });
