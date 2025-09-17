@@ -124,6 +124,8 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
 	filterData.word2 = 1 << m_layerNumber;
+
+	static_cast<PhysicsControllerFilterCallback*>(m_filters->mFilterCallback)->SetCharacterLayer(m_layerNumber);
 	//
 }
 
