@@ -258,7 +258,7 @@ void EntityAsis::Purification(float tick)
 		XMVECTOR orbitOffset = XMVector3Transform(localOrbit, axisRotation);
 
 		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
-		arr[i]->GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
+		arr[i]->GetComponent<RigidBodyComponent>()->SetLinearVelocity(Mathf::Vector3::Zero);
 		arr[i]->GetOwner()->m_transform.SetPosition(finalPos);
 		i++;
 	}
@@ -385,7 +385,7 @@ void EntityAsis::PathMove(float tick)
 		Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMatrix);
 		Quaternion newRot = Quaternion::Slerp(currentRotation, rot, m_rotateSpeed * tick);
 
-		rotDownSpeed = rot.Dot(GetComponent<Transform>().GetWorldQuaternion());
+		rotDownSpeed = rot.Dot(GetComponent<Transform>()->GetWorldQuaternion());
 		rotDownSpeed = std::clamp(rotDownSpeed, 0.f, 1.f);
 
 		GetOwner()->m_transform.SetRotation(newRot);

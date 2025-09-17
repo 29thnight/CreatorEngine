@@ -27,7 +27,7 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage)
 				if (gm) {
 					auto& asis = gm->GetAsis();
 					for (auto& a : asis) {
-						a->GetComponent<EntityAsis>().AddPollutionGauge(m_stoneReward);
+						a->GetComponent<EntityAsis>()->AddPollutionGauge(m_stoneReward);
 					}
 				}
 			}
