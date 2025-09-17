@@ -188,7 +188,7 @@ GBufferOutput main(PixelShaderInput IN)
     OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, ior);
     float3 normalResult = surf.N * 0.5 + 0.5;
     OUT.normal = float4(normalResult, 1); // 여기 나중에 normal.w 까지 받아서 행렬변환한곳 오류날 가능성 있음.
-    OUT.emissive = timer > 0 ? float4(1, 1, 1, 1) : emissive;
+    OUT.emissive = lerp(emissive, float4(1, 1, 1, 1), saturate(timer / 10.f));
 
     OUT.bitmask = bit;
 
