@@ -5,7 +5,7 @@
 
 void LoadingController::Start()
 {
-	m_loadingImage = GetComponentPtr<ImageComponent>();
+	m_loadingImage = GetComponent<ImageComponent>();
 	int childIndex = GetOwner()->m_childrenIndices[0];
 	GameObject* child = GameObject::FindIndex(childIndex);
 	if (child)
