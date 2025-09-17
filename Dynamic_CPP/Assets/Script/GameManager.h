@@ -35,6 +35,7 @@ public:
 	void UnloadScene(const std::string& sceneName);
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
+	float GetAsisPollutionGaugeRatio();
 
 	// Test for Scene Management
 	[[Method]]

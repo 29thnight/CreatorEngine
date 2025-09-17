@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "IRegistableEvent.h"
+#include "KeyState.h"
 #include "PlayerInputComponent.generated.h"
 class ActionMap;
 class PlayerInputComponent : public Component, public RegistableEvent<PlayerInputComponent>

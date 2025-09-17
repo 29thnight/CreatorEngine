@@ -37,6 +37,10 @@ public:
 	float GetPollutionGaugePercent();
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
+	float GetPollutionGaugeRatio() const
+	{
+		return static_cast<float>(m_currentPollutionGauge) / static_cast<float>(maxPollutionGauge);
+	}
 private:
 	Animator* m_animator = nullptr;
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
