@@ -103,6 +103,15 @@ void WeaponSlot::UpdateDurability(Weapon* weapon)
 	//현재 슬롯에 추가된 무기 정보 갱신
 	m_curDurability = weapon->GetCurDur();
 	m_curMaxDurability = weapon->GetMaxDur();
+	if (m_curMaxDurability > 0)
+	{
+		m_curPersent = static_cast<float>(m_curDurability) / static_cast<float>(m_curMaxDurability);
+	}
+	else
+	{
+		m_curPersent = 0.0f;
+	}
+
 	if (0 >= m_curDurability)
 	{
 		m_slotImage->SetTexture((int)ItemType::None);
@@ -118,6 +127,16 @@ void WeaponSlot::UpdateDurability(Weapon* weapon)
 
 void WeaponSlot::UpdateChargingPersent(Weapon* weapon)
 {
+	if (!weapon) return;
+	//게이지 퍼센트 갱신
+	m_curPersent = ( static_cast<float>(m_curDurability) 
+		/ static_cast<float>(m_curMaxDurability)) * (1 - weapon->chargingPersent);
+}
+
+void WeaponSlot::EndChargingPersent()
+{
+	m_curPersent = (static_cast<float>(m_curDurability)
+		/ static_cast<float>(m_curMaxDurability));
 }
 
 void WeaponSlot::SetActive(bool active)

@@ -28,11 +28,15 @@ public:
 	void SetCharacterIndex(int index) { m_characterIndex = index; }
 	void AddWeapon(class Weapon* weapon, int slotIndex);
 	void UpdateDurability(class Weapon* weapon, int slotIndex);
+	void UpdateChargingPersent(class Weapon* weapon, int slotIndex);
+	void EndChargingPersent(int slotIndex);
 	void SetActive(int slotIndex);
 
 	Core::DelegateHandle m_ApplyWeaponHandle{};
 	Core::DelegateHandle m_UpdateDurabilityHandle{};
 	Core::DelegateHandle m_SetActiveHandle{};
+	Core::DelegateHandle m_UpdateChargingPersentHandle{};
+	Core::DelegateHandle m_EndChargingPersentHandle{};
 
 private:
 	[[Property]]

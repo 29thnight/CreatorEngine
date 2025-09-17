@@ -47,9 +47,11 @@ public:
 	[[Method]]
 	void Damage(int damage);
 
-	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
-	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
-	Core::Delegate<void, int> m_SetActiveEvent;
+	Core::Delegate<void, Weapon*, int>	m_AddWeaponEvent;
+	Core::Delegate<void, Weapon*, int>	m_UpdateDurabilityEvent;
+	Core::Delegate<void, Weapon*, int>	m_ChargingWeaponEvent;
+	Core::Delegate<void, int>			m_EndChargingEvent; //TODO : 차징이 취소되었을 때 int slotIndex -> UnsafeBroadcast해야함
+	Core::Delegate<void, int>			m_SetActiveEvent; 
 
 	[[Method]]
 	void SwapWeaponLeft();

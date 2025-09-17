@@ -51,6 +51,27 @@ void WeaponSlotController::UpdateDurability(Weapon* weapon, int slotIndex)
 	}
 }
 
+void WeaponSlotController::UpdateChargingPersent(Weapon* weapon, int slotIndex)
+{
+	if (nullptr == m_weaponSlots[slotIndex]) return;
+
+	auto weaponSlot = m_weaponSlots[slotIndex]->GetComponent<WeaponSlot>();
+	if (weaponSlot)
+	{
+		weaponSlot->UpdateChargingPersent(weapon);
+	}
+}
+
+void WeaponSlotController::EndChargingPersent(int slotIndex)
+{
+	if (nullptr == m_weaponSlots[slotIndex]) return;
+	auto weaponSlot = m_weaponSlots[slotIndex]->GetComponent<WeaponSlot>();
+	if (weaponSlot)
+	{
+		weaponSlot->EndChargingPersent();
+	}
+}
+
 void WeaponSlotController::SetActive(int slotIndex)
 {
 	for (unsigned int i = 0; i < WEAPON_SLOT_MAX; i++)

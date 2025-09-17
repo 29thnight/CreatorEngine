@@ -84,6 +84,8 @@ void Player::Start()
 			weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 			weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 			weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+			weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
+			weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
 		}
 	}
 
@@ -221,7 +223,6 @@ void Player::Update(float tick)
 
 	if (catchedObject)
 	{
-		
 		UpdateChatchObject();
 	}
 
@@ -252,6 +253,7 @@ void Player::Update(float tick)
 		{
 			m_curWeapon->isCompleteCharge = false;
 		}
+		m_ChargingWeaponEvent.UnsafeBroadcast(m_curWeapon, m_weaponIndex);
 	}
 	if (m_curDashCount != 0)
 	{
@@ -329,13 +331,11 @@ void Player::LateUpdate(float tick)
 			return;
 		}
 
-
 		{
 			//이미화면밖임
 			stunRespawnElapsedTime += tick;
 			if (stunRespawnTime <= stunRespawnElapsedTime)
 			{
-
 				auto& asiss = GM->GetAsis();
 				if (!asiss.empty())
 				{
@@ -348,12 +348,7 @@ void Player::LateUpdate(float tick)
 					GetOwner()->m_transform.SetPosition(newWorldPos);
 					stunRespawnElapsedTime = 0;
 				}
-
-
-
 			}
-			
-
 		}
 	}
 	else
@@ -530,7 +525,6 @@ void Player::CatchAndThrow()
 
 void Player::Catch()
 {
-
 	if (false == CheckState(PlayerStateFlag::CanGrab))  return;
 	if (m_nearObject != nullptr && catchedObject ==nullptr)
 	{
@@ -713,9 +707,6 @@ void Player::Charging()
 		isCharging = true;    //true 일동안 chargeTime 상승중
 	}
 	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
-
-		
-
 }
 
 void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀예정

@@ -404,6 +404,11 @@ bool Material::TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xM
     return ReadBytes(FindVar(cb, var), &out, sizeof(out));
 }
 
+bool Material::TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size)
+{
+	return WriteBytes(FindVar(cb, var), src, size);
+}
+
 // 式式 Qualified name sugar ("CB.Var") 式式
 bool Material::TrySetFloat(std::string_view q, float v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;

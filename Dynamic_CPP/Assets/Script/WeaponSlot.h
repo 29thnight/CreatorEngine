@@ -26,12 +26,17 @@ public:
 	void ApplyWeapon(class Weapon* weapon);
 	void UpdateDurability(class Weapon* weapon);
 	void UpdateChargingPersent(class Weapon* weapon);
+	void EndChargingPersent();
 	void SetActive(bool active);
 	bool IsActive() const { return m_isActive; }
-
-	int GetCurrentWeaponType() const { return m_curWeaponType; }
-	int GetCurrentDurability() const { return m_curDurability; }
 	int GetMaxDurability() const { return m_curMaxDurability; }
+	int GetCurrentDurability() const { return m_curDurability; }
+	int GetCurrentWeaponType() const { return m_curWeaponType; }
+	float GetDurabilityRatio() const 
+	{ 
+		if (m_curMaxDurability <= 0) return 0.0f;
+		return m_curPersent;
+	}
 
 private:
 	//자식 객체들로 게이지 및 UI표시를 처리한다.
@@ -44,6 +49,8 @@ private:
 	int m_curMaxDurability = 0;
 	//현재 슬롯에 추가된 무기의 내구도(게이지 감소용)
 	int m_curDurability = 0;
+	//현재 슬롯에 추가된 무기의 게이지 퍼센트(차징용)
+	float m_curPersent = 0.0f;
 	//UI 활성화 여부
 	bool m_isActive = false;
 };
