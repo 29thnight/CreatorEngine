@@ -22,12 +22,14 @@ Material::Material(const Material& material) :
     m_AO_TexName(material.m_AO_TexName),
     m_EmissiveTexName(material.m_EmissiveTexName),
     m_flowInfo(material.m_flowInfo),
-    m_shaderPSO(material.m_shaderPSO),
+    /*m_shaderPSO(material.m_shaderPSO),*/
     m_renderingMode(material.m_renderingMode),
     m_shaderPSOName(material.m_shaderPSOName),
     m_cbMeta(material.m_cbMeta),
-    m_cbufferValues(material.m_cbufferValues)
+    m_cbufferValues(material.m_cbufferValues),
+	m_dirtyCBs(material.m_dirtyCBs)
 {
+	SetShaderPSO(material.m_shaderPSO);
 }
 
 Material::Material(Material&& material) noexcept
@@ -52,6 +54,7 @@ Material::Material(Material&& material) noexcept
     m_flowInfo = std::move(material.m_flowInfo);
     std::exchange(m_cbMeta, material.m_cbMeta);
     m_cbufferValues = std::move(material.m_cbufferValues);
+	m_dirtyCBs = std::move(material.m_dirtyCBs);
 }
 
 Material::~Material()
@@ -117,7 +120,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	cloneMaterial->m_name = finalName;
 	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 
-	DataSystems->SaveMaterial(cloneMaterial.get());
+	//DataSystems->SaveMaterial(cloneMaterial.get());
 
 	return cloneMaterial;
 }
@@ -500,5 +503,5 @@ void Material::UpdateCBufferView()
     if (!m_cbMeta) return;
 
 	m_cbufferView = m_cbufferValues;
-    m_viewDirtyCBs = std::move(m_dirtyCBs);
+    m_viewDirtyCBs = m_dirtyCBs;
 }

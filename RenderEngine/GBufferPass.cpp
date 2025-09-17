@@ -296,8 +296,11 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		{
 			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
 			{
-				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
-				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				for (auto* proxy : proxies)
+				{
+					proxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+					proxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				}
 				customPSO = firstProxy->m_Material->m_shaderPSO;
 			}
 			else
@@ -323,6 +326,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
 			proxy->m_Material->TrySetMaterialInfo();
+			//Cbuffer를 View 전용 컨테이너로 복사
+			proxy->m_Material->UpdateCBufferView();
 			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
 
@@ -343,8 +348,11 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		{
 			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
 			{
-				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
-				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				for (auto* proxy : proxies)
+				{
+					proxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+					proxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				}
 				customPSO = firstProxy->m_Material->m_shaderPSO;
 			}
 			else
@@ -359,7 +367,6 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
 		for (auto* proxy : proxies)
 		{
-
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
 			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
 			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
@@ -372,14 +379,11 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
 			proxy->m_Material->TrySetValue("BoneTransformation", "BoneTransforms", proxy->m_finalTransforms, sizeof(Mathf::xMatrix) * 50);
 			proxy->m_Material->TrySetMaterialInfo();
+
+			//Cbuffer를 View 전용 컨테이너로 복사
+			proxy->m_Material->UpdateCBufferView();
 			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
-
-			//if (proxy->m_finalTransforms)
-			//{
-			//	DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), proxy->m_finalTransforms);
-			//}
-			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
 			proxy->Draw(deferredPtr);
 		}
 	}

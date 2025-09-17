@@ -29,7 +29,8 @@
 #include "WeaponSlotController.h"
 #include "Bomb.h"
 #include "HPBar.h"
-
+#include "MeshRenderer.h"
+#include "Material.h"
 #include "CurveIndicator.h"
 #include "DebugLog.h"
 #include "EntityMonsterA.h"
@@ -37,9 +38,29 @@
 #include "PlayerState.h"
 void Player::Start()
 {
-	
 	player = GetOwner();
+
 	auto childred = player->m_childrenIndices;
+	//TEST : Player에 대한 매쉬를 찾아서 머테리얼 인스턴스화
+	for(auto& child : childred)
+	{
+		auto child_childred = GameObject::FindIndex(child)->m_childrenIndices;
+		for (auto& child2 : child_childred)
+		{
+			auto mesh = GameObject::FindIndex(child2)->GetComponent<MeshRenderer>();
+			if (mesh)
+			{
+				auto material = mesh->m_Material;
+				if (material)
+				{
+					Material* instanceMaterial{ material->Instantiate(material) };
+					mesh->m_Material = instanceMaterial;
+					mesh->m_Material->TrySetFloat("TestCB", "timer", 0.f);
+				}
+			}
+		}
+	}
+
 	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
@@ -50,7 +71,6 @@ void Player::Start()
 			aniOwner = GameObject::FindIndex(child);
 			break;
 		}
-
 	}
 	if (!m_animator)
 	{
@@ -165,10 +185,6 @@ void Player::Start()
 
 	}
 
-
-
-
-
 	//idle에 move 도포함
 	BitFlag idleBit;
 	idleBit.Set(PlayerStateFlag::CanMove);
@@ -231,6 +247,35 @@ void Player::Update(float tick)
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
 	}
+
+	static float elapsedTime = 0.f;
+	auto childred = player->m_childrenIndices;
+	elapsedTime += tick;
+	//TEST : Player에 대한 매쉬를 찾아서 머테리얼 인스턴스화
+	for (auto& child : childred)
+	{
+		auto child_childred = GameObject::FindIndex(child)->m_childrenIndices;
+		for (auto& child2 : child_childred)
+		{
+			auto mesh = GameObject::FindIndex(child2)->GetComponent<MeshRenderer>();
+			if (mesh)
+			{
+				auto material = mesh->m_Material;
+				if (material)
+				{
+					Material* instanceMaterial{ material->Instantiate(material) };
+					mesh->m_Material = instanceMaterial;
+					mesh->m_Material->TrySetFloat("TestCB", "timer", sinf(elapsedTime));
+				}
+			}
+		}
+	}
+
+	if (elapsedTime >= 10.f)
+	{
+		elapsedTime = 0.f;
+	}
+
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
 		m_comboElapsedTime += tick;

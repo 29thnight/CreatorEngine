@@ -67,6 +67,7 @@ private:
 public:
     ShaderPSO();
     ~ShaderPSO() = default;
+    ShaderPSO(const ShaderPSO& other);
 
     // Reflect all attached shaders and create constant buffers automatically.
     void ReflectConstantBuffers();
