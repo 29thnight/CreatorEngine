@@ -98,7 +98,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "red",
+                                "name": "CriticalRed",
                                 "slot": 0
                             }
                         ],
