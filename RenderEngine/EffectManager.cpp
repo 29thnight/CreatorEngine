@@ -347,10 +347,14 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	meshColorModule->Initialize();
 	meshColorModule->SetEnabled(false);
 
+	auto meshMovementModule = particleSystem->AddModule<MeshMovementModuleCS>();
+	meshMovementModule->Initialize();
+	meshMovementModule->SetEnabled(false);
+
 	auto trailGenerateModule = particleSystem->AddModule<TrailGenerateModule>();
 	trailGenerateModule->Initialize();
 	trailGenerateModule->SetEnabled(false);
-
+	
 	// RenderModule도 초기화
 	auto billboardModule = particleSystem->AddRenderModule<BillboardModuleGPU>();
 	billboardModule->Initialize(); // PSO 생성
@@ -441,6 +445,9 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 							}
 							else if (moduleType == "MeshColorModuleCS") {
 								psConfig.moduleConfig.meshColorEnabled = true;
+							}
+							else if (moduleType == "MeshMovementModuleCS") {
+								psConfig.moduleConfig.meshMovementEnabled = true;
 							}
 							else if (moduleType == "TrailGenerateModule") {
 								psConfig.moduleConfig.trailGenerateEnable = true;
@@ -538,6 +545,12 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 
 		if (psConfig.moduleConfig.meshColorEnabled) {
 			if (auto* module = ps->GetModule<MeshColorModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.meshMovementEnabled) {
+			if (auto* module = ps->GetModule<MeshMovementModuleCS>()) {
 				module->SetEnabled(true);
 			}
 		}

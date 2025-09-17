@@ -2,57 +2,6 @@
 #include "ParticleModule.h"
 #include "ISerializable.h"
 
-enum class VelocityMode
-{
-	Constant,           // 일정한 속도
-	Curve,             // 시간에 따른 곡선
-	Impulse,           // 특정 시점에 충격
-	Wind,              // 바람 효과
-	Orbital,            // 궤도 운동
-	Explosive,			// 폭발
-};
-
-struct alignas(16) VelocityPoint
-{
-	float time;
-	Mathf::Vector3 velocity;
-	float strength;
-	float3 pad1;
-};
-
-struct alignas(16) ImpulseData
-{
-	float triggerTime;
-	Mathf::Vector3 direction;
-	float force;
-	float duration;
-	float2 pad1;
-};
-
-struct WindData
-{
-	Mathf::Vector3 direction;
-	float baseStrength;
-	float turbulence;        // 난기류 강도
-	float frequency;         // 변화 빈도
-};
-
-struct OrbitalData
-{
-	Mathf::Vector3 center;
-	float radius;
-	float speed;
-	Mathf::Vector3 axis;     // 회전축
-};
-
-struct ExplosiveData
-{
-	float initialSpeed;      // 초기 폭발 속도
-	float speedDecay;        // 속도 감소율
-	float randomFactor;      // 랜덤 요소 강도
-	float sphereRadius;      // 구형 분포 반지름 (0이면 완전한 구)
-};
-
 class MovementModuleCS : public ParticleModule, public ISerializable
 {
 public:
@@ -67,6 +16,7 @@ public:
 	void Initialize() override;
 	void Update(float delta) override;
 	void OnSystemResized(UINT max) override;
+	void Release() override;
 
 	virtual void ResetForReuse();
 	virtual bool IsReadyForReuse() const;
@@ -116,7 +66,7 @@ public:
 private:
 	void UpdateConstantBuffers(float delta);
 	void UpdateStructuredBuffers();
-	void Release();
+
 
 	// Parameters structure (constant buffer)
 	struct alignas(16) MovementParams

@@ -55,13 +55,10 @@ cbuffer ParticleTemplate : register(b1)
     float4 gColor;
     
     float3 gVelocity;
-    float gMinVerticalVelocity;
+    float gVelocityRandomRange;
     
     float3 gAcceleration;
-    float gMaxVerticalVelocity;
-    
-    float gHorizontalVelocityRange;
-    float3 pad;
+    float pad1;
 }
 
 // 버퍼 바인딩
@@ -212,17 +209,18 @@ float3 GenerateInitialVelocity(uint seed)
 {
     float3 velocity = gVelocity;
     
-    if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
+    // 랜덤 범위 적용 (각 축별로)
+    if (gVelocityRandomRange > 0.0)
     {
-        float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
-        float horizontalAngle = RandomFloat01(seed + 1) * 6.28318530718;
-        float horizontalMag = RandomFloat01(seed + 2) * gHorizontalVelocityRange;
+        uint seed1 = WangHash(seed);
+        uint seed2 = WangHash(seed1);
+        uint seed3 = WangHash(seed2);
         
-        velocity += float3(
-            horizontalMag * cos(horizontalAngle),
-            verticalVel,
-            horizontalMag * sin(horizontalAngle)
-        );
+        float randomX = (RandomFloat01(seed1) - 0.5) * gVelocityRandomRange;
+        float randomY = (RandomFloat01(seed2) - 0.5) * gVelocityRandomRange;
+        float randomZ = (RandomFloat01(seed3) - 0.5) * gVelocityRandomRange;
+        
+        velocity += float3(randomX, randomY, randomZ);
     }
     
     // 속도에도 회전 적용

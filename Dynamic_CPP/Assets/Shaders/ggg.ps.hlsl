@@ -45,7 +45,7 @@ PixelOutput main(PixelInput input)
 
     // 원하는 구간 설정 (예: 0.25~1.0)
     float Umin = 0.00;
-    float Umax = 0.65;
+    float Umax = 0.75;
 
     float edgeFade = 1.0;
     float fadeWidth = 0.1;

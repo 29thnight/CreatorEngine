@@ -152,6 +152,30 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 	}
 }
 
+void ParticleSystem::UpdateEffectBaseRotation(const Mathf::Vector3& newBaseRotation)
+{
+	m_effectBaseRotation = newBaseRotation;
+
+	// 실제 emitter 월드 회전 = Effect 기준 회전 + 이 ParticleSystem의 상대회전
+	Mathf::Vector3 finalWorldRotation = m_effectBaseRotation + m_rotation;
+
+	// SpawnModule들에 최종 계산된 회전값 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetEmitterRotation(finalWorldRotation);
+		}
+		if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetEmitterRotation(finalWorldRotation);
+		}
+		//if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEmitterRotation(finalWorldRotation);
+		//	continue;
+		//}
+	}
+}
+
 void ParticleSystem::UpdateGenerateModule(float delta)
 {
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
@@ -220,24 +244,10 @@ void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 
 void ParticleSystem::SetRotation(const Mathf::Vector3& rotation)
 {
-	m_rotation = rotation;
+	m_rotation = rotation;  // 상대회전 저장
 
-	// SpawnModule들에 회전값 전달
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
-	{
-		ParticleModule& module = *it;
-
-		// SpawnModuleCS인지 확인
-		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module))
-		{
-			spawnModule->SetEmitterRotation(rotation);
-		}
-		// MeshSpawnModuleCS인지 확인
-		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module))
-		{
-			meshSpawnModule->SetEmitterRotation(rotation);
-		}
-	}
+	// Effect 기준 회전이 설정되어 있다면 즉시 업데이트
+	UpdateEffectBaseRotation(m_effectBaseRotation);
 }
 
 void ParticleSystem::CreateParticleBuffer(UINT numParticles)

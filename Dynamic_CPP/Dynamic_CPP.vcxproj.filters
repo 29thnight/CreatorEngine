@@ -234,9 +234,6 @@
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEffect.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
@@ -264,8 +261,11 @@
 		<ClInclude Include="Assets\Script\NormalBullet.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\Bomb.h">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\Explosion.h">
-			<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponCapsule.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -548,9 +548,6 @@
 		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEffect.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
@@ -578,8 +575,11 @@
 		<ClCompile Include="Assets\Script\NormalBullet.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\Explosion.cpp">
-			<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
 			<Filter>Script\ScriptClass</Filter>

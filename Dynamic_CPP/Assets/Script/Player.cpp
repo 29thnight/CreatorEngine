@@ -148,6 +148,8 @@ void Player::Start()
 	}
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
+
+	player->SetLayer("Player");
 	camera = GameObject::Find("Main Camera");
 
 	Prefab* IndicatorPrefab = PrefabUtilitys->LoadPrefab("Indicator");
@@ -1267,7 +1269,7 @@ void Player::ThrowBomb()
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 		bombObj->GetComponent<Transform>()->SetPosition(pos);
 		Bomb* bomb = bombObj->GetComponent<Bomb>();
-		bomb->ThrowBomb(this, pos,bombThrowPosition);
+		bomb->ThrowBomb(this, pos, bombThrowPosition, calculDamge());
 		onBombIndicate = false;
 	}
 

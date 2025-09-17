@@ -13,6 +13,8 @@ struct PixelInput
     float3 viewDir : VIEW_DIR;
     float alpha : ALPHA;
     uint renderMode : RENDER_MODE;
+    float particleAge : PARTICLE_AGE;
+    float particleLifeTime : PARTICLE_LIFETIME;
 };
 struct PixelOutput
 {
