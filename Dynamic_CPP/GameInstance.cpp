@@ -26,6 +26,7 @@ void GameInstance::AsyncSceneLoadUpdate()
 		{
 			std::string sceneName = loadedScene->m_sceneName.ToString();
 			m_loadedScenes[sceneName] = loadedScene;
+			m_isLoadSceneComplete = true;
 			LOG("Scene loaded: " + sceneName);
 		}
 		else {
@@ -47,6 +48,7 @@ void GameInstance::SwitchScene(const std::string& sceneName)
 		return;
 	}
 	SceneManagers->ActivateScene(m_loadedScenes[sceneName]);
+	m_isLoadSceneComplete = false;
 }
 
 void GameInstance::UnloadScene(const std::string& sceneName)
