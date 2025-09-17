@@ -17,9 +17,14 @@ public:
 	void SetOwner(GameObject* owner);
 	GameObject* GetOwner() const { return m_pOwner; }
 
-	//TODO : 테스트 필요(사유는 inl에 요약)
+	//template<typename T>
+	//T& GetComponent();
+
 	template<typename T>
-	T& GetComponent();
+	T* GetComponent();
+
+	template<typename T>
+	T* GetComponentDynamicCast();
 	//Transform의 경우에는 GetComponent<Transform>()로 사용
 	Component& GetComponent(HashedGuid typeof);
 

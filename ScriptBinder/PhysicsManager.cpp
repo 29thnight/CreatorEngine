@@ -10,6 +10,7 @@
 #include "CapsuleColliderComponent.h"
 #include "MeshCollider.h"
 #include "MeshRenderer.h"
+#include "TagManager.h"
 #include "Terrain.h"
 #include "TerrainCollider.h"
 #include "CharacterControllerComponent.h"
@@ -37,6 +38,8 @@ void PhysicsManager::Initialize()
 		row.resize(32, 1); // 기본적으로 모든 충돌체가 충돌 가능하도록 설정
 	}
 	SetCollisionMatrix(collisionGrid);
+
+	LoadCollisionMatrix();
 }
 void PhysicsManager::Update(float fixedDeltaTime)
 {
@@ -78,6 +81,8 @@ void PhysicsManager::Shutdown()
 	Container.clear();
 	// 물리 엔진 종료
 	Physics->UnInitialize();
+
+	SaveCollisionMatrix();
 
 }
 void PhysicsManager::ChangeScene()
@@ -929,6 +934,57 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 		Physics->SetControllerPosition(change.id, change.position);
 	}
 	m_pendingControllerPositions.clear();
+}
+
+void PhysicsManager::SaveCollisionMatrix()
+{
+	file::path matrixSettingsPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
+
+	std::ofstream settingsFile(matrixSettingsPath);
+	MetaYml::Node matrixNode;
+	constexpr int MAX_LAYER_SIZE = 32;
+	std::vector<std::string> layerNames = TagManagers->GetLayers();
+
+	for(int i = 0; i < layerNames.size(); ++i)
+	{
+		auto vec = m_collisionMatrix[i];
+		for (int j = 0; j < layerNames.size(); ++j)
+		{
+			matrixNode[i][j] = (bool)vec[j];
+		}
+	}
+
+	settingsFile << matrixNode;
+
+	settingsFile.close();
+}
+
+void PhysicsManager::LoadCollisionMatrix()
+{
+	file::path matrixSettingsPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
+	std::ifstream settingsFile(matrixSettingsPath);
+	if (!settingsFile.is_open())
+	{
+		Debug->LogWarning("No CollisionMatrix.asset file found. Using default collision matrix.");
+		return;
+	}
+	MetaYml::Node matrixNode = MetaYml::LoadFile(matrixSettingsPath.string());
+	constexpr int MAX_LAYER_SIZE = 32;
+	for (int i = 0; i < MAX_LAYER_SIZE; ++i)
+	{
+		for (int j = 0; j < MAX_LAYER_SIZE; ++j)
+		{
+			if (matrixNode[i] && matrixNode[i][j])
+			{
+				m_collisionMatrix[i][j] = matrixNode[i][j].as<bool>();
+			}
+			else
+			{
+				m_collisionMatrix[i][j] = true; // 기본값 설정
+			}
+		}
+	}
+	settingsFile.close();
 }
 
 void PhysicsManager::SetRigidBodyState(const RigidBodyState& state)

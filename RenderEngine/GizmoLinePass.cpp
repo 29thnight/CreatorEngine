@@ -1,5 +1,6 @@
 #include "GizmoLinePass.h"
 #include "GizmoLinePass.h"
+#include "GizmoLinePass.h"
 #include "GizmoCbuffer.h"
 #include "ShaderSystem.h"
 #include "LightComponent.h"
@@ -137,11 +138,11 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
             const float height = characterController->m_height * scale.y;
             DrawWireCapsule(transformMatrix, radius, height, { 0.f, 1.f, 1.f, 1.f });
 		}
-        //for (const auto& obj : activeScene->m_SceneObjects) {
-        //    if (!obj || obj->m_gameObjectType != GameObjectType::UI) continue;
-        //    if (auto* rt = obj->GetComponent<RectTransformComponent>(); rt && rt->IsEnabled())
-        //        DrawUIRect(rt->GetWorldRect(), { 1.f, 0.f, 0.f, 1.f });
-        //}
+        for (const auto& obj : activeScene->m_SceneObjects) {
+            if (!obj || obj->m_gameObjectType != GameObjectType::UI) continue;
+            if (auto* rt = obj->GetComponent<RectTransformComponent>(); rt && rt->IsEnabled())
+                DrawUIRect(rt->GetWorldRect(), { 1.f, 0.f, 0.f, 1.f }, camera);
+        }
     }
 
     if (selectedObject)
@@ -468,6 +469,39 @@ void GizmoLinePass::DrawUIRect(const Mathf::Rect& rect, const Mathf::Color4& col
         {{right, bottom, 0.f}, color}, {{right, top, 0.f}, color},
         {{right, top, 0.f}, color}, {{left, top, 0.f}, color},
         {{left, top, 0.f}, color}, {{left, bottom, 0.f}, color},
+    } };
+
+    DrawLines(vertices.data(), static_cast<uint32_t>(vertices.size()));
+}
+
+void GizmoLinePass::DrawUIRect(const Mathf::Rect& rect, const Mathf::Color4& color, Camera& camera)
+{
+    const float minX = rect.x;
+    const float maxX = rect.x + rect.width;
+    const float minY = rect.y;
+    const float maxY = rect.y + rect.height;
+
+    const auto screenToWorld = [&camera](float x, float y)
+    {
+        const Mathf::Vector2 screenPosition{ x, y };
+        const auto worldPosition = camera.ConvertScreenToWorld(screenPosition, 0.0f);
+        return Mathf::ConvertToDistance(worldPosition);
+    };
+
+    const Mathf::Vector3 bottomLeft = screenToWorld(minX, minY);
+    const Mathf::Vector3 bottomRight = screenToWorld(maxX, minY);
+    const Mathf::Vector3 topRight = screenToWorld(maxX, maxY);
+    const Mathf::Vector3 topLeft = screenToWorld(minX, maxY);
+
+    std::array<LineVertex, 8> vertices{ {
+        {{bottomLeft.x, bottomLeft.y, bottomLeft.z}, color},
+        {{bottomRight.x, bottomRight.y, bottomRight.z}, color},
+        {{bottomRight.x, bottomRight.y, bottomRight.z}, color},
+        {{topRight.x, topRight.y, topRight.z}, color},
+        {{topRight.x, topRight.y, topRight.z}, color},
+        {{topLeft.x, topLeft.y, topLeft.z}, color},
+        {{topLeft.x, topLeft.y, topLeft.z}, color},
+        {{bottomLeft.x, bottomLeft.y, bottomLeft.z}, color},
     } };
 
     DrawLines(vertices.data(), static_cast<uint32_t>(vertices.size()));

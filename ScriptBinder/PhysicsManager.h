@@ -158,6 +158,8 @@ public:
 		Physics->SetCollisionMatrix(collisionMatrix);
 	}
 	std::vector<std::vector<uint8_t>> GetCollisionMatrix() const { return m_collisionMatrix; }
+	void SaveCollisionMatrix();
+	void LoadCollisionMatrix();
 
 	// RigidBody 상태 변경 요청 (RigidBodyComponent에서 호출)
 	void SetRigidBodyState(const RigidBodyState& state);

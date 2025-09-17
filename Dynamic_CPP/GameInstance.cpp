@@ -26,6 +26,7 @@ void GameInstance::AsyncSceneLoadUpdate()
 		{
 			std::string sceneName = loadedScene->m_sceneName.ToString();
 			m_loadedScenes[sceneName] = loadedScene;
+			m_isLoadSceneComplete = true;
 			LOG("Scene loaded: " + sceneName);
 		}
 		else {
@@ -36,10 +37,6 @@ void GameInstance::AsyncSceneLoadUpdate()
 
 void GameInstance::LoadScene(const std::string& sceneName)
 {
-	if (m_loadedScenes.find(sceneName) != m_loadedScenes.end()) {
-		LOG("Scene already loaded: " + sceneName);
-		return;
-	}
 	file::path fullPath = PathFinder::Relative("Scenes\\") / std::string(sceneName + ".creator");
 	m_loadingSceneFuture = SceneManagers->LoadSceneAsync(fullPath.string());
 }
@@ -51,6 +48,7 @@ void GameInstance::SwitchScene(const std::string& sceneName)
 		return;
 	}
 	SceneManagers->ActivateScene(m_loadedScenes[sceneName]);
+	m_isLoadSceneComplete = false;
 }
 
 void GameInstance::UnloadScene(const std::string& sceneName)

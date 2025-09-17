@@ -20,6 +20,9 @@ public:
 	void LoadScene(const std::string& sceneName);
 	void SwitchScene(const std::string& sceneName);
 	void UnloadScene(const std::string& sceneName);
+	bool IsLoadSceneComplete() const { return m_isLoadSceneComplete; }
+	void SetNextSceneName(const std::string& sceneName) { m_nextSceneName = sceneName; }
+	const std::string& GetNextSceneName() const { return m_nextSceneName; }
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 
@@ -34,6 +37,8 @@ public:
 private:
 	EventManager* m_eventManager{ nullptr };
 	int m_RewardAmount{};
+	bool m_isLoadSceneComplete{ false };
+	std::string m_nextSceneName{};
 	// 로드된 씬들을 저장하는 맵
 	std::unordered_map<std::string, class Scene*> m_loadedScenes;
 	// 오른쪽 왼쪽 UI 구분용 Left: 0, Right: 1
