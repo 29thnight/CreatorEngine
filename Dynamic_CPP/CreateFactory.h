@@ -30,7 +30,6 @@
 #include "SpecialBullet.h"
 #include "Bullet.h"
 #include "DestroyEffect.h"
-#include "TestEffect.h"
 #include "EntityEnemy.h"
 #include "Weapon.h"
 #include "TweenManager.h"
