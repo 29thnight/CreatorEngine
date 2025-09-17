@@ -606,7 +606,7 @@ void Scene::LateUpdate(float deltaSecond)
                 if (scene && (scene == this ||
                     (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
                 {
-                        data->PushUIRenderData(image->GetInstanceID());
+                    data->PushUIRenderData(image->GetInstanceID());
                 }
 			}
 		});

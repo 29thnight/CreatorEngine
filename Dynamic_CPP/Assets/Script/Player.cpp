@@ -29,8 +29,6 @@
 #include "WeaponSlotController.h"
 #include "Bomb.h"
 #include "HPBar.h"
-#include "MeshRenderer.h"
-#include "Material.h"
 #include "CurveIndicator.h"
 #include "DebugLog.h"
 #include "EntityMonsterA.h"
@@ -41,25 +39,6 @@ void Player::Start()
 	player = GetOwner();
 
 	auto childred = player->m_childrenIndices;
-	//TEST : Player에 대한 매쉬를 찾아서 머테리얼 인스턴스화
-	for(auto& child : childred)
-	{
-		auto child_childred = GameObject::FindIndex(child)->m_childrenIndices;
-		for (auto& child2 : child_childred)
-		{
-			auto mesh = GameObject::FindIndex(child2)->GetComponent<MeshRenderer>();
-			if (mesh)
-			{
-				auto material = mesh->m_Material;
-				if (material)
-				{
-					Material* instanceMaterial{ material->Instantiate(material) };
-					mesh->m_Material = instanceMaterial;
-					mesh->m_Material->TrySetFloat("TestCB", "timer", 0.f);
-				}
-			}
-		}
-	}
 
 	for (auto& child : childred)
 	{
@@ -93,19 +72,37 @@ void Player::Start()
 
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 
-	//TEST : UIController 현재는 테스트라 P1_UIController로 고정
-	//TODO : 관련해서 플레이어 컴포넌트가 본인 인덱스를 알아야 함.
-	GameObject* uiController = GameObject::Find("P1_UIController");
-	if (uiController)
+	GameObject* uiController{};
+	if(0 == playerIndex)
 	{
-		auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
-		if (weaponSlotController)
+		GameObject* uiController = GameObject::Find("P1_UIController");
+		if (uiController)
 		{
-			weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
-			weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
-			weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
-			weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
-			weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+			if (weaponSlotController)
+			{
+				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
+				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
+				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+			}
+		}
+	}
+	else
+	{
+		GameObject* uiController = GameObject::Find("P2_UIController");
+		if (uiController)
+		{
+			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+			if (weaponSlotController)
+			{
+				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
+				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
+				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+			}
 		}
 	}
 
@@ -246,34 +243,6 @@ void Player::Update(float tick)
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
-	}
-
-	static float elapsedTime = 0.f;
-	auto childred = player->m_childrenIndices;
-	elapsedTime += tick;
-	//TEST : Player에 대한 매쉬를 찾아서 머테리얼 인스턴스화
-	for (auto& child : childred)
-	{
-		auto child_childred = GameObject::FindIndex(child)->m_childrenIndices;
-		for (auto& child2 : child_childred)
-		{
-			auto mesh = GameObject::FindIndex(child2)->GetComponent<MeshRenderer>();
-			if (mesh)
-			{
-				auto material = mesh->m_Material;
-				if (material)
-				{
-					Material* instanceMaterial{ material->Instantiate(material) };
-					mesh->m_Material = instanceMaterial;
-					mesh->m_Material->TrySetFloat("TestCB", "timer", sinf(elapsedTime));
-				}
-			}
-		}
-	}
-
-	if (elapsedTime >= 10.f)
-	{
-		elapsedTime = 0.f;
 	}
 
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
