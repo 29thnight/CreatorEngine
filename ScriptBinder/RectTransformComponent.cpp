@@ -7,8 +7,105 @@
 RectTransformComponent::RectTransformComponent()
 {
     // 초기화가 필요한 경우 여기에 작성합니다.
-	m_name = "RectTransformComponent";
-	m_typeID = type_guid(RectTransformComponent);
+    m_name = "RectTransformComponent";
+    m_typeID = type_guid(RectTransformComponent);
+}
+
+Mathf::Vector2 RectTransformComponent::GetAnchoredPosition() const
+{
+    const auto parentRect = ResolveParentRect();
+    return CalculateDisplayPosition(parentRect);
+}
+
+void RectTransformComponent::SetAnchoredPosition(const Mathf::Vector2& position)
+{
+    const auto parentRect = ResolveParentRect();
+    m_anchoredPosition.x = ToRaw(position.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x);
+    m_anchoredPosition.y = ToRaw(position.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y);
+    m_isDirty = true;
+}
+
+void RectTransformComponent::SetAnchorMin(const Mathf::Vector2& anchorMin)
+{
+    const auto parentRect = ResolveParentRect();
+    const auto display = CalculateDisplayPosition(parentRect);
+    m_anchorMin = anchorMin;
+    m_isDirty = true;
+    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x);
+    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y);
+}
+
+void RectTransformComponent::SetAnchorMax(const Mathf::Vector2& anchorMax)
+{
+    const auto parentRect = ResolveParentRect();
+    const auto display = CalculateDisplayPosition(parentRect);
+    m_anchorMax = anchorMax;
+    m_isDirty = true;
+    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x);
+    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y);
+}
+
+void RectTransformComponent::SetSizeDelta(const Mathf::Vector2& size)
+{
+    const auto parentRect = ResolveParentRect();
+    const auto display = CalculateDisplayPosition(parentRect);
+    m_sizeDelta = size;
+    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x);
+    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y);
+    m_isDirty = true;
+}
+
+void RectTransformComponent::SetPivot(const Mathf::Vector2& pivot)
+{
+    const auto parentRect = ResolveParentRect();
+    const auto display = CalculateDisplayPosition(parentRect);
+    m_pivot = pivot;
+    m_isDirty = true;
+    m_anchoredPosition.x = ToRaw(display.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x);
+    m_anchoredPosition.y = ToRaw(display.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y);
+}
+
+Mathf::Rect RectTransformComponent::ResolveParentRect() const
+{
+    Mathf::Rect parentRect{ 0.f, 0.f,
+        DirectX11::DeviceStates->g_ClientRect.width,
+        DirectX11::DeviceStates->g_ClientRect.height };
+
+    if (m_pOwner)
+    {
+        if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
+        {
+            if (auto* parentObj = GameObject::FindIndex(m_pOwner->m_parentIndex))
+            {
+                if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+                {
+                    parentRect = parentRT->GetWorldRect();
+                }
+            }
+        }
+    }
+
+    return parentRect;
+}
+
+Mathf::Vector2 RectTransformComponent::CalculateDisplayPosition(const Mathf::Rect& parentRect) const
+{
+    return {
+        ToDisplay(m_anchoredPosition.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x),
+        ToDisplay(m_anchoredPosition.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y)
+    };
+}
+
+float RectTransformComponent::ToDisplay(float raw, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot)
+{
+    const float anchorCenter = anchorMin + (anchorMax - anchorMin) * pivot;
+    return parentOrigin + parentSize * anchorCenter + raw;
+}
+
+float RectTransformComponent::ToRaw(float display, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot)
+{
+    const float anchorCenter = anchorMin + (anchorMax - anchorMin) * pivot;
+    return display - (parentOrigin + parentSize * anchorCenter);
 }
 
 // 레이아웃 업데이트 함수: 가장 핵심적인 로직입니다.
