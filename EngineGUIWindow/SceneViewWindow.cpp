@@ -711,7 +711,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			{
 				m_hitResults = hits;
 
+				m_currentHitIndex = m_currentHitIndex % m_hitResults.size();
 				GameObject* selected = m_hitResults[m_currentHitIndex].object;
+				m_currentHitIndex++;
+
 				bool shift = ImGui::GetIO().KeyShift;
 				auto prevList = selectedObjects;
 				GameObject* prevSelection = sceneSelectedObj;
