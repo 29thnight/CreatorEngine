@@ -1,9 +1,9 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "qq1",
     "particleSystems": [
         {
@@ -28,7 +28,6 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "VerticalVelocity": 0.0,
                             "acceleration": {
                                 "x": 0.0,
                                 "y": -9.800000190734863,
@@ -40,7 +39,6 @@
                                 "y": 0.03758964315056801,
                                 "z": 0.3173598647117615
                             },
-                            "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
@@ -48,7 +46,8 @@
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -77,6 +76,73 @@
                     },
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
+                        "easing": {
+                            "enabled": false
+                        },
+                        "explosiveData": {
+                            "initialSpeed": 50.0,
+                            "randomFactor": 0.4000000059604645,
+                            "speedDecay": 2.0,
+                            "sphereRadius": 1.0
+                        },
+                        "impulses": [],
+                        "meshParams": {
+                            "endScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "gravityStrength": 0.0,
+                            "randomScaleMax": 1.2000000476837158,
+                            "randomScaleMin": 0.800000011920929,
+                            "startScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "useGravity": 0,
+                            "useRandomScale": 0
+                        },
+                        "movementParams": {
+                            "currentTime": 0.0,
+                            "velocityMode": 0
+                        },
+                        "orbitalData": {
+                            "axis": [
+                                0.0,
+                                1.0,
+                                0.0
+                            ],
+                            "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "radius": 5.0,
+                            "speed": 1.0
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 1
+                        },
+                        "velocityCurve": [],
+                        "windData": {
+                            "baseStrength": 1.0,
+                            "direction": [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            "frequency": 1.0,
+                            "turbulence": 0.5
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MeshMovementModuleCS",
                     "useEasing": false
                 }
             ],

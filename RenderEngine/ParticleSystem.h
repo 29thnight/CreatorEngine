@@ -12,6 +12,7 @@
 #include "TrailGenerateModule.h"
 #include "TrailRenderModule.h"
 #include "MeshColorModuleCS.h"
+#include "MeshMovementModuleCS.h"
 
 enum class ParticleDataType
 {

@@ -40,7 +40,7 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.Scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
     // 3D 회전 속도 범위
-    m_meshParticleTemplate.RotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    m_meshParticleTemplate.RotationSpeed = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
     // 3D 초기 회전 범위
     m_meshParticleTemplate.InitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
@@ -49,8 +49,7 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     m_meshParticleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_meshParticleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
-    m_meshParticleTemplate.VerticalVelocity = 0.0f;
-    m_meshParticleTemplate.horizontalVelocityRange = 0.0f;
+    m_meshParticleTemplate.velocityRandomRange = 0.0f;
     m_meshParticleTemplate.textureIndex = 0;
     m_meshParticleTemplate.textureIndex = 0;
 
@@ -493,22 +492,16 @@ void MeshSpawnModuleCS::SetParticleColor(const XMFLOAT4& color)
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity)
+void MeshSpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity, float randomRange)
 {
     m_meshParticleTemplate.velocity = velocity;
+    m_meshParticleTemplate.velocityRandomRange = randomRange;
     m_templateDirty = true;
 }
 
 void MeshSpawnModuleCS::SetParticleAcceleration(const XMFLOAT3& acceleration)
 {
     m_meshParticleTemplate.acceleration = acceleration;
-    m_templateDirty = true;
-}
-
-void MeshSpawnModuleCS::SetVelocity(float Vertical, float horizontalRange)
-{
-    m_meshParticleTemplate.VerticalVelocity = Vertical;
-    m_meshParticleTemplate.horizontalVelocityRange = horizontalRange;
     m_templateDirty = true;
 }
 
@@ -553,9 +546,8 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
         {"InitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.InitialRotation)},
         {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
         {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
+        {"velocityRange", m_meshParticleTemplate.velocityRandomRange},
         {"acceleration", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.acceleration)},
-        {"VerticalVelocity", m_meshParticleTemplate.VerticalVelocity},
-        {"horizontalVelocityRange", m_meshParticleTemplate.horizontalVelocityRange},
         {"textureIndex", m_meshParticleTemplate.textureIndex},
         {"renderMode", m_meshParticleTemplate.renderMode}
     };
@@ -623,14 +615,11 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
         if (templateJson.contains("velocity"))
             m_meshParticleTemplate.velocity = EffectSerializer::DeserializeXMFLOAT3(templateJson["velocity"]);
 
+        if (templateJson.contains("velocityRange"))
+            m_meshParticleTemplate.velocityRandomRange = templateJson["velocityRange"];
+
         if (templateJson.contains("acceleration"))
             m_meshParticleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
-
-        if (templateJson.contains("VerticalVelocity"))
-            m_meshParticleTemplate.VerticalVelocity = templateJson["VerticalVelocity"];
-
-        if (templateJson.contains("horizontalVelocityRange"))
-            m_meshParticleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
 
         if (templateJson.contains("textureIndex"))
             m_meshParticleTemplate.textureIndex = templateJson["textureIndex"];
