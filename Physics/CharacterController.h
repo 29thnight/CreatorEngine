@@ -104,7 +104,11 @@ public:
 	{
 		
 		unsigned int otherLayer = shape->getSimulationFilterData().word0;
-		if (m_collisionMatrix[m_characterLayer] & (1 << otherLayer)) {
+
+		
+
+		if(m_collisionMatrix[m_characterLayer] & (1 << otherLayer)) 
+		{
 
 			// 충돌해야 한다면 BLOCK
 			return PxQueryHitType::eBLOCK;
@@ -121,4 +125,29 @@ public:
 private:
 	unsigned int m_characterLayer; // 캐릭터 레이어
 	const unsigned int* m_collisionMatrix; //physics collision matrix ptr
+
+public:
+	void SetCharacterLayer(unsigned int layer) { m_characterLayer = layer; }
+};
+
+class CCTFilterCallback : public PxControllerFilterCallback
+{
+	// PxControllerFilterCallback을(를) 통해 상속됨
+	bool filter(const PxController& a, const PxController& b) override {
+		PxShape* shapeA = nullptr;
+		a.getActor()->getShapes(&shapeA, 1);
+		PxShape* shapeB = nullptr;
+		b.getActor()->getShapes(&shapeB, 1);
+
+		if (shapeA == nullptr || shapeB == nullptr) return false;
+
+		auto shapeANum = shapeA->getQueryFilterData().word1;
+		auto shapeBNum = shapeB->getQueryFilterData().word2;
+
+		if ((shapeANum & shapeBNum) > 0) {
+			return true;
+		}
+
+		return false;
+	}
 };

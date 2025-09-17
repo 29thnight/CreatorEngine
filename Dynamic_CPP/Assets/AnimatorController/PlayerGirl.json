@@ -10,7 +10,44 @@
                     "m_isAny": true,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Ani State",
-                    "transitions": [],
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnHit"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Hit",
+                            "transName": "Ani State to Hit"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnStun"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Stun",
+                            "transName": "Ani State to Stun"
+                        }
+                    ],
                     "useMultipler": 0
                 },
                 {
@@ -59,7 +96,7 @@
                             "transName": "Idle to MeleeAttack1"
                         },
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.009999999776482582,
                             "conditions": [
                                 {
                                     "bValue": true,
@@ -129,6 +166,78 @@
                             "hasExitTime": 0,
                             "nextStateName": "RangeAttack1",
                             "transName": "Idle to RangeAttack1"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "BombAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "BombAttack",
+                            "transName": "Idle to BombAttack"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeChargeAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeChargeAttack",
+                            "transName": "Idle to MeleeChargeAttack"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangeChargeAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeChargeAttack",
+                            "transName": "Idle to RangeChargeAttack"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangeSpecialAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeSpecialAttack",
+                            "transName": "Idle to RangeSpecialAttack"
                         }
                     ],
                     "useMultipler": 0
@@ -179,7 +288,7 @@
                             "transName": "Run to MeleeAttack1"
                         },
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.009999999776482582,
                             "conditions": [
                                 {
                                     "bValue": true,
@@ -231,15 +340,87 @@
                             "hasExitTime": 0,
                             "nextStateName": "MeleeAttack3",
                             "transName": "Run to MeleeAttack3"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangeAttack"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeAttack1",
+                            "transName": "Run to RangeAttack1"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeChargeAttack"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeChargeAttack",
+                            "transName": "Run to MeleeChargeAttack"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangeChargeAttack"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeChargeAttack",
+                            "transName": "Run to RangeChargeAttack"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangeSpecialAttack"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeSpecialAttack",
+                            "transName": "Run to RangeSpecialAttack"
                         }
                     ],
                     "useMultipler": 0
                 },
                 {
                     "animationIndex": 0,
-                    "animationSpeed": 25.0,
+                    "animationSpeed": 10.0,
                     "animationSpeedParameterName": "None",
-                    "behaviourName": "",
+                    "behaviourName": "PlayerDash",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Dash",
@@ -351,6 +532,24 @@
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "MeleeAttack3 to Idle"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeAttack1"
+                                }
+                            ],
+                            "curStateName": "MeleeAttack3",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeAttack1",
+                            "transName": "MeleeAttack3 to MeleeAttack1"
                         }
                     ],
                     "useMultipler": 0
@@ -359,7 +558,7 @@
                     "animationIndex": 6,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
-                    "behaviourName": "",
+                    "behaviourName": "PlayerRangeAttack",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "RangeAttack1",
@@ -372,6 +571,141 @@
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "RangeAttack1 to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 2,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerBombAttack",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "BombAttack",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "BombAttack",
+                            "exitTime": 0.7889999747276306,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "BombAttack to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 9,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerAttackAH",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "MeleeChargeAttack",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "MeleeChargeAttack",
+                            "exitTime": 0.8569999933242798,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "MeleeChargeAttack to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 7,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerRangeAttack",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeChargeAttack",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "RangeChargeAttack",
+                            "exitTime": 0.9819999933242798,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "RangeChargeAttack to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 7,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerRangeAttack",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeSpecialAttack",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "RangeSpecialAttack",
+                            "exitTime": 0.9750000238418579,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "RangeSpecialAttack to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 4,
+                    "animationSpeed": 4.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerHit",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Hit",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Hit",
+                            "exitTime": 0.7900000214576721,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "Hit to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerStun",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Stun",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnResurrection"
+                                }
+                            ],
+                            "curStateName": "Stun",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Stun to Idle"
                         }
                     ],
                     "useMultipler": 0
@@ -515,7 +849,7 @@
                 },
                 {
                     "animationIndex": 11,
-                    "animationSpeed": 1.0,
+                    "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
                     "m_isAny": false,
@@ -585,6 +919,34 @@
         },
         {
             "param_name": "RangeAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "BombAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "RangeSpecialAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "MeleeChargeAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "RangeChargeAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnStun",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnHit",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnResurrection",
             "param_vType": 3
         }
     ]

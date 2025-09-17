@@ -3,6 +3,7 @@
 #include "Entity.h"
 #include "ItemType.h"
 #include "EntityResource.generated.h"
+class CriticalMark;
 class EntityResource : public Entity
 {
 public:
@@ -29,4 +30,7 @@ public:
 	int  itemCode = 0;
 	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
+
+private:
+	CriticalMark* m_criticalMark;
 };

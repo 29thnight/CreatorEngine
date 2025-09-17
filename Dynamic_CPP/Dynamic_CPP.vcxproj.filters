@@ -40,6 +40,9 @@
 		<Filter Include="Script\ScriptClass\Bullet">
 			<UniqueIdentifier>{d867b0dd-5ce3-49c4-8312-b79aded8e198}</UniqueIdentifier>
 		</Filter>
+		<Filter Include="Script\ScriptClass\Event">
+			<UniqueIdentifier>{afa374f5-8fbf-4b6c-b6ff-9d225e54e2e2}</UniqueIdentifier>
+		</Filter>
 	</ItemGroup>
 	<ItemGroup>
 		<ClInclude Include="framework.h">
@@ -231,9 +234,6 @@
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEffect.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
@@ -252,18 +252,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\CameraMove.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="CriticalMark.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="ItemType.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="PlayerBuff.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\Bullet.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
@@ -274,10 +262,10 @@
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\Bomb.h">
-			<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\Explosion.h">
-			<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponCapsule.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -289,9 +277,6 @@
 			<Filter>Script</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\CurveIndicator.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Boss1.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\BP0031.h">
@@ -315,9 +300,6 @@
 		<ClInclude Include="Assets\Script\UIGageTest.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\EntitlyRock.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
 			<Filter>Script</Filter>
 		</ClInclude>
@@ -330,10 +312,79 @@
 		<ClInclude Include="Assets\Script\WeaponSlotController.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityRock.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityMonsterA.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntitySpiritStone.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityItemHeal.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerStun.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerDash.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\CriticalMark.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\RewardObserver.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventSelector.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityBigWood.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerHit.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestMonsterB.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\MonsterProjectile.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="PlayerState.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="GameInstance.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventTarget.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventManager.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\CameraMove.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\HPBar.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="ItemType.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\ITriggerCondition.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponSlotDurFont.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\LoadingController.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\Bomb.h">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SwitchingSceneTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -497,9 +548,6 @@
 		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEffect.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
@@ -518,15 +566,6 @@
 		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\CameraMove.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="CriticalMark.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="PlayerBuff.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\Bullet.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
@@ -537,10 +576,10 @@
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Bomb.cpp">
-			<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Explosion.cpp">
-			<Filter>Script\ScriptClass</Filter>
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\WeaponCapsule.cpp">
 			<Filter>Script\ScriptClass</Filter>
@@ -553,9 +592,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Boss1.cpp">
-			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\BP0031.cpp">
 			<Filter>BehaviorTree\Action</Filter>
@@ -578,9 +614,6 @@
 		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntitlyRock.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
 			<Filter>Script</Filter>
 		</ClCompile>
@@ -593,7 +626,70 @@
 		<ClCompile Include="Assets\Script\WeaponSlotController.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\TestMonsterB.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MonsterProjectile.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\RewardObserver.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventSelector.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityRock.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityItemHeal.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerStun.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerDash.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CriticalMark.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityBigWood.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerHit.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="GameInstance.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventManager.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\HPBar.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CameraMove.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ITriggerCondition.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventTarget.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponSlotDurFont.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\LoadingController.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwitchingSceneTrigger.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

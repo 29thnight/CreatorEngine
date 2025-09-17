@@ -24,6 +24,7 @@ void RigidBody::UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxG
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
+	filterData.word2 = 1 << m_layerNumber;
 	newShape->setSimulationFilterData(filterData);
 	newShape->setQueryFilterData(filterData);
 

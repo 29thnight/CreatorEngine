@@ -43,6 +43,26 @@ namespace Meta
 		{
 			node[prop.name] = std::any_cast<bool>(value);
 		}
+		else if (typeID == type_guid(int8_t))
+		{
+			node[prop.name] = std::any_cast<int8_t>(value);
+		}
+		else if (typeID == type_guid(uint8_t))
+		{
+			node[prop.name] = std::any_cast<uint8_t>(value);
+		}
+		else if (typeID == type_guid(int16_t))
+		{
+			node[prop.name] = std::any_cast<int16_t>(value);
+		}
+		else if (typeID == type_guid(uint16_t))
+		{
+			node[prop.name] = std::any_cast<uint16_t>(value);
+		}
+		else if (typeID == type_guid(int32_t))
+		{
+			node[prop.name] = std::any_cast<int32_t>(value);
+		}
 		else if (typeID == type_guid(uint32_t))
 		{
 			node[prop.name] = std::any_cast<uint32_t>(value);
@@ -164,6 +184,26 @@ namespace Meta
 			else if (prop.typeID == type_guid(bool))
 			{
 				prop.setter(instance, node[prop.name].as<bool>());
+			}
+			else if (prop.typeID == type_guid(int8_t))
+			{
+				prop.setter(instance, node[prop.name].as<int8_t>());
+			}
+			else if (prop.typeID == type_guid(uint8_t))
+			{
+				prop.setter(instance, node[prop.name].as<uint8_t>());
+			}
+			else if (prop.typeID == type_guid(int16_t))
+			{
+				prop.setter(instance, node[prop.name].as<int16_t>());
+			}
+			else if (prop.typeID == type_guid(uint16_t))
+			{
+				prop.setter(instance, node[prop.name].as<uint16_t>());
+			}
+			else if (prop.typeID == type_guid(int32_t))
+			{
+				prop.setter(instance, node[prop.name].as<int32_t>());
 			}
 			else if (prop.typeID == type_guid(uint32_t))
 			{
@@ -346,6 +386,56 @@ namespace Meta
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<bool*>(element));
+						}
+						else if (ty_name == type_guid(int8_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<int8_t*>(element));
+						}
+						else if (ty_name == type_guid(uint8_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<uint8_t*>(element));
+						}
+						else if (ty_name == type_guid(int16_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<int16_t*>(element));
+						}
+						else if (ty_name == type_guid(uint16_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<uint16_t*>(element));
+						}
+						else if (ty_name == type_guid(int32_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<int32_t*>(element));
+						}
+						else if (ty_name == type_guid(uint32_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<uint32_t*>(element));
+						}
+						else if (ty_name == type_guid(int64_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<int64_t*>(element));
+						}
+						else if (ty_name == type_guid(uint64_t))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<uint64_t*>(element));
+						}
+						else if (ty_name == type_guid(double))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<double*>(element));
+						}
+						else if (ty_name == type_guid(file::path))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(static_cast<file::path*>(element)->string());
 						}
 						else if (ty_name == type_guid(std::string))
 						{

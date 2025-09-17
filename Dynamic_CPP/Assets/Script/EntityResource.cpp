@@ -8,8 +8,26 @@
 #include "EffectComponent.h"
 #include "DebugLog.h"
 #include "PrefabUtility.h"
+#include "CriticalMark.h"
 void EntityResource::Start()
 {
+
+
+	m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
+
+
+	auto owner = GetOwner();
+	auto childred = owner->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		m_criticalMark = GameObject::FindIndex(child)->GetComponent<CriticalMark>();
+	}
+	if (!m_criticalMark)
+	{
+		m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
+	}
+
+
 }
 
 void EntityResource::Update(float tick)
@@ -24,12 +42,16 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 		if (player)
 		{
 			// hit
+ 			if (m_criticalMark != nullptr && true == m_criticalMark->UpdateMark(player->playerIndex))
+			{
+				//크리티컬 성공
+			}
 			m_currentHP -= std::max(damage, 0);
 
 			if (m_currentHP <= 0) {
 				// dead
 
-				auto& resources = GameObject::Find("GameManager")->GetComponent<GameManager>()->GetResourcePool();
+				//auto& resources = GameObject::Find("GameManager")->GetComponent<GameManager>()->GetResourcePool();
 				/*if (!resources.empty()) {
 					int tempidx = 0;
 					auto item = resources[tempidx];
@@ -54,18 +76,22 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 					}
 					tempidx++;
 				}*/
-				Prefab* itemPrefab;
-				if (itemCode == 0)
+				Prefab* itemPrefab = nullptr;
+				if (itemType == EItemType::Mushroom)
 				{
 					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom");
 				}
-				else if (itemCode == 1)
+				else if (itemType == EItemType::Mineral)
 				{
 					itemPrefab = PrefabUtilitys->LoadPrefab("BoxMineral");
 				}
-				else
+				else if(itemType == EItemType::Fruit)
 				{
 					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFruit");
+				}
+				else if (itemType == EItemType::Flower)
+				{
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFlower"); //BoxFlower(힐 아이템 아직 없음)
 				}
 				
 				if (itemPrefab)
@@ -79,9 +105,12 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 
 				GetOwner()->Destroy();
 				auto pung = GameObject::Find("Pung2");
-				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-				pung->m_transform.SetPosition(pos);
-				pung->GetComponent<EffectComponent>()->Apply();
+				if (pung)
+				{
+					Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+					pung->m_transform.SetPosition(pos);
+					pung->GetComponent<EffectComponent>()->Apply();
+				}
 			}
 		}
 	}

@@ -49,7 +49,7 @@ void GameViewWindow::RenderGameViewWindow()
 		}
 		else
 		{
-			auto renderData = RenderPassData::GetData(camera);
+			auto renderData = RenderPassData::GetData(camera.get());
 			ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, imageSize);
 		}
 	}

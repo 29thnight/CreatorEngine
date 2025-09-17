@@ -2,9 +2,11 @@
 #include "Core.Minimal.h"
 enum class EItemType
 {
-	Mushroom,
-	Mineral,
-	Fruit,
+	Basic,
+	Mushroom,  //meely
+	Mineral,   // range
+	Fruit,    //bomb
+	Flower,   //heal 웨폰아니고 다른곳으로 
 };
 AUTO_REGISTER_ENUM(EItemType)
 
@@ -17,6 +19,16 @@ enum class ItemType
 	Bomb,
 };
 AUTO_REGISTER_ENUM(ItemType)
+
+constexpr ItemType EToIMap[] = {
+	ItemType::Basic,   
+	ItemType::Melee,
+	ItemType::Range,   
+	ItemType::Bomb,   
+	ItemType::None    
+};
+
+
 
 enum class BuffType
 {

@@ -3,7 +3,7 @@
 #include "Entity.h"
 #include "Player.generated.h"
 #include "ItemType.h"
-
+#include "BitFlag.h"
 class Animator;
 class Socket;
 class EffectComponent;
@@ -16,15 +16,6 @@ class Entity;
 class EntityItem;
 class EntityEnemy;
 
-enum class playerState 
-{
-	Idle,
-	Attack,
-	Dead,
-	Dash,
-	Hit,
-	Stun, //부활가능한 상태
-};
 class Player : public Entity
 {
 public:
@@ -39,7 +30,6 @@ public:
 	virtual void OnTriggerStay(const Collision& collision) override;
 	virtual void OnTriggerExit(const Collision& collision) override;
 
-
 	virtual void OnCollisionEnter(const Collision& collision) override;
 	virtual void OnCollisionStay(const Collision& collision) override;
 	virtual void OnCollisionExit(const Collision& collision) override;
@@ -49,9 +39,13 @@ public:
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
 
-
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override {}
+	void Heal(int healAmount);
+	[[Method]]
+	void SetCurHP(int hp);
+	[[Method]]
+	void Damage(int damage);
 
 	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
 	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
@@ -74,33 +68,39 @@ public:
 	[[Property]]
 	int playerIndex = 0;
 	[[Property]]
-	float  moveSpeed= 0.025f;
+	float moveSpeed= 0.025f;
+	[[Property]]
+	float  chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
+	float  baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
-	playerState m_state = playerState::Idle;
+	std::string curStateName = "Idle";
+	std::unordered_map<std::string, BitFlag> playerState;           //스테이트별 행동제어용
+	void ChangeState(std::string _stateName);
+	bool CheckState(flag _flag);  //현재 상태에서 가능한 행동인지
+	//playerState m_state = playerState::Idle;
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	void CharacterMove(Mathf::Vector2 dir);
 	
-
 	//잡기 던지기
 	[[Property]]
-	float ThrowPowerX = 6.f;
+	float ThrowPowerX = 6.f;      //들고있던물체 던져서 움직일량
 	[[Property]]
 	float ThrowPowerY = 7.f;
 	[[Property]]
-	float DropPowerX = 2.f;
+	float DropPowerX = 2.f;        //맞거나 공격하거나등 들고있는물체 그냥 떨어뜨릴떄 움직일량
 	[[Property]]
 	float DropPowerY = 0.f;
 	[[Property]]
-	float detectAngle = 30.f;
+	float detectAngle = 30.f;      //물체 던질떄 indicator on/off 정할 각도  
 
 	float m_nearDistance = FLT_MAX;
 	EntityItem* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
-	bool    onIndicate = false;
+	bool onIndicate = false;
 	[[Method]]
 	void CatchAndThrow();
 	void Catch();
@@ -108,20 +108,22 @@ public:
 	void DropCatchItem();
 	[[Method]]
 	void ThrowEvent();
+	void UpdateChatchObject();
+
 
 	//대시
 	[[Property]]
-	float dashDistacne = 5.f; // 대시이동거리 
+	float dashDistacne = 0.05f; // 대시속도 (dashDistacne 속도 애니메이션 재생시간동안 감) 
 	[[Property]]
-	float m_dashTime = 0.15f;
+	float m_dashTime = 0.15f; //현재는 애니메이션 재생시간에 맞춰서 정해짐
 	[[Property]]
 	float dashCooldown = 1.f; //대쉬 쿨타임
 	[[Property]]
 	float dashGracePeriod = 1.f; //대시 무적시간
 	[[Property]]
-	int   dashAmount = 1;   //최대대시가능 횟수
+	int  dashAmount = 1;   //최대대시가능 횟수
 	bool isDashing = false; //대쉬중
-	float m_dashElapsedTime = 0.f;
+	float m_dashElapsedTime = 0.f;  //미사용중
 	float m_dashCoolElapsedTime = 0.f; //
 	[[Property]]
 	float dubbleDashTime = 0.5f; //더블대쉬 가능한시간
@@ -134,50 +136,32 @@ public:
 
 	//공격
 	[[Property]]
-	int Atk = 1;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
-	[[Property]]
-	float AttackRange = 2.5f;        //공격사거리  //근접은 무기사거리  //원거리는 탄환 이속 * 살아있는 시간 // 붐은 최대거리구현 필요
-	[[Property]]
-	float AttackSpeed = 1.0f;      
+	int Atk = 1;                     //기본공격력   // (기본공격력 + 무기공격력(차징시 차징공격력)  ) * 크리티컬 배율  = 최종데미지
 	int m_comboCount = 0;            //현재 콤보횟수
 	[[Property]]
 	float comboDuration = 0.5f;        //콤보유지시간
 	float m_comboElapsedTime = 0.f;  //콤보유지시간 체크
 	[[Property]]
-	float atkFwDistacne = 2.0f;      //기본공격시 전진거리
-	[[Property]]
-	int  rangedAtkCountMax = 5.0f;   //원거리공격 최대 연타횟수
-	[[Property]]
-	float rangedAtkDelay = 0.3f;     //연속공격중 발사간 간격
-	[[Property]]
-	float rangedAtkCooldown = 1.0f;   //연속공격 종료후 발사대기시간
-	[[Property]]
 	float rangedAutoAimRange = 10.f; //자동조준 거리 
 	[[Property]]
-	float minChargedTime = 0.7f; //최소 차지시간
-
+	float rangeAngle = 150.f;      //원거리 무기공격시 유도 각
 	bool canMeleeCancel = false; //밀리어택 애니메이션 진행중 캔슬가능한지 //키프레임 이벤트에서 각 시점에 true로 바꿔주고 true 일때 공격입력시 다음공격 전환
 	[[Method]]
 	void Cancancel();
 
+	bool startAttack = false;
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isChargeAttack = false;
-	int  chargeCount = 0; //차지몇번했는지 ex 0.3초당한번
 	bool isAttacking = false;
-	float attackTime = 0.765f;
-	float attackElapsedTime = 0.f;
 	float nearDistance = FLT_MAX;
 	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들
-	[[Property]]
-	float rangeAngle = 150.f;      //원거리 무기공격시 유도 각
-	[[Property]]
-	float rangeDistacne = 5.f;    //원거리 유도거리 최대거리
-	std::unordered_set<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
-	EntityEnemy* curTarget = nullptr;
+
+	std::unordered_set<Entity*>   inRangeEnemy; //내 공격 사거리안 적들
+	Entity* curTarget = nullptr;
 	int countRangeAttack = 0;
 	[[Property]]
-	int countSpecialBullet = 5;
+	int countSpecialBullet = 5;   //n발마다 스페셜탄 쏠지 
 
 
 	bool OnMoveBomb = false;
@@ -185,7 +169,7 @@ public:
 	Mathf::Vector3 bombThrowPosition = {0,0,0};
 	Mathf::Vector3 bombThrowPositionoffset = { 0,0,0 };
 	[[Property]]
-	float bombMoveSpeed = 0.005f;  //폭탄도착지점 
+	float bombMoveSpeed = 0.005f;  //폭탄도착지점 조절 스피드
  	void MeleeAttack();
 	void RangeAttack();
 	[[Method]]
@@ -194,6 +178,7 @@ public:
 	void ShootNormalBullet();
 	[[Method]]
 	void ShootSpecialBullet();
+	void ShootChargeBullet();
 	[[Method]]
 	void ThrowBomb();
 
@@ -202,7 +187,7 @@ public:
 	[[Method]]
 	void Charging();
 	[[Method]]
-	void Attack1();
+	void ChargeAttack();
 	[[Method]]
 	void StartRay();
 	[[Method]]
@@ -211,33 +196,42 @@ public:
 	void EndAttack();
 	bool startRay = false;
 
-	float calculDamge(bool isCharge = false,int _chargeCount = 0);
-
-
-
+	float calculDamge(bool isCharge = false);
+	bool sucessAttack = false;
+	[[Property]]
+	float MeleeAttackSpeed = 1.0f;        //미사용중  //추가능력치로 공격속도가빨라질경우 사용 
+	[[Property]]
+	float RangeAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
+	[[Property]]
+	float BombAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
 
 	//피격,죽음
 	bool isStun = false;
 	float stunTime = 0.f;
-	//bool isKnockBack = false;
-	float KnockBackForceY = 0.1f;
-	float KnockBackForce = 0.05f; //때린애가 나한테 줄 넉백힘
+	[[Property]]
+	float stunRespawnTime = 5.0f;   //스턴시 아시스 옆으로 위치이동까지 걸리는 시간  화면밖에나간후 n초뒤 아시스옆 생성
+	float stunRespawnElapsedTime = 0.f;
 	[[Property]]
 	float GracePeriod = 1.0f;       //피격시 무적시간
 	[[Property]]
-	float ResurrectionRange = 5.f;   //부활가능한 트리거 콜라이더 크기 다른플레이어가 이범위안이면 부활  // 콜라이더 or 스크립트에서 범위계산으로 구현예정
+	float ResurrectionRange = 5.f;   //부활가능한 트리거 콜라이더 크기 다른플레이어가 이범위안이면 부활  
 	[[Property]]
 	float ResurrectionTime = 3.f;   //부활거리안에 머물러야할 시간
+	float ResurrectionElapsedTime = 0.f;
 	[[Property]]
 	float ResurrectionHP = 50.f;   //부활시 회복하는 HP &비율
 	[[Property]]
 	float ResurrectionGracePeriod = 3.0f;  //부활시 무적시간
-	bool sucessAttack = false;
-
+	bool CheckResurrectionByOther();
+	void Resurrection();
+	bool sucessResurrection = false;  
+	
+	void OnHit(); //히트 애니메이션이 발동될떄만 씀 
+	void Knockback(Mathf::Vector2 _KnockbackForce);
 
 	//무기
 	[[Property]]
-	float SlotChangeCooldown = 2.0f;
+	float SlotChangeCooldown = 1.0f;
 	float SlotChangeCooldownElapsedTime = 0.f;
 	bool  canChangeSlot = true;
 
@@ -251,7 +245,8 @@ public:
 	//이펙트 출력관련
 	GameObject* dashObj = nullptr;
 	EffectComponent* dashEffect = nullptr;
-	EffectComponent* bombIndicator = nullptr; //폭탄 떨어질위치 보여줄 이펙트
+	//EffectComponent* bombIndicator = nullptr; //폭탄 떨어질위치 보여줄 이펙트
+
 
 
 	GameManager* GM = nullptr;
@@ -261,6 +256,24 @@ public:
 	Socket* handSocket = nullptr;
 	CharacterControllerComponent* m_controller = nullptr;
 
+	GameObject* shootPosObj = nullptr;
 	GameObject* Indicator = nullptr;
 	GameObject* camera = nullptr;
+
+
+
+
+
+	GameObject* BombIndicator = nullptr;
+	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
+
+	[[Method]]
+	void TestKillPlayer();
+
+	[[Property]]
+	float testHitPowerX = 1.5f;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
+	[[Property]]
+	float testHitPowerY = 0.1f;
+	[[Method]]
+	void TestHit();
 };

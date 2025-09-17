@@ -42,6 +42,7 @@ public:
 	void SaveSceneAsync(std::string_view name = "SampleScene");
 	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
     void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
+    void ActivateScene(Scene* sceneToActivate);
 
     void WaitForSceneLoad();
 
@@ -100,7 +101,6 @@ public:
     std::future<Scene*>                 m_loadingSceneFuture;
     InputActionManager*                 m_inputActionManager{ nullptr };  //TODO: 삭제처리 없음 필요시 추가해야함 //sehwan&&&&&
 private:
-	void ActivateScene(Scene* sceneToActivate);
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();
     void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);

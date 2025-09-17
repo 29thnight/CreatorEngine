@@ -7,6 +7,7 @@
 #include "SpriteSheet.h"
 #include "SpriteSheetComponent.h"
 #include <DirectXTK/SpriteFont.h>
+#include <DirectXMath.h>
 #include <algorithm>
 
 // Clamps percent to [0, 1] and calculates source and destination rectangles based on the clipping direction.
@@ -104,9 +105,14 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.font       = text->font;
     data.message    = text->message;
     data.color      = text->color;
-    data.position   = Mathf::Vector2(text->pos);
+
+    const auto centeredPosition = Mathf::Vector2(text->pos) + text->stretchSize * 0.5f;
+    data.position   = { centeredPosition.x, centeredPosition.y };
     data.fontSize   = text->fontSize;
     data.layerOrder = text->GetLayerOrder();
+    data.maxSize    = text->stretchSize;
+    data.stretchX   = text->isStretchX;
+    data.stretchY   = text->isStretchY;
     m_data          = data;
     m_instancedID   = text->GetInstanceID();
 }
@@ -198,15 +204,13 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         info.scale.x, info.scale.y,
                         src, dst))
                     {
-                        DirectX::XMFLOAT2 originZero{ 0.f, 0.f };
-
                         spriteBatch->Draw(
                             info.texture->m_pSRV,
                             dst,
                             &src,
                             info.color,
                             info.rotation,
-                            originZero,
+                            info.origin,
                             DirectX::SpriteEffects_None,
                             static_cast<float>(info.layerOrder) / MaxOreder);
                     }
@@ -216,14 +220,33 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
             {
                 if (info.font)
                 {
+                    DirectX::XMVECTOR sizeVec = info.font->MeasureString(info.message.c_str());
+                    DirectX::XMFLOAT2 size{};
+                    DirectX::XMStoreFloat2(&size, sizeVec);
+
+                    float scale = info.fontSize;
+                    if (info.stretchX || info.stretchY)
+                    {
+                        float width = size.x * scale;
+                        float height = size.y * scale;
+                        float factor = 1.f;
+                        if (info.stretchX && width > info.maxSize.x)
+                            factor = std::min(factor, info.maxSize.x / width);
+                        if (info.stretchY && height > info.maxSize.y)
+                            factor = std::min(factor, info.maxSize.y / height);
+                        scale *= factor;
+                    }
+
+                    DirectX::XMFLOAT2 origin{ size.x * 0.5f, size.y * 0.5f };
+
                     info.font->DrawString(
                         spriteBatch.get(),
                         info.message.c_str(),
                         { info.position.x, info.position.y },
                         info.color,
                         0.0f,
-                        DirectX::XMFLOAT2(0, 0),
-                        info.fontSize,
+                        origin,
+                        scale,
                         DirectX::SpriteEffects_None,
                         static_cast<float>(info.layerOrder) / MaxOreder);
                 }

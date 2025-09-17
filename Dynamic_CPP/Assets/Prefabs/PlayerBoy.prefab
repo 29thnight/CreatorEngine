@@ -1,6 +1,6 @@
 m_name: PlayerBoy
 m_isEnabled: true
-m_instanceID: 1213241550
+m_instanceID: 3306706692
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -15,7 +15,7 @@ PrefabNode:
     m_index: 483
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [484]
+    m_childrenIndices: [484, 541]
     m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -55,6 +55,7 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         playerIndex: 1
         moveSpeed: 0.0250000004
+        chargingMoveSpeed: 0.0125000002
         maxHP: 100
         ThrowPowerX: 6
         ThrowPowerY: 3
@@ -77,16 +78,22 @@ PrefabNode:
         rangedAtkCooldown: 1
         rangedAutoAimRange: 10
         minChargedTime: 0.699999988
+        rangeAngle: 150
+        rangeDistacne: 5
+        countSpecialBullet: 5
         bombMoveSpeed: 0.00999999978
+        stunRespawnTime: 5
         GracePeriod: 1
         ResurrectionRange: 5
         ResurrectionTime: 3
         ResurrectionHP: 50
         ResurrectionGracePeriod: 3
         SlotChangeCooldown: 2
+        testHitPowerX: 1.5
+        testHitPowerY: 0.100000001
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 2728072976
+        m_instanceID: 865853616
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -122,7 +129,7 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 2267141630
+            m_instanceID: 1746039785
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -134,7 +141,12 @@ PrefabNode:
                   m_keyFrameEvent: ~
                 - m_name: Ani_PC2_explosive
                   m_isLoop: false
-                  m_keyFrameEvent: ~
+                  m_keyFrameEvent:
+                    - m_eventName: ThrowBomb
+                      m_scriptName: Player
+                      m_funName: ThrowBomb
+                      key: 0.651162803
+                      frameKey: 28
                 - m_name: Ani_PC2_grab
                   m_isLoop: false
                   m_keyFrameEvent: ~
@@ -146,17 +158,17 @@ PrefabNode:
                   m_keyFrameEvent:
                     - m_eventName: shoot
                       m_scriptName: Player
-                      m_funName: ShootNormalBullet
-                      key: 0.285714298
-                      frameKey: 10
-                    - m_eventName: end
-                      m_scriptName: Player
-                      m_funName: EndAttack
-                      key: 0.857142866
-                      frameKey: 30
+                      m_funName: ShootBullet
+                      key: 0.571428597
+                      frameKey: 20
                 - m_name: Ani_PC2_longATK2
                   m_isLoop: false
-                  m_keyFrameEvent: ~
+                  m_keyFrameEvent:
+                    - m_eventName: ShootBullet
+                      m_scriptName: Player
+                      m_funName: ShootBullet
+                      key: 0.465116292
+                      frameKey: 20
                 - m_name: Ani_PC2_nomalATK2
                   m_isLoop: false
                   m_keyFrameEvent:
@@ -226,7 +238,7 @@ PrefabNode:
                   m_isLoop: true
                   m_keyFrameEvent: ~
               m_rootTransform: "[not suport type]"
-            m_AnimIndexChosen: 4
+            m_AnimIndexChosen: 5
             m_AnimIndex: 0
             m_Motion: 9fa2ba19-84ef-5932-8470-9200273a4f29
             m_animationControllers:
@@ -282,7 +294,7 @@ PrefabNode:
                       nextStateName: Dash
                       hasExitTime: false
                       exitTime: 0.100000001
-                      blendTime: 0.200000003
+                      blendTime: 0.00999999978
                     - conditions:
                         - valueName: MeleeAttack2
                           cType: 1
@@ -331,6 +343,70 @@ PrefabNode:
                       hasExitTime: false
                       exitTime: 0.100000001
                       blendTime: 0.200000003
+                    - conditions:
+                        - valueName: BombAttack
+                          cType: 1
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to BombAttack
+                      curStateName: Idle
+                      nextStateName: BombAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
+                    - conditions:
+                        - valueName: MeleeChargeAttack
+                          cType: 1
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to MeleeChargeAttack
+                      curStateName: Idle
+                      nextStateName: MeleeChargeAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
+                    - conditions:
+                        - valueName: RangeChargeAttack
+                          cType: 1
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to RangeChargeAttack
+                      curStateName: Idle
+                      nextStateName: RangeChargeAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
+                    - conditions:
+                        - valueName: RangeSpecialAttack
+                          cType: 1
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to RangeSpecialAttack
+                      curStateName: Idle
+                      nextStateName: RangeSpecialAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
                   index: 1
                   AnimationIndex: 4
                   m_isAny: false
@@ -341,7 +417,39 @@ PrefabNode:
                 StateVec:
                   - m_name: Ani State
                     behaviourName: ""
-                    Transitions: ~
+                    Transitions:
+                      - conditions:
+                          - valueName: OnHit
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Ani State to Hit
+                        curStateName: Ani State
+                        nextStateName: Hit
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: OnStun
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Ani State to Stun
+                        curStateName: Ani State
+                        nextStateName: Stun
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
                     index: 0
                     AnimationIndex: -1
                     m_isAny: true
@@ -399,7 +507,7 @@ PrefabNode:
                         nextStateName: Dash
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.200000003
+                        blendTime: 0.00999999978
                       - conditions:
                           - valueName: MeleeAttack2
                             cType: 1
@@ -445,6 +553,70 @@ PrefabNode:
                         m_name: Idle to RangeAttack1
                         curStateName: Idle
                         nextStateName: RangeAttack1
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: BombAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to BombAttack
+                        curStateName: Idle
+                        nextStateName: BombAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: MeleeChargeAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to MeleeChargeAttack
+                        curStateName: Idle
+                        nextStateName: MeleeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeChargeAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to RangeChargeAttack
+                        curStateName: Idle
+                        nextStateName: RangeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeSpecialAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to RangeSpecialAttack
+                        curStateName: Idle
+                        nextStateName: RangeSpecialAttack
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
@@ -505,7 +677,7 @@ PrefabNode:
                         nextStateName: Dash
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.200000003
+                        blendTime: 0.00999999978
                       - conditions:
                           - valueName: MeleeAttack2
                             cType: 1
@@ -538,6 +710,70 @@ PrefabNode:
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to RangeAttack1
+                        curStateName: Run
+                        nextStateName: RangeAttack1
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: MeleeChargeAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to MeleeChargeAttack
+                        curStateName: Run
+                        nextStateName: MeleeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeChargeAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to RangeChargeAttack
+                        curStateName: Run
+                        nextStateName: RangeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeSpecialAttack
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to RangeSpecialAttack
+                        curStateName: Run
+                        nextStateName: RangeSpecialAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
                     index: 2
                     AnimationIndex: 12
                     m_isAny: false
@@ -546,7 +782,7 @@ PrefabNode:
                     animationSpeedParameterName: None
                     useMultipler: false
                   - m_name: Dash
-                    behaviourName: ""
+                    behaviourName: PlayerDash
                     Transitions:
                       - conditions: ~
                         m_name: Dash to Idle
@@ -558,7 +794,7 @@ PrefabNode:
                     index: 3
                     AnimationIndex: 0
                     m_isAny: false
-                    animationSpeed: 25
+                    animationSpeed: 10
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -638,6 +874,22 @@ PrefabNode:
                         hasExitTime: true
                         exitTime: 0.635999978
                         blendTime: 0.200000003
+                      - conditions:
+                          - valueName: MeleeAttack1
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: MeleeAttack3 to MeleeAttack1
+                        curStateName: MeleeAttack3
+                        nextStateName: MeleeAttack1
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
                     index: 6
                     AnimationIndex: 10
                     m_isAny: false
@@ -646,7 +898,7 @@ PrefabNode:
                     animationSpeedParameterName: None
                     useMultipler: false
                   - m_name: RangeAttack1
-                    behaviourName: ""
+                    behaviourName: PlayerRangeAttack
                     Transitions:
                       - conditions: ~
                         m_name: RangeAttack1 to Idle
@@ -657,6 +909,117 @@ PrefabNode:
                         blendTime: 0.200000003
                     index: 7
                     AnimationIndex: 5
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: BombAttack
+                    behaviourName: PlayerBombAttack
+                    Transitions:
+                      - conditions: ~
+                        m_name: BombAttack to Idle
+                        curStateName: BombAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.788999975
+                        blendTime: 0.200000003
+                    index: 8
+                    AnimationIndex: 2
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: MeleeChargeAttack
+                    behaviourName: PlayerAttackAH
+                    Transitions:
+                      - conditions: ~
+                        m_name: MeleeChargeAttack to Idle
+                        curStateName: MeleeChargeAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.856999993
+                        blendTime: 0.200000003
+                    index: 9
+                    AnimationIndex: 10
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: RangeChargeAttack
+                    behaviourName: PlayerRangeAttack
+                    Transitions:
+                      - conditions: ~
+                        m_name: RangeChargeAttack to Idle
+                        curStateName: RangeChargeAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.981999993
+                        blendTime: 0.200000003
+                    index: 10
+                    AnimationIndex: 6
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: RangeSpecialAttack
+                    behaviourName: PlayerRangeAttack
+                    Transitions:
+                      - conditions: ~
+                        m_name: RangeSpecialAttack to Idle
+                        curStateName: RangeSpecialAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.975000024
+                        blendTime: 0.200000003
+                    index: 11
+                    AnimationIndex: 6
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: Hit
+                    behaviourName: PlayerHit
+                    Transitions:
+                      - conditions: ~
+                        m_name: Hit to Idle
+                        curStateName: Hit
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.790000021
+                        blendTime: 0.200000003
+                    index: 12
+                    AnimationIndex: 9
+                    m_isAny: false
+                    animationSpeed: 4
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: Stun
+                    behaviourName: PlayerStun
+                    Transitions:
+                      - conditions:
+                          - valueName: OnResurrection
+                            cType: 1
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Stun to Idle
+                        curStateName: Stun
+                        nextStateName: Idle
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                    index: 13
+                    AnimationIndex: 1
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -889,7 +1252,7 @@ PrefabNode:
                     index: 4
                     AnimationIndex: 12
                     m_isAny: false
-                    animationSpeed: 1
+                    animationSpeed: 1.5
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -936,7 +1299,7 @@ PrefabNode:
                     - isEnabled: false
                     - isEnabled: false
                     - isEnabled: false
-                    - isEnabled: false
+                    - isEnabled: true
                     - isEnabled: false
                     - isEnabled: false
                     - isEnabled: false
@@ -1009,6 +1372,48 @@ PrefabNode:
                 tValue: false
               - vType: 3
                 name: RangeAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: BombAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: RangeSpecialAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: MeleeChargeAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: RangeChargeAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: OnStun
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: OnHit
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: OnResurrection
                 fValue: 0
                 iValue: 0
                 bValue: false
@@ -2301,3 +2706,24 @@ PrefabNode:
                 m_tag: Untagged
                 m_layer: Default
                 m_components: ~
+      - GameObject: 2166264123
+        m_name: RangeShootPos
+        m_isEnabled: true
+        m_instanceID: 3241416835
+        m_transform:
+          position: {x: 0.398000002, y: 1.10000002, z: 2.25699997, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 483
+        m_index: 541
+        m_parentIndex: 483
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+        m_attachedSoketID: 0
+        m_collisionType: 1
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components: ~

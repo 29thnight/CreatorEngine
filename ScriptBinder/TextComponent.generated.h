@@ -10,6 +10,8 @@ ReflectionFieldInheritance(TextComponent, UIComponent) \
 		meta_property(relpos) \
 		meta_property(color) \
 		meta_property(fontSize) \
+		meta_property(useManualRect) \
+		meta_property(manualRect) \
 	}); \
 	FieldEnd(TextComponent, PropertyOnlyInheritance) \
 };

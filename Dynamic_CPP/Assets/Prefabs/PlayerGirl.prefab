@@ -1,6 +1,6 @@
 m_name: PlayerGirl
 m_isEnabled: true
-m_instanceID: 1716626905
+m_instanceID: 2248444186
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -8,17 +8,17 @@ PrefabNode:
     m_isEnabled: true
     m_instanceID: 3240989125
     m_transform:
-      position: {x: 18.2484493, y: 0, z: 16.6706924, w: 1}
+      position: {x: 19.0000019, y: 0, z: 16.9999981, w: 1}
       rotation: {x: 0, y: 1, z: 0, w: -3.94253874e-08}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
     m_index: 390
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [391]
+    m_childrenIndices: [391, 542]
     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
     m_attachedSoketID: 0
-    m_collisionType: 1
+    m_collisionType: 0
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
@@ -55,41 +55,40 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         playerIndex: 0
         moveSpeed: 0.0250000004
+        chargingMoveSpeed: 0.0125000002
         maxHP: 100
         ThrowPowerX: 6
         ThrowPowerY: 3
         DropPowerX: 2
         DropPowerY: 0
         detectAngle: 30
-        dashDistacne: 5
+        dashDistacne: 0.100000001
         m_dashTime: 0.150000006
         dashCooldown: 0.5
         dashGracePeriod: 1
         dashAmount: 1
         dubbleDashTime: 0.5
         Atk: 1
-        AttackRange: 2.5
-        AttackSpeed: 1
         comboDuration: 0.5
-        atkFwDistacne: 2
-        rangedAtkCountMax: 5
-        rangedAtkDelay: 0.300000012
-        rangedAtkCooldown: 1
         rangedAutoAimRange: 10
-        minChargedTime: 0.699999988
         rangeAngle: 150
-        rangeDistacne: 5
         countSpecialBullet: 5
         bombMoveSpeed: 0.00999999978
+        MeleeAttackSpeed: 1
+        RangeAttackSpeed: 1
+        BombAttackSpeed: 1
+        stunRespawnTime: 5
         GracePeriod: 1
         ResurrectionRange: 5
         ResurrectionTime: 3
         ResurrectionHP: 50
         ResurrectionGracePeriod: 3
         SlotChangeCooldown: 2
+        testHitPowerX: 0.0399999991
+        testHitPowerY: 0.0280000009
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 57550389
+        m_instanceID: 4055200106
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -116,7 +115,7 @@ PrefabNode:
         m_childrenIndices: [392, 394]
         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -125,7 +124,7 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 4320392
+            m_instanceID: 2592905100
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -162,7 +161,12 @@ PrefabNode:
                       frameKey: 20
                 - m_name: Ani_PC1_longATK2
                   m_isLoop: false
-                  m_keyFrameEvent: ~
+                  m_keyFrameEvent:
+                    - m_eventName: ShootBullet
+                      m_scriptName: Player
+                      m_funName: ShootBullet
+                      key: 0.465116292
+                      frameKey: 20
                 - m_name: Ani_PC1_nomalATK2
                   m_isLoop: false
                   m_keyFrameEvent:
@@ -285,7 +289,7 @@ PrefabNode:
                       nextStateName: Dash
                       hasExitTime: false
                       exitTime: 0.100000001
-                      blendTime: 0.200000003
+                      blendTime: 0.00999999978
                     - conditions:
                         - valueName: MeleeAttack2
                           cType: 1
@@ -350,6 +354,54 @@ PrefabNode:
                       hasExitTime: false
                       exitTime: 0.100000001
                       blendTime: 0.200000003
+                    - conditions:
+                        - valueName: MeleeChargeAttack
+                          cType: 6
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to MeleeChargeAttack
+                      curStateName: Idle
+                      nextStateName: MeleeChargeAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
+                    - conditions:
+                        - valueName: RangeChargeAttack
+                          cType: 6
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to RangeChargeAttack
+                      curStateName: Idle
+                      nextStateName: RangeChargeAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
+                    - conditions:
+                        - valueName: RangeSpecialAttack
+                          cType: 6
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to RangeSpecialAttack
+                      curStateName: Idle
+                      nextStateName: RangeSpecialAttack
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
                   index: 1
                   AnimationIndex: 5
                   m_isAny: false
@@ -360,7 +412,39 @@ PrefabNode:
                 StateVec:
                   - m_name: Ani State
                     behaviourName: ""
-                    Transitions: ~
+                    Transitions:
+                      - conditions:
+                          - valueName: OnHit
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Ani State to Hit
+                        curStateName: Ani State
+                        nextStateName: Hit
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.00999999978
+                      - conditions:
+                          - valueName: OnStun
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Ani State to Stun
+                        curStateName: Ani State
+                        nextStateName: Stun
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
                     index: 0
                     AnimationIndex: -1
                     m_isAny: true
@@ -418,7 +502,7 @@ PrefabNode:
                         nextStateName: Dash
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.200000003
+                        blendTime: 0.00999999978
                       - conditions:
                           - valueName: MeleeAttack2
                             cType: 1
@@ -483,6 +567,54 @@ PrefabNode:
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
+                      - conditions:
+                          - valueName: MeleeChargeAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to MeleeChargeAttack
+                        curStateName: Idle
+                        nextStateName: MeleeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeChargeAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to RangeChargeAttack
+                        curStateName: Idle
+                        nextStateName: RangeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeSpecialAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to RangeSpecialAttack
+                        curStateName: Idle
+                        nextStateName: RangeSpecialAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
                     index: 1
                     AnimationIndex: 5
                     m_isAny: false
@@ -540,7 +672,7 @@ PrefabNode:
                         nextStateName: Dash
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.200000003
+                        blendTime: 0.00999999978
                       - conditions:
                           - valueName: MeleeAttack2
                             cType: 1
@@ -589,6 +721,54 @@ PrefabNode:
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
+                      - conditions:
+                          - valueName: MeleeChargeAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to MeleeChargeAttack
+                        curStateName: Run
+                        nextStateName: MeleeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeChargeAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to RangeChargeAttack
+                        curStateName: Run
+                        nextStateName: RangeChargeAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
+                          - valueName: RangeSpecialAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Run to RangeSpecialAttack
+                        curStateName: Run
+                        nextStateName: RangeSpecialAttack
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
                     index: 2
                     AnimationIndex: 11
                     m_isAny: false
@@ -597,7 +777,7 @@ PrefabNode:
                     animationSpeedParameterName: None
                     useMultipler: false
                   - m_name: Dash
-                    behaviourName: ""
+                    behaviourName: PlayerDash
                     Transitions:
                       - conditions: ~
                         m_name: Dash to Idle
@@ -609,7 +789,7 @@ PrefabNode:
                     index: 3
                     AnimationIndex: 0
                     m_isAny: false
-                    animationSpeed: 25
+                    animationSpeed: 10
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -741,6 +921,100 @@ PrefabNode:
                         blendTime: 0.200000003
                     index: 8
                     AnimationIndex: 2
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: MeleeChargeAttack
+                    behaviourName: PlayerAttackAH
+                    Transitions:
+                      - conditions: ~
+                        m_name: MeleeChargeAttack to Idle
+                        curStateName: MeleeChargeAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.856999993
+                        blendTime: 0.200000003
+                    index: 9
+                    AnimationIndex: 9
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: RangeChargeAttack
+                    behaviourName: PlayerRangeAttack
+                    Transitions:
+                      - conditions: ~
+                        m_name: RangeChargeAttack to Idle
+                        curStateName: RangeChargeAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.981999993
+                        blendTime: 0.200000003
+                    index: 10
+                    AnimationIndex: 7
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: RangeSpecialAttack
+                    behaviourName: PlayerRangeAttack
+                    Transitions:
+                      - conditions: ~
+                        m_name: RangeSpecialAttack to Idle
+                        curStateName: RangeSpecialAttack
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.975000024
+                        blendTime: 0.200000003
+                    index: 11
+                    AnimationIndex: 7
+                    m_isAny: false
+                    animationSpeed: 1
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: Hit
+                    behaviourName: PlayerHit
+                    Transitions:
+                      - conditions: ~
+                        m_name: Hit to Idle
+                        curStateName: Hit
+                        nextStateName: Idle
+                        hasExitTime: true
+                        exitTime: 0.699999988
+                        blendTime: 0.300000012
+                    index: 12
+                    AnimationIndex: 4
+                    m_isAny: false
+                    animationSpeed: 3
+                    multiplerAnimationSpeed: 1
+                    animationSpeedParameterName: None
+                    useMultipler: false
+                  - m_name: Stun
+                    behaviourName: PlayerStun
+                    Transitions:
+                      - conditions:
+                          - valueName: OnResurrection
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Stun to Idle
+                        curStateName: Stun
+                        nextStateName: Idle
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                    index: 13
+                    AnimationIndex: 1
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -969,7 +1243,7 @@ PrefabNode:
                     index: 4
                     AnimationIndex: 11
                     m_isAny: false
-                    animationSpeed: 1
+                    animationSpeed: 1.5
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -1095,6 +1369,42 @@ PrefabNode:
                 iValue: 0
                 bValue: false
                 tValue: false
+              - vType: 3
+                name: RangeSpecialAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: MeleeChargeAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: RangeChargeAttack
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: OnStun
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: OnHit
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
+              - vType: 3
+                name: OnResurrection
+                fValue: 0
+                iValue: 0
+                bValue: false
+                tValue: false
         children:
           - GameObject: 2166264123
             m_name: Red_low (4)
@@ -1111,7 +1421,7 @@ PrefabNode:
             m_childrenIndices: [393]
             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
             m_attachedSoketID: 0
-            m_collisionType: 1
+            m_collisionType: 0
             m_isStatic: false
             m_gameObjectType: 3
             m_tag: Untagged
@@ -1170,7 +1480,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 3
                 m_tag: Untagged
@@ -1228,7 +1538,7 @@ PrefabNode:
             m_childrenIndices: [395, 423, 424, 425, 429, 433, 437, 440, 443]
             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
             m_attachedSoketID: 0
-            m_collisionType: 1
+            m_collisionType: 0
             m_isStatic: false
             m_gameObjectType: 4
             m_tag: Untagged
@@ -1250,7 +1560,7 @@ PrefabNode:
                 m_childrenIndices: [396]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -1272,7 +1582,7 @@ PrefabNode:
                     m_childrenIndices: [397]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -1294,7 +1604,7 @@ PrefabNode:
                         m_childrenIndices: [398, 407, 414, 421, 422]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -1316,7 +1626,7 @@ PrefabNode:
                             m_childrenIndices: [399]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1338,7 +1648,7 @@ PrefabNode:
                                 m_childrenIndices: [400]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 1
+                                m_collisionType: 0
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1360,7 +1670,7 @@ PrefabNode:
                                     m_childrenIndices: [401, 402, 403]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 1
+                                    m_collisionType: 0
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1382,7 +1692,7 @@ PrefabNode:
                                         m_childrenIndices: ~
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1403,7 +1713,7 @@ PrefabNode:
                                         m_childrenIndices: ~
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1424,7 +1734,7 @@ PrefabNode:
                                         m_childrenIndices: [404]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1446,7 +1756,7 @@ PrefabNode:
                                             m_childrenIndices: [405]
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1468,7 +1778,7 @@ PrefabNode:
                                                 m_childrenIndices: [406]
                                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                                 m_attachedSoketID: 0
-                                                m_collisionType: 1
+                                                m_collisionType: 0
                                                 m_isStatic: false
                                                 m_gameObjectType: 4
                                                 m_tag: Untagged
@@ -1490,7 +1800,7 @@ PrefabNode:
                                                     m_childrenIndices: ~
                                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                                     m_attachedSoketID: 0
-                                                    m_collisionType: 1
+                                                    m_collisionType: 0
                                                     m_isStatic: false
                                                     m_gameObjectType: 4
                                                     m_tag: Untagged
@@ -1511,7 +1821,7 @@ PrefabNode:
                             m_childrenIndices: [408]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1533,7 +1843,7 @@ PrefabNode:
                                 m_childrenIndices: [409]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 1
+                                m_collisionType: 0
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1555,7 +1865,7 @@ PrefabNode:
                                     m_childrenIndices: [410, 412]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 1
+                                    m_collisionType: 0
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1577,7 +1887,7 @@ PrefabNode:
                                         m_childrenIndices: [411]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1599,7 +1909,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1620,7 +1930,7 @@ PrefabNode:
                                         m_childrenIndices: [413]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1642,7 +1952,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1663,7 +1973,7 @@ PrefabNode:
                             m_childrenIndices: [415]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1685,7 +1995,7 @@ PrefabNode:
                                 m_childrenIndices: [416]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 1
+                                m_collisionType: 0
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1707,7 +2017,7 @@ PrefabNode:
                                     m_childrenIndices: [417, 419]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 1
+                                    m_collisionType: 0
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1729,7 +2039,7 @@ PrefabNode:
                                         m_childrenIndices: [418]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1751,7 +2061,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1772,7 +2082,7 @@ PrefabNode:
                                         m_childrenIndices: [420]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 1
+                                        m_collisionType: 0
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1794,7 +2104,7 @@ PrefabNode:
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 1
+                                            m_collisionType: 0
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1815,7 +2125,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1836,7 +2146,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1857,7 +2167,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -1878,7 +2188,7 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -1899,7 +2209,7 @@ PrefabNode:
                 m_childrenIndices: [426]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -1921,7 +2231,7 @@ PrefabNode:
                     m_childrenIndices: [427]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -1943,7 +2253,7 @@ PrefabNode:
                         m_childrenIndices: [428]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -1965,7 +2275,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1986,7 +2296,7 @@ PrefabNode:
                 m_childrenIndices: [430]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2008,7 +2318,7 @@ PrefabNode:
                     m_childrenIndices: [431]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2030,7 +2340,7 @@ PrefabNode:
                         m_childrenIndices: [432]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2052,7 +2362,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2073,7 +2383,7 @@ PrefabNode:
                 m_childrenIndices: [434]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2095,7 +2405,7 @@ PrefabNode:
                     m_childrenIndices: [435]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2117,7 +2427,7 @@ PrefabNode:
                         m_childrenIndices: [436]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2139,7 +2449,7 @@ PrefabNode:
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 1
+                            m_collisionType: 0
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2160,7 +2470,7 @@ PrefabNode:
                 m_childrenIndices: [438]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2182,7 +2492,7 @@ PrefabNode:
                     m_childrenIndices: [439]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2204,7 +2514,7 @@ PrefabNode:
                         m_childrenIndices: ~
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2225,7 +2535,7 @@ PrefabNode:
                 m_childrenIndices: [441]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2247,7 +2557,7 @@ PrefabNode:
                     m_childrenIndices: [442]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 1
+                    m_collisionType: 0
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2269,7 +2579,7 @@ PrefabNode:
                         m_childrenIndices: ~
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 1
+                        m_collisionType: 0
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2290,9 +2600,30 @@ PrefabNode:
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 1
+                m_collisionType: 0
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
                 m_layer: Default
                 m_components: ~
+      - GameObject: 2166264123
+        m_name: RangeShootPos
+        m_isEnabled: true
+        m_instanceID: 2501384123
+        m_transform:
+          position: {x: 0.397999763, y: 1.10000002, z: 2.25700092, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 390
+        m_index: 542
+        m_parentIndex: 390
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components: ~

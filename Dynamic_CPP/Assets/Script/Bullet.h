@@ -41,6 +41,6 @@ public:
 	bool hasAttacked = false;
 	float lifeTime = 5.f; //임시용
 	Mathf::Vector3 m_moveDir = { 0,0,0 }; //나아갈 방향
-	Player* m_owenrPlayer = nullptr;
+	Player* m_ownerPlayer = nullptr;
 	EffectComponent* m_effect = nullptr; 
 };

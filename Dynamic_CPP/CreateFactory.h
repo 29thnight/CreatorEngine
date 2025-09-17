@@ -3,11 +3,24 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SwitchingSceneTrigger.h"
+#include "LoadingController.h"
+#include "WeaponSlotDurFont.h"
+#include "EventTarget.h"
+#include "MonsterProjectile.h"
+#include "TestMonsterB.h"
+#include "EventManager.h"
+#include "HPBar.h"
+#include "EventSelector.h"
+#include "RewardObserver.h"
+#include "EntityBigWood.h"
+#include "CriticalMark.h"
+#include "EntityItemHeal.h"
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
+#include "EntityRock.h"
 #include "EntitySpiritStone.h"
 #include "UIGageTest.h"
-#include "EntitlyRock.h"
 #include "EntityMonsterA.h"
 #include "WeaponCapsule.h"
 #include "Explosion.h"
@@ -18,7 +31,6 @@
 #include "SpecialBullet.h"
 #include "Bullet.h"
 #include "DestroyEffect.h"
-#include "TestEffect.h"
 #include "EntityEnemy.h"
 #include "Weapon.h"
 #include "TweenManager.h"
@@ -33,7 +45,6 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "CameraMove.h"
-
 class CreateFactory : public Singleton<CreateFactory>
 {
 private:

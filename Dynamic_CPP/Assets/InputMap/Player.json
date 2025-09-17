@@ -39,7 +39,7 @@
         {
             "actionName": "Attack",
             "actionType": "Button",
-            "funName": "Attack1",
+            "funName": "ChargeAttack",
             "inputType": "GamePad",
             "key0": "X",
             "key1": "A",
@@ -90,6 +90,18 @@
             "funName": "SwapWeaponRight",
             "inputType": "GamePad",
             "key0": "Right Shoulder",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "TestStun",
+            "actionType": "Button",
+            "funName": "TestHit",
+            "inputType": "GamePad",
+            "key0": "Y",
             "key1": "A",
             "key2": "A",
             "key3": "A",

@@ -41,21 +41,27 @@ public:
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
 	bool isBoxAttack = false; //박스 공격중인지 여부
 
+	//공통 속성
 	[[Property]]
 	bool isAsisAction = false; //asis 행동중인지 여부
 	[[Property]]
+	int m_maxHP = 100;
+	//int m_currHP = m_maxHP;
+	[[Property]]
+	float m_enemyReward = 10.f; //처치시 플레이어에게 주는 보상
+	//이동 및 추적
+	[[Property]]
 	float m_moveSpeed = 0.02f;
 	[[Property]]
-	int m_maxHP = 100;
-	int m_currHP = m_maxHP;
+	float m_chaseRange = 10.f; //감지 범위
+	[[Property]]
+	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
+	//근접 공격 방식
 	[[Property]]
 	float m_attackRange = 2.f;
 	[[Property]]
 	int m_attackDamage = 10;
-	[[Property]]
-	float m_chaseRange = 10.f;
-	[[Property]]
-	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
+
 
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
 	std::string m_identity = "MonsterNomal";
@@ -68,6 +74,7 @@ public:
 	void AttackBoxOff(); //공격 박스 비활성화
 
 	void ChaseTarget(); //타겟 추적
+
 	void Dead(); //죽음 처리
 
 	void RotateToTarget(); //타겟 바라보기

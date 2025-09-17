@@ -29,6 +29,7 @@
 #include "VolumeComponent.h"
 #include "RectTransformComponent.h"
 #include "DecalComponent.h"
+#include "SpriteRenderer.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -216,6 +217,15 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						if (nullptr != image)
 						{
 							ImGuiDrawHelperImageComponent(image);
+						}
+					}
+					else if (componentTypeID == type_guid(SpriteRenderer))
+					{
+						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
+						if (nullptr != sprite)
+						{
+							//이건 뭔 버그죠?
+							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
 					else if (type)
@@ -957,6 +967,8 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 
 		if (ImGui::CollapsingHeader("SkyBoxPass"))
 		{
+			ImGui::Checkbox("Use SkyBox", &profile.settings.m_isSkyboxEnabled);
+
 			file::path HDRPath = PathFinder::Relative("HDR\\");
 			std::string_view profileTextureName = profile.settings.skyboxTextureName;
 			std::string_view settingsTextureName = EngineSettingInstance->GetRenderPassSettings().skyboxTextureName;
@@ -1210,7 +1222,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::Text("Drag Texture Here");
 	if (ImGui::BeginDragDropTarget())
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 		{
 			const char* droppedFilePath = static_cast<const char*>(payload->Data);
 			file::path filename = file::path(droppedFilePath).filename();
@@ -1318,7 +1330,34 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			}
 		}
 	}
+}
 
+void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRenderer)
+{
+	if (spriteRenderer->GetSprite() == nullptr)
+		ImGui::Button("None Sprite", ImVec2(150, 20));
+	else
+		ImGui::Image((ImTextureID)spriteRenderer->GetSprite()->m_pSRV, ImVec2(30, 30));
+	ImVec2 minRect = ImGui::GetItemRectMin();
+	ImVec2 maxRect = ImGui::GetItemRectMax();
+	ImRect bb(minRect, maxRect);
+	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		{
+			const char* droppedFilePath = (const char*)payload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::Texture);
+			spriteRenderer->SetSprite(texture);
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	if (const auto* type = Meta::Find("SpriteRenderer"))
+	{
+		Meta::DrawProperties(spriteRenderer, *type);
+	}
 }
 
 #endif // !DYNAMICCPP_EXPORTS

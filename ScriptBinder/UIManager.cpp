@@ -22,16 +22,16 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
 	auto can = newObj->AddComponent<Canvas>();
 
-	if (auto* rect = newObj->GetComponent<RectTransformComponent>())
-	{
-		const std::array<float, 2> screenSize{
-				static_cast<float>(DirectX11::GetWidth()),
-				static_cast<float>(DirectX11::GetHeight())
-		};
-		rect->SetAnchoredPosition({ -screenSize[0] * 0.5f, -screenSize[1] * 0.5f });
-		rect->SetSizeDelta({ screenSize[0], screenSize[1] });
-		rect->UpdateLayout({ 0.0f, 0.0f, screenSize[0], screenSize[1] });
-	}
+        if (auto* rect = newObj->GetComponent<RectTransformComponent>())
+        {
+                const std::array<float, 2> screenSize{
+                                static_cast<float>(DirectX11::GetWidth()),
+                                static_cast<float>(DirectX11::GetHeight())
+                };
+                rect->SetAnchoredPosition({ 0.0f, 0.0f });
+                rect->SetSizeDelta({ screenSize[0], screenSize[1] });
+                rect->UpdateLayout({ 0.0f, 0.0f, screenSize[0], screenSize[1] });
+        }
 
 	Canvases.emplace_back(newObj);
 	CanvasMap[name.data()] = newObj;
@@ -124,206 +124,174 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 
 std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
 {
-	if (Canvases.empty())
-		MakeCanvas();
-	int canvasIndex = 0;
-	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
-	{
-		if (auto c = Canvases[canvasIndex].lock())
-		{
-			if (c->ToString() == canvasname)
-				break;
-		}
-	}
+    if (Canvases.empty())
+            MakeCanvas();
 
-	GameObject* canvas = FindCanvasName(canvasname);
-	if (canvas == nullptr)
-	{
-        auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI);
-        if (auto* rect = newImage->GetComponent<RectTransformComponent>())
-        {
-            rect->SetAnchoredPosition(Pos);
-            rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-        }
-	}
+    GameObject* canvas = FindCanvasName(canvasname);
+    if (canvas == nullptr)
+    {
+            std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+            return nullptr;
+    }
 
-	auto newButton0 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	if (auto* rect = newButton0->GetComponent<RectTransformComponent>())
-	{
-		rect->SetAnchoredPosition(Pos);
-		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-	}
-	auto newButton1 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	if (auto* rect = newButton1->GetComponent<RectTransformComponent>())
-	{
-		rect->SetAnchoredPosition(Pos);
-		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-	}
-
-	auto newText0 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	if (auto* rect = newText0->GetComponent<RectTransformComponent>())
-	{
-		rect->SetAnchoredPosition(Pos);
-		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-	}
-
-	auto newText1 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	if (auto* rect = newText1->GetComponent<RectTransformComponent>())
-	{
-		rect->SetAnchoredPosition(Pos);
-		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-	}
-
-       
-	if (Canvases.empty())
-		MakeCanvas();
-	if (!canvas)
-	{
-		if (auto c = Canvases.front().lock())
-			canvas = c.get();
-		else
-			return nullptr;
-	}
-	auto canvasCom = canvas->GetComponent<Canvas>();
-	if (!canvasCom)
-	{
-		std::cout << "This Obj Not Canvas" << std::endl;
-		return nullptr;
-	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newButton->AddComponent<ImageComponent>()->Load(texture);
-	auto component = newButton->AddComponent<UIButton>();
-	//component->SetClickFunction(clickfun);
-
-	canvasCom->AddUIObject(newButton);
-
-	return newButton;
+    return MakeImage(name, texture, canvas, Pos);
 }
 
 
 
+std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, GameObject* canvas)
+{
+    if (Canvases.empty())
+            MakeCanvas();
+
+    if (!canvas)
+    {
+            if (auto c = Canvases.front().lock())
+                    canvas = c.get();
+            else
+                    return nullptr;
+    }
+
+    auto canvasCom = canvas->GetComponent<Canvas>();
+    auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+    if (!canvasCom || !canvasRect)
+    {
+            std::cout << "This Obj Not Canvas" << std::endl;
+            return nullptr;
+    }
+
+    auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    if (auto* rect = newButton->GetComponent<RectTransformComponent>())
+    {
+            rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+            rect->SetPivot({ 0.5f, 0.5f });
+            rect->SetAnchoredPosition(Pos);
+            rect->UpdateLayout(canvasRect->GetWorldRect());
+    }
+
+    if (texture == nullptr)
+    {
+            newButton->AddComponent<ImageComponent>();
+    }
+    else
+    {
+            newButton->AddComponent<ImageComponent>()->Load(texture);
+    }
+
+    auto component = newButton->AddComponent<UIButton>();
+    component->SetClickFunction(clickfun);
+
+    canvasCom->AddUIObject(newButton);
+
+    return newButton;
+}
+
 std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
-	if (Canvases.empty())
-		MakeCanvas();
-	int canvasIndex = 0;
-	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
-	{
-		if (auto c = Canvases[canvasIndex].lock())
-		{
-			if (c->ToString() == canvasname)
-				break;
-		}
-	}
-	GameObject* canvas = FindCanvasName(canvasname);
-	if (canvas == nullptr)
-	{
-		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
-		return nullptr;
-	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newButton->AddComponent<ImageComponent>()->Load(texture);
-	auto component = newButton->AddComponent<UIButton>();
-	component->SetClickFunction(clickfun);
+    if (Canvases.empty())
+            MakeCanvas();
 
+    GameObject* canvas = FindCanvasName(canvasname);
+    if (canvas == nullptr)
+    {
+            std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+            return nullptr;
+    }
 
-	canvas->GetComponent<Canvas>()->AddUIObject(newButton);
-
-	return newButton;
+    return MakeButton(name, texture, clickfun, Pos, canvas);
 }
 
 std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, GameObject* canvas, Mathf::Vector2 Pos)
 {
-	if (Canvases.empty())
-		MakeCanvas();
-	if (!canvas)
-	{
-		if (auto c = Canvases.front().lock())
-			canvas = c.get();
-		else
-			return nullptr;
-	}
-	auto canvasCom = canvas->GetComponent<Canvas>();
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->SetFont(FontName);
-	canvasCom->AddUIObject(newText);
+    if (Canvases.empty())
+            MakeCanvas();
+    if (!canvas)
+    {
+            if (auto c = Canvases.front().lock())
+                    canvas = c.get();
+            else
+                    return nullptr;
+    }
+    auto canvasCom = canvas->GetComponent<Canvas>();
+    auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+    if (!canvasCom || !canvasRect)
+    {
+            std::cout << "This Obj Not Canvas" << std::endl;
+            return nullptr;
+    }
 
-	return newText;
+    auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    if (auto* rect = newText->GetComponent<RectTransformComponent>())
+    {
+            rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+            rect->SetPivot({ 0.5f, 0.5f });
+            rect->SetAnchoredPosition(Pos);
+            rect->UpdateLayout(canvasRect->GetWorldRect());
+    }
+
+    newText->AddComponent<TextComponent>()->SetFont(FontName);
+    canvasCom->AddUIObject(newText);
+
+    return newText;
 }
 
 std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)
 {
-	if (Canvases.empty())
-		MakeCanvas();
-	int canvasIndex = 0;
-	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
-	{
-		if (auto c = Canvases[canvasIndex].lock())
-		{
-			if (c->ToString() == canvasname)
-				break;
-		}
-	}
-	GameObject* canvas = FindCanvasName(canvasname);
-	if (canvas == nullptr)
-	{
-		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
-		return nullptr;
-	}
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newText->AddComponent<TextComponent>()->SetFont(FontName);
-	canvas->GetComponent<Canvas>()->AddUIObject(newText);
-
-	return newText;
+        if (Canvases.empty())
+                MakeCanvas();
+        GameObject* canvas = FindCanvasName(canvasname);
+        if (canvas == nullptr)
+        {
+                std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+                return nullptr;
+        }
+        return MakeText(name, FontName, canvas, Pos);
 }
 
 std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas, Mathf::Vector2 Pos)
 {
-	if (Canvases.empty())
-		MakeCanvas();
-	if (!canvas)
-	{
-		if (auto c = Canvases.front().lock())
-			canvas = c.get();
-		else
-			return nullptr;
-	}
-	auto canvasCom = canvas->GetComponent<Canvas>();
-	auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	newSpriteSheet->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
-	canvasCom->AddUIObject(newSpriteSheet);
-	return newSpriteSheet;
+        if (Canvases.empty())
+                MakeCanvas();
+        if (!canvas)
+        {
+                if (auto c = Canvases.front().lock())
+                        canvas = c.get();
+                else
+                        return nullptr;
+        }
+        auto canvasCom = canvas->GetComponent<Canvas>();
+        auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+        if (!canvasCom || !canvasRect)
+        {
+                std::cout << "This Obj Not Canvas" << std::endl;
+                return nullptr;
+        }
+
+        auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+        if (auto* rect = newSpriteSheet->GetComponent<RectTransformComponent>())
+        {
+                rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+                rect->SetPivot({ 0.5f, 0.5f });
+                rect->SetAnchoredPosition(Pos);
+                rect->UpdateLayout(canvasRect->GetWorldRect());
+        }
+
+        newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
+        canvasCom->AddUIObject(newSpriteSheet);
+        return newSpriteSheet;
 }
 
 std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos)
 {
-	if (Canvases.empty())
-		MakeCanvas();
-	int canvasIndex = 0;
-	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
-	{
-		if (auto c = Canvases[canvasIndex].lock())
-		{
-			if (c->ToString() == canvasname)
-				break;
-		}
-	}
-	GameObject* canvas = FindCanvasName(canvasname);
-	if (canvas == nullptr)
-	{
-		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
-		return nullptr;
-	}
-	auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-	newSpriteSheet->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newSpriteSheet->AddComponent<SpriteSheetComponent>()->LoadSpriteSheet(spriteSheetPath);
-	canvas->GetComponent<Canvas>()->AddUIObject(newSpriteSheet);
-	return newSpriteSheet;
+        if (Canvases.empty())
+                MakeCanvas();
+        GameObject* canvas = FindCanvasName(canvasname);
+        if (canvas == nullptr)
+        {
+                std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+                return nullptr;
+        }
+        return MakeSpriteSheet(name, spriteSheetPath, canvas, Pos);
 }
 
 void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)

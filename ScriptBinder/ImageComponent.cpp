@@ -20,11 +20,13 @@ ImageComponent::ImageComponent()
 
 void ImageComponent::SetTexture(int index)
 {
+	if (index < 0 || index >= textures.size())
+		return;
+
 	curindex = index;
 	m_curtexture = textures[curindex];
-	uiinfo.size = textures[curindex]->GetImageSize();
-
-	origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
+    uiinfo.size = textures[curindex]->GetImageSize();
+	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
 }
 
 bool ImageComponent::isThisTextureExist(std::string_view path) const
@@ -79,15 +81,20 @@ void ImageComponent::Update(float tick)
     if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
         const auto& worldRect = rect->GetWorldRect();
-        pos = { worldRect.x + worldRect.width * 0.5f,
-                worldRect.y + worldRect.height * 0.5f,
+        const auto& pivot = rect->GetPivot();
+
+		pos = { worldRect.x + worldRect.width * 2 * pivot.x,
+				worldRect.y + worldRect.height * 2 * pivot.y,
                 0.0f };
         scale = { worldRect.width / uiinfo.size.x,
                   worldRect.height / uiinfo.size.y };
 
-		scale *= unionScale;
+        origin = { uiinfo.size.x * 0.5f,
+                   uiinfo.size.y * 0.5f };
 
-		rect->SetSizeDelta(uiinfo.size);
+        scale *= unionScale;
+
+        rect->SetSizeDelta(uiinfo.size);
     }
 }
 

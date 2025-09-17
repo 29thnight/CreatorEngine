@@ -171,6 +171,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		else if (componentType->typeID == type_guid(Animator))
 		{
 			auto animator = static_cast<Animator*>(component);
+			Meta::Deserialize(animator, itNode);
 			Model* model = nullptr;
 			std::vector<bool> animationBools;
 			std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;
@@ -354,7 +355,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		else if (componentType->typeID == type_guid(SpriteRenderer))
 		{
 			auto spriteRenderer = static_cast<SpriteRenderer*>(component);
-			Texture* texture = nullptr;
+			std::shared_ptr<Texture> texture = nullptr;
 			if (itNode["m_Sprite"])
 			{
 				auto spriteNode = itNode["m_Sprite"];
@@ -363,6 +364,16 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             Meta::Deserialize(spriteRenderer, itNode);
 			spriteRenderer->SetOwner(obj);
 			spriteRenderer->SetEnabled(true);
+
+			if (spriteRenderer->m_SpritePath != "")
+			{
+				texture = DataSystems->LoadSharedTexture(spriteRenderer->m_SpritePath, DataSystem::TextureFileType::Texture);
+				if (texture)
+				{
+					spriteRenderer->SetSprite(std::shared_ptr<Texture>(texture));
+				}
+			}
+
 		}
 		else if (componentType->typeID == type_guid(RigidBodyComponent))
 		{

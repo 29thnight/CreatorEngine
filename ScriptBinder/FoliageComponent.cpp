@@ -29,7 +29,7 @@ void FoliageComponent::Update(float deltaTime)
         auto camera = CameraManagement->GetLastCamera();
         if (camera)
         {
-            UpdateFoliageCullingData(camera);
+            UpdateFoliageCullingData(camera.get());
 		}
 	}
 }
@@ -219,6 +219,8 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
 
     for (auto& foliage : m_foliageInstances)
     {
+        if (foliage.m_foliageTypeID > m_foliageTypes.size()) continue;
+
         Mathf::Vector3 position = foliage.m_position;
         Mathf::Vector3 rotation = foliage.m_rotation;
         Mathf::Vector3 scale = foliage.m_scale;

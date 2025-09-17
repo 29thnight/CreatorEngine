@@ -49,7 +49,7 @@ void EntityEnemy::Start()
 
 	m_pOwner->m_collisionType = 3;
 
-	for (auto& child : childred)
+	/*for (auto& child : childred)
 	{
 		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
 
@@ -59,7 +59,7 @@ void EntityEnemy::Start()
 			break;
 		}
 
-	}
+	}*/
 }
 
 void EntityEnemy::OnTriggerEnter(const Collision& collision)
@@ -220,7 +220,7 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 			blackBoard->SetValueAsInt("Damage", damage);
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);
-			if (true == criticalMark.TryCriticalHit(playerIndex))
+			/*if (true == criticalMark.TryCriticalHit(playerIndex))
 			{
 				if (markEffect)
 				{
@@ -237,7 +237,7 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 						markEffect->StopEffect();
 					}
 				}
-			}
+			}*/
 
 			
 			if (m_currentHP <= 0)
@@ -258,7 +258,7 @@ void EntityEnemy::SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce)
 		{
 			isKnockBack = true;
 			KnockBackTime = 0.1f;
-			GetOwner()->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce.x, KnockBackForce.y);
+			//GetOwner()->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce.x, KnockBackForce.y);
 		}
 	}
 }

@@ -5,6 +5,8 @@
 #define NORMAL_MAP 1
 #define BUMP_MAP 2
 
+#define MAX_TERRAIN_LAYERS 16
+
 Texture2D Albedo : register(t0);
 Texture2D NormalMap : register(t1);
 Texture2D OcclusionRoughnessMetal : register(t2);
@@ -12,7 +14,8 @@ Texture2D AoMap : register(t3);
 Texture2D Emissive : register(t5);
 
 Texture2DArray LayerAlbedo : register(t6);
-Texture2D SplatTexture : register(t7);
+//Texture2D SplatTexture : register(t7);
+Texture2DArray SplatMapArray : register(t7);
 
 cbuffer PBRMaterial : register(b0)
 {
@@ -33,10 +36,9 @@ cbuffer PBRMaterial : register(b0)
 cbuffer TerrainLayerConstants : register(b12)
 {
     int useTerrainLayers;
-    float gLayerTiling0;
-    float gLayerTiling1;
-    float gLayerTiling2;
-    float gLayerTiling3;
+    int numLayers; // 실제 사용하는 레이어 개수
+    int2 padding;
+    float gLayerTiling[MAX_TERRAIN_LAYERS];
 };
 
 
@@ -130,38 +132,51 @@ GBufferOutput main(PixelShaderInput IN)
 
     }
 
-    if (useTerrainLayers)
+    if (useTerrainLayers && numLayers > 0)
     {
-        float2 uv = IN.texCoord;
-        uv.y = -uv.y;
-        
-        float2 uv0 = uv * gLayerTiling0;
-        float2 uv1 = uv * gLayerTiling1;
-        float2 uv2 = uv * gLayerTiling2;
-        float2 uv3 = uv * gLayerTiling3;
-        
-        float4 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0);
-            layer0 = SRGBtoLINEAR(layer0);
-        float4 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0);
-            layer1 = SRGBtoLINEAR(layer1);
-        float4 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv2, (float) 2), 0);
-            layer2 = SRGBtoLINEAR(layer2);
-        float4 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv3, (float) 3), 0);
-            layer3 = SRGBtoLINEAR(layer3);
-        
-        
-        float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
-        splat = normalize(splat);
+        float3 finalColor = float3(0.0f, 0.0f, 0.0f);
+        float totalWeight = 0.0f;
 
-        float3 color = layer0 * splat.r + layer1 * splat.g + layer2 * splat.b + layer3 * splat.a;
+        // 루프를 통해 모든 레이어를 순회하며 색상을 계산하고 가중치를 합산
+        [loop]
+        for (int i = 0; i < numLayers; ++i)
+        {
+            float2 uv = IN.texCoord * gLayerTiling[i];
+            uv.y = -uv.y;
 
-        albedo = float4(color, 1.0);
+            // 레이어의 Albedo 색상 샘플링
+            float3 layerColor = LayerAlbedo.Sample(LinearSampler, float3(uv, (float) i)).rgb;
+            layerColor = SRGBtoLINEAR(float4(layerColor, 1.0)).rgb;
+
+            // SplatMapArray에서 해당 레이어의 가중치(Weight) 샘플링
+            float weight = SplatMapArray.Sample(LinearSampler, float3(IN.texCoord, (float) i)).r;
+
+            finalColor += layerColor * weight;
+            totalWeight += weight;
+        }
+
+        // 가중치의 합이 0이 되는 경우를 방지 (검은색 픽셀 방지)
+        if (totalWeight < 0.001f)
+        {
+            // 베이스 텍스처(0번)를 기본 색상으로 사용
+            float2 uv = IN.texCoord * gLayerTiling[0];
+            uv.y = -uv.y;
+            finalColor = LayerAlbedo.Sample(LinearSampler, float3(uv, 0.0f)).rgb;
+            finalColor = SRGBtoLINEAR(float4(finalColor, 1.0)).rgb;
+        }
+        else
+        {
+            // 가중치 합으로 나누어 정규화 (선택적)
+            // finalColor /= totalWeight;
+        }
+
+        albedo = float4(finalColor, 1.0);
 
         occlusion = 1;
         metallic = 0.0;
         roughness = 1.0;
         bit = 1 << 8;
-        bit |= 1 << 9; // Set bit 8 and 9 for terrain layers
+        bit |= 1 << 9; // 터레인 레이어 비트 설정
     }
     
     roughness = max(roughness, 0.1f);

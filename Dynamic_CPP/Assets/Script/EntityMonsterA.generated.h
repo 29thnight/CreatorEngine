@@ -6,12 +6,13 @@ ReflectionScriptField(EntityMonsterA) \
 	PropertyField \
 	({ \
 		meta_property(isAsisAction) \
-		meta_property(m_moveSpeed) \
 		meta_property(m_maxHP) \
-		meta_property(m_attackRange) \
-		meta_property(m_attackDamage) \
+		meta_property(m_enemyReward) \
+		meta_property(m_moveSpeed) \
 		meta_property(m_chaseRange) \
 		meta_property(m_rangeOutDuration) \
+		meta_property(m_attackRange) \
+		meta_property(m_attackDamage) \
 	}); \
 	MethodField \
 	({ \

@@ -258,7 +258,7 @@ void EntityAsis::Purification(float tick)
 		XMVECTOR orbitOffset = XMVector3Transform(localOrbit, axisRotation);
 
 		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
-		arr[i]->GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
+		arr[i]->GetComponent<RigidBodyComponent>()->SetLinearVelocity(Mathf::Vector3::Zero);
 		arr[i]->GetOwner()->m_transform.SetPosition(finalPos);
 		i++;
 	}
@@ -296,7 +296,7 @@ void EntityAsis::Purification(float tick)
 				GameObject* weaponCapsule = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
 				//플레이어 방향으로 웨폰날리기
 				auto weaponcapcom = weaponCapsule->GetComponent<WeaponCapsule>();
-				weaponcapcom->weaponCode = item->itemCode;  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
+				weaponcapcom->weaponCode = static_cast<int>(item->itemType);  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
 				weaponcapcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
 			}
@@ -385,7 +385,7 @@ void EntityAsis::PathMove(float tick)
 		Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMatrix);
 		Quaternion newRot = Quaternion::Slerp(currentRotation, rot, m_rotateSpeed * tick);
 
-		rotDownSpeed = rot.Dot(GetComponent<Transform>().GetWorldQuaternion());
+		rotDownSpeed = rot.Dot(GetComponent<Transform>()->GetWorldQuaternion());
 		rotDownSpeed = std::clamp(rotDownSpeed, 0.f, 1.f);
 
 		GetOwner()->m_transform.SetRotation(newRot);
@@ -403,6 +403,11 @@ void EntityAsis::PathMove(float tick)
 
 void EntityAsis::Stun()
 {
+}
+
+float EntityAsis::GetPollutionGaugePercent()
+{
+	return (float)m_currentPollutionGauge / maxPollutionGauge;
 }
 
 EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()

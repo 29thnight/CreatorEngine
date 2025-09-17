@@ -109,7 +109,9 @@ public:
 	void RemoveAllCCT();
 	//입력값 추가
 	void AddInputMove(const CharactorControllerInputInfo& info);
-
+	void SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& info,float maxSpeed);
+	void SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity);
+	void SetKnockBack(const CharactorControllerInputInfo& info,bool _isknockback, DirectX::SimpleMath::Vector3 velocity = {0,0,0});
 	// CharacterController의 위치를 강제로 설정합니다.
 	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
 

@@ -10,6 +10,7 @@
 #include "Material.h"
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
+#include "ShaderSystem.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -124,8 +125,9 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 	bool isEnabled = owner->IsEnabled();
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-        std::string vertexShaderName = componentPtr->GetVertexShaderName();
-        std::string pixelShaderName = componentPtr->GetPixelShaderName();
+        std::string customPSOName = componentPtr->GetCustomPSOName();
+       BillboardType billboardType = componentPtr->GetBillboardType();
+       auto billboardAxis = componentPtr->GetBillboardAxis();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
@@ -145,9 +147,19 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 		proxyObject->m_worldPosition = worldPosition;
 		proxyObject->m_isStatic = isStatic;
 		proxyObject->m_isEnableShadow = isEnabled;
-		proxyObject->m_spriteTexture = originTexture;
-                proxyObject->m_vertexShaderName = vertexShaderName;
-                proxyObject->m_pixelShaderName = pixelShaderName;
+                proxyObject->m_spriteTexture = originTexture;
+                proxyObject->m_customPSOName = customPSOName;
+               proxyObject->m_billboardType = billboardType;
+               proxyObject->m_billboardAxis = billboardAxis;
+                if (!customPSOName.empty())
+                {
+                        auto it = ShaderSystem->ShaderAssets.find(customPSOName);
+                        proxyObject->m_customPSO = (it != ShaderSystem->ShaderAssets.end()) ? it->second : nullptr;
+                }
+                else
+                {
+                        proxyObject->m_customPSO = nullptr;
+                }
         };
 }
 
@@ -332,7 +344,7 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
 	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
-	DirectX::XMFLOAT2 origin{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
+        DirectX::XMFLOAT2 origin{ pComponent->origin.x, pComponent->origin.y };
 	auto textures	= pComponent->textures;
 	auto curTexture	= pComponent->m_curtexture;
 	auto color		= pComponent->color;
@@ -396,27 +408,33 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 
 	auto font = pComponent->font;
 	auto message = pComponent->message;
-	auto color = pComponent->color;
-	auto position = pComponent->pos;
-	float fontSize = pComponent->fontSize;
-	int layerOrder = pComponent->GetLayerOrder();
+        auto color = pComponent->color;
+        auto position = pComponent->pos;
+        float fontSize = pComponent->fontSize;
+        int layerOrder = pComponent->GetLayerOrder();
+        auto maxSize = pComponent->stretchSize;
+        bool stretchX = pComponent->isStretchX;
+        bool stretchY = pComponent->isStretchY;
 	bool isEnable = owner->IsEnabled();
 
-	m_updateFunction = [weakProxyObject, isEnable, font, message, color, position, fontSize, layerOrder]()
-	{
-		if (auto proxyObject = weakProxyObject.lock())
-		{
-			UIRenderProxy::TextData data{};
-			data.font = font;
-			data.message = message;
-			data.color = color;
-			data.position = Mathf::Vector2(position);
-			data.fontSize = fontSize;
-			data.layerOrder = layerOrder;
-			proxyObject->m_data = std::move(data);
-			proxyObject->m_isEnabled = isEnable;
-		}
-	};
+        m_updateFunction = [weakProxyObject, isEnable, font, message, color, position, fontSize, layerOrder, maxSize, stretchX, stretchY]()
+        {
+                if (auto proxyObject = weakProxyObject.lock())
+                {
+                        UIRenderProxy::TextData data{};
+                        data.font = font;
+                        data.message = message;
+                        data.color = color;
+                        data.position = Mathf::Vector2(position);
+                        data.fontSize = fontSize;
+                        data.layerOrder = layerOrder;
+                        data.maxSize = maxSize;
+                        data.stretchX = stretchX;
+                        data.stretchY = stretchY;
+                        proxyObject->m_data = std::move(data);
+                        proxyObject->m_isEnabled = isEnable;
+                }
+        };
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :

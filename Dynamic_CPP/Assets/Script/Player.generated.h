@@ -7,6 +7,7 @@ ReflectionScriptField(Player) \
 	({ \
 		meta_property(playerIndex) \
 		meta_property(moveSpeed) \
+		meta_property(chargingMoveSpeed) \
 		meta_property(maxHP) \
 		meta_property(ThrowPowerX) \
 		meta_property(ThrowPowerY) \
@@ -20,28 +21,28 @@ ReflectionScriptField(Player) \
 		meta_property(dashAmount) \
 		meta_property(dubbleDashTime) \
 		meta_property(Atk) \
-		meta_property(AttackRange) \
-		meta_property(AttackSpeed) \
 		meta_property(comboDuration) \
-		meta_property(atkFwDistacne) \
-		meta_property(rangedAtkCountMax) \
-		meta_property(rangedAtkDelay) \
-		meta_property(rangedAtkCooldown) \
 		meta_property(rangedAutoAimRange) \
-		meta_property(minChargedTime) \
 		meta_property(rangeAngle) \
-		meta_property(rangeDistacne) \
 		meta_property(countSpecialBullet) \
 		meta_property(bombMoveSpeed) \
+		meta_property(MeleeAttackSpeed) \
+		meta_property(RangeAttackSpeed) \
+		meta_property(BombAttackSpeed) \
+		meta_property(stunRespawnTime) \
 		meta_property(GracePeriod) \
 		meta_property(ResurrectionRange) \
 		meta_property(ResurrectionTime) \
 		meta_property(ResurrectionHP) \
 		meta_property(ResurrectionGracePeriod) \
 		meta_property(SlotChangeCooldown) \
+		meta_property(testHitPowerX) \
+		meta_property(testHitPowerY) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(SetCurHP, "hp") \
+		meta_method(Damage, "damage") \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(SwapBasicWeapon) \
@@ -58,10 +59,12 @@ ReflectionScriptField(Player) \
 		meta_method(ThrowBomb) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \
-		meta_method(Attack1) \
+		meta_method(ChargeAttack) \
 		meta_method(StartRay) \
 		meta_method(EndRay) \
 		meta_method(EndAttack) \
+		meta_method(TestKillPlayer) \
+		meta_method(TestHit) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };

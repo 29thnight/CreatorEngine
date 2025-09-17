@@ -1,6 +1,8 @@
 #pragma once
 #include "Core.Minimal.h"
 
+#define MAX_TERRAIN_LAYERS 16
+
 cbuffer TerrainAddLayerBuffer
 {
 	UINT slice;
@@ -15,13 +17,16 @@ cbuffer TerrainGizmoBuffer
     bool32 isEditMode{ false }; // 편집 모드 여부
 };
 
+// [수정] HLSL의 16바이트 정렬 규칙에 맞춤
 cbuffer TerrainLayerBuffer
 {
-	bool32 useLayer{ false };
-	float layerTilling0;
-	float layerTilling1;
-	float layerTilling2;
-	float layerTilling3;
+    int useLayer{};
+    int numLayers{};
+    int padding1{}; // 16바이트 정렬을 위한 패딩
+    int padding2{};
+    // HLSL에서 float 배열은 각 요소가 float4(16바이트)로 정렬될 수 있으므로
+    // C++에서도 동일한 크기를 갖도록 DirectX::XMFLOAT4를 사용합니다.
+    DirectX::XMFLOAT4 layerTilling[MAX_TERRAIN_LAYERS]{};
 };
 
 //-----------------------------------------------------------------------------

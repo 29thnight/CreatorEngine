@@ -3,6 +3,7 @@
 #include "EntityEnemy.h"
 #include "Player.h"
 #include "DebugLog.h"
+#include "Entity.h"
 void NormalBullet::Start()
 {
 	bulletType = BulletType::Normal;
@@ -30,12 +31,12 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 	{
 		//if (collision.otherObj->m_tag == "Enemy")
 		{
-			EntityEnemy* enemy = collision.otherObj->GetComponent<EntityEnemy>();
+			Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
 
 			if (enemy)
 			{
 				LOG("EnemyHit!");
-				enemy->SendDamage(m_owenrPlayer, 1);
+				enemy->SendDamage(m_ownerPlayer, m_damage);
 				hasAttacked = true;
 				GetOwner()->Destroy(); //지우지말고 BulletPool만들기
 

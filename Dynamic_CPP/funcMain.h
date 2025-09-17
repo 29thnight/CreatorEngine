@@ -192,12 +192,25 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("SwitchingSceneTrigger", []() { return new SwitchingSceneTrigger(); });
+		CreateFactory::GetInstance()->RegisterFactory("LoadingController", []() { return new LoadingController(); });
+		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotDurFont", []() { return new WeaponSlotDurFont(); });
+		CreateFactory::GetInstance()->RegisterFactory("EventTarget", []() { return new EventTarget(); });
+		CreateFactory::GetInstance()->RegisterFactory("EventManager", []() { return new EventManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("HPBar", []() { return new HPBar(); });
+		CreateFactory::GetInstance()->RegisterFactory("EventSelector", []() { return new EventSelector(); });
+		CreateFactory::GetInstance()->RegisterFactory("RewardObserver", []() { return new RewardObserver(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityBigWood", []() { return new EntityBigWood(); });
+		CreateFactory::GetInstance()->RegisterFactory("CriticalMark", []() { return new CriticalMark(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityItemHeal", []() { return new EntityItemHeal(); });
+		CreateFactory::GetInstance()->RegisterFactory("MonsterProjectile", []() { return new MonsterProjectile(); });
+		CreateFactory::GetInstance()->RegisterFactory("TestMonsterB", []() { return new TestMonsterB(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotController", []() { return new WeaponSlotController(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlot", []() { return new WeaponSlot(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityRock", []() { return new EntityRock(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntitySpiritStone", []() { return new EntitySpiritStone(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterA", []() { return new EntityMonsterA(); });
 		CreateFactory::GetInstance()->RegisterFactory("UIGageTest", []() { return new UIGageTest(); });
-		CreateFactory::GetInstance()->RegisterFactory("EntitlyRock", []() { return new EntitlyRock(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponCapsule", []() { return new WeaponCapsule(); });
 		CreateFactory::GetInstance()->RegisterFactory("Explosion", []() { return new Explosion(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bomb", []() { return new Bomb(); });
@@ -207,7 +220,6 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("SpecialBullet", []() { return new SpecialBullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bullet", []() { return new Bullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("DestroyEffect", []() { return new DestroyEffect(); });
-		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityEnemy", []() { return new EntityEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("Weapon", []() { return new Weapon(); });
 		CreateFactory::GetInstance()->RegisterFactory("TweenManager", []() { return new TweenManager(); });
@@ -289,6 +301,9 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerHit", []() { return new PlayerHit(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerDash", []() { return new PlayerDash(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerStun", []() { return new PlayerStun(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerBombAttack", []() { return new PlayerBombAttack(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttack", []() { return new PlayerRangeAttack(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("MosterMeleeAni", []() { return new MosterMeleeAni(); });
