@@ -14,7 +14,7 @@ void Bullet::Initialize(Player* owner,Mathf::Vector3 originpos,Mathf::Vector3 di
 {
 	Transform* transform = GetOwner()->GetComponent<Transform>();
 	transform->SetPosition(originpos);
-	m_owenrPlayer = owner;
+	m_ownerPlayer = owner;
 	m_moveDir = dir;
 	m_damage = _damage;
 	hasAttacked = false;

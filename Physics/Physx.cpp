@@ -1553,6 +1553,7 @@ void PhysicX::SetCCTData(const unsigned int& id,const CharacterControllerGetSetD
 		auto& controller = m_characterControllerContainer[id];
 		physx::PxController* pxController = controller->GetController();
 
+		
 		m_characterControllerContainer[id]->ChangeLayerNumber(controllerData.LayerNumber, m_collisionMatrix);
 		controller->SetPosition(controllerData.position);
 	}
@@ -1561,6 +1562,7 @@ void PhysicX::SetCCTData(const unsigned int& id,const CharacterControllerGetSetD
 			if (controller.id == id)
 			{
 				controller.position = controllerData.position;
+				
 			}
 		}
 		for (auto& [controller, movement] : m_waittingCCTList)
@@ -1581,6 +1583,7 @@ void PhysicX::SetMovementData(const unsigned int& id,const CharacterMovementGetS
 		CharacterMovement* movement = controller->GetCharacterMovement();
 
 		controller->SetMoveRestrct(movementData.restrictDirection);
+		
 		movement->SetIsFall(movementData.isFall);
 		movement->SetVelocity(movementData.velocity);
 		movement->SetMaxSpeed(movementData.maxSpeed);
