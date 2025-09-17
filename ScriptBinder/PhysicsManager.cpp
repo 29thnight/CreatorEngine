@@ -753,8 +753,10 @@ void PhysicsManager::SetPhysicData()
 			auto prevlayer = controllerInfo.layerNumber;
 			auto currentLayer = static_cast<unsigned int>(colliderInfo.gameObject->GetCollisionType());
 			
-			if (prevlayer != currentLayer) {
+			//if (prevlayer != currentLayer) 
+			{
 				data.LayerNumber = currentLayer;
+				controllerInfo.layerNumber = currentLayer;
 				controller->SetControllerInfo(controllerInfo);
 			}
 
@@ -984,6 +986,7 @@ void PhysicsManager::LoadCollisionMatrix()
 			}
 		}
 	}
+	SetCollisionMatrix(m_collisionMatrix);
 	settingsFile.close();
 }
 

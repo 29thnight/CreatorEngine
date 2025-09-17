@@ -104,7 +104,11 @@ public:
 	{
 		
 		unsigned int otherLayer = shape->getSimulationFilterData().word0;
-		if (m_collisionMatrix[m_characterLayer] & (1 << otherLayer)) {
+
+		
+
+		if(m_collisionMatrix[m_characterLayer] & (1 << otherLayer)) 
+		{
 
 			// 충돌해야 한다면 BLOCK
 			return PxQueryHitType::eBLOCK;
