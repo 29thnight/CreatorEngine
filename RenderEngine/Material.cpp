@@ -22,14 +22,13 @@ Material::Material(const Material& material) :
     m_AO_TexName(material.m_AO_TexName),
     m_EmissiveTexName(material.m_EmissiveTexName),
     m_flowInfo(material.m_flowInfo),
-    /*m_shaderPSO(material.m_shaderPSO),*/
+    m_shaderPSO(material.m_shaderPSO),
     m_renderingMode(material.m_renderingMode),
     m_shaderPSOName(material.m_shaderPSOName),
     m_cbMeta(material.m_cbMeta),
     m_cbufferValues(material.m_cbufferValues),
 	m_dirtyCBs(material.m_dirtyCBs)
 {
-	SetShaderPSO(material.m_shaderPSO);
 }
 
 Material::Material(Material&& material) noexcept
@@ -470,16 +469,11 @@ void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
     if (!m_shaderPSO) return;
     if (!ctx) ctx = DirectX11::DeviceStates->g_pDeviceContext;
 
-    // 더러워진 CB만 올려준다.
-    for (const auto& cbName : m_viewDirtyCBs)
+    for (const auto& [cbName, data] : m_cbufferView)
     {
-        auto it = m_cbufferView.find(cbName);
-        if (it == m_cbufferView.end()) continue;
-        m_shaderPSO->UpdateConstantBuffer(ctx, cbName, it->second.data(), it->second.size());
+		m_shaderPSO->UpdateConstantBuffer(ctx, cbName, data.data(), data.size());
     }
     m_viewDirtyCBs.clear();
-
-
 }
 
 void Material::TrySetMaterialInfo()
