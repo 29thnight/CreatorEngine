@@ -405,6 +405,11 @@ void EntityAsis::Stun()
 {
 }
 
+float EntityAsis::GetPollutionGaugePercent()
+{
+	return (float)m_currentPollutionGauge / maxPollutionGauge;
+}
+
 EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 {
 	if (m_currentEntityItemCount <= 0)

@@ -12,6 +12,7 @@ cbuffer SSGIParams
 {
     XMMATRIX view;
     XMMATRIX proj;
+    XMMATRIX inverseView;
     XMMATRIX inverseProjection;
     float2 screenSize; // 화면 크기
     float radius; // 샘플링 반경
@@ -143,7 +144,8 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     SSGIParams params;
     params.view = camera.CalculateView();
     params.proj = camera.CalculateProjection();
-    params.inverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
+    params.inverseView = XMMatrixInverse(nullptr, params.view);
+    params.inverseProjection = XMMatrixInverse(nullptr, params.proj);
     params.screenSize = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
     params.radius = radius;;
     params.thickness = thickness;
@@ -246,7 +248,10 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     compositeParams.inputTextureSize = { (float)DirectX11::DeviceStates->g_Viewport.Width / (ssratio), (float)DirectX11::DeviceStates->g_Viewport.Height / (ssratio) };
     DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeParams);
     DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-    DirectX11::Dispatch(deferredPtr, DirectX11::DeviceStates->g_Viewport.Width / 16, DirectX11::DeviceStates->g_Viewport.Height / 16, 1);
+    DirectX11::Dispatch(
+        deferredPtr, 
+        (DirectX11::DeviceStates->g_Viewport.Width + 15) / 16, 
+        (DirectX11::DeviceStates->g_Viewport.Height + 15) / 16, 1);
     // Clear resources
     ID3D11ShaderResourceView* nullSRV[3] = { nullptr, nullptr, nullptr };
     DirectX11::CSSetShaderResources(deferredPtr, 0, 3, nullSRV);

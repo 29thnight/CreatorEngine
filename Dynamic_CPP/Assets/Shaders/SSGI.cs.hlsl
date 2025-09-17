@@ -36,6 +36,7 @@ cbuffer SSGIParams : register(b0)
 {
     float4x4 viewMat;
     float4x4 projection;
+    float4x4 inverseView;
     float4x4 inverseProjection;
     float2 screenSize; // 화면 크기
     float radius; // 샘플링 반경
@@ -69,7 +70,9 @@ float3 CalculateViewSpaceFromDepth(float depth, float2 texCoord)
 
 float3 CalculateViewSpaceFromWorldNormal(float3 normal)
 {
+    //float3x3 viewMatrix = transpose((float3x3)inverseView);
     float3 viewNormal = mul((float3x3)viewMat, normal);
+    //float3 viewNormal = mul(viewMatrix, normal);
     return normalize(viewNormal);
 }
 float2 GetDirection(uint i, float2 noise)
@@ -79,7 +82,7 @@ float2 GetDirection(uint i, float2 noise)
 }
 float randf(int x, int y)
 {
-    return fmod(52.9829189 * fmod(0.06711056 * (float) x + 0.00583715 * (float) y, 1.0), 1.0);
+    return fmod(52.9829189 * fmod(0.06711056 * (float) x + 0.00583715 * (float) y, 1.0), 1.0);  // 0~1
 }
 uint updateSectors(float minHorizon, float maxHorizon, uint outBitfield)
 {
@@ -110,23 +113,23 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float2 frontBackHorizon = float2(0.0, 0.0);
     float2 aspect = screenSize.yx / screenSize.x;
 
-    float3 position = CalculateViewSpaceFromDepth(depth, uv); //screenPosition.Sample(samplerLinear, fragUV).rgb;
-    float3 camera = normalize(-position);
-    float3 normal = CalculateViewSpaceFromWorldNormal((gNormalTex.SampleLevel(PointSampler, uv, 0).rgb * 2 - 1));
+    float3 position = CalculateViewSpaceFromDepth(depth, uv);   //view space position
+    float3 camera = normalize(-position);                       //view space camera minus direction 
+    float3 normal = CalculateViewSpaceFromWorldNormal((gNormalTex.SampleLevel(PointSampler, uv, 0).rgb * 2 - 1));   // view space normal
 
     float sliceRotation = twoPI / (Nd - 1.0);
     float sampleScale = (-radius * projection[0][0]) / position.z;
     float sampleOffset = 0.01;
     float jitter = randf(DTid.x, DTid.y) - 0.5;
 
-    float3 albedo = gColor.SampleLevel(LinearSampler, uv, 0);
-    float2 metalrough = MetalRough.SampleLevel(LinearSampler, uv, 0).rg;
+    float3 albedo = gColor.SampleLevel(PointSampler, uv, 0);
+    float2 metalrough = MetalRough.SampleLevel(PointSampler, uv, 0).rg;
     float metallic = metalrough.x;
     float roughness = metalrough.y;
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);
     
-    for (float slice = 0.0; slice < Nd + 0.5; slice += 1.0)
+    for (float slice = 1.0; slice < Nd + 0.5; slice += 1.0)
     {
         float phi = sliceRotation * (slice + jitter) + PI;
         float2 omega = float2(cos(phi), sin(phi));
@@ -140,15 +143,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
         float cosN = clamp(dot(projNormal, camera) / projLength, 0.0, 1.0);
         float n = signN * acos(cosN);
 
-        for (float currentSample = 0.0; currentSample < Ns + 0.5; currentSample += 1.0)
+        for (float currentSample = 1.0; currentSample < Ns + 0.5; currentSample += 1.0)
         {
             float sampleStep = (currentSample + jitter) / Ns + sampleOffset;
             float2 sampleUV = uv - sampleStep * sampleScale * omega * aspect;
-            float sDepth = gDepthTex.SampleLevel(LinearSampler, sampleUV, 0);
+            float sDepth = gDepthTex.SampleLevel(PointSampler, sampleUV, 0);
             //sDepth = -linearZ(sDepth); // linearize depth
             float3 samplePosition = CalculateViewSpaceFromDepth(sDepth, sampleUV); //screenPosition.Sample(samplerLinear, sampleUV).rgb;
-            float3 sampleNormal = CalculateViewSpaceFromWorldNormal((gNormalTex.SampleLevel(LinearSampler, sampleUV, 0).rgb * 2 - 1));
-            float3 sampleLight = gLightEmissive.SampleLevel(LinearSampler, sampleUV, 0).rgb; //screenLight.Sample(samplerLinear, sampleUV).rgb;
+            float3 sampleNormal = CalculateViewSpaceFromWorldNormal((gNormalTex.SampleLevel(PointSampler, sampleUV, 0).rgb * 2 - 1));
+            float3 sampleLight = gLightEmissive.SampleLevel(PointSampler, sampleUV, 0).rgb; //screenLight.Sample(samplerLinear, sampleUV).rgb;
             float3 sampleDistance = samplePosition - position;
             float sampleLength = length(sampleDistance);
             float3 sampleHorizon = sampleDistance / sampleLength;

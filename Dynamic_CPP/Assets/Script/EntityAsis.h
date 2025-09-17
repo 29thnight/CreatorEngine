@@ -33,6 +33,9 @@ public:
 	void PathMove(float tick);
 	void Stun();
 
+	// 0~1
+	float GetPollutionGaugePercent();
+
 	EntityItem* GetPurificationItemInEntityItemQueue();
 	float GetPollutionGaugeRatio() const
 	{
