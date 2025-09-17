@@ -344,7 +344,7 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
 	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
-	DirectX::XMFLOAT2 origin{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
+        DirectX::XMFLOAT2 origin{ pComponent->origin.x, pComponent->origin.y };
 	auto textures	= pComponent->textures;
 	auto curTexture	= pComponent->m_curtexture;
 	auto color		= pComponent->color;

@@ -23,6 +23,7 @@ public:
 
 	//한글이 안나올시 sfont 제대로 만들었는지 확인
 	void SetMessage(std::string _message) { message = _message; }
+	std::string GetTextMessage() { return message; }
 	void SetFont(const file::path& path);
 	void SetFont(const file::path& path, SpriteFont* _font)
 	{
@@ -31,6 +32,24 @@ public:
 	}
 	SpriteFont* GetFont() const { return font; }
 	const std::string& GetFontPath() const { return fontPath; }
+
+	Mathf::Color4 GetColor() const { return color; }
+	void SetColor(const Mathf::Color4& col) { color = col; }
+
+	float GetAlpha() const { return color.w; }
+	void SetAlpha(float alpha) { color.w = alpha; }
+
+	float GetFontSize() const { return fontSize; }
+	void SetFontSize(float size) { fontSize = size; }
+
+	Mathf::Vector2 GetRelativePosition() const { return relpos; }
+	void SetRelativePosition(const Mathf::Vector2& pos) { relpos = pos; }
+
+	Mathf::Rect GetManualRect() const { return manualRect; }
+	void SetManualRect(const Mathf::Rect& rect) { manualRect = rect; }
+
+	bool IsUsingManualRect() const { return useManualRect; }
+	void SetUseManualRect(bool use) { useManualRect = use; }
 
 private:
 	friend class UIRenderProxy;

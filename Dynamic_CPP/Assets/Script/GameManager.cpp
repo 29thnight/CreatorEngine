@@ -13,6 +13,7 @@
 #include "EntityResource.h"
 #include "EntityItem.h"
 #include "DebugLog.h"
+#include "EntityAsis.h"
 
 void GameManager::Awake()
 {
@@ -125,6 +126,14 @@ void GameManager::SetPlayerInputDevice(int playerIndex, CharType charType, Playe
 {
 	if (playerIndex < 0 || playerIndex >= MAX_INPUT_DEVICE) return;
 	GameInstance::GetInstance()->SetPlayerInputDevice(playerIndex, charType, dir);
+}
+
+float GameManager::GetAsisPollutionGaugeRatio()
+{
+	if (m_asis.empty()) return 0.f;
+	auto asis = dynamic_cast<EntityAsis*>(m_asis[0]);
+	if (!asis) return 0.f;
+	return asis->GetPollutionGaugeRatio();
 }
 
 void GameManager::LoadTestScene()

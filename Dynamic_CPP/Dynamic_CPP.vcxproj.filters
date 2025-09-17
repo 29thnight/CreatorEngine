@@ -252,9 +252,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="PlayerBuff.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\Bullet.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
@@ -382,6 +379,12 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\LoadingController.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\Bomb.h">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SwitchingSceneTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -668,9 +671,6 @@
 		<ClCompile Include="Assets\Script\HPBar.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="PlayerBuff.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\CameraMove.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -684,6 +684,12 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\LoadingController.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Bomb.cpp">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwitchingSceneTrigger.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

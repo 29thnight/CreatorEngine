@@ -125,4 +125,7 @@ public:
 private:
 	unsigned int m_characterLayer; // 캐릭터 레이어
 	const unsigned int* m_collisionMatrix; //physics collision matrix ptr
+
+public:
+	void SetCharacterLayer(unsigned int layer) { m_characterLayer = layer; }
 };
