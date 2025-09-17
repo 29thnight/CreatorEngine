@@ -468,13 +468,13 @@ void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
     if (!ctx) ctx = DirectX11::DeviceStates->g_pDeviceContext;
 
     // 더러워진 CB만 올려준다.
-    for (const auto& cbName : m_dirtyCBs)
+    for (const auto& cbName : m_viewDirtyCBs)
     {
-        auto it = m_cbufferValues.find(cbName);
-        if (it == m_cbufferValues.end()) continue;
+        auto it = m_cbufferView.find(cbName);
+        if (it == m_cbufferView.end()) continue;
         m_shaderPSO->UpdateConstantBuffer(ctx, cbName, it->second.data(), it->second.size());
     }
-    m_dirtyCBs.clear();
+    m_viewDirtyCBs.clear();
 
 
 }
@@ -493,4 +493,12 @@ void Material::TrySetMaterialInfo()
     TrySetInt("PBRMaterial", "gConvertToLinear", m_materialInfo.m_convertToLinearSpace);
 
 	TrySetInt("PBRMaterial", "bitflag", m_materialInfo.m_bitflag);
+}
+
+void Material::UpdateCBufferView()
+{
+    if (!m_cbMeta) return;
+
+	m_cbufferView = m_cbufferValues;
+    m_viewDirtyCBs = std::move(m_dirtyCBs);
 }

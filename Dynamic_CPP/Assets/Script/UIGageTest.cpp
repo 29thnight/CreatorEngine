@@ -43,7 +43,7 @@ void UIGageTest::Update(float tick)
 	//내구도 퍼센트 계산
 	if (m_weaponSlot)
 	{
-		int curDur = m_weaponSlot->GetDurabilityRatio();
+		float curDur = m_weaponSlot->GetDurabilityRatio();
 		percent = curDur;
 	}
 	else

@@ -112,6 +112,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 			proxyObject->m_Material = originMat;
 			proxyObject->m_materialGuid = originMatGuid;
 		}
+		proxyObject->m_Material->UpdateCBufferView();
 	};
 }
 

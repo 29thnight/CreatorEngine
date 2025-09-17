@@ -97,6 +97,8 @@ public:
 	void ApplyShaderParams(ID3D11DeviceContext* ctx);
 	void TrySetMaterialInfo();
 
+	void UpdateCBufferView();
+
 private:
 	struct VarView {
 		const ShaderPSO::CBEntry* cb{};
@@ -140,6 +142,8 @@ public:
     std::string m_shaderPSOName{};
     const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
     std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
+	std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferView{};
 	std::unordered_set<std::string> m_dirtyCBs;
+	std::unordered_set<std::string> m_viewDirtyCBs;
 };
 
