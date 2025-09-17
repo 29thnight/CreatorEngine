@@ -370,14 +370,15 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
+			proxy->m_Material->TrySetValue("BoneTransformation", "BoneTransforms", proxy->m_finalTransforms, sizeof(Mathf::xMatrix) * 50);
 			proxy->m_Material->TrySetMaterialInfo();
 			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
 
-			if (proxy->m_finalTransforms)
-			{
-				DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), proxy->m_finalTransforms);
-			}
+			//if (proxy->m_finalTransforms)
+			//{
+			//	DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), proxy->m_finalTransforms);
+			//}
 			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
 			proxy->Draw(deferredPtr);
 		}

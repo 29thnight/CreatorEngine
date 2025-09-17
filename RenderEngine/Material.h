@@ -77,6 +77,8 @@ public:
 	bool TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m);
 	bool TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const;
 
+	bool TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size);
+
 	// 式式 Qualified name sugar: "CB.Var" 式式
 	bool TrySetFloat(std::string_view qualified, float v);
 	bool TryGetFloat(std::string_view qualified, float& out) const;
