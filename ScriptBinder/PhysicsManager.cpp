@@ -755,6 +755,7 @@ void PhysicsManager::SetPhysicData()
 			
 			if (prevlayer != currentLayer) {
 				data.LayerNumber = currentLayer;
+				controllerInfo.layerNumber = currentLayer;
 				controller->SetControllerInfo(controllerInfo);
 			}
 
