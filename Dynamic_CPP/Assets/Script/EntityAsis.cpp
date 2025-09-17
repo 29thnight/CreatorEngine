@@ -345,6 +345,7 @@ void EntityAsis::Purification(float tick)
 void EntityAsis::PathMove(float tick)
 {
 	int pathSize = points.size();
+	if (pathSize == 0) return;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;
 	Vector3 currentPosition = GetOwner()->m_transform.GetWorldPosition();
 	Quaternion currentRotation = GetOwner()->m_transform.GetWorldQuaternion();

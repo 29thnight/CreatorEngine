@@ -12,7 +12,7 @@
                     "state_name": "Ani State",
                     "transitions": [
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.009999999776482582,
                             "conditions": [
                                 {
                                     "bValue": true,
@@ -243,7 +243,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 12,
+                    "animationIndex": 11,
                     "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -597,7 +597,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 10,
+                    "animationIndex": 8,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerAttackAH",
@@ -661,7 +661,7 @@
                 },
                 {
                     "animationIndex": 9,
-                    "animationSpeed": 4.0,
+                    "animationSpeed": 3.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerHit",
                     "m_isAny": false,
@@ -669,10 +669,10 @@
                     "state_name": "Hit",
                     "transitions": [
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.30000001192092896,
                             "conditions": [],
                             "curStateName": "Hit",
-                            "exitTime": 0.7900000214576721,
+                            "exitTime": 0.699999988079071,
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "Hit to Idle"

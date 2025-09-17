@@ -148,7 +148,7 @@ public:
 	bool canMeleeCancel = false; //밀리어택 애니메이션 진행중 캔슬가능한지 //키프레임 이벤트에서 각 시점에 true로 바꿔주고 true 일때 공격입력시 다음공격 전환
 	[[Method]]
 	void Cancancel();
-
+	void CancelChargeAttack();
 	bool startAttack = false;
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;

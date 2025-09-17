@@ -300,100 +300,93 @@ void Player::Update(float tick)
 void Player::LateUpdate(float tick)
 {
 
-	if (isStun)
-	{
-		
-		CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-		auto cam = camComponent->GetCamera();
-		auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-		auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//if (isStun)
+	//{
+	//	
+	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//	auto cam = camComponent->GetCamera();
+	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-		XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-		XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-		float w = XMVectorGetW(clipSpacePos);
-		if (w < 0.001f) {
-			// 원래 위치 반환.
-			GetOwner()->m_transform.SetPosition(worldpos);
-			return;
-		}
-		XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//	float w = XMVectorGetW(clipSpacePos);
+	//	if (w < 0.001f) {
+	//		// 원래 위치 반환.
+	//		GetOwner()->m_transform.SetPosition(worldpos);
+	//		return;
+	//	}
+	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-		float x = XMVectorGetX(ndcPos);
-		float y = XMVectorGetY(ndcPos);
-		x = abs(x);
-		y = abs(y);
+	//	float x = XMVectorGetX(ndcPos);
+	//	float y = XMVectorGetY(ndcPos);
+	//	x = abs(x);
+	//	y = abs(y);
 
-		float clamp_limit = 0.9f;
-		if (x < clamp_limit && y < clamp_limit)
-		{
-			return;
-		}
+	//	float clamp_limit = 0.9f;
+	//	if (x < clamp_limit && y < clamp_limit)
+	//	{
+	//		return;
+	//	}
+	//	{
+	//		//이미화면밖임
+	//		stunRespawnElapsedTime += tick;
+	//		if (stunRespawnTime <= stunRespawnElapsedTime)
+	//		{
 
+	//			auto& asiss = GM->GetAsis();
+	//			if (!asiss.empty())
+	//			{
+	//				auto asis = asiss[0]->GetOwner();
+	//				Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+	//				Mathf::Vector3 asisForward = asis->m_transform.GetForward();
 
-		{
-			//이미화면밖임
-			stunRespawnElapsedTime += tick;
-			if (stunRespawnTime <= stunRespawnElapsedTime)
-			{
+	//				Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{5, 0, 5};
 
-				auto& asiss = GM->GetAsis();
-				if (!asiss.empty())
-				{
-					auto asis = asiss[0]->GetOwner();
-					Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-					Mathf::Vector3 asisForward = asis->m_transform.GetForward();
+	//				GetOwner()->m_transform.SetPosition(newWorldPos);
+	//				stunRespawnElapsedTime = 0;
+	//			}
+	//		}
+	//	}
+	//}
+	//else
+	//{
+	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//	auto cam = camComponent->GetCamera();
+	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-					Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{5, 0, 5};
+	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//	float w = XMVectorGetW(clipSpacePos);
+	//	if (w < 0.001f) {
+	//		// 원래 위치 반환.
+	//		GetOwner()->m_transform.SetPosition(worldpos);
+	//		return;
+	//	}
+	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-					GetOwner()->m_transform.SetPosition(newWorldPos);
-					stunRespawnElapsedTime = 0;
-				}
+	//	float x = XMVectorGetX(ndcPos);
+	//	float y = XMVectorGetY(ndcPos);
+	//	x = abs(x);
+	//	y = abs(y);
 
+	//	float clamp_limit = 0.9f;
+	//	if (x < clamp_limit && y < clamp_limit)
+	//	{
+	//		return;
+	//	}
 
+	//	XMVECTOR clampedNdcPos = XMVectorClamp(
+	//		ndcPos,
+	//		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+	//		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	//	);
+	//	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	//	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-			}
-			
-
-		}
-	}
-	else
-	{
-		CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-		auto cam = camComponent->GetCamera();
-		auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-		auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
-
-		XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-		XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-		float w = XMVectorGetW(clipSpacePos);
-		if (w < 0.001f) {
-			// 원래 위치 반환.
-			GetOwner()->m_transform.SetPosition(worldpos);
-			return;
-		}
-		XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
-
-		float x = XMVectorGetX(ndcPos);
-		float y = XMVectorGetY(ndcPos);
-		x = abs(x);
-		y = abs(y);
-
-		float clamp_limit = 0.9f;
-		if (x < clamp_limit && y < clamp_limit)
-		{
-			return;
-		}
-
-		XMVECTOR clampedNdcPos = XMVectorClamp(
-			ndcPos,
-			XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-			XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-		);
-		XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-		XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
-
-		GetOwner()->m_transform.SetPosition(newWorldPos);
-	}
+	//	GetOwner()->m_transform.SetPosition(newWorldPos);
+	//}
 	
 }
 
@@ -575,35 +568,38 @@ void Player::UpdateChatchObject()
 	//&&&&& 포지션 소켓에 붙여서 옮겨야 할수도
 	catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 	//asis와 거리계속 갱신
-	auto& asiss = GM->GetAsis();
-	if (!asiss.empty())
+	if (GM)
 	{
-		auto asis = asiss[0]->GetOwner();
-		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-		Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-		Mathf::Vector3 directionToAsis = asisPos - myPos;
-		float distance = directionToAsis.Length();
-		directionToAsis.Normalize();
-
-		float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-		if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
+		auto& asiss = GM->GetAsis();
+		if (!asiss.empty())
 		{
-			onIndicate = true;
+			auto asis = asiss[0]->GetOwner();
+			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+			Mathf::Vector3 directionToAsis = asisPos - myPos;
+			float distance = directionToAsis.Length();
+			directionToAsis.Normalize();
 
-			if (Indicator)
+			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
 			{
-				auto curveindicator = Indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);
-				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+				onIndicate = true;
+
+				if (Indicator)
+				{
+					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+					curveindicator->EnableIndicator(onIndicate);
+					curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+				}
 			}
-		}
-		else
-		{
-			onIndicate = false;
-			if (Indicator)
+			else
 			{
-				auto curveindicator = Indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);
+				onIndicate = false;
+				if (Indicator)
+				{
+					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+					curveindicator->EnableIndicator(onIndicate);
+				}
 			}
 		}
 	}
@@ -823,6 +819,7 @@ void Player::OnHit()
 	if (m_animator)
 	{
 		m_animator->SetParameter("OnHit", true);
+		CancelChargeAttack(); 
 	}
 }
 
@@ -856,13 +853,19 @@ void Player::SwapWeaponLeft()
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
-		startAttack = false;
-		isAttacking = false;
-		m_chargingTime = 0;
-		isCharging = false;
+		onBombIndicate = false;
 		m_comboCount = 0;
 
-		onBombIndicate = false;  
+		/*startAttack = false;
+		isAttacking = false;
+		m_chargingTime = 0;
+		isCharging = false;*/
+
+		CancelChargeAttack();
+
+		
+
+		
 
 		LOG("Swap Left" + std::to_string(m_weaponIndex));
 	}
@@ -893,12 +896,15 @@ void Player::SwapWeaponRight()
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
-		startAttack = false;
+		onBombIndicate = false;
+		m_comboCount = 0;
+
+		/*startAttack = false;
 		isAttacking = false;
 		m_chargingTime = 0;
-		isCharging = false;
-		m_comboCount = 0;
-		onBombIndicate = false;
+		isCharging = false;*/
+
+		CancelChargeAttack(); 
 
 		LOG("Swap Right" + std::to_string(m_weaponIndex));
 	}
@@ -1030,6 +1036,14 @@ void Player::Cancancel()
 	m_comboCount = (m_comboCount + 1) % maxCombo;
 }
 
+void Player::CancelChargeAttack()
+{
+	startAttack = false;
+	isAttacking = false;
+	m_chargingTime = 0;
+	isCharging = false;
+}
+
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
 	m_controller->Move({ 0,0 });
@@ -1065,7 +1079,7 @@ void Player::MeleeAttack()
 	}
 	float damage = calculDamge(isChargeAttack);
 
-	unsigned int layerMask = 1 << 0 | 1 << 3 | 1 << 4;
+	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10;
 
 	int size = RaycastAll(rayOrigin, direction, distacne, layerMask, hits);
 
