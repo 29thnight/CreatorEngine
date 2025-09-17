@@ -1065,6 +1065,14 @@ void TerrainComponent::ClearLayers()
 	m_pMaterial->ClearLayers(); // 머티리얼에서 레이어 제거
 }
 
+void TerrainComponent::RefreshTexture()
+{
+	for (auto& layer : m_layers) {
+		layer.diffuseTexture = Texture::LoadFormPath(layer.diffuseTexturePath);
+	}
+	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
+}
+
 /// 브러쉬 마스크 텍스쳐 로드
 bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask,int& dataWidth,int& dataHeight)
 {

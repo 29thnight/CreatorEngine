@@ -225,10 +225,26 @@ void Player::Start()
 
 
 	ChangeState("Idle");
+
+	auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for(auto& meshrenderer : meshrenderers)
+	{
+		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
+		meshrenderer->m_Material->TrySetFloat("TestCB", "timer", 0.f);
+	}
+	Debug->Log("Player Start");
 }
 
+float temp = 0.f;
 void Player::Update(float tick)
 {
+	temp += tick;
+	auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for (auto& meshrenderer : meshrenderers)
+	{
+		meshrenderer->m_Material->TrySetFloat("TestCB", "timer", 10.f * sinf(temp));
+	}
+
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
