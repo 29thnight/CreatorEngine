@@ -124,115 +124,115 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 
 std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos)
 {
-        if (Canvases.empty())
-                MakeCanvas();
+    if (Canvases.empty())
+            MakeCanvas();
 
-        GameObject* canvas = FindCanvasName(canvasname);
-        if (canvas == nullptr)
-        {
-                std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
-                return nullptr;
-        }
+    GameObject* canvas = FindCanvasName(canvasname);
+    if (canvas == nullptr)
+    {
+            std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+            return nullptr;
+    }
 
-        return MakeImage(name, texture, canvas, Pos);
+    return MakeImage(name, texture, canvas, Pos);
 }
 
 
 
 std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, GameObject* canvas)
 {
-        if (Canvases.empty())
-                MakeCanvas();
+    if (Canvases.empty())
+            MakeCanvas();
 
-        if (!canvas)
-        {
-                if (auto c = Canvases.front().lock())
-                        canvas = c.get();
-                else
-                        return nullptr;
-        }
+    if (!canvas)
+    {
+            if (auto c = Canvases.front().lock())
+                    canvas = c.get();
+            else
+                    return nullptr;
+    }
 
-        auto canvasCom = canvas->GetComponent<Canvas>();
-        auto canvasRect = canvas->GetComponent<RectTransformComponent>();
-        if (!canvasCom || !canvasRect)
-        {
-                std::cout << "This Obj Not Canvas" << std::endl;
-                return nullptr;
-        }
+    auto canvasCom = canvas->GetComponent<Canvas>();
+    auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+    if (!canvasCom || !canvasRect)
+    {
+            std::cout << "This Obj Not Canvas" << std::endl;
+            return nullptr;
+    }
 
-        auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newButton->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
-                rect->SetPivot({ 0.5f, 0.5f });
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout(canvasRect->GetWorldRect());
-        }
+    auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    if (auto* rect = newButton->GetComponent<RectTransformComponent>())
+    {
+            rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+            rect->SetPivot({ 0.5f, 0.5f });
+            rect->SetAnchoredPosition(Pos);
+            rect->UpdateLayout(canvasRect->GetWorldRect());
+    }
 
-        if (texture == nullptr)
-        {
-                newButton->AddComponent<ImageComponent>();
-        }
-        else
-        {
-                newButton->AddComponent<ImageComponent>()->Load(texture);
-        }
+    if (texture == nullptr)
+    {
+            newButton->AddComponent<ImageComponent>();
+    }
+    else
+    {
+            newButton->AddComponent<ImageComponent>()->Load(texture);
+    }
 
-        auto component = newButton->AddComponent<UIButton>();
-        component->SetClickFunction(clickfun);
+    auto component = newButton->AddComponent<UIButton>();
+    component->SetClickFunction(clickfun);
 
-        canvasCom->AddUIObject(newButton);
+    canvasCom->AddUIObject(newButton);
 
-        return newButton;
+    return newButton;
 }
 
 std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
-        if (Canvases.empty())
-                MakeCanvas();
+    if (Canvases.empty())
+            MakeCanvas();
 
-        GameObject* canvas = FindCanvasName(canvasname);
-        if (canvas == nullptr)
-        {
-                std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
-                return nullptr;
-        }
+    GameObject* canvas = FindCanvasName(canvasname);
+    if (canvas == nullptr)
+    {
+            std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+            return nullptr;
+    }
 
-        return MakeButton(name, texture, clickfun, Pos, canvas);
+    return MakeButton(name, texture, clickfun, Pos, canvas);
 }
 
 std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, GameObject* canvas, Mathf::Vector2 Pos)
 {
-        if (Canvases.empty())
-                MakeCanvas();
-        if (!canvas)
-        {
-                if (auto c = Canvases.front().lock())
-                        canvas = c.get();
-                else
-                        return nullptr;
-        }
-        auto canvasCom = canvas->GetComponent<Canvas>();
-        auto canvasRect = canvas->GetComponent<RectTransformComponent>();
-        if (!canvasCom || !canvasRect)
-        {
-                std::cout << "This Obj Not Canvas" << std::endl;
-                return nullptr;
-        }
+    if (Canvases.empty())
+            MakeCanvas();
+    if (!canvas)
+    {
+            if (auto c = Canvases.front().lock())
+                    canvas = c.get();
+            else
+                    return nullptr;
+    }
+    auto canvasCom = canvas->GetComponent<Canvas>();
+    auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+    if (!canvasCom || !canvasRect)
+    {
+            std::cout << "This Obj Not Canvas" << std::endl;
+            return nullptr;
+    }
 
-        auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newText->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
-                rect->SetPivot({ 0.5f, 0.5f });
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout(canvasRect->GetWorldRect());
-        }
+    auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    if (auto* rect = newText->GetComponent<RectTransformComponent>())
+    {
+            rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+            rect->SetPivot({ 0.5f, 0.5f });
+            rect->SetAnchoredPosition(Pos);
+            rect->UpdateLayout(canvasRect->GetWorldRect());
+    }
 
-        newText->AddComponent<TextComponent>()->SetFont(FontName);
-        canvasCom->AddUIObject(newText);
+    newText->AddComponent<TextComponent>()->SetFont(FontName);
+    canvasCom->AddUIObject(newText);
 
-        return newText;
+    return newText;
 }
 
 std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos)

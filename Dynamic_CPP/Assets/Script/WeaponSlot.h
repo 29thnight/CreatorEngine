@@ -25,6 +25,7 @@ public:
 
 	void ApplyWeapon(class Weapon* weapon);
 	void UpdateDurability(class Weapon* weapon);
+	void UpdateChargingPersent(class Weapon* weapon);
 	void SetActive(bool active);
 	bool IsActive() const { return m_isActive; }
 

@@ -116,6 +116,10 @@ void WeaponSlot::UpdateDurability(Weapon* weapon)
 	}
 }
 
+void WeaponSlot::UpdateChargingPersent(Weapon* weapon)
+{
+}
+
 void WeaponSlot::SetActive(bool active)
 {
 	if(m_curWeaponType == (int)ItemType::None)

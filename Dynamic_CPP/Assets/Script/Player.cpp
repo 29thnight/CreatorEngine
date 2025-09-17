@@ -243,6 +243,15 @@ void Player::Update(float tick)
 	if (isCharging)
 	{
 		m_chargingTime += tick;
+		m_curWeapon->chargingPersent = m_chargingTime / m_curWeapon->chgTime;
+		if (!isChargeAttack && m_chargingTime >= m_curWeapon->chgTime) //차징시간이 무기 차징시간보다 길면
+		{
+			m_curWeapon->isCompleteCharge = true;
+		}
+		else
+		{
+			m_curWeapon->isCompleteCharge = false;
+		}
 	}
 	if (m_curDashCount != 0)
 	{
@@ -725,6 +734,7 @@ void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀�
 		{
 			//차지공격나감
 			isChargeAttack = true;
+			m_curWeapon->isCompleteCharge = false;
 			if (m_curWeapon->itemType == ItemType::Melee)
 			{
 				m_animator->SetParameter("MeleeChargeAttack", true);
@@ -826,8 +836,6 @@ void Player::Knockback(Mathf::Vector2 _KnockbackForce)
 	controller->SetKnockBack(knockbackVeocity);
 }
 
-
-
 void Player::SwapWeaponLeft()
 {
 	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
@@ -843,8 +851,8 @@ void Player::SwapWeaponLeft()
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
-		m_SetActiveEvent.Broadcast(m_weaponIndex);
-		m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
+		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
+		m_UpdateDurabilityEvent.UnsafeBroadcast(m_curWeapon, m_weaponIndex);
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
@@ -855,6 +863,8 @@ void Player::SwapWeaponLeft()
 		m_comboCount = 0;
 
 		onBombIndicate = false;  
+
+		LOG("Swap Left" + std::to_string(m_weaponIndex));
 	}
 }
 
@@ -878,8 +888,8 @@ void Player::SwapWeaponRight()
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
-		m_SetActiveEvent.Broadcast(m_weaponIndex);
-		m_UpdateDurabilityEvent.Broadcast(m_curWeapon, m_weaponIndex);
+		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
+		m_UpdateDurabilityEvent.UnsafeBroadcast(m_curWeapon, m_weaponIndex);
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
@@ -888,9 +898,9 @@ void Player::SwapWeaponRight()
 		m_chargingTime = 0;
 		isCharging = false;
 		m_comboCount = 0;
-
-
 		onBombIndicate = false;
+
+		LOG("Swap Right" + std::to_string(m_weaponIndex));
 	}
 }
 
@@ -901,7 +911,7 @@ void Player::SwapBasicWeapon()
 	{
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
-		m_SetActiveEvent.Broadcast(m_weaponIndex);
+		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
 		m_curWeapon->SetEnabled(true);
 		canChangeSlot = false;
 	}
@@ -941,8 +951,8 @@ void Player::AddWeapon(Weapon* weapon)
 	weapon->SetEnabled(false);
 	int prevSize = m_weaponInventory.size();
 	m_weaponInventory.push_back(weapon);
-	m_AddWeaponEvent.Broadcast(weapon, m_weaponInventory.size() - 1);
-	m_UpdateDurabilityEvent.Broadcast(weapon, m_weaponIndex);
+	m_AddWeaponEvent.UnsafeBroadcast(weapon, m_weaponInventory.size() - 1);
+	m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
 	handSocket->AttachObject(weapon->GetOwner());
 	if (1 >= prevSize)
 	{
@@ -953,7 +963,7 @@ void Player::AddWeapon(Weapon* weapon)
 
 		m_curWeapon = weapon;
 		m_curWeapon->SetEnabled(true);
-		m_SetActiveEvent.Broadcast(m_weaponInventory.size() - 1);
+		m_SetActiveEvent.UnsafeBroadcast(m_weaponInventory.size() - 1);
 		m_weaponIndex = m_weaponInventory.size() - 1;
 	}
 }
@@ -975,11 +985,11 @@ void Player::DeleteCurWeapon()
 		{
 			if (i < m_weaponInventory.size())
 			{
-				m_AddWeaponEvent.Broadcast(m_weaponInventory[i], i);
+				m_AddWeaponEvent.UnsafeBroadcast(m_weaponInventory[i], i);
 			}
 			else
 			{
-				m_AddWeaponEvent.Broadcast(nullptr, i);
+				m_AddWeaponEvent.UnsafeBroadcast(nullptr, i);
 			}
 		}
 	}

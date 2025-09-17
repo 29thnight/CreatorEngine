@@ -25,24 +25,8 @@ void ImageComponent::SetTexture(int index)
 
 	curindex = index;
 	m_curtexture = textures[curindex];
-        uiinfo.size = textures[curindex]->GetImageSize();
-
-        if (GameObject* owner = m_pOwner)
-        {
-                if (auto* rect = owner->GetComponent<RectTransformComponent>())
-                {
-                        const auto& pivot = rect->GetPivot();
-                        origin = { uiinfo.size.x * pivot.x, uiinfo.size.y * pivot.y };
-                }
-                else
-                {
-                        origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
-                }
-        }
-        else
-        {
-                origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
-        }
+    uiinfo.size = textures[curindex]->GetImageSize();
+	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
 }
 
 bool ImageComponent::isThisTextureExist(std::string_view path) const
@@ -99,14 +83,14 @@ void ImageComponent::Update(float tick)
         const auto& worldRect = rect->GetWorldRect();
         const auto& pivot = rect->GetPivot();
 
-        pos = { worldRect.x + worldRect.width * pivot.x,
-                worldRect.y + worldRect.height * pivot.y,
+		pos = { worldRect.x + worldRect.width * 2 * pivot.x,
+				worldRect.y + worldRect.height * 2 * pivot.y,
                 0.0f };
         scale = { worldRect.width / uiinfo.size.x,
                   worldRect.height / uiinfo.size.y };
 
-        origin = { uiinfo.size.x * pivot.x,
-                   uiinfo.size.y * pivot.y };
+        origin = { uiinfo.size.x * 0.5f,
+                   uiinfo.size.y * 0.5f };
 
         scale *= unionScale;
 

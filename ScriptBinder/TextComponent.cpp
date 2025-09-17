@@ -36,20 +36,10 @@ void TextComponent::Update(float tick)
     else if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
         const auto& worldRect = rect->GetWorldRect();
-        pos = { worldRect.x, worldRect.y };
-        stretchSize = { worldRect.width, worldRect.height };
-
-        if (GameObject::IsValidIndex(m_pOwner->m_parentIndex))
-        {
-            if (auto* parent = GameObject::FindIndex(m_pOwner->m_parentIndex))
-            {
-                if (auto* parentRect = parent->GetComponent<RectTransformComponent>())
-                {
-                        const auto& pRect = parentRect->GetWorldRect();
-                        stretchSize = { pRect.width, pRect.height };
-                }
-            }
-        }
+        const auto& pivot = rect->GetPivot();
+        pos = { worldRect.x + worldRect.width * pivot.x,
+                worldRect.y + worldRect.height * pivot.y };
+        stretchSize = { worldRect.width * pivot.x, worldRect.height * pivot.x };
 
         isStretchX = true;
         isStretchY = true;

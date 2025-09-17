@@ -30,7 +30,6 @@ public:
 	virtual void OnTriggerStay(const Collision& collision) override;
 	virtual void OnTriggerExit(const Collision& collision) override;
 
-
 	virtual void OnCollisionEnter(const Collision& collision) override;
 	virtual void OnCollisionStay(const Collision& collision) override;
 	virtual void OnCollisionExit(const Collision& collision) override;
@@ -39,7 +38,6 @@ public:
 	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
-
 
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override {}

@@ -6,7 +6,6 @@
 
 void PlayerInputComponent::Update(float tick)
 {
-
 	if (SceneManagers->m_isGameStart == false) return;
 	if (m_actionMap == nullptr)
 	{

@@ -79,9 +79,7 @@ public:
 	[[Property]]
 	int durUseAtk = 1; //일반 공격시 소모 내구도
 	int curDur = durMax;  //현재 내구도
+	float chargingPersent = 0.f; //차징중인 시간/차징완료시간
 	bool isBreak = false;   //무기 부서짐확인용
-	
-
-	
-	
+	bool isCompleteCharge = false; //차징완료 확인용
 };

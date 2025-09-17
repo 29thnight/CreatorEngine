@@ -20,15 +20,15 @@ public:
 	void AddCanvas(std::shared_ptr<GameObject> canvas);
 	void DeleteCanvas(const std::shared_ptr<GameObject>& canvas);
 
-	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 0,0 });
-	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 0,0 });
-	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 0,0 },GameObject* canvas = nullptr);
-	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 0,0 });
-	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 0,0 });
-	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 0,0 });
+	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<GameObject> MakeImage(std::string_view name, const std::shared_ptr<Texture>& texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960, 540 },GameObject* canvas = nullptr);
+	std::shared_ptr<GameObject> MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<GameObject> MakeText(std::string_view name, file::path FontName, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
 
-	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 0,0 });
-	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 0,0 });
+	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960, 540 });
+	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
 
 	void CheckInput();
 

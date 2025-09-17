@@ -95,6 +95,30 @@
             "key3": "A",
             "keystate": "Down",
             "scpritName": "Player"
+        },
+        {
+            "actionName": "SwapWeaponLeft",
+            "actionType": "Button",
+            "funName": "SwapWeaponLeft",
+            "inputType": "KeyBoard",
+            "key0": "Z",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Released",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "SwapWeaponRight",
+            "actionType": "Button",
+            "funName": "SwapWeaponRight",
+            "inputType": "KeyBoard",
+            "key0": "X",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Released",
+            "scpritName": "Player"
         }
     ],
     "mapName": "PlayerKeyBoard"
