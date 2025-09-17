@@ -137,8 +137,6 @@ void Player::Start()
 	dashEffect->Awake();
 	dashEffect->m_effectTemplateName = "testdash";
 
-	player->m_collisionType = 2;
-
 	auto gmobj = GameObject::Find("GameManager");
 	if (gmobj)
 	{

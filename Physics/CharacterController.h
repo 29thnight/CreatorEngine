@@ -125,3 +125,25 @@ private:
 public:
 	void SetCharacterLayer(unsigned int layer) { m_characterLayer = layer; }
 };
+
+class CCTFilterCallback : public PxControllerFilterCallback
+{
+	// PxControllerFilterCallback을(를) 통해 상속됨
+	bool filter(const PxController& a, const PxController& b) override {
+		PxShape* shapeA = nullptr;
+		a.getActor()->getShapes(&shapeA, 1);
+		PxShape* shapeB = nullptr;
+		b.getActor()->getShapes(&shapeB, 1);
+
+		if (shapeA == nullptr || shapeB == nullptr) return false;
+
+		auto shapeANum = shapeA->getQueryFilterData().word1;
+		auto shapeBNum = shapeB->getQueryFilterData().word2;
+
+		if ((shapeANum & shapeBNum) > 0) {
+			return true;
+		}
+
+		return false;
+	}
+};
