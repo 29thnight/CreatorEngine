@@ -11,9 +11,6 @@ struct alignas(16) MeshParticleTemplateParams
 	float3 RotationSpeed;
 	float pad2;
 
-	float3 InitialRotation;
-	float pad4;
-
 	float4 color;
 
 	float3 velocity;
@@ -90,7 +87,6 @@ public:
 	void SetParticleLifeTime(float lifeTime);
 	void SetParticleScale(const XMFLOAT3& Scale);
 	void SetParticleRotationSpeed(const XMFLOAT3& Speed);
-	void SetParticleInitialRotation(const XMFLOAT3& Rot);
 	void SetParticleColor(const XMFLOAT4& color);
 	void SetParticleVelocity(const XMFLOAT3& velocity, float randomRange = 0.0f);
 	void SetParticleAcceleration(const XMFLOAT3& acceleration);

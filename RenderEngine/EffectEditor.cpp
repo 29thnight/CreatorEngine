@@ -375,6 +375,9 @@ void EffectEditor::RenderModuleDetailEditor()
 	else if (auto* meshMovementModule = dynamic_cast<MeshMovementModuleCS*>(targetModule)) {
 		RenderMeshMovementModuleEditor(meshMovementModule);
 	}
+	else if (auto* meshSizeModule = dynamic_cast<MeshSizeModuleCS*>(targetModule)) {
+		RenderMeshSizeModuleEditor(meshSizeModule);
+	}
 	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule)){
 		RenderTrailGenerateModuleEditor(trailGenModule);
 	}
@@ -681,6 +684,9 @@ void EffectEditor::RenderModifyEmitterEditor()
 		}
 		else if (dynamic_cast<MeshMovementModuleCS*>(&module)) {
 			moduleName = "Mesh Movement Module";
+		}
+		else if (dynamic_cast<MeshSizeModuleCS*>(&module)) {
+			moduleName = "Mesh Size Module";
 		}
 
 		bool isSelected = (m_selectedModuleForEdit == moduleIndex);
@@ -1043,6 +1049,9 @@ void EffectEditor::RenderExistingModules()
 			else if (auto* meshMovementModule = dynamic_cast<MeshMovementModuleCS*>(&module)) {
 				ImGui::Text("Mesh Movement Module Settings");
 			}
+			else if (auto* meshSizeModule = dynamic_cast<MeshSizeModuleCS*>(&module)) {
+				ImGui::Text("Mesh Size Module Settings");
+			}
 			ImGui::Unindent();
 			ImGui::Separator();
 		}
@@ -1134,6 +1143,11 @@ void EffectEditor::AddSelectedModule()
 		if (!targetSystem->GetModule<MeshMovementModuleCS>()) {
 			targetSystem->AddModule<MeshMovementModuleCS>();
 			targetSystem->GetModule<MeshMovementModuleCS>()->Initialize();
+		}
+	case EffectModuleType::MeshSizeModule:
+		if (!targetSystem->GetModule<MeshSizeModuleCS>()) {
+			targetSystem->AddModule<MeshSizeModuleCS>();
+			targetSystem->GetModule<MeshSizeModuleCS>()->Initialize();
 		}
 		break;
 	}
@@ -2631,28 +2645,6 @@ void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
 			sizeModule->SetEasing(EasingEffect::InOutSine, StepAnimation::StepLoopPingPong, 1.0f);
 		}
-
-		// 디버그 정보 (디버그 모드에서만 표시)
-#ifdef _DEBUG
-		if (ImGui::TreeNode("Debug Info"))
-		{
-			ImGui::Text("Is Initialized: %s", sizeModule->IsInitialized() ? "Yes" : "No");
-			ImGui::Text("Particle Capacity: %u", sizeModule->GetParticleCapacity());
-			ImGui::Text("Ready for Reuse: %s", sizeModule->IsReadyForReuse() ? "Yes" : "No");
-
-			if (ImGui::Button("Reset Module"))
-			{
-				sizeModule->ResetForReuse();
-			}
-
-			ImGui::TreePop();
-		}
-#endif
-
-		if (!enabled)
-		{
-			ImGui::EndDisabled();
-		}
 	}
 }
 
@@ -2820,15 +2812,6 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 	if (ImGui::DragFloat3("Min Rotation Speed", RotSpeed, 0.1f, -360.0f, 360.0f)) {
 		meshSpawnModule->SetParticleRotationSpeed(
 			XMFLOAT3(RotSpeed[0], RotSpeed[1], RotSpeed[2])
-		);
-	}
-
-	// 3D 초기 회전 범위
-	float InitRot[3] = { currentTemplate.InitialRotation.x, currentTemplate.InitialRotation.y, currentTemplate.InitialRotation.z };
-
-	if (ImGui::DragFloat3("Min Initial Rotation", InitRot, 0.1f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleInitialRotation(
-			XMFLOAT3(InitRot[0], InitRot[1], InitRot[2])
 		);
 	}
 
@@ -3428,57 +3411,6 @@ void EffectEditor::RenderMeshMovementModuleEditor(MeshMovementModuleCS* movement
 		}
 		}
 
-		// Scale 설정
-		ImGui::Spacing();
-		ImGui::Text("Scale Settings");
-		ImGui::Separator();
-
-		float startScale[3] = {
-			movementModule->m_movementParams.startScale.x,
-			movementModule->m_movementParams.startScale.y,
-			movementModule->m_movementParams.startScale.z
-		};
-
-		if (ImGui::SliderFloat3("Start Scale", startScale, 0.1f, 10.0f))
-		{
-			movementModule->SetStartScale(Mathf::Vector3(startScale[0], startScale[1], startScale[2]));
-		}
-
-		float endScale[3] = {
-			movementModule->m_movementParams.endScale.x,
-			movementModule->m_movementParams.endScale.y,
-			movementModule->m_movementParams.endScale.z
-		};
-
-		if (ImGui::SliderFloat3("End Scale", endScale, 0.1f, 10.0f))
-		{
-			movementModule->SetEndScale(Mathf::Vector3(endScale[0], endScale[1], endScale[2]));
-		}
-
-		bool useRandomScale = movementModule->m_movementParams.useRandomScale != 0;
-		if (ImGui::Checkbox("Use Random Scale", &useRandomScale))
-		{
-			movementModule->SetRandomScale(useRandomScale,
-				movementModule->m_movementParams.randomScaleMin,
-				movementModule->m_movementParams.randomScaleMax);
-		}
-
-		if (useRandomScale)
-		{
-			float randomMin = movementModule->m_movementParams.randomScaleMin;
-			float randomMax = movementModule->m_movementParams.randomScaleMax;
-
-			if (ImGui::SliderFloat("Random Min", &randomMin, 0.1f, 2.0f))
-			{
-				movementModule->SetRandomScale(true, randomMin, randomMax);
-			}
-
-			if (ImGui::SliderFloat("Random Max", &randomMax, 0.1f, 2.0f))
-			{
-				movementModule->SetRandomScale(true, randomMin, randomMax);
-			}
-		}
-
 		// 이징 설정
 		if (ImGui::TreeNode("Easing Settings"))
 		{
@@ -3522,6 +3454,152 @@ void EffectEditor::RenderMeshMovementModuleEditor(MeshMovementModuleCS* movement
 				if (movementModule->m_easingEnable)
 				{
 					movementModule->DisableEasing();
+				}
+			}
+			ImGui::TreePop();
+		}
+	}
+}
+
+void EffectEditor::RenderMeshSizeModuleEditor(MeshSizeModuleCS* sizeModule)
+{
+	if (!sizeModule) return;
+
+	ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+	if (ImGui::CollapsingHeader("Size Module"))
+	{
+		// 모듈 활성화 체크박스
+		bool enabled = sizeModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Size Module", &enabled))
+		{
+			sizeModule->SetEnabled(enabled);
+		}
+
+		if (!enabled)
+		{
+			ImGui::BeginDisabled();
+		}
+
+		ImGui::Separator();
+
+		// 시작 크기 설정
+		XMFLOAT3 startSize = sizeModule->GetStartSize();
+		if (ImGui::DragFloat3("Start Size", &startSize.x, 0.01f, 0.01f, 10.0f, "%.2f"))
+		{
+			sizeModule->SetStartSize(startSize);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Initial size of particles (Width, Height)");
+		}
+
+		// 끝 크기 설정
+		XMFLOAT3 endSize = sizeModule->GetEndSize();
+		if (ImGui::DragFloat3("End Size", &endSize.x, 0.01f, 0.01f, 10.0f, "%.2f"))
+		{
+			sizeModule->SetEndSize(endSize);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Final size of particles (Width, Height)");
+		}
+
+		ImGui::Separator();
+
+		// 랜덤 스케일 설정
+		ImGui::Text("Random Scale");
+
+		bool useRandomScale = sizeModule->GetUseRandomScale();
+		if (ImGui::Checkbox("Use Random Scale", &useRandomScale))
+		{
+			float minScale = sizeModule->GetRandomScaleMin();
+			float maxScale = sizeModule->GetRandomScaleMax();
+			sizeModule->SetRandomScale(useRandomScale, minScale, maxScale);
+		}
+
+		if (useRandomScale)
+		{
+			ImGui::Indent();
+
+			float minScale = sizeModule->GetRandomScaleMin();
+			if (ImGui::DragFloat("Min Scale", &minScale, 0.01f, 0.1f, 5.0f, "%.2f"))
+			{
+				float maxScale = sizeModule->GetRandomScaleMax();
+				if (minScale > maxScale) maxScale = minScale;
+				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			float maxScale = sizeModule->GetRandomScaleMax();
+			if (ImGui::DragFloat("Max Scale", &maxScale, 0.01f, 0.1f, 5.0f, "%.2f"))
+			{
+				float minScale = sizeModule->GetRandomScaleMin();
+				if (maxScale < minScale) minScale = maxScale;
+				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
+		// 이징 설정
+		ImGui::Text("Easing Animation");
+
+		bool easingEnabled = sizeModule->IsEasingEnabled();
+		if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+		{
+			if (easingEnabled)
+			{
+				sizeModule->SetEasing(EasingEffect::Linear, StepAnimation::StepLoopForward, 1.0f);
+			}
+			else
+			{
+				sizeModule->DisableEasing();
+			}
+		}
+
+		if (ImGui::TreeNode("Easing Settings"))
+		{
+			static bool easingEnabled = false;
+			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			if (easingEnabled)
+			{
+				static const char* easingTypes[] = {
+					"Linear", "InSine", "OutSine", "InOutSine",
+					"InQuad", "OutQuad", "InOutQuad",
+					"InCubic", "OutCubic", "InOutCubic",
+					"InQuart", "OutQuart", "InOutQuart",
+					"InQuint", "OutQuint", "InOutQuint",
+					"InExpo", "OutExpo", "InOutExpo",
+					"InCirc", "OutCirc", "InOutCirc",
+					"InBack", "OutBack", "InOutBack",
+					"InElastic", "OutElastic", "InOutElastic",
+					"InBounce", "OutBounce", "InOutBounce"
+				};
+				static const char* animationTypes[] = {
+					"Once Forward", "Once Back", "Once PingPong",
+					"Loop Forward", "Loop Back", "Loop PingPong"
+				};
+				static int currentEasingType = 0;
+				static int currentAnimationType = 0;
+				static float duration = 1.0f;
+				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+				if (ImGui::Button("Apply Easing"))
+				{
+					sizeModule->SetEasing(
+						static_cast<EasingEffect>(currentEasingType),
+						static_cast<StepAnimation>(currentAnimationType),
+						duration
+					);
+				}
+			}
+			else
+			{
+				if (sizeModule->m_easingEnable)
+				{
+					sizeModule->DisableEasing();
 				}
 			}
 			ImGui::TreePop();

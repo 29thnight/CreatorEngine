@@ -82,15 +82,6 @@ cbuffer MeshMovementParams : register(b0)
     int velocityCurveSize;
     int impulseCount;
     float2 pad2;
-    
-    float3 startScale;
-    float scalePad1;
-    float3 endScale;
-    float scalePad2;
-    int useRandomScale;
-    float randomScaleMin;
-    float randomScaleMax;
-    float scalePad3;
 };
 
 // 파티클 버퍼 (읽기)
@@ -240,75 +231,66 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     return explosionDir * explosiveSpeed * speedDecay * randomFactor;
 }
 
-// 메인 컴퓨트 셰이더 함수
+float3x3 CreateRotationMatrix(float3 rotation)
+{
+    float cx = cos(rotation.x);
+    float sx = sin(rotation.x);
+    float cy = cos(rotation.y);
+    float sy = sin(rotation.y);
+    float cz = cos(rotation.z);
+    float sz = sin(rotation.z);
+    
+    float3x3 rotX = float3x3(1, 0, 0, 0, cx, -sx, 0, sx, cx);
+    float3x3 rotY = float3x3(cy, 0, sy, 0, 1, 0, -sy, 0, cy);
+    float3x3 rotZ = float3x3(cz, -sz, 0, sz, cz, 0, 0, 0, 1);
+    
+    return mul(mul(rotZ, rotY), rotX);
+}
+
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint particleIndex = DTid.x;
     
-    // 파티클 데이터를 입력 버퍼에서 읽기
     MeshParticleData particle = ParticlesInput[particleIndex];
     
-    // 파티클이 활성화된 경우에만 계산
     if (particle.isActive)
     {
-        // 정규화된 나이 계산
         float normalizedAge = particle.age / particle.lifeTime;
         
-        // 추가 velocity 계산
+        // 추가 velocity 계산 (모두 월드 공간에서)
         float3 additionalVelocity = float3(0, 0, 0);
         
-        // Velocity 모드에 따른 처리
-        if (velocityMode == 1) // Curve
-        {
+        if (velocityMode == 1)
             additionalVelocity += GetVelocityFromCurve(normalizedAge);
-        }
-        else if (velocityMode == 2) // Impulse  
-        {
+        else if (velocityMode == 2)
             additionalVelocity += GetImpulseForce(normalizedAge);
-        }
-        else if (velocityMode == 3) // Wind
-        {
+        else if (velocityMode == 3)
             additionalVelocity += GetWindForce(particle.position, currentTime);
-        }
-        else if (velocityMode == 4) // Orbital
-        {
+        else if (velocityMode == 4)
             additionalVelocity += GetOrbitalVelocity(particle.position, currentTime);
-        }
-        else if (velocityMode == 5) // explosive
-        {
+        else if (velocityMode == 5)
             additionalVelocity += GetExplosiveMovement(particle.position, normalizedAge, particleIndex, particle.age);
-        }
         
-        // 기존 velocity에 추가 velocity 더하기
+        // velocity 업데이트 (월드 공간에서)
         particle.velocity += additionalVelocity * deltaTime;
         
-        // 중력 적용 (설정된 경우)
+        // 중력 적용 (월드 공간에서)
         if (useGravity != 0)
         {
             particle.velocity += particle.acceleration * gravityStrength * deltaTime;
         }
         
-        // 위치 및 회전 업데이트
-        particle.position += particle.velocity * deltaTime;
-        
+        // 파티클 회전 업데이트 (로컬 회전)
         if (length(particle.rotationSpeed) > 0.0001)
         {
             particle.rotation += particle.rotationSpeed * deltaTime;
         }
         
-        // 크기 업데이트 (3D 스케일)
-        float3 currentScale = lerp(startScale, endScale, normalizedAge);
+        // 위치 업데이트 (월드 공간에서)
+        particle.position += particle.velocity * deltaTime;
         
-        if (useRandomScale != 0)
-        {
-            float randomScale = lerp(randomScaleMin, randomScaleMax, Hash(particleIndex + 1));
-            currentScale *= randomScale;
-        }
-        
-        particle.scale = currentScale;
     }
     
-    // 계산된 파티클 데이터를 출력 버퍼에 쓰기
     ParticlesOutput[particleIndex] = particle;
 }

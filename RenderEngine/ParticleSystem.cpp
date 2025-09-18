@@ -1,5 +1,6 @@
 ﻿#include "ParticleSystem.h"
 
+
 ParticleSystem::ParticleSystem(int maxParticles, ParticleDataType dataType) : m_maxParticles(maxParticles), m_isRunning(false)
 {
 	SetParticleDatatype(dataType);
@@ -50,6 +51,8 @@ void ParticleSystem::Update(float delta)
 	if (!m_modulesConnected) {
 		AutoConnectModules();
 	}
+
+	SyncEmitterTransform();
 
 	UpdateGenerateModule(delta);
 
@@ -232,7 +235,47 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
+void ParticleSystem::SyncEmitterTransform()
+{
+	// 최종 월드 위치/회전/스케일 계산
+	Mathf::Vector3 finalWorldPosition = m_effectBasePosition + m_position;
+	Mathf::Vector3 finalWorldRotation = m_effectBaseRotation + m_rotation;
+	Mathf::Vector3 finalWorldScale = m_scale;
 
+	// Movement 모듈들에 이미터 변환 정보 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// MeshMovementModuleCS에 이미터 변환 전달
+		if (MeshMovementModuleCS* movementModule = dynamic_cast<MeshMovementModuleCS*>(&module))
+		{
+			movementModule->SetEmitterTransform(
+				finalWorldPosition,
+				finalWorldRotation
+			);
+		}
+
+		// 일반 MovementModuleCS에도 필요시 전달
+		if (MovementModuleCS* movementModule = dynamic_cast<MovementModuleCS*>(&module))
+		{
+			movementModule->SetEmitterTransform(
+				finalWorldPosition,
+				finalWorldRotation
+			);
+		}
+
+		if (MeshSizeModuleCS* sizeModule = dynamic_cast<MeshSizeModuleCS*>(&module))
+		{
+			sizeModule->SetEmitterTransform(finalWorldScale);
+		}
+
+		if (SizeModuleCS* sizeModule = dynamic_cast<SizeModuleCS*>(&module))
+		{
+			sizeModule->SetEmitterTransform(finalWorldScale);
+		}
+	}
+}
 
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {

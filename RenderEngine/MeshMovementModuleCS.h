@@ -33,14 +33,10 @@ struct alignas(16) MeshMovementParams
 	int impulseCount;
 	float2 pad2;
 
-	float3 startScale;
-	float scalePad1;
-	float3 endScale;
-	float scalePad2;
-	int useRandomScale;
-	float randomScaleMin;
-	float randomScaleMax;
-	float scalePad3;
+	float3 emitterPosition;
+	float emitterPad1;
+	float3 emitterRotation;
+	float emitterPad2;
 };
 
 class MeshMovementModuleCS : public ParticleModule, public ISerializable
@@ -91,6 +87,8 @@ public:
 	virtual void ResetForReuse();
 	virtual bool IsReadyForReuse() const;
 
+	void SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation);
+
 	// Movement settings
 	void SetUseGravity(bool use);
 	bool GetUseGravity() const;
@@ -107,11 +105,6 @@ public:
 	void SetWindEffect(const Mathf::Vector3& direction, float strength, float turbulence = 0.5f, float frequency = 1.0f);
 	void SetOrbitalMotion(const Mathf::Vector3& center, float radius, float speed, const Mathf::Vector3& axis = Mathf::Vector3(0, 1, 0));
 	void SetExplosiveEffect(float initialSpeed = 50.0f, float speedDecay = 2.0f, float randomFactor = 0.4f, float sphereRadius = 1.0f);
-
-	// Size ฐüทร
-	void SetStartScale(const Mathf::Vector3& scale);
-	void SetEndScale(const Mathf::Vector3& scale);
-	void SetRandomScale(bool use, float min = 0.8f, float max = 1.2f);
 
 	VelocityMode GetVelocityMode() const { return m_velocityMode; }
 	const std::vector<VelocityPoint>& GetVelocityCurve() const { return m_velocityCurve; }

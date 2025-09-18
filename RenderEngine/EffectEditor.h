@@ -12,6 +12,7 @@ enum class EffectModuleType
     TrailModule,
     MeshColorModule,
     MeshMovementModule,
+    MeshSizeModule,
 };
 
 enum class RenderType
@@ -74,12 +75,13 @@ private:
 
     std::vector<ModuleInfo> m_availableModules = {
         {"Spawn Module", EffectModuleType::SpawnModule},
-        {"Mesh Spawn Module", EffectModuleType::MeshSpawnModule},
-        {"Mesh Color Module", EffectModuleType::MeshColorModule},
-        {"Mesh Movement Module", EffectModuleType::MeshMovementModule},
         {"Movement Module", EffectModuleType::MovementModule},
         {"Color Module", EffectModuleType::ColorModule},
         {"Size Module", EffectModuleType::SizeModule},
+        {"Mesh Spawn Module", EffectModuleType::MeshSpawnModule},
+        {"Mesh Color Module", EffectModuleType::MeshColorModule},
+        {"Mesh Movement Module", EffectModuleType::MeshMovementModule},
+        {"Mesh Size Module", EffectModuleType::MeshSizeModule},
         {"Trail Module", EffectModuleType::TrailModule},
     };
 
@@ -161,6 +163,7 @@ private:
     void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
     void RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule);
     void RenderMeshMovementModuleEditor(MeshMovementModuleCS* movementModule);
+    void RenderMeshSizeModuleEditor(MeshSizeModuleCS* sizeModule);
     void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
 
     // cpu 모듈용 설정 메서드

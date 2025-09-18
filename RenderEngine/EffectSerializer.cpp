@@ -281,6 +281,10 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
     {
         module = std::make_unique<MeshMovementModuleCS>();
     }
+    else if (moduleType == "MeshSizeModuleCS")
+    {
+        module = std::make_unique<MeshSizeModuleCS>();
+    }
     else
     {
         std::cerr << "Unknown module type: " << moduleType << std::endl;

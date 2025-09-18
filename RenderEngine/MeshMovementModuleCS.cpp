@@ -28,11 +28,6 @@ MeshMovementModuleCS::MeshMovementModuleCS()
 
     // Size 기본값 추가
     memset(&m_movementParams, 0, sizeof(MeshMovementParams));
-    m_movementParams.startScale = float3(1.0f, 1.0f, 1.0f);
-    m_movementParams.endScale = float3(1.0f, 1.0f, 1.0f);
-    m_movementParams.useRandomScale = 0;
-    m_movementParams.randomScaleMin = 0.8f;
-    m_movementParams.randomScaleMax = 1.2f;
 }
 
 MeshMovementModuleCS::~MeshMovementModuleCS()
@@ -139,6 +134,13 @@ bool MeshMovementModuleCS::IsReadyForReuse() const
         m_movementParamsBuffer != nullptr;
 }
 
+void MeshMovementModuleCS::SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation)
+{
+    m_movementParams.emitterPosition = float3(position.x, position.y, position.z);
+    m_movementParams.emitterRotation = float3(rotation.x, rotation.y, rotation.z);
+    m_paramsDirty = true;
+}
+
 void MeshMovementModuleCS::Release()
 {
     // 리소스 해제
@@ -207,14 +209,11 @@ void MeshMovementModuleCS::UpdateConstantBuffers(float delta)
         params->velocityCurveSize = static_cast<int>(m_velocityCurve.size());
         params->impulseCount = static_cast<int>(m_impulses.size());
 
-        params->startScale = m_movementParams.startScale;
-        params->endScale = m_movementParams.endScale;
-        params->useRandomScale = m_movementParams.useRandomScale;
-        params->randomScaleMin = m_movementParams.randomScaleMin;
-        params->randomScaleMax = m_movementParams.randomScaleMax;
-
         params->useGravity = m_movementParams.useGravity;
         params->gravityStrength = m_movementParams.gravityStrength;
+
+        params->emitterPosition = m_movementParams.emitterPosition;
+        params->emitterRotation = m_movementParams.emitterRotation;
 
         DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_movementParamsBuffer, 0);
 
@@ -417,28 +416,6 @@ void MeshMovementModuleCS::ClearImpulses()
     m_paramsDirty = true;
 }
 
-void MeshMovementModuleCS::SetStartScale(const Mathf::Vector3& scale)
-{
-    m_movementParams.startScale = float3(scale.x, scale.y, scale.z);
-    m_paramsDirty = true;
-}
-
-void MeshMovementModuleCS::SetEndScale(const Mathf::Vector3& scale)
-{
-    m_movementParams.endScale = float3(scale.x, scale.y, scale.z);
-    m_paramsDirty = true;
-}
-
-void MeshMovementModuleCS::SetRandomScale(bool use, float min, float max)
-{
-    m_movementParams.useRandomScale = use ? 1 : 0;
-    m_movementParams.randomScaleMin = min;
-    m_movementParams.randomScaleMax = max;
-    m_paramsDirty = true;
-}
-
-
-
 nlohmann::json MeshMovementModuleCS::SerializeData() const
 {
     nlohmann::json json;
@@ -453,11 +430,6 @@ nlohmann::json MeshMovementModuleCS::SerializeData() const
     json["meshParams"] = {
         {"useGravity", m_movementParams.useGravity},
         {"gravityStrength", m_movementParams.gravityStrength},
-        {"startScale", {m_movementParams.startScale.x, m_movementParams.startScale.y, m_movementParams.startScale.z}},
-        {"endScale", {m_movementParams.endScale.x, m_movementParams.endScale.y, m_movementParams.endScale.z}},
-        {"useRandomScale", m_movementParams.useRandomScale},
-        {"randomScaleMin", m_movementParams.randomScaleMin},
-        {"randomScaleMax", m_movementParams.randomScaleMax}
     };
 
     // VelocityCurve 데이터 직렬화
@@ -547,22 +519,6 @@ void MeshMovementModuleCS::DeserializeData(const nlohmann::json& json)
             m_movementParams.useGravity = meshJson["useGravity"];
         if (meshJson.contains("gravityStrength"))
             m_movementParams.gravityStrength = meshJson["gravityStrength"];
-        if (meshJson.contains("startScale"))
-        {
-            auto scale = meshJson["startScale"];
-            m_movementParams.startScale = float3(scale[0], scale[1], scale[2]);
-        }
-        if (meshJson.contains("endScale"))
-        {
-            auto scale = meshJson["endScale"];
-            m_movementParams.endScale = float3(scale[0], scale[1], scale[2]);
-        }
-        if (meshJson.contains("useRandomScale"))
-            m_movementParams.useRandomScale = meshJson["useRandomScale"];
-        if (meshJson.contains("randomScaleMin"))
-            m_movementParams.randomScaleMin = meshJson["randomScaleMin"];
-        if (meshJson.contains("randomScaleMax"))
-            m_movementParams.randomScaleMax = meshJson["randomScaleMax"];
     }
 
     // VelocityCurve 데이터 복원

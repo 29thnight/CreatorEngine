@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "t1",
+    "name": "gumgi2",
     "particleSystems": [
         {
             "isRunning": true,
@@ -15,7 +15,7 @@
                         "meshParticleTemplate": {
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": 0.0,
+                                "y": 3.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -30,11 +30,11 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
-                            "lifeTime": 10.0,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -76,33 +76,55 @@
                 {
                     "data": {
                         "easing": {
-                            "animationType": 0,
-                            "duration": 1.0,
-                            "enabled": false,
-                            "type": 0
+                            "enabled": false
                         },
-                        "sizeParams": {
-                            "endSize": {
-                                "x": 2.450000047683716,
-                                "y": 3.7100000381469727,
-                                "z": 2.7699999809265137
-                            },
-                            "randomScaleMax": 2.0,
-                            "randomScaleMin": 0.5,
-                            "startSize": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "useRandomScale": 0
+                        "explosiveData": {
+                            "initialSpeed": 50.0,
+                            "randomFactor": 0.4000000059604645,
+                            "speedDecay": 2.0,
+                            "sphereRadius": 1.0
+                        },
+                        "impulses": [],
+                        "meshParams": {
+                            "gravityStrength": 0.0,
+                            "useGravity": 0
+                        },
+                        "movementParams": {
+                            "currentTime": 146.50271606445313,
+                            "velocityMode": 0
+                        },
+                        "orbitalData": {
+                            "axis": [
+                                0.0,
+                                1.0,
+                                0.0
+                            ],
+                            "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "radius": 5.0,
+                            "speed": 1.0
                         },
                         "state": {
                             "isInitialized": true,
                             "particleCapacity": 1
+                        },
+                        "velocityCurve": [],
+                        "windData": {
+                            "baseStrength": 1.0,
+                            "direction": [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            "frequency": 1.0,
+                            "turbulence": 0.5
                         }
                     },
                     "stage": 2,
-                    "type": "MeshSizeModuleCS",
+                    "type": "MeshMovementModuleCS",
                     "useEasing": false
                 }
             ],
@@ -125,28 +147,46 @@
                         },
                         "mesh": {
                             "meshIndex": 0,
-                            "type": 1
+                            "type": 3
                         },
                         "model": {
-                            "hasModel": false
+                            "assigned": true,
+                            "hasModel": true,
+                            "meshIndex": 0,
+                            "name": "Slash3"
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 2,
+                            "blendPreset": 1,
                             "depthPreset": 2,
-                            "rasterizerPreset": 2
+                            "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "MeshParticle",
+                            "pixelShader": "gg",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "123",
+                                "name": "Slash3",
                                 "slot": 0
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Crater62",
+                                "slot": 1
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Noise43b",
+                                "slot": 2
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Smoke12",
+                                "slot": 3
                             }
                         ]
                     },

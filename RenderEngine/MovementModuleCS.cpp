@@ -109,6 +109,10 @@ void MovementModuleCS::OnSystemResized(UINT max)
     }
 }
 
+void MovementModuleCS::SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation)
+{
+}
+
 bool MovementModuleCS::InitializeCompute()
 {
     // 상수 버퍼 생성

@@ -551,6 +551,9 @@
     <ClCompile Include="MeshMovementModuleCS.cpp">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClCompile>
+    <ClCompile Include="MeshSizeModuleCS.cpp">
+      <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -913,6 +916,9 @@
     <ClInclude Include="BillboardType.h">
       <Filter>Resources</Filter>
     </ClInclude>
+    <ClInclude Include="MeshSizeModuleCS.h">
+      <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -1180,6 +1186,9 @@
       <Filter>Shaders\Effect\Special</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshMovementModule.cs.hlsl">
+      <Filter>Shaders\Effect\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSizeModule.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
   </ItemGroup>
