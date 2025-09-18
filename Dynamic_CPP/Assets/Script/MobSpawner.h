@@ -37,6 +37,8 @@ public:
 	void TestSpawn();
 
 	Mathf::Vector3 SpawnArea{};
+
+	bool triggerOnce = true;
 private:
 	double radical_inverse_base2(unsigned int n);
 	Mathf::Vector3 UniformRandomUpdirection(float angle, int curindex, int maxCount);

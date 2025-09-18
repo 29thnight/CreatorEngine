@@ -23,6 +23,9 @@ void MobSpawner::OnCollisionEnter(const Collision& collision)
 
 void MobSpawner::Spawn()
 {
+	if (!triggerOnce) return;
+	triggerOnce = false;
+
 	int index = 0;
 	int maxcount = 0;
 
@@ -51,7 +54,7 @@ void MobSpawner::Spawn()
 		}
 	}
 
-	GameObject::FindIndex(GetOwner()->m_parentIndex)->Destroy();
+	//GameObject::FindIndex(GetOwner()->m_parentIndex)->Destroy();
 }
 
 void MobSpawner::TestSpawn()
