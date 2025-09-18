@@ -317,6 +317,7 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 
         if (SUCCEEDED(hr))
         {
+            m_spawnParams.allowNewSpawn = m_allowNewSpawn ? 1 : 0;
             memcpy(mappedResource.pData, &m_spawnParams, sizeof(SpawnParams));
             DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
             m_spawnParamsDirty = false;

@@ -118,6 +118,43 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 	}
 }
 
+void ParticleSystem::StopSpawning()
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		// SpawnModuleCS만 비활성화
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetAllowNewSpawn(false);
+		}
+		// MeshSpawnModuleCS도 비활성화
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetAllowNewSpawn(false);
+		}
+		// TrailGenerateModule도 비활성화 (필요시)
+		//else if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEnabled(false);
+		//}
+	}
+}
+
+void ParticleSystem::ResumeSpawning()
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetAllowNewSpawn(true);
+		}
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetAllowNewSpawn(true);
+		}
+		//else if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEnabled(true);
+		//}
+	}
+}
+
 void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition)
 {
 	m_effectBasePosition = newBasePosition;

@@ -80,7 +80,7 @@ PixelOutput main(PixelInput input)
     if (normalizedAge > dissolveOutStart)
     {
         float fadeProgress = (normalizedAge - dissolveOutStart) / (1.0 - dissolveOutStart);
-        globalFade = 1.0 - smoothstep(0.0, 1.0, fadeProgress);
+        globalFade = 1.0 - smoothstep(0.0, 1.0, pow(fadeProgress, 0.5));
     }
     
     // Emission ¸®¸ÊÇÎ

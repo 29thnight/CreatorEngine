@@ -4,10 +4,10 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "gumgi1",
+    "name": "1",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -15,7 +15,7 @@
                         "meshParticleTemplate": {
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": -2.0,
+                                "y": 0.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -30,11 +30,11 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.06440294533967972,
-                                "y": 0.03758964315056801,
-                                "z": 0.3173598647117615
+                                "x": 1.0,
+                                "y": 1.0,
+                                "z": 1.0
                             },
-                            "lifeTime": 1.0,
+                            "lifeTime": 10.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -72,60 +72,6 @@
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
                     "useEasing": false
-                },
-                {
-                    "data": {
-                        "easing": {
-                            "enabled": false
-                        },
-                        "explosiveData": {
-                            "initialSpeed": 50.0,
-                            "randomFactor": 0.4000000059604645,
-                            "speedDecay": 2.0,
-                            "sphereRadius": 1.0
-                        },
-                        "impulses": [],
-                        "meshParams": {
-                            "gravityStrength": 0.0,
-                            "useGravity": 0
-                        },
-                        "movementParams": {
-                            "currentTime": 0.0,
-                            "velocityMode": 0
-                        },
-                        "orbitalData": {
-                            "axis": [
-                                0.0,
-                                1.0,
-                                0.0
-                            ],
-                            "center": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "radius": 5.0,
-                            "speed": 1.0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 1
-                        },
-                        "velocityCurve": [],
-                        "windData": {
-                            "baseStrength": 1.0,
-                            "direction": [
-                                1.0,
-                                0.0,
-                                0.0
-                            ],
-                            "frequency": 1.0,
-                            "turbulence": 0.5
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MeshMovementModuleCS",
-                    "useEasing": false
                 }
             ],
             "name": "NewEmitter",
@@ -153,40 +99,30 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "Slash3"
+                            "name": "EffectSpehere"
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
-                            "rasterizerPreset": 1
+                            "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "gg",
+                            "pixelShader": "ggg",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Slash3",
+                                "name": "noise_02",
                                 "slot": 0
                             },
                             {
                                 "hasTexture": true,
-                                "name": "Crater62",
+                                "name": "grad01_13",
                                 "slot": 1
-                            },
-                            {
-                                "hasTexture": true,
-                                "name": "Noise43b",
-                                "slot": 2
-                            },
-                            {
-                                "hasTexture": true,
-                                "name": "Smoke12",
-                                "slot": 3
                             }
                         ]
                     },

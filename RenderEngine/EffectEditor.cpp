@@ -1486,12 +1486,30 @@ void EffectEditor::RenderSpawnModuleEditor(SpawnModuleCS* spawnModule)
 		spawnModule->SetParticleAcceleration(XMFLOAT3(acceleration[0], acceleration[1], acceleration[2]));
 	}
 
-
-
 	// 회전 속도
 	if (ImGui::DragFloat("Rotate Speed", &currentTemplate.rotateSpeed, 0.1f, -360.0f, 360.0f)) {
 		spawnModule->SetRotateSpeed(currentTemplate.rotateSpeed);
 	}
+
+	float rotation = currentTemplate.initialRotation;
+	float rotationRange = currentTemplate.initialRotationRange;
+
+	bool rotationChange = false;
+	bool rotationRangeChange = false;
+
+	if (ImGui::DragFloat("Rotation", &rotation, 0.1f, -100.0f, 100.0f)) {
+		rotationChange = true;
+	}
+
+	// Random Range 슬라이더  
+	if (ImGui::DragFloat("Rotation Random Range", &rotationRange, 0.1f, 0.0f, 50.0f)) {
+		rotationRangeChange = true;
+	}
+
+	if (rotationChange || rotationRangeChange) {
+		spawnModule->SetRotation(rotation, rotationRange);
+	}
+
 }
 
 void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
@@ -2157,7 +2175,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 			"Custom"
 		};
 
-		static int currentTransitionMode = 0;
+		int currentTransitionMode = static_cast<int>(colorModule->GetTransitionMode());
 		if (ImGui::Combo("Transition Mode", &currentTransitionMode, transitionModes, IM_ARRAYSIZE(transitionModes)))
 		{
 			colorModule->SetTransitionMode(static_cast<ColorTransitionMode>(currentTransitionMode));
@@ -2166,16 +2184,11 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 		ImGui::Separator();
 
 		// 그라데이션 모드
-		if (currentTransitionMode == 0)
+		if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Gradient))
 		{
 			if (ImGui::TreeNode("Gradient Settings"))
 			{
-				static std::vector<std::pair<float, Mathf::Vector4>> gradientPoints = {
-					{0.0f, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f)},
-					{0.3f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 0.9f)},
-					{0.7f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 0.7f)},
-					{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.0f, 0.0f)}
-				};
+				auto gradientPoints = colorModule->GetColorGradient();
 
 				for (int i = 0; i < gradientPoints.size(); ++i)
 				{
@@ -2186,7 +2199,8 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 
 					if (ImGui::TreeNode(label))
 					{
-						ImGui::SliderFloat("Time", &gradientPoints[i].first, 0.0f, 1.0f);
+						float time = gradientPoints[i].first;
+						ImGui::SliderFloat("Time", &time, 0.0f, 1.0f);
 
 						float color[4] = {
 							gradientPoints[i].second.x,
@@ -2195,9 +2209,19 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 							gradientPoints[i].second.w
 						};
 
+						bool timeChanged = (time != gradientPoints[i].first);
+						bool colorChanged = false;
+
 						if (ImGui::ColorEdit4("Color", color))
 						{
+							colorChanged = true;
+						}
+
+						if (timeChanged || colorChanged)
+						{
+							gradientPoints[i].first = time;
 							gradientPoints[i].second = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							colorModule->SetColorGradient(gradientPoints);
 						}
 
 						if (gradientPoints.size() > 2)
@@ -2205,6 +2229,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 							if (ImGui::Button("Delete Point"))
 							{
 								gradientPoints.erase(gradientPoints.begin() + i);
+								colorModule->SetColorGradient(gradientPoints);
 								ImGui::TreePop();
 								ImGui::PopID();
 								break;
@@ -2222,10 +2247,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					float newTime = gradientPoints.empty() ? 0.5f :
 						(gradientPoints.back().first + 0.1f > 1.0f ? 0.5f : gradientPoints.back().first + 0.1f);
 					gradientPoints.emplace_back(newTime, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-				}
 
-				if (ImGui::Button("Apply Gradient"))
-				{
 					std::sort(gradientPoints.begin(), gradientPoints.end(),
 						[](const auto& a, const auto& b) { return a.first < b.first; });
 
@@ -2236,15 +2258,11 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 			}
 		}
 		// 이산 색상 모드
-		else if (currentTransitionMode == 1)
+		else if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Discrete))
 		{
 			if (ImGui::TreeNode("Discrete Colors"))
 			{
-				static std::vector<Mathf::Vector4> discreteColors = {
-					Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-					Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-					Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
-				};
+				auto discreteColors = colorModule->GetDiscreteColors();
 
 				for (int i = 0; i < discreteColors.size(); ++i)
 				{
@@ -2263,12 +2281,14 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					if (ImGui::ColorEdit4(label, color))
 					{
 						discreteColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						colorModule->SetDiscreteColors(discreteColors);
 					}
 
 					ImGui::SameLine();
 					if (ImGui::Button("Remove") && discreteColors.size() > 1)
 					{
 						discreteColors.erase(discreteColors.begin() + i);
+						colorModule->SetDiscreteColors(discreteColors);
 						ImGui::PopID();
 						break;
 					}
@@ -2279,10 +2299,6 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				if (ImGui::Button("Add Color") && discreteColors.size() < 32)
 				{
 					discreteColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
-				}
-
-				if (ImGui::Button("Apply Colors"))
-				{
 					colorModule->SetDiscreteColors(discreteColors);
 				}
 
@@ -2290,7 +2306,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 			}
 		}
 		// 커스텀 함수 모드
-		else if (currentTransitionMode == 2)
+		else if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Custom))
 		{
 			if (ImGui::TreeNode("Custom Function"))
 			{
@@ -2300,20 +2316,41 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					"Flicker"
 				};
 
-				static int currentFunction = 0;
-				ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes));
+				int currentFunction = colorModule->GetCustomFunctionType();
+				if (ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes)))
+				{
+					colorModule->SetCustomFunction(currentFunction, 0.0f, 0.0f, 0.0f, 0.0f);
+				}
 
 				if (currentFunction == 0) // Pulse
 				{
-					static float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-					static float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-					static float frequency = 1.0f;
+					auto discreteColors = colorModule->GetDiscreteColors();
 
-					ImGui::ColorEdit4("Base Color", baseColor);
-					ImGui::ColorEdit4("Pulse Color", pulseColor);
-					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+					float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-					if (ImGui::Button("Apply Pulse"))
+					if (discreteColors.size() >= 2)
+					{
+						baseColor[0] = discreteColors[0].x;
+						baseColor[1] = discreteColors[0].y;
+						baseColor[2] = discreteColors[0].z;
+						baseColor[3] = discreteColors[0].w;
+
+						pulseColor[0] = discreteColors[1].x;
+						pulseColor[1] = discreteColors[1].y;
+						pulseColor[2] = discreteColors[1].z;
+						pulseColor[3] = discreteColors[1].w;
+					}
+
+					float frequency = colorModule->GetCustomParam4();
+					if (frequency == 0.0f) frequency = 1.0f;
+
+					bool changed = false;
+					changed |= ImGui::ColorEdit4("Base Color", baseColor);
+					changed |= ImGui::ColorEdit4("Pulse Color", pulseColor);
+					changed |= ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+
+					if (changed || ImGui::Button("Apply Pulse"))
 					{
 						colorModule->SetPulseColor(
 							Mathf::Vector4(baseColor[0], baseColor[1], baseColor[2], baseColor[3]),
@@ -2324,17 +2361,36 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				}
 				else if (currentFunction == 1) // Sine Wave
 				{
-					static float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-					static float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-					static float frequency = 1.0f;
-					static float phase = 0.0f;
+					auto discreteColors = colorModule->GetDiscreteColors();
 
-					ImGui::ColorEdit4("Color 1", color1);
-					ImGui::ColorEdit4("Color 2", color2);
-					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
-					ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+					float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
-					if (ImGui::Button("Apply Sine Wave"))
+					if (discreteColors.size() >= 2)
+					{
+						color1[0] = discreteColors[0].x;
+						color1[1] = discreteColors[0].y;
+						color1[2] = discreteColors[0].z;
+						color1[3] = discreteColors[0].w;
+
+						color2[0] = discreteColors[1].x;
+						color2[1] = discreteColors[1].y;
+						color2[2] = discreteColors[1].z;
+						color2[3] = discreteColors[1].w;
+					}
+
+					float frequency = colorModule->GetCustomParam1();
+					float phase = colorModule->GetCustomParam2();
+
+					if (frequency == 0.0f) frequency = 1.0f;
+
+					bool changed = false;
+					changed |= ImGui::ColorEdit4("Color 1", color1);
+					changed |= ImGui::ColorEdit4("Color 2", color2);
+					changed |= ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					changed |= ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+
+					if (changed || ImGui::Button("Apply Sine Wave"))
 					{
 						colorModule->SetSineWaveColor(
 							Mathf::Vector4(color1[0], color1[1], color1[2], color1[3]),
@@ -2346,12 +2402,16 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				}
 				else if (currentFunction == 2) // Flicker
 				{
-					static std::vector<Mathf::Vector4> flickerColors = {
-						Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-						Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-						Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
-					};
-					static float speed = 5.0f;
+					auto flickerColors = colorModule->GetDiscreteColors();
+
+					if (flickerColors.empty())
+					{
+						flickerColors = {
+							Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+							Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+							Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
+						};
+					}
 
 					for (int i = 0; i < flickerColors.size(); ++i)
 					{
@@ -2370,12 +2430,14 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 						if (ImGui::ColorEdit4(label, color))
 						{
 							flickerColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							colorModule->SetDiscreteColors(flickerColors);
 						}
 
 						ImGui::SameLine();
 						if (ImGui::Button("Remove") && flickerColors.size() > 1)
 						{
 							flickerColors.erase(flickerColors.begin() + i);
+							colorModule->SetDiscreteColors(flickerColors);
 							ImGui::PopID();
 							break;
 						}
@@ -2386,11 +2448,13 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					if (ImGui::Button("Add Flicker Color") && flickerColors.size() < 32)
 					{
 						flickerColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+						colorModule->SetDiscreteColors(flickerColors);
 					}
 
-					ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f);
+					float speed = colorModule->GetCustomParam1();
+					if (speed == 0.0f) speed = 5.0f;
 
-					if (ImGui::Button("Apply Flicker"))
+					if (ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f))
 					{
 						colorModule->SetFlickerColor(flickerColors, speed);
 					}
@@ -2405,8 +2469,11 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 		// 이징 설정
 		if (ImGui::TreeNode("Easing Settings"))
 		{
-			static bool easingEnabled = false;
-			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			bool easingEnabled = colorModule->IsEasingEnabled();
+			if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+			{
+				colorModule->EnableEasing(easingEnabled);
+			}
 
 			if (easingEnabled)
 			{
@@ -2428,15 +2495,22 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					"Loop Forward", "Loop Back", "Loop PingPong"
 				};
 
-				static int currentEasingType = 0;
-				static int currentAnimationType = 0;
-				static float duration = 1.0f;
+				// 이징 모듈의 Get 함수가 있다고 가정하고, 없다면 기본값 사용
+				int currentEasingType = 0;
+				int currentAnimationType = 0;
+				float duration = 1.0f;
 
-				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
-				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
-				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+				// TODO: 헤더에 이징 Get 함수들이 있는지 확인 필요
+				currentEasingType = static_cast<int>(colorModule->GetEasingModule().GetEasingType());
+				currentAnimationType = static_cast<int>(colorModule->GetEasingModule().GetAnimationType());
+				duration = colorModule->GetEasingModule().GetDuration();
 
-				if (ImGui::Button("Apply Easing"))
+				bool changed = false;
+				changed |= ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				changed |= ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				changed |= ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+
+				if (changed || ImGui::Button("Apply Easing"))
 				{
 					colorModule->SetEasing(
 						static_cast<EasingEffect>(currentEasingType),

@@ -413,6 +413,9 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 		if (effectJson.contains("loop")) {
 			loop = effectJson["loop"];
 		}
+		if (effectJson.contains("timeScale")) {
+			timeScale = effectJson["timeScale"];
+		}
 
 		if (effectJson.contains("particleSystems") && effectJson["particleSystems"].is_array()) {
 			for (const auto& psJson : effectJson["particleSystems"]) {
@@ -593,4 +596,16 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 			}
 		}
 	}
+
+	auto& particleSystemsd = effect->GetAllParticleSystems();
+	std::cout << "=== ParticleSystem Order Check ===" << std::endl;
+	for (int i = 0; i < particleSystemsd.size(); ++i) {
+		std::cout << "ParticleSystem[" << i << "] name: " << particleSystemsd[i]->m_name << std::endl;
+		if (i < templateConfig.particleSystemConfigs.size()) {
+			const auto& psConfig = templateConfig.particleSystemConfigs[i];
+			std::cout << "  Config[" << i << "] - spawn:" << psConfig.moduleConfig.spawnEnabled
+				<< ", billboard:" << psConfig.moduleConfig.billboardEnabled << std::endl;
+		}
+	}
+	std::cout << "=================================" << std::endl;
 }

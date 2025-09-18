@@ -45,6 +45,7 @@ private:
 	bool m_spawnParamsDirty;
 	bool m_templateDirty;
 	UINT m_particleCapacity;
+	bool m_allowNewSpawn = true;
 
 	// 난수 생성기 (동일)
 	std::random_device m_randomDevice;
@@ -98,6 +99,12 @@ public:
 	float GetSpawnRate() const { return m_spawnParams.spawnRate; }
 	EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
 	MeshParticleTemplateParams GetTemplate() const { return m_meshParticleTemplate; }
+
+	void SetAllowNewSpawn(bool allow) {
+		m_allowNewSpawn = allow;
+		m_spawnParamsDirty = true;
+	}
+	bool IsAllowNewSpawn() const { return m_allowNewSpawn; }
 
 	// 직렬화
 public:

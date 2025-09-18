@@ -1191,6 +1191,12 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSizeModule.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\glow.ps.hlsl">
+      <Filter>Shaders\Effect\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\spike.vs.hlsl">
+      <Filter>Shaders\Effect\2D</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UIPass.h">

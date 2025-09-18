@@ -52,7 +52,7 @@ cbuffer SpawnParameters : register(b0)
     uint gForceRotationUpdate;
     
     float3 gPreviousEmitterRotation;
-    float spawnPad1;
+    uint gAllowNewSpawn;
 }
 
 // 3D 메시 파티클 템플릿
@@ -344,27 +344,31 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 비활성 파티클 - 스폰 체크
     else
     {
-        float particleSpawnTime = float(particleIndex) / gSpawnRate;
-        float spawnCycle = float(gMaxParticles) / gSpawnRate;
-        float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
-        
-        bool shouldSpawn = false;
-        
-        if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
+        if (gAllowNewSpawn)
         {
-            shouldSpawn = true;
-        }
-        else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
+            float particleSpawnTime = float(particleIndex) / gSpawnRate;
+            float spawnCycle = float(gMaxParticles) / gSpawnRate;
+            float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
+        
+            bool shouldSpawn = false;
+        
+            if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
+            {
+                shouldSpawn = true;
+            }
+            else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
                  cycleTime < (spawnCycle + particleSpawnTime + (1.0 / gSpawnRate)))
-        {
-            shouldSpawn = true;
+            {
+                shouldSpawn = true;
+            }
+        
+            if (shouldSpawn)
+            {
+                uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
+                InitializeMeshParticle(particle, seed);
+            }
         }
         
-        if (shouldSpawn)
-        {
-            uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
-            InitializeMeshParticle(particle, seed);
-        }
     }
     
     gParticlesOutput[particleIndex] = particle;

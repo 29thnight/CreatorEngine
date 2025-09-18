@@ -16,7 +16,12 @@ struct alignas(16) ParticleTemplateParams
     float velocityRandomRange;
 
     float3 acceleration;
+    float initialRotation;       // 초기 Z축 회전값
+
+    float initialRotationRange;  // 초기 회전 랜덤 범위
+    float pad1;
     float pad2;
+    float pad3;
 };
 
 enum class EmitterType;
@@ -44,6 +49,7 @@ private:
     bool m_spawnParamsDirty;
     bool m_templateDirty;
     UINT m_particleCapacity;
+    bool m_allowNewSpawn = true;
 
     // 난수 생성기 (초기 시드용)
     std::random_device m_randomDevice;
@@ -95,14 +101,21 @@ public:
     void SetParticleVelocity(const XMFLOAT3& velocity, float randomRange = 0.0f);
     void SetParticleAcceleration(const XMFLOAT3& acceleration);
     void SetRotateSpeed(float speed);
+    void SetRotation(float rotation, float randomrange);
 
     // 상태 조회
     float GetSpawnRate() const { return m_spawnParams.spawnRate; }
     EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
     ParticleTemplateParams GetTemplate() const { return m_particleTemplate; }
 
-    // 직렬화
+    void SetAllowNewSpawn(bool allow) {
+        m_allowNewSpawn = allow;
+        m_spawnParamsDirty = true;
+    }
+    bool IsAllowNewSpawn() const { return m_allowNewSpawn; }
+
 public:
+    // 직렬화
     // ISerializable 인터페이스 구현
     virtual nlohmann::json SerializeData() const override;
     virtual void DeserializeData(const nlohmann::json& json) override;

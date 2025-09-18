@@ -116,6 +116,10 @@ public:
 
 	virtual void Render(RenderScene& scene, Camera& camera);
 
+	void StopSpawning();
+
+	void ResumeSpawning();
+
 	void UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition);
 
 	void UpdateEffectBaseRotation(const Mathf::Vector3& newBaseRotation);

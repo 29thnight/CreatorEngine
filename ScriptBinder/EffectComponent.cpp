@@ -135,9 +135,15 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     bool templateLoop;
     if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
     {
-        m_timeScale = templateTimeScale;
-        m_loop = templateLoop;
-        m_duration = templateDuration;
+        if (m_timeScale == 1.0f) {  // 기본값인 경우에만
+            m_timeScale = templateTimeScale;
+        }
+        if (m_loop == true) {  // 기본값인 경우에만
+            m_loop = templateLoop;
+        }
+        if (m_duration == -1.0f) {  // 기본값인 경우에만
+            m_duration = templateDuration;
+        }
     }
 
     auto currentPos = GetOwner()->m_transform.GetWorldPosition();
@@ -196,9 +202,16 @@ void EffectComponent::ChangeEffect(const std::string& newEffectName)
 
     if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
     {
-        m_timeScale = templateTimeScale;
-        m_loop = templateLoop;
-        m_duration = templateDuration;
+        // 기본값이 아닌 경우에만 템플릿 값 사용
+        if (m_timeScale == 1.0f) {  // 기본값인 경우에만
+            m_timeScale = templateTimeScale;
+        }
+        if (m_loop == true) {  // 기본값인 경우에만
+            m_loop = templateLoop;
+        }
+        if (m_duration == -1.0f) {  // 기본값인 경우에만
+            m_duration = templateDuration;
+        }
     }
 
     // 기존 이펙트가 있으면 Replace, 없으면 새로 생성
