@@ -88,6 +88,19 @@ void Player::Start()
 				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
 			}
 		}
+
+		auto HPbar = GameObject::Find("P1_HPBar");
+		if (HPbar)
+		{
+			auto hpbar = HPbar->GetComponent<HPBar>();
+			if (hpbar)
+			{
+				hpbar->targetIndex = player->m_index;
+				m_currentHP = m_maxHP;
+				hpbar->SetMaxHP(m_maxHP);
+				hpbar->SetCurHP(m_currentHP);
+			}
+		}
 	}
 	else
 	{
@@ -104,21 +117,20 @@ void Player::Start()
 				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
 			}
 		}
-	}
 
-	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
-	if (HPbar)
-	{
-		auto hpbar = HPbar->GetComponent<HPBar>();
-		if (hpbar)
+		auto HPbar = GameObject::Find("P2_HPBar");
+		if (HPbar)
 		{
-			hpbar->targetIndex = player->m_index;
-			m_currentHP = m_maxHP;
-			hpbar->SetMaxHP(m_maxHP);
-			hpbar->SetCurHP(m_currentHP);
+			auto hpbar = HPbar->GetComponent<HPBar>();
+			if (hpbar)
+			{
+				hpbar->targetIndex = player->m_index;
+				m_currentHP = m_maxHP;
+				hpbar->SetMaxHP(m_maxHP);
+				hpbar->SetCurHP(m_currentHP);
+			}
 		}
 	}
-	//~TEST
 
 	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("WeaponBasic");
 	Weapon* weapon = nullptr;

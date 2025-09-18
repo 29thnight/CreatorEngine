@@ -356,11 +356,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			auto spriteRenderer = static_cast<SpriteRenderer*>(component);
 			std::shared_ptr<Texture> texture = nullptr;
-			if (itNode["m_Sprite"])
-			{
-				auto spriteNode = itNode["m_Sprite"];
-				FileGuid guid = spriteNode["m_fileGuid"].as<std::string>();
-			}
             Meta::Deserialize(spriteRenderer, itNode);
 			spriteRenderer->SetOwner(obj);
 			spriteRenderer->SetEnabled(true);
