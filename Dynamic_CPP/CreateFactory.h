@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "MobSpawner.h"
 #include "SwitchingSceneTrigger.h"
 #include "LoadingController.h"
 #include "WeaponSlotDurFont.h"

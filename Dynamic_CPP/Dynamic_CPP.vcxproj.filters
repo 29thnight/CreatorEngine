@@ -387,6 +387,9 @@
 		<ClInclude Include="Assets\Script\SwitchingSceneTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\MobSpawner.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -690,6 +693,9 @@
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SwitchingSceneTrigger.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MobSpawner.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
