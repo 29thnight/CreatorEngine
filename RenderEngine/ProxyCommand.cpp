@@ -133,6 +133,7 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
 	Texture* originTexture = pComponent->GetSprite().get();
+	bool isEnableDepth = pComponent->IsEnableDepth();
 	if (!originTexture)
 	{
 		m_updateFunction = [=]
@@ -152,6 +153,7 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
         proxyObject->m_customPSOName = customPSOName;
         proxyObject->m_billboardType = billboardType;
         proxyObject->m_billboardAxis = billboardAxis;
+		proxyObject->m_enableDepth = isEnableDepth;
         if (!customPSOName.empty())
         {
             auto it = ShaderSystem->ShaderAssets.find(customPSOName);

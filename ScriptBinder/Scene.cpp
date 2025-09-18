@@ -1591,6 +1591,8 @@ void Scene::SetInternalPhysicData()
 
 void Scene::AllUpdateWorldMatrix()
 {
+	if (m_SceneObjects.empty()) return;
+
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
 
 	auto updateFunc = [this](GameObject::Index index)

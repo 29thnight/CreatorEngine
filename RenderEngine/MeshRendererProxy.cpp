@@ -91,8 +91,9 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
 PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
     m_spriteTexture(component->GetSprite().get()),
     m_customPSOName(component->GetCustomPSOName()),
-   m_billboardType(component->GetBillboardType()),
-   m_billboardAxis(component->GetBillboardAxis())
+    m_billboardType(component->GetBillboardType()),
+    m_billboardAxis(component->GetBillboardAxis()),
+    m_enableDepth(component->IsEnableDepth())
 {
     if (!m_customPSOName.empty())
     {

@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "PlayerSelector.h"
+#include "InputDeviceDetector.h"
 #include "ItemPopup.h"
 #include "MovingUILayer.h"
 #include "MobSpawner.h"

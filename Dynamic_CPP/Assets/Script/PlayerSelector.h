@@ -1,14 +1,11 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "MovingUILayer.generated.h"
 
-class MovingUILayer : public ModuleBehavior
+class PlayerSelector : public ModuleBehavior
 {
 public:
-   ReflectMovingUILayer
-	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(MovingUILayer)
+	MODULE_BEHAVIOR_BODY(PlayerSelector)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -24,19 +21,5 @@ public:
 	virtual void OnDestroy() override  {}
 
 private:
-	[[Property]]
-	float m_movingSpeed{};
-	[[Property]]
-	float m_waitTick{};
-	[[Property]]
-	float m_baseY{};
-	[[Property]]
-	float offset{};
-
-	float m_elapsedTime{};
-	bool m_active{};
-
-	Mathf::Vector2 pos{};
-
-	class RectTransformComponent* m_movingTarget{ nullptr };
+	//std::array< <- 여기 뭘 넣어야 되지?
 };

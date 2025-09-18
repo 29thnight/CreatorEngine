@@ -5,6 +5,13 @@
 void MovingUILayer::Start()
 {
 	m_movingTarget = GetComponent<RectTransformComponent>();
+	if(!m_movingTarget)
+	{
+		return;
+	}
+
+	pos = m_movingTarget->GetAnchoredPosition();
+	m_baseY = pos.y;
 }
 
 void MovingUILayer::Update(float tick)
@@ -33,7 +40,9 @@ void MovingUILayer::Update(float tick)
 		const float phase = m_elapsedTime / duration;
 		const float tri = 1.f - fabsf(2.f * phase - 1.f);
 
-		//m_movingTarget->SetAnchoredPosition();
+		pos.y = m_baseY + offset * tri;
+
+		m_movingTarget->SetAnchoredPosition(pos);
 	}
 }
 

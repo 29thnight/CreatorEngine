@@ -192,6 +192,8 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("PlayerSelector", []() { return new PlayerSelector(); });
+		CreateFactory::GetInstance()->RegisterFactory("InputDeviceDetector", []() { return new InputDeviceDetector(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemPopup", []() { return new ItemPopup(); });
 		CreateFactory::GetInstance()->RegisterFactory("MovingUILayer", []() { return new MovingUILayer(); });
 		CreateFactory::GetInstance()->RegisterFactory("MobSpawner", []() { return new MobSpawner(); });
