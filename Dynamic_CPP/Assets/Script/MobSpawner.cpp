@@ -50,6 +50,8 @@ void MobSpawner::Spawn()
 			}
 		}
 	}
+
+	GameObject::FindIndex(GetOwner()->m_parentIndex)->Destroy();
 }
 
 void MobSpawner::TestSpawn()
