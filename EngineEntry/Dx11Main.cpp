@@ -32,12 +32,12 @@ std::atomic<bool> isCE_Thread_End = false;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
-   
+    DirectX11::TimeSystem::GetInstance();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
 {
-
+    DirectX11::TimeSystem::Destroy();
 }
 
 void DirectX11::Dx11Main::Initialize()
@@ -240,10 +240,10 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-    EngineSettingInstance->frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+    EngineSettingInstance->frameDeltaTime = Time->GetElapsedSeconds();
 
     PROFILE_CPU_BEGIN("GameLogic");
-    m_timeSystem.Tick([&]
+    Time->Tick([&]
     {
         InfoWindow();
         InputManagement->Update(EngineSettingInstance->frameDeltaTime);
@@ -313,7 +313,7 @@ bool DirectX11::Dx11Main::ExecuteRenderPass()
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-	if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+	if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     { 
         PROFILE_CPU_END();
         return false;
@@ -341,9 +341,9 @@ void DirectX11::Dx11Main::InfoWindow()
         << L" Height: "
         << DirectX11::DeviceStates->g_Viewport.Height
         << L" FPS: "
-        << m_timeSystem.GetFramesPerSecond()
+        << Time->GetFramesPerSecond()
         << L" FrameCount: "
-        << m_timeSystem.GetFrameCount()
+        << Time->GetFrameCount()
         << "<Dx11>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
@@ -383,7 +383,7 @@ void DirectX11::Dx11Main::CommandBuildThread()
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
     // 처음 업데이트하기 전에 아무 것도 하지 마세요.
-    if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+    if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     {
         PROFILE_CPU_END();
         //RenderCommandFence.Signal();

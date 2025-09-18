@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "ItemPopup.h"
+#include "MovingUILayer.h"
 #include "SwitchingSceneTrigger.h"
 #include "LoadingController.h"
 #include "WeaponSlotDurFont.h"

@@ -243,6 +243,9 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	//    패치 크기 = (maxX-minX+1) × (maxY-minY+1)
 	int patchW = maxX - minX + 1;
 	int patchH = maxY - minY + 1;
+
+	if (0 > patchH || 0 > patchW) return;
+
 	std::vector<Vertex> patchVerts;
 	patchVerts.reserve(patchW * patchH);
 

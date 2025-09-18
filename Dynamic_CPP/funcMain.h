@@ -192,6 +192,8 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("ItemPopup", []() { return new ItemPopup(); });
+		CreateFactory::GetInstance()->RegisterFactory("MovingUILayer", []() { return new MovingUILayer(); });
 		CreateFactory::GetInstance()->RegisterFactory("SwitchingSceneTrigger", []() { return new SwitchingSceneTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("LoadingController", []() { return new LoadingController(); });
 		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotDurFont", []() { return new WeaponSlotDurFont(); });

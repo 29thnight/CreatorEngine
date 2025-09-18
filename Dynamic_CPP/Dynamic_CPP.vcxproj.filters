@@ -387,6 +387,12 @@
 		<ClInclude Include="Assets\Script\SwitchingSceneTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\MovingUILayer.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\ItemPopup.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -690,6 +696,12 @@
 			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SwitchingSceneTrigger.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MovingUILayer.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ItemPopup.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
