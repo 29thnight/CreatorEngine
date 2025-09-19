@@ -31,6 +31,7 @@ void PlayerStun::Enter()
 	{
 		m_player->ChangeState("Stun");
 		m_player->m_curWeapon->SetEnabled(false);
+		m_player->m_animator->SetUseLayer(1, false);
 	}
 }
 
@@ -60,5 +61,6 @@ void PlayerStun::Exit()
 	{
 		m_player->ChangeState("Idle");
 		m_player->m_curWeapon->SetEnabled(true);
+		m_player->m_animator->SetUseLayer(1, true);
 	}
 }

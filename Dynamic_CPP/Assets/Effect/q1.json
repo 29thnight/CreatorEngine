@@ -36,9 +36,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.0,
-                                "y": 0.2839059829711914,
-                                "z": 1.0
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
@@ -57,6 +57,11 @@
                                 "z": 0.0
                             },
                             "emitterRadius": 1.0,
+                            "emitterRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
                             "emitterSize": {
                                 "x": 0.5,
                                 "y": 0.5,
@@ -106,7 +111,7 @@
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 2,
+                            "blendPreset": 1,
                             "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
@@ -117,7 +122,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Trail70",
+                                "name": "Slash3",
                                 "slot": 0
                             },
                             {
@@ -139,7 +144,12 @@
                     },
                     "type": "MeshModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {

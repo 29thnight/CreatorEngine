@@ -31,6 +31,7 @@ void PlayerDash::Enter()
 	if (m_player)
 	{
 		m_player->ChangeState("Dash");
+		m_player->DropCatchItem();
 		m_player->m_animator->SetUseLayer(1, false);
 		if (m_player->dashEffect)
 			m_player->dashEffect->Apply();
@@ -41,12 +42,6 @@ void PlayerDash::Enter()
 
 void PlayerDash::Update(float deltaTime)
 {
-	if (m_player)
-	{
-		auto forward = m_player->player->m_transform.GetForward();
-		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
-		controller->Move({ forward.x ,forward.z });
-	}
 }
 
 void PlayerDash::Exit()
@@ -57,8 +52,9 @@ void PlayerDash::Exit()
 		m_player->m_animator->SetUseLayer(1, true);
 		if (m_player->dashEffect)
 			m_player->dashEffect->StopEffect();
-		m_player->m_dashElapsedTime = 0.f;
 		m_player->player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
+		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0 ,0 });
 	}
 
 }

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <string>
 
-static std::string Trim(std::string s) {
+static std::string ShaderTrim(std::string s) {
     s.erase(0, s.find_first_not_of(" \t\r\n"));
     s.erase(s.find_last_not_of(" \t\r\n") + 1);
     return s;
@@ -66,8 +66,8 @@ bool ParseShaderDSL(std::string_view srcView, ShaderAssetDesc& out)
             R"SHD(([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*)")SHD"
         );
         for (std::sregex_iterator it(body.begin(), body.end(), assign), end; it != end; ++it) {
-            std::string key = Lower(Trim((*it)[1]));
-            std::string val = Trim((*it)[2]);
+            std::string key = Lower(ShaderTrim((*it)[1]));
+            std::string val = ShaderTrim((*it)[2]);
 
             if (key == "vertexpass" || key == "vs" || key == "vertex")
                 out.pass.vs = val;

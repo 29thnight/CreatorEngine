@@ -131,7 +131,7 @@ public:
 	[[Property]]
 	HashedGuid m_attachedSoketID{};
 	[[Property]]
-	uint32 m_collisionType = 1;
+	uint32 m_collisionType = 0;
 	[[Property]]
 	bool m_isStatic{ false };
 

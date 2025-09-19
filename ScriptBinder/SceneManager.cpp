@@ -520,7 +520,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             }
 
             RebindEventDontDestroyOnLoadObjects(newScene);
-            newScene->AllUpdateWorldMatrix();
+            //newScene->AllUpdateWorldMatrix();
             return newScene;
         }
         catch (const std::exception& e)
@@ -802,7 +802,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
             Meta::Deserialize(obj, itNode);
             if (!obj->m_tag.ToString().empty())
             {
-                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+                TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
             }
 
             if (!obj->m_layer.ToString().empty())
@@ -845,7 +845,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             Meta::Deserialize(obj, itNode);
             if (!obj->m_tag.ToString().empty())
             {
-                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+                TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
             }
 
             if (!obj->m_layer.ToString().empty())

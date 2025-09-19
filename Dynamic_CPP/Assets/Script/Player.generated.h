@@ -21,19 +21,15 @@ ReflectionScriptField(Player) \
 		meta_property(dashAmount) \
 		meta_property(dubbleDashTime) \
 		meta_property(Atk) \
-		meta_property(AttackRange) \
-		meta_property(AttackSpeed) \
 		meta_property(comboDuration) \
-		meta_property(atkFwDistacne) \
-		meta_property(rangedAtkCountMax) \
-		meta_property(rangedAtkDelay) \
-		meta_property(rangedAtkCooldown) \
 		meta_property(rangedAutoAimRange) \
-		meta_property(minChargedTime) \
 		meta_property(rangeAngle) \
-		meta_property(rangeDistacne) \
 		meta_property(countSpecialBullet) \
 		meta_property(bombMoveSpeed) \
+		meta_property(MeleeAttackSpeed) \
+		meta_property(RangeAttackSpeed) \
+		meta_property(BombAttackSpeed) \
+		meta_property(stunRespawnTime) \
 		meta_property(GracePeriod) \
 		meta_property(ResurrectionRange) \
 		meta_property(ResurrectionTime) \
@@ -45,6 +41,8 @@ ReflectionScriptField(Player) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(SetCurHP, "hp") \
+		meta_method(Damage, "damage") \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(SwapBasicWeapon) \

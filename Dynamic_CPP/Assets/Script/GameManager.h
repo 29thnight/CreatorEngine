@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "GameManager.generated.h"
+#include "GameInstance.h"
 
 class Entity;
 class ActionMap;
@@ -12,6 +13,7 @@ public:
    ReflectGameManager
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(GameManager)
+	// 기본 함수들
 	virtual void Awake() override;
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -31,7 +33,11 @@ public:
 	void LoadScene(const std::string& sceneName);
 	void SwitchScene(const std::string& sceneName);
 	void UnloadScene(const std::string& sceneName);
+	// Input Device Management
+	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
+	float GetAsisPollutionGaugeRatio();
 
+	// Test for Scene Management
 	[[Method]]
 	void LoadTestScene();
 	[[Method]]
@@ -51,39 +57,17 @@ public:
 	std::vector<Weapon*>& GetWeaponPiecePool();
 private:
 	std::vector<Entity*> m_entities;
-	ActionMap* playerMap{ nullptr };
-
 	std::vector<Entity*> m_resourcePool;
 	std::vector<Weapon*> m_weaponPiecePool;
 	std::vector<Entity*> m_players;
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
-	std::future<Scene*>  m_loadingSceneFuture;
 
 private:
 	void CheatMiningResource();
 
-private:
-	static int m_RewardAmount;
-	static int m_player1DeviceID;
-	static int m_player2DeviceID;
-private:
-	static std::unordered_map<std::string, Scene*> m_loadedScenes; // 로드된 씬들을 저장하는 맵
 public:
-	static void InitReward(int amount) { m_RewardAmount = amount; }	// 게임 시작 시 또는 치트용.
-	inline void AddReward(int amount) { 
-		GameManager::m_RewardAmount += amount; 
-		std::cout << "Current Reward: " << m_RewardAmount << std::endl;
-		if (m_RewardAmount > 99)
-		{
-			m_RewardAmount = 99; // 최대 보상 제한
-		}
-	}
-	static int GetReward() { return m_RewardAmount; }
-	static void SetPlayer1DeviceID(int id) { m_player1DeviceID = id; }
-	static void SetPlayer2DeviceID(int id) { m_player2DeviceID = id; }
-	static void SwitchPlayerInputDevice() {
-		auto temp = m_player1DeviceID;
-		m_player1DeviceID = m_player2DeviceID;
-		m_player2DeviceID = temp;
-	}
+	void InitReward(int amount);
+	void AddReward(int amount);
+	int GetReward();
 };
+

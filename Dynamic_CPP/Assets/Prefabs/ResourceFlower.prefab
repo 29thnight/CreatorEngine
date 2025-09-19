@@ -1,21 +1,21 @@
 m_name: ResourceFlower
 m_isEnabled: true
-m_instanceID: 2842330821
+m_instanceID: 4091644555
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: ResourceFlower
     m_isEnabled: true
-    m_instanceID: 3104164527
+    m_instanceID: 4266715890
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 543
+    m_index: 6
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [544]
+    m_childrenIndices: [3, 7]
     m_prefabFileGuid: aea35ad8-f5d8-5983-99c8-3afd0fc5e7fb
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2827230809
+        m_instanceID: 2521585436
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 3123664803
+        m_instanceID: 1796968494
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 1, y: 1.20000005, z: 1}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -53,26 +53,26 @@ PrefabNode:
         itemType: 4
         m_name: EntityResource
         m_isEnabled: true
-        m_instanceID: 3327060951
+        m_instanceID: 2596590282
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
     children:
       - GameObject: 2166264123
-        m_name: Obj_inter_Flower_1
+        m_name: item_flower
         m_isEnabled: true
-        m_instanceID: 1998555589
+        m_instanceID: 1797022018
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 543
-        m_index: 544
-        m_parentIndex: 543
+          m_parentID: 6
+        m_index: 3
+        m_parentIndex: 6
         m_rootIndex: 0
-        m_childrenIndices: [545, 546]
-        m_prefabFileGuid: aea35ad8-f5d8-5983-99c8-3afd0fc5e7fb
+        m_childrenIndices: [4, 5]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -80,21 +80,21 @@ PrefabNode:
         m_components: ~
         children:
           - GameObject: 2166264123
-            m_name: Sphere.001-0
+            m_name: Cylinder.007-0
             m_isEnabled: true
-            m_instanceID: 2005265291
+            m_instanceID: 2962397295
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 544
-            m_index: 545
-            m_parentIndex: 544
+              m_parentID: 3
+            m_index: 4
+            m_parentIndex: 3
             m_rootIndex: 0
             m_childrenIndices: ~
-            m_prefabFileGuid: aea35ad8-f5d8-5983-99c8-3afd0fc5e7fb
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
             m_attachedSoketID: 0
-            m_collisionType: 1
+            m_collisionType: 0
             m_isStatic: false
             m_gameObjectType: 3
             m_tag: Untagged
@@ -103,11 +103,11 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 1052542311
+                m_instanceID: 836885986
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: Bush_Flower01.001
-                  m_baseColorTexName: Obj_Inter_Flower_2_low_stylizedbush_001_BaseColor.png
+                  m_name: item_bush
+                  m_baseColorTexName: item_bush.png
                   m_normalTexName: ""
                   m_ORM_TexName: ""
                   m_AO_TexName: ""
@@ -115,16 +115,16 @@ PrefabNode:
                   m_materialInfo:
                     m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                     m_metallic: 0
-                    m_roughness: 0.5
+                    m_roughness: 0.699999988
                     m_bitflag: 0
                   m_flowInfo:
                     m_windVector: {x: 0, y: 0, z: 0, w: 0}
                     m_uvScroll: {x: 0, y: 0}
-                  m_fileGuid: 55c59b56-f877-5e23-9f90-612898c24711
-                  m_renderingMode: 1
+                  m_fileGuid: 5eb0c68c-eabe-5f78-9794-66816befdfd3
+                  m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Sphere.001-0
+                  m_name: Cylinder.007-0
                   m_materialIndex: 0
                   m_LODThresholds: ~
                 m_LightMapping:
@@ -138,21 +138,21 @@ PrefabNode:
                 m_shadowCast: true
                 m_isEnableLOD: false
           - GameObject: 2166264123
-            m_name: Sphere.001-1
+            m_name: Cylinder.007-1
             m_isEnabled: true
-            m_instanceID: 2103138295
+            m_instanceID: 1044139036
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 544
-            m_index: 546
-            m_parentIndex: 544
+              m_parentID: 3
+            m_index: 5
+            m_parentIndex: 3
             m_rootIndex: 0
             m_childrenIndices: ~
-            m_prefabFileGuid: aea35ad8-f5d8-5983-99c8-3afd0fc5e7fb
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
             m_attachedSoketID: 0
-            m_collisionType: 1
+            m_collisionType: 0
             m_isStatic: false
             m_gameObjectType: 3
             m_tag: Untagged
@@ -161,10 +161,10 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 1164560087
+                m_instanceID: 4100465617
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: Bush_Flower02.001
+                  m_name: flower
                   m_baseColorTexName: Obj_Inter_Flower_DefaultMaterial_BaseColor.png
                   m_normalTexName: Obj_Inter_Flower_DefaultMaterial_Normal.png
                   m_ORM_TexName: Obj_Inter_Flower_DefaultMaterial_OcclusionRoughnessMetallic.png
@@ -178,11 +178,11 @@ PrefabNode:
                   m_flowInfo:
                     m_windVector: {x: 0, y: 0, z: 0, w: 0}
                     m_uvScroll: {x: 0, y: 0}
-                  m_fileGuid: 55c59b56-f877-5e23-9f90-612898c24711
+                  m_fileGuid: 5eb0c68c-eabe-5f78-9794-66816befdfd3
                   m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Sphere.001-1
+                  m_name: Cylinder.007-1
                   m_materialIndex: 1
                   m_LODThresholds: ~
                 m_LightMapping:
@@ -195,3 +195,43 @@ PrefabNode:
                 m_shadowRecive: true
                 m_shadowCast: true
                 m_isEnableLOD: false
+      - GameObject: 2166264123
+        m_name: CriticalMark
+        m_isEnabled: true
+        m_instanceID: 3668376924
+        m_transform:
+          position: {x: 0, y: 1.91392028, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 6
+        m_index: 7
+        m_parentIndex: 6
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: aea35ad8-f5d8-5983-99c8-3afd0fc5e7fb
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - EffectComponent: 3131036541
+            m_name: EffectComponent
+            m_isEnabled: true
+            m_instanceID: 2826082942
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_effectTemplateName: "Null"
+            m_isPlaying: false
+            m_isPaused: false
+            m_timeScale: 1
+            m_loop: true
+            m_duration: -1
+            m_useAbsolutePosition: false
+            m_effectInstanceName: ""
+          - ModuleBehavior: 1399118904
+            m_name: CriticalMark
+            m_isEnabled: true
+            m_instanceID: 2539664596
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245

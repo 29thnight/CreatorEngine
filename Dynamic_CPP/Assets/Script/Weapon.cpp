@@ -43,10 +43,10 @@ void Weapon::DecreaseDur(bool isCharge)
 	}
 }
 
-bool Weapon::CheckChargedDur(float chargedTime)  //charge count세서 리턴
+bool Weapon::CheckChargedDur(float chargedTime)  
 {
-	int durUsechargeAtk = chargedTime / chgTime * durUseChg;
-	curDur -= durUsechargeAtk;
+	//차지시 그냥 다뿌숨
+	curDur -= curDur;
 	if (curDur)
 		return true;
 	return false;

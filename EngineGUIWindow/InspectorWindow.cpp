@@ -29,6 +29,7 @@
 #include "VolumeComponent.h"
 #include "RectTransformComponent.h"
 #include "DecalComponent.h"
+#include "SpriteRenderer.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -223,6 +224,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
 						if (nullptr != sprite)
 						{
+							//이건 뭔 버그죠?
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
@@ -1220,7 +1222,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::Text("Drag Texture Here");
 	if (ImGui::BeginDragDropTarget())
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 		{
 			const char* droppedFilePath = static_cast<const char*>(payload->Data);
 			file::path filename = file::path(droppedFilePath).filename();

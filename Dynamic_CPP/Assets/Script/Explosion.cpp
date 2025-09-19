@@ -6,7 +6,9 @@ void Explosion::Start()
 
 void Explosion::Update(float tick)
 {
-	if (endAttack == false) //한번 SphereOverlap으로 공격후 끝  or 터진곳 지속 얘가떄리기 or 폭탄투사체가 도착하면 때리기 
+
+	//들고있는 이펙트 재생끝나면 알아서 풀로 들어가게끔 
+	if (endAttack == false) 
 	{
 
 		endAttack = true;

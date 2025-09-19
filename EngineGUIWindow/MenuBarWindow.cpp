@@ -264,9 +264,18 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         {
             //적용된 충돌 매스릭스 저장
             PhysicsManagers->SetCollisionMatrix(collisionMatrix);
+			PhysicsManagers->SaveCollisionMatrix();
             m_bCollisionMatrixWindow = false;
             ImGui::GetContext("CollisionMatrixPopup").Close();
         }
+		ImGui::SameLine();
+        if (ImGui::Button("Load"))
+        {
+			PhysicsManagers->LoadCollisionMatrix();
+			collisionMatrix = PhysicsManagers->GetCollisionMatrix();
+            m_bCollisionMatrixWindow = false;
+            ImGui::GetContext("CollisionMatrixPopup").Close();
+		}
         
     }, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar);
    

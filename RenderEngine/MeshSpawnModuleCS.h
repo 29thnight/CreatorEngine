@@ -17,15 +17,15 @@ struct alignas(16) MeshParticleTemplateParams
 	float4 color;
 
 	float3 velocity;
-	float VerticalVelocity;
+	float velocityRandomRange;
 
 	float3 acceleration;
 	float pad5;
 
-	float horizontalVelocityRange;
 	UINT textureIndex;
 	UINT renderMode;
-	float pad6;
+	float2 pad6;  // 정렬 맞추기
+
 };
 
 class MeshSpawnModuleCS : public ParticleModule , public ISerializable
@@ -92,9 +92,8 @@ public:
 	void SetParticleRotationSpeed(const XMFLOAT3& Speed);
 	void SetParticleInitialRotation(const XMFLOAT3& Rot);
 	void SetParticleColor(const XMFLOAT4& color);
-	void SetParticleVelocity(const XMFLOAT3& velocity);
+	void SetParticleVelocity(const XMFLOAT3& velocity, float randomRange = 0.0f);
 	void SetParticleAcceleration(const XMFLOAT3& acceleration);
-	void SetVelocity(float Vertical, float horizontalRange);
 	void SetTextureIndex(UINT textureIndex);
 	void SetRenderMode(UINT mode);
 	

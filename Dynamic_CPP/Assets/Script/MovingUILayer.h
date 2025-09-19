@@ -1,11 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "MovingUILayer.generated.h"
 
-class TestEffect : public ModuleBehavior
+class MovingUILayer : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(TestEffect)
+   ReflectMovingUILayer
+	[[ScriptReflectionField]]
+	MODULE_BEHAVIOR_BODY(MovingUILayer)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,5 +23,20 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	float currentT = 0;
+private:
+	[[Property]]
+	float m_movingSpeed{};
+	[[Property]]
+	float m_waitTick{};
+	[[Property]]
+	float m_baseY{};
+	[[Property]]
+	float offset{};
+
+	float m_elapsedTime{};
+	bool m_active{};
+
+	Mathf::Vector2 pos{};
+
+	class RectTransformComponent* m_movingTarget{ nullptr };
 };

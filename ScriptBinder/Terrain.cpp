@@ -248,6 +248,9 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	//    패치 크기 = (maxX-minX+1) × (maxY-minY+1)
 	int patchW = maxX - minX + 1;
 	int patchH = maxY - minY + 1;
+
+	if (0 > patchH || 0 > patchW) return;
+
 	std::vector<Vertex> patchVerts;
 	patchVerts.reserve(patchW * patchH);
 
@@ -1068,6 +1071,14 @@ void TerrainComponent::ClearLayers()
 	m_nextLayerID = 0;
 	
 	m_pMaterial->ClearLayers(); // 머티리얼에서 레이어 제거
+}
+
+void TerrainComponent::RefreshTexture()
+{
+	for (auto& layer : m_layers) {
+		layer.diffuseTexture = Texture::LoadFormPath(layer.diffuseTexturePath);
+	}
+	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
 }
 
 /// 브러쉬 마스크 텍스쳐 로드

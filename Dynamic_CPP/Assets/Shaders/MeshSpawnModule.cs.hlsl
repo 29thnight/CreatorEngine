@@ -60,25 +60,24 @@ cbuffer MeshParticleTemplateParams : register(b1)
 {
     float gLifeTime;
     float3 gScale;
-
+       
     float3 gRotationSpeed;
     float templatePad2;
-
+       
     float3 gInitialRotation;
     float templatePad4;
-
+       
     float4 gColor;
-
+       
     float3 gVelocity;
-    float gMinVerticalVelocity;
-
+    float gVelocityRandomRange; // 단순화됨
+       
     float3 gAcceleration;
-    float gMaxVerticalVelocity;
-
-    float gHorizontalVelocityRange;
-    int gTextureIndex;
-    int gRenderMode;
-    float templatePad6;
+    float templatePad5;
+       
+    uint gTextureIndex;
+    uint gRenderMode;
+    float2 templatePad6;
 }
 
 // 버퍼 바인딩
@@ -241,21 +240,22 @@ float3 GenerateEmitterPosition(uint seed)
 float3 GenerateInitialVelocity(uint seed)
 {
     float3 velocity = gVelocity;
-    
-    if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
+       
+    if (gVelocityRandomRange > 0.0)
     {
-        float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
-        float horizontalAngle = RandomFloat01(seed + 1) * 6.28318530718;
-        float horizontalMag = RandomFloat01(seed + 2) * gHorizontalVelocityRange;
-        
-        velocity += float3(
-            horizontalMag * cos(horizontalAngle),
-            verticalVel,
-            horizontalMag * sin(horizontalAngle)
-        );
+           // 각 축별로 ±randomRange 적용
+        uint seed1 = WangHash(seed);
+        uint seed2 = WangHash(seed1);
+        uint seed3 = WangHash(seed2);
+           
+        float randomX = (RandomFloat01(seed1) - 0.5) * gVelocityRandomRange;
+        float randomY = (RandomFloat01(seed2) - 0.5) * gVelocityRandomRange;
+        float randomZ = (RandomFloat01(seed3) - 0.5) * gVelocityRandomRange;
+           
+        velocity += float3(randomX, randomY, randomZ);
     }
-    
-    // 속도에도 회전 적용
+       
+       // 회전 적용
     float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
     return mul(rotationMatrix, velocity);
 }
@@ -267,9 +267,9 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.acceleration = gAcceleration;
     
     // Range 제거 - 단일 값 사용
-    particle.scale = gScale; // RandomRange3D 제거
-    particle.rotationSpeed = gRotationSpeed; // RandomRange3D 제거  
-    particle.rotation = gInitialRotation; // RandomRange3D 제거
+    particle.scale = gScale; 
+    particle.rotationSpeed = gRotationSpeed;
+    particle.rotation = gInitialRotation; 
     
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
@@ -290,21 +290,23 @@ void UpdateExistingMeshParticlePosition(inout MeshParticleData particle)
 
 void UpdateExistingMeshParticleRotation(inout MeshParticleData particle)
 {
-    // 에미터 중심을 기준으로 파티클의 상대 위치 계산
+    float3 rotationDelta = gEmitterRotation - gPreviousEmitterRotation;
+    
+   // 에미터 중심을 기준으로 파티클의 상대 위치 계산
     float3 relativePos = particle.position - gEmitterPosition;
     
-    // 전체 에미터 회전 행렬
-    float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
+    // 회전 차이만큼 회전 행렬 생성
+    float3x3 deltaRotationMatrix = CreateRotationMatrix(rotationDelta);
     
-    // 파티클 위치 회전
-    float3 rotatedRelativePos = mul(rotationMatrix, relativePos);
+    // 파티클 위치를 회전 차이만큼만 회전
+    float3 rotatedRelativePos = mul(deltaRotationMatrix, relativePos);
     particle.position = rotatedRelativePos + gEmitterPosition;
     
-    // 파티클 속도 회전  
-    particle.velocity = mul(rotationMatrix, particle.velocity);
+    // 파티클 속도도 회전 차이만큼만 회전
+    particle.velocity = mul(deltaRotationMatrix, particle.velocity);
     
-    // 파티클 자체 회전도 에미터 회전과 동일하게 설정
-    particle.rotation = gEmitterRotation;
+    // 파티클 자체 회전에도 회전 차이 적용
+    particle.rotation += rotationDelta;
 }
 
 #define THREAD_GROUP_SIZE 1024
@@ -322,25 +324,23 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 기존 활성 파티클 업데이트
     if (particle.isActive == 1)
     {
-        // 에미터 위치가 변경되었다면 즉시 파티클 위치 업데이트
-        if (gForcePositionUpdate == 1)
+        // 에미터 변환이 있다면 매트릭스로 처리
+        if (gForcePositionUpdate == 1 || gForceRotationUpdate == 1)
         {
-            UpdateExistingMeshParticlePosition(particle);
-        }
-        else
-        {
-            particle.position = gEmitterPosition;
-        }
-
-        // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트  
-        if (gForceRotationUpdate == 1)
-        {
-            UpdateExistingMeshParticleRotation(particle);
-        }
-        else
-        {
-            // 항상 에미터 회전을 따라가도록 유지
-            particle.rotation = gEmitterRotation;
+            // 이전 에미터 변환의 역변환으로 로컬 좌표 복원
+            float3x3 prevRotMatrix = CreateRotationMatrix(gPreviousEmitterRotation);
+            float3x3 invPrevRotMatrix = transpose(prevRotMatrix);
+            
+            // 파티클의 로컬 위치 계산
+            float3 localPos = mul(invPrevRotMatrix, particle.position - gPreviousEmitterPosition);
+            float3 localVel = mul(invPrevRotMatrix, particle.velocity);
+            
+            // 새로운 에미터 변환 적용
+            float3x3 currentRotMatrix = CreateRotationMatrix(gEmitterRotation);
+            
+            // 새로운 월드 좌표로 변환
+            particle.position = mul(currentRotMatrix, localPos) + gEmitterPosition;
+            particle.velocity = mul(currentRotMatrix, localVel);
         }
 
         // 나이 증가

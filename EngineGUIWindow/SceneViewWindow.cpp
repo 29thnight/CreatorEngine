@@ -644,32 +644,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedSceneObjects;
 		for (auto* target : selectedObjects)
 		{
-		    // 월드 공간의 '앞쪽' 벡터 (보통 Z-축 또는 X-축을 사용)
-		    // 여기서는 DirectX의 일반적인 관례에 따라 Z-축을 사용합니다.
-		    const DirectX::XMVECTOR forward = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-		
-		    // 두 벡터가 거의 반대 방향일 경우를 처리
-		    float dot = DirectX::XMVectorGetX(DirectX::XMVector3Dot(forward, cam->m_forward));
-		    if (dot < -0.999999f)
-		    {
-		        // 180도 회전. 회전 축은 어떤 것이든 상관없으므로,
-		        // 월드 '위쪽' 벡터와 교차하여 축을 찾습니다.
-		        DirectX::XMVECTOR right = DirectX::XMVector3Cross(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), forward);
-
-				target->m_transform.SetWorldRotation(DirectX::XMQuaternionRotationAxis(right, DirectX::XM_PI));
-		    }
-		
-		    // 두 벡터가 거의 같은 방향일 경우 (회전 필요 없음)
-		    if (dot > 0.999999f)
-		    {
-				target->m_transform.SetWorldRotation(DirectX::XMQuaternionIdentity());
-		    }
-		
-		    // 가장 짧은 호 회전(shortest arc rotation)을 계산합니다.
-		    DirectX::XMVECTOR rotAxis = DirectX::XMVector3Cross(forward, cam->m_forward);
-		    float angle = acosf(dot);
-		
-			target->m_transform.SetWorldRotation(DirectX::XMQuaternionRotationAxis(rotAxis, angle));
+			target->m_transform.SetWorldRotation(cam->rotate);
 
 			target->m_transform.SetWorldPosition(cam->m_eyePosition);
 		}
@@ -736,7 +711,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			{
 				m_hitResults = hits;
 
+				m_currentHitIndex = m_currentHitIndex % m_hitResults.size();
 				GameObject* selected = m_hitResults[m_currentHitIndex].object;
+				m_currentHitIndex++;
+
 				bool shift = ImGui::GetIO().KeyShift;
 				auto prevList = selectedObjects;
 				GameObject* prevSelection = sceneSelectedObj;

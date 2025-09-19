@@ -59,7 +59,6 @@ void WeaponCapsule::Update(float tick)
 					Player* player= ownerPlayer->GetComponent<Player>();
 					player->AddWeapon(weapon); //AddWeapon 실패시 그냥 바닥에 둥둥 떠있기   and 둥둥떠있는중 플레이어가 집으면 addweapon 다시시도
 
-					
 				}
 				GetOwner()->Destroy();
 			}

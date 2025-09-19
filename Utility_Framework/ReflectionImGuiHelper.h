@@ -116,48 +116,118 @@ namespace Meta
             else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
             {
                 auto iter = prop.createVectorIterator(instance);
-                std::vector<std::string> value;
-                int size = 0;
+                ImGui::PushID(prop.name);
+                std::vector<std::string> temp;
                 while (iter->IsValid())
                 {
                     std::string str = *static_cast<std::string*>(iter->Get());
-                    value.push_back(str);
+                    temp.push_back(str);
                     iter->Next();
                 }
-
-                /* std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));*/
-                if (value.empty()) return;
-
-                int selectedIndex = 0; // 안전하게 관리할 방법이 있다면 외부에서 가져와도 됨
-
-                if (selectedIndex >= value.size())
-                    selectedIndex = 0;
-
-                const char* currentLabel = value[selectedIndex].c_str();
-
-                ImGui::PushID(prop.name);
-                if (ImGui::BeginCombo("Ani list", currentLabel))
-                {
-                    for (int i = 0; i < value.size(); ++i)
-                    {
-                        const bool isSelected = (selectedIndex == i);
-                        if (ImGui::Selectable(value[i].c_str(), isSelected))
-                        {
-                            selectedIndex = i;
-                            if (prop.setter)
-                                prop.setter(instance, value[i]);
-                        }
-
-                        if (isSelected)
-                        {
-
-                        }
-                        //ImGui::SetItemDefaultFocus();
+                if (ImGui::CollapsingHeader(prop.name)) {
+                    if (ImGui::Button("Add")) {
+                        temp.push_back("");
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        if (!temp.empty())
+						    temp.pop_back();
                     }
 
-                    ImGui::EndCombo();
+                    char buf[128];
+                    int size = temp.size();
+                    for (int i = 0; i < temp.size(); i++) {
+                        ImGui::PushID(i);
+
+                        // strncpy_s를 사용하여 안전하게 문자열 복사 (_TRUNCATE: 출력 버퍼 크기를 넘어가면 잘라냄)
+                        strncpy_s(buf, sizeof(buf), temp[i].c_str(), _TRUNCATE);
+                        buf[sizeof(buf) - 1] = '\0';
+                        if (ImGui::InputText(("##" + std::to_string(i)).c_str(), buf, sizeof(buf)))
+                        {
+                            temp[i] = std::string(buf);
+                        }
+
+                        if (size > 0) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("^") && i > 0) {
+                                std::string t = temp[i];
+                                temp[i] = temp[i - 1];
+                                temp[i - 1] = t;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("v") && i < size - 1) {
+                                std::string t = temp[i];
+                                temp[i] = temp[i + 1];
+                                temp[i + 1] = t;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+
+                    auto castInstance = reinterpret_cast<std::vector<std::string>*>(reinterpret_cast<char*>(instance) + prop.offset);
+                    castInstance->clear(); // Clear existing elements
+                    for (const auto& elem : temp)
+                    {
+                        castInstance->push_back(elem);
+                    }
+                    //if(temp.size() != 0)
                 }
+
                 ImGui::PopID();
+
+
+
+
+
+
+     //           auto iter = prop.createVectorIterator(instance);
+
+     //           std::vector<std::string> value;
+     //           int size = 0;
+     //           while (iter->IsValid())
+     //           {
+     //               std::string str = *static_cast<std::string*>(iter->Get());
+     //               value.push_back(str);
+     //               iter->Next();
+     //           }
+
+     //           if (ImGui::Button("Add")) {
+					//value.push_back("");
+     //           }
+
+     //           /* std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));*/
+     //           if (value.empty()) return;
+
+     //           int selectedIndex = 0; // 안전하게 관리할 방법이 있다면 외부에서 가져와도 됨
+
+     //           if (selectedIndex >= value.size())
+     //               selectedIndex = 0;
+
+     //           const char* currentLabel = value[selectedIndex].c_str();
+
+     //           ImGui::PushID(prop.name);
+     //           if (ImGui::BeginCombo("Ani list", currentLabel))
+     //           {
+     //               for (int i = 0; i < value.size(); ++i)
+     //               {
+     //                   const bool isSelected = (selectedIndex == i);
+     //                   if (ImGui::Selectable(value[i].c_str(), isSelected))
+     //                   {
+     //                       selectedIndex = i;
+     //                       if (prop.setter)
+     //                           prop.setter(instance, value[i]);
+     //                   }
+
+     //                   if (isSelected)
+     //                   {
+
+     //                   }
+     //                   //ImGui::SetItemDefaultFocus();
+     //               }
+
+     //               ImGui::EndCombo();
+     //           }
+     //           ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {

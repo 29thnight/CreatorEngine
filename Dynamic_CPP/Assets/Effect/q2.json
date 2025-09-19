@@ -1,10 +1,10 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "newgg",
+    "loop": true,
+    "name": "q2",
     "particleSystems": [
         {
             "isRunning": true,
@@ -36,9 +36,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 1.0,
-                                "y": 0.0,
-                                "z": 0.0
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
@@ -57,6 +57,11 @@
                                 "z": 0.0
                             },
                             "emitterRadius": 1.0,
+                            "emitterRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
                             "emitterSize": {
                                 "x": 0.5,
                                 "y": 0.5,
@@ -100,45 +105,51 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "slash2"
-                        },
-                        "polarClipping": {
-                            "animating": true,
-                            "animationSpeed": 5.0,
-                            "enabled": true,
-                            "params": {
-                                "polarAngleProgress": 0.004705309867858887,
-                                "polarCenter": {
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "polarDirection": 1.0,
-                                "polarReferenceDir": {
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "polarStartAngle": 0.0,
-                                "polarUpAxis": {
-                                    "x": 0.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                }
-                            }
+                            "name": "Slash3"
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "Slash1B"
-                        }
+                        "renderStates": {
+                            "blendPreset": 1,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 1
+                        },
+                        "shaders": {
+                            "pixelShader": "ggg",
+                            "vertexShader": "MeshParticle"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "Slash3",
+                                "slot": 0
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Crater62",
+                                "slot": 1
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Noise43b",
+                                "slot": 2
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Smoke12",
+                                "slot": 3
+                            }
+                        ]
                     },
                     "type": "MeshModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         },
         {
             "isRunning": true,
@@ -149,7 +160,7 @@
                         "meshParticleTemplate": {
                             "InitialRotation": {
                                 "x": 0.0,
-                                "y": 0.0,
+                                "y": 198.0,
                                 "z": 0.0
                             },
                             "RotationSpeed": {
@@ -170,9 +181,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.0009041428565979004,
-                                "y": 0.2032528519630432,
-                                "z": 1.0
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 1.0,
@@ -187,10 +198,15 @@
                         "spawnParams": {
                             "emitterPosition": {
                                 "x": 0.0,
-                                "y": 0.20000000298023224,
+                                "y": 0.0,
                                 "z": 0.0
                             },
                             "emitterRadius": 1.0,
+                            "emitterRotation": {
+                                "x": 0.0,
+                                "y": 198.0,
+                                "z": 0.0
+                            },
                             "emitterSize": {
                                 "x": 0.5,
                                 "y": 0.5,
@@ -213,7 +229,7 @@
             "particleDataType": 2,
             "position": {
                 "x": 0.0,
-                "y": 0.20000000298023224,
+                "y": 0.0,
                 "z": 0.0
             },
             "renderModules": [
@@ -234,45 +250,51 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "slash2"
-                        },
-                        "polarClipping": {
-                            "animating": true,
-                            "animationSpeed": 1.0,
-                            "enabled": true,
-                            "params": {
-                                "polarAngleProgress": 0.00018849968910217285,
-                                "polarCenter": {
-                                    "x": 0.0,
-                                    "y": 0.20000000298023224,
-                                    "z": 0.0
-                                },
-                                "polarDirection": 1.0,
-                                "polarReferenceDir": {
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "polarStartAngle": 0.0,
-                                "polarUpAxis": {
-                                    "x": 0.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                }
-                            }
+                            "name": "Slash3"
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "Slash1G"
-                        }
+                        "renderStates": {
+                            "blendPreset": 1,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 1
+                        },
+                        "shaders": {
+                            "pixelShader": "ggg",
+                            "vertexShader": "MeshParticle"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "Slash3",
+                                "slot": 0
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Crater62",
+                                "slot": 1
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Noise43b",
+                                "slot": 2
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Smoke12",
+                                "slot": 3
+                            }
+                        ]
                     },
                     "type": "MeshModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 198.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {

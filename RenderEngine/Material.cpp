@@ -26,7 +26,8 @@ Material::Material(const Material& material) :
     m_renderingMode(material.m_renderingMode),
     m_shaderPSOName(material.m_shaderPSOName),
     m_cbMeta(material.m_cbMeta),
-    m_cbufferValues(material.m_cbufferValues)
+    m_cbufferValues(material.m_cbufferValues),
+	m_dirtyCBs(material.m_dirtyCBs)
 {
 }
 
@@ -52,6 +53,7 @@ Material::Material(Material&& material) noexcept
     m_flowInfo = std::move(material.m_flowInfo);
     std::exchange(m_cbMeta, material.m_cbMeta);
     m_cbufferValues = std::move(material.m_cbufferValues);
+	m_dirtyCBs = std::move(material.m_dirtyCBs);
 }
 
 Material::~Material()
@@ -117,7 +119,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	cloneMaterial->m_name = finalName;
 	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 
-	DataSystems->SaveMaterial(cloneMaterial.get());
+	//DataSystems->SaveMaterial(cloneMaterial.get());
 
 	return cloneMaterial;
 }
@@ -404,6 +406,11 @@ bool Material::TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xM
     return ReadBytes(FindVar(cb, var), &out, sizeof(out));
 }
 
+bool Material::TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size)
+{
+	return WriteBytes(FindVar(cb, var), src, size);
+}
+
 // ── Qualified name sugar ("CB.Var") ──
 bool Material::TrySetFloat(std::string_view q, float v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
@@ -462,16 +469,11 @@ void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
     if (!m_shaderPSO) return;
     if (!ctx) ctx = DirectX11::DeviceStates->g_pDeviceContext;
 
-    // 더러워진 CB만 올려준다.
-    for (const auto& cbName : m_dirtyCBs)
+    for (const auto& [cbName, data] : m_cbufferView)
     {
-        auto it = m_cbufferValues.find(cbName);
-        if (it == m_cbufferValues.end()) continue;
-        m_shaderPSO->UpdateConstantBuffer(ctx, cbName, it->second.data(), it->second.size());
+		m_shaderPSO->UpdateConstantBuffer(ctx, cbName, data.data(), data.size());
     }
-    m_dirtyCBs.clear();
-
-
+    m_viewDirtyCBs.clear();
 }
 
 void Material::TrySetMaterialInfo()
@@ -488,4 +490,12 @@ void Material::TrySetMaterialInfo()
     TrySetInt("PBRMaterial", "gConvertToLinear", m_materialInfo.m_convertToLinearSpace);
 
 	TrySetInt("PBRMaterial", "bitflag", m_materialInfo.m_bitflag);
+}
+
+void Material::UpdateCBufferView()
+{
+    if (!m_cbMeta) return;
+
+	m_cbufferView = m_cbufferValues;
+    m_viewDirtyCBs = m_dirtyCBs;
 }

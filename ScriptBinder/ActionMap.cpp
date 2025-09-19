@@ -246,13 +246,9 @@ void ActionMap::CheckAction()
 
 void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* type)
 {
-
 	for (auto& action : m_actions)
 	{
 		if (type->name != action->m_scriptName) return;
-
-
-
 		if (action->actionType == ActionType::Button)
 		{
 			if (action->key.size() == 0) continue;

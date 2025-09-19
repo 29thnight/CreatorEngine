@@ -31,9 +31,12 @@ void CharacterController::Initialize(const CharacterControllerInfo& info, const 
 
 	//케릭터 충돌 필터 설정
 	m_filterData = new physx::PxFilterData();
-	m_filterData->word0 = 0;
+	m_filterData->word0 = m_layerNumber;		//layer number
+	m_filterData->word1 = collisionMatrix[m_layerNumber];
+	m_filterData->word2 = 1 << m_layerNumber;	// layer bitmask
 	m_filters = new physx::PxControllerFilters(m_filterData);
 	m_filters->mFilterCallback = new PhysicsControllerFilterCallback(m_layerNumber, collisionMatrix); //&&&&&filter
+	m_filters->mCCTFilterCallback = new CCTFilterCallback();
 	m_characterMovement = new CharacterMovement();
 	m_characterMovement->Initialize(moveInfo);
 
@@ -119,10 +122,18 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 
 	m_layerNumber = newLayerNumber;
 
-	physx::PxFilterData filterData;
-	filterData.word0 = m_layerNumber;
-	filterData.word1 = collisionMatrix[m_layerNumber];
+	//physx::PxFilterData filterData;
+	m_filterData->word0 = m_layerNumber;
+	m_filterData->word1 = collisionMatrix[m_layerNumber];
+	m_filterData->word2 = 1 << m_layerNumber;
 
+	PxShape* shape = nullptr;
+	m_controller->getActor()->getShapes(&shape, 1);
+	if (shape != nullptr) {
+		shape->setQueryFilterData(*m_filterData);
+		shape->setSimulationFilterData(*m_filterData);
+	}
+	static_cast<PhysicsControllerFilterCallback*>(m_filters->mFilterCallback)->SetCharacterLayer(m_layerNumber);
 	//
 }
 

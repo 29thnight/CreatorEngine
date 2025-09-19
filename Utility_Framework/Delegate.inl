@@ -84,6 +84,16 @@ namespace Core
 	}
 
 	template<typename Ret, typename ...Args>
+	inline void Delegate<Ret, Args...>::UnsafeBroadcast(Args ...args)
+	{
+		for (auto& info : callbacks_)
+		{
+			try { info.callback(args...); }
+			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
+		}
+	}
+
+	template<typename Ret, typename ...Args>
 	inline void Delegate<Ret, Args...>::TargetInvoke(DelegateHandle& DelegateHandle, Args ...args)
 	{
 		std::vector<CallbackInfo> callbacksToInvoke;

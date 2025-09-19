@@ -13,15 +13,10 @@ struct alignas(16) ParticleTemplateParams
     float4 color;
 
     float3 velocity;
-    float pad1;
+    float velocityRandomRange;
 
     float3 acceleration;
     float pad2;
-
-    float minVerticalVelocity;
-    float maxVerticalVelocity;
-    float horizontalVelocityRange;
-    float pad3;
 };
 
 enum class EmitterType;
@@ -97,9 +92,8 @@ public:
     void SetParticleLifeTime(float lifeTime);
     void SetParticleSize(const XMFLOAT2& size);
     void SetParticleColor(const XMFLOAT4& color);
-    void SetParticleVelocity(const XMFLOAT3& velocity);
+    void SetParticleVelocity(const XMFLOAT3& velocity, float randomRange = 0.0f);
     void SetParticleAcceleration(const XMFLOAT3& acceleration);
-    void SetVelocityRange(float minVertical, float maxVertical, float horizontalRange);
     void SetRotateSpeed(float speed);
 
     // 상태 조회

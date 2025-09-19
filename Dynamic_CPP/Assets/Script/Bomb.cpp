@@ -1,6 +1,10 @@
 #include "Bomb.h"
 #include "pch.h"
 #include "DebugLog.h"
+#include "PrefabUtility.h"
+#include "Explosion.h"
+#include "Entity.h"
+#include "Player.h"
 void Bomb::Start()
 {
 	
@@ -21,6 +25,44 @@ void Bomb::Update(float tick)
 
 		transform->SetPosition(pos);
 		//땅에 도착하면 Explosion 생성하고 자기자신은 죽이기?
+		if (t >= 1.0f) 
+		{
+			transform->SetPosition(m_targetPos);
+
+			float explosionRadius = 1;
+			/*Prefab* ExplosionPrefab = PrefabUtilitys->LoadPrefab("Explosion");
+			if (ExplosionPrefab)
+			{
+				GameObject* ExplosionObj = PrefabUtilitys->InstantiatePrefab(ExplosionPrefab, "Explosion");
+				auto explosion = ExplosionObj->GetComponent<Explosion>();
+				ExplosionObj->GetComponent<Transform>()->SetPosition(m_targetPos);
+				explosionRadius = explosion->explosionRadius;
+
+			}*/
+
+
+			std::vector<HitResult> hits;
+			OverlapInput explosionInfo;
+			explosionInfo.layerMask = 1u; //일단 다떄림
+			explosionInfo.position = transform->GetWorldPosition();
+			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
+
+
+			for (auto& hit : hits)
+			{
+				auto object = hit.gameObject;
+				if (object == GetOwner()) continue;
+
+				auto enemy = object->GetComponentDynamicCast<Entity>();
+				if (enemy)
+				{
+					enemy->SendDamage(m_ownerPlayer, m_damage);
+				}
+			}
+
+
+			GetOwner()->Destroy(); //&&&&& 풀에넣기
+		}
 	}
 
 }
@@ -35,12 +77,14 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 }
 
 
-void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos)
+void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos, float _damage)
 {
 	isThrow = true;
 	m_ownerPlayer = _owner;
 	m_startPos = _startPos;
 	m_targetPos = _targetPos;
+	m_damage = _damage;
 }
+
 
 

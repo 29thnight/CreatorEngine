@@ -192,6 +192,17 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("PlayerSelector", []() { return new PlayerSelector(); });
+		CreateFactory::GetInstance()->RegisterFactory("InputDeviceDetector", []() { return new InputDeviceDetector(); });
+		CreateFactory::GetInstance()->RegisterFactory("ItemPopup", []() { return new ItemPopup(); });
+		CreateFactory::GetInstance()->RegisterFactory("MovingUILayer", []() { return new MovingUILayer(); });
+		CreateFactory::GetInstance()->RegisterFactory("MobSpawner", []() { return new MobSpawner(); });
+		CreateFactory::GetInstance()->RegisterFactory("SwitchingSceneTrigger", []() { return new SwitchingSceneTrigger(); });
+		CreateFactory::GetInstance()->RegisterFactory("LoadingController", []() { return new LoadingController(); });
+		CreateFactory::GetInstance()->RegisterFactory("WeaponSlotDurFont", []() { return new WeaponSlotDurFont(); });
+		CreateFactory::GetInstance()->RegisterFactory("EventTarget", []() { return new EventTarget(); });
+		CreateFactory::GetInstance()->RegisterFactory("EventManager", []() { return new EventManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("HPBar", []() { return new HPBar(); });
 		CreateFactory::GetInstance()->RegisterFactory("EventSelector", []() { return new EventSelector(); });
 		CreateFactory::GetInstance()->RegisterFactory("RewardObserver", []() { return new RewardObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityBigWood", []() { return new EntityBigWood(); });
@@ -214,7 +225,6 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("SpecialBullet", []() { return new SpecialBullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("Bullet", []() { return new Bullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("DestroyEffect", []() { return new DestroyEffect(); });
-		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityEnemy", []() { return new EntityEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("Weapon", []() { return new Weapon(); });
 		CreateFactory::GetInstance()->RegisterFactory("TweenManager", []() { return new TweenManager(); });

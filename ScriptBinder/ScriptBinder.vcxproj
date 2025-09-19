@@ -289,6 +289,7 @@
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="AnchorPreset.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
+    <ClInclude Include="BillboardType.h" />
     <ClInclude Include="BlackBoardEnum.h" />
     <ClInclude Include="BLackBoardValue.h" />
     <ClInclude Include="BTBuildGraph.h" />

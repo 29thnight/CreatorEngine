@@ -72,7 +72,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
-	filterData.word2 = 1;
+	filterData.word2 = 1 << m_layerNumber;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
 	m_linkContainer.insert(std::make_pair(linkInfo.boneName, link));
@@ -107,7 +107,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
-	filterData.word2 = 1;
+	filterData.word2 = 1 << m_layerNumber;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
 	m_linkContainer.insert(std::make_pair(linkInfo.boneName, link));
@@ -141,7 +141,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
-	filterData.word2 = 1;
+	filterData.word2 = 1 << m_layerNumber;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
 	m_linkContainer.insert(std::make_pair(linkInfo.boneName, link));
@@ -167,7 +167,7 @@ bool RagdollPhysics::ChangeLayerNumber(const unsigned int& newLayerNumber, unsig
 	physx::PxFilterData newFilterData;
 	newFilterData.word0 = newLayerNumber;
 	newFilterData.word1 = collisionMatrix[newLayerNumber];
-	newFilterData.word2 = 1;
+	newFilterData.word2 = 1 << newLayerNumber;
 
 	m_collisionData->thisId = m_id;
 	m_collisionData->thisLayerNumber = newLayerNumber;

@@ -211,6 +211,13 @@ void TagManager::AddTagToObject(std::string_view tag, GameObject* object)
 	{
 		m_taggedObjects[tag.data()].push_back(object);
 	}
+    else
+    {
+        // If the tag does not exist, you might want to add it or handle the error
+		// For now, we'll just add the object to the "Untagged" category
+		object->SetTag("Untagged");
+		m_taggedObjects["Untagged"].push_back(object);
+    }
 }
 
 void TagManager::AddObjectToLayer(std::string_view layer, GameObject* object)
@@ -224,6 +231,13 @@ void TagManager::AddObjectToLayer(std::string_view layer, GameObject* object)
     if (it != m_layerMap.end())
     {
         m_layeredObjects[layer.data()].push_back(object);
+    }
+    else
+    {
+        // If the layer does not exist, you might want to add it or handle the error
+        // For now, we'll just add the object to a default layer
+		object->SetLayer("Default");
+		m_layeredObjects["Default"].push_back(object);
     }
 }
 

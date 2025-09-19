@@ -10,7 +10,44 @@
                     "m_isAny": true,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Ani State",
-                    "transitions": [],
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnHit"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Hit",
+                            "transName": "Ani State to Hit"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnStun"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Stun",
+                            "transName": "Ani State to Stun"
+                        }
+                    ],
                     "useMultipler": 0
                 },
                 {
@@ -59,7 +96,7 @@
                             "transName": "Idle to MeleeAttack1"
                         },
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.009999999776482582,
                             "conditions": [
                                 {
                                     "bValue": true,
@@ -117,7 +154,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -135,7 +172,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -153,7 +190,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -171,7 +208,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -189,7 +226,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -251,7 +288,7 @@
                             "transName": "Run to MeleeAttack1"
                         },
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.009999999776482582,
                             "conditions": [
                                 {
                                     "bValue": true,
@@ -309,7 +346,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -327,7 +364,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -345,7 +382,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -363,7 +400,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -381,9 +418,9 @@
                 },
                 {
                     "animationIndex": 0,
-                    "animationSpeed": 25.0,
+                    "animationSpeed": 10.0,
                     "animationSpeedParameterName": "None",
-                    "behaviourName": "",
+                    "behaviourName": "PlayerDash",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Dash",
@@ -501,7 +538,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 1,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -593,7 +630,7 @@
                             "blendTime": 0.20000000298023224,
                             "conditions": [],
                             "curStateName": "RangeChargeAttack",
-                            "exitTime": 0.878000020980835,
+                            "exitTime": 0.9819999933242798,
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "RangeChargeAttack to Idle"
@@ -614,10 +651,61 @@
                             "blendTime": 0.20000000298023224,
                             "conditions": [],
                             "curStateName": "RangeSpecialAttack",
-                            "exitTime": 0.8960000276565552,
+                            "exitTime": 0.9750000238418579,
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "RangeSpecialAttack to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 4,
+                    "animationSpeed": 4.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerHit",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Hit",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Hit",
+                            "exitTime": 0.7900000214576721,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "Hit to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "PlayerStun",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Stun",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnResurrection"
+                                }
+                            ],
+                            "curStateName": "Stun",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Stun to Idle"
                         }
                     ],
                     "useMultipler": 0
@@ -761,7 +849,7 @@
                 },
                 {
                     "animationIndex": 11,
-                    "animationSpeed": 1.0,
+                    "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
                     "m_isAny": false,
@@ -847,6 +935,18 @@
         },
         {
             "param_name": "RangeChargeAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnStun",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnHit",
+            "param_vType": 3
+        },
+        {
+            "param_name": "OnResurrection",
             "param_vType": 3
         }
     ]

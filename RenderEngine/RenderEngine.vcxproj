@@ -255,6 +255,7 @@
     <ClCompile Include="LineModuleCS.cpp" />
     <ClCompile Include="MeshColorModuleCS.cpp" />
     <ClCompile Include="MeshModuleGPU.cpp" />
+    <ClCompile Include="MeshMovementModuleCS.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="MeshSpawnModuleCS.cpp" />
     <ClCompile Include="MovementModuleCS.cpp" />
@@ -356,6 +357,7 @@
     <ClInclude Include="MaterialFlowInformation.h" />
     <ClInclude Include="MeshColorModuleCS.h" />
     <ClInclude Include="MeshModuleGPU.h" />
+    <ClInclude Include="MeshMovementModuleCS.h" />
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="MeshSpawnModuleCS.h" />
     <ClInclude Include="MovementModuleCS.h" />
@@ -649,7 +651,17 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ggg.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshColorModule.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshMovementModule.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

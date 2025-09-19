@@ -19,19 +19,19 @@ public:
 
     // --- Getters & Setters ---
     const Mathf::Vector2& GetAnchorMin() const { return m_anchorMin; }
-    void SetAnchorMin(const Mathf::Vector2& anchorMin) { m_anchorMin = anchorMin; m_isDirty = true; }
+    void SetAnchorMin(const Mathf::Vector2& anchorMin);
 
     const Mathf::Vector2& GetAnchorMax() const { return m_anchorMax; }
-    void SetAnchorMax(const Mathf::Vector2& anchorMax) { m_anchorMax = anchorMax; m_isDirty = true; }
+    void SetAnchorMax(const Mathf::Vector2& anchorMax);
 
-    const Mathf::Vector2& GetAnchoredPosition() const { return m_anchoredPosition; }
-    void SetAnchoredPosition(const Mathf::Vector2& position) { m_anchoredPosition = position; m_isDirty = true; }
+    Mathf::Vector2 GetAnchoredPosition() const;
+    void SetAnchoredPosition(const Mathf::Vector2& position);
 
     const Mathf::Vector2& GetSizeDelta() const { return m_sizeDelta; }
-    void SetSizeDelta(const Mathf::Vector2& size) { m_sizeDelta = size; m_isDirty = true; }
+    void SetSizeDelta(const Mathf::Vector2& size);
 
     const Mathf::Vector2& GetPivot() const { return m_pivot; }
-    void SetPivot(const Mathf::Vector2& pivot) { m_pivot = pivot; m_isDirty = true; }
+    void SetPivot(const Mathf::Vector2& pivot);
 
     const Mathf::Rect& GetWorldRect() const { return m_worldRect; }
 
@@ -75,4 +75,9 @@ private:
 
     // 레이아웃이 변경되었는지 여부
     bool m_isDirty = true;
+
+    Mathf::Rect ResolveParentRect() const;
+    Mathf::Vector2 CalculateDisplayPosition(const Mathf::Rect& parentRect) const;
+    static float ToDisplay(float raw, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot);
+    static float ToRaw(float display, float parentOrigin, float parentSize, float anchorMin, float anchorMax, float pivot);
 };
