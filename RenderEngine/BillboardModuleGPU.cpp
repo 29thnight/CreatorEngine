@@ -124,6 +124,17 @@ void BillboardModuleGPU::CreateBillboard()
 			&m_SpriteAnimationConstantBuffer
 		);
 	}
+
+	D3D11_BUFFER_DESC bufferDesc = {};
+	bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	bufferDesc.ByteWidth = sizeof(TimeParams);
+	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_timeBuffer);
+	if (FAILED(hr))
+	{
+		m_timeBuffer.Reset();
+	}
 }
 
 void BillboardModuleGPU::ResetForReuse()
@@ -263,6 +274,20 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	{
 		deviceContext->PSSetConstantBuffers(0, 1, m_SpriteAnimationBuffer.GetAddressOf());
 		DirectX11::UpdateBuffer(m_SpriteAnimationBuffer.Get(), &m_SpriteAnimationConstantBuffer);
+	}
+
+	if (m_timeBuffer) {
+		m_timeParams.time = Time->GetTotalSeconds();
+
+		D3D11_MAPPED_SUBRESOURCE mappedResource;
+		HRESULT hr = deviceContext->Map(m_timeBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+		if (SUCCEEDED(hr)) {
+			TimeParams* params = static_cast<TimeParams*>(mappedResource.pData);
+			*params = m_timeParams;
+			deviceContext->Unmap(m_timeBuffer.Get(), 0);
+		}
+
+		deviceContext->PSSetConstantBuffers(3, 1, m_timeBuffer.GetAddressOf());
 	}
 
 	BindResource();

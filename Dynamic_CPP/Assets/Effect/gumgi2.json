@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "realG",
+    "name": "gumgi2",
     "particleSystems": [
         {
             "isRunning": true,
@@ -13,14 +13,9 @@
                 {
                     "data": {
                         "meshParticleTemplate": {
-                            "InitialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": -3.0,
+                                "y": 3.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -91,24 +86,11 @@
                         },
                         "impulses": [],
                         "meshParams": {
-                            "endScale": [
-                                1.0,
-                                1.0,
-                                1.0
-                            ],
                             "gravityStrength": 0.0,
-                            "randomScaleMax": 1.2000000476837158,
-                            "randomScaleMin": 0.800000011920929,
-                            "startScale": [
-                                1.0,
-                                1.0,
-                                1.0
-                            ],
-                            "useGravity": 0,
-                            "useRandomScale": 0
+                            "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 100.87849426269531,
+                            "currentTime": 146.50271606445313,
                             "velocityMode": 0
                         },
                         "orbitalData": {

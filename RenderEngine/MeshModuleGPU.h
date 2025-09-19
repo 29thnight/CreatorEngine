@@ -12,14 +12,6 @@ enum class MeshType
 	Model
 };
 
-
-
-struct TimeParams
-{
-	float time;
-	float3 pad1;
-};
-
 struct MeshConstantBuffer
 {
 	Mathf::Matrix world;
@@ -28,8 +20,6 @@ struct MeshConstantBuffer
 	Mathf::Vector3 cameraPosition;
 	float padding;
 };
-
-
 
 class MeshModuleGPU : public RenderModules, public ISerializable
 {

@@ -21,6 +21,12 @@ struct PixelOutput
     float4 color : SV_Target;
 };
 
+cbuffer TimeBuffer : register(b3)
+{
+    float gTime;
+    float3 gPadding;
+};
+
 Texture2D gDiffuseTexture : register(t0);
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);

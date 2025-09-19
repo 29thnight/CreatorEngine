@@ -40,6 +40,9 @@ SpawnModuleCS::SpawnModuleCS()
 	m_particleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_particleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
 	m_particleTemplate.velocityRandomRange = 0.0f;
+	m_particleTemplate.initialRotation = 0.f;
+	m_particleTemplate.initialRotationRange = 0.f;
+
 
 	m_originalEmitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
 	m_originalParticleScale = XMFLOAT2(1.0f, 1.0f);
@@ -254,6 +257,7 @@ void SpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 
 		if (SUCCEEDED(hr))
 		{
+			m_spawnParams.allowNewSpawn = m_allowNewSpawn ? 1 : 0;
 			memcpy(mappedResource.pData, &m_spawnParams, sizeof(SpawnParams));
 			DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
 			m_spawnParamsDirty = false;
@@ -468,6 +472,12 @@ void SpawnModuleCS::SetRotateSpeed(float speed)
 	}
 }
 
+void SpawnModuleCS::SetRotation(float rotation, float randomrange)
+{
+	m_particleTemplate.initialRotation = rotation;
+	m_particleTemplate.initialRotationRange = randomrange;
+	m_templateDirty = true;
+}
 
 void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
 {
@@ -510,6 +520,8 @@ nlohmann::json SpawnModuleCS::SerializeData() const
 		{"velocity", EffectSerializer::SerializeXMFLOAT3(m_particleTemplate.velocity)},
 		{"velocityRange", m_particleTemplate.velocityRandomRange},
 		{"acceleration", EffectSerializer::SerializeXMFLOAT3(m_particleTemplate.acceleration)},
+				{"initialRotation", m_particleTemplate.initialRotation},
+		{"initialRotationRange", m_particleTemplate.initialRotationRange},
 	};
 
 	// 상태 정보
@@ -578,7 +590,10 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 
 		if (templateJson.contains("acceleration"))
 			m_particleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
-
+		if (templateJson.contains("initialRotation"))
+			m_particleTemplate.initialRotation = templateJson["initialRotation"];
+		if (templateJson.contains("initialRotationRange"))
+			m_particleTemplate.initialRotationRange = templateJson["initialRotationRange"];
 	}
 
 	// 상태 정보 복원

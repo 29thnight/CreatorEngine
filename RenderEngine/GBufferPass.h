@@ -23,6 +23,7 @@ private:
 	ComPtr<ID3D11Buffer> m_materialBuffer;
 	ComPtr<ID3D11Buffer> m_boneBuffer;
 	ComPtr<ID3D11Buffer> m_instanceBuffer;
+	ComPtr<ID3D11Buffer> m_TimeBuffer;
 	ComPtr<ID3D11ShaderResourceView> m_instanceBufferSRV;
 	ID3D11RenderTargetView* m_renderTargetViews[RTV_TypeMax]{}; //0: diffuse, 1: metalRough, 2: normal, 3: emissive
 };

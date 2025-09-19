@@ -22,6 +22,12 @@ struct PixelOutput
     float4 color : SV_Target;
 };
 
+cbuffer TimeBuffer : register(b3)
+{
+    float gTime;
+    float3 gPadding;
+};
+
 Texture2D gDiffuseTexture : register(t0);
 Texture2D gEmissionTexture : register(t1);
 Texture2D gDissolveTexture : register(t2);
@@ -38,7 +44,8 @@ PixelOutput main(PixelInput input)
     
     // UV 애니메이션 계산
     float2 dissolveUV = input.texCoord * float2(1.0, 2.0);
-    dissolveUV.x *= normalizedAge * 5;
+    dissolveUV.x += gTime * 2.0;
+    
     float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
 
     float2 tempUV = input.texCoord;
@@ -80,7 +87,7 @@ PixelOutput main(PixelInput input)
     if (normalizedAge > dissolveOutStart)
     {
         float fadeProgress = (normalizedAge - dissolveOutStart) / (1.0 - dissolveOutStart);
-        globalFade = 1.0 - smoothstep(0.0, 1.0, fadeProgress);
+        globalFade = 1.0 - smoothstep(0.0, 1.0, pow(fadeProgress, 0.5));
     }
     
     // Emission 리맵핑

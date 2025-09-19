@@ -1,8 +1,8 @@
-#include "SizeModuleCS.h"
+#include "MeshSizeModuleCS.h"
 #include "ShaderSystem.h"
 #include "DeviceState.h"
 
-SizeModuleCS::SizeModuleCS()
+MeshSizeModuleCS::MeshSizeModuleCS()
 	: m_computeShader(nullptr)
 	, m_sizeParamsBuffer(nullptr)
 	, m_paramsDirty(true)
@@ -10,28 +10,23 @@ SizeModuleCS::SizeModuleCS()
 	, m_isInitialized(false)
 	, m_particleCapacity(0)
 {
-	// 기본값 설정
-	m_sizeParams.startSize = XMFLOAT2(0.1f, 0.1f);
-	m_sizeParams.endSize = XMFLOAT2(1.0f, 1.0f);
+	m_sizeParams.startSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	m_sizeParams.endSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
 	m_sizeParams.deltaTime = 0.0f;
 	m_sizeParams.useRandomScale = 0;
 	m_sizeParams.randomScaleMin = 0.5f;
 	m_sizeParams.randomScaleMax = 2.0f;
 	m_sizeParams.maxParticles = 0;
-	m_sizeParams.pad1 = 0.0f;
-	m_sizeParams.pad2 = 0.0f;
-	m_sizeParams.pad3 = 0.0f;
 	m_sizeParams.emitterScale = { 1,1,1 };
 }
 
-SizeModuleCS::~SizeModuleCS()
+MeshSizeModuleCS::~MeshSizeModuleCS()
 {
 	Release();
 }
 
-void SizeModuleCS::Initialize()
+void MeshSizeModuleCS::Initialize()
 {
-
 	if (m_isInitialized)
 		return;
 
@@ -51,7 +46,7 @@ void SizeModuleCS::Initialize()
 	OutputDebugStringA("SizeModuleCS initialized successfully\n");
 }
 
-void SizeModuleCS::Update(float deltaTime)
+void MeshSizeModuleCS::Update(float deltaTime)
 {
 	if (!m_enabled) return;
 
@@ -61,7 +56,7 @@ void SizeModuleCS::Update(float deltaTime)
 		return;
 	}
 
-	DirectX11::BeginEvent(L"SizeModuleCS Update");
+	DirectX11::BeginEvent(L"MeshSizeModuleCS Update");
 
 	// 파티클 용량 업데이트
 	m_sizeParams.maxParticles = m_particleCapacity;
@@ -73,6 +68,7 @@ void SizeModuleCS::Update(float deltaTime)
 		float easingValue = m_easingModule.Update(deltaTime);
 		processedDeltaTime = deltaTime * easingValue;
 	}
+
 	m_sizeParams.deltaTime = processedDeltaTime;
 
 	// 상수 버퍼 업데이트
@@ -113,13 +109,13 @@ void SizeModuleCS::Update(float deltaTime)
 	DirectX11::EndEvent();
 }
 
-void SizeModuleCS::Release()
+void MeshSizeModuleCS::Release()
 {
 	ReleaseResources();
 	m_isInitialized = false;
 }
 
-void SizeModuleCS::OnSystemResized(UINT maxParticles)
+void MeshSizeModuleCS::OnSystemResized(UINT maxParticles)
 {
 	if (maxParticles != m_particleCapacity)
 	{
@@ -129,92 +125,7 @@ void SizeModuleCS::OnSystemResized(UINT maxParticles)
 	}
 }
 
-bool SizeModuleCS::InitializeComputeShader()
-{
-	m_computeShader = ShaderSystem->ComputeShaders["SizeModule"].GetShader();
-	return m_computeShader != nullptr;
-}
-
-bool SizeModuleCS::CreateConstantBuffers()
-{
-	// Size 파라미터 상수 버퍼
-	D3D11_BUFFER_DESC bufferDesc = {};
-	bufferDesc.ByteWidth = sizeof(SizeParams);
-	bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_sizeParamsBuffer);
-	if (FAILED(hr))
-	{
-		OutputDebugStringA("Failed to create size params buffer\n");
-		return false;
-	}
-
-	return true;
-}
-
-void SizeModuleCS::UpdateConstantBuffers()
-{
-	D3D11_MAPPED_SUBRESOURCE mappedResource;
-	HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_sizeParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-
-	if (SUCCEEDED(hr))
-	{
-		memcpy(mappedResource.pData, &m_sizeParams, sizeof(SizeParams));
-		DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_sizeParamsBuffer, 0);
-		m_paramsDirty = false;
-	}
-}
-
-void SizeModuleCS::ReleaseResources()
-{
-	if (m_computeShader) { m_computeShader->Release(); m_computeShader = nullptr; }
-	if (m_sizeParamsBuffer) { m_sizeParamsBuffer->Release(); m_sizeParamsBuffer = nullptr; }
-}
-
-// 설정 메서드들
-void SizeModuleCS::SetStartSize(const XMFLOAT2& size)
-{
-	if (m_sizeParams.startSize.x != size.x || m_sizeParams.startSize.y != size.y)
-	{
-		m_sizeParams.startSize = size;
-		m_paramsDirty = true;
-	}
-}
-
-void SizeModuleCS::SetEndSize(const XMFLOAT2& size)
-{
-	if (m_sizeParams.endSize.x != size.x || m_sizeParams.endSize.y != size.y)
-	{
-		m_sizeParams.endSize = size;
-		m_paramsDirty = true;
-	}
-}
-
-void SizeModuleCS::SetRandomScale(bool enabled, float minScale, float maxScale)
-{
-	int enabledInt = enabled ? 1 : 0;
-	if (m_sizeParams.useRandomScale != enabledInt ||
-		m_sizeParams.randomScaleMin != minScale ||
-		m_sizeParams.randomScaleMax != maxScale)
-	{
-		m_sizeParams.useRandomScale = enabledInt;
-		m_sizeParams.randomScaleMin = minScale;
-		m_sizeParams.randomScaleMax = maxScale;
-		m_paramsDirty = true;
-	}
-}
-
-void SizeModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationType, float duration)
-{
-	m_easingModule.SetEasingType(easingType);
-	m_easingModule.SetAnimationType(animationType);
-	m_easingModule.SetDuration(duration);
-	m_easingEnable = true;
-}
-
-void SizeModuleCS::ResetForReuse()
+void MeshSizeModuleCS::ResetForReuse()
 {
 	if (!m_enabled) return;
 
@@ -230,14 +141,84 @@ void SizeModuleCS::ResetForReuse()
 	}
 }
 
-bool SizeModuleCS::IsReadyForReuse() const
+bool MeshSizeModuleCS::IsReadyForReuse() const
 {
 	return m_isInitialized &&
 		m_sizeParamsBuffer != nullptr;
 }
 
+void MeshSizeModuleCS::SetRandomScale(bool useRandomScale, float min, float max)
+{
+	m_sizeParams.useRandomScale = useRandomScale;
+	m_sizeParams.randomScaleMin = min;
+	m_sizeParams.randomScaleMax = max;
+	m_paramsDirty = true;
+}
 
-nlohmann::json SizeModuleCS::SerializeData() const
+void MeshSizeModuleCS::SetEasingEnabled(bool enabled)
+{
+	m_easingEnable = enabled;
+	m_paramsDirty = true;
+}
+
+void MeshSizeModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationType, float duration)
+{
+	m_easingModule.SetEasingType(easingType);
+	m_easingModule.SetAnimationType(animationType);
+	m_easingModule.SetDuration(duration);
+	m_easingEnable = true;
+}
+
+void MeshSizeModuleCS::DisableEasing()
+{
+	m_easingEnable = false;
+}
+
+bool MeshSizeModuleCS::InitializeComputeShader()
+{
+	m_computeShader = ShaderSystem->ComputeShaders["MeshSizeModule"].GetShader();
+	return m_computeShader != nullptr;
+}
+
+bool MeshSizeModuleCS::CreateConstantBuffers()
+{
+	// Size 파라미터 상수 버퍼
+	D3D11_BUFFER_DESC bufferDesc = {};
+	bufferDesc.ByteWidth = sizeof(MeshSizeParams);
+	bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_sizeParamsBuffer);
+	if (FAILED(hr))
+	{
+		OutputDebugStringA("Failed to create size params buffer\n");
+		return false;
+	}
+
+	return true;
+}
+
+void MeshSizeModuleCS::UpdateConstantBuffers()
+{
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(m_sizeParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+
+	if (SUCCEEDED(hr))
+	{
+		memcpy(mappedResource.pData, &m_sizeParams, sizeof(MeshSizeParams));
+		DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_sizeParamsBuffer, 0);
+		m_paramsDirty = false;
+	}
+}
+
+void MeshSizeModuleCS::ReleaseResources()
+{
+	if (m_computeShader) { m_computeShader->Release(); m_computeShader = nullptr; }
+	if (m_sizeParamsBuffer) { m_sizeParamsBuffer->Release(); m_sizeParamsBuffer = nullptr; }
+}
+
+nlohmann::json MeshSizeModuleCS::SerializeData() const
 {
 	nlohmann::json json;
 
@@ -245,11 +226,13 @@ nlohmann::json SizeModuleCS::SerializeData() const
 	json["sizeParams"] = {
 		{"startSize", {
 			{"x", m_sizeParams.startSize.x},
-			{"y", m_sizeParams.startSize.y}
+			{"y", m_sizeParams.startSize.y},
+			{"z", m_sizeParams.startSize.z},
 		}},
 		{"endSize", {
 			{"x", m_sizeParams.endSize.x},
-			{"y", m_sizeParams.endSize.y}
+			{"y", m_sizeParams.endSize.y},
+			{"z", m_sizeParams.endSize.z},
 		}},
 		{"useRandomScale", m_sizeParams.useRandomScale},
 		{"randomScaleMin", m_sizeParams.randomScaleMin},
@@ -273,7 +256,7 @@ nlohmann::json SizeModuleCS::SerializeData() const
 	return json;
 }
 
-void SizeModuleCS::DeserializeData(const nlohmann::json& json)
+void MeshSizeModuleCS::DeserializeData(const nlohmann::json& json)
 {
 	// SizeParams 복원
 	if (json.contains("sizeParams"))
@@ -283,8 +266,9 @@ void SizeModuleCS::DeserializeData(const nlohmann::json& json)
 		if (sizeJson.contains("startSize"))
 		{
 			const auto& startSizeJson = sizeJson["startSize"];
-			m_sizeParams.startSize.x = startSizeJson.value("x", 0.1f);
-			m_sizeParams.startSize.y = startSizeJson.value("y", 0.1f);
+			m_sizeParams.startSize.x = startSizeJson.value("x", 1.0f);
+			m_sizeParams.startSize.y = startSizeJson.value("y", 1.0f);
+			m_sizeParams.startSize.z = startSizeJson.value("z", 1.0f);
 		}
 
 		if (sizeJson.contains("endSize"))
@@ -292,6 +276,7 @@ void SizeModuleCS::DeserializeData(const nlohmann::json& json)
 			const auto& endSizeJson = sizeJson["endSize"];
 			m_sizeParams.endSize.x = endSizeJson.value("x", 1.0f);
 			m_sizeParams.endSize.y = endSizeJson.value("y", 1.0f);
+			m_sizeParams.endSize.z = endSizeJson.value("z", 1.0f);
 		}
 
 		if (sizeJson.contains("useRandomScale"))
@@ -340,7 +325,7 @@ void SizeModuleCS::DeserializeData(const nlohmann::json& json)
 	m_paramsDirty = true;
 }
 
-std::string SizeModuleCS::GetModuleType() const
+std::string MeshSizeModuleCS::GetModuleType() const
 {
-	return "SizeModuleCS";
+	return "MeshSizeModuleCS";
 }

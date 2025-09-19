@@ -15,13 +15,15 @@ void EntityBigWood::Start()
 void EntityBigWood::OnTriggerEnter(const Collision& collision)
 {
 	// 아시스가 부딪히면 아시스에게 데미지를 줌.
-	//HitAsis();
+	EntityAsis* asis = collision.otherObj->GetComponent<EntityAsis>();
+	HitAsis(asis);
 }
 
 void EntityBigWood::OnCollisionEnter(const Collision& collision)
 {
 	// 아시스가 부딪히면 아시스에게 데미지를 줌.
-	//HitAsis();
+	EntityAsis* asis = collision.otherObj->GetComponent<EntityAsis>();
+	HitAsis(asis);
 }
 
 void EntityBigWood::SendDamage(Entity* sender, int damage)
