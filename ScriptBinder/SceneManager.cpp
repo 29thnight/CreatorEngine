@@ -586,11 +586,12 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
     });
 }
 
-void SceneManager::ActivateScene(Scene* sceneToActivate)
+void SceneManager::ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete)
 {
     if (!sceneToActivate) return;
     Benchmark debugTimer;
     Scene* oldScene = m_activeScene.load();
+    oldScene->ResetSelectedSceneObject();
     if (m_activeScene)
     {
         for (auto& object : m_dontDestroyOnLoadObjects)
@@ -609,7 +610,10 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
 
         //m_activeScene = nullptr;
 
-        std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+        if(isOldSceneDelete)
+        {
+            std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+        }
 
     }
 
@@ -630,7 +634,10 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
 
     m_activeScene.load()->Reset();
 
-    delete oldScene;
+    if (isOldSceneDelete)
+    {
+        delete oldScene;
+    }
 
 	Debug->Log(std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
 }

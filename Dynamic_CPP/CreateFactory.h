@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "GameInit.h"
+#include "ImageButton.h"
 #include "PlayerSelector.h"
 #include "InputDeviceDetector.h"
 #include "ItemPopup.h"

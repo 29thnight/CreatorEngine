@@ -78,7 +78,12 @@ namespace Core
 
 		for (auto& info : callbacksToInvoke)
 		{
-			try { info.callback(args...); }
+			try 
+			{ 
+				if (isStopped_) break;
+
+				info.callback(args...); 
+			}
 			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
 		}
 	}
@@ -88,7 +93,12 @@ namespace Core
 	{
 		for (auto& info : callbacks_)
 		{
-			try { info.callback(args...); }
+			try 
+			{ 
+				if (isStopped_) break;
+
+				info.callback(args...); 
+			}
 			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
 		}
 	}
@@ -106,7 +116,12 @@ namespace Core
 			[&DelegateHandle](const CallbackInfo& info) { return info.handle == DelegateHandle; });
 		if (it != callbacksToInvoke.end())
 		{
-			try { it->callback(args...); }
+			try 
+			{ 
+				if (isStopped_) return;
+
+				it->callback(args...); 
+			}
 			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; }
 		}
 	}

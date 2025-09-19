@@ -42,7 +42,7 @@ public:
 	void SaveSceneAsync(std::string_view name = "SampleScene");
 	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
     void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
-    void ActivateScene(Scene* sceneToActivate);
+    void ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete = true);
 
     void WaitForSceneLoad();
 

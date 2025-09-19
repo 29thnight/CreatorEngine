@@ -42,8 +42,16 @@ public:
 	void LoadTestScene();
 	[[Method]]
 	void SwitchTestScene();
+	[[Method]]
+	void LoadNextScene();
+	[[Method]]
+	void SwitchNextScene();
+	[[Method]]
+	void LoadImidiateNextScene();
 	[[Property]]
 	bool m_isTestReward{ false };
+	[[Property]]
+	std::string m_nextSceneName{};
 
 public:
 	void PushEntity(Entity* entity);

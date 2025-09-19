@@ -368,8 +368,11 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		{
 			if (shaderPSOContainer.find(psoName) != shaderPSOContainer.end())
 			{
-				firstProxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
-				firstProxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				for (auto* proxy : proxies)
+				{
+					proxy->m_Material->SetShaderPSO(nullptr); // 기존 PSO 해제
+					proxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
+				}
 				customPSO = firstProxy->m_Material->m_shaderPSO;
 			}
 			else
