@@ -1,12 +1,12 @@
 m_name: Bomb
 m_isEnabled: true
-m_instanceID: 2246877748
+m_instanceID: 2178083899
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: Bomb
     m_isEnabled: true
-    m_instanceID: 4224274167
+    m_instanceID: 2410983098
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -16,7 +16,7 @@ PrefabNode:
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: [4]
-    m_prefabFileGuid: 8f78caa2-785c-511d-8cb9-52822778f3dc
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 12
     m_isStatic: false
@@ -30,14 +30,14 @@ PrefabNode:
         duration: 3
         m_name: Bomb
         m_isEnabled: true
-        m_instanceID: 1864181341
+        m_instanceID: 3779115195
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 0c2030d9-44d3-5584-b605-2c8715412982
     children:
       - GameObject: 2166264123
-        m_name: Weapon_bomb
+        m_name: Weapon_Bomb
         m_isEnabled: true
-        m_instanceID: 2362196276
+        m_instanceID: 1967859430
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -47,7 +47,7 @@ PrefabNode:
         m_parentIndex: 3
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 8f78caa2-785c-511d-8cb9-52822778f3dc
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -58,10 +58,10 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1720406954
+            m_instanceID: 2945109326
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material.001(1)
+              m_name: Weapon_Bomb
               m_baseColorTexName: Weapon_bomb_low_DefaultMaterial_BaseColor.png
               m_normalTexName: Weapon_bomb_low_DefaultMaterial_Normal.png
               m_ORM_TexName: Weapon_bomb_low_DefaultMaterial_OcclusionRoughnessMetallic.png
@@ -75,7 +75,7 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 0324860b-23ae-560b-8e17-233daa658e6b
+              m_fileGuid: 00ae718e-2fa2-5cfd-8b19-39f7d10e923d
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:

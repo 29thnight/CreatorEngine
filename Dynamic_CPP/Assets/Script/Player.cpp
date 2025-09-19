@@ -34,6 +34,7 @@
 #include "EntityMonsterA.h"
 #include "EntityItemHeal.h"
 #include "PlayerState.h"
+#include "SlashEffect.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -238,11 +239,11 @@ void Player::Start()
 
 	ChangeState("Idle");
 
-	auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
-	for(auto& meshrenderer : meshrenderers)
-	{
-		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
-	}
+	//auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	//for(auto& meshrenderer : meshrenderers)
+	//{
+	//	meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
+	//}
 	Debug->Log("Player Start");
 }
 
@@ -813,6 +814,85 @@ float Player::calculDamge(bool isCharge)
 		finalDamge += m_curWeapon->itemAckDmg;
 	}
 	return finalDamge; //여기에 크리티컬있으면 곱해주기 
+}
+
+void Player::PlaySlashEvent()
+{
+
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
+	if (SlashPrefab)
+	{
+		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
+		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		//현위치에서 offset줘서 정하기
+		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		float effectOffset = 2.f;
+		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
+		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+
+
+		Mathf::Vector3 up = Mathf::Vector3::Up;
+		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
+		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
+
+		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
+		Quaternion finalRot = rot * lookRot;
+		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
+
+
+		Slashscript->Initialize();
+	}
+
+
+}
+
+void Player::PlaySlashEvent2()
+{
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect2");
+	if (SlashPrefab)
+	{
+		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
+		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		//현위치에서 offset줘서 정하기
+		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		float effectOffset = 2.f;
+		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
+		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+
+
+		Mathf::Vector3 up = Mathf::Vector3::Up;
+		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
+		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
+
+		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
+		Quaternion finalRot = rot * lookRot;
+		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
+
+		Slashscript->Initialize();
+	}
+}
+
+void Player::PlaySlashEvent3()
+{
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect3");
+	if (SlashPrefab)
+	{
+		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
+		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		//현위치에서 offset줘서 정하기
+		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		//float effectOffset = 1.f;
+		Mathf::Vector3 effectPos = myPos;
+		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+
+
+
+
+		Slashscript->Initialize();
+	}
 }
 
 bool Player::CheckResurrectionByOther()

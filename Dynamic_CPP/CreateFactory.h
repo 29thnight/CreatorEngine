@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SlashEffect.h"
 #include "PlayerSelector.h"
 #include "InputDeviceDetector.h"
 #include "ItemPopup.h"

@@ -1,16 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "Explosion.generated.h"
 
 class EffectComponent;
-class Player;
-class Explosion : public ModuleBehavior
+class SlashEffect : public ModuleBehavior
 {
 public:
-   ReflectExplosion
-	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(Explosion)
+	MODULE_BEHAVIOR_BODY(SlashEffect)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -24,12 +20,10 @@ public:
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
-
-	void Initialize(Player* _owner);
-	Player* m_ownerPlayer = nullptr;
-	bool endAttack = false;
-	EffectComponent* m_effect;
 	
-	[[Property]]
-	float explosionRadius = 3.0f; //범위공격 반경
+	void Initialize();
+private:
+	EffectComponent* m_effect;
+	bool beLateFrame = false; //setposion으로 정한 위치가 한프레임 늦어서 이렇게 조절
+	bool OnEffect = false;
 };

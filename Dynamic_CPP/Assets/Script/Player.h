@@ -199,13 +199,16 @@ public:
 	bool startRay = false;
 
 	float calculDamge(bool isCharge = false);
+	[[Method]]
+	void PlaySlashEvent(); //검기 이펙트 + 사운드 출력
+	[[Method]]
+	void PlaySlashEvent2();
+	[[Method]]
+	void PlaySlashEvent3();
+
 	bool sucessAttack = false;
 	[[Property]]
-	float MeleeAttackSpeed = 1.0f;        //미사용중  //추가능력치로 공격속도가빨라질경우 사용 
-	[[Property]]
-	float RangeAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
-	[[Property]]
-	float BombAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
+	float MultipleAttackSpeed = 1.0f;        //미사용중  //추가능력치로 공격속도가빨라질경우 사용 
 
 	//피격,죽음
 	bool isStun = false;

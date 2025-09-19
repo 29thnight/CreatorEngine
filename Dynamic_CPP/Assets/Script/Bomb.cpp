@@ -30,15 +30,15 @@ void Bomb::Update(float tick)
 			transform->SetPosition(m_targetPos);
 
 			float explosionRadius = 1;
-			/*Prefab* ExplosionPrefab = PrefabUtilitys->LoadPrefab("Explosion");
+			Prefab* ExplosionPrefab = PrefabUtilitys->LoadPrefab("Explosion");
 			if (ExplosionPrefab)
 			{
 				GameObject* ExplosionObj = PrefabUtilitys->InstantiatePrefab(ExplosionPrefab, "Explosion");
 				auto explosion = ExplosionObj->GetComponent<Explosion>();
 				ExplosionObj->GetComponent<Transform>()->SetPosition(m_targetPos);
 				explosionRadius = explosion->explosionRadius;
-
-			}*/
+				explosion->Initialize(m_ownerPlayer);
+			}
 
 
 			std::vector<HitResult> hits;
