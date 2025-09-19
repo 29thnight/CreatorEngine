@@ -1,13 +1,13 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "explosion1",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 5,
             "modules": [
                 {
@@ -103,7 +103,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 129.1614990234375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -227,7 +227,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "glow",
+                            "pixelShader": "Glow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -298,7 +298,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 10,
             "modules": [
                 {
@@ -364,7 +364,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 129.1614990234375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -528,7 +528,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "glow",
+                            "pixelShader": "Glow",
                             "vertexShader": "spike"
                         },
                         "textures": [
@@ -599,7 +599,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -714,7 +714,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "glow",
+                            "pixelShader": "Glow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -785,7 +785,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -976,7 +976,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "glow",
+                            "pixelShader": "Glow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -1047,7 +1047,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 5,
             "modules": [
                 {
@@ -1216,7 +1216,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "glow",
+                            "pixelShader": "Glow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
