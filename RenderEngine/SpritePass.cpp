@@ -100,6 +100,15 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
             m_pso->Apply(deferredPtr);
         }
 
+        if (proxy->m_enableDepth)
+        {
+            deferredPtr->OMSetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
+        }
+        else
+        {
+			deferredPtr->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+        }
+
         auto world = proxy->m_worldMatrix;
         if (proxy->m_billboardType != BillboardType::None)
         {

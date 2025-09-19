@@ -60,6 +60,7 @@ struct VertexOutput
     float alpha : ALPHA;
     uint renderMode : RENDER_MODE;
     float particleAge : PARTICLE_AGE;
+    float particleLifeTime : PARTICLE_LIFETIME;
 };
 
 float3x3 CreateRotationMatrix(float3 rotation)
@@ -184,6 +185,7 @@ VertexOutput main(VertexInput input)
     output.alpha = particle.color.a;
     output.renderMode = particle.renderMode;
     output.particleAge = particle.age;
+    output.particleLifeTime = particle.lifeTime;
     
     return output;
 }

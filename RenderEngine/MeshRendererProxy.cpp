@@ -91,8 +91,9 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(DecalComponent* component) :
 PrimitiveRenderProxy::PrimitiveRenderProxy(SpriteRenderer* component) :
     m_spriteTexture(component->GetSprite().get()),
     m_customPSOName(component->GetCustomPSOName()),
-   m_billboardType(component->GetBillboardType()),
-   m_billboardAxis(component->GetBillboardAxis())
+    m_billboardType(component->GetBillboardType()),
+    m_billboardAxis(component->GetBillboardAxis()),
+    m_enableDepth(component->IsEnableDepth())
 {
     if (!m_customPSOName.empty())
     {
@@ -156,15 +157,15 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_diffuseTexture(other.m_diffuseTexture),
     m_normalTexture(other.m_normalTexture),
     m_occluroughmetalTexture(other.m_occluroughmetalTexture),
-        m_sliceX(other.m_sliceX),
-        m_sliceY(other.m_sliceY),
-        m_sliceNum(other.m_sliceNum),
-        m_quadMesh(other.m_quadMesh),
-        m_spriteTexture(other.m_spriteTexture),
-        m_customPSOName(other.m_customPSOName),
-        m_customPSO(other.m_customPSO),
-       m_billboardType(other.m_billboardType),
-       m_billboardAxis(other.m_billboardAxis)
+    m_sliceX(other.m_sliceX),
+    m_sliceY(other.m_sliceY),
+    m_sliceNum(other.m_sliceNum),
+    m_quadMesh(other.m_quadMesh),
+    m_spriteTexture(other.m_spriteTexture),
+    m_customPSOName(other.m_customPSOName),
+    m_customPSO(other.m_customPSO),
+    m_billboardType(other.m_billboardType),
+    m_billboardAxis(other.m_billboardAxis)
 {
 }
 
@@ -194,15 +195,15 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_diffuseTexture(std::exchange(other.m_diffuseTexture, nullptr)),
     m_normalTexture(std::exchange(other.m_normalTexture, nullptr)),
     m_occluroughmetalTexture(std::exchange(other.m_occluroughmetalTexture, nullptr)),
-        m_sliceX(other.m_sliceX),
-        m_sliceY(other.m_sliceY),
-        m_sliceNum(other.m_sliceNum),
-        m_quadMesh(std::move(other.m_quadMesh)),
-        m_spriteTexture(std::exchange(other.m_spriteTexture, nullptr)),
-        m_customPSOName(std::move(other.m_customPSOName)),
-        m_customPSO(std::move(other.m_customPSO)),
-       m_billboardType(other.m_billboardType),
-       m_billboardAxis(other.m_billboardAxis)
+    m_sliceX(other.m_sliceX),
+    m_sliceY(other.m_sliceY),
+    m_sliceNum(other.m_sliceNum),
+    m_quadMesh(std::move(other.m_quadMesh)),
+    m_spriteTexture(std::exchange(other.m_spriteTexture, nullptr)),
+    m_customPSOName(std::move(other.m_customPSOName)),
+    m_customPSO(std::move(other.m_customPSO)),
+    m_billboardType(other.m_billboardType),
+    m_billboardAxis(other.m_billboardAxis)
 {
 }
 

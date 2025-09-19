@@ -177,7 +177,7 @@ void EntityAsis::Update(float tick)
 	}
 
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
-		Attack(nullptr, 10);
+		SendDamage(nullptr, 10);
 	}
 
 	m_currentGracePeriod -= tick;
@@ -193,7 +193,7 @@ void EntityAsis::Update(float tick)
 	Purification(tick);
 }
 
-void EntityAsis::Attack(Entity* sender, int damage)
+void EntityAsis::SendDamage(Entity* sender, int damage)
 {
 	if (m_currentGracePeriod > 0.f) {
 		// 무적이지만 히트 사운드나 별도 처리시 여기서 처리.

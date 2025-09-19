@@ -33,6 +33,13 @@ cbuffer PBRMaterial : register(b0)
     uint bitflag;
 }
 
+cbuffer TimeBuffer : register(b5)
+{
+    float totalTime;
+    float deltaTime;
+    uint totalFrame;
+}
+
 cbuffer TerrainLayerConstants : register(b12)
 {
     int useTerrainLayers;

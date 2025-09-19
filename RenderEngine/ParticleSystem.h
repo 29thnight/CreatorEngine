@@ -3,7 +3,6 @@
 #include "IRenderPass.h"
 #include "SpawnModuleCS.h"
 #include "MovementModuleCS.h"
-//#include "LifeModuleCS.h"
 #include "ColorModuleCS.h"
 #include "SizeModuleCS.h"
 #include "MeshSpawnModuleCS.h"
@@ -12,6 +11,8 @@
 #include "TrailGenerateModule.h"
 #include "TrailRenderModule.h"
 #include "MeshColorModuleCS.h"
+#include "MeshMovementModuleCS.h"
+#include "MeshSizeModuleCS.h"
 
 enum class ParticleDataType
 {
@@ -115,13 +116,21 @@ public:
 
 	virtual void Render(RenderScene& scene, Camera& camera);
 
+	void StopSpawning();
+
+	void ResumeSpawning();
+
 	void UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition);
+
+	void UpdateEffectBaseRotation(const Mathf::Vector3& newBaseRotation);
 
 	void UpdateGenerateModule(float delta);
 
 	void SetPosition(const Mathf::Vector3& position);
 
 	void ExecuteSimulationModules(float delta);
+	
+	void SyncEmitterTransform();
 
 	Mathf::Vector3 GetWorldPosition() const {
 		return m_effectBasePosition + m_position;
@@ -208,7 +217,8 @@ protected:
 	Mathf::Vector3 m_position = { 0, 0, 0 };
 	Mathf::Vector3 m_effectBasePosition = { 0, 0, 0 };
 	Mathf::Vector3 m_rotation = { 0, 0, 0 };
-	Mathf::Vector3 m_scale = { 0, 0, 0 };
+	Mathf::Vector3 m_effectBaseRotation = { 0, 0, 0 };
+	Mathf::Vector3 m_scale = { 1, 1, 1 };
 	std::vector<RenderModules*> m_renderModules;
 
 	// 더블 버퍼링을 위한 멤버들

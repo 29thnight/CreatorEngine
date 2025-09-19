@@ -175,6 +175,10 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					}
 				}
 
+				if (ImGui::Button("Refresh Terrain Texture")) {
+					terrainComponent->RefreshTexture();
+				}
+
 				// 브러시 모양 선택
 				if (ImGui::Button("mask texture load"))
 				{

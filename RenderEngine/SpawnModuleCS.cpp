@@ -35,13 +35,14 @@ SpawnModuleCS::SpawnModuleCS()
 	// 파티클 템플릿 기본값
 	m_particleTemplate.lifeTime = 10.0f;
 	m_particleTemplate.rotateSpeed = 0.0f;
-	m_particleTemplate.size = XMFLOAT2(0.1f, 0.1f);
+	m_particleTemplate.size = XMFLOAT2(1.0f, 1.0f);
 	m_particleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	m_particleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_particleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
-	m_particleTemplate.minVerticalVelocity = 0.0f;
-	m_particleTemplate.maxVerticalVelocity = 0.0f;
-	m_particleTemplate.horizontalVelocityRange = 0.0f;
+	m_particleTemplate.velocityRandomRange = 0.0f;
+	m_particleTemplate.initialRotation = 0.f;
+	m_particleTemplate.initialRotationRange = 0.f;
+
 
 	m_originalEmitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
 	m_originalParticleScale = XMFLOAT2(1.0f, 1.0f);
@@ -256,6 +257,7 @@ void SpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 
 		if (SUCCEEDED(hr))
 		{
+			m_spawnParams.allowNewSpawn = m_allowNewSpawn ? 1 : 0;
 			memcpy(mappedResource.pData, &m_spawnParams, sizeof(SpawnParams));
 			DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
 			m_spawnParamsDirty = false;
@@ -447,9 +449,10 @@ void SpawnModuleCS::SetParticleColor(const XMFLOAT4& color)
 	m_templateDirty = true;
 }
 
-void SpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity)
+void SpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity, float randomRange)
 {
 	m_particleTemplate.velocity = velocity;
+	m_particleTemplate.velocityRandomRange = randomRange;
 	m_templateDirty = true;
 }
 
@@ -459,13 +462,6 @@ void SpawnModuleCS::SetParticleAcceleration(const XMFLOAT3& acceleration)
 	m_templateDirty = true;
 }
 
-void SpawnModuleCS::SetVelocityRange(float minVertical, float maxVertical, float horizontalRange)
-{
-	m_particleTemplate.minVerticalVelocity = minVertical;
-	m_particleTemplate.maxVerticalVelocity = maxVertical;
-	m_particleTemplate.horizontalVelocityRange = horizontalRange;
-	m_templateDirty = true;
-}
 
 void SpawnModuleCS::SetRotateSpeed(float speed)
 {
@@ -476,6 +472,12 @@ void SpawnModuleCS::SetRotateSpeed(float speed)
 	}
 }
 
+void SpawnModuleCS::SetRotation(float rotation, float randomrange)
+{
+	m_particleTemplate.initialRotation = rotation;
+	m_particleTemplate.initialRotationRange = randomrange;
+	m_templateDirty = true;
+}
 
 void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
 {
@@ -516,10 +518,10 @@ nlohmann::json SpawnModuleCS::SerializeData() const
 		}},
 		{"color", EffectSerializer::SerializeXMFLOAT4(m_particleTemplate.color)},
 		{"velocity", EffectSerializer::SerializeXMFLOAT3(m_particleTemplate.velocity)},
+		{"velocityRange", m_particleTemplate.velocityRandomRange},
 		{"acceleration", EffectSerializer::SerializeXMFLOAT3(m_particleTemplate.acceleration)},
-		{"minVerticalVelocity", m_particleTemplate.minVerticalVelocity},
-		{"maxVerticalVelocity", m_particleTemplate.maxVerticalVelocity},
-		{"horizontalVelocityRange", m_particleTemplate.horizontalVelocityRange}
+				{"initialRotation", m_particleTemplate.initialRotation},
+		{"initialRotationRange", m_particleTemplate.initialRotationRange},
 	};
 
 	// 상태 정보
@@ -583,17 +585,15 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 		if (templateJson.contains("velocity"))
 			m_particleTemplate.velocity = EffectSerializer::DeserializeXMFLOAT3(templateJson["velocity"]);
 
+		if (templateJson.contains("velocityRange"))
+			m_particleTemplate.velocityRandomRange = templateJson["velocityRange"];
+
 		if (templateJson.contains("acceleration"))
 			m_particleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
-
-		if (templateJson.contains("minVerticalVelocity"))
-			m_particleTemplate.minVerticalVelocity = templateJson["minVerticalVelocity"];
-
-		if (templateJson.contains("maxVerticalVelocity"))
-			m_particleTemplate.maxVerticalVelocity = templateJson["maxVerticalVelocity"];
-
-		if (templateJson.contains("horizontalVelocityRange"))
-			m_particleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
+		if (templateJson.contains("initialRotation"))
+			m_particleTemplate.initialRotation = templateJson["initialRotation"];
+		if (templateJson.contains("initialRotationRange"))
+			m_particleTemplate.initialRotationRange = templateJson["initialRotationRange"];
 	}
 
 	// 상태 정보 복원

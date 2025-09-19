@@ -47,9 +47,11 @@ public:
 	[[Method]]
 	void Damage(int damage);
 
-	Core::Delegate<void, Weapon*, int> m_AddWeaponEvent;
-	Core::Delegate<void, Weapon*, int> m_UpdateDurabilityEvent;
-	Core::Delegate<void, int> m_SetActiveEvent;
+	Core::Delegate<void, Weapon*, int>	m_AddWeaponEvent;
+	Core::Delegate<void, Weapon*, int>	m_UpdateDurabilityEvent;
+	Core::Delegate<void, Weapon*, int>	m_ChargingWeaponEvent;
+	Core::Delegate<void, int>			m_EndChargingEvent; //TODO : 차징이 취소되었을 때 int slotIndex -> UnsafeBroadcast해야함
+	Core::Delegate<void, int>			m_SetActiveEvent; 
 
 	[[Method]]
 	void SwapWeaponLeft();
@@ -70,8 +72,8 @@ public:
 	[[Property]]
 	float moveSpeed= 0.025f;
 	[[Property]]
-	float  chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
-	float  baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
+	float chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
+	float baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;

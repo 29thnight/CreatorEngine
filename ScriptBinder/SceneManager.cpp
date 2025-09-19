@@ -520,7 +520,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             }
 
             RebindEventDontDestroyOnLoadObjects(newScene);
-            newScene->AllUpdateWorldMatrix();
+            //newScene->AllUpdateWorldMatrix();
             return newScene;
         }
         catch (const std::exception& e)

@@ -33,7 +33,7 @@ public:
 
     // 핵심 인터페이스
     virtual void Update(float delta) {
-        if (m_state != EffectState::Playing) return;
+        if (m_state != EffectState::Playing && m_state != EffectState::Finished) return;
 
         // 시간 업데이트
         m_currentTime += delta * m_timeScale;
@@ -43,14 +43,13 @@ public:
         bool isInfinite = (m_duration < 0);
 
         if (isInfinite) {
-            // 무한 재생 모드 - 고정된 주기로 0~1 반복 (예: 1초 주기)
             progressRatio = std::fmod(m_currentTime, 1.0f);
         }
         else if (m_duration > 0) {
             progressRatio = std::clamp(m_currentTime / m_duration, 0.0f, 1.0f);
         }
 
-        // ParticleSystem 업데이트
+        // ParticleSystem 업데이트 (Finished 상태에서도 계속)
         for (auto& ps : m_particleSystems) {
             if (ps) {
                 ps->SetEffectProgress(progressRatio);
@@ -58,9 +57,18 @@ public:
             }
         }
 
-        // duration이 끝나면 바로 Stop
-        if (!isInfinite && m_duration > 0 && m_currentTime >= m_duration) {
-            Stop();
+        // duration이 끝나면 Finished 상태로 변경 (Stop 대신)
+        if (!isInfinite && m_duration > 0 && m_currentTime >= (m_duration * m_timeScale)) {
+            if (m_state == EffectState::Playing) {
+                m_state = EffectState::Finished;
+
+                // 새 파티클 스폰만 중단
+                for (auto& ps : m_particleSystems) {
+                    if (ps) {
+                        ps->StopSpawning();
+                    }
+                }
+            }
         }
     }
 
@@ -97,6 +105,7 @@ public:
         for (auto& ps : m_particleSystems) {
             if (ps) {
                 ps->Stop();
+                ps->ResumeSpawning();
             }
         }
     }
@@ -141,7 +150,7 @@ public:
         // 모든 ParticleSystem에 회전 적용
         for (auto& ps : m_particleSystems) {
             if (ps) {
-                ps->SetRotation(m_rotation);
+                ps->UpdateEffectBaseRotation(newRotation);
             }
         }
     }

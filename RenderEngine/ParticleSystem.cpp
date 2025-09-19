@@ -1,5 +1,6 @@
 ﻿#include "ParticleSystem.h"
 
+
 ParticleSystem::ParticleSystem(int maxParticles, ParticleDataType dataType) : m_maxParticles(maxParticles), m_isRunning(false)
 {
 	SetParticleDatatype(dataType);
@@ -50,6 +51,8 @@ void ParticleSystem::Update(float delta)
 	if (!m_modulesConnected) {
 		AutoConnectModules();
 	}
+
+	SyncEmitterTransform();
 
 	UpdateGenerateModule(delta);
 
@@ -115,6 +118,43 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 	}
 }
 
+void ParticleSystem::StopSpawning()
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		// SpawnModuleCS만 비활성화
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetAllowNewSpawn(false);
+		}
+		// MeshSpawnModuleCS도 비활성화
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetAllowNewSpawn(false);
+		}
+		// TrailGenerateModule도 비활성화 (필요시)
+		//else if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEnabled(false);
+		//}
+	}
+}
+
+void ParticleSystem::ResumeSpawning()
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetAllowNewSpawn(true);
+		}
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetAllowNewSpawn(true);
+		}
+		//else if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEnabled(true);
+		//}
+	}
+}
+
 void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition)
 {
 	m_effectBasePosition = newBasePosition;
@@ -149,6 +189,30 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
 			meshModule->SetPolarCenter(finalWorldPosition);
 		}
+	}
+}
+
+void ParticleSystem::UpdateEffectBaseRotation(const Mathf::Vector3& newBaseRotation)
+{
+	m_effectBaseRotation = newBaseRotation;
+
+	// 실제 emitter 월드 회전 = Effect 기준 회전 + 이 ParticleSystem의 상대회전
+	Mathf::Vector3 finalWorldRotation = m_effectBaseRotation + m_rotation;
+
+	// SpawnModule들에 최종 계산된 회전값 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetEmitterRotation(finalWorldRotation);
+		}
+		if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetEmitterRotation(finalWorldRotation);
+		}
+		//if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEmitterRotation(finalWorldRotation);
+		//	continue;
+		//}
 	}
 }
 
@@ -208,7 +272,47 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
+void ParticleSystem::SyncEmitterTransform()
+{
+	// 최종 월드 위치/회전/스케일 계산
+	Mathf::Vector3 finalWorldPosition = m_effectBasePosition + m_position;
+	Mathf::Vector3 finalWorldRotation = m_effectBaseRotation + m_rotation;
+	Mathf::Vector3 finalWorldScale = m_scale;
 
+	// Movement 모듈들에 이미터 변환 정보 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// MeshMovementModuleCS에 이미터 변환 전달
+		if (MeshMovementModuleCS* movementModule = dynamic_cast<MeshMovementModuleCS*>(&module))
+		{
+			movementModule->SetEmitterTransform(
+				finalWorldPosition,
+				finalWorldRotation
+			);
+		}
+
+		// 일반 MovementModuleCS에도 필요시 전달
+		if (MovementModuleCS* movementModule = dynamic_cast<MovementModuleCS*>(&module))
+		{
+			movementModule->SetEmitterTransform(
+				finalWorldPosition,
+				finalWorldRotation
+			);
+		}
+
+		if (MeshSizeModuleCS* sizeModule = dynamic_cast<MeshSizeModuleCS*>(&module))
+		{
+			sizeModule->SetEmitterTransform(finalWorldScale);
+		}
+
+		if (SizeModuleCS* sizeModule = dynamic_cast<SizeModuleCS*>(&module))
+		{
+			sizeModule->SetEmitterTransform(finalWorldScale);
+		}
+	}
+}
 
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {
@@ -220,24 +324,10 @@ void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 
 void ParticleSystem::SetRotation(const Mathf::Vector3& rotation)
 {
-	m_rotation = rotation;
+	m_rotation = rotation;  // 상대회전 저장
 
-	// SpawnModule들에 회전값 전달
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
-	{
-		ParticleModule& module = *it;
-
-		// SpawnModuleCS인지 확인
-		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module))
-		{
-			spawnModule->SetEmitterRotation(rotation);
-		}
-		// MeshSpawnModuleCS인지 확인
-		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module))
-		{
-			meshSpawnModule->SetEmitterRotation(rotation);
-		}
-	}
+	// Effect 기준 회전이 설정되어 있다면 즉시 업데이트
+	UpdateEffectBaseRotation(m_effectBaseRotation);
 }
 
 void ParticleSystem::CreateParticleBuffer(UINT numParticles)

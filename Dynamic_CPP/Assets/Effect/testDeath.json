@@ -1,13 +1,13 @@
 {
     "currentTime": 0.0,
-    "duration": 3.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "D1",
+    "loop": true,
+    "name": "testDeath",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 50,
             "modules": [
                 {
@@ -24,10 +24,9 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
                             "lifeTime": 5.0,
-                            "maxVerticalVelocity": 0.0,
-                            "minVerticalVelocity": 0.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 0.30000001192092896,
@@ -37,7 +36,8 @@
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -73,7 +73,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 316.0418395996094,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -165,11 +165,22 @@
                             2,
                             3
                         ],
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "star"
+                        "renderStates": {
+                            "blendPreset": 1,
+                            "depthPreset": 1,
+                            "rasterizerPreset": 1
                         },
+                        "shaders": {
+                            "pixelShader": "BillBoard",
+                            "vertexShader": "BillBoard"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "star",
+                                "slot": 0
+                            }
+                        ],
                         "vertices": [
                             {
                                 "position": {
@@ -223,7 +234,12 @@
                     },
                     "type": "BillboardModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {

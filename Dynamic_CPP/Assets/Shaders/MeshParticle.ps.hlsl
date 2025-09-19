@@ -13,10 +13,18 @@ struct PixelInput
     float3 viewDir : VIEW_DIR;
     float alpha : ALPHA;
     uint renderMode : RENDER_MODE;
+    float particleAge : PARTICLE_AGE;
+    float particleLifeTime : PARTICLE_LIFETIME;
 };
 struct PixelOutput
 {
     float4 color : SV_Target;
+};
+
+cbuffer TimeBuffer : register(b3)
+{
+    float gTime;
+    float3 gPadding;
 };
 
 Texture2D gDiffuseTexture : register(t0);

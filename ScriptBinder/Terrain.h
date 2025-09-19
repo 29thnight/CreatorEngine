@@ -63,6 +63,8 @@ public:
     void RemoveLayer(uint32_t layerID);
 	void ClearLayers();
 
+    void RefreshTexture();
+
     std::vector<TerrainLayer> GetLayerCount() const { return m_layers; }
 	TerrainLayer* GetLayerDesc(uint32_t layerID)
 	{

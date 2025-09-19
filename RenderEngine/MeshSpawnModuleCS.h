@@ -11,21 +11,18 @@ struct alignas(16) MeshParticleTemplateParams
 	float3 RotationSpeed;
 	float pad2;
 
-	float3 InitialRotation;
-	float pad4;
-
 	float4 color;
 
 	float3 velocity;
-	float VerticalVelocity;
+	float velocityRandomRange;
 
 	float3 acceleration;
 	float pad5;
 
-	float horizontalVelocityRange;
 	UINT textureIndex;
 	UINT renderMode;
-	float pad6;
+	float2 pad6;  // 정렬 맞추기
+
 };
 
 class MeshSpawnModuleCS : public ParticleModule , public ISerializable
@@ -48,6 +45,7 @@ private:
 	bool m_spawnParamsDirty;
 	bool m_templateDirty;
 	UINT m_particleCapacity;
+	bool m_allowNewSpawn = true;
 
 	// 난수 생성기 (동일)
 	std::random_device m_randomDevice;
@@ -90,11 +88,9 @@ public:
 	void SetParticleLifeTime(float lifeTime);
 	void SetParticleScale(const XMFLOAT3& Scale);
 	void SetParticleRotationSpeed(const XMFLOAT3& Speed);
-	void SetParticleInitialRotation(const XMFLOAT3& Rot);
 	void SetParticleColor(const XMFLOAT4& color);
-	void SetParticleVelocity(const XMFLOAT3& velocity);
+	void SetParticleVelocity(const XMFLOAT3& velocity, float randomRange = 0.0f);
 	void SetParticleAcceleration(const XMFLOAT3& acceleration);
-	void SetVelocity(float Vertical, float horizontalRange);
 	void SetTextureIndex(UINT textureIndex);
 	void SetRenderMode(UINT mode);
 	
@@ -103,6 +99,12 @@ public:
 	float GetSpawnRate() const { return m_spawnParams.spawnRate; }
 	EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
 	MeshParticleTemplateParams GetTemplate() const { return m_meshParticleTemplate; }
+
+	void SetAllowNewSpawn(bool allow) {
+		m_allowNewSpawn = allow;
+		m_spawnParamsDirty = true;
+	}
+	bool IsAllowNewSpawn() const { return m_allowNewSpawn; }
 
 	// 직렬화
 public:

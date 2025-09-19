@@ -40,17 +40,13 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.Scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
     // 3D 회전 속도 범위
-    m_meshParticleTemplate.RotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
-
-    // 3D 초기 회전 범위
-    m_meshParticleTemplate.InitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_meshParticleTemplate.RotationSpeed = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
     // 기존과 동일한 속성들
     m_meshParticleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     m_meshParticleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_meshParticleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
-    m_meshParticleTemplate.VerticalVelocity = 0.0f;
-    m_meshParticleTemplate.horizontalVelocityRange = 0.0f;
+    m_meshParticleTemplate.velocityRandomRange = 0.0f;
     m_meshParticleTemplate.textureIndex = 0;
     m_meshParticleTemplate.textureIndex = 0;
 
@@ -321,6 +317,7 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 
         if (SUCCEEDED(hr))
         {
+            m_spawnParams.allowNewSpawn = m_allowNewSpawn ? 1 : 0;
             memcpy(mappedResource.pData, &m_spawnParams, sizeof(SpawnParams));
             DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
             m_spawnParamsDirty = false;
@@ -397,7 +394,6 @@ void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 
         // 새 회전값 설정
         m_spawnParams.emitterRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
-        m_meshParticleTemplate.InitialRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
 
         m_forceRotationUpdate = 1;
         m_spawnParamsDirty = true;
@@ -472,12 +468,6 @@ void MeshSpawnModuleCS::SetParticleRotationSpeed(const XMFLOAT3& Speed)
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetParticleInitialRotation(const XMFLOAT3& Rot)
-{
-    m_meshParticleTemplate.InitialRotation = Rot;
-    m_templateDirty = true;
-}
-
 void MeshSpawnModuleCS::SetParticleLifeTime(float lifeTime)
 {
     if (m_meshParticleTemplate.lifeTime != lifeTime)
@@ -493,22 +483,16 @@ void MeshSpawnModuleCS::SetParticleColor(const XMFLOAT4& color)
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity)
+void MeshSpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity, float randomRange)
 {
     m_meshParticleTemplate.velocity = velocity;
+    m_meshParticleTemplate.velocityRandomRange = randomRange;
     m_templateDirty = true;
 }
 
 void MeshSpawnModuleCS::SetParticleAcceleration(const XMFLOAT3& acceleration)
 {
     m_meshParticleTemplate.acceleration = acceleration;
-    m_templateDirty = true;
-}
-
-void MeshSpawnModuleCS::SetVelocity(float Vertical, float horizontalRange)
-{
-    m_meshParticleTemplate.VerticalVelocity = Vertical;
-    m_meshParticleTemplate.horizontalVelocityRange = horizontalRange;
     m_templateDirty = true;
 }
 
@@ -541,7 +525,8 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
         {"emitterType", m_spawnParams.emitterType},
         {"emitterSize", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterSize)},
         {"emitterRadius", m_spawnParams.emitterRadius},
-        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)}
+        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)},
+        {"emitterRotation", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterRotation)}
     };
 
     // MeshParticleTemplateParams 직렬화
@@ -549,12 +534,10 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
         {"lifeTime", m_meshParticleTemplate.lifeTime},
         {"Scale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.Scale)},
         {"RotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.RotationSpeed)},
-        {"InitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.InitialRotation)},
         {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
         {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
+        {"velocityRange", m_meshParticleTemplate.velocityRandomRange},
         {"acceleration", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.acceleration)},
-        {"VerticalVelocity", m_meshParticleTemplate.VerticalVelocity},
-        {"horizontalVelocityRange", m_meshParticleTemplate.horizontalVelocityRange},
         {"textureIndex", m_meshParticleTemplate.textureIndex},
         {"renderMode", m_meshParticleTemplate.renderMode}
     };
@@ -592,6 +575,9 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
 
         if (spawnJson.contains("emitterPosition"))
             m_spawnParams.emitterPosition = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterPosition"]);
+
+        if (spawnJson.contains("emitterRotation"))
+            m_spawnParams.emitterRotation = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterRotation"]);
     }
 
     // MeshParticleTemplateParams 복원
@@ -610,23 +596,17 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
         if (templateJson.contains("RotationSpeed"))
             m_meshParticleTemplate.RotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["RotationSpeed"]);
 
-        if (templateJson.contains("InitialRotation"))
-            m_meshParticleTemplate.InitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["InitialRotation"]);
-
         if (templateJson.contains("color"))
             m_meshParticleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);
 
         if (templateJson.contains("velocity"))
             m_meshParticleTemplate.velocity = EffectSerializer::DeserializeXMFLOAT3(templateJson["velocity"]);
 
+        if (templateJson.contains("velocityRange"))
+            m_meshParticleTemplate.velocityRandomRange = templateJson["velocityRange"];
+
         if (templateJson.contains("acceleration"))
             m_meshParticleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
-
-        if (templateJson.contains("VerticalVelocity"))
-            m_meshParticleTemplate.VerticalVelocity = templateJson["VerticalVelocity"];
-
-        if (templateJson.contains("horizontalVelocityRange"))
-            m_meshParticleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
 
         if (templateJson.contains("textureIndex"))
             m_meshParticleTemplate.textureIndex = templateJson["textureIndex"];

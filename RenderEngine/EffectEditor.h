@@ -11,6 +11,8 @@ enum class EffectModuleType
     SizeModule,
     TrailModule,
     MeshColorModule,
+    MeshMovementModule,
+    MeshSizeModule,
 };
 
 enum class RenderType
@@ -46,36 +48,6 @@ public:
     void AssignTextureToEmitter(int emitterIndex, int textureIndex);
     void RenderUnifiedDragDropTarget();
 
-    // 2D 모듈용 설정 메서드
-    void StartModifyEmitter(int index);
-    void SaveModifiedEmitter(const std::string& name = "");
-    void CancelModifyEmitter();
-
-    // 렌더 모듈용 설정 메서드
-    void RenderShaderSelectionUI(RenderModules* renderModule);
-    void RenderTextureSelectionUI(RenderModules* renderModule);
-    void RenderStateSelectionUI(RenderModules* renderModule);
-
-    void RenderModuleDetailEditor();            // 2d
-    void RenderRenderModuleDetailEditor();      // 3d
-
-    // 2D 모듈용 설정 메서드
-    void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
-    void RenderMovementModuleEditor(MovementModuleCS* movementModule);
-    void RenderColorModuleEditor(ColorModuleCS* colorModule);
-    void RenderSizeModuleEditor(SizeModuleCS* sizeModule);
-    void RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule);
-
-    // 3D 모듈용 설정 메서드
-    void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
-    void RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule);
-    void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
-
-
-    // cpu 모듈용 설정 메서드
-    void RenderTrailGenerateModuleEditor(TrailGenerateModule* trailModule);
-    void RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderModule);
-
 private:
     // 미리보기용 임시 에미터들
     std::vector<TempEmitterInfo> m_tempEmitters;
@@ -103,10 +75,13 @@ private:
 
     std::vector<ModuleInfo> m_availableModules = {
         {"Spawn Module", EffectModuleType::SpawnModule},
-        {"Mesh Spawn Module", EffectModuleType::MeshSpawnModule},
         {"Movement Module", EffectModuleType::MovementModule},
         {"Color Module", EffectModuleType::ColorModule},
         {"Size Module", EffectModuleType::SizeModule},
+        {"Mesh Spawn Module", EffectModuleType::MeshSpawnModule},
+        {"Mesh Color Module", EffectModuleType::MeshColorModule},
+        {"Mesh Movement Module", EffectModuleType::MeshMovementModule},
+        {"Mesh Size Module", EffectModuleType::MeshSizeModule},
         {"Trail Module", EffectModuleType::TrailModule},
     };
 
@@ -163,4 +138,35 @@ private:
     void LoadEffectFromJson(const std::string& filename);
     void SyncResourcesFromLoadedEmitters();
     void AddTextureToEditorList(Texture* texture);
+
+    // 2D 모듈용 설정 메서드
+    void StartModifyEmitter(int index);
+    void SaveModifiedEmitter(const std::string& name = "");
+    void CancelModifyEmitter();
+
+    // 렌더 모듈용 설정 메서드
+    void RenderShaderSelectionUI(RenderModules* renderModule);
+    void RenderTextureSelectionUI(RenderModules* renderModule);
+    void RenderStateSelectionUI(RenderModules* renderModule);
+
+    void RenderModuleDetailEditor();            // 2d
+    void RenderRenderModuleDetailEditor();      // 3d
+
+    // 2D 모듈용 설정 메서드
+    void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
+    void RenderMovementModuleEditor(MovementModuleCS* movementModule);
+    void RenderColorModuleEditor(ColorModuleCS* colorModule);
+    void RenderSizeModuleEditor(SizeModuleCS* sizeModule);
+    void RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule);
+
+    // 3D 모듈용 설정 메서드
+    void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
+    void RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule);
+    void RenderMeshMovementModuleEditor(MeshMovementModuleCS* movementModule);
+    void RenderMeshSizeModuleEditor(MeshSizeModuleCS* sizeModule);
+    void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
+
+    // cpu 모듈용 설정 메서드
+    void RenderTrailGenerateModuleEditor(TrailGenerateModule* trailModule);
+    void RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderModule);
 };

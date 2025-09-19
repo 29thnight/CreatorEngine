@@ -88,6 +88,10 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
 
     auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
+    // 렌더링 전 UAV 해제 (해저드 방지)
+    ID3D11UnorderedAccessView* nullUAVs[] = { nullptr };
+    deviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
+
     auto currentMesh = GetCurrentMesh();
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;

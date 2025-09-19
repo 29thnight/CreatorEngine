@@ -2,18 +2,22 @@
 #include <wrl.h>
 #include <exception>
 #include "TypeDefinition.h"
+#include "DLLAcrossSingleton.h"
 
 namespace DirectX11
 {
-	class TimeSystem
+	class TimeSystem : public DLLCore::Singleton<TimeSystem>
 	{
-	public:
+	private:
+		friend DLLCore::Singleton<TimeSystem>;
 		TimeSystem();
+		~TimeSystem() = default;
 
+	public:
 		// Get elapsed time since the previous Update call.
 		uint64_t GetElapsedTicks() const { return m_elapsedTicks; }
 		double GetElapsedSeconds() const { return TicksToSeconds(m_elapsedTicks); }
-
+		
 		// Get total time since the start of the program.
 		uint64_t GetTotalTicks() const { return m_totalTicks; }
 		double GetTotalSeconds() const { return TicksToSeconds(m_totalTicks); }
@@ -166,9 +170,6 @@ namespace DirectX11
 			postFixedUpdate();
 		}
 
-		//[unsafe]
-		static TimeSystem* TimeSysInstance;
-
 	private:
 		// 원본 타이밍 데이터에는 QPC 단위가 사용됩니다.
         LARGE_INTEGER m_qpcFrequency{};
@@ -196,4 +197,4 @@ namespace DirectX11
 }
 
 //[unsafe]
-static auto& Time = DirectX11::TimeSystem::TimeSysInstance;
+static auto Time = DirectX11::TimeSystem::GetInstance();

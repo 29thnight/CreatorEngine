@@ -198,6 +198,7 @@ void EffectEditor::RenderShaderSelectionUI(RenderModules* renderModule)
 
 	auto availableVS = RenderModules::GetAvailableVertexShaders();
 	if (!availableVS.empty()) {
+		std::sort(availableVS.begin(), availableVS.end());
 		std::string currentVS = renderModule->GetVertexShaderName();
 		if (ImGui::BeginCombo("Vertex Shader", currentVS.c_str())) {
 			for (const auto& shaderName : availableVS) {
@@ -215,6 +216,7 @@ void EffectEditor::RenderShaderSelectionUI(RenderModules* renderModule)
 
 	auto availablePS = RenderModules::GetAvailablePixelShaders();
 	if (!availablePS.empty()) {
+		std::sort(availablePS.begin(), availablePS.end());
 		std::string currentPS = renderModule->GetPixelShaderName();
 		if (ImGui::BeginCombo("Pixel Shader", currentPS.c_str())) {
 			for (const auto& shaderName : availablePS) {
@@ -369,8 +371,14 @@ void EffectEditor::RenderModuleDetailEditor()
 	else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(targetModule)) {
 		RenderMeshSpawnModuleEditor(meshSpawnModule);
 	}
-	else if (auto* meshSpawnModule = dynamic_cast<MeshColorModuleCS*>(targetModule)) {
-		RenderMeshColorModuleEditor(meshSpawnModule);
+	else if (auto* meshColorModule = dynamic_cast<MeshColorModuleCS*>(targetModule)) {
+		RenderMeshColorModuleEditor(meshColorModule);
+	}
+	else if (auto* meshMovementModule = dynamic_cast<MeshMovementModuleCS*>(targetModule)) {
+		RenderMeshMovementModuleEditor(meshMovementModule);
+	}
+	else if (auto* meshSizeModule = dynamic_cast<MeshSizeModuleCS*>(targetModule)) {
+		RenderMeshSizeModuleEditor(meshSizeModule);
 	}
 	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule)){
 		RenderTrailGenerateModuleEditor(trailGenModule);
@@ -468,6 +476,15 @@ void EffectEditor::RenderMainEditor()
 						ImGui::SameLine();
 						ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Relative to Effect Center)");
 
+						Mathf::Vector3 currentRot = m_tempEmitters[i].particleSystem->GetRotation();
+						float rot[3] = { currentRot.x, currentRot.y, currentRot.z };
+
+						if (ImGui::DragFloat3("Emitter Rotation", rot, 1.0f)) {
+							m_tempEmitters[i].particleSystem->SetRotation(Mathf::Vector3(rot[0], rot[1], rot[2]));
+						}
+
+						ImGui::SameLine();
+						ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Relative to Effect Rotation)");
 
 						// 최대 파티클 수 설정
 						UINT currentMaxParticles = m_tempEmitters[i].particleSystem->GetMaxParticles();
@@ -582,7 +599,6 @@ void EffectEditor::RenderModifyEmitterEditor()
 
 	ImGui::Text("Modifying Emitter: %s", m_tempEmitters[m_modifyingEmitterIndex].name.c_str());
 
-	// 이름 변경 입력 필드 추가
 	if (!m_emitterNameInitialized) {
 		strcpy_s(m_newEmitterName, sizeof(m_newEmitterName), m_tempEmitters[m_modifyingEmitterIndex].name.c_str());
 		m_emitterNameInitialized = true;
@@ -591,7 +607,53 @@ void EffectEditor::RenderModifyEmitterEditor()
 	ImGui::InputText("Emitter Name", m_newEmitterName, sizeof(m_newEmitterName));
 	ImGui::Separator();
 
-	// 모듈 리스트 표시
+	ImGui::Text("Add New Modules:");
+
+	const char* currentModuleName = m_selectedModuleIndex < m_availableModules.size() ?
+		m_availableModules[m_selectedModuleIndex].name : "None";
+
+	if (ImGui::BeginCombo("Add Module", currentModuleName)) {
+		for (size_t i = 0; i < m_availableModules.size(); i++) {
+			bool isSelected = (m_selectedModuleIndex == i);
+			if (ImGui::Selectable(m_availableModules[i].name, isSelected)) {
+				m_selectedModuleIndex = static_cast<int>(i);
+			}
+			if (isSelected) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Add Module##ModifyMode")) {
+		AddSelectedModule();
+	}
+
+	const char* currentRenderName = m_selectedRenderIndex < m_availableRenders.size() ?
+		m_availableRenders[m_selectedRenderIndex].name : "None";
+
+	if (ImGui::BeginCombo("Add Render", currentRenderName)) {
+		for (size_t i = 0; i < m_availableRenders.size(); i++) {
+			bool isSelected = (m_selectedRenderIndex == i);
+			if (ImGui::Selectable(m_availableRenders[i].name, isSelected)) {
+				m_selectedRenderIndex = static_cast<int>(i);
+			}
+			if (isSelected) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Add Render##ModifyMode")) {
+		AddSelectedRender();
+	}
+
+	ImGui::Separator();
+
+	// 나머지 코드는 동일...
 	ImGui::Text("Particle Modules:");
 	auto& moduleList = m_modifyingSystem->GetModuleList();
 	int moduleIndex = 0;
@@ -619,11 +681,20 @@ void EffectEditor::RenderModifyEmitterEditor()
 		else if (dynamic_cast<TrailGenerateModule*>(&module)) {
 			moduleName = "Trail Module";
 		}
+		else if (dynamic_cast<MeshColorModuleCS*>(&module)) {
+			moduleName = "Mesh Color Module";
+		}
+		else if (dynamic_cast<MeshMovementModuleCS*>(&module)) {
+			moduleName = "Mesh Movement Module";
+		}
+		else if (dynamic_cast<MeshSizeModuleCS*>(&module)) {
+			moduleName = "Mesh Size Module";
+		}
 
 		bool isSelected = (m_selectedModuleForEdit == moduleIndex);
 		if (ImGui::Selectable((moduleName + "##" + std::to_string(moduleIndex)).c_str(), isSelected)) {
 			m_selectedModuleForEdit = isSelected ? -1 : moduleIndex;
-			m_selectedRenderForEdit = -1; // 다른 모듈 선택시 렌더 선택 해제
+			m_selectedRenderForEdit = -1;
 		}
 
 		ImGui::PopID();
@@ -632,7 +703,6 @@ void EffectEditor::RenderModifyEmitterEditor()
 
 	ImGui::Separator();
 
-	// 렌더 모듈 리스트 표시
 	ImGui::Text("Render Modules:");
 	auto& renderList = m_modifyingSystem->GetRenderModules();
 	int renderIndex = 0;
@@ -654,7 +724,7 @@ void EffectEditor::RenderModifyEmitterEditor()
 		bool isSelected = (m_selectedRenderForEdit == renderIndex);
 		if (ImGui::Selectable((renderName + "##" + std::to_string(renderIndex)).c_str(), isSelected)) {
 			m_selectedRenderForEdit = isSelected ? -1 : renderIndex;
-			m_selectedModuleForEdit = -1; // 다른 렌더 선택시 모듈 선택 해제
+			m_selectedModuleForEdit = -1;
 		}
 
 		ImGui::PopID();
@@ -663,19 +733,16 @@ void EffectEditor::RenderModifyEmitterEditor()
 
 	ImGui::Separator();
 
-	// 선택된 모듈의 세부 설정 UI (ParticleModule)
 	if (m_selectedModuleForEdit >= 0) {
 		RenderModuleDetailEditor();
 	}
 
-	// 선택된 렌더 모듈의 세부 설정 UI (RenderModules)
 	if (m_selectedRenderForEdit >= 0) {
 		RenderRenderModuleDetailEditor();
 	}
 
 	ImGui::Separator();
 
-	// 저장/취소 버튼
 	if (ImGui::Button("Save Changes")) {
 		SaveModifiedEmitter(std::string(m_newEmitterName));
 		m_emitterNameInitialized = false;
@@ -981,6 +1048,12 @@ void EffectEditor::RenderExistingModules()
 			else if (auto* meshColorModule = dynamic_cast<MeshColorModuleCS*>(&module)) {
 				ImGui::Text("Mesh Color Module Settings");
 			}
+			else if (auto* meshMovementModule = dynamic_cast<MeshMovementModuleCS*>(&module)) {
+				ImGui::Text("Mesh Movement Module Settings");
+			}
+			else if (auto* meshSizeModule = dynamic_cast<MeshSizeModuleCS*>(&module)) {
+				ImGui::Text("Mesh Size Module Settings");
+			}
 			ImGui::Unindent();
 			ImGui::Separator();
 		}
@@ -1018,64 +1091,102 @@ void EffectEditor::RenderExistingModules()
 
 void EffectEditor::AddSelectedModule()
 {
-	if (!m_editingEmitter || m_selectedModuleIndex >= m_availableModules.size()) return;
+	// 현재 편집중인 시스템 결정 (새 생성 모드 vs 수정 모드)
+	std::shared_ptr<ParticleSystem> targetSystem = m_isModifyingEmitter ? m_modifyingSystem : m_editingEmitter;
+
+	if (!targetSystem || m_selectedModuleIndex >= m_availableModules.size()) return;
 
 	EffectModuleType type = m_availableModules[m_selectedModuleIndex].type;
 
 	switch (type) {
 	case EffectModuleType::SpawnModule:
-		m_editingEmitter->AddModule<SpawnModuleCS>();
-		m_editingEmitter->GetModule<SpawnModuleCS>()->Initialize();
-		break;
-	case EffectModuleType::MeshSpawnModule:
-		m_editingEmitter->AddModule<MeshSpawnModuleCS>();
-		m_editingEmitter->GetModule<MeshSpawnModuleCS>()->Initialize();
+		if (!targetSystem->GetModule<SpawnModuleCS>()) {
+			targetSystem->AddModule<SpawnModuleCS>();
+			targetSystem->GetModule<SpawnModuleCS>()->Initialize();
+		}
 		break;
 	case EffectModuleType::MovementModule:
-		m_editingEmitter->AddModule<MovementModuleCS>();
-		m_editingEmitter->GetModule<MovementModuleCS>()->Initialize();
+		if (!targetSystem->GetModule<MovementModuleCS>()) {
+			targetSystem->AddModule<MovementModuleCS>();
+			targetSystem->GetModule<MovementModuleCS>()->Initialize();
+		}
 		break;
 	case EffectModuleType::ColorModule:
-		m_editingEmitter->AddModule<ColorModuleCS>();
-		m_editingEmitter->GetModule<ColorModuleCS>()->Initialize();
+		if (!targetSystem->GetModule<ColorModuleCS>()) {
+			targetSystem->AddModule<ColorModuleCS>();
+			targetSystem->GetModule<ColorModuleCS>()->Initialize();
+		}
 		break;
 	case EffectModuleType::SizeModule:
-		m_editingEmitter->AddModule<SizeModuleCS>();
-		m_editingEmitter->GetModule<SizeModuleCS>()->Initialize();
+		if (!targetSystem->GetModule<SizeModuleCS>()) {
+			targetSystem->AddModule<SizeModuleCS>();
+			targetSystem->GetModule<SizeModuleCS>()->Initialize();
+		}
 		break;
 	case EffectModuleType::TrailModule:
-		m_editingEmitter->AddModule<TrailGenerateModule>();
-		m_editingEmitter->GetModule<TrailGenerateModule>()->Initialize();
+		if (!targetSystem->GetModule<TrailGenerateModule>()) {
+			targetSystem->AddModule<TrailGenerateModule>();
+			targetSystem->GetModule<TrailGenerateModule>()->Initialize();
+		}
+		break;
+	case EffectModuleType::MeshSpawnModule:
+		if (!targetSystem->GetModule<MeshSpawnModuleCS>()) {
+			targetSystem->AddModule<MeshSpawnModuleCS>();
+			targetSystem->GetModule<MeshSpawnModuleCS>()->Initialize();
+		}
 		break;
 	case EffectModuleType::MeshColorModule:
-		m_editingEmitter->AddModule<MeshColorModuleCS>();
-		m_editingEmitter->GetModule<MeshColorModuleCS>()->Initialize();
+		if (!targetSystem->GetModule<MeshColorModuleCS>()) {
+			targetSystem->AddModule<MeshColorModuleCS>();
+			targetSystem->GetModule<MeshColorModuleCS>()->Initialize();
+		}
+		break;
+	case EffectModuleType::MeshMovementModule:
+		if (!targetSystem->GetModule<MeshMovementModuleCS>()) {
+			targetSystem->AddModule<MeshMovementModuleCS>();
+			targetSystem->GetModule<MeshMovementModuleCS>()->Initialize();
+		}
+		break;
+	case EffectModuleType::MeshSizeModule:
+		if (!targetSystem->GetModule<MeshSizeModuleCS>()) {
+			targetSystem->AddModule<MeshSizeModuleCS>();
+			targetSystem->GetModule<MeshSizeModuleCS>()->Initialize();
+		}
 		break;
 	}
-
 }
 
 void EffectEditor::AddSelectedRender()
 {
-	if (!m_editingEmitter || m_selectedRenderIndex >= m_availableRenders.size()) return;
+	// 현재 편집중인 시스템 결정 (새 생성 모드 vs 수정 모드)
+	std::shared_ptr<ParticleSystem> targetSystem = m_isModifyingEmitter ? m_modifyingSystem : m_editingEmitter;
+
+	if (!targetSystem || m_selectedRenderIndex >= m_availableRenders.size()) return;
 
 	RenderType type = m_availableRenders[m_selectedRenderIndex].type;
 
 	switch (type) {
 	case RenderType::Billboard:
-		m_editingEmitter->SetParticleDatatype(ParticleDataType::Standard);
-		m_editingEmitter->AddRenderModule<BillboardModuleGPU>();
-		m_editingEmitter->GetRenderModule<BillboardModuleGPU>()->Initialize();
+		if (!targetSystem->GetRenderModule<BillboardModuleGPU>()) {
+			targetSystem->SetParticleDatatype(ParticleDataType::Standard);
+			targetSystem->AddRenderModule<BillboardModuleGPU>();
+			targetSystem->GetRenderModule<BillboardModuleGPU>()->Initialize();
+		}
 		break;
 	case RenderType::Mesh:
-		m_editingEmitter->SetParticleDatatype(ParticleDataType::Mesh);
-		m_editingEmitter->AddRenderModule<MeshModuleGPU>();
-		m_editingEmitter->GetRenderModule<MeshModuleGPU>()->Initialize();
+		if (!targetSystem->GetRenderModule<MeshModuleGPU>()) {
+			targetSystem->SetParticleDatatype(ParticleDataType::Mesh);
+			targetSystem->AddRenderModule<MeshModuleGPU>();
+			targetSystem->GetRenderModule<MeshModuleGPU>()->Initialize();
+		}
 		break;
 	case RenderType::Trail:
-		m_editingEmitter->SetParticleDatatype(ParticleDataType::Mesh);
-		m_editingEmitter->AddRenderModule<TrailRenderModule>();
-		m_editingEmitter->GetRenderModule<TrailRenderModule>()->Initialize();
+		if (!targetSystem->GetRenderModule<TrailRenderModule>()) {
+			targetSystem->SetParticleDatatype(ParticleDataType::Mesh);
+			targetSystem->AddRenderModule<TrailRenderModule>();
+			targetSystem->GetRenderModule<TrailRenderModule>()->Initialize();
+		}
+		break;
 	}
 }
 
@@ -1143,10 +1254,9 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 
 		auto loadedEffect = EffectSerializer::DeserializeEffect(effectJson);
 		if (loadedEffect) {
-			m_tempEmitters.clear();
-			m_emitterTextureSelections.clear();
 
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
+			size_t startIndex = m_tempEmitters.size();
 
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
@@ -1351,10 +1461,26 @@ void EffectEditor::RenderSpawnModuleEditor(SpawnModuleCS* spawnModule)
 		spawnModule->SetParticleColor(XMFLOAT4(color[0], color[1], color[2], color[3]));
 	}
 
-	// 속도
+	// 현재 값들을 변수로 저장
 	float velocity[3] = { currentTemplate.velocity.x, currentTemplate.velocity.y, currentTemplate.velocity.z };
+	float velocityRandomRange = currentTemplate.velocityRandomRange;
+
+	bool velocityChanged = false;
+	bool rangeChanged = false;
+
+	// Velocity 슬라이더
 	if (ImGui::DragFloat3("Velocity", velocity, 0.1f, -100.0f, 100.0f)) {
-		spawnModule->SetParticleVelocity(XMFLOAT3(velocity[0], velocity[1], velocity[2]));
+		velocityChanged = true;
+	}
+
+	// Random Range 슬라이더  
+	if (ImGui::DragFloat("Velocity Random Range", &velocityRandomRange, 0.1f, 0.0f, 50.0f)) {
+		rangeChanged = true;
+	}
+
+	// 둘 중 하나라도 변경되면 함께 업데이트
+	if (velocityChanged || rangeChanged) {
+		spawnModule->SetParticleVelocity(XMFLOAT3(velocity[0], velocity[1], velocity[2]), velocityRandomRange);
 	}
 
 	// 가속도
@@ -1363,25 +1489,30 @@ void EffectEditor::RenderSpawnModuleEditor(SpawnModuleCS* spawnModule)
 		spawnModule->SetParticleAcceleration(XMFLOAT3(acceleration[0], acceleration[1], acceleration[2]));
 	}
 
-	// 속도 범위
-	float minVertical = currentTemplate.minVerticalVelocity;
-	float maxVertical = currentTemplate.maxVerticalVelocity;
-	float horizontalRange = currentTemplate.horizontalVelocityRange;
-
-	if (ImGui::DragFloat("Min Vertical Velocity", &minVertical, 0.1f, -100.0f, 100.0f)) {
-		spawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
-	}
-	if (ImGui::DragFloat("Max Vertical Velocity", &maxVertical, 0.1f, -100.0f, 100.0f)) {
-		spawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
-	}
-	if (ImGui::DragFloat("Horizontal Velocity Range", &horizontalRange, 0.1f, 0.0f, 100.0f)) {
-		spawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
-	}
-
 	// 회전 속도
 	if (ImGui::DragFloat("Rotate Speed", &currentTemplate.rotateSpeed, 0.1f, -360.0f, 360.0f)) {
 		spawnModule->SetRotateSpeed(currentTemplate.rotateSpeed);
 	}
+
+	float rotation = currentTemplate.initialRotation;
+	float rotationRange = currentTemplate.initialRotationRange;
+
+	bool rotationChange = false;
+	bool rotationRangeChange = false;
+
+	if (ImGui::DragFloat("Rotation", &rotation, 0.1f, -100.0f, 100.0f)) {
+		rotationChange = true;
+	}
+
+	// Random Range 슬라이더  
+	if (ImGui::DragFloat("Rotation Random Range", &rotationRange, 0.1f, 0.0f, 50.0f)) {
+		rotationRangeChange = true;
+	}
+
+	if (rotationChange || rotationRangeChange) {
+		spawnModule->SetRotation(rotation, rotationRange);
+	}
+
 }
 
 void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
@@ -2047,7 +2178,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 			"Custom"
 		};
 
-		static int currentTransitionMode = 0;
+		int currentTransitionMode = static_cast<int>(colorModule->GetTransitionMode());
 		if (ImGui::Combo("Transition Mode", &currentTransitionMode, transitionModes, IM_ARRAYSIZE(transitionModes)))
 		{
 			colorModule->SetTransitionMode(static_cast<ColorTransitionMode>(currentTransitionMode));
@@ -2056,16 +2187,11 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 		ImGui::Separator();
 
 		// 그라데이션 모드
-		if (currentTransitionMode == 0)
+		if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Gradient))
 		{
 			if (ImGui::TreeNode("Gradient Settings"))
 			{
-				static std::vector<std::pair<float, Mathf::Vector4>> gradientPoints = {
-					{0.0f, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f)},
-					{0.3f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 0.9f)},
-					{0.7f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 0.7f)},
-					{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.0f, 0.0f)}
-				};
+				auto gradientPoints = colorModule->GetColorGradient();
 
 				for (int i = 0; i < gradientPoints.size(); ++i)
 				{
@@ -2076,7 +2202,8 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 
 					if (ImGui::TreeNode(label))
 					{
-						ImGui::SliderFloat("Time", &gradientPoints[i].first, 0.0f, 1.0f);
+						float time = gradientPoints[i].first;
+						ImGui::SliderFloat("Time", &time, 0.0f, 1.0f);
 
 						float color[4] = {
 							gradientPoints[i].second.x,
@@ -2085,9 +2212,19 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 							gradientPoints[i].second.w
 						};
 
+						bool timeChanged = (time != gradientPoints[i].first);
+						bool colorChanged = false;
+
 						if (ImGui::ColorEdit4("Color", color))
 						{
+							colorChanged = true;
+						}
+
+						if (timeChanged || colorChanged)
+						{
+							gradientPoints[i].first = time;
 							gradientPoints[i].second = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							colorModule->SetColorGradient(gradientPoints);
 						}
 
 						if (gradientPoints.size() > 2)
@@ -2095,6 +2232,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 							if (ImGui::Button("Delete Point"))
 							{
 								gradientPoints.erase(gradientPoints.begin() + i);
+								colorModule->SetColorGradient(gradientPoints);
 								ImGui::TreePop();
 								ImGui::PopID();
 								break;
@@ -2112,10 +2250,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					float newTime = gradientPoints.empty() ? 0.5f :
 						(gradientPoints.back().first + 0.1f > 1.0f ? 0.5f : gradientPoints.back().first + 0.1f);
 					gradientPoints.emplace_back(newTime, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-				}
 
-				if (ImGui::Button("Apply Gradient"))
-				{
 					std::sort(gradientPoints.begin(), gradientPoints.end(),
 						[](const auto& a, const auto& b) { return a.first < b.first; });
 
@@ -2126,15 +2261,11 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 			}
 		}
 		// 이산 색상 모드
-		else if (currentTransitionMode == 1)
+		else if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Discrete))
 		{
 			if (ImGui::TreeNode("Discrete Colors"))
 			{
-				static std::vector<Mathf::Vector4> discreteColors = {
-					Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-					Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-					Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
-				};
+				auto discreteColors = colorModule->GetDiscreteColors();
 
 				for (int i = 0; i < discreteColors.size(); ++i)
 				{
@@ -2153,12 +2284,14 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					if (ImGui::ColorEdit4(label, color))
 					{
 						discreteColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						colorModule->SetDiscreteColors(discreteColors);
 					}
 
 					ImGui::SameLine();
 					if (ImGui::Button("Remove") && discreteColors.size() > 1)
 					{
 						discreteColors.erase(discreteColors.begin() + i);
+						colorModule->SetDiscreteColors(discreteColors);
 						ImGui::PopID();
 						break;
 					}
@@ -2169,10 +2302,6 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				if (ImGui::Button("Add Color") && discreteColors.size() < 32)
 				{
 					discreteColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
-				}
-
-				if (ImGui::Button("Apply Colors"))
-				{
 					colorModule->SetDiscreteColors(discreteColors);
 				}
 
@@ -2180,7 +2309,7 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 			}
 		}
 		// 커스텀 함수 모드
-		else if (currentTransitionMode == 2)
+		else if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Custom))
 		{
 			if (ImGui::TreeNode("Custom Function"))
 			{
@@ -2190,20 +2319,41 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					"Flicker"
 				};
 
-				static int currentFunction = 0;
-				ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes));
+				int currentFunction = colorModule->GetCustomFunctionType();
+				if (ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes)))
+				{
+					colorModule->SetCustomFunction(currentFunction, 0.0f, 0.0f, 0.0f, 0.0f);
+				}
 
 				if (currentFunction == 0) // Pulse
 				{
-					static float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-					static float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-					static float frequency = 1.0f;
+					auto discreteColors = colorModule->GetDiscreteColors();
 
-					ImGui::ColorEdit4("Base Color", baseColor);
-					ImGui::ColorEdit4("Pulse Color", pulseColor);
-					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+					float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-					if (ImGui::Button("Apply Pulse"))
+					if (discreteColors.size() >= 2)
+					{
+						baseColor[0] = discreteColors[0].x;
+						baseColor[1] = discreteColors[0].y;
+						baseColor[2] = discreteColors[0].z;
+						baseColor[3] = discreteColors[0].w;
+
+						pulseColor[0] = discreteColors[1].x;
+						pulseColor[1] = discreteColors[1].y;
+						pulseColor[2] = discreteColors[1].z;
+						pulseColor[3] = discreteColors[1].w;
+					}
+
+					float frequency = colorModule->GetCustomParam4();
+					if (frequency == 0.0f) frequency = 1.0f;
+
+					bool changed = false;
+					changed |= ImGui::ColorEdit4("Base Color", baseColor);
+					changed |= ImGui::ColorEdit4("Pulse Color", pulseColor);
+					changed |= ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+
+					if (changed || ImGui::Button("Apply Pulse"))
 					{
 						colorModule->SetPulseColor(
 							Mathf::Vector4(baseColor[0], baseColor[1], baseColor[2], baseColor[3]),
@@ -2214,17 +2364,36 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				}
 				else if (currentFunction == 1) // Sine Wave
 				{
-					static float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-					static float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-					static float frequency = 1.0f;
-					static float phase = 0.0f;
+					auto discreteColors = colorModule->GetDiscreteColors();
 
-					ImGui::ColorEdit4("Color 1", color1);
-					ImGui::ColorEdit4("Color 2", color2);
-					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
-					ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+					float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
-					if (ImGui::Button("Apply Sine Wave"))
+					if (discreteColors.size() >= 2)
+					{
+						color1[0] = discreteColors[0].x;
+						color1[1] = discreteColors[0].y;
+						color1[2] = discreteColors[0].z;
+						color1[3] = discreteColors[0].w;
+
+						color2[0] = discreteColors[1].x;
+						color2[1] = discreteColors[1].y;
+						color2[2] = discreteColors[1].z;
+						color2[3] = discreteColors[1].w;
+					}
+
+					float frequency = colorModule->GetCustomParam1();
+					float phase = colorModule->GetCustomParam2();
+
+					if (frequency == 0.0f) frequency = 1.0f;
+
+					bool changed = false;
+					changed |= ImGui::ColorEdit4("Color 1", color1);
+					changed |= ImGui::ColorEdit4("Color 2", color2);
+					changed |= ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					changed |= ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+
+					if (changed || ImGui::Button("Apply Sine Wave"))
 					{
 						colorModule->SetSineWaveColor(
 							Mathf::Vector4(color1[0], color1[1], color1[2], color1[3]),
@@ -2236,12 +2405,16 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				}
 				else if (currentFunction == 2) // Flicker
 				{
-					static std::vector<Mathf::Vector4> flickerColors = {
-						Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-						Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-						Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
-					};
-					static float speed = 5.0f;
+					auto flickerColors = colorModule->GetDiscreteColors();
+
+					if (flickerColors.empty())
+					{
+						flickerColors = {
+							Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+							Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+							Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
+						};
+					}
 
 					for (int i = 0; i < flickerColors.size(); ++i)
 					{
@@ -2260,12 +2433,14 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 						if (ImGui::ColorEdit4(label, color))
 						{
 							flickerColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							colorModule->SetDiscreteColors(flickerColors);
 						}
 
 						ImGui::SameLine();
 						if (ImGui::Button("Remove") && flickerColors.size() > 1)
 						{
 							flickerColors.erase(flickerColors.begin() + i);
+							colorModule->SetDiscreteColors(flickerColors);
 							ImGui::PopID();
 							break;
 						}
@@ -2276,11 +2451,13 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					if (ImGui::Button("Add Flicker Color") && flickerColors.size() < 32)
 					{
 						flickerColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+						colorModule->SetDiscreteColors(flickerColors);
 					}
 
-					ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f);
+					float speed = colorModule->GetCustomParam1();
+					if (speed == 0.0f) speed = 5.0f;
 
-					if (ImGui::Button("Apply Flicker"))
+					if (ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f))
 					{
 						colorModule->SetFlickerColor(flickerColors, speed);
 					}
@@ -2295,8 +2472,11 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 		// 이징 설정
 		if (ImGui::TreeNode("Easing Settings"))
 		{
-			static bool easingEnabled = false;
-			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			bool easingEnabled = colorModule->IsEasingEnabled();
+			if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+			{
+				colorModule->EnableEasing(easingEnabled);
+			}
 
 			if (easingEnabled)
 			{
@@ -2318,15 +2498,22 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					"Loop Forward", "Loop Back", "Loop PingPong"
 				};
 
-				static int currentEasingType = 0;
-				static int currentAnimationType = 0;
-				static float duration = 1.0f;
+				// 이징 모듈의 Get 함수가 있다고 가정하고, 없다면 기본값 사용
+				int currentEasingType = 0;
+				int currentAnimationType = 0;
+				float duration = 1.0f;
 
-				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
-				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
-				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+				// TODO: 헤더에 이징 Get 함수들이 있는지 확인 필요
+				currentEasingType = static_cast<int>(colorModule->GetEasingModule().GetEasingType());
+				currentAnimationType = static_cast<int>(colorModule->GetEasingModule().GetAnimationType());
+				duration = colorModule->GetEasingModule().GetDuration();
 
-				if (ImGui::Button("Apply Easing"))
+				bool changed = false;
+				changed |= ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				changed |= ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				changed |= ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+
+				if (changed || ImGui::Button("Apply Easing"))
 				{
 					colorModule->SetEasing(
 						static_cast<EasingEffect>(currentEasingType),
@@ -2535,28 +2722,6 @@ void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
 			sizeModule->SetEasing(EasingEffect::InOutSine, StepAnimation::StepLoopPingPong, 1.0f);
 		}
-
-		// 디버그 정보 (디버그 모드에서만 표시)
-#ifdef _DEBUG
-		if (ImGui::TreeNode("Debug Info"))
-		{
-			ImGui::Text("Is Initialized: %s", sizeModule->IsInitialized() ? "Yes" : "No");
-			ImGui::Text("Particle Capacity: %u", sizeModule->GetParticleCapacity());
-			ImGui::Text("Ready for Reuse: %s", sizeModule->IsReadyForReuse() ? "Yes" : "No");
-
-			if (ImGui::Button("Reset Module"))
-			{
-				sizeModule->ResetForReuse();
-			}
-
-			ImGui::TreePop();
-		}
-#endif
-
-		if (!enabled)
-		{
-			ImGui::EndDisabled();
-		}
 	}
 }
 
@@ -2727,15 +2892,6 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 		);
 	}
 
-	// 3D 초기 회전 범위
-	float InitRot[3] = { currentTemplate.InitialRotation.x, currentTemplate.InitialRotation.y, currentTemplate.InitialRotation.z };
-
-	if (ImGui::DragFloat3("Min Initial Rotation", InitRot, 0.1f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleInitialRotation(
-			XMFLOAT3(InitRot[0], InitRot[1], InitRot[2])
-		);
-	}
-
 	// 색상
 	float color[4] = { currentTemplate.color.x, currentTemplate.color.y, currentTemplate.color.z, currentTemplate.color.w };
 	if (ImGui::ColorEdit4("Color", color)) {
@@ -2744,25 +2900,30 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 
 	// 속도
 	float velocity[3] = { currentTemplate.velocity.x, currentTemplate.velocity.y, currentTemplate.velocity.z };
+	float velocityRandomRange = currentTemplate.velocityRandomRange;
+
+	bool velocityChanged = false;
+	bool rangeChanged = false;
+
+	// Velocity 슬라이더
 	if (ImGui::DragFloat3("Velocity", velocity, 0.1f, -100.0f, 100.0f)) {
-		meshSpawnModule->SetParticleVelocity(XMFLOAT3(velocity[0], velocity[1], velocity[2]));
+		velocityChanged = true;
+	}
+
+	// Random Range 슬라이더  
+	if (ImGui::DragFloat("Velocity Random Range", &velocityRandomRange, 0.1f, 0.0f, 50.0f)) {
+		rangeChanged = true;
+	}
+
+	// 둘 중 하나라도 변경되면 함께 업데이트
+	if (velocityChanged || rangeChanged) {
+		meshSpawnModule->SetParticleVelocity(XMFLOAT3(velocity[0], velocity[1], velocity[2]), velocityRandomRange);
 	}
 
 	// 가속도
 	float acceleration[3] = { currentTemplate.acceleration.x, currentTemplate.acceleration.y, currentTemplate.acceleration.z };
 	if (ImGui::DragFloat3("Acceleration", acceleration, 0.1f, -100.0f, 100.0f)) {
 		meshSpawnModule->SetParticleAcceleration(XMFLOAT3(acceleration[0], acceleration[1], acceleration[2]));
-	}
-
-	// 속도 범위
-	float Vertical = currentTemplate.VerticalVelocity;
-	float horizontalRange = currentTemplate.horizontalVelocityRange;
-
-	if (ImGui::DragFloat("Min Vertical Velocity", &Vertical, 0.1f, -100.0f, 100.0f)) {
-		meshSpawnModule->SetVelocity(Vertical, horizontalRange);
-	}
-	if (ImGui::DragFloat("Horizontal Velocity Range", &horizontalRange, 0.1f, 0.0f, 100.0f)) {
-		meshSpawnModule->SetVelocity(Vertical, horizontalRange);
 	}
 
 	const char* renderModes[] = { "Emissive", "Lit" };
@@ -3085,6 +3246,439 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 				}
 			}
 
+			ImGui::TreePop();
+		}
+	}
+}
+
+void EffectEditor::RenderMeshMovementModuleEditor(MeshMovementModuleCS* movementModule)
+{
+	if (!movementModule) return;
+
+	if (ImGui::CollapsingHeader("Mesh Movement Module", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		// 기본 설정
+		ImGui::Text("Basic Settings");
+		ImGui::Separator();
+
+		bool useGravity = movementModule->GetUseGravity();
+		if (ImGui::Checkbox("Use Gravity", &useGravity))
+		{
+			movementModule->SetUseGravity(useGravity);
+		}
+
+		if (useGravity)
+		{
+			float gravityStrength = movementModule->m_movementParams.gravityStrength;
+			if (ImGui::SliderFloat("Gravity Strength", &gravityStrength, 0.0f, 50.0f))
+			{
+				movementModule->SetGravityStrength(gravityStrength);
+			}
+		}
+
+		// Velocity Mode 선택
+		ImGui::Spacing();
+		ImGui::Text("Velocity Mode");
+		ImGui::Separator();
+
+		int currentMode = static_cast<int>(movementModule->GetVelocityMode());
+		const char* velocityModes[] = { "Constant", "Curve", "Impulse", "Wind", "Orbital", "Explosive" };
+
+		if (ImGui::Combo("Mode", &currentMode, velocityModes, IM_ARRAYSIZE(velocityModes)))
+		{
+			movementModule->SetVelocityMode(static_cast<VelocityMode>(currentMode));
+		}
+
+		// Velocity Mode별 세부 설정
+		ImGui::Spacing();
+		switch (static_cast<VelocityMode>(currentMode))
+		{
+		case VelocityMode::Curve:
+		{
+			ImGui::Text("Velocity Curve");
+			ImGui::Separator();
+
+			// Velocity Point 추가
+			static float addTime = 0.0f;
+			static float addVelocity[3] = { 0.0f, 0.0f, 0.0f };
+			static float addStrength = 1.0f;
+
+			ImGui::SliderFloat("Time", &addTime, 0.0f, 1.0f);
+			ImGui::SliderFloat3("Velocity", addVelocity, -50.0f, 50.0f);
+			ImGui::SliderFloat("Strength", &addStrength, 0.0f, 5.0f);
+
+			if (ImGui::Button("Add Point"))
+			{
+				movementModule->AddVelocityPoint(addTime,
+					Mathf::Vector3(addVelocity[0], addVelocity[1], addVelocity[2]),
+					addStrength);
+			}
+
+			ImGui::SameLine();
+			if (ImGui::Button("Clear Curve"))
+			{
+				movementModule->ClearVelocityCurve();
+			}
+
+			// 현재 Curve 표시
+			const auto& curve = movementModule->GetVelocityCurve();
+			if (!curve.empty())
+			{
+				ImGui::Text("Current Points: %zu", curve.size());
+				for (size_t i = 0; i < curve.size(); ++i)
+				{
+					ImGui::Text("  [%.2f] (%.1f, %.1f, %.1f) * %.2f",
+						curve[i].time,
+						curve[i].velocity.x, curve[i].velocity.y, curve[i].velocity.z,
+						curve[i].strength);
+				}
+			}
+			break;
+		}
+
+		case VelocityMode::Impulse:
+		{
+			ImGui::Text("Impulse Settings");
+			ImGui::Separator();
+
+			static float impulseTime = 0.0f;
+			static float impulseDirection[3] = { 0.0f, 1.0f, 0.0f };
+			static float impulseForce = 10.0f;
+			static float impulseDuration = 0.1f;
+
+			ImGui::SliderFloat("Trigger Time", &impulseTime, 0.0f, 1.0f);
+			ImGui::SliderFloat3("Direction", impulseDirection, -1.0f, 1.0f);
+			ImGui::SliderFloat("Force", &impulseForce, 0.0f, 100.0f);
+			ImGui::SliderFloat("Duration", &impulseDuration, 0.01f, 1.0f);
+
+			if (ImGui::Button("Add Impulse"))
+			{
+				movementModule->AddImpulse(impulseTime,
+					Mathf::Vector3(impulseDirection[0], impulseDirection[1], impulseDirection[2]),
+					impulseForce, impulseDuration);
+			}
+
+			ImGui::SameLine();
+			if (ImGui::Button("Clear Impulses"))
+			{
+				movementModule->ClearImpulses();
+			}
+
+			const auto& impulses = movementModule->GetImpulses();
+			if (!impulses.empty())
+			{
+				ImGui::Text("Current Impulses: %zu", impulses.size());
+			}
+			break;
+		}
+
+		case VelocityMode::Wind:
+		{
+			ImGui::Text("Wind Settings");
+			ImGui::Separator();
+
+			const auto& windData = movementModule->GetWindData();
+			float direction[3] = { windData.direction.x, windData.direction.y, windData.direction.z };
+			float strength = windData.baseStrength;
+			float turbulence = windData.turbulence;
+			float frequency = windData.frequency;
+
+			if (ImGui::SliderFloat3("Direction", direction, -1.0f, 1.0f))
+			{
+				movementModule->SetWindEffect(
+					Mathf::Vector3(direction[0], direction[1], direction[2]),
+					strength, turbulence, frequency);
+			}
+
+			if (ImGui::SliderFloat("Strength", &strength, 0.0f, 50.0f))
+			{
+				movementModule->SetWindEffect(
+					Mathf::Vector3(direction[0], direction[1], direction[2]),
+					strength, turbulence, frequency);
+			}
+
+			if (ImGui::SliderFloat("Turbulence", &turbulence, 0.0f, 2.0f))
+			{
+				movementModule->SetWindEffect(
+					Mathf::Vector3(direction[0], direction[1], direction[2]),
+					strength, turbulence, frequency);
+			}
+
+			if (ImGui::SliderFloat("Frequency", &frequency, 0.1f, 5.0f))
+			{
+				movementModule->SetWindEffect(
+					Mathf::Vector3(direction[0], direction[1], direction[2]),
+					strength, turbulence, frequency);
+			}
+			break;
+		}
+
+		case VelocityMode::Orbital:
+		{
+			ImGui::Text("Orbital Settings");
+			ImGui::Separator();
+
+			const auto& orbitalData = movementModule->GetOrbitalData();
+			float center[3] = { orbitalData.center.x, orbitalData.center.y, orbitalData.center.z };
+			float radius = orbitalData.radius;
+			float speed = orbitalData.speed;
+			float axis[3] = { orbitalData.axis.x, orbitalData.axis.y, orbitalData.axis.z };
+
+			if (ImGui::SliderFloat3("Center", center, -100.0f, 100.0f))
+			{
+				movementModule->SetOrbitalMotion(
+					Mathf::Vector3(center[0], center[1], center[2]),
+					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
+			}
+
+			if (ImGui::SliderFloat("Radius", &radius, 1.0f, 50.0f))
+			{
+				movementModule->SetOrbitalMotion(
+					Mathf::Vector3(center[0], center[1], center[2]),
+					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
+			}
+
+			if (ImGui::SliderFloat("Speed", &speed, -10.0f, 10.0f))
+			{
+				movementModule->SetOrbitalMotion(
+					Mathf::Vector3(center[0], center[1], center[2]),
+					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
+			}
+
+			if (ImGui::SliderFloat3("Axis", axis, -1.0f, 1.0f))
+			{
+				movementModule->SetOrbitalMotion(
+					Mathf::Vector3(center[0], center[1], center[2]),
+					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
+			}
+			break;
+		}
+
+		case VelocityMode::Explosive:
+		{
+			ImGui::Text("Explosive Settings");
+			ImGui::Separator();
+
+			const auto& explosiveData = movementModule->GetExplosiveData();
+			float initialSpeed = explosiveData.initialSpeed;
+			float speedDecay = explosiveData.speedDecay;
+			float randomFactor = explosiveData.randomFactor;
+			float sphereRadius = explosiveData.sphereRadius;
+
+			if (ImGui::SliderFloat("Initial Speed", &initialSpeed, 0.0f, 200.0f))
+			{
+				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
+			}
+
+			if (ImGui::SliderFloat("Speed Decay", &speedDecay, 0.1f, 5.0f))
+			{
+				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
+			}
+
+			if (ImGui::SliderFloat("Random Factor", &randomFactor, 0.0f, 1.0f))
+			{
+				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
+			}
+
+			if (ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.0f, 2.0f))
+			{
+				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
+			}
+			break;
+		}
+		}
+
+		// 이징 설정
+		if (ImGui::TreeNode("Easing Settings"))
+		{
+			static bool easingEnabled = false;
+			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			if (easingEnabled)
+			{
+				static const char* easingTypes[] = {
+					"Linear", "InSine", "OutSine", "InOutSine",
+					"InQuad", "OutQuad", "InOutQuad",
+					"InCubic", "OutCubic", "InOutCubic",
+					"InQuart", "OutQuart", "InOutQuart",
+					"InQuint", "OutQuint", "InOutQuint",
+					"InExpo", "OutExpo", "InOutExpo",
+					"InCirc", "OutCirc", "InOutCirc",
+					"InBack", "OutBack", "InOutBack",
+					"InElastic", "OutElastic", "InOutElastic",
+					"InBounce", "OutBounce", "InOutBounce"
+				};
+				static const char* animationTypes[] = {
+					"Once Forward", "Once Back", "Once PingPong",
+					"Loop Forward", "Loop Back", "Loop PingPong"
+				};
+				static int currentEasingType = 0;
+				static int currentAnimationType = 0;
+				static float duration = 1.0f;
+				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+				if (ImGui::Button("Apply Easing"))
+				{
+					movementModule->SetEasing(
+						static_cast<EasingEffect>(currentEasingType),
+						static_cast<StepAnimation>(currentAnimationType),
+						duration
+					);
+				}
+			}
+			else
+			{
+				if (movementModule->m_easingEnable)
+				{
+					movementModule->DisableEasing();
+				}
+			}
+			ImGui::TreePop();
+		}
+	}
+}
+
+void EffectEditor::RenderMeshSizeModuleEditor(MeshSizeModuleCS* sizeModule)
+{
+	if (!sizeModule) return;
+
+	ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+	if (ImGui::CollapsingHeader("Size Module"))
+	{
+		// 모듈 활성화 체크박스
+		bool enabled = sizeModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Size Module", &enabled))
+		{
+			sizeModule->SetEnabled(enabled);
+		}
+
+		if (!enabled)
+		{
+			ImGui::BeginDisabled();
+		}
+
+		ImGui::Separator();
+
+		// 시작 크기 설정
+		XMFLOAT3 startSize = sizeModule->GetStartSize();
+		if (ImGui::DragFloat3("Start Size", &startSize.x, 0.01f, 0.01f, 10.0f, "%.2f"))
+		{
+			sizeModule->SetStartSize(startSize);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Initial size of particles (Width, Height)");
+		}
+
+		// 끝 크기 설정
+		XMFLOAT3 endSize = sizeModule->GetEndSize();
+		if (ImGui::DragFloat3("End Size", &endSize.x, 0.01f, 0.01f, 10.0f, "%.2f"))
+		{
+			sizeModule->SetEndSize(endSize);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Final size of particles (Width, Height)");
+		}
+
+		ImGui::Separator();
+
+		// 랜덤 스케일 설정
+		ImGui::Text("Random Scale");
+
+		bool useRandomScale = sizeModule->GetUseRandomScale();
+		if (ImGui::Checkbox("Use Random Scale", &useRandomScale))
+		{
+			float minScale = sizeModule->GetRandomScaleMin();
+			float maxScale = sizeModule->GetRandomScaleMax();
+			sizeModule->SetRandomScale(useRandomScale, minScale, maxScale);
+		}
+
+		if (useRandomScale)
+		{
+			ImGui::Indent();
+
+			float minScale = sizeModule->GetRandomScaleMin();
+			if (ImGui::DragFloat("Min Scale", &minScale, 0.01f, 0.1f, 5.0f, "%.2f"))
+			{
+				float maxScale = sizeModule->GetRandomScaleMax();
+				if (minScale > maxScale) maxScale = minScale;
+				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			float maxScale = sizeModule->GetRandomScaleMax();
+			if (ImGui::DragFloat("Max Scale", &maxScale, 0.01f, 0.1f, 5.0f, "%.2f"))
+			{
+				float minScale = sizeModule->GetRandomScaleMin();
+				if (maxScale < minScale) minScale = maxScale;
+				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
+		// 이징 설정
+		ImGui::Text("Easing Animation");
+
+		bool easingEnabled = sizeModule->IsEasingEnabled();
+		if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+		{
+			if (easingEnabled)
+			{
+				sizeModule->SetEasing(EasingEffect::Linear, StepAnimation::StepLoopForward, 1.0f);
+			}
+			else
+			{
+				sizeModule->DisableEasing();
+			}
+		}
+
+		if (ImGui::TreeNode("Easing Settings"))
+		{
+			static bool easingEnabled = false;
+			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			if (easingEnabled)
+			{
+				static const char* easingTypes[] = {
+					"Linear", "InSine", "OutSine", "InOutSine",
+					"InQuad", "OutQuad", "InOutQuad",
+					"InCubic", "OutCubic", "InOutCubic",
+					"InQuart", "OutQuart", "InOutQuart",
+					"InQuint", "OutQuint", "InOutQuint",
+					"InExpo", "OutExpo", "InOutExpo",
+					"InCirc", "OutCirc", "InOutCirc",
+					"InBack", "OutBack", "InOutBack",
+					"InElastic", "OutElastic", "InOutElastic",
+					"InBounce", "OutBounce", "InOutBounce"
+				};
+				static const char* animationTypes[] = {
+					"Once Forward", "Once Back", "Once PingPong",
+					"Loop Forward", "Loop Back", "Loop PingPong"
+				};
+				static int currentEasingType = 0;
+				static int currentAnimationType = 0;
+				static float duration = 1.0f;
+				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+				if (ImGui::Button("Apply Easing"))
+				{
+					sizeModule->SetEasing(
+						static_cast<EasingEffect>(currentEasingType),
+						static_cast<StepAnimation>(currentAnimationType),
+						duration
+					);
+				}
+			}
+			else
+			{
+				if (sizeModule->m_easingEnable)
+				{
+					sizeModule->DisableEasing();
+				}
+			}
 			ImGui::TreePop();
 		}
 	}

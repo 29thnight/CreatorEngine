@@ -42,7 +42,7 @@ cbuffer SpawnParameters : register(b0)
     uint gForceRotationUpdate;
     
     float3 gPreviousEmitterRotation;
-    float padd1;
+    uint gAllowNewSpawn;
 }
 
 // 파티클 템플릿
@@ -55,13 +55,15 @@ cbuffer ParticleTemplate : register(b1)
     float4 gColor;
     
     float3 gVelocity;
-    float gMinVerticalVelocity;
+    float gVelocityRandomRange;
     
     float3 gAcceleration;
-    float gMaxVerticalVelocity;
+    float gInitialRotation;
     
-    float gHorizontalVelocityRange;
-    float3 pad;
+    float gInitialRotationRange;
+    float pad1;
+    float pad2;
+    float pad3;
 }
 
 // 버퍼 바인딩
@@ -189,8 +191,8 @@ float3 GenerateEmitterPosition(uint seed)
 
                 localPos = float3(
                 r * cos(angle),
-                0.0,
-                r * sin(angle)
+                r * sin(angle),
+                0.0
             );
                 break;
             }
@@ -212,22 +214,36 @@ float3 GenerateInitialVelocity(uint seed)
 {
     float3 velocity = gVelocity;
     
-    if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
+    // 랜덤 범위 적용 (각 축별로)
+    if (gVelocityRandomRange > 0.0)
     {
-        float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
-        float horizontalAngle = RandomFloat01(seed + 1) * 6.28318530718;
-        float horizontalMag = RandomFloat01(seed + 2) * gHorizontalVelocityRange;
+        uint seed1 = WangHash(seed);
+        uint seed2 = WangHash(seed1);
         
-        velocity += float3(
-            horizontalMag * cos(horizontalAngle),
-            verticalVel,
-            horizontalMag * sin(horizontalAngle)
-        );
+        float randomX = (RandomFloat01(seed1) - 0.5) * gVelocityRandomRange;
+        float randomY = (RandomFloat01(seed2) - 0.5) * gVelocityRandomRange;
+        
+        velocity += float3(randomX, randomY, 0);
     }
     
     // 속도에도 회전 적용
     float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
     return mul(rotationMatrix, velocity);
+}
+
+// 2D 빌보드 초기 회전 생성
+float GenerateInitialRotation(uint seed)
+{
+    float rotation = gInitialRotation;
+    
+    // 랜덤 범위 적용
+    if (gInitialRotationRange > 0.0)
+    {
+        float randomOffset = (RandomFloat01(seed) - 0.5) * gInitialRotationRange;
+        rotation += randomOffset;
+    }
+    
+    return rotation;
 }
 
 // 파티클 초기화
@@ -239,7 +255,7 @@ void InitializeParticle(inout ParticleData particle, uint seed)
     particle.size = gSize;
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
-    particle.rotation = 0.0;
+    particle.rotation = GenerateInitialRotation(seed + 200); // Z축 회전만
     particle.rotateSpeed = gRotateSpeed;
     particle.color = gColor;
     particle.isActive = 1;
@@ -311,26 +327,29 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 비활성 파티클 스폰 체크
     else
     {
-        float particleSpawnTime = float(particleIndex) / gSpawnRate;
-        float spawnCycle = float(gMaxParticles) / gSpawnRate;
-        float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
-        
-        bool shouldSpawn = false;
-        
-        if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
+        if (gAllowNewSpawn == 1)
         {
-            shouldSpawn = true;
-        }
-        else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
+            float particleSpawnTime = float(particleIndex) / gSpawnRate;
+            float spawnCycle = float(gMaxParticles) / gSpawnRate;
+            float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
+        
+            bool shouldSpawn = false;
+        
+            if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
+            {
+                shouldSpawn = true;
+            }
+            else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
                  cycleTime < (spawnCycle + particleSpawnTime + (1.0 / gSpawnRate)))
-        {
-            shouldSpawn = true;
-        }
+            {
+                shouldSpawn = true;
+            }
         
-        if (shouldSpawn)
-        {
-            uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
-            InitializeParticle(particle, seed);
+            if (shouldSpawn)
+            {
+                uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
+                InitializeParticle(particle, seed);
+            }
         }
     }
     

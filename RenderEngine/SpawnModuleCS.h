@@ -13,14 +13,14 @@ struct alignas(16) ParticleTemplateParams
     float4 color;
 
     float3 velocity;
-    float pad1;
+    float velocityRandomRange;
 
     float3 acceleration;
-    float pad2;
+    float initialRotation;       // 초기 Z축 회전값
 
-    float minVerticalVelocity;
-    float maxVerticalVelocity;
-    float horizontalVelocityRange;
+    float initialRotationRange;  // 초기 회전 랜덤 범위
+    float pad1;
+    float pad2;
     float pad3;
 };
 
@@ -49,6 +49,7 @@ private:
     bool m_spawnParamsDirty;
     bool m_templateDirty;
     UINT m_particleCapacity;
+    bool m_allowNewSpawn = true;
 
     // 난수 생성기 (초기 시드용)
     std::random_device m_randomDevice;
@@ -97,18 +98,24 @@ public:
     void SetParticleLifeTime(float lifeTime);
     void SetParticleSize(const XMFLOAT2& size);
     void SetParticleColor(const XMFLOAT4& color);
-    void SetParticleVelocity(const XMFLOAT3& velocity);
+    void SetParticleVelocity(const XMFLOAT3& velocity, float randomRange = 0.0f);
     void SetParticleAcceleration(const XMFLOAT3& acceleration);
-    void SetVelocityRange(float minVertical, float maxVertical, float horizontalRange);
     void SetRotateSpeed(float speed);
+    void SetRotation(float rotation, float randomrange);
 
     // 상태 조회
     float GetSpawnRate() const { return m_spawnParams.spawnRate; }
     EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
     ParticleTemplateParams GetTemplate() const { return m_particleTemplate; }
 
-    // 직렬화
+    void SetAllowNewSpawn(bool allow) {
+        m_allowNewSpawn = allow;
+        m_spawnParamsDirty = true;
+    }
+    bool IsAllowNewSpawn() const { return m_allowNewSpawn; }
+
 public:
+    // 직렬화
     // ISerializable 인터페이스 구현
     virtual nlohmann::json SerializeData() const override;
     virtual void DeserializeData(const nlohmann::json& json) override;

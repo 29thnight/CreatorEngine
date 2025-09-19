@@ -91,5 +91,8 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_SpriteAnimationBuffer;
     SpriteAnimationBuffer m_SpriteAnimationConstantBuffer;
+
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_timeBuffer;
+    TimeParams m_timeParams = {};
 };
 

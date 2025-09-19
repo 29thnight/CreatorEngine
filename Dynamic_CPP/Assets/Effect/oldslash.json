@@ -1,10 +1,10 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "gg",
+    "loop": true,
+    "name": "oldslash",
     "particleSystems": [
         {
             "isRunning": true,
@@ -13,11 +13,6 @@
                 {
                     "data": {
                         "meshParticleTemplate": {
-                            "InitialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
                             "RotationSpeed": {
                                 "x": 1.0,
                                 "y": 1.0,
@@ -28,7 +23,6 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "VerticalVelocity": 0.0,
                             "acceleration": {
                                 "x": 0.0,
                                 "y": -9.800000190734863,
@@ -36,19 +30,19 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 1.0,
-                                "y": 1.0,
+                                "x": 0.0,
+                                "y": 0.12115740776062012,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
-                            "lifeTime": 10.0,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -57,6 +51,11 @@
                                 "z": 0.0
                             },
                             "emitterRadius": 1.0,
+                            "emitterRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
                             "emitterSize": {
                                 "x": 0.5,
                                 "y": 0.5,
@@ -102,43 +101,49 @@
                             "meshIndex": 0,
                             "name": "Eff_PC_charge"
                         },
-                        "polarClipping": {
-                            "animating": true,
-                            "animationSpeed": 5.0,
-                            "enabled": true,
-                            "params": {
-                                "polarAngleProgress": 0.9628547430038452,
-                                "polarCenter": {
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "polarDirection": -1.0,
-                                "polarReferenceDir": {
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "polarStartAngle": 3.1415927410125732,
-                                "polarUpAxis": {
-                                    "x": 0.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                }
-                            }
-                        },
                         "renderState": {
                             "instanceCount": 1
                         },
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "Eff_PC_charge_DefaultMaterial_BaseColor.png"
-                        }
+                        "renderStates": {
+                            "blendPreset": 3,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 2
+                        },
+                        "shaders": {
+                            "pixelShader": "MeshParticleTest",
+                            "vertexShader": "MeshParticle"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_01",
+                                "slot": 0
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_02",
+                                "slot": 1
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_03",
+                                "slot": 2
+                            },
+                            {
+                                "hasTexture": true,
+                                "name": "Sword_Eft_04",
+                                "slot": 3
+                            }
+                        ]
                     },
                     "type": "MeshModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {
