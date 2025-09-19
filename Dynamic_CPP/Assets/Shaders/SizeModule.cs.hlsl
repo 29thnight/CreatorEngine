@@ -90,6 +90,9 @@ void main(uint3 id : SV_DispatchThreadID)
         currentSize *= randomScale;
     }
     
+    currentSize.x *= emitterScale.x;
+    currentSize.y *= emitterScale.y;
+    
     // 결과 적용
     particle.size = currentSize;
     

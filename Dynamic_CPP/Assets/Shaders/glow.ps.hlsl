@@ -4,6 +4,12 @@
 Texture2D sparkleTexture : register(t0);
 SamplerState linearSampler : register(s0);
 
+cbuffer TimeBuffer : register(b3)
+{
+    float gTime;
+    float3 gPadding;
+};
+
 // 픽셀 셰이더 입력 구조체
 struct VSOutput
 {

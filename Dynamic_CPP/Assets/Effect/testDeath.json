@@ -4,10 +4,10 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "realD",
+    "name": "testDeath",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 50,
             "modules": [
                 {
@@ -24,6 +24,8 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
                             "lifeTime": 5.0,
                             "rotateSpeed": 0.0,
                             "size": {
@@ -71,7 +73,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 18.95982551574707,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,

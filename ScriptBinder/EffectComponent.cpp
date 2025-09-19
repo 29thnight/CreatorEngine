@@ -135,13 +135,13 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     bool templateLoop;
     if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
     {
-        if (m_timeScale == 1.0f) {  // 기본값인 경우에만
+        if (!m_timeScaleModified) {
             m_timeScale = templateTimeScale;
         }
-        if (m_loop == true) {  // 기본값인 경우에만
+        if (!m_loopModified) {
             m_loop = templateLoop;
         }
-        if (m_duration == -1.0f) {  // 기본값인 경우에만
+        if (!m_durationModified) {
             m_duration = templateDuration;
         }
     }
@@ -202,14 +202,13 @@ void EffectComponent::ChangeEffect(const std::string& newEffectName)
 
     if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
     {
-        // 기본값이 아닌 경우에만 템플릿 값 사용
-        if (m_timeScale == 1.0f) {  // 기본값인 경우에만
+        if (!m_timeScaleModified) {
             m_timeScale = templateTimeScale;
         }
-        if (m_loop == true) {  // 기본값인 경우에만
+        if (!m_loopModified) {
             m_loop = templateLoop;
         }
-        if (m_duration == -1.0f) {  // 기본값인 경우에만
+        if (!m_durationModified) {
             m_duration = templateDuration;
         }
     }
@@ -300,42 +299,10 @@ void EffectComponent::ForeceUpdatePosition()
     }
 }
 
-void EffectComponent::ApplyEffectSettings()
-{
-    if (!m_effectInstanceName.empty())
-    {
-        EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
-        if (!proxy) return;
-        proxy->UpdateInstanceName(m_effectInstanceName);
-        //auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, m_timeScale);
-        //EffectCommandQueue->PushEffectCommand(std::move(timeScaleCommand));
-        proxy->UpdateTimeScale(m_timeScale);
-
-        proxy->PushCommand(EffectCommandType::SetTimeScale);
-
-        // 루프 설정
-        //proxy->UpdateTimeScale(m_timeScale);
-        proxy->UpdateLoop(m_loop);
-        proxy->PushCommand(EffectCommandType::SetLoop);
-
-        // 지속시간 설정
-        //proxy->UpdateTimeScale(m_timeScale);
-        proxy->UpdateDuration(m_duration);
-        proxy->PushCommand(EffectCommandType::SetDuration);
-
-
-        // 위치 설정
-        auto currentPos = GetOwner()->m_transform.GetWorldPosition();
-        //auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
-        //EffectCommandQueue->PushEffectCommand(std::move(positionCommand));
-        proxy->UpdatePosition(currentPos);
-        proxy->PushCommand(EffectCommandType::SetPosition);
-    }
-}
-
 void EffectComponent::SetLoop(bool loop)
 {
     m_loop = loop;
+    m_loopModified = true;
     if (!m_effectInstanceName.empty())
     {
         auto loopCommand = EffectManagerProxy::CreateSetLoopCommand(m_effectInstanceName, loop);
@@ -346,6 +313,7 @@ void EffectComponent::SetLoop(bool loop)
 void EffectComponent::SetDuration(float duration)
 {
     m_duration = duration;
+    m_durationModified = true;
     if (!m_effectInstanceName.empty())
     {
         auto durationCommand = EffectManagerProxy::CreateSetDurationCommand(m_effectInstanceName, duration);
@@ -356,6 +324,7 @@ void EffectComponent::SetDuration(float duration)
 void EffectComponent::SetTimeScale(float timeScale)
 {
     m_timeScale = timeScale;
+    m_timeScaleModified = true;
     if (!m_effectInstanceName.empty())
     {
         auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, timeScale);

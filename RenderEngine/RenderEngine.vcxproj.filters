@@ -300,6 +300,12 @@
     <Filter Include="Resources\SpriteSheet">
       <UniqueIdentifier>{a94062ae-a711-4028-835d-4f8b3a7b0c5a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Effect\Special\2D">
+      <UniqueIdentifier>{04905063-d31f-4c62-9936-af965003636a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Effect\Special\3D">
+      <UniqueIdentifier>{5cc2eb6b-2c4a-46c7-b5d8-289ccc3f4534}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -1146,9 +1152,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailPixel.ps.hlsl">
       <Filter>Shaders\Effect\Generate</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Dash.ps.hlsl">
-      <Filter>Shaders\Effect\Special</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailMeshGenerate.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
@@ -1170,20 +1173,11 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TestForward.ps.hlsl">
       <Filter>Shaders\TestShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpriteAnimation.ps.hlsl">
-      <Filter>Shaders\Effect\2D</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshColorModule.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleTest.ps.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ggg.ps.hlsl">
-      <Filter>Shaders\Effect\Special</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\gg.ps.hlsl">
-      <Filter>Shaders\Effect\Special</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshMovementModule.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
@@ -1191,11 +1185,26 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSizeModule.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\spincircle.ps.hlsl">
+      <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\gg.ps.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ggg.ps.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Dash.ps.hlsl">
+      <Filter>Shaders\Effect\Generate</Filter>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\glow.ps.hlsl">
-      <Filter>Shaders\Effect\2D</Filter>
+      <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\spike.vs.hlsl">
-      <Filter>Shaders\Effect\2D</Filter>
+      <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpriteAnimation.ps.hlsl">
+      <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

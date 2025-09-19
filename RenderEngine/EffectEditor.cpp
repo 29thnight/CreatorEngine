@@ -198,6 +198,7 @@ void EffectEditor::RenderShaderSelectionUI(RenderModules* renderModule)
 
 	auto availableVS = RenderModules::GetAvailableVertexShaders();
 	if (!availableVS.empty()) {
+		std::sort(availableVS.begin(), availableVS.end());
 		std::string currentVS = renderModule->GetVertexShaderName();
 		if (ImGui::BeginCombo("Vertex Shader", currentVS.c_str())) {
 			for (const auto& shaderName : availableVS) {
@@ -215,6 +216,7 @@ void EffectEditor::RenderShaderSelectionUI(RenderModules* renderModule)
 
 	auto availablePS = RenderModules::GetAvailablePixelShaders();
 	if (!availablePS.empty()) {
+		std::sort(availablePS.begin(), availablePS.end());
 		std::string currentPS = renderModule->GetPixelShaderName();
 		if (ImGui::BeginCombo("Pixel Shader", currentPS.c_str())) {
 			for (const auto& shaderName : availablePS) {
@@ -1144,6 +1146,7 @@ void EffectEditor::AddSelectedModule()
 			targetSystem->AddModule<MeshMovementModuleCS>();
 			targetSystem->GetModule<MeshMovementModuleCS>()->Initialize();
 		}
+		break;
 	case EffectModuleType::MeshSizeModule:
 		if (!targetSystem->GetModule<MeshSizeModuleCS>()) {
 			targetSystem->AddModule<MeshSizeModuleCS>();

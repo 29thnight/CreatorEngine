@@ -1,10 +1,10 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "test4",
+    "loop": true,
+    "name": "walk2",
     "particleSystems": [
         {
             "isRunning": true,
@@ -24,10 +24,9 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
                             "lifeTime": 1.0,
-                            "maxVerticalVelocity": 0.0,
-                            "minVerticalVelocity": 0.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 0.30000001192092896,
@@ -37,7 +36,8 @@
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -161,7 +161,12 @@
                     },
                     "type": "BillboardModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {
