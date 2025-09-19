@@ -27,6 +27,9 @@ public:
    void SetBillboardAxis(const Mathf::Vector3& axis) { m_billboardAxis = axis; }
    const Mathf::Vector3& GetBillboardAxis() const noexcept { return m_billboardAxis; }
 
+   bool IsEnableDepth() const { return m_enableDepth; }
+   void SetEnableDepth(bool enable) { m_enableDepth = enable; }
+
 private:
 	friend class ComponentFactory;
     [[Property]]
@@ -39,6 +42,8 @@ private:
     BillboardType m_billboardType{ BillboardType::None };
     [[Property]]
     Mathf::Vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
+	[[Property]]
+	bool m_enableDepth{ false };
 
     std::shared_ptr<Texture> m_Sprite = nullptr;
 };

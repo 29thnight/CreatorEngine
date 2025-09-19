@@ -1,7 +1,5 @@
 #include "TimeSystem.h"
 
-DirectX11::TimeSystem* DirectX11::TimeSystem::TimeSysInstance = nullptr;
-
 DirectX11::TimeSystem::TimeSystem() :
 	m_elapsedTicks(0),
 	m_totalTicks(0),
@@ -26,6 +24,4 @@ DirectX11::TimeSystem::TimeSystem() :
 
 	// NewCreateSceneInitialize max delta to 1/10 of a second.
 	m_qpcMaxDelta = m_qpcFrequency.QuadPart / 10;
-
-	TimeSysInstance = this;
 }

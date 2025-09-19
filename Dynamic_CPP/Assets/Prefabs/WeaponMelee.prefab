@@ -1,22 +1,22 @@
 m_name: WeaponMelee
 m_isEnabled: true
-m_instanceID: 1859699724
+m_instanceID: 3765037785
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponMelee
     m_isEnabled: true
-    m_instanceID: 3531490491
+    m_instanceID: 2128834898
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 5
+    m_index: 6
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [6]
-    m_prefabFileGuid: 5ea20cc1-76e7-5178-bc7f-c7159a7de3eb
+    m_childrenIndices: [10]
+    m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -27,43 +27,39 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         itemType: 2
         itemAckDmg: 1
-        itemAckSpd: 1
         itemAckRange: 2
         itemKnockback: 0.5
         coopCrit: 2
         chgTime: 0.200000003
-        chgDmgscal: 2
-        chgSpd: 3
-        chgDelay: 1
+        chgAckDmg: 5
         chgRange: 4
-        chgHitbox: 4
         chgKnockback: 1
+        ChargeAttackBulletCount: 5
+        ChargeAttackBulletAngle: 15
         durMax: 10
         durUseAtk: 1
-        durUseChg: 1
-        durUseBuf: 100
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 298557601
+        m_instanceID: 2663221396
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
         m_name: Weapon_Sword_02
         m_isEnabled: true
-        m_instanceID: 587438901
+        m_instanceID: 277207608
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 5
-        m_index: 6
-        m_parentIndex: 5
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 6
+        m_index: 10
+        m_parentIndex: 6
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 5ea20cc1-76e7-5178-bc7f-c7159a7de3eb
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -72,7 +68,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3531944432
+            m_instanceID: 792801244
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_Sword_02

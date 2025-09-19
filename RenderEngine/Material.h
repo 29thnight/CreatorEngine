@@ -77,6 +77,8 @@ public:
 	bool TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m);
 	bool TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const;
 
+	bool TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size);
+
 	// ── Qualified name sugar: "CB.Var" ──
 	bool TrySetFloat(std::string_view qualified, float v);
 	bool TryGetFloat(std::string_view qualified, float& out) const;
@@ -94,6 +96,8 @@ public:
 	// ── 커스텀 PSO용: 더러워진 CB만 GPU 반영 ──
 	void ApplyShaderParams(ID3D11DeviceContext* ctx);
 	void TrySetMaterialInfo();
+
+	void UpdateCBufferView();
 
 private:
 	struct VarView {
@@ -138,6 +142,8 @@ public:
     std::string m_shaderPSOName{};
     const std::unordered_map<std::string, ShaderPSO::CBEntry>* m_cbMeta{ nullptr };
     std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
+	std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferView{};
 	std::unordered_set<std::string> m_dirtyCBs;
+	std::unordered_set<std::string> m_viewDirtyCBs;
 };
 

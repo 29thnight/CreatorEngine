@@ -128,10 +128,11 @@ public:
 	//sprite type
 	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
 	Texture*						m_spriteTexture{ nullptr };
-        std::string m_customPSOName{};
-        std::shared_ptr<ShaderPSO>      m_customPSO{ nullptr };
-       BillboardType                          m_billboardType{ BillboardType::None };
-       Mathf::Vector3                         m_billboardAxis{ 0.f, 1.f, 0.f };
+    std::string						m_customPSOName{};
+    std::shared_ptr<ShaderPSO>      m_customPSO{ nullptr };
+    BillboardType                   m_billboardType{ BillboardType::None };
+    Mathf::Vector3                  m_billboardAxis{ 0.f, 1.f, 0.f };
+	bool                            m_enableDepth{ false };
 
 private:
 	bool							m_isNeedUpdateCulling{ false };

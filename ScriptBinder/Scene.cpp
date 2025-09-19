@@ -606,7 +606,7 @@ void Scene::LateUpdate(float deltaSecond)
                 if (scene && (scene == this ||
                     (owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
                 {
-                        data->PushUIRenderData(image->GetInstanceID());
+                    data->PushUIRenderData(image->GetInstanceID());
                 }
 			}
 		});
@@ -1591,6 +1591,8 @@ void Scene::SetInternalPhysicData()
 
 void Scene::AllUpdateWorldMatrix()
 {
+	if (m_SceneObjects.empty()) return;
+
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
 
 	auto updateFunc = [this](GameObject::Index index)

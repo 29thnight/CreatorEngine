@@ -10,6 +10,10 @@ ShaderPSO::ShaderPSO() : PipelineStateObject(true)
 {
 }
 
+ShaderPSO::ShaderPSO(const ShaderPSO& other) : PipelineStateObject(true)
+{
+}
+
 void ShaderPSO::ReflectConstantBuffers()
 {
     m_cbByName.clear();

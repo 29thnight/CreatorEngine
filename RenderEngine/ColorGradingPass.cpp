@@ -134,7 +134,7 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
-	timer += DirectX11::TimeSystem::TimeSysInstance->GetElapsedSeconds();
+	timer += Time->GetElapsedSeconds();
 	camera.UpdateBuffer();
 	CBData cbData;
 	cbData.lerpValue = lerp;

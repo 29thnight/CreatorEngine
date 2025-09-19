@@ -29,7 +29,6 @@
 #include "WeaponSlotController.h"
 #include "Bomb.h"
 #include "HPBar.h"
-
 #include "CurveIndicator.h"
 #include "DebugLog.h"
 #include "EntityMonsterA.h"
@@ -37,9 +36,10 @@
 #include "PlayerState.h"
 void Player::Start()
 {
-	
 	player = GetOwner();
+
 	auto childred = player->m_childrenIndices;
+
 	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
@@ -50,7 +50,6 @@ void Player::Start()
 			aniOwner = GameObject::FindIndex(child);
 			break;
 		}
-
 	}
 	if (!m_animator)
 	{
@@ -73,33 +72,65 @@ void Player::Start()
 
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 
-	//TEST : UIController 현재는 테스트라 P1_UIController로 고정
-	//TODO : 관련해서 플레이어 컴포넌트가 본인 인덱스를 알아야 함.
-	GameObject* uiController = GameObject::Find("P1_UIController");
-	if (uiController)
+	GameObject* uiController{};
+	if(0 == playerIndex)
 	{
-		auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
-		if (weaponSlotController)
+		GameObject* uiController = GameObject::Find("P1_UIController");
+		if (uiController)
 		{
-			weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
-			weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
-			weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+			if (weaponSlotController)
+			{
+				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
+				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
+				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+			}
 		}
-	}
 
-	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
-	if (HPbar)
-	{
-		auto hpbar = HPbar->GetComponent<HPBar>();
-		if (hpbar)
+		auto HPbar = GameObject::Find("P1_HPBar");
+		if (HPbar)
 		{
-			hpbar->targetIndex = player->m_index;
-			m_currentHP = m_maxHP;
-			hpbar->SetMaxHP(m_maxHP);
-			hpbar->SetCurHP(m_currentHP);
+			auto hpbar = HPbar->GetComponent<HPBar>();
+			if (hpbar)
+			{
+				hpbar->targetIndex = player->m_index;
+				m_currentHP = m_maxHP;
+				hpbar->SetMaxHP(m_maxHP);
+				hpbar->SetCurHP(m_currentHP);
+			}
 		}
 	}
-	//~TEST
+	else
+	{
+		GameObject* uiController = GameObject::Find("P2_UIController");
+		if (uiController)
+		{
+			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+			if (weaponSlotController)
+			{
+				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
+				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
+				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
+				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+			}
+		}
+
+		auto HPbar = GameObject::Find("P2_HPBar");
+		if (HPbar)
+		{
+			auto hpbar = HPbar->GetComponent<HPBar>();
+			if (hpbar)
+			{
+				hpbar->targetIndex = player->m_index;
+				m_currentHP = m_maxHP;
+				hpbar->SetMaxHP(m_maxHP);
+				hpbar->SetCurHP(m_currentHP);
+			}
+		}
+	}
 
 	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("WeaponBasic");
 	Weapon* weapon = nullptr;
@@ -163,10 +194,6 @@ void Player::Start()
 
 	}
 
-
-
-
-
 	//idle에 move 도포함
 	BitFlag idleBit;
 	idleBit.Set(PlayerStateFlag::CanMove);
@@ -210,6 +237,13 @@ void Player::Start()
 
 
 	ChangeState("Idle");
+
+	auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for(auto& meshrenderer : meshrenderers)
+	{
+		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
+	}
+	Debug->Log("Player Start");
 }
 
 void Player::Update(float tick)
@@ -221,7 +255,6 @@ void Player::Update(float tick)
 
 	if (catchedObject)
 	{
-		
 		UpdateChatchObject();
 	}
 
@@ -230,6 +263,7 @@ void Player::Update(float tick)
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
 	}
+
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
 		m_comboElapsedTime += tick;
@@ -252,6 +286,7 @@ void Player::Update(float tick)
 		{
 			m_curWeapon->isCompleteCharge = false;
 		}
+		m_ChargingWeaponEvent.UnsafeBroadcast(m_curWeapon, m_weaponIndex);
 	}
 	if (m_curDashCount != 0)
 	{
@@ -329,13 +364,11 @@ void Player::LateUpdate(float tick)
 			return;
 		}
 
-
 		{
 			//이미화면밖임
 			stunRespawnElapsedTime += tick;
 			if (stunRespawnTime <= stunRespawnElapsedTime)
 			{
-
 				auto& asiss = GM->GetAsis();
 				if (!asiss.empty())
 				{
@@ -348,12 +381,7 @@ void Player::LateUpdate(float tick)
 					GetOwner()->m_transform.SetPosition(newWorldPos);
 					stunRespawnElapsedTime = 0;
 				}
-
-
-
 			}
-			
-
 		}
 	}
 	else
@@ -530,7 +558,6 @@ void Player::CatchAndThrow()
 
 void Player::Catch()
 {
-
 	if (false == CheckState(PlayerStateFlag::CanGrab))  return;
 	if (m_nearObject != nullptr && catchedObject ==nullptr)
 	{
@@ -713,9 +740,6 @@ void Player::Charging()
 		isCharging = true;    //true 일동안 chargeTime 상승중
 	}
 	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
-
-		
-
 }
 
 void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀예정

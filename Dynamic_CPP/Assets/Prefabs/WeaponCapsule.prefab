@@ -1,12 +1,12 @@
 m_name: WeaponCapsule
 m_isEnabled: true
-m_instanceID: 3182638247
+m_instanceID: 1689466135
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponCapsule
     m_isEnabled: true
-    m_instanceID: 1529465952
+    m_instanceID: 3373962246
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -27,14 +27,14 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         m_name: WeaponCapsule
         m_isEnabled: true
-        m_instanceID: 856857495
+        m_instanceID: 3422231630
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 8acd9958-6fe5-56b2-8515-19007ffb78b1
     children:
       - GameObject: 2166264123
-        m_name: Weapon_sword01
+        m_name: Weapon_sword01 (1)
         m_isEnabled: true
-        m_instanceID: 3800223571
+        m_instanceID: 2235644338
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -46,7 +46,7 @@ PrefabNode:
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -55,7 +55,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1911843809
+            m_instanceID: 55929548
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_sword01

@@ -2,6 +2,7 @@
 #include "TextComponent.h"
 #include "WeaponSlot.h"
 #include "pch.h"
+
 void WeaponSlotDurFont::Start()
 {
 	m_textComponent = GetOwner()->GetComponent<TextComponent>();
@@ -45,6 +46,7 @@ void WeaponSlotDurFont::Update(float tick)
 	int curDur = m_weaponSlot->GetCurrentDurability();
 	int weapon_type = m_weaponSlot->GetCurrentWeaponType();
 	std::string durStr = std::format("{}", curDur);
+	
 	switch (weapon_type)
 	{
 	case (int)ItemType::Melee:
@@ -53,6 +55,11 @@ void WeaponSlotDurFont::Update(float tick)
 		m_textComponent->SetMessage(durStr);
 		break;
 	case (int)ItemType::Basic:
+	{
+		std::string infiStr = std::format("{}", "\u221E"); //¡Ä
+		m_textComponent->SetMessage(infiStr);
+		break;
+	}
 	case (int)ItemType::None:
 	default:
 		m_textComponent->SetMessage("");
