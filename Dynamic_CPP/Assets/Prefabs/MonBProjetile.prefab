@@ -1,21 +1,21 @@
-m_name: WeaponCapsule
+m_name: MonBProjetile
 m_isEnabled: true
-m_instanceID: 1875213001
+m_instanceID: 3938054178
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: WeaponCapsule
+    m_name: MonBProjetile
     m_isEnabled: true
-    m_instanceID: 1906892746
+    m_instanceID: 1221277075
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      scale: {x: 0.800000012, y: 0.800000012, z: 0.800000012, w: 0}
       m_parentID: 0
-    m_index: 3
+    m_index: 556
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4]
+    m_childrenIndices: [557]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -25,23 +25,23 @@ PrefabNode:
     m_layer: Default
     m_components:
       - ModuleBehavior: 1399118904
-        m_name: WeaponCapsule
+        m_name: MonsterProjectile
         m_isEnabled: true
-        m_instanceID: 2344006676
+        m_instanceID: 136200612
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 8acd9958-6fe5-56b2-8515-19007ffb78b1
+        m_scriptGuid: a36795c1-7431-5e59-ae6b-5804a3fdd8f0
     children:
       - GameObject: 2166264123
-        m_name: Bomb
+        m_name: sphere
         m_isEnabled: true
-        m_instanceID: 1712741685
+        m_instanceID: 3593552761
         m_transform:
-          position: {x: 1.77509832, y: 0.767088354, z: 0, w: 1}
+          position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00400000019, y: 0.00400000019, z: 0.00400000019, w: 0}
-          m_parentID: 3
-        m_index: 4
-        m_parentIndex: 3
+          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
+          m_parentID: 556
+        m_index: 557
+        m_parentIndex: 556
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -55,24 +55,24 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 2415470766
+            m_instanceID: 410120268
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material(2)
+              m_name: DefaultMaterial
               m_baseColorTexName: ""
               m_normalTexName: ""
               m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 0.0197853446, g: 0.800819218, b: 0.0199853349, a: 1}
+                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 1}
                 m_metallic: 0
-                m_roughness: 0.272165537
+                m_roughness: 0.301511347
                 m_bitflag: 0
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 10423ee9-c583-5f9b-ad0b-fb6d74665a9c
+              m_fileGuid: 9851b227-b723-4ea8-a6f7-f4eea253dc9b
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:

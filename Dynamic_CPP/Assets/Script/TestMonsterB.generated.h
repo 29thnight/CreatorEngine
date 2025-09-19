@@ -12,6 +12,7 @@ ReflectionScriptField(TestMonsterB) \
 		meta_property(m_chaseRange) \
 		meta_property(m_rangeOutDuration) \
 		meta_property(m_rangedAttackDamage) \
+		meta_property(m_projectileDamegeRadius) \
 		meta_property(m_projectileSpeed) \
 		meta_property(m_projectileRange) \
 		meta_property(m_projectileArcHeight) \

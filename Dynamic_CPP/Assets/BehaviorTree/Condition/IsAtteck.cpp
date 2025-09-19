@@ -5,11 +5,34 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	LOG("IsAtteck ConditionCheck: Checking if entity is in attack range.");
 
+
+	bool hasIdentity = blackBoard.HasKey("Identity");
+
+	std::string identity = "";
+	if (hasIdentity)
+	{
+		identity = blackBoard.GetValueAsString("Identity");
+	}
 	//this based target logic
 	bool isTarget = blackBoard.HasKey("Target");
-	bool useAttack = blackBoard.HasKey("AtkRange");
 	bool hasState = blackBoard.HasKey("State");
-	bool hasAtkDelay = blackBoard.HasKey("AtkDelay");
+
+	bool useAttack = false;
+	bool hasAtkDelay = false;
+	float atkRange = 0.0f;
+	if (identity == "MonsterNomal")
+	{
+		useAttack = blackBoard.HasKey("AtkRange");
+		hasAtkDelay = blackBoard.HasKey("AtkDelay");
+		atkRange = blackBoard.GetValueAsFloat("AtkRange");
+	}
+
+	if (identity == "MonsterRange") 
+	{
+		useAttack = blackBoard.HasKey("ProjectileRange");
+		hasAtkDelay = blackBoard.HasKey("RangedAttackCoolTime");
+		atkRange = blackBoard.GetValueAsFloat("ProjectileRange");
+	}
 
 
 	//if (hasState) {
@@ -47,7 +70,7 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	Transform* targetTransform = target->GetComponent<Transform>();
 	Mathf::Vector3 targetPos = targetTransform->GetWorldPosition();
 	Mathf::Vector3 dir = targetPos - pos;
-	float atkRange = blackBoard.GetValueAsFloat("AtkRange");
+	
 
 	if (dir.Length() < atkRange)
 	{

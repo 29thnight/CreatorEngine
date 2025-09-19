@@ -1,21 +1,21 @@
-m_name: ResourceMineral
+m_name: SpecialBullet
 m_isEnabled: true
-m_instanceID: 1101502060
+m_instanceID: 627519773
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: ResourceMineral
+    m_name: SpecialBullet
     m_isEnabled: true
-    m_instanceID: 197301158
+    m_instanceID: 4230605130
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
-      rotation: {x: 0, y: 0, z: 0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 606
+    m_index: 4
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [107]
+    m_childrenIndices: [6]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,9 +27,9 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 502098952
+        m_instanceID: 1223274803
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_bodyType: 2
+        m_bodyType: 1
         LinearDamping: 0.00999999978
         m_mass: 70
         maxLinearVelocity: 1.00000003e+16
@@ -37,36 +37,38 @@ PrefabNode:
         maxContactImpulse: 1.00000003e+32
         maxDepenetrationVelocity: 1.00000003e+32
         m_useGravity: false
-        m_setTrigger: false
-        m_setKinematic: true
+        m_setTrigger: true
+        m_setKinematic: false
         m_collisionEnabled: true
-      - BoxColliderComponent: 4263226401
-        m_name: BoxColliderComponent
+      - SphereColliderComponent: 1490099576
+        m_name: SphereColliderComponent
         m_isEnabled: true
-        m_instanceID: 396209858
+        m_instanceID: 3031930000
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 0.5, y: 1, z: 0.5}
+        radius: 0.100000001
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        itemCode: 1
-        m_name: EntityResource
+        rangedProjSpd: 1
+        rangedProjDist: 10
+        explosionRadius: 3
+        m_name: SpecialBullet
         m_isEnabled: true
-        m_instanceID: 2491590876
+        m_instanceID: 545023558
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+        m_scriptGuid: 0cd3c915-d85c-5c8c-9048-39ea1da6b878
     children:
       - GameObject: 2166264123
-        m_name: Obj_Inter_stone (7)
+        m_name: SpecialBullet
         m_isEnabled: true
-        m_instanceID: 3303961028
+        m_instanceID: 1613692734
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 606
-        m_index: 107
-        m_parentIndex: 606
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.00200000009, y: 0.00200000009, z: 0.00200000009, w: 0}
+          m_parentID: 4
+        m_index: 6
+        m_parentIndex: 4
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -80,28 +82,28 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3949240023
+            m_instanceID: 1525832912
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material.003
-              m_baseColorTexName: Obj_Inter_stone_Material_BaseColor.png
-              m_normalTexName: Obj_Inter_stone_Material_Normal.png
-              m_ORM_TexName: Obj_Inter_stone_Material_OcclusionRoughnessMetallic.png
+              m_name: Material(1)
+              m_baseColorTexName: ""
+              m_normalTexName: ""
+              m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-                m_metallic: 1
-                m_roughness: 1
+                m_baseColor: {r: 0.0201296601, g: 0, b: 0.800978065, a: 1}
+                m_metallic: 0
+                m_roughness: 0.272165537
                 m_bitflag: 0
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 048e2897-6ef6-5fca-a947-305db40c30cd
+              m_fileGuid: 7076e246-6956-5d2f-893e-9c184fe9defa
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
-              m_name: Plane.009
+              m_name: Sphere
               m_materialIndex: 0
               m_LODThresholds: ~
             m_LightMapping:

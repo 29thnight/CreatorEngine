@@ -1,21 +1,21 @@
-m_name: ResourceFruit
+m_name: ResoucreMushroom
 m_isEnabled: true
-m_instanceID: 3308372410
+m_instanceID: 33816668
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: ResourceFruit
+    m_name: ResoucreMushroom
     m_isEnabled: true
-    m_instanceID: 2558934878
+    m_instanceID: 712655375
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 604
+    m_index: 605
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [105]
+    m_childrenIndices: [44]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2540424011
+        m_instanceID: 2743006014
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -43,32 +43,32 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 1079900671
+        m_instanceID: 1189829369
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 1, y: 1, z: 1}
+        m_boxExtent: {x: 2, y: 5, z: 2}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        itemCode: 2
+        itemCode: 0
         m_name: EntityResource
         m_isEnabled: true
-        m_instanceID: 3472368115
+        m_instanceID: 1650678263
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
     children:
       - GameObject: 2166264123
-        m_name: Obj_Inter_Flower (2)
+        m_name: Obj_Inter_mushroom (1)
         m_isEnabled: true
-        m_instanceID: 1843523138
+        m_instanceID: 1346716809
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 604
-        m_index: 105
-        m_parentIndex: 604
+          m_parentID: 605
+        m_index: 44
+        m_parentIndex: 605
         m_rootIndex: 0
-        m_childrenIndices: [106, 107]
+        m_childrenIndices: [45, 46]
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
         m_collisionType: 1
@@ -79,16 +79,16 @@ PrefabNode:
         m_components: ~
         children:
           - GameObject: 2166264123
-            m_name: Sphere.004-0 (2)
+            m_name: mesh-0 (1)
             m_isEnabled: true
-            m_instanceID: 3032283362
+            m_instanceID: 1714615321
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 105
-            m_index: 106
-            m_parentIndex: 105
+              m_parentID: 44
+            m_index: 45
+            m_parentIndex: 44
             m_rootIndex: 0
             m_childrenIndices: ~
             m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -102,12 +102,12 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 2540265023
+                m_instanceID: 2980031149
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: Bush
-                  m_baseColorTexName: ""
-                  m_normalTexName: ""
+                  m_name: Obj_Inter_mushroom_01
+                  m_baseColorTexName: MR02_L_Material_001_BaseColor.png
+                  m_normalTexName: MR02_L_Material_001_Normal.png
                   m_ORM_TexName: ""
                   m_AO_TexName: ""
                   m_EmissiveTexName: ""
@@ -119,11 +119,11 @@ PrefabNode:
                   m_flowInfo:
                     m_windVector: {x: 0, y: 0, z: 0, w: 0}
                     m_uvScroll: {x: 0, y: 0}
-                  m_fileGuid: 31951fb3-8fad-56ed-a47e-acba9c82f1ff
+                  m_fileGuid: 8ad8c663-8e9c-5d71-ab9c-cd2c1a000725
                   m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Sphere.004-0
+                  m_name: mesh-0
                   m_materialIndex: 0
                   m_LODThresholds: ~
                 m_LightMapping:
@@ -137,16 +137,16 @@ PrefabNode:
                 m_shadowCast: true
                 m_isEnableLOD: false
           - GameObject: 2166264123
-            m_name: Sphere.004-1 (2)
+            m_name: mesh-1 (1)
             m_isEnabled: true
-            m_instanceID: 2724989420
+            m_instanceID: 2318124646
             m_transform:
-              position: {x: 0, y: -5.96046448e-08, z: 0, w: 1}
+              position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 105
-            m_index: 107
-            m_parentIndex: 105
+              m_parentID: 44
+            m_index: 46
+            m_parentIndex: 44
             m_rootIndex: 0
             m_childrenIndices: ~
             m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -160,13 +160,13 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 324457918
+                m_instanceID: 1224660468
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: Obj_Inter_Flower_B
-                  m_baseColorTexName: Obj_Inter_Flower_DefaultMaterial_BaseColor.png
-                  m_normalTexName: Obj_Inter_Flower_DefaultMaterial_Normal.png
-                  m_ORM_TexName: Obj_Inter_Flower_DefaultMaterial_OcclusionRoughnessMetallic.png
+                  m_name: Obj_Inter_mushroom
+                  m_baseColorTexName: MR02_L_Material_BaseColor.png
+                  m_normalTexName: MR02_L_Material_Normal.png
+                  m_ORM_TexName: ""
                   m_AO_TexName: ""
                   m_EmissiveTexName: ""
                   m_materialInfo:
@@ -177,11 +177,11 @@ PrefabNode:
                   m_flowInfo:
                     m_windVector: {x: 0, y: 0, z: 0, w: 0}
                     m_uvScroll: {x: 0, y: 0}
-                  m_fileGuid: 31951fb3-8fad-56ed-a47e-acba9c82f1ff
+                  m_fileGuid: 8ad8c663-8e9c-5d71-ab9c-cd2c1a000725
                   m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Sphere.004-1
+                  m_name: mesh-1
                   m_materialIndex: 1
                   m_LODThresholds: ~
                 m_LightMapping:

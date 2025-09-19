@@ -182,24 +182,6 @@
             "m_curState": "Idle",
             "useController": 1,
             "useMask": 1
-        },
-        {
-            "StateVec": [
-                {
-                    "animationIndex": -1,
-                    "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
-                    "behaviourName": "",
-                    "m_isAny": true,
-                    "multiplerAnimationSpeed": 1.0,
-                    "state_name": "Ani State",
-                    "transitions": [],
-                    "useMultipler": 0
-                }
-            ],
-            "controller_name": "NewLayer1",
-            "useController": 1,
-            "useMask": 1
         }
     ],
     "Parameters": [
