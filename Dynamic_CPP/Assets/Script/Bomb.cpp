@@ -43,7 +43,7 @@ void Bomb::Update(float tick)
 
 			std::vector<HitResult> hits;
 			OverlapInput explosionInfo;
-			explosionInfo.layerMask = 1u; //일단 다떄림
+			explosionInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10;
 			explosionInfo.position = transform->GetWorldPosition();
 			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
 

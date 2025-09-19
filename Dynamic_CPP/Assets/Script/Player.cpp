@@ -294,7 +294,12 @@ void Player::Update(float tick)
 		curveindicator->EnableIndicator(onBombIndicate);
 	}
 
-
+	///test sehwan
+	if(InputManagement->IsKeyDown('V'))
+	{
+		auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+		input->SetControllerVibration(3.f, 1.0, 1.0, 1.0, 1.0);
+	}
 }
 
 void Player::LateUpdate(float tick)

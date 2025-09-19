@@ -3,7 +3,7 @@
 #include "ModuleBehavior.h"
 #include "InputActionManager.h"
 #include "SceneManager.h"
-
+#include "InputManager.h"
 void PlayerInputComponent::Update(float tick)
 {
 	if (SceneManagers->m_isGameStart == false) return;
@@ -53,4 +53,11 @@ void PlayerInputComponent::SetActionMap(ActionMap* _actionMap)
 {
 	m_actionMap = _actionMap;
 	m_actionMapName = _actionMap->m_name;
+}
+
+void PlayerInputComponent::SetControllerVibration(float tick, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre)
+{
+
+	InputManagement->SetControllerVibrationTime(controllerIndex,tick);
+	InputManagement->SetControllerVibration(controllerIndex, leftMotorSpeed,rightMotorSpeed,lowFre,highFre);
 }
