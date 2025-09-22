@@ -1,10 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "ItemComponent.generated.h"
 
 class ItemComponent : public ModuleBehavior
 {
 public:
+   ReflectItemComponent
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(ItemComponent)
 	virtual void Start() override;
