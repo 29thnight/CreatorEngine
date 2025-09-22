@@ -76,14 +76,17 @@ public:
     std::string m_effectInstanceName;
 
 private:
-
     float m_currentTime = 0;
 
     Mathf::Vector3 m_lastPosition;
     Mathf::Vector3 m_lastRotation;
     Mathf::Vector3 m_lastScale;
 
-    void ApplyEffectSettings();
     void DestroyCurrentEffect();
     void ForeceUpdatePosition();
+
+    bool m_timeScaleModified = false;
+    bool m_loopModified = false;
+    bool m_durationModified = false;
+
 };

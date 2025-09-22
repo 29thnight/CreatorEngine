@@ -20,6 +20,12 @@ ID3D11ShaderResourceView* nullSRVs[5]{
 	nullptr
 };
 
+struct alignas(16) TimeBuffer {
+	float totalTime;
+	float deltaTime;
+	unsigned int totalFrame;
+};
+
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -87,6 +93,7 @@ GBufferPass::GBufferPass()
 
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_TimeBuffer = DirectX11::CreateBuffer(sizeof(TimeBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	for (uint32 i = 0; i < MAX_BONES; i++)
 	{
@@ -191,11 +198,18 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	scene.UseModel(deferredPtr);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+	TimeBuffer timeBuffer{
+		Time->GetTotalSeconds(),
+		Time->GetElapsedSeconds(),
+		Time->GetFrameCount()
+	};
+	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
 
 	// --- 2. RENDER ANIMATED OBJECTS (INDIVIDUALLY) ---
 	m_pso->Apply(deferredPtr);
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
 
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
@@ -325,6 +339,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
+			proxy->m_Material->TrySetFloat("TimeBuffer", "totalTime", Time->GetTotalSeconds());
+			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
+			unsigned int frameCount = Time->GetFrameCount();
+			proxy->m_Material->TrySetValue("TimeBuffer", "totalFrame", &frameCount, sizeof(unsigned int));
 			proxy->m_Material->TrySetMaterialInfo();
 			//Cbuffer를 View 전용 컨테이너로 복사
 			proxy->m_Material->UpdateCBufferView();
@@ -378,6 +396,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
 			proxy->m_Material->TrySetValue("BoneTransformation", "BoneTransforms", proxy->m_finalTransforms, sizeof(Mathf::xMatrix) * 50);
+			proxy->m_Material->TrySetFloat("TimeBuffer", "totalTime", Time->GetTotalSeconds());
+			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
+			unsigned int frameCount = Time->GetFrameCount();
+			proxy->m_Material->TrySetValue("TimeBuffer", "totalFrame", &frameCount, sizeof(unsigned int));
 			proxy->m_Material->TrySetMaterialInfo();
 
 			//Cbuffer를 View 전용 컨테이너로 복사
@@ -431,6 +453,13 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 	scene.UseModel(deferredPtr);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+	TimeBuffer timeBuffer{
+		Time->GetTotalSeconds(),
+		Time->GetElapsedSeconds(),
+		Time->GetFrameCount()
+	};
+	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
+	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
 
 	for (auto& terrainProxy : data->m_terrainQueue) 
 	{

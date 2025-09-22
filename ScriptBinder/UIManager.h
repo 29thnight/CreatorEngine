@@ -2,6 +2,7 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "DLLAcrossSingleton.h"
 #include "GameObject.h"
+#include "Core.Property.h"
 #include <stop_token>
 #include <DirectXTK/SpriteFont.h>
 
@@ -43,11 +44,18 @@ public:
 	void UnregisterImageComponent(ImageComponent* image);
 	void UnregisterTextComponent(TextComponent* text);
 	void UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet);
+	//UI 네비게이션 활성화 여부 및 프로퍼티 클래스 테스트용
+	Property<bool> EnableUINavigation
+	{
+		.get = [this]() { return isEnableUINavigation; },
+		.set = [this](bool able) { isEnableUINavigation = able; }
+	};
+	//UI 네비게이션 활성화 여부 레거시
+	bool IsEnableUINavigation() const { return isEnableUINavigation; }
+	void SetEnableUINavigation(bool able) { isEnableUINavigation = able; }
 
 public:
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
-	std::vector<std::weak_ptr<GameObject>>	Canvases;
-	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
 	std::vector<ImageComponent*>			Images;
 	std::vector<TextComponent*>				Texts;
 	std::vector<SpriteSheetComponent*>      SpriteSheets;
@@ -57,6 +65,9 @@ public:
 	GameObject* SelectUI = nullptr;
 
 	bool needSort = false;
+
+private:
+	bool isEnableUINavigation = true;
 };
 
 static auto UIManagers = UIManager::GetInstance();

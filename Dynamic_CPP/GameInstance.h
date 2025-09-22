@@ -20,6 +20,7 @@ public:
 	void LoadScene(const std::string& sceneName);
 	void SwitchScene(const std::string& sceneName);
 	void UnloadScene(const std::string& sceneName);
+	void LoadImidiateNextScene();
 	bool IsLoadSceneComplete() const { return m_isLoadSceneComplete; }
 	void SetNextSceneName(const std::string& sceneName) { m_nextSceneName = sceneName; }
 	const std::string& GetNextSceneName() const { return m_nextSceneName; }

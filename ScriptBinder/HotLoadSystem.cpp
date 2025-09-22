@@ -257,12 +257,13 @@ void HotLoadSystem::ReplaceScriptComponent()
 				continue;
 			}
 
+			newScript->SetOwner(gameObject);
+
 			if (SceneManagers->m_isGameStart)
 			{
 				ScriptManager->BindScriptEvents(newScript, name);
 			}
 
-			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
 			if (index >= gameObject->m_components.size())
 			{
@@ -406,7 +407,8 @@ void HotLoadSystem::CompileEvent()
 
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view name)
 {
-	auto activeScene = SceneManagers->GetActiveScene();
+	auto owner = script->GetOwner();
+	auto activeScene = owner->GetScene();
 	//결국 이렇게되면 .meta파일을 클라이언트가 가지고 있어야 됨...
 	std::string scriptMetaFile = "Assets\\Script\\" + std::string(name) + ".cpp" + ".meta";
 	file::path scriptMetaFileName = PathFinder::DynamicSolutionPath(scriptMetaFile);
@@ -518,7 +520,8 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view na
 
 void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, std::string_view name)
 {
-	auto activeScene = SceneManagers->GetActiveScene();
+	auto owner = script->GetOwner();
+	auto activeScene = owner->GetScene();
 
 	if (script->m_awakeEventHandle.IsValid())
 	{
@@ -589,7 +592,6 @@ void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, std::string_view 
 	{
 		activeScene->OnDestroyEvent -= script->m_onDestroyEventHandle;
 	}
-
 }
 
 void HotLoadSystem::CreateScriptFile(std::string_view name)

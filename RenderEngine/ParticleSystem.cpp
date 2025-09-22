@@ -1,5 +1,6 @@
 ﻿#include "ParticleSystem.h"
 
+
 ParticleSystem::ParticleSystem(int maxParticles, ParticleDataType dataType) : m_maxParticles(maxParticles), m_isRunning(false)
 {
 	SetParticleDatatype(dataType);
@@ -50,6 +51,8 @@ void ParticleSystem::Update(float delta)
 	if (!m_modulesConnected) {
 		AutoConnectModules();
 	}
+
+	SyncEmitterTransform();
 
 	UpdateGenerateModule(delta);
 
@@ -112,6 +115,43 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 		renderModule->Render(world, view, projection);
 		renderModule->CleanupRenderState();
 		renderModule->RestoreRenderState();
+	}
+}
+
+void ParticleSystem::StopSpawning()
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		// SpawnModuleCS만 비활성화
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetAllowNewSpawn(false);
+		}
+		// MeshSpawnModuleCS도 비활성화
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetAllowNewSpawn(false);
+		}
+		// TrailGenerateModule도 비활성화 (필요시)
+		//else if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEnabled(false);
+		//}
+	}
+}
+
+void ParticleSystem::ResumeSpawning()
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
+			spawnModule->SetAllowNewSpawn(true);
+		}
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
+			meshSpawnModule->SetAllowNewSpawn(true);
+		}
+		//else if (TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module)) {
+		//	trailModule->SetEnabled(true);
+		//}
 	}
 }
 
@@ -232,7 +272,47 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
+void ParticleSystem::SyncEmitterTransform()
+{
+	// 최종 월드 위치/회전/스케일 계산
+	Mathf::Vector3 finalWorldPosition = m_effectBasePosition + m_position;
+	Mathf::Vector3 finalWorldRotation = m_effectBaseRotation + m_rotation;
+	Mathf::Vector3 finalWorldScale = m_scale;
 
+	// Movement 모듈들에 이미터 변환 정보 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// MeshMovementModuleCS에 이미터 변환 전달
+		if (MeshMovementModuleCS* movementModule = dynamic_cast<MeshMovementModuleCS*>(&module))
+		{
+			movementModule->SetEmitterTransform(
+				finalWorldPosition,
+				finalWorldRotation
+			);
+		}
+
+		// 일반 MovementModuleCS에도 필요시 전달
+		if (MovementModuleCS* movementModule = dynamic_cast<MovementModuleCS*>(&module))
+		{
+			movementModule->SetEmitterTransform(
+				finalWorldPosition,
+				finalWorldRotation
+			);
+		}
+
+		if (MeshSizeModuleCS* sizeModule = dynamic_cast<MeshSizeModuleCS*>(&module))
+		{
+			sizeModule->SetEmitterTransform(finalWorldScale);
+		}
+
+		if (SizeModuleCS* sizeModule = dynamic_cast<SizeModuleCS*>(&module))
+		{
+			sizeModule->SetEmitterTransform(finalWorldScale);
+		}
+	}
+}
 
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {

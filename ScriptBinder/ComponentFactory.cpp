@@ -27,7 +27,9 @@ void ComponentFactory::Initialize()
 
    for (const auto& [name, type] : registerMap)
    {
-	   if (name == "Component" || name == "ScriptComponent" || name == "InvalidScriptComponent")
+	   if (name == "Component" ||
+		   name == "ScriptComponent" ||
+		   name == "InvalidScriptComponent")
 	   {
 		   continue; // Skip base Component and ScriptComponent
 	   }
@@ -43,6 +45,16 @@ void ComponentFactory::Initialize()
 		   m_componentTypes[name] = &type;
 	   }
 	   pos = name.find("Animator");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+	   pos = name.find("UIButton");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+	   pos = name.find("Canvas");
 	   if (pos != std::string::npos)
 	   {
 		   m_componentTypes[name] = &type;
@@ -501,6 +513,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			Meta::Deserialize(image, itNode);
 			image->SetOwner(obj);
 
+			if (itNode["navigations"])
+			{
+				auto& naviNode = itNode["navigations"];
+				for (auto& navi : naviNode)
+				{
+					Navigation newNavi;
+					Meta::Deserialize(&newNavi, navi);
+					image->navigations.push_back(newNavi);
+				}
+			}
+
 			auto canvasObj = UIManagers->FindCanvasName(image->m_ownerCanvasName);
 			auto canvas = canvasObj->GetComponent<Canvas>();
 			if (canvas)
@@ -526,7 +549,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					continue;
 				}
 				image->DeserializeTexture(texture);
-				image->DeserializeNavi();
+				//image->DeserializeNavi();
 				image->DeserializeShader();
 			}
 
@@ -536,6 +559,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto text = static_cast<TextComponent*>(component);
 			Meta::Deserialize(text, itNode);
 			text->SetOwner(obj);
+
+			if (itNode["navigations"])
+			{
+				auto& naviNode = itNode["navigations"];
+				for (auto& navi : naviNode)
+				{
+					Navigation newNavi;
+					Meta::Deserialize(&newNavi, navi);
+					text->navigations.push_back(newNavi);
+				}
+			}
 
 			auto canvasObj = UIManagers->FindCanvasName(text->m_ownerCanvasName);
 			auto canvas = canvasObj->GetComponent<Canvas>();
@@ -558,7 +592,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				Debug->LogError("Text Component is missing font path");
 			}
 
-			text->DeserializeNavi();
+			//text->DeserializeNavi();
 			text->DeserializeShader();
 		}
 		else if (componentType->typeID == type_guid(SpriteSheetComponent))
@@ -567,6 +601,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			Meta::Deserialize(spriteSheet, itNode);
 			spriteSheet->SetOwner(obj);
 			spriteSheet->m_isPreview = false;
+
+			if (itNode["navigations"])
+			{
+				auto& naviNode = itNode["navigations"];
+				for (auto& navi : naviNode)
+				{
+					Navigation newNavi;
+					Meta::Deserialize(&newNavi, navi);
+					spriteSheet->navigations.push_back(newNavi);
+				}
+			}
 
 			auto canvasObj = UIManagers->FindCanvasName(spriteSheet->m_ownerCanvasName);
 			auto canvas = canvasObj->GetComponent<Canvas>();
@@ -587,6 +632,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			{
 				Debug->LogError("SpriteSheetComponent is missing m_spriteSheetPath");
 			}
+
+			//spriteSheet->DeserializeNavi();
+			spriteSheet->DeserializeShader();
 		}
 		else
 		{

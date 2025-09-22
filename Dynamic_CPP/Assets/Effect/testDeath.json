@@ -4,11 +4,11 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "test",
+    "name": "testDeath",
     "particleSystems": [
         {
-            "isRunning": true,
-            "maxParticles": 1,
+            "isRunning": false,
+            "maxParticles": 50,
             "modules": [
                 {
                     "data": {
@@ -24,20 +24,20 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
-                            "lifeTime": 10.0,
-                            "maxVerticalVelocity": 0.0,
-                            "minVerticalVelocity": 0.0,
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
+                            "lifeTime": 5.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 0.10000000149011612,
-                                "y": 0.10000000149011612
+                                "x": 0.30000001192092896,
+                                "y": 0.30000001192092896
                             },
                             "velocity": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -52,11 +52,11 @@
                                 "z": 1.0
                             },
                             "emitterType": 0,
-                            "spawnRate": 1.0
+                            "spawnRate": 1000.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 50
                         }
                     },
                     "stage": 2,
@@ -65,65 +65,81 @@
                 },
                 {
                     "data": {
-                        "colorGradient": [
-                            {
-                                "color": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
-                                },
-                                "time": 0.0
-                            },
-                            {
-                                "color": {
-                                    "w": 0.8999999761581421,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.30000001192092896
-                            },
-                            {
-                                "color": {
-                                    "w": 0.699999988079071,
-                                    "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.699999988079071
-                            },
-                            {
-                                "color": {
-                                    "w": 0.0,
-                                    "x": 0.5,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 1.0
-                            }
-                        ],
-                        "colorParams": {
-                            "customFunctionType": 0,
-                            "customParam1": 0.0,
-                            "customParam2": 0.0,
-                            "customParam3": 0.0,
-                            "customParam4": 0.0,
-                            "discreteColorsSize": 0,
-                            "gradientSize": 4,
-                            "transitionMode": 0
+                        "explosiveData": {
+                            "initialSpeed": 2.753999948501587,
+                            "randomFactor": 1.0,
+                            "speedDecay": 0.14300000667572021,
+                            "sphereRadius": 2.0
                         },
-                        "discreteColors": [],
-                        "easing": {
-                            "enabled": false
+                        "impulses": [],
+                        "movementParams": {
+                            "currentTime": 0.0,
+                            "easingEnabled": false,
+                            "easingType": 0,
+                            "gravityStrength": 9.800000190734863,
+                            "useGravity": false,
+                            "velocityMode": 5
+                        },
+                        "orbitalData": {
+                            "axis": {
+                                "x": 0.0,
+                                "y": 1.0,
+                                "z": 0.0
+                            },
+                            "center": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "radius": 5.0,
+                            "speed": 1.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 50
+                        },
+                        "velocityCurve": [
+                            {
+                                "strength": 1.0,
+                                "time": 0.0,
+                                "velocity": {
+                                    "x": 0.0,
+                                    "y": 2.0,
+                                    "z": 0.0
+                                }
+                            },
+                            {
+                                "strength": 0.800000011920929,
+                                "time": 0.5,
+                                "velocity": {
+                                    "x": 1.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                }
+                            },
+                            {
+                                "strength": 0.5,
+                                "time": 1.0,
+                                "velocity": {
+                                    "x": 0.0,
+                                    "y": -1.0,
+                                    "z": 0.0
+                                }
+                            }
+                        ],
+                        "windData": {
+                            "baseStrength": 1.0,
+                            "direction": {
+                                "x": 1.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "frequency": 1.0,
+                            "turbulence": 0.5
                         }
                     },
                     "stage": 2,
-                    "type": "ColorModuleCS",
+                    "type": "MovementModuleCS",
                     "useEasing": false
                 }
             ],
@@ -149,11 +165,22 @@
                             2,
                             3
                         ],
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "123"
+                        "renderStates": {
+                            "blendPreset": 1,
+                            "depthPreset": 1,
+                            "rasterizerPreset": 1
                         },
+                        "shaders": {
+                            "pixelShader": "BillBoard",
+                            "vertexShader": "BillBoard"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "star",
+                                "slot": 0
+                            }
+                        ],
                         "vertices": [
                             {
                                 "position": {
@@ -207,7 +234,12 @@
                     },
                     "type": "BillboardModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {

@@ -1,14 +1,14 @@
 {
     "currentTime": 0.0,
-    "duration": 3.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "D1",
+    "loop": true,
+    "name": "walk2",
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 50,
+            "maxParticles": 1,
             "modules": [
                 {
                     "data": {
@@ -24,10 +24,9 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
-                            "lifeTime": 5.0,
-                            "maxVerticalVelocity": 0.0,
-                            "minVerticalVelocity": 0.0,
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 0.30000001192092896,
@@ -37,7 +36,8 @@
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -52,94 +52,15 @@
                                 "z": 1.0
                             },
                             "emitterType": 0,
-                            "spawnRate": 1000.0
+                            "spawnRate": 1.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 50
+                            "particleCapacity": 1
                         }
                     },
                     "stage": 2,
                     "type": "SpawnModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
-                        "explosiveData": {
-                            "initialSpeed": 2.753999948501587,
-                            "randomFactor": 1.0,
-                            "speedDecay": 0.14300000667572021,
-                            "sphereRadius": 2.0
-                        },
-                        "impulses": [],
-                        "movementParams": {
-                            "currentTime": 316.0418395996094,
-                            "easingEnabled": false,
-                            "easingType": 0,
-                            "gravityStrength": 9.800000190734863,
-                            "useGravity": false,
-                            "velocityMode": 5
-                        },
-                        "orbitalData": {
-                            "axis": {
-                                "x": 0.0,
-                                "y": 1.0,
-                                "z": 0.0
-                            },
-                            "center": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "radius": 5.0,
-                            "speed": 1.0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 50
-                        },
-                        "velocityCurve": [
-                            {
-                                "strength": 1.0,
-                                "time": 0.0,
-                                "velocity": {
-                                    "x": 0.0,
-                                    "y": 2.0,
-                                    "z": 0.0
-                                }
-                            },
-                            {
-                                "strength": 0.800000011920929,
-                                "time": 0.5,
-                                "velocity": {
-                                    "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                }
-                            },
-                            {
-                                "strength": 0.5,
-                                "time": 1.0,
-                                "velocity": {
-                                    "x": 0.0,
-                                    "y": -1.0,
-                                    "z": 0.0
-                                }
-                            }
-                        ],
-                        "windData": {
-                            "baseStrength": 1.0,
-                            "direction": {
-                                "x": 1.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "frequency": 1.0,
-                            "turbulence": 0.5
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MovementModuleCS",
                     "useEasing": false
                 }
             ],
@@ -155,7 +76,7 @@
                     "data": {
                         "billboard": {
                             "maxCount": 0,
-                            "type": 0
+                            "type": 2
                         },
                         "indices": [
                             0,
@@ -165,11 +86,28 @@
                             2,
                             3
                         ],
-                        "texture": {
-                            "assigned": true,
-                            "hasTexture": true,
-                            "name": "star"
+                        "renderStates": {
+                            "blendPreset": 2,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 2
                         },
+                        "shaders": {
+                            "pixelShader": "SpriteAnimation",
+                            "vertexShader": "BillBoard"
+                        },
+                        "spriteAnimation": {
+                            "animationDuration": 1.0,
+                            "frameCount": 4,
+                            "gridColumns": 2,
+                            "gridRows": 2
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "Smoke3_White_Sheet",
+                                "slot": 0
+                            }
+                        ],
                         "vertices": [
                             {
                                 "position": {
@@ -223,7 +161,12 @@
                     },
                     "type": "BillboardModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {

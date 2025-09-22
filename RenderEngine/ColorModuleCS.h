@@ -120,6 +120,14 @@ public:
     // 이징 설정
     void SetEasing(EasingEffect easingType, StepAnimation animationType, float duration);
 
+    // Getter
+    int GetCustomFunctionType() const { return m_colorParams.customFunctionType; }
+    float GetCustomParam1() const { return m_colorParams.customParam1; }
+    float GetCustomParam2() const { return m_colorParams.customParam2; }
+    float GetCustomParam3() const { return m_colorParams.customParam3; }
+    float GetCustomParam4() const { return m_colorParams.customParam4; }
+    EaseInOut GetEasingModule() { return m_easingModule; }
+
     // 상태 조회
     bool IsInitialized() const { return m_isInitialized; }
     ColorTransitionMode GetTransitionMode() const { return static_cast<ColorTransitionMode>(m_colorParams.transitionMode); }

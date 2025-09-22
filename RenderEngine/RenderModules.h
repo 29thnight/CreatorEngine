@@ -34,6 +34,12 @@ struct ModelConstantBuffer
     Mathf::Matrix projection;
 };
 
+struct TimeParams
+{
+    float time;
+    float3 pad1;
+};
+
 struct PolarClippingParams
 {
     float polarClippingEnabled = 0.0f;    // 극좌표 클리핑 활성화 여부

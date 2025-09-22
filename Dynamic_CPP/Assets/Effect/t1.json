@@ -13,22 +13,16 @@
                 {
                     "data": {
                         "meshParticleTemplate": {
-                            "InitialRotation": {
+                            "RotationSpeed": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            },
-                            "RotationSpeed": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
                             },
                             "Scale": {
                                 "x": 1.0,
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "VerticalVelocity": 0.0,
                             "acceleration": {
                                 "x": 0.0,
                                 "y": -9.800000190734863,
@@ -40,7 +34,6 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
                             "lifeTime": 10.0,
                             "renderMode": 0,
                             "textureIndex": 0,
@@ -48,7 +41,8 @@
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -81,57 +75,26 @@
                 },
                 {
                     "data": {
-                        "colorGradient": [
-                            {
-                                "color": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
-                                },
-                                "time": 0.0
-                            },
-                            {
-                                "color": {
-                                    "w": 0.8999999761581421,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.30000001192092896
-                            },
-                            {
-                                "color": {
-                                    "w": 0.699999988079071,
-                                    "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.699999988079071
-                            },
-                            {
-                                "color": {
-                                    "w": 0.0,
-                                    "x": 0.5,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 1.0
-                            }
-                        ],
-                        "colorParams": {
-                            "customFunctionType": 0,
-                            "customParam1": 0.0,
-                            "customParam2": 0.0,
-                            "customParam3": 0.0,
-                            "customParam4": 0.0,
-                            "discreteColorsSize": 0,
-                            "gradientSize": 4,
-                            "transitionMode": 0
-                        },
-                        "discreteColors": [],
                         "easing": {
-                            "enabled": false
+                            "animationType": 0,
+                            "duration": 1.0,
+                            "enabled": false,
+                            "type": 0
+                        },
+                        "sizeParams": {
+                            "endSize": {
+                                "x": 2.0,
+                                "y": 2.0,
+                                "z": 2.0
+                            },
+                            "randomScaleMax": 2.0,
+                            "randomScaleMin": 0.5,
+                            "startSize": {
+                                "x": 1.0,
+                                "y": 1.0,
+                                "z": 1.0
+                            },
+                            "useRandomScale": 0
                         },
                         "state": {
                             "isInitialized": true,
@@ -139,7 +102,7 @@
                         }
                     },
                     "stage": 2,
-                    "type": "MeshColorModuleCS",
+                    "type": "MeshSizeModuleCS",
                     "useEasing": false
                 }
             ],

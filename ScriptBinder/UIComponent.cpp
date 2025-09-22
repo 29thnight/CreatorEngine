@@ -4,21 +4,37 @@
 
 float MaxOreder = 100.0f;
 
+UIComponent::UIComponent()
+{
+    m_name = "UIComponent"; 
+    m_typeID = TypeTrait::GUIDCreator::GetTypeID<UIComponent>();
+}
+
 void UIComponent::SetCanvas(Canvas* canvas)
 {
    ownerCanvas = canvas;
-
 }
 
 void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI)
 {
-	navigation[(int)dir] = otherUI;
-	Navigation nav;
-	nav.mode = dir;
-	nav.navObject = otherUI->GetInstanceID();
+    navigation[(int)dir] = otherUI;
+    Navigation nav;
+    nav.mode = (int)dir;
+    nav.navObject = otherUI->GetInstanceID();
 
-    if (std::find(navigations.begin(), navigations.end(), nav) == navigations.end())
-		navigations.push_back(nav);
+    auto it =  std::ranges::find_if(navigations, [&](const Navigation& n)
+    {
+        return n.mode == nav.mode; 
+    });
+
+    if (it == navigations.end())
+    {
+        navigations.push_back(nav);
+    }
+    else
+    {
+	    *it = nav;
+    }
 }
 
 void UIComponent::DeserializeNavi()

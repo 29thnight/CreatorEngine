@@ -146,6 +146,27 @@ void GameManager::SwitchTestScene()
 	SwitchScene("CreateUIPrefabV2");
 }
 
+void GameManager::LoadNextScene()
+{
+	if (m_nextSceneName.empty()) return;
+
+	LoadScene(m_nextSceneName);
+}
+
+void GameManager::SwitchNextScene()
+{
+	if (m_nextSceneName.empty() || !GameInstance::GetInstance()->IsLoadSceneComplete()) 
+	{
+		return;
+	}
+
+	SwitchScene(m_nextSceneName);
+}
+
+void GameManager::LoadImidiateNextScene()
+{
+}
+
 void GameManager::PushEntity(Entity* entity)
 {
 	if (entity)

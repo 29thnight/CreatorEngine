@@ -22,98 +22,44 @@ struct PixelOutput
     float4 color : SV_Target;
 };
 
-Texture2D gDiffuseTexture : register(t0);
-Texture2D gEmissionTexture : register(t1);
-Texture2D gDissolveTexture : register(t2);
-Texture2D gSmokeTexture : register(t3);
+cbuffer TimeBuffer : register(b3)
+{
+    float gTime;
+    float3 gPadding;
+};
+
+Texture2D gMainTexture : register(t0);
+Texture2D gNoiseTexture : register(t1);
 
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
+#define pi 3.1415926
 
 PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    float normalizedAge = input.particleAge / input.particleLifeTime;
+    float temp = input.texCoord.y * pi;
     
-    // UV 애니메이션 계산
-    float2 dissolveUV = input.texCoord * float2(1.0, 2.0);
-    dissolveUV.x *= normalizedAge * 5;
-    float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
-
-    float2 tempUV = input.texCoord;
-
-    // 원하는 구간 설정 (예: 0.25~1.0)
-    float Umin = 0.00;
-    float Umax = 0.75;
-
-    float edgeFade = 1.0;
-    float fadeWidth = 0.1;
+    // 노이즈 기반 UV 애니메이션
+    float2 noiseUV = input.texCoord + (gTime / 2) * float2(0.2, 0.3);
+    float4 noiseValue = gNoiseTexture.Sample(gLinearSampler, noiseUV);
     
-    // 왼쪽 가장자리
-    if (tempUV.x < Umin + fadeWidth)
-        edgeFade *= smoothstep(Umin, Umin + fadeWidth, tempUV.x);
-
-    // 오른쪽 가장자리  
-    if (tempUV.x > Umax - fadeWidth)
-        edgeFade *= smoothstep(Umax, Umax - fadeWidth, tempUV.x);
-
-    // 완전히 범위 밖이면 버리기
-    if (tempUV.x < Umin || tempUV.x > Umax)
-        discard;
+    // 메인 텍스처 UV에 노이즈의 zw 성분을 더해서 움직임 효과
+    float2 animatedUV = noiseUV + noiseValue.zw * 0.1; // 강도 조절
     
-    // 선택한 구간을 다시 0~1로 정규화
-    float2 clippedUV;
-    clippedUV.x = (tempUV.x - Umin) / (Umax - Umin);
-    clippedUV.y = tempUV.y;
+    float4 diffuseColor = gMainTexture.Sample(gLinearSampler, animatedUV * float2(2, 1));
     
+    float emission = 1.5;
     
-    // 텍스처 샘플링
-    float4 smokeColor = gSmokeTexture.Sample(gLinearSampler, clippedUV);
-    float4 emissionColor = gEmissionTexture.Sample(gLinearSampler, clippedUV);
-    
-    float dissolveValue = dissolveData.r;
-    
-    float dissolveOutStart = 0.4; // 60%부터 dissolve-out 시작
-    
-    float globalFade = 1.0;
-    if (normalizedAge > dissolveOutStart)
-    {
-        float fadeProgress = (normalizedAge - dissolveOutStart) / (1.0 - dissolveOutStart);
-        globalFade = 1.0 - smoothstep(0.0, 1.0, fadeProgress);
-    }
-    
-    // Emission 리맵핑
-    float emissionStrength = 2.0;
-    float remapMin = -0.3;
-    float remapMax = 1.0;
-    float remappedEmission = saturate((emissionColor.r - remapMin) / (remapMax - remapMin));
-    
-    // 최종 색상 계산
-    float smokeThreshold = 0.01;
-    float3 adjustedSmoke = input.color.rgb;
-    float smokeIntensity = (smokeColor.r + smokeColor.g + smokeColor.b) / 3.0;
-
-    // smoke texture의 검은 부분의 알파값도 함께 줄이기
-    float smokeAlphaMultiplier = saturate(smokeIntensity / smokeThreshold);
-
-    float dissolveAlpha = step(0.5, dissolveValue);
-
-    float3 baseColor = adjustedSmoke;
-    float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);
-    finalColor *= 3.0 * globalFade;
-    
-    float finalAlpha = input.alpha * smokeColor.a * smokeAlphaMultiplier * edgeFade * dissolveAlpha * globalFade;
+    float alphaWeight = diffuseColor.a * diffuseColor.a;
+    float4 finalColor = lerp(diffuseColor, diffuseColor * input.color, alphaWeight);
+    finalColor.rgb *= emission;
+    float finalAlpha = diffuseColor.a * input.color.a * sin(temp);
     
     clip(finalAlpha - 0.01);
     
-    float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
-    if (colorBrightness < 0.1)
-        discard;
-    
-    finalColor = pow(finalColor, 0.7);
-    
-    output.color = float4(finalColor, finalAlpha);
+    output.color = float4(finalColor.rgb, finalAlpha);
     
     return output;
 }

@@ -17,9 +17,12 @@ struct alignas(16) SizeParams
     float randomScaleMax;       // 랜덤 스케일 최대값
     
     UINT maxParticles;          // 최대 파티클 수
-    float padding1;              // 16바이트 정렬을 위한 패딩
-    float padding2;              // 16바이트 정렬을 위한 패딩
-    float padding3;              // 16바이트 정렬을 위한 패딩
+    float pad1;              // 16바이트 정렬을 위한 패딩
+    float pad2;              // 16바이트 정렬을 위한 패딩
+    float pad3;              // 16바이트 정렬을 위한 패딩
+
+    Mathf::Vector3 emitterScale;
+    float pad4;
 };
 
 class SizeModuleCS : public ParticleModule, public ISerializable
@@ -50,6 +53,8 @@ public:
     virtual nlohmann::json SerializeData() const override;
     virtual void DeserializeData(const nlohmann::json& json) override;
     virtual std::string GetModuleType() const override;
+
+    void SetEmitterTransform(Mathf::Vector3 scale) { m_sizeParams.emitterScale = scale; m_paramsDirty = true; }
 
     XMFLOAT2 GetStartSize() const {
         return XMFLOAT2(m_sizeParams.startSize.x, m_sizeParams.startSize.y);

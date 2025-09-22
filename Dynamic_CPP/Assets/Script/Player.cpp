@@ -81,7 +81,7 @@ void Player::Start()
 			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
 			if (weaponSlotController)
 			{
-				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_AddWeaponHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
@@ -110,7 +110,7 @@ void Player::Start()
 			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
 			if (weaponSlotController)
 			{
-				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_AddWeaponHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
@@ -242,21 +242,12 @@ void Player::Start()
 	for(auto& meshrenderer : meshrenderers)
 	{
 		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
-		meshrenderer->m_Material->TrySetFloat("TestCB", "timer", 0.f);
 	}
 	Debug->Log("Player Start");
 }
 
-float temp = 0.f;
 void Player::Update(float tick)
 {
-	temp += tick;
-	auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
-	for (auto& meshrenderer : meshrenderers)
-	{
-		meshrenderer->m_Material->TrySetFloat("TestCB", "timer", 10.f * sinf(temp));
-	}
-
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;

@@ -31,7 +31,9 @@ cbuffer SizeParams : register(b0)
     float randomScaleMin; // 랜덤 스케일 최소값
     float randomScaleMax; // 랜덤 스케일 최대값
     uint maxParticles; // 최대 파티클 수
-    float padding; // 패딩
+    float pad1; // 패딩
+    float3 emitterScale;
+    float pad2;
 };
 
 // 입출력 버퍼
@@ -87,6 +89,9 @@ void main(uint3 id : SV_DispatchThreadID)
         float randomScale = lerp(randomScaleMin, randomScaleMax, Hash(particleIndex + 1));
         currentSize *= randomScale;
     }
+    
+    currentSize.x *= emitterScale.x;
+    currentSize.y *= emitterScale.y;
     
     // 결과 적용
     particle.size = currentSize;

@@ -1,10 +1,10 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "test4",
+    "loop": true,
+    "name": "walk",
     "particleSystems": [
         {
             "isRunning": true,
@@ -24,20 +24,20 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "horizontalVelocityRange": 0.0,
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
                             "lifeTime": 1.0,
-                            "maxVerticalVelocity": 0.0,
-                            "minVerticalVelocity": 0.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 0.30000001192092896,
-                                "y": 0.30000001192092896
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612
                             },
                             "velocity": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
-                            }
+                            },
+                            "velocityRange": 0.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -97,14 +97,14 @@
                         },
                         "spriteAnimation": {
                             "animationDuration": 1.0,
-                            "frameCount": 4,
-                            "gridColumns": 2,
-                            "gridRows": 2
+                            "frameCount": 9,
+                            "gridColumns": 3,
+                            "gridRows": 3
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Smoke3_White_Sheet",
+                                "name": "Smoke1_White_Sheet",
                                 "slot": 0
                             }
                         ],
@@ -161,7 +161,12 @@
                     },
                     "type": "BillboardModuleGPU"
                 }
-            ]
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
         }
     ],
     "position": {

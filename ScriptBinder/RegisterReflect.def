@@ -73,7 +73,6 @@
 #include "TransCondition.h"
 #include "Transform.h"
 #include "UIButton.h"
-#include "UIComponent.h"
 #include "VolumeComponent.h"
 
 REFLECTION_REGISTER()
@@ -147,7 +146,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);
     AUTO_REGISTER_CLASS(UIButton);
-    AUTO_REGISTER_CLASS(UIComponent);
     AUTO_REGISTER_CLASS(VignettePassSetting);
     AUTO_REGISTER_CLASS(VolumeComponent);
     AUTO_REGISTER_CLASS(VolumeProfile);

@@ -11,6 +11,12 @@ cbuffer SpriteAnimationBuffer : register(b0)
     uint2 gridSize; // 스프라이트 시트 격자 크기 (columns, rows)
 };
 
+cbuffer TimeBuffer : register(b3)
+{
+    float gTime;
+    float3 gPadding;
+};
+
 // 픽셀 셰이더 입력 구조체
 struct VSOutput
 {

@@ -30,6 +30,8 @@ public:
 	void SetEasingEnabled(bool enabled) { m_easingEnabled = enabled; m_paramsDirty = true; }
 	void SetEasingType(int type) { m_easingType = type; m_paramsDirty = true; }
 
+	void SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation);
+
 	// Compute shader methods
 	bool InitializeCompute();
 

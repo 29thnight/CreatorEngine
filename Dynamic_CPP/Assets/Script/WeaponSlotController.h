@@ -32,6 +32,7 @@ public:
 	void EndChargingPersent(int slotIndex);
 	void SetActive(int slotIndex);
 
+	Core::DelegateHandle m_AddWeaponHandle{};
 	Core::DelegateHandle m_ApplyWeaponHandle{};
 	Core::DelegateHandle m_UpdateDurabilityHandle{};
 	Core::DelegateHandle m_SetActiveHandle{};

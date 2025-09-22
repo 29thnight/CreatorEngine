@@ -170,15 +170,9 @@ namespace Meta
                     {
                         castInstance->push_back(elem);
                     }
-                    //if(temp.size() != 0)
                 }
 
                 ImGui::PopID();
-
-
-
-
-
 
      //           auto iter = prop.createVectorIterator(instance);
 
@@ -228,6 +222,296 @@ namespace Meta
      //               ImGui::EndCombo();
      //           }
      //           ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<std::vector<int>>()) {
+                auto iter = prop.createVectorIterator(instance);
+                ImGui::PushID(prop.name);
+                std::vector<int> temp;
+                while (iter->IsValid())
+                {
+                    int i = *static_cast<int*>(iter->Get());
+                    temp.push_back(i);
+                    iter->Next();
+                }
+                if (ImGui::CollapsingHeader(prop.name)) {
+                    if (ImGui::Button("Add")) {
+                        temp.push_back(0);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        if (!temp.empty())
+                            temp.pop_back();
+                    }
+
+                    int buf;
+                    int size = temp.size();
+                    for (int i = 0; i < temp.size(); i++) {
+                        ImGui::PushID(i);
+
+                        buf = temp[i];
+                        if (ImGui::InputInt(("##" + std::to_string(i)).c_str(), &buf))
+                        {
+                            temp[i] = buf;
+                        }
+
+                        if (size > 0) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("^") && i > 0) {
+                                int t = temp[i];
+                                temp[i] = temp[i - 1];
+                                temp[i - 1] = t;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("v") && i < size - 1) {
+                                int t = temp[i];
+                                temp[i] = temp[i + 1];
+                                temp[i + 1] = t;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+
+                    auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
+                    castInstance->clear(); // Clear existing elements
+                    for (const auto& elem : temp)
+                    {
+                        castInstance->push_back(elem);
+                    }
+                }
+
+                ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<std::vector<int>>()) {
+                auto iter = prop.createVectorIterator(instance);
+                ImGui::PushID(prop.name);
+                std::vector<int> temp;
+                while (iter->IsValid())
+                {
+                    int i = *static_cast<int*>(iter->Get());
+                    temp.push_back(i);
+                    iter->Next();
+                }
+                if (ImGui::CollapsingHeader(prop.name)) {
+                    if (ImGui::Button("Add")) {
+                        temp.push_back(0);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        if (!temp.empty())
+                            temp.pop_back();
+                    }
+
+                    int buf;
+                    int size = temp.size();
+                    for (int i = 0; i < temp.size(); i++) {
+                        ImGui::PushID(i);
+
+                        buf = temp[i];
+                        if (ImGui::InputInt(("##" + std::to_string(i)).c_str(), &buf))
+                        {
+                            temp[i] = buf;
+                        }
+
+                        if (size > 0) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("^") && i > 0) {
+                                int t = temp[i];
+                                temp[i] = temp[i - 1];
+                                temp[i - 1] = t;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("v") && i < size - 1) {
+                                int t = temp[i];
+                                temp[i] = temp[i + 1];
+                                temp[i + 1] = t;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+
+                    auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
+                    castInstance->clear(); // Clear existing elements
+                    for (const auto& elem : temp)
+                    {
+                        castInstance->push_back(elem);
+                    }
+                }
+
+                ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<std::vector<float>>()) {
+                auto iter = prop.createVectorIterator(instance);
+                ImGui::PushID(prop.name);
+                std::vector<float> temp;
+                while (iter->IsValid())
+                {
+                    float i = *static_cast<float*>(iter->Get());
+                    temp.push_back(i);
+                    iter->Next();
+                }
+                if (ImGui::CollapsingHeader(prop.name)) {
+                    if (ImGui::Button("Add")) {
+                        temp.push_back(0.f);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        if (!temp.empty())
+                            temp.pop_back();
+                    }
+
+                    float buf;
+                    int size = temp.size();
+                    for (int i = 0; i < temp.size(); i++) {
+                        ImGui::PushID(i);
+
+                        buf = temp[i];
+                        if (ImGui::InputFloat(("##" + std::to_string(i)).c_str(), &buf))
+                        {
+                            temp[i] = buf;
+                        }
+
+                        if (size > 0) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("^") && i > 0) {
+                                float t = temp[i];
+                                temp[i] = temp[i - 1];
+                                temp[i - 1] = t;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("v") && i < size - 1) {
+                                float t = temp[i];
+                                temp[i] = temp[i + 1];
+                                temp[i + 1] = t;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+
+                    auto castInstance = reinterpret_cast<std::vector<float>*>(reinterpret_cast<char*>(instance) + prop.offset);
+                    castInstance->clear(); // Clear existing elements
+                    for (const auto& elem : temp)
+                    {
+                        castInstance->push_back(elem);
+                    }
+                }
+
+                ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<std::vector<Mathf::Vector2>>()) {
+                auto iter = prop.createVectorIterator(instance);
+                ImGui::PushID(prop.name);
+                std::vector<Mathf::Vector2> temp;
+                while (iter->IsValid())
+                {
+                    Mathf::Vector2 i = *static_cast<Mathf::Vector2*>(iter->Get());
+                    temp.push_back(i);
+                    iter->Next();
+                }
+                if (ImGui::CollapsingHeader(prop.name)) {
+                    if (ImGui::Button("Add")) {
+                        temp.push_back({0.f,0.f});
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        if (!temp.empty())
+                            temp.pop_back();
+                    }
+
+                    Mathf::Vector2 buf;
+                    int size = temp.size();
+                    for (int i = 0; i < temp.size(); i++) {
+                        ImGui::PushID(i);
+
+                        buf = temp[i];
+                        if (ImGui::InputFloat2(("##" + std::to_string(i)).c_str(), &buf.x))
+                        {
+                            temp[i] = buf;
+                        }
+
+                        if (size > 0) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("^") && i > 0) {
+                                Mathf::Vector2 t = temp[i];
+                                temp[i] = temp[i - 1];
+                                temp[i - 1] = t;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("v") && i < size - 1) {
+                                Mathf::Vector2 t = temp[i];
+                                temp[i] = temp[i + 1];
+                                temp[i + 1] = t;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+
+                    auto castInstance = reinterpret_cast<std::vector<Mathf::Vector2>*>(reinterpret_cast<char*>(instance) + prop.offset);
+                    castInstance->clear(); // Clear existing elements
+                    for (const auto& elem : temp)
+                    {
+                        castInstance->push_back(elem);
+                    }
+                }
+
+                ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<std::vector<Mathf::Vector3>>()) {
+                auto iter = prop.createVectorIterator(instance);
+                ImGui::PushID(prop.name);
+                std::vector<Mathf::Vector3> temp;
+                while (iter->IsValid())
+                {
+                    Mathf::Vector3 i = *static_cast<Mathf::Vector3*>(iter->Get());
+                    temp.push_back(i);
+                    iter->Next();
+                }
+                if (ImGui::CollapsingHeader(prop.name)) {
+                    if (ImGui::Button("Add")) {
+                        temp.push_back({ 0.f,0.f,0.f });
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        if (!temp.empty())
+                            temp.pop_back();
+                    }
+
+                    Mathf::Vector3 buf;
+                    int size = temp.size();
+                    for (int i = 0; i < temp.size(); i++) {
+                        ImGui::PushID(i);
+
+                        buf = temp[i];
+                        if (ImGui::InputFloat3(("##" + std::to_string(i)).c_str(), &buf.x))
+                        {
+                            temp[i] = buf;
+                        }
+
+                        if (size > 0) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("^") && i > 0) {
+                                Mathf::Vector3 t = temp[i];
+                                temp[i] = temp[i - 1];
+                                temp[i - 1] = t;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("v") && i < size - 1) {
+                                Mathf::Vector3 t = temp[i];
+                                temp[i] = temp[i + 1];
+                                temp[i + 1] = t;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+
+                    auto castInstance = reinterpret_cast<std::vector<Mathf::Vector3>*>(reinterpret_cast<char*>(instance) + prop.offset);
+                    castInstance->clear(); // Clear existing elements
+                    for (const auto& elem : temp)
+                    {
+                        castInstance->push_back(elem);
+                    }
+                }
+
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {

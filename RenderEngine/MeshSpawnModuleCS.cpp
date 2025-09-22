@@ -42,9 +42,6 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     // 3D 회전 속도 범위
     m_meshParticleTemplate.RotationSpeed = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-    // 3D 초기 회전 범위
-    m_meshParticleTemplate.InitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
-
     // 기존과 동일한 속성들
     m_meshParticleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     m_meshParticleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
@@ -320,6 +317,7 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 
         if (SUCCEEDED(hr))
         {
+            m_spawnParams.allowNewSpawn = m_allowNewSpawn ? 1 : 0;
             memcpy(mappedResource.pData, &m_spawnParams, sizeof(SpawnParams));
             DirectX11::DeviceStates->g_pDeviceContext->Unmap(m_spawnParamsBuffer, 0);
             m_spawnParamsDirty = false;
@@ -396,7 +394,6 @@ void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 
         // 새 회전값 설정
         m_spawnParams.emitterRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
-        m_meshParticleTemplate.InitialRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
 
         m_forceRotationUpdate = 1;
         m_spawnParamsDirty = true;
@@ -471,12 +468,6 @@ void MeshSpawnModuleCS::SetParticleRotationSpeed(const XMFLOAT3& Speed)
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetParticleInitialRotation(const XMFLOAT3& Rot)
-{
-    m_meshParticleTemplate.InitialRotation = Rot;
-    m_templateDirty = true;
-}
-
 void MeshSpawnModuleCS::SetParticleLifeTime(float lifeTime)
 {
     if (m_meshParticleTemplate.lifeTime != lifeTime)
@@ -543,7 +534,6 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
         {"lifeTime", m_meshParticleTemplate.lifeTime},
         {"Scale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.Scale)},
         {"RotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.RotationSpeed)},
-        {"InitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.InitialRotation)},
         {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
         {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
         {"velocityRange", m_meshParticleTemplate.velocityRandomRange},
@@ -605,9 +595,6 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
 
         if (templateJson.contains("RotationSpeed"))
             m_meshParticleTemplate.RotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["RotationSpeed"]);
-
-        if (templateJson.contains("InitialRotation"))
-            m_meshParticleTemplate.InitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["InitialRotation"]);
 
         if (templateJson.contains("color"))
             m_meshParticleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);
