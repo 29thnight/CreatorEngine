@@ -19,7 +19,7 @@ void GameManager::Awake()
 {
 	LOG("GameManager Awake");
 	//앞으론 언리얼 처럼 게임인스턴스를 활용해서 전역 설정값 관리
-	GameInstance::GetInstance();
+	GameInstance::GetInstance()->Initialize();
 	
 	auto resourcePool = GameObject::Find("ResourcePool");
 	auto weaponPiecePool = GameObject::Find("WeaponPiecePool");

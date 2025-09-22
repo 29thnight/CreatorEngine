@@ -2,10 +2,11 @@
 #include "Core.Minimal.h"
 #include "ItemInfo.h"
 #include "DLLAcrossSingleton.h"
-
+//input device
 static constexpr int MAX_INPUT_DEVICE = 2;
 enum class CharType { None = 0, Man = 1, Woman = 2 };
 enum class PlayerDir { None = 0, Left = 1, Right = 2 };
+
 
 class EventManager;
 class GameInstance : public DLLCore::Singleton<GameInstance>
@@ -36,6 +37,27 @@ public:
 	EventManager* GetActiveEventManager() const { return m_eventManager; }
 	void SetActiveEventManager(EventManager* mgr) { m_eventManager = mgr; }
 	void ClearActiveEventManager() { m_eventManager = nullptr; }
+	// Item Info Management
+	void LoadItemInfoFromCSV(const std::string& csvFilePath);
+	const ItemInfo* GetItemInfo(int itemID, int rarity) const;
+	int GetMaxItemID() const { return m_maxItemID; }
+	// Enhancement Management
+	template<ItemEnhancementType T>
+	void AddEnhancementDelta(SourceKey key, const EnhancementDelta<T>& d);
+	void RemoveEnhancementDelta(SourceKey key);
+
+	// 조회/적용
+	int   GetAdd(ItemEnhancementType t) const;
+	float GetMul(ItemEnhancementType t) const;
+	int   ApplyToBaseInt(ItemEnhancementType t, int base)   const;
+	float ApplyToBaseFloat(ItemEnhancementType t, float base) const;
+
+	void ResetAllEnhancements();
+	void ApplyItemEnhancement(const ItemInfo& info);
+	void RemoveItemEnhancement(const ItemInfo& info);
+
+	bool HasApplied(int itemId, int rarity) const;
+	std::vector<ItemInfo> PickRandomUnappliedItems(int count);
 
 private:
 	EventManager* m_eventManager{ nullptr };
@@ -50,4 +72,26 @@ private:
 	std::future<Scene*>  m_loadingSceneFuture;
 	// Item Info Management
 	std::unordered_map<ItemUniqueID, ItemInfo, ItemUniqueIDHash> m_itemInfoMap;
+	int m_maxItemID{ 0 };
+
+	int   m_addInt[MAX_ENHANCEMENT_TYPE] = {};
+	float m_mulFloat[MAX_ENHANCEMENT_TYPE] = {};
+
+	std::unordered_map<SourceKey, AnyDelta> m_applied;
 };
+
+template<ItemEnhancementType T>
+void GameInstance::AddEnhancementDelta(SourceKey key, const EnhancementDelta<T>& d)
+{
+	// 이미 있으면 제거(갱신)
+	RemoveEnhancementDelta(key);
+
+	constexpr int idx = static_cast<int>(T);
+	if constexpr (std::same_as<typename EnhancementDelta<T>::value_type, int>) {
+		m_addInt[idx] += d.value;
+	}
+	else {
+		m_mulFloat[idx] += d.value; // 0.10f == +10%
+	}
+	m_applied.emplace(key, d); // AnyDelta로 저장(variant)
+}

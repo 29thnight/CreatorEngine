@@ -1,6 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "ItemComponent.h"
+#include "Core.Random.h"
+#include "GameInstance.h"
+#include "ItemInfo.h"
 
 class ItemManager : public ModuleBehavior
 {
@@ -20,7 +24,19 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-private:
-	//std::array<ItemComponent*, 3> itemSlots;
+	//현재 씬의 아이템 슬롯 최초 초기화 함수
+	void InitItemSlots();
+	//아이템 슬롯 리롤 함수
+	void RefreshItemSlots();
+	//아이템 구매	함수
+	void BuyItem(int slotIndex);
+	//아이템 빈 슬롯 만들기
+	void ClearItemSlot(int slotIndex);
 
+private:
+	class GameManager* gameManager{ nullptr };
+	//현재 씬의 아이템 슬롯 3개
+	std::array<ItemComponent*, 3> itemSlots;
+	//아이템 정보 3개 -> 렌덤으로 돌려서 슬롯에 넣어줌
+	std::array<ItemInfo, 3> itemInfos;
 };

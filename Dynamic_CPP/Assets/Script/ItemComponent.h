@@ -17,4 +17,7 @@ public:
 	int m_itemRarity{ 0 };
 	std::string name{};
 	std::string description{};
+	int price{ 0 };
+	int enhanceType{ 0 };
+	int enhanceValue{ 0 };
 };
