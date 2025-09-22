@@ -25,10 +25,14 @@ PxFilterFlags CustomFilterShader(
 {
 	
 	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1)) {
-		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
-			| PxPairFlag::eNOTIFY_TOUCH_FOUND
-			| PxPairFlag::eNOTIFY_TOUCH_LOST;
-		return PxFilterFlag::eDEFAULT;
+		if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0)))
+		{
+			pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+				| PxPairFlag::eNOTIFY_TOUCH_FOUND
+				| PxPairFlag::eNOTIFY_TOUCH_LOST;
+			return PxFilterFlag::eDEFAULT;
+		}
+		return PxFilterFlag::eSUPPRESS;
 	}
 	else {
 		if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0))) {
@@ -132,7 +136,7 @@ public:
 	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
 	{
 		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
-		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eTOUCH;
+ 		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eTOUCH;
 		return physx::PxQueryHitType::eNONE;
 	}
 	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eTOUCH; }

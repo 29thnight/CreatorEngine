@@ -4,10 +4,10 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
-    "name": "gumgi1",
+    "name": "gumgi2",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -15,7 +15,7 @@
                         "meshParticleTemplate": {
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": -2.0,
+                                "y": 3.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -90,7 +90,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 146.50271606445313,
                             "velocityMode": 0
                         },
                         "orbitalData": {

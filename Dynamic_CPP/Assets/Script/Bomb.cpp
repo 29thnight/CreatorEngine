@@ -48,7 +48,7 @@ void Bomb::Update(float tick)
 			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
 
 
-			for (auto& hit : hits)
+ 			for (auto& hit : hits)
 			{
 				auto object = hit.gameObject;
 				if (object == GetOwner()) continue;

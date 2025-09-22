@@ -239,16 +239,23 @@ void Player::Start()
 
 	ChangeState("Idle");
 
-	//auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
-	//for(auto& meshrenderer : meshrenderers)
-	//{
-	//	meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
-	//}
+	/*auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for(auto& meshrenderer : meshrenderers)
+	{
+		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
+	}*/
 	Debug->Log("Player Start");
+
+	m_maxHP = maxHP;
+	m_currentHP = m_maxHP;
 }
 
 void Player::Update(float tick)
 {
+
+
+
+
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
@@ -331,10 +338,31 @@ void Player::Update(float tick)
 	}
 
 	///test sehwan
-	if(InputManagement->IsKeyDown('V'))
+	/*if(InputManagement->IsKeyDown('V'))
 	{
 		auto input = GetOwner()->GetComponent<PlayerInputComponent>();
 		input->SetControllerVibration(3.f, 1.0, 1.0, 1.0, 1.0);
+	}*/
+
+	if (true == OnInvincibility)
+	{
+		GracePeriodElpasedTime += tick;
+		if (GracePeriod <= GracePeriodElpasedTime)
+		{
+			OnInvincibility = false;
+		}
+		else
+		{
+			//깜빡깜빡 tick당한번 or 0.n초당 규철이가 작성할예정
+		}
+	}
+
+
+
+
+	if (m_animator)
+	{
+		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
 	}
 }
 
@@ -440,13 +468,12 @@ void Player::SendDamage(Entity* sender, int damage)
 	if (sender)
 	{
 		
-		auto enemy = dynamic_cast<EntityEnemy*>(sender);
-		if (enemy)
-		{
-			// hit
-			DropCatchItem();
-			Damage(damage);
-		}
+		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
+		// hit
+		//DropCatchItem();
+		
+		Damage(damage);
+		std::cout << m_currentHP << std::endl;
 	}
 }
 
@@ -836,9 +863,9 @@ void Player::PlaySlashEvent()
 		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
 		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
 
-		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
-		Quaternion finalRot = rot * lookRot;
-		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
+		//Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(180.f));
+		//Quaternion finalRot = rot * lookRot;
+		SlashObj->GetComponent<Transform>()->SetRotation(lookRot);
 
 
 		Slashscript->Initialize();
@@ -901,7 +928,7 @@ bool Player::CheckResurrectionByOther()
 	std::vector<HitResult> hits;
 	OverlapInput reviveInfo;
 	Transform transform = GetOwner()->m_transform;
-	reviveInfo.layerMask = 1u; //&&&&& Player만 체크하게 바꾸기
+	reviveInfo.layerMask = 1 << 5; //&&&&& Player만 체크하게 바꾸기
 	reviveInfo.position = transform.GetWorldPosition();
 	reviveInfo.rotation = transform.GetWorldQuaternion();
 	PhysicsManagers->SphereOverlap(reviveInfo, ResurrectionRange, hits);
@@ -1163,8 +1190,10 @@ void Player::CancelChargeAttack()
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
 	m_controller->Move({ 0,0 });
-	bombThrowPositionoffset.x += dir.x;
-	bombThrowPositionoffset.z += dir.y;
+	float offsetX = bombMoveSpeed * dir.x;
+	float offsetZ = bombMoveSpeed * dir.y;
+	bombThrowPositionoffset.x += offsetX;
+	bombThrowPositionoffset.z += offsetZ;
 
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	bombThrowPosition = pos + bombThrowPositionoffset;
@@ -1239,7 +1268,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1u; //일단 다떄림
+	RangeInfo.layerMask = 1 << 8 | 1 << 10;; //일단 다떄림
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();

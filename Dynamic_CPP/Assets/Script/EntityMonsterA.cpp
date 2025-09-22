@@ -47,7 +47,6 @@ void EntityMonsterA::Start()
 		}
 	}
 
-	m_pOwner->m_collisionType = 3;
 
 	for (auto& child : childred)
 	{
@@ -252,6 +251,7 @@ void EntityMonsterA::ChaseTarget()
 void EntityMonsterA::Dead()
 {
 	m_animator->SetParameter("Dead", true);
+	GetOwner()->SetLayer("Water");
 	//todo : Dead entity remove or disable
 }
 
