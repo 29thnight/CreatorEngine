@@ -250,7 +250,13 @@ void HotLoadSystem::ReplaceScriptComponent()
 		{
 			if (!gameObjectSet.contains(gameObject)) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
 
-			auto* newScript = CreateMonoBehavior(name.c_str());
+			std::shared_ptr<ModuleBehavior> newScript = std::shared_ptr<ModuleBehavior>(
+				ScriptManager->CreateMonoBehavior(name.data()),
+				[](ModuleBehavior* ptr) // Custom deleter to ensure proper cleanup
+				{
+					ScriptManager->DestroyMonoBehavior(ptr);
+				}
+			);
 			if (nullptr == newScript)
 			{
 				Debug->LogError("Failed to create script: " + std::string(name));
@@ -259,12 +265,13 @@ void HotLoadSystem::ReplaceScriptComponent()
 
 			newScript->SetOwner(gameObject);
 
+
 			if (SceneManagers->m_isGameStart)
 			{
-				ScriptManager->BindScriptEvents(newScript, name);
+				ScriptManager->BindScriptEvents(newScript.get(), name);
 			}
 
-			auto sharedScript = std::shared_ptr<Component>(newScript);
+			auto sharedScript = std::reinterpret_pointer_cast<Component>(newScript);
 			if (index >= gameObject->m_components.size())
 			{
 				gameObject->m_components.push_back(sharedScript);
@@ -341,7 +348,13 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 	{
 		if (!gameObjectSet.contains(gameObject)) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
 
-		auto* newScript = CreateMonoBehavior(name.c_str());
+		std::shared_ptr<ModuleBehavior> newScript = std::shared_ptr<ModuleBehavior>(
+			ScriptManager->CreateMonoBehavior(name.data()),
+			[](ModuleBehavior* ptr) // Custom deleter to ensure proper cleanup
+			{
+				ScriptManager->DestroyMonoBehavior(ptr);
+			}
+		);
 		if (nullptr == newScript)
 		{
 			Debug->LogError("Failed to create script: " + std::string(name));
@@ -350,11 +363,11 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 
 		if (SceneManagers->m_isGameStart)
 		{
-			ScriptManager->BindScriptEvents(newScript, name);
+			ScriptManager->BindScriptEvents(newScript.get(), name);
 		}
 
 		newScript->SetOwner(gameObject);
-		auto sharedScript = std::shared_ptr<Component>(newScript);
+		auto sharedScript = std::reinterpret_pointer_cast<Component>(newScript);
 		if (index >= gameObject->m_components.size())
 		{
 			gameObject->m_components.push_back(sharedScript);
@@ -409,6 +422,7 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view na
 {
 	auto owner = script->GetOwner();
 	auto activeScene = owner->GetScene();
+	auto sharedThis = std::static_pointer_cast<ModuleBehavior>(script->shared_from_this());
 	//결국 이렇게되면 .meta파일을 클라이언트가 가지고 있어야 됨...
 	std::string scriptMetaFile = "Assets\\Script\\" + std::string(name) + ".cpp" + ".meta";
 	file::path scriptMetaFileName = PathFinder::DynamicSolutionPath(scriptMetaFile);
@@ -432,85 +446,86 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view na
 				{
 					if (script->m_awakeEventHandle.IsValid()) continue;
 
-					script->m_awakeEventHandle = activeScene->AwakeEvent.AddRaw(script, &ModuleBehavior::AwakeInvoke);
+					
+					script->m_awakeEventHandle = activeScene->AwakeEvent.AddShared(sharedThis, &ModuleBehavior::AwakeInvoke);
 				}
 				else if (event == "OnEnable")
 				{
 					if (script->m_onEnableEventHandle.IsValid()) continue;
 
-					script->m_onEnableEventHandle = activeScene->OnEnableEvent.AddRaw(script, &ModuleBehavior::OnEnableInvoke);
+					script->m_onEnableEventHandle = activeScene->OnEnableEvent.AddShared(sharedThis, &ModuleBehavior::OnEnableInvoke);
 				}
 				else if (event == "Start")
 				{
 					if (script->m_startEventHandle.IsValid()) continue;
 
-					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::StartInvoke);
+					script->m_startEventHandle = activeScene->StartEvent.AddShared(sharedThis, &ModuleBehavior::StartInvoke);
 				}
 				else if (event == "FixedUpdate")
 				{
 					if (script->m_fixedUpdateEventHandle.IsValid()) continue;
 
-					script->m_fixedUpdateEventHandle = activeScene->FixedUpdateEvent.AddRaw(script, &ModuleBehavior::FixedUpdateInvoke);
+					script->m_fixedUpdateEventHandle = activeScene->FixedUpdateEvent.AddShared(sharedThis, &ModuleBehavior::FixedUpdateInvoke);
 				}
 				else if (event == "OnTriggerEnter")
 				{
 					if (script->m_onTriggerEnterEventHandle.IsValid()) continue;
 
-					script->m_onTriggerEnterEventHandle = activeScene->OnTriggerEnterEvent.AddRaw(script, &ModuleBehavior::OnTriggerEnterInvoke);
+					script->m_onTriggerEnterEventHandle = activeScene->OnTriggerEnterEvent.AddShared(sharedThis, &ModuleBehavior::OnTriggerEnterInvoke);
 				}
 				else if (event == "OnTriggerStay")
 				{
 					if (script->m_onTriggerStayEventHandle.IsValid()) continue;
 
-					script->m_onTriggerStayEventHandle = activeScene->OnTriggerStayEvent.AddRaw(script, &ModuleBehavior::OnTriggerStayInvoke);
+					script->m_onTriggerStayEventHandle = activeScene->OnTriggerStayEvent.AddShared(sharedThis, &ModuleBehavior::OnTriggerStayInvoke);
 				}
 				else if (event == "OnTriggerExit")
 				{
 					if (script->m_onTriggerExitEventHandle.IsValid()) continue;
 
-					script->m_onTriggerExitEventHandle = activeScene->OnTriggerExitEvent.AddRaw(script, &ModuleBehavior::OnTriggerExitInvoke);
+					script->m_onTriggerExitEventHandle = activeScene->OnTriggerExitEvent.AddShared(sharedThis, &ModuleBehavior::OnTriggerExitInvoke);
 				}
 				else if (event == "OnCollisionEnter")
 				{
 					if (script->m_onCollisionEnterEventHandle.IsValid()) continue;
 
-					script->m_onCollisionEnterEventHandle = activeScene->OnCollisionEnterEvent.AddRaw(script, &ModuleBehavior::OnCollisionEnterInvoke);
+					script->m_onCollisionEnterEventHandle = activeScene->OnCollisionEnterEvent.AddShared(sharedThis, &ModuleBehavior::OnCollisionEnterInvoke);
 				}
 				else if (event == "OnCollisionStay")
 				{
 					if (script->m_onCollisionStayEventHandle.IsValid()) continue;
 
-					script->m_onCollisionStayEventHandle = activeScene->OnCollisionStayEvent.AddRaw(script, &ModuleBehavior::OnCollisionStayInvoke);
+					script->m_onCollisionStayEventHandle = activeScene->OnCollisionStayEvent.AddShared(sharedThis, &ModuleBehavior::OnCollisionStayInvoke);
 				}
 				else if (event == "OnCollisionExit")
 				{
 					if (script->m_onCollisionExitEventHandle.IsValid()) continue;
 
-					script->m_onCollisionExitEventHandle = activeScene->OnCollisionExitEvent.AddRaw(script, &ModuleBehavior::OnCollisionExitInvoke);
+					script->m_onCollisionExitEventHandle = activeScene->OnCollisionExitEvent.AddShared(sharedThis, &ModuleBehavior::OnCollisionExitInvoke);
 				}
 				else if (event == "Update")
 				{
 					if (script->m_updateEventHandle.IsValid()) continue;
 
-					script->m_updateEventHandle = activeScene->UpdateEvent.AddRaw(script, &ModuleBehavior::UpdateInvoke);
+					script->m_updateEventHandle = activeScene->UpdateEvent.AddShared(sharedThis, &ModuleBehavior::UpdateInvoke);
 				}
 				else if (event == "LateUpdate")
 				{
 					if (script->m_lateUpdateEventHandle.IsValid()) continue;
 
-					script->m_lateUpdateEventHandle = activeScene->LateUpdateEvent.AddRaw(script, &ModuleBehavior::LateUpdateInvoke);
+					script->m_lateUpdateEventHandle = activeScene->LateUpdateEvent.AddShared(sharedThis, &ModuleBehavior::LateUpdateInvoke);
 				}
 				else if (event == "OnDisable")
 				{
 					if (script->m_onDisableEventHandle.IsValid()) continue;
 
-					script->m_onDisableEventHandle = activeScene->OnDisableEvent.AddRaw(script, &ModuleBehavior::OnDisableInvoke);
+					script->m_onDisableEventHandle = activeScene->OnDisableEvent.AddShared(sharedThis, &ModuleBehavior::OnDisableInvoke);
 				}
 				else if (event == "OnDestroy")
 				{
 					if (script->m_onDestroyEventHandle.IsValid()) continue;
 
-					script->m_onDestroyEventHandle = activeScene->OnDestroyEvent.AddRaw(script, &ModuleBehavior::OnDestroyInvoke);
+					script->m_onDestroyEventHandle = activeScene->OnDestroyEvent.AddShared(sharedThis, &ModuleBehavior::OnDestroyInvoke);
 				}
 			}
 			

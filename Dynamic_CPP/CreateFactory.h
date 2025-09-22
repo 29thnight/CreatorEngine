@@ -3,6 +3,10 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "ItemComponent.h"
+#include "ItemManager.h"
+#include "ItemUIPopup.h"
+#include "ItemUIIcon.h"
 #include "GameInit.h"
 #include "ImageButton.h"
 #include "PlayerSelector.h"

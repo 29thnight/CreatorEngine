@@ -13,7 +13,7 @@
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
-	if( auto existingCanvas = FindCanvasName(name); existingCanvas )
+	if(auto existingCanvas = FindCanvasName(name); existingCanvas )
 	{
 		std::cout << "Canvas with name '" << name << "' already exists." << std::endl;
 		return nullptr;
@@ -60,7 +60,7 @@ void UIManager::AddCanvas(std::shared_ptr<GameObject> canvas)
 		return;
 	}
 
-	auto curScene = SceneManagers->GetActiveScene();
+	auto curScene = canvas->GetScene();
 	if (curScene == nullptr) return;
 
 	std::string canvasName = canvas->ToString();
@@ -156,8 +156,6 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 
     return MakeImage(name, texture, canvas, Pos);
 }
-
-
 
 std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const std::shared_ptr<Texture>& texture, std::function<void()> clickfun, Mathf::Vector2 Pos, GameObject* canvas)
 {
@@ -349,7 +347,7 @@ void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
 {
     if (!canvas) return;
 
-	auto curScene = SceneManagers->GetActiveScene();
+	auto curScene = canvas->GetScene();
 	if (curScene == nullptr) return;
 
 	curScene->RemoveCanvas(canvas);
@@ -358,7 +356,23 @@ void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
 void UIManager::CheckInput()
 {
 	auto curCanvasObj = CurCanvas.lock();
+	
 	if (!curCanvasObj) return;
+
+	auto canvasScene = curCanvasObj->GetScene();
+	auto activeScene = SceneManagers->GetActiveScene();
+	if (canvasScene != activeScene)
+	{
+		//activeScene가 바뀌었을 때 CurCanvas를 nullptr로 만들어서 다시 캔버스 찾도록 함
+		CurCanvas.reset();
+		return;
+	}
+
+	if (!isEnableUINavigation)
+	{
+		return;
+	}
+
 	Canvas* curCanvas = curCanvasObj->GetComponent<Canvas>();
 	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
 	{
@@ -432,13 +446,29 @@ GameObject* UIManager::FindCanvasName(std::string_view name)
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
 	auto CanvasObj = curScene->FindCanvasName(name);
-
 	return CanvasObj.get();
 }
 
 GameObject* UIManager::FindCanvasIndex(int index)
 {
 	auto curScene = SceneManagers->GetActiveScene();
+	if (curScene == nullptr) return nullptr;
+	auto CanvasObj = curScene->FindCanvasIndex(index);
+	return CanvasObj.get();
+}
+
+GameObject* UIManager::FindCanvasName(const std::shared_ptr<GameObject>& obj, std::string_view name)
+{
+	auto curScene = obj->GetScene();
+	if (curScene == nullptr) return nullptr;
+	auto CanvasObj = curScene->FindCanvasName(name);
+
+	return CanvasObj.get();
+}
+
+GameObject* UIManager::FindCanvasIndex(const std::shared_ptr<GameObject>& obj, int index)
+{
+	auto curScene = obj->GetScene();
 	if (curScene == nullptr) return nullptr;
 
 	auto CanvasObj = curScene->FindCanvasIndex(index);
@@ -451,7 +481,7 @@ void UIManager::Update()
 	SortCanvas();
 
 	auto curScene = SceneManagers->GetActiveScene();
-	if (curScene != nullptr)
+	if (curScene != nullptr || CurCanvas.expired())
 	{
 		auto& canvases = curScene->GetCanvases();
 

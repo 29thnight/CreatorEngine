@@ -32,7 +32,8 @@ public:
 	std::shared_ptr<GameObject> MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, Mathf::Vector2 Pos = { 960, 540 });
 
 	void CheckInput();
-
+	GameObject* FindCanvasName(const std::shared_ptr<GameObject>& obj, std::string_view name);
+	GameObject* FindCanvasIndex(const std::shared_ptr<GameObject>& obj, int index);
 	GameObject* FindCanvasName(std::string_view name);
 	GameObject* FindCanvasIndex(int index);
 	void Update();

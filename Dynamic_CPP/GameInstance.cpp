@@ -3,6 +3,16 @@
 #include "DebugLog.h"
 #include "pch.h"
 
+void GameInstance::Initialize()
+{
+	if (m_isInitialize) {
+		return;
+	}
+	m_isInitialize = true;
+	m_RewardAmount = 0;
+	m_playerInputDevices.fill({ CharType::None, PlayerDir::None });
+}
+
 void GameInstance::AddRewardAmount(int amount)
 {
 	m_RewardAmount += amount;

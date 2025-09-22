@@ -5,6 +5,7 @@
 #include "ManagedHeapObject.h"
 #include "Component.generated.h"
 
+
 class GameObject;
 class Transform;
 class Component : public Object

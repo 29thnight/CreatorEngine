@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "ItemInfo.h"
 #include "DLLAcrossSingleton.h"
 
 static constexpr int MAX_INPUT_DEVICE = 2;
@@ -15,6 +16,7 @@ private:
 	~GameInstance() = default;
 
 public:
+	void Initialize();
 	//Scene Management
 	void AsyncSceneLoadUpdate();
 	void LoadScene(const std::string& sceneName);
@@ -39,10 +41,13 @@ private:
 	EventManager* m_eventManager{ nullptr };
 	int m_RewardAmount{};
 	bool m_isLoadSceneComplete{ false };
+	bool m_isInitialize{ false };
 	std::string m_nextSceneName{};
 	// 로드된 씬들을 저장하는 맵
 	std::unordered_map<std::string, class Scene*> m_loadedScenes;
 	// 오른쪽 왼쪽 UI 구분용 Left: 0, Right: 1
 	std::array<std::pair<CharType, PlayerDir>, MAX_INPUT_DEVICE> m_playerInputDevices;
 	std::future<Scene*>  m_loadingSceneFuture;
+	// Item Info Management
+	std::unordered_map<ItemUniqueID, ItemInfo, ItemUniqueIDHash> m_itemInfoMap;
 };
