@@ -8,21 +8,11 @@
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 1,
+            "maxParticles": 1000,
             "modules": [
                 {
                     "data": {
-                        "meshParticleTemplate": {
-                            "RotationSpeed": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
+                        "particleTemplate": {
                             "acceleration": {
                                 "x": 0.0,
                                 "y": -9.800000190734863,
@@ -34,9 +24,14 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "lifeTime": 10.0,
-                            "renderMode": 0,
-                            "textureIndex": 0,
+                            "initialRotation": 0.0,
+                            "initialRotationRange": 0.0,
+                            "lifeTime": 100.0,
+                            "rotateSpeed": 0.0,
+                            "size": {
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612
+                            },
                             "velocity": {
                                 "x": 0.0,
                                 "y": 0.0,
@@ -51,63 +46,26 @@
                                 "z": 0.0
                             },
                             "emitterRadius": 1.0,
-                            "emitterRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
                             "emitterSize": {
-                                "x": 0.5,
-                                "y": 0.5,
-                                "z": 0.5
-                            },
-                            "emitterType": 0,
-                            "spawnRate": 1.0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 1
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MeshSpawnModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
-                        "easing": {
-                            "animationType": 0,
-                            "duration": 1.0,
-                            "enabled": false,
-                            "type": 0
-                        },
-                        "sizeParams": {
-                            "endSize": {
-                                "x": 2.0,
-                                "y": 2.0,
-                                "z": 2.0
-                            },
-                            "randomScaleMax": 2.0,
-                            "randomScaleMin": 0.5,
-                            "startSize": {
                                 "x": 1.0,
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "useRandomScale": 0
+                            "emitterType": 1,
+                            "spawnRate": 3.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 1000
                         }
                     },
                     "stage": 2,
-                    "type": "MeshSizeModuleCS",
+                    "type": "SpawnModuleCS",
                     "useEasing": false
                 }
             ],
             "name": "NewEmitter",
-            "particleDataType": 2,
+            "particleDataType": 1,
             "position": {
                 "x": 0.0,
                 "y": 0.0,
@@ -116,41 +74,86 @@
             "renderModules": [
                 {
                     "data": {
-                        "constantBuffer": {
-                            "cameraPosition": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            }
-                        },
-                        "mesh": {
-                            "meshIndex": 0,
+                        "billboard": {
+                            "maxCount": 0,
                             "type": 1
                         },
-                        "model": {
-                            "hasModel": false
-                        },
-                        "renderState": {
-                            "instanceCount": 1
-                        },
+                        "indices": [
+                            0,
+                            1,
+                            2,
+                            0,
+                            2,
+                            3
+                        ],
                         "renderStates": {
-                            "blendPreset": 2,
-                            "depthPreset": 2,
-                            "rasterizerPreset": 2
+                            "blendPreset": 1,
+                            "depthPreset": 1,
+                            "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "MeshParticle",
-                            "vertexShader": "MeshParticle"
+                            "pixelShader": "BillBoard",
+                            "vertexShader": "BillBoard"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "123",
+                                "name": "star",
                                 "slot": 0
+                            }
+                        ],
+                        "vertices": [
+                            {
+                                "position": {
+                                    "w": 1.0,
+                                    "x": -1.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                },
+                                "texcoord": {
+                                    "x": 0.0,
+                                    "y": 0.0
+                                }
+                            },
+                            {
+                                "position": {
+                                    "w": 1.0,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                },
+                                "texcoord": {
+                                    "x": 1.0,
+                                    "y": 0.0
+                                }
+                            },
+                            {
+                                "position": {
+                                    "w": 1.0,
+                                    "x": 1.0,
+                                    "y": -1.0,
+                                    "z": 0.0
+                                },
+                                "texcoord": {
+                                    "x": 1.0,
+                                    "y": 1.0
+                                }
+                            },
+                            {
+                                "position": {
+                                    "w": 1.0,
+                                    "x": -1.0,
+                                    "y": -1.0,
+                                    "z": 0.0
+                                },
+                                "texcoord": {
+                                    "x": 0.0,
+                                    "y": 1.0
+                                }
                             }
                         ]
                     },
-                    "type": "MeshModuleGPU"
+                    "type": "BillboardModuleGPU"
                 }
             ],
             "rotation": {

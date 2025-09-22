@@ -28,6 +28,18 @@ void EffectComponent::Awake()
             m_loop = templateLoop;
             m_duration = templateDuration;
         }
+
+        proxy->UpdateInstanceName(m_effectInstanceName);
+        proxy->UpdatePosition(m_lastPosition);
+        proxy->PushCommand(EffectCommandType::SetPosition);
+
+        proxy->UpdateInstanceName(m_effectInstanceName);
+        proxy->UpdateRotation(m_lastRotation);
+        proxy->PushCommand(EffectCommandType::SetRotation);
+
+        proxy->UpdateInstanceName(m_effectInstanceName);
+        proxy->UpdateScale(m_lastScale);
+        proxy->PushCommand(EffectCommandType::SetScale);
     }
 }
 
@@ -51,22 +63,22 @@ void EffectComponent::Update(float tick)
     }
 
     // 인스턴스 이름이 있을 때만 position/rotation/scale 업데이트
+// Update 함수의 변화 감지 부분만 수정
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
         auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
-        auto worldScale = GetOwner()->m_transform.GetWorldScale();  // 추가
+        auto worldScale = GetOwner()->m_transform.GetWorldScale();
 
         Mathf::Vector3 currentPos = Mathf::Vector3(worldPos.m128_f32[0], worldPos.m128_f32[1], worldPos.m128_f32[2]);
-        Mathf::Vector3 currentScale = Mathf::Vector3(worldScale.m128_f32[0], worldScale.m128_f32[1], worldScale.m128_f32[2]);  // 추가
+        Mathf::Vector3 currentScale = Mathf::Vector3(worldScale.m128_f32[0], worldScale.m128_f32[1], worldScale.m128_f32[2]);
 
         float pitch, yaw, roll;
         Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
         Mathf::Vector3 currentRot = Mathf::Vector3(-pitch, -yaw, -roll);
 
-        float posThreshold = 0.01f;
-        float posDistance = (m_lastPosition - currentPos).Length();
-        if (posDistance > posThreshold)
+        // Position 변화 감지 (threshold 제거)
+        if (m_lastPosition != currentPos)
         {
             proxy->UpdateInstanceName(m_effectInstanceName);
             proxy->UpdatePosition(currentPos);
@@ -74,9 +86,8 @@ void EffectComponent::Update(float tick)
             m_lastPosition = currentPos;
         }
 
-        float rotThreshold = 0.01f;
-        float rotDistance = (m_lastRotation - currentRot).Length();
-        if (rotDistance > rotThreshold)
+        // Rotation 변화 감지 (threshold 제거)
+        if (m_lastRotation != currentRot)
         {
             proxy->UpdateInstanceName(m_effectInstanceName);
             proxy->UpdateRotation(currentRot);
@@ -84,10 +95,8 @@ void EffectComponent::Update(float tick)
             m_lastRotation = currentRot;
         }
 
-        // Scale 변화 감지 추가
-        float scaleThreshold = 0.01f;
-        float scaleDistance = (m_lastScale - currentScale).Length();
-        if (scaleDistance > scaleThreshold)
+        // Scale 변화 감지 (threshold 제거)
+        if (m_lastScale != currentScale)
         {
             proxy->UpdateInstanceName(m_effectInstanceName);
             proxy->UpdateScale(currentScale);

@@ -25,7 +25,7 @@ float4 main(VSOutput input) : SV_TARGET
     float4 texColor = sparkleTexture.Sample(linearSampler, input.TexCoord);
     float intensity = texColor.r;
     
-    float3 finalColor = input.Color.rgb * texColor.rgb;
+    float3 finalColor = texColor.rgb;
     float finalAlpha = texColor.a * input.Color.a * intensity;
     
     //if (finalAlpha < 0.1)
