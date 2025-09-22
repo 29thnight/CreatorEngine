@@ -55,16 +55,6 @@ void GameManager::Start()
 
 void GameManager::Update(float tick)
 {
-	auto cam = GameObject::Find("Main Camera");
-	if (!cam) return;
-
-	std::vector<HitResult> hits;
-	Quaternion currentRotation = cam->m_transform.GetWorldQuaternion();
-	currentRotation.Normalize();
-	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
-
-	int size = RaycastAll(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1u, hits);
-
 	GameInstance::GetInstance()->AsyncSceneLoadUpdate();
 
 	//테스트용 보상 코드

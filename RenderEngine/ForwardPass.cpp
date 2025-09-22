@@ -246,8 +246,8 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	float blend_factor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 	UINT sample_mask = 0xffffffff;
 	DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
 
@@ -398,18 +398,45 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", renderData->m_frameCalculatedView);
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", renderData->m_frameCalculatedProjection);
 			proxy->m_Material->TrySetMaterialInfo();
+
+
+			//Cbuffer를 View 전용 컨테이너로 복사
+			proxy->m_Material->UpdateCBufferView();
 			// 이 머티리얼이 보관하던 CBuffer 변경분만 GPU로 반영
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
-
 			// 텍스처 SRV는 SetShaderPSO() 때 슬롯 고정 바인딩됨
+
+			// 기존 forward binding
+			{
+				DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
+				DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
+				DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
+				DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+				//DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
+				DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
+
+				ID3D11ShaderResourceView* envSRVs[3] = {
+					m_UseEnvironmentMap ? envMap->m_pSRV : nullptr,
+					m_UseEnvironmentMap ? preFilter->m_pSRV : nullptr,
+					m_UseEnvironmentMap ? brdfLut->m_pSRV : nullptr
+				};
+				DirectX11::PSSetShaderResources(deferredPtr, 6, 3, envSRVs);
+
+				auto& lightManager = scene.m_LightController;
+				if (lightManager->hasLightWithShadows) {
+					DirectX11::PSSetShaderResources(deferredPtr, 4, 1, &renderData->m_shadowMapTexture->m_pSRV);
+					DirectX11::PSSetConstantBuffer(deferredPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+					lightManager->PSBindCloudShadowMap(deferredPtr);
+				}
+			}
 			proxy->Draw(deferredPtr);
 		}
 
-		DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRVs);
+		/*DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRVs);
 		DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &nullSRVs);
 		DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &nullSRVs);
 		DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &nullSRVs);
-		DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &nullSRVs);
+		DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &nullSRVs);*/
 	}
 
 	if (0 == renderData->m_index)
