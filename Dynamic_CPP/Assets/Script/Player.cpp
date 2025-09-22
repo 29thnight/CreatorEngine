@@ -57,13 +57,13 @@ void Player::Start()
 		m_animator = player->GetComponent<Animator>();
 	}
 
-	std::string ShootPosObjName = "RangeShootPos";
+	std::string ShootPosTagName = "ShootTag";
 	for (auto& child : childred)
 	{
 		GameObject* childObj = GameObject::FindIndex(child);
 		if (childObj)
 		{
-			if (childObj->RemoveSuffixNumberTag() == ShootPosObjName)
+			if (childObj->m_tag == ShootPosTagName)
 			{
 				shootPosObj = childObj;
 				break;
@@ -958,11 +958,9 @@ void Player::Resurrection()
 
 void Player::OnHit()
 {
-	DropCatchItem();
 	if (m_animator)
 	{
 		m_animator->SetParameter("OnHit", true);
-		CancelChargeAttack(); 
 	}
 }
 
