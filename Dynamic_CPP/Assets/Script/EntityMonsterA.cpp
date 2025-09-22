@@ -178,6 +178,14 @@ void EntityMonsterA::Update(float tick)
 	{
 		Dead();
 	}
+	if (EndDeadAnimation)
+	{
+		deadElapsedTime += tick;
+		if (deadDestroyTime <= deadElapsedTime)
+		{
+			GetOwner()->Destroy();
+		}
+	}
 
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
@@ -250,7 +258,8 @@ void EntityMonsterA::Dead()
 
 void EntityMonsterA::DeadEvent()
 {
-	GetOwner()->Destroy(); //&&&&&풀에 넣기
+	EndDeadAnimation = true;
+	//GetOwner()->Destroy(); //&&&&&풀에 넣기
 	//monster death Effect 생성
 }
 

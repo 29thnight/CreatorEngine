@@ -30,6 +30,8 @@ public:
 	bool endAttack = false;
 	EffectComponent* m_effect;
 	
+	bool onEffect = false;
+
 	[[Property]]
 	float explosionRadius = 3.0f; //범위공격 반경
 };

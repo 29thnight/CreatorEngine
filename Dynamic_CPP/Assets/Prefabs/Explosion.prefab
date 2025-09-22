@@ -1,22 +1,22 @@
 m_name: Explosion
 m_isEnabled: true
-m_instanceID: 3538846026
+m_instanceID: 1277846129
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: Explosion
     m_isEnabled: true
-    m_instanceID: 2060910586
+    m_instanceID: 1556954425
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 3
+    m_index: 58
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabFileGuid: a4dbe431-b313-5e82-92b4-875db7229799
     m_attachedSoketID: 0
     m_collisionType: 12
     m_isStatic: false
@@ -27,20 +27,20 @@ PrefabNode:
       - EffectComponent: 3131036541
         m_name: EffectComponent
         m_isEnabled: true
-        m_instanceID: 1557913600
+        m_instanceID: 568035398
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_effectTemplateName: explosion1
+        m_effectTemplateName: gumgi1
         m_isPlaying: true
         m_isPaused: false
         m_timeScale: 1
         m_loop: false
         m_duration: 1
         m_useAbsolutePosition: false
-        m_effectInstanceName: explosion1_obj2060910586
+        m_effectInstanceName: gumgi1_obj1556954425
       - ModuleBehavior: 1399118904
         explosionRadius: 3
         m_name: Explosion
         m_isEnabled: true
-        m_instanceID: 1579453164
+        m_instanceID: 1546753074
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: d82b261c-fa0b-56fa-95e2-f7342b9f03a3
