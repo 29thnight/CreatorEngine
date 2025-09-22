@@ -1,0 +1,140 @@
+{
+    "currentTime": 0.0,
+    "duration": -1.0,
+    "isPaused": false,
+    "isPlaying": false,
+    "loop": true,
+    "name": "3",
+    "particleSystems": [
+        {
+            "isRunning": false,
+            "maxParticles": 1,
+            "modules": [
+                {
+                    "data": {
+                        "meshParticleTemplate": {
+                            "RotationSpeed": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "Scale": {
+                                "x": 0.5,
+                                "y": 0.5,
+                                "z": 5.0
+                            },
+                            "acceleration": {
+                                "x": 0.0,
+                                "y": -9.800000190734863,
+                                "z": 0.0
+                            },
+                            "color": {
+                                "w": 1.0,
+                                "x": 0.5569620132446289,
+                                "y": 0.0,
+                                "z": 1.0
+                            },
+                            "lifeTime": 1.0,
+                            "renderMode": 0,
+                            "textureIndex": 0,
+                            "velocity": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "velocityRange": 0.0
+                        },
+                        "spawnParams": {
+                            "emitterPosition": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "emitterRadius": 1.0,
+                            "emitterRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "emitterSize": {
+                                "x": 0.5,
+                                "y": 0.5,
+                                "z": 0.5
+                            },
+                            "emitterType": 0,
+                            "spawnRate": 1.0
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 1
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MeshSpawnModuleCS",
+                    "useEasing": false
+                }
+            ],
+            "name": "NewEmitter",
+            "particleDataType": 2,
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "renderModules": [
+                {
+                    "data": {
+                        "constantBuffer": {
+                            "cameraPosition": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            }
+                        },
+                        "mesh": {
+                            "meshIndex": 0,
+                            "type": 3
+                        },
+                        "model": {
+                            "assigned": true,
+                            "hasModel": true,
+                            "meshIndex": 0,
+                            "name": "EffectSpehere"
+                        },
+                        "renderState": {
+                            "instanceCount": 1
+                        },
+                        "renderStates": {
+                            "blendPreset": 2,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 2
+                        },
+                        "shaders": {
+                            "pixelShader": "ggg",
+                            "vertexShader": "MeshParticle"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "wenli",
+                                "slot": 0
+                            }
+                        ]
+                    },
+                    "type": "MeshModuleGPU"
+                }
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
+        }
+    ],
+    "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "timeScale": 1.0
+}
