@@ -378,9 +378,6 @@
 		<ClInclude Include="ItemType.h">
 			<Filter>Script\ScriptClass\Items</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass\Util</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
