@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "3",
+    "name": "lazer",
     "particleSystems": [
         {
             "isRunning": true,
@@ -352,7 +352,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "LaserBeam",
+                            "pixelShader": "MeshParticle",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
@@ -481,7 +481,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "LaserBeam",
+                            "pixelShader": "MeshParticle",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [
@@ -613,7 +613,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 1065.916015625,
+                            "currentTime": 22.619686126708984,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.0,
