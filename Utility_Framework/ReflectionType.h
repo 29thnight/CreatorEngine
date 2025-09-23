@@ -43,13 +43,13 @@ namespace Meta
 
     struct Property
     {
-        const char*           name;
-        std::string           typeName;
+        const char*           name{};
+        std::string           typeName{};
         const Meta::TypeInfo& typeInfo;
-        Meta::GetterType      getter;
-        Meta::SetterType      setter;
-        bool                  isPointer;
-        Meta::OffsetType      offset;
+        Meta::GetterType      getter{};
+        Meta::SetterType      setter{};
+        bool                  isPointer{};
+        Meta::OffsetType      offset{};
 		HashedGuid		      typeID;
 
         //TODO: vector 처리 전용 프로퍼티가 따로 있어야 할거 같음.

@@ -9,6 +9,8 @@
 #include "DebugLog.h"
 #include "PrefabUtility.h"
 #include "CriticalMark.h"
+#include "TweenManager.h"
+#include "Core.Random.h"
 void EntityResource::Start()
 {
 
@@ -91,16 +93,54 @@ void EntityResource::SendDamage(Entity* sender, int damage)
 				}
 				else if (itemType == EItemType::Flower)
 				{
-					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFlower"); //BoxFlower(힐 아이템 아직 없음)
+					itemPrefab = PrefabUtilitys->LoadPrefab("BoxFlower"); 
 				}
 				
 				if (itemPrefab)
 				{
 					GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
 					Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
-					spawnPos.y += 3.f;
+					spawnPos.y += 0.1f;
 					itemObj->m_transform.SetPosition(spawnPos);
-					itemObj->GetComponent<RigidBodyComponent>()->AddForce({ 0.f, 30.f, 300.f }, EForceMode::IMPULSE);
+					
+					Random<float> randX(-3.0f, 3.0f);   
+					Random<float> randY(0.2f, 1.f);         
+					Random<float> randZ(-3.0f, 3.0f);
+
+					float randx = randX();
+					float randy = randY();
+					float randz = randZ();
+
+					Mathf::Vector3 temp = { randx, randy,randz };
+					float f = Random<float>(m_minRewardUpForce, m_maxRewardUpForce).Generate();
+					auto tween = std::make_shared<Tweener<float>>(
+						[=]() { return 0.f; },
+						[=](float val) {
+							Mathf::Vector3 pos = spawnPos;
+							float force = f; // 중력 비슷하게 y축 곡선
+							pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
+							pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
+							pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val)
+								+ force * (1 - (2 * val - 1) * (2 * val - 1));
+							itemObj->m_transform.SetPosition(pos);
+						},
+						1.f,
+						.5f,
+						[](float t) { return Easing::Linear(t); }
+					);
+
+				
+					auto GM = GameObject::Find("GameManager");
+					if (GM)
+					{
+						auto tweenManager = GM->GetComponent<TweenManager>();
+						if (tweenManager)
+						{
+							tweenManager->AddTween(tween);
+						}
+					}
+
+
 				}
 
 				GetOwner()->Destroy();

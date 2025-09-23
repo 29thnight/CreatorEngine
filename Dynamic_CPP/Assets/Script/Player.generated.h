@@ -61,6 +61,9 @@ ReflectionScriptField(Player) \
 		meta_method(StartRay) \
 		meta_method(EndRay) \
 		meta_method(EndAttack) \
+		meta_method(PlaySlashEvent) \
+		meta_method(PlaySlashEvent2) \
+		meta_method(PlaySlashEvent3) \
 		meta_method(TestKillPlayer) \
 		meta_method(TestHit) \
 	}); \

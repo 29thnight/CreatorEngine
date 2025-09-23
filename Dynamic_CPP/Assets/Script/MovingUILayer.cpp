@@ -15,8 +15,11 @@ void MovingUILayer::Start()
 		if (m_selector) 
 		{
 			m_selector->RegisterObserver(this);
-			// Start 시점 초기 위치를 중립으로 맞춤(원하면 현재 위치 유지)
-			if (iconRect) iconRect->SetAnchoredPosition(neutralPos);
+			// Start 시점 초기 위치를 현재 위치로 지정
+			if (iconRect) 
+			{
+				neutralPos = iconRect->GetAnchoredPosition();
+			}
 			m_curSlot = SelectorSlot::Neutral;
 		}
 	}
@@ -60,6 +63,10 @@ void MovingUILayer::Update(float tick)
 
 void MovingUILayer::OnDestroy()
 {
+	if (m_selector)
+	{
+		m_selector->RegisterObserver(this);
+	}
 }
 
 void MovingUILayer::OnSelectorChanged(const SelectorState& state)

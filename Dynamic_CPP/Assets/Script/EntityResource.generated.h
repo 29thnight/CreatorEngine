@@ -7,6 +7,8 @@ ReflectionScriptField(EntityResource) \
 	({ \
 		meta_property(itemCode) \
 		meta_property(itemType) \
+		meta_property(m_minRewardUpForce) \
+		meta_property(m_maxRewardUpForce) \
 	}); \
 	FieldEnd(EntityResource, PropertyOnly) \
 };

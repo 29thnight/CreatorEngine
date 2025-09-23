@@ -1,0 +1,17 @@
+{
+    "actions": [
+        {
+            "actionName": "PlayerSelectUIMove",
+            "actionType": "Value",
+            "funName": "MoveSelector",
+            "inputType": "GamePad",
+            "key0": "Left Thumbstick",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "InputDeviceDetector"
+        }
+    ],
+    "mapName": "PlayerSelect"
+}

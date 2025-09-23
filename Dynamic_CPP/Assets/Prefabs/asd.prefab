@@ -1,0 +1,61 @@
+m_name: asd_Prefab
+m_isEnabled: true
+m_instanceID: 3805162310
+m_fileGuid: 3eb0bb02-0c6c-5f67-ab4f-fb411d658dad
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: asd
+    m_isEnabled: true
+    m_instanceID: 448858755
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0.733219862, y: -0.0971813574, z: 0.088428013, w: 0.667176902}
+      scale: {x: 1, y: 0.999999881, z: 0.999999881, w: 0}
+      m_parentID: 0
+    m_index: 1
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [2]
+    m_prefabFileGuid: 3eb0bb02-0c6c-5f67-ab4f-fb411d658dad
+    m_attachedSoketID: 0
+    m_collisionType: 0
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components: ~
+    children:
+      - GameObject: 2166264123
+        m_name: GameObject
+        m_isEnabled: true
+        m_instanceID: 3307573473
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 3, y: 0.99999994, z: 0.99999994, w: 0}
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 3eb0bb02-0c6c-5f67-ab4f-fb411d658dad
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - EffectComponent: 3131036541
+            m_name: EffectComponent
+            m_isEnabled: true
+            m_instanceID: 4239217086
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_effectTemplateName: t1
+            m_isPlaying: true
+            m_isPaused: false
+            m_timeScale: 1
+            m_loop: true
+            m_duration: -1
+            m_useAbsolutePosition: false
+            m_effectInstanceName: t1_obj3446800525

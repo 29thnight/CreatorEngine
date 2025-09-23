@@ -33,6 +33,8 @@ void InputDeviceDetector::MoveSelector(Mathf::Vector2 dir)
 
     if (!m_isCallStart || !m_playerSelector) return;
 
+	m_p.axisDiscrete = SignAxis(dir.x, m_deadZone);
+
     auto stepProcess = [&](int playerIdx, AxisState& st) 
     {
         const int axis = st.axisDiscrete;

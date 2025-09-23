@@ -186,18 +186,18 @@ void AnimationJob::Update(float deltaTime)
                     animationcontroller = animator->m_animationControllers[0].get();
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += delta * animation.m_ticksPerSecond;
-                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
+                    //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     if (animation.m_isLoop == true)
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
                     }
                     else
                     {
-                        if (animationcontroller->curAnimationProgress >= 0.95)
-                            animationcontroller->endAnimation = true;
                         if (animationcontroller->m_timeElapsed >= animation.m_duration)
                         {
                             animationcontroller->m_timeElapsed = animation.m_duration;
+                            if (animationcontroller->curAnimationProgress >= 0.95)
+                                animationcontroller->endAnimation = true;
                         }
 
                     }
@@ -216,10 +216,22 @@ void AnimationJob::Update(float deltaTime)
                             //Debug->Log("다음애니메이션인덱스를확인해주세요");
                             return;
                         }
+                        /*Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
+                        animationcontroller->m_nextTimeElapsed += delta * nextanimation.m_ticksPerSecond;
+                        animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
+                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);*/
+
+
                         Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
                         animationcontroller->m_nextTimeElapsed += delta * nextanimation.m_ticksPerSecond;
                         animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
+                        animationcontroller->preNextAnimationProgress = animationcontroller->nextAnimationProgress;
+                        animationcontroller->nextAnimationProgress = animationcontroller->m_nextTimeElapsed / nextanimation.m_duration;
                         UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
+
+
+
+
                     }
                     else
                     {

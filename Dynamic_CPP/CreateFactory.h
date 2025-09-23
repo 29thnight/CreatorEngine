@@ -11,6 +11,7 @@
 #include "EntityEleteMonster.h"
 #include "GameInit.h"
 #include "ImageButton.h"
+#include "SlashEffect.h"
 #include "PlayerSelector.h"
 #include "InputDeviceDetector.h"
 #include "ItemPopup.h"

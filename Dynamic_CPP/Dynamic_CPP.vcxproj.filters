@@ -579,6 +579,15 @@
 		<ClInclude Include="Assets\Script\EntityEleteMonster.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\TestEffect.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SlashEffect.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
+			<Filter>Script</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1009,6 +1018,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityEleteMonster.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SlashEffect.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestEffect.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerBombCharing.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

@@ -1,33 +1,33 @@
 m_name: BoxMushroom
 m_isEnabled: true
-m_instanceID: 779781550
+m_instanceID: 438494709
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: BoxMushroom
     m_isEnabled: true
-    m_instanceID: 1842135788
+    m_instanceID: 1312719949
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
-      rotation: {x: 0, y: 0, z: 0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 605
+    m_index: 9
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [312]
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [10]
+    m_prefabFileGuid: 7622b6ce-65e1-5dcb-a9df-574e75d55b30
     m_attachedSoketID: 0
-    m_collisionType: 1
+    m_collisionType: 9
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
-    m_layer: Default
+    m_layer: Entityitem
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1810114772
+        m_instanceID: 3632413927
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,58 +43,58 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 508882116
+        m_instanceID: 1613189477
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.300000012, y: 0.300000012, z: 0.300000012}
         m_posOffset: {x: 0, y: 0.100000001, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        asisTail: ~
-        m_rigid: ~
         indicatorDistacne: 15
-        itemCode: 0
+        itemCode: 1
+        itemType: 1
+        itemReward: 0
         m_name: EntityItem
         m_isEnabled: true
-        m_instanceID: 123826060
+        m_instanceID: 527050193
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 2170a86b-cda4-5c0c-ab27-ebb53252ee19
     children:
       - GameObject: 2166264123
-        m_name: msshroomBox
+        m_name: Obj_block_2
         m_isEnabled: true
-        m_instanceID: 289128973
+        m_instanceID: 505738777
         m_transform:
-          position: {x: 0, y: 0, z: 0, w: 1}
+          position: {x: 0, y: 0, z: 0, w: 0}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 605
-        m_index: 312
-        m_parentIndex: 605
+          m_parentID: 9
+        m_index: 10
+        m_parentIndex: 9
         m_rootIndex: 0
-        m_childrenIndices: [313, 314]
-        m_prefabFileGuid: 26af9ba5-b556-5094-856b-02566586deff
+        m_childrenIndices: [11, 12]
+        m_prefabFileGuid: 7622b6ce-65e1-5dcb-a9df-574e75d55b30
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
-        m_layer: EntityItem
+        m_layer: Default
         m_components: ~
         children:
           - GameObject: 2166264123
-            m_name: Obj_Inter_mushroom_L-0 (1)
+            m_name: Obj_Inter_mushroom_L-0
             m_isEnabled: true
-            m_instanceID: 2358020090
+            m_instanceID: 3508919417
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 312
-            m_index: 313
-            m_parentIndex: 312
+              m_parentID: 10
+            m_index: 11
+            m_parentIndex: 10
             m_rootIndex: 0
             m_childrenIndices: ~
-            m_prefabFileGuid: 26af9ba5-b556-5094-856b-02566586deff
+            m_prefabFileGuid: 7622b6ce-65e1-5dcb-a9df-574e75d55b30
             m_attachedSoketID: 0
             m_collisionType: 1
             m_isStatic: false
@@ -105,7 +105,7 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 2726405046
+                m_instanceID: 27520987
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
                   m_name: Obj_block_2_1
@@ -140,19 +140,19 @@ PrefabNode:
                 m_shadowCast: true
                 m_isEnableLOD: false
           - GameObject: 2166264123
-            m_name: Obj_Inter_mushroom_L-1 (1)
+            m_name: Obj_Inter_mushroom_L-1
             m_isEnabled: true
-            m_instanceID: 485689561
+            m_instanceID: 2379787914
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 312
-            m_index: 314
-            m_parentIndex: 312
+              m_parentID: 10
+            m_index: 12
+            m_parentIndex: 10
             m_rootIndex: 0
             m_childrenIndices: ~
-            m_prefabFileGuid: 26af9ba5-b556-5094-856b-02566586deff
+            m_prefabFileGuid: 7622b6ce-65e1-5dcb-a9df-574e75d55b30
             m_attachedSoketID: 0
             m_collisionType: 1
             m_isStatic: false
@@ -163,7 +163,7 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 1989787082
+                m_instanceID: 1014757853
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
                   m_name: Obj_block_2_2

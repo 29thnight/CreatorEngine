@@ -29,6 +29,9 @@ void PlayerHit::Enter()
 	if (m_player)
 	{
 		m_player->ChangeState("Hit");
+		m_player->CancelChargeAttack();
+		m_player->DropCatchItem();
+		m_player->onBombIndicate = false;
 		m_player->m_animator->SetUseLayer(1, false);
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });

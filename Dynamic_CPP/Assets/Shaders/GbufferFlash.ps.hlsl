@@ -189,6 +189,7 @@ GBufferOutput main(PixelShaderInput IN)
         roughness = 1.0;
         bit = 1 << 8;
         bit |= 1 << 9; // 터레인 레이어 비트 설정
+        ior = 1.5f;
     }
     
     roughness = max(roughness, 0.1f);

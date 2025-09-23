@@ -47,7 +47,8 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 
 				std::vector<HitResult> hits;
 				OverlapInput bulletInfo;
-				bulletInfo.layerMask = 1u; //일단 다떄림
+				
+				bulletInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10;
 				bulletInfo.position = transform.GetWorldPosition();
 				bulletInfo.rotation = transform.GetWorldQuaternion();
 				PhysicsManagers->SphereOverlap(bulletInfo, explosionRadius, hits);

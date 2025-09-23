@@ -135,7 +135,7 @@ public:
 	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
 	{
 		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
-		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eTOUCH;
+ 		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eTOUCH;
 		return physx::PxQueryHitType::eNONE;
 	}
 	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eTOUCH; }
@@ -2401,14 +2401,11 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 
 	if (in.layerMask == ALL_LAYER) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
-		//filterData.data.word1 = 0xFFFFFFFF;
-		//filterData.data.word2 = 0xFFFFFFFF;
 	}
 	else {
 		// 특정 레이어에 대해서만 raycast
 		filterData.data.word0 = in.layerMask;
-		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
-		filterData.data.word2 = 1 << in.layerMask;*/
+		
 	}
 
 	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData, m_touchCallback);

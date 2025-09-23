@@ -25,10 +25,12 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void ThrowBomb(Player* _owner, Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos, float _damage);
+	void BoundBomb(Mathf::Vector3 _targetPos);
 	[[Property]]
 	float throwSpeed = 0.01f;
 	[[Property]]
-	float throwPowerY = 4.0f; //포물선 y값
+	float m_throwPowerY = 4.0f; //포물선 y값
+	float m_boundPowerY = 0.5f;
 	[[Property]]
 	float duration = 3.0f; //도달까지 걸릴시간
 	float elapsedTime = 0.f;
@@ -38,6 +40,7 @@ public:
 	Player* m_ownerPlayer = nullptr;
 
 	bool isThrow = false;
+	bool isBound = false;
 	Mathf::Vector3 m_startPos = { 0,0,0 };
 	Mathf::Vector3 m_targetPos = { 0,0,0 };
 };

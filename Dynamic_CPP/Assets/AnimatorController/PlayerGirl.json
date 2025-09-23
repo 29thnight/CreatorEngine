@@ -12,11 +12,11 @@
                     "state_name": "Ani State",
                     "transitions": [
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.009999999776482582,
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -34,7 +34,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -51,7 +51,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 5,
+                    "animationIndex": 6,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -154,7 +154,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -176,7 +176,7 @@
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
-                                    "valueName": "BombAttack"
+                                    "valueName": "OnTargetBomb"
                                 }
                             ],
                             "curStateName": "Idle",
@@ -190,7 +190,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -208,7 +208,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -226,7 +226,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -243,7 +243,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 11,
+                    "animationIndex": 12,
                     "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -346,7 +346,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -364,7 +364,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -382,7 +382,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -400,7 +400,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -438,9 +438,9 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 9,
+                    "animationIndex": 10,
                     "animationSpeed": 2.5,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -474,12 +474,12 @@
                             "transName": "MeleeAttack1 to MeleeAttack2"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 8,
+                    "animationIndex": 9,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -513,12 +513,12 @@
                             "transName": "MeleeAttack2 to MeleeAttack3"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 12,
+                    "animationIndex": 13,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -538,7 +538,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -552,12 +552,12 @@
                             "transName": "MeleeAttack3 to MeleeAttack1"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 6,
+                    "animationIndex": 7,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerRangeAttack",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -573,12 +573,12 @@
                             "transName": "RangeAttack1 to Idle"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
                     "animationIndex": 2,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerBombAttack",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -586,20 +586,29 @@
                     "transitions": [
                         {
                             "blendTime": 0.20000000298023224,
-                            "conditions": [],
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "BombAttack"
+                                }
+                            ],
                             "curStateName": "BombAttack",
-                            "exitTime": 0.7889999747276306,
-                            "hasExitTime": 1,
-                            "nextStateName": "Idle",
-                            "transName": "BombAttack to Idle"
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "ThrowBomb",
+                            "transName": "BombAttack to ThrowBomb"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 9,
+                    "animationIndex": 10,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -615,12 +624,12 @@
                             "transName": "MeleeChargeAttack to Idle"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 7,
+                    "animationIndex": 8,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerRangeAttack",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -636,12 +645,12 @@
                             "transName": "RangeChargeAttack to Idle"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 7,
+                    "animationIndex": 8,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
+                    "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerRangeAttack",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
@@ -657,11 +666,11 @@
                             "transName": "RangeSpecialAttack to Idle"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 },
                 {
-                    "animationIndex": 4,
-                    "animationSpeed": 4.0,
+                    "animationIndex": 5,
+                    "animationSpeed": 3.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "PlayerHit",
                     "m_isAny": false,
@@ -669,10 +678,10 @@
                     "state_name": "Hit",
                     "transitions": [
                         {
-                            "blendTime": 0.20000000298023224,
+                            "blendTime": 0.30000001192092896,
                             "conditions": [],
                             "curStateName": "Hit",
-                            "exitTime": 0.7900000214576721,
+                            "exitTime": 0.699999988079071,
                             "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "Hit to Idle"
@@ -694,7 +703,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -706,6 +715,27 @@
                             "hasExitTime": 0,
                             "nextStateName": "Idle",
                             "transName": "Stun to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 3,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "ThrowBomb",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "ThrowBomb",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "ThrowBomb to Idle"
                         }
                     ],
                     "useMultipler": 0
@@ -749,7 +779,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 5,
+                    "animationIndex": 6,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -779,7 +809,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 10,
+                    "animationIndex": 11,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -800,7 +830,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 3,
+                    "animationIndex": 4,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -848,7 +878,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 11,
+                    "animationIndex": 12,
                     "animationSpeed": 1.5,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -947,6 +977,14 @@
         },
         {
             "param_name": "OnResurrection",
+            "param_vType": 3
+        },
+        {
+            "param_name": "AttackSpeed",
+            "param_vType": 0
+        },
+        {
+            "param_name": "OnTargetBomb",
             "param_vType": 3
         }
     ]
