@@ -1186,12 +1186,14 @@ void Player::CancelChargeAttack()
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
 	m_controller->Move({ 0,0 });
+
 	float offsetX = bombMoveSpeed * dir.x;
 	float offsetZ = bombMoveSpeed * dir.y;
 	bombThrowPositionoffset.x += offsetX;
 	bombThrowPositionoffset.z += offsetZ;
 
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Transform* transform = GetOwner()->GetComponent<Transform>();
+	Mathf::Vector3 pos = transform->GetWorldPosition();
 	bombThrowPosition = pos + bombThrowPositionoffset;
 	onIndicate = true;
 	if (BombIndicator)
@@ -1200,6 +1202,17 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 		curveindicator->SetIndicator(pos, bombThrowPosition, ThrowPowerY);
 		onBombIndicate = true;
 	}
+
+	Mathf::Vector3 targetdir = bombThrowPosition - pos;
+	targetdir.Normalize();
+	float yaw = atan2(targetdir.x, targetdir.z); // z가 앞, x가 옆일 때
+	Quaternion rotation = Quaternion::CreateFromAxisAngle(Mathf::Vector3::Up, yaw);
+	
+
+	transform->SetWorldRotation(rotation);
+	
+
+
 }
 
 void Player::MeleeAttack()
