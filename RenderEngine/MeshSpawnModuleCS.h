@@ -17,12 +17,10 @@ struct alignas(16) MeshParticleTemplateParams
 	float velocityRandomRange;
 
 	float3 acceleration;
-	float pad5;
-
 	UINT textureIndex;
-	UINT renderMode;
-	float2 pad6;  // 정렬 맞추기
 
+	UINT renderMode;
+	float3 particleInitialRotation;
 };
 
 class MeshSpawnModuleCS : public ParticleModule , public ISerializable
@@ -93,7 +91,8 @@ public:
 	void SetParticleAcceleration(const XMFLOAT3& acceleration);
 	void SetTextureIndex(UINT textureIndex);
 	void SetRenderMode(UINT mode);
-	
+	void SetParticleInitialRotation(const XMFLOAT3& rotation);
+
 	// 상태 조회
 	const SpawnParams& GetSpawnParams() const { return m_spawnParams; }
 	float GetSpawnRate() const { return m_spawnParams.spawnRate; }

@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TestEffect.h"
 #include "ItemComponent.h"
 #include "ItemManager.h"
 #include "ItemUIPopup.h"
