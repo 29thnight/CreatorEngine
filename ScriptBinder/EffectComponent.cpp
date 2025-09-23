@@ -4,9 +4,9 @@
 #include "EffectProxyController.h"
 #include "EffectRenderProxy.h"
 
-void EffectComponent::Awake()
+void EffectComponent::Initialize()
 {
-    EffectRenderProxy* proxy = EffectCommandQueue->RegisterProxy(this);
+    EffectRenderProxy* proxy = EffectCommandQueue->RegisterProxy((EffectComponent*)this);
 
     // Awake에서는 기본 설정만 하고 이펙트는 생성하지 않음
     m_lastPosition = GetOwner()->m_transform.GetWorldPosition();

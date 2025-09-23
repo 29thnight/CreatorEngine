@@ -3,14 +3,14 @@
 #include "EffectComponent.generated.h"
 #include "IRegistableEvent.h"
 
-class EffectComponent : public Component, public RegistableEvent<EffectComponent>
+class EffectComponent : public Component, public RegistableEvent<EffectComponent>, public System::IInitializable
 {
 public:
     ReflectEffectComponent
     [[Serializable(Inheritance:Component)]]
     GENERATED_BODY(EffectComponent)
 
-    void Awake() override;
+    void Initialize() override;
     void Update(float tick) override;
     void OnDestroy() override;
 
