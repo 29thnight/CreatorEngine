@@ -33,4 +33,8 @@ public:
 
 private:
 	CriticalMark* m_criticalMark;
+	[[Property]]
+	float m_minRewardUpForce = 2.f;
+	[[Property]]
+	float m_maxRewardUpForce = 3.f;
 };
