@@ -38,6 +38,7 @@
 #include "TableAPIHelper.h"
 #include "NodeEditor.h"
 #include <algorithm>
+#include "imgui_stdlib.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -226,6 +227,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						{
 							//이건 뭔 버그죠?
 							ImGuiDrawHelperSpriteRenderer(sprite);
+						}
+					}
+					else if (componentTypeID == type_guid(Canvas))
+					{
+						Canvas* canvas = dynamic_cast<Canvas*>(component.get());
+						if (nullptr != canvas)
+						{
+							ImGuiDrawHelperCanvas(canvas);
 						}
 					}
 					else if (type)
@@ -1243,11 +1252,16 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		ImGui::EndDragDropTarget();
 	}
 
+	ImGui::SeparatorText("BaseInfo");
 	ImGui::ColorEdit4("color tint", &imageComponent->color.x);
 	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
 	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
 	ImGui::DragFloat("union scale", &imageComponent->unionScale, 0.01f, 1.f, 10.f);
 	ImGui::InputInt("layer", &imageComponent->_layerorder);
+	if(ImGui::Button("Reset Size", ImVec2(100, 20)))
+	{
+		imageComponent->ResetSize();
+	}
 	static const char* clipDirections[] = { "None", "LeftToRight", "RightToLeft", "UpToBottom", "BottomToTop" };
 
 	int currentClipDir = static_cast<int>(imageComponent->clipDirection);
@@ -1277,6 +1291,13 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	}
 
 	ImGui::Text("Navigation");
+	auto originNaviContainer = imageComponent->GetNavigations();
+	std::array<Navigation, 4> naviContainer{}; // 복사본 생성
+
+	for (auto navi : originNaviContainer)
+	{
+		naviContainer[navi.mode] = navi;
+	}
 
 	ImGui::Button(ICON_FA_ARROW_LEFT "##Left", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
@@ -1291,6 +1312,25 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			}
 		}
 	}
+	ImGui::SameLine();
+	Navigation leftNavi = naviContainer[(int)Direction::Left];
+	if (leftNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
+	{
+		auto obj = GameObject::FindInstanceID(leftNavi.navObject);
+		if (obj)
+		{
+			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
+		}
+		else
+		{
+			ImGui::Text("-> None");
+		}
+	}
+	else
+	{
+		ImGui::Text("-> None");
+	}
+
 	ImGui::Button(ICON_FA_ARROW_RIGHT "##Right", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
 	{
@@ -1304,6 +1344,25 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			}
 		}
 	}
+	ImGui::SameLine();
+	Navigation rightNavi = naviContainer[(int)Direction::Right];
+	if (rightNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
+	{
+		auto obj = GameObject::FindInstanceID(rightNavi.navObject);
+		if (obj)
+		{
+			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
+		}
+		else
+		{
+			ImGui::Text("-> None");
+		}
+	}
+	else
+	{
+		ImGui::Text("-> None");
+	}
+
 	ImGui::Button(ICON_FA_ARROW_UP "##Up", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
 	{
@@ -1317,6 +1376,24 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			}
 		}
 	}
+	ImGui::SameLine();
+	Navigation upNavi = naviContainer[(int)Direction::Up];
+	if (upNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
+	{
+		auto obj = GameObject::FindInstanceID(upNavi.navObject);
+		if (obj)
+		{
+			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
+		}
+		else
+		{
+			ImGui::Text("-> None");
+		}
+	}
+	else
+	{
+		ImGui::Text("-> None");
+	}
 	ImGui::Button(ICON_FA_ARROW_DOWN "##Down", ImVec2(30, 20));
 	if (ImGui::BeginDragDropTarget())
 	{
@@ -1329,6 +1406,24 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 				imageComponent->SetNavi(Direction::Down, draggedObject->shared_from_this());
 			}
 		}
+	}
+	ImGui::SameLine();
+	Navigation downNavi = naviContainer[(int)Direction::Down];
+	if (downNavi.navObject.m_ID_Data != HashedGuid::INVAILD_ID)
+	{
+		auto obj = GameObject::FindInstanceID(downNavi.navObject);
+		if (obj)
+		{
+			ImGui::Text(("-> " + obj->m_name.ToString()).c_str());
+		}
+		else
+		{
+			ImGui::Text("-> None");
+		}
+	}
+	else
+	{
+		ImGui::Text("-> None");
 	}
 }
 
@@ -1357,6 +1452,14 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	if (const auto* type = Meta::Find("SpriteRenderer"))
 	{
 		Meta::DrawProperties(spriteRenderer, *type);
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
+{
+	if (const auto* type = Meta::Find("Canvas"))
+	{
+		Meta::DrawProperties(canvas, *type);
 	}
 }
 

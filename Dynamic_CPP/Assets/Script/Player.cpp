@@ -82,7 +82,7 @@ void Player::Start()
 			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
 			if (weaponSlotController)
 			{
-				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_AddWeaponHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
@@ -111,7 +111,7 @@ void Player::Start()
 			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
 			if (weaponSlotController)
 			{
-				weaponSlotController->m_awakeEventHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
+				weaponSlotController->m_AddWeaponHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
 				weaponSlotController->m_UpdateDurabilityHandle = m_UpdateDurabilityEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateDurability);
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
@@ -328,8 +328,6 @@ void Player::Update(float tick)
 		m_animator->SetParameter("OnResurrection", true);
 		sucessResurrection = false;
 	}
-
-
 
 	if (BombIndicator)
 	{

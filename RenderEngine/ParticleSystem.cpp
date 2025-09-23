@@ -204,7 +204,7 @@ void ParticleSystem::UpdateEffectBaseRotation(const Mathf::Vector3& newBaseRotat
 		ParticleModule& module = *it;
 
 		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
-			spawnModule->SetEmitterRotation(finalWorldRotation);
+			spawnModule->SetEmitterRotation(-finalWorldRotation);
 		}
 		if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
 			meshSpawnModule->SetEmitterRotation(finalWorldRotation);

@@ -207,9 +207,13 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     // 초기 폭발 속도 (시간에 따라 감소)
     float speedDecay = 1.0 - pow(normalizedAge, explosiveDecay);
     
-    // 랜덤성 추가 (파티클별 고정값)
-    float2 noiseInput = float2(particleIndex * 0.0731 + birthTime * 0.4567, particleIndex * 0.1234 + birthTime * 0.8901);
-    float randomFactor = 1.0 + (noise(noiseInput) - 0.5) * explosiveRandom;
+    // explosiveRandom이 0이면 랜덤 팩터 1.0 고정, 아니면 랜덤성 적용
+    float randomFactor = 1.0;
+    if (explosiveRandom > 0.0)
+    {
+        float2 speedSeed = float2(particleIndex * 0.0731 + birthTime * 0.4567, particleIndex * 0.1234 + birthTime * 0.8901);
+        randomFactor = 1.0 + (noise(speedSeed) - 0.5) * explosiveRandom;
+    }
     
     return explosionDir * explosiveSpeed * speedDecay * randomFactor;
 }

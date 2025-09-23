@@ -26,6 +26,7 @@ public:
     [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
+	void ResetSize();
 
 	bool isThisTextureExist(std::string_view path) const;
 
@@ -35,7 +36,7 @@ public:
 	ImageInfo								uiinfo{};
 	std::shared_ptr<Texture>				m_curtexture{};
     [[Property]]
-	int										curindex = 0;
+	int										curindex{ 0 };
 	[[Property]]							
 	Mathf::Color4							color{ 1,1,1,1 };
 	[[Property]]							

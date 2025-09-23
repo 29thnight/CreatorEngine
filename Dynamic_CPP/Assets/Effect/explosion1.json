@@ -73,14 +73,14 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 1.5,
-                                "y": 1.5
+                                "x": 3.0,
+                                "y": 3.0
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 2.0,
+                                "y": 2.0
                             },
                             "useRandomScale": 0
                         },
@@ -103,7 +103,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 836.4417724609375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -364,7 +364,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 836.4417724609375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -485,8 +485,8 @@
                             "randomScaleMax": 0.5,
                             "randomScaleMin": 0.0,
                             "startSize": {
-                                "x": 0.6000000238418579,
-                                "y": 0.6000000238418579
+                                "x": 0.800000011920929,
+                                "y": 0.800000011920929
                             },
                             "useRandomScale": 1
                         },
@@ -529,7 +529,7 @@
                         },
                         "shaders": {
                             "pixelShader": "Glow",
-                            "vertexShader": "spike"
+                            "vertexShader": "Spike"
                         },
                         "textures": [
                             {
@@ -665,14 +665,14 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 3.0,
-                                "y": 3.0
+                                "x": 6.0,
+                                "y": 6.0
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 2.0,
+                                "y": 2.0
                             },
                             "useRandomScale": 0
                         },
@@ -798,14 +798,14 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 1.2000000476837158,
-                                "y": 1.2000000476837158
+                                "x": 2.4000000953674316,
+                                "y": 2.4000000953674316
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.5,
-                                "y": 0.5
+                                "x": 1.0,
+                                "y": 1.0
                             },
                             "useRandomScale": 0
                         },
@@ -1167,14 +1167,14 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 2.0,
+                                "y": 2.0
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 2.0,
+                                "y": 2.0
                             },
                             "useRandomScale": 0
                         },

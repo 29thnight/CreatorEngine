@@ -29,8 +29,8 @@
                             "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.5,
+                                "y": 0.5
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -283,14 +283,14 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 4.0,
-                                "y": 4.0
+                                "x": 2.0,
+                                "y": 2.0
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.5,
+                                "y": 0.5
                             },
                             "useRandomScale": 0
                         },
@@ -425,8 +425,8 @@
                             "lifeTime": 3.0,
                             "rotateSpeed": 1.0,
                             "size": {
-                                "x": 2.0,
-                                "y": 2.0
+                                "x": 1.0,
+                                "y": 1.0
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -469,7 +469,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 1487.8848876953125,
+                            "currentTime": 170.72543334960938,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -632,8 +632,8 @@
                             "lifeTime": 15.0,
                             "rotateSpeed": 1.5,
                             "size": {
-                                "x": 1.600000023841858,
-                                "y": 1.600000023841858
+                                "x": 0.800000011920929,
+                                "y": 0.800000011920929
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -676,7 +676,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 1487.8848876953125,
+                            "currentTime": 170.72543334960938,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -829,9 +829,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.5,
+                                "y": 0.5,
+                                "z": 0.5
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -1012,14 +1012,14 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 6.0,
-                                "y": 6.0
+                                "x": 3.0,
+                                "y": 3.0
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 2.0,
-                                "y": 2.0
+                                "x": 1.0,
+                                "y": 1.0
                             },
                             "useRandomScale": 0
                         },
