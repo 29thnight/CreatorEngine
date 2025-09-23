@@ -28,6 +28,7 @@ void CharacterController::Initialize(const CharacterControllerInfo& info, const 
 	m_id = info.id;
 	m_layerNumber = info.layerNumber;
 	m_material = material;
+	m_isForcedMoveActive = false;
 
 	//케릭터 충돌 필터 설정
 	m_filterData = new physx::PxFilterData();
@@ -45,41 +46,82 @@ void CharacterController::Initialize(const CharacterControllerInfo& info, const 
 
 void CharacterController::Update(float deltaTime)
 {
-	//컨트롤러로 보여줄 이동 벡터
-	physx::PxVec3 displayVector;
+	// 이번 프레임에 적용될 최종 이동 변위 벡터
+	physx::PxVec3 currentFrameVelocity(0.f, 0.f, 0.f);
 
-	//이동량 계산
-	m_characterMovement->Update(deltaTime, m_inputMove, m_IsDynamic);
-	m_characterMovement->OutputPxVector3(displayVector);
-
-	//이동 제한
-	if (displayVector.x<0.0f&&m_bMoveRestrict[static_cast<int>(ERestrictDirection::MINUS_X)])
+	// 1. 상태에 따라 이번 프레임의 이동 방향 결정
+	 // 1. 강제 이동 상태일 경우
+	if (m_isForcedMoveActive)
 	{
-		displayVector.x = 0.0f;
+		if (m_forcedMoveTotalDuration <= 0.f) // 지속적인 힘
+		{
+			m_forcedMoveCurrentVelocity = m_forcedMoveInitialVelocity;
+		}
+		else // 시간이 정해진 움직임
+		{
+			m_forcedMoveTimer -= deltaTime;
+			if (m_forcedMoveTimer <= 0.f)
+			{
+				StopForcedMove();
+			}
+			else
+			{
+				if (m_currentCurveType == static_cast<int>(Easing::EasingType::Linear)) { /* Easing 사용 안함 */ }
+				else // 커브 적용
+				{
+					float progress = 1.0f - (m_forcedMoveTimer / m_forcedMoveTotalDuration);
+					float easeValue = Easing::EasingFunction[m_currentCurveType](progress);
+					DirectX::SimpleMath::Vector3 initialXZ = { m_forcedMoveInitialVelocity.x, 0, m_forcedMoveInitialVelocity.z };
+					DirectX::SimpleMath::Vector3 currentXZ = DirectX::SimpleMath::Vector3::Lerp(initialXZ, DirectX::SimpleMath::Vector3::Zero, easeValue);
+					m_forcedMoveCurrentVelocity.x = currentXZ.x;
+					m_forcedMoveCurrentVelocity.z = currentXZ.z;
+				}
+			}
+		}
+
+		currentFrameVelocity = physx::PxVec3(m_forcedMoveCurrentVelocity.x, m_forcedMoveCurrentVelocity.y, m_forcedMoveCurrentVelocity.z);
 	}
-	else if (displayVector.x>0.0f&&m_bMoveRestrict[static_cast<int>(ERestrictDirection::PlUS_X)])
+	else
 	{
-		displayVector.x = 0.0f;
+		// 일반 이동 계산
+		m_characterMovement->Update(deltaTime, m_inputMove, m_IsDynamic);
+		m_characterMovement->OutputPxVector3(currentFrameVelocity);
+
+		// 일반 이동이 끝났으므로 입력 초기화
+		m_inputMove = {};
+		m_IsDynamic = false;
 	}
 
-	if (displayVector.z < 0.0f && m_bMoveRestrict[static_cast<int>(ERestrictDirection::MINUS_Z)])
+	// 2. 이동 제한 적용 (공통 로직)
+	// 강제 이동이든 일반 이동이든 상관없이 항상 이동 제한을 체크
+	if (currentFrameVelocity.x < 0.0f && m_bMoveRestrict[static_cast<int>(ERestrictDirection::MINUS_X)])
 	{
-		displayVector.z = 0.0f;
+		currentFrameVelocity.x = 0.0f;
 	}
-	else if (displayVector.z > 0.0f && m_bMoveRestrict[static_cast<int>(ERestrictDirection::PLUS_Z)])
+	else if (currentFrameVelocity.x > 0.0f && m_bMoveRestrict[static_cast<int>(ERestrictDirection::PlUS_X)])
 	{
-		displayVector.z = 0.0f;
+		currentFrameVelocity.x = 0.0f;
 	}
 
-	//케릭터 컨트롤러 이동
-	physx::PxControllerCollisionFlags collisionFlag = m_controller->move(displayVector, 0.01f, deltaTime, *m_filters);
+	if (currentFrameVelocity.z < 0.0f && m_bMoveRestrict[static_cast<int>(ERestrictDirection::MINUS_Z)])
+	{
+		currentFrameVelocity.z = 0.0f;
+	}
+	else if (currentFrameVelocity.z > 0.0f && m_bMoveRestrict[static_cast<int>(ERestrictDirection::PLUS_Z)])
+	{
+		currentFrameVelocity.z = 0.0f;
+	}
 
+	// 3. 컨트롤러 이동 실행 (공통 로직 - move()는 여기서 딱 한 번만!)
+	physx::PxControllerCollisionFlags collisionFlag = m_controller->move(currentFrameVelocity, 0.01f, deltaTime, *m_filters);
+
+	// 4. 이동 후 처리 (공통 로직)
 	if (m_hitReportCallback)
 	{
 		m_hitReportCallback->UpdateAndDispatchEndEvents();
 	}
 
-	//바닥면 충돌 체크
+	// 바닥면 충돌 체크
 	if (collisionFlag & physx::PxControllerCollisionFlag::eCOLLISION_DOWN) {
 		m_characterMovement->SetIsFall(false);
 	}
@@ -87,12 +129,6 @@ void CharacterController::Update(float deltaTime)
 	{
 		m_characterMovement->SetIsFall(true);
 	}
-
-
-	//입력 초기화
-	m_inputMove = {};
-	m_IsDynamic = false;
-
 }
 
 void CharacterController::AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic)
@@ -135,6 +171,30 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 	}
 	static_cast<PhysicsControllerFilterCallback*>(m_filters->mFilterCallback)->SetCharacterLayer(m_layerNumber);
 	//
+}
+
+void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType)
+{
+	m_isForcedMoveActive = true;
+	m_forcedMoveTimer = duration;
+	m_forcedMoveTotalDuration = duration;
+	m_currentCurveType = curveType;
+	m_forcedMoveInitialVelocity = initialVelocity;
+	m_forcedMoveCurrentVelocity = initialVelocity;
+}
+
+void CharacterController::StopForcedMove()
+{
+	m_isForcedMoveActive = false;
+	m_forcedMoveTimer = 0.f;
+	m_forcedMoveTotalDuration = 0.f;
+	m_forcedMoveInitialVelocity = DirectX::SimpleMath::Vector3::Zero;
+	m_forcedMoveCurrentVelocity = DirectX::SimpleMath::Vector3::Zero;
+}
+
+bool CharacterController::IsInForcedMove() const
+{
+	return m_isForcedMoveActive;
 }
 
 

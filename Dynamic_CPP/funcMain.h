@@ -197,6 +197,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("ItemManager", []() { return new ItemManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemUIPopup", []() { return new ItemUIPopup(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemUIIcon", []() { return new ItemUIIcon(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityEleteMonster", []() { return new EntityEleteMonster(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameInit", []() { return new GameInit(); });
 		CreateFactory::GetInstance()->RegisterFactory("ImageButton", []() { return new ImageButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayerSelector", []() { return new PlayerSelector(); });

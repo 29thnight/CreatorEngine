@@ -111,7 +111,11 @@ public:
 	void AddInputMove(const CharactorControllerInputInfo& info);
 	void SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& info,float maxSpeed);
 	void SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity);
-	void SetKnockBack(const CharactorControllerInputInfo& info,bool _isknockback, DirectX::SimpleMath::Vector3 velocity = {0,0,0});
+	//강제 이동
+	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType);
+	//강제 이동 중지
+	void StopForcedMoveOnCCT(UINT controllerId);
+	bool IsInForcedMove(UINT controllerId) const;
 	// CharacterController의 위치를 강제로 설정합니다.
 	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
 

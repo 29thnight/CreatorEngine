@@ -25,7 +25,7 @@ NodeStatus DamegeAction::Tick(float deltatime, BlackBoard& blackBoard)
 			{
 				enemy->isKnockBack = false;
 				enemy->KnockBackElapsedTime = 0.f;
-				m_owner->GetComponent<CharacterControllerComponent>()->EndKnockBack();
+				m_owner->GetComponent<CharacterControllerComponent>()->StopForcedMove();
 				return NodeStatus::Success; //�˹鳡
 			}
 			else
