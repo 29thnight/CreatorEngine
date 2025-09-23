@@ -36,3 +36,12 @@ namespace DirectX11
         float height;
     };
 };
+
+namespace System 
+{
+    interface IInitializable
+    {
+        virtual void Initialize() = 0;
+    };
+}
+
