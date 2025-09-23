@@ -20,7 +20,6 @@ struct alignas(16) ForwardBuffer
 struct alignas(16) MatrixBuffer {
 	XMMATRIX View;
 	XMMATRIX Proj;
-	float ior;
 	float add;
 };
 
@@ -195,7 +194,6 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	MatrixBuffer matrixBuffer{};
 	matrixBuffer.Proj = renderData->m_frameCalculatedProjection;
 	matrixBuffer.View = renderData->m_frameCalculatedView;
-	matrixBuffer.ior = ior;
 	matrixBuffer.add = add;
 	DirectX11::UpdateBuffer(deferredPtr, m_MatrixBuffer.Get(), &matrixBuffer);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
@@ -381,12 +379,13 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			}
 		}
 
-		// PSO는 그룹 단위로 1회 Apply
-		customPSO->Apply(deferredPtr);
 
 		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
 		for (auto* proxy : proxies)
 		{
+			// PSO는 그룹 단위로 1회 Apply
+			customPSO->Apply(deferredPtr);
+
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
 			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
 			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);

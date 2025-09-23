@@ -490,6 +490,7 @@ void Material::TrySetMaterialInfo()
     TrySetInt("PBRMaterial", "gConvertToLinear", m_materialInfo.m_convertToLinearSpace);
 
 	TrySetInt("PBRMaterial", "bitflag", m_materialInfo.m_bitflag);
+	TrySetFloat("PBRMaterial", "gIOR", m_materialInfo.m_IOR);
 }
 
 void Material::UpdateCBufferView()

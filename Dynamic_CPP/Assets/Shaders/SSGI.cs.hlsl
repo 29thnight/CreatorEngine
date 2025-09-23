@@ -1,7 +1,7 @@
 #include "Sampler.hlsli"
 #include "BRDF.hlsli"
 #define Nd 4       // 방향 개수
-#define Ns 4       // 각 방향당 샘플 개수
+#define Ns 8       // 각 방향당 샘플 개수
 #define Nb 32      // 비트마스크 크기
 #define PI 3.14159265
 #define twoPI PI * 2
@@ -145,7 +145,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
         for (float currentSample = 1.0; currentSample < Ns + 0.5; currentSample += 1.0)
         {
-            float sampleStep = (currentSample + jitter) / Ns + sampleOffset;
+            float sampleStep = (currentSample) / Ns + sampleOffset;
             float2 sampleUV = uv - sampleStep * sampleScale * omega * aspect;
             float sDepth = gDepthTex.SampleLevel(PointSampler, sampleUV, 0);
             //sDepth = -linearZ(sDepth); // linearize depth
