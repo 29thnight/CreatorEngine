@@ -651,5 +651,10 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			component->MakeInstanceID();
 		}
+		// Initialize if the component is initializable
+		if (auto initializable = dynamic_cast<System::IInitializable*>(component))
+		{
+			initializable->Initialize();
+		}
     }
 }

@@ -51,6 +51,7 @@ public:
 		if (m_pCamera == nullptr)
 		{
 			m_pCamera = std::make_shared<Camera>();
+			m_inspectorOnlyCameraPtr = m_pCamera.get();
 			m_pCamera->RegisterContainer();
 		}
 		m_cameraIndex = m_pCamera->m_cameraIndex;
@@ -106,8 +107,9 @@ public:
 	}
 
 private:
-	[[Property]]
 	std::shared_ptr<Camera> m_pCamera{ nullptr };
+	[[Property]]
+	Camera* m_inspectorOnlyCameraPtr{ nullptr };
 	[[Property]]
 	int m_cameraIndex{ -1 };
 	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };

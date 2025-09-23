@@ -31,7 +31,7 @@ namespace Meta
             _casters[typeid(std::shared_ptr<T>)] = [](const std::any& a) -> void*
             {
                 const auto& sp = std::any_cast<std::shared_ptr<T>>(a);
-                return sp.get();  // 郴何 raw pointer 府畔
+                return const_cast<void*>(static_cast<const void*>(sp.get()));  // 郴何 raw pointer 府畔
             };
 
             std::string typeName = ToString<T>();
