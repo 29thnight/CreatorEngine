@@ -1214,6 +1214,7 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LaserBeam.ps.hlsl">
       <Filter>Shaders\Effect\Special\3D</Filter>
+	</FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GbufferFlash.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
