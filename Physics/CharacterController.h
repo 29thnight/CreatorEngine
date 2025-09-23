@@ -3,6 +3,8 @@
 //#include "../Utility_Framework/Core.Minimal.h"
 #include "PhysicsCommon.h"
 #include "CharacterMovement.h"
+#define UNUSE_SHADER_TYPEDEF
+#include "Core.Mathf.h"
 #include <functional>
 #include <set>
 using namespace physx;
@@ -68,6 +70,15 @@ public:
 	}
 
 
+	// 강제 이동(넉백, 대시) 상태를 시작시킵니다.
+	void StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration=0.0f, int curveType=-1);
+	//void StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration);
+
+	// 강제 이동을 즉시 중지시킵니다.
+	void StopForcedMove();
+
+	// 현재 강제 이동 상태인지 여부를 반환합니다.
+	bool IsInForcedMove() const;
 
 protected:
 	unsigned int m_id; //컨트롤러 ID
@@ -86,6 +97,15 @@ protected:
 
 	physx::PxMaterial* m_material;
 	physx::PxController* m_controller;
+
+	// --- 강제 이동 상태 관리를 위한 새로운 멤버 변수들 ---
+	bool m_isForcedMoveActive = false;
+	float m_forcedMoveTimer = 0.f;
+	float m_forcedMoveTotalDuration = 0.f;
+	Mathf::Easing::EaseType m_currentCurveType = Mathf::Easing::EaseType::None;
+	float m_gravityWeight = 0.2f;
+	DirectX::SimpleMath::Vector3 m_forcedMoveInitialVelocity;
+	DirectX::SimpleMath::Vector3 m_forcedMoveCurrentVelocity;
 
 };
 

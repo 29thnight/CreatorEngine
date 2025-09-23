@@ -8,6 +8,7 @@
 #include "ItemManager.h"
 #include "ItemUIPopup.h"
 #include "ItemUIIcon.h"
+#include "EntityEleteMonster.h"
 #include "GameInit.h"
 #include "ImageButton.h"
 #include "PlayerSelector.h"

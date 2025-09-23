@@ -109,17 +109,6 @@ void CharacterMovement::CumputeMovement(float deltaTime)
 	}
 
 	m_outVector.y = m_velocity.y;
-
-
-	if (onKnockback)
-	{
-		if (m_isFall)
-		{
-			knockbackVelocity.y -= m_gravityWeight * deltaTime;
-		}
-		m_outVector = knockbackVelocity;
-	}
-
 }
 
 void CharacterMovement::LimitVelocity()

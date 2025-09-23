@@ -1444,21 +1444,62 @@ void PhysicX::SetVelocity(const CharactorControllerInputInfo& info, DirectX::Sim
 	controller->GetCharacterMovement()->SetVelocity(velocity);
 }
 
-void PhysicX::SetKnockBack(const CharactorControllerInputInfo& info,bool _isknockback, DirectX::SimpleMath::Vector3 velocity)
+void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity,float duration,int curveType)
 {
-
-	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	// m_characterControllerContainer는 ID를 키로 사용한다고 가정
+	auto it = m_characterControllerContainer.find(controllerId);
+	if (it == m_characterControllerContainer.end())
 	{
 		return;
 	}
 
-	CharacterController* controller = m_characterControllerContainer[info.id];
-	controller->GetCharacterMovement()->SetVelocity({0,0,0});
-	controller->GetCharacterMovement()->SetKnockback(_isknockback);
-	controller->GetCharacterMovement()->SetKnockbackVeloicy(velocity);
+	// CharacterMovement에 값을 세팅하는 대신,
+	// CharacterController의 멤버 함수를 직접 호출하여 명령을 전달
+	CharacterController* controller = it->second;
+	controller->StartForcedMove(initialVelocity, duration, curveType);
 }
 
+//void PhysicX::ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
+//{
+//	// m_characterControllerContainer는 ID를 키로 사용한다고 가정
+//	auto it = m_characterControllerContainer.find(controllerId);
+//	if (it == m_characterControllerContainer.end())
+//	{
+//		return;
+//	}
+//
+//	// CharacterMovement에 값을 세팅하는 대신,
+//	// CharacterController의 멤버 함수를 직접 호출하여 명령을 전달
+//	CharacterController* controller = it->second;
+//	controller->StartForcedMove(initialVelocity, duration);
+//}
 
+void PhysicX::StopForcedMoveOnCCT(UINT controllerId)
+{
+	auto it = m_characterControllerContainer.find(controllerId);
+	if (it != m_characterControllerContainer.end())
+	{
+		CharacterController* controller = it->second;
+
+		// 저수준 컨트롤러의 StopForcedMove()를 호출하여
+		// 모든 관련 상태를 깨끗하게 리셋합니다.
+		controller->StopForcedMove();
+	}
+}
+
+bool PhysicX::IsInForcedMove(UINT controllerId) const 
+{
+	auto it = m_characterControllerContainer.find(controllerId);
+	if (it != m_characterControllerContainer.end())
+	{
+		CharacterController* controller = it->second;
+
+		// 저수준 컨트롤러의 StopForcedMove()를 호출하여
+		// 모든 관련 상태를 깨끗하게 리셋합니다.
+		return controller->IsInForcedMove();
+	}
+	return false;
+}
 
 void PhysicX::SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos)
 {
@@ -2063,9 +2104,19 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::V
 	// ePREFILTER: 성능을 위해 사전 필터링을 사용합니다.
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
 	// 어떤 레이어와 충돌할지 비트마스크로 지정합니다.
-	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
-	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
-	filterData.data.word2 = 1 << in.layerMask;
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		//filterData.data.word1 = 0xFFFFFFFF;
+		//filterData.data.word2 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;*/
+	}
 
 	// --- 5. 스윕 실행 ---
 	bool isHit = m_scene->sweep(
@@ -2135,9 +2186,20 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
-	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
-	filterData.data.word2 = 1 << in.layerMask;
+	
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		//filterData.data.word1 = 0xFFFFFFFF;
+		//filterData.data.word2 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;*/
+	}
 
 	bool isHit = m_scene->sweep(sphereGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
 
@@ -2194,9 +2256,20 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
-	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
-	filterData.data.word2 = 1 << in.layerMask;
+	
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		//filterData.data.word1 = 0xFFFFFFFF;
+		//filterData.data.word2 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;*/
+	}
 
 	bool isHit = m_scene->sweep(capsuleGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
 
@@ -2253,9 +2326,20 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleM
 	// --- 4. 충돌 필터 설정 ---
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
-	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
-	filterData.data.word2 = 1 << in.layerMask;
+
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		//filterData.data.word1 = 0xFFFFFFFF;
+		//filterData.data.word2 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;*/
+	}
 
 	// --- 5. 오버랩 실행 ---
 	bool isHit = m_scene->overlap(
@@ -2317,14 +2401,14 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 
 	if (in.layerMask == ALL_LAYER) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
-		filterData.data.word1 = 0xFFFFFFFF;
-		filterData.data.word2 = 0xFFFFFFFF;
+		//filterData.data.word1 = 0xFFFFFFFF;
+		//filterData.data.word2 = 0xFFFFFFFF;
 	}
 	else {
 		// 특정 레이어에 대해서만 raycast
 		filterData.data.word0 = in.layerMask;
-		filterData.data.word1 = m_collisionMatrix[in.layerMask];
-		filterData.data.word2 = 1 << in.layerMask;
+		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;*/
 	}
 
 	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData, m_touchCallback);
@@ -2373,9 +2457,20 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
-	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
-	filterData.data.word2 = 1 << in.layerMask;
+	
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		//filterData.data.word1 = 0xFFFFFFFF;
+		//filterData.data.word2 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		/*filterData.data.word1 = m_collisionMatrix[in.layerMask];
+		filterData.data.word2 = 1 << in.layerMask;*/
+	}
 
 	bool isHit = m_scene->overlap(capsuleGeometry, pose, overlapResult, filterData);
 

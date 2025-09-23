@@ -1,6 +1,6 @@
 m_name: PlayerGirl
 m_isEnabled: true
-m_instanceID: 2248444186
+m_instanceID: 3846643142
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -8,17 +8,17 @@ PrefabNode:
     m_isEnabled: true
     m_instanceID: 3240989125
     m_transform:
-      position: {x: 19.0000019, y: 0, z: 16.9999981, w: 1}
+      position: {x: 18.2484493, y: 0, z: 16.6706924, w: 1}
       rotation: {x: 0, y: 1, z: 0, w: -3.94253874e-08}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 390
+    m_index: 449
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [391, 542]
+    m_childrenIndices: [450]
     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
     m_attachedSoketID: 0
-    m_collisionType: 0
+    m_collisionType: 1
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
@@ -55,40 +55,38 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         playerIndex: 0
         moveSpeed: 0.0250000004
-        chargingMoveSpeed: 0.0125000002
         maxHP: 100
         ThrowPowerX: 6
         ThrowPowerY: 3
         DropPowerX: 2
         DropPowerY: 0
         detectAngle: 30
-        dashDistacne: 0.100000001
+        dashDistacne: 5
         m_dashTime: 0.150000006
         dashCooldown: 0.5
         dashGracePeriod: 1
         dashAmount: 1
         dubbleDashTime: 0.5
         Atk: 1
+        AttackRange: 2.5
+        AttackSpeed: 1
         comboDuration: 0.5
+        atkFwDistacne: 2
+        rangedAtkCountMax: 5
+        rangedAtkDelay: 0.300000012
+        rangedAtkCooldown: 1
         rangedAutoAimRange: 10
-        rangeAngle: 150
-        countSpecialBullet: 5
+        minChargedTime: 0.699999988
         bombMoveSpeed: 0.00999999978
-        MeleeAttackSpeed: 1
-        RangeAttackSpeed: 1
-        BombAttackSpeed: 1
-        stunRespawnTime: 5
         GracePeriod: 1
         ResurrectionRange: 5
         ResurrectionTime: 3
         ResurrectionHP: 50
         ResurrectionGracePeriod: 3
         SlotChangeCooldown: 2
-        testHitPowerX: 0.0399999991
-        testHitPowerY: 0.0280000009
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 4055200106
+        m_instanceID: 3828739847
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -108,14 +106,14 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 1, z: 0, w: -4.45447199e-08}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 390
-        m_index: 391
-        m_parentIndex: 390
+          m_parentID: 449
+        m_index: 450
+        m_parentIndex: 449
         m_rootIndex: 0
-        m_childrenIndices: [392, 394]
+        m_childrenIndices: [451, 453]
         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
         m_attachedSoketID: 0
-        m_collisionType: 0
+        m_collisionType: 1
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -124,7 +122,7 @@ PrefabNode:
           - Animator: 1291484284
             m_name: Animator
             m_isEnabled: true
-            m_instanceID: 2592905100
+            m_instanceID: 3307602168
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -136,12 +134,7 @@ PrefabNode:
                   m_keyFrameEvent: ~
                 - m_name: Ani_PC1_explosive
                   m_isLoop: false
-                  m_keyFrameEvent:
-                    - m_eventName: ThrowBomb
-                      m_scriptName: Player
-                      m_funName: ThrowBomb
-                      key: 0.651162803
-                      frameKey: 28
+                  m_keyFrameEvent: ~
                 - m_name: Ani_PC1_grab
                   m_isLoop: false
                   m_keyFrameEvent: ~
@@ -156,17 +149,17 @@ PrefabNode:
                   m_keyFrameEvent:
                     - m_eventName: ShootBullet
                       m_scriptName: Player
-                      m_funName: ShootBullet
-                      key: 0.571428597
-                      frameKey: 20
+                      m_funName: ShootNormalBullet
+                      key: 0.285714298
+                      frameKey: 10
+                    - m_eventName: newEvent
+                      m_scriptName: Player
+                      m_funName: EndAttack
+                      key: 0.857142866
+                      frameKey: 30
                 - m_name: Ani_PC1_longATK2
                   m_isLoop: false
-                  m_keyFrameEvent:
-                    - m_eventName: ShootBullet
-                      m_scriptName: Player
-                      m_funName: ShootBullet
-                      key: 0.465116292
-                      frameKey: 20
+                  m_keyFrameEvent: ~
                 - m_name: Ani_PC1_nomalATK2
                   m_isLoop: false
                   m_keyFrameEvent:
@@ -225,8 +218,8 @@ PrefabNode:
                     - m_eventName: StartRay
                       m_scriptName: Player
                       m_funName: StartRay
-                      key: 0.0500000007
-                      frameKey: 2
+                      key: 0
+                      frameKey: 1
                     - m_eventName: Endray
                       m_scriptName: Player
                       m_funName: EndRay
@@ -289,7 +282,7 @@ PrefabNode:
                       nextStateName: Dash
                       hasExitTime: false
                       exitTime: 0.100000001
-                      blendTime: 0.00999999978
+                      blendTime: 0.200000003
                     - conditions:
                         - valueName: MeleeAttack2
                           cType: 1
@@ -338,70 +331,6 @@ PrefabNode:
                       hasExitTime: false
                       exitTime: 0.100000001
                       blendTime: 0.200000003
-                    - conditions:
-                        - valueName: BombAttack
-                          cType: 6
-                          CompareParameter:
-                            vType: 2
-                            name: None
-                            fValue: 0
-                            iValue: 0
-                            bValue: true
-                            tValue: false
-                      m_name: Idle to BombAttack
-                      curStateName: Idle
-                      nextStateName: BombAttack
-                      hasExitTime: false
-                      exitTime: 0.100000001
-                      blendTime: 0.200000003
-                    - conditions:
-                        - valueName: MeleeChargeAttack
-                          cType: 6
-                          CompareParameter:
-                            vType: 2
-                            name: None
-                            fValue: 0
-                            iValue: 0
-                            bValue: true
-                            tValue: false
-                      m_name: Idle to MeleeChargeAttack
-                      curStateName: Idle
-                      nextStateName: MeleeChargeAttack
-                      hasExitTime: false
-                      exitTime: 0.100000001
-                      blendTime: 0.200000003
-                    - conditions:
-                        - valueName: RangeChargeAttack
-                          cType: 6
-                          CompareParameter:
-                            vType: 2
-                            name: None
-                            fValue: 0
-                            iValue: 0
-                            bValue: true
-                            tValue: false
-                      m_name: Idle to RangeChargeAttack
-                      curStateName: Idle
-                      nextStateName: RangeChargeAttack
-                      hasExitTime: false
-                      exitTime: 0.100000001
-                      blendTime: 0.200000003
-                    - conditions:
-                        - valueName: RangeSpecialAttack
-                          cType: 6
-                          CompareParameter:
-                            vType: 2
-                            name: None
-                            fValue: 0
-                            iValue: 0
-                            bValue: true
-                            tValue: false
-                      m_name: Idle to RangeSpecialAttack
-                      curStateName: Idle
-                      nextStateName: RangeSpecialAttack
-                      hasExitTime: false
-                      exitTime: 0.100000001
-                      blendTime: 0.200000003
                   index: 1
                   AnimationIndex: 5
                   m_isAny: false
@@ -412,39 +341,7 @@ PrefabNode:
                 StateVec:
                   - m_name: Ani State
                     behaviourName: ""
-                    Transitions:
-                      - conditions:
-                          - valueName: OnHit
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Ani State to Hit
-                        curStateName: Ani State
-                        nextStateName: Hit
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.00999999978
-                      - conditions:
-                          - valueName: OnStun
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Ani State to Stun
-                        curStateName: Ani State
-                        nextStateName: Stun
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
+                    Transitions: ~
                     index: 0
                     AnimationIndex: -1
                     m_isAny: true
@@ -502,7 +399,7 @@ PrefabNode:
                         nextStateName: Dash
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.00999999978
+                        blendTime: 0.200000003
                       - conditions:
                           - valueName: MeleeAttack2
                             cType: 1
@@ -548,70 +445,6 @@ PrefabNode:
                         m_name: Idle to RangeAttack1
                         curStateName: Idle
                         nextStateName: RangeAttack1
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: BombAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Idle to BombAttack
-                        curStateName: Idle
-                        nextStateName: BombAttack
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: MeleeChargeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Idle to MeleeChargeAttack
-                        curStateName: Idle
-                        nextStateName: MeleeChargeAttack
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeChargeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Idle to RangeChargeAttack
-                        curStateName: Idle
-                        nextStateName: RangeChargeAttack
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeSpecialAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Idle to RangeSpecialAttack
-                        curStateName: Idle
-                        nextStateName: RangeSpecialAttack
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
@@ -672,7 +505,7 @@ PrefabNode:
                         nextStateName: Dash
                         hasExitTime: false
                         exitTime: 0.100000001
-                        blendTime: 0.00999999978
+                        blendTime: 0.200000003
                       - conditions:
                           - valueName: MeleeAttack2
                             cType: 1
@@ -705,70 +538,6 @@ PrefabNode:
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Run to RangeAttack1
-                        curStateName: Run
-                        nextStateName: RangeAttack1
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: MeleeChargeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Run to MeleeChargeAttack
-                        curStateName: Run
-                        nextStateName: MeleeChargeAttack
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeChargeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Run to RangeChargeAttack
-                        curStateName: Run
-                        nextStateName: RangeChargeAttack
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeSpecialAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Run to RangeSpecialAttack
-                        curStateName: Run
-                        nextStateName: RangeSpecialAttack
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
                     index: 2
                     AnimationIndex: 11
                     m_isAny: false
@@ -777,7 +546,7 @@ PrefabNode:
                     animationSpeedParameterName: None
                     useMultipler: false
                   - m_name: Dash
-                    behaviourName: PlayerDash
+                    behaviourName: ""
                     Transitions:
                       - conditions: ~
                         m_name: Dash to Idle
@@ -789,7 +558,7 @@ PrefabNode:
                     index: 3
                     AnimationIndex: 0
                     m_isAny: false
-                    animationSpeed: 10
+                    animationSpeed: 25
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -869,22 +638,6 @@ PrefabNode:
                         hasExitTime: true
                         exitTime: 0.635999978
                         blendTime: 0.200000003
-                      - conditions:
-                          - valueName: MeleeAttack1
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: MeleeAttack3 to MeleeAttack1
-                        curStateName: MeleeAttack3
-                        nextStateName: MeleeAttack1
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
                     index: 6
                     AnimationIndex: 12
                     m_isAny: false
@@ -893,7 +646,7 @@ PrefabNode:
                     animationSpeedParameterName: None
                     useMultipler: false
                   - m_name: RangeAttack1
-                    behaviourName: PlayerRangeAttack
+                    behaviourName: ""
                     Transitions:
                       - conditions: ~
                         m_name: RangeAttack1 to Idle
@@ -904,117 +657,6 @@ PrefabNode:
                         blendTime: 0.200000003
                     index: 7
                     AnimationIndex: 6
-                    m_isAny: false
-                    animationSpeed: 1
-                    multiplerAnimationSpeed: 1
-                    animationSpeedParameterName: None
-                    useMultipler: false
-                  - m_name: BombAttack
-                    behaviourName: PlayerBombAttack
-                    Transitions:
-                      - conditions: ~
-                        m_name: BombAttack to Idle
-                        curStateName: BombAttack
-                        nextStateName: Idle
-                        hasExitTime: true
-                        exitTime: 0.788999975
-                        blendTime: 0.200000003
-                    index: 8
-                    AnimationIndex: 2
-                    m_isAny: false
-                    animationSpeed: 1
-                    multiplerAnimationSpeed: 1
-                    animationSpeedParameterName: None
-                    useMultipler: false
-                  - m_name: MeleeChargeAttack
-                    behaviourName: PlayerAttackAH
-                    Transitions:
-                      - conditions: ~
-                        m_name: MeleeChargeAttack to Idle
-                        curStateName: MeleeChargeAttack
-                        nextStateName: Idle
-                        hasExitTime: true
-                        exitTime: 0.856999993
-                        blendTime: 0.200000003
-                    index: 9
-                    AnimationIndex: 9
-                    m_isAny: false
-                    animationSpeed: 1
-                    multiplerAnimationSpeed: 1
-                    animationSpeedParameterName: None
-                    useMultipler: false
-                  - m_name: RangeChargeAttack
-                    behaviourName: PlayerRangeAttack
-                    Transitions:
-                      - conditions: ~
-                        m_name: RangeChargeAttack to Idle
-                        curStateName: RangeChargeAttack
-                        nextStateName: Idle
-                        hasExitTime: true
-                        exitTime: 0.981999993
-                        blendTime: 0.200000003
-                    index: 10
-                    AnimationIndex: 7
-                    m_isAny: false
-                    animationSpeed: 1
-                    multiplerAnimationSpeed: 1
-                    animationSpeedParameterName: None
-                    useMultipler: false
-                  - m_name: RangeSpecialAttack
-                    behaviourName: PlayerRangeAttack
-                    Transitions:
-                      - conditions: ~
-                        m_name: RangeSpecialAttack to Idle
-                        curStateName: RangeSpecialAttack
-                        nextStateName: Idle
-                        hasExitTime: true
-                        exitTime: 0.975000024
-                        blendTime: 0.200000003
-                    index: 11
-                    AnimationIndex: 7
-                    m_isAny: false
-                    animationSpeed: 1
-                    multiplerAnimationSpeed: 1
-                    animationSpeedParameterName: None
-                    useMultipler: false
-                  - m_name: Hit
-                    behaviourName: PlayerHit
-                    Transitions:
-                      - conditions: ~
-                        m_name: Hit to Idle
-                        curStateName: Hit
-                        nextStateName: Idle
-                        hasExitTime: true
-                        exitTime: 0.699999988
-                        blendTime: 0.300000012
-                    index: 12
-                    AnimationIndex: 4
-                    m_isAny: false
-                    animationSpeed: 3
-                    multiplerAnimationSpeed: 1
-                    animationSpeedParameterName: None
-                    useMultipler: false
-                  - m_name: Stun
-                    behaviourName: PlayerStun
-                    Transitions:
-                      - conditions:
-                          - valueName: OnResurrection
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Stun to Idle
-                        curStateName: Stun
-                        nextStateName: Idle
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                    index: 13
-                    AnimationIndex: 1
                     m_isAny: false
                     animationSpeed: 1
                     multiplerAnimationSpeed: 1
@@ -1243,7 +885,7 @@ PrefabNode:
                     index: 4
                     AnimationIndex: 11
                     m_isAny: false
-                    animationSpeed: 1.5
+                    animationSpeed: 1
                     multiplerAnimationSpeed: 1
                     animationSpeedParameterName: None
                     useMultipler: false
@@ -1363,48 +1005,6 @@ PrefabNode:
                 iValue: 0
                 bValue: false
                 tValue: false
-              - vType: 3
-                name: BombAttack
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
-              - vType: 3
-                name: RangeSpecialAttack
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
-              - vType: 3
-                name: MeleeChargeAttack
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
-              - vType: 3
-                name: RangeChargeAttack
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
-              - vType: 3
-                name: OnStun
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
-              - vType: 3
-                name: OnHit
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
-              - vType: 3
-                name: OnResurrection
-                fValue: 0
-                iValue: 0
-                bValue: false
-                tValue: false
         children:
           - GameObject: 2166264123
             m_name: Red_low (4)
@@ -1414,14 +1014,14 @@ PrefabNode:
               position: {x: 0, y: 0, z: -0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 391
-            m_index: 392
-            m_parentIndex: 391
+              m_parentID: 450
+            m_index: 451
+            m_parentIndex: 450
             m_rootIndex: 0
-            m_childrenIndices: [393]
+            m_childrenIndices: [452]
             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
             m_attachedSoketID: 0
-            m_collisionType: 0
+            m_collisionType: 1
             m_isStatic: false
             m_gameObjectType: 3
             m_tag: Untagged
@@ -1473,14 +1073,14 @@ PrefabNode:
                   position: {x: 0, y: 0, z: -0, w: 1}
                   rotation: {x: -0, y: 0, z: -0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 0}
-                  m_parentID: 392
-                m_index: 393
-                m_parentIndex: 392
+                  m_parentID: 451
+                m_index: 452
+                m_parentIndex: 451
                 m_rootIndex: 0
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 3
                 m_tag: Untagged
@@ -1531,14 +1131,14 @@ PrefabNode:
               position: {x: 0, y: 0.744947731, z: -0.010512013, w: 1}
               rotation: {x: -0.125819653, y: -1.23901899e-07, z: 1.57141731e-08, w: 0.992053151}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 391
-            m_index: 394
-            m_parentIndex: 391
+              m_parentID: 450
+            m_index: 453
+            m_parentIndex: 450
             m_rootIndex: 3
-            m_childrenIndices: [395, 423, 424, 425, 429, 433, 437, 440, 443]
+            m_childrenIndices: [454, 482, 483, 484, 488, 492, 496, 499, 502]
             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
             m_attachedSoketID: 0
-            m_collisionType: 0
+            m_collisionType: 1
             m_isStatic: false
             m_gameObjectType: 4
             m_tag: Untagged
@@ -1553,14 +1153,14 @@ PrefabNode:
                   position: {x: -1.27090941e-16, y: 0.122045338, z: -0, w: 1}
                   rotation: {x: 0.0872987881, y: 1.94142245e-07, z: -4.79292384e-09, w: 0.996182203}
                   scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                  m_parentID: 394
-                m_index: 395
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 454
+                m_parentIndex: 453
                 m_rootIndex: 3
-                m_childrenIndices: [396]
+                m_childrenIndices: [455]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -1575,14 +1175,14 @@ PrefabNode:
                       position: {x: 5.61580515e-15, y: 0.174004599, z: -3.53902578e-08, w: 1}
                       rotation: {x: 0.238273457, y: 4.38391901e-09, z: 3.44299522e-08, w: 0.971198082}
                       scale: {x: 1, y: 1, z: 1, w: 0}
-                      m_parentID: 395
-                    m_index: 396
-                    m_parentIndex: 395
+                      m_parentID: 454
+                    m_index: 455
+                    m_parentIndex: 454
                     m_rootIndex: 3
-                    m_childrenIndices: [397]
+                    m_childrenIndices: [456]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 0
+                    m_collisionType: 1
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -1597,14 +1197,14 @@ PrefabNode:
                           position: {x: -2.90892968e-15, y: 0.150656313, z: 4.19095159e-08, w: 1}
                           rotation: {x: -0.186464012, y: 1.33387248e-08, z: -3.03168939e-08, w: 0.98246181}
                           scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                          m_parentID: 396
-                        m_index: 397
-                        m_parentIndex: 396
+                          m_parentID: 455
+                        m_index: 456
+                        m_parentIndex: 455
                         m_rootIndex: 3
-                        m_childrenIndices: [398, 407, 414, 421, 422]
+                        m_childrenIndices: [457, 466, 473, 480, 481]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 0
+                        m_collisionType: 1
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -1619,14 +1219,14 @@ PrefabNode:
                               position: {x: -4.06824334e-15, y: 0.154404148, z: 1.95577741e-08, w: 1}
                               rotation: {x: -0.201737657, y: -1.44650798e-07, z: -5.74509595e-09, w: 0.979439616}
                               scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                              m_parentID: 397
-                            m_index: 398
-                            m_parentIndex: 397
+                              m_parentID: 456
+                            m_index: 457
+                            m_parentIndex: 456
                             m_rootIndex: 3
-                            m_childrenIndices: [399]
+                            m_childrenIndices: [458]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1641,14 +1241,14 @@ PrefabNode:
                                   position: {x: -6.64505309e-15, y: 0.0530481637, z: -2.23517418e-08, w: 1}
                                   rotation: {x: 0.0948571935, y: -2.22509495e-08, z: -1.34280729e-08, w: 0.995490909}
                                   scale: {x: 1, y: 1, z: 1, w: 0}
-                                  m_parentID: 398
-                                m_index: 399
-                                m_parentIndex: 398
+                                  m_parentID: 457
+                                m_index: 458
+                                m_parentIndex: 457
                                 m_rootIndex: 3
-                                m_childrenIndices: [400]
+                                m_childrenIndices: [459]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 0
+                                m_collisionType: 1
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1663,14 +1263,14 @@ PrefabNode:
                                       position: {x: -5.22590106e-15, y: 0.0502719805, z: 1.67638063e-08, w: 1}
                                       rotation: {x: 0.0937120616, y: 1.25633136e-07, z: -3.53522389e-09, w: 0.995599329}
                                       scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                                      m_parentID: 399
-                                    m_index: 400
-                                    m_parentIndex: 399
+                                      m_parentID: 458
+                                    m_index: 459
+                                    m_parentIndex: 458
                                     m_rootIndex: 3
-                                    m_childrenIndices: [401, 402, 403]
+                                    m_childrenIndices: [460, 461, 462]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 0
+                                    m_collisionType: 1
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1685,14 +1285,14 @@ PrefabNode:
                                           position: {x: 0.0944328979, y: 0.474965572, z: 0.0198037978, w: 1}
                                           rotation: {x: 1.31684885e-09, y: -1.60233398e-07, z: -0.159779921, w: 0.987152696}
                                           scale: {x: 1, y: 1, z: 1, w: 0}
-                                          m_parentID: 400
-                                        m_index: 401
-                                        m_parentIndex: 400
+                                          m_parentID: 459
+                                        m_index: 460
+                                        m_parentIndex: 459
                                         m_rootIndex: 3
                                         m_childrenIndices: ~
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1706,14 +1306,14 @@ PrefabNode:
                                           position: {x: -0.0944328979, y: 0.474965572, z: 0.0198037829, w: 1}
                                           rotation: {x: -1.56202304e-08, y: 7.24522025e-08, z: 0.159779921, w: 0.987152696}
                                           scale: {x: 1, y: 1, z: 1, w: 0}
-                                          m_parentID: 400
-                                        m_index: 402
-                                        m_parentIndex: 400
+                                          m_parentID: 459
+                                        m_index: 461
+                                        m_parentIndex: 459
                                         m_rootIndex: 3
                                         m_childrenIndices: ~
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1727,14 +1327,14 @@ PrefabNode:
                                           position: {x: -2.31936887e-08, y: 0.565667748, z: 0.262181252, w: 1}
                                           rotation: {x: 0.350640267, y: 0.614045143, z: 0.350640178, w: 0.614045262}
                                           scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                                          m_parentID: 400
-                                        m_index: 403
-                                        m_parentIndex: 400
+                                          m_parentID: 459
+                                        m_index: 462
+                                        m_parentIndex: 459
                                         m_rootIndex: 3
-                                        m_childrenIndices: [404]
+                                        m_childrenIndices: [463]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1749,14 +1349,14 @@ PrefabNode:
                                               position: {x: 1.49011612e-07, y: 0.195392817, z: 7.28306304e-14, w: 1}
                                               rotation: {x: 9.36486586e-08, y: 4.59589309e-08, z: 0.662270188, w: 0.749265194}
                                               scale: {x: 1, y: 1, z: 1, w: 0}
-                                              m_parentID: 403
-                                            m_index: 404
-                                            m_parentIndex: 403
+                                              m_parentID: 462
+                                            m_index: 463
+                                            m_parentIndex: 462
                                             m_rootIndex: 3
-                                            m_childrenIndices: [405]
+                                            m_childrenIndices: [464]
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 0
+                                            m_collisionType: 1
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1771,14 +1371,14 @@ PrefabNode:
                                                   position: {x: -1.49011612e-07, y: 0.237649471, z: -2.22044605e-14, w: 1}
                                                   rotation: {x: -0.00495853648, y: -0.00101385219, z: 0.250311375, w: 0.968152165}
                                                   scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                                                  m_parentID: 404
-                                                m_index: 405
-                                                m_parentIndex: 404
+                                                  m_parentID: 463
+                                                m_index: 464
+                                                m_parentIndex: 463
                                                 m_rootIndex: 3
-                                                m_childrenIndices: [406]
+                                                m_childrenIndices: [465]
                                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                                 m_attachedSoketID: 0
-                                                m_collisionType: 0
+                                                m_collisionType: 1
                                                 m_isStatic: false
                                                 m_gameObjectType: 4
                                                 m_tag: Untagged
@@ -1793,14 +1393,14 @@ PrefabNode:
                                                       position: {x: 1.18784897e-07, y: 0.249851376, z: -1.39698386e-09, w: 1}
                                                       rotation: {x: 0.0425796323, y: -0.000159343806, z: -0.00781985652, w: 0.999062479}
                                                       scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
-                                                      m_parentID: 405
-                                                    m_index: 406
-                                                    m_parentIndex: 405
+                                                      m_parentID: 464
+                                                    m_index: 465
+                                                    m_parentIndex: 464
                                                     m_rootIndex: 3
                                                     m_childrenIndices: ~
                                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                                     m_attachedSoketID: 0
-                                                    m_collisionType: 0
+                                                    m_collisionType: 1
                                                     m_isStatic: false
                                                     m_gameObjectType: 4
                                                     m_tag: Untagged
@@ -1814,14 +1414,14 @@ PrefabNode:
                               position: {x: 0.0146724498, y: 0.110020071, z: -0.0627394319, w: 1}
                               rotation: {x: 0.605154455, y: 0.345862359, z: -0.356134385, w: 0.622362971}
                               scale: {x: 1, y: 1.00000012, z: 0.99999994, w: 0}
-                              m_parentID: 397
-                            m_index: 407
-                            m_parentIndex: 397
+                              m_parentID: 456
+                            m_index: 466
+                            m_parentIndex: 456
                             m_rootIndex: 3
-                            m_childrenIndices: [408]
+                            m_childrenIndices: [467]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1836,14 +1436,14 @@ PrefabNode:
                                   position: {x: 0.0241840743, y: 0.150435373, z: 0.0163487364, w: 1}
                                   rotation: {x: -0.00560499169, y: 0.745009959, z: 0.218207166, w: -0.630328774}
                                   scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                  m_parentID: 407
-                                m_index: 408
-                                m_parentIndex: 407
+                                  m_parentID: 466
+                                m_index: 467
+                                m_parentIndex: 466
                                 m_rootIndex: 3
-                                m_childrenIndices: [409]
+                                m_childrenIndices: [468]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 0
+                                m_collisionType: 1
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -1858,14 +1458,14 @@ PrefabNode:
                                       position: {x: -1.14319846e-07, y: 0.216559619, z: 1.86264515e-08, w: 1}
                                       rotation: {x: -0.117635176, y: 0.0607364997, z: 0.0873848572, w: 0.987338305}
                                       scale: {x: 1, y: 1, z: 0.999999821, w: 0}
-                                      m_parentID: 408
-                                    m_index: 409
-                                    m_parentIndex: 408
+                                      m_parentID: 467
+                                    m_index: 468
+                                    m_parentIndex: 467
                                     m_rootIndex: 3
-                                    m_childrenIndices: [410, 412]
+                                    m_childrenIndices: [469, 471]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 0
+                                    m_collisionType: 1
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -1880,14 +1480,14 @@ PrefabNode:
                                           position: {x: 6.63567334e-08, y: 0.176488891, z: -1.86264515e-09, w: 1}
                                           rotation: {x: -0.0425384231, y: -0.012710683, z: 0.116324469, w: 0.992218494}
                                           scale: {x: 0.999999881, y: 0.99999994, z: 0.999999881, w: 0}
-                                          m_parentID: 409
-                                        m_index: 410
-                                        m_parentIndex: 409
+                                          m_parentID: 468
+                                        m_index: 469
+                                        m_parentIndex: 468
                                         m_rootIndex: 3
-                                        m_childrenIndices: [411]
+                                        m_childrenIndices: [470]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1902,14 +1502,14 @@ PrefabNode:
                                               position: {x: 3.07103619e-07, y: 0.0871344507, z: -7.4505806e-09, w: 1}
                                               rotation: {x: 2.10711733e-08, y: 6.68224004e-07, z: -7.05360435e-07, w: 1}
                                               scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
-                                              m_parentID: 410
-                                            m_index: 411
-                                            m_parentIndex: 410
+                                              m_parentID: 469
+                                            m_index: 470
+                                            m_parentIndex: 469
                                             m_rootIndex: 3
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 0
+                                            m_collisionType: 1
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1923,14 +1523,14 @@ PrefabNode:
                                           position: {x: 1.80676579e-07, y: 0.176488906, z: 7.63684511e-08, w: 1}
                                           rotation: {x: -0.335561723, y: -0.0660399497, z: -0.129671484, w: 0.930710673}
                                           scale: {x: 0.999999881, y: 0.99999994, z: 0.99999994, w: 0}
-                                          m_parentID: 409
-                                        m_index: 412
-                                        m_parentIndex: 409
+                                          m_parentID: 468
+                                        m_index: 471
+                                        m_parentIndex: 468
                                         m_rootIndex: 3
-                                        m_childrenIndices: [413]
+                                        m_childrenIndices: [472]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -1945,14 +1545,14 @@ PrefabNode:
                                               position: {x: 1.09095708e-07, y: 0.0805392116, z: -9.19681042e-08, w: 1}
                                               rotation: {x: 1.68569386e-07, y: -5.08502126e-07, z: -7.26431608e-08, w: 1}
                                               scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                              m_parentID: 412
-                                            m_index: 413
-                                            m_parentIndex: 412
+                                              m_parentID: 471
+                                            m_index: 472
+                                            m_parentIndex: 471
                                             m_rootIndex: 3
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 0
+                                            m_collisionType: 1
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -1966,14 +1566,14 @@ PrefabNode:
                               position: {x: -0.0146724274, y: 0.110020071, z: -0.0627394393, w: 1}
                               rotation: {x: 0.605154514, y: -0.345862538, z: 0.356134653, w: 0.622362673}
                               scale: {x: 1, y: 1.00000024, z: 1.00000012, w: 0}
-                              m_parentID: 397
-                            m_index: 414
-                            m_parentIndex: 397
+                              m_parentID: 456
+                            m_index: 473
+                            m_parentIndex: 456
                             m_rootIndex: 3
-                            m_childrenIndices: [415]
+                            m_childrenIndices: [474]
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -1988,14 +1588,14 @@ PrefabNode:
                                   position: {x: -0.0241840761, y: 0.150435343, z: 0.0163488537, w: 1}
                                   rotation: {x: 0.00560491206, y: 0.745009959, z: 0.21820721, w: 0.630328774}
                                   scale: {x: 0.999999881, y: 0.99999994, z: 1, w: 0}
-                                  m_parentID: 414
-                                m_index: 415
-                                m_parentIndex: 414
+                                  m_parentID: 473
+                                m_index: 474
+                                m_parentIndex: 473
                                 m_rootIndex: 3
-                                m_childrenIndices: [416]
+                                m_childrenIndices: [475]
                                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                 m_attachedSoketID: 0
-                                m_collisionType: 0
+                                m_collisionType: 1
                                 m_isStatic: false
                                 m_gameObjectType: 4
                                 m_tag: Untagged
@@ -2010,14 +1610,14 @@ PrefabNode:
                                       position: {x: 2.12457962e-07, y: 0.216559574, z: -3.7252903e-09, w: 1}
                                       rotation: {x: -0.117635123, y: -0.0607365519, z: -0.08738482, w: 0.987338305}
                                       scale: {x: 1.00000012, y: 1.00000012, z: 0.99999994, w: 0}
-                                      m_parentID: 415
-                                    m_index: 416
-                                    m_parentIndex: 415
+                                      m_parentID: 474
+                                    m_index: 475
+                                    m_parentIndex: 474
                                     m_rootIndex: 3
-                                    m_childrenIndices: [417, 419]
+                                    m_childrenIndices: [476, 478]
                                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                     m_attachedSoketID: 0
-                                    m_collisionType: 0
+                                    m_collisionType: 1
                                     m_isStatic: false
                                     m_gameObjectType: 4
                                     m_tag: Untagged
@@ -2032,14 +1632,14 @@ PrefabNode:
                                           position: {x: -1.50641426e-07, y: 0.176488951, z: -5.58793545e-09, w: 1}
                                           rotation: {x: -0.0425384343, y: 0.0127106775, z: -0.116324492, w: 0.992218494}
                                           scale: {x: 1, y: 0.999999821, z: 0.999999881, w: 0}
-                                          m_parentID: 416
-                                        m_index: 417
-                                        m_parentIndex: 416
+                                          m_parentID: 475
+                                        m_index: 476
+                                        m_parentIndex: 475
                                         m_rootIndex: 3
-                                        m_childrenIndices: [418]
+                                        m_childrenIndices: [477]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -2054,14 +1654,14 @@ PrefabNode:
                                               position: {x: -1.8090941e-07, y: 0.0871344954, z: -1.11758709e-08, w: 1}
                                               rotation: {x: 1.62981451e-08, y: -6.64382242e-07, z: 6.9651287e-07, w: 1}
                                               scale: {x: 1, y: 1, z: 1, w: 0}
-                                              m_parentID: 417
-                                            m_index: 418
-                                            m_parentIndex: 417
+                                              m_parentID: 476
+                                            m_index: 477
+                                            m_parentIndex: 476
                                             m_rootIndex: 3
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 0
+                                            m_collisionType: 1
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -2075,14 +1675,14 @@ PrefabNode:
                                           position: {x: -2.72179022e-07, y: 0.176488921, z: 7.68341124e-08, w: 1}
                                           rotation: {x: -0.335561663, y: 0.066039972, z: 0.129671499, w: 0.930710673}
                                           scale: {x: 0.999999881, y: 0.99999994, z: 1, w: 0}
-                                          m_parentID: 416
-                                        m_index: 419
-                                        m_parentIndex: 416
+                                          m_parentID: 475
+                                        m_index: 478
+                                        m_parentIndex: 475
                                         m_rootIndex: 3
-                                        m_childrenIndices: [420]
+                                        m_childrenIndices: [479]
                                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                         m_attachedSoketID: 0
-                                        m_collisionType: 0
+                                        m_collisionType: 1
                                         m_isStatic: false
                                         m_gameObjectType: 4
                                         m_tag: Untagged
@@ -2097,14 +1697,14 @@ PrefabNode:
                                               position: {x: -1.97949703e-07, y: 0.0805391297, z: -6.48433343e-08, w: 1}
                                               rotation: {x: 2.08616243e-07, y: 5.19677997e-07, z: 3.35276127e-08, w: 1}
                                               scale: {x: 1, y: 1, z: 1.00000012, w: 0}
-                                              m_parentID: 419
-                                            m_index: 420
-                                            m_parentIndex: 419
+                                              m_parentID: 478
+                                            m_index: 479
+                                            m_parentIndex: 478
                                             m_rootIndex: 3
                                             m_childrenIndices: ~
                                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                                             m_attachedSoketID: 0
-                                            m_collisionType: 0
+                                            m_collisionType: 1
                                             m_isStatic: false
                                             m_gameObjectType: 4
                                             m_tag: Untagged
@@ -2118,14 +1718,14 @@ PrefabNode:
                               position: {x: 0.0949298441, y: -0.00391337182, z: 0.0342812687, w: 1}
                               rotation: {x: -1.91291676e-08, y: -0.69693619, z: 0.717133224, w: -1.356985e-07}
                               scale: {x: 0.999999881, y: 0.999999881, z: 0.99999994, w: 0}
-                              m_parentID: 397
-                            m_index: 421
-                            m_parentIndex: 397
+                              m_parentID: 456
+                            m_index: 480
+                            m_parentIndex: 456
                             m_rootIndex: 3
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2139,14 +1739,14 @@ PrefabNode:
                               position: {x: -0.094929859, y: -0.00391337136, z: 0.0342812464, w: 1}
                               rotation: {x: -1.91292084e-08, y: -0.69693619, z: 0.717133224, w: -1.35698514e-07}
                               scale: {x: 0.999999881, y: 0.999999881, z: 0.99999994, w: 0}
-                              m_parentID: 397
-                            m_index: 422
-                            m_parentIndex: 397
+                              m_parentID: 456
+                            m_index: 481
+                            m_parentIndex: 456
                             m_rootIndex: 3
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2160,14 +1760,14 @@ PrefabNode:
                   position: {x: 0.0743518099, y: 0.0627117157, z: 0.0161671899, w: 1}
                   rotation: {x: 0.1524553, y: 0.793330848, z: -0.285503864, w: 0.515626967}
                   scale: {x: 0.99999994, y: 0.999999821, z: 1, w: 0}
-                  m_parentID: 394
-                m_index: 423
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 482
+                m_parentIndex: 453
                 m_rootIndex: 3
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2181,14 +1781,14 @@ PrefabNode:
                   position: {x: -0.074351795, y: 0.0627118349, z: 0.0161672533, w: 1}
                   rotation: {x: -0.152455345, y: 0.79333055, z: -0.285503864, w: -0.515627325}
                   scale: {x: 1.00000024, y: 1.00000012, z: 1, w: 0}
-                  m_parentID: 394
-                m_index: 424
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 483
+                m_parentIndex: 453
                 m_rootIndex: 3
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2202,14 +1802,14 @@ PrefabNode:
                   position: {x: 0.155107483, y: 0.0367968939, z: -0.00178330729, w: 1}
                   rotation: {x: 0.985036552, y: -1.20200037e-08, z: -1.78467701e-07, w: -0.172345743}
                   scale: {x: 1, y: 1, z: 1.00000012, w: 0}
-                  m_parentID: 394
-                m_index: 425
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 484
+                m_parentIndex: 453
                 m_rootIndex: 3
-                m_childrenIndices: [426]
+                m_childrenIndices: [485]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2224,14 +1824,14 @@ PrefabNode:
                       position: {x: -1.93184171e-08, y: 0.349806458, z: 4.90194019e-09, w: 1}
                       rotation: {x: -0.257252753, y: 0.00256737974, z: 0.00221811491, w: 0.966338158}
                       scale: {x: 1, y: 1, z: 1, w: 0}
-                      m_parentID: 425
-                    m_index: 426
-                    m_parentIndex: 425
+                      m_parentID: 484
+                    m_index: 485
+                    m_parentIndex: 484
                     m_rootIndex: 3
-                    m_childrenIndices: [427]
+                    m_childrenIndices: [486]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 0
+                    m_collisionType: 1
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2246,14 +1846,14 @@ PrefabNode:
                           position: {x: -2.41852831e-08, y: 0.389106512, z: 1.60653144e-08, w: 1}
                           rotation: {x: 0.779286504, y: -0.00338268536, z: -0.00026905752, w: 0.626658618}
                           scale: {x: 0.99999994, y: 1.00000012, z: 1.00000012, w: 0}
-                          m_parentID: 426
-                        m_index: 427
-                        m_parentIndex: 426
+                          m_parentID: 485
+                        m_index: 486
+                        m_parentIndex: 485
                         m_rootIndex: 3
-                        m_childrenIndices: [428]
+                        m_childrenIndices: [487]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 0
+                        m_collisionType: 1
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2268,14 +1868,14 @@ PrefabNode:
                               position: {x: -1.31707978e-09, y: 0.169529542, z: 2.18153673e-09, w: 1}
                               rotation: {x: 0.121281318, y: 7.52521601e-09, z: -0.0709121302, w: 0.990082026}
                               scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                              m_parentID: 427
-                            m_index: 428
-                            m_parentIndex: 427
+                              m_parentID: 486
+                            m_index: 487
+                            m_parentIndex: 486
                             m_rootIndex: 3
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2289,14 +1889,14 @@ PrefabNode:
                   position: {x: -0.155107483, y: 0.0367968939, z: -0.00178322976, w: 1}
                   rotation: {x: 0.985036552, y: -3.07943502e-08, z: -7.11635195e-08, w: -0.172345728}
                   scale: {x: 1, y: 1, z: 1.00000036, w: 0}
-                  m_parentID: 394
-                m_index: 429
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 488
+                m_parentIndex: 453
                 m_rootIndex: 3
-                m_childrenIndices: [430]
+                m_childrenIndices: [489]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2311,14 +1911,14 @@ PrefabNode:
                       position: {x: 4.76544448e-09, y: 0.349806488, z: 6.00854477e-09, w: 1}
                       rotation: {x: -0.257252693, y: -0.00256737648, z: -0.00221811468, w: 0.966338217}
                       scale: {x: 1, y: 0.999999881, z: 0.999999881, w: 0}
-                      m_parentID: 429
-                    m_index: 430
-                    m_parentIndex: 429
+                      m_parentID: 488
+                    m_index: 489
+                    m_parentIndex: 488
                     m_rootIndex: 3
-                    m_childrenIndices: [431]
+                    m_childrenIndices: [490]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 0
+                    m_collisionType: 1
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2333,14 +1933,14 @@ PrefabNode:
                           position: {x: 9.92440619e-09, y: 0.389106452, z: 1.60653144e-08, w: 1}
                           rotation: {x: 0.779286444, y: 0.00338268629, z: 0.000269059121, w: 0.626658738}
                           scale: {x: 0.999999881, y: 0.99999994, z: 0.99999994, w: 0}
-                          m_parentID: 430
-                        m_index: 431
-                        m_parentIndex: 430
+                          m_parentID: 489
+                        m_index: 490
+                        m_parentIndex: 489
                         m_rootIndex: 3
-                        m_childrenIndices: [432]
+                        m_childrenIndices: [491]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 0
+                        m_collisionType: 1
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2355,14 +1955,14 @@ PrefabNode:
                               position: {x: 1.61150684e-08, y: 0.169529498, z: 4.61722038e-09, w: 1}
                               rotation: {x: 0.121281348, y: -1.2228476e-08, z: 0.0709121302, w: 0.990081966}
                               scale: {x: 1, y: 1, z: 1, w: 0}
-                              m_parentID: 431
-                            m_index: 432
-                            m_parentIndex: 431
+                              m_parentID: 490
+                            m_index: 491
+                            m_parentIndex: 490
                             m_rootIndex: 3
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2376,14 +1976,14 @@ PrefabNode:
                   position: {x: 3.95199464e-08, y: 0.0163557157, z: 0.158213422, w: 1}
                   rotation: {x: 0.747208953, y: 8.30035276e-08, z: -9.33222211e-08, w: 0.664589167}
                   scale: {x: 1, y: 0.99999994, z: 1, w: 0}
-                  m_parentID: 394
-                m_index: 433
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 492
+                m_parentIndex: 453
                 m_rootIndex: 3
-                m_childrenIndices: [434]
+                m_childrenIndices: [493]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2398,14 +1998,14 @@ PrefabNode:
                       position: {x: -5.08219768e-21, y: 0.0731240585, z: 3.35276127e-08, w: 1}
                       rotation: {x: -0.266910017, y: -4.06178735e-08, z: 1.12494218e-08, w: 0.963721454}
                       scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                      m_parentID: 433
-                    m_index: 434
-                    m_parentIndex: 433
+                      m_parentID: 492
+                    m_index: 493
+                    m_parentIndex: 492
                     m_rootIndex: 3
-                    m_childrenIndices: [435]
+                    m_childrenIndices: [494]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 0
+                    m_collisionType: 1
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2420,14 +2020,14 @@ PrefabNode:
                           position: {x: 9.15220285e-15, y: 0.0928639174, z: 4.47034836e-08, w: 1}
                           rotation: {x: -0.147835866, y: 1.22088863e-08, z: 1.06366658e-08, w: 0.989011943}
                           scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                          m_parentID: 434
-                        m_index: 435
-                        m_parentIndex: 434
+                          m_parentID: 493
+                        m_index: 494
+                        m_parentIndex: 493
                         m_rootIndex: 3
-                        m_childrenIndices: [436]
+                        m_childrenIndices: [495]
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 0
+                        m_collisionType: 1
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2442,14 +2042,14 @@ PrefabNode:
                               position: {x: -4.09275647e-15, y: 0.128645897, z: -1.1920929e-07, w: 1}
                               rotation: {x: 0.147835776, y: 2.94748439e-08, z: -4.40584724e-09, w: 0.989011943}
                               scale: {x: 1, y: 1, z: 1, w: 0}
-                              m_parentID: 435
-                            m_index: 436
-                            m_parentIndex: 435
+                              m_parentID: 494
+                            m_index: 495
+                            m_parentIndex: 494
                             m_rootIndex: 3
                             m_childrenIndices: ~
                             m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                             m_attachedSoketID: 0
-                            m_collisionType: 0
+                            m_collisionType: 1
                             m_isStatic: false
                             m_gameObjectType: 4
                             m_tag: Untagged
@@ -2463,14 +2063,14 @@ PrefabNode:
                   position: {x: 0.069760114, y: 0.163346857, z: 0.13186793, w: 1}
                   rotation: {x: 0.564496934, y: 0.305361181, z: 0.65454942, w: -0.399578273}
                   scale: {x: 0.999999702, y: 1, z: 1, w: 0}
-                  m_parentID: 394
-                m_index: 437
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 496
+                m_parentIndex: 453
                 m_rootIndex: 3
-                m_childrenIndices: [438]
+                m_childrenIndices: [497]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2485,14 +2085,14 @@ PrefabNode:
                       position: {x: -7.4505806e-09, y: 0.205251694, z: -6.84522092e-08, w: 1}
                       rotation: {x: -0.237389579, y: 0.00050396187, z: -0.00455114152, w: 0.971403718}
                       scale: {x: 0.999999881, y: 1.00000012, z: 1.00000012, w: 0}
-                      m_parentID: 437
-                    m_index: 438
-                    m_parentIndex: 437
+                      m_parentID: 496
+                    m_index: 497
+                    m_parentIndex: 496
                     m_rootIndex: 3
-                    m_childrenIndices: [439]
+                    m_childrenIndices: [498]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 0
+                    m_collisionType: 1
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2507,14 +2107,14 @@ PrefabNode:
                           position: {x: -1.11758709e-08, y: 0.162190184, z: -2.81900903e-08, w: 1}
                           rotation: {x: -0.224066049, y: 1.62515519e-07, z: -0.00204998767, w: 0.974571824}
                           scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                          m_parentID: 438
-                        m_index: 439
-                        m_parentIndex: 438
+                          m_parentID: 497
+                        m_index: 498
+                        m_parentIndex: 497
                         m_rootIndex: 3
                         m_childrenIndices: ~
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 0
+                        m_collisionType: 1
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2528,14 +2128,14 @@ PrefabNode:
                   position: {x: -0.0697600096, y: 0.163347036, z: 0.13186802, w: 1}
                   rotation: {x: -0.564496398, y: 0.305361271, z: 0.654549897, w: 0.399578154}
                   scale: {x: 1.00000048, y: 1.00000012, z: 1, w: 0}
-                  m_parentID: 394
-                m_index: 440
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 499
+                m_parentIndex: 453
                 m_rootIndex: 3
-                m_childrenIndices: [441]
+                m_childrenIndices: [500]
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
@@ -2550,14 +2150,14 @@ PrefabNode:
                       position: {x: -2.14204192e-08, y: 0.20525153, z: 9.49949026e-08, w: 1}
                       rotation: {x: -0.237389892, y: -0.000504045631, z: 0.00455118623, w: 0.971403658}
                       scale: {x: 0.999999881, y: 0.99999994, z: 0.999999881, w: 0}
-                      m_parentID: 440
-                    m_index: 441
-                    m_parentIndex: 440
+                      m_parentID: 499
+                    m_index: 500
+                    m_parentIndex: 499
                     m_rootIndex: 3
-                    m_childrenIndices: [442]
+                    m_childrenIndices: [501]
                     m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                     m_attachedSoketID: 0
-                    m_collisionType: 0
+                    m_collisionType: 1
                     m_isStatic: false
                     m_gameObjectType: 4
                     m_tag: Untagged
@@ -2572,14 +2172,14 @@ PrefabNode:
                           position: {x: 4.09781933e-08, y: 0.162190109, z: 4.2489539e-08, w: 1}
                           rotation: {x: -0.224066198, y: 1.82762765e-08, z: 0.00204994227, w: 0.974571764}
                           scale: {x: 1, y: 1, z: 1, w: 0}
-                          m_parentID: 441
-                        m_index: 442
-                        m_parentIndex: 441
+                          m_parentID: 500
+                        m_index: 501
+                        m_parentIndex: 500
                         m_rootIndex: 3
                         m_childrenIndices: ~
                         m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                         m_attachedSoketID: 0
-                        m_collisionType: 0
+                        m_collisionType: 1
                         m_isStatic: false
                         m_gameObjectType: 4
                         m_tag: Untagged
@@ -2593,37 +2193,16 @@ PrefabNode:
                   position: {x: -0.57306987, y: 0.570056558, z: 0.157817543, w: 1}
                   rotation: {x: 0.125819713, y: 1.19978949e-07, z: 1.52166404e-08, w: 0.992053151}
                   scale: {x: 1, y: 0.99999994, z: 0.999999881, w: 0}
-                  m_parentID: 394
-                m_index: 443
-                m_parentIndex: 394
+                  m_parentID: 453
+                m_index: 502
+                m_parentIndex: 453
                 m_rootIndex: 3
                 m_childrenIndices: ~
                 m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
                 m_attachedSoketID: 0
-                m_collisionType: 0
+                m_collisionType: 1
                 m_isStatic: false
                 m_gameObjectType: 4
                 m_tag: Untagged
                 m_layer: Default
                 m_components: ~
-      - GameObject: 2166264123
-        m_name: RangeShootPos
-        m_isEnabled: true
-        m_instanceID: 2501384123
-        m_transform:
-          position: {x: 0.397999763, y: 1.10000002, z: 2.25700092, w: 1}
-          rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 390
-        m_index: 542
-        m_parentIndex: 390
-        m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 244bda7b-c3d7-5083-8c4c-c4925c269e0f
-        m_attachedSoketID: 0
-        m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 0
-        m_tag: Untagged
-        m_layer: Default
-        m_components: ~
