@@ -29,5 +29,6 @@ private:
 	void ImGuiDrawHelperDecal(class DecalComponent* decalComponent);
 	void ImGuiDrawHelperImageComponent(class ImageComponent* imageComponent);
 	void ImGuiDrawHelperSpriteRenderer(class SpriteRenderer* spriteRenderer);
+	void ImGuiDrawHelperCanvas(class Canvas* canvas);
 };
 #endif // !DYNAMICCPP_EXPORTS

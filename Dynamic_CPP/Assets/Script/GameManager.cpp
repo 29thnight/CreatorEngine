@@ -14,12 +14,13 @@
 #include "EntityItem.h"
 #include "DebugLog.h"
 #include "EntityAsis.h"
+#include "Player.h"
 
 void GameManager::Awake()
 {
 	LOG("GameManager Awake");
 	//앞으론 언리얼 처럼 게임인스턴스를 활용해서 전역 설정값 관리
-	GameInstance::GetInstance();
+	GameInstance::GetInstance()->Initialize();
 	
 	auto resourcePool = GameObject::Find("ResourcePool");
 	auto weaponPiecePool = GameObject::Find("WeaponPiecePool");
@@ -55,16 +56,6 @@ void GameManager::Start()
 
 void GameManager::Update(float tick)
 {
-	auto cam = GameObject::Find("Main Camera");
-	if (!cam) return;
-
-	std::vector<HitResult> hits;
-	Quaternion currentRotation = cam->m_transform.GetWorldQuaternion();
-	currentRotation.Normalize();
-	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
-
-	int size = RaycastAll(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1u, hits);
-
 	GameInstance::GetInstance()->AsyncSceneLoadUpdate();
 
 	//테스트용 보상 코드
@@ -146,6 +137,96 @@ void GameManager::SwitchTestScene()
 	SwitchScene("CreateUIPrefabV2");
 }
 
+void GameManager::LoadNextScene()
+{
+	if (m_nextSceneName.empty()) return;
+
+	LoadScene(m_nextSceneName);
+}
+
+void GameManager::SwitchNextScene()
+{
+	if (m_nextSceneName.empty() || !GameInstance::GetInstance()->IsLoadSceneComplete()) 
+	{
+		return;
+	}
+
+	SwitchScene(m_nextSceneName);
+}
+
+void GameManager::LoadImidiateNextScene()
+{
+}
+
+void GameManager::ApplyGlobalEnhancementsToAllPlayers()
+{
+	// GameManager가 들고 있는 플레이어 목록에 순회 적용
+	for (Entity* e : m_players) 
+	{                             
+		// GameManager가 보관하는 리스트 사용 :contentReference[oaicite:14]{index=14}
+		if (auto* p = dynamic_cast<Player*>(e)) 
+		{
+			ApplyGlobalEnhancementsToPlayer(p);
+		}
+	}
+}
+
+void GameManager::ApplyGlobalEnhancementsToPlayer(Player* player)
+{
+	if (!player) return;
+	EnsureBaseSnapshot(player);
+
+	auto& snap = m_baseByPlayer[player];
+	auto* gi = GameInstance::GetInstance();
+
+	// ---- 전역 강화치 조회 & 적용 ----
+	// 1) 이동속도: 곱산(float)
+	//    최종: baseMoveSpeed * (1 + MoveSpeedUp 누적 비율)
+	{
+		float finalMove = gi->ApplyToBaseFloat(ItemEnhancementType::MoveSpeedUp, snap.baseMoveSpeed);
+		player->moveSpeed = finalMove;                       // Player::moveSpeed에 반영 :contentReference[oaicite:9]{index=9}
+	}
+
+	// 2) 대시 횟수: 가산(int)
+	//    최종: baseDashAmount + DashCountUp 누적
+	{
+		int finalDash = gi->ApplyToBaseInt(ItemEnhancementType::DashCountUp, snap.baseDashAmount);
+		player->dashAmount = finalDash;                      // Player::dashAmount 반영 :contentReference[oaicite:10]{index=10}
+	}
+
+	// 3) 공격력: 가산(int)
+	//    최종: baseAtk + Atk 누적
+	{
+		int finalAtk = gi->ApplyToBaseInt(ItemEnhancementType::Atk, snap.baseAtk);
+		player->Atk = finalAtk;                              // Player::Atk 반영 :contentReference[oaicite:11]{index=11}
+	}
+
+	// 4) 공격속도 배수: 곱산(float)
+	//    최종: baseAtkSpeedMult * (1 + AtkSpeedUp 누적 비율)
+	{
+		float finalAtkSpd = gi->ApplyToBaseFloat(ItemEnhancementType::AtkSpeedUp, snap.baseAtkSpeedMult);
+		player->MultipleAttackSpeed = finalAtkSpd;           // Player::MultipleAttackSpeed 반영 :contentReference[oaicite:12]{index=12}
+	}
+
+	// 5) 최대 체력: **Entity::m_maxHP** 기준으로 가산(int)
+	//    최종: baseMaxHP + MaxHPUp 누적    (Player::maxHP 사용 금지!)
+	{
+		Entity* e = static_cast<Entity*>(player);
+		int oldMax = e->m_maxHP;
+		int finalMax = gi->ApplyToBaseInt(ItemEnhancementType::MaxHPUp, snap.baseMaxHP);
+		e->m_maxHP = finalMax;                               // Entity::m_maxHP 반영 :contentReference[oaicite:13]{index=13}
+
+		// 현재 HP 보정 정책(택1)
+		// A) 비율 유지:
+		// float ratio = (oldMax > 0) ? (float)e->m_currentHP / (float)oldMax : 1.f;
+		// e->m_currentHP = (int)std::round(finalMax * ratio);
+
+		// B) 최대치 증가분만큼 현재 HP도 올림(과잉 회복 방지):
+		int delta = finalMax - oldMax;
+		if (delta > 0) e->m_currentHP = std::min(e->m_currentHP + delta, finalMax);
+	}
+}
+
 void GameManager::PushEntity(Entity* entity)
 {
 	if (entity)
@@ -216,6 +297,24 @@ void GameManager::CheatMiningResource()
 		
 		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 300.f, EForceMode::IMPULSE);
 	}*/
+}
+
+void GameManager::EnsureBaseSnapshot(Player* player)
+{
+	auto& snap = m_baseByPlayer[player];
+	if (snap.initialized) return;
+
+	// Player 쪽 기준값
+	snap.baseMoveSpeed = player->baseMoveSpeed;          // 별도 기준 값 필드 존재 :contentReference[oaicite:7]{index=7}
+	snap.baseDashAmount = player->dashAmount;             // 현재값을 초기 기준으로 스냅샷
+	snap.baseAtk = player->Atk;
+	snap.baseAtkSpeedMult = player->MultipleAttackSpeed;
+
+	// Entity(부모) 쪽 최대체력 기준값
+	Entity* e = static_cast<Entity*>(player);
+	snap.baseMaxHP = e->m_maxHP;                             // Player의 maxHP 말고 Entity::m_maxHP 사용 :contentReference[oaicite:8]{index=8}
+
+	snap.initialized = true;
 }
 
 void GameManager::InitReward(int amount)

@@ -48,6 +48,8 @@ public:
     // 현재 worldRect를 유지한 채 부모를 바꾸고 싶을 때 호출
     void SetParentKeepWorldPosition(GameObject* newParent);
 
+	bool IsDirty() const { return m_isDirty; }
+
 private:
     // 부모 RectTransform의 사각형을 기준으로 한 최소/최대 앵커 위치 (0.0 ~ 1.0 비율)
     [[Property]]

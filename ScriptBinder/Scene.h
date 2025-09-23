@@ -223,6 +223,14 @@ public:
 	std::vector<MeshColliderComponent*>& GetMeshColliderComponents() { return m_meshColliderComponents; }
 	std::vector<CharacterControllerComponent*>& GetCharacterControllerComponents() { return m_characterControllerComponents; }
 
+public:
+	void AddCanvas(const std::shared_ptr<GameObject>& canvas);
+	void RemoveCanvas(const std::shared_ptr<GameObject>& canvas);
+	std::vector<std::weak_ptr<GameObject>>& GetCanvases() { return Canvases; }
+	std::unordered_map<std::string, std::weak_ptr<GameObject>>& GetCanvasMap() { return CanvasMap; }
+	std::shared_ptr<GameObject> FindCanvasName(std::string_view name);
+	std::shared_ptr<GameObject> FindCanvasIndex(size_t index);
+
 private:
     void DestroyGameObjects();
 	void DestroyComponents();
@@ -265,6 +273,10 @@ private:
 	std::vector<std::shared_ptr<Animator*>>     m_animators;
     RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
 	ColliderContainerType						m_colliderContainer;
+
+private:
+	std::vector<std::weak_ptr<GameObject>>	Canvases;
+	std::unordered_map<std::string, std::weak_ptr<GameObject>> CanvasMap;
 
 public:
 	HashingString GetSceneName() const { return m_sceneName; }

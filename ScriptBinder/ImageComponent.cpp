@@ -29,6 +29,19 @@ void ImageComponent::SetTexture(int index)
 	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
 }
 
+void ImageComponent::ResetSize()
+{
+	if (m_curtexture)
+	{
+		uiinfo.size = m_curtexture->GetImageSize();
+		origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
+		if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+		{
+			rect->SetSizeDelta(uiinfo.size);
+		}
+	}
+}
+
 bool ImageComponent::isThisTextureExist(std::string_view path) const
 {
 	for (const auto& p : texturePaths)
@@ -74,28 +87,47 @@ void ImageComponent::Awake()
 	{
 		renderScene->RegisterCommand(this);
 	}
+
+	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+	{
+		const auto& worldRect = rect->GetWorldRect();
+		const auto& pivot = rect->GetPivot();
+
+		pos = { worldRect.x + worldRect.width * 2 * pivot.x,
+				worldRect.y + worldRect.height * 2 * pivot.y,
+				0.0f };
+		scale = { worldRect.width / uiinfo.size.x,
+				  worldRect.height / uiinfo.size.y };
+
+		origin = { uiinfo.size.x * 0.5f,
+				   uiinfo.size.y * 0.5f };
+
+		scale *= unionScale;
+
+		rect->SetSizeDelta(uiinfo.size);
+	}
 }
 
 void ImageComponent::Update(float tick)
 {
-    if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
-    {
-        const auto& worldRect = rect->GetWorldRect();
-        const auto& pivot = rect->GetPivot();
+	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+	{
+		const auto& worldRect = rect->GetWorldRect();
+		const auto& pivot = rect->GetPivot();
 
 		pos = { worldRect.x + worldRect.width * 2 * pivot.x,
 				worldRect.y + worldRect.height * 2 * pivot.y,
-                0.0f };
-        scale = { worldRect.width / uiinfo.size.x,
-                  worldRect.height / uiinfo.size.y };
+				0.0f };
+		scale = { worldRect.width / uiinfo.size.x,
+				  worldRect.height / uiinfo.size.y };
 
-        origin = { uiinfo.size.x * 0.5f,
-                   uiinfo.size.y * 0.5f };
+		origin = { uiinfo.size.x * 0.5f,
+				   uiinfo.size.y * 0.5f };
 
-        scale *= unionScale;
+		scale *= unionScale;
 
-        rect->SetSizeDelta(uiinfo.size);
-    }
+		//rect->SetSizeDelta(uiinfo.size);
+	}
 }
 
 void ImageComponent::OnDestroy()

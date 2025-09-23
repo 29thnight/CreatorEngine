@@ -24,7 +24,7 @@ AUTO_REGISTER_ENUM(ClipDirection)
 struct Navigation
 {
 	[[Property]]
-	Direction mode = Direction::Right;
+	int mode{};
 	[[Property]]
 	HashedGuid navObject{};
 

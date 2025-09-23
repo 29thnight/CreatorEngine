@@ -25,10 +25,13 @@ PxFilterFlags CustomFilterShader(
 {
 	
 	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1)) {
-		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
-			| PxPairFlag::eNOTIFY_TOUCH_FOUND
-			| PxPairFlag::eNOTIFY_TOUCH_LOST;
-		return PxFilterFlag::eDEFAULT;
+		if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0))) {
+			pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+				| PxPairFlag::eNOTIFY_TOUCH_FOUND
+				| PxPairFlag::eNOTIFY_TOUCH_LOST;
+			return PxFilterFlag::eDEFAULT;
+		}
+		return PxFilterFlag::eSUPPRESS;
 	}
 	else {
 		if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0))) {

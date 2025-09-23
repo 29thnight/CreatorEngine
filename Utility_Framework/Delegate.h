@@ -96,6 +96,7 @@ namespace Core
 		std::atomic_flag atomic_flag_ = ATOMIC_FLAG_INIT;
 		std::vector<CallbackInfo> callbacks_;
 		std::size_t nextID_;
+		bool isStopped_ = false;
 	};
 }
 

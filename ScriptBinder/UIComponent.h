@@ -20,8 +20,9 @@ class UIComponent : public Component
 {
 public:
    ReflectUIComponent
-    [[Serializable(Inheritance:Component)]]
-	GENERATED_BODY(UIComponent)
+	[[Serializable(Inheritance:Component)]]
+	UIComponent(); 
+	virtual ~UIComponent() = default;
 
    void SetCanvas(Canvas* canvas);
 	Canvas* GetOwnerCanvas() { return ownerCanvas; }
@@ -29,6 +30,7 @@ public:
 	int GetLayerOrder() const { return _layerorder; }
 	void SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI);
 	void DeserializeNavi();
+	std::vector<Navigation> GetNavigations() const { return navigations; }
 	GameObject* GetNextNavi(Direction dir);
 	bool IsNavigationThis();
 
@@ -85,6 +87,7 @@ public:
 	std::string m_ownerCanvasName{};
 	[[Property]]
 	std::vector<Navigation> navigations{};
+	bool isDeserialized = false;
 
 private:
 	std::array<std::weak_ptr<GameObject>, NavDirectionCount> navigation;

@@ -356,7 +356,7 @@ std::shared_ptr<GameObject> Scene::GetGameObject(std::string_view name)
 	HashingString hashedName(name.data());
 	for (auto& obj : m_SceneObjects)
 	{
-		if (obj->GetHashedName() == hashedName)
+		if (obj && obj->GetHashedName() == hashedName)
 		{
 			return obj;
 		}
@@ -1601,4 +1601,73 @@ void Scene::AllUpdateWorldMatrix()
 	};
 
 	std::for_each(std::execution::par_unseq, rootObjects.begin(), rootObjects.end(), updateFunc);
+}
+
+void Scene::AddCanvas(const std::shared_ptr<GameObject>& canvas)
+{
+	if (!canvas) return;
+
+	std::string name = canvas->m_name.ToString();
+	if (CanvasMap.find(name) != CanvasMap.end())
+	{
+		Canvases.push_back(canvas);
+		CanvasMap[name] = canvas;
+	}
+	else
+	{
+		Canvases.push_back(canvas);
+		CanvasMap.insert({ name, canvas });
+	}
+}
+
+void Scene::RemoveCanvas(const std::shared_ptr<GameObject>& canvas)
+{
+	if (!canvas) return;
+
+	auto it = std::find_if(Canvases.begin(), Canvases.end(), [&](const std::weak_ptr<GameObject>& c)
+	{
+		return !c.expired() && c.lock() == canvas;
+	});
+
+	if (it != Canvases.end())
+	{
+		auto canvasCom = canvas->GetComponent<Canvas>();
+		for (auto& uiObj : canvasCom->UIObjs)
+		{
+			if (auto uiObjPtr = uiObj.lock())
+				uiObjPtr->Destroy();
+		}
+		canvasCom->UIObjs.clear();
+
+		std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& c)
+		{
+			return c.expired() || c.lock() == canvas;
+		});
+
+		std::erase_if(CanvasMap, [&](auto& pair)
+		{
+			auto sp = pair.second.lock();
+			return !sp || sp == canvas;
+		});
+
+		canvas->Destroy();
+	}
+}
+
+std::shared_ptr<GameObject> Scene::FindCanvasName(std::string_view name)
+{
+	if (CanvasMap.find(name.data()) != CanvasMap.end())
+	{
+		return CanvasMap[name.data()].lock();
+	}
+	return nullptr;
+}
+
+std::shared_ptr<GameObject> Scene::FindCanvasIndex(size_t index)
+{
+	if (index < Canvases.size())
+	{
+		return Canvases[index].lock();
+	}
+	return nullptr;
 }

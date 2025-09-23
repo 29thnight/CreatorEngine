@@ -4,6 +4,12 @@
 
 // Automation include ScriptClass header
 #include "TestEffect.h"
+#include "ItemComponent.h"
+#include "ItemManager.h"
+#include "ItemUIPopup.h"
+#include "ItemUIIcon.h"
+#include "GameInit.h"
+#include "ImageButton.h"
 #include "PlayerSelector.h"
 #include "InputDeviceDetector.h"
 #include "ItemPopup.h"
