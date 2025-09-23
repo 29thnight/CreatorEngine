@@ -20,6 +20,23 @@ void MovingUILayer::Start()
 			m_curSlot = SelectorSlot::Neutral;
 		}
 	}
+
+	GameObject* lefttargetObj = nullptr;
+	GameObject* righttargetObj = nullptr;
+	RectTransformComponent* LPosRect = nullptr;
+	RectTransformComponent* RPosRect = nullptr;
+
+	if (lefttargetObj = GameObject::Find("readyButtonSlot (0)"))
+	{
+		LPosRect = lefttargetObj->GetComponent<RectTransformComponent>();
+		if (LPosRect) leftPos = LPosRect->GetAnchoredPosition();
+	}
+
+	if (righttargetObj = GameObject::Find("readyButtonSlot (1)"))
+	{
+		RPosRect = righttargetObj->GetComponent<RectTransformComponent>();
+		if (RPosRect) rightPos = RPosRect->GetAnchoredPosition();
+	}
 }
 
 void MovingUILayer::Update(float tick)
