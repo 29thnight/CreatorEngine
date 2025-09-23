@@ -36,6 +36,11 @@ public:
 
 	GameObject* target = nullptr;
 	bool isDead = false;
+	[[Method]]
+	void DeadEvent();
+	bool EndDeadAnimation = false;
+	float deadElapsedTime = 0.f;
+	float deadDestroyTime = 1.0f;
 
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
@@ -82,7 +87,7 @@ public:
 	void SendDamage(Entity* sender, int damage) override;
 
 
-	//넥백처리 -> 차후 에니메이션 이벤트로 처리
+	//넥백처리
 	float hittimer = 0.f;
 	Mathf::Vector3 hitPos;
 	Mathf::Vector3 hitBaseScale;

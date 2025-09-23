@@ -8,6 +8,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [686063297]
+    ChildWeights: ~
     Position: {x: -90, y: -243}
   - ID: 686063297
     Type: 3
@@ -18,6 +19,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [1442497393, 3909499465, 1608338673, 3825938343]
+    ChildWeights: ~
     Position: {x: -74, y: -35}
   - ID: 3909499465
     Type: 2
@@ -28,6 +30,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [1191098861, 1220802128]
+    ChildWeights: ~
     Position: {x: -266, y: 216}
   - ID: 1191098861
     Type: 6
@@ -38,6 +41,7 @@ NodeList:
     ScriptName: IsDaed
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: -362, y: 360}
   - ID: 1220802128
     Type: 8
@@ -48,6 +52,7 @@ NodeList:
     ScriptName: DaedAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: -314, y: 536}
   - ID: 3825938343
     Type: 3
@@ -58,6 +63,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [2754018510, 700856674, 3240466497, 3380368976, 2108044870]
+    ChildWeights: ~
     Position: {x: 390, y: 109}
   - ID: 700856674
     Type: 2
@@ -68,6 +74,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [1558418268, 2341585939, 1856270841]
+    ChildWeights: ~
     Position: {x: 406, y: 269}
   - ID: 1558418268
     Type: 6
@@ -78,6 +85,7 @@ NodeList:
     ScriptName: IsAtteck
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 230, y: 520}
   - ID: 3380368976
     Type: 2
@@ -88,6 +96,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [574968042, 4286035256]
+    ChildWeights: ~
     Position: {x: 806, y: 264}
   - ID: 574968042
     Type: 6
@@ -98,6 +107,7 @@ NodeList:
     ScriptName: IsDetect
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 758, y: 424}
   - ID: 2108044870
     Type: 8
@@ -108,6 +118,7 @@ NodeList:
     ScriptName: Idle
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 1014, y: 248}
   - ID: 1856270841
     Type: 8
@@ -118,6 +129,7 @@ NodeList:
     ScriptName: AtteckAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 470, y: 680}
   - ID: 3513064655
     Type: 8
@@ -128,6 +140,7 @@ NodeList:
     ScriptName: ChaseAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 646, y: 600}
   - ID: 1608338673
     Type: 5
@@ -138,6 +151,7 @@ NodeList:
     ScriptName: IsDamege
     Policy: -858993460
     Children: [3264712637]
+    ChildWeights: ~
     Position: {x: -42, y: 213}
   - ID: 3264712637
     Type: 8
@@ -148,6 +162,7 @@ NodeList:
     ScriptName: DamegeAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: -74, y: 472}
   - ID: 1442497393
     Type: 5
@@ -158,6 +173,7 @@ NodeList:
     ScriptName: IsInitialize
     Policy: -858993460
     Children: [2607363938]
+    ChildWeights: ~
     Position: {x: -624, y: 185}
   - ID: 2607363938
     Type: 8
@@ -168,6 +184,7 @@ NodeList:
     ScriptName: BTEntityInitAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: -634, y: 424}
   - ID: 2754018510
     Type: 2
@@ -178,6 +195,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [711360861]
+    ChildWeights: ~
     Position: {x: 198, y: 269}
   - ID: 3240466497
     Type: 2
@@ -188,6 +206,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [89034692, 3513064655]
+    ChildWeights: ~
     Position: {x: 598, y: 269}
   - ID: 711360861
     Type: 5
@@ -198,6 +217,7 @@ NodeList:
     ScriptName: IsUseAsis
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 166, y: 405}
   - ID: 89034692
     Type: 6
@@ -208,6 +228,7 @@ NodeList:
     ScriptName: IsChase
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 534, y: 456}
   - ID: 4286035256
     Type: 8
@@ -218,6 +239,7 @@ NodeList:
     ScriptName: DetectAndTargetingAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 854, y: 600}
   - ID: 2341585939
     Type: 8
@@ -228,4 +250,5 @@ NodeList:
     ScriptName: WaitAction
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 278, y: 680}

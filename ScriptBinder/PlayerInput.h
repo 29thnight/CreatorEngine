@@ -20,6 +20,7 @@ public:
 
 	void SetActionMap(std::string mapName);
 	void SetActionMap(ActionMap* _actionMap);
+	void SetControllerVibration(float tick, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre);
 	//쓸 액션맵네임
 	ActionMap* m_actionMap = nullptr; 
 	[[Property]]

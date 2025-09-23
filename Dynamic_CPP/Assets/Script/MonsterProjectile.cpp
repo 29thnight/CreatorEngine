@@ -16,19 +16,42 @@ void MonsterProjectile::Update(float tick)
     t = (t > 1.f) ? 1.f : t;
 
     Mathf::Vector3 currentPos = CalculateBezierPoint(t, m_startPos, m_controlPos, m_endPos);
-    m_pOwner->m_transform.SetPosition(m_startPos);
+    m_pOwner->m_transform.SetPosition(currentPos);
+
+    std::cout << "MonsterProjectile elapsedTime : " << t << "currentPos [ x: " << currentPos.x << " y: " << currentPos.y << " z: " << currentPos.z << std::endl;
 
     if (t >= 1.f)
     {
         m_isMoving = false;
 
         // TODO: 여기에 폭발 이펙트 생성, 데미지 처리, 오브젝트 파괴 등의 로직을 추가합니다.
-        // 예: GetOwner()->Destroy();
+        OverlapInput input;
+        
+        std::vector<HitResult> results;
+
+        input.position = currentPos;
+        input.rotation = SimpleMath::Quaternion::Identity;
+
+        PhysicsManagers->SphereOverlap(input, m_radius, results);
+        
+        for (auto& res : results) {
+            if (res.gameObject->GetHashedName().ToString() == "1P" || res.gameObject->GetHashedName().ToString() == "2P") {
+                auto entity = res.gameObject->GetComponent<Entity>();
+                if (entity) {
+                    entity->SendDamage(m_owner, m_damege);
+                }
+            }
+        }
+
     }
 }
 
-void MonsterProjectile::Initialize(Mathf::Vector3 startPos, Mathf::Vector3 controlPos, Mathf::Vector3 endPos, float calculatedDuration)
+void MonsterProjectile::Initialize(Entity* owner, float radius, int damege, Mathf::Vector3 startPos, Mathf::Vector3 controlPos, Mathf::Vector3 endPos, float calculatedDuration)
 {
+    m_owner = owner;
+    m_radius = radius;
+    m_damege = damege;
+
     m_startPos = startPos;
     m_controlPos = controlPos;
     m_endPos = endPos;

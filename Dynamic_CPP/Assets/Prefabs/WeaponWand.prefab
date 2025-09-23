@@ -1,21 +1,21 @@
 m_name: WeaponWand
 m_isEnabled: true
-m_instanceID: 3668591799
+m_instanceID: 2818888681
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponWand
     m_isEnabled: true
-    m_instanceID: 124795183
+    m_instanceID: 4199028579
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 7
+    m_index: 4
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [11]
+    m_childrenIndices: [6]
     m_prefabFileGuid: daa1d7b2-8722-5501-917a-6e205a13a46f
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -40,21 +40,21 @@ PrefabNode:
         durUseAtk: 1
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 3179748566
+        m_instanceID: 1737922543
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
-        m_name: Weapon_wand
+        m_name: Weapon_Wand
         m_isEnabled: true
-        m_instanceID: 1220687269
+        m_instanceID: 60026298
         m_transform:
-          position: {x: 0, y: -5.96046448e-08, z: 0, w: 1}
-          rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 7
-        m_index: 11
-        m_parentIndex: 7
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 4
+        m_index: 6
+        m_parentIndex: 4
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -68,10 +68,10 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1905058417
+            m_instanceID: 1338235792
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material.001(1)
+              m_name: Weapon_Wand
               m_baseColorTexName: Weapon_wand_Low_DefaultMaterial_BaseColor.png
               m_normalTexName: Weapon_wand_Low_DefaultMaterial_Normal.png
               m_ORM_TexName: Weapon_wand_Low_DefaultMaterial_OcclusionRoughnessMetallic.png
@@ -85,7 +85,7 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 193d2b6f-bdcc-5856-8d5b-b9077179017d
+              m_fileGuid: 4feb1f46-df54-56a7-ac8e-4b85f30cc2de
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:

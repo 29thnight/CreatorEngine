@@ -43,19 +43,21 @@ void PlayerAttackAH::Enter()
 		controller->Move({ 0 ,0 });
 		m_player->m_animator->SetUseLayer(1, false);
 	}
-	if (!eft)
+	/*if (!eft)
 	{
 		eft = SceneManagers->GetActiveScene()->CreateGameObject("asd").get();
 		eft->AddComponent<EffectComponent>()->Awake();
 	}
-	eft->GetComponent<EffectComponent>()->ChangeEffect("test2");
+	eft->GetComponent<EffectComponent>()->ChangeEffect("test2");*/
 }
 
 void PlayerAttackAH::Update(float deltaTime)
 {
 	
 	if (m_player && m_player->startRay)
-		eft->m_transform.SetPosition(m_player->handSocket->transform.GetLocalMatrix().r[3]); //keyframe 이벤트로 
+	{
+		//eft->m_transform.SetPosition(m_player->handSocket->transform.GetLocalMatrix().r[3]); //keyframe 이벤트로 
+	}
 
 	if (m_player && m_player->startRay)
 	{

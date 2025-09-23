@@ -18,6 +18,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	}
 
 
+
 	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
 	input.x = m_moveInput.x;
 	input.z = m_moveInput.y;
@@ -45,12 +46,10 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 
 	Physics->SetCharacterMovementMaxSpeed(inputInfo, m_movementInfo.maxSpeed);
 
-	constexpr float rotationOffsetSquare = 0.5f * 0.5f;
-
-	float inputSquare = input.LengthSquared();
-
-	if (!m_isKnockBack) //&&&&& 넉백당하면어케할지 상의필요
+	if (m_useAutomaticRotation)
 	{
+		constexpr float rotationOffsetSquare = 0.5f * 0.5f;
+		float inputSquare = input.LengthSquared();
 		DirectX::SimpleMath::Vector3 flatInput = input;
 		flatInput.y = 0.f;
 
@@ -84,36 +83,30 @@ void CharacterControllerComponent::OnLateUpdate(float fixedDeltaTime)
 	//m_fFinalMultiplierSpeed = 1.0f; 
 }
 
-void CharacterControllerComponent::Stun(float stunTime)
+
+void CharacterControllerComponent::SetAutomaticRotation(bool useAuto)
 {
-	m_isStun = true;
-	m_stunTime = stunTime;
-	stunElapsedTime = 0.f;
+	m_useAutomaticRotation = useAuto;
 }
 
-void CharacterControllerComponent::SetKnockBack(Mathf::Vector3 knockbackVelocity)
+void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, Mathf::Easing::EaseType curveType)
+{	
+	int castint = static_cast<int>(curveType);
+	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration, castint);
+}
+//void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
+//{
+//	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration);
+//}
+
+void CharacterControllerComponent::StopForcedMove()
 {
-	//m_fFinalMultiplierSpeed = KnockBackPower;
-	//JumpPower = yKnockBackPower;
-	m_isKnockBack = true;
-	CharactorControllerInputInfo inputInfo;
-	inputInfo.id = m_controllerInfo.id;
-
-	Physics->SetKnockBack(inputInfo, true, knockbackVelocity);
-
+	Physics->StopForcedMoveOnCCT(m_controllerInfo.id);
 }
 
-
-
-void CharacterControllerComponent::EndKnockBack()
+bool CharacterControllerComponent::IsInForcedMove() const
 {
-	//m_moveInput.y = 0;
-	m_isKnockBack = false;
-	//m_fFinalMultiplierSpeed = 1.0f;
-	CharactorControllerInputInfo inputInfo;
-	inputInfo.id = m_controllerInfo.id;
-
-	Physics->SetKnockBack(inputInfo, false);
+	return Physics->IsInForcedMove(m_controllerInfo.id);
 }
 
 void CharacterControllerComponent::OnTriggerEnter(ICollider* other)

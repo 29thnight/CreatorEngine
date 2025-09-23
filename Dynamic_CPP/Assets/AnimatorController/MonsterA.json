@@ -27,7 +27,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 4,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -45,7 +45,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -104,7 +104,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 4,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -143,7 +143,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 4,
+                                    "cType": 0,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -182,37 +182,19 @@
             "m_curState": "Idle",
             "useController": 1,
             "useMask": 1
-        },
-        {
-            "StateVec": [
-                {
-                    "animationIndex": -1,
-                    "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
-                    "behaviourName": "",
-                    "m_isAny": true,
-                    "multiplerAnimationSpeed": 1.0,
-                    "state_name": "Ani State",
-                    "transitions": [],
-                    "useMultipler": 0
-                }
-            ],
-            "controller_name": "NewLayer1",
-            "useController": 1,
-            "useMask": 1
         }
     ],
     "Parameters": [
-        {
-            "param_name": "Dead",
-            "param_vType": 2
-        },
         {
             "param_name": "Move",
             "param_vType": 2
         },
         {
             "param_name": "Attack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "Dead",
             "param_vType": 3
         }
     ]

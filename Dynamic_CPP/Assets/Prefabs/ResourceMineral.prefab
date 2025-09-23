@@ -1,33 +1,33 @@
 m_name: ResourceMineral
 m_isEnabled: true
-m_instanceID: 3464483684
+m_instanceID: 2753052341
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: ResourceMineral
     m_isEnabled: true
-    m_instanceID: 3210501272
+    m_instanceID: 4104535538
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 4
+    m_index: 13
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [3, 5]
+    m_childrenIndices: [14, 15]
     m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
     m_attachedSoketID: 0
-    m_collisionType: 1
+    m_collisionType: 8
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
-    m_layer: Default
+    m_layer: EntityResource
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 3809088991
+        m_instanceID: 2703297940
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 2064869404
+        m_instanceID: 1290941221
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.5, y: 1, z: 0.5}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -53,24 +53,24 @@ PrefabNode:
         itemType: 2
         m_name: EntityResource
         m_isEnabled: true
-        m_instanceID: 4142551494
+        m_instanceID: 1463546527
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
     children:
       - GameObject: 2166264123
         m_name: obj_Inter_stone
         m_isEnabled: true
-        m_instanceID: 3391993420
+        m_instanceID: 518659754
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 4
-        m_index: 3
-        m_parentIndex: 4
+          m_parentID: 13
+        m_index: 14
+        m_parentIndex: 13
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -81,7 +81,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 4188969552
+            m_instanceID: 3792993953
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: obj_Inter_stone
@@ -116,16 +116,16 @@ PrefabNode:
             m_shadowCast: true
             m_isEnableLOD: false
       - GameObject: 2166264123
-        m_name: CriticalMark
+        m_name: CriticalMark (2)
         m_isEnabled: true
-        m_instanceID: 1575878402
+        m_instanceID: 2008783052
         m_transform:
           position: {x: 0, y: 1.82164216, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 4
-        m_index: 5
-        m_parentIndex: 4
+          m_parentID: 13
+        m_index: 15
+        m_parentIndex: 13
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
@@ -139,7 +139,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 184198677
+            m_instanceID: 391271598
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: "Null"
             m_isPlaying: false
@@ -152,6 +152,6 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: CriticalMark
             m_isEnabled: true
-            m_instanceID: 1540576484
+            m_instanceID: 4082081097
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245

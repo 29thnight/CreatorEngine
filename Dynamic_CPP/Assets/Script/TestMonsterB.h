@@ -32,6 +32,9 @@ public:
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
+	
+	std::vector<GameObject*> m_projectiles;
+	int m_projectileIndex = 0;
 
 	GameObject* target = nullptr;
 	bool isDead = false;
@@ -39,6 +42,7 @@ public:
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
 	bool isBoxAttack = false; //박스 공격중인지 여부
+	bool isMelee = false; //근접공격을 할지 원거리 공격을 할지
 
 	//공통 속성
 	[[Property]]
@@ -57,15 +61,16 @@ public:
 	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
 
 	//근접 공격 방식
-	/*
 	float m_attackRange = 2.f;
 	
 	int m_attackDamage = 10;
-	*/
+
 
 	//원거리 공격 방식 - 투사체 공격
 	[[Property]]
 	int m_rangedAttackDamage = 10; //원거리 공격 데미지
+	[[Property]]
+	float m_projectileDamegeRadius = 5.0f;//투사체 데미지 범위
 	[[Property]]
 	float m_projectileSpeed = 0.1f; //투사체 속도
 	[[Property]]
@@ -85,12 +90,11 @@ public:
 	void RotateToTarget(); //타겟 바라보기
 
 	//근접 공격 방식 - 박스 공격
-	//
-	//void AttackBoxOn(); //공격 박스 활성화
-	//
-	//void AttackBoxOff(); //공격 박스 비활성화
+	void AttackBoxOn(); //공격 박스 활성화
+	
+	void AttackBoxOff(); //공격 박스 비활성화
 
-	//void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
+	void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
 
 	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사
 

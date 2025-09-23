@@ -1,33 +1,33 @@
 m_name: ResourceFruit
 m_isEnabled: true
-m_instanceID: 1689059141
+m_instanceID: 3626752689
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: ResourceFruit
     m_isEnabled: true
-    m_instanceID: 1721449053
+    m_instanceID: 1042807082
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 6
+    m_index: 11
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [3, 7]
+    m_childrenIndices: [12, 6]
     m_prefabFileGuid: dae41571-4142-5138-bee0-f9133453f24b
     m_attachedSoketID: 0
-    m_collisionType: 1
+    m_collisionType: 8
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
-    m_layer: Default
+    m_layer: EntityResource
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1163378471
+        m_instanceID: 1217265697
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 3127912611
+        m_instanceID: 3370787374
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 1, y: 1, z: 1}
         m_posOffset: {x: 0, y: 0.699999988, z: 0}
@@ -53,23 +53,63 @@ PrefabNode:
         itemType: 3
         m_name: EntityResource
         m_isEnabled: true
-        m_instanceID: 2756415834
+        m_instanceID: 2938829075
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
     children:
       - GameObject: 2166264123
+        m_name: CriticalMark (1)
+        m_isEnabled: true
+        m_instanceID: 1231940036
+        m_transform:
+          position: {x: 0, y: 1.69096124, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 11
+        m_index: 12
+        m_parentIndex: 11
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: dae41571-4142-5138-bee0-f9133453f24b
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - EffectComponent: 3131036541
+            m_name: EffectComponent
+            m_isEnabled: true
+            m_instanceID: 1019610625
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_effectTemplateName: red
+            m_isPlaying: false
+            m_isPaused: false
+            m_timeScale: 1
+            m_loop: true
+            m_duration: -1
+            m_useAbsolutePosition: false
+            m_effectInstanceName: red_obj2343634777
+          - ModuleBehavior: 1399118904
+            m_name: CriticalMark
+            m_isEnabled: true
+            m_instanceID: 2662711744
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+      - GameObject: 2166264123
         m_name: item_fruit
         m_isEnabled: true
-        m_instanceID: 2677250156
+        m_instanceID: 685092932
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 6
-        m_index: 3
-        m_parentIndex: 6
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 11
+        m_index: 6
+        m_parentIndex: 11
         m_rootIndex: 0
-        m_childrenIndices: [4, 5]
+        m_childrenIndices: [7, 8]
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
         m_collisionType: 0
@@ -80,16 +120,16 @@ PrefabNode:
         m_components: ~
         children:
           - GameObject: 2166264123
-            m_name: Cylinder.006-0
+            m_name: Cylinder.001-0
             m_isEnabled: true
-            m_instanceID: 3422315480
+            m_instanceID: 551234995
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 3
-            m_index: 4
-            m_parentIndex: 3
+              m_parentID: 6
+            m_index: 7
+            m_parentIndex: 6
             m_rootIndex: 0
             m_childrenIndices: ~
             m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -103,11 +143,11 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 2834933706
+                m_instanceID: 3218392485
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: item_bush
-                  m_baseColorTexName: item_bush.png
+                  m_name: item_fruit_bush
+                  m_baseColorTexName: item_fruit_bush.png
                   m_normalTexName: ""
                   m_ORM_TexName: ""
                   m_AO_TexName: ""
@@ -124,7 +164,7 @@ PrefabNode:
                   m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Cylinder.006-0
+                  m_name: Cylinder.001-0
                   m_materialIndex: 0
                   m_LODThresholds: ~
                 m_LightMapping:
@@ -138,16 +178,16 @@ PrefabNode:
                 m_shadowCast: true
                 m_isEnableLOD: false
           - GameObject: 2166264123
-            m_name: Cylinder.006-1
+            m_name: Cylinder.001-1
             m_isEnabled: true
-            m_instanceID: 869670501
+            m_instanceID: 2949006176
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 3
-            m_index: 5
-            m_parentIndex: 3
+              m_parentID: 6
+            m_index: 8
+            m_parentIndex: 6
             m_rootIndex: 0
             m_childrenIndices: ~
             m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
@@ -161,13 +201,13 @@ PrefabNode:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
                 m_isEnabled: true
-                m_instanceID: 2779825464
+                m_instanceID: 2949264528
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
-                  m_name: fruit
-                  m_baseColorTexName: Obj_Inter_Fruit_Material-1.png
-                  m_normalTexName: Obj_Inter_Fruit_Material.png
-                  m_ORM_TexName: Obj_Inter_Fruit_Material-2.png
+                  m_name: item_fruit
+                  m_baseColorTexName: item_fruit_Material-1.png
+                  m_normalTexName: item_fruit_Material.png
+                  m_ORM_TexName: item_fruit_Material-2.png
                   m_AO_TexName: ""
                   m_EmissiveTexName: ""
                   m_materialInfo:
@@ -182,7 +222,7 @@ PrefabNode:
                   m_renderingMode: 0
                   m_shaderPSOName: ""
                 m_Mesh:
-                  m_name: Cylinder.006-1
+                  m_name: Cylinder.001-1
                   m_materialIndex: 1
                   m_LODThresholds: ~
                 m_LightMapping:
@@ -195,43 +235,3 @@ PrefabNode:
                 m_shadowRecive: true
                 m_shadowCast: true
                 m_isEnableLOD: false
-      - GameObject: 2166264123
-        m_name: CriticalMark
-        m_isEnabled: true
-        m_instanceID: 2343634777
-        m_transform:
-          position: {x: 0, y: 1.69096124, z: 0, w: 1}
-          rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 6
-        m_index: 7
-        m_parentIndex: 6
-        m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 7a95e7a9-feb8-57df-9a01-45a280282d9e
-        m_attachedSoketID: 0
-        m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 0
-        m_tag: Untagged
-        m_layer: Default
-        m_components:
-          - EffectComponent: 3131036541
-            m_name: EffectComponent
-            m_isEnabled: true
-            m_instanceID: 3413902389
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_effectTemplateName: red
-            m_isPlaying: false
-            m_isPaused: false
-            m_timeScale: 1
-            m_loop: true
-            m_duration: -1
-            m_useAbsolutePosition: false
-            m_effectInstanceName: red_obj2343634777
-          - ModuleBehavior: 1399118904
-            m_name: CriticalMark
-            m_isEnabled: true
-            m_instanceID: 3269544778
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
