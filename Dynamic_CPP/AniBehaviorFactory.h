@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include AniScriptClass header
+#include "PlayerBombCharing.h"
 #include "PlayerHit.h"
 #include "PlayerDash.h"
 #include "PlayerStun.h"

@@ -498,7 +498,7 @@
 		<ClInclude Include="Assets\Script\MovingUILayer.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
-			<ClInclude Include="Assets\Script\InputDeviceDetector.h">
+		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\LoadingController.h">
@@ -584,6 +584,9 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\SlashEffect.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
+			<Filter>Script</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -1021,6 +1024,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestEffect.cpp">
 			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerBombCharing.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
