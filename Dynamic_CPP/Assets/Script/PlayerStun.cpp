@@ -4,6 +4,7 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "Weapon.h"
+#include "CharacterControllerComponent.h"
 void PlayerStun::Enter()
 {
 	if (m_player == nullptr)
@@ -32,6 +33,8 @@ void PlayerStun::Enter()
 		m_player->ChangeState("Stun");
 		m_player->m_curWeapon->SetEnabled(false);
 		m_player->m_animator->SetUseLayer(1, false);
+		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0 ,0 });
 	}
 }
 

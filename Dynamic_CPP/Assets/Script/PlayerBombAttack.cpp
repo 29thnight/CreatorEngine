@@ -35,10 +35,12 @@ void PlayerBombAttack::Enter()
 		controller->Move({ 0 ,0 });
 		m_player->m_animator->SetUseLayer(1, false);
 	}
+
 }
 
 void PlayerBombAttack::Update(float deltaTime)
 {
+
 }
 
 void PlayerBombAttack::Exit()
