@@ -1,0 +1,89 @@
+{
+    "Controllers": [
+        {
+            "StateVec": [
+                {
+                    "animationIndex": -1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": true,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Ani State",
+                    "transitions": [],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Idle",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnMove"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Run",
+                            "transName": "Idle to Run"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Run",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 5,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnMove"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Run to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                }
+            ],
+            "controller_name": "NewLayer0",
+            "m_curState": "Idle",
+            "useController": 1,
+            "useMask": 0
+        }
+    ],
+    "Parameters": [
+        {
+            "param_name": "OnMove",
+            "param_vType": 2
+        }
+    ]
+}

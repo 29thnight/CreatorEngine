@@ -197,8 +197,10 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("ItemManager", []() { return new ItemManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemUIPopup", []() { return new ItemUIPopup(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemUIIcon", []() { return new ItemUIIcon(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityEleteMonster", []() { return new EntityEleteMonster(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameInit", []() { return new GameInit(); });
 		CreateFactory::GetInstance()->RegisterFactory("ImageButton", []() { return new ImageButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("SlashEffect", []() { return new SlashEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayerSelector", []() { return new PlayerSelector(); });
 		CreateFactory::GetInstance()->RegisterFactory("InputDeviceDetector", []() { return new InputDeviceDetector(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemPopup", []() { return new ItemPopup(); });
@@ -313,6 +315,7 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerBombCharing", []() { return new PlayerBombCharing(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerHit", []() { return new PlayerHit(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerDash", []() { return new PlayerDash(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerStun", []() { return new PlayerStun(); });

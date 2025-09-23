@@ -1,9 +1,9 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "Easing.h"
 #include <functional>
 
+using namespace Mathf;
 class TweenManager : public ModuleBehavior
 {
 public:

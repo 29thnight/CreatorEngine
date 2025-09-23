@@ -75,8 +75,8 @@ public:
 	float chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
 	float baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
 	[[Property]]
-	float maxHP = 100;
-	float curHP = maxHP;
+	int maxHP = 100;
+	int curHP = maxHP;
 	std::string curStateName = "Idle";
 	std::unordered_map<std::string, BitFlag> playerState;           //스테이트별 행동제어용
 	void ChangeState(std::string _stateName);
@@ -148,7 +148,7 @@ public:
 	bool canMeleeCancel = false; //밀리어택 애니메이션 진행중 캔슬가능한지 //키프레임 이벤트에서 각 시점에 true로 바꿔주고 true 일때 공격입력시 다음공격 전환
 	[[Method]]
 	void Cancancel();
-
+	void CancelChargeAttack();
 	bool startAttack = false;
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
@@ -196,9 +196,16 @@ public:
 	bool startRay = false;
 
 	float calculDamge(bool isCharge = false);
+	[[Method]]
+	void PlaySlashEvent(); //검기 이펙트 + 사운드 출력
+	[[Method]]
+	void PlaySlashEvent2();
+	[[Method]]
+	void PlaySlashEvent3();
+
 	bool sucessAttack = false;
 	[[Property]]
-	float MultipleAttackSpeed = 1.0f;
+	float MultipleAttackSpeed = 1.0f;        //미사용중  //추가능력치로 공격속도가빨라질경우 사용 
 
 	//피격,죽음
 	bool isStun = false;
@@ -206,8 +213,10 @@ public:
 	[[Property]]
 	float stunRespawnTime = 5.0f;   //스턴시 아시스 옆으로 위치이동까지 걸리는 시간  화면밖에나간후 n초뒤 아시스옆 생성
 	float stunRespawnElapsedTime = 0.f;
+	bool  OnInvincibility = false; //무적 on off
 	[[Property]]
 	float GracePeriod = 1.0f;       //피격시 무적시간
+	float GracePeriodElpasedTime = 0.f;
 	[[Property]]
 	float ResurrectionRange = 5.f;   //부활가능한 트리거 콜라이더 크기 다른플레이어가 이범위안이면 부활  
 	[[Property]]
@@ -219,6 +228,7 @@ public:
 	float ResurrectionGracePeriod = 3.0f;  //부활시 무적시간
 	bool CheckResurrectionByOther();
 	void Resurrection();
+	bool IsInvincibility() { return OnInvincibility; }
 	bool sucessResurrection = false;  
 	
 	void OnHit(); //히트 애니메이션이 발동될떄만 씀 

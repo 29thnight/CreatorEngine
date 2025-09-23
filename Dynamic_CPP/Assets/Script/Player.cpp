@@ -34,6 +34,7 @@
 #include "EntityMonsterA.h"
 #include "EntityItemHeal.h"
 #include "PlayerState.h"
+#include "SlashEffect.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -56,13 +57,13 @@ void Player::Start()
 		m_animator = player->GetComponent<Animator>();
 	}
 
-	std::string ShootPosObjName = "RangeShootPos";
+	std::string ShootPosTagName = "ShootTag";
 	for (auto& child : childred)
 	{
 		GameObject* childObj = GameObject::FindIndex(child);
 		if (childObj)
 		{
-			if (childObj->RemoveSuffixNumberTag() == ShootPosObjName)
+			if (childObj->m_tag == ShootPosTagName)
 			{
 				shootPosObj = childObj;
 				break;
@@ -238,16 +239,23 @@ void Player::Start()
 
 	ChangeState("Idle");
 
-	auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	/*auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
 	for(auto& meshrenderer : meshrenderers)
 	{
 		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
-	}
+	}*/
 	Debug->Log("Player Start");
+
+	m_maxHP = maxHP;
+	m_currentHP = m_maxHP;
 }
 
 void Player::Update(float tick)
 {
+
+
+
+
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
@@ -327,6 +335,29 @@ void Player::Update(float tick)
 		curveindicator->EnableIndicator(onBombIndicate);
 	}
 
+	///test sehwan
+	/*if(InputManagement->IsKeyDown('V'))
+	{
+		auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+		input->SetControllerVibration(3.f, 1.0, 1.0, 1.0, 1.0);
+	}*/
+
+	if (true == OnInvincibility)
+	{
+		GracePeriodElpasedTime += tick;
+		if (GracePeriod <= GracePeriodElpasedTime)
+		{
+			OnInvincibility = false;
+		}
+		else
+		{
+			//깜빡깜빡 tick당한번 or 0.n초당 규철이가 작성할예정
+		}
+	}
+
+
+
+
 	if (m_animator)
 	{
 		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
@@ -336,93 +367,93 @@ void Player::Update(float tick)
 void Player::LateUpdate(float tick)
 {
 
-	if (isStun)
-	{
-		
-		CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-		auto cam = camComponent->GetCamera();
-		auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-		auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//if (isStun)
+	//{
+	//	
+	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//	auto cam = camComponent->GetCamera();
+	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-		XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-		XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-		float w = XMVectorGetW(clipSpacePos);
-		if (w < 0.001f) {
-			// 원래 위치 반환.
-			GetOwner()->m_transform.SetPosition(worldpos);
-			return;
-		}
-		XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//	float w = XMVectorGetW(clipSpacePos);
+	//	if (w < 0.001f) {
+	//		// 원래 위치 반환.
+	//		GetOwner()->m_transform.SetPosition(worldpos);
+	//		return;
+	//	}
+	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-		float x = XMVectorGetX(ndcPos);
-		float y = XMVectorGetY(ndcPos);
-		x = abs(x);
-		y = abs(y);
+	//	float x = XMVectorGetX(ndcPos);
+	//	float y = XMVectorGetY(ndcPos);
+	//	x = abs(x);
+	//	y = abs(y);
 
-		float clamp_limit = 0.9f;
-		if (x < clamp_limit && y < clamp_limit)
-		{
-			return;
-		}
+	//	float clamp_limit = 0.9f;
+	//	if (x < clamp_limit && y < clamp_limit)
+	//	{
+	//		return;
+	//	}
+	//	{
+	//		//이미화면밖임
+	//		stunRespawnElapsedTime += tick;
+	//		if (stunRespawnTime <= stunRespawnElapsedTime)
+	//		{
 
-		{
-			//이미화면밖임
-			stunRespawnElapsedTime += tick;
-			if (stunRespawnTime <= stunRespawnElapsedTime)
-			{
-				auto& asiss = GM->GetAsis();
-				if (!asiss.empty())
-				{
-					auto asis = asiss[0]->GetOwner();
-					Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-					Mathf::Vector3 asisForward = asis->m_transform.GetForward();
+	//			auto& asiss = GM->GetAsis();
+	//			if (!asiss.empty())
+	//			{
+	//				auto asis = asiss[0]->GetOwner();
+	//				Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+	//				Mathf::Vector3 asisForward = asis->m_transform.GetForward();
 
-					Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{5, 0, 5};
+	//				Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{5, 0, 5};
 
-					GetOwner()->m_transform.SetPosition(newWorldPos);
-					stunRespawnElapsedTime = 0;
-				}
-			}
-		}
-	}
-	else
-	{
-		CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-		auto cam = camComponent->GetCamera();
-		auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-		auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//				GetOwner()->m_transform.SetPosition(newWorldPos);
+	//				stunRespawnElapsedTime = 0;
+	//			}
+	//		}
+	//	}
+	//}
+	//else
+	//{
+	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//	auto cam = camComponent->GetCamera();
+	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-		XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-		XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-		float w = XMVectorGetW(clipSpacePos);
-		if (w < 0.001f) {
-			// 원래 위치 반환.
-			GetOwner()->m_transform.SetPosition(worldpos);
-			return;
-		}
-		XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//	float w = XMVectorGetW(clipSpacePos);
+	//	if (w < 0.001f) {
+	//		// 원래 위치 반환.
+	//		GetOwner()->m_transform.SetPosition(worldpos);
+	//		return;
+	//	}
+	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-		float x = XMVectorGetX(ndcPos);
-		float y = XMVectorGetY(ndcPos);
-		x = abs(x);
-		y = abs(y);
+	//	float x = XMVectorGetX(ndcPos);
+	//	float y = XMVectorGetY(ndcPos);
+	//	x = abs(x);
+	//	y = abs(y);
 
-		float clamp_limit = 0.9f;
-		if (x < clamp_limit && y < clamp_limit)
-		{
-			return;
-		}
+	//	float clamp_limit = 0.9f;
+	//	if (x < clamp_limit && y < clamp_limit)
+	//	{
+	//		return;
+	//	}
 
-		XMVECTOR clampedNdcPos = XMVectorClamp(
-			ndcPos,
-			XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-			XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-		);
-		XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-		XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+	//	XMVECTOR clampedNdcPos = XMVectorClamp(
+	//		ndcPos,
+	//		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+	//		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	//	);
+	//	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	//	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-		GetOwner()->m_transform.SetPosition(newWorldPos);
-	}
+	//	GetOwner()->m_transform.SetPosition(newWorldPos);
+	//}
 	
 }
 
@@ -435,13 +466,12 @@ void Player::SendDamage(Entity* sender, int damage)
 	if (sender)
 	{
 		
-		auto enemy = dynamic_cast<EntityEnemy*>(sender);
-		if (enemy)
-		{
-			// hit
-			DropCatchItem();
-			Damage(damage);
-		}
+		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
+		// hit
+		//DropCatchItem();
+		
+		Damage(damage);
+		std::cout << m_currentHP << std::endl;
 	}
 }
 
@@ -603,35 +633,38 @@ void Player::UpdateChatchObject()
 	//&&&&& 포지션 소켓에 붙여서 옮겨야 할수도
 	catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 	//asis와 거리계속 갱신
-	auto& asiss = GM->GetAsis();
-	if (!asiss.empty())
+	if (GM)
 	{
-		auto asis = asiss[0]->GetOwner();
-		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-		Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-		Mathf::Vector3 directionToAsis = asisPos - myPos;
-		float distance = directionToAsis.Length();
-		directionToAsis.Normalize();
-
-		float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-		if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
+		auto& asiss = GM->GetAsis();
+		if (!asiss.empty())
 		{
-			onIndicate = true;
+			auto asis = asiss[0]->GetOwner();
+			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+			Mathf::Vector3 directionToAsis = asisPos - myPos;
+			float distance = directionToAsis.Length();
+			directionToAsis.Normalize();
 
-			if (Indicator)
+			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
 			{
-				auto curveindicator = Indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);
-				curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+				onIndicate = true;
+
+				if (Indicator)
+				{
+					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+					curveindicator->EnableIndicator(onIndicate);
+					curveindicator->SetIndicator(myPos, asisPos, ThrowPowerY);
+				}
 			}
-		}
-		else
-		{
-			onIndicate = false;
-			if (Indicator)
+			else
 			{
-				auto curveindicator = Indicator->GetComponent<CurveIndicator>();
-				curveindicator->EnableIndicator(onIndicate);
+				onIndicate = false;
+				if (Indicator)
+				{
+					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
+					curveindicator->EnableIndicator(onIndicate);
+				}
 			}
 		}
 	}
@@ -671,7 +704,7 @@ void Player::Dash()
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,0,horizontal.z };
 
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetKnockBack(knockbackVeocity);
+ 	controller->TriggerForcedMove(knockbackVeocity);
 	//isDashing = true;
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
@@ -721,6 +754,8 @@ void Player::StartAttack()
 				bombThrowPositionoffset = { 0,0,0 };
 				if (m_animator)
 					m_animator->SetParameter("OnMove", false);
+				if (m_animator)
+					m_animator->SetParameter("OnTargetBomb", true);
 				//현재무기 감추거나 attach떼고 손에붙여서 날아가게?
 			}
 			startAttack = true; 
@@ -808,13 +843,92 @@ float Player::calculDamge(bool isCharge)
 	return finalDamge; //여기에 크리티컬있으면 곱해주기 
 }
 
+void Player::PlaySlashEvent()
+{
+
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
+	if (SlashPrefab)
+	{
+		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
+		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		//현위치에서 offset줘서 정하기
+		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		float effectOffset = 2.f;
+		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
+		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+
+
+		Mathf::Vector3 up = Mathf::Vector3::Up;
+		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
+		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
+
+		//Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(180.f));
+		//Quaternion finalRot = rot * lookRot;
+		SlashObj->GetComponent<Transform>()->SetRotation(lookRot);
+
+
+		Slashscript->Initialize();
+	}
+
+
+}
+
+void Player::PlaySlashEvent2()
+{
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect2");
+	if (SlashPrefab)
+	{
+		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
+		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		//현위치에서 offset줘서 정하기
+		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		float effectOffset = 2.f;
+		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
+		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+
+
+		Mathf::Vector3 up = Mathf::Vector3::Up;
+		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
+		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
+
+		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
+		Quaternion finalRot = rot * lookRot;
+		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
+
+		Slashscript->Initialize();
+	}
+}
+
+void Player::PlaySlashEvent3()
+{
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect3");
+	if (SlashPrefab)
+	{
+		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
+		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		//현위치에서 offset줘서 정하기
+		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
+		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+		//float effectOffset = 1.f;
+		Mathf::Vector3 effectPos = myPos;
+		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+
+
+
+
+		Slashscript->Initialize();
+	}
+}
+
 bool Player::CheckResurrectionByOther()
 {
 
 	std::vector<HitResult> hits;
 	OverlapInput reviveInfo;
 	Transform transform = GetOwner()->m_transform;
-	reviveInfo.layerMask = 1u; //&&&&& Player만 체크하게 바꾸기
+	reviveInfo.layerMask = 1 << 5; //&&&&& Player만 체크하게 바꾸기
 	reviveInfo.position = transform.GetWorldPosition();
 	reviveInfo.rotation = transform.GetWorldQuaternion();
 	PhysicsManagers->SphereOverlap(reviveInfo, ResurrectionRange, hits);
@@ -844,7 +958,6 @@ void Player::Resurrection()
 
 void Player::OnHit()
 {
-	DropCatchItem();
 	if (m_animator)
 	{
 		m_animator->SetParameter("OnHit", true);
@@ -858,7 +971,7 @@ void Player::Knockback(Mathf::Vector2 _KnockbackForce)
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,_KnockbackForce.y ,horizontal.z };
 
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetKnockBack(knockbackVeocity);
+	controller->TriggerForcedMove(knockbackVeocity);
 }
 
 void Player::SwapWeaponLeft()
@@ -881,13 +994,19 @@ void Player::SwapWeaponLeft()
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
-		startAttack = false;
-		isAttacking = false;
-		m_chargingTime = 0;
-		isCharging = false;
+		onBombIndicate = false;
 		m_comboCount = 0;
 
-		onBombIndicate = false;  
+		/*startAttack = false;
+		isAttacking = false;
+		m_chargingTime = 0;
+		isCharging = false;*/
+
+		CancelChargeAttack();
+
+		
+
+		
 
 		LOG("Swap Left" + std::to_string(m_weaponIndex));
 	}
@@ -918,12 +1037,15 @@ void Player::SwapWeaponRight()
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
-		startAttack = false;
+		onBombIndicate = false;
+		m_comboCount = 0;
+
+		/*startAttack = false;
 		isAttacking = false;
 		m_chargingTime = 0;
-		isCharging = false;
-		m_comboCount = 0;
-		onBombIndicate = false;
+		isCharging = false;*/
+
+		CancelChargeAttack(); 
 
 		LOG("Swap Right" + std::to_string(m_weaponIndex));
 	}
@@ -1055,11 +1177,21 @@ void Player::Cancancel()
 	m_comboCount = (m_comboCount + 1) % maxCombo;
 }
 
+void Player::CancelChargeAttack()
+{
+	startAttack = false;
+	isAttacking = false;
+	m_chargingTime = 0;
+	isCharging = false;
+}
+
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
 	m_controller->Move({ 0,0 });
-	bombThrowPositionoffset.x += dir.x;
-	bombThrowPositionoffset.z += dir.y;
+	float offsetX = bombMoveSpeed * dir.x;
+	float offsetZ = bombMoveSpeed * dir.y;
+	bombThrowPositionoffset.x += offsetX;
+	bombThrowPositionoffset.z += offsetZ;
 
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	bombThrowPosition = pos + bombThrowPositionoffset;
@@ -1090,7 +1222,7 @@ void Player::MeleeAttack()
 	}
 	float damage = calculDamge(isChargeAttack);
 
-	unsigned int layerMask = 1 << 0 | 1 << 3 | 1 << 4;
+	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10;
 
 	int size = RaycastAll(rayOrigin, direction, distacne, layerMask, hits);
 
@@ -1134,7 +1266,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1u; //일단 다떄림
+	RangeInfo.layerMask = 1 << 8 | 1 << 10;; //일단 다떄림
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();
@@ -1380,7 +1512,7 @@ void Player::TestHit()
 	Mathf::Vector3 horizontal = -forward * testHitPowerX;
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,testHitPowerY ,horizontal.z };
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetKnockBack(knockbackVeocity);
+	controller->TriggerForcedMove(knockbackVeocity);
 	//넉백이 끝날떄까지 x z testHitPowerX  // y testHitPowerY;
 
 }

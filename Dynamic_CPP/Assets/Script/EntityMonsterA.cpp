@@ -47,7 +47,6 @@ void EntityMonsterA::Start()
 		}
 	}
 
-	m_pOwner->m_collisionType = 3;
 
 	for (auto& child : childred)
 	{
@@ -149,7 +148,7 @@ void EntityMonsterA::Update(float tick)
 		sweepInput.startRotation = SimpleMath::Quaternion::Identity;
 		sweepInput.distance = m_attackRange;
 		sweepInput.direction = m_pOwner->m_transform.GetForward();
-
+		sweepInput.layerMask = 1 << 5 | 1 << 7;
 		SimpleMath::Vector3 boxHalfExtents = { 0.5f,0.5f,0.5f };
 		std::vector<HitResult> hitResults;
 		int count = PhysicsManagers->BoxSweep(sweepInput, boxHalfExtents, hitResults);
@@ -160,7 +159,7 @@ void EntityMonsterA::Update(float tick)
 					|| hit.gameObject->GetHashedName().ToString()== player2->GetHashedName().ToString()) //player
 				{
 					std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-					auto entity = hit.gameObject->GetComponent<Entity>();
+					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();
 					if (entity) {
 						entity->SendDamage(this, m_attackDamage);	
 					}
@@ -174,6 +173,18 @@ void EntityMonsterA::Update(float tick)
 		m_state = "Attack";
 	}
 	
+	if (isDead)
+	{
+		Dead();
+	}
+	if (EndDeadAnimation)
+	{
+		deadElapsedTime += tick;
+		if (deadDestroyTime <= deadElapsedTime)
+		{
+			GetOwner()->Destroy();
+		}
+	}
 
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
@@ -197,6 +208,8 @@ void EntityMonsterA::Update(float tick)
 	}
 
 }
+
+
 
 void EntityMonsterA::AttackBoxOn()
 {
@@ -238,7 +251,16 @@ void EntityMonsterA::ChaseTarget()
 void EntityMonsterA::Dead()
 {
 	m_animator->SetParameter("Dead", true);
+	GetOwner()->SetLayer("Water");
 	//todo : Dead entity remove or disable
+}
+
+
+void EntityMonsterA::DeadEvent()
+{
+	EndDeadAnimation = true;
+	//GetOwner()->Destroy(); //&&&&&풀에 넣기
+	//monster death Effect 생성
 }
 
 void EntityMonsterA::RotateToTarget()
@@ -268,7 +290,6 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage)
 	if (sender)
 	{
 		auto player = dynamic_cast<Player*>(sender);
-		//CurrHP - damae;
 		if (player)
 		{
 			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
@@ -295,27 +316,7 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage)
 
 
 
-			/*크리티컬 마크 이펙트
-			int playerIndex = player->playerIndex;
-			m_currentHP -= std::max(damage, 0);
-			if (true == criticalMark.TryCriticalHit(playerIndex))
-			{
-				if (markEffect)
-				{
-					if (criticalMark.markIndex == 0)
-					{
-						markEffect->PlayEffectByName("red");
-					}
-					else if (criticalMark.markIndex == 1)
-					{
-						markEffect->PlayEffectByName("blue");
-					}
-					else
-					{
-						markEffect->StopEffect();
-					}
-				}
-			}*/
+			
 
 
 			if (m_currentHP <= 0)

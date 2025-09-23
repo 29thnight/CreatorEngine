@@ -14,22 +14,231 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 1,
+                    "animationIndex": 2,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Idle",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Dead"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Dead",
+                            "transName": "Idle to Dead"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 1,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Attack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Atteck",
+                            "transName": "Idle to Atteck"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Move"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Move",
+                            "transName": "Idle to Move"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangeAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeAttack",
+                            "transName": "Idle to RangeAttack"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Dead",
                     "transitions": [],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "MosterMeleeAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Atteck",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Dead"
+                                }
+                            ],
+                            "curStateName": "Atteck",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Dead",
+                            "transName": "Atteck to Dead"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Atteck",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Atteck to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 3,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Move",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Dead"
+                                }
+                            ],
+                            "curStateName": "Move",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Dead",
+                            "transName": "Move to Dead"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 5,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Move"
+                                }
+                            ],
+                            "curStateName": "Move",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Move to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 3,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeAttack",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "RangeAttack",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "RangeAttack to Idle"
+                        }
+                    ],
                     "useMultipler": 0
                 }
             ],
-            "controller_name": "MonsterB0",
+            "controller_name": "NewLayer0",
             "m_curState": "Idle",
             "useController": 1,
-            "useMask": 1
+            "useMask": 0
         }
     ],
-    "Parameters": []
+    "Parameters": [
+        {
+            "param_name": "Move",
+            "param_vType": 2
+        },
+        {
+            "param_name": "Attack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "RangeAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "Dead",
+            "param_vType": 3
+        }
+    ]
 }

@@ -6,7 +6,7 @@ ReflectionScriptField(Bomb) \
 	PropertyField \
 	({ \
 		meta_property(throwSpeed) \
-		meta_property(throwPowerY) \
+		meta_property(m_throwPowerY) \
 		meta_property(duration) \
 	}); \
 	FieldEnd(Bomb, PropertyOnly) \

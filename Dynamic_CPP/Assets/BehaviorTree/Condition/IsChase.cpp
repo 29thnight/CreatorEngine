@@ -76,7 +76,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	}
 
 
-	//LOG("closed Target Out ranage");
+	LOG("closed Target Out ranage");
 
 	return false;
 }

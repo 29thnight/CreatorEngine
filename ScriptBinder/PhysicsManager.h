@@ -170,6 +170,16 @@ public:
 	bool IsRigidBodyColliderEnabled(unsigned int id) const;
 	bool IsRigidBodyUseGravity(unsigned int id) const;
 
+
+	// 지정된 CCT에 강제 이동을 시작시킵니다.
+	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity);
+
+	// 지정된 CCT의 강제 이동을 중지시킵니다.
+	void StopForcedMoveOnCCT(UINT controllerId);
+
+	// 지정된 CCT가 현재 강제 이동 중인지 확인합니다.
+	bool IsInForcedMove(UINT controllerId) const;
+
 	// CharacterController의 위치를 강제로 설정하는 인터페이스 (이제 큐에 작업을 추가합니다)
 	void SetControllerPosition(UINT id, const DirectX::SimpleMath::Vector3& pos);
 
@@ -246,8 +256,6 @@ private:
 	};
 	std::vector<PendingControllerPosition> m_pendingControllerPositions;
 	void ApplyPendingControllerPositionChanges(); // 펜딩된 CCT 위치 변경을 적용하는 함수
-
-
 	
 	//물리엔진 객체
 	//std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;

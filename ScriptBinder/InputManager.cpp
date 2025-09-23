@@ -29,7 +29,7 @@ void InputManager::Update(float deltaTime)
     KeyBoardUpdate();
     MouseUpdate();
     GamePadUpdate();
- 
+    UpdateControllerVibration(deltaTime);
 }
 
 void InputManager::KeyBoardUpdate()
@@ -355,12 +355,11 @@ void InputManager::UpdateControllerVibration(float tick)
     		if (m_controllerVibrationTime[i] > 0.0f)
     		{
     			m_controllerVibrationTime[i] -= tick;
-    			//SetControllerVibration(i, _controllerVibration[i].wLeftMotorSpeed, _controllerVibration[i].wRightMotorSpeed);
-    			SetControllerVibration(i, 0.5f, 0.5f,0.5f, 0.5f);
     		}
     		else
     		{
-    			SetControllerVibration(i, 0.5f, 0.5f, 0.5f, 0.5f);
+                GameInputRumbleParams vibration = {};
+                device[i]->SetRumbleState(&vibration);
     		}
     	}
     }

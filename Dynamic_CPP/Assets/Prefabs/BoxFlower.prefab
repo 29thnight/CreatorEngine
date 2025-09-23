@@ -1,33 +1,33 @@
 m_name: BoxFlower
 m_isEnabled: true
-m_instanceID: 2253429532
+m_instanceID: 3591503897
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: BoxFlower
     m_isEnabled: true
-    m_instanceID: 13103867
+    m_instanceID: 4146643106
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 4
+    m_index: 3
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [5]
+    m_childrenIndices: [4]
     m_prefabFileGuid: 33f233b8-1507-5e1e-89b9-14007244931a
     m_attachedSoketID: 0
-    m_collisionType: 1
+    m_collisionType: 9
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
-    m_layer: Default
+    m_layer: Entityitem
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1019825761
+        m_instanceID: 3089708219
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 2696950573
+        m_instanceID: 75496359
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.300000012, y: 0.300000012, z: 0.300000012}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -54,21 +54,21 @@ PrefabNode:
         healAmount: 10
         m_name: EntityItemHeal
         m_isEnabled: true
-        m_instanceID: 3829106848
+        m_instanceID: 4142518187
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 1c8b5983-b84f-5ef9-bb70-55b5f4e0776a
     children:
       - GameObject: 2166264123
         m_name: Obj_Inter_flower_low
         m_isEnabled: true
-        m_instanceID: 777940755
+        m_instanceID: 2805899993
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 4
-        m_index: 5
-        m_parentIndex: 4
+          m_parentID: 3
+        m_index: 4
+        m_parentIndex: 3
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 33f233b8-1507-5e1e-89b9-14007244931a
@@ -82,7 +82,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 4191659233
+            m_instanceID: 1955262927
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Material

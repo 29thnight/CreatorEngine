@@ -27,7 +27,6 @@ cbuffer MatrixBuffer : register(b12)
 {
     matrix viewMat;
     matrix projMat;
-    float dior;
     float dadd;
 };
 
@@ -46,6 +45,7 @@ cbuffer PBRMaterial : register(b0)
     int gConvertToLinear;
 
     uint bitflag;
+    float gIOR;
 }
 
 cbuffer ForwardCBuffer : register(b3)
@@ -208,9 +208,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         float3 view = -surf.V;
         float3 refractionColor;
     
-        refractionColor.r = Refraction(IN.wPosition.xyz, view, surf.N, dior).r;
-        refractionColor.g = Refraction(IN.wPosition.xyz, view, surf.N, dior + dadd).g;
-        refractionColor.b = Refraction(IN.wPosition.xyz, view, surf.N, dior + (dadd * 2)).b;
+        refractionColor.r = Refraction(IN.wPosition.xyz, view, surf.N, 1 / gIOR).r;
+        refractionColor.g = Refraction(IN.wPosition.xyz, view, surf.N, 1 / (gIOR + dadd)).g;
+        refractionColor.b = Refraction(IN.wPosition.xyz, view, surf.N, 1 / (gIOR + dadd * 2)).b;
         
         float3 transmissionColor = refractionColor * albedo.rgb;
         

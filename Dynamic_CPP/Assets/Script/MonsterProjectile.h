@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "Entity.h"
 
 class MonsterProjectile : public ModuleBehavior
 {
@@ -20,6 +21,11 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	Entity* m_owner;
+
+	float m_radius;
+	int m_damege;
+
 	bool isInitialize = false;
 	bool m_isMoving = false;
 	Mathf::Vector3 m_startPos;
@@ -29,7 +35,7 @@ public:
 	float m_elapsedTime;
 
 
-	void Initialize(Mathf::Vector3 startPos, Mathf::Vector3 controlPos, Mathf::Vector3 endPos,float calculatedDuration);
+	void Initialize(Entity* owner,float radius,int damege,Mathf::Vector3 startPos, Mathf::Vector3 controlPos, Mathf::Vector3 endPos,float calculatedDuration);
 	Mathf::Vector3 CalculateBezierPoint(float t, const Mathf::Vector3& p0, const Mathf::Vector3& p1, const Mathf::Vector3& p2);
 
 };

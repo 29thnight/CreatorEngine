@@ -202,6 +202,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	}
 
 	//LOG("Idle action executed.");
+	std::cout << "Idle action executed." << std::endl;
 
 	return NodeStatus::Success;
 }

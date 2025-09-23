@@ -2,7 +2,6 @@
 #include "ItemUIIcon.h"
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"
-#include "Easing.h"
 #include "Texture.h"
 #include "pch.h"
 void ItemUIPopup::Start()
@@ -19,6 +18,7 @@ void ItemUIPopup::Start()
 
 void ItemUIPopup::Update(float tick)
 {
+	using namespace Mathf;
 	//TODO : itemManager를 통해서 m_iconObj를 받아오도록 변경 필요
 	if (!m_rect || !m_iconObj || !m_icon || !m_image || !m_iconRect) return;
 
