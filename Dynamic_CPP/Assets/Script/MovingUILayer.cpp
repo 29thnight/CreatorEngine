@@ -1,48 +1,66 @@
 #include "MovingUILayer.h"
+#include "PlayerSelector.h"
 #include "RectTransformComponent.h"
+#include "Core.Mathf.h"
 #include "pch.h"
 
 void MovingUILayer::Start()
 {
-	m_movingTarget = GetComponent<RectTransformComponent>();
-	if(!m_movingTarget)
-	{
-		return;
-	}
+	if (!iconRect) iconRect = m_pOwner->GetComponent<RectTransformComponent>();
 
-	pos = m_movingTarget->GetAnchoredPosition();
-	m_baseY = pos.y;
+	// PlayerSelector 구독
+	if (auto* gm = GameObject::Find("GameManager"))
+	{
+		m_selector = gm->GetComponent<PlayerSelector>();
+		if (m_selector) 
+		{
+			m_selector->RegisterObserver(this);
+			// Start 시점 초기 위치를 중립으로 맞춤(원하면 현재 위치 유지)
+			if (iconRect) iconRect->SetAnchoredPosition(neutralPos);
+			m_curSlot = SelectorSlot::Neutral;
+		}
+	}
 }
 
 void MovingUILayer::Update(float tick)
 {
-	if (!m_movingTarget) return;
+	if (!m_animating || !iconRect) return;
 
-	m_elapsedTime += tick;
+	m_elapsed += tick;
+	float t = std::clamp(m_elapsed / std::max(duration, 0.0001f), 0.f, 1.f);
 
-	if (!m_active && m_elapsedTime >= m_waitTick)
-	{
-		m_active = true;
-		m_elapsedTime = 0;
+	float alpha = useEaseOutQuad ? Mathf::Easing::EaseOutQuad(t) : t;
+
+	const float x = Mathf::Lerp(m_startPos.x, m_targetPos.x, alpha);
+	const float y = Mathf::Lerp(m_startPos.y, m_targetPos.y, alpha);
+	iconRect->SetAnchoredPosition({ x, y });
+
+	if (t >= 1.f) {
+		m_animating = false;
+		iconRect->SetAnchoredPosition(m_targetPos);
 	}
+}
 
-	if (m_active)
-	{
-		const float totalDist = 2.f * offset;
-		const float duration = totalDist / m_movingSpeed;
+void MovingUILayer::OnDestroy()
+{
+}
 
-		if (m_elapsedTime >= duration)
-		{
-			m_elapsedTime = 0;
-			m_active = false;
-		}
+void MovingUILayer::OnSelectorChanged(const SelectorState& state)
+{
+	if (!iconRect) return;
+	if (state.playerIndex != playerIndex) return;
 
-		const float phase = m_elapsedTime / duration;
-		const float tri = 1.f - fabsf(2.f * phase - 1.f);
+	// 목표 좌표 결정
+	const Mathf::Vector2 target = SlotToPos(state.slot);
 
-		pos.y = m_baseY + offset * tri;
+	// 동일한 목표면 무시(불필요한 트윈 방지)
+	if (target == m_targetPos && !m_animating) return;
 
-		m_movingTarget->SetAnchoredPosition(pos);
-	}
+	// 트윈 초기화
+	m_startPos = iconRect->GetAnchoredPosition();
+	m_targetPos = target;
+	m_elapsed = 0.f;
+	m_animating = true;
+	m_curSlot = state.slot;
 }
 
