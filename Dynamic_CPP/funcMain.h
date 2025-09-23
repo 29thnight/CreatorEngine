@@ -315,6 +315,7 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerBombCharing", []() { return new PlayerBombCharing(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerHit", []() { return new PlayerHit(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerDash", []() { return new PlayerDash(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerStun", []() { return new PlayerStun(); });
