@@ -20,7 +20,7 @@
 #include "Animation.h"
 #include "Canvas.h"
 #include "UIManager.h"
-
+	
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -95,7 +95,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     if (component)
     {
         using namespace TypeTrait;
-        if (componentType->typeID == type_guid(MeshRenderer))
+		HashedGuid typeID = componentType->typeID;
+        if		(typeID == type_guid(MeshRenderer))
         {
 			std::string materialName{};
             auto meshRenderer = static_cast<MeshRenderer*>(component);
@@ -131,6 +132,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                         Meta::Deserialize(meshRenderer->m_Material, materialNode);
                         if (!materialName.empty())
                             meshRenderer->m_Material->m_name = materialName;
+
+						if (meshRenderer->m_Material->m_materialInfo.m_IOR < 0.0f)
+						{
+							meshRenderer->m_Material->m_materialInfo.m_IOR = 1.5f;
+						}
 
                         auto loadTex = [](const std::string& texName, Texture*& texPtr, bool compress = false)
                         {
@@ -180,7 +186,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);
         }
-		else if (componentType->typeID == type_guid(Animator))
+		else if (typeID == type_guid(Animator))
 		{
 			auto animator = static_cast<Animator*>(component);
 			Meta::Deserialize(animator, itNode);
@@ -350,21 +356,21 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 		}
-		else if (componentType->typeID == type_guid(LightComponent))
+		else if (typeID == type_guid(LightComponent))
 		{
 			auto lightComponent = static_cast<LightComponent*>(component);
             Meta::Deserialize(lightComponent, itNode);
 			lightComponent->SetOwner(obj);
 			lightComponent->SetEnabled(true);
 		}
-		else if (componentType->typeID == type_guid(CameraComponent))
+		else if (typeID == type_guid(CameraComponent))
 		{
 			auto cameraComponent = static_cast<CameraComponent*>(component);
 			Meta::Deserialize(cameraComponent, itNode);
 			cameraComponent->SetOwner(obj);
 			cameraComponent->SetEnabled(true);
 		}
-		else if (componentType->typeID == type_guid(SpriteRenderer))
+		else if (typeID == type_guid(SpriteRenderer))
 		{
 			auto spriteRenderer = static_cast<SpriteRenderer*>(component);
 			std::shared_ptr<Texture> texture = nullptr;
@@ -382,25 +388,25 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			}
 
 		}
-		else if (componentType->typeID == type_guid(RigidBodyComponent))
+		else if (typeID == type_guid(RigidBodyComponent))
 		{
 			auto rigidBody = static_cast<RigidBodyComponent*>(component);
 			Meta::Deserialize(rigidBody, itNode);
 			rigidBody->SetOwner(obj);
 		}
-		else if (componentType->typeID == type_guid(BoxColliderComponent))
+		else if (typeID == type_guid(BoxColliderComponent))
 		{
 			auto boxCollider = static_cast<BoxColliderComponent*>(component);
 			Meta::Deserialize(boxCollider, itNode);
 			boxCollider->SetOwner(obj);
 		}
-		else if (componentType->typeID == type_guid(CharacterControllerComponent))
+		else if (typeID == type_guid(CharacterControllerComponent))
 		{
 			auto characterController = static_cast<CharacterControllerComponent*>(component);
 			Meta::Deserialize(characterController, itNode);
 			characterController->SetOwner(obj);
 		}
-		else if (componentType->typeID == type_guid(FoliageComponent))
+		else if (typeID == type_guid(FoliageComponent))
 		{
 			auto foliage = static_cast<FoliageComponent*>(component);
 
@@ -466,7 +472,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			foliage->SetOwner(obj);
 			foliage->SetEnabled(true);
 		}
-		else if(componentType->typeID == type_guid(TerrainComponent))
+		else if (typeID == type_guid(TerrainComponent))
 		{
 			auto terrain = static_cast<TerrainComponent*>(component);
 			Meta::Deserialize(terrain, itNode);
@@ -486,13 +492,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				Debug->LogError("Terrain component is missing m_trrainAssetGuid");
 			}
 		}
-		else if (componentType->typeID == type_guid(BehaviorTreeComponent))
+		else if (typeID == type_guid(BehaviorTreeComponent))
 		{
 			auto behaviorTree = static_cast<BehaviorTreeComponent*>(component);
 			Meta::Deserialize(behaviorTree, itNode);
 			behaviorTree->SetOwner(obj);
 		}
-		else if (componentType->typeID == type_guid(PlayerInputComponent))
+		else if (typeID == type_guid(PlayerInputComponent))
 		{
 			auto playerinput = static_cast<PlayerInputComponent*>(component);
 			Meta::Deserialize(playerinput, itNode);
@@ -500,14 +506,14 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 			//playerinput->SetActionMap(playerinput->m_actionMapName);
 		}
-		else if (componentType->typeID == type_guid(Canvas))
+		else if (typeID == type_guid(Canvas))
 		{
 			auto canvas = static_cast<Canvas*>(component);
 			Meta::Deserialize(canvas, itNode);
 			canvas->SetOwner(obj);
 			UIManagers->AddCanvas(obj->shared_from_this());
 		}
-		else if (componentType->typeID == type_guid(ImageComponent))
+		else if (typeID == type_guid(ImageComponent))
 		{
 			auto image = static_cast<ImageComponent*>(component);
 			Meta::Deserialize(image, itNode);
@@ -559,7 +565,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			}
 
 		}
-		else if (componentType->typeID == type_guid(TextComponent))
+		else if (typeID == type_guid(TextComponent))
 		{
 			auto text = static_cast<TextComponent*>(component);
 			Meta::Deserialize(text, itNode);
@@ -600,7 +606,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			//text->DeserializeNavi();
 			text->DeserializeShader();
 		}
-		else if (componentType->typeID == type_guid(SpriteSheetComponent))
+		else if (typeID == type_guid(SpriteSheetComponent))
 		{
 			auto spriteSheet = static_cast<SpriteSheetComponent*>(component);
 			Meta::Deserialize(spriteSheet, itNode);
