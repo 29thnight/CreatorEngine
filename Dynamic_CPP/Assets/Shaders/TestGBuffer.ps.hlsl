@@ -31,6 +31,7 @@ cbuffer PBRMaterial : register(b0)
     int gConvertToLinear;
     
     uint bitflag;
+    float gIOR;
 }
 
 cbuffer TimeBuffer : register(b5)
