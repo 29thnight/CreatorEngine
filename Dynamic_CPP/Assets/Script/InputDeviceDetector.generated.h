@@ -10,6 +10,7 @@ ReflectionScriptField(InputDeviceDetector) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(SetSlot, "slot") \
 		meta_method(MoveSelector, "dir") \
 	}); \
 	FieldEnd(InputDeviceDetector, PropertyAndMethod) \

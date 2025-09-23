@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "t1",
+    "name": "4",
     "particleSystems": [
         {
             "isRunning": true,
@@ -19,9 +19,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
+                                "x": 0.20000000298023224,
                                 "y": 1.0,
-                                "z": 1.0
+                                "z": 0.20000000298023224
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -37,7 +37,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 28.0
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -98,10 +98,13 @@
                         },
                         "mesh": {
                             "meshIndex": 0,
-                            "type": 1
+                            "type": 3
                         },
                         "model": {
-                            "hasModel": false
+                            "assigned": true,
+                            "hasModel": true,
+                            "meshIndex": 0,
+                            "name": "Daodantou"
                         },
                         "renderState": {
                             "instanceCount": 1
@@ -118,7 +121,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "123",
+                                "name": "wenli",
                                 "slot": 0
                             }
                         ]
