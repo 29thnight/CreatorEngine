@@ -59,7 +59,6 @@
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DLLRefHelper.h" />
     <ClInclude Include="DumpHandler.h" />
-    <ClInclude Include="Easing.h" />
     <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="HashingString.h" />

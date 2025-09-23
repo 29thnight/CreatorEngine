@@ -112,7 +112,8 @@ public:
 	void SetCharacterMovementMaxSpeed(const CharactorControllerInputInfo& info,float maxSpeed);
 	void SetVelocity(const CharactorControllerInputInfo& info, DirectX::SimpleMath::Vector3 velocity);
 	//강제 이동
-	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType);
+	//void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType);
+	void ApplyForcedMoveToCCT(UINT controllerId, const DirectX::SimpleMath::Vector3& initialVelocity, float duration);
 	//강제 이동 중지
 	void StopForcedMoveOnCCT(UINT controllerId);
 	bool IsInForcedMove(UINT controllerId) const;

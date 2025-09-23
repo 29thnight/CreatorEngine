@@ -64,21 +64,22 @@ void CharacterController::Update(float deltaTime)
 			{
 				StopForcedMove();
 			}
-			else
-			{
-				if (m_currentCurveType == static_cast<int>(Easing::EasingType::Linear)) { /* Easing 사용 안함 */ }
-				else // 커브 적용
-				{
-					float progress = 1.0f - (m_forcedMoveTimer / m_forcedMoveTotalDuration);
-					float easeValue = Easing::EasingFunction[m_currentCurveType](progress);
-					DirectX::SimpleMath::Vector3 initialXZ = { m_forcedMoveInitialVelocity.x, 0, m_forcedMoveInitialVelocity.z };
-					DirectX::SimpleMath::Vector3 currentXZ = DirectX::SimpleMath::Vector3::Lerp(initialXZ, DirectX::SimpleMath::Vector3::Zero, easeValue);
-					m_forcedMoveCurrentVelocity.x = currentXZ.x;
-					m_forcedMoveCurrentVelocity.z = currentXZ.z;
-				}
-			}
+			//else
+			//{
+			//	if (m_currentCurveType == 0) { /* Easing 사용 안함 */ }
+			//	else // 커브 적용
+			//	{
+			//		float progress = 1.0f - (m_forcedMoveTimer / m_forcedMoveTotalDuration);
+			//		float easeValue = Mathf::Easing::EaseOutSine(progress); //일단 사인 받자 함수 선택 가능시 변경
+			//		DirectX::SimpleMath::Vector3 initialXZ = { m_forcedMoveInitialVelocity.x, 0, m_forcedMoveInitialVelocity.z };
+			//		DirectX::SimpleMath::Vector3 currentXZ = DirectX::SimpleMath::Vector3::Lerp(initialXZ, DirectX::SimpleMath::Vector3::Zero, easeValue);
+			//		m_forcedMoveCurrentVelocity.x = currentXZ.x;
+			//		m_forcedMoveCurrentVelocity.z = currentXZ.z;
+			//	}
+			//}
 		}
 
+		m_forcedMoveCurrentVelocity.y -= m_gravityWeight * deltaTime;
 		currentFrameVelocity = physx::PxVec3(m_forcedMoveCurrentVelocity.x, m_forcedMoveCurrentVelocity.y, m_forcedMoveCurrentVelocity.z);
 	}
 	else
@@ -173,14 +174,22 @@ bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, 
 	//
 }
 
-void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType)
+//void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType)
+//{
+//	m_isForcedMoveActive = true;
+//	m_forcedMoveTimer = duration;
+//	m_forcedMoveTotalDuration = duration;
+//	m_currentCurveType = curveType;
+//	m_forcedMoveInitialVelocity = initialVelocity;
+//	m_forcedMoveCurrentVelocity = initialVelocity;
+//}
+
+void CharacterController::StartForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
 {
 	m_isForcedMoveActive = true;
 	m_forcedMoveTimer = duration;
 	m_forcedMoveTotalDuration = duration;
-	m_currentCurveType = curveType;
 	m_forcedMoveInitialVelocity = initialVelocity;
-	m_forcedMoveCurrentVelocity = initialVelocity;
 }
 
 void CharacterController::StopForcedMove()

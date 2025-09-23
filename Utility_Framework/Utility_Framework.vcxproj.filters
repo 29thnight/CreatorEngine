@@ -312,9 +312,6 @@
     <ClInclude Include="Paklib.hpp">
       <Filter>Utility</Filter>
     </ClInclude>
-    <ClInclude Include="Easing.h">
-      <Filter>Utility</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
