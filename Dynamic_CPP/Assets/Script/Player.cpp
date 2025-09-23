@@ -179,6 +179,7 @@ void Player::Start()
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
 
+	m_controller->SetAutomaticRotation(true);
 	player->SetLayer("Player");
 	camera = GameObject::Find("Main Camera");
 
