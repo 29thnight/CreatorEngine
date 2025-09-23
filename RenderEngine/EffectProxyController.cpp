@@ -178,6 +178,7 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 					if (auto* effect = EffectManagers->GetEffectInstance(newInstanceId)) {
 						effect->SetPosition(proxy->GetPosition());
 						effect->SetRotation(proxy->GetRotation());
+						effect->SetScale(proxy->GetScale());
 						effect->SetTimeScale(proxy->GetTimeScale());
 						effect->SetLoop(proxy->GetLoop());
 						effect->SetDuration(proxy->GetDuration());
@@ -199,6 +200,7 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 					if (auto* effect = EffectManagers->GetEffectInstance(resultInstanceId)) {
 						effect->SetPosition(proxy->GetPosition());
 						effect->SetRotation(proxy->GetRotation());
+						effect->SetScale(proxy->GetScale());
 						effect->SetTimeScale(proxy->GetTimeScale());
 						effect->SetLoop(proxy->GetLoop());
 						effect->SetDuration(proxy->GetDuration());

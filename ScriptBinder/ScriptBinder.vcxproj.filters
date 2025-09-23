@@ -652,6 +652,7 @@
     <None Include="Component.inl">
       <Filter>Classes\Components\ComponentBase</Filter>
     </None>
+    <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="GameAi.txt">

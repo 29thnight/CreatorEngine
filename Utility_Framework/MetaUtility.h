@@ -75,4 +75,37 @@ namespace Meta
     {
         return RemoveObjectPrefix(ExtractVectorElementType(ToString<T>()));
     }
+
+    inline static bool IsSharedPtr(std::string_view tn)
+    {
+        return tn.find("std::shared_ptr<") != std::string_view::npos;
+    }
+
+    inline static bool IsWeakPtr(std::string_view tn)
+    {
+        return tn.find("std::weak_ptr<") != std::string_view::npos;
+    }
+
+    inline static bool IsRawPtr(std::string_view tn)
+    {
+        return tn.size() && tn.back() == '*';
+    }
+
+    inline static std::string ExtractPointee(std::string_view tn) {
+        // "std::shared_ptr<Foo>" -> "Foo"
+        // "std::weak_ptr<Foo>"   -> "Foo"
+        // "Foo*"                 -> "Foo"
+        if (IsSharedPtr(tn)) {
+            auto b = tn.find('<'); auto e = tn.rfind('>');
+            return std::string(tn.substr(b + 1, e - b - 1));
+        }
+        if (IsWeakPtr(tn)) {
+            auto b = tn.find('<'); auto e = tn.rfind('>');
+            return std::string(tn.substr(b + 1, e - b - 1));
+        }
+        if (IsRawPtr(tn)) {
+            return std::string(tn.substr(0, tn.size() - 1));
+        }
+        return std::string(tn);
+    }
 }

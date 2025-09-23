@@ -14,10 +14,23 @@ void PlayerSelector::MoveStep(int playerIndex, int step)
     step = (step < 0) ? -1 : (step > 0) ? +1 : 0;
 
     const int curIdx = static_cast<int>(m_slot[playerIndex]);
-    const int nextIdx = std::clamp(curIdx + step, -1, +1);
+    int       nextIdx = std::clamp(curIdx + step, -1, +1);
+    SelectorSlot nextSlot = static_cast<SelectorSlot>(nextIdx);
 
+    // ★ 다른 플레이어가 이미 점유한 좌/우면 이동 금지
+    if (IsSide(nextSlot) && IsOccupiedByOther(nextSlot, playerIndex)) {
+        // 슬롯은 그대로 두고, (원하면) 축 상태만 갱신/통지
+        if (m_axis[playerIndex] != step) {
+            m_axis[playerIndex] = step;
+            SelectorState s{ playerIndex, m_slot[playerIndex], step };
+            //Notify(s); // 선택: 막힘 알림용으로도 사용(효과음 등)
+        }
+        return;
+    }
+
+    // 정상 이동
     if (nextIdx != curIdx || m_axis[playerIndex] != step) {
-        m_slot[playerIndex] = static_cast<SelectorSlot>(nextIdx);
+        m_slot[playerIndex] = nextSlot;
         m_axis[playerIndex] = step;
         SelectorState s{ playerIndex, m_slot[playerIndex], step };
         Notify(s);
@@ -42,12 +55,19 @@ void PlayerSelector::SetAxis(int playerIndex, int axis)
     // holding/auto-repeat은 Detector 쪽에서 step으로 콜 주는 게 깔끔함
 }
 
+bool PlayerSelector::IsOccupiedByOther(SelectorSlot target, int playerIndex) const {
+    if (!IsSide(target)) return false;
+    int other = 1 - playerIndex;
+    return m_slot[other] == target;
+}
+
 void PlayerSelector::RegisterObserver(IPlayerSelectorObserver* observer)
 {
     if (!observer) return;
     m_observers.push_back(observer);
     // 등록 직후 초기 상태 동기화
-    for (int p = 0; p < 2; ++p) {
+    for (int p = 0; p < 2; ++p) 
+    {
         SelectorState s{ p, m_slot[p], m_axis[p] };
         observer->OnSelectorChanged(s);
     }

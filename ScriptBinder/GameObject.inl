@@ -16,14 +16,14 @@ inline T* GameObject::AddComponent()
         receiver->RegisterOverriddenEvents(this->GetScene());
     }
 
+    m_components.push_back(component);
+    component->SetOwner(this);
+    m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+
     if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
     {
         initializable->Initialize();
     }
-
-    m_components.push_back(component);
-    component->SetOwner(this);
-    m_componentIds[component->GetTypeID()] = m_components.size() - 1;
 
     return component.get();
 }
@@ -42,14 +42,14 @@ inline T* GameObject::AddComponent(Args && ...args)
         receiver->RegisterOverriddenEvents(this->GetScene());
     }
 
+    m_components.push_back(component);
+    component->SetOwner(this);
+    m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+
     if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
     {
         initializable->Initialize();
     }
-
-    m_components.push_back(component);
-    component->SetOwner(this);
-    m_componentIds[component->GetTypeID()] = m_components.size() - 1;
 
     return component.get();
 }

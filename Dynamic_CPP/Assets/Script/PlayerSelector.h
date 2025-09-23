@@ -12,6 +12,12 @@ public:
 
 	void MoveStep(int playerIndex, int step);
 	void SetAxis(int playerIndex, int axis);
+
+	static inline bool IsSide(SelectorSlot s) {
+		return s == SelectorSlot::Left || s == SelectorSlot::Right;
+	}
+
+	bool IsOccupiedByOther(SelectorSlot target, int playerIndex) const;
 	void RegisterObserver(IPlayerSelectorObserver* observer);
 	void UnregisterObserver(IPlayerSelectorObserver* observer);
 	SelectorSlot GetSlot(int playerIndex) const;
