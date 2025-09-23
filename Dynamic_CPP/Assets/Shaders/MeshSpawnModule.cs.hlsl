@@ -67,13 +67,15 @@ cbuffer MeshParticleTemplateParams : register(b1)
     float4 gColor;
 
     float3 gVelocity;
-    float gVelocityRandomRange;
+    float gMinVerticalVelocity;
 
     float3 gAcceleration;
-    uint gTextureIndex;
-    
-    uint gRenderMode;
-    float3 gParticleInitialRotation;
+    float gMaxVerticalVelocity;
+
+    float gHorizontalVelocityRange;
+    int gTextureIndex;
+    int gRenderMode;
+    float templatePad6;
 }
 
 // 버퍼 바인딩
@@ -237,14 +239,15 @@ float3 GenerateInitialVelocity(uint seed)
 {
     float3 velocity = gVelocity;
     
-    if (gVelocityRandomRange > 0.0)
+    if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
     {
+        float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
         float horizontalAngle = RandomFloat01(seed + 1) * 6.28318530718;
-        float horizontalMag = RandomFloat01(seed + 2) * gVelocityRandomRange;
+        float horizontalMag = RandomFloat01(seed + 2) * gHorizontalVelocityRange;
         
         velocity += float3(
             horizontalMag * cos(horizontalAngle),
-            0.0,
+            verticalVel,
             horizontalMag * sin(horizontalAngle)
         );
     }
@@ -260,14 +263,15 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.velocity = GenerateInitialVelocity(seed + 100);
     particle.acceleration = gAcceleration;
     
+    // Range 제거 - 단일 값 사용
     particle.scale = gScale;
     particle.rotationSpeed = gRotationSpeed;
-    particle.rotation = gParticleInitialRotation; // 변경: gEmitterRotation -> gParticleInitialRotation
+    particle.rotation = gEmitterRotation;
     
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
     particle.color = gColor;
-    particle.textureIndex = gTextureIndex; // 변경: 0 -> gTextureIndex
+    particle.textureIndex = 0;
     particle.renderMode = gRenderMode;
     particle.isActive = 1;
 }
@@ -296,11 +300,8 @@ void UpdateExistingMeshParticleRotation(inout MeshParticleData particle)
     // 파티클 속도 회전  
     particle.velocity = mul(rotationMatrix, particle.velocity);
     
-    // 에미터 회전 변화량 계산
-    float3 rotationDelta = gEmitterRotation - gPreviousEmitterRotation;
-    
-    // 파티클 개별 회전에 에미터 회전 변화량 추가
-    particle.rotation += rotationDelta;
+    // 파티클 자체 회전도 에미터 회전과 동일하게 설정
+    particle.rotation = gEmitterRotation;
 }
 
 #define THREAD_GROUP_SIZE 1024
