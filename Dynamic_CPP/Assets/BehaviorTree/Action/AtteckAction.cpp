@@ -145,7 +145,7 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
             //m_isActionRunning = false;
 
             // 2. BT에 Success를 반환하여 행동이 성공적으로 끝났음을 알립니다.
-			std::cout << "AtteckAction: Attack animation completed." << std::endl;
+			//std::cout << "AtteckAction: Attack animation completed." << std::endl;
 			//스테이트를 Idle로 변경
 			blackBoard.SetValueAsString("State", "Idle");
             return NodeStatus::Success;

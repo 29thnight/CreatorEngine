@@ -11,14 +11,114 @@
 
 void EntityEleteMonster::Start()
 {
+	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
+	blackBoard = enemyBT->GetBlackBoard();
+	auto childred = m_pOwner->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
+
+		if (animator)
+		{
+			m_animator = animator;
+			break;
+		}
+
+	}
+
+	/*if (!m_animator)
+	{
+		m_animator = m_pOwner->GetComponent<Animator>();
+		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
+	}
+	else {
+		auto hitscale = m_animator->GetOwner()->m_transform.scale;
+		hitBaseScale = Vector3(hitscale.x, hitscale.y, hitscale.z);
+	}*/
+
+	bool hasid = blackBoard->HasKey("Identity");
+	if (hasid) {
+		std::string id = blackBoard->GetValueAsString("Identity");
+		//if (id == "MonsterNomal") {
+		//	/*m_animator->SetParameter("Dead", false);
+		//	m_animator->SetParameter("Atteck", false);
+		//	m_animator->SetParameter("Move", false);*/
+		//}
+	}
+
+	m_pOwner->m_collisionType = 3;
+
+	for (auto& child : childred)
+	{
+		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+
+		if (criticalmark)
+		{
+			markEffect = criticalmark;
+			break;
+		}
+
+	}
+
+	//투사체 프리펩 가져오기 //todo : mage 투사체 붙이기
+	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonBProjetile");
+	if (projectilePrefab) {
+		GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(projectilePrefab, "MonBProjectile1");
+		PrefabObject1->SetEnabled(false);
+		GameObject* PrefabObject2 = PrefabUtilitys->InstantiatePrefab(projectilePrefab, "MonBProjectile2");
+		PrefabObject2->SetEnabled(false);
+
+		m_projectiles.push_back(PrefabObject1);
+		m_projectiles.push_back(PrefabObject2);
+	}
+
+	//blackboard initialize
+	blackBoard->SetValueAsString("State", m_state); //현제 상태
+	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
+
+	blackBoard->SetValueAsInt("MaxHP", m_maxHP); //최대 체력
+	blackBoard->SetValueAsInt("CurrHP", m_currHP); //현재 체력
+
+	blackBoard->SetValueAsFloat("MoveSpeed", m_moveSpeed); //이동 속도
+	blackBoard->SetValueAsFloat("ChaseRange", m_chaseRange); // 추적 거리
+	blackBoard->SetValueAsFloat("ChaseOutTime", m_rangeOutDuration); //추적 지속 시간
+
+	//blackBoard->SetValueAsFloat("AttackRange", m_attackRange); //근접 공격 거리
+	//blackBoard->SetValueAsInt("AttackDamage", m_attackDamage); //근접 공격 데미지
+
+	blackBoard->SetValueAsInt("RangedAttackDamage", m_rangedAttackDamage); //원거리 공격 데미지
+	blackBoard->SetValueAsFloat("ProjectileSpeed", m_projectileSpeed); //투사체 속도
+	blackBoard->SetValueAsFloat("ProjectileRange", m_projectileRange); //투사체 최대 사거리
+	blackBoard->SetValueAsFloat("RangedAttackCoolTime", m_rangedAttackCoolTime); //원거리 공격 쿨타임
+
+	//
+	blackBoard->SetValueAsFloat("RetreatDistance", m_retreatDistance);
+	blackBoard->SetValueAsFloat("TeleportDistance", m_teleportDistance);
+	blackBoard->SetValueAsFloat("TeleportCollTime", m_teleportCollTime);
 }
 
 void EntityEleteMonster::Update(float tick)
 {
+	bool hasIdentity = blackBoard->HasKey("Identity");
+	if (hasIdentity) {
+		std::string Identity = blackBoard->GetValueAsString("Identity");
+	}
+
+	//TPCooldown update
+	bool hasTPCooldown = blackBoard->HasKey("TeleportColldown");
+	if (hasTPCooldown) 
+	{
+		float cooldown = blackBoard->GetValueAsFloat("TeleportColldown");
+		cooldown -= tick;
+		if (cooldown < 0) {
+			cooldown = 0.0f;
+		}
+		blackBoard->SetValueAsFloat("TeleportColldown", cooldown);
+	}
+
 	//플레이어 위치 업데이트
 	UpdatePlayer();
-
-
 }
 
 void EntityEleteMonster::UpdatePlayer()
@@ -130,6 +230,18 @@ void EntityEleteMonster::Teleport()
 	{
 		Vector3 candidatePos = pos + dir * 6.0f;
 
+		std::vector<GameObject*> monstersToPush;
+
+		if (IsValidTeleportLocation(candidatePos, monstersToPush)) 
+		{
+			//텔레포트
+			PushAndTeleportTo(candidatePos,monstersToPush);
+			// TODO: 텔레포트 성공 후 쿨타임 적용 로직 추가
+			blackBoard->SetValueAsFloat("TeleportColldown", m_rangedAttackCoolTime);
+			m_isTeleport = false;
+			return; // 성공
+		}
+
 	}
 }
 
@@ -145,7 +257,7 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage)
 {
 }
 
-bool EntityEleteMonster::IsValidTeleportLocation(const Vector3& candidatePos, Vector3& outGroundPos, std::vector<GameObject*>& outMonstersToPush)
+bool EntityEleteMonster::IsValidTeleportLocation(const Vector3& candidatePos,  std::vector<GameObject*>& outMonstersToPush)
 {
 	// --- 검사 1: 공간 확보 및 밀어낼 몬스터 확인 (Overlap) ---
 	outMonstersToPush.clear();
@@ -192,6 +304,31 @@ bool EntityEleteMonster::IsValidTeleportLocation(const Vector3& candidatePos, Ve
 void EntityEleteMonster::PushAndTeleportTo(const Vector3& finalPos, const std::vector<GameObject*>& monstersToPush)
 {
 	CharacterControllerComponent* cct = m_pOwner->GetComponent<CharacterControllerComponent>();
+
+	//몬스터 밀어내기
+	for (auto& monster : monstersToPush) 
+	{
+		CharacterControllerComponent* otherCCT = monster->GetComponent<CharacterControllerComponent>();
+		Transform* monTr = monster->GetComponent<Transform>();
+		if (!monTr) {
+			continue;
+		}
+		Mathf::Vector3 monpos = monTr->GetWorldPosition();
+		Mathf::Vector3 dir = monpos - finalPos;
+		if (otherCCT) {
+			if (dir.LengthSquared() < 0.001f)//위치가 텔포위치와 거의 같은경우 랜덤한 방향으로 날림
+			{
+				dir = Vector3(static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f, 0, static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f);
+			}
+			dir.Normalize();
+			otherCCT->TriggerForcedMove(dir * 2, 1.0f);
+		}
+	}
+	//위치 주변 모든 몬스터를 밀어내고 나서 이동
+	if (!m_posset) {
+		cct->ForcedSetPosition(finalPos); //이동 되고 나서 계속 이동 시키면 낭비
+		m_posset = true;
+	}
 }
 
 

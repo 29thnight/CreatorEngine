@@ -3,12 +3,6 @@
 #include "DebugLog.h"
 NodeStatus RetreatAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
-	//todo 도망 치기 어느 방향으로? 가장 가까운 플레이어와 반대로?
-	auto Identity = blackBoard.GetValueAsString("Identity");
-	if (Identity.empty() || Identity != "Mage")
-	{
-		return NodeStatus::Failure; // Identity가 없거나 "Mage"가 아닐 경우 실패 반환
-	}
 	auto State = blackBoard.GetValueAsString("State");
 	if (State == "Retreat")
 	{

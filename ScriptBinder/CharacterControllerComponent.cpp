@@ -84,6 +84,11 @@ void CharacterControllerComponent::OnLateUpdate(float fixedDeltaTime)
 }
 
 
+void CharacterControllerComponent::ForcedSetPosition(const DirectX::SimpleMath::Vector3& pos)
+{
+	PhysicsManagers->SetControllerPosition(m_controllerInfo.id, pos);
+}
+
 void CharacterControllerComponent::SetAutomaticRotation(bool useAuto)
 {
 	m_useAutomaticRotation = useAuto;

@@ -3,7 +3,7 @@
 #include "DebugLog.h"
 bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
-	LOG("IsAtteck ConditionCheck: Checking if entity is in attack range.");
+	//LOG("IsAtteck ConditionCheck: Checking if entity is in attack range.");
 
 
 	bool hasIdentity = blackBoard.HasKey("Identity");
@@ -146,6 +146,6 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 dir = asispos - pos;*/
 		
-	LOG("IsAtteck ConditionCheck: Entity is out of attack range.");
+	//LOG("IsAtteck ConditionCheck: Entity is out of attack range.");
 	return false;
 }

@@ -84,8 +84,10 @@ public:
 	[[Property]]
 	float m_teleportDistance = 5.0f; //텔레포트 시작 거리
 	[[Property]]
-	float m_taleportColldown = 3.0f; //텔레포트 쿨다운
+	float m_teleportCollTime = 3.0f; //텔레포트 쿨타임
 
+	bool m_isTeleport = false; //텔레포트 실행중
+	bool m_posset = false; //이동 완료시
 
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
 	std::string m_identity = "MonsterMage";
@@ -110,7 +112,7 @@ public:
 
 	//텔레포트
 	// 주어진 위치가 텔레포트 가능한지 검사하는 헬퍼 함수
-	bool IsValidTeleportLocation(const Mathf::Vector3& candidatePos, Mathf::Vector3& outGroundPos, std::vector<GameObject*>& outMonstersToPush);
+	bool IsValidTeleportLocation(const Mathf::Vector3& candidatePos, std::vector<GameObject*>& outMonstersToPush);
 
 	// 최종 위치로 텔레포트하고, 밀어낼 몬스터들을 밀어내는 헬퍼 함수
 	void PushAndTeleportTo(const Mathf::Vector3& finalPos, const std::vector<GameObject*>& monstersToPush);

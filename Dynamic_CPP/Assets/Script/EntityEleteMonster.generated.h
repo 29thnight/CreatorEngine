@@ -19,7 +19,7 @@ ReflectionScriptField(EntityEleteMonster) \
 		meta_property(m_rangedAttackCoolTime) \
 		meta_property(m_retreatDistance) \
 		meta_property(m_teleportDistance) \
-		meta_property(m_taleportColldown) \
+		meta_property(m_teleportCollTime) \
 	}); \
 	MethodField \
 	({ \

@@ -202,6 +202,10 @@ public:
 	/*void SetKnockBack(Mathf::Vector3 knockbackVelocity);
 	void EndKnockBack();*/
 
+	//순간이동 해당 포지션 위치로 강제이동
+	void ForcedSetPosition(const DirectX::SimpleMath::Vector3& pos);
+
+
 	// CCT의 자동 회전 기능을 켜거나 끕니다.
 	void SetAutomaticRotation(bool useAuto);
 
@@ -254,7 +258,7 @@ private:
 	[[Property]]
 	float m_rotationSpeed{ 0.1f }; //회전 속도
 
-	bool m_useAutomaticRotation; // 자동 회전 기능 사용 여부
+	bool m_useAutomaticRotation{true}; // 자동 회전 기능 사용 여부
 
 
 

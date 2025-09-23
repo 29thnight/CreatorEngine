@@ -498,7 +498,7 @@
 		<ClInclude Include="Assets\Script\MovingUILayer.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
-			<ClInclude Include="Assets\Script\InputDeviceDetector.h">
+		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\LoadingController.h">
@@ -533,6 +533,7 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponSlot.h">
 			<Filter>Script\ScriptClass\UI</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\WeaponSlotController.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
@@ -907,7 +908,7 @@
 		<ClCompile Include="Assets\Script\GameManager.cpp">
 			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClCompile>
-		ClCompile Include="Assets\Script\PlayerStun.cpp">
+		<ClCompile Include="Assets\Script\PlayerStun.cpp">
 			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerDash.cpp">
