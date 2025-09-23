@@ -88,5 +88,6 @@ private:
     bool m_timeScaleModified = false;
     bool m_loopModified = false;
     bool m_durationModified = false;
-
+    bool m_pendingPlay;
+    bool m_isNewInstance;
 };

@@ -35,7 +35,10 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, input.texCoord);
+    float2 flowDirection = float2(0.0, -1.0); // 오른쪽으로 흐름
+    float2 animatedUV = input.texCoord + gTime * 0.5 * flowDirection;
+    
+    float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, animatedUV);
     
     if (diffuseColor.a < 0.1)
         discard;
