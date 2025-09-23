@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "ItemComponent.h"
-#include "Core.Random.h"
 #include "GameInstance.h"
 #include "ItemInfo.h"
 
@@ -39,4 +38,6 @@ private:
 	std::array<ItemComponent*, 3> itemSlots;
 	//아이템 정보 3개 -> 렌덤으로 돌려서 슬롯에 넣어줌
 	std::array<ItemInfo, 3> itemInfos;
+	//아이템 아이콘 3개
+	std::array<class ItemUIIcon*, 3> itemPopups;
 };

@@ -1,14 +1,37 @@
 #include "ItemUIIcon.h"
 #include "RectTransformComponent.h"
 #include "Camera.h"
+#include "GameObject.h"
+#include "ImageComponent.h"
+#include "Player.h"
 #include "pch.h"
+
 void ItemUIIcon::Start()
 {
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
-	//TODO : 테스트용, 나중에 다른 오브젝트로 변경 필요
+	m_image = m_pOwner->GetComponent<ImageComponent>();
+	//TEST : 테스트용, 실제로는 ItemManager에서 SetTarget 해줌
     m_target = GameObject::Find("TestItem");
     // 필요 시 초기화
     m_bobTime = 0.f;
+}
+
+void ItemUIIcon::OnTriggerEnter(const Collision& collision)
+{
+    if (collision.otherObj->HasComponent<Player>())
+    {
+        ++m_enterCount;
+    }
+}
+
+void ItemUIIcon::OnTriggerExit(const Collision& collision)
+{
+    if (collision.otherObj->HasComponent<Player>())
+    {
+        --m_enterCount;
+
+        m_enterCount = std::max(0, m_enterCount);
+    }
 }
 
 void ItemUIIcon::Update(float tick)
@@ -27,6 +50,16 @@ void ItemUIIcon::Update(float tick)
     const DirectX::XMVECTOR clip = XMVector4Transform(pos, viewProj);
     const float w = XMVectorGetW(clip);
     if (w <= 0.0f) return;
+
+    // 충돌 카운트 기반 팝업 on/off 
+    //TODO : TEST코드 제거하면, 같이 제거 해야함.
+    //m_isSetPopup = (m_enterCount > 0);
+
+    // ── 구매되었으면 팝업 강제 종료 ──
+    if (m_isPurchased) 
+    {
+        m_isSetPopup = false; // 팝업 off로 유도
+    }
 
     const float x_ndc = XMVectorGetX(clip) / w;
     const float y_ndc = XMVectorGetY(clip) / w;
@@ -116,6 +149,11 @@ void ItemUIIcon::Update(float tick)
             m_isPopupComplete = false;  // 해제 완료
             m_bobbing = true;   // 보빙 재개 (원하면 true로 돌려둠)
             m_rect->SetAnchoredPosition({ baseX, baseY });
+
+            if (m_isPurchased && m_image) {
+                m_image->SetEnabled(false);
+                // 추후 필요 시 콜라이더/오브젝트도 비활성화:
+            }
         }
         else
         {
@@ -148,5 +186,15 @@ void ItemUIIcon::Update(float tick)
 
     // --- 4) 마지막에 현재 상태를 prev로 보관 (다음 프레임 에지 감지용) ---
     m_prevIsSetPopup = m_isSetPopup;
+}
+
+void ItemUIIcon::SetItemID(int id)
+{
+    itemID = id;
+    if (m_image)
+    {
+        //TODO : id에 따른 이미지 변경 필요
+    }
+
 }
 

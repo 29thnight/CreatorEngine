@@ -229,6 +229,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
+					else if (componentTypeID == type_guid(Canvas))
+					{
+						Canvas* canvas = dynamic_cast<Canvas*>(component.get());
+						if (nullptr != canvas)
+						{
+							ImGuiDrawHelperCanvas(canvas);
+						}
+					}
 					else if (type)
 					{
 						Meta::DrawObject(component.get(), *type);
@@ -1444,6 +1452,14 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	if (const auto* type = Meta::Find("SpriteRenderer"))
 	{
 		Meta::DrawProperties(spriteRenderer, *type);
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
+{
+	if (const auto* type = Meta::Find("Canvas"))
+	{
+		Meta::DrawProperties(canvas, *type);
 	}
 }
 

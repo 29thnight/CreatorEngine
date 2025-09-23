@@ -1,6 +1,8 @@
 #include "ItemManager.h"
 #include "GameObject.h"
 #include "GameManager.h"
+#include "ItemComponent.h"
+#include "ItemUIIcon.h"
 #include "pch.h"
 
 void ItemManager::Start()
@@ -8,20 +10,48 @@ void ItemManager::Start()
 	itemSlots.fill(nullptr);
 
 	gameManager = GetOwner()->GetComponent<GameManager>();
+	gameManager->ApplyGlobalEnhancementsToAllPlayers();
 
 	//현재 씬의 아이템 슬롯 3개 세팅
 	InitItemSlots();
 
-	auto slot0 = GameObject::Find("ItemSlot0");
-	auto slot1 = GameObject::Find("ItemSlot1");
-	auto slot2 = GameObject::Find("ItemSlot2");
+	//아이템 슬롯 3개 세팅
+	{
+		auto slot0 = GameObject::Find("ItemSlot0");
+		auto slot1 = GameObject::Find("ItemSlot1");
+		auto slot2 = GameObject::Find("ItemSlot2");
 
-	if (slot0)
-		itemSlots[0] = slot0->GetComponent<ItemComponent>();
-	if (slot1)
-		itemSlots[1] = slot1->GetComponent<ItemComponent>();
-	if (slot2)
-		itemSlots[2] = slot2->GetComponent<ItemComponent>();
+		if (slot0)
+			itemSlots[0] = slot0->GetComponent<ItemComponent>();
+		if (slot1)
+			itemSlots[1] = slot1->GetComponent<ItemComponent>();
+		if (slot2)
+			itemSlots[2] = slot2->GetComponent<ItemComponent>();
+	}
+
+	//아이템 아이콘 3개 세팅
+	{
+		auto popup0 = GameObject::Find("ItemPopup0");
+		auto popup1 = GameObject::Find("ItemPopup1");
+		auto popup2 = GameObject::Find("ItemPopup2");
+
+		if (popup0)
+			itemPopups[0] = popup0->GetComponent<ItemUIIcon>();
+		if (popup1)
+			itemPopups[1] = popup1->GetComponent<ItemUIIcon>();
+		if (popup2)
+			itemPopups[2] = popup2->GetComponent<ItemUIIcon>();
+		//아이콘 세팅
+		for (int i = 0; i < 3; ++i)
+		{
+			if (itemPopups[i])
+			{
+				itemPopups[i]->SetItemID(itemInfos[i].id);
+				itemPopups[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
+			}
+		}
+	}
+
 }
 
 void ItemManager::Update(float tick)
@@ -56,6 +86,7 @@ void ItemManager::RefreshItemSlots()
 	{
 		if (itemSlots[i])
 		{
+			//아이템 정보 세팅
 			itemSlots[i]->m_itemID = itemInfos[i].id;
 			itemSlots[i]->m_itemRarity = itemInfos[i].rarity;
 			itemSlots[i]->name = itemInfos[i].name;
@@ -63,6 +94,13 @@ void ItemManager::RefreshItemSlots()
 			itemSlots[i]->price = itemInfos[i].price;
 			itemSlots[i]->enhanceType = itemInfos[i].enhancementType;
 			itemSlots[i]->enhanceValue = itemInfos[i].enhancementValue;
+			// 아이템 아이콘 세팅
+			if (itemPopups[i])
+			{
+				itemPopups[i]->SetItemID(itemInfos[i].id);
+				itemPopups[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
+				itemPopups[i]->ResetPurchased();
+			}
 		}
 	}
 }
@@ -93,9 +131,10 @@ void ItemManager::BuyItem(int slotIndex)
 	{
 		//구매 가능
 		gameManager->AddReward(-itemPrice);
-		//TODO : 아이템 획득 처리
+		//아이템 획득 처리
 		GameInstance::GetInstance()->ApplyItemEnhancement(info);
-		//...
+		gameManager->ApplyGlobalEnhancementsToAllPlayers();
+		//아이템 슬롯 비우기
 		ClearItemSlot(slotIndex);
 	}
 	else
@@ -110,12 +149,20 @@ void ItemManager::ClearItemSlot(int slotIndex)
 		return;
 	if (!itemSlots[slotIndex])
 		return;
-	itemSlots[slotIndex]->m_itemID = 0;
+	//아이템 슬롯 비우기
+	itemSlots[slotIndex]->m_itemID = -1;
 	itemSlots[slotIndex]->m_itemRarity = 0;
 	itemSlots[slotIndex]->name = "";
 	itemSlots[slotIndex]->description = "";
 	itemSlots[slotIndex]->price = 0;
 	itemSlots[slotIndex]->enhanceType = 0;
 	itemSlots[slotIndex]->enhanceValue = 0;
+	//아이템 정보 비우기
+	itemInfos[slotIndex] = ItemInfo{};
+	//아이템 아이콘 비우기
+	if (itemPopups[slotIndex])
+	{
+		itemPopups[slotIndex]->OnPurchased();
+	}
 }
 

@@ -30,7 +30,7 @@ constexpr int MAX_ENHANCEMENT_TYPE = 7;
 
 struct ItemInfo
 {
-	int id{};
+	int id{ -1 };
 	int rarity{};
 	std::string name{};
 	std::string description{};

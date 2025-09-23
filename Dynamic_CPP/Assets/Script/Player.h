@@ -198,11 +198,7 @@ public:
 	float calculDamge(bool isCharge = false);
 	bool sucessAttack = false;
 	[[Property]]
-	float MeleeAttackSpeed = 1.0f;        //미사용중  //추가능력치로 공격속도가빨라질경우 사용 
-	[[Property]]
-	float RangeAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
-	[[Property]]
-	float BombAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
+	float MultipleAttackSpeed = 1.0f;
 
 	//피격,죽음
 	bool isStun = false;
