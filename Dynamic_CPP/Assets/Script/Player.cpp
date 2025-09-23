@@ -321,15 +321,16 @@ void Player::Update(float tick)
 		sucessResurrection = false;
 	}
 
-
-
 	if (BombIndicator)
 	{
 		auto curveindicator = BombIndicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(onBombIndicate);
 	}
 
-
+	if (m_animator)
+	{
+		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
+	}
 }
 
 void Player::LateUpdate(float tick)

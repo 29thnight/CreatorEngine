@@ -70,7 +70,7 @@ public:
 	[[Property]]
 	int playerIndex = 0;
 	[[Property]]
-	float moveSpeed= 0.025f;
+	float moveSpeed = 0.025f;
 	[[Property]]
 	float chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
 	float baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
@@ -112,7 +112,6 @@ public:
 	void ThrowEvent();
 	void UpdateChatchObject();
 
-
 	//대시
 	[[Property]]
 	float dashDistacne = 0.05f; // 대시속도 (dashDistacne 속도 애니메이션 재생시간동안 감) 
@@ -134,7 +133,6 @@ public:
 
 	[[Method]]
 	void Dash();
-
 
 	//공격
 	[[Property]]
@@ -164,7 +162,6 @@ public:
 	int countRangeAttack = 0;
 	[[Property]]
 	int countSpecialBullet = 5;   //n발마다 스페셜탄 쏠지 
-
 
 	bool OnMoveBomb = false;
 	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
@@ -201,11 +198,7 @@ public:
 	float calculDamge(bool isCharge = false);
 	bool sucessAttack = false;
 	[[Property]]
-	float MeleeAttackSpeed = 1.0f;        //미사용중  //추가능력치로 공격속도가빨라질경우 사용 
-	[[Property]]
-	float RangeAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
-	[[Property]]
-	float BombAttackSpeed = 1.0f;        //미사용중   //추가능력치로 공격속도가빨라질경우 사용 
+	float MultipleAttackSpeed = 1.0f;
 
 	//피격,죽음
 	bool isStun = false;
@@ -241,15 +234,10 @@ public:
 	std::vector<Weapon*> m_weaponInventory;
 	Weapon* m_curWeapon = nullptr;
 
-
-
-
 	//이펙트 출력관련
 	GameObject* dashObj = nullptr;
 	EffectComponent* dashEffect = nullptr;
 	//EffectComponent* bombIndicator = nullptr; //폭탄 떨어질위치 보여줄 이펙트
-
-
 
 	GameManager* GM = nullptr;
 	GameObject* player = nullptr; // ==GetOwner() 스크립트 주인
@@ -261,10 +249,6 @@ public:
 	GameObject* shootPosObj = nullptr;
 	GameObject* Indicator = nullptr;
 	GameObject* camera = nullptr;
-
-
-
-
 
 	GameObject* BombIndicator = nullptr;
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경

@@ -2874,6 +2874,16 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 		meshSpawnModule->SetParticleLifeTime(currentTemplate.lifeTime);
 	}
 
+	// 초기 회전 설정
+	float initialRotation[3] = {
+		currentTemplate.particleInitialRotation.x,
+		currentTemplate.particleInitialRotation.y,
+		currentTemplate.particleInitialRotation.z
+	};
+	if (ImGui::DragFloat3("Initial Rotation", initialRotation, 1.0f, -360.0f, 360.0f)) {
+		meshSpawnModule->SetParticleInitialRotation(XMFLOAT3(initialRotation[0], initialRotation[1], initialRotation[2]));
+	}
+
 	// 3D 스케일 범위
 	float Scale[3] = { currentTemplate.Scale.x, currentTemplate.Scale.y, currentTemplate.Scale.z };
 

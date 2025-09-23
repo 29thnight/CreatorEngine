@@ -192,6 +192,11 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
+		CreateFactory::GetInstance()->RegisterFactory("ItemComponent", []() { return new ItemComponent(); });
+		CreateFactory::GetInstance()->RegisterFactory("ItemManager", []() { return new ItemManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("ItemUIPopup", []() { return new ItemUIPopup(); });
+		CreateFactory::GetInstance()->RegisterFactory("ItemUIIcon", []() { return new ItemUIIcon(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameInit", []() { return new GameInit(); });
 		CreateFactory::GetInstance()->RegisterFactory("ImageButton", []() { return new ImageButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayerSelector", []() { return new PlayerSelector(); });

@@ -524,8 +524,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-			auto canvasObj = UIManagers->FindCanvasName(image->m_ownerCanvasName);
-			auto canvas = canvasObj->GetComponent<Canvas>();
+			auto canvasObj = UIManagers->FindCanvasName(obj->shared_from_this(), image->m_ownerCanvasName);
+			Canvas* canvas{};
+			if (canvasObj)
+			{
+				canvas = canvasObj->GetComponent<Canvas>();
+			}
+
 			if (canvas)
 			{
 				canvas->AddUIObject(obj->shared_from_this());
@@ -571,7 +576,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-			auto canvasObj = UIManagers->FindCanvasName(text->m_ownerCanvasName);
+			auto canvasObj = UIManagers->FindCanvasName(obj->shared_from_this(), text->m_ownerCanvasName);
 			auto canvas = canvasObj->GetComponent<Canvas>();
 			if (canvas)
 			{
@@ -613,7 +618,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-			auto canvasObj = UIManagers->FindCanvasName(spriteSheet->m_ownerCanvasName);
+			auto canvasObj = UIManagers->FindCanvasName(obj->shared_from_this(), spriteSheet->m_ownerCanvasName);
 			auto canvas = canvasObj->GetComponent<Canvas>();
 			if (canvas)
 			{

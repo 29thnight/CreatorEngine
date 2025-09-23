@@ -229,6 +229,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
+					else if (componentTypeID == type_guid(Canvas))
+					{
+						Canvas* canvas = dynamic_cast<Canvas*>(component.get());
+						if (nullptr != canvas)
+						{
+							ImGuiDrawHelperCanvas(canvas);
+						}
+					}
 					else if (type)
 					{
 						Meta::DrawObject(component.get(), *type);
@@ -1244,11 +1252,16 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		ImGui::EndDragDropTarget();
 	}
 
+	ImGui::SeparatorText("BaseInfo");
 	ImGui::ColorEdit4("color tint", &imageComponent->color.x);
 	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
 	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
 	ImGui::DragFloat("union scale", &imageComponent->unionScale, 0.01f, 1.f, 10.f);
 	ImGui::InputInt("layer", &imageComponent->_layerorder);
+	if(ImGui::Button("Reset Size", ImVec2(100, 20)))
+	{
+		imageComponent->ResetSize();
+	}
 	static const char* clipDirections[] = { "None", "LeftToRight", "RightToLeft", "UpToBottom", "BottomToTop" };
 
 	int currentClipDir = static_cast<int>(imageComponent->clipDirection);
@@ -1439,6 +1452,14 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	if (const auto* type = Meta::Find("SpriteRenderer"))
 	{
 		Meta::DrawProperties(spriteRenderer, *type);
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
+{
+	if (const auto* type = Meta::Find("Canvas"))
+	{
+		Meta::DrawProperties(canvas, *type);
 	}
 }
 

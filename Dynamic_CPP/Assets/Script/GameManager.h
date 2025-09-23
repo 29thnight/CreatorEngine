@@ -52,6 +52,11 @@ public:
 	bool m_isTestReward{ false };
 	[[Property]]
 	std::string m_nextSceneName{};
+	// Player Stat
+	[[Method]]
+	void ApplyGlobalEnhancementsToAllPlayers();
+
+	void ApplyGlobalEnhancementsToPlayer(class Player* player);
 
 public:
 	void PushEntity(Entity* entity);
@@ -72,6 +77,21 @@ private:
 
 private:
 	void CheatMiningResource();
+
+	struct PlayerBaseSnapshot {
+		// Player 쪽(가산/곱산 대상)
+		float baseMoveSpeed{ 0.f };         // Player::baseMoveSpeed 를 기준으로 사용
+		int   baseDashAmount{ 0 };          // Player::dashAmount 의 초기값 스냅샷
+		int   baseAtk{ 0 };                 // Player::Atk 의 초기값 스냅샷
+		float baseAtkSpeedMult{ 1.f };      // Player::MultipleAttackSpeed 의 초기값 스냅샷
+
+		// Entity 쪽(최대체력은 Entity 사용)
+		int   baseMaxHP{ 0 };               // Entity::m_maxHP 초기값 스냅샷
+		bool  initialized{ false };
+	};
+	std::unordered_map<class Player*, PlayerBaseSnapshot> m_baseByPlayer;
+
+	void EnsureBaseSnapshot(class Player* player);
 
 public:
 	void InitReward(int amount);

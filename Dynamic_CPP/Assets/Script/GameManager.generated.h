@@ -15,6 +15,7 @@ ReflectionScriptField(GameManager) \
 		meta_method(LoadNextScene) \
 		meta_method(SwitchNextScene) \
 		meta_method(LoadImidiateNextScene) \
+		meta_method(ApplyGlobalEnhancementsToAllPlayers) \
 	}); \
 	FieldEnd(GameManager, PropertyAndMethod) \
 };

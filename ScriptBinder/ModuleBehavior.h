@@ -14,7 +14,7 @@
 
 struct ICollider;
 // 사용자가 새로운 컴포넌트를 추가할 때 유용한 기능을 받기 위한 컴포넌트
-class ModuleBehavior : public Component
+class ModuleBehavior : public Component, public std::enable_shared_from_this<ModuleBehavior>
 {
 public:
    ReflectModuleBehavior
