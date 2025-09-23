@@ -754,6 +754,8 @@ void Player::StartAttack()
 				bombThrowPositionoffset = { 0,0,0 };
 				if (m_animator)
 					m_animator->SetParameter("OnMove", false);
+				if (m_animator)
+					m_animator->SetParameter("OnTargetBomb", true);
 				//현재무기 감추거나 attach떼고 손에붙여서 날아가게?
 			}
 			startAttack = true; 

@@ -34,4 +34,8 @@ public:
 
 	[[Property]]
 	float explosionRadius = 3.0f; //범위공격 반경
+
+private:
+	bool beLateFrame = false; //setposion으로 정한 위치가 한프레임 늦어서 이렇게 조절
+	bool OnEffect = false;
 };

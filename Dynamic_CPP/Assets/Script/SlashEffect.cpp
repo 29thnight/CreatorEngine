@@ -26,6 +26,8 @@ void SlashEffect::Update(float tick)
 	{
 		beLateFrame = true;
 	}
+
+
 	//들고있는 이펙트 재생끝나면 알아서 풀로 들어가게끔 
 	if (m_effect->m_isPlaying == false)
 	{
