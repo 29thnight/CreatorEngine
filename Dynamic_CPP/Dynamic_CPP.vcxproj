@@ -290,6 +290,7 @@
 		<ClInclude Include="Assets\Script\ItemUIPopup.h" />
 		<ClInclude Include="Assets\Script\ItemManager.h" />
 		<ClInclude Include="Assets\Script\ItemComponent.h" />
+		<ClInclude Include="Assets\Script\EntityEleteMonster.h" />
 		<ClInclude Include="Assets\Script\SlashEffect.h" />
 	</ItemGroup>
 	<ItemGroup>
@@ -699,6 +700,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ItemComponent.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityEleteMonster.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

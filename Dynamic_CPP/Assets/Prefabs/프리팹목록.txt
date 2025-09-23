@@ -1,0 +1,60 @@
+프리팹
+바위 벽
+
+
+Map_SmallRock	               Map_obj_stone  
+Map_MiddleRock_Green	Map_obj_rock_2 
+Map_BigRock_Green		Map_obj_rock_1 
+Map_BigRock_Green_Re	RE_Map_obj_rock_1   
+
+Map_MiddleRock_Red        Map_obj_rock_2_Red 
+Map_BigRock_Red             Map_obj_rock_Red   
+Map_SmallRock_Red          Map_obj_stone_Red 
+
+자원 리소스(부술수있는거).,자원블럭( 부수면 나오는거)
+ResourceMushroom   버섯          Obj_inter_mushroom2    
+ResourceMineral       광석          Obj_Inter_stone           
+ResourceFruit           열매식물     Obj_inter_fruit       
+ResourceFlower	      꽃              Obj_inter_Flower_1        //힐템드랍     
+BoxMushroom                          Obj_block_2     
+BoxMineral                              Obj_B_Inter_stone    
+BoxFruit                                   Obj_block_3    
+BoxFlower                                모델확인필요  
+
+무기 , 무기캡슐(Asis -> 플레이어에게 던질때 쓸용도? (무기랑 같은 리소스 가능)) 
+//무기들 사거리,데미지등 세부수치 조절필요
+WeaponBasic  
+WeaponMelee 
+WeaponWand 
+WeaponBomb      //들고있을 폭탄 일단 기본칼모양
+WeaponCapsule   
+
+
+드리고 테스트 문제없으면 -> 남캐랑 차지공격 추가 + 다시드릴게여
+
+BulletNormal   빨간구체
+BulletSpecial   파란구체
+Bomb // 예시 아시스 모양임 
+Asis     --아시스
+Indicator -- test용   d
+플레이어
+PlayerGirl
+기본몹
+
+
+
+
+
+
+
+
+
+
+
+PlayerBoy
+몹
+
+원거리몹
+엘리트몹
+보스몹
+

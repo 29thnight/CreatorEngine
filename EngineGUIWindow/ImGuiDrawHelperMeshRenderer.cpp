@@ -67,6 +67,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 			ImGui::SliderFloat("roughness", &mat_info.m_roughness, 0.f, 1.f);
 
+			ImGui::SliderFloat("IOR", &mat_info.m_IOR, 0.01f, 4.f);
+
 			ImGui::DragScalar("bitflag", ImGuiDataType_U32, &mat_info.m_bitflag);
 
 			std::string shaderName = "No Shader";

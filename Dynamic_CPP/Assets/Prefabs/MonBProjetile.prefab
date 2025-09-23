@@ -1,21 +1,21 @@
-m_name: WeaponCapsule
+m_name: MonBProjetile
 m_isEnabled: true
-m_instanceID: 1875213001
+m_instanceID: 2007062055
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: WeaponCapsule
+    m_name: MonBProjetile
     m_isEnabled: true
-    m_instanceID: 1906892746
+    m_instanceID: 1221277075
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      scale: {x: 0.800000012, y: 0.800000012, z: 0.800000012, w: 0}
       m_parentID: 0
-    m_index: 3
+    m_index: 556
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4]
+    m_childrenIndices: [608]
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 1
@@ -25,28 +25,28 @@ PrefabNode:
     m_layer: Default
     m_components:
       - ModuleBehavior: 1399118904
-        m_name: WeaponCapsule
+        m_name: MonsterProjectile
         m_isEnabled: true
-        m_instanceID: 2344006676
+        m_instanceID: 1135567570
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 8acd9958-6fe5-56b2-8515-19007ffb78b1
+        m_scriptGuid: a36795c1-7431-5e59-ae6b-5804a3fdd8f0
     children:
       - GameObject: 2166264123
-        m_name: Bomb
+        m_name: Mon_Slime
         m_isEnabled: true
-        m_instanceID: 1712741685
+        m_instanceID: 434455499
         m_transform:
-          position: {x: 1.77509832, y: 0.767088354, z: 0, w: 1}
+          position: {x: 0, y: 0, z: 0, w: 0}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00400000019, y: 0.00400000019, z: 0.00400000019, w: 0}
-          m_parentID: 3
-        m_index: 4
-        m_parentIndex: 3
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 556
+        m_index: 608
+        m_parentIndex: 556
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
         m_attachedSoketID: 0
-        m_collisionType: 1
+        m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 3
         m_tag: Untagged
@@ -55,28 +55,28 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 2415470766
+            m_instanceID: 2938933991
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material(2)
-              m_baseColorTexName: ""
-              m_normalTexName: ""
-              m_ORM_TexName: ""
+              m_name: Material.001
+              m_baseColorTexName: Mon_slime_low_Material_BaseColor.png
+              m_normalTexName: Mon_slime_low_Material_Normal.png
+              m_ORM_TexName: Mon_slime_low_Material_OcclusionRoughnessMetallic.png
               m_AO_TexName: ""
-              m_EmissiveTexName: ""
+              m_EmissiveTexName: Mon_slime_low_Material_Emissive.png
               m_materialInfo:
-                m_baseColor: {r: 0.0197853446, g: 0.800819218, b: 0.0199853349, a: 1}
-                m_metallic: 0
-                m_roughness: 0.272165537
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
                 m_bitflag: 0
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: 10423ee9-c583-5f9b-ad0b-fb6d74665a9c
+              m_fileGuid: 11fc8aa2-d271-5e82-87e2-b3b570cf6319
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
-              m_name: Sphere
+              m_name: Cube.001
               m_materialIndex: 0
               m_LODThresholds: ~
             m_LightMapping:

@@ -192,14 +192,14 @@ namespace Mathf
         return XMMatrixTranspose(XMMATRIX(&in.a1));
     }
 
-    inline float3 aiToFloat3(aiVector3D in)
+    inline DirectX::XMFLOAT3 aiToFloat3(aiVector3D in)
     {
-        return float3(in.x, in.y, in.z);
+        return DirectX::XMFLOAT3(in.x, in.y, in.z);
     }
 
-    inline float2 aiToFloat2(aiVector3D in)
+    inline DirectX::XMFLOAT2 aiToFloat2(aiVector3D in)
     {
-        return float2(in.x, in.y);
+        return DirectX::XMFLOAT2(in.x, in.y);
     }
 
 	inline Mathf::Vector2 jsonToVector2(const nlohmann::json& j)
@@ -283,6 +283,7 @@ namespace Mathf
 
 	class Easing {
 	public:
+#pragma region Easing Functions
 		inline static float Linear(float t) {
 			return t;
 		}
@@ -498,8 +499,80 @@ namespace Mathf
 				return 0.5f * EaseOutBounceCustom(t * 2 - 1) + 0.5f;
 			}
 		}
+#pragma endregion
+		enum class EaseType
+		{
+			None = -1,
+			Linear,
+			EaseInQuad, EaseOutQuad, EaseInOutQuad,
+			EaseInCubic, EaseOutCubic, EaseInOutCubic,
+			EaseInQuart, EaseOutQuart, EaseInOutQuart,
+			EaseInQuint, EaseOutQuint, EaseInOutQuint,
+			EaseInSine, EaseOutSine, EaseInOutSine,
+			EaseInExpo, EaseOutExpo, EaseInOutExpo,
+			EaseInCirc, EaseOutCirc, EaseInOutCirc,
+			EaseInBack, EaseOutBack, EaseInOutBack,
+			EaseInElastic, EaseOutElastic, EaseInOutElastic,
+			EaseInBounce, EaseOutBounce, EaseInOutBounce,
+			EaseInElasticCustom, EaseOutElasticCustom, EaseInOutElasticCustom,
+			EaseInBounceCustom, EaseOutBounceCustom, EaseInOutBounceCustom
+		};
 	};
 
+	class DynamicEasing
+	{
+	private:
+		Easing::EaseType ET;
+
+	public:
+		explicit DynamicEasing(Easing::EaseType type) : ET(type) {};
+		~DynamicEasing() = default;
+	public:
+		float operator()(const float& t)
+		{
+			switch (ET)
+			{
+			case Easing::EaseType::Linear:					return Easing::Linear(t);
+			case Easing::EaseType::EaseInQuad:				return Easing::EaseInQuad(t);
+			case Easing::EaseType::EaseOutQuad:				return Easing::EaseOutQuad(t);
+			case Easing::EaseType::EaseInOutQuad:			return Easing::EaseInOutQuad(t);
+			case Easing::EaseType::EaseInCubic:				return Easing::EaseInCubic(t);
+			case Easing::EaseType::EaseOutCubic:			return Easing::EaseOutCubic(t);
+			case Easing::EaseType::EaseInOutCubic:			return Easing::EaseInOutCubic(t);
+			case Easing::EaseType::EaseInQuart:				return Easing::EaseInQuart(t);
+			case Easing::EaseType::EaseOutQuart:			return Easing::EaseOutQuart(t);
+			case Easing::EaseType::EaseInOutQuart:			return Easing::EaseInOutQuart(t);
+			case Easing::EaseType::EaseInQuint:				return Easing::EaseInQuint(t);
+			case Easing::EaseType::EaseOutQuint:			return Easing::EaseOutQuint(t);
+			case Easing::EaseType::EaseInOutQuint:			return Easing::EaseInOutQuint(t);
+			case Easing::EaseType::EaseInSine:				return Easing::EaseInSine(t);
+			case Easing::EaseType::EaseOutSine:				return Easing::EaseOutSine(t);
+			case Easing::EaseType::EaseInOutSine:			return Easing::EaseInOutSine(t);
+			case Easing::EaseType::EaseInExpo:				return Easing::EaseInExpo(t);
+			case Easing::EaseType::EaseOutExpo:				return Easing::EaseOutExpo(t);
+			case Easing::EaseType::EaseInOutExpo:			return Easing::EaseInOutExpo(t);
+			case Easing::EaseType::EaseInCirc:				return Easing::EaseInCirc(t);
+			case Easing::EaseType::EaseOutCirc:				return Easing::EaseOutCirc(t);
+			case Easing::EaseType::EaseInOutCirc:			return Easing::EaseInOutCirc(t);
+			case Easing::EaseType::EaseInBack:				return Easing::EaseInBack(t);
+			case Easing::EaseType::EaseOutBack:				return Easing::EaseOutBack(t);
+			case Easing::EaseType::EaseInOutBack:			return Easing::EaseInOutBack(t);
+			case Easing::EaseType::EaseInElastic:			return Easing::EaseInElastic(t);
+			case Easing::EaseType::EaseOutElastic:			return Easing::EaseOutElastic(t);
+			case Easing::EaseType::EaseInOutElastic:		return Easing::EaseInOutElastic(t);
+			case Easing::EaseType::EaseInBounce:			return Easing::EaseInBounce(t);
+			case Easing::EaseType::EaseOutBounce:			return Easing::EaseOutBounce(t);
+			case Easing::EaseType::EaseInOutBounce:			return Easing::EaseInOutBounce(t);
+			case Easing::EaseType::EaseInElasticCustom:		return Easing::EaseInElasticCustom(t);
+			case Easing::EaseType::EaseOutElasticCustom:	return Easing::EaseOutElasticCustom(t);
+			case Easing::EaseType::EaseInOutElasticCustom:	return Easing::EaseInOutElasticCustom(t);
+			case Easing::EaseType::EaseInBounceCustom:		return Easing::EaseInBounceCustom(t);
+			case Easing::EaseType::EaseOutBounceCustom:		return Easing::EaseOutBounceCustom(t);
+			case Easing::EaseType::EaseInOutBounceCustom:	return Easing::EaseInOutBounceCustom(t);
+			default: return Easing::Linear(t);
+			}
+		}
+	};
 
 	template<typename T>
 	struct LerpHelper;

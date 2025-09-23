@@ -31,6 +31,7 @@ cbuffer PBRMaterial : register(b0)
     int gConvertToLinear;
     
     uint bitflag;
+    float gIOR;
 }
 
 cbuffer TimeBuffer : register(b5)
@@ -114,7 +115,7 @@ GBufferOutput main(PixelShaderInput IN)
     float texAO = 1.f;
     float metallic = gMetallic;
     float roughness = gRoughness;
-    float ior = 1;
+    float ior = gIOR;
     [branch]
     if (gUseOccMetalRough)
     {

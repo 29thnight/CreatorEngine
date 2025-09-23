@@ -1,6 +1,7 @@
 #include "AtteckAction.h"
 #include "pch.h"
 #include "EntityMonsterA.h"
+#include "TestMonsterB.h"
 #include "Animator.h"
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
@@ -43,6 +44,47 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
             }
         }
     }
+
+    if (identity == "MonsterRange") {
+        
+
+
+        TestMonsterB* script = m_owner->GetComponent<TestMonsterB>();
+        bool isAttack = script->isAttack;
+        bool isAttackAnimation = script->isAttackAnimation;
+        bool isMelee = script->isMelee;
+        if (!isAttack) {
+            //공격중이 아닐시 공격 시작
+            script->isAttack = true;
+            script->isAttackAnimation = true;
+            if (isMelee) 
+            {
+                script->m_animator->SetParameter("Attack", true);
+            }
+            else 
+            {
+                script->m_animator->SetParameter("RangeAttack", true);
+            }
+            blackBoard.SetValueAsBool("IsAttacking", true);
+            return NodeStatus::Running;
+        }
+        else {
+            //공격중일시 에니메이션 종료 여부 확인
+            if (isAttackAnimation) {
+                //에니메이션이 실행중이면 계속 실행
+                return NodeStatus::Running;
+            }
+            else
+            {
+                //완료시 모든 변수 초기화하고 성공 반환
+                script->isAttack = false;
+                script->isAttackAnimation = false;
+                script->m_state = "Idle";
+                return NodeStatus::Success;
+            }
+        }
+    }
+
 
 	bool hasAttackState = blackBoard.HasKey("IsAttacking");
 	bool hasState = blackBoard.HasKey("State");

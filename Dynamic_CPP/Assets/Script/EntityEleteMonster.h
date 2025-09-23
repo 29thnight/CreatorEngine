@@ -2,18 +2,19 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Entity.h"
-#include "TestMonsterB.generated.h"
+#include "EntityEleteMonster.generated.h"
+
 
 class BehaviorTreeComponent;
 class BlackBoard;
 class Animator;
 class EffectComponent;
-class TestMonsterB : public Entity
+class EntityEleteMonster : public Entity
 {
 public:
-   ReflectTestMonsterB
+   ReflectEntityEleteMonster
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(TestMonsterB)
+	MODULE_BEHAVIOR_BODY(EntityEleteMonster)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -28,22 +29,22 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+
 	BehaviorTreeComponent* enemyBT = nullptr;
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
-	
-	std::vector<GameObject*> m_projectiles;
-	int m_projectileIndex = 0;
 
-	GameObject* target = nullptr;
-	bool isDead = false;
+	std::vector<GameObject*> m_projectiles; // 공격 투사체
+	int m_projectileIndex = 0; // 투사체 번호
+
+	GameObject* target = nullptr; //타겟 오브젝트 
+	bool isDead = false; //죽음 여부 
 
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
-	bool isBoxAttack = false; //박스 공격중인지 여부
-	bool isMelee = false; //근접공격을 할지 원거리 공격을 할지
-
+	//bool isBoxAttack = false; //박스 공격중인지 여부 => 근접 공격 실행 X
+	
 	//공통 속성
 	[[Property]]
 	bool isAsisAction = false; //asis 행동중인지 여부
@@ -60,11 +61,8 @@ public:
 	[[Property]]
 	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
 
-	//근접 공격 방식
-	float m_attackRange = 2.f;
+	//근접 공격 방식  => 근접 공격 실행 X
 	
-	int m_attackDamage = 10;
-
 
 	//원거리 공격 방식 - 투사체 공격
 	[[Property]]
@@ -80,33 +78,50 @@ public:
 	[[Property]]
 	float m_rangedAttackCoolTime = 2.f; //원거리 공격 쿨타임
 
-	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
-	std::string m_identity = "MonsterRange";
+	//MonsterMage 특수
+	[[Property]]
+	float m_retreatDistance = 10.0f; //후퇴 시작 거리
+	[[Property]]
+	float m_teleportDistance = 5.0f; //텔레포트 시작 거리
+	[[Property]]
+	float m_taleportColldown = 3.0f; //텔레포트 쿨다운
 
-	void Dead(); //죽음 처리
+
+	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
+	std::string m_identity = "MonsterMage";
+
+	void UpdatePlayer();
+
+	//근접 공격 방식  => 근접 공격 실행 X
+	[[Method]]
+	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사
 
 	void ChaseTarget(); //타겟 추적
 
+	void Retreat(); // 플레이어 접근시 후퇴
+
+	void Teleport(); // 일정 거리 이내 접근시 순간이동
+
+	void Dead(); //죽음 처리
+
 	void RotateToTarget(); //타겟 바라보기
 
-	//근접 공격 방식 - 박스 공격
-	void AttackBoxOn(); //공격 박스 활성화
-	
-	void AttackBoxOff(); //공격 박스 비활성화
+	void SendDamage(Entity* sender, int damage) override;
 
-	void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
+	//텔레포트
+	// 주어진 위치가 텔레포트 가능한지 검사하는 헬퍼 함수
+	bool IsValidTeleportLocation(const Mathf::Vector3& candidatePos, Mathf::Vector3& outGroundPos, std::vector<GameObject*>& outMonstersToPush);
 
-	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사
-
-
+	// 최종 위치로 텔레포트하고, 밀어낼 몬스터들을 밀어내는 헬퍼 함수
+	void PushAndTeleportTo(const Mathf::Vector3& finalPos, const std::vector<GameObject*>& monstersToPush);
 
 
-	//넥백처리 
-	float hittimer = 0.f;
-	Mathf::Vector3 hitPos;
-	Mathf::Vector3 hitBaseScale;
-	Mathf::Quaternion hitrot;
-	float m_knockBackVelocity = 1.f;
-	float m_knockBackScaleVelocity = 1.f;
-	float m_MaxknockBackTime = 0.2f;
+	////넥백처리 -> 넉백 X
+	//float hittimer = 0.f;
+	//Mathf::Vector3 hitPos;
+	//Mathf::Vector3 hitBaseScale;
+	//Mathf::Quaternion hitrot;
+	//float m_knockBackVelocity = 1.f;
+	//float m_knockBackScaleVelocity = 1.f;
+	//float m_MaxknockBackTime = 0.2f;
 };

@@ -704,7 +704,7 @@ void Player::Dash()
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,0,horizontal.z };
 
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetKnockBack(knockbackVeocity);
+ 	controller->TriggerForcedMove(knockbackVeocity);
 	//isDashing = true;
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
@@ -971,7 +971,7 @@ void Player::Knockback(Mathf::Vector2 _KnockbackForce)
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,_KnockbackForce.y ,horizontal.z };
 
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetKnockBack(knockbackVeocity);
+	controller->TriggerForcedMove(knockbackVeocity);
 }
 
 void Player::SwapWeaponLeft()
@@ -1512,7 +1512,7 @@ void Player::TestHit()
 	Mathf::Vector3 horizontal = -forward * testHitPowerX;
 	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,testHitPowerY ,horizontal.z };
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetKnockBack(knockbackVeocity);
+	controller->TriggerForcedMove(knockbackVeocity);
 	//넉백이 끝날떄까지 x z testHitPowerX  // y testHitPowerY;
 
 }

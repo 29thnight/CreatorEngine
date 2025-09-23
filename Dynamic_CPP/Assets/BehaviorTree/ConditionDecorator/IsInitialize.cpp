@@ -30,6 +30,7 @@ bool IsInitialize::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	else
 	{
 		//LOG("IsInitialize ConditionCheck: Entity is not initialized.");
+		std::cout << "Entity is not initialized -> initialize action will be executed" << std::endl;
 		return true; // Entity is not initialized -> initialize action will be executed
 	}
 }

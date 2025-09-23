@@ -1,7 +1,7 @@
 #pragma once
 
-#define ReflectTestMonsterB \
-ReflectionScriptField(TestMonsterB) \
+#define ReflectEntityEleteMonster \
+ReflectionScriptField(EntityEleteMonster) \
 { \
 	PropertyField \
 	({ \
@@ -17,6 +17,13 @@ ReflectionScriptField(TestMonsterB) \
 		meta_property(m_projectileRange) \
 		meta_property(m_projectileArcHeight) \
 		meta_property(m_rangedAttackCoolTime) \
+		meta_property(m_retreatDistance) \
+		meta_property(m_teleportDistance) \
+		meta_property(m_taleportColldown) \
 	}); \
-	FieldEnd(TestMonsterB, PropertyOnly) \
+	MethodField \
+	({ \
+		meta_method(ShootingAttack) \
+	}); \
+	FieldEnd(EntityEleteMonster, PropertyAndMethod) \
 };

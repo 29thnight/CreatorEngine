@@ -3,6 +3,7 @@
 #include "EntityEnemy.h"
 #include "Animator.h"
 #include "EntityMonsterA.h"
+#include "TestMonsterB.h"
 #include "CharacterControllerComponent.h"
 
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
@@ -17,6 +18,12 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 	if (identity == "MonsterNomal")
 	{
 		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
+		script->ChaseTarget();
+		return NodeStatus::Success;
+	}
+	else if(identity == "MonsterRange")
+	{
+		TestMonsterB* script = m_owner->GetComponent<TestMonsterB>();
 		script->ChaseTarget();
 		return NodeStatus::Success;
 	}

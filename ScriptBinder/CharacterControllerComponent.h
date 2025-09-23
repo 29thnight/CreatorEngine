@@ -198,9 +198,21 @@ public:
 		return m_collsionCount;
 	}
 
-	void Stun(float stunTime);
-	void SetKnockBack(Mathf::Vector3 knockbackVelocity);
-	void EndKnockBack();
+	//void Stun(float stunTime);
+	/*void SetKnockBack(Mathf::Vector3 knockbackVelocity);
+	void EndKnockBack();*/
+
+	// CCT의 자동 회전 기능을 켜거나 끕니다.
+	void SetAutomaticRotation(bool useAuto);
+
+	// 넉백, 대시 등 일회성 강제 이동을 '요청'합니다.
+	void TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration=0.0f, Mathf::Easing::EaseType curveType = Mathf::Easing::EaseType::None);
+	//void TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration = 0.0f);
+
+	// 진행 중인 강제 이동을 '요청'하여 중지시킵니다.
+	void StopForcedMove();
+
+	bool IsInForcedMove() const;
 private: 
 
 	//collision event
@@ -228,11 +240,7 @@ private:
 	bool m_bIsFall{ false }; //낙하중인지 체크
 	bool m_bOnMove{ false }; //이동중인지 체크
 	bool m_bHasInput{ false }; //입력값이 있는지 체크
-
-	bool  m_isKnockBack = false;
-	bool  m_isStun = false;
-	float m_stunTime = 0.f;
-	float stunElapsedTime = 0.f;
+	
 	[[Property]]
 	float m_fBaseSpeed{ 0.025f }; //기본 속도
 	float PreSpeed = m_fBaseSpeed;
@@ -245,6 +253,10 @@ private:
 
 	[[Property]]
 	float m_rotationSpeed{ 0.1f }; //회전 속도
+
+	bool m_useAutomaticRotation; // 자동 회전 기능 사용 여부
+
+
 
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;
