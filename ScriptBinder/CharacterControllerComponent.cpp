@@ -89,14 +89,15 @@ void CharacterControllerComponent::SetAutomaticRotation(bool useAuto)
 	m_useAutomaticRotation = useAuto;
 }
 
-//void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, int curveType)
-//{	
-//	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration, curveType);
-//}
-void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
-{
-	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration);
+void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration, Mathf::Easing::EaseType curveType)
+{	
+	int castint = static_cast<int>(curveType);
+	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration, castint);
 }
+//void CharacterControllerComponent::TriggerForcedMove(const DirectX::SimpleMath::Vector3& initialVelocity, float duration)
+//{
+//	Physics->ApplyForcedMoveToCCT(m_controllerInfo.id, initialVelocity, duration);
+//}
 
 void CharacterControllerComponent::StopForcedMove()
 {

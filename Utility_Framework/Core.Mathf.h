@@ -502,6 +502,7 @@ namespace Mathf
 #pragma endregion
 		enum class EaseType
 		{
+			None = -1,
 			Linear,
 			EaseInQuad, EaseOutQuad, EaseInOutQuad,
 			EaseInCubic, EaseOutCubic, EaseInOutCubic,
@@ -518,9 +519,14 @@ namespace Mathf
 		};
 	};
 
-	template<Easing::EaseType ET>
 	class DynamicEasing
 	{
+	private:
+		Easing::EaseType ET;
+
+	public:
+		explicit DynamicEasing(Easing::EaseType type) : ET(type) {};
+		~DynamicEasing() = default;
 	public:
 		float operator()(const float& t)
 		{
