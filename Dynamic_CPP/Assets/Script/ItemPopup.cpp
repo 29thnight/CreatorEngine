@@ -1,6 +1,5 @@
 #include "ItemPopup.h"
 #include "Player.h"
-#include "Easing.h"
 #include "pch.h"
 
 void ItemPopup::Start()
@@ -33,6 +32,7 @@ void ItemPopup::OnTriggerExit(const Collision& collision)
 
 void ItemPopup::Update(float tick)
 {
+	using namespace Mathf;
     if (!m_popupObj) return;
 
     if (0 >= m_enterCount)

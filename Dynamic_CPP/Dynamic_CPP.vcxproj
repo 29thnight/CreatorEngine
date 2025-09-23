@@ -198,7 +198,6 @@
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="DebugLog.h" />
-		<ClInclude Include="Easing.h" />
 		<ClInclude Include="GameInstance.h" />
 		<ClInclude Include="ItemType.h" />
 		<ClInclude Include="PlayerState.h" />
