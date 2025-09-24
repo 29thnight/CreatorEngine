@@ -31,8 +31,11 @@ void PlayerStun::Enter()
 	if (m_player)
 	{
 		m_player->ChangeState("Stun");
+		m_player->DropCatchItem();
+		m_player->onBombIndicate = false;
 		m_player->m_curWeapon->SetEnabled(false);
 		m_player->m_animator->SetUseLayer(1, false);
+
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 	}

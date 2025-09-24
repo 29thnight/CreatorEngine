@@ -27,7 +27,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 	Transform* selfTransform = m_owner->GetComponent<Transform>();
 	Mathf::Quaternion rotation = selfTransform->GetWorldQuaternion();
 
-	auto effcomponent = m_owner->GetComponent<EffectComponent>();
+	//auto effcomponent = m_owner->GetComponent<EffectComponent>();
 
 
 	if (hasState)
@@ -48,7 +48,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 				// 1. 회전이 끝났으면 최종 위치로 정확히 맞춰줍니다.
 				selfTransform->SetRotation(finalRotation);
 				std::cout << "DieAction: OnUpdate - Target reached. Finishing." << std::endl;
-				effcomponent->StopEffect(); // Stop the effect component if needed
+				//effcomponent->StopEffect(); // Stop the effect component if needed
 				blackBoard.SetValueAsString("State", "PreDelete");
 				return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
 			}
@@ -65,7 +65,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 			finalRotation = XMQuaternionMultiply(targetRotation, rotation); // Combine the current rotation with the target rotation
 			Mathf::Quaternion newRotation = Mathf::Quaternion::Slerp(rotation, targetRotation, deltatime); // Smoothly interpolate towards the target rotation
 
-			effcomponent->Apply();
+			//effcomponent->Apply();
 
 
 			blackBoard.SetValueAsString("State", "Daed");

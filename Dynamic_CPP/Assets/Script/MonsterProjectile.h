@@ -34,7 +34,7 @@ public:
 	float m_duration;
 	float m_elapsedTime;
 
-
+	bool OwnerDestroy = false;
 	void Initialize(Entity* owner,float radius,int damege,Mathf::Vector3 startPos, Mathf::Vector3 controlPos, Mathf::Vector3 endPos,float calculatedDuration);
 	Mathf::Vector3 CalculateBezierPoint(float t, const Mathf::Vector3& p0, const Mathf::Vector3& p1, const Mathf::Vector3& p2);
 

@@ -96,8 +96,10 @@ public:
 
 	void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
 
+	[[Method]]
 	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사
-
+	[[Method]]
+	void DeadEvent();
 
 
 
@@ -109,4 +111,9 @@ public:
 	float m_knockBackVelocity = 1.f;
 	float m_knockBackScaleVelocity = 1.f;
 	float m_MaxknockBackTime = 0.2f;
+
+private:
+	bool EndDeadAnimation = false;
+	float deadElapsedTime = 0.f;
+	float deadDestroyTime = 1.0f;
 };

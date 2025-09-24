@@ -28,6 +28,8 @@ void PlayerBombCharing::Enter()
 
 	if (m_player)
 	{
+		m_player->OnMoveBomb = true;
+		m_player->onBombIndicate = true;
 		m_player->ChangeState("Attack");
 		m_player->isAttacking = true;
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();

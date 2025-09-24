@@ -7,6 +7,7 @@
 #include "DebugLog.h"
 void SpecialBullet::Start()
 {
+	__super::Start();
 	bulletType = BulletType::Special;
 }
 
@@ -18,6 +19,7 @@ void SpecialBullet::OnTriggerStay(const Collision& collision)
 
 void SpecialBullet::Update(float tick)
 {
+	__super::Update(tick);
 	Transform* transform = GetOwner()->GetComponent<Transform>();
 	transform->AddPosition(m_moveDir * rangedProjSpd);
 

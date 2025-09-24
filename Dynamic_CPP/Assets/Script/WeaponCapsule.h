@@ -1,12 +1,15 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "WeaponCapsule.generated.h"
 
 class Player;
 //아시스가 정화후 던져줄 웨폰캡슐 -> 플레이어에게 도달시 매칭된 weapon 생성해줌
 class WeaponCapsule : public ModuleBehavior
 {
 public:
+   ReflectWeaponCapsule
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(WeaponCapsule)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -32,4 +35,11 @@ public:
 	float speed = 3.0f;
 	int OwnerPlayerIndex = -1;
 	GameObject* ownerPlayer = nullptr; //날아갈 경로찾는용
+private:
+	[[Property]]
+	float boundingRange = 2.f;  //둥둥떠다닐대 위아래 움직일거리
+	[[Property]]
+	float boundSpeed = 0.01f; //위아래 움직일속도
+	float yBoundpos = 0.f;
+	bool  goingUp = true; //위로뜨고있는지
 };

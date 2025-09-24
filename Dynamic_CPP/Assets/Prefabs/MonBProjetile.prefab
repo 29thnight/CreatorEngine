@@ -1,22 +1,22 @@
 m_name: MonBProjetile
 m_isEnabled: true
-m_instanceID: 2007062055
+m_instanceID: 2163586433
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: MonBProjetile
     m_isEnabled: true
-    m_instanceID: 1221277075
+    m_instanceID: 2512288307
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 0.800000012, y: 0.800000012, z: 0.800000012, w: 0}
+      scale: {x: 0.5, y: 0.5, z: 0.5, w: 0}
       m_parentID: 0
-    m_index: 556
+    m_index: 237
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [608]
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [238]
+    m_prefabFileGuid: cdc67a3b-01a0-5f0b-89c5-bc49690a49b5
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -27,24 +27,24 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         m_name: MonsterProjectile
         m_isEnabled: true
-        m_instanceID: 1135567570
+        m_instanceID: 1784703599
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: a36795c1-7431-5e59-ae6b-5804a3fdd8f0
     children:
       - GameObject: 2166264123
         m_name: Mon_Slime
         m_isEnabled: true
-        m_instanceID: 434455499
+        m_instanceID: 4240349575
         m_transform:
-          position: {x: 0, y: 0, z: 0, w: 0}
+          position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 556
-        m_index: 608
-        m_parentIndex: 556
+          m_parentID: 237
+        m_index: 238
+        m_parentIndex: 237
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: cdc67a3b-01a0-5f0b-89c5-bc49690a49b5
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -55,10 +55,10 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 2938933991
+            m_instanceID: 1905672109
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: Material.001
+              m_name: Mon_slime
               m_baseColorTexName: Mon_slime_low_Material_BaseColor.png
               m_normalTexName: Mon_slime_low_Material_Normal.png
               m_ORM_TexName: Mon_slime_low_Material_OcclusionRoughnessMetallic.png
@@ -69,6 +69,7 @@ PrefabNode:
                 m_metallic: 1
                 m_roughness: 1
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}

@@ -25,7 +25,8 @@ void EntityMonsterA::Start()
 		}
 
 	}
-
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetAutomaticRotation(true);
 	if (!m_animator)
 	{
 		m_animator = m_pOwner->GetComponent<Animator>();
@@ -78,6 +79,10 @@ void EntityMonsterA::Start()
 void EntityMonsterA::Update(float tick)
 {
 
+	if (blackBoard == nullptr)
+	{
+		return;
+	}
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
@@ -173,10 +178,7 @@ void EntityMonsterA::Update(float tick)
 		m_state = "Attack";
 	}
 	
-	if (isDead)
-	{
-		Dead();
-	}
+
 	if (EndDeadAnimation)
 	{
 		deadElapsedTime += tick;
@@ -322,6 +324,7 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage)
 			if (m_currentHP <= 0)
 			{
 				isDead = true;
+				Dead();
 			}
 		}
 	}

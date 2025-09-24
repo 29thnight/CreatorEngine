@@ -61,7 +61,7 @@ public:
 	void SwapBasicWeapon();
 	[[Method]]
 	void AddMeleeWeapon();
-	void AddWeapon(Weapon* weapon);
+	bool AddWeapon(Weapon* weapon);
 	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
 	void FindNearObject(GameObject* gameObject);
@@ -198,6 +198,13 @@ public:
 	float calculDamge(bool isCharge = false);
 	[[Method]]
 	void PlaySlashEvent(); //검기 이펙트 + 사운드 출력
+	[[Property]]
+	float slash1Offset = 2.f;
+	[[Property]]
+	float slash2Offset = 2.f;
+	[[Property]]
+	float slashChargeOffset = 3.f;
+
 	[[Method]]
 	void PlaySlashEvent2();
 	[[Method]]

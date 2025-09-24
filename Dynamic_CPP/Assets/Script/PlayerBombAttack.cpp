@@ -3,6 +3,7 @@
 #include "Animator.h"
 #include "Player.h"
 #include "CharacterControllerComponent.h"
+#include "Weapon.h"
 void PlayerBombAttack::Enter()
 {
 	if (m_player == nullptr)
@@ -47,8 +48,14 @@ void PlayerBombAttack::Exit()
 {
 	if (m_player)
 	{
+		if (!m_player->m_curWeapon->IsBasic())
+		{
+			m_player->m_curWeapon->DecreaseDur(m_player->isChargeAttack);
+			m_player->m_UpdateDurabilityEvent.Broadcast(m_player->m_curWeapon, m_player->m_weaponIndex);
+		}
 		m_player->ChangeState("Idle");
 		m_player->isAttacking = false;
 		m_player->sucessAttack = true;
+		m_player->m_curWeapon->SetEnabled(true);
 	}
 }

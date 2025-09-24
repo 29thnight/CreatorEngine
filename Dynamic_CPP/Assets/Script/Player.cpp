@@ -35,10 +35,11 @@
 #include "EntityItemHeal.h"
 #include "PlayerState.h"
 #include "SlashEffect.h"
+#include "SoundManager.h"
 void Player::Start()
 {
 	player = GetOwner();
-
+	
 	auto childred = player->m_childrenIndices;
 
 	for (auto& child : childred)
@@ -254,7 +255,14 @@ void Player::Start()
 void Player::Update(float tick)
 {
 
+	static float ealpsetime = 0.f;
+	ealpsetime += tick;
+	if (0.5f <= ealpsetime)
+	{
+		Sound->playOneShot("Blackguard Sound - Shinobi Fight - Swing Whoosh ", ChannelType::PLAYER,0.5f);
+		ealpsetime = 0.f;
 
+	}
 
 
 	m_controller->SetBaseSpeed(moveSpeed);
@@ -591,16 +599,29 @@ void Player::CatchAndThrow()
 void Player::Catch()
 {
 	if (false == CheckState(PlayerStateFlag::CanGrab))  return;
-	if (m_nearObject != nullptr && catchedObject ==nullptr)
+	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
 
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 
 		m_animator->SetParameter("OnGrab", true);
-		catchedObject = m_nearObject->GetComponent<EntityItem>();
+		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
+		catchedObject = item;
 		m_nearObject = nullptr;
 		catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 		catchedObject->SetThrowOwner(this);
+
+		/*switch (item->itemType)
+		{
+		case EItemType::Flower:
+			Sound->playOneShot();
+		case EItemType::Fruit:
+			Sound->playOneShot();
+		case EItemType::Mineral:
+			Sound->playOneShot();
+		case EItemType::Mushroom:
+			Sound->playOneShot();
+		}*/
 	}
 }
 
@@ -751,7 +772,6 @@ void Player::StartAttack()
 			}
 			if (m_curWeapon->itemType == ItemType::Bomb)
 			{
-				OnMoveBomb = true;
 				bombThrowPositionoffset = { 0,0,0 };
 				if (m_animator)
 					m_animator->SetParameter("OnTargetBomb", true);
@@ -853,7 +873,11 @@ void Player::PlaySlashEvent()
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-		float effectOffset = 2.f;
+		float effectOffset = slash1Offset;
+		if (isChargeAttack)
+		{
+			effectOffset = slashChargeOffset;
+		}
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
 
@@ -871,6 +895,7 @@ void Player::PlaySlashEvent()
 	}
 
 
+
 }
 
 void Player::PlaySlashEvent2()
@@ -883,7 +908,7 @@ void Player::PlaySlashEvent2()
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-		float effectOffset = 2.f;
+		float effectOffset = slash2Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
 
@@ -910,7 +935,6 @@ void Player::PlaySlashEvent3()
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
-		//float effectOffset = 1.f;
 		Mathf::Vector3 effectPos = myPos;
 		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
 
@@ -1082,14 +1106,14 @@ void Player::AddMeleeWeapon()
 	}
 }
 
-void Player::AddWeapon(Weapon* weapon)
+bool Player::AddWeapon(Weapon* weapon)
 {
-	if (!weapon) return;
+	if (!weapon) return false;
 
 	if (m_weaponInventory.size() >= 4)
 	{
 		weapon->GetOwner()->Destroy();
-		return;
+		return false;
 
 		//TODO : 리턴하고 던져진무기 땅에떨구기 지금은 Destory인대 바꿔야함&&&&&
 	}
@@ -1112,6 +1136,7 @@ void Player::AddWeapon(Weapon* weapon)
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponInventory.size() - 1);
 		m_weaponIndex = m_weaponInventory.size() - 1;
 	}
+	return true;
 }
 
 void Player::DeleteCurWeapon()
@@ -1201,7 +1226,6 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	{
 		auto curveindicator = BombIndicator->GetComponent<CurveIndicator>();
 		curveindicator->SetIndicator(pos, bombThrowPosition, ThrowPowerY);
-		onBombIndicate = true;
 	}
 
 	Mathf::Vector3 targetdir = bombThrowPosition - pos;
@@ -1449,6 +1473,7 @@ void Player::ThrowBomb()
 		Bomb* bomb = bombObj->GetComponent<Bomb>();
 		bomb->ThrowBomb(this, pos, bombThrowPosition, calculDamge());
 		onBombIndicate = false;
+		m_curWeapon->SetEnabled(false);
 	}
 
 }

@@ -42,5 +42,9 @@ public:
 	float lifeTime = 5.f; //임시용
 	Mathf::Vector3 m_moveDir = { 0,0,0 }; //나아갈 방향
 	Player* m_ownerPlayer = nullptr;
-	EffectComponent* m_effect = nullptr; 
+	
+private:
+	bool beLateFrame = false; //setposion으로 정한 위치가 한프레임 늦어서 이렇게 조절
+	bool OnEffect = false;
+	EffectComponent* m_effect = nullptr;
 };
