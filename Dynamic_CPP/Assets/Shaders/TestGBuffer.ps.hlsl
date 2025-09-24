@@ -184,10 +184,10 @@ GBufferOutput main(PixelShaderInput IN)
         roughness = 1.0;
         bit = 1 << 8;
         bit |= 1 << 9; // 터레인 레이어 비트 설정
-        ior = 1.5f;
+        ior = 1.0f;
     }
     
-    if (surf.NdotV < abs(sin(totalTime)))
+    if (surf.NdotV > (sin(totalTime)))
         discard;
 
     roughness = max(roughness, 0.1f);
@@ -196,8 +196,11 @@ GBufferOutput main(PixelShaderInput IN)
     float3 normalResult = surf.N * 0.5 + 0.5;
     OUT.normal = float4(normalResult, 1); // 여기 나중에 normal.w 까지 받아서 행렬변환한곳 오류날 가능성 있음.
     //float tempX = saturate(sin(IN.wPosition.x / 2 - totalTime * 4) - 0.99) / (1 - 0.99); // 0~1
-    OUT.emissive = emissive;// lerp(emissive, float4(2, 2, 2, 1), pow(tempX, 1 / 2.2));
+    //OUT.emissive = emissive;// lerp(emissive, float4(2, 2, 2, 1), pow(tempX, 1 / 2.2));
+    OUT.emissive = surf.NdotV > ((sin(totalTime)) - 0.1) ? float4(2, 1, 1, 1) : emissive; // lerp(emissive, float4(2, 2, 2, 1), pow(tempX, 1 / 2.2));
 
+    //OUT.diffuse = float4(surf.NdotV, surf.NdotV, surf.NdotV, 1);
+    
     OUT.bitmask = bit;
 
     return OUT;

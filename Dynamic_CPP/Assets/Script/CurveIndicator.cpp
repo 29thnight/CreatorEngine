@@ -9,7 +9,12 @@ void CurveIndicator::Start()
 	for (auto& index : GetOwner()->m_childrenIndices) {
 		auto object = GameObject::FindIndex(index);
 		if (object) {
+			MeshRenderer* render = object->GetComponent<MeshRenderer>();
+			render->m_Material = render->m_Material->Instantiate(render->m_Material, "IndicatorMaterial");
+			// 메터리얼의 쉐이더를 변경 후 투명도나 색상 변경.
+
 			indicators.push_back(object);
+			indicatorInitScale.push_back(Mathf::Vector3(object->m_transform.scale)); // 베이스로 할 스케일 저장
 		}
 	}
 }
@@ -18,22 +23,31 @@ void CurveIndicator::Update(float tick)
 {
 	if(!enableIndicator)
 		return;
+	Vector3 direction = endPos - startPos;
+	float length = direction.Length();
+	int repeatCount = static_cast<int>(length / indicatorInterval);
 
-	Vector3 pB = ((endPos - startPos) / 2) + startPos;
+	Vector3 pB = (direction / 2) + startPos;
 	pB.y += heightPos;
 	Vector3 pA = startPos;
 
-	float count = (float)indicators.size();
+	//float count = std::min((int)indicators.size(), repeatCount);
 
 	int index = 0;
-	timer += tick;
 	for (auto& indicator : indicators) {
-		float t = index / count * 1.5f;
-		Vector3 p0 = Lerp(pA, pB, t);
-		Vector3 p1 = Lerp(pB, endPos, t);
+		indicator->SetEnabled(true);
+		//float t = index / count;
+		float d = indicatorInterval * index;
+		float t = d / length;
+		Vector3 p0 = Lerp(endPos, pB, t);
+		Vector3 p1 = Lerp(pB, pA, t);
 		Vector3 p01 = Lerp(p0, p1, t);
 		indicator->m_transform.SetPosition(p01);
-		indicator->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_baseColor.w = sinf(timer) * 0.5f + 0.5f;//->TrySetFloat("TestCB", "timer", timer);
+		float alpha = sinf(t);
+		float indicatorScale = alpha * 3;
+		indicatorScale = std::min(std::max(indicatorScale, 0.7f), 1.f);
+		indicator->m_transform.SetScale(indicatorInitScale[index] * indicatorScale);
+		indicator->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_baseColor.w = alpha;
 		index++;
 	}
 }

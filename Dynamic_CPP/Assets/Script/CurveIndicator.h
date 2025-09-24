@@ -30,8 +30,10 @@ private:
 
 private:
 	std::vector<GameObject*> indicators;
+	std::vector<Mathf::Vector3> indicatorInitScale;
 	bool enableIndicator = false;
-	float timer = 0.f;
+	float indicatorMinLimitSize = 0.7f;
+	float indicatorInterval = 1.0f;
 };
 
 /*
