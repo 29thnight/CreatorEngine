@@ -136,9 +136,6 @@ bool MeshMovementModuleCS::IsReadyForReuse() const
 
 void MeshMovementModuleCS::SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation)
 {
-    m_movementParams.emitterPosition = float3(position.x, position.y, position.z);
-    m_movementParams.emitterRotation = float3(rotation.x, rotation.y, rotation.z);
-    m_paramsDirty = true;
 }
 
 void MeshMovementModuleCS::Release()
@@ -361,13 +358,15 @@ void MeshMovementModuleCS::AddVelocityPoint(float time, const Mathf::Vector3& ve
     m_paramsDirty = true;
 }
 
-void MeshMovementModuleCS::AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration)
+void MeshMovementModuleCS::AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration, float impulseRange, UINT impulseType)
 {
     ImpulseData impulse;
     impulse.triggerTime = triggerTime;
     impulse.direction = direction;
     impulse.force = force;
     impulse.duration = duration;
+    impulse.impulseRange = impulseRange;
+    impulse.impulseType = impulseType;
 
     m_impulses.push_back(impulse);
     std::sort(m_impulses.begin(), m_impulses.end(),
@@ -451,7 +450,9 @@ nlohmann::json MeshMovementModuleCS::SerializeData() const
             {"triggerTime", impulse.triggerTime},
             {"direction", {impulse.direction.x, impulse.direction.y, impulse.direction.z}},
             {"force", impulse.force},
-            {"duration", impulse.duration}
+            {"duration", impulse.duration},
+            {"range", impulse.impulseRange},
+            {"type", impulse.impulseType}
             });
     }
 
@@ -548,6 +549,8 @@ void MeshMovementModuleCS::DeserializeData(const nlohmann::json& json)
             impulse.direction = Mathf::Vector3(dir[0], dir[1], dir[2]);
             impulse.force = impulseJson.value("force", 1.0f);
             impulse.duration = impulseJson.value("duration", 1.0f);
+            impulse.impulseRange = impulseJson.value("range", 1.0f);
+            impulse.impulseType = impulseJson.value("type", 0);
             m_impulses.push_back(impulse);
         }
     }

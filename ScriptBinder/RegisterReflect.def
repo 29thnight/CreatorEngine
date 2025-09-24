@@ -13,7 +13,6 @@
 #include "Camera.h"
 #include "AAPassSetting.h"
 #include "MaterialFlowInformation.h"
-#include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
 #include "BloomSetting.h"
@@ -53,21 +52,24 @@
 #include "CapsuleColliderComponent.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
-#include "Scene.h"
+#include "LightComponent.h"
+#include "CurvePoint.h"
 #include "EffectComponent.h"
 #include "FoliageInstance.h"
+#include "SoundComponent.h"
+#include "Scene.h"
 #include "MeshCollider.h"
 #include "RagdollComponent.h"
 #include "FoliageComponent.h"
 #include "GameObject.h"
 #include "InputAction.h"
-#include "SpriteSheetComponent.h"
-#include "LightComponent.h"
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
 #include "Navigation.h"
 #include "Object.h"
 #include "RectTransformComponent.h"
+#include "SpriteRenderer.h"
+#include "SpriteSheetComponent.h"
 #include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
@@ -102,6 +104,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(ColorGradingPassSetting);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);
+    AUTO_REGISTER_CLASS(CurvePoint);
     AUTO_REGISTER_CLASS(DecalComponent);
     AUTO_REGISTER_CLASS(DeferredPassSetting);
     AUTO_REGISTER_CLASS(EffectComponent);
@@ -135,6 +138,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(ShadowMapPassSetting);
     AUTO_REGISTER_CLASS(Skeleton);
+    AUTO_REGISTER_CLASS(SoundComponent);
     AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(SpriteRenderer);
     AUTO_REGISTER_CLASS(SpriteSheetComponent);

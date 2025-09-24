@@ -385,6 +385,8 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		{
 			// PSO는 그룹 단위로 1회 Apply
 			customPSO->Apply(deferredPtr);
+			DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
+			DirectX11::OMSetDepthStencilState(deferredPtr, m_depthNoWrite.Get(), 1);
 
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
 			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);

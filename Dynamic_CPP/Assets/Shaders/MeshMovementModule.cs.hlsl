@@ -49,7 +49,8 @@ struct ImpulseData
     float3 direction;
     float force;
     float duration;
-    float2 pad;
+    float spreadRange; // 분산 범위
+    int spreadType; // 분산 타입 (0=직선, 1=원뿔, 2=구형)
 };
 
 // 상수 버퍼 정의 (C++의 MeshMovementParams와 정확히 일치)
@@ -149,23 +150,74 @@ float3 GetVelocityFromCurve(float normalizedAge)
 }
 
 // 충격 효과 계산
-float3 GetImpulseForce(float normalizedAge)
+float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout MeshParticleData particle)
 {
     float3 totalImpulse = float3(0, 0, 0);
+    float3 dominantDirection = float3(0, 0, 0);
+    float maxStrength = 0.0;
     
     for (int i = 0; i < impulseCount; i++)
     {
         float timeDiff = abs(normalizedAge - Impulses[i].triggerTime);
         
-        // 충격 지속시간 내에 있는지 확인
         if (timeDiff <= Impulses[i].duration)
         {
-            // 거리에 따른 강도 감소 (가까울수록 강함)
             float strength = 1.0 - (timeDiff / Impulses[i].duration);
-            strength = strength * strength; // 제곱으로 더 급격한 감소
+            strength = strength * strength;
             
-            totalImpulse += Impulses[i].direction * Impulses[i].force * strength;
+            uint seed1 = particleIndex * 73856093u ^ (i * 19349663u);
+            uint seed2 = particleIndex * 83492791u ^ (i * 41943041u);
+            
+            float3 baseDir = normalize(Impulses[i].direction);
+            float3 finalDirection;
+            
+            if (Impulses[i].spreadType == 0)
+            {
+                // 직선 (분산 없음)
+                finalDirection = baseDir;
+            }
+            else if (Impulses[i].spreadType == 1)
+            {
+                // 원뿔형 분산 (샷건)
+                float angle = Hash(seed1) * 6.28318;
+                float radius = Hash(seed2) * Impulses[i].spreadRange;
+                
+                float3 up = abs(baseDir.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
+                float3 right = normalize(cross(baseDir, up));
+                up = normalize(cross(right, baseDir));
+                
+                float3 spreadOffset = (right * cos(angle) + up * sin(angle)) * radius;
+                finalDirection = normalize(baseDir + spreadOffset);
+            }
+            else if (Impulses[i].spreadType == 2)
+            {
+                // 구형 분산 (폭발)
+                float angle = Hash(seed1) * 6.28318;
+                float elevation = (Hash(seed2) - 0.5) * 1.57079;
+                
+                float3 spreadDir = float3(
+                    cos(angle) * cos(elevation),
+                    sin(elevation),
+                    sin(angle) * cos(elevation)
+                );
+                
+                finalDirection = normalize(baseDir + spreadDir * Impulses[i].spreadRange);
+            }
+            
+            totalImpulse += finalDirection * Impulses[i].force * strength;
+            
+            if (strength > maxStrength)
+            {
+                maxStrength = strength;
+                dominantDirection = finalDirection;
+            }
         }
+    }
+    
+    if (maxStrength > 0.001)
+    {
+        particle.pad3 = dominantDirection;
+        particle.pad4 = maxStrength;
     }
     
     return totalImpulse;
@@ -264,7 +316,30 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (velocityMode == 1)
             additionalVelocity += GetVelocityFromCurve(normalizedAge);
         else if (velocityMode == 2)
-            additionalVelocity += GetImpulseForce(normalizedAge);
+        {
+            additionalVelocity += GetImpulseForce(normalizedAge, particleIndex, particle);
+            
+            // 임펄스 방향에 따른 회전 조정
+            if (particle.pad4 > 0.001) // 강도가 충분할 때
+            {
+                float3 targetDirection = normalize(particle.pad3);
+                
+                // 방향 벡터를 오일러 각도로 변환
+                float3 targetRotation = float3(
+                    atan2(targetDirection.y, length(targetDirection.xz)), // pitch
+                    atan2(targetDirection.x, targetDirection.z), // yaw  
+                    0.0 // roll
+                );
+                
+                float rotationLerpSpeed = 5.0;
+                float lerpFactor = min(particle.pad4 * rotationLerpSpeed * deltaTime, 1.0);
+                particle.rotation = lerp(particle.rotation, targetRotation, lerpFactor);
+                
+                // 사용 후 초기화
+                particle.pad3 = float3(0, 0, 0);
+                particle.pad4 = 0.0;
+            }
+        }
         else if (velocityMode == 3)
             additionalVelocity += GetWindForce(particle.position, currentTime);
         else if (velocityMode == 4)
@@ -278,7 +353,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         // 중력 적용 (월드 공간에서)
         if (useGravity != 0)
         {
-            particle.velocity += particle.acceleration * gravityStrength * deltaTime;
+            float3 gravityForce = float3(0, -9.8, 0) * gravityStrength;
+            particle.velocity += gravityForce * deltaTime;
         }
         
         // 파티클 회전 업데이트 (로컬 회전)

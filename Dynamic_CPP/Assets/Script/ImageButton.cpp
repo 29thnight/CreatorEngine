@@ -6,7 +6,7 @@
 void ImageButton::Start()
 {
 	m_imageComponent = GetComponent<ImageComponent>();
-	GameInstance::GetInstance()->LoadScene("LoadingScene");
+	//GameInstance::GetInstance()->LoadScene("LoadingScene");
 }
 
 void ImageButton::Update(float tick)
@@ -20,6 +20,7 @@ void ImageButton::Update(float tick)
 
 void ImageButton::ClickFunction()
 {
-	GameInstance::GetInstance()->SwitchScene("LoadingScene");
+	//테스트 기본
+	GameInstance::GetInstance()->SwitchScene("CharSelectScene");
 }
 

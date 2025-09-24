@@ -52,7 +52,7 @@ float4 main(VSOutput input) : SV_TARGET
     float3 baseColor = texColor.rgb;
     
     // 입력 색상을 additive 방식으로 더하기 (밝기 증가)
-    float3 coloredTexture = baseColor + (input.Color.rgb * 0.5f);
+    float3 coloredTexture = baseColor * input.Color.rgb;
     
     float3 finalColor = coloredTexture;
     

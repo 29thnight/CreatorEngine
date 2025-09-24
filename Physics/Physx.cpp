@@ -2332,7 +2332,9 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleM
 	TouchRaycastQueryFilter filter;
 	// --- 4. 충돌 필터 설정 ---
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER 
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 
@@ -2403,7 +2405,9 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
 
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER 
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	//filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
@@ -2462,7 +2466,9 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
 
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	

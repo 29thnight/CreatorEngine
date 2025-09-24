@@ -279,6 +279,11 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	auto origin			= DirectX::XMFLOAT2{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
 	auto position		= pComponent->pos;
 	auto scale			= pComponent->scale;
+	auto* canvas = pComponent->GetOwnerCanvas();
+	int canvasOrder{};
+	{
+		canvasOrder = canvas->GetCanvasOrder();
+	}
 	int layerOrder		= pComponent->GetLayerOrder();
 	float frameDuration = pComponent->m_frameDuration;
 	auto cpuBuffer		= pComponent->GetCustomPixelCPUBuffer();
@@ -297,7 +302,7 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 		}
 	}
 
-	m_updateFunction = [weakProxyObject, isPreview, isEnable, origin, position, scale, layerOrder, frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
+	m_updateFunction = [weakProxyObject, canvasOrder, isPreview, isEnable, origin, position, scale, layerOrder, frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
 	{
 		if (auto proxyObject = weakProxyObject.lock())
 		{
@@ -306,6 +311,7 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 			data.origin = origin;
 			data.position = position;
 			data.scale = scale;
+			data.canvasOrder = canvasOrder;
 			data.layerOrder = layerOrder;
 			data.frameDuration = frameDuration;
 			data.isPreview = isPreview;
@@ -354,6 +360,11 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	auto position	= pComponent->pos;
 	auto scale		= pComponent->scale;
 	float rotation	= pComponent->rotate;
+	auto* canvas = pComponent->GetOwnerCanvas();
+	int canvasOrder{};
+	{
+		canvasOrder = canvas->GetCanvasOrder();
+	}
 	int layerOrder	= pComponent->GetLayerOrder();
 	auto clipDirection = pComponent->clipDirection;
 	auto clipPercent   = pComponent->clipPercent;
@@ -368,7 +379,7 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	}
 
 	m_updateFunction = [weakProxyObject, textures = std::move(textures),
-		curTexture, origin, position, scale, isEnable,
+		curTexture, origin, position, scale, isEnable, canvasOrder,
 		rotation, layerOrder, color, clipDirection, clipPercent, buffer = std::move(cpuBuffer)]() mutable
 	{
 		if (auto proxyObject = weakProxyObject.lock())
@@ -381,6 +392,7 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 			data.position = position;
 			data.scale = scale;
 			data.rotation = rotation;
+			data.canvasOrder = canvasOrder;
 			data.layerOrder = layerOrder;
 			data.clipDirection = clipDirection;
 			data.clipPercent = clipPercent;
@@ -414,13 +426,18 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
     auto color = pComponent->color;
     auto position = pComponent->pos;
     float fontSize = pComponent->fontSize;
+	auto* canvas = pComponent->GetOwnerCanvas();
+	int canvasOrder{};
+	{
+		canvasOrder = canvas->GetCanvasOrder();
+	}
     int layerOrder = pComponent->GetLayerOrder();
     auto maxSize = pComponent->stretchSize;
     bool stretchX = pComponent->isStretchX;
     bool stretchY = pComponent->isStretchY;
 	bool isEnable = owner->IsEnabled();
 
-    m_updateFunction = [weakProxyObject, isEnable, font, message, color, position, fontSize, layerOrder, maxSize, stretchX, stretchY]()
+    m_updateFunction = [weakProxyObject, canvasOrder, isEnable, font, message, color, position, fontSize, layerOrder, maxSize, stretchX, stretchY]()
     {
         if (auto proxyObject = weakProxyObject.lock())
         {
@@ -430,6 +447,7 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
             data.color = color;
             data.position = Mathf::Vector2(position);
             data.fontSize = fontSize;
+			data.canvasOrder = canvasOrder;
             data.layerOrder = layerOrder;
             data.maxSize = maxSize;
             data.stretchX = stretchX;

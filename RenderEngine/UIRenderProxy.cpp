@@ -84,6 +84,8 @@ inline bool CalculateClippedRects(
 //==================================================================
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
+    auto* canvas = image->GetOwnerCanvas();
+
     ImageData data{};
 	data.textures   = image->textures;
     data.texture    = image->m_curtexture;
@@ -95,12 +97,18 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
     data.layerOrder = image->GetLayerOrder();
     data.clipDirection = image->clipDirection;
     data.clipPercent   = image->clipPercent;
+    if (canvas)
+    {
+        data.canvasOrder = canvas->GetCanvasOrder();
+    }
     m_data          = data;
     m_instancedID   = image->GetInstanceID();
 }
 
 UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
 {
+    auto* canvas = text->GetOwnerCanvas();
+
     TextData data{};
     data.font       = text->font;
     data.message    = text->message;
@@ -109,6 +117,10 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     const auto centeredPosition = Mathf::Vector2(text->pos) + text->stretchSize * 0.5f;
     data.position   = { centeredPosition.x, centeredPosition.y };
     data.fontSize   = text->fontSize;
+    if (canvas)
+    {
+        data.canvasOrder = canvas->GetCanvasOrder();
+    }
     data.layerOrder = text->GetLayerOrder();
     data.maxSize    = text->stretchSize;
     data.stretchX   = text->isStretchX;
@@ -119,6 +131,8 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
 
 UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
 {
+    auto* canvas = sprite->GetOwnerCanvas();
+
     SpriteSheetData data{};
     m_texture               = sprite->m_spriteSheetTexture;
     m_spriteSheet           = std::make_shared<SpriteSheet>();
@@ -126,6 +140,10 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
     data.origin             = { sprite->uiinfo.size.x * 0.5f, sprite->uiinfo.size.y * 0.5f };
     data.position           = sprite->pos;
     data.scale              = sprite->scale;
+    if (canvas)
+    {
+        data.canvasOrder = canvas->GetCanvasOrder();
+    }
     data.layerOrder         = sprite->GetLayerOrder();
     m_sequenceState.loop    = sprite->m_isLoop;
 	data.frameDuration      = sprite->m_frameDuration;
