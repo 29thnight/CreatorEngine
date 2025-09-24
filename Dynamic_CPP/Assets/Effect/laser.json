@@ -742,7 +742,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 246.42189025878906,
+                            "currentTime": 43.02195739746094,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.0,
@@ -816,7 +816,7 @@
                             "vertexShader": "BillBoard"
                         },
                         "spriteAnimation": {
-                            "animationDuration": 1.0000001192092896,
+                            "animationDuration": 5.0,
                             "frameCount": 16,
                             "gridColumns": 4,
                             "gridRows": 4

@@ -408,7 +408,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Component.inl" />
-    <None Include="cpp.hint" />
     <None Include="GameObject.inl" />
   </ItemGroup>
   <ItemGroup>

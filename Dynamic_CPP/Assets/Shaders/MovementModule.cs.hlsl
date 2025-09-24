@@ -132,23 +132,50 @@ float3 GetVelocityFromCurve(float normalizedAge)
 }
 
 // 충격 효과 계산
-float3 GetImpulseForce(float normalizedAge)
+float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleData particle)
 {
     float3 totalImpulse = float3(0, 0, 0);
+    float3 dominantDirection = float3(0, 0, 0);
+    float maxStrength = 0.0;
     
     for (int i = 0; i < impulseCount; i++)
     {
         float timeDiff = abs(normalizedAge - Impulses[i].triggerTime);
         
-        // 충격 지속시간 내에 있는지 확인
         if (timeDiff <= Impulses[i].duration)
         {
-            // 거리에 따른 강도 감소 (가까울수록 강함)
             float strength = 1.0 - (timeDiff / Impulses[i].duration);
-            strength = strength * strength; // 제곱으로 더 급격한 감소
+            strength = strength * strength;
             
-            totalImpulse += Impulses[i].direction * Impulses[i].force * strength;
+            float2 seed = float2(particleIndex * 0.1234 + i * 0.5678, particleIndex * 0.8765 + i * 0.4321);
+            float angle = noise(seed) * 6.28318;
+            float elevation = (noise(seed + 50.0) - 0.5) * 1.57079;
+            
+            float3 baseDir = normalize(Impulses[i].direction);
+            float3 spreadDir = float3(
+                cos(angle) * cos(elevation),
+                sin(elevation),
+                sin(angle) * cos(elevation)
+            );
+            
+            float3 finalDirection = normalize(baseDir + spreadDir * 0.5);
+            
+            totalImpulse += finalDirection * Impulses[i].force * strength;
+            
+            // 가장 강한 impulse의 방향을 기억 (pad4에 임시 저장)
+            if (strength > maxStrength)
+            {
+                maxStrength = strength;
+                dominantDirection = finalDirection;
+            }
         }
+    }
+    
+    // pad4에 방향 정보 임시 저장 (x에는 방향각도, y에는 강도)
+    if (maxStrength > 0.001)
+    {
+        particle.pad4.x = atan2(dominantDirection.z, dominantDirection.x); // 목표 각도
+        particle.pad4.y = maxStrength; // 강도
     }
     
     return totalImpulse;
@@ -243,7 +270,19 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (velocityMode == 2) // Impulse  
         {
-            additionalVelocity += GetImpulseForce(normalizedAge);
+            additionalVelocity += GetImpulseForce(normalizedAge, particleIndex, particle);
+    
+            // pad4에 저장된 방향 정보로 rotation 조정
+            if (particle.pad4.y > 0.001) // 강도가 충분할 때
+            {
+                float targetRotation = particle.pad4.x;
+                float rotationLerpSpeed = 5.0;
+                float lerpFactor = min(particle.pad4.y * rotationLerpSpeed * deltaTime, 1.0);
+                particle.rotation = lerp(particle.rotation, targetRotation, lerpFactor);
+
+                // 사용 후 초기화
+                particle.pad4 = float2(0, 0);
+            }
         }
         else if (velocityMode == 3) // Wind
         {

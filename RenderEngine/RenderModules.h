@@ -88,6 +88,14 @@ enum class RasterizerPreset
     Custom          // 사용자 정의
 };
 
+struct SpriteAnimationBuffer
+{
+    uint32 frameCount;      // 총 프레임 수
+    float animationDuration;
+    uint32 gridColumns;     // 스프라이트 시트 격자 크기 - 열
+    uint32 gridRows;        // 스프라이트 시트 격자 크기 - 행
+};
+
 class RenderModules
 {
 public:
