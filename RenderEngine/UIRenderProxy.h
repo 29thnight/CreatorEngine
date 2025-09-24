@@ -26,6 +26,7 @@ public:
         Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
         float                                   rotation{ 0.f };
+        int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
         ClipDirection                           clipDirection{ ClipDirection::None };
         float                                   clipPercent{ 1.f };
@@ -38,6 +39,7 @@ public:
         Mathf::Color4                           color{ DirectX::Colors::Black };
         DirectX::XMFLOAT2                       position{};
         float                                   fontSize{ 5.f };
+        int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
         Mathf::Vector2                          maxSize{};
         bool                                    stretchX{ false };
@@ -52,6 +54,7 @@ public:
         Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
         float                                   rotation{ 0.f };
+        int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
         float                                   deltaTime{};
 		float                                   frameDuration{ 0.1f };
@@ -71,6 +74,14 @@ public:
 
 	void SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer);
 	ComPtr<ID3D11Buffer> GetCustomPixelBuffer() const { return m_customPixelBuffer; }
+
+    int GetCanvasOrder() const {
+        return std::visit([](auto&& d) { return d.canvasOrder; }, m_data);
+    }
+
+    int GetLayerOrder() const {
+        return std::visit([](auto&& d) { return d.layerOrder; }, m_data);
+    }
 
 	void UpdateShaderBuffer(ID3D11DeviceContext* deferredContext);
 

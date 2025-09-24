@@ -83,6 +83,13 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 
     DirectX11::VSSetConstantBuffer(deferredPtr, 0, 1, m_UIBuffer.GetAddressOf());
 
+    std::ranges::sort(renderData->m_UIRenderQueue, [](const auto& lhs, const auto& rhs)
+    {
+        if (lhs->GetCanvasOrder() != rhs->GetCanvasOrder())
+            return lhs->GetCanvasOrder() < rhs->GetCanvasOrder();
+        return lhs->GetLayerOrder() < rhs->GetLayerOrder();
+    });
+
     for (auto* proxy : renderData->m_UIRenderQueue)
     {
 		if (!proxy->IsEnabled()) continue;

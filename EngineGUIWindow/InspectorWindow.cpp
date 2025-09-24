@@ -1473,10 +1473,15 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 
 void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
 {
-	if (const auto* type = Meta::Find("Canvas"))
+	ImGui::InputText("CanvasName", &canvas->CanvasName);
+	static int order{};
+
+	order = canvas->CanvasOrder;
+	if (ImGui::DragInt("CanvasOrder", &order))
 	{
-		Meta::DrawProperties(canvas, *type);
+		canvas->SetCanvasOrder(order);
 	}
+
 }
 
 void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
