@@ -14,7 +14,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 2,
+                    "animationIndex": 1,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -148,7 +148,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 3,
+                    "animationIndex": 6,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",
@@ -196,7 +196,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 3,
+                    "animationIndex": 0,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
                     "behaviourName": "",

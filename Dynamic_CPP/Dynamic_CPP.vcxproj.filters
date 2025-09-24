@@ -588,6 +588,9 @@
 		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\MonEleteProjetile.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1027,6 +1030,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerBombCharing.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MonEleteProjetile.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

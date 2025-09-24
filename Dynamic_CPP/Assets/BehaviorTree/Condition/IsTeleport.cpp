@@ -12,10 +12,10 @@ bool IsTeleport::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	{
 		return false; // Identity가 없거나 "MonsterMage"가 아닐 경우 false 반환
 	}
-	bool hasCooldown = blackBoard.HasKey("TeleportColldown");
+	bool hasCooldown = blackBoard.HasKey("TeleportCooldown");
 	if (hasCooldown) 
 	{
-		float cooldown = blackBoard.GetValueAsFloat("TeleportColldown");
+		float cooldown = blackBoard.GetValueAsFloat("TeleportCooldown");
 		if (cooldown > 0.01f)
 		{
 			return false; // 텔레포트 쿨타임이 남아있으면 false 반환
@@ -34,7 +34,7 @@ bool IsTeleport::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	Mathf::Vector3 Dir = TargetTransform->GetWorldPosition() - selfTransform->GetWorldPosition();
 	float len = Dir.Length();
 	std::cout << "len : " << len << "and";
-	auto invokeRange = blackBoard.GetValueAsFloat("TeleportDistance");
+	float invokeRange = blackBoard.GetValueAsFloat("TeleportDistance");
 	if (Dir.Length() < invokeRange)
 	{
 		return true; //가장 가까운 플레이어가 근접하면 텔레포트

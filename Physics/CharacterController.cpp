@@ -11,12 +11,12 @@ CharacterController::~CharacterController()
 {
 	CollisionData* data = (CollisionData*)m_controller->getActor()->userData;
 	data->isDead = true;
-
-	if (m_controller)
+	// physics update에서 지연 삭제
+	/*if (m_controller) 
 	{
 		m_controller->release();
 		m_controller = nullptr;
-	}
+	}*/
 	//터지니? 만약에 중앙 통제면, 메니저에서 할당하고 넘겨줘야지...
 	Memory::SafeDelete(m_characterMovement);
 	Memory::SafeDelete(m_filters);

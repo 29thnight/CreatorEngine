@@ -18,7 +18,7 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [978219678, 1592544601, 311265363, 243661542]
+    Children: [978219678, 1592544601, 311265363, 3460955026, 1693382485]
     ChildWeights: ~
     Position: {x: 134, y: 173}
   - ID: 978219678
@@ -109,7 +109,40 @@ NodeList:
     Children: ~
     ChildWeights: ~
     Position: {x: 198, y: 680}
-  - ID: 243661542
+  - ID: 3460955026
+    Type: 2
+    Name: Sequence
+    ParentID: 47888644
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2710490406, 2060018329]
+    ChildWeights: ~
+    Position: {x: 422, y: 360}
+  - ID: 2710490406
+    Type: 7
+    Name: Condition
+    ParentID: 3460955026
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsReteat
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 374, y: 504}
+  - ID: 2060018329
+    Type: 9
+    Name: Action
+    ParentID: 3460955026
+    IsRoot: false
+    HasScript: true
+    ScriptName: RetreatAction
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 470, y: 648}
+  - ID: 1693382485
     Type: 9
     Name: Action
     ParentID: 47888644
@@ -119,4 +152,4 @@ NodeList:
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 486, y: 296}
+    Position: {x: 646, y: 344}
