@@ -1,14 +1,4 @@
 Mage:
-  - key: eChaseOutDuration
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 0
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: Player2
     value:
       Type: 8
@@ -25,6 +15,16 @@ Mage:
       BoolValue: false
       IntValue: 0
       FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eChaseOutDuration
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
@@ -69,22 +69,22 @@ Mage:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eSpeed
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 1
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: eChaseRange
     value:
       Type: 3
       BoolValue: false
       IntValue: 0
       FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eSpeed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 1
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
@@ -165,7 +165,7 @@ Mage:
       BoolValue: false
       IntValue: 0
       FloatValue: 0
-      StringValue: 1PAni
+      StringValue: 1P
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}

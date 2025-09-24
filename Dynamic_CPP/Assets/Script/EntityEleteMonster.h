@@ -9,6 +9,7 @@ class BehaviorTreeComponent;
 class BlackBoard;
 class Animator;
 class EffectComponent;
+struct Feeler;
 class EntityEleteMonster : public Entity
 {
 public:
@@ -55,7 +56,7 @@ public:
 	float m_enemyReward = 10.f; //처치시 플레이어에게 주는 보상
 	//이동 및 추적
 	[[Property]]
-	float m_moveSpeed = 0.02f;
+	float m_moveSpeed = 0.5f;
 	[[Property]]
 	float m_chaseRange = 10.f; //감지 범위
 	[[Property]]
@@ -80,15 +81,31 @@ public:
 
 	//MonsterMage 특수
 	[[Property]]
-	float m_retreatDistance = 10.0f; //후퇴 시작 거리
+	float m_retreatRange = 10.0f; //후퇴 감지 범위
+	[[Property]]
+	float m_retreatCoolTime = 3.0f; //후퇴 행동 쿨타임
+	[[Property]]
+	float m_retreatDistance = 4.0f; //1회 후퇴거리
+	[[Property]]
+	float m_avoidanceStrength = 0.03f; //물체 회피시의 힘
+
+	bool m_isRetreat = false; // 후퇴중
+	DirectX::SimpleMath::Vector3 m_previousPos= DirectX::SimpleMath::Vector3::Zero;
+	float m_retreatTreval = 0.0f; //후퇴하며 이동한 거리
+
 	[[Property]]
 	float m_teleportDistance = 5.0f; //텔레포트 시작 거리
 	[[Property]]
-	float m_taleportColldown = 3.0f; //텔레포트 쿨다운
+	float m_teleportCoolTime = 3.0f; //텔레포트 쿨타임
 
+	bool m_isTeleport = false; //텔레포트 실행중
+	bool m_posset = false; //이동 완료시
 
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
 	std::string m_identity = "MonsterMage";
+
+	DirectX::SimpleMath::Vector3 m_currentVelocity = DirectX::SimpleMath::Vector3::Zero;
+
 
 	void UpdatePlayer();
 
@@ -98,7 +115,19 @@ public:
 
 	void ChaseTarget(); //타겟 추적
 
-	void Retreat(); // 플레이어 접근시 후퇴
+	void StartRetreat();
+
+	void Retreat(float tick); // 플레이어 접근시 후퇴
+
+	DirectX::SimpleMath::Vector3 ObstacleAvoider(
+		const std::vector<Feeler>& feelers,
+		const DirectX::SimpleMath::Vector3& currentPosition,
+		const DirectX::SimpleMath::Quaternion& currentOrientation,
+		const DirectX::SimpleMath::Vector3& currentVelocity,
+		float characterShapeRadius,
+		float characterShapeHalfHeight,
+		float avoidanceStrength,
+		unsigned int layerMask);
 
 	void Teleport(); // 일정 거리 이내 접근시 순간이동
 
@@ -110,7 +139,7 @@ public:
 
 	//텔레포트
 	// 주어진 위치가 텔레포트 가능한지 검사하는 헬퍼 함수
-	bool IsValidTeleportLocation(const Mathf::Vector3& candidatePos, Mathf::Vector3& outGroundPos, std::vector<GameObject*>& outMonstersToPush);
+	bool IsValidTeleportLocation(const Mathf::Vector3& candidatePos, std::vector<GameObject*>& outMonstersToPush,bool onlast);
 
 	// 최종 위치로 텔레포트하고, 밀어낼 몬스터들을 밀어내는 헬퍼 함수
 	void PushAndTeleportTo(const Mathf::Vector3& finalPos, const std::vector<GameObject*>& monstersToPush);

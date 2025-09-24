@@ -56,6 +56,7 @@ public:
 	//개별 엑터 삭제
 	void DestroyActor(unsigned int id);
 
+	
 
 	//충돌 검사를 위한 레이캐스트
 	RayCastOutput RayCast(const RayCastInput& in, bool isStatic = false);
@@ -170,6 +171,8 @@ public:
 	//void SetLogger();
 	//삭제 예정 엑터 삭제
 	void RemoveActors();
+	//삭제 예정 CCT 삭제
+	void RemoveControllers();
 
 	void UnInitialize(); //물리엔진 종료
 	void ShowNotRelease(); // 해제 되지 않은 객체들 출력
@@ -255,7 +258,7 @@ private:
 	unsigned int m_collisionMatrix[32]{};
 
 	std::vector<physx::PxActor*> m_removeActorList{}; //삭제할 액터들
-
+	std::vector<physx::PxController*> m_removeControllerList{}; // 삭제할 CCT의 PxController 포인터를 저장할 목록입니다.
 	//==================================================================================
 	//rigid body 관리용
 	std::unordered_map<unsigned int, RigidBody*> m_rigidBodyContainer{}; //rigid body 관리용

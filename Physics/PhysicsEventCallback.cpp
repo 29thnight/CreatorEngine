@@ -244,6 +244,10 @@ void PhysicsEventCallback::CountTrigger(unsigned int triggerId,unsigned int othe
 	{
 		//트리거 맵에서 triggerId를 찾고 세트되어 있는 otherId를 찾는다
 		auto triggerIter = m_triggerMap.find(triggerId);
+		// 이미 소멸된 객체에 대한 END_OVERLAP 이벤트일 수 있습니다.
+		if (triggerIter == m_triggerMap.end()) {
+			return; // 이미 처리되었거나 유효하지 않은 ID이므로 무시
+		}
 		auto otherSetIter = triggerIter->second.find(otherId);
 		
 		//충돌이 끝난 객체만 지움

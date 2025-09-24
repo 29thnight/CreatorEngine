@@ -209,6 +209,12 @@ void EntityMonsterA::Update(float tick)
 		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
 
+	// test code start
+	if (InputManagement->IsKeyDown('M'))
+	{
+		GetOwner()->Destroy();
+	}
+	// test code end
 }
 
 

@@ -931,10 +931,29 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 {
 	if (!Physics || m_pendingControllerPositions.empty()) return;
 
+	// ID를 통해 게임오브젝트를 찾기 위해 콜라이더 컨테이너에 접근합니다.
+	auto& colliderContainer = SceneManagers->GetActiveScene()->m_colliderContainer;
+
 	for (const auto& change : m_pendingControllerPositions)
 	{
+		// 1. PhysX 엔진 내부의 컨트롤러 위치를 강제로 설정합니다.
 		Physics->SetControllerPosition(change.id, change.position);
+
+		// 2. 해당 ID를 가진 게임오브젝트를 찾습니다.
+		auto it = colliderContainer.find(change.id);
+		if (it != colliderContainer.end())
+		{
+			auto& colliderInfo = it->second;
+			if (colliderInfo.gameObject)
+			{
+				// 3. (핵심) 게임오브젝트의 Transform 컴포넌트 위치도 즉시 동기화합니다.
+				// CCT의 경우 일반적으로 오프셋이 없거나, 있더라도 순간이동은 기준점을 기준으로 하는 것이 명확합니다.
+				// 만약 오프셋을 고려해야 한다면, change.position에서 오프셋을 빼준 값을 SetWorldPosition에 넘겨주어야 합니다.
+				colliderInfo.gameObject->m_transform.SetWorldPosition(change.position);
+			}
+		}
 	}
+
 	m_pendingControllerPositions.clear();
 }
 

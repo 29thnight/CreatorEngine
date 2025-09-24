@@ -291,6 +291,19 @@ void PhysicX::RemoveActors()
 	}
 	m_removeActorList.clear();
 }
+
+void PhysicX::RemoveControllers()
+{
+	if (m_removeControllerList.empty()) return;
+
+	for (physx::PxController* controller : m_removeControllerList)
+	{
+		// 이 시점은 simulate() 전이므로 PxController를 release() 하기에 안전합니다.
+		controller->release();
+	}
+	m_removeControllerList.clear(); // 처리 완료된 큐는 비웁니다.
+}
+
 void PhysicX::UnInitialize() {
 	if (m_scene) m_scene->release();
 	if (gDispatcher) gDispatcher->release();
@@ -311,6 +324,7 @@ void PhysicX::Update(float fixedDeltaTime)
 	// PxScene 업데이트
 	RemoveActors();
 	//첫 틱 마다 시뮬레이션 업데이트 -> 물리 업데이트
+	RemoveControllers();
 	//rigid body 업데이트
 	{
 		//콜라이더 업데이트
@@ -1396,10 +1410,26 @@ void PhysicX::CreateCCT(const CharacterControllerInfo& controllerInfo, const Cha
 
 void PhysicX::RemoveCCT(const unsigned int& id)
 {
-	auto controllerIter = m_characterControllerContainer.find(id);
-	if (controllerIter!= m_characterControllerContainer.end()) {
-		m_characterControllerContainer.erase(controllerIter);
+	// 1. 우리 엔진의 CCT 컨테이너에서 해당 CCT를 찾습니다.
+	auto iter = m_characterControllerContainer.find(id);
+	if (iter == m_characterControllerContainer.end())
+	{
+		return; // 이미 없거나 잘못된 ID
 	}
+
+	CharacterController* controllerWrapper = iter->second;
+
+	// 2. 래퍼 클래스에서 실제 PxController 포인터를 가져옵니다.
+	physx::PxController* pxController = controllerWrapper->GetController();
+	if (pxController)
+	{
+		// 3. 실제 PxController를 '삭제 큐'에 추가합니다.
+		m_removeControllerList.push_back(pxController);
+	}
+
+	// 4. 우리 엔진의 CCT 래퍼 객체와 컨테이너 항목을 정리합니다.
+	delete controllerWrapper; // 래퍼 클래스 메모리 해제
+	m_characterControllerContainer.erase(iter); // 컨테이너에서 제거
 	
 }
 

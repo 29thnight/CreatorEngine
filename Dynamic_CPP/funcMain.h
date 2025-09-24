@@ -194,6 +194,7 @@ extern "C"
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("ImageSlideshow", []() { return new ImageSlideshow(); });
 		CreateFactory::GetInstance()->RegisterFactory("IllustrationMove", []() { return new IllustrationMove(); });
+		CreateFactory::GetInstance()->RegisterFactory("MonEleteProjetile", []() { return new MonEleteProjetile(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemComponent", []() { return new ItemComponent(); });
 		CreateFactory::GetInstance()->RegisterFactory("ItemManager", []() { return new ItemManager(); });

@@ -46,6 +46,23 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
 	}
 
+	if (identity == "MonsterMage") {
+		CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
+		bool isState = blackBoard.HasKey("State");
+
+		if (isState)
+		{
+			std::string state = blackBoard.GetValueAsString("State");
+		}
+		else
+		{
+			blackBoard.SetValueAsString("State", "Idle");
+			//LOG("Setting Idle state for the first time.");
+		}
+		return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
+	}
+
+
 	bool isP1 = blackBoard.HasKey("Player1");
 	bool isP2 = blackBoard.HasKey("Player2");
 	bool isAsis = blackBoard.HasKey("Asis");
