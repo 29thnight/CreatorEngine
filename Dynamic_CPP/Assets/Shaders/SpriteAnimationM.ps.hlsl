@@ -1,30 +1,10 @@
 // SpriteAnimation.hlsl - 스프라이트 애니메이션 구현하는 픽셀 셰이더 
-
-// 픽셀 셰이더 입력 구조체
-struct PixelInput
-{
-    float4 position : SV_POSITION;
-    float3 worldPos : WORLD_POSITION;
-    float3 particleCenter : PARTICLE_CENTER;
-    float3 localPos : LOCAL_POSITION; // 원본 로컬 위치
-    float3 particleScale : PARTICLE_SCALE;
-    float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD0;
-    float4 color : COLOR;
-    float3 viewDir : VIEW_DIR;
-    float alpha : ALPHA;
-    uint renderMode : RENDER_MODE;
-    float particleAge : PARTICLE_AGE;
-    float particleLifeTime : PARTICLE_LIFETIME;
-
-};
-
 // 텍스처 및 샘플러 정의
 Texture2D gTexture : register(t0);
 SamplerState linearSampler : register(s0);
 
 // Sprite Animation Constant Buffer
-cbuffer SpriteAnimationBuffer : register(b4)
+cbuffer SpriteAnimationBuffer : register(b0)
 {
     uint frameCount; // 총 프레임 수
     float animationDuration;
@@ -37,10 +17,20 @@ cbuffer TimeBuffer : register(b3)
     float3 gPadding;
 };
 
-float4 main(PixelInput input) : SV_TARGET
+// 픽셀 셰이더 입력 구조체
+struct VSOutput
 {
-    // particleAge를 기반으로 현재 프레임 계산 (전역 시간이 아닌 파티클별 나이 사용)
-    float normalizedTime = fmod(input.particleAge, animationDuration) / animationDuration;
+    float4 Position : SV_POSITION;
+    float2 TexCoord : TEXCOORD0;
+    uint TexIndex : TEXCOORD1;
+    float4 Color : COLOR0;
+    float Age : TEXCOORD2;
+};
+
+float4 main(VSOutput input) : SV_TARGET
+{
+    // age를 기반으로 현재 프레임 계산
+    float normalizedTime = fmod(input.Age, animationDuration) / animationDuration;
     uint currentFrame = (uint) (normalizedTime * frameCount) % frameCount;
     
     // 스프라이트 애니메이션을 위한 UV 좌표 계산
@@ -49,7 +39,7 @@ float4 main(PixelInput input) : SV_TARGET
     uint frameY = currentFrame / gridSize.x;
     
     float2 frameOffset = float2(frameX * frameSize.x, frameY * frameSize.y);
-    float2 animatedUV = frameOffset + (input.texCoord * frameSize);
+    float2 animatedUV = frameOffset + (input.TexCoord * frameSize);
     
     // 마스크 텍스처에서 마스크값 가져오기
     float4 temp = gTexture.Sample(linearSampler, animatedUV);
@@ -63,21 +53,21 @@ float4 main(PixelInput input) : SV_TARGET
         discard;
     
     // 파티클 수명에 따른 디졸브 임계값 계산
-    float dissolveThreshold = saturate(input.particleAge);
+    float dissolveThreshold = saturate(input.Age);
     
     // 디졸브 효과: 마스크값이 임계값보다 낮으면 픽셀 폐기
     if (dissolve < dissolveThreshold || alpha < 0.1)
         discard;
     
     // 입력 색상을 기본색으로 사용하고 마스크로 강도 조절
-    float3 baseColor = input.color.rgb * maskValue;
+    float3 baseColor = input.Color.rgb * maskValue;
     //float3 emissiveColor = float3(1.4f, 0.7f, 0.37f) * alpha;
 
     // 에미시브 값에 따라 기본 색상과 에미시브 색상을 블렌딩
     float3 finalColor = baseColor;
     
     // 최종 알파값 계산 (마스크값 × 입력 알파)
-    float finalAlpha = input.color.a * alpha;
+    float finalAlpha = input.Color.a * alpha;
     
     return float4(finalColor, finalAlpha);
 }

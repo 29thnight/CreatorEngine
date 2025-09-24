@@ -43,7 +43,8 @@ struct ImpulseData
     float3 direction;
     float force;
     float duration;
-    float2 pad;
+    float spreadRange; // 분산 범위
+    int spreadType; // 분산 타입 (0=직선, 1=원뿔, 2=구형)
 };
 
 // 상수 버퍼 정의 (C++의 MovementParams와 정확히 일치)
@@ -99,6 +100,17 @@ float noise(float2 uv)
     return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
 }
 
+// Hash 함수 (랜덤값 생성용)
+float Hash(uint seed)
+{
+    seed = (seed ^ 61u) ^ (seed >> 16u);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
+    return float(seed) * (1.0f / 4294967296.0f);
+}
+
 // 시간 기반 velocity 보간 함수
 float3 GetVelocityFromCurve(float normalizedAge)
 {
@@ -147,22 +159,47 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleDa
             float strength = 1.0 - (timeDiff / Impulses[i].duration);
             strength = strength * strength;
             
-            float2 seed = float2(particleIndex * 0.1234 + i * 0.5678, particleIndex * 0.8765 + i * 0.4321);
-            float angle = noise(seed) * 6.28318;
-            float elevation = (noise(seed + 50.0) - 0.5) * 1.57079;
+            uint seed1 = particleIndex * 73856093u ^ (i * 19349663u);
+            uint seed2 = particleIndex * 83492791u ^ (i * 41943041u);
             
             float3 baseDir = normalize(Impulses[i].direction);
-            float3 spreadDir = float3(
-                cos(angle) * cos(elevation),
-                sin(elevation),
-                sin(angle) * cos(elevation)
-            );
+            float3 finalDirection;
             
-            float3 finalDirection = normalize(baseDir + spreadDir * 0.5);
+            if (Impulses[i].spreadType == 0)
+            {
+                // 직선 (분산 없음)
+                finalDirection = baseDir;
+            }
+            else if (Impulses[i].spreadType == 1)
+            {
+                // 원뿔형 분산 (샷건)
+                float angle = Hash(seed1) * 6.28318;
+                float radius = Hash(seed2) * Impulses[i].spreadRange;
+                
+                float3 up = abs(baseDir.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
+                float3 right = normalize(cross(baseDir, up));
+                up = normalize(cross(right, baseDir));
+                
+                float3 spreadOffset = (right * cos(angle) + up * sin(angle)) * radius;
+                finalDirection = normalize(baseDir + spreadOffset);
+            }
+            else if (Impulses[i].spreadType == 2)
+            {
+                // 구형 분산 (폭발)
+                float angle = Hash(seed1) * 6.28318;
+                float elevation = (Hash(seed2) - 0.5) * 1.57079;
+                
+                float3 spreadDir = float3(
+                    cos(angle) * cos(elevation),
+                    sin(elevation),
+                    sin(angle) * cos(elevation)
+                );
+                
+                finalDirection = normalize(baseDir + spreadDir * Impulses[i].spreadRange);
+            }
             
             totalImpulse += finalDirection * Impulses[i].force * strength;
             
-            // 가장 강한 impulse의 방향을 기억 (pad4에 임시 저장)
             if (strength > maxStrength)
             {
                 maxStrength = strength;
@@ -171,11 +208,10 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleDa
         }
     }
     
-    // pad4에 방향 정보 임시 저장 (x에는 방향각도, y에는 강도)
     if (maxStrength > 0.001)
     {
-        particle.pad4.x = atan2(dominantDirection.z, dominantDirection.x); // 목표 각도
-        particle.pad4.y = maxStrength; // 강도
+        particle.pad3 = dominantDirection;
+        particle.pad4 = maxStrength;
     }
     
     return totalImpulse;

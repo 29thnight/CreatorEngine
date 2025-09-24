@@ -49,7 +49,8 @@ struct ImpulseData
     float3 direction;
     float force;
     float duration;
-    float2 pad;
+    float spreadRange; // 분산 범위
+    int spreadType; // 분산 타입 (0=직선, 1=원뿔, 2=구형)
 };
 
 // 상수 버퍼 정의 (C++의 MeshMovementParams와 정확히 일치)
@@ -164,18 +165,44 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout MeshPartic
             float strength = 1.0 - (timeDiff / Impulses[i].duration);
             strength = strength * strength;
             
-            float2 seed = float2(particleIndex * 0.1234 + i * 0.5678, particleIndex * 0.8765 + i * 0.4321);
-            float angle = noise(seed) * 6.28318;
-            float elevation = (noise(seed + 50.0) - 0.5) * 1.57079;
+            uint seed1 = particleIndex * 73856093u ^ (i * 19349663u);
+            uint seed2 = particleIndex * 83492791u ^ (i * 41943041u);
             
             float3 baseDir = normalize(Impulses[i].direction);
-            float3 spreadDir = float3(
-                cos(angle) * cos(elevation),
-                sin(elevation),
-                sin(angle) * cos(elevation)
-            );
+            float3 finalDirection;
             
-            float3 finalDirection = normalize(baseDir + spreadDir * 0.5);
+            if (Impulses[i].spreadType == 0)
+            {
+                // 직선 (분산 없음)
+                finalDirection = baseDir;
+            }
+            else if (Impulses[i].spreadType == 1)
+            {
+                // 원뿔형 분산 (샷건)
+                float angle = Hash(seed1) * 6.28318;
+                float radius = Hash(seed2) * Impulses[i].spreadRange;
+                
+                float3 up = abs(baseDir.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
+                float3 right = normalize(cross(baseDir, up));
+                up = normalize(cross(right, baseDir));
+                
+                float3 spreadOffset = (right * cos(angle) + up * sin(angle)) * radius;
+                finalDirection = normalize(baseDir + spreadOffset);
+            }
+            else if (Impulses[i].spreadType == 2)
+            {
+                // 구형 분산 (폭발)
+                float angle = Hash(seed1) * 6.28318;
+                float elevation = (Hash(seed2) - 0.5) * 1.57079;
+                
+                float3 spreadDir = float3(
+                    cos(angle) * cos(elevation),
+                    sin(elevation),
+                    sin(angle) * cos(elevation)
+                );
+                
+                finalDirection = normalize(baseDir + spreadDir * Impulses[i].spreadRange);
+            }
             
             totalImpulse += finalDirection * Impulses[i].force * strength;
             
@@ -187,11 +214,10 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout MeshPartic
         }
     }
     
-    // 3D 방향 정보를 pad3에 저장 (전체 3D 방향벡터)
     if (maxStrength > 0.001)
     {
         particle.pad3 = dominantDirection;
-        particle.pad4 = maxStrength; // 강도 저장
+        particle.pad4 = maxStrength;
     }
     
     return totalImpulse;
@@ -327,7 +353,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         // 중력 적용 (월드 공간에서)
         if (useGravity != 0)
         {
-            particle.velocity += particle.acceleration * gravityStrength * deltaTime;
+            float3 gravityForce = float3(0, -9.8, 0) * gravityStrength;
+            particle.velocity += gravityForce * deltaTime;
         }
         
         // 파티클 회전 업데이트 (로컬 회전)

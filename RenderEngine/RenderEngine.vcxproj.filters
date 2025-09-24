@@ -1228,6 +1228,9 @@
       <Filter>Shaders\Effect\Special\3D</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Burst.vs.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpriteAnimationM.ps.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
   </ItemGroup>

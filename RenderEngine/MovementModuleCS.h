@@ -27,8 +27,9 @@ public:
 	bool GetUseGravity() { return m_gravity; }
 
 	void SetGravityStrength(float strength) { m_gravityStrength = strength; m_paramsDirty = true; }
-	void SetEasingEnabled(bool enabled) { m_easingEnabled = enabled; m_paramsDirty = true; }
-	void SetEasingType(int type) { m_easingType = type; m_paramsDirty = true; }
+	void SetEasingEnabled(bool enabled);
+	void SetEasing(EasingEffect easingType, StepAnimation animationType, float duration);
+	void DisableEasing();
 
 	void SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation);
 
@@ -46,7 +47,7 @@ public:
 
 	void AddVelocityPoint(float time, const Mathf::Vector3& velocity, float strength = 1.0f);
 
-	void AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration = 0.1f);
+	void AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration, float impulseRange = 0.5f, UINT impulseType = 1);
 
 	void SetWindEffect(const Mathf::Vector3& direction, float strength, float turbulence = 0.5f, float frequency = 1.0f);
 
@@ -108,6 +109,7 @@ private:
 	WindData m_windData;
 	OrbitalData m_orbitalData;
 	ExplosiveData m_explosiveData;
+	EaseInOut m_easingModule;
 
 	float m_currentTime;
 
@@ -115,8 +117,7 @@ private:
 	// Basic movement properties
 	bool m_gravity;
 	float m_gravityStrength;
-	bool m_easingEnabled;
-	int m_easingType;
+	bool m_easingEnable;
 
 	// Compute shader related variables
 	ID3D11ComputeShader* m_computeShader;

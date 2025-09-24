@@ -4,11 +4,11 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "3",
+    "name": "2",
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 10,
+            "maxParticles": 1,
             "modules": [
                 {
                     "data": {
@@ -21,12 +21,12 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 1.0,
+                            "lifeTime": 10.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -51,12 +51,12 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "emitterType": 1,
-                            "spawnRate": 10.0
+                            "emitterType": 0,
+                            "spawnRate": 1.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 1
                         }
                     },
                     "stage": 2,
@@ -92,19 +92,19 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "RandomSpriteM",
+                            "pixelShader": "SpriteAnimation",
                             "vertexShader": "BillBoard"
                         },
                         "spriteAnimation": {
-                            "animationDuration": 0.0,
-                            "frameCount": 2,
+                            "animationDuration": 1.0,
+                            "frameCount": 4,
                             "gridColumns": 2,
-                            "gridRows": 1
+                            "gridRows": 2
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Tex_fx_HCFX_Stone_01",
+                                "name": "Tex_fx_HCFX_Dust_01",
                                 "slot": 0
                             }
                         ],

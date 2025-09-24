@@ -92,7 +92,7 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID)
     
     output.Position = positionP;
     output.TexCoord = input.TexCoord;
-    output.TexIndex = 0; // 필요하다면 particle에서 텍스처 인덱스 가져오기
+    output.TexIndex = instanceID;
     output.Color = particle.color;
     output.Age = particle.age;
     
