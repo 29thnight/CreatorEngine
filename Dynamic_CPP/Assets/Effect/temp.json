@@ -4,11 +4,11 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "3",
+    "name": "temp",
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 100,
+            "maxParticles": 10,
             "modules": [
                 {
                     "data": {
@@ -51,12 +51,12 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "emitterType": 3,
+                            "emitterType": 0,
                             "spawnRate": 100.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 100
+                            "particleCapacity": 10
                         }
                     },
                     "stage": 2,
@@ -78,13 +78,13 @@
                                     "y": 1.0,
                                     "z": 0.0
                                 },
-                                "duration": 1.0,
-                                "force": 2.928999900817871,
+                                "duration": 0.3319999873638153,
+                                "force": 6.699999809265137,
                                 "triggerTime": 0.0
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 566.4208984375,
+                            "currentTime": 2525.29541015625,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -107,7 +107,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 100
+                            "particleCapacity": 10
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -135,20 +135,20 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 1.0,
-                                "y": 0.0
+                                "x": 0.0,
+                                "y": 0.10000000149011612
                             },
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.10000000149011612,
                             "startSize": {
                                 "x": 1.0,
-                                "y": 0.5
+                                "y": 0.10000000149011612
                             },
                             "useRandomScale": 1
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 100
+                            "particleCapacity": 10
                         }
                     },
                     "stage": 2,
@@ -168,7 +168,7 @@
                     "data": {
                         "billboard": {
                             "maxCount": 0,
-                            "type": 2
+                            "type": 1
                         },
                         "indices": [
                             0,
@@ -180,23 +180,17 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
-                            "rasterizerPreset": 2
+                            "depthPreset": 1,
+                            "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "SpriteAnimation",
-                            "vertexShader": "Burst"
-                        },
-                        "spriteAnimation": {
-                            "animationDuration": 1.0,
-                            "frameCount": 4,
-                            "gridColumns": 2,
-                            "gridRows": 2
+                            "pixelShader": "BillBoard",
+                            "vertexShader": "Spike"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Tex_fx_HCFX_Sharp_02",
+                                "name": "123",
                                 "slot": 0
                             }
                         ],

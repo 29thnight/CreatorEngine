@@ -84,6 +84,12 @@ public:
 	float GetPolarClippingAnimationSpeed() const { return m_polarClippingAnimationSpeed; }
 	void SetPolarReferenceDirection(const Mathf::Vector3& referenceDir);
 
+
+	void EnableSpriteAnimation(bool enable);
+	void SetSpriteAnimation(uint32 frameCount, float duration, uint32 gridColumns, uint32 gridRows);
+	bool IsSpriteAnimationEnabled() const { return m_enableSpriteAnimation; }
+	const SpriteAnimationBuffer& GetSpriteAnimationParams() const { return m_SpriteAnimationConstantBuffer; }
+
 public:
 	virtual nlohmann::json SerializeData() const override;
 	virtual void DeserializeData(const nlohmann::json& json) override;
@@ -95,8 +101,6 @@ private:
 	void CreateSphereMesh();
 	void UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf::Matrix& view,
 		const Mathf::Matrix& projection);
-
-
 
 	bool m_isClippingAnimating = false;
 	float m_clippingAnimationSpeed = 1.0f;
@@ -132,4 +136,8 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_timeBuffer;
 	TimeParams m_timeParams = {};
+
+	ComPtr<ID3D11Buffer> m_SpriteAnimationBuffer;
+	SpriteAnimationBuffer m_SpriteAnimationConstantBuffer;
+	bool m_enableSpriteAnimation = false;
 };

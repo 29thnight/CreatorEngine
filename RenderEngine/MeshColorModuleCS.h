@@ -124,5 +124,12 @@ public:
     // ÀÌÂ¡ Á¦¾î
     void EnableEasing(bool enable) { m_easingEnable = enable; }
     bool IsEasingEnabled() const { return m_easingEnable; }
+
+    int GetCustomFunctionType() const { return m_colorParams.customFunctionType; }
+    float GetCustomParam1() const { return m_colorParams.customParam1; }
+    float GetCustomParam2() const { return m_colorParams.customParam2; }
+    float GetCustomParam3() const { return m_colorParams.customParam3; }
+    float GetCustomParam4() const { return m_colorParams.customParam4; }
+    EaseInOut GetEasingModule() { return m_easingModule; }
 };
 

@@ -364,7 +364,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         
             if (shouldSpawn)
             {
-                uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
+                uint seed = WangHash(particleIndex * 12345 + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
                 InitializeMeshParticle(particle, seed);
             }
         }

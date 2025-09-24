@@ -279,6 +279,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					if (ImGui::MenuItem(type_name.c_str()))
 					{
 						auto component = selectedSceneObject->AddComponent(*type);
+						if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
+						{
+							initializable->Initialize();
+						}
 					}
 				}
 
