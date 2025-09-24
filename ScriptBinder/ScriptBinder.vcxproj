@@ -264,6 +264,7 @@
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
+    <ClCompile Include="SoundComponent.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="SpriteSheetComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
@@ -307,7 +308,10 @@
     <ClInclude Include="MSBuildHelper.h" />
     <ClInclude Include="Navigation.h" />
     <ClInclude Include="RectTransformComponent.h" />
+    <ClInclude Include="CurvePoint.h" />
     <ClInclude Include="ScriptStringModule.h" />
+    <ClInclude Include="SoundComponent.h" />
+    <ClInclude Include="SoundDefinition.h" />
     <ClInclude Include="SpriteSheetComponent.h" />
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
@@ -404,7 +408,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Component.inl" />
-    <None Include="cpp.hint" />
     <None Include="GameObject.inl" />
   </ItemGroup>
   <ItemGroup>

@@ -1,5 +1,6 @@
 #pragma once
 #include "ParticleSystem.h"
+#include "SoundComponent.h"
 
 enum class EffectState {
     Stopped,    // Á¤ÁöµÊ (·»´õ¸µ ¾ÈÇÔ)

@@ -136,7 +136,8 @@ struct alignas(16) ImpulseData
 	Mathf::Vector3 direction;
 	float force;
 	float duration;
-	float2 pad1;
+	float impulseRange;
+	UINT impulseType;
 };
 
 struct WindData

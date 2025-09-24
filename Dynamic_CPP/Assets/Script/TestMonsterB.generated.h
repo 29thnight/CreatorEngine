@@ -18,5 +18,10 @@ ReflectionScriptField(TestMonsterB) \
 		meta_property(m_projectileArcHeight) \
 		meta_property(m_rangedAttackCoolTime) \
 	}); \
-	FieldEnd(TestMonsterB, PropertyOnly) \
+	MethodField \
+	({ \
+		meta_method(ShootingAttack) \
+		meta_method(DeadEvent) \
+	}); \
+	FieldEnd(TestMonsterB, PropertyAndMethod) \
 };

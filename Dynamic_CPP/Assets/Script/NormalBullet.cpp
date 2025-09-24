@@ -6,12 +6,14 @@
 #include "Entity.h"
 void NormalBullet::Start()
 {
+	__super::Start();
 	bulletType = BulletType::Normal;
 }
 
 
 void NormalBullet::Update(float tick)
 {
+	__super::Update(tick);
 	Transform* transform = GetOwner()->GetComponent<Transform>();
 	transform->AddPosition(m_moveDir * rangedProjSpd);
 

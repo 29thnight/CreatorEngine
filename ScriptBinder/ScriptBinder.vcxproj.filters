@@ -1,10 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="리소스 파일">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
     <Filter Include="Interfaces">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
@@ -184,6 +180,12 @@
     <Filter Include="Managers\InputManager\EngineReflect">
       <UniqueIdentifier>{ca4d0a2a-f8f3-464b-845e-7e806c05ddf1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\SoundComponent">
+      <UniqueIdentifier>{dbd0177b-e6c2-4bdc-98b6-0fd24b1209fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources\Sound">
+      <UniqueIdentifier>{a2c4428d-0d20-4142-846f-1b2cba944fdf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -341,6 +343,9 @@
     </ClCompile>
     <ClCompile Include="SpriteRenderer.cpp">
       <Filter>Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="SoundComponent.cpp">
+      <Filter>Classes\Components\SoundComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -644,6 +649,15 @@
     <ClInclude Include="BillboardType.h">
       <Filter>Classes</Filter>
     </ClInclude>
+    <ClInclude Include="SoundDefinition.h">
+      <Filter>Classes\Resources\Sound</Filter>
+    </ClInclude>
+    <ClInclude Include="SoundComponent.h">
+      <Filter>Classes\Components\SoundComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="CurvePoint.h">
+      <Filter>Classes\Resources\Sound</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObject.inl">
@@ -652,7 +666,6 @@
     <None Include="Component.inl">
       <Filter>Classes\Components\ComponentBase</Filter>
     </None>
-    <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="GameAi.txt">

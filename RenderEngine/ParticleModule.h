@@ -40,9 +40,9 @@ public:
 	Mathf::Vector3 GetSystemEffectBasePosition() const;
 	bool IsSystemRunning() const;
 
-	void SetEasingType(EasingEffect type)
+	void SetEasingType(int type)
 	{
-		m_easingType = type;
+		m_easingType = static_cast<EasingEffect>(type);
 		m_useEasing = true;
 	}
 

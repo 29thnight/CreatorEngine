@@ -1,6 +1,7 @@
 #include "Core.Minimal.h"
 #include "AniBehavior.h"
 
+class Player;
 class PlayerBombCharing : public AniBehavior
 {
 public:
@@ -8,4 +9,6 @@ public:
 	virtual void Enter() override;
 	virtual void Update(float tick) override;
 	virtual void Exit() override;
+
+	Player* m_player = nullptr;
 };

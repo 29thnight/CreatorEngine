@@ -469,7 +469,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 170.72543334960938,
+                            "currentTime": 32.775970458984375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -539,7 +539,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "Spincircle",
+                            "pixelShader": "SpinCircle",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -676,7 +676,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 170.72543334960938,
+                            "currentTime": 81.12799072265625,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -746,7 +746,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "Spincircle",
+                            "pixelShader": "SpinCircle",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -843,6 +843,11 @@
                                 "x": 0.10980392247438431,
                                 "y": 0.3921568691730499,
                                 "z": 0.7490196228027344
+                            },
+                            "initialRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "lifeTime": 10.0,
                             "renderMode": 0,

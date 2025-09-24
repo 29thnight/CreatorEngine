@@ -80,6 +80,15 @@ void MeshModuleGPU::Initialize()
     if (IsPolarClippingEnabled()) {
         OnClippingStateChanged();
     }
+
+    if (m_enableSpriteAnimation)
+    {
+        m_SpriteAnimationBuffer = DirectX11::CreateBuffer(
+            sizeof(SpriteAnimationBuffer),
+            D3D11_BIND_CONSTANT_BUFFER,
+            &m_SpriteAnimationConstantBuffer
+        );
+    }
 }
 
 void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
@@ -137,6 +146,12 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         deviceContext->PSSetConstantBuffers(3, 1, m_timeBuffer.GetAddressOf());
     }
 
+    if (m_enableSpriteAnimation && m_SpriteAnimationBuffer)
+    {
+        deviceContext->PSSetConstantBuffers(4, 1, m_SpriteAnimationBuffer.GetAddressOf());
+        DirectX11::UpdateBuffer(m_SpriteAnimationBuffer.Get(), &m_SpriteAnimationConstantBuffer);
+    }
+
     // 파티클 SRV 바인딩
     deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
 
@@ -189,6 +204,10 @@ void MeshModuleGPU::Release()
     m_meshIndex = 0;
     m_particleSRV = nullptr;
     m_instanceCount = 0;
+
+    if (m_SpriteAnimationBuffer) {
+        m_SpriteAnimationBuffer.Reset();
+    }
 
     // 다중 텍스처 정리
     ClearTextures();
@@ -300,6 +319,9 @@ void MeshModuleGPU::ResetForReuse()
 
     m_worldMatrix = Mathf::Matrix::Identity;
     m_invWorldMatrix = Mathf::Matrix::Identity;
+
+    m_enableSpriteAnimation = false;
+    m_SpriteAnimationConstantBuffer = {};
 }
 
 bool MeshModuleGPU::IsReadyForReuse() const
@@ -585,6 +607,29 @@ void MeshModuleGPU::SetPolarReferenceDirection(const Mathf::Vector3& referenceDi
     }
 }
 
+void MeshModuleGPU::EnableSpriteAnimation(bool enable)
+{
+    m_enableSpriteAnimation = enable;
+
+    // 활성화될 때 버퍼가 없으면 생성
+    if (enable && !m_SpriteAnimationBuffer)
+    {
+        m_SpriteAnimationBuffer = DirectX11::CreateBuffer(
+            sizeof(SpriteAnimationBuffer),
+            D3D11_BIND_CONSTANT_BUFFER,
+            &m_SpriteAnimationConstantBuffer
+        );
+    }
+}
+
+void MeshModuleGPU::SetSpriteAnimation(uint32 frameCount, float duration, uint32 gridColumns, uint32 gridRows)
+{
+    m_SpriteAnimationConstantBuffer.frameCount = frameCount;
+    m_SpriteAnimationConstantBuffer.animationDuration = duration;
+    m_SpriteAnimationConstantBuffer.gridColumns = gridColumns;
+    m_SpriteAnimationConstantBuffer.gridRows = gridRows;
+}
+
 nlohmann::json MeshModuleGPU::SerializeData() const
 {
     nlohmann::json json;
@@ -649,6 +694,17 @@ nlohmann::json MeshModuleGPU::SerializeData() const
     json["renderState"] = {
         {"instanceCount", m_instanceCount},
     };
+
+    if (m_enableSpriteAnimation)
+    {
+        json["spriteAnimation"] = {
+            {"enabled", m_enableSpriteAnimation},
+            {"frameCount", m_SpriteAnimationConstantBuffer.frameCount},
+            {"animationDuration", m_SpriteAnimationConstantBuffer.animationDuration},
+            {"gridColumns", m_SpriteAnimationConstantBuffer.gridColumns},
+            {"gridRows", m_SpriteAnimationConstantBuffer.gridRows}
+        };
+    }
 
     return json;
 }
@@ -788,6 +844,39 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
 
         if (renderJson.contains("instanceCount")) {
             m_instanceCount = renderJson["instanceCount"];
+        }
+    }
+
+    if (json.contains("spriteAnimation"))
+    {
+        const auto& spriteAnimJson = json["spriteAnimation"];
+
+        if (spriteAnimJson.contains("enabled"))
+        {
+            EnableSpriteAnimation(spriteAnimJson["enabled"]);
+        }
+
+        if (m_enableSpriteAnimation)
+        {
+            if (spriteAnimJson.contains("frameCount"))
+            {
+                m_SpriteAnimationConstantBuffer.frameCount = spriteAnimJson["frameCount"];
+            }
+
+            if (spriteAnimJson.contains("animationDuration"))
+            {
+                m_SpriteAnimationConstantBuffer.animationDuration = spriteAnimJson["animationDuration"];
+            }
+
+            if (spriteAnimJson.contains("gridColumns"))
+            {
+                m_SpriteAnimationConstantBuffer.gridColumns = spriteAnimJson["gridColumns"];
+            }
+
+            if (spriteAnimJson.contains("gridRows"))
+            {
+                m_SpriteAnimationConstantBuffer.gridRows = spriteAnimJson["gridRows"];
+            }
         }
     }
 

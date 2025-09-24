@@ -135,7 +135,8 @@ public:
 	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
 	{
 		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
- 		if (queryFilterData.word0 & shapeFilterData.word2) return physx::PxQueryHitType::eTOUCH;
+ 		if (queryFilterData.word0 & shapeFilterData.word2) 
+			return physx::PxQueryHitType::eTOUCH;
 		return physx::PxQueryHitType::eNONE;
 	}
 	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eTOUCH; }
@@ -2132,7 +2133,9 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::V
 	physx::PxQueryFilterData filterData;
 	// eSTATIC, eDYNAMIC: 정적/동적 객체 모두와 충돌을 검사합니다.
 	// ePREFILTER: 성능을 위해 사전 필터링을 사용합니다.
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	// 어떤 레이어와 충돌할지 비트마스크로 지정합니다.
 	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
 
@@ -2215,7 +2218,9 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 	physx::PxSweepBuffer sweepResult(hitBuffer, maxHits);
 
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER 
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	
 	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
 
@@ -2285,7 +2290,9 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
 	physx::PxSweepBuffer sweepResult(hitBuffer, maxHits);
 
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	
 	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
 
@@ -2355,7 +2362,11 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleM
 	TouchRaycastQueryFilter filter;
 	// --- 4. 충돌 필터 설정 ---
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 
 	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
 
@@ -2424,7 +2435,11 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
 
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	//filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	//filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
 	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
@@ -2435,9 +2450,7 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 	else {
 		// 특정 레이어에 대해서만 raycast
 		filterData.data.word0 = in.layerMask;
-		
 	}
-
 	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData, m_touchCallback);
 
 	OverlapOutput out;
@@ -2483,7 +2496,11 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
 
 	physx::PxQueryFilterData filterData;
-	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	
 	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
 

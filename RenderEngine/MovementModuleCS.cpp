@@ -6,8 +6,8 @@ MovementModuleCS::MovementModuleCS()
     : m_computeShader(nullptr), m_movementParamsBuffer(nullptr),
     m_velocityCurveBuffer(nullptr), m_velocityCurveSRV(nullptr),
     m_impulsesBuffer(nullptr), m_impulsesSRV(nullptr),
-    m_paramsDirty(true), m_easingEnabled(false),
-    m_easingType(0), m_currentTime(0.0f)
+    m_paramsDirty(true), m_easingEnable(false),
+    m_currentTime(0.0f)
 {
     // 기본값 설정
     m_velocityMode = VelocityMode::Constant;
@@ -49,14 +49,19 @@ void MovementModuleCS::Update(float delta)
 
     DirectX11::BeginEvent(L"MovementModuleCS");
 
-    // 시간 업데이트
-    m_currentTime += delta;
+    float processedDeltaTime = delta;
+    if (m_easingEnable)
+    {
+        float easingValue = m_easingModule.Update(delta);
+        processedDeltaTime = delta * easingValue;
+    }
+    m_currentTime += processedDeltaTime;
 
     // Structured Buffer 업데이트 (매번 체크)
     UpdateStructuredBuffers();
 
     // 상수 버퍼 업데이트
-    UpdateConstantBuffers(delta);
+    UpdateConstantBuffers(processedDeltaTime);
 
     // 컴퓨트 셰이더 설정
     DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
@@ -107,6 +112,25 @@ void MovementModuleCS::OnSystemResized(UINT max)
         m_particleCapacity = max;
         m_paramsDirty = true;
     }
+}
+
+void MovementModuleCS::SetEasingEnabled(bool enabled)
+{
+    m_easingEnable = enabled;
+    m_paramsDirty = true;
+}
+
+void MovementModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationType, float duration)
+{
+    m_easingModule.SetEasingType(easingType);
+    m_easingModule.SetAnimationType(animationType);
+    m_easingModule.SetDuration(duration);
+    m_easingEnable = true;
+}
+
+void MovementModuleCS::DisableEasing()
+{
+    m_easingEnable = false;
 }
 
 void MovementModuleCS::SetEmitterTransform(const Mathf::Vector3& position, const Mathf::Vector3& rotation)
@@ -315,13 +339,15 @@ void MovementModuleCS::AddVelocityPoint(float time, const Mathf::Vector3& veloci
     // UpdateStructuredBuffers는 Update()에서 호출됨
 }
 
-void MovementModuleCS::AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration)
+void MovementModuleCS::AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration, float impulseRange, UINT impulseType)
 {
     ImpulseData impulse;
     impulse.triggerTime = triggerTime;
     impulse.direction = direction;
     impulse.force = force;
     impulse.duration = duration;
+    impulse.impulseRange = impulseRange;
+    impulse.impulseType = impulseType;
 
     m_impulses.push_back(impulse);
     std::sort(m_impulses.begin(), m_impulses.end(),
@@ -329,7 +355,6 @@ void MovementModuleCS::AddImpulse(float triggerTime, const Mathf::Vector3& direc
             return a.triggerTime < b.triggerTime;
         });
     m_paramsDirty = true;
-    // UpdateStructuredBuffers는 Update()에서 호출됨
 }
 
 void MovementModuleCS::SetWindEffect(const Mathf::Vector3& direction, float strength, float turbulence, float frequency)
@@ -382,7 +407,7 @@ nlohmann::json MovementModuleCS::SerializeData() const
     json["movementParams"] = {
         {"useGravity", m_gravity},
         {"gravityStrength", m_gravityStrength},
-        {"easingEnabled", m_easingEnabled},
+        {"easingEnabled", m_easingEnable},
         {"easingType", m_easingType},
         {"velocityMode", static_cast<int>(m_velocityMode)},
         {"currentTime", m_currentTime}
@@ -407,7 +432,9 @@ nlohmann::json MovementModuleCS::SerializeData() const
             {"triggerTime", impulse.triggerTime},
             {"direction", EffectSerializer::SerializeVector3(impulse.direction)},
             {"force", impulse.force},
-            {"duration", impulse.duration}
+            {"duration", impulse.duration},
+            {"range", impulse.impulseRange},
+            {"type", impulse.impulseType}
             });
     }
 
@@ -434,6 +461,16 @@ nlohmann::json MovementModuleCS::SerializeData() const
         {"sphereRadius", m_explosiveData.sphereRadius}
     };
 
+    json["easing"] = {
+      {"enabled", m_easingEnable}
+    };
+    if (m_easingEnable)
+    {
+        json["easing"]["easingType"] = static_cast<int>(m_easingModule.GetEasingType());
+        json["easing"]["animationType"] = static_cast<int>(m_easingModule.GetAnimationType());
+        json["easing"]["duration"] = m_easingModule.GetDuration();
+    }
+
     // 상태 정보
     json["state"] = {
         {"isInitialized", m_isInitialized},
@@ -455,7 +492,7 @@ void MovementModuleCS::DeserializeData(const nlohmann::json& json)
         if (movementJson.contains("gravityStrength"))
             m_gravityStrength = movementJson["gravityStrength"];
         if (movementJson.contains("easingEnabled"))
-            m_easingEnabled = movementJson["easingEnabled"];
+            m_easingEnable = movementJson["easingEnabled"];
         if (movementJson.contains("easingType"))
             m_easingType = movementJson["easingType"];
         if (movementJson.contains("velocityMode"))
@@ -499,6 +536,8 @@ void MovementModuleCS::DeserializeData(const nlohmann::json& json)
             Mathf::Vector3 direction;
             float force = 1.0f;
             float duration = 1.0f;
+            float range = 1.0f;
+            UINT type = 0;
 
             if (impulseJson.contains("triggerTime"))
                 triggerTime = impulseJson["triggerTime"];
@@ -508,8 +547,12 @@ void MovementModuleCS::DeserializeData(const nlohmann::json& json)
                 force = impulseJson["force"];
             if (impulseJson.contains("duration"))
                 duration = impulseJson["duration"];
+            if (impulseJson.contains("range"))
+                range = impulseJson["range"];
+            if (impulseJson.contains("type"))
+                type = impulseJson["type"];
 
-            AddImpulse(triggerTime, direction, force, duration);
+            AddImpulse(triggerTime, direction, force, duration, range, type);
         }
     }
 
@@ -574,6 +617,22 @@ void MovementModuleCS::DeserializeData(const nlohmann::json& json)
             sphereRadius = explosiveJson["sphereRadius"];
 
         SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
+    }
+
+    // 이징 정보 복원
+    if (json.contains("easing"))
+    {
+        const auto& easingJson = json["easing"];
+        m_easingEnable = easingJson.value("enabled", false);
+
+        if (m_easingEnable && easingJson.contains("easingType") &&
+            easingJson.contains("animationType") && easingJson.contains("duration"))
+        {
+            EasingEffect easingType = static_cast<EasingEffect>(easingJson["easingType"]);
+            StepAnimation animationType = static_cast<StepAnimation>(easingJson["animationType"]);
+            float duration = easingJson["duration"];
+            SetEasing(easingType, animationType, duration);
+        }
     }
 
     // 상태 정보 복원

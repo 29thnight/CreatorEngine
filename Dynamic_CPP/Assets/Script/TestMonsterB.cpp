@@ -26,7 +26,8 @@ void TestMonsterB::Start()
 		}
 
 	}
-
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetAutomaticRotation(true);
 	if (!m_animator)
 	{
 		m_animator = m_pOwner->GetComponent<Animator>();
@@ -96,6 +97,7 @@ void TestMonsterB::Start()
 
 void TestMonsterB::Update(float tick)
 {
+	if (blackBoard == nullptr) return;
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
@@ -162,7 +164,7 @@ void TestMonsterB::Update(float tick)
 
 
 	if (closedDist < m_attackRange) {
-		isMelee = true;
+		isMelee = false;
 	}
 	else 
 	{
@@ -213,12 +215,29 @@ void TestMonsterB::Update(float tick)
 		m_animator->SetParameter("Move", false);
 	}
 
+	
+	if (EndDeadAnimation)
+	{
+		deadElapsedTime += tick;
+		if (deadDestroyTime <= deadElapsedTime)
+		{
+			GetOwner()->Destroy();
 
+			for (auto& bullet : m_projectiles)
+			{
+				if (bullet->IsEnabled() == false)
+				{
+					bullet->Destroy();
+				}
+			}
+		}
+	}
 }
 
 void TestMonsterB::Dead()
 {
 	m_animator->SetParameter("Dead", true);
+	GetOwner()->SetLayer("Water");
 }
 
 void TestMonsterB::ChaseTarget()
@@ -338,6 +357,7 @@ void TestMonsterB::SendDamage(Entity* sender, int damage)
 			if (m_currentHP <= 0)
 			{
 				isDead = true;
+				Dead();
 			}
 		}
 	}
@@ -396,5 +416,10 @@ void TestMonsterB::ShootingAttack()
 			m_projectileIndex = 0;
 		}
 	}
+}
+
+void TestMonsterB::DeadEvent()
+{
+	EndDeadAnimation = true;
 }
 

@@ -6,6 +6,10 @@ void MonsterProjectile::Start()
 
 void MonsterProjectile::Update(float tick)
 {
+    if (m_owner->IsDestroyMark() == true)
+    {
+        OwnerDestroy = true;
+    }
 	if (!isInitialize||!m_isMoving) {
         return;
 	}
@@ -36,13 +40,19 @@ void MonsterProjectile::Update(float tick)
         
         for (auto& res : results) {
             if (res.gameObject->GetHashedName().ToString() == "1P" || res.gameObject->GetHashedName().ToString() == "2P") {
-                auto entity = res.gameObject->GetComponent<Entity>();
+                auto entity = res.gameObject->GetComponentDynamicCast<Entity>();
                 if (entity) {
                     entity->SendDamage(m_owner, m_damege);
                 }
             }
         }
 
+        if (OwnerDestroy)
+        {
+            GetOwner()->Destroy();
+        }
+        GetOwner()->SetEnabled(false);
+        
     }
 }
 

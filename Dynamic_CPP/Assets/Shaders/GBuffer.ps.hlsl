@@ -118,7 +118,7 @@ GBufferOutput main(PixelShaderInput IN)
         float4 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord);
         //occRoughMetal = SRGBtoLINEAR(occRoughMetal);
         ormAO = occRoughMetal.r;
-        roughness = 1 - occRoughMetal.g;
+        roughness = occRoughMetal.g;
         metallic = occRoughMetal.b;
     }
 
@@ -185,7 +185,7 @@ GBufferOutput main(PixelShaderInput IN)
         roughness = 1.0;
         bit = 1 << 8;
         bit |= 1 << 9; // 터레인 레이어 비트 설정
-        ior = 1.5f;
+        ior = 1.0f;
     }
     
     roughness = max(roughness, 0.1f);

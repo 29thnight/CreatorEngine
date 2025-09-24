@@ -19,6 +19,7 @@
 #include "TagManager.h"
 #include "PlayerInput.h"
 #include "InputActionManager.h"
+#include "SoundManager.h"
 //----------------------------
 #include "NodeFactory.h"
 #include "ExternUI.h"
@@ -30,6 +31,7 @@
 #include "RectTransformComponent.h"
 #include "DecalComponent.h"
 #include "SpriteRenderer.h"
+#include "SoundComponent.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -237,6 +239,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperCanvas(canvas);
 						}
 					}
+					else if (componentTypeID == type_guid(SoundComponent))
+					{
+						SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
+						if (snd) ImGuiDrawHelperSoundComponent(snd);   // 커스텀 인스펙터 호출
+					}
 					else if (type)
 					{
 						Meta::DrawObject(component.get(), *type);
@@ -279,6 +286,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					if (ImGui::MenuItem(type_name.c_str()))
 					{
 						auto component = selectedSceneObject->AddComponent(*type);
+						if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
+						{
+							initializable->Initialize();
+						}
 					}
 				}
 
@@ -332,6 +343,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				ImGui::OpenPopup("NewScript");
 				m_openNewScriptPopup = false;
+			}
+
+			if (m_openClipPicker) 
+			{
+				DrawSoundClipPicker();
 			}
 
 			if (isOpen)
@@ -1457,10 +1473,422 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 
 void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
 {
-	if (const auto* type = Meta::Find("Canvas"))
+	ImGui::InputText("CanvasName", &canvas->CanvasName);
+	static int order{};
+
+	order = canvas->CanvasOrder;
+	if (ImGui::DragInt("CanvasOrder", &order))
 	{
-		Meta::DrawProperties(canvas, *type);
+		canvas->SetCanvasOrder(order);
 	}
+
+}
+
+void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
+{
+	using namespace ImGui;
+
+	// ─────────────────────────────────────────────────────────────
+	//  Clip / Picker
+	// ─────────────────────────────────────────────────────────────
+	TextUnformatted("Clip");
+	ImGui::SameLine();
+	SetNextItemWidth(240);
+	InputText("##ClipKeyRO", &sc->clipKey, ImGuiInputTextFlags_ReadOnly);
+	ImGui::SameLine();
+	if (Button(ICON_FA_FILE_AUDIO))
+	{
+		m_clipKeyCache = Sound->getAllClipKeys();
+		m_clipSearch.clear();
+		m_clipPickerTarget = sc;
+		m_openClipPicker = true;
+	}
+
+	// ─────────────────────────────────────────────────────────────
+	//  Bus / Basic Params
+	// ─────────────────────────────────────────────────────────────
+	SeparatorText("Bus / Params");
+
+	const char* busNames[] = { "BGM","SFX","PLAYER","MONSTER","UI" };
+	int busIdx = (int)sc->bus;
+	SetNextItemWidth(150);
+	if (Combo("Bus", &busIdx, busNames, IM_ARRAYSIZE(busNames))) {
+		sc->bus = (ChannelType)busIdx;
+	}
+
+	SetNextItemWidth(200);
+	DragFloat("Volume", &sc->volume, 0.01f, 0.0f, 1.0f, "%.3f");
+	SetNextItemWidth(200);
+	DragFloat("Pitch", &sc->pitch, 0.01f, 0.25f, 4.0f, "%.2f");
+	SetNextItemWidth(200);
+	DragInt("Priority", &sc->priority, 1, 0, 256);
+
+	bool loopBefore = sc->loop;
+	Checkbox("Loop", &sc->loop); ImGui::SameLine();
+	Checkbox("Play On Start", &sc->playOnStart);
+
+	// 루프 상태 변경 즉시 채널에 반영
+	if (loopBefore != sc->loop) {
+		auto applyLoop = [&](FMOD::Channel* ch) {
+			if (!ch) return;
+			FMOD_MODE mode = FMOD_DEFAULT; ch->getMode(&mode);
+			mode &= ~(FMOD_MODE)FMOD_LOOP_NORMAL;
+			mode &= ~(FMOD_MODE)FMOD_LOOP_OFF;
+			mode |= sc->loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF;
+			ch->setMode(mode);
+			};
+		applyLoop(sc->Get2DChannel());
+		applyLoop(sc->Get3DChannel());
+	}
+
+	// ─────────────────────────────────────────────────────────────
+	//  Spatial
+	// ─────────────────────────────────────────────────────────────
+	SeparatorText("Spatial");
+	Checkbox("Spatial (Blend 2D+3D)", &sc->spatial);
+
+	if (sc->spatial) 
+	{
+		ImGui::SetNextItemWidth(220);
+		ImGui::DragFloat("Spatial Blend", &sc->spatialBlend, 0.01f, 0.0f, 1.0f, "%.2f");
+
+		float minBefore = sc->minDistance, maxBefore = sc->maxDistance;
+		ImGui::SetNextItemWidth(220);
+		ImGui::DragFloat("Min Distance", &sc->minDistance, 0.01f, 0.01f, 200.0f, "%.2f");
+		ImGui::SetNextItemWidth(220);
+		ImGui::DragFloat("Max Distance", &sc->maxDistance, 0.10f, 0.10f, 500.0f, "%.2f");
+		if (sc->minDistance > sc->maxDistance) sc->maxDistance = sc->minDistance + 0.01f;
+
+		const char* rolloffNames[] = { "Linear", "Inverse", "Custom" };
+		int roll = (int)sc->rolloff;
+		ImGui::SetNextItemWidth(180);
+		bool rollChanged = ImGui::Combo("Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
+		sc->rolloff = (Rolloff)roll;
+
+		// 그래프: spatial이면 항상 표시
+		ImGui::SeparatorText("Distance Rolloff Curve");
+
+		const bool isCustom = (sc->rolloff == Rolloff::Custom);
+
+		// Linear /Inverse 선택 시: 자동 곡선으로 동기화(읽기전용)
+		if (!isCustom) {
+			if (rollChanged || minBefore != sc->minDistance || maxBefore != sc->maxDistance || sc->localRolloffCurve.size() < 2) {
+				if (sc->rolloff == Rolloff::Linear)  BuildLinearCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
+				if (sc->rolloff == Rolloff::Inverse) BuildInverseCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
+			}
+			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), ImVec2(0, 200), nullptr, /*readOnly=*/true);
+			ImGui::TextDisabled("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
+		}
+		else {
+			// Custom: 에디트 가능
+			if (sc->localRolloffCurve.size() < 2) {
+				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
+			}
+			// maxDistance 변경 시 마지막 점 X를 범위 내로 보정(편집 내용은 유지)
+			sc->localRolloffCurve.back().distance = std::clamp(sc->localRolloffCurve.back().distance, 0.1f, std::max(0.1f, sc->maxDistance));
+
+			if (ImGui::SmallButton("Reset to Default")) {
+				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
+			}
+			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), ImVec2(0, 200), nullptr, /*readOnly=*/false);
+			ImGui::TextDisabled("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
+		}
+
+		// 실시간 3D 채널 반영(위치/거리/롤오프 모드 등)
+		if (auto* ch3 = sc->Get3DChannel()) {
+			FMOD_VECTOR p{ sc->position.x, sc->position.y, sc->position.z };
+			FMOD_VECTOR v{ sc->velocity.x, sc->velocity.y, sc->velocity.z };
+			ch3->set3DAttributes(&p, &v);
+
+			if (minBefore != sc->minDistance || maxBefore != sc->maxDistance || rollChanged) {
+				FMOD_MODE mode = FMOD_DEFAULT | FMOD_3D | (sc->loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
+				mode &= ~(FMOD_MODE)FMOD_3D_LINEARROLLOFF;
+				mode &= ~(FMOD_MODE)FMOD_3D_INVERSEROLLOFF;
+				mode &= ~(FMOD_MODE)FMOD_3D_CUSTOMROLLOFF;
+
+				switch (sc->rolloff) {
+				case Rolloff::Linear:  mode |= FMOD_3D_LINEARROLLOFF;  break;
+				case Rolloff::Inverse: mode |= FMOD_3D_INVERSEROLLOFF; break;
+				case Rolloff::Custom:  mode |= FMOD_3D_CUSTOMROLLOFF;  break;
+				}
+				ch3->setMode(mode);
+				ch3->set3DMinMaxDistance(sc->minDistance, sc->maxDistance);
+			}
+		}
+	}
+
+	// ─────────────────────────────────────────────────────────────
+	//  Reverb Send
+	// ─────────────────────────────────────────────────────────────
+	SeparatorText("Reverb Send");
+	bool useRevBefore = sc->useReverbSend;
+	Checkbox("Enable Reverb Send", &sc->useReverbSend);
+
+	// dB 슬라이더(-80~+10), 내부는 선형(0~1)로 변환해서 FMOD에 적용
+	SetNextItemWidth(260);
+	DragFloat("Reverb Level (dB)", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
+	SetNextItemWidth(200);
+	DragInt("Reverb Index", &sc->reverbIndex, 1, 0, 3);
+
+	auto applyReverb = [&](FMOD::Channel* ch) {
+		if (!ch) return;
+		if (!sc->useReverbSend) { ch->setReverbProperties(sc->reverbIndex, 0.0f); return; }
+
+		// dB -> linear (0~1 clamp)
+		float wet = powf(10.0f, sc->reverbLevel / 20.0f);
+		wet = std::clamp(wet, 0.0f, 1.0f);
+		ch->setReverbProperties(sc->reverbIndex, wet);
+		};
+
+	if (useRevBefore != sc->useReverbSend) {
+		applyReverb(sc->Get2DChannel());
+		applyReverb(sc->Get3DChannel());
+	}
+	// 값이 바뀌면 항상 적용
+	if (IsItemEdited() || IsItemDeactivatedAfterEdit()) {
+		applyReverb(sc->Get2DChannel());
+		applyReverb(sc->Get3DChannel());
+	}
+
+	// ─────────────────────────────────────────────────────────────
+	//  Preview Controls
+	// ─────────────────────────────────────────────────────────────
+	Separator();
+	if (Button("Play")) { sc->Play(); } ImGui::SameLine();
+	if (Button("Stop")) { sc->Stop(); } ImGui::SameLine();
+	if (Button("OneShot")) { sc->PlayOneShot(); }
+
+	// 볼륨/피치/프라이어리티 변경 실시간 반영(채널 살아있을 때)
+	auto applyBasic = [&](FMOD::Channel* ch) {
+		if (!ch) return;
+		ch->setVolume(sc->volume);
+		ch->setPitch(sc->pitch);
+		ch->setPriority(sc->priority);
+		};
+	applyBasic(sc->Get2DChannel());
+	applyBasic(sc->Get3DChannel());
+}
+
+bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& curve, float maxDist, ImVec2 size, int* outSelected, bool readOnly)
+{
+	using namespace ImGui;
+	if (curve.size() < 2) {
+		curve = { {0.f, 1.f}, {std::max(0.1f, maxDist), 0.f} };
+	}
+	std::sort(curve.begin(), curve.end(),
+		[](auto& a, auto& b) { return a.distance < b.distance; });
+
+	if (size.x <= 0) size.x = GetContentRegionAvail().x;
+	const ImVec2 p0 = GetCursorScreenPos();
+	const ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
+	const ImRect  rc(p0, p1);
+
+	ImDrawList* dl = GetWindowDrawList();
+	dl->AddRectFilled(rc.Min, rc.Max, GetColorU32(ImGuiCol_FrameBg));
+	dl->AddRect(rc.Min, rc.Max, GetColorU32(ImGuiCol_Border));
+	for (int i = 1; i < 4; i++) {
+		float x = ImLerp(rc.Min.x, rc.Max.x, i / 4.f);
+		float y = ImLerp(rc.Min.y, rc.Max.y, i / 4.f);
+		dl->AddLine(ImVec2(x, rc.Min.y), ImVec2(x, rc.Max.y), GetColorU32(ImGuiCol_Separator), 1.f);
+		dl->AddLine(ImVec2(rc.Min.x, y), ImVec2(rc.Max.x, y), GetColorU32(ImGuiCol_Separator), 1.f);
+	}
+
+	auto toScreen = [&](float dist, float gain) {
+		float nx = (maxDist <= 0.0001f) ? 0.f : (dist / maxDist);
+		float ny = 1.f - clamp01(gain);
+		return ImVec2(ImLerp(rc.Min.x, rc.Max.x, clamp01(nx)),
+			ImLerp(rc.Min.y, rc.Max.y, clamp01(ny)));
+		};
+	auto toData = [&](ImVec2 sp) {
+		float nx = (sp.x - rc.Min.x) / std::max(1e-6f, (rc.Max.x - rc.Min.x));
+		float ny = (sp.y - rc.Min.y) / std::max(1e-6f, (rc.Max.y - rc.Min.y));
+		float dist = clamp01(nx) * std::max(0.0f, maxDist);
+		float gain = clamp01(1.f - clamp01(ny));
+		return std::pair<float, float>(dist, gain);
+		};
+
+	const ImVec2  mouse = GetIO().MousePos;
+	const bool hovered = rc.Contains(mouse);
+	const bool clicked = hovered && IsMouseClicked(ImGuiMouseButton_Left) && !readOnly;
+	const bool rclicked = hovered && IsMouseClicked(ImGuiMouseButton_Right) && !readOnly;
+	const bool dclicked = hovered && IsMouseDoubleClicked(ImGuiMouseButton_Left) && !readOnly;
+
+	static int  s_selected = -1;
+	static bool s_dragging = false;
+	if (outSelected) s_selected = *outSelected;
+
+	const ImU32 lineCol = GetColorU32(ImGuiCol_PlotLines);
+	for (size_t i = 1; i < curve.size(); ++i) {
+		dl->AddLine(toScreen(curve[i - 1].distance, curve[i - 1].gain),
+			toScreen(curve[i].distance, curve[i].gain), lineCol, 2.0f);
+	}
+
+	const float R = 5.f;
+	const ImU32 handleCol = GetColorU32(ImGuiCol_PlotLinesHovered);
+	int hoverIdx = -1;
+	for (int i = 0; i < (int)curve.size(); ++i) {
+		ImVec2 sp = toScreen(curve[i].distance, curve[i].gain);
+		bool isHover = (ImLengthSqr(mouse - sp) <= (R + 2) * (R + 2));
+		if (isHover) hoverIdx = i;
+		dl->AddCircleFilled(sp, R, GetColorU32(i == s_selected ? ImGuiCol_PlotHistogramHovered :
+			isHover ? ImGuiCol_PlotHistogram :
+			ImGuiCol_ButtonHovered));
+		dl->AddCircle(sp, R, handleCol);
+	}
+
+	if (!readOnly) {
+		if (clicked) {
+			if (hoverIdx >= 0) { s_selected = hoverIdx; s_dragging = true; }
+			else { s_selected = -1; s_dragging = false; }
+		}
+		if (!IsMouseDown(ImGuiMouseButton_Left)) s_dragging = false;
+
+		bool changed = false;
+		if (s_dragging && s_selected >= 0) {
+			bool lockX = (s_selected == 0 || s_selected == (int)curve.size() - 1);
+			auto [nd, ng] = toData(mouse);
+			if (lockX) nd = curve[s_selected].distance;
+			ng = clamp01(ng);
+			const float eps = 0.001f;
+			if (!lockX) {
+				float lo = (s_selected > 0) ? (curve[s_selected - 1].distance + eps) : 0.f;
+				float hi = (s_selected < (int)curve.size() - 1) ? (curve[s_selected + 1].distance - eps) : maxDist;
+				nd = std::clamp(nd, lo, hi);
+			}
+			if (curve[s_selected].distance != nd || curve[s_selected].gain != ng) {
+				curve[s_selected].distance = nd;
+				curve[s_selected].gain = ng;
+				changed = true;
+			}
+		}
+
+		if (dclicked) {
+			auto [nd, ng] = toData(mouse);
+			nd = std::clamp(nd, 0.f, std::max(0.f, maxDist));
+			ng = clamp01(ng);
+			int ins = (int)curve.size();
+			for (int i = 1; i < (int)curve.size(); ++i) { if (nd <= curve[i].distance) { ins = i; break; } }
+			curve.insert(curve.begin() + ins, { nd, ng });
+			s_selected = ins;
+			changed = true;
+		}
+
+		if ((rclicked || IsKeyPressed(ImGuiKey_Delete)) &&
+			s_selected > 0 && s_selected < (int)curve.size() - 1) {
+			curve.erase(curve.begin() + s_selected);
+			s_selected = std::min(s_selected, (int)curve.size() - 1);
+			changed = true;
+		}
+
+		if (hovered) {
+			SetTooltip("L-Drag: Move  |  Double-Click: Add  |  Right-Click/Delete: Remove");
+		}
+
+		Dummy(size);
+		if (outSelected) *outSelected = s_selected;
+		return changed;
+	}
+	else {
+		// readOnly 모드: 상호작용 없음, 안내만
+		if (hovered) SetTooltip("Graph is read-only (driven by Rolloff mode).");
+		Dummy(size);
+		if (outSelected) *outSelected = -1;
+		return false;
+	}
+}
+
+void InspectorWindow::DrawSoundClipPicker()
+{
+	using namespace ImGui;
+	if (!m_openClipPicker) return;
+
+	// 독립 윈도우(모달 느낌)
+	SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
+	if (Begin("Select Audio Clip", &m_openClipPicker,
+		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
+	{
+		// 상단: 검색/리프레시
+		if (InputTextWithHint("##search", "Search clip key...", &m_clipSearch)) {
+			// 입력 시 즉시 필터 반영
+		}
+		SameLine();
+		if (Button("Refresh")) {
+			m_clipKeyCache = Sound->getAllClipKeys();
+		}
+		Separator();
+
+		// 필터링
+		auto toLower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), ::tolower); return s; };
+		std::string q = toLower(m_clipSearch);
+
+		// 리스트 영역
+		BeginChild("##cliplist", ImVec2(0, -48), true);
+		static int selectedIndex = -1;
+		const int N = (int)m_clipKeyCache.size();
+		for (int i = 0; i < N; ++i) {
+			const std::string& key = m_clipKeyCache[i];
+			if (!q.empty() && toLower(key).find(q) == std::string::npos) continue;
+
+			bool selected = (i == selectedIndex);
+			if (Selectable(key.c_str(), selected)) {
+				selectedIndex = i;
+			}
+
+			// 우측 프리뷰 버튼
+			if (IsItemHovered() && IsMouseDoubleClicked(0)) 
+			{
+				// 더블클릭 = 선택 확정
+				if (m_clipPickerTarget && i >= 0) m_clipPickerTarget->clipKey = key;
+				m_openClipPicker = false;
+				selectedIndex = -1;
+				break;
+			}
+			SameLine();
+			if (SmallButton((ICON_FA_PLAY "##prev" + std::to_string(i)).c_str())) 
+			{
+				if (m_clipPickerTarget) 
+				{
+					// 미리듣기: 현재 타겟 버스/볼륨/피치 사용
+					FMOD_VECTOR pos{ m_clipPickerTarget->position.x,
+									 m_clipPickerTarget->position.y,
+									 m_clipPickerTarget->position.z };
+
+					FMOD_VECTOR vel{ m_clipPickerTarget->velocity.x,
+									 m_clipPickerTarget->velocity.y,
+									 m_clipPickerTarget->velocity.z };
+
+					Sound->playOneShotPooled(
+						key,
+						m_clipPickerTarget->bus,
+						m_clipPickerTarget->volume,
+						m_clipPickerTarget->pitch,
+						m_clipPickerTarget->priority,
+						m_clipPickerTarget->spatial ? m_clipPickerTarget->spatialBlend : 0.0f,
+						m_clipPickerTarget->spatial ? &pos : nullptr,
+						m_clipPickerTarget->spatial ? &vel : nullptr,
+						m_clipPickerTarget
+					);
+				}
+			}
+		}
+		EndChild();
+
+		// 하단 버튼
+		BeginDisabled(selectedIndex < 0);
+		if (Button("Use")) 
+		{
+			if (m_clipPickerTarget && selectedIndex >= 0) 
+			{
+				m_clipPickerTarget->clipKey = m_clipKeyCache[selectedIndex];
+			}
+			m_openClipPicker = false;
+			selectedIndex = -1;
+		}
+		EndDisabled();
+		SameLine();
+		if (Button("Close")) { m_openClipPicker = false; selectedIndex = -1; }
+	}
+	End();
 }
 
 #endif // !DYNAMICCPP_EXPORTS

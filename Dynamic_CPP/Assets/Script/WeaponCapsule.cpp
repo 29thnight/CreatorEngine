@@ -57,12 +57,39 @@ void WeaponCapsule::Update(float tick)
 					GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(weaponPrefab, "Weapon");
 					auto weapon = weaponObj->GetComponent<Weapon>();
 					Player* player= ownerPlayer->GetComponent<Player>();
-					player->AddWeapon(weapon); //AddWeapon ½ÇÆÐ½Ã ±×³É ¹Ù´Ú¿¡ µÕµÕ ¶°ÀÖ±â   and µÕµÕ¶°ÀÖ´ÂÁß ÇÃ·¹ÀÌ¾î°¡ ÁýÀ¸¸é addweapon ´Ù½Ã½Ãµµ
+					bool Success = player->AddWeapon(weapon); //AddWeapon ½ÇÆÐ½Ã ±×³É ¹Ù´Ú¿¡ µÕµÕ ¶°ÀÖ±â   and µÕµÕ¶°ÀÖ´ÂÁß ÇÃ·¹ÀÌ¾î°¡ ÁýÀ¸¸é addweapon ´Ù½Ã½Ãµµ
+					if (Success)
+					{
+						GetOwner()->Destroy();
+					}
+					else
+					{
+						ownerPlayer = nullptr;
+						//¹Ù´Ú¿¡ µÕµÕ
+					}
 
 				}
-				GetOwner()->Destroy();
 			}
 		}
+	}
+	else
+	{
+		Transform* transform = GetOwner()->GetComponent<Transform>();
+
+		float delta = (goingUp ? 1 : -1) * boundSpeed * tick;
+		transform->AddPosition({ 0,delta,0 });
+		yBoundpos += delta;
+		if (yBoundpos > boundingRange)
+		{
+			yBoundpos = boundingRange;
+			goingUp = false;
+		}
+		else if (yBoundpos < 0.0f)
+		{
+			yBoundpos = 0.0f;
+			goingUp = true;
+		}
+		
 	}
 }
 

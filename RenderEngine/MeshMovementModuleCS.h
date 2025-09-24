@@ -101,7 +101,7 @@ public:
 	void SetVelocityMode(VelocityMode mode);
 	void SetVelocityCurve(const std::vector<VelocityPoint>& curve);
 	void AddVelocityPoint(float time, const Mathf::Vector3& velocity, float strength = 1.0f);
-	void AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration = 0.1f);
+	void AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration, float impulseRange = 0.5f, UINT impulseType = 1);
 	void SetWindEffect(const Mathf::Vector3& direction, float strength, float turbulence = 0.5f, float frequency = 1.0f);
 	void SetOrbitalMotion(const Mathf::Vector3& center, float radius, float speed, const Mathf::Vector3& axis = Mathf::Vector3(0, 1, 0));
 	void SetExplosiveEffect(float initialSpeed = 50.0f, float speedDecay = 2.0f, float randomFactor = 0.4f, float sphereRadius = 1.0f);

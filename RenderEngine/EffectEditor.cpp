@@ -1677,13 +1677,15 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 					defaultImpulse.direction = Mathf::Vector3(0, 1, 0);
 					defaultImpulse.force = 5.0f;
 					defaultImpulse.duration = 0.1f;
+					defaultImpulse.impulseRange = 1.0f;
+					defaultImpulse.impulseType = 0;
 					impulses.push_back(defaultImpulse);
 
 					// 기본값을 바로 적용
 					movementModule->ClearImpulses();
 					for (const auto& impulse : impulses)
 					{
-						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration, impulse.impulseRange, impulse.impulseType);
 					}
 				}
 
@@ -1719,6 +1721,17 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 						if (ImGui::SliderFloat("Duration", &impulses[i].duration, 0.01f, 1.0f))
 							impulsesChanged = true;
 
+						if (ImGui::SliderFloat("Range", &impulses[i].impulseRange, 0.0f, 20.0f))
+							impulsesChanged = true;
+
+						const char* typeNames[] = { "Direct", "Cone", "Sphere" };
+						int currentType = static_cast<int>(impulses[i].impulseType);
+						if (ImGui::Combo("Type", &currentType, typeNames, IM_ARRAYSIZE(typeNames)))
+						{
+							impulses[i].impulseType = static_cast<UINT>(currentType);
+							impulsesChanged = true;
+						}
+
 						if (ImGui::Button("Delete Impulse"))
 						{
 							impulses.erase(impulses.begin() + i);
@@ -1726,7 +1739,7 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 							movementModule->ClearImpulses();
 							for (const auto& impulse : impulses)
 							{
-								movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+								movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration, impulse.impulseRange, impulse.impulseType);
 							}
 							ImGui::TreePop();
 							ImGui::PopID();
@@ -1752,7 +1765,7 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 					movementModule->ClearImpulses();
 					for (const auto& impulse : impulses)
 					{
-						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration, impulse.impulseRange, impulse.impulseType);
 					}
 				}
 
@@ -1762,7 +1775,7 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 					movementModule->ClearImpulses();
 					for (const auto& impulse : impulses)
 					{
-						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration, impulse.impulseRange, impulse.impulseType);
 					}
 				}
 
@@ -2967,7 +2980,7 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 			"Custom"
 		};
 
-		static int currentTransitionMode = 0;
+		int currentTransitionMode = static_cast<int>(colorModule->GetTransitionMode());
 		if (ImGui::Combo("Transition Mode", &currentTransitionMode, transitionModes, IM_ARRAYSIZE(transitionModes)))
 		{
 			colorModule->SetTransitionMode(static_cast<ColorTransitionMode>(currentTransitionMode));
@@ -2976,16 +2989,11 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 		ImGui::Separator();
 
 		// 그라데이션 모드
-		if (currentTransitionMode == 0)
+		if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Gradient))
 		{
 			if (ImGui::TreeNode("Gradient Settings"))
 			{
-				static std::vector<std::pair<float, Mathf::Vector4>> gradientPoints = {
-					{0.0f, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f)},
-					{0.3f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 0.9f)},
-					{0.7f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 0.7f)},
-					{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.0f, 0.0f)}
-				};
+				auto gradientPoints = colorModule->GetColorGradient();
 
 				for (int i = 0; i < gradientPoints.size(); ++i)
 				{
@@ -2996,7 +3004,8 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 
 					if (ImGui::TreeNode(label))
 					{
-						ImGui::SliderFloat("Time", &gradientPoints[i].first, 0.0f, 1.0f);
+						float time = gradientPoints[i].first;
+						ImGui::SliderFloat("Time", &time, 0.0f, 1.0f);
 
 						float color[4] = {
 							gradientPoints[i].second.x,
@@ -3005,9 +3014,19 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 							gradientPoints[i].second.w
 						};
 
+						bool timeChanged = (time != gradientPoints[i].first);
+						bool colorChanged = false;
+
 						if (ImGui::ColorEdit4("Color", color))
 						{
+							colorChanged = true;
+						}
+
+						if (timeChanged || colorChanged)
+						{
+							gradientPoints[i].first = time;
 							gradientPoints[i].second = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							colorModule->SetColorGradient(gradientPoints);
 						}
 
 						if (gradientPoints.size() > 2)
@@ -3015,6 +3034,7 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 							if (ImGui::Button("Delete Point"))
 							{
 								gradientPoints.erase(gradientPoints.begin() + i);
+								colorModule->SetColorGradient(gradientPoints);
 								ImGui::TreePop();
 								ImGui::PopID();
 								break;
@@ -3032,10 +3052,7 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 					float newTime = gradientPoints.empty() ? 0.5f :
 						(gradientPoints.back().first + 0.1f > 1.0f ? 0.5f : gradientPoints.back().first + 0.1f);
 					gradientPoints.emplace_back(newTime, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-				}
 
-				if (ImGui::Button("Apply Gradient"))
-				{
 					std::sort(gradientPoints.begin(), gradientPoints.end(),
 						[](const auto& a, const auto& b) { return a.first < b.first; });
 
@@ -3046,15 +3063,11 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 			}
 		}
 		// 이산 색상 모드
-		else if (currentTransitionMode == 1)
+		else if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Discrete))
 		{
 			if (ImGui::TreeNode("Discrete Colors"))
 			{
-				static std::vector<Mathf::Vector4> discreteColors = {
-					Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-					Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-					Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
-				};
+				auto discreteColors = colorModule->GetDiscreteColors();
 
 				for (int i = 0; i < discreteColors.size(); ++i)
 				{
@@ -3073,12 +3086,14 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 					if (ImGui::ColorEdit4(label, color))
 					{
 						discreteColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						colorModule->SetDiscreteColors(discreteColors);
 					}
 
 					ImGui::SameLine();
 					if (ImGui::Button("Remove") && discreteColors.size() > 1)
 					{
 						discreteColors.erase(discreteColors.begin() + i);
+						colorModule->SetDiscreteColors(discreteColors);
 						ImGui::PopID();
 						break;
 					}
@@ -3089,10 +3104,6 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 				if (ImGui::Button("Add Color") && discreteColors.size() < 32)
 				{
 					discreteColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
-				}
-
-				if (ImGui::Button("Apply Colors"))
-				{
 					colorModule->SetDiscreteColors(discreteColors);
 				}
 
@@ -3100,7 +3111,7 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 			}
 		}
 		// 커스텀 함수 모드
-		else if (currentTransitionMode == 2)
+		else if (currentTransitionMode == static_cast<int>(ColorTransitionMode::Custom))
 		{
 			if (ImGui::TreeNode("Custom Function"))
 			{
@@ -3110,20 +3121,41 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 					"Flicker"
 				};
 
-				static int currentFunction = 0;
-				ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes));
+				int currentFunction = colorModule->GetCustomFunctionType();
+				if (ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes)))
+				{
+					colorModule->SetCustomFunction(currentFunction, 0.0f, 0.0f, 0.0f, 0.0f);
+				}
 
 				if (currentFunction == 0) // Pulse
 				{
-					static float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-					static float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-					static float frequency = 1.0f;
+					auto discreteColors = colorModule->GetDiscreteColors();
 
-					ImGui::ColorEdit4("Base Color", baseColor);
-					ImGui::ColorEdit4("Pulse Color", pulseColor);
-					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+					float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-					if (ImGui::Button("Apply Pulse"))
+					if (discreteColors.size() >= 2)
+					{
+						baseColor[0] = discreteColors[0].x;
+						baseColor[1] = discreteColors[0].y;
+						baseColor[2] = discreteColors[0].z;
+						baseColor[3] = discreteColors[0].w;
+
+						pulseColor[0] = discreteColors[1].x;
+						pulseColor[1] = discreteColors[1].y;
+						pulseColor[2] = discreteColors[1].z;
+						pulseColor[3] = discreteColors[1].w;
+					}
+
+					float frequency = colorModule->GetCustomParam4();
+					if (frequency == 0.0f) frequency = 1.0f;
+
+					bool changed = false;
+					changed |= ImGui::ColorEdit4("Base Color", baseColor);
+					changed |= ImGui::ColorEdit4("Pulse Color", pulseColor);
+					changed |= ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+
+					if (changed || ImGui::Button("Apply Pulse"))
 					{
 						colorModule->SetPulseColor(
 							Mathf::Vector4(baseColor[0], baseColor[1], baseColor[2], baseColor[3]),
@@ -3134,17 +3166,36 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 				}
 				else if (currentFunction == 1) // Sine Wave
 				{
-					static float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-					static float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-					static float frequency = 1.0f;
-					static float phase = 0.0f;
+					auto discreteColors = colorModule->GetDiscreteColors();
 
-					ImGui::ColorEdit4("Color 1", color1);
-					ImGui::ColorEdit4("Color 2", color2);
-					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
-					ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+					float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
-					if (ImGui::Button("Apply Sine Wave"))
+					if (discreteColors.size() >= 2)
+					{
+						color1[0] = discreteColors[0].x;
+						color1[1] = discreteColors[0].y;
+						color1[2] = discreteColors[0].z;
+						color1[3] = discreteColors[0].w;
+
+						color2[0] = discreteColors[1].x;
+						color2[1] = discreteColors[1].y;
+						color2[2] = discreteColors[1].z;
+						color2[3] = discreteColors[1].w;
+					}
+
+					float frequency = colorModule->GetCustomParam1();
+					float phase = colorModule->GetCustomParam2();
+
+					if (frequency == 0.0f) frequency = 1.0f;
+
+					bool changed = false;
+					changed |= ImGui::ColorEdit4("Color 1", color1);
+					changed |= ImGui::ColorEdit4("Color 2", color2);
+					changed |= ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					changed |= ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+
+					if (changed || ImGui::Button("Apply Sine Wave"))
 					{
 						colorModule->SetSineWaveColor(
 							Mathf::Vector4(color1[0], color1[1], color1[2], color1[3]),
@@ -3156,12 +3207,16 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 				}
 				else if (currentFunction == 2) // Flicker
 				{
-					static std::vector<Mathf::Vector4> flickerColors = {
-						Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-						Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-						Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
-					};
-					static float speed = 5.0f;
+					auto flickerColors = colorModule->GetDiscreteColors();
+
+					if (flickerColors.empty())
+					{
+						flickerColors = {
+							Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+							Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+							Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
+						};
+					}
 
 					for (int i = 0; i < flickerColors.size(); ++i)
 					{
@@ -3180,12 +3235,14 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 						if (ImGui::ColorEdit4(label, color))
 						{
 							flickerColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							colorModule->SetDiscreteColors(flickerColors);
 						}
 
 						ImGui::SameLine();
 						if (ImGui::Button("Remove") && flickerColors.size() > 1)
 						{
 							flickerColors.erase(flickerColors.begin() + i);
+							colorModule->SetDiscreteColors(flickerColors);
 							ImGui::PopID();
 							break;
 						}
@@ -3196,11 +3253,13 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 					if (ImGui::Button("Add Flicker Color") && flickerColors.size() < 32)
 					{
 						flickerColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+						colorModule->SetDiscreteColors(flickerColors);
 					}
 
-					ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f);
+					float speed = colorModule->GetCustomParam1();
+					if (speed == 0.0f) speed = 5.0f;
 
-					if (ImGui::Button("Apply Flicker"))
+					if (ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f))
 					{
 						colorModule->SetFlickerColor(flickerColors, speed);
 					}
@@ -3215,8 +3274,11 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 		// 이징 설정
 		if (ImGui::TreeNode("Easing Settings"))
 		{
-			static bool easingEnabled = false;
-			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			bool easingEnabled = colorModule->IsEasingEnabled();
+			if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+			{
+				colorModule->EnableEasing(easingEnabled);
+			}
 
 			if (easingEnabled)
 			{
@@ -3238,15 +3300,16 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 					"Loop Forward", "Loop Back", "Loop PingPong"
 				};
 
-				static int currentEasingType = 0;
-				static int currentAnimationType = 0;
-				static float duration = 1.0f;
+				int currentEasingType = static_cast<int>(colorModule->GetEasingModule().GetEasingType());
+				int currentAnimationType = static_cast<int>(colorModule->GetEasingModule().GetAnimationType());
+				float duration = colorModule->GetEasingModule().GetDuration();
 
-				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
-				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
-				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+				bool changed = false;
+				changed |= ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				changed |= ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				changed |= ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
 
-				if (ImGui::Button("Apply Easing"))
+				if (changed || ImGui::Button("Apply Easing"))
 				{
 					colorModule->SetEasing(
 						static_cast<EasingEffect>(currentEasingType),
@@ -3267,282 +3330,610 @@ void EffectEditor::RenderMeshMovementModuleEditor(MeshMovementModuleCS* movement
 
 	if (ImGui::CollapsingHeader("Mesh Movement Module", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		// 기본 설정
-		ImGui::Text("Basic Settings");
+		// 모듈 활성화 체크박스
+		bool enabled = movementModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Mesh Movement Module", &enabled))
+		{
+			movementModule->SetEnabled(enabled);
+		}
+
+		if (!enabled) return;
+
 		ImGui::Separator();
 
-		bool useGravity = movementModule->GetUseGravity();
-		if (ImGui::Checkbox("Use Gravity", &useGravity))
+		// Velocity 모드 선택
+		if (ImGui::TreeNode("Velocity Mode"))
 		{
-			movementModule->SetUseGravity(useGravity);
-		}
+			static const char* velocityModes[] = {
+				"Constant",
+				"Curve",
+				"Impulse",
+				"Wind",
+				"Orbital",
+				"Explosive"
+			};
 
-		if (useGravity)
-		{
-			float gravityStrength = movementModule->m_movementParams.gravityStrength;
-			if (ImGui::SliderFloat("Gravity Strength", &gravityStrength, 0.0f, 50.0f))
+			int currentVelocityMode = static_cast<int>(movementModule->GetVelocityMode());
+			if (ImGui::Combo("Velocity Mode", &currentVelocityMode, velocityModes, IM_ARRAYSIZE(velocityModes)))
 			{
-				movementModule->SetGravityStrength(gravityStrength);
+				movementModule->SetVelocityMode(static_cast<VelocityMode>(currentVelocityMode));
 			}
+
+			ImGui::TreePop();
 		}
 
-		// Velocity Mode 선택
-		ImGui::Spacing();
-		ImGui::Text("Velocity Mode");
 		ImGui::Separator();
 
-		int currentMode = static_cast<int>(movementModule->GetVelocityMode());
-		const char* velocityModes[] = { "Constant", "Curve", "Impulse", "Wind", "Orbital", "Explosive" };
+		int currentVelocityMode = static_cast<int>(movementModule->GetVelocityMode());
 
-		if (ImGui::Combo("Mode", &currentMode, velocityModes, IM_ARRAYSIZE(velocityModes)))
+		if (currentVelocityMode == 1) // Curve
 		{
-			movementModule->SetVelocityMode(static_cast<VelocityMode>(currentMode));
-		}
-
-		// Velocity Mode별 세부 설정
-		ImGui::Spacing();
-		switch (static_cast<VelocityMode>(currentMode))
-		{
-		case VelocityMode::Curve:
-		{
-			ImGui::Text("Velocity Curve");
-			ImGui::Separator();
-
-			// Velocity Point 추가
-			static float addTime = 0.0f;
-			static float addVelocity[3] = { 0.0f, 0.0f, 0.0f };
-			static float addStrength = 1.0f;
-
-			ImGui::SliderFloat("Time", &addTime, 0.0f, 1.0f);
-			ImGui::SliderFloat3("Velocity", addVelocity, -50.0f, 50.0f);
-			ImGui::SliderFloat("Strength", &addStrength, 0.0f, 5.0f);
-
-			if (ImGui::Button("Add Point"))
+			if (ImGui::TreeNode("Velocity Curve"))
 			{
-				movementModule->AddVelocityPoint(addTime,
-					Mathf::Vector3(addVelocity[0], addVelocity[1], addVelocity[2]),
-					addStrength);
-			}
+				auto currentCurve = movementModule->GetVelocityCurve();
+				auto velocityPoints = currentCurve;
 
-			ImGui::SameLine();
-			if (ImGui::Button("Clear Curve"))
-			{
-				movementModule->ClearVelocityCurve();
-			}
-
-			// 현재 Curve 표시
-			const auto& curve = movementModule->GetVelocityCurve();
-			if (!curve.empty())
-			{
-				ImGui::Text("Current Points: %zu", curve.size());
-				for (size_t i = 0; i < curve.size(); ++i)
+				if (velocityPoints.empty())
 				{
-					ImGui::Text("  [%.2f] (%.1f, %.1f, %.1f) * %.2f",
-						curve[i].time,
-						curve[i].velocity.x, curve[i].velocity.y, curve[i].velocity.z,
-						curve[i].strength);
+					VelocityPoint defaultPoint;
+					defaultPoint.time = 0.0f;
+					defaultPoint.velocity = Mathf::Vector3(0, 2, 0);
+					defaultPoint.strength = 1.0f;
+					velocityPoints.push_back(defaultPoint);
+
+					defaultPoint.time = 0.5f;
+					defaultPoint.velocity = Mathf::Vector3(1, 0, 0);
+					defaultPoint.strength = 0.8f;
+					velocityPoints.push_back(defaultPoint);
+
+					defaultPoint.time = 1.0f;
+					defaultPoint.velocity = Mathf::Vector3(0, -1, 0);
+					defaultPoint.strength = 0.5f;
+					velocityPoints.push_back(defaultPoint);
+
+					movementModule->SetVelocityCurve(velocityPoints);
+				}
+
+				bool curveChanged = false;
+
+				for (int i = 0; i < velocityPoints.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Point %d", i);
+
+					if (ImGui::TreeNode(label))
+					{
+						if (ImGui::SliderFloat("Time", &velocityPoints[i].time, 0.0f, 1.0f))
+						{
+							curveChanged = true;
+						}
+
+						float velocity[3] = {
+							velocityPoints[i].velocity.x,
+							velocityPoints[i].velocity.y,
+							velocityPoints[i].velocity.z
+						};
+
+						if (ImGui::DragFloat3("Velocity", velocity, 0.1f, -10.0f, 10.0f))
+						{
+							velocityPoints[i].velocity = Mathf::Vector3(velocity[0], velocity[1], velocity[2]);
+							curveChanged = true;
+						}
+
+						if (ImGui::SliderFloat("Strength", &velocityPoints[i].strength, 0.0f, 2.0f))
+						{
+							curveChanged = true;
+						}
+
+						if (velocityPoints.size() > 1)
+						{
+							if (ImGui::Button("Delete Point"))
+							{
+								velocityPoints.erase(velocityPoints.begin() + i);
+								movementModule->SetVelocityCurve(velocityPoints);
+								ImGui::TreePop();
+								ImGui::PopID();
+								break;
+							}
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Point") && velocityPoints.size() < 16)
+				{
+					VelocityPoint newPoint;
+					newPoint.time = velocityPoints.empty() ? 0.5f : std::min(velocityPoints.back().time + 0.1f, 1.0f);
+					newPoint.velocity = Mathf::Vector3(0, 0, 0);
+					newPoint.strength = 1.0f;
+					velocityPoints.push_back(newPoint);
+					movementModule->SetVelocityCurve(velocityPoints);
+				}
+
+				if (curveChanged)
+				{
+					movementModule->SetVelocityCurve(velocityPoints);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		else if (currentVelocityMode == 2) // Impulse
+		{
+			if (ImGui::TreeNode("Impulse Settings"))
+			{
+				auto currentImpulses = movementModule->GetImpulses();
+				auto impulses = currentImpulses;
+
+				if (impulses.empty())
+				{
+					ImpulseData defaultImpulse;
+					defaultImpulse.triggerTime = 0.2f;
+					defaultImpulse.direction = Mathf::Vector3(0, 1, 0);
+					defaultImpulse.force = 5.0f;
+					defaultImpulse.duration = 0.1f;
+					defaultImpulse.impulseRange = 1.0f;
+					defaultImpulse.impulseType = 1;
+					impulses.push_back(defaultImpulse);
+
+					movementModule->ClearImpulses();
+					for (const auto& impulse : impulses)
+					{
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force,
+							impulse.duration, impulse.impulseRange, impulse.impulseType);
+					}
+				}
+
+				bool impulsesChanged = false;
+
+				for (int i = 0; i < impulses.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Impulse %d", i);
+
+					if (ImGui::TreeNode(label))
+					{
+						if (ImGui::SliderFloat("Trigger Time", &impulses[i].triggerTime, 0.0f, 1.0f))
+							impulsesChanged = true;
+
+						float direction[3] = {
+							impulses[i].direction.x,
+							impulses[i].direction.y,
+							impulses[i].direction.z
+						};
+
+						if (ImGui::DragFloat3("Direction", direction, 0.1f, -1.0f, 1.0f))
+						{
+							impulses[i].direction = Mathf::Vector3(direction[0], direction[1], direction[2]);
+							impulsesChanged = true;
+						}
+
+						if (ImGui::SliderFloat("Force", &impulses[i].force, 0.0f, 20.0f))
+							impulsesChanged = true;
+
+						if (ImGui::SliderFloat("Duration", &impulses[i].duration, 0.01f, 1.0f))
+							impulsesChanged = true;
+
+						if (ImGui::SliderFloat("Range", &impulses[i].impulseRange, 0.0f, 2.0f))
+							impulsesChanged = true;
+
+						const char* typeNames[] = { "Direct", "Cone", "Sphere" };
+						int currentType = static_cast<int>(impulses[i].impulseType);
+						if (ImGui::Combo("Type", &currentType, typeNames, IM_ARRAYSIZE(typeNames)))
+						{
+							impulses[i].impulseType = static_cast<UINT>(currentType);
+							impulsesChanged = true;
+						}
+
+						if (ImGui::Button("Delete Impulse"))
+						{
+							impulses.erase(impulses.begin() + i);
+							movementModule->ClearImpulses();
+							for (const auto& impulse : impulses)
+							{
+								movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force,
+									impulse.duration, impulse.impulseRange, impulse.impulseType);
+							}
+							ImGui::TreePop();
+							ImGui::PopID();
+							break;
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Impulse") && impulses.size() < 16)
+				{
+					ImpulseData newImpulse;
+					newImpulse.triggerTime = 0.5f;
+					newImpulse.direction = Mathf::Vector3(0, 1, 0);
+					newImpulse.force = 5.0f;
+					newImpulse.duration = 0.1f;
+					newImpulse.impulseRange = 1.0f;
+					newImpulse.impulseType = 1;
+					impulses.push_back(newImpulse);
+
+					movementModule->ClearImpulses();
+					for (const auto& impulse : impulses)
+					{
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force,
+							impulse.duration, impulse.impulseRange, impulse.impulseType);
+					}
+				}
+
+				if (impulsesChanged)
+				{
+					movementModule->ClearImpulses();
+					for (const auto& impulse : impulses)
+					{
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force,
+							impulse.duration, impulse.impulseRange, impulse.impulseType);
+					}
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		else if (currentVelocityMode == 3) // Wind
+		{
+			if (ImGui::TreeNode("Wind Settings"))
+			{
+				auto windData = movementModule->GetWindData();
+
+				float windDirection[3] = { windData.direction.x, windData.direction.y, windData.direction.z };
+				float windStrength = windData.baseStrength;
+				float turbulence = windData.turbulence;
+				float frequency = windData.frequency;
+
+				bool windChanged = false;
+
+				if (ImGui::DragFloat3("Wind Direction", windDirection, 0.1f, -1.0f, 1.0f))
+				{
+					float length = sqrt(windDirection[0] * windDirection[0] +
+						windDirection[1] * windDirection[1] +
+						windDirection[2] * windDirection[2]);
+					if (length > 0.001f)
+					{
+						windDirection[0] /= length;
+						windDirection[1] /= length;
+						windDirection[2] /= length;
+					}
+					windChanged = true;
+				}
+
+				if (ImGui::SliderFloat("Wind Strength", &windStrength, 0.0f, 10.0f))
+					windChanged = true;
+
+				if (ImGui::SliderFloat("Turbulence", &turbulence, 0.0f, 2.0f))
+					windChanged = true;
+
+				if (ImGui::SliderFloat("Frequency", &frequency, 0.1f, 5.0f))
+					windChanged = true;
+
+				if (windChanged)
+				{
+					movementModule->SetWindEffect(
+						Mathf::Vector3(windDirection[0], windDirection[1], windDirection[2]),
+						windStrength,
+						turbulence,
+						frequency
+					);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		else if (currentVelocityMode == 4) // Orbital
+		{
+			if (ImGui::TreeNode("Orbital Settings"))
+			{
+				auto orbitalData = movementModule->GetOrbitalData();
+
+				float orbitalCenter[3] = { orbitalData.center.x, orbitalData.center.y, orbitalData.center.z };
+				float orbitalRadius = orbitalData.radius;
+				float orbitalSpeed = orbitalData.speed;
+				float orbitalAxis[3] = { orbitalData.axis.x, orbitalData.axis.y, orbitalData.axis.z };
+
+				bool orbitalChanged = false;
+
+				if (ImGui::DragFloat3("Orbital Center", orbitalCenter, 0.1f, -20.0f, 20.0f))
+					orbitalChanged = true;
+
+				if (ImGui::SliderFloat("Radius", &orbitalRadius, 0.1f, 20.0f))
+					orbitalChanged = true;
+
+				if (ImGui::SliderFloat("Speed", &orbitalSpeed, -5.0f, 5.0f))
+					orbitalChanged = true;
+
+				if (ImGui::DragFloat3("Rotation Axis", orbitalAxis, 0.1f, -1.0f, 1.0f))
+				{
+					float length = sqrt(orbitalAxis[0] * orbitalAxis[0] +
+						orbitalAxis[1] * orbitalAxis[1] +
+						orbitalAxis[2] * orbitalAxis[2]);
+					if (length > 0.001f)
+					{
+						orbitalAxis[0] /= length;
+						orbitalAxis[1] /= length;
+						orbitalAxis[2] /= length;
+					}
+					orbitalChanged = true;
+				}
+
+				ImGui::Text("Presets:");
+				if (ImGui::Button("Horizontal"))
+				{
+					orbitalAxis[0] = 0.0f; orbitalAxis[1] = 1.0f; orbitalAxis[2] = 0.0f;
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Vertical"))
+				{
+					orbitalAxis[0] = 1.0f; orbitalAxis[1] = 0.0f; orbitalAxis[2] = 0.0f;
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Depth"))
+				{
+					orbitalAxis[0] = 0.0f; orbitalAxis[1] = 0.0f; orbitalAxis[2] = 1.0f;
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+
+				if (orbitalChanged)
+				{
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		else if (currentVelocityMode == 5) // Explosive
+		{
+			if (ImGui::TreeNode("Explosive Settings"))
+			{
+				auto explosiveData = movementModule->GetExplosiveData();
+
+				float initialSpeed = explosiveData.initialSpeed;
+				float speedDecay = explosiveData.speedDecay;
+				float randomFactor = explosiveData.randomFactor;
+				float sphereRadius = explosiveData.sphereRadius;
+
+				bool explosiveChanged = false;
+
+				ImGui::Text("Basic Settings:");
+				if (ImGui::SliderFloat("Initial Speed", &initialSpeed, 1.0f, 200.0f))
+					explosiveChanged = true;
+
+				if (ImGui::SliderFloat("Speed Decay", &speedDecay, 0.1f, 5.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Higher values make particles slow down faster");
+
+				ImGui::Text("Distribution:");
+				if (ImGui::SliderFloat("Random Factor", &randomFactor, 0.0f, 1.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("0 = uniform spread, 1 = very random");
+
+				if (ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 2.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("1.0 = perfect sphere, lower values = flatter distribution");
+
+				ImGui::Separator();
+				ImGui::Text("Presets:");
+
+				if (ImGui::Button("Fireworks"))
+				{
+					initialSpeed = 80.0f;
+					speedDecay = 1.5f;
+					randomFactor = 0.3f;
+					sphereRadius = 1.0f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Grenade"))
+				{
+					initialSpeed = 120.0f;
+					speedDecay = 2.5f;
+					randomFactor = 0.6f;
+					sphereRadius = 0.8f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Soft Pop"))
+				{
+					initialSpeed = 30.0f;
+					speedDecay = 0.8f;
+					randomFactor = 0.2f;
+					sphereRadius = 1.2f;
+					explosiveChanged = true;
+				}
+
+				if (ImGui::Button("Ring Burst"))
+				{
+					initialSpeed = 60.0f;
+					speedDecay = 1.2f;
+					randomFactor = 0.1f;
+					sphereRadius = 0.3f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Chaos"))
+				{
+					initialSpeed = 100.0f;
+					speedDecay = 3.0f;
+					randomFactor = 0.8f;
+					sphereRadius = 1.5f;
+					explosiveChanged = true;
+				}
+
+				if (explosiveChanged)
+				{
+					movementModule->SetExplosiveEffect(
+						initialSpeed,
+						speedDecay,
+						randomFactor,
+						sphereRadius
+					);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+
+		ImGui::Separator();
+
+		// 중력 설정
+		if (ImGui::TreeNode("Gravity Settings"))
+		{
+			bool useGravity = movementModule->GetUseGravity();
+			if (ImGui::Checkbox("Use Gravity", &useGravity))
+			{
+				movementModule->SetUseGravity(useGravity);
+			}
+
+			if (useGravity)
+			{
+				static float gravityStrength = 9.8f;
+
+				if (ImGui::SliderFloat("Gravity Strength", &gravityStrength, 0.0f, 50.0f, "%.2f"))
+				{
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Reset##Gravity"))
+				{
+					gravityStrength = 9.8f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+
+				ImGui::Text("Gravity Presets:");
+				ImGui::SameLine();
+
+				if (ImGui::Button("Earth"))
+				{
+					gravityStrength = 9.8f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Moon"))
+				{
+					gravityStrength = 1.6f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Mars"))
+				{
+					gravityStrength = 3.7f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Jupiter"))
+				{
+					gravityStrength = 24.8f;
+					movementModule->SetGravityStrength(gravityStrength);
 				}
 			}
-			break;
+
+			ImGui::TreePop();
 		}
 
-		case VelocityMode::Impulse:
-		{
-			ImGui::Text("Impulse Settings");
-			ImGui::Separator();
-
-			static float impulseTime = 0.0f;
-			static float impulseDirection[3] = { 0.0f, 1.0f, 0.0f };
-			static float impulseForce = 10.0f;
-			static float impulseDuration = 0.1f;
-
-			ImGui::SliderFloat("Trigger Time", &impulseTime, 0.0f, 1.0f);
-			ImGui::SliderFloat3("Direction", impulseDirection, -1.0f, 1.0f);
-			ImGui::SliderFloat("Force", &impulseForce, 0.0f, 100.0f);
-			ImGui::SliderFloat("Duration", &impulseDuration, 0.01f, 1.0f);
-
-			if (ImGui::Button("Add Impulse"))
-			{
-				movementModule->AddImpulse(impulseTime,
-					Mathf::Vector3(impulseDirection[0], impulseDirection[1], impulseDirection[2]),
-					impulseForce, impulseDuration);
-			}
-
-			ImGui::SameLine();
-			if (ImGui::Button("Clear Impulses"))
-			{
-				movementModule->ClearImpulses();
-			}
-
-			const auto& impulses = movementModule->GetImpulses();
-			if (!impulses.empty())
-			{
-				ImGui::Text("Current Impulses: %zu", impulses.size());
-			}
-			break;
-		}
-
-		case VelocityMode::Wind:
-		{
-			ImGui::Text("Wind Settings");
-			ImGui::Separator();
-
-			const auto& windData = movementModule->GetWindData();
-			float direction[3] = { windData.direction.x, windData.direction.y, windData.direction.z };
-			float strength = windData.baseStrength;
-			float turbulence = windData.turbulence;
-			float frequency = windData.frequency;
-
-			if (ImGui::SliderFloat3("Direction", direction, -1.0f, 1.0f))
-			{
-				movementModule->SetWindEffect(
-					Mathf::Vector3(direction[0], direction[1], direction[2]),
-					strength, turbulence, frequency);
-			}
-
-			if (ImGui::SliderFloat("Strength", &strength, 0.0f, 50.0f))
-			{
-				movementModule->SetWindEffect(
-					Mathf::Vector3(direction[0], direction[1], direction[2]),
-					strength, turbulence, frequency);
-			}
-
-			if (ImGui::SliderFloat("Turbulence", &turbulence, 0.0f, 2.0f))
-			{
-				movementModule->SetWindEffect(
-					Mathf::Vector3(direction[0], direction[1], direction[2]),
-					strength, turbulence, frequency);
-			}
-
-			if (ImGui::SliderFloat("Frequency", &frequency, 0.1f, 5.0f))
-			{
-				movementModule->SetWindEffect(
-					Mathf::Vector3(direction[0], direction[1], direction[2]),
-					strength, turbulence, frequency);
-			}
-			break;
-		}
-
-		case VelocityMode::Orbital:
-		{
-			ImGui::Text("Orbital Settings");
-			ImGui::Separator();
-
-			const auto& orbitalData = movementModule->GetOrbitalData();
-			float center[3] = { orbitalData.center.x, orbitalData.center.y, orbitalData.center.z };
-			float radius = orbitalData.radius;
-			float speed = orbitalData.speed;
-			float axis[3] = { orbitalData.axis.x, orbitalData.axis.y, orbitalData.axis.z };
-
-			if (ImGui::SliderFloat3("Center", center, -100.0f, 100.0f))
-			{
-				movementModule->SetOrbitalMotion(
-					Mathf::Vector3(center[0], center[1], center[2]),
-					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
-			}
-
-			if (ImGui::SliderFloat("Radius", &radius, 1.0f, 50.0f))
-			{
-				movementModule->SetOrbitalMotion(
-					Mathf::Vector3(center[0], center[1], center[2]),
-					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
-			}
-
-			if (ImGui::SliderFloat("Speed", &speed, -10.0f, 10.0f))
-			{
-				movementModule->SetOrbitalMotion(
-					Mathf::Vector3(center[0], center[1], center[2]),
-					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
-			}
-
-			if (ImGui::SliderFloat3("Axis", axis, -1.0f, 1.0f))
-			{
-				movementModule->SetOrbitalMotion(
-					Mathf::Vector3(center[0], center[1], center[2]),
-					radius, speed, Mathf::Vector3(axis[0], axis[1], axis[2]));
-			}
-			break;
-		}
-
-		case VelocityMode::Explosive:
-		{
-			ImGui::Text("Explosive Settings");
-			ImGui::Separator();
-
-			const auto& explosiveData = movementModule->GetExplosiveData();
-			float initialSpeed = explosiveData.initialSpeed;
-			float speedDecay = explosiveData.speedDecay;
-			float randomFactor = explosiveData.randomFactor;
-			float sphereRadius = explosiveData.sphereRadius;
-
-			if (ImGui::SliderFloat("Initial Speed", &initialSpeed, 0.0f, 200.0f))
-			{
-				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
-			}
-
-			if (ImGui::SliderFloat("Speed Decay", &speedDecay, 0.1f, 5.0f))
-			{
-				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
-			}
-
-			if (ImGui::SliderFloat("Random Factor", &randomFactor, 0.0f, 1.0f))
-			{
-				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
-			}
-
-			if (ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.0f, 2.0f))
-			{
-				movementModule->SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
-			}
-			break;
-		}
-		}
+		ImGui::Separator();
 
 		// 이징 설정
 		if (ImGui::TreeNode("Easing Settings"))
 		{
 			static bool easingEnabled = false;
-			ImGui::Checkbox("Enable Easing", &easingEnabled);
+			if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+			{
+				movementModule->SetEasingEnabled(easingEnabled);
+			}
+
 			if (easingEnabled)
 			{
 				static const char* easingTypes[] = {
-					"Linear", "InSine", "OutSine", "InOutSine",
-					"InQuad", "OutQuad", "InOutQuad",
-					"InCubic", "OutCubic", "InOutCubic",
-					"InQuart", "OutQuart", "InOutQuart",
-					"InQuint", "OutQuint", "InOutQuint",
-					"InExpo", "OutExpo", "InOutExpo",
-					"InCirc", "OutCirc", "InOutCirc",
-					"InBack", "OutBack", "InOutBack",
-					"InElastic", "OutElastic", "InOutElastic",
-					"InBounce", "OutBounce", "InOutBounce"
+					"Linear",
+					"Ease In Quad", "Ease Out Quad", "Ease In Out Quad",
+					"Ease In Cubic", "Ease Out Cubic", "Ease In Out Cubic",
+					"Ease In Quart", "Ease Out Quart", "Ease In Out Quart",
+					"Ease In Quint", "Ease Out Quint", "Ease In Out Quint",
+					"Ease In Sine", "Ease Out Sine", "Ease In Out Sine",
+					"Ease In Expo", "Ease Out Expo", "Ease In Out Expo",
+					"Ease In Circ", "Ease Out Circ", "Ease In Out Circ",
+					"Ease In Back", "Ease Out Back", "Ease In Out Back",
+					"Ease In Elastic", "Ease Out Elastic", "Ease In Out Elastic",
+					"Ease In Bounce", "Ease Out Bounce", "Ease In Out Bounce"
 				};
-				static const char* animationTypes[] = {
-					"Once Forward", "Once Back", "Once PingPong",
-					"Loop Forward", "Loop Back", "Loop PingPong"
-				};
+
 				static int currentEasingType = 0;
-				static int currentAnimationType = 0;
-				static float duration = 1.0f;
-				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
-				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
-				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
-				if (ImGui::Button("Apply Easing"))
+				if (ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes)))
 				{
-					movementModule->SetEasing(
-						static_cast<EasingEffect>(currentEasingType),
-						static_cast<StepAnimation>(currentAnimationType),
-						duration
-					);
+					movementModule->SetEasingType(currentEasingType);
 				}
 			}
-			else
+
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+
+		// 디버그 정보
+		if (ImGui::TreeNode("Debug Info"))
+		{
+			ImGui::Text("Module Status: %s", movementModule->IsEnabled() ? "Enabled" : "Disabled");
+			ImGui::Text("Ready for Reuse: %s", movementModule->IsReadyForReuse() ? "Yes" : "No");
+			ImGui::Text("Current Velocity Mode: %d", static_cast<int>(movementModule->GetVelocityMode()));
+			ImGui::Text("Velocity Points: %zu", movementModule->GetVelocityCurve().size());
+			ImGui::Text("Impulses: %zu", movementModule->GetImpulses().size());
+
+			if (ImGui::Button("Reset Module"))
 			{
-				if (movementModule->m_easingEnable)
-				{
-					movementModule->DisableEasing();
-				}
+				movementModule->ResetForReuse();
 			}
+
 			ImGui::TreePop();
 		}
 	}
@@ -3847,7 +4238,7 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 						ImGui::PushID(i);
 						if (ImGui::SmallButton("Select")) {
 							meshModule->SetModel(currentModel, i);
-							selectedMeshIndex = i; // UI 인덱스도 업데이트
+							selectedMeshIndex = i;
 						}
 						ImGui::PopID();
 					}
@@ -3874,6 +4265,67 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	if (instanceCount == 0) {
 		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "No particle data assigned");
 		ImGui::Text("This will be automatically set when connected to a particle system");
+	}
+
+	// 스프라이트 애니메이션 설정 UI
+	ImGui::Separator();
+	ImGui::Text("Sprite Animation Settings:");
+
+	bool spriteAnimationEnabled = meshModule->IsSpriteAnimationEnabled();
+	if (ImGui::Checkbox("Enable Sprite Animation", &spriteAnimationEnabled)) {
+		meshModule->EnableSpriteAnimation(spriteAnimationEnabled);
+	}
+
+	if (spriteAnimationEnabled) {
+		ImGui::Indent();
+
+		const auto& spriteParams = meshModule->GetSpriteAnimationParams();
+
+		uint32_t frameCount = spriteParams.frameCount;
+		if (ImGui::InputScalar("Frame Count", ImGuiDataType_U32, &frameCount, nullptr, nullptr, "%u")) {
+			meshModule->SetSpriteAnimation(frameCount, spriteParams.animationDuration, spriteParams.gridColumns, spriteParams.gridRows);
+		}
+
+		float animationDuration = spriteParams.animationDuration;
+		if (ImGui::SliderFloat("Animation Duration", &animationDuration, 0.1f, 10.0f, "%.2f sec")) {
+			meshModule->SetSpriteAnimation(spriteParams.frameCount, animationDuration, spriteParams.gridColumns, spriteParams.gridRows);
+		}
+
+		uint32_t gridColumns = spriteParams.gridColumns;
+		if (ImGui::InputScalar("Grid Columns", ImGuiDataType_U32, &gridColumns, nullptr, nullptr, "%u")) {
+			meshModule->SetSpriteAnimation(spriteParams.frameCount, spriteParams.animationDuration, gridColumns, spriteParams.gridRows);
+		}
+
+		uint32_t gridRows = spriteParams.gridRows;
+		if (ImGui::InputScalar("Grid Rows", ImGuiDataType_U32, &gridRows, nullptr, nullptr, "%u")) {
+			meshModule->SetSpriteAnimation(spriteParams.frameCount, spriteParams.animationDuration, spriteParams.gridColumns, gridRows);
+		}
+
+		ImGui::Separator();
+		ImGui::Text("Presets:");
+		if (ImGui::Button("4x4 Grid (16 frames)")) {
+			meshModule->SetSpriteAnimation(16, 1.0f, 4, 4);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("8x8 Grid (64 frames)")) {
+			meshModule->SetSpriteAnimation(64, 2.0f, 8, 8);
+		}
+		if (ImGui::Button("2x2 Grid (4 frames)")) {
+			meshModule->SetSpriteAnimation(4, 0.5f, 2, 2);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("1x8 Strip (8 frames)")) {
+			meshModule->SetSpriteAnimation(8, 1.0f, 8, 1);
+		}
+
+		if (ImGui::CollapsingHeader("Sprite Animation Help")) {
+			ImGui::BulletText("Frame Count: Total number of animation frames");
+			ImGui::BulletText("Duration: Time to complete one full animation cycle");
+			ImGui::BulletText("Grid: How frames are arranged in the texture");
+			ImGui::BulletText("Frames are read left-to-right, top-to-bottom");
+		}
+
+		ImGui::Unindent();
 	}
 
 	// 요약 상태 정보 (하단)

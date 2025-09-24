@@ -26,6 +26,9 @@ ReflectionScriptField(Player) \
 		meta_property(rangeAngle) \
 		meta_property(countSpecialBullet) \
 		meta_property(bombMoveSpeed) \
+		meta_property(slash1Offset) \
+		meta_property(slash2Offset) \
+		meta_property(slashChargeOffset) \
 		meta_property(MultipleAttackSpeed) \
 		meta_property(stunRespawnTime) \
 		meta_property(GracePeriod) \
