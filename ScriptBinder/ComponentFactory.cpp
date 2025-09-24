@@ -16,6 +16,7 @@
 #include "ImageComponent.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
+#include "SoundComponent.h"
 #include "PlayerInput.h"
 #include "Animation.h"
 #include "Canvas.h"
@@ -646,6 +647,23 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 			//spriteSheet->DeserializeNavi();
 			spriteSheet->DeserializeShader();
+		}
+		else if (typeID == type_guid(SoundComponent))
+		{
+			auto sound = static_cast<SoundComponent*>(component);
+			Meta::Deserialize(sound, itNode);
+			sound->SetOwner(obj);
+
+			if (itNode["localRolloffCurve"])
+			{
+				auto& curveNode = itNode["localRolloffCurve"];
+				for(auto& p : curveNode)
+				{
+					CurvePoint point;
+					Meta::Deserialize(&point, p);
+					sound->localRolloffCurve.push_back(point);
+				}
+			}
 		}
 		else
 		{

@@ -1,472 +1,121 @@
 #include "SoundManager.h"
 #include "PathFinder.h"
+#include "SoundComponent.h"
 #include "Core.Minimal.h"
 
-static inline float dbToLinear(float db) { return powf(10.0f, db / 20.0f); }
-static inline float linearToDb(float lin) { return 20.0f * log10f(std::max(lin, 1e-6f)); }
+namespace fs = std::filesystem;
 
+// ===== ctor/dtor =====
+SoundManager::SoundManager() {}
+SoundManager::~SoundManager() {
+    while (_isSoundLoaderThreadRunning) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    shutdown();
+}
+
+// ===== 레거시 표면 =====
 bool SoundManager::initialize(int maxChannels)
 {
     _inputMaxChannels = maxChannels;
     Initialize();
-
     _soundLoaderThread = std::thread(&SoundManager::SoundLoaderThread, this);
     _soundLoaderThread.detach();
-
     return true;
 }
 
 void SoundManager::update()
 {
-    if (system)
-    {
-        system->update();
-
-        FMOD::Channel* ch = channels[(int)ChannelType::BGM];
-        if (ch) {
-            bool playing = false, paused = false; float aud = 0.f;
-            ch->isPlaying(&playing);
-            ch->getPaused(&paused);
-            ch->getAudibility(&aud); // 0이면 가상화/스틸 의심
-
-            FMOD::Sound* snd = nullptr;
-            ch->getCurrentSound(&snd);
-            if (snd) {
-                FMOD_OPENSTATE st = FMOD_OPENSTATE_READY;
-                unsigned int percent = 0;
-                bool starving = false, diskbusy = false;
-                snd->getOpenState(&st, &percent, &starving, &diskbusy);
-
-                unsigned int posMs = 0;
-                ch->getPosition(&posMs, FMOD_TIMEUNIT_MS);
-                constexpr float kAudEps = 1e-3f; // 0.001 이하를 사실상 0으로 간주
-                if (starving || false == playing || aud <= kAudEps)
-                {
-                    // playing=false || aud0 → 스틸/가상화
-                    // starving=true → 스트림 버퍼/IO 문제
-                    __debugbreak();
-                }
-            }
-        }
-    }
+    if (system) system->update();
 }
 
 void SoundManager::shutdown()
 {
-    for (auto& [key, sound] : sounds)
     {
-        sound->release();
-    }
-    sounds.clear();
-
-    for (auto& [key, channel] : channels)
-    {
-        channel->stop();
-    }
-    channels.clear();
-
-    for (auto& channelGroup : _channelGroups)
-    {
-        channelGroup->release();
+        std::unique_lock wlock(_soundsMutex);
+        for (auto& [k, s] : sounds) if (s) s->release();
+        sounds.clear();
     }
 
-    if (_pMasterChannelGroup)
-    {
-        _pMasterChannelGroup->release();
-    }
+    for (auto* g : groups) if (g) g->release();
+    groups.clear();
 
-    if (system)
-    {
-        system->close();
-        system->release();
-        system = nullptr;
-    }
-}
+    // master는 System 소유
+    master = nullptr;
 
-void SoundManager::setBusVolume(ChannelType bus, float linear /*0~1 권장*/) {
-    _channelGroups[(int)bus]->setVolume(linear);
-}
-
-void SoundManager::setBusVolumeDb(ChannelType bus, float db) {
-    _channelGroups[(int)bus]->setVolume(dbToLinear(db));
-}
-
-// UI 슬라이더(0~100) → dB 매핑(예: -60dB ~ 0dB)
-static inline float sliderToDb(int percent) {
-    const float minDb = -60.0f;
-    if (percent <= 0) return -80.0f; // 사실상 mute
-    return minDb + (0.0f - minDb) * (percent / 100.0f);
-}
-
-void SoundManager::setBusVolumePercent(ChannelType bus, int percent) {
-    setBusVolumeDb(bus, sliderToDb(percent));
-}
-
-bool SoundManager::loadSound(const std::string& name, const std::string& filePath, bool is3D, bool loop)
-{
-    if (sounds.find(name) != sounds.end()) { Debug->LogError("Sound already loaded: " + name); return false; }
-
-    FMOD_MODE mode = FMOD_DEFAULT;
-    if (is3D) mode |= FMOD_3D; else mode |= FMOD_2D;
-
-    // BGM 폴더면 스트리밍 + 루프 권장
-    const bool isBGM = filePath.find("\\Sounds\\BGM\\") != std::string::npos
-        || filePath.find("/Sounds/BGM/") != std::string::npos;
-
-    if (isBGM) mode |= FMOD_CREATESTREAM;
-    if (loop)  mode |= FMOD_LOOP_NORMAL;
-
-    FMOD::Sound* sound = nullptr;
-    FMOD_RESULT r = system->createSound(filePath.c_str(), mode, nullptr, &sound);
-    if (r != FMOD_OK)
-    {
-        Debug->LogError("Failed to load sound: " + filePath + " - " + FMOD_ErrorString(r));
-        return false;
-    }
-
-    if (isBGM) {
-        float freq = 0.0f;
-        int   prio = 128; // default
-
-        FMOD_RESULT r = sound->getDefaults(&freq, &prio);  // 현재 주파수/우선순위 읽기
-        if (r == FMOD_OK) {
-            r = sound->setDefaults(freq, /*priority=*/0);  // 0 = 최상위 우선순위
-        }
-    }
-
-    sounds[name] = sound;
-    return true;
-}
-
-void SoundManager::unloadSound(const std::string& name)
-{
-    auto it = sounds.find(name);
-    if (it != sounds.end())
-    {
-        it->second->release();
-        sounds.erase(it);
-    }
-}
-
-void SoundManager::playSound(const std::string& name, int channel, bool isPaused)
-{
-    auto it = sounds.find(name);
-    if (it == sounds.end())
-    {
-        Debug->LogError("Sound not found: " + name);
-        return;
-    }
-
-    FMOD::Channel* pChannel = nullptr;
-    FMOD_RESULT result = system->playSound(it->second, _channelGroups[channel], isPaused, &pChannel);
-    if (result != FMOD_OK)
-    {
-        Debug->LogError("Failed to play sound: " + name + " - " + FMOD_ErrorString(result));
-    }
-    else
-    {
-        channels[channel] = pChannel;
-    }
-}
-
-void SoundManager::playOneShot(const std::string& name, ChannelType ch, float volume, float pitch)
-{
-    auto it = sounds.find(name);
-    if (it == sounds.end()) { Debug->LogError("Sound not found: " + name); return; }
-
-    FMOD::Channel* c = nullptr;
-    FMOD_RESULT r = system->playSound(it->second, _channelGroups[(int)ch], false, &c);
-    if (r != FMOD_OK) {
-        Debug->LogError("Failed to play oneshot: " + name + " - " + std::string(FMOD_ErrorString(r)));
-        return;
-    }
-    c->setMode(FMOD_LOOP_OFF);   // 원샷 보장
-    c->setVolume(volume);
-    c->setPitch(pitch);
-}
-
-void SoundManager::playBGM(const std::string& name, bool paused)
-{
-    auto it = sounds.find(name);
-    if (it == sounds.end()) { Debug->LogError("BGM not found: " + name); return; }
-
-    FMOD::Channel* ch = nullptr;
-    auto* group = _channelGroups[(int)ChannelType::BGM]; // 네가 쓰는 BGM 그룹 인덱스
-    FMOD_RESULT r = system->playSound(it->second, group, paused, &ch);
-    if (r != FMOD_OK) {
-        Debug->LogError("Failed to play BGM: " + name + " - " + std::string(FMOD_ErrorString(r)));
-        return;
-    }
-
-    ch->setMode(FMOD_LOOP_NORMAL);
-    ch->setPriority(0);       // 최상위
-    ch->setVolume(1.0f);        // 그룹 볼륨으로 전체 레벨 제어
-    channels[(int)ChannelType::BGM] = ch;
-}
-
-void SoundManager::playSound(const std::string& name, ChannelType channel, bool isPaused)
-{
-    auto it = sounds.find(name);
-    if (it == sounds.end())
-    {
-        Debug->LogError("Sound not found: " + name);
-        return;
-    }
-
-    FMOD::Channel* pChannel = nullptr;
-    FMOD_RESULT result = system->playSound(it->second, _channelGroups[(int)channel], isPaused, &pChannel);
-    if (result != FMOD_OK)
-    {
-        Debug->LogError("Failed to play sound: " + name + " - " + FMOD_ErrorString(result));
-    }
-    else
-    {
-        channels[(int)channel] = pChannel;
-    }
-}
-
-void SoundManager::stopSound(const int channel)
-{
-    auto it = channels.find(channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->stop();
-        channels.erase(it);
-    }
-}
-
-void SoundManager::stopSound(const ChannelType channel)
-{
-    auto it = channels.find((int)channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->stop();
-        channels.erase(it);
-    }
-}
-
-void SoundManager::stopAllSound()
-{
-    for (auto& [key, channel] : channels)
-    {
-        channel->stop();
-    }
-    channels.clear();
-}
-
-void SoundManager::setPaused(const int channel, bool paused)
-{
-    auto it = channels.find(channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setPaused(paused);
-    }
-}
-
-void SoundManager::setPaused(const ChannelType channel, bool paused)
-{
-    auto it = channels.find((int)channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setPaused(paused);
-    }
-}
-
-void SoundManager::setMasterVolume(float volume)
-{
-    if (_pMasterChannelGroup)
-    {
-        _pMasterChannelGroup->setVolume(volume);
-    }
-}
-
-void SoundManager::setVolume(const int channel, float volume)
-{
-    auto it = channels.find(channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setVolume(volume);
-    }
-}
-
-void SoundManager::setVolume(const ChannelType channel, float volume)
-{
-    auto it = channels.find((int)channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setVolume(volume);
-    }
-}
-
-void SoundManager::setPitch(const int channel, float pitch)
-{
-    auto it = channels.find(channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setPitch(pitch);
-    }
-}
-
-void SoundManager::setPitch(const ChannelType channel, float pitch)
-{
-    auto it = channels.find((int)channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setPitch(pitch);
-    }
-}
-
-void SoundManager::setMute(const int channel, bool mute)
-{
-    auto it = channels.find(channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setMute(mute);
-    }
-}
-
-void SoundManager::setMute(const ChannelType channel, bool mute)
-{
-    auto it = channels.find((int)channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->setMute(mute);
-    }
-}
-
-void SoundManager::set3DAttributes(const int channel, const FMOD_VECTOR& position, const FMOD_VECTOR& velocity)
-{
-    auto it = channels.find(channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->set3DAttributes(&position, &velocity);
-    }
-}
-
-void SoundManager::set3DAttributes(const ChannelType channel, const FMOD_VECTOR& position, const FMOD_VECTOR& velocity)
-{
-    auto it = channels.find((int)channel);
-    if (it != channels.end() && it->second)
-    {
-        it->second->set3DAttributes(&position, &velocity);
-    }
-}
-
-SoundManager::SoundManager()
-{
-}
-
-SoundManager::~SoundManager()
-{
-    while (_isSoundLoaderThreadRunning)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    };
-
-    shutdown();
+    if (system) { system->close(); system->release(); system = nullptr; }
 }
 
 void SoundManager::Initialize()
 {
-    int numberOfAvailableChannels{};
+    FMOD_RESULT r = FMOD::System_Create(&system);
+    if (r != FMOD_OK) Debug->LogError(std::string("FMOD create failed: ") + FMOD_ErrorString(r));
 
-    FMOD_RESULT result = FMOD::System_Create(&system);
-    if (result != FMOD_OK)
-    {
-        Debug->LogError("FMOD System creation failed: " + std::string(FMOD_ErrorString(result)));
-    }
+    r = system->init(_inputMaxChannels, FMOD_INIT_NORMAL, nullptr);
+    if (r != FMOD_OK) Debug->LogError(std::string("FMOD init failed: ") + FMOD_ErrorString(r));
 
-    result = system->init(_inputMaxChannels, FMOD_INIT_NORMAL, nullptr); // FMOD 시스템 초기화
-    if (result != FMOD_OK)
-    {
-        Debug->LogError("FMOD System initialization failed: " + std::string(FMOD_ErrorString(result)));
-    }
+    int avail = 0; system->getSoftwareChannels(&avail);
+    _softMaxChannels = std::min(_inputMaxChannels, avail);
 
-    system->getSoftwareChannels(&numberOfAvailableChannels); // 사용 가능한 채널 수를 가져온다.
-
-    if (numberOfAvailableChannels < _inputMaxChannels) // 사용 가능한 채널 수가 설정한 채널 수보다 작다면
-    {
-        _inputMaxChannels = numberOfAvailableChannels; // 사용 가능한 채널 수로 설정한다.
-    }
-
-    // 스트림 버퍼(언더런 방지) 증가 권장
+    // 스트림 안정성
     system->setStreamBufferSize(128 * 1024, FMOD_TIMEUNIT_RAWBYTES);
 
-    // 볼륨 0 가상화 임계치 내리기(필요시)
+    // vol0virtual 보정
     FMOD_ADVANCEDSETTINGS adv{}; adv.cbSize = sizeof(adv);
-    adv.vol0virtualvol = 0.0f; // 0 근처 볼륨도 진짜로 믹스하게
+    adv.vol0virtualvol = 0.0f;
     system->setAdvancedSettings(&adv);
 
-    _maxChannels = _inputMaxChannels;
-    _channelGroups.resize(_maxChannels);
-    system->getMasterChannelGroup(&_pMasterChannelGroup);
-    system->getSoftwareFormat(&_pSamplateInt, 0, 0);
-    setMasterVolume(2.f);
-    //for (int i = 0; i < _maxChannels; i++)
-    //{
-    //    system->createChannelGroup(0, &_channelGroups[i]);
-    //    _pMasterChannelGroup->addGroup(_channelGroups[i]);
-    //}
-    system->createChannelGroup("BGM", &_channelGroups[(int)ChannelType::BGM]);
-    system->createChannelGroup("SFX", &_channelGroups[(int)ChannelType::SFX]);
-    system->createChannelGroup("Player", &_channelGroups[(int)ChannelType::PLAYER]);
-    system->createChannelGroup("Monster", &_channelGroups[(int)ChannelType::MONSTER]);
-    system->createChannelGroup("UI", &_channelGroups[(int)ChannelType::UI]);
+    system->set3DSettings(1.0f, 1.0f, 1.0f);
 
-    for (int i = 0; i < _maxChannels; i++)
-    {
-        _pMasterChannelGroup->addGroup(_channelGroups[i]);
+    groups.assign((int)ChannelType::MaxChannel, nullptr);
+    system->getMasterChannelGroup(&master);
+    system->getSoftwareFormat(&_sampleRate, 0, 0);
+
+    system->createChannelGroup("BGM", &groups[(int)ChannelType::BGM]);
+    system->createChannelGroup("SFX", &groups[(int)ChannelType::SFX]);
+    system->createChannelGroup("Player", &groups[(int)ChannelType::PLAYER]);
+    system->createChannelGroup("Monster", &groups[(int)ChannelType::MONSTER]);
+    system->createChannelGroup("UI", &groups[(int)ChannelType::UI]);
+
+    for (auto* g : groups) {
+        if (g && master) {
+            FMOD_RESULT rr = master->addGroup(g);
+            if (rr != FMOD_OK) Debug->LogError(std::string("addGroup failed: ") + FMOD_ErrorString(rr));
+        }
     }
 
+    // 기본 볼륨
+    setMasterVolume(1.0f);
     setBusVolumeDb(ChannelType::BGM, -5.0f);
     setBusVolumeDb(ChannelType::SFX, -3.0f);
     setBusVolumeDb(ChannelType::PLAYER, -3.0f);
     setBusVolumeDb(ChannelType::MONSTER, -3.0f);
     setBusVolumeDb(ChannelType::UI, -8.0f);
 
-    channels.reserve(_maxChannels);
+    // 기본 정책
+    groupCfg[(int)ChannelType::SFX] = { 12, StealPolicy::Quietest, true };
 
     _isInitialized = true;
 }
 
 void SoundManager::SoundLoaderThread()
 {
-    while (true)
-    {
-        uint32 soundCount = 0;
-
-        try
-        {
-            file::path soundPath = PathFinder::Relative("Sounds\\");
-            for (auto& dir : file::recursive_directory_iterator(soundPath))
-            {
-                if (dir.is_directory())
-                    continue;
-
-                if (dir.path().extension() == ".mp3" ||
-                    dir.path().extension() == ".wav" ||
-                    dir.path().extension() == ".ogg"
-                    )
-                {
-                    soundCount++;
+    while (true) {
+        uint32_t cnt = 0;
+        try {
+            fs::path root = PathFinder::Relative("Sounds\\");
+            for (auto& e : fs::recursive_directory_iterator(root)) {
+                if (!e.is_directory()) {
+                    auto ext = e.path().extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    if (ext == ".mp3" || ext == ".wav" || ext == ".ogg") cnt++;
                 }
             }
         }
-        catch (const file::filesystem_error& e)
-        {
-            Debug->LogWarning("Could not load sounds" + std::string(e.what()));
-        }
-        catch (const std::exception& e)
-        {
-            Debug->LogWarning("Error" + std::string(e.what()));
-        }
+        catch (...) {}
 
-        if (_currSoundCount != soundCount)
-        {
+        if (_currSoundCount != cnt) {
             LoadSounds();
-            _currSoundCount = soundCount;
+            _currSoundCount = cnt;
         }
-
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
@@ -474,19 +123,394 @@ void SoundManager::SoundLoaderThread()
 void SoundManager::LoadSounds()
 {
     _isSoundLoaderThreadRunning = true;
-    file::path soundPath = PathFinder::Relative("Sounds\\");
-    for (auto& dir : file::recursive_directory_iterator(soundPath))
-    {
-        if (dir.is_directory())
-            continue;
-        if (dir.path().extension() == ".mp3" || dir.path().extension() == ".wav" || dir.path().extension() == ".ogg")
-        {
-            std::string key = dir.path().filename().string();
-            key = key.substr(0, key.find_last_of('.'));
-            bool loop = (dir.path().parent_path() == PathFinder::Relative("Sounds\\BGM"));
-            loadSound(key, dir.path().string(), false, loop);
-            Debug->Log("Loaded Sound : " + key);
+    try {
+        fs::path root = PathFinder::Relative("Sounds\\");
+        for (auto& e : fs::recursive_directory_iterator(root)) {
+            if (e.is_directory()) continue;
+            auto ext = e.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".mp3" || ext == ".wav" || ext == ".ogg") {
+                std::string key = e.path().filename().string();
+                key = key.substr(0, key.find_last_of('.'));
+                bool loop = (e.path().parent_path() == PathFinder::Relative("Sounds\\BGM"));
+                loadSound(key, e.path().string(), /*is3D=*/false, loop);
+            }
         }
     }
+    catch (...) {}
     _isSoundLoaderThreadRunning = false;
+}
+
+// ===== 리스너 & 볼륨 =====
+void SoundManager::setListenerAttributes(const FMOD_VECTOR& pos,
+    const FMOD_VECTOR& vel,
+    const FMOD_VECTOR& forward,
+    const FMOD_VECTOR& up)
+{
+    if (system) system->set3DListenerAttributes(0, &pos, &vel, &forward, &up);
+}
+void SoundManager::setMasterVolume(float v) { if (master) master->setVolume(v); }
+void SoundManager::setBusVolume(ChannelType bus, float lin) { if (groups[(int)bus]) groups[(int)bus]->setVolume(lin); }
+void SoundManager::setBusVolumeDb(ChannelType bus, float db) { setBusVolume(bus, dbToLinear(db)); }
+void SoundManager::setBusVolumePercent(ChannelType bus, int percent) { setBusVolumeDb(bus, sliderToDb(percent)); }
+
+// ===== 리소스 =====
+bool SoundManager::loadSound(const std::string& name, const std::string& filePath, bool is3D, bool loop)
+{
+    {
+        std::shared_lock rlock(_soundsMutex);
+        if (sounds.count(name)) return true;
+    }
+
+    FMOD_MODE mode = FMOD_DEFAULT | (is3D ? FMOD_3D : FMOD_2D);
+    const bool isBGM = filePath.find("\\Sounds\\BGM\\") != std::string::npos
+        || filePath.find("/Sounds/BGM/") != std::string::npos;
+    if (isBGM) mode |= FMOD_CREATESTREAM;
+    if (loop)  mode |= FMOD_LOOP_NORMAL;
+
+    FMOD::Sound* s = nullptr;
+    FMOD_RESULT r = system->createSound(filePath.c_str(), mode, nullptr, &s);
+    if (r != FMOD_OK) {
+        Debug->LogError("Failed to load sound: " + filePath + " - " + std::string(FMOD_ErrorString(r)));
+        return false;
+    }
+    if (isBGM) {
+        float freq = 0; int pr = 128;
+        if (s->getDefaults(&freq, &pr) == FMOD_OK) s->setDefaults(freq, 0);
+    }
+
+    {
+        std::unique_lock wlock(_soundsMutex);
+        sounds[name] = s;
+    }
+    return true;
+}
+
+void SoundManager::unloadSound(const std::string& name)
+{
+    std::unique_lock wlock(_soundsMutex);
+    auto it = sounds.find(name);
+    if (it != sounds.end()) { if (it->second) it->second->release(); sounds.erase(it); }
+}
+
+std::vector<std::string> SoundManager::getAllClipKeys() const
+{
+    std::shared_lock rlock(_soundsMutex);
+    std::vector<std::string> out; out.reserve(sounds.size());
+    for (auto& kv : sounds) out.push_back(kv.first);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+// ===== 정책 =====
+void SoundManager::setGroupMaxVoices(ChannelType bus, int maxVoices) { groupCfg[(int)bus].maxVoices = std::max(0, maxVoices); }
+void SoundManager::setGroupStealPolicy(ChannelType bus, StealPolicy p) { groupCfg[(int)bus].policy = p; }
+void SoundManager::setGroupPreemptSameClip(ChannelType bus, bool on) { groupCfg[(int)bus].preemptSameClip = on; }
+
+// ===== SpatialBlend =====
+void SoundManager::computeEqualPowerGains(float t, float& w2D, float& w3D)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    w2D = cosf(t * (3.14159265f * 0.5f));
+    w3D = sinf(t * (3.14159265f * 0.5f));
+}
+
+ChannelPair
+SoundManager::playBlendedInternal(FMOD::Sound* sound, ChannelType bus,
+    float volume, float pitch, int priority,
+    float blend01, bool loop,
+    const FMOD_VECTOR* pos, const FMOD_VECTOR* vel,
+    void* ownerTag)
+{
+    ChannelPair out{};
+    if (!sound) return out;
+    auto* group = groups[(int)bus];
+    if (!group) return out;
+
+    pruneStopped(bus);
+    const auto& cfg = groupCfg[(int)bus];
+    int playing = countPlaying(bus);
+    const int limit = cfg.maxVoices;
+
+    float w2D = 1.f, w3D = 0.f;
+    computeEqualPowerGains(blend01, w2D, w3D);
+    const bool want2D = (w2D > 1e-3f);
+    const bool want3D = (w3D > 1e-3f);
+    int need = (int)want2D + (int)want3D;
+
+    // 부족하면 스틸 → 그래도 부족하면 1채널로 degrade (3D 우선)
+    if (limit > 0 && playing + need > limit) {
+        int deficit = (playing + need) - limit;
+        while (deficit-- > 0) {
+            if (FMOD::Channel* v = findStealCandidate(bus, sound)) v->stop();
+            else break;
+        }
+        playing = countPlaying(bus);
+        if (limit > 0 && playing + need > limit) {
+            if (want3D) {
+                FMOD::Channel* c = nullptr;
+                if (system->playSound(sound, group, true, &c) == FMOD_OK && c) {
+                    c->setMode(FMOD_DEFAULT | FMOD_3D | (loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF));
+                    if (pos) c->set3DAttributes(pos, vel);
+                    c->set3DMinMaxDistance(1.f, 50.f);
+                    c->setPriority(priority);
+                    c->setPitch(pitch);
+                    c->setVolume(volume * w3D);
+                    if (ownerTag) c->setUserData(ownerTag);
+                    c->setPaused(false);
+                    out.ch3D = c;
+                }
+                return out;
+            }
+            else {
+                FMOD::Channel* c = nullptr;
+                if (system->playSound(sound, group, true, &c) == FMOD_OK && c) {
+                    c->setMode(FMOD_DEFAULT | FMOD_2D | (loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF));
+                    c->setPriority(priority);
+                    c->setPitch(pitch);
+                    c->setVolume(volume * w2D);
+                    if (ownerTag) c->setUserData(ownerTag);
+                    c->setPaused(false);
+                    out.ch2D = c;
+                }
+                return out;
+            }
+        }
+    }
+
+    auto create2D = [&](FMOD::Channel** ch) {
+        FMOD::Channel* c = nullptr;
+        if (system->playSound(sound, group, true, &c) == FMOD_OK && c) {
+            c->setMode(FMOD_DEFAULT | FMOD_2D | (loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF));
+            c->setPriority(priority);
+            c->setPitch(pitch);
+            c->setVolume(volume * w2D);
+            if (ownerTag) c->setUserData(ownerTag);
+            c->setPaused(false);
+            *ch = c;
+        }
+        };
+    auto create3D = [&](FMOD::Channel** ch) {
+        FMOD::Channel* c = nullptr;
+        if (system->playSound(sound, group, true, &c) == FMOD_OK && c) {
+            c->setMode(FMOD_DEFAULT | FMOD_3D | (loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF));
+            if (pos) c->set3DAttributes(pos, vel);
+            c->set3DMinMaxDistance(1.f, 50.f);
+            c->setPriority(priority);
+            c->setPitch(pitch);
+            c->setVolume(volume * w3D);
+            if (ownerTag) c->setUserData(ownerTag);
+            c->setPaused(false);
+            *ch = c;
+        }
+        };
+
+    if (want2D) create2D(&out.ch2D);
+    if (want3D) create3D(&out.ch3D);
+    return out;
+}
+
+ChannelPair
+SoundManager::playFromSourceBlended(const SoundComponent& src, void* ownerTag)
+{
+    FMOD::Sound* snd = nullptr;
+    {
+        std::shared_lock rlock(_soundsMutex);
+        auto it = sounds.find(src.clipKey);
+        if (it == sounds.end()) { Debug->LogError("Sound not found: " + src.clipKey); return {}; }
+        snd = it->second;
+    }
+
+    FMOD_VECTOR p{ src.position.x, src.position.y, src.position.z };
+    FMOD_VECTOR v{ src.velocity.x, src.velocity.y, src.velocity.z };
+    float blend = src.spatial ? std::clamp(src.spatialBlend, 0.f, 1.f) : 0.f;
+
+    return playBlendedInternal(snd, src.bus,
+        src.volume, src.pitch, src.priority,
+        blend, src.loop,
+        src.spatial ? &p : nullptr,
+        src.spatial ? &v : nullptr,
+        ownerTag);
+}
+
+// ===== 풀링 =====
+std::string SoundManager::poolKey(const std::string& clipKey, ChannelType bus) {
+    return clipKey + "#" + std::to_string((int)bus);
+}
+
+void SoundManager::configureVoicePool(const std::string& clipKey, ChannelType bus, int capacity)
+{
+    auto& pool = voicePools[poolKey(clipKey, bus)];
+    pool.bus = bus;
+    pool.capacity = std::max(1, capacity);
+    pool.cursor = 0;
+    pool.slots.clear();
+    pool.slots.resize(pool.capacity);
+}
+
+ChannelPair
+SoundManager::playOneShotPooled(const std::string& clipKey, ChannelType bus,
+    float volume, float pitch, int priority,
+    float spatialBlend,
+    const FMOD_VECTOR* pos, const FMOD_VECTOR* vel,
+    void* ownerTag)
+{
+    FMOD::Sound* snd = nullptr;
+    {
+        std::shared_lock rlock(_soundsMutex);
+        auto it = sounds.find(clipKey);
+        if (it == sounds.end()) { Debug->LogError("Sound not found: " + clipKey); return {}; }
+        snd = it->second;
+    }
+
+    auto& pool = voicePools[poolKey(clipKey, bus)];
+    if (pool.slots.empty()) { pool.bus = bus; pool.capacity = 8; pool.cursor = 0; pool.slots.resize(pool.capacity); }
+
+    const int idx = pool.cursor++ % pool.capacity;
+    auto& slot = pool.slots[idx];
+
+    if (slot.ch2D) { bool p = false; if (slot.ch2D->isPlaying(&p) == FMOD_OK && p) slot.ch2D->stop(); slot.ch2D = nullptr; }
+    if (slot.ch3D) { bool p = false; if (slot.ch3D->isPlaying(&p) == FMOD_OK && p) slot.ch3D->stop(); slot.ch3D = nullptr; }
+
+    auto made = playBlendedInternal(snd, bus, volume, pitch, priority,
+        std::clamp(spatialBlend, 0.f, 1.f),
+        /*loop=*/false, pos, vel, ownerTag);
+    slot.ch2D = made.ch2D;
+    slot.ch3D = made.ch3D;
+    return made;
+}
+
+void SoundManager::clearVoicePool(const std::string& clipKey, ChannelType bus)
+{
+    auto it = voicePools.find(poolKey(clipKey, bus));
+    if (it == voicePools.end()) return;
+    for (auto& s : it->second.slots) {
+        if (s.ch2D) { s.ch2D->stop(); s.ch2D = nullptr; }
+        if (s.ch3D) { s.ch3D->stop(); s.ch3D = nullptr; }
+    }
+    voicePools.erase(it);
+}
+
+void SoundManager::stopByOwnerTag(void* ownerTag)
+{
+    if (!ownerTag) return;
+    for (int b = 0; b < (int)ChannelType::MaxChannel; ++b)
+        stopByOwnerTag(ownerTag, (ChannelType)b);
+
+}
+
+void SoundManager::stopByOwnerTag(void* ownerTag, ChannelType bus)
+{
+    if (!ownerTag) return;
+    FMOD::ChannelGroup* g = groups[(int)bus];
+    if (!g) return;
+
+    int n = 0; g->getNumChannels(&n);
+    for (int i = 0; i < n; ++i) {
+        FMOD::Channel* ch = nullptr;
+        if (g->getChannel(i, &ch) == FMOD_OK && ch) {
+            void* tag = nullptr;
+            ch->getUserData(&tag);
+            if (tag == ownerTag) ch->stop();
+        }
+    }
+}
+
+bool SoundManager::getListenerPosition(FMOD_VECTOR& out) const
+{
+    if (!system) return false;
+    FMOD_VECTOR vel{}, fwd{}, up{};
+    auto r = system->get3DListenerAttributes(0, &out, &vel, &fwd, &up);
+    return r == FMOD_OK;
+}
+
+// ===== 내부 유틸 =====
+int SoundManager::countPlaying(ChannelType bus) const
+{
+    int n = 0;
+    if (auto* g = groups[(int)bus]) g->getNumChannels(&n);
+    return n;
+}
+
+void SoundManager::pruneStopped(ChannelType bus)
+{
+    if (auto* g = groups[(int)bus]) {
+        int n = 0; g->getNumChannels(&n);
+        for (int i = 0; i < n; ++i) {
+            FMOD::Channel* ch = nullptr;
+            if (g->getChannel(i, &ch) == FMOD_OK && ch) {
+                bool playing = false; ch->isPlaying(&playing);
+                (void)playing; // 필요 시 stop()으로 적극 정리 가능
+            }
+        }
+    }
+}
+
+FMOD::Channel* SoundManager::findStealCandidate(ChannelType bus, FMOD::Sound* newSound)
+{
+    auto& cfg = groupCfg[(int)bus];
+    FMOD::Channel* cand = nullptr;
+
+    if (auto* g = groups[(int)bus]) {
+        int n = 0; g->getNumChannels(&n);
+
+        if (cfg.preemptSameClip && newSound) {
+            for (int i = 0; i < n; ++i) {
+                FMOD::Channel* ch = nullptr;
+                if (g->getChannel(i, &ch) == FMOD_OK && ch) {
+                    FMOD::Sound* cur = nullptr;
+                    if (ch->getCurrentSound(&cur) == FMOD_OK && cur == newSound) return ch;
+                }
+            }
+        }
+
+        switch (cfg.policy) {
+        case StealPolicy::Oldest: {
+            unsigned int maxPos = 0;
+            for (int i = 0; i < n; ++i) {
+                FMOD::Channel* ch = nullptr;
+                if (g->getChannel(i, &ch) == FMOD_OK && ch) {
+                    bool playing = false; ch->isPlaying(&playing);
+                    if (!playing) return ch;
+                    unsigned int pos = 0;
+                    if (ch->getPosition(&pos, FMOD_TIMEUNIT_MS) == FMOD_OK) {
+                        if (pos >= maxPos) { maxPos = pos; cand = ch; }
+                    }
+                }
+            }
+            break;
+        }
+        case StealPolicy::Quietest: {
+            float minAud = FLT_MAX;
+            for (int i = 0; i < n; ++i) {
+                FMOD::Channel* ch = nullptr;
+                if (g->getChannel(i, &ch) == FMOD_OK && ch) {
+                    bool playing = false; ch->isPlaying(&playing);
+                    if (!playing) return ch;
+                    float aud = 0.f;
+                    if (ch->getAudibility(&aud) == FMOD_OK) {
+                        if (aud <= minAud) { minAud = aud; cand = ch; }
+                    }
+                }
+            }
+            break;
+        }
+        case StealPolicy::LowestPriority: {
+            int worst = -1;
+            for (int i = 0; i < n; ++i) {
+                FMOD::Channel* ch = nullptr;
+                if (g->getChannel(i, &ch) == FMOD_OK && ch) {
+                    bool playing = false; ch->isPlaying(&playing);
+                    if (!playing) return ch;
+                    int p = 0;
+                    if (ch->getPriority(&p) == FMOD_OK) {
+                        if (p > worst) { worst = p; cand = ch; }
+                    }
+                }
+            }
+            break;
+        }
+        }
+    }
+    return cand;
 }

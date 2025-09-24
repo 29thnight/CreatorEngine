@@ -75,7 +75,7 @@ void DirectX11::Dx11Main::Initialize()
     g_progressWindow->SetProgress(65);
 
     g_progressWindow->SetStatusText(L"Initializing SoundManager...");
-    Sound->initialize((int)ChannelType::MaxChannel);
+    Sound->initialize(128);
     g_progressWindow->SetProgress(70);
 
     g_progressWindow->SetStatusText(L"Loading Assets...");

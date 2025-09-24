@@ -118,7 +118,7 @@ GBufferOutput main(PixelShaderInput IN)
         float4 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord);
         //occRoughMetal = SRGBtoLINEAR(occRoughMetal);
         ormAO = occRoughMetal.r;
-        roughness = 1 - occRoughMetal.g;
+        roughness = occRoughMetal.g;
         metallic = occRoughMetal.b;
     }
 

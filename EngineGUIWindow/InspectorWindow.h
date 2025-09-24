@@ -3,6 +3,7 @@
 #include "ImGuiRegister.h"
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "CurvePoint.h"
 
 class SceneRenderer;
 class GameObject;
@@ -30,5 +31,19 @@ private:
 	void ImGuiDrawHelperImageComponent(class ImageComponent* imageComponent);
 	void ImGuiDrawHelperSpriteRenderer(class SpriteRenderer* spriteRenderer);
 	void ImGuiDrawHelperCanvas(class Canvas* canvas);
+	void ImGuiDrawHelperSoundComponent(class SoundComponent* sc);
+
+	bool DrawRolloffCurveEditor(std::vector<CurvePoint>& curve,
+		float maxDist,
+		ImVec2 size = ImVec2(0, 180),
+		int* outSelected = nullptr,
+		bool readOnly = false);
+	void DrawSoundClipPicker();
+
+private:
+	bool            m_openClipPicker{ false };
+	SoundComponent* m_clipPickerTarget{ nullptr };
+	std::string     m_clipSearch;                 // 검색어
+	std::vector<std::string> m_clipKeyCache;      // 캐시
 };
 #endif // !DYNAMICCPP_EXPORTS
