@@ -24,7 +24,6 @@ void Bullet::Update(float tick)
 		OnEffect = true;
 		if (m_effect)
 		{
-			m_effect->Awake(); //awake 안치면 출력이안됨 
 			m_effect->Apply();
 		}
 	}

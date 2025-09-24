@@ -255,16 +255,6 @@ void Player::Start()
 void Player::Update(float tick)
 {
 
-	static float ealpsetime = 0.f;
-	ealpsetime += tick;
-	if (0.5f <= ealpsetime)
-	{
-		Sound->playOneShot("Blackguard Sound - Shinobi Fight - Swing Whoosh ", ChannelType::PLAYER,0.5f);
-		ealpsetime = 0.f;
-
-	}
-
-
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
