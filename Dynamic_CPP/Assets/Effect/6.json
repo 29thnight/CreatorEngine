@@ -4,11 +4,11 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "1",
+    "name": "6",
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 1,
+            "maxParticles": 5,
             "modules": [
                 {
                     "data": {
@@ -20,17 +20,17 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.29411765933036804,
+                                "y": 0.29411765933036804,
+                                "z": 0.29411765933036804
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 10.0,
+                            "lifeTime": 3.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -52,11 +52,11 @@
                                 "z": 1.0
                             },
                             "emitterType": 0,
-                            "spawnRate": 1.0
+                            "spawnRate": 100.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 5
                         }
                     },
                     "stage": 2,
@@ -74,14 +74,27 @@
                             "speedDecay": 2.0,
                             "sphereRadius": 1.0
                         },
-                        "impulses": [],
+                        "impulses": [
+                            {
+                                "direction": {
+                                    "x": 0.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                },
+                                "duration": 0.652999997138977,
+                                "force": 20.0,
+                                "range": 6.86899995803833,
+                                "triggerTime": 0.09600000083446503,
+                                "type": 1
+                            }
+                        ],
                         "movementParams": {
-                            "currentTime": 35.10852813720703,
+                            "currentTime": 170.40785217285156,
                             "easingEnabled": false,
                             "easingType": 0,
-                            "gravityStrength": 9.800000190734863,
-                            "useGravity": false,
-                            "velocityMode": 4
+                            "gravityStrength": 0.3400000035762787,
+                            "useGravity": true,
+                            "velocityMode": 2
                         },
                         "orbitalData": {
                             "axis": {
@@ -94,12 +107,12 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "radius": 20.0,
-                            "speed": 5.0
+                            "radius": 5.0,
+                            "speed": 1.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 5
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -130,7 +143,7 @@
                     "data": {
                         "billboard": {
                             "maxCount": 0,
-                            "type": 1
+                            "type": 2
                         },
                         "indices": [
                             0,
@@ -142,17 +155,23 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 1,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "BillBoard",
+                            "pixelShader": "RandomSpriteM",
                             "vertexShader": "BillBoard"
+                        },
+                        "spriteAnimation": {
+                            "animationDuration": 0.0,
+                            "frameCount": 2,
+                            "gridColumns": 2,
+                            "gridRows": 1
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "star",
+                                "name": "Tex_fx_HCFX_Stone_01",
                                 "slot": 0
                             }
                         ],

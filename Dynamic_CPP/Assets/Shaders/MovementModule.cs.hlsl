@@ -159,22 +159,27 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleDa
             float strength = 1.0 - (timeDiff / Impulses[i].duration);
             strength = strength * strength;
             
-            uint seed1 = particleIndex * 73856093u ^ (i * 19349663u);
-            uint seed2 = particleIndex * 83492791u ^ (i * 41943041u);
+            // 더 복잡한 시드 생성 (시간, 위치, 속도 포함)
+            uint timeSeed = (uint) (currentTime * 1000.0) + (uint) (normalizedAge * 10000.0);
+            uint posSeed = (uint) (particle.position.x * 1000.0) ^ (uint) (particle.position.z * 1000.0);
+            uint velSeed = (uint) (length(particle.velocity) * 100.0);
+            
+            uint seed1 = particleIndex * 73856093u ^ (i * 19349663u) ^ timeSeed ^ posSeed;
+            uint seed2 = particleIndex * 83492791u ^ (i * 41943041u) ^ velSeed ^ (timeSeed >> 16);
+            uint seed3 = particleIndex * 37573297u ^ (i * 29297303u) ^ (posSeed >> 8);
             
             float3 baseDir = normalize(Impulses[i].direction);
             float3 finalDirection;
             
             if (Impulses[i].spreadType == 0)
             {
-                // 직선 (분산 없음)
                 finalDirection = baseDir;
             }
             else if (Impulses[i].spreadType == 1)
             {
-                // 원뿔형 분산 (샷건)
-                float angle = Hash(seed1) * 6.28318;
-                float radius = Hash(seed2) * Impulses[i].spreadRange;
+                // 원뿔형 분산에 더 많은 랜덤성 추가
+                float angle = Hash(seed1) * 6.28318 + Hash(seed3) * 0.1;
+                float radius = Hash(seed2) * Impulses[i].spreadRange * (0.8 + Hash(seed3) * 0.4);
                 
                 float3 up = abs(baseDir.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
                 float3 right = normalize(cross(baseDir, up));
@@ -185,9 +190,9 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleDa
             }
             else if (Impulses[i].spreadType == 2)
             {
-                // 구형 분산 (폭발)
-                float angle = Hash(seed1) * 6.28318;
-                float elevation = (Hash(seed2) - 0.5) * 1.57079;
+                // 구형 분산에 더 많은 랜덤성 추가
+                float angle = Hash(seed1) * 6.28318 + Hash(seed3) * 0.2;
+                float elevation = (Hash(seed2) - 0.5) * 1.57079 + (Hash(seed3) - 0.5) * 0.3;
                 
                 float3 spreadDir = float3(
                     cos(angle) * cos(elevation),
@@ -195,7 +200,8 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleDa
                     sin(angle) * cos(elevation)
                 );
                 
-                finalDirection = normalize(baseDir + spreadDir * Impulses[i].spreadRange);
+                float spreadMultiplier = 0.7 + Hash(seed1) * 0.6;
+                finalDirection = normalize(baseDir + spreadDir * Impulses[i].spreadRange * spreadMultiplier);
             }
             
             totalImpulse += finalDirection * Impulses[i].force * strength;
@@ -238,16 +244,37 @@ float3 GetWindForce(float3 position, float time)
 }
 
 // 궤도 운동 계산
-float3 GetOrbitalVelocity(float3 position, float time)
+float3 GetOrbitalVelocity(float3 position, float time, float3 birthPosition, float age, float lifeTime)
 {
-    // 중심점으로부터의 벡터
-    float3 centerToParticle = position - orbitalCenter;
+    if (length(orbitalAxis) < 0.001 || lifeTime <= 0)
+        return float3(0, 0, 0);
     
-    // 궤도 축과 수직인 평면에서의 움직임 계산
-    float3 tangent = cross(normalize(orbitalAxis), normalize(centerToParticle));
+    float3 normalizedAxis = normalize(orbitalAxis);
     
-    // 궤도 속도 적용
-    return tangent * orbitalSpeed;
+    // 생성 위치를 중심으로 궤도
+    float3 centerToParticle = position - birthPosition;
+    float currentRadius = length(centerToParticle);
+    
+    // orbitalRadius 거리로 조정
+    if (currentRadius < orbitalRadius * 0.9 || currentRadius > orbitalRadius * 1.1)
+    {
+        float3 direction = currentRadius > 0.001 ? normalize(centerToParticle) : float3(1, 0, 0);
+        float3 targetPosition = birthPosition + direction * orbitalRadius;
+        return (targetPosition - position) * 100.0;
+    }
+    
+    // 생명주기 동안 orbitalSpeed배 회전하도록 각속도 계산
+    float normalizedAge = age / lifeTime;
+    float angularVelocity = (6.28318 * orbitalSpeed) / lifeTime; // 2π * 회전수 / 생명주기
+    
+    // 접선 방향 계산
+    float3 radialDirection = normalize(centerToParticle);
+    float3 tangentDirection = cross(normalizedAxis, radialDirection);
+    
+    // 접선 속도 = 각속도 * 반지름
+    float tangentialSpeed = angularVelocity * orbitalRadius;
+    
+    return normalize(tangentDirection) * tangentialSpeed;
 }
 
 float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex, float particleAge)
@@ -326,7 +353,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (velocityMode == 4) // Orbital
         {
-            additionalVelocity += GetOrbitalVelocity(particle.position, currentTime);
+            particle.velocity = float3(0, 0, 0);
+            additionalVelocity = GetOrbitalVelocity(particle.position, currentTime, particle.pad5, particle.age, particle.lifeTime);
         }
         else if (velocityMode == 5) // explosive
         {
@@ -334,7 +362,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         
         // 기존 velocity에 추가 velocity 더하기
-        particle.velocity += additionalVelocity * deltaTime;
+        if (velocityMode == 4)
+        {
+            particle.velocity = additionalVelocity;
+        }
+        else
+        {
+            particle.velocity += additionalVelocity * deltaTime;
+        }
         
         // 중력 적용 (설정된 경우)
         if (useGravity != 0)

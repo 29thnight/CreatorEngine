@@ -27,9 +27,23 @@ struct VSOutput
     float Age : TEXCOORD2;
 };
 
+// Hash 함수 (랜덤값 생성용)
+float Hash(uint seed)
+{
+    seed = (seed ^ 61u) ^ (seed >> 16u);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
+    return float(seed) * (1.0f / 4294967296.0f);
+}
+
 float4 main(VSOutput input) : SV_TARGET
 {
-    uint randomFrame = input.TexIndex % frameCount;
+    
+    float randomValue = Hash(input.TexIndex);
+    
+    uint randomFrame = (uint) (randomValue * frameCount);
     
     // age를 기반으로 현재 프레임 계산
     float normalizedTime = fmod(input.Age, animationDuration) / animationDuration;

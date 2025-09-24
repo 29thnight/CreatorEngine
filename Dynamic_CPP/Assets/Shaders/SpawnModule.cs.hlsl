@@ -259,6 +259,7 @@ void InitializeParticle(inout ParticleData particle, uint seed)
     particle.rotateSpeed = gRotateSpeed;
     particle.color = gColor;
     particle.isActive = 1;
+    particle.pad5 = particle.position;
 }
 
 // 기존 파티클의 위치를 즉시 업데이트 (에미터 이동 시)
