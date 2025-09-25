@@ -327,6 +327,7 @@ void SceneRenderer::InitializeDeviceState()
     DirectX11::DeviceStates->g_pRasterizerState		= m_deviceResources->GetRasterizerState();
     DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
     DirectX11::DeviceStates->g_Viewport				= m_deviceResources->GetScreenViewport();
+    DirectX11::DeviceStates->g_fullsizeViewport		= m_deviceResources->GetScreenViewport();
     DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
     DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
     DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetOutputSize();
@@ -343,6 +344,7 @@ void SceneRenderer::InitializeDeviceState()
 		DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
 		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
 		//DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
+		DirectX11::DeviceStates->g_fullsizeViewport	= m_deviceResources->GetScreenViewport();
 		DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
 		DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
 		DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetLogicalSize();
