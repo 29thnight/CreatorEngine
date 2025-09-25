@@ -37,9 +37,9 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 28.0
+                                "z": 0.0
                             },
-                            "lifeTime": 1.0,
+                            "lifeTime": 10.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -76,6 +76,40 @@
                     },
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
+                        "easing": {
+                            "animationType": 0,
+                            "duration": 1.0,
+                            "enabled": false,
+                            "type": 0
+                        },
+                        "sizeParams": {
+                            "endSize": {
+                                "x": 1.0,
+                                "y": 1.0,
+                                "z": 1.0
+                            },
+                            "oscillationSpeed": 5.0,
+                            "randomScaleMax": 2.0,
+                            "randomScaleMin": 0.5,
+                            "startSize": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "useOscillation": 1,
+                            "useRandomScale": 0
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 1
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MeshSizeModuleCS",
                     "useEasing": false
                 }
             ],
@@ -118,7 +152,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "123",
+                                "name": "Animation",
                                 "slot": 0
                             }
                         ]

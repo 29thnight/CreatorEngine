@@ -17,8 +17,8 @@ struct alignas(16) SizeParams
     float randomScaleMax;       // 랜덤 스케일 최대값
     
     UINT maxParticles;          // 최대 파티클 수
-    float pad1;              // 16바이트 정렬을 위한 패딩
-    float pad2;              // 16바이트 정렬을 위한 패딩
+    UINT useOscillation;        // 진동 사용여부
+    float oscillationSpeed;     // 진동속도
     float pad3;              // 16바이트 정렬을 위한 패딩
 
     Mathf::Vector3 emitterScale;
@@ -45,6 +45,7 @@ public:
     void SetEndSize(const XMFLOAT2& size);
     void SetRandomScale(bool enabled, float minScale = 0.5f, float maxScale = 2.0f);
     void SetEasing(EasingEffect easingType, StepAnimation animationType, float duration);
+    void SetOscillation(bool enabled, float speed);
 
     // 편의 메서드 (uniform size)
     void SetStartSize(float size) { SetStartSize(XMFLOAT2(size, size)); }
@@ -94,6 +95,14 @@ public:
 
     UINT GetParticleCapacity() const {
         return m_particleCapacity;
+    }
+
+    bool GetUseOscillation() const { 
+        return m_sizeParams.useOscillation != 0;
+    }
+
+    float GetOscillationSpeed() const {
+        return m_sizeParams.oscillationSpeed;
     }
 
     bool IsInitialized() const {

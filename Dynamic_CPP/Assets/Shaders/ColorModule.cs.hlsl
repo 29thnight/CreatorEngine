@@ -9,8 +9,9 @@
 #define PULSE_FUNCTION 0
 #define SINE_WAVE_FUNCTION 1
 #define FLICKER_FUNCTION 2
-#define LINEAR_FUNCTION 3
+#define RANDOM_COLOR_FUNCTION 3
 #define EXPONENTIAL_FUNCTION 4
+#define LINEAR_FUNCTION 5
 
 struct ParticleData
 {
@@ -63,6 +64,16 @@ StructuredBuffer<float4> DiscreteColors : register(t2);
 
 RWStructuredBuffer<ParticleData> OutputParticles : register(u0);
 
+float Hash(uint seed)
+{
+    seed = (seed ^ 61u) ^ (seed >> 16u);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
+    return float(seed) * (1.0f / 4294967296.0f);
+}
+
 // 그라데이션 색상 평가
 float4 EvaluateGradient(float t)
 {
@@ -101,13 +112,12 @@ float4 EvaluateDiscrete(float t)
 }
 
 // 사용자 정의 함수들
-float4 EvaluateCustomFunction(float t, float totalTime)
+float4 EvaluateCustomFunction(float t, float totalTime, uint particleIndex)
 {
     switch (customFunctionType)
     {
         case PULSE_FUNCTION:
         {
-            // 맥박 효과: 두 색상 사이를 주파수에 따라 전환
                 if (discreteColorsSize >= 2)
                 {
                     float pulseValue = sin(totalTime * customParam4) * 0.5 + 0.5;
@@ -118,7 +128,6 @@ float4 EvaluateCustomFunction(float t, float totalTime)
         
         case SINE_WAVE_FUNCTION:
         {
-            // 사인파 기반 색상 전환
                 if (discreteColorsSize >= 2)
                 {
                     float phase = customParam2;
@@ -131,7 +140,6 @@ float4 EvaluateCustomFunction(float t, float totalTime)
         
         case FLICKER_FUNCTION:
         {
-            // 깜빡임 효과: 빠르게 색상들 사이를 전환
                 if (discreteColorsSize > 0)
                 {
                     float speed = customParam1;
@@ -144,17 +152,28 @@ float4 EvaluateCustomFunction(float t, float totalTime)
         
         case LINEAR_FUNCTION:
         {
-            // 선형 색상 변화 (customParam1~4를 RGBA로 사용)
                 float4 targetColor = float4(customParam1, customParam2, customParam3, customParam4);
                 return lerp(float4(1, 1, 1, 1), targetColor, t);
             }
         
         case EXPONENTIAL_FUNCTION:
         {
-            // 지수 함수 기반 색상 변화
                 float expValue = 1.0 - exp(-customParam1 * t);
                 float4 targetColor = float4(customParam2, customParam3, customParam4, 1.0);
                 return lerp(float4(1, 1, 1, 1), targetColor, expValue);
+            }
+        
+        case RANDOM_COLOR_FUNCTION:
+        {
+                if (discreteColorsSize > 0)
+                {
+                // 파티클별로 색상 풀에서 하나씩 랜덤 선택
+                    uint seed = particleIndex * 2654435761u;
+                    int colorIndex = (int) (Hash(seed) * discreteColorsSize);
+                    colorIndex = clamp(colorIndex, 0, discreteColorsSize - 1);
+                    return DiscreteColors[colorIndex];
+                }
+                return float4(1, 1, 1, 1);
             }
         
         default:
@@ -163,7 +182,7 @@ float4 EvaluateCustomFunction(float t, float totalTime)
 }
 
 // 메인 색상 평가 함수
-float4 EvaluateColor(float t, float totalTime)
+float4 EvaluateColor(float t, float totalTime, uint particleIndex)
 {
     switch (transitionMode)
     {
@@ -174,7 +193,7 @@ float4 EvaluateColor(float t, float totalTime)
             return EvaluateDiscrete(t);
             
         case CUSTOM_FUNCTION_MODE:
-            return EvaluateCustomFunction(t, totalTime);
+            return EvaluateCustomFunction(t, totalTime, particleIndex);
             
         default:
             return float4(1, 1, 1, 1);
@@ -205,7 +224,7 @@ void main(uint3 id : SV_DispatchThreadID)
         float totalTime = particle.age;
         
         // 색상 계산
-        particle.color = EvaluateColor(normalizedAge, totalTime);
+        particle.color = EvaluateColor(normalizedAge, totalTime, particleIndex);
     }
     
     // 결과 저장
