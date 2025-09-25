@@ -18,9 +18,9 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [978219678, 1592544601, 311265363, 3460955026, 1693382485]
+    Children: [978219678, 1592544601, 311265363, 3460955026, 116742254, 2522017156, 3803926605]
     ChildWeights: ~
-    Position: {x: 134, y: 173}
+    Position: {x: 134, y: 168}
   - ID: 978219678
     Type: 6
     Name: ConditionDecorator
@@ -142,7 +142,84 @@ NodeList:
     Children: ~
     ChildWeights: ~
     Position: {x: 470, y: 648}
-  - ID: 1693382485
+  - ID: 116742254
+    Type: 2
+    Name: Sequence
+    ParentID: 47888644
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [234235678, 3954268036, 2071691094]
+    ChildWeights: ~
+    Position: {x: 726, y: 344}
+  - ID: 234235678
+    Type: 7
+    Name: Condition
+    ParentID: 116742254
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsAtteck
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 694, y: 488}
+  - ID: 3954268036
+    Type: 9
+    Name: Action
+    ParentID: 116742254
+    IsRoot: false
+    HasScript: true
+    ScriptName: WaitAction
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 726, y: 696}
+  - ID: 2071691094
+    Type: 9
+    Name: Action
+    ParentID: 116742254
+    IsRoot: false
+    HasScript: true
+    ScriptName: AtteckAction
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 758, y: 856}
+  - ID: 2522017156
+    Type: 2
+    Name: Sequence
+    ParentID: 47888644
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [507765029, 691197832]
+    ChildWeights: ~
+    Position: {x: 982, y: 344}
+  - ID: 507765029
+    Type: 7
+    Name: Condition
+    ParentID: 2522017156
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsChase
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 950, y: 488}
+  - ID: 691197832
+    Type: 9
+    Name: Action
+    ParentID: 2522017156
+    IsRoot: false
+    HasScript: true
+    ScriptName: ChaseAction
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 966, y: 680}
+  - ID: 3803926605
     Type: 9
     Name: Action
     ParentID: 47888644
@@ -152,4 +229,4 @@ NodeList:
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 646, y: 344}
+    Position: {x: 1063, y: 240}

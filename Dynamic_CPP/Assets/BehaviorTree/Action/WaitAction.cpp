@@ -3,6 +3,7 @@
 #include "EntityEnemy.h"
 #include "EntityMonsterA.h"
 #include "TestMonsterB.h"
+#include "EntityEleteMonster.h"
 #include "Animator.h"
 #include "CharacterControllerComponent.h"
 
@@ -33,6 +34,14 @@ NodeStatus WaitAction::Tick(float deltatime, BlackBoard& blackBoard)
 	else if(identity == "MonsterRange")
 	{
 		TestMonsterB* script = m_owner->GetComponent<TestMonsterB>();
+		animator = script->m_animator;
+		script->m_state = "Idle";
+		if (elapsedTime < 0.1f) {
+			script->RotateToTarget(); // Rotate to face target at the start of the wait
+		}
+	}
+	else if (identity == "MonsterMage") {
+		EntityEleteMonster* script = m_owner->GetComponent<EntityEleteMonster>();
 		animator = script->m_animator;
 		script->m_state = "Idle";
 		if (elapsedTime < 0.1f) {

@@ -11,6 +11,17 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	float chaseRange = 0.0f;
 	float chaseOutTime = 0.0f;
 
+	bool hasIdentity = blackBoard.HasKey("Identity");
+
+	std::string identity = "";
+	if (hasIdentity)
+	{
+		identity = blackBoard.GetValueAsString("Identity");
+	}
+	if (identity == "MonsterMage") {
+		int a = 0;
+	}
+
 	Transform* tr = m_owner->GetComponent<Transform>();
 	Mathf::Vector3 pos = tr->GetWorldPosition();
 

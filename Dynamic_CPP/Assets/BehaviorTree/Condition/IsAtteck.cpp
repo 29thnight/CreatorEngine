@@ -35,6 +35,13 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	}
 
 
+	if (identity == "MonsterMage")
+	{
+		useAttack = blackBoard.HasKey("ProjectileRange");
+		hasAtkDelay = blackBoard.HasKey("RangedAttackCoolTime");
+		atkRange = blackBoard.GetValueAsFloat("ProjectileRange");
+	}
+
 	//if (hasState) {
 	//	std::string state = blackBoard.GetValueAsString("State");
 	//	if (state == "Atteck") {
