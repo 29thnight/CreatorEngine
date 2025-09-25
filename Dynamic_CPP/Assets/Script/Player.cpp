@@ -39,6 +39,7 @@
 #include "SoundComponent.h"
 #include "Core.Random.h"
 #include "WeaponCapsule.h"
+#include "EntityEleteMonster.h"
 std::vector<std::string> dashSounds
 {
 	"Dodge 1_Movement_01",
@@ -244,12 +245,16 @@ void Player::Start()
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(false);
 
-		BombIndicator = PrefabUtilitys->InstantiatePrefab(IndicatorPrefab, "bombIndicator");
-		auto bombindicator = BombIndicator->GetComponent<CurveIndicator>();
-		bombindicator->EnableIndicator(false);
 
 	}
 
+	Prefab* bombIndicatorPrefab = PrefabUtilitys->LoadPrefab("BombIndicator");
+	if(bombIndicatorPrefab)
+	{
+
+		BombIndicator = PrefabUtilitys->InstantiatePrefab(bombIndicatorPrefab, "bombIndicator");
+		BombIndicator->SetEnabled(false);
+	}
 	//idle에 move 도포함
 	BitFlag idleBit;
 	idleBit.Set(PlayerStateFlag::CanMove);
@@ -383,8 +388,7 @@ void Player::Update(float tick)
 
 	if (BombIndicator)
 	{
-		auto curveindicator = BombIndicator->GetComponent<CurveIndicator>();
-		curveindicator->EnableIndicator(onBombIndicate);
+		BombIndicator->SetEnabled(onBombIndicate);
 	}
 
 	///test sehwan
@@ -510,7 +514,7 @@ void Player::LateUpdate(float tick)
 	
 }
 
-void Player::SendDamage(Entity* sender, int damage)
+void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	
 	//엘리트 보스몹에게 피격시에만 피격 애니메이션 출력 및DropCatchItem();  그외는 단순 HP깍기 + 캐릭터 깜빡거리는 연출등
@@ -522,7 +526,31 @@ void Player::SendDamage(Entity* sender, int damage)
 		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		// hit
 		//DropCatchItem();
-		
+		EntityEleteMonster* elete = dynamic_cast<EntityEleteMonster*>(sender);
+		if (elete)
+		{
+			Transform* transform = GetOwner()->GetComponent<Transform>();
+			Mathf::Vector3 myPos = transform->GetWorldPosition();
+			Mathf::Vector3 dir =  hitinfo.attakerPos - myPos;
+			dir.Normalize();
+			dir.y = 0;
+			float targetYaw = std::atan2(dir.z, dir.x) - (XM_PI / 2.0);
+			targetYaw = -targetYaw;
+			DirectX::SimpleMath::Quaternion lookQuat = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0, 0);
+			transform->SetRotation(lookQuat);
+
+			DirectX::SimpleMath::Vector3 baseForward(0, 0, 1); // 모델 기준 Forward
+			DirectX::SimpleMath::Vector3 forward = DirectX::SimpleMath::Vector3::Transform(baseForward, lookQuat);
+			if (m_animator)
+			{
+				m_animator->SetParameter("OnHit", true);
+				//Mathf::Vector3 forward = player->m_transform.GetForward();
+				Mathf::Vector3 horizontal = -forward * testHitPowerX;
+				Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,testHitPowerY ,horizontal.z };
+				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+				controller->TriggerForcedMove(knockbackVeocity);
+			}
+		}
 		Damage(damage);
 		SetInvincibility(HitGracePeriodTime);
 	}
@@ -660,10 +688,11 @@ void Player::Catch()
 		{
 			m_animator->SetParameter("OnGrab", true);
 			catchedObject = item;
-			m_nearObject = nullptr;
 			catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 			catchedObject->SetThrowOwner(this);
 		}
+
+
 		/*switch (item->itemType)
 		{
 		case EItemType::Flower:
@@ -675,6 +704,13 @@ void Player::Catch()
 		case EItemType::Mushroom:
 			Sound->playOneShot();
 		}*/
+		WeaponCapsule* weaponCapsule = m_nearObject->GetComponent<WeaponCapsule>();
+		if (weaponCapsule)
+		{
+			weaponCapsule->CatchCapsule(this);
+		}
+
+		m_nearObject = nullptr;
 	}
 }
 
@@ -1258,9 +1294,18 @@ void Player::DeleteCurWeapon()
 	}
 }
 
-void Player::FindNearObject(GameObject* gameObject)
+void Player::FindNearObject(GameObject* _gameObject)
 {
-	if (gameObject->GetComponent<EntityItem>() == nullptr) return;
+	GameObject* gameObject = nullptr;
+	if (_gameObject->GetComponent<EntityItem>() != nullptr)
+	{
+		gameObject = _gameObject;
+	}
+	if (_gameObject->GetComponent<WeaponCapsule>() != nullptr)
+	{
+		gameObject = _gameObject;
+	}
+	if (gameObject == nullptr)  return;
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	auto objectPos = gameObject->m_transform.GetWorldPosition();
 	XMVECTOR diff = XMVectorSubtract(playerPos, objectPos);
@@ -1316,8 +1361,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	onIndicate = true;
 	if (BombIndicator)
 	{
-		auto curveindicator = BombIndicator->GetComponent<CurveIndicator>();
-		curveindicator->SetIndicator(pos, bombThrowPosition, ThrowPowerY);
+		BombIndicator->m_transform.SetPosition(bombThrowPosition);
 	}
 
 	Mathf::Vector3 targetdir = bombThrowPosition - pos;
@@ -1370,6 +1414,7 @@ void Player::MeleeAttack()
 	allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
 	for (auto& hit : allHits)
 	{
+		Mathf::Vector3 pos = hit.point;
 		auto object = hit.gameObject;
 		if (object == nullptr || object == GetOwner()) continue;
 		auto entity = object->GetComponentDynamicCast<Entity>();
@@ -1634,10 +1679,6 @@ void Player::OnCollisionExit(const Collision& collision)
 }
 
 
-void Player::TestKillPlayer()
-{
-	SendDamage(nullptr,100);
-}
 
 void Player::TestHit()
 {

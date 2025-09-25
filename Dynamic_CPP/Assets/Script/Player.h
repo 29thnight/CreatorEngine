@@ -38,8 +38,7 @@ public:
 	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
-
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 	virtual void OnRay() override {}
 	void Heal(int healAmount);
 	[[Method]]
@@ -64,7 +63,7 @@ public:
 	bool AddWeapon(Weapon* weapon);
 	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
-	void FindNearObject(GameObject* gameObject);
+	void FindNearObject(GameObject* _gameObject);
 
 	//플레이어 기본
 	[[Property]]
@@ -280,9 +279,6 @@ public:
 
 	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
-
-	[[Method]]
-	void TestKillPlayer();
 
 	[[Property]]
 	float testHitPowerX = 1.5f;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 

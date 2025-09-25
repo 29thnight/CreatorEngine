@@ -34,41 +34,43 @@ void WeaponCapsule::Update(float tick)
 			}
 			else //Å¸°ÙÁöÁ¡µµÂø °°ÀºÅ¸ÀÔ weapon »ý¼ºÇØ¼­ player¿¡°Ô ÁÖ±â //
 			{
-				Prefab* weaponPrefab;
-				if (weaponCode == 1)  
-				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
-				}
-				else if (weaponCode == 2)  
-				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
-				}
-				else if (weaponCode == 3)  
-				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBomb");
-				}
-				else
-				{
-					weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBasic");
-				}
-				
-				if (weaponPrefab && ownerPlayer)
-				{
-					GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(weaponPrefab, "Weapon");
-					auto weapon = weaponObj->GetComponent<Weapon>();
-					Player* player= ownerPlayer->GetComponent<Player>();
-					bool Success = player->AddWeapon(weapon); //AddWeapon ½ÇÆÐ½Ã ±×³É ¹Ù´Ú¿¡ µÕµÕ ¶°ÀÖ±â   and µÕµÕ¶°ÀÖ´ÂÁß ÇÃ·¹ÀÌ¾î°¡ ÁýÀ¸¸é addweapon ´Ù½Ã½Ãµµ
-					if (Success)
-					{
-						GetOwner()->Destroy();
-					}
-					else
-					{
-						ownerPlayer = nullptr;
-						//¹Ù´Ú¿¡ µÕµÕ
-					}
+				//Prefab* weaponPrefab;
+				//if (weaponCode == 1)  
+				//{
+				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
+				//}
+				//else if (weaponCode == 2)  
+				//{
+				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
+				//}
+				//else if (weaponCode == 3)  
+				//{
+				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBomb");
+				//}
+				//else
+				//{
+				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBasic");
+				//}
+				//
+				//if (weaponPrefab && ownerPlayer)
+				//{
+				//	GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(weaponPrefab, "Weapon");
+				//	auto weapon = weaponObj->GetComponent<Weapon>();
+				//	Player* player= ownerPlayer->GetComponent<Player>();
+				//	bool Success = player->AddWeapon(weapon); //AddWeapon ½ÇÆÐ½Ã ±×³É ¹Ù´Ú¿¡ µÕµÕ ¶°ÀÖ±â   and µÕµÕ¶°ÀÖ´ÂÁß ÇÃ·¹ÀÌ¾î°¡ ÁýÀ¸¸é addweapon ´Ù½Ã½Ãµµ
+				//	if (Success)
+				//	{
+				//		GetOwner()->Destroy();
+				//	}
+				//	else
+				//	{
+				//		ownerPlayer = nullptr;
+				//		//¹Ù´Ú¿¡ µÕµÕ
+				//	}
 
-				}
+				//}
+
+				TryAddWeapon();
 			}
 		}
 	}
@@ -90,6 +92,52 @@ void WeaponCapsule::Update(float tick)
 			goingUp = true;
 		}
 		
+	}
+}
+
+void WeaponCapsule::CatchCapsule(Player* _player)
+{
+	OwnerPlayerIndex = _player->playerIndex;
+	ownerPlayer = _player->GetOwner();
+	TryAddWeapon();
+}
+
+void WeaponCapsule::TryAddWeapon()
+{
+	Prefab* weaponPrefab;
+	if (weaponCode == 1)
+	{
+		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
+	}
+	else if (weaponCode == 2)
+	{
+		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
+	}
+	else if (weaponCode == 3)
+	{
+		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBomb");
+	}
+	else
+	{
+		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBasic");
+	}
+
+	if (weaponPrefab && ownerPlayer)
+	{
+		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(weaponPrefab, "Weapon");
+		auto weapon = weaponObj->GetComponent<Weapon>();
+		Player* player = ownerPlayer->GetComponent<Player>();
+		bool Success = player->AddWeapon(weapon); //AddWeapon ½ÇÆÐ½Ã ±×³É ¹Ù´Ú¿¡ µÕµÕ ¶°ÀÖ±â   and µÕµÕ¶°ÀÖ´ÂÁß ÇÃ·¹ÀÌ¾î°¡ ÁýÀ¸¸é addweapon ´Ù½Ã½Ãµµ
+		if (Success)
+		{
+			GetOwner()->Destroy();
+		}
+		else
+		{
+			ownerPlayer = nullptr;
+			//¹Ù´Ú¿¡ µÕµÕ
+		}
+
 	}
 }
 

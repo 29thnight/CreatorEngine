@@ -26,7 +26,7 @@ public:
 	virtual void OnDestroy() override {}
 public:
 	virtual void Interact() override {}
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
 	bool AddItem(EntityItem* item);
 	void Purification(float tick);

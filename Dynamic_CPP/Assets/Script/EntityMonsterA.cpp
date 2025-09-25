@@ -293,7 +293,7 @@ void EntityMonsterA::RotateToTarget()
 	}
 }
 
-void EntityMonsterA::SendDamage(Entity* sender, int damage)
+void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{

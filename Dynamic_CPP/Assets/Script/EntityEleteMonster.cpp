@@ -566,7 +566,7 @@ void EntityEleteMonster::RotateToTarget()
 	}
 }
 
-void EntityEleteMonster::SendDamage(Entity* sender, int damage)
+void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{

@@ -195,7 +195,7 @@ void EntityAsis::Update(float tick)
 	}
 }
 
-void EntityAsis::SendDamage(Entity* sender, int damage)
+void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (m_currentGracePeriod > 0.f) {
 		// 무적이지만 히트 사운드나 별도 처리시 여기서 처리.

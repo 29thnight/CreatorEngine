@@ -28,6 +28,8 @@ public:
 
 	//아시스 -> 플레이어 날아올떄쓰는것들
 	int weaponCode = 0;  //asis가 넘겨줄거  0 1 2 3 값에따라 다른 무기생성 0번 베이직 1번 밀리 2번 레인지 3번 붐
+	void CatchCapsule(Player* _player);
+	void TryAddWeapon();
 	void Throw(Player* _player, Mathf::Vector3 statrPos);
 	Mathf::Vector3 startPos{};
 	Mathf::Vector3 endPos{};
