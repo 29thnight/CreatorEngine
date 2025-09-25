@@ -283,9 +283,13 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     float birthTime = currentTime - particleAge;
     
     // 파티클별 고유한 시드 (생성 시점 + 인덱스로 랜덤하지만 고정)
-    float2 seed = float2(particleIndex * 0.1537 + birthTime * 0.7321, particleIndex * 0.2891 + birthTime * 1.2345);
-    float angle = noise(seed) * 6.28318; // 0~2π
-    float elevation = (noise(seed + 100.0) - 0.5) * 3.14159 * explosiveSphere; // 구형 분포 조절
+    uint timeSeed = (uint) (birthTime * 1000.0);
+    uint seed1 = particleIndex * 73856093u ^ timeSeed;
+    uint seed2 = particleIndex * 83492791u ^ (timeSeed >> 16);
+    uint seed3 = particleIndex * 37573297u ^ (timeSeed << 8);
+    
+    float angle = Hash(seed1) * 6.28318; // 0~2π
+    float elevation = (Hash(seed2) - 0.5) * 3.14159 * explosiveSphere; // 구형 분포 조절
     
     // 파티클별 고정 방향 (생성 시점에서 결정되고 변하지 않음)
     float3 explosionDir = float3(
@@ -301,8 +305,7 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     float randomFactor = 1.0;
     if (explosiveRandom > 0.0)
     {
-        float2 speedSeed = float2(particleIndex * 0.0731 + birthTime * 0.4567, particleIndex * 0.1234 + birthTime * 0.8901);
-        randomFactor = 1.0 + (noise(speedSeed) - 0.5) * explosiveRandom;
+        randomFactor = 1.0 + (Hash(seed3) - 0.5) * explosiveRandom;
     }
     
     return explosionDir * explosiveSpeed * speedDecay * randomFactor;

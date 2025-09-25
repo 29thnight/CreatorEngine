@@ -15,7 +15,7 @@ class Weapon;
 class Entity;
 class EntityItem;
 class EntityEnemy;
-
+class SoundComponent;
 class Player : public Entity
 {
 public:
@@ -85,7 +85,8 @@ public:
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	void CharacterMove(Mathf::Vector2 dir);
-	
+	[[Method]]
+	void PlaySoundStep();
 	//잡기 던지기
 	[[Property]]
 	float ThrowPowerX = 6.f;      //들고있던물체 던져서 움직일량
@@ -133,7 +134,8 @@ public:
 
 	[[Method]]
 	void Dash();
-
+	[[Method]]
+	void PlaySoundDash();
 	//공격
 	[[Property]]
 	int Atk = 1;                     //기본공격력   // (기본공격력 + 무기공격력(차징시 차징공격력)  ) * 크리티컬 배율  = 최종데미지
@@ -222,8 +224,9 @@ public:
 	float stunRespawnElapsedTime = 0.f;
 	bool  OnInvincibility = false; //무적 on off
 	[[Property]]
-	float GracePeriod = 1.0f;       //피격시 무적시간
+	float HitGracePeriodTime = 1.0f;       //피격시 무적시간
 	float GracePeriodElpasedTime = 0.f;
+	float curGracePeriodTime = 0.f;
 	[[Property]]
 	float ResurrectionRange = 5.f;   //부활가능한 트리거 콜라이더 크기 다른플레이어가 이범위안이면 부활  
 	[[Property]]
@@ -238,6 +241,8 @@ public:
 	bool IsInvincibility() { return OnInvincibility; }
 	bool sucessResurrection = false;  
 	
+	void SetInvincibility(float _GracePeriodTime); //무적설정 무적시간전달
+	void EndInvincibility(); //무적 강제종료
 	void OnHit(); //히트 애니메이션이 발동될떄만 씀 
 	void Knockback(Mathf::Vector2 _KnockbackForce);
 
@@ -268,6 +273,12 @@ public:
 	GameObject* camera = nullptr;
 
 	GameObject* BombIndicator = nullptr;
+
+	SoundComponent* m_ActionSound; //칼 휘두름, 탄 발사, 잡기,던지기,죽음,부활 등 행동사운드
+	SoundComponent* m_MoveSound;   //대시, 걷기 등 이동중사운드
+	//이펙트 사운드는 따로 몬스터이펙트등 모아서 관리 or 플레이어껀 따로
+
+	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
 
 	[[Method]]

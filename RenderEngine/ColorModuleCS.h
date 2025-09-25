@@ -116,6 +116,7 @@ public:
     void SetPulseColor(const Mathf::Vector4& baseColor, const Mathf::Vector4& pulseColor, float frequency);
     void SetSineWaveColor(const Mathf::Vector4& color1, const Mathf::Vector4& color2, float frequency, float phase = 0.0f);
     void SetFlickerColor(const std::vector<Mathf::Vector4>& colors, float speed);
+    void SetRandomColors(const std::vector<Mathf::Vector4>& colors);
 
     // ÀÌÂ¡ ¼³Á¤
     void SetEasing(EasingEffect easingType, StepAnimation animationType, float duration);

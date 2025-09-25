@@ -3,24 +3,37 @@
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"
 #include "Texture.h"
+#include "GameInstance.h"
 #include "pch.h"
 void ItemUIPopup::Start()
 {
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
 	m_image = m_pOwner->GetComponent<ImageComponent>();
     m_popupSize = m_image->uiinfo.size;
-
-	//TEST : 강제로 아이콘 오브젝트 지정
-	auto iconObj = GameObject::Find("TestIcon");
-	SetIconObject(iconObj);
-    //~TEST
 }
 
 void ItemUIPopup::Update(float tick)
 {
 	using namespace Mathf;
-	//TODO : itemManager를 통해서 m_iconObj를 받아오도록 변경 필요
+
 	if (!m_rect || !m_iconObj || !m_icon || !m_image || !m_iconRect) return;
+
+    itemID = m_icon->GetItemID();
+    rarityID = m_icon->GetRarityID();
+    switch (rarityID)
+    {
+    case 2:
+        m_image->color = GameInstance::GetInstance()->EpicItemColor;
+        break;
+    case 1:
+        m_image->color = GameInstance::GetInstance()->RareItemColor;
+        break;
+    case 0:
+    default:
+        m_image->color = GameInstance::GetInstance()->CommonItemColor;
+        break;
+    }
+    m_image->color.w = 0.5f;
 
 	// 아이콘 위치 동기화
 	auto iconPos = m_iconRect->GetAnchoredPosition();

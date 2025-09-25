@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "EntityMonsterA.h"
 #include "TestMonsterB.h"
+#include "EntityEleteMonster.h"
 #include "Animator.h"
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
@@ -65,6 +66,40 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
             {
                 script->m_animator->SetParameter("RangeAttack", true);
             }
+            blackBoard.SetValueAsBool("IsAttacking", true);
+            return NodeStatus::Running;
+        }
+        else {
+            //공격중일시 에니메이션 종료 여부 확인
+            if (isAttackAnimation) {
+                //에니메이션이 실행중이면 계속 실행
+                return NodeStatus::Running;
+            }
+            else
+            {
+                //완료시 모든 변수 초기화하고 성공 반환
+                script->isAttack = false;
+                script->isAttackAnimation = false;
+                script->m_state = "Idle";
+                return NodeStatus::Success;
+            }
+        }
+    }
+
+    if (identity == "MonsterMage") {
+
+
+
+        EntityEleteMonster* script = m_owner->GetComponent<EntityEleteMonster>();
+        bool isAttack = script->isAttack;
+        bool isAttackAnimation = script->isAttackAnimation;
+        if (!isAttack) {
+            //공격중이 아닐시 공격 시작
+            script->isAttack = true;
+            script->isAttackAnimation = true;
+            script->m_animator->SetParameter("Attack", true);
+            script->m_animator->SetParameter("RangeAttack", true);
+            
             blackBoard.SetValueAsBool("IsAttacking", true);
             return NodeStatus::Running;
         }

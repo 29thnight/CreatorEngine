@@ -14,6 +14,7 @@
 #include "ScriptStringModule.h"
 #include "AnimationState.h"
 #include "MSBuildHelper.h"
+#include <utility>
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -315,7 +316,7 @@ void HotLoadSystem::ReplaceScriptComponent()
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
 
-		m_scriptComponentIndexs.clear();
+		RecollectScriptComponents(gameObjects);
 
 
 		m_isReloading = false;
@@ -410,7 +411,41 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 		newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 	}
 
+	RecollectScriptComponents(gameObjects);
+}
+
+void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<GameObject>>& gameObjects)
+{
+	std::unique_lock lock(m_scriptFileMutex);
 	m_scriptComponentIndexs.clear();
+
+	for (const auto& gameObjectPtr : gameObjects)
+	{
+		if (!gameObjectPtr)
+		{
+			continue;
+		}
+
+		auto* gameObject = gameObjectPtr.get();
+
+		for (size_t index = 0; index < gameObject->m_components.size(); ++index)
+		{
+			const auto& component = gameObject->m_components[index];
+			if (!component)
+			{
+				continue;
+			}
+
+			if (auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(component))
+			{
+				auto scriptName = scriptComponent->m_name.ToString();
+				if (!scriptName.empty())
+				{
+					m_scriptComponentIndexs.emplace_back(gameObject, index, std::move(scriptName));
+				}
+			}
+		}
+	}
 }
 
 void HotLoadSystem::CompileEvent()

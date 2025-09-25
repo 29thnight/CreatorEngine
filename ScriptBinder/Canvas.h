@@ -22,6 +22,7 @@ public:
 
 	void SetCanvasName(std::string_view name) { CanvasName = name.data(); }
 	std::string GetCanvasName() const { return CanvasName; }
+	std::weak_ptr<GameObject> GetFrontUIObject();
 
 	int PreCanvasOrder = 0;
     [[Property]]
@@ -29,8 +30,6 @@ public:
 	std::vector<std::weak_ptr<GameObject>> UIObjs;
 	[[Property]]
 	std::string CanvasName = "Canvas";
-
-	//현재 선택중인 UI
-	std::weak_ptr<GameObject> SelectUI;
+	std::string prevCanvasName{};
 };
 

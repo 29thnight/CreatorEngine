@@ -4,10 +4,13 @@
 #include "ItemComponent.h"
 #include "GameInstance.h"
 #include "ItemInfo.h"
+#include "ItemManager.generated.h"
 
 class ItemManager : public ModuleBehavior
 {
 public:
+   ReflectItemManager
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(ItemManager)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -39,5 +42,13 @@ private:
 	//아이템 정보 3개 -> 렌덤으로 돌려서 슬롯에 넣어줌
 	std::array<ItemInfo, 3> itemInfos;
 	//아이템 아이콘 3개
-	std::array<class ItemUIIcon*, 3> itemPopups;
+	std::array<class ItemUIIcon*, 3> itemIcons;
+
+	//테스트 전용
+	[[Property]]
+	Mathf::Color4 CommonItemColor{ 1.f, 1.f, 1.f, 1.f };
+	[[Property]]
+	Mathf::Color4 RareItemColor{ 1.f, 1.f, 1.f, 1.f };
+	[[Property]]
+	Mathf::Color4 EpicItemColor{ 1.f, 1.f, 1.f, 1.f };
 };

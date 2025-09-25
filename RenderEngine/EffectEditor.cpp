@@ -380,7 +380,7 @@ void EffectEditor::RenderModuleDetailEditor()
 	else if (auto* meshSizeModule = dynamic_cast<MeshSizeModuleCS*>(targetModule)) {
 		RenderMeshSizeModuleEditor(meshSizeModule);
 	}
-	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule)){
+	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule)) {
 		RenderTrailGenerateModuleEditor(trailGenModule);
 	}
 }
@@ -2035,7 +2035,7 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 
 				ImGui::TreePop();
 			}
-			}
+		}
 
 
 		ImGui::Separator();
@@ -2329,7 +2329,8 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 				static const char* functionTypes[] = {
 					"Pulse",
 					"Sine Wave",
-					"Flicker"
+					"Flicker",
+					"RandomColor"
 				};
 
 				int currentFunction = colorModule->GetCustomFunctionType();
@@ -2473,6 +2474,63 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 					if (ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f))
 					{
 						colorModule->SetFlickerColor(flickerColors, speed);
+					}
+				}
+
+				else if (currentFunction == 3) // Random Color Range
+				{
+					auto randomColors = colorModule->GetDiscreteColors();
+					if (randomColors.empty())
+					{
+						randomColors = {
+							Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+							Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+							Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
+						};
+					}
+
+					bool changed = false;
+
+					for (int i = 0; i < static_cast<int>(randomColors.size()); ++i)
+					{
+						ImGui::PushID(i);
+						char label[32];
+						sprintf_s(label, "Random Color %d", i);
+						float color[4] = {
+							randomColors[i].x,
+							randomColors[i].y,
+							randomColors[i].z,
+							randomColors[i].w
+						};
+
+						if (ImGui::ColorEdit4(label, color))
+						{
+							randomColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							changed = true;  // 즉시 호출하지 않고 플래그만 설정＼
+						}
+
+						ImGui::SameLine();
+						if (ImGui::Button("Remove") && randomColors.size() > 1)
+						{
+							randomColors.erase(randomColors.begin() + i);
+							changed = true;
+							ImGui::PopID();
+							break;
+						}
+
+						ImGui::PopID();
+					}
+
+					if (ImGui::Button("Add Random Color") && randomColors.size() < 32)
+					{
+						randomColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+						changed = true;
+					}
+
+					// Apply 버튼으로 한번에 적용
+					if (changed || ImGui::Button("Apply Random Colors"))
+					{
+						colorModule->SetRandomColors(randomColors);
 					}
 				}
 
@@ -2622,6 +2680,39 @@ void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 
 		ImGui::Separator();
 
+		// 진동 설정 추가
+		ImGui::Text("Oscillation");
+
+		bool useOscillation = sizeModule->GetUseOscillation();
+		if (ImGui::Checkbox("Use Oscillation", &useOscillation))
+		{
+			float speed = sizeModule->GetOscillationSpeed();
+			sizeModule->SetOscillation(useOscillation, speed);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Makes particles oscillate between start and end size");
+		}
+
+		if (useOscillation)
+		{
+			ImGui::Indent();
+
+			float speed = sizeModule->GetOscillationSpeed();
+			if (ImGui::DragFloat("Oscillation Speed", &speed, 0.1f, 0.1f, 50.0f, "%.1f"))
+			{
+				sizeModule->SetOscillation(true, speed);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Higher values = faster oscillation");
+			}
+
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
 		// 이징 설정
 		ImGui::Text("Easing Animation");
 
@@ -2735,6 +2826,23 @@ void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
 			sizeModule->SetEasing(EasingEffect::InOutSine, StepAnimation::StepLoopPingPong, 1.0f);
 		}
+
+		if (ImGui::Button("Heartbeat Effect"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(0.8f, 0.8f));
+			sizeModule->SetEndSize(XMFLOAT2(1.2f, 1.2f));
+			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
+			sizeModule->SetOscillation(true, 8.0f);
+		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Breathing Effect"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(0.5f, 0.5f));
+			sizeModule->SetEndSize(XMFLOAT2(1.5f, 1.5f));
+			sizeModule->SetRandomScale(true, 0.8f, 1.2f);
+			sizeModule->SetOscillation(true, 3.0f);
+		}
 	}
 }
 
@@ -2752,7 +2860,7 @@ void EffectEditor::RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardM
 	ImGui::Text("Billboard Specific Settings:");
 
 	// 빌보드 타입 선택
-	const char* billboardTypes[] = { "None", "Basic", "SpriteAnimation"};
+	const char* billboardTypes[] = { "None", "Basic", "SpriteAnimation" };
 	int currentType = static_cast<int>(billboardModule->GetBillboardType());
 	if (ImGui::Combo("Billboard Type", &currentType, billboardTypes, IM_ARRAYSIZE(billboardTypes)))
 	{
@@ -3118,7 +3226,8 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 				static const char* functionTypes[] = {
 					"Pulse",
 					"Sine Wave",
-					"Flicker"
+					"Flicker",
+					"RandomColor"
 				};
 
 				int currentFunction = colorModule->GetCustomFunctionType();
@@ -3264,6 +3373,63 @@ void EffectEditor::RenderMeshColorModuleEditor(MeshColorModuleCS* colorModule)
 						colorModule->SetFlickerColor(flickerColors, speed);
 					}
 				}
+
+				else if (currentFunction == 3) // Random Color Range
+				{
+					auto randomColors = colorModule->GetDiscreteColors();
+					if (randomColors.empty())
+					{
+						randomColors = {
+							Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+							Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+							Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
+						};
+					}
+
+					bool changed = false;
+
+					for (int i = 0; i < static_cast<int>(randomColors.size()); ++i)
+					{
+						ImGui::PushID(i);
+						char label[32];
+						sprintf_s(label, "Random Color %d", i);
+						float color[4] = {
+							randomColors[i].x,
+							randomColors[i].y,
+							randomColors[i].z,
+							randomColors[i].w
+						};
+
+						if (ImGui::ColorEdit4(label, color))
+						{
+							randomColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+							changed = true;  // 즉시 호출하지 않고 플래그만 설정＼
+						}
+
+						ImGui::SameLine();
+						if (ImGui::Button("Remove") && randomColors.size() > 1)
+						{
+							randomColors.erase(randomColors.begin() + i);
+							changed = true;
+							ImGui::PopID();
+							break;
+						}
+
+						ImGui::PopID();
+					}
+
+					if (ImGui::Button("Add Random Color") && randomColors.size() < 32)
+					{
+						randomColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+						changed = true;
+					}
+
+					// Apply 버튼으로 한번에 적용
+					if (changed || ImGui::Button("Apply Random Colors"))
+					{
+						colorModule->SetRandomColors(randomColors);
+					}
+					}
 
 				ImGui::TreePop();
 			}
@@ -4013,6 +4179,39 @@ void EffectEditor::RenderMeshSizeModuleEditor(MeshSizeModuleCS* sizeModule)
 				float minScale = sizeModule->GetRandomScaleMin();
 				if (maxScale < minScale) minScale = maxScale;
 				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
+		// 진동 설정 추가
+		ImGui::Text("Oscillation");
+
+		bool useOscillation = sizeModule->GetUseOscillation();
+		if (ImGui::Checkbox("Use Oscillation", &useOscillation))
+		{
+			float speed = sizeModule->GetOscillationSpeed();
+			sizeModule->SetOscillation(useOscillation, speed);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Makes particles oscillate between start and end size");
+		}
+
+		if (useOscillation)
+		{
+			ImGui::Indent();
+
+			float speed = sizeModule->GetOscillationSpeed();
+			if (ImGui::DragFloat("Oscillation Speed", &speed, 0.1f, 0.1f, 50.0f, "%.1f"))
+			{
+				sizeModule->SetOscillation(true, speed);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Higher values = faster oscillation");
 			}
 
 			ImGui::Unindent();

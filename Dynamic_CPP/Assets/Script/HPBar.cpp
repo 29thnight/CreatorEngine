@@ -25,6 +25,10 @@ void HPBar::Start()
     if (imageComp)
     {
         m_image = imageComp;
+        if (m_isPlayer2)
+        {
+            m_image->SetTexture(1);
+        }
     }
 }
 
@@ -50,6 +54,10 @@ void HPBar::LateUpdate(float)
         if (imageComp)
         {
             m_image = imageComp;
+            if (m_isPlayer2)
+            {
+                m_image->SetTexture(1);
+            }
         }
         return;
     }
@@ -86,5 +94,10 @@ void HPBar::LateUpdate(float)
 	while (ratio > 1.0f) ratio = 1.0f;
 
 	m_image->clipPercent = ratio;
+}
+
+void HPBar::SetPlayer2Texture()
+{
+    m_isPlayer2 = true;
 }
 

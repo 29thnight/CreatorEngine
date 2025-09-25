@@ -4,6 +4,7 @@
 #include "Animator.h"
 #include "EntityMonsterA.h"
 #include "TestMonsterB.h"
+#include "EntityEleteMonster.h"
 #include "CharacterControllerComponent.h"
 
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
@@ -24,6 +25,12 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 	else if(identity == "MonsterRange")
 	{
 		TestMonsterB* script = m_owner->GetComponent<TestMonsterB>();
+		script->ChaseTarget();
+		return NodeStatus::Success;
+	}
+	else if (identity == "MonsterMage")
+	{
+		EntityEleteMonster* script = m_owner->GetComponent<EntityEleteMonster>();
 		script->ChaseTarget();
 		return NodeStatus::Success;
 	}

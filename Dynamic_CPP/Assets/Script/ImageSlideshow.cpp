@@ -11,6 +11,7 @@ void ImageSlideshow::Start()
     m_fadeTimer = 0.f;
     m_pendingStep = 0;
     m_switchStep = 0;
+    m_finished = false;
 
     if (m_resetToFirstOnStart && m_image)
         SetFrame(0);
@@ -72,6 +73,7 @@ void ImageSlideshow::SetFrame(int index)
         ApplyIndex();
     }
 }
+
 
 void ImageSlideshow::StartOrQueueAdvance(int step)
 {
@@ -135,6 +137,7 @@ void ImageSlideshow::AdvanceOneStep(int step)
         m_pendingAutoStop = true;
         // 재생 루프는 멈춰서 다음 인터벌을 시작하지 않도록
         m_playing = false;
+        m_finished = false;
         return;
     }
 }
@@ -161,17 +164,20 @@ void ImageSlideshow::BeginFadeSequence(int stepToAdvance)
 {
     if (!m_fadeEnabled || m_fadeDuration <= 0.f) {
         // 페이드 꺼짐: 즉시 전환
+        m_finished = false;
         AdvanceOneStep(stepToAdvance);
         return;
     }
 
     // 이미 진행 중이면 누적 step에 담아두고, 현재 페이드는 그대로 진행
     if (m_fadeState != FadeState::None) {
+        m_finished = false;
         m_pendingStep += stepToAdvance;
         return;
     }
 
     // 새 페이드 시작
+    m_finished = false;
     m_switchStep = stepToAdvance;
     m_fadeState = FadeState::FadingOut;
     m_fadeTimer = 0.f;
@@ -232,20 +238,24 @@ void ImageSlideshow::TickFade(float dt)
             // 페이드 인 완료
             m_fadeTimer = 0.f;
 
-            if (m_pendingAutoStop && m_fadeEnabled && m_stopFadeOnStop) {
+            if (m_pendingAutoStop && m_fadeEnabled && m_stopFadeOnStop) 
+            {
                 // 마지막 프레임을 충분히 보여주기 위한 Hold 단계로 진입(옵션)
-                if (m_stopHoldDuration > 0.f) {
+                if (m_stopHoldDuration > 0.f) 
+                {
                     m_fadeState = FadeState::StopHold;
                     m_stopHoldTimer = 0.f;
                     // 알파는 1.0으로 유지
                     SetAlpha(1.f);
                 }
-                else {
+                else 
+                {
                     // Hold 없이 바로 StopFadingOut
                     m_fadeState = FadeState::StopFadingOut;
                 }
             }
-            else {
+            else 
+            {
                 // 일반 케이스: 페이드 상태 종료
                 m_fadeState = FadeState::None;
             }
@@ -290,15 +300,18 @@ void ImageSlideshow::TickFade(float dt)
             m_switchStep = 0;
 
             // 투명으로 마무리 or 보이게 멈춤
-            if (m_stopFadeHoldVisible) {
+            if (m_stopFadeHoldVisible) 
+            {
                 SetAlpha(1.f);  // 보이게 정지
             }
-            else {
+            else 
+            {
                 SetAlpha(0.f);  // 투명하게 정지
             }
 
             m_fadeState = FadeState::None;
             m_fadeTimer = 0.f;
+            m_finished = true;
         }
         break;
     }
@@ -362,4 +375,6 @@ void ImageSlideshow::ImmediateStopToTerminalFrame()
     // Stop 시 보이게/투명하게 멈출지
     if (m_fadeEnabled && !m_stopFadeHoldVisible) SetAlpha(0.f);
     else SetAlpha(1.f);
+
+    m_finished = true;
 }

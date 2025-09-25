@@ -39,7 +39,8 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void Drop(Mathf::Vector3 ownerForward,Mathf::Vector2 distacne);
-	void Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2 distacne,bool indicate);
+	void Throw(Player* player, Mathf::Vector3 ownerForward, Mathf::Vector2 distacne, bool indicate);
+	void Throw(Mathf::Vector3 startPos, Mathf::Vector3 velocity, float height);
 	void SetThrowOwner(Player* player);
 	Player* GetThrowOwner();
 	void ClearThrowOwner();
