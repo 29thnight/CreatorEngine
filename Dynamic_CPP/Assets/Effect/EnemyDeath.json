@@ -4,7 +4,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
-    "name": "1",
+    "name": "EnemyDeath",
     "particleSystems": [
         {
             "isRunning": false,

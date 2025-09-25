@@ -8,7 +8,7 @@
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 1,
+            "maxParticles": 10,
             "modules": [
                 {
                     "data": {
@@ -21,23 +21,23 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 1.0,
-                                "y": 0.0,
-                                "z": 0.0
+                                "y": 1.0,
+                                "z": 1.0
                             },
                             "initialRotation": 0.0,
-                            "initialRotationRange": 0.0,
-                            "lifeTime": 10.0,
-                            "rotateSpeed": 0.0,
+                            "initialRotationRange": 3.0,
+                            "lifeTime": 2.0,
+                            "rotateSpeed": 0.5,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.30000001192092896,
+                                "y": 0.30000001192092896
                             },
                             "velocity": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "velocityRange": 0.0
+                            "velocityRange": 0.5
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -51,16 +51,152 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "emitterType": 0,
-                            "spawnRate": 1.0
+                            "emitterType": 1,
+                            "spawnRate": 10.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 10
                         }
                     },
                     "stage": 2,
                     "type": "SpawnModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
+                        "easing": {
+                            "enabled": false
+                        },
+                        "explosiveData": {
+                            "initialSpeed": 50.0,
+                            "randomFactor": 0.4000000059604645,
+                            "speedDecay": 2.0,
+                            "sphereRadius": 1.0
+                        },
+                        "impulses": [],
+                        "movementParams": {
+                            "currentTime": 164.9158477783203,
+                            "easingEnabled": false,
+                            "easingType": 0,
+                            "gravityStrength": 9.800000190734863,
+                            "useGravity": false,
+                            "velocityMode": 0
+                        },
+                        "orbitalData": {
+                            "axis": {
+                                "x": 0.0,
+                                "y": 1.0,
+                                "z": 0.0
+                            },
+                            "center": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "radius": 5.0,
+                            "speed": 1.0
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 10
+                        },
+                        "velocityCurve": [],
+                        "windData": {
+                            "baseStrength": 1.0,
+                            "direction": {
+                                "x": 1.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "frequency": 1.0,
+                            "turbulence": 0.5
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MovementModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
+                        "colorGradient": [
+                            {
+                                "color": {
+                                    "w": 1.0,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
+                                "time": 0.0
+                            },
+                            {
+                                "color": {
+                                    "w": 0.8999999761581421,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                },
+                                "time": 0.30000001192092896
+                            },
+                            {
+                                "color": {
+                                    "w": 0.699999988079071,
+                                    "x": 1.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 0.699999988079071
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.5,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 1.0
+                            }
+                        ],
+                        "colorParams": {
+                            "customFunctionType": 3,
+                            "customParam1": 0.0,
+                            "customParam2": 0.0,
+                            "customParam3": 0.0,
+                            "customParam4": 0.0,
+                            "discreteColorsSize": 3,
+                            "gradientSize": 4,
+                            "transitionMode": 2
+                        },
+                        "discreteColors": [
+                            {
+                                "w": 1.0,
+                                "x": 0.7019608020782471,
+                                "y": 0.800000011920929,
+                                "z": 0.027450980618596077
+                            },
+                            {
+                                "w": 1.0,
+                                "x": 0.250980406999588,
+                                "y": 0.5647059082984924,
+                                "z": 0.10588235408067703
+                            },
+                            {
+                                "w": 1.0,
+                                "x": 0.6980392336845398,
+                                "y": 0.4941176474094391,
+                                "z": 0.12156862765550613
+                            }
+                        ],
+                        "easing": {
+                            "enabled": false
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 10
+                        }
+                    },
+                    "stage": 2,
+                    "type": "ColorModuleCS",
                     "useEasing": false
                 }
             ],
@@ -76,7 +212,7 @@
                     "data": {
                         "billboard": {
                             "maxCount": 0,
-                            "type": 2
+                            "type": 1
                         },
                         "indices": [
                             0,
@@ -88,23 +224,17 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 1,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "SpriteAnimation",
+                            "pixelShader": "Glow",
                             "vertexShader": "BillBoard"
-                        },
-                        "spriteAnimation": {
-                            "animationDuration": 1.0,
-                            "frameCount": 4,
-                            "gridColumns": 2,
-                            "gridRows": 2
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Tex_fx_HCFX_Dust_01",
+                                "name": "leaf01",
                                 "slot": 0
                             }
                         ],
