@@ -2,9 +2,19 @@
 #include "pch.h"
 #include "Entity.h"
 #include "Camera.h"
-
+#include "EffectComponent.h"
+#include "Core.Minimal.h"
 void MonEleteProjetile::Start()
 {
+	if (nullptr == m_effect)
+	{
+		auto childred = GetOwner()->m_childrenIndices;
+		for (auto& child : childred)
+		{
+			m_effect = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+			break;
+		}
+	}
 }
 
 
@@ -72,6 +82,25 @@ void MonEleteProjetile::Initallize(Entity* owner, int damage, float speed, Mathf
 	m_Speed = speed;
 	m_Dir = dir;
 	isInitialize = true;
+	if (nullptr == m_effect)
+	{
+		auto childred = GetOwner()->m_childrenIndices;
+		for (auto& child : childred)
+		{
+			m_effect = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+			break;
+		}
+	}
+	Transform* transform = GetOwner()->GetComponent<Transform>();
+	float yaw = atan2(m_Dir.x, m_Dir.z);
+
+	Mathf::Quaternion dirRot = Mathf::Quaternion::CreateFromYawPitchRoll(yaw, 0.0f, 0.0f);
+	transform->SetRotation(dirRot);
+	if (m_effect)
+	{
+		m_effect->Apply();
+	}
+
 }
 
 void MonEleteProjetile::Action(GameObject* target)
@@ -97,5 +126,9 @@ void MonEleteProjetile::RevertPool()
 	}
 	m_isMoving = false;
 	GetOwner()->SetEnabled(false);
+	if (m_effect)
+	{
+		m_effect->StopEffect();
+	}
 }
 

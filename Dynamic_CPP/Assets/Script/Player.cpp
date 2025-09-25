@@ -38,6 +38,7 @@
 #include "SoundManager.h"
 #include "SoundComponent.h"
 #include "Core.Random.h"
+#include "WeaponCapsule.h"
 std::vector<std::string> dashSounds
 {
 	"Dodge 1_Movement_01",
@@ -654,13 +655,15 @@ void Player::Catch()
 	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
 
-		m_animator->SetParameter("OnGrab", true);
 		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
-		catchedObject = item;
-		m_nearObject = nullptr;
-		catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
-		catchedObject->SetThrowOwner(this);
-
+		if (item)
+		{
+			m_animator->SetParameter("OnGrab", true);
+			catchedObject = item;
+			m_nearObject = nullptr;
+			catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
+			catchedObject->SetThrowOwner(this);
+		}
 		/*switch (item->itemType)
 		{
 		case EItemType::Flower:

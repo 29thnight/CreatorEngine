@@ -31,7 +31,8 @@ void EntityEleteMonster::Start()
 		}
 
 	}
-
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetAutomaticRotation(true);
 	/*if (!m_animator)
 	{
 		m_animator = m_pOwner->GetComponent<Animator>();
@@ -53,7 +54,6 @@ void EntityEleteMonster::Start()
 		//}
 	}
 
-	m_pOwner->m_collisionType = 3;
 
 	for (auto& child : childred)
 	{
@@ -147,6 +147,15 @@ void EntityEleteMonster::Update(float tick)
 	}
 
 	
+	if (EndDeadAnimation)
+	{
+		deadElapsedTime += tick;
+		if (deadDestroyTime <= deadElapsedTime)
+		{
+			GetOwner()->Destroy();
+		}
+	}
+
 
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
@@ -527,6 +536,12 @@ void EntityEleteMonster::Teleport()
 void EntityEleteMonster::Dead()
 {
 	m_animator->SetParameter("Dead", true);
+	GetOwner()->SetLayer("Water");
+}
+
+void EntityEleteMonster::DeadEvent()
+{
+	EndDeadAnimation = true;
 }
 
 void EntityEleteMonster::RotateToTarget()
@@ -609,6 +624,8 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage)
 			if (m_currentHP <= 0)
 			{
 				isDead = true;
+				Dead();
+				DeadEvent(); //Die 애니메이션나오면 거기로 옮길것
 			}
 		}
 	}
