@@ -1,0 +1,87 @@
+m_name: MonsterC
+m_isEnabled: true
+m_instanceID: 1762782606
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: MonsterC
+    m_isEnabled: true
+    m_instanceID: 248528279
+    m_transform:
+      position: {x: 0, y: 0, z: 1.39001156e-06, w: 1}
+      rotation: {x: 0, y: 1, z: 0, w: -1.37443735e-07}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 7
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_prefabFileGuid: 0995c81a-0b1f-5451-8c79-76a8bc2085c8
+    m_attachedSoketID: 0
+    m_collisionType: 0
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_isEnabled: true
+        m_instanceID: 162864540
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 1
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: true
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - CharacterControllerComponent: 939015310
+        m_name: CharacterControllerComponent
+        m_isEnabled: true
+        m_instanceID: 4080839532
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_posOffset: {x: 0, y: 1.5, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+        m_radius: 0.550000012
+        m_height: 2
+        m_fBaseSpeed: 0.0250000004
+        m_fFinalMultiplierSpeed: 1
+        m_rotationSpeed: 0.100000001
+      - BehaviorTreeComponent: 1234464095
+        m_name: BehaviorTreeComponent
+        m_isEnabled: true
+        m_instanceID: 3550850684
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        name: Mage
+        blackBoardName: Mage
+        m_BehaviorTreeGuid: 32a25562-9ef2-59a7-a6d0-58365a493c48
+        m_BlackBoardGuid: 765490ec-dc96-5662-9a78-5c159a08078a
+      - ModuleBehavior: 1399118904
+        isAsisAction: false
+        m_maxHP: 100
+        m_enemyReward: 10
+        m_moveSpeed: 0.0199999996
+        m_chaseRange: 15
+        m_rangeOutDuration: 2
+        m_rangedAttackDamage: 10
+        m_projectileDamegeRadius: 5
+        m_projectileSpeed: 1
+        m_projectileRange: 10
+        m_projectileArcHeight: 5
+        m_rangedAttackCoolTime: 2
+        m_retreatRange: 5
+        m_retreatCoolTime: 3
+        m_retreatDistance: 5
+        m_avoidanceStrength: 0.0299999993
+        m_teleportDistance: 3
+        m_teleportCoolTime: 3
+        m_name: EntityEleteMonster
+        m_isEnabled: true
+        m_instanceID: 1777458765
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 2c35f895-1e24-59bb-a08c-ff1b7caa2617
