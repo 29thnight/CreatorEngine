@@ -1,0 +1,24 @@
+tags:
+  - Untagged
+  - Respawn
+  - Finish
+  - MainCamera
+  - Player
+  - GameController
+  - ShootTag
+  - Wall
+layers:
+  - Default
+  - TransparentFX
+  - Ignore RayCast
+  - Water
+  - UI
+  - Player
+  - PlayerDash
+  - Asis
+  - EntityResource
+  - Entityitem
+  - Enemy
+  - Rock
+  - PlayerBullet
+  - EnemyBullet

@@ -132,6 +132,11 @@ public:
 	void Teleport(); // 일정 거리 이내 접근시 순간이동
 
 	void Dead(); //죽음 처리
+	[[Method]]
+	void DeadEvent();
+	bool EndDeadAnimation = false;
+	float deadElapsedTime = 0.f;
+	float deadDestroyTime = 1.0f;
 
 	void RotateToTarget(); //타겟 바라보기
 

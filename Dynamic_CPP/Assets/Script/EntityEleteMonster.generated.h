@@ -27,6 +27,7 @@ ReflectionScriptField(EntityEleteMonster) \
 	MethodField \
 	({ \
 		meta_method(ShootingAttack) \
+		meta_method(DeadEvent) \
 	}); \
 	FieldEnd(EntityEleteMonster, PropertyAndMethod) \
 };
