@@ -436,7 +436,7 @@ void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<
 				continue;
 			}
 
-			if (auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(component))
+			if (auto scriptComponent = std::static_pointer_cast<ModuleBehavior>(component))
 			{
 				auto scriptName = scriptComponent->m_name.ToString();
 				if (!scriptName.empty())
@@ -1700,6 +1700,8 @@ void HotLoadSystem::Compile()
 
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
+			if (gameObject->m_components.empty()) continue;
+
 			auto script = std::dynamic_pointer_cast<ModuleBehavior>(gameObject->m_components[index]);
 			if (nullptr != script)
 			{
