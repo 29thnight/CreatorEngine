@@ -56,7 +56,7 @@ PrefabNode:
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
     children:
       - GameObject: 2166264123
-        m_name: Mon_Slime_V2
+        m_name: Mon_slime
         m_isEnabled: true
         m_instanceID: 501313601
         m_transform:
@@ -97,7 +97,7 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: f93f031a-1827-5acc-8666-6b69df5b8a4b
+              m_fileGuid: 11fc8aa2-d271-5e82-87e2-b3b570cf6319
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:
