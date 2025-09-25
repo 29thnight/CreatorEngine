@@ -66,12 +66,21 @@ RWStructuredBuffer<ParticleData> OutputParticles : register(u0);
 
 float Hash(uint seed)
 {
-    seed = (seed ^ 61u) ^ (seed >> 16u);
-    seed *= 9u;
-    seed = seed ^ (seed >> 4u);
-    seed *= 0x27d4eb2du;
-    seed = seed ^ (seed >> 15u);
+    seed ^= seed >> 16u;
+    seed *= 0x85ebca6bu;
+    seed ^= seed >> 13u;
+    seed *= 0xc2b2ae35u;
+    seed ^= seed >> 16u;
     return float(seed) * (1.0f / 4294967296.0f);
+}
+
+float Hash2D(uint x, uint y)
+{
+    uint h = x * 374761393u + y * 668265263u;
+    h = (h ^ (h >> 15u)) * 0x45d9f3bu;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = h ^ (h >> 16u);
+    return float(h) * (1.0f / 4294967296.0f);
 }
 
 // 그라데이션 색상 평가
@@ -164,12 +173,19 @@ float4 EvaluateCustomFunction(float t, float totalTime, uint particleIndex)
             }
         
         case RANDOM_COLOR_FUNCTION:
-        {
+{
                 if (discreteColorsSize > 0)
                 {
-                // 파티클별로 색상 풀에서 하나씩 랜덤 선택
-                    uint seed = particleIndex * 2654435761u;
-                    int colorIndex = (int) (Hash(seed) * discreteColorsSize);
+                    // 시간과 파티클 인덱스를 조합한 더 다양한 랜덤
+                    uint timeBasedSeed = (uint) (totalTime * 1000.0f);
+                    float randomValue = Hash2D(particleIndex * 2654435761u, timeBasedSeed);
+        
+                    // customParam1을 변화 속도로 사용
+                    float changeRate = max(customParam1, 0.1f);
+                    uint colorChangeTime = (uint) (totalTime * changeRate);
+                    randomValue = Hash2D(particleIndex, colorChangeTime);
+        
+                    int colorIndex = (int) (randomValue * discreteColorsSize);
                     colorIndex = clamp(colorIndex, 0, discreteColorsSize - 1);
                     return DiscreteColors[colorIndex];
                 }

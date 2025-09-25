@@ -1,39 +1,39 @@
 m_name: MonEleteProjectile
 m_isEnabled: true
-m_instanceID: 3796572434
+m_instanceID: 2740186539
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: MonEleteProjectile
     m_isEnabled: true
-    m_instanceID: 756287248
+    m_instanceID: 2486172128
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 607
+    m_index: 207
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [608]
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [208]
+    m_prefabFileGuid: e21650ac-7436-5cb5-9c57-8160912f2382
     m_attachedSoketID: 0
-    m_collisionType: 0
+    m_collisionType: 13
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
-    m_layer: Default
+    m_layer: EnemyBullet
     m_components:
       - ModuleBehavior: 1399118904
         m_name: MonEleteProjetile
         m_isEnabled: true
-        m_instanceID: 4039890850
+        m_instanceID: 709219289
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 7e0f3bfe-1b3d-5a0c-b23a-fb36a24faba4
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1668761774
+        m_instanceID: 2875345845
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -49,26 +49,26 @@ PrefabNode:
       - SphereColliderComponent: 1490099576
         m_name: SphereColliderComponent
         m_isEnabled: true
-        m_instanceID: 47274240
+        m_instanceID: 692652201
         m_FileID: 00000000-0000-0000-0000-000000000000
         radius: 1
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
     children:
       - GameObject: 2166264123
-        m_name: Mon_Slime_V2
+        m_name: Mon_slime
         m_isEnabled: true
-        m_instanceID: 501313601
+        m_instanceID: 44602187
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 607
-        m_index: 608
-        m_parentIndex: 607
+          m_parentID: 207
+        m_index: 208
+        m_parentIndex: 207
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: e21650ac-7436-5cb5-9c57-8160912f2382
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -79,7 +79,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3761326452
+            m_instanceID: 2245203704
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Mon_Slime
@@ -97,7 +97,7 @@ PrefabNode:
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
-              m_fileGuid: f93f031a-1827-5acc-8666-6b69df5b8a4b
+              m_fileGuid: 11fc8aa2-d271-5e82-87e2-b3b570cf6319
               m_renderingMode: 0
               m_shaderPSOName: ""
             m_Mesh:

@@ -629,6 +629,7 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 
 void Player::PlaySoundStep()
 {
+	if (m_MoveSound == nullptr) return;
 	int rand = Random<int>(0, stepSounds.size() - 1).Generate();
 	m_MoveSound->clipKey = stepSounds[rand];
 	m_MoveSound->PlayOneShot();
@@ -784,6 +785,7 @@ void Player::Dash()
 
 void Player::PlaySoundDash()
 {
+	if (m_MoveSound == nullptr) return;
 	int rand = Random<int>(0, dashSounds.size()-1).Generate();
 	m_MoveSound->clipKey = dashSounds[rand];
 	m_MoveSound->PlayOneShot();
@@ -953,8 +955,10 @@ void Player::PlaySlashEvent()
 
 		Slashscript->Initialize();
 
-		
-		m_ActionSound->PlayOneShot();
+		if (m_ActionSound)
+		{
+			m_ActionSound->PlayOneShot();
+		}
 	}
 
 
@@ -985,8 +989,11 @@ void Player::PlaySlashEvent2()
 		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
 
 		Slashscript->Initialize();
-		m_ActionSound->clipKey = "HD Audio - Unarmed Combat - Whoosh Quick";
-		m_ActionSound->PlayOneShot();
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = "HD Audio - Unarmed Combat - Whoosh Quick";
+			m_ActionSound->PlayOneShot();
+		}
 	}
 }
 
@@ -1005,8 +1012,11 @@ void Player::PlaySlashEvent3()
 
 
 		Slashscript->Initialize();
-		m_ActionSound->clipKey = "Vadi Sound - Swift - Fast Rope Whoosh Whipping ";
-		m_ActionSound->PlayOneShot();
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = "Vadi Sound - Swift - Fast Rope Whoosh Whipping ";
+			m_ActionSound->PlayOneShot();
+		}
 	}
 }
 
@@ -1484,9 +1494,13 @@ void Player::ShootNormalBullet()
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge());
 		}
-		int rand = Random<int>(0, normalBulletSounds.size() - 1).Generate();
-		m_ActionSound->clipKey = normalBulletSounds[rand];
-		m_ActionSound->PlayOneShot();
+
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, normalBulletSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = normalBulletSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
 	}
 }
 
@@ -1509,8 +1523,11 @@ void Player::ShootSpecialBullet()
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge(true));
 		}
 		int rand = Random<int>(0, specialBulletSounds.size() - 1).Generate();
-		m_ActionSound->clipKey = specialBulletSounds[rand];
-		m_ActionSound->PlayOneShot();
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = specialBulletSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
 	}
 
 	

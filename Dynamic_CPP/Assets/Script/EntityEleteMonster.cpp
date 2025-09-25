@@ -8,6 +8,7 @@
 #include "Animator.h"
 #include "CharacterControllerComponent.h"
 #include "PrefabUtility.h"
+#include "MonEleteProjetile.h"
 
 struct Feeler {
 	float length;
@@ -67,11 +68,11 @@ void EntityEleteMonster::Start()
 	}
 
 	//투사체 프리펩 가져오기 //todo : mage 투사체 붙이기
-	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonBProjetile");
+	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonEleteProjectile");
 	if (projectilePrefab) {
-		GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(projectilePrefab, "MonBProjectile1");
+		GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(projectilePrefab, "MonEleteProjectile1");
 		PrefabObject1->SetEnabled(false);
-		GameObject* PrefabObject2 = PrefabUtilitys->InstantiatePrefab(projectilePrefab, "MonBProjectile2");
+		GameObject* PrefabObject2 = PrefabUtilitys->InstantiatePrefab(projectilePrefab, "MonEleteProjectile2");
 		PrefabObject2->SetEnabled(false);
 
 		m_projectiles.push_back(PrefabObject1);
@@ -139,6 +140,26 @@ void EntityEleteMonster::Update(float tick)
 
 	if (m_isRetreat) {
 		Retreat(tick);
+	}
+
+	if (isAttack) {
+		m_state = "Attack";
+	}
+
+	
+
+	bool haskey = blackBoard->HasKey("IsAttacking");
+	if (haskey) {
+		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
+		//test
+		 //animatian 2.0f 진행
+		static float time = 0.0f;
+		time += tick;
+		if (time > 2.0f) {
+			isAttackAnimation = false;
+			time = 0.0f;
+		}
+		//
 	}
 
 }
@@ -223,6 +244,7 @@ void EntityEleteMonster::ShootingAttack()
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Mathf::Vector3 forward = m_transform->GetForward();
+		//생성위치
 		Mathf::Vector3 startpos = pos + forward * 1.f + Vector3(0, 1.f, 0);
 
 		PrefabObject->SetEnabled(true);
@@ -230,8 +252,9 @@ void EntityEleteMonster::ShootingAttack()
 	
 		//기존 원거리 공격 방식을 말고 forward 방향으로 직선으로 날림
 		//스크립트 따로 만들고 넘겨주고 직선운동 하게 변경함
-		// EleteMonsterProjectile* script = m_pOwner->GetComponent<EleteMonsterProjectile>();
-		// script->Initialize(forward,m_projectileSpeed);
+		 MonEleteProjetile* script = PrefabObject->GetComponent<MonEleteProjetile>();
+		 script->Initallize(this, m_rangedAttackDamage, m_projectileSpeed,forward);
+		 script->m_isMoving = true;
 		// 폭파 뒤엔 자신의 사용 상태를 disabled 한다.
 		m_projectileIndex++;
 		if (m_projectileIndex >= m_projectiles.size()) {
