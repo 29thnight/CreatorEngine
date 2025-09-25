@@ -3,6 +3,8 @@
 #include "Camera.h"
 #include "GameObject.h"
 #include "ImageComponent.h"
+#include "ItemComponent.h"
+#include "GameInstance.h"
 #include "Player.h"
 #include "pch.h"
 
@@ -11,27 +13,9 @@ void ItemUIIcon::Start()
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
 	m_image = m_pOwner->GetComponent<ImageComponent>();
 	//TEST : 테스트용, 실제로는 ItemManager에서 SetTarget 해줌
-    m_target = GameObject::Find("TestItem");
+    //m_target = GameObject::Find("TestItem");
     // 필요 시 초기화
     m_bobTime = 0.f;
-}
-
-void ItemUIIcon::OnTriggerEnter(const Collision& collision)
-{
-    if (collision.otherObj->HasComponent<Player>())
-    {
-        ++m_enterCount;
-    }
-}
-
-void ItemUIIcon::OnTriggerExit(const Collision& collision)
-{
-    if (collision.otherObj->HasComponent<Player>())
-    {
-        --m_enterCount;
-
-        m_enterCount = std::max(0, m_enterCount);
-    }
 }
 
 void ItemUIIcon::Update(float tick)
@@ -50,10 +34,6 @@ void ItemUIIcon::Update(float tick)
     const DirectX::XMVECTOR clip = XMVector4Transform(pos, viewProj);
     const float w = XMVectorGetW(clip);
     if (w <= 0.0f) return;
-
-    // 충돌 카운트 기반 팝업 on/off 
-    //TODO : TEST코드 제거하면, 같이 제거 해야함.
-    //m_isSetPopup = (m_enterCount > 0);
 
     // ── 구매되었으면 팝업 강제 종료 ──
     if (m_isPurchased) 
@@ -188,13 +168,50 @@ void ItemUIIcon::Update(float tick)
     m_prevIsSetPopup = m_isSetPopup;
 }
 
+void ItemUIIcon::SetTarget(GameObject* target)
+{
+    m_target = target;
+    if (m_target)
+    {
+        auto itemComp = m_target->GetComponent<ItemComponent>();
+        if (itemComp)
+        {
+            itemComp->SetItemIcon(this);
+        }
+    }
+}
+
 void ItemUIIcon::SetItemID(int id)
 {
     itemID = id;
     if (m_image)
     {
-        //TODO : id에 따른 이미지 변경 필요
+        //IF_TODO : IF 이미지로 구분해서 주시면 TODO-> id에 따른 이미지 변경 필요
     }
 
+}
+
+void ItemUIIcon::SetRarityID(int id)
+{
+    rarityID = id;
+    if (m_image)
+    {
+        //(현재 적용)
+        //IF_TODO : IF 이미지로 구분해서 안주시면 TODO-> id에 따른 색상 변경 필요
+        switch (rarityID)
+        {
+        case 2:
+            m_image->color = GameInstance::GetInstance()->EpicItemColor;
+            break;
+        case 1:
+            m_image->color = GameInstance::GetInstance()->RareItemColor;
+            break;
+        case 0:
+        default:
+            m_image->color = GameInstance::GetInstance()->CommonItemColor;
+            break;
+        }
+
+    }
 }
 

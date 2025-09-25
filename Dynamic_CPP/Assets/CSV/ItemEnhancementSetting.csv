@@ -1,0 +1,4 @@
+id,rarity,name,desc,price,enhancementType,enhancementValue
+1,0,테스트,테스트 공격력 +1,20,4,1
+1,1,테스트,테스트 공격렬 +2,30,4,2
+1,2,테스트,테스트 공격력 +3,40,4,3

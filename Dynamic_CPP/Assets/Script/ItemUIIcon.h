@@ -12,9 +12,9 @@ public:
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
-	virtual void OnTriggerEnter(const Collision& collision) override;
+	virtual void OnTriggerEnter(const Collision& collision) override {};
 	virtual void OnTriggerStay(const Collision& collision) override {}
-	virtual void OnTriggerExit(const Collision& collision) override;
+	virtual void OnTriggerExit(const Collision& collision) override {};
 	virtual void OnCollisionEnter(const Collision& collision) override {}
 	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
@@ -23,11 +23,15 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void SetPopup(bool popup) { m_isSetPopup = popup; }
 	bool IsPopupComplete() const { return m_isPopupComplete; }
 	bool IsSetPopup() const { return m_isSetPopup; }
 
-	void SetTarget(class GameObject* target) { m_target = target; }
+	void SetTarget(class GameObject* target);
 	void SetItemID(int id);
+	void SetRarityID(int id);
+	int GetItemID() const { return itemID; }
+	int GetRarityID() const { return rarityID;  }
 
 	void OnPurchased() { m_isPurchased = true; }
 	void ResetPurchased() { m_isPurchased = false; }
@@ -44,6 +48,8 @@ private:
 	bool			m_isSetPopup = false; // º¸ºù ¸ØÃß°í ÆË¾÷À¸·Î ÀüÈ¯
 	[[Property]]
 	int				itemID{};
+	[[Property]]
+	int				rarityID{};
 	[[Property]]
 	Mathf::Vector2	screenOffset{};
 	[[Property]]

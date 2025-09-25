@@ -7,6 +7,7 @@ ReflectionScriptField(ItemUIIcon) \
 	({ \
 		meta_property(m_isSetPopup) \
 		meta_property(itemID) \
+		meta_property(rarityID) \
 		meta_property(screenOffset) \
 		meta_property(popupOffset) \
 		meta_property(m_duration) \

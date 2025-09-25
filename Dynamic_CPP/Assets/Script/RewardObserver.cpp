@@ -10,7 +10,6 @@ void RewardObserver::Start()
 	rewardText = GetOwner()->GetComponent<TextComponent>();
 	rewardImage = GameObject::Find("GamFill")->GetComponent<ImageComponent>();
 	gameManager = GameObject::Find("GameManager")->GetComponent<GameManager>();
-
 }
 
 void RewardObserver::Update(float tick)

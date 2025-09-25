@@ -45,7 +45,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::size_t> m_headerMap;
-    std::vector<std::vector<std::string>> m_rawData;
+    std::deque<std::vector<std::string>> m_rawData;
     std::vector<CSVRowView> m_viewData;
 
     void parseHeader(const std::string& headerLine)

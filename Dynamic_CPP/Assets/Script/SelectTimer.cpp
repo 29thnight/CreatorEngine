@@ -1,16 +1,23 @@
 #include "SelectTimer.h"
 #include "GameObject.h"
 #include "GameManager.h"
+#include "TextComponent.h"
 #include "pch.h"
+
 void SelectTimer::Start()
 {
 	auto gameManagerObj = GameObject::Find("GameManager");
 	if (gameManagerObj)
 	{
 		gameManager = gameManagerObj->GetComponent<GameManager>();
+		if(gameManager)
+		{
+			gameManager->m_nextSceneName = "LoadingScene";
+			gameManager->LoadNextScene();
+		}
 	}
 
-	//TODO : 타이머 텍스트 컴포넌트 초기화 단계에서 받아서 m_remainTimeInternal 출력 할 것
+	timerText = GetComponent<TextComponent>();
 }
 
 void SelectTimer::Update(float tick)
@@ -27,11 +34,30 @@ void SelectTimer::Update(float tick)
 
 		m_remainTimeInternal -= tick;
 
+		if (0 >= m_remainTimeInternal)
+		{
+			//로드 씬 전환
+			gameManager->SwitchNextScene();
+			return;
+		}
+
+		int timer{ static_cast<int>(m_remainTimeInternal) };
+		std::string ramineTime = std::format("{:02}", timer);
+		if (timerText)
+		{
+			timerText->SetEnabled(true);
+			timerText->SetMessage(ramineTime);
+		}
+		
 	}
 	else
 	{
 		m_remainTimeInternal = -1.f;
-		//TODO: 텍스트 컴포넌트 비활성화 시킬것
+		if (timerText)
+		{
+			timerText->SetMessage("");
+			timerText->SetEnabled(false);
+		}
 	}
 }
 

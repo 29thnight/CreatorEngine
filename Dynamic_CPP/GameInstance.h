@@ -6,7 +6,8 @@
 static constexpr int MAX_INPUT_DEVICE = 2;
 enum class CharType { None = 0, Man = 1, Woman = 2 };
 enum class PlayerDir { None = 0, Left = 1, Right = 2 };
-
+//정리해보면 이런데...
+enum class SceneType { Bootstrap, SelectChar, Loading, Stage, Tutorial, Boss, Credits };
 
 class EventManager;
 class GameInstance : public DLLCore::Singleton<GameInstance>
@@ -19,6 +20,7 @@ private:
 public:
 	void Initialize();
 	//Scene Management
+	void LoadSceneSettings();
 	void AsyncSceneLoadUpdate();
 	void LoadScene(const std::string& sceneName);
 	void SwitchScene(const std::string& sceneName);
@@ -59,6 +61,10 @@ public:
 
 	bool HasApplied(int itemId, int rarity) const;
 	std::vector<ItemInfo> PickRandomUnappliedItems(int count);
+	//테스트 전용
+	Mathf::Color4 CommonItemColor{ 1.f, 1.f, 1.f, 1.f };
+	Mathf::Color4 RareItemColor{ 1.f, 1.f, 1.f, 1.f };
+	Mathf::Color4 EpicItemColor{ 1.f, 1.f, 1.f, 1.f };
 
 private:
 	EventManager* m_eventManager{ nullptr };
@@ -66,7 +72,9 @@ private:
 	bool m_isLoadSceneComplete{ false };
 	bool m_isInitialize{ false };
 	std::string m_nextSceneName{};
+	std::string m_beyondSceneName{}; //로딩씬 전용
 	// 로드된 씬들을 저장하는 맵
+	std::unordered_map<SceneType, std::string> m_settingedSceneNames;
 	std::unordered_map<std::string, class Scene*> m_loadedScenes;
 	// 오른쪽 왼쪽 UI 구분용 Left: 0, Right: 1
 	std::array<std::pair<CharType, PlayerDir>, MAX_INPUT_DEVICE> m_playerInputDevices;

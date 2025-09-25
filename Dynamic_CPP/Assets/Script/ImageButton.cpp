@@ -22,6 +22,7 @@ void ImageButton::Update(float tick)
 
 	if (m_imageComponent)
 	{
+		//TEST : 테스트용 네비게이션 선택 색상임.
 		if(m_imageComponent->IsNavigationThis())
 		{
 			m_imageComponent->color = { 1, 0, 0, 1 };

@@ -2,7 +2,32 @@
 #include "SceneManager.h"
 #include "DebugLog.h"
 #include "CSVLoader.h"
+#include "SimpleIniFile.h"
 #include "pch.h"
+
+inline constexpr std::string_view ToKey(SceneType t) {
+	switch (t) {
+	case SceneType::Bootstrap:  return "Bootstrap";
+	case SceneType::SelectChar: return "SelectChar";
+	case SceneType::Loading:    return "Loading";
+	case SceneType::Stage:      return "Stage";
+	case SceneType::Tutorial:   return "Tutorial";
+	case SceneType::Boss:       return "Boss";
+	case SceneType::Credits:    return "Credits";
+	}
+	return "Unknown";
+}
+
+inline std::optional<SceneType> FromKey(std::string_view k) {
+	if (k == "Bootstrap")  return SceneType::Bootstrap;
+	if (k == "SelectChar") return SceneType::SelectChar;
+	if (k == "Loading")    return SceneType::Loading;
+	if (k == "Stage")      return SceneType::Stage;
+	if (k == "Tutorial")   return SceneType::Tutorial;
+	if (k == "Boss")       return SceneType::Boss;
+	if (k == "Credits")    return SceneType::Credits;
+	return std::nullopt;
+}
 
 void GameInstance::Initialize()
 {
@@ -13,8 +38,11 @@ void GameInstance::Initialize()
 	m_RewardAmount = 0;
 	m_playerInputDevices.fill({ CharType::None, PlayerDir::None });
 
+	LoadSceneSettings();
+
 	std::string csvFileName = "ItemEnhancementSetting.csv";
 	LoadItemInfoFromCSV(csvFileName);
+
 }
 
 void GameInstance::AddRewardAmount(int amount)
@@ -48,7 +76,7 @@ void GameInstance::LoadItemInfoFromCSV(const std::string& csvFilePath)
 			info.id					= row["id"].as<int>();
 			info.rarity				= row["rarity"].as<int>();
 			info.name				= row["name"].as<std::string>();
-			info.description		= row["description"].as<std::string>();
+			info.description		= row["desc"].as<std::string>();
 			info.price				= row["price"].as<int>();
 			info.enhancementType	= row["enhancementType"].as<int>();
 
@@ -221,6 +249,21 @@ std::vector<ItemInfo> GameInstance::PickRandomUnappliedItems(int count)
 		picked.push_back(*candidates[i]); // º¹»ç
 
 	return picked;
+}
+
+void GameInstance::LoadSceneSettings()
+{
+	auto settingINIPath = PathFinder::Relative("INI") / std::string("SceneBindSettings.ini");
+	SimpleIniFile loadINI{ settingINIPath };
+
+	if(const auto* sec = loadINI.TryGetSection("Scenes"))
+	{
+		for (const auto& [k, v] : *sec) {
+			if (auto t = FromKey(k)) {
+				m_settingedSceneNames[*t] = v; // INI °ªÀÌ ÀÖÀ¸¸é µ¤¾î¾¸
+			}
+		}
+	}
 }
 
 void GameInstance::AsyncSceneLoadUpdate()
