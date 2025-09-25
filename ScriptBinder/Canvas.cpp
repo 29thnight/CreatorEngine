@@ -57,11 +57,6 @@ void Canvas::AddUIObject(std::shared_ptr<GameObject> obj)
 	}
 
 	UIObjs.push_back(obj);
-	//맨처음 추가되는 UI를 선택된 UI로 지정
-	if (SelectUI.expired())
-	{
-		SelectUI = obj;
-	}
 }
 
 
@@ -76,4 +71,23 @@ void Canvas::Update(float tick)
 	////이 부분 UI Manager 에서 통합으로 처리하자
 	std::erase_if(UIObjs, [](const std::weak_ptr<GameObject>& obj) 
 		{ return obj.expired() || (obj.lock() && obj.lock()->IsDestroyMark()); });
+
+	if(prevCanvasName != CanvasName)
+	{
+		for (auto& ui : UIObjs)
+		{
+			auto obj = ui.lock();
+			if (obj)
+			{
+				auto uiComp = obj->GetComponentDynamicCast<UIComponent>();
+				uiComp->m_ownerCanvasName = CanvasName;
+			}
+		}
+		prevCanvasName = CanvasName;
+	}
+}
+
+std::weak_ptr<GameObject> Canvas::GetFrontUIObject()
+{
+	return UIObjs.front();
 }

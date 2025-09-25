@@ -13,4 +13,10 @@ private:
 	void LoadNextScene();
 
 	class GameManager* m_gameManager{ nullptr };
+	class ImageSlideshow* m_slideshowComp{};
+	class ImageComponent* m_bootBg{};
+
+	float elapsed{};
+	float m_fadeDuration{ 0.3f };
+	Mathf::Color4 m_bootBgStartColor{ 1.f, 1.f, 1.f, 1.f };
 };

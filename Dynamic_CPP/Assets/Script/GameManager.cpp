@@ -77,6 +77,19 @@ void GameManager::Update(float tick)
 			{
 				InitReward(0);
 			}
+			displayPollutionGaugeRatio += tick;
+		}
+		else
+		{
+			displayPollutionGaugeRatio = 0;
+		}
+	}
+
+	if (!m_asis.empty())
+	{
+		if(m_asis.front())
+		{
+			auto asis = static_cast<EntityAsis*>(m_asis.front());
 		}
 	}
 }
@@ -116,15 +129,32 @@ void GameManager::UnloadScene(const std::string& sceneName)
 void GameManager::SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)
 {
 	if (playerIndex < 0 || playerIndex >= MAX_INPUT_DEVICE) return;
+
 	GameInstance::GetInstance()->SetPlayerInputDevice(playerIndex, charType, dir);
+	++selectPlayerCount;
+}
+
+void GameManager::RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)
+{
+	if (playerIndex < 0 || playerIndex >= MAX_INPUT_DEVICE) return;
+
+	GameInstance::GetInstance()->RemovePlayerInputDevice(playerIndex, charType, dir);
+	--selectPlayerCount;
 }
 
 float GameManager::GetAsisPollutionGaugeRatio()
 {
-	if (m_asis.empty()) return 0.f;
-	auto asis = dynamic_cast<EntityAsis*>(m_asis[0]);
-	if (!asis) return 0.f;
-	return asis->GetPollutionGaugeRatio();
+	if(!m_isTestReward)
+	{
+		if (m_asis.empty()) return 0.f;
+		auto asis = dynamic_cast<EntityAsis*>(m_asis[0]);
+		if (!asis) return 0.f;
+		return asis->GetPollutionGaugeRatio();
+	}
+	else
+	{
+		return displayPollutionGaugeRatio;
+	}
 }
 
 void GameManager::LoadTestScene()

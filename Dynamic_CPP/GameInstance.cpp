@@ -295,3 +295,24 @@ void GameInstance::SetPlayerInputDevice(int playerIndex, CharType charType, Play
 	LOG("Player " + std::to_string(playerIndex) + " set to CharType: " + 
 		std::to_string(static_cast<int>(charType)) + ", PlayerDir: " + std::to_string(static_cast<int>(dir)));
 }
+
+void GameInstance::RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)
+{
+	if (playerIndex < 0 || playerIndex >= MAX_INPUT_DEVICE) {
+		LOG("Invalid player index: " + std::to_string(playerIndex));
+		return;
+	}
+
+	auto& current = m_playerInputDevices[playerIndex];
+
+	// 현재 설정된 값과 동일할 때만 해제
+	if (current.first == charType && current.second == dir)
+	{
+		current = { CharType::None, PlayerDir::None };
+		LOG("Player " + std::to_string(playerIndex) + " input device removed.");
+	}
+	else
+	{
+		LOG("RemovePlayerInputDevice: mismatch, nothing removed for player " + std::to_string(playerIndex));
+	}
+}

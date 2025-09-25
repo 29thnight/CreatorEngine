@@ -356,6 +356,9 @@ void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
 void UIManager::CheckInput()
 {
 	auto curCanvasObj = CurCanvas.lock();
+	float tick = Time->GetElapsedSeconds();
+
+	elapsed += tick;
 	
 	if (!curCanvasObj) return;
 
@@ -395,39 +398,46 @@ void UIManager::CheckInput()
 	//TODO : 추가로 특정 상황일때 비활성화 할 수 있도록 처리도 해야할 거 같은데?
 	Mathf::Vector2 stickLP1 = InputManagement->GetControllerThumbL(0);
 	Mathf::Vector2 stickLP2 = InputManagement->GetControllerThumbL(1);
-	auto selectUI = curCanvas->SelectUI.lock();
+	auto selectUI = SelectUI.lock();
 	if (selectUI)
 	{
-		if (stickLP1.x > 0.5 || stickLP2.x > 0.5)
+		if(0.2 < elapsed)
 		{
-			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
-			if (navi)
+			if (stickLP1.x > 0.5 || stickLP2.x > 0.5)
 			{
-				curCanvas->SelectUI = navi->shared_from_this();
+				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
+				if (navi)
+				{
+					SelectUI = navi->shared_from_this();
+					elapsed = 0;
+				}
 			}
-		}
-		if (stickLP1.x < -0.5 || stickLP2.x < -0.5)
-		{
-			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
-			if (navi)
+			if (stickLP1.x < -0.5 || stickLP2.x < -0.5)
 			{
-				curCanvas->SelectUI = navi->shared_from_this();
+				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
+				if (navi)
+				{
+					SelectUI = navi->shared_from_this();
+					elapsed = 0;
+				}
 			}
-		}
-		if (stickLP1.y > 0.5 || stickLP2.y > 0.5)
-		{
-			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Up);
-			if (navi)
+			if (stickLP1.y > 0.5 || stickLP2.y > 0.5)
 			{
-				curCanvas->SelectUI = navi->shared_from_this();
+				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Up);
+				if (navi)
+				{
+					SelectUI = navi->shared_from_this();
+					elapsed = 0;
+				}
 			}
-		}
-		if (stickLP1.y < -0.5 || stickLP2.y < -0.5)
-		{
-			auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Down);
-			if (navi)
+			if (stickLP1.y < -0.5 || stickLP2.y < -0.5)
 			{
-				curCanvas->SelectUI = navi->shared_from_this();
+				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Down);
+				if (navi)
+				{
+					SelectUI = navi->shared_from_this();
+					elapsed = 0;
+				}
 			}
 		}
 
@@ -493,8 +503,14 @@ void UIManager::Update()
 				canvases.erase(canvases.begin() + i);
 				continue;
 			}
-			if (!canvasPtr->GetComponent<Canvas>()->IsEnabled()) continue;
-			CurCanvas = canvasPtr;
+			auto canvas = canvasPtr->GetComponent<Canvas>();
+			if (!canvas->IsEnabled()) continue;
+			
+			if (CurCanvas.lock() != canvasPtr)
+			{
+				CurCanvas = canvasPtr;
+				SelectUI = canvas->GetFrontUIObject();
+			}
 			break;
 		}
 

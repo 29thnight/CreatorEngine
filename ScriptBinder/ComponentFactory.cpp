@@ -134,7 +134,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                         if (!materialName.empty())
                             meshRenderer->m_Material->m_name = materialName;
 
-						if (meshRenderer->m_Material->m_materialInfo.m_IOR < 0.0f)
+						if (0.04f > meshRenderer->m_Material->m_materialInfo.m_IOR || 4.f < meshRenderer->m_Material->m_materialInfo.m_IOR)
 						{
 							meshRenderer->m_Material->m_materialInfo.m_IOR = 1.5f;
 						}
@@ -513,6 +513,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			Meta::Deserialize(canvas, itNode);
 			canvas->SetOwner(obj);
 			UIManagers->AddCanvas(obj->shared_from_this());
+			canvas->prevCanvasName = canvas->CanvasName;
 		}
 		else if (typeID == type_guid(ImageComponent))
 		{

@@ -29,6 +29,7 @@ public:
 	const std::string& GetNextSceneName() const { return m_nextSceneName; }
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
+	void RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	// Reward Management
 	void SetRewardAmount(int amount) { m_RewardAmount = amount; } 	// 게임 시작 시 또는 치트용.
 	void AddRewardAmount(int amount);

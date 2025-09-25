@@ -63,9 +63,10 @@ public:
 	//이정 캔버스
 	//현재 상호작용할 UI
 	std::weak_ptr<GameObject> CurCanvas;
-	GameObject* SelectUI = nullptr;
+	std::weak_ptr<GameObject> SelectUI;
 
 	bool needSort = false;
+	float elapsed{};
 
 private:
 	bool isEnableUINavigation = true;

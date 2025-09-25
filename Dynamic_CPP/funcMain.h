@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("SelectTimer", []() { return new SelectTimer(); });
 		CreateFactory::GetInstance()->RegisterFactory("ImageSlideshow", []() { return new ImageSlideshow(); });
 		CreateFactory::GetInstance()->RegisterFactory("IllustrationMove", []() { return new IllustrationMove(); });
 		CreateFactory::GetInstance()->RegisterFactory("MonEleteProjetile", []() { return new MonEleteProjetile(); });

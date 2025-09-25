@@ -23,4 +23,5 @@ public:
 private:
 	class TextComponent* rewardText = nullptr;
 	class ImageComponent* rewardImage = nullptr;
+	class GameManager* gameManager = nullptr;
 };

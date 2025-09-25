@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "GameInstance.h"
 #include "InputDeviceDetector.generated.h"
 
 class InputDeviceDetector : public ModuleBehavior
@@ -15,14 +16,21 @@ public:
 public:
 	[[Method]]
 	void MoveSelector(Mathf::Vector2 dir);
+	[[Method]]
+	void CharSelect();
+	[[Method]]
+	void ReleaseKey();
 
 	void SetPlayerIndex(int index) { m_playerIndex = index; }
 	int GetPlayerIndex() const { return m_playerIndex; }
+	bool IsSelectComplete() const { return m_isSelectComplete; }
 
 private:
 	class GameObject* m_gameManagerObj = nullptr;
 	class GameManager* m_gameManager = nullptr;
 	class PlayerSelector* m_playerSelector = nullptr;
+	class ImageComponent* leftPos = nullptr;
+	class ImageComponent* rightPos = nullptr;
 
 private:
 	// 입력/리피트 파라미터
@@ -42,4 +50,15 @@ private:
 	int m_playerIndex = 0; // 0 or 1
 	[[Property]]
 	float m_lastDelta = 0.f;    // 마지막 틱의 deltaTime
+	[[Property]]
+	float m_requiredSelectHold{ 0.5f };
+	[[Property]]
+	float m_requiredCancelHold{ 0.5f };
+	float m_selectHold{};
+
+	bool m_isSelectComplete{ false };
+
+	CharType charType{};
+	PlayerDir dir{};
+
 };
