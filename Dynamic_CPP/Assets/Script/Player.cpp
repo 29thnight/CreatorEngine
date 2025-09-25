@@ -50,6 +50,13 @@ std::vector<std::string> dashSounds
 	"Dodge 2_Movement_02",
 	"Dodge 2_Movement_03"
 };
+std::vector<std::string> stepSounds
+{
+	"Step_Movement_Small_01",
+	"Step_Movement_Small_02",
+	"Step_Movement_Small_03"
+
+};
 std::vector<std::string> normalBulletSounds
 {
 	"Electric_Attack_01",
@@ -292,7 +299,7 @@ void Player::Start()
 		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
 	}*/
 	Debug->Log("Player Start");
-
+	m_animator->SetUseLayer(1, false);
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 }
@@ -600,7 +607,7 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 	if (false == CheckState(PlayerStateFlag::CanMove)) return;
-	m_animator->SetUseLayer(1, true);
+	//m_animator->SetUseLayer(1, true);
 	//auto worldRot = camera->m_transform.GetWorldQuaternion();
 	//Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
 	//Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
@@ -620,6 +627,14 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 	}
 }
 
+void Player::PlaySoundStep()
+{
+	int rand = Random<int>(0, stepSounds.size() - 1).Generate();
+	m_MoveSound->clipKey = stepSounds[rand];
+	m_MoveSound->PlayOneShot();
+
+}
+
 void Player::CatchAndThrow()
 {
 	if (catchedObject)
@@ -637,8 +652,6 @@ void Player::Catch()
 	if (false == CheckState(PlayerStateFlag::CanGrab))  return;
 	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
-
-		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 
 		m_animator->SetParameter("OnGrab", true);
 		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
@@ -769,7 +782,7 @@ void Player::Dash()
 	m_curDashCount++;
 }
 
-void Player::DashPlaySound()
+void Player::PlaySoundDash()
 {
 	int rand = Random<int>(0, dashSounds.size()-1).Generate();
 	m_MoveSound->clipKey = dashSounds[rand];
