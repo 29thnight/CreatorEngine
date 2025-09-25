@@ -123,6 +123,8 @@ private:
     void RenderModifyEmitterEditor();
     void RenderJsonSaveLoadUI();
     void RenderEffectPlaybackSettings();
+    void RemoveModuleAtIndex(int index);
+    void RemoveRenderAtIndex(int index);
 
     // 에미터 생성/편집 관련
     void StartCreateEmitter();
