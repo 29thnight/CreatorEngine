@@ -18,8 +18,8 @@ SizeModuleCS::SizeModuleCS()
 	m_sizeParams.randomScaleMin = 0.5f;
 	m_sizeParams.randomScaleMax = 2.0f;
 	m_sizeParams.maxParticles = 0;
-	m_sizeParams.pad1 = 0.0f;
-	m_sizeParams.pad2 = 0.0f;
+	m_sizeParams.useOscillation = 0;
+	m_sizeParams.oscillationSpeed = 5.0f;
 	m_sizeParams.pad3 = 0.0f;
 	m_sizeParams.emitterScale = { 1,1,1 };
 }
@@ -214,6 +214,18 @@ void SizeModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationTyp
 	m_easingEnable = true;
 }
 
+void SizeModuleCS::SetOscillation(bool enabled, float speed)
+{
+	int enabledInt = enabled ? 1 : 0;
+	if (m_sizeParams.useOscillation != enabledInt ||
+		m_sizeParams.oscillationSpeed != speed)
+	{
+		m_sizeParams.useOscillation = enabledInt;
+		m_sizeParams.oscillationSpeed = speed;
+		m_paramsDirty = true;
+	}
+}
+
 void SizeModuleCS::ResetForReuse()
 {
 	if (!m_enabled) return;
@@ -253,7 +265,9 @@ nlohmann::json SizeModuleCS::SerializeData() const
 		}},
 		{"useRandomScale", m_sizeParams.useRandomScale},
 		{"randomScaleMin", m_sizeParams.randomScaleMin},
-		{"randomScaleMax", m_sizeParams.randomScaleMax}
+		{"randomScaleMax", m_sizeParams.randomScaleMax},
+		{"useOscillation", m_sizeParams.useOscillation},
+		{"oscillationSpeed", m_sizeParams.oscillationSpeed}
 	};
 
 	// 이징 관련 정보 직렬화
@@ -302,6 +316,12 @@ void SizeModuleCS::DeserializeData(const nlohmann::json& json)
 
 		if (sizeJson.contains("randomScaleMax"))
 			m_sizeParams.randomScaleMax = sizeJson["randomScaleMax"];
+
+		if (sizeJson.contains("useOscillation"))
+			m_sizeParams.useOscillation = sizeJson["useOscillation"];
+
+		if (sizeJson.contains("oscillationSpeed"))
+			m_sizeParams.oscillationSpeed = sizeJson["oscillationSpeed"];
 	}
 
 	// 이징 정보 복원

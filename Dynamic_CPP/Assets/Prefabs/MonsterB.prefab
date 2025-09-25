@@ -653,7 +653,7 @@ PrefabNode:
                                 m_parentIndex: 12
                                 m_rootIndex: 4
                                 m_childrenIndices: ~
-                                m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                                 m_attachedSoketID: 0
                                 m_collisionType: 0
                                 m_isStatic: false
@@ -806,7 +806,7 @@ PrefabNode:
                                                     m_parentIndex: 19
                                                     m_rootIndex: 4
                                                     m_childrenIndices: ~
-                                                    m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                                                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                                                     m_attachedSoketID: 0
                                                     m_collisionType: 0
                                                     m_isStatic: false
@@ -871,7 +871,7 @@ PrefabNode:
                                                     m_parentIndex: 22
                                                     m_rootIndex: 4
                                                     m_childrenIndices: ~
-                                                    m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                                                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                                                     m_attachedSoketID: 0
                                                     m_collisionType: 0
                                                     m_isStatic: false
@@ -1024,7 +1024,7 @@ PrefabNode:
                                                     m_parentIndex: 29
                                                     m_rootIndex: 4
                                                     m_childrenIndices: ~
-                                                    m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                                                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                                                     m_attachedSoketID: 0
                                                     m_collisionType: 0
                                                     m_isStatic: false
@@ -1089,7 +1089,7 @@ PrefabNode:
                                                     m_parentIndex: 32
                                                     m_rootIndex: 4
                                                     m_childrenIndices: ~
-                                                    m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                                                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                                                     m_attachedSoketID: 0
                                                     m_collisionType: 0
                                                     m_isStatic: false
@@ -1176,7 +1176,7 @@ PrefabNode:
                             m_parentIndex: 36
                             m_rootIndex: 4
                             m_childrenIndices: ~
-                            m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                             m_attachedSoketID: 0
                             m_collisionType: 0
                             m_isStatic: false
@@ -1263,7 +1263,7 @@ PrefabNode:
                             m_parentIndex: 40
                             m_rootIndex: 4
                             m_childrenIndices: ~
-                            m_prefabFileGuid: 10061f20-d1a8-5323-b795-18ac3508c7e9
+                            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
                             m_attachedSoketID: 0
                             m_collisionType: 0
                             m_isStatic: false

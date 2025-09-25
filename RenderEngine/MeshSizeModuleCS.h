@@ -6,7 +6,7 @@
 struct alignas(16) MeshSizeParams
 {
 	Mathf::Vector3 startSize;
-	float pad1;
+	UINT useOscillation;
 	Mathf::Vector3 endSize;
 	float deltaTime;
 
@@ -16,7 +16,7 @@ struct alignas(16) MeshSizeParams
 	UINT maxParticles;
 	
 	Mathf::Vector3 emitterScale;
-	float pad2;
+	float oscillationSpeed;
 };
 
 class MeshSizeModuleCS : public ParticleModule, public ISerializable
@@ -66,6 +66,16 @@ public:
 	float GetRandomScaleMax() const { return m_sizeParams.randomScaleMax; }
 
 	void SetRandomScale(bool useRandomScale, float min, float max);
+
+	void SetOscillation(bool enabled, float speed);
+
+	bool GetUseOscillation() const {
+		return m_sizeParams.useOscillation != 0;
+	}
+
+	float GetOscillationSpeed() const {
+		return m_sizeParams.oscillationSpeed;
+	}
 
 	void SetEasingEnabled(bool enabled);
 	void SetEasing(EasingEffect easingType, StepAnimation animationType, float duration);
