@@ -36,7 +36,7 @@ void PlayerBombCharing::Enter()
 		controller->Move({ 0 ,0 });
 		if (m_player->m_animator)
 			m_player->m_animator->SetParameter("OnMove", false);
-		m_player->m_animator->SetUseLayer(1, false);
+		//m_player->m_animator->SetUseLayer(1, false);
 	}
 
 }

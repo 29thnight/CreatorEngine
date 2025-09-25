@@ -342,6 +342,20 @@ void MeshColorModuleCS::SetFlickerColor(const std::vector<Mathf::Vector4>& color
     SetDiscreteColors(colors);
 }
 
+void MeshColorModuleCS::SetRandomColors(const std::vector<Mathf::Vector4>& colors)
+{
+    SetTransitionMode(ColorTransitionMode::Custom);
+    m_colorParams.customFunctionType = 3; // RANDOM_COLOR_FUNCTION
+
+    m_colorParams.customParam1 = 0.0f; // 시간 변화 강도 (나중에 사용)
+    m_colorParams.customParam2 = 0.0f; // 변화 속도 (나중에 사용) 
+    m_colorParams.customParam3 = 0.0f; // 예약
+    m_colorParams.customParam4 = 0.0f; // 예약
+
+    SetDiscreteColors(colors);
+}
+
+
 void MeshColorModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationType, float duration)
 {
     m_easingModule.SetEasingType(easingType);

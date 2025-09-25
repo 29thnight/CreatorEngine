@@ -36,6 +36,47 @@
 #include "PlayerState.h"
 #include "SlashEffect.h"
 #include "SoundManager.h"
+#include "SoundComponent.h"
+#include "Core.Random.h"
+std::vector<std::string> dashSounds
+{
+	"Dodge 1_Movement_01",
+	"Dodge 1_Movement_02",
+	"Dodge 1_Movement_03",
+	"Dodge 1_Slow_Armour_01",
+	"Dodge 1_Slow_Armour_02",
+	"Dodge 1_Slow_Armour_03",
+	"Dodge 2_Movement_01",
+	"Dodge 2_Movement_02",
+	"Dodge 2_Movement_03"
+};
+std::vector<std::string> stepSounds
+{
+	"Step_Movement_Small_01",
+	"Step_Movement_Small_02",
+	"Step_Movement_Small_03"
+
+};
+std::vector<std::string> normalBulletSounds
+{
+	"Electric_Attack_01",
+	"Electric_Attack_02",
+	"Electric_Attack_03"
+
+
+};
+std::vector<std::string> specialBulletSounds
+{
+	"Electric_Skill_01",
+	"Electric_Skill_02"
+};
+std::vector<std::string> MeleeChargeSounds
+{
+	"Nunchaku Attack_Skill_Bass_01",
+	"Nunchaku Attack_Skill_Bass_02",
+	"Nunchaku Attack_Skill_Bass_03"
+
+};
 void Player::Start()
 {
 	player = GetOwner();
@@ -59,6 +100,8 @@ void Player::Start()
 	}
 
 	std::string ShootPosTagName = "ShootTag";
+	std::string ActionSoundName = "PlayerActionSound";
+	std::string MoveSoundName   = "PlayerMoveSound";
 	for (auto& child : childred)
 	{
 		GameObject* childObj = GameObject::FindIndex(child);
@@ -67,7 +110,15 @@ void Player::Start()
 			if (childObj->m_tag == ShootPosTagName)
 			{
 				shootPosObj = childObj;
-				break;
+			}
+			else if (childObj->RemoveSuffixNumberTag() == ActionSoundName)
+			{
+				m_ActionSound = childObj->GetComponent<SoundComponent>();
+				
+			}
+			else if (childObj->RemoveSuffixNumberTag() == MoveSoundName)
+			{
+				m_MoveSound = childObj->GetComponent<SoundComponent>();
 			}
 		}
 	}
@@ -248,7 +299,7 @@ void Player::Start()
 		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
 	}*/
 	Debug->Log("Player Start");
-
+	m_animator->SetUseLayer(1, false);
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 }
@@ -345,9 +396,10 @@ void Player::Update(float tick)
 	if (true == OnInvincibility)
 	{
 		GracePeriodElpasedTime += tick;
-		if (GracePeriod <= GracePeriodElpasedTime)
+		if (curGracePeriodTime <= GracePeriodElpasedTime)
 		{
 			OnInvincibility = false;
+			GracePeriodElpasedTime = 0.f;
 		}
 		else
 		{
@@ -465,13 +517,13 @@ void Player::SendDamage(Entity* sender, int damage)
 	//Knockback({ testHitPowerX,testHitPowerY }); //떄린애가 knockbackPower 주기  
 	if (sender)
 	{
-		
+		if (true == IsInvincibility()) return;
 		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		// hit
 		//DropCatchItem();
 		
 		Damage(damage);
-		std::cout << m_currentHP << std::endl;
+		SetInvincibility(HitGracePeriodTime);
 	}
 }
 
@@ -555,7 +607,7 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 	if (false == CheckState(PlayerStateFlag::CanMove)) return;
-	m_animator->SetUseLayer(1, true);
+	//m_animator->SetUseLayer(1, true);
 	//auto worldRot = camera->m_transform.GetWorldQuaternion();
 	//Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
 	//Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
@@ -575,6 +627,14 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 	}
 }
 
+void Player::PlaySoundStep()
+{
+	int rand = Random<int>(0, stepSounds.size() - 1).Generate();
+	m_MoveSound->clipKey = stepSounds[rand];
+	m_MoveSound->PlayOneShot();
+
+}
+
 void Player::CatchAndThrow()
 {
 	if (catchedObject)
@@ -592,8 +652,6 @@ void Player::Catch()
 	if (false == CheckState(PlayerStateFlag::CanGrab))  return;
 	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
-
-		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 
 		m_animator->SetParameter("OnGrab", true);
 		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
@@ -722,6 +780,13 @@ void Player::Dash()
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
 	m_curDashCount++;
+}
+
+void Player::PlaySoundDash()
+{
+	int rand = Random<int>(0, dashSounds.size()-1).Generate();
+	m_MoveSound->clipKey = dashSounds[rand];
+	m_MoveSound->PlayOneShot();
 }
 
 void Player::StartAttack()
@@ -865,9 +930,13 @@ void Player::PlaySlashEvent()
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash1Offset;
+
+		m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
 		if (isChargeAttack)
 		{
 			effectOffset = slashChargeOffset;
+			int rand = Random<int>(0, MeleeChargeSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = MeleeChargeSounds[rand];
 		}
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
@@ -883,6 +952,9 @@ void Player::PlaySlashEvent()
 
 
 		Slashscript->Initialize();
+
+		
+		m_ActionSound->PlayOneShot();
 	}
 
 
@@ -913,6 +985,8 @@ void Player::PlaySlashEvent2()
 		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
 
 		Slashscript->Initialize();
+		m_ActionSound->clipKey = "HD Audio - Unarmed Combat - Whoosh Quick";
+		m_ActionSound->PlayOneShot();
 	}
 }
 
@@ -930,9 +1004,9 @@ void Player::PlaySlashEvent3()
 		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
 
 
-
-
 		Slashscript->Initialize();
+		m_ActionSound->clipKey = "Vadi Sound - Swift - Fast Rope Whoosh Whipping ";
+		m_ActionSound->PlayOneShot();
 	}
 }
 
@@ -967,7 +1041,21 @@ void Player::Resurrection()
 	sucessResurrection = true;
 	Heal(ResurrectionHP);
 	ResurrectionElapsedTime = 0;
+	SetInvincibility(ResurrectionGracePeriod);
 	
+}
+
+void Player::SetInvincibility(float _GracePeriodTime)
+{
+	OnInvincibility = true;
+	curGracePeriodTime = _GracePeriodTime;
+}
+
+void Player::EndInvincibility()
+{
+	OnInvincibility = false;
+	curGracePeriodTime = 0.f;
+	GracePeriodElpasedTime = 0.f;
 }
 
 void Player::OnHit()
@@ -1396,7 +1484,9 @@ void Player::ShootNormalBullet()
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge());
 		}
-
+		int rand = Random<int>(0, normalBulletSounds.size() - 1).Generate();
+		m_ActionSound->clipKey = normalBulletSounds[rand];
+		m_ActionSound->PlayOneShot();
 	}
 }
 
@@ -1418,7 +1508,9 @@ void Player::ShootSpecialBullet()
 		{
 			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge(true));
 		}
-
+		int rand = Random<int>(0, specialBulletSounds.size() - 1).Generate();
+		m_ActionSound->clipKey = specialBulletSounds[rand];
+		m_ActionSound->PlayOneShot();
 	}
 
 	

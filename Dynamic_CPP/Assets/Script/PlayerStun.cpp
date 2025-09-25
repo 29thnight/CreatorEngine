@@ -34,7 +34,7 @@ void PlayerStun::Enter()
 		m_player->DropCatchItem();
 		m_player->onBombIndicate = false;
 		m_player->m_curWeapon->SetEnabled(false);
-		m_player->m_animator->SetUseLayer(1, false);
+		//m_player->m_animator->SetUseLayer(1, false);
 
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
@@ -67,6 +67,6 @@ void PlayerStun::Exit()
 	{
 		m_player->ChangeState("Idle");
 		m_player->m_curWeapon->SetEnabled(true);
-		m_player->m_animator->SetUseLayer(1, true);
+		//m_player->m_animator->SetUseLayer(1, true);
 	}
 }

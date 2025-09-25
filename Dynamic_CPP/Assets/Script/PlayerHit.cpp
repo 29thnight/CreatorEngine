@@ -32,7 +32,7 @@ void PlayerHit::Enter()
 		m_player->CancelChargeAttack();
 		m_player->DropCatchItem();
 		m_player->onBombIndicate = false;
-		m_player->m_animator->SetUseLayer(1, false);
+		//m_player->m_animator->SetUseLayer(1, false);
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 	}
@@ -47,7 +47,7 @@ void PlayerHit::Exit()
 	if (m_player)
 	{
 		m_player->ChangeState("Idle");
-		m_player->m_animator->SetUseLayer(1, true);
+		//m_player->m_animator->SetUseLayer(1, true);
 		m_player->player->GetComponent<CharacterControllerComponent>()->StopForcedMove(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });

@@ -7,8 +7,9 @@
 #define PULSE_FUNCTION 0
 #define SINE_WAVE_FUNCTION 1
 #define FLICKER_FUNCTION 2
-#define LINEAR_FUNCTION 3
-#define EXPONENTIAL_FUNCTION 4
+#define RANDOM_COLOR_FUNCTION 3
+#define LINEAR_FUNCTION 4
+#define EXPONENTIAL_FUNCTION 5
 
 struct MeshParticleData
 {
@@ -70,6 +71,16 @@ StructuredBuffer<float4> DiscreteColors : register(t2);
 
 RWStructuredBuffer<MeshParticleData> OutputParticles : register(u0);
 
+float Hash(uint seed)
+{
+    seed = (seed ^ 61u) ^ (seed >> 16u);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
+    return float(seed) * (1.0f / 4294967296.0f);
+}
+
 float4 EvaluateGradient(float t)
 {
     if (gradientSize <= 0)
@@ -103,7 +114,7 @@ float4 EvaluateDiscrete(float t)
     return DiscreteColors[index];
 }
 
-float4 EvaluateCustomFunction(float t, float totalTime)
+float4 EvaluateCustomFunction(float t, float totalTime, uint particleIndex)
 {
     switch (customFunctionType)
     {
@@ -154,12 +165,25 @@ float4 EvaluateCustomFunction(float t, float totalTime)
                 return lerp(float4(1, 1, 1, 1), targetColor, expValue);
             }
         
+        case RANDOM_COLOR_FUNCTION:
+        {
+                if (discreteColorsSize > 0)
+                {
+                // 파티클별로 색상 풀에서 하나씩 랜덤 선택
+                    uint seed = particleIndex * 2654435761u;
+                    int colorIndex = (int) (Hash(seed) * discreteColorsSize);
+                    colorIndex = clamp(colorIndex, 0, discreteColorsSize - 1);
+                    return DiscreteColors[colorIndex];
+                }
+                return float4(1, 1, 1, 1);
+            }
+        
         default:
             return float4(1, 1, 1, 1);
     }
 }
 
-float4 EvaluateColor(float t, float totalTime)
+float4 EvaluateColor(float t, float totalTime, uint particleIndex)
 {
     switch (transitionMode)
     {
@@ -170,7 +194,7 @@ float4 EvaluateColor(float t, float totalTime)
             return EvaluateDiscrete(t);
             
         case CUSTOM_FUNCTION_MODE:
-            return EvaluateCustomFunction(t, totalTime);
+            return EvaluateCustomFunction(t, totalTime, particleIndex);
             
         default:
             return float4(1, 1, 1, 1);
@@ -194,7 +218,7 @@ void main(uint3 id : SV_DispatchThreadID)
         float normalizedAge = saturate(particle.age / max(particle.lifeTime, 0.001f));
         float totalTime = particle.age;
         
-        particle.color = EvaluateColor(normalizedAge, totalTime);
+        particle.color = EvaluateColor(normalizedAge, totalTime, particleIndex);
     }
     
     OutputParticles[particleIndex] = particle;

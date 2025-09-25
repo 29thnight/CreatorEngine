@@ -26,14 +26,19 @@ cbuffer SizeParams : register(b0)
 {
     float2 startSize; // 시작 크기
     float2 endSize; // 끝 크기
+    
     float deltaTime; // 델타 시간 (이징 적용됨)
     int useRandomScale; // 랜덤 스케일 사용 여부
     float randomScaleMin; // 랜덤 스케일 최소값
     float randomScaleMax; // 랜덤 스케일 최대값
+    
     uint maxParticles; // 최대 파티클 수
-    float pad1; // 패딩
+    int useOscillation;
+    float oscillationSpeed;
+    float ppad2;
+    
     float3 emitterScale;
-    float pad2;
+    float ppad1;
 };
 
 // 입출력 버퍼
@@ -82,14 +87,22 @@ void main(uint3 id : SV_DispatchThreadID)
     // 크기 보간 (이미 CPU에서 이징이 적용된 상태)
     float2 currentSize = lerp(startSize, endSize, lifeRatio);
     
+    if (useOscillation)
+    {
+        float oscillation = (sin(particle.age * oscillationSpeed) + 1.0f) * 0.5f;
+        float2 oscillationSize = lerp(startSize, endSize, oscillation);
+        currentSize = oscillationSize;
+    }
+    
     // 랜덤 스케일 적용 (파티클별로 고유한 시드 사용)
     if (useRandomScale)
     {
         // 파티클 인덱스를 시드로 사용하여 일관된 랜덤값 생성
-        float randomScale = lerp(randomScaleMin, randomScaleMax, Hash(particleIndex + 1));
+        float timeSeed = particle.age * 1000.0f; // age를 시드로 활용
+        float randomScale = lerp(randomScaleMin, randomScaleMax, Hash(particleIndex * 1000 + uint(timeSeed)));
         currentSize *= randomScale;
     }
-    
+
     currentSize.x *= emitterScale.x;
     currentSize.y *= emitterScale.y;
     

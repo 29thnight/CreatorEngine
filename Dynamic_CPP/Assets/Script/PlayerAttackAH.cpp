@@ -41,7 +41,7 @@ void PlayerAttackAH::Enter()
 		m_player->isAttacking = true;
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
-		m_player->m_animator->SetUseLayer(1, false);
+		//m_player->m_animator->SetUseLayer(1, false);
 	}
 	/*if (!eft)
 	{
