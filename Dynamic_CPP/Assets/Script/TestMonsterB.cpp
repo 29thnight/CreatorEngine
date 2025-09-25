@@ -49,7 +49,6 @@ void TestMonsterB::Start()
 		//}
 	}
 
-	m_pOwner->m_collisionType = 3;
 
 	for (auto& child : childred)
 	{

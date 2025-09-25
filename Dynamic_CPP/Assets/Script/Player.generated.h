@@ -31,7 +31,7 @@ ReflectionScriptField(Player) \
 		meta_property(slashChargeOffset) \
 		meta_property(MultipleAttackSpeed) \
 		meta_property(stunRespawnTime) \
-		meta_property(GracePeriod) \
+		meta_property(HitGracePeriodTime) \
 		meta_property(ResurrectionRange) \
 		meta_property(ResurrectionTime) \
 		meta_property(ResurrectionHP) \
@@ -53,6 +53,7 @@ ReflectionScriptField(Player) \
 		meta_method(CatchAndThrow) \
 		meta_method(ThrowEvent) \
 		meta_method(Dash) \
+		meta_method(DashPlaySound) \
 		meta_method(Cancancel) \
 		meta_method(ShootBullet) \
 		meta_method(ShootNormalBullet) \

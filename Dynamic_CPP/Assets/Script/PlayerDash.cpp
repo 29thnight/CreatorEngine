@@ -30,7 +30,9 @@ void PlayerDash::Enter()
 
 	if (m_player)
 	{
+		m_player->GetOwner()->SetLayer("PlayerDash");
 		m_player->ChangeState("Dash");
+		m_player->SetInvincibility(4.f);
 		m_player->DropCatchItem();
 		m_player->m_animator->SetUseLayer(1, false);
 		if (m_player->dashEffect)
@@ -48,7 +50,9 @@ void PlayerDash::Exit()
 {
 	if (m_player)
 	{
+		m_player->GetOwner()->SetLayer("Player");
 		m_player->ChangeState("Idle");
+		m_player->EndInvincibility();
 		m_player->m_animator->SetUseLayer(1, true);
 		if (m_player->dashEffect)
 			m_player->dashEffect->StopEffect();
