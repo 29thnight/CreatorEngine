@@ -7,31 +7,122 @@
 #include <functional>
 #include <any>
 #include <typeindex>
-#include <stack>
+#include <vector>
+#include <unordered_set>
 #include <yaml-cpp/yaml.h>
 
 class ComponentFactory;
 namespace Meta
 {
-    // --- TypeCaster: ·±Å¸ÀÓ Å¸ÀÔ -> void* º¯È¯ ---
-    using AnyCaster = std::function<void* (const std::any&)>;
+            const std::type_index casterKey{ typeid(std::shared_ptr<T>) };
+            _casters[casterKey] = [](const std::any& a) -> void*
+            TrackScopeCaster(casterKey);
+            TrackScopeMakeAny(casterKey);
+            const std::type_index casterKey{ typeid(T) };
+                _casters[casterKey] = [](const std::any& a) -> void*
+                _casters[casterKey] = [](const std::any& a) -> void*
+            TrackScopeCaster(casterKey);
+            const std::type_index ptrKey{ typeid(T*) };
+            _makeAny[ptrKey] = [](void* ptr) -> std::any {
+            TrackScopeMakeAny(ptrKey);
 
-    class TypeCaster : public DLLCore::Singleton<TypeCaster>
-    {
-    private:
-		TypeCaster() = default;
-		~TypeCaster() = default;
-        friend DLLCore::Singleton<TypeCaster>;
-    public:
+            const std::type_index sharedKey{ typeid(std::shared_ptr<T>) };
+            _makeAny[sharedKey] = [](void* ptr) -> std::any {
 
-    public:
-        template<typename T>
-        void RegisterSharedPtr()
+            TrackScopeMakeAny(sharedKey);
+        void BeginScope(std::string_view scope)
         {
-            _casters[typeid(std::shared_ptr<T>)] = [](const std::any& a) -> void*
+            _scopeStack.emplace_back(scope);
+        }
+
+        void EndScope()
+            if (!_scopeStack.empty())
             {
-                const auto& sp = std::any_cast<std::shared_ptr<T>>(a);
-                return const_cast<void*>(static_cast<const void*>(sp.get()));  // ³»ºÎ raw pointer ¸®ÅÏ
+                _scopeStack.pop_back();
+            }
+        }
+        void UnRegisterScope(std::string_view scope)
+        {
+            const std::string scopeKey(scope);
+            if (auto casterIt = _scopeCasterKeys.find(scopeKey); casterIt != _scopeCasterKeys.end())
+            {
+                for (const auto& key : casterIt->second)
+                {
+                    ReleaseCaster(key);
+                }
+                _scopeCasterKeys.erase(casterIt);
+            }
+
+            if (auto makeAnyIt = _scopeMakeAnyKeys.find(scopeKey); makeAnyIt != _scopeMakeAnyKeys.end())
+            {
+                for (const auto& key : makeAnyIt->second)
+                {
+                    ReleaseMakeAny(key);
+                }
+                _scopeMakeAnyKeys.erase(makeAnyIt);
+            }
+        }
+        void TrackScopeCaster(const std::type_index& key)
+        {
+            if (_scopeStack.empty()) return;
+
+            auto& scopeName = _scopeStack.back();
+            auto& typeSet = _scopeCasterKeys[scopeName];
+            if (typeSet.insert(key).second)
+            {
+                ++_casterRefCounts[key];
+            }
+        }
+
+        void TrackScopeMakeAny(const std::type_index& key)
+        {
+            if (_scopeStack.empty()) return;
+
+            auto& scopeName = _scopeStack.back();
+            auto& typeSet = _scopeMakeAnyKeys[scopeName];
+            if (typeSet.insert(key).second)
+            {
+                ++_makeAnyRefCounts[key];
+            }
+        }
+
+        void ReleaseCaster(const std::type_index& key)
+        {
+            if (auto it = _casterRefCounts.find(key); it != _casterRefCounts.end())
+            {
+                if (--(it->second) == 0)
+                {
+                    _casterRefCounts.erase(it);
+                    _casters.erase(key);
+                }
+            }
+            else
+            {
+                _casters.erase(key);
+            }
+        }
+
+        void ReleaseMakeAny(const std::type_index& key)
+        {
+            if (auto it = _makeAnyRefCounts.find(key); it != _makeAnyRefCounts.end())
+            {
+                if (--(it->second) == 0)
+                {
+                    _makeAnyRefCounts.erase(it);
+                    _makeAny.erase(key);
+                }
+            }
+            else
+            {
+                _makeAny.erase(key);
+            }
+        }
+
+        std::vector<std::string> _scopeStack;
+        std::unordered_map<std::string, std::unordered_set<std::type_index>> _scopeCasterKeys;
+        std::unordered_map<std::string, std::unordered_set<std::type_index>> _scopeMakeAnyKeys;
+        std::unordered_map<std::type_index, std::size_t> _casterRefCounts;
+        std::unordered_map<std::type_index, std::size_t> _makeAnyRefCounts;
             };
 
             std::string typeName = ToString<T>();
@@ -85,7 +176,7 @@ namespace Meta
             if (it != _makeAny.end())
                 return it->second(ptr);
 
-            return {}; // º¯È¯ ½ÇÆĞ
+            return {}; // ë³€í™˜ ì‹¤íŒ¨
         }
 
         void UnRegister(std::string_view name)
@@ -130,22 +221,22 @@ namespace Meta
 			}
         }
 
-        //[warning] ½ºÅ©¸³Æ®¿¡¼­ Å¸ÀÔÀ» µî·ÏÇÒ ¶§ »ç¿ë
+        //[warning] ìŠ¤í¬ë¦½íŠ¸ì—ì„œ íƒ€ì…ì„ ë“±ë¡í•  ë•Œ ì‚¬ìš©
         void ScriptRegister(const std::string& name, const Type& type)
         {
-            // ½ºÅ©¸³Æ®°¡ ¸®·ÎµåµÇ¸é ±âÁ¸ Å¸ÀÔÀ» µ¤¾î¾²Áö ¾ÊÀ½
+            // ìŠ¤í¬ë¦½íŠ¸ê°€ ë¦¬ë¡œë“œë˜ë©´ ê¸°ì¡´ íƒ€ì…ì„ ë®ì–´ì“°ì§€ ì•ŠìŒ
             auto it = map.find(name);
             if (it != map.end())
             {
-                it->second = type; // ±âÁ¸ Å¸ÀÔ ¾÷µ¥ÀÌÆ®
+                it->second = type; // ê¸°ì¡´ íƒ€ì… ì—…ë°ì´íŠ¸
             }
             else
             {
-                map[name] = type; // »õ Å¸ÀÔ µî·Ï
+                map[name] = type; // ìƒˆ íƒ€ì… ë“±ë¡
             }
         }
 
-        //[warning] ½ºÅ©¸³Æ®¿¡¼­ Å¸ÀÔÀ» µî·ÏÇØÁ¦ÇÒ ¶§ »ç¿ë
+        //[warning] ìŠ¤í¬ë¦½íŠ¸ì—ì„œ íƒ€ì…ì„ ë“±ë¡í•´ì œí•  ë•Œ ì‚¬ìš©
         void UnRegister(const std::string& name)
         {
             auto it = map.find(name);
@@ -257,7 +348,7 @@ namespace Meta
                 return it->second();
             }
 
-			return nullptr; // ÇØ´ç Å¸ÀÔÀÇ ÆÑÅä¸®°¡ ¾øÀ¸¸é nullptr ¹İÈ¯
+			return nullptr; // í•´ë‹¹ íƒ€ì…ì˜ íŒ©í† ë¦¬ê°€ ì—†ìœ¼ë©´ nullptr ë°˜í™˜
         }
 
 		template<typename T>
@@ -279,7 +370,7 @@ namespace Meta
             {
                 return std::static_pointer_cast<T>(it->second());
             }
-			return nullptr; // ÇØ´ç Å¸ÀÔÀÇ ÆÑÅä¸®°¡ ¾øÀ¸¸é nullptr ¹İÈ¯
+			return nullptr; // í•´ë‹¹ íƒ€ì…ì˜ íŒ©í† ë¦¬ê°€ ì—†ìœ¼ë©´ nullptr ë°˜í™˜
         }
 
     private:
@@ -303,7 +394,7 @@ namespace Meta
             {
                 cmd->Redo();
                 m_undoStack.push(std::move(cmd));
-                while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack ÃÊ±âÈ­
+                while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack ì´ˆê¸°í™”
             }
 			else
 			{
