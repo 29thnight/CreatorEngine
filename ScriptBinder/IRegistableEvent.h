@@ -98,7 +98,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         this->m_awakeEventHandle = scene->AwakeEvent.AddLambda([derived_component, &isAwakeCalled]()
         { 
             auto sceneObject = derived_component->GetOwner();
-            if (!derived_component->IsEnabled() && sceneObject->IsDestroyMark())
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
             {
                 return;
             }
@@ -113,7 +113,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         this->m_startEventHandle = scene->StartEvent.AddLambda([derived_component, &isStartCalled]()
         { 
             auto sceneObject = derived_component->GetOwner();
-            if (!derived_component->IsEnabled() && sceneObject->IsDestroyMark())
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
             {
                 return;
             }
@@ -128,7 +128,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         this->m_updateEventHandle = scene->UpdateEvent.AddLambda([derived_component](float dt) 
         { 
             auto sceneObject = derived_component->GetOwner();
-            if (!derived_component->IsEnabled() && sceneObject->IsDestroyMark())
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
             {
                 return;
             }
@@ -142,7 +142,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         this->m_lateUpdateEventHandle = scene->LateUpdateEvent.AddLambda([derived_component](float dt)
         { 
             auto sceneObject = derived_component->GetOwner();
-            if (!derived_component->IsEnabled() && sceneObject->IsDestroyMark())
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
             {
                 return;
             }
@@ -156,7 +156,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         this->m_fixedUpdateEventHandle = scene->FixedUpdateEvent.AddLambda([derived_component](float ts) 
         { 
             auto sceneObject = derived_component->GetOwner();
-            if (!derived_component->IsEnabled() && sceneObject->IsDestroyMark())
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
             {
                 return;
             }

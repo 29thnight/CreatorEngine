@@ -12,6 +12,11 @@ void ItemComponent::OnTriggerEnter(const Collision& collision)
     if (collision.otherObj->HasComponent<Player>())
     {
         ++m_enterCount;
+        auto player = collision.otherObj->GetComponent<Player>();
+        if (player)
+        {
+            m_playerID = player->playerIndex;
+        }
     }
 }
 
@@ -20,7 +25,7 @@ void ItemComponent::OnTriggerExit(const Collision& collision)
     if (collision.otherObj->HasComponent<Player>())
     {
         --m_enterCount;
-
+        m_playerID = -1;
         m_enterCount = std::max(0, m_enterCount);
     }
 }

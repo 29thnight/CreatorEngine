@@ -28,7 +28,7 @@ void SwitchingSceneTrigger::Update(float tick)
 {
 	if (!m_buttonText || !m_switchingText) return;
 
-	if (/*!GameInstance::GetInstance()->IsLoadSceneComplete()*/true)
+	if (!GameInstance::GetInstance()->IsLoadSceneComplete())
 	{
 		if (!m_isFadeInComplete)
 		{

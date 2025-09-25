@@ -36,11 +36,14 @@ public:
 	void OnPurchased() { m_isPurchased = true; }
 	void ResetPurchased() { m_isPurchased = false; }
 
+	[[Property]]
+	int				m_playerID{ -1 };
+
 private:
 	class RectTransformComponent*	m_rect = nullptr;
 	class ImageComponent*			m_image = nullptr;
 	class GameObject*				m_target = nullptr;
-
+	class ItemComponent*			m_itemComp = nullptr;
 	enum class PopupPhase { None, ToPopup, ToScreen }; // 왕복 트윈 상태
 
 private:

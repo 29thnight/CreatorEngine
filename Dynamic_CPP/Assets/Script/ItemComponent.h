@@ -18,6 +18,8 @@ public:
 
 public:
 	[[Property]]
+	int m_playerID{ -1 };
+	[[Property]]
 	int m_itemID{ 0 };
 	[[Property]]
 	int m_itemRarity{ 0 };

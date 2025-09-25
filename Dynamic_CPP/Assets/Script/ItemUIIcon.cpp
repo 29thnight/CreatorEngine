@@ -22,7 +22,7 @@ void ItemUIIcon::Update(float tick)
 {
     // --- 0) 카메라/스크린 좌표 계산 (원래 코드) ---
     auto cameraPtr = CameraManagement->GetLastCamera();
-    if (!cameraPtr || !m_rect || !m_target) return;
+    if (!cameraPtr || !m_rect || !m_target || !m_itemComp) return;
     Camera* camera = cameraPtr.get();
 
     const Mathf::Vector4 worldPos = m_target->m_transform.GetWorldPosition();
@@ -34,6 +34,8 @@ void ItemUIIcon::Update(float tick)
     const DirectX::XMVECTOR clip = XMVector4Transform(pos, viewProj);
     const float w = XMVectorGetW(clip);
     if (w <= 0.0f) return;
+
+    m_playerID = m_itemComp->m_playerID;
 
     // ── 구매되었으면 팝업 강제 종료 ──
     if (m_isPurchased) 
@@ -173,10 +175,10 @@ void ItemUIIcon::SetTarget(GameObject* target)
     m_target = target;
     if (m_target)
     {
-        auto itemComp = m_target->GetComponent<ItemComponent>();
-        if (itemComp)
+        m_itemComp = m_target->GetComponent<ItemComponent>();
+        if (m_itemComp)
         {
-            itemComp->SetItemIcon(this);
+            m_itemComp->SetItemIcon(this);
         }
     }
 }

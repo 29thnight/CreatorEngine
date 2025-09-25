@@ -3,6 +3,7 @@
 #include "ImageComponent.h"
 #include "TextComponent.h"
 #include "RectTransformComponent.h"
+#include "PlayerInput.h"
 #include "Texture.h"
 #include "ItemManager.h"
 #include "GameInstance.h"
@@ -10,9 +11,9 @@
 
 void ItemUIPopup::Start()
 {
-
     m_rect = m_pOwner->GetComponent<RectTransformComponent>();
     m_image = m_pOwner->GetComponent<ImageComponent>();
+    m_input = m_pOwner->GetComponent<PlayerInputComponent>();
     m_popupSize = m_image->uiinfo.size;
     auto gmObj = GameObject::Find("GameManager");
     if (gmObj)
@@ -71,9 +72,19 @@ void ItemUIPopup::Update(float tick)
 
 	if (!m_rect     || !m_iconObj   || !m_icon      || !m_image     || 
         !m_iconRect || !m_button    || !m_purchase  || !m_descComp ||
-        !m_nameComp) //안전한 실행을 위한 과한 nullptr 검사 
+        !m_nameComp || !m_input) //안전한 실행을 위한 과한 nullptr 검사 
     {
         return;
+    }
+
+    if (0 <= m_icon->m_playerID)
+    {
+        m_input->controllerIndex = m_icon->m_playerID;
+        m_input->SetEnabled(true);
+    }
+    else
+    {
+        m_input->SetEnabled(false);
     }
 
     itemID = m_icon->GetItemID();

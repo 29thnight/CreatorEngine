@@ -17,7 +17,7 @@ void LoadingController::Start()
 
 void LoadingController::Update(float tick)
 {
-	if (/*!GameInstance::GetInstance()->IsLoadSceneComplete()*/true)
+	if (!GameInstance::GetInstance()->IsLoadSceneComplete())
 	{
 		if (m_loadingImage)
 		{

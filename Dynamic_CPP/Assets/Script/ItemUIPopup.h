@@ -58,7 +58,7 @@ private:
 	class ImageComponent* m_purchase{}; // 동의 UI 이미지
 	class TextComponent* m_descComp{ nullptr }; // 설명 텍스트
 	class TextComponent* m_nameComp{ nullptr }; // 이름 텍스트
-
+	class PlayerInputComponent* m_input{};
 private:
 	[[Property]]
 	int				itemID{};
