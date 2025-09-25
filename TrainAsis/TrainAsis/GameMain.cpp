@@ -96,10 +96,15 @@ void DirectX11::GameMain::Initialize()
 
         while (isGameToRender)
         {
-            if (!m_isInvokeResize)
+            if (m_isInvokeResize)
             {
-                CommandBuildThread();
+                EngineSettingInstance->renderBarrier.ArriveAndWait();
+                EngineSettingInstance->renderBarrier.ArriveAndWait();
+                std::this_thread::yield();
+                continue;
             }
+
+            CommandBuildThread();
         }
 
         isCB_Thread_End = true;
@@ -156,7 +161,7 @@ void DirectX11::GameMain::Finalize()
 
 void DirectX11::GameMain::CreateWindowSizeDependentResources()
 {
-    //·»´õ·¯ÀÇ Ã¢ Å©±â¿¡ µû¶ó ¸®¼Ò½º¸¦ ´Ù½Ã ¸¸µå´Â ÄÚµå¸¦ ¿©±â¿¡ Ãß°¡ÇÕ´Ï´Ù.
+    //ë Œë”ëŸ¬ì˜ ì°½ í¬ê¸°ì— ë”°ë¼ ë¦¬ì†ŒìŠ¤ë¥¼ ë‹¤ì‹œ ë§Œë“œëŠ” ì½”ë“œë¥¼ ì—¬ê¸°ì— ì¶”ê°€í•©ë‹ˆë‹¤.
     m_deviceResources->ReleaseSwapChain();
     OnResizeReleaseEvent();
 
@@ -203,7 +208,7 @@ void DirectX11::GameMain::Update()
 
 bool DirectX11::GameMain::ExecuteRenderPass()
 {
-    // Ã³À½ ¾÷µ¥ÀÌÆ®ÇÏ±â Àü¿¡ ¾Æ¹« °Íµµ ·»´õ¸µÇÏÁö ¸¶¼¼¿ä.
+    // ì²˜ìŒ ì—…ë°ì´íŠ¸í•˜ê¸° ì „ì— ì•„ë¬´ ê²ƒë„ ë Œë”ë§í•˜ì§€ ë§ˆì„¸ìš”.
     if (m_timeSystem.GetFrameCount() == 0)
     {
         return false;
@@ -251,7 +256,7 @@ void DirectX11::GameMain::DisableOrEnable()
 
 void DirectX11::GameMain::CommandBuildThread()
 {
-    // Ã³À½ ¾÷µ¥ÀÌÆ®ÇÏ±â Àü¿¡ ¾Æ¹« °Íµµ ÇÏÁö ¸¶¼¼¿ä.
+    // ì²˜ìŒ ì—…ë°ì´íŠ¸í•˜ê¸° ì „ì— ì•„ë¬´ ê²ƒë„ í•˜ì§€ ë§ˆì„¸ìš”.
     if (m_timeSystem.GetFrameCount() == 0)
     {
         //RenderCommandFence.Signal();
@@ -284,13 +289,13 @@ void DirectX11::GameMain::InvokeResizeFlag()
     m_isInvokeResize = true;
 }
 
-// ¸±¸®½º°¡ ÇÊ¿äÇÑ µğ¹ÙÀÌ½º ¸®¼Ò½º¸¦ ·»´õ·¯¿¡ ¾Ë¸³´Ï´Ù.
+// ë¦´ë¦¬ìŠ¤ê°€ í•„ìš”í•œ ë””ë°”ì´ìŠ¤ ë¦¬ì†ŒìŠ¤ë¥¼ ë Œë”ëŸ¬ì— ì•Œë¦½ë‹ˆë‹¤.
 void DirectX11::GameMain::OnDeviceLost()
 {
 
 }
 
-// µğ¹ÙÀÌ½º ¸®¼Ò½º°¡ ÀÌÁ¦ ´Ù½Ã ¸¸µé¾îÁú ¼ö ÀÖÀ½À» ·»´õ·¯¿¡ ¾Ë¸³´Ï´Ù.
+// ë””ë°”ì´ìŠ¤ ë¦¬ì†ŒìŠ¤ê°€ ì´ì œ ë‹¤ì‹œ ë§Œë“¤ì–´ì§ˆ ìˆ˜ ìˆìŒì„ ë Œë”ëŸ¬ì— ì•Œë¦½ë‹ˆë‹¤.
 void DirectX11::GameMain::OnDeviceRestored()
 {
     CreateWindowSizeDependentResources();
