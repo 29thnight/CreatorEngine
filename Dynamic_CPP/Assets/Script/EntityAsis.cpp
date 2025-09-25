@@ -17,6 +17,7 @@
 #include "Weapon.h"
 #include "WeaponCapsule.h"
 #include "DebugLog.h"
+#include "Core.Random.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -170,8 +171,6 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
-
-	m_animator->SetParameter("OnMove", true);
 	if (asisTail) {
 		Debug->Log(asisTail->m_name.data());
 	}
@@ -184,13 +183,16 @@ void EntityAsis::Update(float tick)
 	m_currentStaggerDuration -= tick;
 
 	if (m_currentStaggerDuration <= 0.f) {
-		m_purificationTimer += tick;
+		m_animator->SetParameter("OnMove", true);
 		m_purificationAngle += tick * 5.f;
 
 		PathMove(tick);
-	}
 
-	Purification(tick);
+		Purification(tick);
+	}
+	else {
+		m_animator->SetParameter("OnMove", false);
+	}
 }
 
 void EntityAsis::SendDamage(Entity* sender, int damage)
@@ -201,8 +203,13 @@ void EntityAsis::SendDamage(Entity* sender, int damage)
 	}
 
 	m_currentHP -= damage;
-	m_currentStaggerDuration = staggerDuration;
-	m_currentGracePeriod = graceperiod;
+	m_currentStaggerDuration = staggerDuration; // 경직
+	m_currentGracePeriod = graceperiod;			// 무적
+	m_currentTailPurificationDuration = 0.f;	// 진행중인 정화 취소
+
+	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
+	bool isDroped = DropItem();
+
 	LOG("EntityAsis: Current HP: " << m_currentHP);
 	if(m_currentHP <= 0)
 	{
@@ -246,8 +253,9 @@ void EntityAsis::Purification(float tick)
 {
 	Transform* tailTr = asisTail->GetComponent<Transform>();
 	Vector3 tailPos = tailTr->GetWorldPosition();
-	Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
+	//Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
 
+	// 큐에 있는 아이템들 회전연출
 	auto& arr = m_EntityItemQueue.getArray();
 	int size = arr.size();
 	for (int i = 0; i < size; i++) {
@@ -404,6 +412,26 @@ void EntityAsis::PathMove(float tick)
 
 void EntityAsis::Stun()
 {
+}
+
+bool EntityAsis::DropItem()
+{
+	if (m_EntityItemQueue.isEmpty())
+		return false;
+
+	auto item = GetPurificationItemInEntityItemQueue();
+	item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(true);
+	//item->Throw(nullptr, GetOwner()->m_transform.GetForward(), Vector2(3.f, 3.f), false);
+	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	float angle = std::atan2(forward.z, forward.x);
+	angle += Mathf::Deg2Rad * Random<float>(-30.f, 30.f).Generate();
+	forward.x = std::cos(angle);
+	forward.z = std::sin(angle);
+	forward.y = 0.f;
+
+	item->Throw(asisHead->m_transform.GetWorldPosition(), forward * 3.f, 3.f);
+
+	return false;
 }
 
 float EntityAsis::GetPollutionGaugePercent()

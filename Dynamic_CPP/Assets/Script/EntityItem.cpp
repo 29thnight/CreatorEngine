@@ -290,6 +290,18 @@ void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2
 	endPos.y = 0.2f;
 }
 
+void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float height)
+{
+	isTargettingTail = false;
+	throwOwner = nullptr;
+	startPos = _startPos;
+	m_state = EItemState::THROWN;
+	timer = 0.f;
+	throwDistacneY = height;
+	endPos = startPos + velocity;
+	endPos.y = 0.2f;
+}
+
 void EntityItem::SetThrowOwner(Player* player)
 {
 	throwOwner = player;

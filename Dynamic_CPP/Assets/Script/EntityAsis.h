@@ -32,6 +32,8 @@ public:
 	void Purification(float tick);
 	void PathMove(float tick);
 	void Stun();
+	// 현재 들고있는 아이템을 떨구는 함수 (index로 가능)
+	bool DropItem();
 
 	// 0~1
 	float GetPollutionGaugePercent();
@@ -54,7 +56,6 @@ private:
 	float m_purificationAngle = 0.f;
 	[[Property]]
 	float m_purificationRadius = 5.f;
-	float m_purificationTimer = 0.f;
 	Mathf::Vector2 dir{ 0.f,0.f };
 
 private:

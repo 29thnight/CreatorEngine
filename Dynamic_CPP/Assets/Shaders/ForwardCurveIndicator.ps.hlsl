@@ -80,5 +80,5 @@ float3 Refraction(float3 worldPos, float3 view, float3 baseNormal, float ior)
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    return float4(gAlbedo.rgb * gAlbedo.a, gAlbedo.a);
+    return float4(gAlbedo.rgb * gAlbedo.a * 3.f, gAlbedo.a);
 }
