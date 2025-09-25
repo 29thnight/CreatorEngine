@@ -85,7 +85,8 @@ public:
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	void CharacterMove(Mathf::Vector2 dir);
-	
+	[[Method]]
+	void PlaySoundStep();
 	//잡기 던지기
 	[[Property]]
 	float ThrowPowerX = 6.f;      //들고있던물체 던져서 움직일량
@@ -134,7 +135,7 @@ public:
 	[[Method]]
 	void Dash();
 	[[Method]]
-	void DashPlaySound();
+	void PlaySoundDash();
 	//공격
 	[[Property]]
 	int Atk = 1;                     //기본공격력   // (기본공격력 + 무기공격력(차징시 차징공격력)  ) * 크리티컬 배율  = 최종데미지
