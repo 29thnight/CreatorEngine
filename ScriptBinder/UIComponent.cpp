@@ -1,5 +1,6 @@
 #include "UIComponent.h"
 #include "GameObject.h"
+#include "UIManager.h"
 #include "ShaderSystem.h"
 
 float MaxOreder = 100.0f;
@@ -59,10 +60,14 @@ GameObject* UIComponent::GetNextNavi(Direction dir)
 bool UIComponent::IsNavigationThis()
 {
 	GameObject* thisObj = GetOwner();
-	auto selectedObj = ownerCanvas->SelectUI.lock();
+	auto selectedObj = UIManagers->SelectUI.lock();
 
     if (selectedObj && thisObj == selectedObj.get())
-		return true;
+    {
+        return true;
+    }
+
+    return false;
 }
 
 void UIComponent::DeserializeShader()

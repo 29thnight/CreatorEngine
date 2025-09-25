@@ -691,6 +691,11 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
         infile.read(reinterpret_cast<char*>(&mat->m_fileGuid), sizeof(FileGuid));
 
+        if (0.04f > mat->m_materialInfo.m_IOR || 4.f < mat->m_materialInfo.m_IOR)
+        {
+            mat->m_materialInfo.m_IOR = 1.5f;
+        }
+
         auto readString = [&](std::string& outStr)
         {
             uint32_t len{};

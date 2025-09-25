@@ -1,22 +1,22 @@
-m_name: Indicator
+m_name: Indicator_Prefab
 m_isEnabled: true
-m_instanceID: 3261401217
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_instanceID: 1971342684
+m_fileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
 PrefabNode:
   - GameObject: 2166264123
     m_name: Indicator
     m_isEnabled: true
-    m_instanceID: 2653002482
+    m_instanceID: 3179970330
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 3
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4, 5, 6, 7, 8]
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [2, 3, 4, 5, 6]
+    m_prefabFileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -27,24 +27,24 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         m_name: CurveIndicator
         m_isEnabled: true
-        m_instanceID: 675964552
+        m_instanceID: 2540208499
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 31c289f0-7df1-560d-9910-443653dc4520
     children:
       - GameObject: 2166264123
         m_name: sphere
         m_isEnabled: true
-        m_instanceID: 3611271483
+        m_instanceID: 2788398275
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
-          m_parentID: 3
-        m_index: 4
-        m_parentIndex: 3
+          scale: {x: 0.00499999989, y: 0.00499999989, z: 0.00499999989, w: 0}
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -55,26 +55,27 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3773193867
+            m_instanceID: 3372447203
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: DefaultMaterial
+              m_name: DefaultMaterial_Clone
               m_baseColorTexName: ""
               m_normalTexName: ""
               m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 1}
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 0
-                m_roughness: 0.301511347
+                m_roughness: 0
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: a4596f93-388c-5b82-acbf-4703861c7fbc
-              m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_renderingMode: 1
+              m_shaderPSOName: CurveIndicator
             m_Mesh:
               m_name: Sphere
               m_materialIndex: 0
@@ -86,23 +87,23 @@ PrefabNode:
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
             m_isSkinnedMesh: false
-            m_shadowRecive: true
-            m_shadowCast: true
+            m_shadowRecive: false
+            m_shadowCast: false
             m_isEnableLOD: false
       - GameObject: 2166264123
         m_name: sphere (1)
         m_isEnabled: true
-        m_instanceID: 2812782950
+        m_instanceID: 2932048143
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
-          m_parentID: 3
-        m_index: 5
-        m_parentIndex: 3
+          scale: {x: 0.00499999989, y: 0.00499999989, z: 0.00499999989, w: 0}
+          m_parentID: 1
+        m_index: 3
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -113,26 +114,27 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3362759487
+            m_instanceID: 239337012
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: DefaultMaterial
+              m_name: DefaultMaterial_Clone
               m_baseColorTexName: ""
               m_normalTexName: ""
               m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 1}
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 0
-                m_roughness: 0.301511347
+                m_roughness: 0
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: a4596f93-388c-5b82-acbf-4703861c7fbc
-              m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_renderingMode: 1
+              m_shaderPSOName: CurveIndicator
             m_Mesh:
               m_name: Sphere
               m_materialIndex: 0
@@ -144,23 +146,23 @@ PrefabNode:
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
             m_isSkinnedMesh: false
-            m_shadowRecive: true
-            m_shadowCast: true
+            m_shadowRecive: false
+            m_shadowCast: false
             m_isEnableLOD: false
       - GameObject: 2166264123
         m_name: sphere (2)
         m_isEnabled: true
-        m_instanceID: 269991895
+        m_instanceID: 274395613
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
-          m_parentID: 3
-        m_index: 6
-        m_parentIndex: 3
+          scale: {x: 0.00499999989, y: 0.00499999989, z: 0.00499999989, w: 0}
+          m_parentID: 1
+        m_index: 4
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -171,26 +173,27 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 576110616
+            m_instanceID: 3584742339
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: DefaultMaterial
+              m_name: DefaultMaterial_Clone
               m_baseColorTexName: ""
               m_normalTexName: ""
               m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 1}
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 0
-                m_roughness: 0.301511347
+                m_roughness: 0
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: a4596f93-388c-5b82-acbf-4703861c7fbc
-              m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_renderingMode: 1
+              m_shaderPSOName: CurveIndicator
             m_Mesh:
               m_name: Sphere
               m_materialIndex: 0
@@ -202,23 +205,23 @@ PrefabNode:
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
             m_isSkinnedMesh: false
-            m_shadowRecive: true
-            m_shadowCast: true
+            m_shadowRecive: false
+            m_shadowCast: false
             m_isEnableLOD: false
       - GameObject: 2166264123
         m_name: sphere (3)
         m_isEnabled: true
-        m_instanceID: 1320440270
+        m_instanceID: 9246935
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
-          m_parentID: 3
-        m_index: 7
-        m_parentIndex: 3
+          scale: {x: 0.00499999989, y: 0.00499999989, z: 0.00499999989, w: 0}
+          m_parentID: 1
+        m_index: 5
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -229,26 +232,27 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 2029170028
+            m_instanceID: 244985814
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: DefaultMaterial
+              m_name: DefaultMaterial_Clone
               m_baseColorTexName: ""
               m_normalTexName: ""
               m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 1}
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 0
-                m_roughness: 0.301511347
+                m_roughness: 0
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: a4596f93-388c-5b82-acbf-4703861c7fbc
-              m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_renderingMode: 1
+              m_shaderPSOName: CurveIndicator
             m_Mesh:
               m_name: Sphere
               m_materialIndex: 0
@@ -260,23 +264,23 @@ PrefabNode:
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
             m_isSkinnedMesh: false
-            m_shadowRecive: true
-            m_shadowCast: true
+            m_shadowRecive: false
+            m_shadowCast: false
             m_isEnableLOD: false
       - GameObject: 2166264123
         m_name: sphere (4)
         m_isEnabled: true
-        m_instanceID: 4001797235
+        m_instanceID: 19337974
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
-          scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
-          m_parentID: 3
-        m_index: 8
-        m_parentIndex: 3
+          scale: {x: 0.00499999989, y: 0.00499999989, z: 0.00499999989, w: 0}
+          m_parentID: 1
+        m_index: 6
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: ec803cf0-c5e1-5d07-8b69-45bf7a113c44
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -287,26 +291,27 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1771815689
+            m_instanceID: 646901647
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: DefaultMaterial
+              m_name: DefaultMaterial_Clone
               m_baseColorTexName: ""
               m_normalTexName: ""
               m_ORM_TexName: ""
               m_AO_TexName: ""
               m_EmissiveTexName: ""
               m_materialInfo:
-                m_baseColor: {r: 0.17268841, g: 0.17268841, b: 0.17268841, a: 1}
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 0
-                m_roughness: 0.301511347
+                m_roughness: 0
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: a4596f93-388c-5b82-acbf-4703861c7fbc
-              m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_renderingMode: 1
+              m_shaderPSOName: CurveIndicator
             m_Mesh:
               m_name: Sphere
               m_materialIndex: 0
@@ -318,6 +323,6 @@ PrefabNode:
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
             m_isSkinnedMesh: false
-            m_shadowRecive: true
-            m_shadowCast: true
+            m_shadowRecive: false
+            m_shadowCast: false
             m_isEnableLOD: false

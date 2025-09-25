@@ -37,7 +37,7 @@ struct MeshParticleData
 cbuffer SizeParams : register(b0)
 {
     float3 startSize;
-    float pad1;
+    uint useOscillation;
     float3 endSize;
     float deltaTime;
     
@@ -47,7 +47,7 @@ cbuffer SizeParams : register(b0)
     uint maxParticles;
     
     float3 emitterScale;
-    float pad2;
+    float oscillationSpeed;
 };
 
 // 입출력 버퍼
@@ -94,6 +94,13 @@ void main(uint3 id : SV_DispatchThreadID)
     
     // 크기 보간 (생명주기에 따른 크기 변화)
     float3 currentSize = lerp(startSize, endSize, lifeRatio);
+    
+    if (useOscillation != 0)
+    {
+        float oscillation = (sin(particle.age * oscillationSpeed) + 1.0f) * 0.5f;
+        float3 oscillationSize = lerp(startSize, endSize, oscillation);
+        currentSize = oscillationSize;
+    }
     
     // 랜덤 스케일 적용
     if (useRandomScale != 0)

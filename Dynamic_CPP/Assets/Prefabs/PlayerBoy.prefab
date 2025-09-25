@@ -99,7 +99,7 @@ PrefabNode:
         m_scriptName: ""
     children:
       - GameObject: 2166264123
-        m_name: RangeShootPos
+        m_name: RangeShootPos (1)
         m_isEnabled: true
         m_instanceID: 1324896896
         m_transform:

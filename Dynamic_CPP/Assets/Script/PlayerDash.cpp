@@ -9,16 +9,16 @@ void PlayerDash::Enter()
 
 	if (m_player == nullptr)
 	{
-		AnimationController* P1uppercontroller = m_ownerController;
-		if (P1uppercontroller)
+		AnimationController* controller = m_ownerController;
+		if (controller)
 		{
-			Animator* P1ani = P1uppercontroller->GetOwner();
-			if (P1ani)
+			Animator* Playerani = controller->GetOwner();
+			if (Playerani)
 			{
-				GameObject* P1 = P1ani->GetOwner();
-				if (P1)
+				GameObject* player = Playerani->GetOwner();
+				if (player)
 				{
-					GameObject* parent = GameObject::FindIndex(P1->m_parentIndex);
+					GameObject* parent = GameObject::FindIndex(player->m_parentIndex);
 					if (parent)
 					{
 						m_player = parent->GetComponent<Player>();
@@ -30,9 +30,11 @@ void PlayerDash::Enter()
 
 	if (m_player)
 	{
+		m_player->GetOwner()->SetLayer("PlayerDash");
 		m_player->ChangeState("Dash");
+		m_player->SetInvincibility(4.f);
 		m_player->DropCatchItem();
-		m_player->m_animator->SetUseLayer(1, false);
+		//m_player->m_animator->SetUseLayer(1, false);
 		if (m_player->dashEffect)
 			m_player->dashEffect->Apply();
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
@@ -48,8 +50,10 @@ void PlayerDash::Exit()
 {
 	if (m_player)
 	{
+		m_player->GetOwner()->SetLayer("Player");
 		m_player->ChangeState("Idle");
-		m_player->m_animator->SetUseLayer(1, true);
+		m_player->EndInvincibility();
+		//m_player->m_animator->SetUseLayer(1, true);
 		if (m_player->dashEffect)
 			m_player->dashEffect->StopEffect();
 		m_player->player->GetComponent<CharacterControllerComponent>()->StopForcedMove(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거

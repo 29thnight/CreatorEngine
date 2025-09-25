@@ -21,15 +21,15 @@ namespace BT
 	class ConditionDecoratorNode;
 }
 #pragma region DLLFunctionPtr
-//Object Pool °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ Á¤ÀÇ
+//Object Pool ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„° ì •ì˜
 typedef void (*SetObjectAllocFunc)(Singleton<GameObjectPool>::FGetInstance);
 
-// ¸ğµâ ½ºÅ©¸³Æ® °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ Á¤ÀÇ
+// ëª¨ë“ˆ ìŠ¤í¬ë¦½íŠ¸ ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„° ì •ì˜
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef void (*ModuleBehaviorDeleteFunc)(ModuleBehavior* behavior);
 typedef const char** (*GetScriptNamesFunc)(int*);
 
-// Çàµ¿ Æ®¸® ³ëµå °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ Á¤ÀÇ
+// í–‰ë™ íŠ¸ë¦¬ ë…¸ë“œ ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„° ì •ì˜
 typedef BT::ActionNode* (*BTActionNodeFunc)(const char*);
 typedef void (*BTActionNodeDeleteFunc)(BT::ActionNode* actionNode);
 typedef BT::ConditionNode* (*BTConditionNodeFunc)(const char*);
@@ -40,12 +40,12 @@ typedef const char** (*ListBTActionNodeNamesFunc)(int*);
 typedef const char** (*ListBTConditionNodeNamesFunc)(int*);
 typedef const char** (*ListBTConditionDecoratorNodeNamesFunc)(int*);
 
-//¿¡´Ï¸ŞÀÌ¼Ç FSM °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ Á¤ÀÇ
+//ì—ë‹ˆë©”ì´ì…˜ FSM ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„° ì •ì˜
 typedef AniBehavior* (*AniBehaviorFunc)(const char*);
 typedef void (*AniBehaviorDeleteFunc)(AniBehavior* AniBehavior);
 typedef const char** (*ListAniBehaviorNamesFunc)(int*);
 
-// ¾À ¸Å´ÏÀú¿Í Çàµ¿ Æ®¸® ³ëµå ÆÑÅä¸® ¾÷µ¥ÀÌÆ® ÇÔ¼ö Æ÷ÀÎÅÍ Á¤ÀÇ[deprecated]
+// ì”¬ ë§¤ë‹ˆì €ì™€ í–‰ë™ íŠ¸ë¦¬ ë…¸ë“œ íŒ©í† ë¦¬ ì—…ë°ì´íŠ¸ í•¨ìˆ˜ í¬ì¸í„° ì •ì˜[deprecated]
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
 typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
 typedef void (*SetPhysicsManagerFunc)(Singleton<PhysicsManager>::FGetInstance);
@@ -68,17 +68,19 @@ public:
 	void ReplaceScriptComponent();
 	void ReplaceScriptComponentTargetScene(Scene* targetScene);
 	void CompileEvent();
-	// ½ºÅ©¸³Æ® »ı¼º
+	// ìŠ¤í¬ë¦½íŠ¸ ìƒì„±
 	void CreateScriptFile(std::string_view name);
 	void BindScriptEvents(ModuleBehavior* script, std::string_view name);
 	void UnbindScriptEvents(ModuleBehavior* script, std::string_view name);
 	void RegisterScriptReflection(std::string_view name, ModuleBehavior* script);
 	void UnRegisterScriptReflection(std::string_view name);
-	// Çàµ¿ Æ®¸® ³ëµå ½ºÅ©¸³Æ® »ı¼º
+	void RecollectScriptComponents(const std::vector<std::shared_ptr<GameObject>>& gameObjects);
+
+	// í–‰ë™ íŠ¸ë¦¬ ë…¸ë“œ ìŠ¤í¬ë¦½íŠ¸ ìƒì„±
 	void CreateActionNodeScript(std::string_view name);
 	void CreateConditionNodeScript(std::string_view name);
 	void CreateConditionDecoratorNodeScript(std::string_view name);
-	// ¿¡´Ï¸ŞÀÌ¼Ç FSM ½ºÅ©¸³Æ® »ı¼º
+	// ì—ë‹ˆë©”ì´ì…˜ FSM ìŠ¤í¬ë¦½íŠ¸ ìƒì„±
 	void CreateAniBehaviorScript(std::string_view name);
 
 #pragma region Script Build Helper
@@ -246,21 +248,21 @@ private:
 	void LoadForceDLL();
 
 private:
-	// DLL ÇÔ¼ö Æ÷ÀÎÅÍ
+	// DLL í•¨ìˆ˜ í¬ì¸í„°
 	HMODULE hDll{};
 private:
-	// Script °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ
+	// Script ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„°
 	ModuleBehaviorFunc						m_scriptFactoryFunc{};
 	ModuleBehaviorDeleteFunc				m_scriptDeleteFunc{};
 	GetScriptNamesFunc						m_scriptNamesFunc{};
-	// msbuild °ü·Ã ¸í·É¾î ¹× ÃÊ±âÈ­ º¯¼ö
+	// msbuild ê´€ë ¨ ëª…ë ¹ì–´ ë° ì´ˆê¸°í™” ë³€ìˆ˜
 	std::wstring							msbuildPath{};
 	std::wstring							command{};
 	std::wstring							rebuildCommand{};
 	std::atomic_bool						m_isStartUp{ false };
 
 private:
-	// Çàµ¿ Æ®¸® ³ëµå °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ
+	// í–‰ë™ íŠ¸ë¦¬ ë…¸ë“œ ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„°
 	BTActionNodeFunc						m_btActionNodeFunc{};
 	BTActionNodeDeleteFunc					m_btActionNodeDeleteFunc{};
 	BTConditionNodeFunc						m_btConditionNodeFunc{};
@@ -272,7 +274,7 @@ private:
 	ListBTConditionDecoratorNodeNamesFunc	m_listBTConditionDecoratorNodeNamesFunc{};
 
 private:
-	// ¿¡´Ï¸ŞÀÌ¼Ç Çàµ¿ ½ºÅ©¸³Æ® °ü·Ã ÇÔ¼ö Æ÷ÀÎÅÍ
+	// ì—ë‹ˆë©”ì´ì…˜ í–‰ë™ ìŠ¤í¬ë¦½íŠ¸ ê´€ë ¨ í•¨ìˆ˜ í¬ì¸í„°
 	AniBehaviorFunc 						m_AniBehaviorFunc{};
 	AniBehaviorDeleteFunc					m_AniBehaviorDeleteFunc{};
 	ListAniBehaviorNamesFunc				m_listAniBehaviorNamesFunc{};
@@ -282,16 +284,16 @@ private:
 	using ModuleBehaviorMetaVector			= std::vector<std::tuple<GameObject*, size_t, MetaYml::Node>>;
 	using AniBehaviorVector					= std::vector<AnimationState*>;
 	
-	// ½ºÅ©¸³Æ® ÄÄÆ÷³ÍÆ® ÀÎµ¦½º¿Í ¸ŞÅ¸ Á¤º¸ ÀúÀå
+	// ìŠ¤í¬ë¦½íŠ¸ ì»´í¬ë„ŒíŠ¸ ì¸ë±ìŠ¤ì™€ ë©”íƒ€ ì •ë³´ ì €ì¥
 	std::vector<std::string>				m_scriptNames{};
 	ModuleBehaviorIndexVector				m_scriptComponentIndexs{};
 	ModuleBehaviorMetaVector				m_scriptComponentMetaIndexs{};
 
-	// ¿¡´Ï¸ŞÀÌ¼Ç Çàµ¿ ½ºÅ©¸³Æ® ÀÌ¸§ ÀúÀå
+	// ì—ë‹ˆë©”ì´ì…˜ í–‰ë™ ìŠ¤í¬ë¦½íŠ¸ ì´ë¦„ ì €ì¥
 	std::vector<std::string>				m_aniBehaviorNames{};
 	AniBehaviorVector 						m_aniBehaviorStates{};
 
-	// ½ºÅ©¸³Æ® ºôµå ½º·¹µå Á¦¾î º¯¼ö
+	// ìŠ¤í¬ë¦½íŠ¸ ë¹Œë“œ ìŠ¤ë ˆë“œ ì œì–´ ë³€ìˆ˜
 	std::thread								m_scriptFileThread{};
 	std::mutex								m_scriptFileMutex{};
 	std::atomic_bool						m_isReloading{ false };

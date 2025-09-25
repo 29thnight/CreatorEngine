@@ -35,6 +35,7 @@ public:
 	void UnloadScene(const std::string& sceneName);
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
+	void RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	float GetAsisPollutionGaugeRatio();
 
 	// Test for Scene Management
@@ -57,6 +58,10 @@ public:
 	void ApplyGlobalEnhancementsToAllPlayers();
 
 	void ApplyGlobalEnhancementsToPlayer(class Player* player);
+
+	int selectPlayerCount{};
+	bool startSelectTimer{ false };
+	float displayPollutionGaugeRatio{}; //테스트 용
 
 public:
 	void PushEntity(Entity* entity);

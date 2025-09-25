@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SelectTimer.h"
 #include "ImageSlideshow.h"
 #include "IllustrationMove.h"
 #include "MonEleteProjetile.h"

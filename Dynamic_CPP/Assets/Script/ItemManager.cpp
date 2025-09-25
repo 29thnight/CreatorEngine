@@ -1,8 +1,10 @@
 #include "ItemManager.h"
 #include "GameObject.h"
 #include "GameManager.h"
+#include "GameInstance.h"
 #include "ItemComponent.h"
 #include "ItemUIIcon.h"
+#include "ItemUIPopup.h"
 #include "pch.h"
 
 void ItemManager::Start()
@@ -11,6 +13,10 @@ void ItemManager::Start()
 
 	gameManager = GetOwner()->GetComponent<GameManager>();
 	gameManager->ApplyGlobalEnhancementsToAllPlayers();
+	//TEST
+	GameInstance::GetInstance()->CommonItemColor = CommonItemColor;
+	GameInstance::GetInstance()->RareItemColor = RareItemColor;
+	GameInstance::GetInstance()->EpicItemColor = EpicItemColor;
 
 	//현재 씬의 아이템 슬롯 3개 세팅
 	InitItemSlots();
@@ -31,31 +37,59 @@ void ItemManager::Start()
 
 	//아이템 아이콘 3개 세팅
 	{
+		auto popup0 = GameObject::Find("ItemIcon0");
+		auto popup1 = GameObject::Find("ItemIcon1");
+		auto popup2 = GameObject::Find("ItemIcon2");
+
+		if (popup0)
+			itemIcons[0] = popup0->GetComponent<ItemUIIcon>();
+		if (popup1)
+			itemIcons[1] = popup1->GetComponent<ItemUIIcon>();
+		if (popup2)
+			itemIcons[2] = popup2->GetComponent<ItemUIIcon>();
+		//아이콘 세팅
+		for (int i = 0; i < 3; ++i)
+		{
+			if (itemIcons[i])
+			{
+				itemIcons[i]->SetItemID(itemInfos[i].id);
+				itemIcons[i]->SetRarityID(itemInfos[i].rarity);
+				itemIcons[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
+			}
+		}
+	}
+
+	//아이템 팝업 3개 세팅
+	{
 		auto popup0 = GameObject::Find("ItemPopup0");
 		auto popup1 = GameObject::Find("ItemPopup1");
 		auto popup2 = GameObject::Find("ItemPopup2");
 
+		std::array<ItemUIPopup*, 3> itemPopups{};
+
 		if (popup0)
-			itemPopups[0] = popup0->GetComponent<ItemUIIcon>();
+			itemPopups[0] = popup0->GetComponent<ItemUIPopup>();
 		if (popup1)
-			itemPopups[1] = popup1->GetComponent<ItemUIIcon>();
+			itemPopups[1] = popup1->GetComponent<ItemUIPopup>();
 		if (popup2)
-			itemPopups[2] = popup2->GetComponent<ItemUIIcon>();
+			itemPopups[2] = popup2->GetComponent<ItemUIPopup>();
 		//아이콘 세팅
 		for (int i = 0; i < 3; ++i)
 		{
 			if (itemPopups[i])
 			{
-				itemPopups[i]->SetItemID(itemInfos[i].id);
-				itemPopups[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
+				itemPopups[i]->SetIconObject(itemIcons[i] ? itemIcons[i]->GetOwner() : nullptr);
 			}
 		}
 	}
-
 }
 
 void ItemManager::Update(float tick)
 {
+	//TEST
+	GameInstance::GetInstance()->CommonItemColor = CommonItemColor;
+	GameInstance::GetInstance()->RareItemColor = RareItemColor;
+	GameInstance::GetInstance()->EpicItemColor = EpicItemColor;
 }
 
 void ItemManager::InitItemSlots()
@@ -94,12 +128,14 @@ void ItemManager::RefreshItemSlots()
 			itemSlots[i]->price = itemInfos[i].price;
 			itemSlots[i]->enhanceType = itemInfos[i].enhancementType;
 			itemSlots[i]->enhanceValue = itemInfos[i].enhancementValue;
+			itemSlots[i]->m_isItemSoldOut = false;
 			// 아이템 아이콘 세팅
-			if (itemPopups[i])
+			if (itemIcons[i])
 			{
-				itemPopups[i]->SetItemID(itemInfos[i].id);
-				itemPopups[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
-				itemPopups[i]->ResetPurchased();
+				itemIcons[i]->SetItemID(itemInfos[i].id);
+				itemIcons[i]->SetRarityID(itemInfos[i].rarity);
+				itemIcons[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
+				itemIcons[i]->ResetPurchased();
 			}
 		}
 	}
@@ -157,12 +193,13 @@ void ItemManager::ClearItemSlot(int slotIndex)
 	itemSlots[slotIndex]->price = 0;
 	itemSlots[slotIndex]->enhanceType = 0;
 	itemSlots[slotIndex]->enhanceValue = 0;
+	itemSlots[slotIndex]->m_isItemSoldOut = true;
 	//아이템 정보 비우기
 	itemInfos[slotIndex] = ItemInfo{};
 	//아이템 아이콘 비우기
-	if (itemPopups[slotIndex])
+	if (itemIcons[slotIndex])
 	{
-		itemPopups[slotIndex]->OnPurchased();
+		itemIcons[slotIndex]->OnPurchased();
 	}
 }
 

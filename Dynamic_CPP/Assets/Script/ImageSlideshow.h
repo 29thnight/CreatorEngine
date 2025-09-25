@@ -15,7 +15,7 @@ public:
 public:
     // Controls (에디터/스크립트 호출용)
     [[Method]] 
-    void Play() { m_playing = true; }
+    void Play() { m_playing = true; m_finished = false; }
     [[Method]] 
     void Pause() { m_playing = false; }
     [[Method]] 
@@ -26,6 +26,8 @@ public:
     void Prev(int step = 1) { StartOrQueueAdvance(-step); }   // 즉시 이전(또는 step만큼)으로 이동
     [[Method]] 
     void SetFrame(int index);                     // 임의 프레임으로 점프
+
+    bool IsFinished() const { return m_finished; }
 
     // Properties
     [[Property]] 
@@ -80,4 +82,5 @@ private:
     int       m_switchStep = 0;     // 이번 전환에 실제로 적용할 step(보통 1*방향)
     bool  m_pendingAutoStop = false;  // 마지막/첫 프레임에 도달해서, FadingIn 완료 후 정지해야 함
     float m_stopHoldTimer = 0.f;    // StopHold(유지) 타이머
+    bool  m_finished = false;   // 완전 종료 플래그
 };

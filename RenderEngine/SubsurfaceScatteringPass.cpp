@@ -85,7 +85,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* defe
 	buffer.CameraFOV	= camera.m_fov;
 	buffer.strength		= strength;
 	buffer.width		= width;
-	buffer.direction	= direction;
+	buffer.direction	= { 1.f, 0.f };//direction;
 
 	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
 
@@ -96,6 +96,15 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* defe
 		m_CopiedTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
 	};
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, srvs);
+
+	DirectX11::Draw(deferredPtr, 4, 0);
+
+	buffer.direction = { 0.f, 1.f };
+	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
+
+	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+
 	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, srvs);
 
 	DirectX11::Draw(deferredPtr, 4, 0);

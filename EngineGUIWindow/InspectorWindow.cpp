@@ -108,6 +108,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			wasMetaSelectedLastFrame = true;
 		}
 
+		if (!selectedSceneObject && EngineSettingInstance->terrainBrush)
+		{
+			EngineSettingInstance->terrainBrush->m_isEditMode = false;
+		}
+
 		if (scene && selectedSceneObject)
 		{
 			ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
@@ -122,6 +127,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 			static bool isOpen = false;
 			static Component* selectedComponent = nullptr;
+
+			if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
+				EngineSettingInstance->terrainBrush)
+			{
+				EngineSettingInstance->terrainBrush->m_isEditMode = false;
+			}
 
 			for (auto& component : selectedSceneObject->m_components)
 			{

@@ -14,7 +14,23 @@ void ImageButton::Update(float tick)
 	if (!m_uiButton)
 	{
 		m_uiButton = GetComponent<UIButton>();
-		m_uiButton->SetClickFunction([&]() { ClickFunction(); });
+		if (m_uiButton)
+		{
+			m_uiButton->SetClickFunction([&]() { ClickFunction(); });
+		}
+	}
+
+	if (m_imageComponent)
+	{
+		//TEST : 테스트용 네비게이션 선택 색상임.
+		if(m_imageComponent->IsNavigationThis())
+		{
+			m_imageComponent->color = { 1, 0, 0, 1 };
+		}
+		else
+		{
+			m_imageComponent->color = { 1, 1, 1, 1 };
+		}
 	}
 }
 
