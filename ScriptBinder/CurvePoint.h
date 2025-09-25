@@ -1,5 +1,5 @@
-#pragma once
-#include <vector>
+ï»¿#pragma once
+#include "Core.Minimal.h"
 #include "CurvePoint.generated.h"
 
 struct CurvePoint
@@ -14,7 +14,7 @@ struct CurvePoint
     CurvePoint() = default;
     ~CurvePoint() = default;
 
-    CurvePoint(float _dist, float _gain) : distance(_dist), gain(_gain)
+    CurvePoint(float in_dist, float in_gain) : distance(in_dist), gain(in_gain)
     {
     }
 };
@@ -27,7 +27,7 @@ static inline void BuildLinearCurve(std::vector<CurvePoint>& curve,
     minD = std::max(0.0f, minD);
     maxD = std::max(minD + 0.01f, maxD);
     curve.clear();
-    // 0~minD ±¸°£Àº 1 À¯Áö, minD~maxD ¼±Çü °¨¼Ò
+    // 0~minD êµ¬ê°„ì€ 1 ìœ ì§€, minD~maxD ì„ í˜• ê°ì†Œ
     curve.push_back({ 0.f,   1.f });
     curve.push_back({ minD,  1.f });
     curve.push_back({ maxD,  0.f });
@@ -42,7 +42,7 @@ static inline void BuildInverseCurve(std::vector<CurvePoint>& curve,
     curve.push_back({ 0.f,  1.f });
     curve.push_back({ minD, 1.f });
 
-    // »ùÇÃ Æ÷ÀÎÆ®·Î ºÎµå·¯¿î ¿ª°¨¼è(´ë·« minD/d) ±Ù»ç
+    // ìƒ˜í”Œ í¬ì¸íŠ¸ë¡œ ë¶€ë“œëŸ¬ìš´ ì—­ê°ì‡ (ëŒ€ëµ minD/d) ê·¼ì‚¬
     const int S = 16;
     for (int i = 1; i < S; i++) {
         float t = i / (float)S;
@@ -50,5 +50,5 @@ static inline void BuildInverseCurve(std::vector<CurvePoint>& curve,
         float g = clamp01(minD / d);          // ~ 1/r
         curve.push_back({ d, g });
     }
-    curve.push_back({ maxD, clamp01(minD / maxD) }); // º¸Åë 0~¼Ò¼ö
+    curve.push_back({ maxD, clamp01(minD / maxD) }); // ë³´í†µ 0~ì†Œìˆ˜
 }

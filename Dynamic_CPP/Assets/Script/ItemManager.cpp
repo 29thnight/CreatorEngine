@@ -179,6 +179,22 @@ void ItemManager::BuyItem(int slotIndex)
 	}
 }
 
+void ItemManager::BuyItem(int itemID, int rarityID)
+{
+	if (!gameManager)
+		return;
+
+	for (int slot = 0; slot < itemInfos.size(); ++slot)
+	{
+		if (itemInfos[slot].id == itemID && 
+			itemInfos[slot].rarity == rarityID)
+		{
+			BuyItem(slot);
+			break;
+		}
+	}
+}
+
 void ItemManager::ClearItemSlot(int slotIndex)
 {
 	if (slotIndex < 0 || slotIndex >= static_cast<int>(itemSlots.size()))
