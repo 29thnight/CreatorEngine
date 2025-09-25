@@ -37,6 +37,8 @@ void ItemUIIcon::Update(float tick)
 
     m_playerID = m_itemComp->m_playerID;
 
+    if (0 > itemID) return;
+
     // ── 구매되었으면 팝업 강제 종료 ──
     if (m_isPurchased) 
     {

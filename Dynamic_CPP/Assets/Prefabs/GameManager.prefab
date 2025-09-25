@@ -1,22 +1,22 @@
-m_name: GameManager_Prefab
+m_name: GameManager
 m_isEnabled: true
-m_instanceID: 3987730806
-m_fileGuid: c1453e45-aa48-53c3-bb64-1f12ae81cc04
+m_instanceID: 1308988322
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: GameManager
     m_isEnabled: true
-    m_instanceID: 3441803091
+    m_instanceID: 3939075635
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
-      rotation: {x: 0, y: 0, z: 0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1
+    m_index: 118
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
-    m_prefabFileGuid: c1453e45-aa48-53c3-bb64-1f12ae81cc04
+    m_prefabFileGuid: e9744788-aefe-58e6-ae5a-4796ece1aadb
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -29,18 +29,21 @@ PrefabNode:
         m_nextSceneName: ""
         m_name: GameManager
         m_isEnabled: true
-        m_instanceID: 3701208076
+        m_instanceID: 3075878217
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 43eba570-3946-5cc3-a3a5-e27244333fdb
       - ModuleBehavior: 1399118904
         m_name: EventManager
         m_isEnabled: true
-        m_instanceID: 1594908821
+        m_instanceID: 315277566
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: d93fe2e4-bc27-5eef-afdf-14505544d1a8
       - ModuleBehavior: 1399118904
-        m_name: TweenManager
+        CommonItemColor: {r: 1, g: 1, b: 1, a: 1}
+        RareItemColor: {r: 0, g: 0.609403133, b: 1, a: 1}
+        EpicItemColor: {r: 0.855334759, g: 0, b: 1, a: 1}
+        m_name: ItemManager
         m_isEnabled: true
-        m_instanceID: 774353161
+        m_instanceID: 503598729
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 4c46804a-2b01-5d5c-a154-5e66877f5fe3
+        m_scriptGuid: 9c8a984c-3a09-55da-83cf-883260c998b5
