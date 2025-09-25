@@ -858,18 +858,33 @@ void HotLoadSystem::RegisterScriptReflection(std::string_view name, ModuleBehavi
 			haveScriptReflectionAttribute = scriptNode["reflectionFlag"].as<bool>();
 		}
 
-		if (true == haveScriptReflectionAttribute)
-		{
-			Meta::Registry::GetInstance()->ScriptRegister(name.data(), script->ScriptReflect());
-		}
-	}
+                if (true == haveScriptReflectionAttribute)
+                {
+                        Meta::TypeCaster* typeCaster = Meta::TypeCaster::GetInstance();
+                        typeCaster->BeginScope(name);
+                        struct TypeCasterScopeGuard
+                        {
+                                Meta::TypeCaster* caster;
+                                ~TypeCasterScopeGuard()
+                                {
+                                        if (caster)
+                                        {
+                                                caster->EndScope();
+                                        }
+                                }
+                        } scopeGuard{ typeCaster };
+
+                        const auto& scriptType = script->ScriptReflect();
+                        Meta::Registry::GetInstance()->ScriptRegister(name.data(), scriptType);
+                }
+        }
 }
 
 void HotLoadSystem::UnRegisterScriptReflection(std::string_view name)
 {
-	Meta::Registry::GetInstance()->UnRegister(name.data());
-	//TODO : Test 필요한 부분
-	Meta::TypeCaster::GetInstance()->UnRegister(name.data());
+        Meta::Registry::GetInstance()->UnRegister(name.data());
+        //TODO : Test 필요한 부분
+        Meta::TypeCaster::GetInstance()->UnRegisterScope(name.data());
 }
 
 void HotLoadSystem::CreateActionNodeScript(std::string_view name)
