@@ -58,26 +58,23 @@ float4 main(PixelInput input) : SV_TARGET
     float emissive = temp.b;
     float alpha = temp.a;
     
-    // 마스크값이 너무 낮으면 픽셀 폐기
-    if (maskValue < 0.01f)
-        discard;
-    
-    // 파티클 수명에 따른 디졸브 임계값 계산
+     // 파티클 수명에 따른 디졸브 임계값 계산
     float dissolveThreshold = saturate(input.particleAge);
     
     // 디졸브 효과: 마스크값이 임계값보다 낮으면 픽셀 폐기
-    if (dissolve < dissolveThreshold || alpha < 0.1)
+    if (dissolve < dissolveThreshold)
         discard;
     
     // 입력 색상을 기본색으로 사용하고 마스크로 강도 조절
     float3 baseColor = input.color.rgb * maskValue;
-    //float3 emissiveColor = float3(1.4f, 0.7f, 0.37f) * alpha;
+    float3 emissiveColor = float3(1.4f, 0.7f, 0.37f);
 
     // 에미시브 값에 따라 기본 색상과 에미시브 색상을 블렌딩
-    float3 finalColor = baseColor;
+    float3 finalColor = lerp(baseColor, baseColor + emissiveColor, pow(emissive, 3));
     
     // 최종 알파값 계산 (마스크값 × 입력 알파)
-    float finalAlpha = input.color.a * alpha;
+    float finalAlpha = input.color.a * alpha * smoothstep(dissolveThreshold, dissolveThreshold + 0.2, dissolve);
+    
     
     return float4(finalColor, finalAlpha);
 }
