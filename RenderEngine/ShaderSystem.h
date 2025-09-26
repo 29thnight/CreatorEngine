@@ -6,8 +6,8 @@
 
 #include <memory>
 
-class VisualShaderPSO; // visual shader pipeline
-        std::unordered_map<std::string, std::shared_ptr<VisualShaderPSO>> VisualShaderAssets;
+//class VisualShaderPSO; // visual shader pipeline
+//        std::unordered_map<std::string, std::shared_ptr<VisualShaderPSO>> VisualShaderAssets;
 class ShaderPSO; // Àü¹æ ¼±¾ð
 class Material;
 class ImageComponent;

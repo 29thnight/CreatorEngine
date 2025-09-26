@@ -230,7 +230,7 @@ void TrailGenerateModule::GenerateRibbonMesh()
         // UV 좌표 개선 - 포인트 인덱스 기반
         float u = (m_trailPoints.size() > 1) ? (float(i) / float(m_trailPoints.size() - 1)) : 0.0f;
 
-        TrailVertex leftVertex, rightVertex;
+        CTrailVertex leftVertex, rightVertex;
         leftVertex.position = point.position - right;
         leftVertex.texcoord = Mathf::Vector2(u, 0.0f);
         leftVertex.color = color;
@@ -310,7 +310,7 @@ void TrailGenerateModule::GenerateTubeMesh()
             Mathf::Vector3 offset = (right * cosAngle + up * sinAngle) * radius;
             Mathf::Vector3 vertexPos = point.position + offset;
 
-            TrailVertex vertex;
+            CTrailVertex vertex;
             vertex.position = vertexPos;
             vertex.texcoord = Mathf::Vector2(u, seg / float(m_tubeSegments));
             vertex.color = color;
