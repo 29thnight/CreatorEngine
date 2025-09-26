@@ -193,11 +193,11 @@ GBufferOutput main(PixelShaderInput IN)
     }
     
     roughness = max(roughness, 0.1f);
-    OUT.diffuse = lerp(float4(0, 0, 0, 1), float4(albedo.rgb, 1), flashStrength);
+    OUT.diffuse = flashStrength > 0 ? lerp(float4(0, 0, 0, 1), float4(albedo.rgb, 1), flashStrength) : float4(albedo.rgb, 1);
     OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, ior);
     float3 normalResult = surf.N * 0.5 + 0.5;
     OUT.normal = float4(normalResult, 1); // 여기 나중에 normal.w 까지 받아서 행렬변환한곳 오류날 가능성 있음.
-    OUT.emissive = lerp(float4(2, 0, 0, 1), float4(2, 2, 2, 1), flashStrength);
+    OUT.emissive = flashStrength > 0 ? lerp(float4(2, 0, 0, 1), float4(2, 2, 2, 1), flashStrength) : emissive;
 
     OUT.bitmask = bit;
 

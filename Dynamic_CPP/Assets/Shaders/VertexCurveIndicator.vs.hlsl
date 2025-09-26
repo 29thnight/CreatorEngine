@@ -18,6 +18,21 @@ cbuffer BoneTransformation : register(b3)
     matrix BoneTransforms[50];
 }
 
+cbuffer TimeBuffer : register(b4)
+{
+    float totalTime;
+    float deltaTime;
+    uint totalFrame;
+}
+
+cbuffer WindBuffer : register(b5)
+{
+    float3 windDirection;
+    float windStrength;
+    float windSpeed;
+    float waveFrequency;
+}
+
 StructuredBuffer<matrix> models : register(t0);
 StructuredBuffer<matrix> BoneTransforms2 : register(t1);
 

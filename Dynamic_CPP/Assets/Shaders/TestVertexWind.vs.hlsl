@@ -18,11 +18,9 @@ cbuffer BoneTransformation : register(b3)
     matrix BoneTransforms[50];
 }
 
-cbuffer TimeBuffer : register(b4)
+cbuffer TestWind : register(b4)
 {
     float totalTime;
-    float deltaTime;
-    uint totalFrame;
 }
 
 cbuffer WindBuffer : register(b5)
@@ -76,8 +74,15 @@ VertexShaderOutput main(AppData IN)
         
     }
 
+    
     VertexShaderOutput OUT;
     OUT.wPosition = mul(model, float4(IN.position, 1.0f));
+    float tempX = saturate(sin(OUT.wPosition.x / 2 - totalTime / 100) + 0.5); // 0~1
+    float nanoWave = sin(OUT.wPosition.x / 2 - totalTime / 30) * 0.1;
+    float weight = pow(OUT.wPosition.y, 2);
+    OUT.wPosition.x = OUT.wPosition.x + (tempX + nanoWave) * weight * 0.2;
+    
+    
     matrix vp = mul(projection, view);
     OUT.position = mul(vp, OUT.wPosition);
     OUT.pos = OUT.position;

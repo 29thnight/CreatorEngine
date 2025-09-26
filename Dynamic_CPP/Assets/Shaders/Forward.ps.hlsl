@@ -54,6 +54,13 @@ cbuffer ForwardCBuffer : register(b3)
     float envMapIntensity;
 }
 
+cbuffer TimeBuffer : register(b5)
+{
+    float totalTime;
+    float deltaTime;
+    uint totalFrame;
+}
+
 struct PixelShaderInput
 {
     float4 position : SV_POSITION;
@@ -150,7 +157,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     if ((bitflag & USE_SSRefraction) == 0)
     {
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < lightCount; ++i)
         {
             Light light = Lights[i];
             if (light.status == LIGHT_DISABLED)
@@ -216,7 +223,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         
         float3 reflectionColor = float3(0, 0, 0);
         
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < lightCount; ++i)
         {
             Light light = Lights[i];
             if (light.status == LIGHT_DISABLED)

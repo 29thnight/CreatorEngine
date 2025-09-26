@@ -54,6 +54,13 @@ cbuffer ForwardCBuffer : register(b3)
     float envMapIntensity;
 }
 
+cbuffer TimeBuffer : register(b5)
+{
+    float totalTime;
+    float deltaTime;
+    uint totalFrame;
+}
+
 struct PixelShaderInput
 {
     float4 position : SV_POSITION;
