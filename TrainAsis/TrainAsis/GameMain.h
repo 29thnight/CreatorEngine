@@ -39,7 +39,7 @@ namespace DirectX11
 
 	private:
 		std::shared_ptr<DeviceResources> m_deviceResources;
-		TimeSystem m_timeSystem;
+		//TimeSystem m_timeSystem;
 		//Renderer
 		std::shared_ptr<SceneRenderer> m_sceneRenderer;
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;

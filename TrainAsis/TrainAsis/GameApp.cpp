@@ -7,9 +7,16 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
+#include "HotLoadSystem.h"
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
+#include "ShaderSystem.h"
+#include "ReflectionRegister.h"
+#include "ReflectionVectorFactory.h"
+#include "DeviceState.h"
+#include "ReflectionVectorInvoker.h"
+#include "ComponentFactory.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -27,6 +34,9 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		return hr;
 	}
 
+	Meta::RegisterClassInitalize();
+	Meta::VectorFactoryRegistry::GetInstance();
+	Meta::VectorInvokerRegistry::GetInstance();
 	PathFinder::Initialize();
 	Log::Initialize();
 
@@ -43,10 +53,13 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 	{
 		GameBuilder::App app;
-		app.Initialize(hInstance, L"How To Train Asis", 2560, 1600);
+		app.Initialize(hInstance, L"How To Train Asis", 1920, 1080);
 		app.Finalize();
 	}
 
+	CameraContainer::Destroy();
+	ComponentFactory::Destroy();
+	HotLoadSystem::Destroy();
 	SceneManager::Destroy();
 	PhysicsManager::Destroy();
 	PhysicX::Destroy();
@@ -57,6 +70,11 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	InputManager::Destroy();
 	DataSystem::Destroy();
 	PrefabUtility::Destroy();
+	ShaderResourceSystem::Destroy();
+	Meta::RegisterClassFinalize();
+	Meta::VectorFactoryRegistry::Destroy();
+	Meta::VectorInvokerRegistry::Destroy();
+	DirectX11::DeviceResourceManager::Destroy();
 
 	Log::Finalize();
 
@@ -67,6 +85,8 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	DirectX11::DeviceResourceManager::GetInstance();
+	ShaderResourceSystem::GetInstance();
 	EngineSetting::GetInstance();
 	TagManager::GetInstance();
 	InputManager::GetInstance();
@@ -77,6 +97,9 @@ void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int
 	PhysicX::GetInstance();
 	PhysicsManager::GetInstance();
 	SceneManager::GetInstance();
+	HotLoadSystem::GetInstance();
+	ComponentFactory::GetInstance();
+	CameraContainer::GetInstance();
 
 	CoreWindow coreWindow(hInstance, title, width, height);
 	CoreWindow::SetDumpType(DUMP_TYPE::DUNP_TYPE_MINI);

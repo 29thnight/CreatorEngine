@@ -123,9 +123,6 @@
 		<ClInclude Include="Assets\Script\TweenManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -606,6 +603,9 @@
 		<ClInclude Include="Assets\Script\PlayerThrow.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\TimerTrigger.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1063,6 +1063,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TimerTrigger.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

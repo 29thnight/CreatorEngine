@@ -318,7 +318,7 @@ bool DirectX11::Dx11Main::ExecuteRenderPass()
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-	if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+	if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd || m_isInvokeResize)
     { 
         PROFILE_CPU_END();
         return false;
@@ -388,7 +388,7 @@ void DirectX11::Dx11Main::CommandBuildThread()
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
     // 처음 업데이트하기 전에 아무 것도 하지 마세요.
-    if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+    if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd || m_isInvokeResize)
     {
         PROFILE_CPU_END();
         //RenderCommandFence.Signal();

@@ -192,6 +192,7 @@
 		<ClInclude Include="Assets\Script\EntitySpiritStone.h" />
 		<ClInclude Include="Assets\Script\EventManager.h" />
 		<ClInclude Include="Assets\Script\EventTarget.h" />
+		<ClInclude Include="Assets\Script\TimerTrigger.h" />
 		<ClInclude Include="Assets\Script\HPBar.h" />
 		<ClInclude Include="Assets\Script\ITriggerCondition.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
@@ -308,6 +309,7 @@
 		<ClCompile Include="Assets\Script\HPBar.cpp" />
 		<ClCompile Include="Assets\Script\ITriggerCondition.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
+		<ClCompile Include="Assets\Script\TimerTrigger.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
 		<ClCompile Include="GameInstance.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />

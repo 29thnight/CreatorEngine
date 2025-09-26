@@ -6,8 +6,12 @@
 class Barrier
 {
 public:
-	explicit Barrier(int count)
-		: m_threshold(count), m_count(count), m_generation(0)
+	explicit Barrier(int count) :
+		m_threshold(count),
+		m_count(count),
+		m_generation(0),
+		m_destroyed(false),
+		m_breakRequested(false)
 	{
 	}
 
@@ -17,36 +21,62 @@ public:
 
 	void Finalize()
 	{
-		// 소멸 상태로 전환
+		// Destroy the barrier and release waiting threads.
 		m_destroyed.store(true, std::memory_order_release);
-		// 한 번이라도 대기 중인 스레드가 깰 수 있도록 generation 증가
+		// Advance the generation to wake up threads.
 		m_generation.fetch_add(1, std::memory_order_release);
+	}
+
+	void BreakBegin()
+	{
+		bool expected = false;
+		if (m_breakRequested.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+		{
+			m_count.store(m_threshold, std::memory_order_release);
+			m_generation.fetch_add(1, std::memory_order_release);
+		}
+	}
+
+	void BreakEnd()
+	{
+		m_breakRequested.store(false, std::memory_order_release);
 	}
 
 	// 스레드가 도달할 때 호출
 	void ArriveAndWait()
 	{
-		int gen = m_generation.load(std::memory_order_acquire);
-
-		if (--m_count == 0)
+		if (m_breakRequested.load(std::memory_order_acquire))
 		{
-			m_count.store(m_threshold, std::memory_order_relaxed);
-			m_generation.fetch_add(1, std::memory_order_release);
+			return;
 		}
-		else
+
+		const int generation = m_generation.load(std::memory_order_acquire);
+
+		if (m_breakRequested.load(std::memory_order_acquire))
 		{
-			while (true)
-			{
-				// ① 정상적으로 다음 세대로 전환됐는지
-				if (m_generation.load(std::memory_order_acquire) != gen)
-					break;
+			return;
+		}
 
-				// ② 객체가 파괴되었는지
-				if (m_destroyed.load(std::memory_order_acquire))
-					break;
+		const int previousCount = m_count.fetch_sub(1, std::memory_order_acq_rel);
+		if (previousCount == 1)
+		{
+			m_count.store(m_threshold, std::memory_order_release);
+			m_generation.fetch_add(1, std::memory_order_release);
+			return;
+		}
 
-				_mm_pause();
-			}
+		while (true)
+		{
+			if (m_breakRequested.load(std::memory_order_acquire))
+				break;
+
+			if (m_generation.load(std::memory_order_acquire) != generation)
+				break;
+
+			if (m_destroyed.load(std::memory_order_acquire))
+				break;
+
+			_mm_pause();
 		}
 	}
 
@@ -55,6 +85,7 @@ private:
 	std::atomic<int> m_count;
 	std::atomic<uint64_t> m_generation;
 	std::atomic<bool> m_destroyed;
+	std::atomic<bool> m_breakRequested;
 };
 
 namespace BarrierHelper

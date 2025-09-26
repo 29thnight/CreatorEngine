@@ -58,7 +58,10 @@ private:
 	class ImageComponent* m_purchase{}; // 동의 UI 이미지
 	class TextComponent* m_descComp{ nullptr }; // 설명 텍스트
 	class TextComponent* m_nameComp{ nullptr }; // 이름 텍스트
-	class PlayerInputComponent* m_input{};
+	class TextComponent* m_priceText{ nullptr }; //가격 텍스트
+	class TextComponent* m_purchaseText{ nullptr }; //구매 버튼 택스트
+
+	class PlayerInputComponent* m_input{ nullptr }; //구매 키 입력 컴포넌트
 private:
 	[[Property]]
 	int				itemID{};

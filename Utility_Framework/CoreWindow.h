@@ -146,6 +146,7 @@ private:
         rect = { 0, 0, m_width, m_height };
         AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
 
+#ifndef BUILD_FLAG
         m_hWnd = CreateWindowEx(
             0,
             L"CoreWindowApp",
@@ -162,10 +163,42 @@ private:
         if (m_hWnd)
         {
             DragAcceptFiles(m_hWnd, TRUE);
-
             ShowWindow(m_hWnd, SW_SHOWNORMAL);
             UpdateWindow(m_hWnd);
         }
+#else
+        // 1) 보더리스 창 생성 (임시 크기)
+        m_hWnd = CreateWindowEx(
+            0,
+            L"CoreWindowApp",
+            title,
+            WS_POPUP,                    // ← 보더리스
+            0, 0,
+            m_width, m_height,           // 어차피 바로 전체화면으로 키움
+            nullptr, nullptr,
+            m_hInstance,
+            this);
+
+        if (!m_hWnd) return;
+
+        DragAcceptFiles(m_hWnd, TRUE);
+
+        // 2) 현재 모니터 전체 크기로 확장 (Borderless Fullscreen)
+        MONITORINFO mi{ sizeof(mi) };
+        HMONITOR mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+        GetMonitorInfo(mon, &mi);
+
+        SetWindowPos(
+            m_hWnd, HWND_TOP,
+            mi.rcMonitor.left, mi.rcMonitor.top,
+            mi.rcMonitor.right - mi.rcMonitor.left,
+            mi.rcMonitor.bottom - mi.rcMonitor.top,
+            SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+
+        ShowWindow(m_hWnd, SW_SHOW); // SWP_SHOWWINDOW로 이미 표시됨
+        UpdateWindow(m_hWnd);
+#endif // BUILD_FLAG
+
     }
 
 public:
