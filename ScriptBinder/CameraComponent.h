@@ -46,6 +46,7 @@ public:
 		if(m_pCamera != camera)
 		{
 			m_pCamera.swap(camera); //임시로 1번 카메라 고정
+			m_Camera = m_pCamera.get();
 		}
 
 		if (m_pCamera == nullptr)

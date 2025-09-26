@@ -61,7 +61,7 @@ cbuffer MovementParams : register(b0)
     float windStrength;
     float turbulence;
     float frequency;
-    float pad1;
+    uint maxParticles;
     
     float3 orbitalCenter;
     float orbitalRadius;
@@ -244,38 +244,30 @@ float3 GetWindForce(float3 position, float time)
 }
 
 // 궤도 운동 계산
-float3 GetOrbitalVelocity(float3 position, float time, float3 birthPosition, float age, float lifeTime)
+float3 GetOrbitalVelocity(float3 position, float time, float3 birthPosition, float age, float lifeTime, uint particleIndex)
 {
-    if (length(orbitalAxis) < 0.001 || lifeTime <= 0)
+    if (lifeTime <= 0)
         return float3(0, 0, 0);
     
-    float3 normalizedAxis = normalize(orbitalAxis);
+    // 파티클별 고정 각도 오프셋 (전체 파티클 수로 360도 균등 분배)
+    float angleStep = 6.28318 / (float) maxParticles;
+    float baseAngle = (float) particleIndex * angleStep;
     
-    // 생성 위치를 중심으로 궤도
-    float3 centerToParticle = position - birthPosition;
-    float currentRadius = length(centerToParticle);
+    // 시간에 따른 회전 + 고정 오프셋
+    float angle = age * orbitalSpeed + baseAngle;
     
-    // orbitalRadius 거리로 조정
-    if (currentRadius < orbitalRadius * 0.9 || currentRadius > orbitalRadius * 1.1)
-    {
-        float3 direction = currentRadius > 0.001 ? normalize(centerToParticle) : float3(1, 0, 0);
-        float3 targetPosition = birthPosition + direction * orbitalRadius;
-        return (targetPosition - position) * 100.0;
-    }
+    // 궤도 위치 계산 (birthPosition을 중심으로)
+    float3 orbitalCenter = birthPosition;
+    float3 targetPosition = orbitalCenter + float3(
+        cos(angle) * orbitalRadius,
+        0,
+        sin(angle) * orbitalRadius
+    );
     
-    // 생명주기 동안 orbitalSpeed배 회전하도록 각속도 계산
-    float normalizedAge = age / lifeTime;
-    float angularVelocity = (6.28318 * orbitalSpeed) / lifeTime; // 2π * 회전수 / 생명주기
-    
-    // 접선 방향 계산
-    float3 radialDirection = normalize(centerToParticle);
-    float3 tangentDirection = cross(normalizedAxis, radialDirection);
-    
-    // 접선 속도 = 각속도 * 반지름
-    float tangentialSpeed = angularVelocity * orbitalRadius;
-    
-    return normalize(tangentDirection) * tangentialSpeed;
+    // 목표 위치로 이동하는 속도 (강한 복원력)
+    return (targetPosition - position) * 20.0;
 }
+
 
 float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex, float particleAge)
 {
@@ -344,8 +336,26 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (velocityMode == 4) // Orbital
         {
+           // 파티클별 고정 각도 오프셋 (균등 분배)
+            float angleStep = 6.28318 / (float) maxParticles;
+            float baseAngle = (float) particleIndex * angleStep;
+    
+            // 생명주기 기반 진행도 (0~1)
+            float normalizedAge = particle.age / particle.lifeTime;
+    
+            // orbitalSpeed만큼 회전 (1.0이면 1바퀴, 2.0이면 2바퀴)
+            float totalRotation = normalizedAge * orbitalSpeed * 6.28318; // 2π * 회전수
+            float currentAngle = baseAngle + totalRotation;
+    
+            // 궤도 위치 직접 계산
+            particle.position = particle.pad5 + float3(
+                 cos(currentAngle) * orbitalRadius,
+                 0,
+                 sin(currentAngle) * orbitalRadius
+             );
+    
+            // velocity는 0 (위치가 직접 제어되므로)
             particle.velocity = float3(0, 0, 0);
-            additionalVelocity = GetOrbitalVelocity(particle.position, currentTime, particle.pad5, particle.age, particle.lifeTime);
         }
         else if (velocityMode == 5) // explosive
         {

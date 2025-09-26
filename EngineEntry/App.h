@@ -28,6 +28,7 @@ namespace Core
 		LRESULT ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleMaximizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 

@@ -186,6 +186,7 @@ void MeshMovementModuleCS::UpdateConstantBuffers(float delta)
         params->deltaTime = delta;
         params->currentTime = m_currentTime;
         params->velocityMode = static_cast<int>(m_velocityMode);
+        params->maxParticles = m_particleCapacity;
 
         // Wind, Orbital, Explosive 데이터 복사
         params->windDirection = m_windData.direction;

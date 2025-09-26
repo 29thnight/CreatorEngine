@@ -548,6 +548,12 @@
     <ClCompile Include="ShaderDSL.cpp">
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClCompile>
+    <ClCompile Include="VisualShaderDSL.cpp">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClCompile>
+    <ClCompile Include="VisualShaderPSO.cpp">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClCompile>
     <ClCompile Include="UIRenderProxy.cpp">
       <Filter>Objects\UIRenderProxy</Filter>
     </ClCompile>
@@ -902,6 +908,12 @@
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClInclude>
     <ClInclude Include="ShaderDSL.h">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClInclude>
+    <ClInclude Include="VisualShaderDSL.h">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClInclude>
+    <ClInclude Include="VisualShaderPSO.h">
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClInclude>
     <ClInclude Include="UIRenderProxy.h">
