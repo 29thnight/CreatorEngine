@@ -163,3 +163,14 @@ struct ExplosiveData
 	float randomFactor;      // 랜덤 요소 강도
 	float sphereRadius;      // 구형 분포 반지름 (0이면 완전한 구)
 };
+
+struct alignas(16) TrailVertex
+{
+	Mathf::Vector3 position;    // 12 bytes
+	float pad1;           // 4 bytes = 16 bytes total
+	Mathf::Vector2 texcoord;    // 8 bytes
+	float2 pad2;        // 8 bytes = 32 bytes total  
+	Mathf::Vector4 color;       // 16 bytes = 48 bytes total
+	Mathf::Vector3 normal;      // 12 bytes
+	float pad3;           // 4 bytes = 64 bytes total
+};

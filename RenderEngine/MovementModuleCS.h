@@ -85,7 +85,7 @@ private:
 		float windStrength;
 		float turbulence;
 		float frequency;
-		float pad1;
+		UINT maxParticles;
 
 		Mathf::Vector3 orbitalCenter;
 		float orbitalRadius;

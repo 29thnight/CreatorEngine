@@ -67,7 +67,7 @@ cbuffer MeshMovementParams : register(b0)
     float windStrength;
     float turbulence;
     float frequency;
-    float pad1;
+    uint maxParticles;
     
     float3 orbitalCenter;
     float orbitalRadius;
