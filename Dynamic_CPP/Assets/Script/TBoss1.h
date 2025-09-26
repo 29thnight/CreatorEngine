@@ -2,12 +2,14 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Entity.h"
+#include "TBoss1.generated.h"
 
 class BehaviorTreeComponent;
 class BlackBoard;
 class TBoss1 : public Entity
 {
 public:
+   ReflectTBoss1
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(TBoss1)
 	virtual void Awake() override {}

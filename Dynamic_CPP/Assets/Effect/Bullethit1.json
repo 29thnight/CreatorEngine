@@ -1,9 +1,9 @@
 {
     "currentTime": 0.0,
-    "duration": -1.0,
+    "duration": 1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": true,
+    "loop": false,
     "name": "Bullethit1",
     "particleSystems": [
         {
@@ -65,6 +65,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 2.753999948501587,
                             "randomFactor": 0.0,
@@ -73,7 +76,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 10.422431945800781,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -155,12 +158,14 @@
                                 "x": 0.10000000149011612,
                                 "y": 0.10000000149011612
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.5,
                                 "y": 0.5
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -395,12 +400,14 @@
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.699999988079071,
                                 "y": 0.699999988079071
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -626,12 +633,14 @@
                                 "x": 1.5,
                                 "y": 0.30000001192092896
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.5,
                                 "y": 0.10000000149011612
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -857,12 +866,14 @@
                                 "x": 1.5,
                                 "y": 0.30000001192092896
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.5,
                                 "y": 0.10000000149011612
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1106,12 +1117,14 @@
                                 "x": 5.0,
                                 "y": 5.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1337,12 +1350,14 @@
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1523,12 +1538,14 @@
                                 "x": 3.0,
                                 "y": 3.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {

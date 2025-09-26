@@ -42,7 +42,6 @@
 #include "EntityEleteMonster.h"
 #include "SFXPoolManager.h"
 #include "SoundName.h"
-
 void Player::Start()
 {
 	player = GetOwner();
@@ -1410,8 +1409,10 @@ void Player::MeleeAttack()
 	float distacne = 2.0f;
 	if (m_curWeapon)
 	{
-		distacne = m_curWeapon->itemAckRange; //사거리도 차지면 다름
+		distacne = m_curWeapon->itemAckRange; 
 	}
+	if (isChargeAttack)
+		distacne = m_curWeapon->chgRange;
 	float damage = calculDamge(isChargeAttack);
 
 	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10;
@@ -1434,13 +1435,18 @@ void Player::MeleeAttack()
 	allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
 	for (auto& hit : allHits)
 	{
-		Mathf::Vector3 pos = hit.point;
 		auto object = hit.gameObject;
 		if (object == nullptr || object == GetOwner()) continue;
 		auto entity = object->GetComponentDynamicCast<Entity>();
 		if (entity) {
 			auto [iter, inserted] = AttackTarget.insert(entity);
-			if (inserted) (*iter)->SendDamage(this, damage);
+			HitInfo hitinfo;
+			hitinfo.itemType = m_curWeapon->itemType;
+			hitinfo.hitPos = hit.point;
+			hitinfo.attakerPos = GetOwner()->m_transform.GetWorldPosition();
+			hitinfo.hitNormal = hit.normal;
+			hitinfo.KnockbackForce = { m_curWeapon->itemKnockback ,0,m_curWeapon->itemKnockback };
+			if (inserted) (*iter)->SendDamage(this, damage, hitinfo);
 			if (GM)
 			{
 				auto pool = GM->GetSFXPool();
@@ -1450,6 +1456,8 @@ void Player::MeleeAttack()
 					pool->PlayOneShot(MeleeStrikeSounds[rand]);
 				}
 			}
+
+			
 		}
 	}
 }
@@ -1468,7 +1476,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1 << 8 | 1 << 10;; //일단 다떄림
+	RangeInfo.layerMask = 1 << 8 | 1 << 10;; 
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();

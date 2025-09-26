@@ -98,6 +98,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         this->m_awakeEventHandle = scene->AwakeEvent.AddLambda([derived_component, &isAwakeCalled]()
         { 
             auto sceneObject = derived_component->GetOwner();
+            if (isAwakeCalled == true) return;
             if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
             {
                 return;

@@ -1,12 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-
+#include "ItemType.h"
 struct HitInfo
 {
 	Mathf::Vector3 attakerPos{};     //떄린애 worldpos
 	Mathf::Vector3 hitPos{};         //맞은애맞은위치 (콜리전반응위치 등)
+	Mathf::Vector3 hitNormal{};
 	Mathf::Vector3 KnockbackForce{}; //맞은애를 넉백시킬거리
+	ItemType itemType = ItemType::None;
 };
 class Entity : public ModuleBehavior
 {
