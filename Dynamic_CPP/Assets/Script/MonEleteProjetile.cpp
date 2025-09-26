@@ -23,6 +23,7 @@ void MonEleteProjetile::OnTriggerEnter(const Collision& collision)
 	if (collision.otherObj->m_tag.ToString() == "Player" || collision.otherObj->m_tag.ToString() == "Asis") {
 		Action(collision.otherObj);
 	}
+	
 	//TODO : 
 	//광물이나 벽등의 충돌되었을때 사라지는 내용이 필요한가?
 }
@@ -110,8 +111,11 @@ void MonEleteProjetile::Action(GameObject* target)
 	//다중충돌 안한다고 가정했을때 1회성으로 끝내려고
 	if (isTrigger) return;
 
+	HitInfo hitInfo;
+	hitInfo.attakerPos = GetOwner()->m_transform.GetWorldPosition();
+	hitInfo.hitPos = {};
 	Entity* targetEntity = target->GetComponentDynamicCast<Entity>();
-	targetEntity->SendDamage(ownerEntity, m_Damege);
+	targetEntity->SendDamage(ownerEntity, m_Damege, hitInfo);
 
 	//todo : 여기서 이제 뚫고 갈건지 비화성화 할건지? 일단은 일회성으로 사라지게 하자
 	RevertPool();

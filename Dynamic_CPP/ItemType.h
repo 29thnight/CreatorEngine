@@ -29,17 +29,17 @@ constexpr ItemType EToIMap[] = {
 };
 
 
-
-enum class BuffType
+enum class PlayerType
 {
-	None,
-	Melee,
-	Range,
-	Explosion,
+	Male,
+	Female,
 };
-AUTO_REGISTER_ENUM(BuffType)
+AUTO_REGISTER_ENUM(PlayerType)
+
+
 
 class Entity;
+//아마 안쓰는대 확인후 삭제예정
 struct AttackContext
 {
 	Entity* target = nullptr;

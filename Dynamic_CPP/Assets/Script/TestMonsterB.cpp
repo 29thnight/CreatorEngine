@@ -302,7 +302,7 @@ void TestMonsterB::AttackBoxOff()
 	isBoxAttack = false;
 }
 
-void TestMonsterB::SendDamage(Entity* sender, int damage)
+void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{

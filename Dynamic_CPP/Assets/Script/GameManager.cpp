@@ -15,7 +15,7 @@
 #include "DebugLog.h"
 #include "EntityAsis.h"
 #include "Player.h"
-
+#include "SFXPoolManager.h"
 void GameManager::Awake()
 {
 	LOG("GameManager Awake");
@@ -305,6 +305,16 @@ std::vector<Weapon*>& GameManager::GetWeaponPiecePool()
 {
 	// TODO: 여기에 return 문을 삽입합니다.
 	return m_weaponPiecePool;
+}
+
+void GameManager::PushSFXPool(SFXPoolManager* _SFXPool)
+{
+	SFXPool = _SFXPool;
+}
+
+SFXPoolManager* GameManager::GetSFXPool()
+{
+	return SFXPool;
 }
 
 void GameManager::CheatMiningResource()

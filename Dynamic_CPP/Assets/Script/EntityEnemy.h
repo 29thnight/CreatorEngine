@@ -30,7 +30,7 @@ public:
 	virtual void OnDestroy() override  {}
 
 	//CriticalMark criticalMark;
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce);
 	bool isDead;
 	BehaviorTreeComponent* enemyBT;

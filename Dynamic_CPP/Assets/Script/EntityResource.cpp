@@ -35,7 +35,7 @@ void EntityResource::Start()
 void EntityResource::Update(float tick)
 {
 }
-void EntityResource::SendDamage(Entity* sender, int damage)
+void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	//LOG("EntityResource Attack");
 	if (sender)

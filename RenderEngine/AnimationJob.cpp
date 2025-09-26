@@ -10,7 +10,7 @@
 #include "Socket.h"
 using namespace DirectX;
 
-std::vector<std::shared_ptr<Animator>> m_currAnimator;
+std::vector<std::weak_ptr<Animator>> m_currAnimator;
 
 inline float lerp(float a, float b, float f)
 {
@@ -66,9 +66,21 @@ void AnimationJob::Update(float deltaTime)
         m_currAnimator.push_back(animator);
     }
 
-    for(auto& animator : m_currAnimator)
+    for(auto& weakanimator : m_currAnimator)
     {
-        std::vector<std::shared_ptr<AnimationController>> controllers = animator->m_animationControllers;
+        auto animator = weakanimator.lock();
+        if (animator == nullptr) return;
+        std::vector<std::weak_ptr<AnimationController>> controllers;
+        for (auto& sharedcontroller : animator->m_animationControllers)
+        {
+            controllers.push_back(sharedcontroller);
+        }
+        
+        for (auto& controller : controllers)
+        {
+            if (controller.lock() == nullptr)
+                return;
+        }
         m_UpdateThreadPool->Enqueue([this, animator, controllers, delta = deltaTime]
         {
             Skeleton* skeleton = animator->m_Skeleton;

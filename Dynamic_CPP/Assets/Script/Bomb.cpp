@@ -5,6 +5,11 @@
 #include "Explosion.h"
 #include "Entity.h"
 #include "Player.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
+#include "Core.Random.h"
+#include "SoundName.h"
+
 void Bomb::Start()
 {
 	
@@ -60,6 +65,21 @@ void Bomb::Update(float tick)
 			explosionInfo.position = transform->GetWorldPosition();
 			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
 
+
+			auto GMobj = GameObject::Find("GameManager");
+			if (GMobj)
+			{
+				GameManager* GM = GMobj->GetComponent<GameManager>();
+				if (GM)
+				{
+					auto pool = GM->GetSFXPool();
+					if (pool)
+					{
+						int rand = Random<int>(0, ExplosionSounds.size() - 1).Generate();
+						pool->PlayOneShot(ExplosionSounds[rand]);
+					}
+				}
+			}
 
  			for (auto& hit : hits)
 			{

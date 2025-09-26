@@ -106,6 +106,7 @@ void EntityEleteMonster::Start()
 
 void EntityEleteMonster::Update(float tick)
 {
+	if (blackBoard == nullptr) return;
 	bool hasIdentity = blackBoard->HasKey("Identity");
 	if (hasIdentity) {
 		std::string Identity = blackBoard->GetValueAsString("Identity");
@@ -566,7 +567,7 @@ void EntityEleteMonster::RotateToTarget()
 	}
 }
 
-void EntityEleteMonster::SendDamage(Entity* sender, int damage)
+void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{
