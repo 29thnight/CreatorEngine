@@ -4,7 +4,11 @@
 #include "Delegate.h"
 #include "DLLAcrossSingleton.h"
 
-class ShaderPSO; // Àü¹æ ¼±¾ð
+#include <memory>
+
+class VisualShaderPSO; // visual shader pipeline
+        std::unordered_map<std::string, std::shared_ptr<VisualShaderPSO>> VisualShaderAssets;
+class ShaderPSO; // Ã€Ã¼Â¹Ã¦ Â¼Â±Â¾Ã°
 class Material;
 class ImageComponent;
 class ShaderResourceSystem final : public DLLCore::Singleton<ShaderResourceSystem>
