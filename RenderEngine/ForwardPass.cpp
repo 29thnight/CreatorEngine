@@ -23,10 +23,24 @@ struct alignas(16) MatrixBuffer {
 	float add;
 };
 
+struct alignas(16) TimeBuffer {
+	float totalTime;
+	float deltaTime;
+	unsigned int totalFrame;
+};
+
+struct alignas(16) WindBuffer {
+	Mathf::Vector3 windDirection;
+	float windStrength;
+	float windSpeed;
+	float windWaveFrequency;
+};
+
 ForwardPass::ForwardPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
 	m_instancePSO = std::make_unique<PipelineStateObject>();
+	m_instanceFoliagePSO = std::make_unique<PipelineStateObject>();
 
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
 	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Forward"];
@@ -35,6 +49,10 @@ ForwardPass::ForwardPass()
 	m_instancePSO->m_vertexShader = &ShaderSystem->VertexShaders["InstancedVertexShader"];
 	m_instancePSO->m_pixelShader = &ShaderSystem->PixelShaders["Forward"];
 	m_instancePSO->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+	m_instanceFoliagePSO->m_vertexShader = &ShaderSystem->VertexShaders["InstancedVertexForFoliageShader"];
+	m_instanceFoliagePSO->m_pixelShader = &ShaderSystem->PixelShaders["Forward"];
+	m_instanceFoliagePSO->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	InputLayOutContainer vertexLayoutDesc = {
 		{ "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -59,6 +77,7 @@ ForwardPass::ForwardPass()
 	//{ "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 	m_instancePSO->CreateInputLayout(std::move(instanceVertexLayoutDesc));
+	m_instanceFoliagePSO->CreateInputLayout(std::move(instanceVertexLayoutDesc));
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -68,10 +87,14 @@ ForwardPass::ForwardPass()
 
 	m_instancePSO->m_samplers.push_back(linearSampler);
 	m_instancePSO->m_samplers.push_back(pointSampler);
+	m_instanceFoliagePSO->m_samplers.push_back(linearSampler);
+	m_instanceFoliagePSO->m_samplers.push_back(pointSampler);
 
 	m_Buffer = DirectX11::CreateBuffer(sizeof(ForwardBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_TimeBuffer = DirectX11::CreateBuffer(sizeof(TimeBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_windBuffer = DirectX11::CreateBuffer(sizeof(WindBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	constexpr uint32 MAX_INSTANCES = 2048; // Max number of instances per draw call
 	m_maxInstanceCount = MAX_INSTANCES;
@@ -199,7 +222,19 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
 	DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
 	DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
-
+	TimeBuffer timeBuffer{
+		Time->GetTotalSeconds(),
+		Time->GetElapsedSeconds(),
+		Time->GetFrameCount()
+	};
+	WindBuffer windBuffer{
+		m_windDirection,
+		m_windStrength,
+		m_windSpeed,
+		m_windWaveFrequency
+	};
+	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
+	DirectX11::UpdateBuffer(deferredPtr, m_windBuffer.Get(), &windBuffer);
 
 	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
@@ -248,6 +283,9 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
 	ID3D11ShaderResourceView* envSRVs[3] = {
 		m_UseEnvironmentMap ? envMap->m_pSRV : nullptr,
@@ -300,6 +338,9 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::OMSetDepthStencilState(deferredPtr, m_depthNoWrite.Get(), 1);
 	DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, m_instanceBufferSRV.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
 	for (auto const& [groupKey, proxies] : instanceGroups)
 	{
@@ -415,6 +456,9 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 				DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 				//DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 				DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
+				DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+				DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
+				DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
 				ID3D11ShaderResourceView* envSRVs[3] = {
 					m_UseEnvironmentMap ? envMap->m_pSRV : nullptr,
@@ -485,7 +529,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	auto brdfLut = m_BrdfLut.lock();
 
 	ID3D11DeviceContext* deferredPtr = deferredContext;
-	m_instancePSO->Apply(deferredPtr);
+	m_instanceFoliagePSO->Apply(deferredPtr);
 	// Bind the pre-created instance buffer SRV to the vertex shader once.
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, m_instanceBufferSRV.GetAddressOf());
 
@@ -504,6 +548,9 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
 	ID3D11ShaderResourceView* envSRVs[3] = {
 		m_UseEnvironmentMap ? envMap->m_pSRV : nullptr,
@@ -592,6 +639,33 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 
 void ForwardPass::ControlPanel()
 {
+	ImGui::PushID(this);
+	auto& setting = EngineSettingInstance->GetRenderPassSettingsRW();
+	if (ImGui::SliderFloat3("Wind Direction", &m_windDirection.x, -1.f, 1.f))
+	{
+		setting.m_windDirection = m_windDirection;
+	}
+	if (ImGui::SliderFloat("Wind Strength", &m_windStrength, 0.f, 1.f))
+	{
+		setting.m_windStrength = m_windStrength;
+	}
+	if (ImGui::SliderFloat("Wind Speed", &m_windSpeed, 0.f, 10.f))
+	{
+		setting.m_windSpeed = m_windSpeed;
+	}
+	if (ImGui::SliderFloat("Wind Wave Frequency", &m_windWaveFrequency, 0.f, 10.f))
+	{
+		setting.m_windWaveFrequency = m_windWaveFrequency;
+	}
 	ImGui::DragFloat("ior", &ior, 0.075f, -1.f, 1.f);
 	ImGui::DragFloat("add", &add, 0.075f, 0.f, 1000.f);
+	ImGui::PopID();
+}
+
+void ForwardPass::ApplySettings(const RenderPassSettings& setting)
+{
+	m_windDirection = setting.m_windDirection;
+	m_windStrength = setting.m_windStrength;
+	m_windSpeed = setting.m_windSpeed;
+	m_windWaveFrequency = setting.m_windWaveFrequency;
 }

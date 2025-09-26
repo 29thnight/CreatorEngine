@@ -26,6 +26,13 @@ struct alignas(16) TimeBuffer {
 	unsigned int totalFrame;
 };
 
+struct alignas(16) WindBuffer {
+	Mathf::Vector3 windDirection;
+	float windStrength;
+	float windSpeed;
+	float windWaveFrequency;
+};
+
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -94,6 +101,7 @@ GBufferPass::GBufferPass()
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_TimeBuffer = DirectX11::CreateBuffer(sizeof(TimeBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_windBuffer = DirectX11::CreateBuffer(sizeof(WindBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	for (uint32 i = 0; i < MAX_BONES; i++)
 	{
@@ -203,13 +211,22 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		Time->GetElapsedSeconds(),
 		Time->GetFrameCount()
 	};
+	WindBuffer windBuffer{
+		m_windDirection,
+		m_windStrength,
+		m_windSpeed,
+		m_windWaveFrequency
+	};
 	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
+	DirectX11::UpdateBuffer(deferredPtr, m_windBuffer.Get(), &windBuffer);
 
 	// --- 2. RENDER ANIMATED OBJECTS (INDIVIDUALLY) ---
 	m_pso->Apply(deferredPtr);
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
@@ -459,8 +476,17 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 		Time->GetElapsedSeconds(),
 		Time->GetFrameCount()
 	};
+	WindBuffer windBuffer{
+		m_windDirection,
+		m_windStrength,
+		m_windSpeed,
+		m_windWaveFrequency
+	};
 	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
+	DirectX11::UpdateBuffer(deferredPtr, m_windBuffer.Get(), &windBuffer);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
 	for (auto& terrainProxy : data->m_terrainQueue) 
 	{
@@ -496,6 +522,38 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
+}
+
+void GBufferPass::ApplySettings(const RenderPassSettings& setting)
+{
+	m_windDirection = setting.m_windDirection;
+	m_windStrength = setting.m_windStrength;
+	m_windSpeed = setting.m_windSpeed;
+	m_windWaveFrequency = setting.m_windWaveFrequency;
+}
+
+void GBufferPass::ControlPanel()
+{
+	ImGui::PushID(this);
+	auto& setting = EngineSettingInstance->GetRenderPassSettingsRW();
+	if(ImGui::SliderFloat3("Wind Direction", &m_windDirection.x, -1.f, 1.f))
+	{
+		setting.m_windDirection = m_windDirection;
+	}
+	if(ImGui::SliderFloat("Wind Strength", &m_windStrength, 0.f, 1.f))
+	{
+		setting.m_windStrength = m_windStrength;
+	}
+	if(ImGui::SliderFloat("Wind Speed", &m_windSpeed, 0.f, 10.f))
+	{
+		setting.m_windSpeed = m_windSpeed;
+	}
+	if(ImGui::SliderFloat("Wind Wave Frequency", &m_windWaveFrequency, 0.f, 10.f))
+	{
+		setting.m_windWaveFrequency = m_windWaveFrequency;
+	}
+
+	ImGui::PopID();
 }
 
 void GBufferPass::Resize(uint32_t width, uint32_t height)

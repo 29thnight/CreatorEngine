@@ -548,6 +548,12 @@
     <ClCompile Include="ShaderDSL.cpp">
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClCompile>
+    <ClCompile Include="VisualShaderDSL.cpp">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClCompile>
+    <ClCompile Include="VisualShaderPSO.cpp">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClCompile>
     <ClCompile Include="UIRenderProxy.cpp">
       <Filter>Objects\UIRenderProxy</Filter>
     </ClCompile>
@@ -904,6 +910,12 @@
     <ClInclude Include="ShaderDSL.h">
       <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClInclude>
+    <ClInclude Include="VisualShaderDSL.h">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClInclude>
+    <ClInclude Include="VisualShaderPSO.h">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
+    </ClInclude>
     <ClInclude Include="UIRenderProxy.h">
       <Filter>Objects\UIRenderProxy</Filter>
     </ClInclude>
@@ -1244,6 +1256,15 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Board.vs.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoardPulseScale.vs.hlsl">
+      <Filter>Shaders\Effect\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\InstancedVertexForFoliageShader.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TestVertexWind.vs.hlsl">
+      <Filter>Shaders\TestShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

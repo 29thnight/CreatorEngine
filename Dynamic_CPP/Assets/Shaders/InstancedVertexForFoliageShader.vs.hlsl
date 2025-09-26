@@ -53,6 +53,11 @@ VertexShaderOutput main(AppData IN, uint instanceID : SV_InstanceID)
 
     VertexShaderOutput OUT;
     OUT.wPosition = mul(instanceModel, float4(IN.position, 1.0f));
+    float wind = sin(OUT.wPosition.x * waveFrequency + totalTime * windSpeed); // 0~1
+    float weight = pow(OUT.wPosition.y, 2);
+    wind *= windStrength * weight;
+    OUT.wPosition.xyz += windDirection * wind;
+    
     matrix vp = mul(projection, view);
     OUT.position = mul(vp, OUT.wPosition);
     OUT.pos = OUT.position;

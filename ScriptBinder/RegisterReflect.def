@@ -33,6 +33,7 @@
 #include "StateMachineComponent.h"
 #include "AniTransition.h"
 #include "SSAOPassSetting.h"
+#include "VolumetricFogPassSetting.h"
 #include "VignettePassSetting.h"
 #include "FoliageType.h"
 #include "VolumeProfile.h"
@@ -44,8 +45,8 @@
 #include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
 #include "BoxColliderComponent.h"
-#include "BTBuildGraph.h"
 #include "SphereColliderComponent.h"
+#include "BTBuildGraph.h"
 #include "Canvas.h"
 #include "BTBuildNode.h"
 #include "CharacterControllerComponent.h"
@@ -153,4 +154,5 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(VignettePassSetting);
     AUTO_REGISTER_CLASS(VolumeComponent);
     AUTO_REGISTER_CLASS(VolumeProfile);
+    AUTO_REGISTER_CLASS(VolumetricFogPassSetting);
 }

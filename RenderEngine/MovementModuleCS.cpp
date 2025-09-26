@@ -165,6 +165,7 @@ void MovementModuleCS::UpdateConstantBuffers(float delta)
         params->deltaTime = delta;
         params->gravityStrength = m_gravityStrength;
         params->useGravity = m_gravity ? 1 : 0;
+        params->maxParticles = m_particleCapacity;
 
         // Velocity 관련 파라미터 업데이트
         params->velocityMode = static_cast<int>(m_velocityMode);

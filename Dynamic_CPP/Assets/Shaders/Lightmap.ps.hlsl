@@ -58,6 +58,9 @@ cbuffer PBRMaterial : register(b0)
     int gUseEmmisive;
     int gNormalState;
     int gConvertToLinear;
+
+    uint bitflag;
+    float gIOR;
 }
 cbuffer CB : register(b1)
 {

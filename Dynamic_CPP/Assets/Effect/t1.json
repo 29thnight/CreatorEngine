@@ -80,36 +80,27 @@
                 },
                 {
                     "data": {
-                        "easing": {
-                            "animationType": 0,
-                            "duration": 1.0,
-                            "enabled": false,
-                            "type": 0
-                        },
-                        "sizeParams": {
-                            "endSize": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "oscillationSpeed": 5.0,
-                            "randomScaleMax": 2.0,
-                            "randomScaleMin": 0.5,
-                            "startSize": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "useOscillation": 1,
-                            "useRandomScale": 0
-                        },
                         "state": {
-                            "isInitialized": true,
+                            "isInitialized": false,
                             "particleCapacity": 1
+                        },
+                        "trailParams": {
+                            "alphaFalloff": 0.800000011920929,
+                            "enableTrail": 1,
+                            "minSpeed": 1.0,
+                            "trailColor": {
+                                "a": 1.0,
+                                "b": 1.0,
+                                "g": 1.0,
+                                "r": 1.0
+                            },
+                            "trailWidth": 1.0,
+                            "uvScale": 1.0,
+                            "widthFalloff": 0.5
                         }
                     },
                     "stage": 2,
-                    "type": "MeshSizeModuleCS",
+                    "type": "MeshTrailModuleCS",
                     "useEasing": false
                 }
             ],
