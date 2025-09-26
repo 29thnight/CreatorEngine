@@ -35,8 +35,21 @@ public:
 
 	bool ownerDestory = false;
 
+	//회전?? 자기 위치를 움직여야 하는군 그럼 플레그 받아서 돌아가는거 만들자
+	bool isOrbiting = false;
+	float m_orbitAngle = 0.0f;
+	float m_orbitDistance = 0.0f;
+	bool m_clockWise = true;
+
+	bool m_useOrbiting = false;
+	float m_orbitingStartDelay = 1.0f;
+	float m_orbitingEndDelay = 1.0f;
+
+
+	//음... 보스위치 기준으로 기준으로 하느냐? 춘식이 위치 기준으로 하는냐 인대... 이 친구들은 일단 보스 위치 기준으로 하자. 그럼 변수 추가 없어도 될듯
+
 	//그럼 소유하는 엔티티랑 데미지,범위,시간 만 받으면 되려나?
-	void Initialize(Entity* owner, int damage, float radius, float delay);
+	void Initialize(Entity* owner,Mathf::Vector3 pos, int damage, float radius, float delay, bool useOrbiting = false,bool clockwise =true);
 
 	void Explosion(); //폭발하며 주변 대미지;
 };
