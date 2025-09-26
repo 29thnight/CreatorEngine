@@ -106,6 +106,7 @@ void EntityEleteMonster::Start()
 
 void EntityEleteMonster::Update(float tick)
 {
+	if (blackBoard == nullptr) return;
 	bool hasIdentity = blackBoard->HasKey("Identity");
 	if (hasIdentity) {
 		std::string Identity = blackBoard->GetValueAsString("Identity");

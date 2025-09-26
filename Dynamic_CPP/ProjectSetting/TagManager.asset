@@ -7,6 +7,10 @@ tags:
   - GameController
   - ShootTag
   - Wall
+  - PlayerMoveSound
+  - PlayerActionSound
+  - PlayerDamageSound
+  - PlayerSpecialActionSound
 layers:
   - Default
   - TransparentFX

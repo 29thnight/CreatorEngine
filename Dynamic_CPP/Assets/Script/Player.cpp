@@ -40,45 +40,9 @@
 #include "Core.Random.h"
 #include "WeaponCapsule.h"
 #include "EntityEleteMonster.h"
-std::vector<std::string> dashSounds
-{
-	"Dodge 1_Movement_01",
-	"Dodge 1_Movement_02",
-	"Dodge 1_Movement_03",
-	"Dodge 1_Slow_Armour_01",
-	"Dodge 1_Slow_Armour_02",
-	"Dodge 1_Slow_Armour_03",
-	"Dodge 2_Movement_01",
-	"Dodge 2_Movement_02",
-	"Dodge 2_Movement_03"
-};
-std::vector<std::string> stepSounds
-{
-	"Step_Movement_Small_01",
-	"Step_Movement_Small_02",
-	"Step_Movement_Small_03"
+#include "SFXPoolManager.h"
+#include "SoundName.h"
 
-};
-std::vector<std::string> normalBulletSounds
-{
-	"Electric_Attack_01",
-	"Electric_Attack_02",
-	"Electric_Attack_03"
-
-
-};
-std::vector<std::string> specialBulletSounds
-{
-	"Electric_Skill_01",
-	"Electric_Skill_02"
-};
-std::vector<std::string> MeleeChargeSounds
-{
-	"Nunchaku Attack_Skill_Bass_01",
-	"Nunchaku Attack_Skill_Bass_02",
-	"Nunchaku Attack_Skill_Bass_03"
-
-};
 void Player::Start()
 {
 	player = GetOwner();
@@ -104,6 +68,8 @@ void Player::Start()
 	std::string ShootPosTagName = "ShootTag";
 	std::string ActionSoundName = "PlayerActionSound";
 	std::string MoveSoundName   = "PlayerMoveSound";
+	std::string SpecialActionSound = "PlayerSpecialActionSound";
+	std::string DamageSound = "PlayerDamageSound";
 	for (auto& child : childred)
 	{
 		GameObject* childObj = GameObject::FindIndex(child);
@@ -113,14 +79,23 @@ void Player::Start()
 			{
 				shootPosObj = childObj;
 			}
-			else if (childObj->RemoveSuffixNumberTag() == ActionSoundName)
+			else if (childObj->m_tag == ActionSoundName)
 			{
 				m_ActionSound = childObj->GetComponent<SoundComponent>();
 				
 			}
-			else if (childObj->RemoveSuffixNumberTag() == MoveSoundName)
+			else if (childObj->m_tag == MoveSoundName)
 			{
 				m_MoveSound = childObj->GetComponent<SoundComponent>();
+			}
+			else if (childObj->m_tag == SpecialActionSound)
+			{
+				m_SpecialActionSound = childObj->GetComponent<SoundComponent>();
+
+			}
+			else if (childObj->m_tag == DamageSound)
+			{
+				m_DamageSound = childObj->GetComponent<SoundComponent>();
 			}
 		}
 	}
@@ -323,11 +298,11 @@ void Player::Update(float tick)
 		UpdateChatchObject();
 	}
 
-	if (m_nearObject) {
+	/*if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
-	}
+	}*/
 
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
@@ -523,6 +498,7 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	if (sender)
 	{
 		if (true == IsInvincibility()) return;
+		if (true == isStun) return;
 		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		// hit
 		//DropCatchItem();
@@ -552,6 +528,13 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			}
 		}
 		Damage(damage);
+
+		if (m_DamageSound)
+		{
+			int rand = Random<int>(0, DamageSounds.size() - 1).Generate();
+			m_DamageSound->clipKey = DamageSounds[rand];
+			m_DamageSound->PlayOneShot();
+		}
 		SetInvincibility(HitGracePeriodTime);
 	}
 }
@@ -890,6 +873,13 @@ void Player::Charging()
 	{
 		startAttack = false;
 		isCharging = true;    //true 일동안 chargeTime 상승중
+
+		if (m_SpecialActionSound)
+		{
+				int rand = Random<int>(0, MeleeChargingSounds.size() - 1).Generate();
+				m_SpecialActionSound->clipKey = MeleeChargingSounds[rand];
+				m_SpecialActionSound->PlayOneShot();
+		}
 	}
 	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
 }
@@ -971,8 +961,10 @@ void Player::PlaySlashEvent()
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash1Offset;
-
-		m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
+		}
 		if (isChargeAttack)
 		{
 			effectOffset = slashChargeOffset;
@@ -1155,10 +1147,15 @@ void Player::SwapWeaponLeft()
 
 		CancelChargeAttack();
 
-		
+
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
 
 		
-
 		LOG("Swap Left" + std::to_string(m_weaponIndex));
 	}
 }
@@ -1198,6 +1195,13 @@ void Player::SwapWeaponRight()
 
 		CancelChargeAttack(); 
 
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
+
 		LOG("Swap Right" + std::to_string(m_weaponIndex));
 	}
 }
@@ -1212,6 +1216,13 @@ void Player::SwapBasicWeapon()
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
 		m_curWeapon->SetEnabled(true);
 		canChangeSlot = false;
+
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
 	}
 	countRangeAttack = 0;
 	m_comboCount = 0;
@@ -1277,6 +1288,14 @@ void Player::DeleteCurWeapon()
 	m_curWeapon->GetOwner()->Destroy();
 	if (it != m_weaponInventory.end())
 	{
+		if (m_curWeapon->itemType != ItemType::Bomb) //basic인건 위에서 검사하니까 붐이아닌지만 체크
+		{
+			int rand = Random<int>(0, WeaponBreakSounds.size() - 1).Generate();
+			m_SpecialActionSound->clipKey = WeaponBreakSounds[rand];
+			m_SpecialActionSound->PlayOneShot();
+		}
+
+
 		SwapBasicWeapon();
 		handSocket->DetachObject((*it)->GetOwner());
 		m_weaponInventory.erase(it);
@@ -1291,6 +1310,7 @@ void Player::DeleteCurWeapon()
 				m_AddWeaponEvent.UnsafeBroadcast(nullptr, i);
 			}
 		}
+		
 	}
 }
 
@@ -1421,6 +1441,15 @@ void Player::MeleeAttack()
 		if (entity) {
 			auto [iter, inserted] = AttackTarget.insert(entity);
 			if (inserted) (*iter)->SendDamage(this, damage);
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					int rand = Random<int>(0, MeleeStrikeSounds.size() - 1).Generate();
+					pool->PlayOneShot(MeleeStrikeSounds[rand]);
+				}
+			}
 		}
 	}
 }
@@ -1606,6 +1635,12 @@ void Player::ShootChargeBullet()
 				bullet->Initialize(this, pos, ShootDir, m_curWeapon->chgAckDmg);
 			}
 		}
+
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = RangeChargeSounds[0];
+			m_ActionSound->PlayOneShot();
+		}
 	}
 
 }
@@ -1622,6 +1657,12 @@ void Player::ThrowBomb()
 		bomb->ThrowBomb(this, pos, bombThrowPosition, calculDamge());
 		onBombIndicate = false;
 		m_curWeapon->SetEnabled(false);
+		
+		if(m_ActionSound)
+		{
+			m_ActionSound->clipKey = "Weapon_Whoosh_Low_2";
+			m_ActionSound->PlayOneShot();
+		}
 	}
 
 }

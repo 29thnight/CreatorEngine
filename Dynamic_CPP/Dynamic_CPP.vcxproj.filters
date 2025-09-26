@@ -606,6 +606,9 @@
 		<ClInclude Include="Assets\Script\PlayerThrow.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\SFXPoolManager.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1063,6 +1066,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SFXPoolManager.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

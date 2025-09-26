@@ -69,6 +69,8 @@ public:
 	[[Property]]
 	int playerIndex = 0;
 	[[Property]]
+	PlayerType m_playerType = PlayerType::Male;
+	[[Property]]
 	float moveSpeed = 0.025f;
 	[[Property]]
 	float chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
@@ -273,8 +275,10 @@ public:
 
 	GameObject* BombIndicator = nullptr;
 
-	SoundComponent* m_ActionSound; //칼 휘두름, 탄 발사, 잡기,던지기,죽음,부활 등 행동사운드
-	SoundComponent* m_MoveSound;   //대시, 걷기 등 이동중사운드
+	SoundComponent* m_ActionSound = nullptr; //칼 휘두름, 탄 발사, 잡기,던지기,부활, 무기교체 등 행동사운드
+	SoundComponent* m_SpecialActionSound = nullptr; //무기 부셔짐,공격차징 등
+	SoundComponent* m_DamageSound = nullptr; //피격 스턴,사운드
+	SoundComponent* m_MoveSound = nullptr;   //대시, 걷기 등 이동중사운드
 	//이펙트 사운드는 따로 몬스터이펙트등 모아서 관리 or 플레이어껀 따로
 
 	
