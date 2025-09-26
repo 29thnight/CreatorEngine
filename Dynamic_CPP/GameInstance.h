@@ -96,10 +96,12 @@ void GameInstance::AddEnhancementDelta(SourceKey key, const EnhancementDelta<T>&
 	RemoveEnhancementDelta(key);
 
 	constexpr int idx = static_cast<int>(T);
-	if constexpr (std::same_as<typename EnhancementDelta<T>::value_type, int>) {
+	if constexpr (std::same_as<typename EnhancementDelta<T>::value_type, int>) 
+	{
 		m_addInt[idx] += d.value;
 	}
-	else {
+	else 
+	{
 		m_mulFloat[idx] += d.value; // 0.10f == +10%
 	}
 	m_applied.emplace(key, d); // AnyDelta∑Œ ¿˙¿Â(variant)

@@ -96,6 +96,8 @@ public:
     int GetWidth() const { return m_width; }
     int GetHeight() const { return m_height; }
 
+    void EnsureSwapChainCompatibleStyle();
+
     static CoreWindow* GetForCurrentInstance()
     {
         return s_instance;

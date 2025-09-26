@@ -4,6 +4,7 @@
 
 class Camera;
 class ShadowMapPass;
+struct VolumetricFogPassSetting;
 //class VolumetricFogMain final : public IRenderPass
 //{
 //	
@@ -41,6 +42,7 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+	virtual void ApplySettings(const VolumetricFogPassSetting& settings);
 	virtual void Resize(uint32_t width, uint32_t height) override;
 private:
 	bool isOn{ true };

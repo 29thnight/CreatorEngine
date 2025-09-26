@@ -29,6 +29,31 @@ inline std::optional<SceneType> FromKey(std::string_view k) {
 	return std::nullopt;
 }
 
+static inline std::string FormatDescFmtStyle(const std::string& fmt, int rawPercent)
+{
+	try
+	{
+		// "{:.#f" 같은 소수 형식이 보이면 실수값(= % 의미로 0.01 배) 사용
+		const bool wantsFloat = (fmt.find("{:.") != std::string::npos);
+
+		if (wantsFloat)
+		{
+			const double v = static_cast<double>(rawPercent) * 0.01; // 20 -> 0.20
+			return std::vformat(fmt, std::make_format_args(v));
+		}
+		else
+		{
+			// 그냥 "{}"면 정수 그대로 넣어 20 -> "20"
+			return std::vformat(fmt, std::make_format_args(rawPercent));
+		}
+	}
+	catch (const std::format_error&)
+	{
+		// 포맷 오류면 원문 그대로 사용
+		return fmt;
+	}
+}
+
 void GameInstance::Initialize()
 {
 	if (m_isInitialize) {
@@ -73,21 +98,15 @@ void GameInstance::LoadItemInfoFromCSV(const std::string& csvFilePath)
 		for (const auto& row : reader)
 		{
 			ItemInfo info{};
-			info.id					= row["id"].as<int>();
-			info.rarity				= row["rarity"].as<int>();
-			info.name				= row["name"].as<std::string>();
-			info.description		= row["desc"].as<std::string>();
-			info.price				= row["price"].as<int>();
-			info.enhancementType	= row["enhancementType"].as<int>();
+			info.id						= row["id"].as<int>();
+			info.rarity					= row["rarity"].as<int>();
+			info.name					= row["name"].as<std::string>();
+			const std::string descTmpl	= row["desc"].as<std::string>();
+			info.price					= row["price"].as<int>();
+			info.enhancementType		= row["enhancementType"].as<int>();
+			info.enhancementValue		= row["enhancementValue"].as<int>();
 
-			if (IsFloatStat(info.enhancementType))
-			{
-				info.enhancementValue = row["enhancementValue"].as<float>();
-			}
-			else 
-			{
-				info.enhancementValue = row["enhancementValue"].as<int>();
-			}
+			info.description = FormatDescFmtStyle(descTmpl, info.enhancementValue);
 
 			ItemUniqueID key{ info.id, info.rarity };
 			m_itemInfoMap[key] = std::move(info);

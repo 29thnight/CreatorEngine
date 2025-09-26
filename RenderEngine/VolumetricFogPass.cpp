@@ -6,6 +6,7 @@
 #include "TimeSystem.h"
 
 #include "LightProperty.h"
+#include "VolumetricFogPassSetting.h"
 
 #define MAX_LIGHT 20
 #define VOXEL_VOLUME_SIZE_Z 128
@@ -315,17 +316,50 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCon
 void VolumetricFogPass::ControlPanel()
 {
 	ImGui::PushID(this);
+	auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().volumetricFog;
+
 	ImGui::Text("VolumetricFogMain");
-	ImGui::Checkbox("VolumetricFog", &isOn);
-	ImGui::SliderFloat("Anisotropy", &mAnisotropy, 0.0f, 1.0f);
-	ImGui::SliderFloat("Density", &mDensity, 0.1f, 10.0f);
-	ImGui::SliderFloat("Strength", &mStrength, 0.0f, 50.0f);
-	//ImGui::SliderFloat("Thickness", &mThicknessFactor, 0.0f, 0.1f);
-	ImGui::SliderFloat("Blending with scene", &mBlendingWithSceneColorFactor, 0.0f, 1.0f);
-	ImGui::SliderFloat("Blending with previous frame", &mPreviousFrameBlendFactor, 0.0f, 1.0f);
-	ImGui::SliderFloat("Custom near plane", &mCustomNearPlane, 0.01f, 10.0f);
-	ImGui::SliderFloat("Custom far plane", &mCustomFarPlane, 10.0f, 10000.0f);
+	if (ImGui::Checkbox("VolumetricFog", &isOn)) {
+		setting.isOn = isOn;
+	}
+	if(ImGui::SliderFloat("Anisotropy", &mAnisotropy, 0.0f, 1.0f)){
+		setting.mAnisotropy = mAnisotropy;
+	}
+	if(ImGui::SliderFloat("Density", &mDensity, 0.1f, 10.0f)){
+		setting.mDensity = mDensity;
+	}
+	if (ImGui::SliderFloat("Strength", &mStrength, 0.0f, 50.0f)) {
+		setting.mStrength = mStrength;
+	}
+	if (ImGui::SliderFloat("Thickness", &mThicknessFactor, 0.0f, 0.1f)) {
+		setting.mThicknessFactor = mThicknessFactor;
+	}
+	if (ImGui::SliderFloat("Blending with scene", &mBlendingWithSceneColorFactor, 0.0f, 1.0f)) {
+		setting.mBlendingWithSceneColorFactor = mBlendingWithSceneColorFactor;
+	}
+	if(ImGui::SliderFloat("Blending with previous frame", &mPreviousFrameBlendFactor, 0.0f, 1.0f)){
+		setting.mPreviousFrameBlendFactor = mPreviousFrameBlendFactor;
+	}
+	if(ImGui::SliderFloat("Custom near plane", &mCustomNearPlane, 0.01f, 10.0f)){
+		setting.mCustomNearPlane = mCustomNearPlane;
+	}
+	if(ImGui::SliderFloat("Custom far plane", &mCustomFarPlane, 10.0f, 10000.0f)){
+		setting.mCustomFarPlane = mCustomFarPlane;
+	}
 	ImGui::PopID();
+}
+
+void VolumetricFogPass::ApplySettings(const VolumetricFogPassSetting& settings)
+{
+	mAnisotropy = settings.mAnisotropy;
+	mDensity = settings.mDensity;
+	mStrength = settings.mStrength;
+	mThicknessFactor = settings.mThicknessFactor;
+	mBlendingWithSceneColorFactor = settings.mBlendingWithSceneColorFactor;
+	mPreviousFrameBlendFactor = settings.mPreviousFrameBlendFactor;
+	mCustomNearPlane = settings.mCustomNearPlane;
+	mCustomFarPlane = settings.mCustomFarPlane;
+	isOn = settings.isOn;
 }
 
 void VolumetricFogPass::Resize(uint32_t width, uint32_t height)

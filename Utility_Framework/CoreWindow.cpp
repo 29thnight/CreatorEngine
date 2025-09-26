@@ -14,13 +14,13 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 #ifndef BUILD_FLAG
     if (message == WM_SETCURSOR)
     {
-        // ƒøº≠ º≥¡§
+        // Ïª§ÏÑú ÏÑ§Ï†ï
         if (LOWORD(lParam) == HTCLIENT)
         {
             SetCursor(LoadCursor(nullptr, IDC_ARROW));
-            return TRUE; // ƒøº≠ ∫Ø∞Ê¿ª øœ∑·«ﬂ¿Ω¿ª æÀ∏≤
+            return TRUE; // Ïª§ÏÑú Î≥ÄÍ≤ΩÏùÑ ÏôÑÎ£åÌñàÏùåÏùÑ ÏïåÎ¶º
         }
-		return FALSE; // ±‚∫ª ƒøº≠ √≥∏Æ∏¶ ∞Ëº”«‘
+		return FALSE; // Í∏∞Î≥∏ Ïª§ÏÑú Ï≤òÎ¶¨Î•º Í≥ÑÏÜçÌï®
     }
     else
     {
@@ -30,7 +30,7 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
     if (message == WM_NCCREATE)
     {
-        // ¿©µµøÏ ª˝º∫ Ω√ √ ±‚»≠
+        // ÏúàÎèÑÏö∞ ÏÉùÏÑ± Ïãú Ï¥àÍ∏∞Ìôî
         CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
         self = static_cast<CoreWindow*>(cs->lpCreateParams);
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
@@ -63,4 +63,40 @@ LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM
     }
     
     return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+void CoreWindow::EnsureSwapChainCompatibleStyle()
+{
+    if (!m_hWnd)
+    {
+        return;
+    }
+
+    constexpr LONG requiredStyleMask = WS_POPUP | WS_BORDER | WS_CAPTION | WS_SYSMENU |
+        WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_THICKFRAME;
+
+    LONG currentStyle = GetWindowLong(m_hWnd, GWL_STYLE);
+    LONG currentExStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE);
+
+    bool styleUpdated = false;
+
+    if ((currentStyle & requiredStyleMask) == 0)
+    {
+        currentStyle |= WS_OVERLAPPEDWINDOW;
+        styleUpdated = true;
+    }
+
+    if ((currentExStyle & WS_EX_TOPMOST) != 0)
+    {
+        currentExStyle &= ~WS_EX_TOPMOST;
+        styleUpdated = true;
+    }
+
+    if (styleUpdated)
+    {
+        SetWindowLong(m_hWnd, GWL_STYLE, currentStyle);
+        SetWindowLong(m_hWnd, GWL_EXSTYLE, currentExStyle);
+        SetWindowPos(m_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+    }
 }

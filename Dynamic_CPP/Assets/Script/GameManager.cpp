@@ -68,15 +68,16 @@ void GameManager::Update(float tick)
 		//1초마다 보상
 		if (m_isTestReward)
 		{
-			int reward = GetReward();
-			if (reward < 99)
-			{
-				AddReward(1);
-			}
-			else
-			{
-				InitReward(0);
-			}
+			AddReward(99);
+			//int reward = GetReward();
+			//if (reward < 99)
+			//{
+			//	AddReward(1);
+			//}
+			//else
+			//{
+			//	InitReward(0);
+			//}
 			displayPollutionGaugeRatio += tick;
 		}
 		else

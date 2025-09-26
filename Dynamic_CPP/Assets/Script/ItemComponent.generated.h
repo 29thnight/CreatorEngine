@@ -5,6 +5,7 @@ ReflectionScriptField(ItemComponent) \
 { \
 	PropertyField \
 	({ \
+		meta_property(m_playerID) \
 		meta_property(m_itemID) \
 		meta_property(m_itemRarity) \
 	}); \

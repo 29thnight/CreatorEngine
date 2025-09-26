@@ -155,10 +155,14 @@ void TestMonsterB::Update(float tick)
 			closedDist = distAsis;
 		}
 	}
-	if (closedTarget) {
-		target = closedTarget;
-		blackBoard->SetValueAsGameObject("ClosedTarget", closedTarget->ToString());
-		blackBoard->SetValueAsGameObject("Target", closedTarget->ToString());
+
+	if (!isAttack) {
+		//공겨 중에 대상 변경 않하기
+		if (closedTarget) {
+			target = closedTarget;
+			blackBoard->SetValueAsGameObject("ClosedTarget", closedTarget->ToString());
+			blackBoard->SetValueAsGameObject("Target", closedTarget->ToString());
+		}
 	}
 
 
@@ -372,7 +376,7 @@ void TestMonsterB::ShootingAttack()
 		bool isUsed = PrefabObject->IsEnabled();
 		if (isUsed) return;
 
-		//생성 위치 및 회전
+		//생성 위치 및 회전 
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Mathf::Vector3 forward = m_transform->GetForward();

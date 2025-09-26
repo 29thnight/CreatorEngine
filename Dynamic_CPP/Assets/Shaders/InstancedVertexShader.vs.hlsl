@@ -8,6 +8,21 @@ cbuffer PerApplication : register(b2)
     matrix projection;
 }
 
+cbuffer TimeBuffer : register(b4)
+{
+    float totalTime;
+    float deltaTime;
+    uint totalFrame;
+}
+
+cbuffer WindBuffer : register(b5)
+{
+    float3 windDirection;
+    float windStrength;
+    float windSpeed;
+    float waveFrequency;
+}
+
 StructuredBuffer<matrix> models : register(t0);  
 
 struct AppData

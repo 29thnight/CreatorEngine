@@ -28,6 +28,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pSSAOPass->ControlPanel();
 		}
 
+		if(ImGui::CollapsingHeader("GBufferPass"))
+		{
+			m_sceneRenderer->m_pGBufferPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("DeferredPass"))
 		{
 			m_sceneRenderer->m_pDeferredPass->ControlPanel();

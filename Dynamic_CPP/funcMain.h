@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("BP003", []() { return new BP003(); });
 		CreateFactory::GetInstance()->RegisterFactory("SFXPoolManager", []() { return new SFXPoolManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("SelectTimer", []() { return new SelectTimer(); });
 		CreateFactory::GetInstance()->RegisterFactory("ImageSlideshow", []() { return new ImageSlideshow(); });

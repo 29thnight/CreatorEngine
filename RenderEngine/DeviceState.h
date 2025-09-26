@@ -22,6 +22,7 @@ namespace DirectX11
 		ID3D11RasterizerState*		g_pRasterizerState{};
 		ID3D11BlendState*			g_pBlendState{};
 		D3D11_VIEWPORT				g_Viewport{};
+		D3D11_VIEWPORT			g_fullsizeViewport{};
 		ID3D11RenderTargetView*		g_backBufferRTV{};
 		ID3D11ShaderResourceView*	g_depthStancilSRV{};
 		ID3D11ShaderResourceView*	g_editorDepthStancilSRV{};

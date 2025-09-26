@@ -96,6 +96,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_bitmaskTexture->GetRTV()
 	};
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
+	m_pGBufferPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
 
     //ssaoPass
     m_pSSAOPass = std::make_unique<SSAOPass>();
@@ -121,6 +122,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//forwardPass
 	m_pForwardPass = std::make_unique<ForwardPass>();
 	m_pForwardPass->SetTexture(m_normalTexture.get());
+	m_pForwardPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
@@ -176,6 +178,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//VolumetricFog
 	m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
 	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
+	m_pVolumetricFogPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().volumetricFog);
 
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
@@ -327,6 +330,7 @@ void SceneRenderer::InitializeDeviceState()
     DirectX11::DeviceStates->g_pRasterizerState		= m_deviceResources->GetRasterizerState();
     DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
     DirectX11::DeviceStates->g_Viewport				= m_deviceResources->GetScreenViewport();
+    DirectX11::DeviceStates->g_fullsizeViewport		= m_deviceResources->GetScreenViewport();
     DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
     DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
     DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetOutputSize();
@@ -343,6 +347,7 @@ void SceneRenderer::InitializeDeviceState()
 		DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
 		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
 		//DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
+		DirectX11::DeviceStates->g_fullsizeViewport	= m_deviceResources->GetScreenViewport();
 		DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
 		DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
 		DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetLogicalSize();
@@ -1053,6 +1058,18 @@ void SceneRenderer::ApplyVolumeProfile()
 	if (m_pSkyBoxPass)
 	{
 		m_pSkyBoxPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().m_isSkyboxEnabled);
+	}
+	if (m_pGBufferPass)
+	{
+		m_pGBufferPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
+	}
+	if(m_pForwardPass)
+	{
+		m_pForwardPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
+	}
+	if (m_pVolumetricFogPass)
+	{
+		m_pVolumetricFogPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().volumetricFog);
 	}
 }
 

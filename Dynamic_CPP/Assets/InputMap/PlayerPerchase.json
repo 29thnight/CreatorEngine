@@ -1,0 +1,29 @@
+{
+    "actions": [
+        {
+            "actionName": "Buy",
+            "actionType": "Button",
+            "funName": "PurshaseButton",
+            "inputType": "GamePad",
+            "key0": "A",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Pressed",
+            "scpritName": "ItemUIPopup"
+        },
+        {
+            "actionName": "Cancel",
+            "actionType": "Button",
+            "funName": "ReleaseKey",
+            "inputType": "GamePad",
+            "key0": "A",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Released",
+            "scpritName": "ItemUIPopup"
+        }
+    ],
+    "mapName": "PlayerPerchase"
+}

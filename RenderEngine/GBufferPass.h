@@ -2,8 +2,9 @@
 #include "IRenderPass.h"
 #include "Texture.h"
 #include "GameObject.h"
-
+#include "Core.Mathf.h"
 class Camera;
+struct RenderPassSettings;
 class GBufferPass final : public IRenderPass
 {
 public:
@@ -15,6 +16,8 @@ public:
 	//NOTICE : after execute TerrainRenderCommandList this Function
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void TerrainRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
+	void ApplySettings(const RenderPassSettings& setting);
+	virtual void ControlPanel() override;
 	virtual void Resize(uint32_t width, uint32_t height) override;
 
 private:
@@ -24,6 +27,13 @@ private:
 	ComPtr<ID3D11Buffer> m_boneBuffer;
 	ComPtr<ID3D11Buffer> m_instanceBuffer;
 	ComPtr<ID3D11Buffer> m_TimeBuffer;
+	ComPtr<ID3D11Buffer> m_windBuffer;
 	ComPtr<ID3D11ShaderResourceView> m_instanceBufferSRV;
 	ID3D11RenderTargetView* m_renderTargetViews[RTV_TypeMax]{}; //0: diffuse, 1: metalRough, 2: normal, 3: emissive
+
+private:
+	Mathf::Vector3 m_windDirection{ 1.f, 0.f, 0.f };
+	float m_windStrength{ 0.1f };
+	float m_windSpeed{ 1.0f };
+	float m_windWaveFrequency{ 0.2f };
 };

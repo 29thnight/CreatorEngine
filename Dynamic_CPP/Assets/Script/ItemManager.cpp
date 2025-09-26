@@ -18,7 +18,6 @@ void ItemManager::Start()
 	GameInstance::GetInstance()->RareItemColor = RareItemColor;
 	GameInstance::GetInstance()->EpicItemColor = EpicItemColor;
 
-	//현재 씬의 아이템 슬롯 3개 세팅
 	InitItemSlots();
 
 	//아이템 슬롯 3개 세팅
@@ -33,6 +32,22 @@ void ItemManager::Start()
 			itemSlots[1] = slot1->GetComponent<ItemComponent>();
 		if (slot2)
 			itemSlots[2] = slot2->GetComponent<ItemComponent>();
+
+		for (int i = 0; i < 3; ++i)
+		{
+			if (itemSlots[i])
+			{
+				//아이템 정보 세팅
+				itemSlots[i]->m_itemID = itemInfos[i].id;
+				itemSlots[i]->m_itemRarity = itemInfos[i].rarity;
+				itemSlots[i]->name = itemInfos[i].name;
+				itemSlots[i]->description = itemInfos[i].description;
+				itemSlots[i]->price = itemInfos[i].price;
+				itemSlots[i]->enhanceType = itemInfos[i].enhancementType;
+				itemSlots[i]->enhanceValue = itemInfos[i].enhancementValue;
+				itemSlots[i]->m_isItemSoldOut = false;
+			}
+		}
 	}
 
 	//아이템 아이콘 3개 세팅
@@ -176,6 +191,22 @@ void ItemManager::BuyItem(int slotIndex)
 	else
 	{
 		//구매 불가
+	}
+}
+
+void ItemManager::BuyItem(int itemID, int rarityID)
+{
+	if (!gameManager)
+		return;
+
+	for (int slot = 0; slot < itemInfos.size(); ++slot)
+	{
+		if (itemInfos[slot].id == itemID && 
+			itemInfos[slot].rarity == rarityID)
+		{
+			BuyItem(slot);
+			break;
+		}
 	}
 }
 

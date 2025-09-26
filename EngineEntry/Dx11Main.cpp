@@ -146,13 +146,18 @@ void DirectX11::Dx11Main::Initialize()
         PROFILE_REGISTER_THREAD("[CB-Thread]");
         while (isGameToRender)
         {
-            if (!m_isInvokeResize)
+            if (m_isInvokeResize)
             {
-                CommandBuildThread();
+                EngineSettingInstance->renderBarrier.ArriveAndWait();
+                EngineSettingInstance->renderBarrier.ArriveAndWait();
+                std::this_thread::yield();
+                continue;
             }
+
+            CommandBuildThread();
         }
 
-		isCB_Thread_End = true;
+                isCB_Thread_End = true;
         CoUninitialize();
     });
 
