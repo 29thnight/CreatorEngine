@@ -5,11 +5,14 @@
 #include "ProgressWindow.h"
 #include "ShaderPSO.h"
 #include "ShaderDSL.h"
+#include "VisualShaderDSL.h"
+#include "VisualShaderPSO.h"
 #include "DataSystem.h"
 #include "ImGuiRegister.h"
 #include "Material.h"
 #include "ImageComponent.h"
 
+#include <fstream>
 ShaderResourceSystem::~ShaderResourceSystem()
 {
 }
@@ -219,73 +222,160 @@ void ShaderResourceSystem::CSOAllCleanup()
 
 static bool ExtractStageAndName(const file::path& hlsl, std::string& stage, std::string& name)
 {
-	// ±ÔÄ¢: <Name>.<stage>.hlsl  (¿¹: "VertexShader.vs.hlsl")
-	if (hlsl.extension() != ".hlsl") return false;
-	file::path stem1 = hlsl.stem();         // "VertexShader.vs"
-	file::path stem2 = stem1.stem();        // "VertexShader"
-	file::path stageExt = stem1.extension();// ".vs"
-	if (stageExt.empty()) return false;
-	stage = stageExt.string();
-	if (!stage.empty() && stage[0] == '.') stage.erase(0, 1); // "vs"
-	name = stem2.string();                                 // "VertexShader"
-	return !stage.empty() && !name.empty();
+static bool ReadTextFile(const file::path& path, std::string& out)
+{
+        std::ifstream fileStream(path);
+        if (!fileStream)
+                return false;
+
+        out.assign((std::istreambuf_iterator<char>(fileStream)), std::istreambuf_iterator<char>());
+        return true;
 }
 
-// NEW: °³º° ½ºÅ©¸³Æ® Ã³¸®
-static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
-{
-	auto pso = std::make_shared<ShaderPSO>();
+        ShaderAssets.clear();
+        VisualShaderAssets.clear();
 
-	auto bindFile = [&](const std::string& path) {
-		if (path.empty()) return;
-		file::path p = PathFinder::RelativeToShader() / path; // Shader Æú´õ ±âÁØ
-		// ÇÊ¿ä½Ã ¸ÕÀú ÄÄÆÄÀÏ/µî·Ï (ÀÌ¹Ì µî·ÏµÅÀÖÀ¸¸é ³»ºÎ¿¡¼­ µ¤¾î¾¸)
-		try { ShaderSystem->AddShaderFromPath(p); }
-		catch (...) {}
+        auto invalidateMaterials = [&](const std::string& assetName)
+        {
+                auto& materials = DataSystems->Materials;
+                for (auto& [matName, mat] : materials)
+                {
+                        if (mat->GetShaderPSO() && mat->GetShaderPSO()->m_shaderPSOName == assetName)
+                        {
+                                mat->GetShaderPSO()->SetInvalidated(true);
+                        }
+                }
 
-		std::string stage, base;
-		if (!ExtractStageAndName(p, stage, base)) return;
+                ShaderAssets.erase(assetName);
+                VisualShaderAssets.erase(assetName);
+        };
 
-		if		(stage == "vs") pso->m_vertexShader		= &ShaderSystem->VertexShaders[base];
-		else if (stage == "ps") pso->m_pixelShader		= &ShaderSystem->PixelShaders[base];
-		else if (stage == "gs") pso->m_geometryShader	= &ShaderSystem->GeometryShaders[base];
-		else if (stage == "hs") pso->m_hullShader		= &ShaderSystem->HullShaders[base];
-		else if (stage == "ds") pso->m_domainShader		= &ShaderSystem->DomainShaders[base];
-		else if (stage == "cs") pso->m_computeShader	= &ShaderSystem->ComputeShaders[base];
-	};
+        try
+        {
+                file::path shaderpath = PathFinder::RelativeToShader();
+                for (auto& dir : file::recursive_directory_iterator(shaderpath))
+                {
+                        if (dir.is_directory())
+                                continue;
 
-	bindFile(desc.pass.vs);
-	bindFile(desc.pass.ps);
-	bindFile(desc.pass.gs);
-	bindFile(desc.pass.hs);
-	bindFile(desc.pass.ds);
-	bindFile(desc.pass.cs);
+                        const auto ext = dir.path().extension();
+                        if (ext == ".shader")
+                        {
+                                std::string src;
+                                if (!ReadTextFile(dir.path(), src))
+                                        continue;
 
-	if(!pso->m_vertexShader || !pso->m_pixelShader)
-	{
-		// ÃÖ¼ÒÇÑ ¹öÅØ½º/ÇÈ¼¿ ¼ÎÀÌ´õ´Â ¸ğµÎ À¯È¿ÇØ¾ß ÇÔ
-		Debug->LogWarning("ShaderPSO '" + desc.name + "' has no valid vertex/pixel/compute shader.");
-		return nullptr;
-	}
+                                ShaderAssetDesc desc{};
+                                if (!ParseShaderDSL(src, desc))
+                                        continue;
 
-	// ÀÚµ¿ ¸®ÇÃ·º¼ÇÀ¸·Î cbuffer/SRV ½½·Ô »ı¼º
-	pso->ReflectConstantBuffers();
-	pso->CreateInputLayoutFromShader();
+                                std::string assetName = !desc.name.empty() ? desc.name : dir.path().stem().string();
 
-	// TODO: queueTag/keywords ·»´õ Å¥/Å°¿öµå ½Ã½ºÅÛ°ú ¿¬µ¿(¿É¼Ç)
-	return pso;
-}
+                                auto pso = BuildPSOFromDesc(desc);
+                                if (pso)
+                                {
+                                        pso->m_shaderPSOName = assetName;
+                                        pso->SetInvalidated(false);
+                                        ShaderAssets[assetName] = pso;
+                                }
+                                else
+                                {
+                                        invalidateMaterials(assetName);
+                                }
+                        }
+                        else if (ext == ".vshader")
+                        {
+                                std::string src;
+                                if (!ReadTextFile(dir.path(), src))
+                                        continue;
 
-void ShaderResourceSystem::LoadShaderAssets()
-{
-	ShaderAssets.clear();
-	try {
+                                VisualShaderGraphDesc graph{};
+                                if (!ParseVisualShaderDSL(src, graph))
+                                        continue;
+
+                                std::string assetName = !graph.name.empty() ? graph.name : dir.path().stem().string();
+                                graph.name = assetName;
+
+                                if (graph.shaderAssetPath.empty())
+                                {
+                                        Debug->LogWarning("Visual shader '" + assetName + "' does not specify a ShaderAsset.");
+                                        continue;
+                                }
+
+                                file::path basePath = PathFinder::RelativeToShader() / graph.shaderAssetPath;
+                                std::string baseSource;
+                                if (!ReadTextFile(basePath, baseSource))
+                                {
+                                        Debug->LogWarning("Visual shader '" + assetName + "' cannot open base shader asset: " + basePath.string());
+                                        continue;
+                                }
+
+                                ShaderAssetDesc baseDesc{};
+                                if (!ParseShaderDSL(baseSource, baseDesc))
+                                {
+                                        Debug->LogWarning("Visual shader '" + assetName + "' failed to parse base shader asset: " + basePath.string());
+                                        continue;
+                                }
+
+                                if (!graph.queueTag.empty())
+                                        baseDesc.pass.queueTag = graph.queueTag;
+                                else
+                                        graph.queueTag = baseDesc.pass.queueTag;
+
+                                if (!graph.keywords.empty())
+                                        baseDesc.pass.keywords = graph.keywords;
+                                else
+                                        graph.keywords = baseDesc.pass.keywords;
+
+                                if (!graph.tag.empty())
+                                        baseDesc.tag = graph.tag;
+                                else
+                                        graph.tag = baseDesc.tag;
+
+                                baseDesc.name = assetName;
+
+                                auto pso = BuildPSOFromDesc(baseDesc);
+                                if (pso)
+                                {
+                                        pso->m_shaderPSOName = assetName;
+                                        pso->SetInvalidated(false);
+                                        ShaderAssets[assetName] = pso;
+                                        VisualShaderAssets[assetName] = std::make_shared<VisualShaderPSO>(pso, graph, baseDesc);
+                                }
+                                else
+                                {
+                                        invalidateMaterials(assetName);
+                                }
+                        }
+                }
+        }
+        catch (const file::filesystem_error& e)
+        {
+                Debug->LogWarning("Could not load shader assets" + std::string(e.what()));
+        }
+        catch (const std::exception& e)
+        {
+                Debug->LogWarning("Error" + std::string(e.what()));
+        }
+
+        for (auto& [name, pso] : ShaderAssets)
+        {
+                file::path shaderpath = PathFinder::RelativeToShader() / (name + ".shader");
+                if (!file::exists(shaderpath))
+                {
+                        shaderpath = PathFinder::RelativeToShader() / (name + ".vshader");
+                }
+                if (file::exists(shaderpath))
+                {
+                        pso->SetShaderPSOGuid(DataSystems->GetFileGuid(shaderpath));
+                }
+        }
 		file::path shaderpath = PathFinder::RelativeToShader();
 		for (auto& dir : file::recursive_directory_iterator(shaderpath))
 		{
 			if (dir.is_directory() || dir.path().extension() != ".shader") continue;
 
-			// ½ºÅ©¸³Æ® ÀĞ±â
+			// ìŠ¤í¬ë¦½íŠ¸ ì½ê¸°
 			std::string src;
 			{
 				std::ifstream f(dir.path());
@@ -295,10 +385,10 @@ void ShaderResourceSystem::LoadShaderAssets()
 			ShaderAssetDesc desc{};
 			if (!ParseShaderDSL(src, desc)) continue;
 
-			// ÀÌ¸§ ¾øÀ¸¸é ÆÄÀÏ¸í¿¡¼­ ÃßÃâ
+			// ì´ë¦„ ì—†ìœ¼ë©´ íŒŒì¼ëª…ì—ì„œ ì¶”ì¶œ
 			std::string assetName = !desc.name.empty() ? desc.name : dir.path().stem().string();
 
-			// PSO ¸¸µé°í µî·Ï
+			// PSO ë§Œë“¤ê³  ë“±ë¡
 			auto pso = BuildPSOFromDesc(desc);
 			if (pso)
 			{
@@ -592,5 +682,6 @@ void ShaderResourceSystem::RemoveShaders()
 	GeometryShaders.clear();
 	PixelShaders.clear();
 	ComputeShaders.clear();
+	VisualShaderAssets.clear();
 }
 #endif // !DYNAMICCPP_EXPORTS

@@ -266,6 +266,8 @@
     <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
+    <ClCompile Include="VisualShaderDSL.cpp" />
+    <ClCompile Include="VisualShaderPSO.cpp" />
     <ClCompile Include="ShaderPSO.cpp" />
     <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
@@ -370,6 +372,8 @@
     <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ShaderDSL.h" />
+    <ClInclude Include="VisualShaderDSL.h" />
+    <ClInclude Include="VisualShaderPSO.h" />
     <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="ShadowMapPassSetting.h" />
     <ClInclude Include="SizeModuleCS.h" />
