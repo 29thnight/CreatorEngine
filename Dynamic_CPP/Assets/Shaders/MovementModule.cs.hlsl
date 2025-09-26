@@ -336,25 +336,24 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (velocityMode == 4) // Orbital
         {
-           // 파티클별 고정 각도 오프셋 (균등 분배)
-            float angleStep = 6.28318 / (float) maxParticles;
+            // 파티클별 고정 각도 오프셋
+            float angleStep = 6.28318 / max((float) maxParticles, 1.0);
             float baseAngle = (float) particleIndex * angleStep;
     
-            // 생명주기 기반 진행도 (0~1)
-            float normalizedAge = particle.age / particle.lifeTime;
+            // 시간 기반 회전 (orbitalSpeed는 초당 회전수)
+            float currentAngle = baseAngle + (currentTime * orbitalSpeed);
     
-            // orbitalSpeed만큼 회전 (1.0이면 1바퀴, 2.0이면 2바퀴)
-            float totalRotation = normalizedAge * orbitalSpeed * 6.28318; // 2π * 회전수
-            float currentAngle = baseAngle + totalRotation;
+            // 궤도 중심점 (orbitalCenter 사용)
+            float3 center = orbitalCenter;
     
-            // 궤도 위치 직접 계산
-            particle.position = particle.pad5 + float3(
-                 cos(currentAngle) * orbitalRadius,
-                 0,
-                 sin(currentAngle) * orbitalRadius
-             );
+            // 궤도 위치 계산
+            particle.position = center + float3(
+                cos(currentAngle) * orbitalRadius,
+                0,
+                sin(currentAngle) * orbitalRadius
+            );
     
-            // velocity는 0 (위치가 직접 제어되므로)
+            // velocity 초기화
             particle.velocity = float3(0, 0, 0);
         }
         else if (velocityMode == 5) // explosive
