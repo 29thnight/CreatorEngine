@@ -5,6 +5,7 @@ ReflectionScriptField(ItemUIIcon) \
 { \
 	PropertyField \
 	({ \
+		meta_property(m_playerID) \
 		meta_property(m_isSetPopup) \
 		meta_property(itemID) \
 		meta_property(rarityID) \

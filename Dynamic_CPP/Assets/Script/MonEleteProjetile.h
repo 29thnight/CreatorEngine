@@ -3,6 +3,7 @@
 #include "ModuleBehavior.h"
 
 class Entity;
+class EffectComponent;
 class MonEleteProjetile : public ModuleBehavior
 {
 public:
@@ -40,4 +41,6 @@ public:
 
 	//벽이나 화면 밖으로 나가도 사라져야 하니 비활성화 따로 빼자
 	void RevertPool();
+private:
+	EffectComponent* m_effect = nullptr;
 };

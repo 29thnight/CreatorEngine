@@ -653,12 +653,14 @@ void EffectEditor::RenderModifyEmitterEditor()
 
 	ImGui::Separator();
 
-	// 나머지 코드는 동일...
+	// Particle Modules 섹션 - 삭제 버그 수정
 	ImGui::Text("Particle Modules:");
 	auto& moduleList = m_modifyingSystem->GetModuleList();
+
+	int moduleToDelete = -1;
 	int moduleIndex = 0;
 
-	for (auto it = moduleList.begin(); it != moduleList.end(); ++it) {
+	for (auto it = moduleList.begin(); it != moduleList.end(); ++it, ++moduleIndex) {
 		ParticleModule& module = *it;
 		ImGui::PushID(moduleIndex);
 
@@ -697,17 +699,35 @@ void EffectEditor::RenderModifyEmitterEditor()
 			m_selectedRenderForEdit = -1;
 		}
 
+		ImGui::SameLine();
+		if (ImGui::Button(("Delete##Module" + std::to_string(moduleIndex)).c_str())) {
+			moduleToDelete = moduleIndex;
+		}
+
 		ImGui::PopID();
-		moduleIndex++;
+	}
+
+	// 삭제가 요청된 경우 처리
+	if (moduleToDelete != -1) {
+		RemoveModuleAtIndex(moduleToDelete);
+		if (m_selectedModuleForEdit == moduleToDelete) {
+			m_selectedModuleForEdit = -1;
+		}
+		else if (m_selectedModuleForEdit > moduleToDelete) {
+			m_selectedModuleForEdit--;
+		}
 	}
 
 	ImGui::Separator();
 
+	// Render Modules 섹션 - 삭제 버그 수정
 	ImGui::Text("Render Modules:");
 	auto& renderList = m_modifyingSystem->GetRenderModules();
+
+	int renderToDelete = -1;
 	int renderIndex = 0;
 
-	for (auto it = renderList.begin(); it != renderList.end(); ++it) {
+	for (auto it = renderList.begin(); it != renderList.end(); ++it, ++renderIndex) {
 		RenderModules& render = **it;
 		ImGui::PushID(renderIndex + 1000);
 
@@ -721,37 +741,83 @@ void EffectEditor::RenderModifyEmitterEditor()
 		else if (dynamic_cast<TrailRenderModule*>(&render)) {
 			renderName = "Trail Render";
 		}
+
 		bool isSelected = (m_selectedRenderForEdit == renderIndex);
 		if (ImGui::Selectable((renderName + "##" + std::to_string(renderIndex)).c_str(), isSelected)) {
 			m_selectedRenderForEdit = isSelected ? -1 : renderIndex;
 			m_selectedModuleForEdit = -1;
 		}
 
+		ImGui::SameLine();
+		if (ImGui::Button(("Delete##Render" + std::to_string(renderIndex)).c_str())) {
+			renderToDelete = renderIndex;
+		}
+
 		ImGui::PopID();
-		renderIndex++;
+	}
+
+	// 삭제가 요청된 경우 처리
+	if (renderToDelete != -1) {
+		RemoveRenderAtIndex(renderToDelete);
+		if (m_selectedRenderForEdit == renderToDelete) {
+			m_selectedRenderForEdit = -1;
+		}
+		else if (m_selectedRenderForEdit > renderToDelete) {
+			m_selectedRenderForEdit--;
+		}
 	}
 
 	ImGui::Separator();
 
+	// 선택된 모듈의 상세 편집 UI 표시
+	ImGui::Separator();
 	if (m_selectedModuleForEdit >= 0) {
 		RenderModuleDetailEditor();
 	}
-
-	if (m_selectedRenderForEdit >= 0) {
+	else if (m_selectedRenderForEdit >= 0) {
 		RenderRenderModuleDetailEditor();
 	}
 
-	ImGui::Separator();
-
+	// 저장/취소 버튼
 	if (ImGui::Button("Save Changes")) {
 		SaveModifiedEmitter(std::string(m_newEmitterName));
-		m_emitterNameInitialized = false;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Cancel")) {
 		CancelModifyEmitter();
-		m_emitterNameInitialized = false;
 	}
+}
+
+// 개선된 모듈 삭제 함수
+void EffectEditor::RemoveModuleAtIndex(int index)
+{
+	if (!m_modifyingSystem || index < 0) return;
+
+	auto& moduleList = m_modifyingSystem->GetModuleList();
+
+	int currentIndex = 0;
+	for (auto it = moduleList.begin(); it != moduleList.end(); ++it, ++currentIndex) {
+		if (currentIndex == index) {
+			moduleList.Unlink(it.GetProperty());
+			std::cout << "Module removed at index: " << index << std::endl;
+			return;
+		}
+	}
+}
+
+// 개선된 렌더 모듈 삭제 함수  
+void EffectEditor::RemoveRenderAtIndex(int index)
+{
+	if (!m_modifyingSystem || index < 0) return;
+
+	auto& renderList = m_modifyingSystem->GetRenderModules();
+	if (index >= static_cast<int>(renderList.size())) return;
+
+	auto it = renderList.begin();
+	std::advance(it, index);
+	renderList.erase(it);
+
+	std::cout << "Render module removed at index: " << index << std::endl;
 }
 
 void EffectEditor::RenderJsonSaveLoadUI()

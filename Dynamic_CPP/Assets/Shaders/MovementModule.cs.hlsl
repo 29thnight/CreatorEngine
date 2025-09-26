@@ -337,18 +337,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
         else if (velocityMode == 2) // Impulse  
         {
             additionalVelocity += GetImpulseForce(normalizedAge, particleIndex, particle);
-    
-            // pad4에 저장된 방향 정보로 rotation 조정
-            if (particle.pad4.y > 0.001) // 강도가 충분할 때
-            {
-                float targetRotation = particle.pad4.x;
-                float rotationLerpSpeed = 5.0;
-                float lerpFactor = min(particle.pad4.y * rotationLerpSpeed * deltaTime, 1.0);
-                particle.rotation = lerp(particle.rotation, targetRotation, lerpFactor);
-
-                // 사용 후 초기화
-                particle.pad4 = float2(0, 0);
-            }
         }
         else if (velocityMode == 3) // Wind
         {
@@ -378,6 +366,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (useGravity != 0)
         {
             particle.velocity += particle.acceleration * gravityStrength * deltaTime;
+        }
+        
+        if (length(particle.velocity) > 0.001)
+        {
+            //float3 dir = normalize(particle.velocity);
+            //// 2D 빌보드에서 velocity 방향으로 회전 (XZ 평면 기준)
+            //particle.rotation = atan2(-dir.x, dir.z);
+        }
+        else
+        {
+            particle.rotation += particle.rotatespeed * deltaTime;
         }
         
         // 위치 및 회전 업데이트

@@ -74,16 +74,17 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID)
     float finalRotation = particle.rotation;
     if (length(particle.velocity) > 0.001)
     {
-        float3 normalizedVel = normalize(particle.velocity);
-        float velocityRotation = atan2(normalizedVel.y, normalizedVel.x);
+        float3 velocityWorld = normalize(particle.velocity);
         
-        // 텍스처 방향에 따른 오프셋 (필요시 조정)
-        velocityRotation += 3.14159265359; // +180도 오프셋
+        // velocity를 카메라 평면에 투영하여 2D 방향 구하기
+        float rightComponent = dot(velocityWorld, cameraRight);
+        float upComponent = dot(velocityWorld, cameraUp);
         
-        finalRotation = velocityRotation; // 또는 += velocityRotation
+        // 텍스처 왼쪽이 velocity 방향을 향하도록 (90도 회전 추가)
+        finalRotation = atan2(upComponent, rightComponent) - 3.14159265359; // -180도
     }
     
-    // 수정된 rotation 사용
+    // 회전 적용
     float sinR = sin(finalRotation);
     float cosR = cos(finalRotation);
     float3 rotatedRight = cameraRight * cosR + cameraUp * sinR;

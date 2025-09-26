@@ -1,0 +1,13 @@
+tags:
+  - Untagged
+  - Respawn
+  - Finish
+  - MainCamera
+  - Player
+  - GameController
+layers:
+  - Default
+  - TransparentFX
+  - Ignore RayCast
+  - Water
+  - UI

@@ -318,27 +318,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
         else if (velocityMode == 2)
         {
             additionalVelocity += GetImpulseForce(normalizedAge, particleIndex, particle);
-            
-            // 임펄스 방향에 따른 회전 조정
-            if (particle.pad4 > 0.001) // 강도가 충분할 때
-            {
-                float3 targetDirection = normalize(particle.pad3);
-                
-                // 방향 벡터를 오일러 각도로 변환
-                float3 targetRotation = float3(
-                    atan2(targetDirection.y, length(targetDirection.xz)), // pitch
-                    atan2(targetDirection.x, targetDirection.z), // yaw  
-                    0.0 // roll
-                );
-                
-                float rotationLerpSpeed = 5.0;
-                float lerpFactor = min(particle.pad4 * rotationLerpSpeed * deltaTime, 1.0);
-                particle.rotation = lerp(particle.rotation, targetRotation, lerpFactor);
-                
-                // 사용 후 초기화
-                particle.pad3 = float3(0, 0, 0);
-                particle.pad4 = 0.0;
-            }
         }
         else if (velocityMode == 3)
             additionalVelocity += GetWindForce(particle.position, currentTime);
@@ -355,6 +334,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             float3 gravityForce = float3(0, -9.8, 0) * gravityStrength;
             particle.velocity += gravityForce * deltaTime;
+        }
+        
+        if (length(particle.velocity) > 0.001)
+        {
+            float3 dir = normalize(particle.velocity);
+    
+                // velocity 방향을 회전각으로 변환 (화살이 날아가는 방향으로)
+            particle.rotation.y = atan2(-dir.x, dir.z); // yaw (좌우 회전)
+            particle.rotation.x = -asin(dir.y); // pitch (위아래 회전)
+                // roll(Z)은 rotationSpeed에 맡김
         }
         
         // 파티클 회전 업데이트 (로컬 회전)

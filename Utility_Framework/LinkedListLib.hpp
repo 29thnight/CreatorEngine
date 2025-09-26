@@ -55,6 +55,8 @@ public:
 			return _pProperty;
 		}
 
+		LinkProperty<_Type>* GetProperty() const { return _pProperty; }
+
 	private:
 		LinkProperty<_Type>* _pProperty{};
 	};
@@ -140,7 +142,6 @@ public:
 	}
 
 	size_t size() const { return _size; }
-
 
 private:
 	LinkProperty<_Type>* _pHead{};

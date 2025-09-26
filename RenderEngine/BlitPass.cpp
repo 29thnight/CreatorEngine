@@ -55,8 +55,10 @@ void BlitPass::Execute(RenderScene& scene, Camera& camera)
 
     m_pso->Apply();
 
-	ID3D11RenderTargetView* rtv = m_backBufferRTV;
-	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+    DirectX11::RSSetViewports(1, &DirectX11::DeviceStates->g_fullsizeViewport);
+
+        ID3D11RenderTargetView* rtv = m_backBufferRTV;
+        DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
 	DirectX11::PSSetShaderResources(0, 1, &renderData->m_renderTarget->m_pSRV);
 	DirectX11::Draw(4, 0);
