@@ -29,6 +29,7 @@ void EntityResource::Start()
 		m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
 	}
 
+	m_currentHP = maxHP;
 
 }
 

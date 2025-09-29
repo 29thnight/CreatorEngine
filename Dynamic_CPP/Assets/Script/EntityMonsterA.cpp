@@ -62,6 +62,8 @@ void EntityMonsterA::Start()
 
 	}
 
+
+	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티

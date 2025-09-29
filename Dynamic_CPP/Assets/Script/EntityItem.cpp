@@ -59,14 +59,13 @@ void EntityItem::Start()
 
 void EntityItem::OnTriggerEnter(const Collision& collision)
 {
-	if (collision.otherObj->m_tag == "Rock")
+	if (collision.otherObj->m_tag == "Wall")
 	{
 		//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 		m_state = EItemState::FALLED;
 		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
+		rigid->UseGravity(true);
 	}
 
 	
@@ -89,18 +88,6 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 
 void EntityItem::Update(float tick)
 {
-	//return;
-	//GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
-	/*if (asisTail != nullptr) {
-		Transform* tailTransform = asisTail->GetComponent<Transform>();
-		if (tailTransform)
-		{
-			speed -= tick;
-			if (speed < 1.f) {
-				speed = 1.f;
-			}
-		}
-	}*/
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	if (abs(pos.y) <= 0.05f)
 	{
@@ -109,38 +96,6 @@ void EntityItem::Update(float tick)
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 		rigid->UseGravity(false);
 	}
-	//if (m_state == EItemState::CATCHED)
-	//{
-	//	auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-	//	rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-	//	rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-	//	//여기서 아이템을 플레이어 손위에 가게하기?
-	//	if (asisTail != nullptr)
-	//	{
-	//		Transform* tailTransform = asisTail->GetComponent<Transform>();
-	//		if (tailTransform)
-	//		{
-	//			Vector3 tailPos = tailTransform->GetWorldPosition();
-	//			Vector3 ownerPos = GetOwner()->m_transform.GetWorldPosition();
-
-	//			// XZ 평면 거리 계산
-	//			float dx = tailPos.x - ownerPos.x;
-	//			float dz = tailPos.z - ownerPos.z;
-	//			if (abs(dx) < indicatorDistacne && abs(dz) < indicatorDistacne)
-	//			{
-	//				isTargettingTail = true;
-	//				//인디케이터 출력? 플레이어가출력?
-	//				//std::cout << "On indicator " << std::endl;
-	//				
-	//			}
-	//			else
-	//			{
-	//				isTargettingTail = false;
-	//			}
-	//		}
-	//	}
-	//}
-
 	if (m_state == EItemState::THROWN)
 	{
 		if (!isTargettingTail)
