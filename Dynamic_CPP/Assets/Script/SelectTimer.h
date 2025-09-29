@@ -18,6 +18,6 @@ private:
 
 private:
 	[[Property]]
-	float m_remainTimeSetting{ 10.f };
+	float m_remainTimeSetting{ 5.f };
 	float m_remainTimeInternal{};
 };

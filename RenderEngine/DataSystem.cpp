@@ -1554,19 +1554,20 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 	for (const auto& entry : bundle.assets)
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
+		file::path name = entry.assetName;
 		switch (type)
 		{
 		case ManagedAssetType::Model:
-			LoadModel(entry.assetName.string());
+			LoadModel(entry.assetName);
 			break;
 		case ManagedAssetType::Material:
-			LoadMaterial(entry.assetName.string());
+			LoadMaterial(entry.assetName);
 			break;
 		case ManagedAssetType::Texture:
-			LoadTexture(entry.assetName.string());
+			LoadTexture(entry.assetName);
 			break;
 		case ManagedAssetType::SpriteFont:
-			LoadSFont(entry.assetName.wstring());
+			LoadSFont(name.wstring());
 			break;
 		default:
 			break;
@@ -1578,7 +1579,8 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 {
 	for (const auto& entry : bundle.assets)
 	{
-		m_retainedAssets[entry.assetTypeID].insert(entry.assetName.stem().string());
+		file::path name = entry.assetName;
+		m_retainedAssets[entry.assetTypeID].insert(name.stem().string());
 	}
 }
 

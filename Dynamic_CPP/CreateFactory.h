@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "PlayEffectAll.h"
 #include "SwordHitEffect.h"
 #include "BP003.h"
 #include "SFXPoolManager.h"

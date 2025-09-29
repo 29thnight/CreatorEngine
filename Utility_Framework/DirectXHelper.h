@@ -318,5 +318,12 @@ namespace DirectX
         default:                                return fmt;
         }
     }
+
+    struct MTGuard 
+    {
+        ID3D11Multithread* mt{};
+        explicit MTGuard(ID3D11Multithread* p) : mt(p) { mt->Enter(); }
+        ~MTGuard() { mt->Leave(); }
+    };
 }
 #endif // !DYNAMICCPP_EXPORTS

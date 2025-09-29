@@ -2,10 +2,11 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
-class SwitchingSceneTrigger : public ModuleBehavior
+class EffectComponent;
+class PlayEffectAll : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(SwitchingSceneTrigger)
+	MODULE_BEHAVIOR_BODY(PlayEffectAll)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,15 +21,9 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void Initialize();
 private:
-	bool m_isFadeInComplete{ false };
-	[[Property]]
-	float m_fadeDuration{ 1.0f };
-	float m_fadeTimer{ 0.0f };
-	//[페이드 인 전용]
-	//지금은 spriteFont로 해서 TextComponent를 받지만, 아이콘으로 변경될 경우
-	//ImageComponent로 변경 필요
-	class GameManager* m_gameManager{ nullptr };
-	class TextComponent* m_buttonText{ nullptr };
-	class TextComponent* m_switchingText{ nullptr };
+	std::vector<EffectComponent*> m_effects;
+	bool beLateFrame = false; //setposion으로 정한 위치가 한프레임 늦어서 이렇게 조절
+	bool OnEffect = false;
 };

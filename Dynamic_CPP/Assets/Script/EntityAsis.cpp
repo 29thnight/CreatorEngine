@@ -179,15 +179,19 @@ void EntityAsis::Update(float tick)
 		SendDamage(nullptr, 10);
 	}
 
+	bool isBigWoodDetect = CheckBigWood();
+
 	m_currentGracePeriod -= tick;
 	m_currentStaggerDuration -= tick;
 
 	if (m_currentStaggerDuration <= 0.f) {
-		m_animator->SetParameter("OnMove", true);
+		m_animator->SetParameter("OnMove", false);
+		if (!isBigWoodDetect)
+		{
+			PathMove(tick);
+			m_animator->SetParameter("OnMove", true);
+		}
 		m_purificationAngle += tick * 5.f;
-
-		PathMove(tick);
-
 		Purification(tick);
 	}
 	else {
@@ -432,6 +436,16 @@ bool EntityAsis::DropItem()
 	item->Throw(asisHead->m_transform.GetWorldPosition(), forward * 3.f, 3.f);
 
 	return false;
+}
+
+int EntityAsis::CheckBigWood()
+{
+	std::vector<HitResult> hits;
+	OverlapInput info;
+	info.layerMask = 1 << 8;
+	info.position = GetOwner()->m_transform.GetWorldPosition();
+	int count = PhysicsManagers->SphereOverlap(info, bigWoodDetectRadius, hits);
+	return count;
 }
 
 float EntityAsis::GetPollutionGaugePercent()

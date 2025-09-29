@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("PlayEffectAll", []() { return new PlayEffectAll(); });
 		CreateFactory::GetInstance()->RegisterFactory("SwordHitEffect", []() { return new SwordHitEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("BP003", []() { return new BP003(); });
 		CreateFactory::GetInstance()->RegisterFactory("SFXPoolManager", []() { return new SFXPoolManager(); });
