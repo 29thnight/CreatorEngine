@@ -185,12 +185,13 @@ void EntityAsis::Update(float tick)
 	m_currentStaggerDuration -= tick;
 
 	if (m_currentStaggerDuration <= 0.f) {
-		m_animator->SetParameter("OnMove", true);
-		m_purificationAngle += tick * 5.f;
-
-		if(!isBigWoodDetect)
+		m_animator->SetParameter("OnMove", false);
+		if (!isBigWoodDetect)
+		{
 			PathMove(tick);
-
+			m_animator->SetParameter("OnMove", true);
+		}
+		m_purificationAngle += tick * 5.f;
 		Purification(tick);
 	}
 	else {
