@@ -54,7 +54,7 @@ void Bomb::Update(float tick)
 				GameObject* ExplosionObj = PrefabUtilitys->InstantiatePrefab(ExplosionPrefab, "Explosion");
 				auto explosion = ExplosionObj->GetComponent<Explosion>();
 				ExplosionObj->GetComponent<Transform>()->SetPosition(m_targetPos);
-				explosionRadius = explosion->explosionRadius;
+				explosionRadius = radius;
 				explosion->Initialize(m_ownerPlayer);
 			}
 
@@ -121,13 +121,15 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 }
 
 
-void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos, float _damage)
+void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos,float bombThrowDuration, float _radius, float _damage)
 {
 	isThrow = true;
 	m_ownerPlayer = _owner;
 	m_startPos = _startPos;
 	m_targetPos = _targetPos;
 	m_damage = _damage;
+	duration = bombThrowDuration;
+	radius = _radius;
 	m_throwPowerY = 4.0f;
 }
 

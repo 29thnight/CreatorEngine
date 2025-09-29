@@ -8,8 +8,6 @@ class Player;
 class Explosion : public ModuleBehavior
 {
 public:
-   ReflectExplosion
-	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Explosion)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -32,7 +30,6 @@ public:
 	
 	bool onEffect = false;
 
-	[[Property]]
 	float explosionRadius = 3.0f; //범위공격 반경
 
 private:

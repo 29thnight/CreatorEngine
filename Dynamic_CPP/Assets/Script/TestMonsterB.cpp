@@ -369,6 +369,7 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 //원거리 투척 
 void TestMonsterB::ShootingAttack()
 {
+	
 	if (target == nullptr) return;
 	
 	GameObject* PrefabObject = m_projectiles[m_projectileIndex];

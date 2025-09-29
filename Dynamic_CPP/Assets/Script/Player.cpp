@@ -42,6 +42,7 @@
 #include "EntityEleteMonster.h"
 #include "SFXPoolManager.h"
 #include "SoundName.h"
+#include "SwordHitEffect.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -193,10 +194,13 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
-	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
-	dashEffect = dashObj->AddComponent<EffectComponent>();
-	dashEffect->Awake();
-	dashEffect->m_effectTemplateName = "testdash";
+	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
+
+	if (dashObj)
+	{
+		dashEffect = dashObj->AddComponent<EffectComponent>();
+		dashEffect->m_effectTemplateName = "testdash";
+	}
 
 	auto gmobj = GameObject::Find("GameManager");
 	if (gmobj)
@@ -290,7 +294,8 @@ void Player::Update(float tick)
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
-	dashObj->m_transform.SetPosition(pos);
+	if(dashObj)
+		dashObj->m_transform.SetPosition(pos);
 
 	if (catchedObject)
 	{
@@ -665,7 +670,7 @@ void Player::Catch()
 	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
 
-		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
+		EntityItem* item = m_nearObject->GetComponentDynamicCast<EntityItem>();
 		if (item)
 		{
 			m_animator->SetParameter("OnGrab", true);
@@ -686,7 +691,7 @@ void Player::Catch()
 		case EItemType::Mushroom:
 			Sound->playOneShot();
 		}*/
-		WeaponCapsule* weaponCapsule = m_nearObject->GetComponent<WeaponCapsule>();
+		WeaponCapsule* weaponCapsule = m_nearObject->GetComponentDynamicCast<WeaponCapsule>();
 		if (weaponCapsule)
 		{
 			weaponCapsule->CatchCapsule(this);
@@ -1662,7 +1667,7 @@ void Player::ThrowBomb()
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 		bombObj->GetComponent<Transform>()->SetPosition(pos);
 		Bomb* bomb = bombObj->GetComponent<Bomb>();
-		bomb->ThrowBomb(this, pos, bombThrowPosition, calculDamge());
+		bomb->ThrowBomb(this, pos, bombThrowPosition, m_curWeapon->bombThrowDuration,m_curWeapon->bombRadius, calculDamge());
 		onBombIndicate = false;
 		m_curWeapon->SetEnabled(false);
 		
@@ -1745,4 +1750,77 @@ void Player::TestHit()
 	controller->TriggerForcedMove(knockbackVeocity);
 	//넉백이 끝날떄까지 x z testHitPowerX  // y testHitPowerY;
 
+}
+
+
+
+void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
+{
+	if (hitinfo.itemType == ItemType::Basic || hitinfo.itemType == ItemType::Melee)
+	{
+		//근접공격타격이벤트
+		Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("SwordHit");
+		if (HirPrefab)
+		{
+			GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
+			auto swordHitEffect = HirObj->GetComponent<SwordHitEffect>();
+			Transform* hitTransform = HirObj->GetComponent<Transform>();
+			hitTransform->SetPosition(hitinfo.hitPos);
+			Vector3 normal = hitinfo.hitNormal;
+			normal.Normalize();
+
+			// 보조 업 벡터 (노말이랑 평행하지 않게 선택)
+			Vector3 up = Vector3::UnitY;
+			if (fabsf(up.Dot(normal)) > 0.99f)
+				up = Vector3::UnitX;
+
+			// 오른쪽 벡터
+			Vector3 right = up.Cross(normal);
+			right.Normalize();
+
+			// 다시 업 보정
+			up = normal.Cross(right);
+			up.Normalize();
+
+			// 회전행렬 → 쿼터니언
+			Matrix rotMat;
+			rotMat.Right(right);
+			rotMat.Up(up);
+			rotMat.Forward(normal);
+
+			Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMat);
+			hitTransform->SetRotation(rot);
+			swordHitEffect->Initialize();
+		}
+
+	}
+	else if (hitinfo.itemType == ItemType::Range)
+	{
+		if (hitinfo.bulletType == BulletType::Normal)
+		{
+			Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("BulletNormalHit");
+			if (HirPrefab)
+			{
+				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
+				auto rangeHitEffect = HirObj->GetComponent<SwordHitEffect>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				Transform* hitTransform = HirObj->GetComponent<Transform>();
+				hitTransform->SetPosition(hitinfo.hitPos);
+
+				rangeHitEffect->Initialize();
+			}
+		}
+		else
+		{
+			Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("BulletSpecialHit");
+			if (HirPrefab)
+			{
+				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
+				auto rangeHitEffect = HirObj->GetComponent<SwordHitEffect>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				Transform* hitTransform = HirObj->GetComponent<Transform>();
+				hitTransform->SetPosition(hitinfo.hitPos);
+
+				rangeHitEffect->Initialize();
+			}
+		}
+	}
 }

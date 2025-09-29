@@ -326,45 +326,8 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			//std::cout << "EntityMonsterA SendDamage CurrHP : " << m_currentHP << std::endl;
 
 
-			if (hitinfo.itemType == ItemType::Basic || hitinfo.itemType == ItemType::Melee)
-			{
-				//근접공격타격이벤트
-				Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("SwordHit");
-				if (HirPrefab)
-				{
-					GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
-					auto swordHitEffect = HirObj->GetComponent<SwordHitEffect>();
-					Transform* hitTransform = HirObj->GetComponent<Transform>();
-					hitTransform->SetPosition(hitinfo.hitPos);
-					Vector3 normal = hitinfo.hitNormal;
-					normal.Normalize();
-
-					// 보조 업 벡터 (노말이랑 평행하지 않게 선택)
-					Vector3 up = Vector3::UnitY;
-					if (fabsf(up.Dot(normal)) > 0.99f)
-						up = Vector3::UnitX;
-
-					// 오른쪽 벡터
-					Vector3 right = up.Cross(normal);
-					right.Normalize();
-
-					// 다시 업 보정
-					up = normal.Cross(right);
-					up.Normalize();
-
-					// 회전행렬 → 쿼터니언
-					Matrix rotMat;
-					rotMat.Right(right);
-					rotMat.Up(up);
-					rotMat.Forward(normal);
-
-					Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMat);
-					hitTransform->SetRotation(rot);
-					swordHitEffect->Initialize();
-				}
-
-			}
 			
+			PlayHitEffect(this->GetOwner(), hitinfo);
 
 
 			if (m_currentHP <= 0)
