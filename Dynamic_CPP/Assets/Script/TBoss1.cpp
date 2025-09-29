@@ -3,6 +3,7 @@
 #include "CharacterControllerComponent.h"
 #include "BehaviorTreeComponent.h"
 #include "PrefabUtility.h"
+#include <utility>
 #include "BP003.h"
 
 void TBoss1::Start()
@@ -93,6 +94,7 @@ void TBoss1::BP0031()
 	//비었으면 문제 인대 그럼 돌려보내
 	if (BP003Objs.empty()) { return; }
 
+	//todo: 일단 타겟으로 잡은 플레이어 위치만 생각 둘다 만들어 지는건 각 플레이어 방향 받아서 생각 좀 해보자
 	Mathf::Vector3 pos = m_target->GetComponent<Transform>()->GetWorldPosition();
 	
 	//한개 
@@ -227,5 +229,98 @@ void TBoss1::BP0033()
 void TBoss1::BP0034()
 {
 	std::cout << "BP0034" << std::endl;
+	//적 방향을 우선으로 대각선 방향으로 맵 전체에 격자 모양으로 순차적으로 생성 폭파
+	//일단은 타깃 방향 
+
+	//일단 보스를 춘식이 위치로 옮겨 0033과 동일
+	Transform* tr = GetOwner()->GetComponent<Transform>();
+	if (m_chunsik) {
+		Mathf::Vector3 chunsik = m_chunsik->GetComponent<Transform>()->GetWorldPosition();
+		tr->SetWorldPosition(chunsik);
+		//이때 회전이나 같은 것도 알맞은 각도로 돌려 놓느것
+	}
+	//춘식이 없으면 제자리
+
+	
+	//todo: 일단 타겟으로 잡은 플레이어 위치만 생각 둘다 만들어 지는건 각 플레이어 방향 받아서 생각 좀 해보자
+	Mathf::Vector3 targetPos;
+
+	if (m_target) {
+		targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
+	}
+	else {//문제가 생겨서 타겟을 잃어 버렸는대 패턴 발생시 
+		//일단 플레이어1의 포지션을 가져오자 -> todo
+
+	}
+
+
+	Mathf::Vector3 direction; //우선 방향
+	Mathf::Vector3 pos = tr->GetWorldPosition();//보스 위치 
+	direction = targetPos - pos; 
+	direction.Normalize();
+
+	// 1. 격자 관련 기본 값 계산
+	const float PI = 3.1415926535f;
+	float circleArea = PI * m_chunsikRadius * m_chunsikRadius;
+	float singleCellArea = circleArea / 16;
+	float gridSpacing = sqrt(singleCellArea);
+	int gridDimension = static_cast<int>(ceil(m_chunsikRadius * 2 / gridSpacing));
+
+	// 2. 정렬 규칙 결정
+	Mathf::Vector3 relativePlayerPos = direction;
+	bool isMajorAxisX = std::abs(relativePlayerPos.x) > std::abs(relativePlayerPos.z);
+	float majorSortSign = (isMajorAxisX ? relativePlayerPos.x : relativePlayerPos.z) < 0.f ? 1.f : -1.f;
+	float minorSortSign = (isMajorAxisX ? relativePlayerPos.z : relativePlayerPos.x) < 0.f ? 1.f : -1.f;
+
+	// 3. 우선순위와 위치를 저장할 벡터
+	std::vector<std::pair<int, Mathf::Vector3>> placements;
+
+	// 4. 격자를 순회하며 우선순위 계산 및 저장
+	int iz = 0;
+	for (float z = -m_chunsikRadius; z <= m_chunsikRadius; z += gridSpacing, ++iz)
+	{
+		int ix = 0;
+		for (float x = -m_chunsikRadius; x <= m_chunsikRadius; x += gridSpacing, ++ix)
+		{
+			Mathf::Vector3 localOffset(x, 0, z);
+			if (localOffset.LengthSquared() > m_chunsikRadius * m_chunsikRadius) continue;
+
+			// ★★★ 회전(기울이기) 없이 월드 좌표를 계산 ★★★
+			Mathf::Vector3 spawnPos = pos + localOffset;
+
+			int majorIndex, minorIndex;
+			if (isMajorAxisX) {
+				majorIndex = ix; minorIndex = iz;
+			}
+			else {
+				majorIndex = iz; minorIndex = ix;
+			}
+
+			int priority = static_cast<int>(
+				(majorIndex * majorSortSign) * gridDimension + (minorIndex * minorSortSign)
+				);
+
+			placements.push_back({ priority, spawnPos });
+		}
+	}
+
+	// 5. 우선순위(pair.first)에 따라 기본 오름차순 정렬
+	std::sort(placements.begin(), placements.end(),[](auto a,auto b){
+		return a.first < b.first;
+		});
+
+	// 6. 정렬된 순서대로 오브젝트 생성
+	for (size_t i = 0; i < placements.size(); ++i) 
+	{
+		const auto& placement = placements[i];
+		int sequenceNumber = static_cast<int>(i);
+		Mathf::Vector3 objpos = placements[i].second;
+		GameObject* floor = BP003Objs[i];
+		BP003* script = floor->GetComponent<BP003>();
+		floor->SetEnabled(true);
+		//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
+		script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
+		script->isAttackStart = true;
+	}
 }
 
