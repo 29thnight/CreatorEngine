@@ -8,9 +8,10 @@ class HierarchyWindow
 {
 public:
 	HierarchyWindow(SceneRenderer* ptr);
+	void DrawSceneObject(const std::shared_ptr<GameObject>& obj);
 	~HierarchyWindow() = default;
 
-	void DrawSceneObject(const std::shared_ptr<GameObject>& obj, GameObject* selected, bool forceOpenPath, bool& scrolledOnce);
+	//void DrawSceneObject(const std::shared_ptr<GameObject>& obj, GameObject* selected, bool forceOpenPath, bool& scrolledOnce);
 
 	SceneRenderer* m_sceneRenderer{ nullptr };
 	ImGuiTextFilter m_searchFilter{};

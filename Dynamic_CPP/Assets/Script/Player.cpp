@@ -665,7 +665,7 @@ void Player::Catch()
 	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
 
-		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
+		EntityItem* item = m_nearObject->GetComponentDynamicCast<EntityItem>();
 		if (item)
 		{
 			m_animator->SetParameter("OnGrab", true);
