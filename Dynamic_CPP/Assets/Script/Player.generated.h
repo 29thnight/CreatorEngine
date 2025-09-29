@@ -6,6 +6,7 @@ ReflectionScriptField(Player) \
 	PropertyField \
 	({ \
 		meta_property(playerIndex) \
+		meta_property(m_playerType) \
 		meta_property(moveSpeed) \
 		meta_property(chargingMoveSpeed) \
 		meta_property(maxHP) \
@@ -69,7 +70,6 @@ ReflectionScriptField(Player) \
 		meta_method(PlaySlashEvent) \
 		meta_method(PlaySlashEvent2) \
 		meta_method(PlaySlashEvent3) \
-		meta_method(TestKillPlayer) \
 		meta_method(TestHit) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \

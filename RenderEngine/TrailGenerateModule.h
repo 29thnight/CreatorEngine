@@ -16,7 +16,7 @@ enum class TrailRenderMode
     TUBE = 1        // ¿øÅëÇü (3D)
 };
 
-struct TrailVertex
+struct CTrailVertex
 {
     Mathf::Vector3 position;
     Mathf::Vector2 texcoord;
@@ -114,7 +114,7 @@ public:
     int GetTubeSegments() const { return m_tubeSegments; }
 
     const std::vector<TrailPoint>& GetTrailPoints() const { return m_trailPoints; }
-    const std::vector<TrailVertex>& GetVertices() const { return m_vertices; }
+    const std::vector<CTrailVertex>& GetVertices() const { return m_vertices; }
     const std::vector<UINT>& GetIndices() const { return m_indices; }
 
     virtual nlohmann::json SerializeData() const override;
@@ -129,7 +129,7 @@ private:
 
 private:
     std::vector<TrailPoint> m_trailPoints;
-    std::vector<TrailVertex> m_vertices;
+    std::vector<CTrailVertex> m_vertices;
     std::vector<UINT> m_indices;
 
     ComPtr<ID3D11Buffer> m_vertexBuffer;

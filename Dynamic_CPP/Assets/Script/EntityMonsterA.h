@@ -84,7 +84,7 @@ public:
 
 	void RotateToTarget(); //≈∏∞Ÿ πŸ∂Û∫∏±‚
 
-	void SendDamage(Entity* sender, int damage) override;
+	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
 
 	//≥ÿπÈ√≥∏Æ

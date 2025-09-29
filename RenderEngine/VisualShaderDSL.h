@@ -31,4 +31,4 @@ struct VisualShaderGraphDesc
     std::vector<VisualShaderConnectionDesc> connections;
 };
 
-bool ParseVisualShaderDSL(std::string_view src, VisualShaderGraphDesc& out);
+extern bool ParseVisualShaderDSL(std::string_view src, VisualShaderGraphDesc& out);

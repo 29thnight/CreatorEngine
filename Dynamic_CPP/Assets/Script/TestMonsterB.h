@@ -94,7 +94,7 @@ public:
 	
 	void AttackBoxOff(); //공격 박스 비활성화
 
-	void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
+	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override; //근접 공격시 데미지 전달
 
 	[[Method]]
 	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사

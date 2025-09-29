@@ -20,7 +20,7 @@ void NormalBullet::Update(float tick)
 	lifeTime -= tick;
 	if (lifeTime <= 0)
 	{
-		//GetOwner()->Destroy();
+		GetOwner()->Destroy();
 	}
 }
 

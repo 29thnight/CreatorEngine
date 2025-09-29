@@ -26,7 +26,7 @@ void EntityBigWood::OnCollisionEnter(const Collision& collision)
 	HitAsis(asis);
 }
 
-void EntityBigWood::SendDamage(Entity* sender, int damage)
+void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (m_currentHP <= 0) return; // 풀링해서 사용하기 위해 만약 이미 파괴된 상태라면 무시.
 

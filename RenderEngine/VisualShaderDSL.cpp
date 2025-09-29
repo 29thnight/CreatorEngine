@@ -1,39 +1,7 @@
 #include "VisualShaderDSL.h"
 
-#include <algorithm>
-#include <cctype>
 #include <regex>
-
-namespace
-{
-std::string Trim(std::string s)
-{
-    const auto notSpace = [](unsigned char ch) { return !std::isspace(ch); };
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), notSpace));
-    s.erase(std::find_if(s.rbegin(), s.rend(), notSpace).base(), s.end());
-    return s;
-}
-
-std::string ToLower(std::string s)
-{
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return s;
-}
-
-bool SplitEndpoint(std::string_view endpoint, std::string& node, std::string& slot)
-{
-    const auto trimmed = Trim(std::string(endpoint));
-    const auto pos = trimmed.find('.');
-    if (pos == std::string::npos)
-    {
-        return false;
-    }
-
-    node = Trim(trimmed.substr(0, pos));
-    slot = Trim(trimmed.substr(pos + 1));
-    return !(node.empty() || slot.empty());
-}
-}
+#include "StringHelper.h"
 
 bool ParseVisualShaderDSL(std::string_view srcView, VisualShaderGraphDesc& out)
 {
