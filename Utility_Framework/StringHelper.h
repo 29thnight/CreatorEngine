@@ -117,3 +117,17 @@ inline std::string Unquote(std::string v)
         return v.substr(1, v.size() - 2);
     return v;
 }
+
+inline bool SplitEndpoint(std::string_view endpoint, std::string& node, std::string& slot)
+{
+    const auto trimmed = Trim(std::string(endpoint));
+    const auto pos = trimmed.find('.');
+    if (pos == std::string::npos)
+    {
+        return false;
+    }
+
+    node = Trim(trimmed.substr(0, pos));
+    slot = Trim(trimmed.substr(pos + 1));
+    return !(node.empty() || slot.empty());
+}
