@@ -576,7 +576,10 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 		for(auto& instance : proxy->m_foliageInstances)
 		{
 			uint32 key = instance.m_foliageTypeID;
-			instanceMap[key].push_back(&instance);
+			if(!instance.m_isCulled)
+			{
+				instanceMap[key].push_back(&instance);
+			}
 		}
 
 		for(auto& [key, instances] : instanceMap)

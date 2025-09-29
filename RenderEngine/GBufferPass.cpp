@@ -505,6 +505,9 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 			// 3. [수정] Splat Map '배열' 텍스처 바인딩 (t7)
 			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
 
+			DirectX11::UpdateBuffer(deferredPtr, terrainMaterial->m_layerBuffer.Get(),
+				&terrainMaterial->m_layerBufferData);
+
 			terrainMesh->Draw(deferredPtr);
 
 			// --- 리소스 정리 ---

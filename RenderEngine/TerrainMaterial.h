@@ -17,6 +17,7 @@ public:
 	~TerrainMaterial() = default;
 
 	void Initialize(UINT width, UINT height);
+	void UpdateBuffer();
 	void ClearLayers();
 
 	// GPU 리소스와 직접 통신하는 함수들
