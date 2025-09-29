@@ -1,22 +1,22 @@
-m_name: Boss1BP003Obj
+m_name: Boss1BP003Obj_Prefab
 m_isEnabled: true
-m_instanceID: 880367728
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_instanceID: 3076236229
+m_fileGuid: 8aa3dda2-6225-542b-947c-95702283deb2
 PrefabNode:
   - GameObject: 2166264123
     m_name: Boss1BP003Obj
     m_isEnabled: true
-    m_instanceID: 3204394850
+    m_instanceID: 3885107687
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 0}
-      rotation: {x: 1, y: 0, z: 0, w: -0}
-      scale: {x: 0, y: 0, z: 0, w: 0}
+      rotation: {x: -1.57541431e-16, y: 4.92108426e-32, z: 3.12367619e-16, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 71
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabFileGuid: 8aa3dda2-6225-542b-947c-95702283deb2
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - SpriteRenderer: 2547306898
         m_name: SpriteRenderer
         m_isEnabled: true
-        m_instanceID: 3815633010
+        m_instanceID: 3098073830
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_SpritePath: bianca.png
         m_CustomPSOName: ""
@@ -38,6 +38,6 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         m_name: BP003
         m_isEnabled: true
-        m_instanceID: 1819981721
+        m_instanceID: 3236220499
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 6791f382-8661-55ff-83c7-781945783428
