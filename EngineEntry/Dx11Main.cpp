@@ -309,6 +309,12 @@ void DirectX11::Dx11Main::Update()
     //RenderCommandFence.Begin();
     //RenderCommandFence.Wait();
     EngineSettingInstance->renderBarrier.ArriveAndWait();
+
+    if (SceneManagers->IsDecommissioning())
+    {
+        HWND handle = m_deviceResources->GetWindow()->GetHandle();
+        PostMessage(handle, WM_CLOSE, 0, 0);
+    }
 }
 
 bool DirectX11::Dx11Main::ExecuteRenderPass()

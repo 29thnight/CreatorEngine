@@ -21,6 +21,19 @@
 #include "MetaStateCommand.h"
 #include "ReflectionRegister.h"
 
+static bool ContainsSelected(Scene* scene,
+	const std::shared_ptr<GameObject>& node,
+	const GameObject* selected)
+{
+	if (!scene || !node || !selected) return false;
+	if (node.get() == selected) return true;
+	for (auto idx : node->m_childrenIndices) {
+		auto child = scene->GetGameObject(idx);
+		if (child && ContainsSelected(scene, child, selected)) return true;
+	}
+	return false;
+}
+
 HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 	m_sceneRenderer(ptr)
 {
@@ -59,6 +72,16 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
 						scene, std::span<GameObject* const>(m_clipboard.data(), m_clipboard.size())));
 				}
+			}
+			
+			bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
+			if (ctrl && ImGui::IsKeyPressed(ImGuiKey_J))
+			{
+				m_requestScrollToSelection = true;
+			}
+			else
+			{
+				m_requestScrollToSelection = false;
 			}
 
 			if (!scene && !renderScene)
@@ -374,6 +397,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					}
 				}
 
+				bool scrolledOnce = false;
 				auto& sceneObjects = scene->m_SceneObjects;
 				for (int i = 1; i < sceneObjects.size(); ++i)
 				{
@@ -381,7 +405,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					if (!obj || obj->m_parentIndex > 0 || obj->IsDontDestroyOnLoad()) continue;
 
 					ImGui::PushID((int)&obj);
-					DrawSceneObject(obj);
+					DrawSceneObject(obj, selectedSceneObject, m_requestScrollToSelection, scrolledOnce);
 					ImGui::PopID();
 				}
 
@@ -403,7 +427,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 						for (const auto& obj : ddolObjects)
 						{
 							ImGui::PushID((int)obj.get());
-							DrawSceneObject(obj);
+							DrawSceneObject(obj, selectedSceneObject, m_requestScrollToSelection, scrolledOnce);
 							ImGui::PopID();
 						}
 						ImGui::TreePop();
@@ -419,11 +443,22 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 	}, ImGuiWindowFlags_NoMove);
 }
 
-void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
+void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj,
+	GameObject* selected,
+	bool forceOpenPath,
+	bool& scrolledOnce)
 {
 	auto scene = SceneManagers->GetActiveScene();
-        auto& selectedSceneObject = scene->m_selectedSceneObject;
-        auto& selectedObjects = scene->m_selectedSceneObjects;
+    auto& selectedSceneObject = scene->m_selectedSceneObject;
+    auto& selectedObjects = scene->m_selectedSceneObjects;
+
+	const bool pathToSelected = (forceOpenPath && selected)
+		? ContainsSelected(scene, obj, selected)
+		: false;
+	if (pathToSelected) 
+	{
+		ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+	}
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
     bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end();
@@ -459,6 +494,11 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	}
 	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
 
+	if (selected && obj.get() == selected && !scrolledOnce) {
+		ImGui::SetScrollHereY(0.25f);      // 화면 상단 25% 지점에 정렬 (취향에 맞게 0~1)
+		ImGui::SetKeyboardFocusHere();     // (선택) 키보드 포커스도 이동
+		scrolledOnce = true;               // 같은 프레임 중복 호출 방지
+	}
 
 	if (!obj->IsEnabled())
 	{
@@ -547,7 +587,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		for (auto childIndex : obj->m_childrenIndices)
 		{
 			auto child = scene->GetGameObject(childIndex);
-			DrawSceneObject(child);
+			DrawSceneObject(child, selected, forceOpenPath, scrolledOnce);
 		}
 		ImGui::TreePop();
 	}
