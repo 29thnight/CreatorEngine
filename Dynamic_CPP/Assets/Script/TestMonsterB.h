@@ -41,6 +41,7 @@ public:
 
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
+	bool isAttackRoll = false;
 	bool isBoxAttack = false; //박스 공격중인지 여부
 	bool isMelee = false; //근접공격을 할지 원거리 공격을 할지
 

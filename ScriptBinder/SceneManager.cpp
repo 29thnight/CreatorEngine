@@ -29,20 +29,25 @@ void SceneManager::Editor()
     PROFILE_CPU_BEGIN("Editor");
     if(m_isGameStart && !m_isEditorSceneLoaded)
     {
+        PROFILE_CPU_BEGIN("CreateEditorOnlyPlayScene");
         CreateEditorOnlyPlayScene();
+        PROFILE_CPU_END();
+        PROFILE_CPU_BEGIN("Reset");
         m_activeScene.load()->Reset();
+        PROFILE_CPU_END();
 		m_isEditorSceneLoaded = true;
     }
     else if (!m_isGameStart && m_isEditorSceneLoaded)
     {
+        PROFILE_CPU_BEGIN("DeleteEditorOnlyPlayScene");
         DeleteEditorOnlyPlayScene();
+        PROFILE_CPU_END();
     }
 
     if (!m_isGameStart)
     {
-
-    // Sweep DDOL bucket for destroyed objects
-    std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
+        // Sweep DDOL bucket for destroyed objects
+        std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
 		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
         ScriptManager->ReloadDynamicLibrary();
         m_isInitialized = false; // Reset initialization state for editor scene
@@ -319,17 +324,40 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
-        if(auto assetsBundleNode = sceneNode["AssetsBundle"])
+        if(auto assetsBundleNode = sceneNode["m_requiredLoadAssetsBundle"])
         {
-            if (assetsBundleNode.IsNull())
+            try
             {
-                Debug->LogError("AssetsBundle node is null.");
+                if (assetsBundleNode.IsNull())
+                {
+                    Debug->LogError("AssetsBundle node is null.");
+                }
+                else
+                {
+                    auto* assetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
+                    Meta::Deserialize(assetBundle, assetsBundleNode);
+                    //DataSystems->LoadAssetBundle(*assetBundle);
+                    if (auto assets = assetsBundleNode["assets"])
+                    {
+                        for (auto asset : assets)
+                        {
+                            if(asset["assetTypeID"] && asset["assetName"])
+                            {
+                                AssetEntry entry{};
+                                entry.assetTypeID = asset["assetTypeID"].as<int>();
+                                entry.assetName = asset["assetName"].as<std::string>();
+                                if (!assetBundle->ContainsAsset(entry))
+                                {
+                                    assetBundle->AddAsset(entry);
+                                }
+                            }
+                        }
+                        DataSystems->LoadAssetBundle(*assetBundle);
+                    }
+                }
             }
-            else
+            catch (...)
             {
-                auto* assetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
-                Meta::Deserialize(assetBundle, assetsBundleNode);
-                DataSystems->LoadAssetBundle(*assetBundle);
             }
         }
 
@@ -471,12 +499,34 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
-            if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+            if (auto assetsBundleNode = sceneNode["m_requiredLoadAssetsBundle"])
             {
-                if (!assetsBundleNode.IsNull())
+                try
                 {
-                    Meta::Deserialize(&newScene->m_requiredLoadAssetsBundle, assetsBundleNode);
-                    DataSystems->LoadAssetBundle(newScene->m_requiredLoadAssetsBundle);
+                    if (!assetsBundleNode.IsNull())
+                    {
+                        auto* assetBundle = &newScene->m_requiredLoadAssetsBundle;
+                        if (auto assets = assetsBundleNode["assets"])
+                        {
+                            for (auto asset : assets)
+                            {
+                                if (asset["assetTypeID"] && asset["assetName"])
+                                {
+                                    AssetEntry entry{};
+                                    entry.assetTypeID = asset["assetTypeID"].as<int>();
+                                    entry.assetName = asset["assetName"].as<std::string>();
+                                    if (!assetBundle->ContainsAsset(entry))
+                                    {
+                                        assetBundle->AddAsset(entry);
+                                    }
+                                }
+                            }
+                            DataSystems->LoadAssetBundle(*assetBundle);
+                        }
+                    }
+                }
+                catch (...)
+                {
                 }
             }
 
@@ -542,12 +592,28 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
-            if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+            if (auto assetsBundleNode = sceneNode["m_requiredLoadAssetsBundle"])
             {
                 if (!assetsBundleNode.IsNull())
                 {
-                    Meta::Deserialize(&newScene->m_requiredLoadAssetsBundle, assetsBundleNode);
-                    DataSystems->LoadAssetBundle(newScene->m_requiredLoadAssetsBundle);
+                    auto* assetBundle = &newScene->m_requiredLoadAssetsBundle;
+                    if (auto assets = assetsBundleNode["assets"])
+                    {
+                        for (auto asset : assets)
+                        {
+                            if (asset["assetTypeID"] && asset["assetName"])
+                            {
+                                AssetEntry entry{};
+                                entry.assetTypeID = asset["assetTypeID"].as<int>();
+                                entry.assetName = asset["assetName"].as<std::string>();
+                                if (!assetBundle->ContainsAsset(entry))
+                                {
+                                    assetBundle->AddAsset(entry);
+                                }
+                            }
+                        }
+                        DataSystems->LoadAssetBundle(*assetBundle);
+                    }
                 }
             }
 
@@ -731,18 +797,22 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
     try
     {
+        PROFILE_CPU_BEGIN("UndoCommandManager::ClearGameMode");
         Meta::UndoCommandManager->ClearGameMode();
 		Meta::UndoCommandManager->Clear();
-		resourceTrimEvent.Broadcast();
+        PROFILE_CPU_END();
         //resetSelectedObjectEvent.Broadcast();
+        PROFILE_CPU_BEGIN("Serialize");
         sceneNode = Meta::Serialize(m_activeScene.load());
-		resourceTrimEvent.Broadcast();
+        PROFILE_CPU_END();
+        resourceTrimEvent.Broadcast();
+
+        PROFILE_CPU_BEGIN("DesirealizeGameObject");
 		Scene* playScene = Scene::LoadScene("PlayScene");
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;
         m_activeSceneIndex = m_scenes.size() - 1;
         m_activeScene = playScene;
-
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -754,6 +824,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
             DesirealizeGameObject(type, objNode);
         }
+        PROFILE_CPU_END();
         m_activeScene.load()->AllUpdateWorldMatrix();
 
 		activeSceneChangedEvent.Broadcast();

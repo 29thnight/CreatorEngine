@@ -36,9 +36,10 @@ NodeStatus WaitAction::Tick(float deltatime, BlackBoard& blackBoard)
 		TestMonsterB* script = m_owner->GetComponent<TestMonsterB>();
 		animator = script->m_animator;
 		script->m_state = "Idle";
-			script->RotateToTarget(); // Rotate to face target at the start of the wait
-		/*if (elapsedTime < 0.1f) {
-		}*/
+		//if (elapsedTime < 0.1f) {
+		script->isAttackRoll = true;
+			//script->RotateToTarget(); // Rotate to face target at the start of the wait
+		//}
 	}
 	else if (identity == "MonsterMage") {
 		EntityEleteMonster* script = m_owner->GetComponent<EntityEleteMonster>();

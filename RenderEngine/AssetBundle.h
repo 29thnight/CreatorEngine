@@ -8,12 +8,18 @@ struct AssetBundle
 	[[Serializable]]
 	AssetBundle() = default;
 	AssetBundle(const std::string& name, const file::path& path)
-		: name(name), path(path) {}
+		: name(name), path(path.string()) {}
+	AssetBundle(const std::string& name, const std::string& path)
+		: name(name), path(path) {
+	}
 	~AssetBundle() = default;
 
 	void AddAsset(const AssetEntry& assetEntry)
 	{
-		assets.push_back(assetEntry);
+		if (-1 != assetEntry.assetTypeID)
+		{
+			assets.push_back(assetEntry);
+		}
 	}
 
 	void RemoveAsset(const AssetEntry& assetEntry)
@@ -38,7 +44,7 @@ struct AssetBundle
 	[[Property]]
 	std::string name; // Name of the asset bundle
 	[[Property]]
-	file::path path; // Path to the asset bundle file
+	std::string path; // Path to the asset bundle file
 	[[Property]]
 	std::vector<AssetEntry> assets; // List of assets contained in the bundle
 };

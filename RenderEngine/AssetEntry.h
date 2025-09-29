@@ -17,7 +17,7 @@ struct AssetEntry
 	[[Serializable]]
 	AssetEntry() = default;
 	AssetEntry(ManagedAssetType assetTypeID, const file::path& assetName)
-		: assetTypeID((int)assetTypeID), assetName(assetName) {
+		: assetTypeID((int)assetTypeID), assetName(assetName.string()) {
 	}
 	~AssetEntry() = default;
 	AssetEntry(const AssetEntry&) = default;
@@ -26,10 +26,16 @@ struct AssetEntry
 	AssetEntry& operator=(const AssetEntry&) = default;
 	AssetEntry& operator=(AssetEntry&&) noexcept = default;
 
+	void Clear()
+	{
+		assetTypeID = -1;
+		assetName.clear();
+	}
+
 	[[Property]]
-	int assetTypeID;
+	int assetTypeID{ -1 };
 	[[Property]]
-	file::path assetName;
+	std::string assetName{};
 
 	friend auto operator<=>(const AssetEntry& lhs, const AssetEntry& rhs)
 	{

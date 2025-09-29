@@ -205,6 +205,10 @@ void TestMonsterB::Update(float tick)
 		m_state = "Attack";
 	}
 
+	if (isAttackRoll) {
+		RotateToTarget();
+	}
+
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
 		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
@@ -371,6 +375,8 @@ void TestMonsterB::ShootingAttack()
 {
 	
 	if (target == nullptr) return;
+
+	isAttackRoll = false;
 	
 	GameObject* PrefabObject = m_projectiles[m_projectileIndex];
 	if (PrefabObject) {
