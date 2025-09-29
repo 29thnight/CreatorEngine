@@ -569,6 +569,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 
 	camera.UpdateBuffer(deferredPtr);
 
+	constexpr size_t kMaxInstancesPerDraw = 2048;
 	//std::unordered_map<std::pair<HashedGuid, HashedGuid>, std::vector<FoliageInstance*>> instanceMap;
 	for(auto& proxy : data->m_foliageQueue)
 	{
@@ -602,26 +603,38 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 			if (mat->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
 			if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
 			if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
-			
+
+			// 3) 인스턴스 행렬 업로드 + 드로우를 2048개씩 청크로
 			std::vector<Mathf::xMatrix> instanceMatrices;
-			instanceMatrices.reserve(instances.size());
-			for (const auto& instance : instances)
+			instanceMatrices.reserve(std::min(instances.size(), kMaxInstancesPerDraw));
+
+			const size_t total = instances.size();
+			for (size_t base = 0; base < total; base += kMaxInstancesPerDraw)
 			{
-				instanceMatrices.push_back(instance->m_worldMatrix * proxy->m_worldMatrix);
+				const size_t count = std::min(kMaxInstancesPerDraw, total - base);
+
+				// 청크용 행렬 채우기
+				instanceMatrices.resize(count);
+				for (size_t i = 0; i < count; ++i)
+				{
+					const auto* inst = instances[base + i];
+					instanceMatrices[i] = inst->m_worldMatrix * proxy->m_worldMatrix;
+				}
+
+				// 버퍼 업데이트 (바이트 단위)
+				D3D11_BOX box{};
+				box.left = 0;
+				box.right = static_cast<UINT>(count * sizeof(Mathf::xMatrix));
+				box.top = 0; box.bottom = 1;
+				box.front = 0; box.back = 1;
+
+				// m_instanceBuffer: 인스턴싱용 VB (DEFAULT 권장)
+				deferredPtr->UpdateSubresource(m_instanceBuffer.Get(), 0, &box,
+					instanceMatrices.data(), 0, 0);
+
+				// 드로우(청크 수만큼)
+				mesh->DrawInstanced(deferredPtr, static_cast<UINT>(count));
 			}
-
-			// Define the destination box to specify the exact region to update.
-			D3D11_BOX destBox;
-			destBox.left = 0;
-			destBox.right = instances.size() * sizeof(Mathf::xMatrix);
-			destBox.top = 0;
-			destBox.bottom = 1;
-			destBox.front = 0;
-			destBox.back = 1;
-
-			deferredPtr->UpdateSubresource(m_instanceBuffer.Get(), 0, &destBox, instanceMatrices.data(), 0, 0);
-
-			mesh->DrawInstanced(deferredPtr, instances.size());
 		}
 	}
 
