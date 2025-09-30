@@ -415,7 +415,8 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-	if (GM->TestCameraControll == false)
+
+	if (GM&& GM->TestCameraControll == false)
 	{
 		if (isStun)
 		{

@@ -19,49 +19,52 @@ void CameraMove::Update(float tick)
 void CameraMove::LateUpdate(float tick)
 {
 	
-	if (GM->TestCameraControll == false)
+	if (GM)
 	{
-		if (target == nullptr)
+		if (GM->TestCameraControll == false)
 		{
-			return;
+			if (target == nullptr)
+			{
+				return;
+			}
+
+			Transform* transform = GetOwner()->GetComponent<Transform>();
+			Mathf::Vector3 targetPos = target->GetComponent<Transform>()->GetWorldPosition();
+			targetPos.y = 0.f;
+			Mathf::Vector3 currentPos = transform->GetWorldPosition();
+			currentPos = currentPos - offset;
+			currentPos.y = 0.f;
+			float distance = Mathf::Vector3::Distance(targetPos, currentPos);
+
+			if (distance > detectRange)
+			{
+				targetPosition = targetPos;
+				followTimer = 0.f;
+			}
+
+			followTimer += tick / followSpeed / 3.f;
+			if (followTimer > followSpeed)
+			{
+
+			}
+
+			Mathf::Vector3 dir = targetPosition - currentPos;
+			dir.y = 0.f;
+			dir.Normalize();
+
+			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
+			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer / followSpeed) + offset);
+
+
+			//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);
+			//lerpPos.y = 0.f;
+			//transform->SetPosition(lerpPos + offset);
 		}
-
-		Transform* transform = GetOwner()->GetComponent<Transform>();
-		Mathf::Vector3 targetPos = target->GetComponent<Transform>()->GetWorldPosition();
-		targetPos.y = 0.f;
-		Mathf::Vector3 currentPos = transform->GetWorldPosition();
-		currentPos = currentPos - offset;
-		currentPos.y = 0.f;
-		float distance = Mathf::Vector3::Distance(targetPos, currentPos);
-
-		if (distance > detectRange)
+		else
 		{
-			targetPosition = targetPos;
-			followTimer = 0.f;
-		}
-
-		followTimer += tick / followSpeed / 3.f;
-		if (followTimer > followSpeed)
-		{
+			//게임패드입력으로 카메라 움직이기
 
 		}
-
-		Mathf::Vector3 dir = targetPosition - currentPos;
-		dir.y = 0.f;
-		dir.Normalize();
-
-		//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
-		transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer / followSpeed) + offset);
-
-
-		//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);
-		//lerpPos.y = 0.f;
-		//transform->SetPosition(lerpPos + offset);
-	}
-	else
-	{
-		//게임패드입력으로 카메라 움직이기
-
 	}
 }
 
