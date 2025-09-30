@@ -258,6 +258,11 @@ void GameManager::ApplyGlobalEnhancementsToPlayer(Player* player)
 	}
 }
 
+
+
+
+
+
 void GameManager::PushEntity(Entity* entity)
 {
 	if (entity)

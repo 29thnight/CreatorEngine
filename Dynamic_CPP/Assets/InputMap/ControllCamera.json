@@ -1,0 +1,41 @@
+{
+    "actions": [
+        {
+            "actionName": "OnCamera",
+            "actionType": "Button",
+            "funName": "OnCameraControll",
+            "inputType": "GamePad",
+            "key0": "Start",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "CameraMove"
+        },
+        {
+            "actionName": "OffCamera",
+            "actionType": "Button",
+            "funName": "OffCameraCOntroll",
+            "inputType": "GamePad",
+            "key0": "Back",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "CameraMove"
+        },
+        {
+            "actionName": "CameraMove",
+            "actionType": "Value",
+            "funName": "CameraMoveFun",
+            "inputType": "GamePad",
+            "key0": "Left Thumbstick",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "CameraMove"
+        }
+    ],
+    "mapName": "ControllCamera"
+}
