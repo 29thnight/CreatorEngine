@@ -5,6 +5,7 @@ ReflectionScriptField(EntityBigWood) \
 { \
 	PropertyField \
 	({ \
+		meta_property(maxHP) \
 		meta_property(m_logDamage) \
 		meta_property(type1) \
 		meta_property(type1Count) \
