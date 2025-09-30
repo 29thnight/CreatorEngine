@@ -15,7 +15,6 @@ ReflectionScriptField(EntityEleteMonster) \
 		meta_property(m_projectileDamegeRadius) \
 		meta_property(m_projectileSpeed) \
 		meta_property(m_projectileRange) \
-		meta_property(m_projectileArcHeight) \
 		meta_property(m_rangedAttackCoolTime) \
 		meta_property(m_retreatRange) \
 		meta_property(m_retreatCoolTime) \

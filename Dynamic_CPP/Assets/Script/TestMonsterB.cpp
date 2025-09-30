@@ -10,7 +10,7 @@
 #include "PrefabUtility.h"
 #include "MonsterProjectile.h"
 #include "HPBar.h"
-
+#include "EntityAsis.h"
 #include "CriticalMark.h"
 void TestMonsterB::Start()
 {
@@ -123,6 +123,21 @@ void TestMonsterB::Start()
 	blackBoard->SetValueAsFloat("ProjectileSpeed", m_projectileSpeed); //투사체 속도
 	blackBoard->SetValueAsFloat("ProjectileRange", m_projectileRange); //투사체 최대 사거리
 	blackBoard->SetValueAsFloat("RangedAttackCoolTime", m_rangedAttackCoolTime); //원거리 공격 쿨타임
+
+	bool hasAsis = blackBoard->HasKey("Asis");
+	bool hasP1 = blackBoard->HasKey("Player1");
+	bool hasP2 = blackBoard->HasKey("Player2");
+
+	if (hasAsis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
+	}
+	if (hasP1) {
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
+	}
+	if (hasP2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
+	}
+
 }
 
 void TestMonsterB::Update(float tick)
@@ -276,9 +291,13 @@ void TestMonsterB::Dead()
 {
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
+	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();
+	if (asisScrip) {
+		asisScrip->AddPollutionGauge(m_enemyReward);
+	}
 }
 
-void TestMonsterB::ChaseTarget()
+void TestMonsterB::ChaseTarget(float deltatime)
 {
 	if (target && !isDead)
 	{
@@ -288,14 +307,36 @@ void TestMonsterB::ChaseTarget()
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
+
+			m_state = "Chase";
 			Mathf::Vector3 targetpos = targetTransform->GetWorldPosition();
 			Mathf::Vector3 dir = targetpos - pos;
 			dir.y = 0.f;
+
+			bool useChaseOutTime = blackBoard->HasKey("ChaseOutTime");
+			float outTime = 0.0f;
+
+			if (useChaseOutTime)
+			{
+				outTime = blackBoard->GetValueAsFloat("ChaseOutTime");
+			}
+
+			std::cout << "dist " << dir.Length() << std::endl;
+
+			if (dir.Length() < m_chaseRange)
+			{
+				outTime = m_rangeOutDuration; // Reset outTime if within range
+			}
+			else {
+				outTime -= deltatime; // Decrease outTime if not within range
+			}
+			blackBoard->SetValueAsString("State", m_state);
+			blackBoard->SetValueAsFloat("ChaseOutTime", outTime);
+
 			dir.Normalize();
 
 			if (controller) {
 				controller->Move({ dir.x * m_moveSpeed, dir.z * m_moveSpeed });
-				m_state = "Chase";
 			}
 
 

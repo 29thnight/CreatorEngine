@@ -37,6 +37,10 @@ public:
 	std::vector<GameObject*> m_projectiles;
 	int m_projectileIndex = 0;
 
+	GameObject* m_asis = nullptr;
+	GameObject* m_player1 = nullptr;
+	GameObject* m_player2 = nullptr;
+
 	GameObject* target = nullptr;
 	bool isDead = false;
 
@@ -87,7 +91,7 @@ public:
 
 	void Dead(); //磷澜 贸府
 
-	void ChaseTarget(); //鸥百 眠利
+	void ChaseTarget(float deltatime); //鸥百 眠利
 
 	void RotateToTarget(); //鸥百 官扼焊扁
 

@@ -35,6 +35,12 @@ public:
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
 	CriticalMark* m_criticalMark = nullptr;
+
+	GameObject* m_asis = nullptr;
+	GameObject* m_player1 = nullptr;
+	GameObject* m_player2 = nullptr;
+
+
 	GameObject* target = nullptr;
 	bool isDead = false;
 	[[Method]]
@@ -68,7 +74,6 @@ public:
 	[[Property]]
 	int m_attackDamage = 10;
 
-	std::string m_preState = "";
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
 	std::string m_identity = "MonsterNomal";
 
