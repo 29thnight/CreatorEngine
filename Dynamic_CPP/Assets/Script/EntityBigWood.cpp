@@ -10,6 +10,8 @@
 
 void EntityBigWood::Start()
 {
+	m_maxHP = maxHP;
+	m_currentHP = m_maxHP;
 }
 
 void EntityBigWood::OnTriggerEnter(const Collision& collision)

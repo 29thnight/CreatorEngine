@@ -9,6 +9,7 @@ struct HitInfo
 	Mathf::Vector3 hitNormal{};
 	Mathf::Vector3 KnockbackForce{}; //맞은애를 넉백시킬거리
 	ItemType itemType = ItemType::None;
+	BulletType bulletType = BulletType::Normal;
 };
 class Entity : public ModuleBehavior
 {

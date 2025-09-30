@@ -291,3 +291,5 @@ public:
 	[[Method]]
 	void TestHit();
 };
+
+void  PlayHitEffect(GameObject* _hitowner,HitInfo hitinfo);  //플레이어가 떄렸을때 나올이펙트 //맞은사람,맞았을때정보 입력 sendDamge 안에서사용

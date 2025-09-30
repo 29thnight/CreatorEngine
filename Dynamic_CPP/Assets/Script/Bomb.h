@@ -24,17 +24,15 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	void ThrowBomb(Player* _owner, Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos, float _damage);
+	void ThrowBomb(Player* _owner, Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos, float bombThrowDuration,float _radius,float _damage);
 	void BoundBomb(Mathf::Vector3 _targetPos);
 	[[Property]]
-	float throwSpeed = 0.01f;
-	[[Property]]
 	float m_throwPowerY = 4.0f; //포물선 y값
-	float m_boundPowerY = 0.5f;
 	[[Property]]
+	float m_boundPowerY = 0.5f;
 	float duration = 3.0f; //도달까지 걸릴시간
 	float elapsedTime = 0.f;
-
+	float radius = 2.5f;
 	float m_damage = 1.0f; // 폭탄던질떄 무기데미지 계산해서 넘겨주기
 
 	Player* m_ownerPlayer = nullptr;

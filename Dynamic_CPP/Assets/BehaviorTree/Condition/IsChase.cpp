@@ -13,6 +13,10 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	bool hasIdentity = blackBoard.HasKey("Identity");
 
+	if (useChaseOutTime) {
+		chaseOutTime = blackBoard.GetValueAsFloat("ChaseOutTime");
+	}
+
 	std::string identity = "";
 	if (hasIdentity)
 	{
@@ -21,6 +25,29 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (identity == "MonsterMage") {
 		int a = 0;
 	}
+
+
+	if (haState)
+	{
+		std::string state = blackBoard.GetValueAsString("State");
+		LOG("BT STATE :" << state);
+		if (state == "Chase")
+		{
+			LOG("chaseOutTime :" << chaseOutTime);
+			if (chaseOutTime > 0) {
+				LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
+				return true;
+			}
+			else {
+				LOG("out time target :" << chaseOutTime);
+			}
+		}
+	}
+
+
+
+
+
 
 	Transform* tr = m_owner->GetComponent<Transform>();
 	Mathf::Vector3 pos = tr->GetWorldPosition();
@@ -36,9 +63,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		chaseRange = blackBoard.GetValueAsFloat("ChaseRange");
 	}
 
-	if (useChaseOutTime) {
-		chaseOutTime = blackBoard.GetValueAsFloat("ChaseOutTime");
-	}
+	
 	
 
 	if (hasClosedTarget)
@@ -66,6 +91,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	{
 	}*/
 	
+	float a = dir.Length();
 
 	if (dir.Length() < chaseRange) {
 		//LOG("closed Target in ChaseRange");
@@ -74,17 +100,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 
 
-	if (haState) 
-	{
-		std::string state = blackBoard.GetValueAsString("State");
-		if (state == "Chase")
-		{
-			if (chaseOutTime > 0) {
-				//LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
-				return true;
-			}	
-		}
-	}
+	
 
 
 	LOG("closed Target Out ranage");

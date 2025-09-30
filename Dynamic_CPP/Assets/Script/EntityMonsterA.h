@@ -67,7 +67,7 @@ public:
 	[[Property]]
 	int m_attackDamage = 10;
 
-
+	std::string m_preState = "";
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
 	std::string m_identity = "MonsterNomal";
 
@@ -78,7 +78,7 @@ public:
 	[[Method]]
 	void AttackBoxOff(); //공격 박스 비활성화
 
-	void ChaseTarget(); //타겟 추적
+	void ChaseTarget(float deltatime); //타겟 추적
 
 	void Dead(); //죽음 처리
 
