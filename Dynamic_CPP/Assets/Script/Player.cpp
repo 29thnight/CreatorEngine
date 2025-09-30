@@ -415,94 +415,96 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
+	if (GM->TestCameraControll == false)
+	{
+		if (isStun)
+		{
 
-	//if (isStun)
-	//{
-	//	
-	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	//	auto cam = camComponent->GetCamera();
-	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+			auto cam = camComponent->GetCamera();
+			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	//	float w = XMVectorGetW(clipSpacePos);
-	//	if (w < 0.001f) {
-	//		// 원래 위치 반환.
-	//		GetOwner()->m_transform.SetPosition(worldpos);
-	//		return;
-	//	}
-	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+			float w = XMVectorGetW(clipSpacePos);
+			if (w < 0.001f) {
+				// 원래 위치 반환.
+				GetOwner()->m_transform.SetPosition(worldpos);
+				return;
+			}
+			XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	//	float x = XMVectorGetX(ndcPos);
-	//	float y = XMVectorGetY(ndcPos);
-	//	x = abs(x);
-	//	y = abs(y);
+			float x = XMVectorGetX(ndcPos);
+			float y = XMVectorGetY(ndcPos);
+			x = abs(x);
+			y = abs(y);
 
-	//	float clamp_limit = 0.9f;
-	//	if (x < clamp_limit && y < clamp_limit)
-	//	{
-	//		return;
-	//	}
-	//	{
-	//		//이미화면밖임
-	//		stunRespawnElapsedTime += tick;
-	//		if (stunRespawnTime <= stunRespawnElapsedTime)
-	//		{
+			float clamp_limit = 0.9f;
+			if (x < clamp_limit && y < clamp_limit)
+			{
+				return;
+			}
+			{
+				//이미화면밖임
+				stunRespawnElapsedTime += tick;
+				if (stunRespawnTime <= stunRespawnElapsedTime)
+				{
 
-	//			auto& asiss = GM->GetAsis();
-	//			if (!asiss.empty())
-	//			{
-	//				auto asis = asiss[0]->GetOwner();
-	//				Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-	//				Mathf::Vector3 asisForward = asis->m_transform.GetForward();
+					auto& asiss = GM->GetAsis();
+					if (!asiss.empty())
+					{
+						auto asis = asiss[0]->GetOwner();
+						Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+						Mathf::Vector3 asisForward = asis->m_transform.GetForward();
 
-	//				Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{5, 0, 5};
+						Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{ 5, 0, 5 };
 
-	//				GetOwner()->m_transform.SetPosition(newWorldPos);
-	//				stunRespawnElapsedTime = 0;
-	//			}
-	//		}
-	//	}
-	//}
-	//else
-	//{
-	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	//	auto cam = camComponent->GetCamera();
-	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+						GetOwner()->m_transform.SetPosition(newWorldPos);
+						stunRespawnElapsedTime = 0;
+					}
+				}
+			}
+		}
+		else
+		{
+			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+			auto cam = camComponent->GetCamera();
+			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	//	float w = XMVectorGetW(clipSpacePos);
-	//	if (w < 0.001f) {
-	//		// 원래 위치 반환.
-	//		GetOwner()->m_transform.SetPosition(worldpos);
-	//		return;
-	//	}
-	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+			float w = XMVectorGetW(clipSpacePos);
+			if (w < 0.001f) {
+				// 원래 위치 반환.
+				GetOwner()->m_transform.SetPosition(worldpos);
+				return;
+			}
+			XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	//	float x = XMVectorGetX(ndcPos);
-	//	float y = XMVectorGetY(ndcPos);
-	//	x = abs(x);
-	//	y = abs(y);
+			float x = XMVectorGetX(ndcPos);
+			float y = XMVectorGetY(ndcPos);
+			x = abs(x);
+			y = abs(y);
 
-	//	float clamp_limit = 0.9f;
-	//	if (x < clamp_limit && y < clamp_limit)
-	//	{
-	//		return;
-	//	}
+			float clamp_limit = 0.9f;
+			if (x < clamp_limit && y < clamp_limit)
+			{
+				return;
+			}
 
-	//	XMVECTOR clampedNdcPos = XMVectorClamp(
-	//		ndcPos,
-	//		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-	//		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	//	);
-	//	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	//	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+			XMVECTOR clampedNdcPos = XMVectorClamp(
+				ndcPos,
+				XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+				XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+			);
+			XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+			XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-	//	GetOwner()->m_transform.SetPosition(newWorldPos);
-	//}
+			GetOwner()->m_transform.SetPosition(newWorldPos);
+		}
+	}
 	
 }
 

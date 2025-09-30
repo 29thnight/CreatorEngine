@@ -8,6 +8,13 @@ ReflectionScriptField(CameraMove) \
 		meta_property(followSpeed) \
 		meta_property(offset) \
 		meta_property(detectRange) \
+		meta_property(cameraMoveSpeed) \
 	}); \
-	FieldEnd(CameraMove, PropertyOnly) \
+	MethodField \
+	({ \
+		meta_method(OnCameraControll) \
+		meta_method(OffCameraCOntroll) \
+		meta_method(CameraMoveFun, "dir") \
+	}); \
+	FieldEnd(CameraMove, PropertyAndMethod) \
 };

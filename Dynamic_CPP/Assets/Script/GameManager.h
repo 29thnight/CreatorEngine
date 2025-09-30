@@ -65,6 +65,10 @@ public:
 	float displayPollutionGaugeRatio{}; //테스트 용
 
 public:
+	bool TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
+	
+
+	GameObject* testCamera = nullptr;
 	void PushEntity(Entity* entity);
 	void PushPlayer(Entity* player);
 	void PushAsis(Entity* asis);
