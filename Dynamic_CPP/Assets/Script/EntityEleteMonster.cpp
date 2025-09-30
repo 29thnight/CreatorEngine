@@ -10,6 +10,7 @@
 #include "PrefabUtility.h"
 #include "MonEleteProjetile.h"
 #include "GameManager.h"
+#include "CriticalMark.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -27,6 +28,19 @@ void EntityEleteMonster::Start()
 		if (animator)
 		{
 			m_animator = animator;
+			break;
+		}
+
+	}
+	childred = GetOwner()->m_childrenIndices;
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
 			break;
 		}
 
@@ -581,7 +595,10 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			Mathf::Vector3 dir = curPos - senderPos;
 
 			dir.Normalize();
-
+			if (m_criticalMark)
+			{
+				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+			}
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
 			*/
 			/*Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));

@@ -1,6 +1,7 @@
 #include "Explosion.h"
 #include "pch.h"
 #include "EffectComponent.h"
+#include "Player.h"
 void Explosion::Start()
 {
 	if (nullptr == m_effect)

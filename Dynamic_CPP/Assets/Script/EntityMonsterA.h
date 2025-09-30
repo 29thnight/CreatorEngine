@@ -8,6 +8,7 @@ class BlackBoard;
 class Animator;
 class EffectComponent;
 class CharacterControllerComponent;
+class CriticalMark;
 class EntityMonsterA : public Entity
 {
 public:
@@ -33,7 +34,7 @@ public:
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
-
+	CriticalMark* m_criticalMark = nullptr;
 	GameObject* target = nullptr;
 	bool isDead = false;
 	[[Method]]

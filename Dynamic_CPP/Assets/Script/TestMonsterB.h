@@ -8,6 +8,7 @@ class BehaviorTreeComponent;
 class BlackBoard;
 class Animator;
 class EffectComponent;
+class CriticalMark;
 class TestMonsterB : public Entity
 {
 public:
@@ -32,7 +33,7 @@ public:
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
-	
+	CriticalMark* m_criticalMark = nullptr;
 	std::vector<GameObject*> m_projectiles;
 	int m_projectileIndex = 0;
 
