@@ -5,6 +5,7 @@
 #include "Entity.h"
 #include "Player.h"
 #include "DebugLog.h"
+#include "SphereColliderComponent.h"
 void SpecialBullet::Start()
 {
 	__super::Start();
@@ -41,7 +42,6 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 			Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
 			if (enemy)
 			{
-				LOG("EnemyHit!");
 
 				hasAttacked = true;
 
@@ -55,16 +55,31 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				bulletInfo.rotation = transform.GetWorldQuaternion();
 				PhysicsManagers->SphereOverlap(bulletInfo, explosionRadius, hits);
 
+				Mathf::Vector3 scale = collision.thisObj->m_transform.GetWorldScale();
+				float radius = GetOwner()->GetComponent<SphereColliderComponent>()->GetRadius();
+				explosionRadius = radius;
+				float myRadius = explosionRadius;
+				Mathf::Vector3 mypos = bulletInfo.position;
+				
+
 
 				for (auto& hit : hits)
 				{
 					auto object = hit.gameObject;
+					Mathf::Vector3 otherpos = hit.gameObject->m_transform.GetWorldPosition();
+					Mathf::Vector3 dir = otherpos - mypos;
+					dir.Normalize();
+					Mathf::Vector3 contactPoint = mypos + dir * myRadius;
+					HitInfo hitinfo;
+					hitinfo.hitPos = contactPoint;
+					hitinfo.itemType = ItemType::Range;
+					hitinfo.bulletType = BulletType::Special;
 					if (object == GetOwner()) continue;
 
 					auto enemy = object->GetComponentDynamicCast<Entity>();
 					if (enemy)
 					{
-						enemy->SendDamage(m_ownerPlayer, m_damage);
+						enemy->SendDamage(m_ownerPlayer, m_damage, hitinfo);
 					}
 				}
 

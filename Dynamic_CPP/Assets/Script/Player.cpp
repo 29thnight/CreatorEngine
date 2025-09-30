@@ -496,7 +496,7 @@ void Player::LateUpdate(float tick)
 
 void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
-	
+
 	//엘리트 보스몹에게 피격시에만 피격 애니메이션 출력 및DropCatchItem();  그외는 단순 HP깍기 + 캐릭터 깜빡거리는 연출등
 	//OnHit();
 	//Knockback({ testHitPowerX,testHitPowerY }); //떄린애가 knockbackPower 주기  
@@ -1383,6 +1383,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	Transform* transform = GetOwner()->GetComponent<Transform>();
 	Mathf::Vector3 pos = transform->GetWorldPosition();
 	bombThrowPosition = pos + bombThrowPositionoffset;
+	bombThrowPosition.y = pos.y + 0.1f;
 	onIndicate = true;
 	if (BombIndicator)
 	{

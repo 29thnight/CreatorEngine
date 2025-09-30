@@ -11,6 +11,7 @@
 #include "PrefabUtility.h"
 #include "HPBar.h"
 
+#include "CriticalMark.h"
 void EntityMonsterA::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -39,6 +40,19 @@ void EntityMonsterA::Start()
 		if (animator)
 		{
 			m_animator = animator;
+			break;
+		}
+
+	}
+	childred = GetOwner()->m_childrenIndices;
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
 			break;
 		}
 
@@ -350,6 +364,10 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
+			if (m_criticalMark)
+			{
+				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+			}
 			dir.Normalize();
 
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체

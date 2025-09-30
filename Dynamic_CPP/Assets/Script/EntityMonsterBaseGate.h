@@ -1,19 +1,20 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Bullet.h"
-#include "SpecialBullet.generated.h"
-
-class SpecialBullet : public Bullet
+#include "ModuleBehavior.h"
+#include "Entity.h"
+#include "EntityMonsterBaseGate.generated.h"
+//몬스터기지 입구,출구역할
+class EntityMonsterBaseGate : public Entity
 {
 public:
-   ReflectSpecialBullet
-	   [[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(SpecialBullet)
+   ReflectEntityMonsterBaseGate
+	[[ScriptReflectionField]]
+	MODULE_BEHAVIOR_BODY(EntityMonsterBaseGate)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
-	virtual void OnTriggerEnter(const Collision& collision) override;
-	virtual void OnTriggerStay(const Collision& collision) override;
+	virtual void OnTriggerEnter(const Collision& collision) override {}
+	virtual void OnTriggerStay(const Collision& collision) override {}
 	virtual void OnTriggerExit(const Collision& collision) override {}
 	virtual void OnCollisionEnter(const Collision& collision) override {}
 	virtual void OnCollisionStay(const Collision& collision) override {}
@@ -23,10 +24,11 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
+private:
 	[[Property]]
-	float rangedProjSpd = 1.0f; //발사체 이동속도
+	int maxHP = 20;
 	[[Property]]
-	float rangedProjDist = 10.f; //발사체 최대 이동거리
-	float explosionRadius = 3.0f; //범위공격 반경
+	int halfDestroyedHP = 10;  //비율로하거나 고정값으로 하거나 이떄가되면 모델변경 or 텍스쳐변경or 애니메이션등
 };

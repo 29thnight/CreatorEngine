@@ -1,0 +1,63 @@
+settings:
+  aa:
+    isApply: true
+    bias: 0.688000023
+    biasMin: 0.0209999997
+    spanMax: 8
+  ssao:
+    radius: 0.259000003
+    thickness: 0.259000003
+  shadow:
+    useCascade: true
+    isCloudOn: false
+    cloudSize: {x: 7, y: 7}
+    cloudDirection: {x: 1, y: 1}
+    cloudMoveSpeed: 0.000260000001
+    cloudAlpha: 1
+    epsilon: 0.00100000005
+  deferred:
+    useAmbientOcclusion: true
+    useEnvironmentMap: true
+    useLightWithShadows: true
+    envMapIntensity: 1
+  bloom:
+    applyBloom: true
+    threshold: 5
+    knee: 0.5
+    coefficient: 0.0500000007
+    blurRadius: 7
+    blurSigma: 2
+  ssgi:
+    isOn: true
+    useOnlySSGI: false
+    useDualFilteringStep: 2
+    radius: 4
+    thickness: 0.5
+    intensity: 1
+    ssratio: 4
+  vignette:
+    isOn: true
+    radius: 0.75
+    softness: 0.5
+  colorGrading:
+    isOn: false
+    lerp: 0
+    textureFilePath: None
+  toneMap:
+    isAbleAutoExposure: false
+    isAbleToneMap: true
+    fNumber: 4.8499999
+    shutterTime: 16
+    ISO: 75
+    exposureCompensation: 0.200000003
+    speedBrightness: 0.00200000009
+    speedDarkness: 0.00200000009
+    toneMapType: 1
+    filmSlope: 0.879999995
+    filmToe: 0.550000012
+    filmShoulder: 0.25999999
+    filmBlackClip: 0
+    filmWhiteClip: 0.0399999991
+    toneMapExposure: 1.29999995
+  skyboxTextureName: syferfontein_1d_clear_puresky_4k.hdr
+  m_isSkyboxEnabled: false

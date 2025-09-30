@@ -10,6 +10,7 @@ class BlackBoard;
 class Animator;
 class EffectComponent;
 struct Feeler;
+class CriticalMark;
 class EntityEleteMonster : public Entity
 {
 public:
@@ -35,7 +36,7 @@ public:
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
-
+	CriticalMark* m_criticalMark = nullptr;
 	std::vector<GameObject*> m_projectiles; // 공격 투사체
 	int m_projectileIndex = 0; // 투사체 번호
 
