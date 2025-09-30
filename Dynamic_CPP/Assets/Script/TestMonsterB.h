@@ -8,6 +8,7 @@ class BehaviorTreeComponent;
 class BlackBoard;
 class Animator;
 class EffectComponent;
+class CriticalMark;
 class TestMonsterB : public Entity
 {
 public:
@@ -32,9 +33,13 @@ public:
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
-	
+	CriticalMark* m_criticalMark = nullptr;
 	std::vector<GameObject*> m_projectiles;
 	int m_projectileIndex = 0;
+
+	GameObject* m_asis = nullptr;
+	GameObject* m_player1 = nullptr;
+	GameObject* m_player2 = nullptr;
 
 	GameObject* target = nullptr;
 	bool isDead = false;
@@ -86,7 +91,7 @@ public:
 
 	void Dead(); //죽음 처리
 
-	void ChaseTarget(); //타겟 추적
+	void ChaseTarget(float deltatime); //타겟 추적
 
 	void RotateToTarget(); //타겟 바라보기
 

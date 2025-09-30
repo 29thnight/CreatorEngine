@@ -30,12 +30,12 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (haState)
 	{
 		std::string state = blackBoard.GetValueAsString("State");
-		LOG("BT STATE :" << state);
+		//LOG("BT STATE :" << state);
 		if (state == "Chase")
 		{
-			LOG("chaseOutTime :" << chaseOutTime);
+			//LOG("chaseOutTime :" << chaseOutTime);
 			if (chaseOutTime > 0) {
-				LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
+				//LOG("closed Target Out ranage but chace remain time :" << chaseOutTime);
 				return true;
 			}
 			else {

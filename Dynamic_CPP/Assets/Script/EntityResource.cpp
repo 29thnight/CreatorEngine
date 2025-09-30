@@ -45,9 +45,12 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		if (player)
 		{
 			// hit
- 			if (m_criticalMark != nullptr && true == m_criticalMark->UpdateMark(player->playerIndex))
+			if (m_criticalMark)
 			{
-				//农府萍拿 己傍
+				if (m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					//农府萍拿 己傍
+				}
 			}
 			m_currentHP -= std::max(damage, 0);
 

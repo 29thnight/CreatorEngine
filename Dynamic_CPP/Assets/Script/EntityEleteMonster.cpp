@@ -10,8 +10,10 @@
 #include "PrefabUtility.h"
 #include "MonEleteProjetile.h"
 #include "HPBar.h"
-
+#include "EntityAsis.h"
 #include "GameManager.h"
+#include "CriticalMark.h"
+#include "PlayEffectAll.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -49,6 +51,19 @@ void EntityEleteMonster::Start()
 		}
 
 	}
+	childred = GetOwner()->m_childrenIndices;
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
+			break;
+		}
+
+	}
 	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->SetAutomaticRotation(true);
 	/*if (!m_animator)
@@ -71,6 +86,22 @@ void EntityEleteMonster::Start()
 		//	m_animator->SetParameter("Move", false);*/
 		//}
 	}
+
+
+	bool hasAsis = blackBoard->HasKey("Asis");
+	bool hasP1 = blackBoard->HasKey("Player1");
+	bool hasP2 = blackBoard->HasKey("Player2");
+
+	if (hasAsis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
+	}
+	if (hasP1) {
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
+	}
+	if (hasP2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
+	}
+
 
 
 	for (auto& child : childred)
@@ -203,13 +234,24 @@ void EntityEleteMonster::UpdatePlayer()
 	if (hasAsis) {
 		Asis = blackBoard->GetValueAsGameObject("Asis");
 	}
+	if (!m_asis) {
+		m_asis = Asis;
+	}
+
 	GameObject* player1 = nullptr;
 	if (hasP1) {
 		player1 = blackBoard->GetValueAsGameObject("Player1");
 	}
+	if (!m_player1) {
+		m_player1 = player1;
+	}
 	GameObject* player2 = nullptr;
 	if (hasP2) {
 		player2 = blackBoard->GetValueAsGameObject("Player2");
+	}
+
+	if (!m_player2) {
+		m_player1 = player2;
 	}
 
 	Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -292,7 +334,7 @@ void EntityEleteMonster::ShootingAttack()
 	}
 }
 
-void EntityEleteMonster::ChaseTarget()
+void EntityEleteMonster::ChaseTarget(float deltatime)
 {
 	if (target && !isDead)
 	{
@@ -302,14 +344,36 @@ void EntityEleteMonster::ChaseTarget()
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
+
+			m_state = "Chase";
 			Mathf::Vector3 targetpos = targetTransform->GetWorldPosition();
 			Mathf::Vector3 dir = targetpos - pos;
 			dir.y = 0.f;
+
+			bool useChaseOutTime = blackBoard->HasKey("ChaseOutTime");
+			float outTime = 0.0f;
+
+			if (useChaseOutTime)
+			{
+				outTime = blackBoard->GetValueAsFloat("ChaseOutTime");
+			}
+
+			std::cout << "dist " << dir.Length() << std::endl;
+
+			if (dir.Length() < m_chaseRange)
+			{
+				outTime = m_rangeOutDuration; // Reset outTime if within range
+			}
+			else {
+				outTime -= deltatime; // Decrease outTime if not within range
+			}
+			blackBoard->SetValueAsString("State", m_state);
+			blackBoard->SetValueAsFloat("ChaseOutTime", outTime);
+
 			dir.Normalize();
 
 			if (controller) {
 				controller->Move({ dir.x * m_moveSpeed, dir.z * m_moveSpeed });
-				m_state = "Chase";
 			}
 
 
@@ -362,6 +426,7 @@ void EntityEleteMonster::Retreat(float tick)
 	{
 		// 목표 거리만큼 도망쳤으므로 후퇴를 멈춥니다.
 		CCT->Move(Vector2::Zero);
+		CCT->SetAutomaticRotation(true);
 		m_currentVelocity = Vector3::Zero;
 		m_isRetreat = false; // 상태 변경
 		return;
@@ -405,6 +470,7 @@ void EntityEleteMonster::Retreat(float tick)
 		// TODO: 여기에 '다른 행동'으로 전환하는 로직을 넣습니다.
 		// 예: BT의 경우 Failure 반환, 상태 머신이면 ChangeState(ATTACK) 등
 		CCT->Move(Vector2::Zero); // 일단 멈춤
+		CCT->SetAutomaticRotation(true);
 		m_currentVelocity = Vector3::Zero;
 		return; // Retreat 행동 종료
 	}
@@ -421,7 +487,7 @@ void EntityEleteMonster::Retreat(float tick)
 	
 	// --- ▼▼▼ 8. 플레이어 주시 회전 로직 (신규 추가) ▼▼▼ ---
 	{
-		Vector3 dirToPlayer = targetPos - pos;
+		Vector3 dirToPlayer = pos - targetPos;
 		dirToPlayer.y = 0;
 		dirToPlayer.Normalize();
 
@@ -557,11 +623,24 @@ void EntityEleteMonster::Dead()
 {
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
+	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();
+	if (asisScrip) {
+		asisScrip->AddPollutionGauge(m_enemyReward);
+	}
 }
 
 void EntityEleteMonster::DeadEvent()
 {
 	EndDeadAnimation = true;
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}
 }
 
 void EntityEleteMonster::RotateToTarget()
@@ -599,7 +678,11 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			Mathf::Vector3 dir = curPos - senderPos;
 
 			dir.Normalize();
-
+			if (m_criticalMark)
+			{
+				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+			}
+			PlayHitEffect(this->GetOwner(), hitinfo);
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
 			*/
 			/*Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
@@ -618,28 +701,7 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 
 
-			/*크리티컬 마크 이펙트
-			int playerIndex = player->playerIndex;
-			m_currentHP -= std::max(damage, 0);
-			if (true == criticalMark.TryCriticalHit(playerIndex))
-			{
-				if (markEffect)
-				{
-					if (criticalMark.markIndex == 0)
-					{
-						markEffect->PlayEffectByName("red");
-					}
-					else if (criticalMark.markIndex == 1)
-					{
-						markEffect->PlayEffectByName("blue");
-					}
-					else
-					{
-						markEffect->StopEffect();
-					}
-				}
-			}*/
-
+			
 
 			if (m_currentHP <= 0)
 			{

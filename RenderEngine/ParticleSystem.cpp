@@ -178,6 +178,16 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 			continue;
 		}
 
+		MovementModuleCS* movementModule = dynamic_cast<MovementModuleCS*>(&module);
+		if (movementModule) {
+			movementModule->SetOrbitalCenter(finalWorldPosition);
+		}
+
+		MeshMovementModuleCS* meshMovementModule = dynamic_cast<MeshMovementModuleCS*>(&module);
+		if (meshMovementModule) {
+			meshMovementModule->SetOrbitalCenter(finalWorldPosition);
+		}
+
 		TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module);
 		if (trailModule) {
 			trailModule->SetEmitterPosition(finalWorldPosition);

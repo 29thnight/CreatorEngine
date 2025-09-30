@@ -1,5 +1,7 @@
 #include "MonsterProjectile.h"
 #include "pch.h"
+#include "PlayEffectAll.h"
+#include "PrefabUtility.h"
 void MonsterProjectile::Start()
 {
 }
@@ -38,6 +40,18 @@ void MonsterProjectile::Update(float tick)
 
         PhysicsManagers->SphereOverlap(input, m_radius, results);
         
+        Prefab* PungPrefab = PrefabUtilitys->LoadPrefab("MonProjectileEffect");
+        if (PungPrefab)
+        {
+            GameObject* pungObj = PrefabUtilitys->InstantiatePrefab(PungPrefab, "PungEffect");
+            auto pungEffect = pungObj->GetComponent<PlayEffectAll>();
+            Mathf::Vector3 pungPos = GetOwner()->m_transform.GetWorldPosition();
+            pungObj->GetComponent<Transform>()->SetPosition(pungPos);
+            pungEffect->Initialize();
+        }
+
+
+
         for (auto& res : results) {
             if (res.gameObject->GetHashedName().ToString() == "1P" || res.gameObject->GetHashedName().ToString() == "2P") {
                 auto entity = res.gameObject->GetComponentDynamicCast<Entity>();

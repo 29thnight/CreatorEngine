@@ -10,7 +10,10 @@
 #include "SwordHitEffect.h"
 #include "PrefabUtility.h"
 #include "HPBar.h"
+#include "CriticalMark.h"
+#include "EntityAsis.h"
 
+#include "PlayEffectAll.h"
 void EntityMonsterA::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -39,6 +42,19 @@ void EntityMonsterA::Start()
 		if (animator)
 		{
 			m_animator = animator;
+			break;
+		}
+
+	}
+	childred = GetOwner()->m_childrenIndices;
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
 			break;
 		}
 
@@ -93,6 +109,21 @@ void EntityMonsterA::Start()
 
 	blackBoard->SetValueAsFloat("AtkRange", m_attackRange); //근접 공격 거리
 	blackBoard->SetValueAsInt("AttackDamage", m_attackDamage); //근접 공격 데미지
+
+	bool hasAsis = blackBoard->HasKey("Asis");
+	bool hasP1 = blackBoard->HasKey("Player1");
+	bool hasP2 = blackBoard->HasKey("Player2");
+
+	if (hasAsis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
+	}
+	if (hasP1) {
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
+	}
+	if (hasP2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
+	}
+
 }
 
 void EntityMonsterA::Update(float tick)
@@ -262,6 +293,7 @@ void EntityMonsterA::ChaseTarget(float deltatime)
 		if (m_state == "Attack") return;
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
 		CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+		controller->SetAutomaticRotation(true);
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
@@ -307,12 +339,26 @@ void EntityMonsterA::Dead()
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	//todo : Dead entity remove or disable
+	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();
+	if (asisScrip) {
+		asisScrip->AddPollutionGauge(m_enemyReward);
+	}
 }
 
 
 void EntityMonsterA::DeadEvent()
 {
 	EndDeadAnimation = true;
+
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}
 	//GetOwner()->Destroy(); //&&&&&풀에 넣기
 	//monster death Effect 생성
 }
@@ -350,6 +396,10 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
+			if (m_criticalMark)
+			{
+				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+			}
 			dir.Normalize();
 
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체

@@ -32,7 +32,7 @@ bool IsReteat::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 Dir = TargetTransform->GetWorldPosition() - selfTransform->GetWorldPosition();
 	float len = Dir.Length();
-	std::cout << "len : " << len << "and";
+	//std::cout << "len : " << len << "and";
 	float invokeRange = blackBoard.GetValueAsFloat("RetreatRange");
 	if (Dir.Length() < invokeRange)
 	{

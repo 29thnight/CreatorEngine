@@ -17,6 +17,7 @@ public:
 		bool meshMovementEnabled = false;
 		bool meshSizeEnabled = false;
 		bool trailGenerateEnable = false;
+		bool trailCSEnabled = false;
 
 		// RenderModule 활성화 상태
 		bool billboardEnabled = false;

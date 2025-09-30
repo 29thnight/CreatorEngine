@@ -404,6 +404,12 @@ void MeshMovementModuleCS::SetExplosiveEffect(float initialSpeed, float speedDec
     m_paramsDirty = true;
 }
 
+void MeshMovementModuleCS::SetOrbitalCenter(const Mathf::Vector3& center)
+{
+    m_orbitalData.center = center;
+    m_paramsDirty = true;
+}
+
 void MeshMovementModuleCS::ClearVelocityCurve()
 {
     m_velocityCurve.clear();

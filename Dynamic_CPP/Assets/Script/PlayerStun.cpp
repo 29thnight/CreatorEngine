@@ -5,6 +5,8 @@
 #include "Animator.h"
 #include "Weapon.h"
 #include "CharacterControllerComponent.h"
+#include "EffectComponent.h"
+#include "Socket.h"
 void PlayerStun::Enter()
 {
 	if (m_player == nullptr)
@@ -35,7 +37,10 @@ void PlayerStun::Enter()
 		m_player->onBombIndicate = false;
 		m_player->m_curWeapon->SetEnabled(false);
 		//m_player->m_animator->SetUseLayer(1, false);
-
+		if (m_player->stunEffect)
+		{
+			m_player->stunEffect->Apply();
+		}
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 	}
@@ -45,6 +50,22 @@ void PlayerStun::Update(float deltaTime)
 {
 	if (m_player)
 	{
+
+		if (m_player->stunEffect)
+		{
+			Mathf::Matrix left = m_player->leftEarSokcet->transform.GetLocalMatrix();
+			Mathf::Vector3 leftPos = left.Translation();
+
+			Mathf::Matrix right = m_player->rightEarSokcet->transform.GetLocalMatrix();
+			Mathf::Vector3 rightPos = right.Translation();
+
+
+			Mathf::Vector3 middlePos = (leftPos + rightPos) * 0.5f;
+			middlePos.y += 0.6;
+			m_player->stunObj->GetComponent<Transform>()->SetPosition(middlePos);
+		}
+
+
 		if (m_player->CheckResurrectionByOther() == true)
 		{
 			//tick올려서 몇초당 한번씩 부활게이지 올리기
@@ -67,6 +88,10 @@ void PlayerStun::Exit()
 	{
 		m_player->ChangeState("Idle");
 		m_player->m_curWeapon->SetEnabled(true);
+		if (m_player->stunEffect)
+		{
+			m_player->stunEffect->StopEffect();
+		}
 		//m_player->m_animator->SetUseLayer(1, true);
 	}
 }
