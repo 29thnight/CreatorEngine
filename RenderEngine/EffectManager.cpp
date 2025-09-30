@@ -339,6 +339,10 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	sizeModule->Initialize(); // PSO »ý¼º
 	sizeModule->SetEnabled(false);
 
+	auto trailModule = particleSystem->AddModule<TrailModuleCS>();
+	trailModule->Initialize();
+	trailModule->SetEnabled(false);
+
 	auto meshSpawnModule = particleSystem->AddModule<MeshSpawnModuleCS>();
 	meshSpawnModule->Initialize();
 	meshSpawnModule->SetEnabled(false);
@@ -462,6 +466,9 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 							else if (moduleType == "TrailGenerateModule") {
 								psConfig.moduleConfig.trailGenerateEnable = true;
 							}
+							else if (moduleType == "TrailGenerateModule") {
+								psConfig.moduleConfig.trailCSEnabled = true;
+							}
 						}
 					}
 				}
@@ -543,6 +550,12 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 
 		if (psConfig.moduleConfig.sizeEnabled) {
 			if (auto* module = ps->GetModule<SizeModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.trailCSEnabled) {
+			if (auto* module = ps->GetModule<TrailModuleCS>()) {
 				module->SetEnabled(true);
 			}
 		}
