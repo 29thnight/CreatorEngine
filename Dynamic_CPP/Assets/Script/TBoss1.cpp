@@ -54,6 +54,13 @@ void TBoss1::Update(float tick)
 	}
 
 	RotateToTarget();
+
+	if (usePatten) {
+		for (auto pos : BP0034Points) {
+
+		}
+	}
+
 }
 
 void TBoss1::RotateToTarget()
@@ -319,7 +326,7 @@ void TBoss1::BP0034()
 		BP003* script = floor->GetComponent<BP003>();
 		floor->SetEnabled(true);
 		//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
-		script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
+		script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
 		script->isAttackStart = true;
 	}
 }

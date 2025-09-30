@@ -75,7 +75,7 @@ void EntityMonsterA::Start()
 	blackBoard->SetValueAsFloat("ChaseRange", m_chaseRange); // 추적 거리
 	blackBoard->SetValueAsFloat("ChaseOutTime", m_rangeOutDuration); //추적 지속 시간
 
-	blackBoard->SetValueAsFloat("AttackRange", m_attackRange); //근접 공격 거리
+	blackBoard->SetValueAsFloat("AtkRange", m_attackRange); //근접 공격 거리
 	blackBoard->SetValueAsInt("AttackDamage", m_attackDamage); //근접 공격 데미지
 }
 
@@ -86,6 +86,11 @@ void EntityMonsterA::Update(float tick)
 	{
 		return;
 	}
+
+	
+
+	std::cout << m_state << std::endl;
+
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
@@ -234,7 +239,7 @@ void EntityMonsterA::AttackBoxOff()
 	isBoxAttack = false;
 }
 
-void EntityMonsterA::ChaseTarget()
+void EntityMonsterA::ChaseTarget(float deltatime)
 {
 	if (target && !isDead)
 	{
@@ -244,14 +249,36 @@ void EntityMonsterA::ChaseTarget()
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
+
+			m_state = "Chase";
 			Mathf::Vector3 targetpos = targetTransform->GetWorldPosition();
 			Mathf::Vector3 dir = targetpos - pos;
 			dir.y = 0.f;
+
+			bool useChaseOutTime = blackBoard->HasKey("ChaseOutTime");
+			float outTime = 0.0f;
+			
+			if (useChaseOutTime)
+			{
+				outTime = blackBoard->GetValueAsFloat("ChaseOutTime");
+			}
+
+			std::cout << "dist "<< dir.Length() << std::endl;
+
+			if (dir.Length() < m_chaseRange)
+			{
+				outTime = m_rangeOutDuration; // Reset outTime if within range
+			}
+			else {
+				outTime -= deltatime; // Decrease outTime if not within range
+			}
+			blackBoard->SetValueAsString("State", m_state);
+			blackBoard->SetValueAsFloat("ChaseOutTime", outTime);
+
 			dir.Normalize();
 			
 			if (controller) {
 				controller->Move({ dir.x * m_moveSpeed, dir.z * m_moveSpeed });
-				m_state = "Chase";
 			}
 
 

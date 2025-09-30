@@ -75,7 +75,10 @@ public:
 
 	//BP0033,0034 용 광역 패턴 사용시 장판패턴이 전체가 다 종료되었는지를 확인하고 전체가 종료 될때 까지 행동을 막는 함수
 	bool usePatten = false;
-	void PattenActionIdle();
+	std::vector<std::pair<int, Mathf::Vector3>> BP0034Points;
+	float bp0034Timer = 0.0f;
+	void PattenActionIdle();	
+
 
 	[[Method]]
 	void BP0031();
