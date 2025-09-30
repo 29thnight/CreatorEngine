@@ -100,7 +100,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float2 invScreenSize = 1.0 / screenSize;
     
     // DTid.xy = screenSize / 2 = (960, 540)
-    float2 uv = float2(DTid.xy * ratio ) * invScreenSize;
+    float2 uv = float2(DTid.xy * ratio + 0.5f) * invScreenSize;
     //float2 uv = float2(DTid.xy) / screenSize;
     //uv *= 2.0;
     float depth = gDepthTex.SampleLevel(PointSampler, uv, 0);

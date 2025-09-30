@@ -141,16 +141,65 @@ DecalPass::DecalPass()
 	);
 	m_CopiedORMTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	for(int i = 0; i < DecalChannel::MAX; i++)
+	for (int i = 0; i < DecalChannel::MAX; i++)
 	{
 		CD3D11_BLEND_DESC1 blendDesc = CD3D11_BLEND_DESC1(CD3D11_DEFAULT());
 		blendDesc.IndependentBlendEnable = TRUE;
-		blendDesc.RenderTarget[0].BlendEnable = FALSE;
-		blendDesc.RenderTarget[0].RenderTargetWriteMask = i & DecalChannel::dDiffuse ? D3D11_COLOR_WRITE_ENABLE_ALL : 0;
-		blendDesc.RenderTarget[1].BlendEnable = FALSE;
-		blendDesc.RenderTarget[1].RenderTargetWriteMask = i & DecalChannel::dNormal ? D3D11_COLOR_WRITE_ENABLE_ALL : 0;
-		blendDesc.RenderTarget[2].BlendEnable = FALSE;
-		blendDesc.RenderTarget[2].RenderTargetWriteMask = i & DecalChannel::dORM ? D3D11_COLOR_WRITE_ENABLE_ALL : 0;
+
+		// --- Diffuse G-Buffer (RT 0) ---
+		if (i & DecalChannel::dDiffuse)
+		{
+			blendDesc.RenderTarget[0].BlendEnable = TRUE; 
+			blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			// 알파 채널 블렌딩 설정 (보통 G-Buffer의 알파는 사용하지 않으므로 간단하게 설정)
+			blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		}
+		else
+		{
+			blendDesc.RenderTarget[0].BlendEnable = FALSE;
+			blendDesc.RenderTarget[0].RenderTargetWriteMask = 0;
+		}
+
+		// --- Normal G-Buffer (RT 1) ---
+		if (i & DecalChannel::dNormal)
+		{
+			blendDesc.RenderTarget[1].BlendEnable = TRUE; 
+			blendDesc.RenderTarget[1].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			blendDesc.RenderTarget[1].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendDesc.RenderTarget[1].BlendOp = D3D11_BLEND_OP_ADD;
+			blendDesc.RenderTarget[1].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendDesc.RenderTarget[1].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendDesc.RenderTarget[1].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendDesc.RenderTarget[1].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		}
+		else
+		{
+			blendDesc.RenderTarget[1].BlendEnable = FALSE;
+			blendDesc.RenderTarget[1].RenderTargetWriteMask = 0;
+		}
+
+		// --- ORM G-Buffer (RT 2) ---
+		if (i & DecalChannel::dORM)
+		{
+			blendDesc.RenderTarget[2].BlendEnable = TRUE; 
+			blendDesc.RenderTarget[2].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			blendDesc.RenderTarget[2].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendDesc.RenderTarget[2].BlendOp = D3D11_BLEND_OP_ADD;
+			blendDesc.RenderTarget[2].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendDesc.RenderTarget[2].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendDesc.RenderTarget[2].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendDesc.RenderTarget[2].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		}
+		else
+		{
+			blendDesc.RenderTarget[2].BlendEnable = FALSE;
+			blendDesc.RenderTarget[2].RenderTargetWriteMask = 0;
+		}
 
 		DirectX11::ThrowIfFailed(
 			DirectX11::DeviceStates->g_pDevice->CreateBlendState1(
