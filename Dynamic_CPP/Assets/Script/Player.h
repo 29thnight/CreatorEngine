@@ -280,9 +280,14 @@ public:
 	SoundComponent* m_DamageSound = nullptr; //피격 스턴,사운드
 	SoundComponent* m_MoveSound = nullptr;   //대시, 걷기 등 이동중사운드
 	//이펙트 사운드는 따로 몬스터이펙트등 모아서 관리 or 플레이어껀 따로
+	Socket* leftEarSokcet = nullptr;
+	Socket* rightEarSokcet = nullptr;
+	GameObject* stunObj = nullptr;
+	EffectComponent* stunEffect = nullptr;
 
 	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
+
 
 	[[Property]]
 	float testHitPowerX = 1.5f;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
@@ -290,6 +295,7 @@ public:
 	float testHitPowerY = 0.1f;
 	[[Method]]
 	void TestHit();
+private:
 };
 
 void  PlayHitEffect(GameObject* _hitowner,HitInfo hitinfo);  //플레이어가 떄렸을때 나올이펙트 //맞은사람,맞았을때정보 입력 sendDamge 안에서사용

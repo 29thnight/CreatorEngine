@@ -102,6 +102,18 @@ void Player::Start()
 
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 
+	leftEarSokcet = m_animator->MakeSocket("leftEarsocket", "ear_L", aniOwner);
+	rightEarSokcet = m_animator->MakeSocket("rightEarsocket", "ear_R", aniOwner);
+
+	stunObj = SceneManagers->GetActiveScene()->CreateGameObject("StunEffect").get();
+	if (stunObj)
+	{
+		stunEffect = stunObj->AddComponent<EffectComponent>();
+		stunEffect->m_effectTemplateName = "Stun";
+	}
+
+
+
 	GameObject* uiController{};
 	if(0 == playerIndex)
 	{
@@ -196,7 +208,6 @@ void Player::Start()
 	}
 
 	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
-
 	if (dashObj)
 	{
 		dashEffect = dashObj->AddComponent<EffectComponent>();
@@ -297,6 +308,7 @@ void Player::Update(float tick)
 	pos.y += 0.5;
 	if(dashObj)
 		dashObj->m_transform.SetPosition(pos);
+
 
 	if (catchedObject)
 	{
