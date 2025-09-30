@@ -130,7 +130,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     {
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
         occlusion = occRoughMetal.r;
-        roughness = 1 - occRoughMetal.g;
+        roughness = occRoughMetal.g;
         metallic = occRoughMetal.b;
     }
     
