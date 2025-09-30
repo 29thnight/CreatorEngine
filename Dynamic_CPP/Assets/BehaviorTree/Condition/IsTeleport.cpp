@@ -3,7 +3,7 @@
 
 bool IsTeleport::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
-	std::cout << "IsTeleport ConditionCheck " << std::endl;
+	//std::cout << "IsTeleport ConditionCheck " << std::endl;
 	bool hasIdentity = blackBoard.HasKey("Identity");
 	if (!hasIdentity) return false; //Identity ¾øÀ¸¸é bt °´Ã¼ ¾Æ´Ô µ¹·Áº¸³¿
 
@@ -33,7 +33,7 @@ bool IsTeleport::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 Dir = TargetTransform->GetWorldPosition() - selfTransform->GetWorldPosition();
 	float len = Dir.Length();
-	std::cout << "len : " << len << "and";
+//	std::cout << "len : " << len << "and";
 	float invokeRange = blackBoard.GetValueAsFloat("TeleportDistance");
 	if (Dir.Length() < invokeRange)
 	{

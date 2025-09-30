@@ -1,5 +1,8 @@
 #include "Idle.h"
 #include "pch.h"
+#include "EntityMonsterA.h"
+#include "TestMonsterB.h"
+#include "EntityEleteMonster.h"
 #include "DebugLog.h"
 NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 {
@@ -15,6 +18,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	{
 		CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
 		bool isState = blackBoard.HasKey("State");
+		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
 		// Perform idle behavior, such as waiting or doing nothing
 		// This is a placeholder for actual idle logic
 		if (movement)
@@ -36,10 +40,52 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 			else
 			{
 				//LOG("Switching to Idle state.");
+				script->m_state = "Idle";
+				blackBoard.SetValueAsString("State", "Idle");
 			}
 		}
 		else
 		{
+			script->m_state = "Idle";
+			blackBoard.SetValueAsString("State", "Idle");
+			//LOG("Setting Idle state for the first time.");
+		}
+		return NodeStatus::Success; // BT에 '성공'을 반환하여 이 액션을 종료
+	}
+
+	if (identity == "MonsterRange")
+	{
+		CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
+		bool isState = blackBoard.HasKey("State");
+		TestMonsterB* script = m_owner->GetComponent<TestMonsterB>();
+		// Perform idle behavior, such as waiting or doing nothing
+		// This is a placeholder for actual idle logic
+		if (movement)
+		{
+			movement->Move(Mathf::Vector2(0.0f, 0.0f)); // Stop movement during idle
+			//LOG("Idle action executed. Stopping movement.");
+		}
+		if (isState)
+		{
+			std::string state = blackBoard.GetValueAsString("State");
+			if (state == "Idle")
+			{
+				//LOG("Idle action already in progress.");
+				//return NodeStatus::Running; // Continue running if already in idle state
+				//dead test code
+				//blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
+				//
+			}
+			else
+			{
+				//LOG("Switching to Idle state.");
+				script->m_state = "Idle";
+				blackBoard.SetValueAsString("State", "Idle");
+			}
+		}
+		else
+		{
+			script->m_state = "Idle";
 			blackBoard.SetValueAsString("State", "Idle");
 			//LOG("Setting Idle state for the first time.");
 		}
@@ -49,13 +95,35 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	if (identity == "MonsterMage") {
 		CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
 		bool isState = blackBoard.HasKey("State");
-
+		EntityEleteMonster* script = m_owner->GetComponent<EntityEleteMonster>();
+		// Perform idle behavior, such as waiting or doing nothing
+		// This is a placeholder for actual idle logic
+		if (movement)
+		{
+			movement->Move(Mathf::Vector2(0.0f, 0.0f)); // Stop movement during idle
+			//LOG("Idle action executed. Stopping movement.");
+		}
 		if (isState)
 		{
 			std::string state = blackBoard.GetValueAsString("State");
+			if (state == "Idle")
+			{
+				//LOG("Idle action already in progress.");
+				//return NodeStatus::Running; // Continue running if already in idle state
+				//dead test code
+				//blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
+				//
+			}
+			else
+			{
+				//LOG("Switching to Idle state.");
+				script->m_state = "Idle";
+				blackBoard.SetValueAsString("State", "Idle");
+			}
 		}
 		else
 		{
+			script->m_state = "Idle";
 			blackBoard.SetValueAsString("State", "Idle");
 			//LOG("Setting Idle state for the first time.");
 		}

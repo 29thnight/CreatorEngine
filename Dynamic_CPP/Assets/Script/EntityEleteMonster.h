@@ -39,6 +39,11 @@ public:
 	std::vector<GameObject*> m_projectiles; // 공격 투사체
 	int m_projectileIndex = 0; // 투사체 번호
 
+	GameObject* m_asis = nullptr;
+	GameObject* m_player1 =nullptr;
+	GameObject* m_player2 = nullptr;
+
+
 	GameObject* target = nullptr; //타겟 오브젝트 
 	bool isDead = false; //죽음 여부 
 
@@ -74,8 +79,8 @@ public:
 	float m_projectileSpeed = 0.1f; //투사체 속도
 	[[Property]]
 	float m_projectileRange = 20.f; //투사체 최대 사거리
-	[[Property]]
-	float m_projectileArcHeight = 5.0f;//투사체 최대 높이
+	
+	//float m_projectileArcHeight = 5.0f;//투사체 최대 높이 --> 직선 투사체
 	[[Property]]
 	float m_rangedAttackCoolTime = 2.f; //원거리 공격 쿨타임
 

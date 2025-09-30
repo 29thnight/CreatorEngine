@@ -36,6 +36,10 @@ public:
 	std::vector<GameObject*> m_projectiles;
 	int m_projectileIndex = 0;
 
+	GameObject* m_asis = nullptr;
+	GameObject* m_player1 = nullptr;
+	GameObject* m_player2 = nullptr;
+
 	GameObject* target = nullptr;
 	bool isDead = false;
 

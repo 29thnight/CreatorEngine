@@ -9,6 +9,8 @@
 #include "CharacterControllerComponent.h"
 #include "SwordHitEffect.h"
 #include "PrefabUtility.h"
+#include "EntityAsis.h"
+
 void EntityMonsterA::Start()
 {
 	
@@ -77,6 +79,21 @@ void EntityMonsterA::Start()
 
 	blackBoard->SetValueAsFloat("AtkRange", m_attackRange); //근접 공격 거리
 	blackBoard->SetValueAsInt("AttackDamage", m_attackDamage); //근접 공격 데미지
+
+	bool hasAsis = blackBoard->HasKey("Asis");
+	bool hasP1 = blackBoard->HasKey("Player1");
+	bool hasP2 = blackBoard->HasKey("Player2");
+
+	if (hasAsis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
+	}
+	if (hasP1) {
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
+	}
+	if (hasP2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
+	}
+
 }
 
 void EntityMonsterA::Update(float tick)
@@ -246,6 +263,7 @@ void EntityMonsterA::ChaseTarget(float deltatime)
 		if (m_state == "Attack") return;
 		Transform* m_transform = m_pOwner->GetComponent<Transform>();
 		CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+		controller->SetAutomaticRotation(true);
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
@@ -291,6 +309,10 @@ void EntityMonsterA::Dead()
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	//todo : Dead entity remove or disable
+	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();
+	if (asisScrip) {
+		asisScrip->AddPollutionGauge(m_enemyReward);
+	}
 }
 
 
