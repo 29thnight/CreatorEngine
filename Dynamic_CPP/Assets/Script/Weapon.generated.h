@@ -18,6 +18,8 @@ ReflectionScriptField(Weapon) \
 		meta_property(ChargeAttackBulletAngle) \
 		meta_property(durMax) \
 		meta_property(durUseAtk) \
+		meta_property(bombThrowDuration) \
+		meta_property(bombRadius) \
 	}); \
 	FieldEnd(Weapon, PropertyOnly) \
 };

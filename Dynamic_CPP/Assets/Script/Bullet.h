@@ -2,13 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Bullet.generated.h"
-
-
-enum class BulletType
-{
-	Normal,
-	Special,
-};
+#include "ItemType.h"
 
 
 class Player;

@@ -30,7 +30,8 @@ public:
 	int  itemCode = 0;
 	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
-
+	[[Property]]
+	int maxHP = 1.f;
 private:
 	CriticalMark* m_criticalMark;
 	[[Property]]

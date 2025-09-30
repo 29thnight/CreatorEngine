@@ -3,9 +3,5 @@
 #define ReflectExplosion \
 ReflectionScriptField(Explosion) \
 { \
-	PropertyField \
-	({ \
-		meta_property(explosionRadius) \
-	}); \
-	FieldEnd(Explosion, PropertyOnly) \
+	FieldEnd(Explosion, None) \
 };
