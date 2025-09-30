@@ -128,6 +128,7 @@ void Player::Start()
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
+				hpbar->SetType(0);
 			}
 		}
 	}
@@ -157,7 +158,7 @@ void Player::Start()
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
-				hpbar->SetPlayer2Texture();
+				hpbar->SetType(1);
 			}
 		}
 	}

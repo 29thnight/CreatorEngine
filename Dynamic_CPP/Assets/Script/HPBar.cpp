@@ -3,6 +3,7 @@
 #include "SceneManager.h"
 #include "Camera.h"
 #include "ImageComponent.h"
+#include "Player.h"
 #include "pch.h"
 
 void HPBar::Start()
@@ -25,10 +26,7 @@ void HPBar::Start()
     if (imageComp)
     {
         m_image = imageComp;
-        if (m_isPlayer2)
-        {
-            m_image->SetTexture(1);
-        }
+        m_image->SetTexture(m_type);
     }
 }
 
@@ -54,10 +52,7 @@ void HPBar::LateUpdate(float)
         if (imageComp)
         {
             m_image = imageComp;
-            if (m_isPlayer2)
-            {
-                m_image->SetTexture(1);
-            }
+            m_image->SetTexture(m_type);
         }
         return;
     }
@@ -67,6 +62,13 @@ void HPBar::LateUpdate(float)
     if (!cameraPtr)
         return;
     Camera* camera = cameraPtr.get();
+
+    auto player = m_target->GetComponentDynamicCast<Entity>();
+    if (player)
+    {
+        m_currentHP = player->m_currentHP;
+        m_maxHP = player->m_maxHP;
+    }
 
     Mathf::Vector3 worldPos = m_target->m_transform.GetWorldPosition();
     auto view = camera->CalculateView();
@@ -96,8 +98,7 @@ void HPBar::LateUpdate(float)
 	m_image->clipPercent = ratio;
 }
 
-void HPBar::SetPlayer2Texture()
+void HPBar::SetType(int type)
 {
-    m_isPlayer2 = true;
+    m_type = type;
 }
-

@@ -9,9 +9,26 @@
 #include "CharacterControllerComponent.h"
 #include "SwordHitEffect.h"
 #include "PrefabUtility.h"
+#include "HPBar.h"
+
 void EntityMonsterA::Start()
 {
-	
+	auto canvObj = GameObject::Find("Canvas");
+	Prefab* HPBarPrefab = PrefabUtilitys->LoadPrefab("UI_HPBarBg");
+	if (HPBarPrefab && canvObj)
+	{
+		GameObject* hpObj = PrefabUtilitys->InstantiatePrefab(HPBarPrefab, "MonAHp");
+		HPBar* hp = hpObj->GetComponentDynamicCast<HPBar>();
+		canvObj->AddChild(hpObj);
+		hp->targetIndex = GetOwner()->m_index;
+		m_currentHP = m_currHP;
+		m_maxHP = m_maxHP;
+		hp->SetMaxHP(m_maxHP);
+		hp->SetCurHP(m_currentHP);
+		hp->SetType(0);
+	}
+
+
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
 	auto childred = m_pOwner->m_childrenIndices;
@@ -48,7 +65,6 @@ void EntityMonsterA::Start()
 			m_animator->SetParameter("Move", false);*/
 		}
 	}
-
 
 	for (auto& child : childred)
 	{

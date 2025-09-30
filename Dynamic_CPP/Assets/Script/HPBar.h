@@ -29,7 +29,7 @@ public:
 	[[Property]]
 	Mathf::Vector2 screenOffset = { 0.f, -50.f };
 
-	void SetPlayer2Texture();
+	void SetType(int type); //0 : p1 or mon(프리팹으로 구분), 1 : p2
 	
 	void SetMaxHP(int maxHP) 
 	{ 
@@ -55,5 +55,5 @@ private:
 
 	int m_currentHP{};
 	int m_maxHP{};
-	bool m_isPlayer2{};
+	int m_type{};
 };
