@@ -208,6 +208,11 @@ void SceneManager::Decommissioning()
 	}
 }
 
+void SceneManager::SetDecommissioning()
+{
+    m_exitCommand = true;
+}
+
 Scene* SceneManager::CreateScene(std::string_view name)
 {
     resourceTrimEvent.Broadcast();

@@ -622,7 +622,7 @@ void TrailGenerateModule::UpdateBuffers()
         return;
 
     auto& deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
-    UINT requiredVertexSize = static_cast<UINT>(m_vertices.size() * sizeof(TrailVertex));
+    UINT requiredVertexSize = static_cast<UINT>(m_vertices.size() * sizeof(CTrailVertex));
     UINT requiredIndexSize = static_cast<UINT>(m_indices.size() * sizeof(UINT));
 
     // 버텍스 버퍼 처리

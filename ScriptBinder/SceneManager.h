@@ -30,6 +30,8 @@ public:
     void Pausing();
     void DisableOrEnable();
     void Decommissioning();
+    void SetDecommissioning();
+    bool IsDecommissioning() const { return m_exitCommand; }
 
     Scene* GetActiveScene() { return m_activeScene; }
     Scene* GetScene(size_t index) { return m_scenes[index]; }
@@ -115,6 +117,7 @@ private:
 	std::string                         m_LoadSceneName{};
     std::atomic_size_t                  m_activeSceneIndex{};
 	std::atomic_bool                    m_volumeProfileApply{ false };
+    std::atomic_bool                    m_exitCommand{ false };
 };
 
 static auto SceneManagers = SceneManager::GetInstance();

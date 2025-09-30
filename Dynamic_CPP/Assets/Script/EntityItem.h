@@ -66,7 +66,7 @@ public:
 	EItemType itemType = EItemType::Mushroom;
 
 	[[Property]]
-	int itemReward = 0;
+	int itemReward = 5;
 
 	bool OnGround;
 private:

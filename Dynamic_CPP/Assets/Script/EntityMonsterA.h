@@ -52,7 +52,7 @@ public:
 	bool isAsisAction = false; //asis 행동중인지 여부
 	[[Property]]
 	int m_maxHP = 100;
-	//int m_currHP = m_maxHP;
+	int m_currHP = m_maxHP;
 	[[Property]]
 	float m_enemyReward = 10.f; //처치시 플레이어에게 주는 보상
 	//이동 및 추적
@@ -68,7 +68,7 @@ public:
 	[[Property]]
 	int m_attackDamage = 10;
 
-
+	std::string m_preState = "";
 	std::string m_state = "Idle"; //Idle,Chase,Attack,Dead
 	std::string m_identity = "MonsterNomal";
 
@@ -79,7 +79,7 @@ public:
 	[[Method]]
 	void AttackBoxOff(); //공격 박스 비활성화
 
-	void ChaseTarget(); //타겟 추적
+	void ChaseTarget(float deltatime); //타겟 추적
 
 	void Dead(); //죽음 처리
 

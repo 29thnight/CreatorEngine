@@ -97,7 +97,7 @@ void TrailRenderModule::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::M
     }
 
     // 정점/인덱스 버퍼 바인딩
-    UINT stride = sizeof(TrailVertex);
+    UINT stride = sizeof(CTrailVertex);
     UINT offset = 0;
     deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
     deviceContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);

@@ -19,7 +19,7 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 	if (identity == "MonsterNomal")
 	{
 		EntityMonsterA* script = m_owner->GetComponent<EntityMonsterA>();
-		script->ChaseTarget();
+		script->ChaseTarget(deltatime);
 		return NodeStatus::Success;
 	}
 	else if(identity == "MonsterRange")
