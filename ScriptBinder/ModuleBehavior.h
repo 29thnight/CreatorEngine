@@ -77,9 +77,9 @@ private:
 
 	void OnEnableInvoke()
 	{
-		if(false == IsEnabled()) return;
+		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (false == m_isCallOnEnable && true == m_isCallAwake)
+		if (false == m_isCallOnEnable)
 		{
 			OnEnable();
 			m_isCallOnEnable = true;
@@ -90,7 +90,7 @@ private:
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (m_isCallStart == false && true == m_isCallAwake)
+		if (m_isCallStart == false)
 		{
 			Start();
 			m_isCallStart = true;
@@ -101,16 +101,12 @@ private:
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
-
 		FixedUpdate(fixedTick);
 	}
 
 	void OnTriggerEnterInvoke(const Collision& collider)
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
 
 		OnTriggerEnter(collider);
 	}
@@ -119,16 +115,12 @@ private:
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
-
 		OnTriggerStay(collider);
 	}
 
 	void OnTriggerExitInvoke(const Collision& collider)
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
 
 		OnTriggerExit(collider);
 	}
@@ -137,16 +129,12 @@ private:
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
-
 		OnCollisionEnter(collider);
 	}
 
 	void OnCollisionStayInvoke(const Collision& collider)
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
-		
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
 
 		OnCollisionStay(collider);
 	}
@@ -155,16 +143,12 @@ private:
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
-
 		OnCollisionExit(collider);
 	}
 
 	void UpdateInvoke(float tick)
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
 
 		Update(tick);
 	}
@@ -173,16 +157,12 @@ private:
 	{
 		if (true == m_destroyMark || false == m_isEnabled) return;
 
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
-
 		LateUpdate(tick);
 	}
 
 	void OnDisableInvoke()
 	{
 		if (true == m_isEnabled) return;
-
-		if (false == m_isCallOnEnable && false == m_isCallStart) return;
 
 		if (true == m_isCallOnEnable)
 		{
