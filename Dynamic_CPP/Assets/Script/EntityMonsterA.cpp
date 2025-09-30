@@ -9,11 +9,28 @@
 #include "CharacterControllerComponent.h"
 #include "SwordHitEffect.h"
 #include "PrefabUtility.h"
+#include "HPBar.h"
+#include "CriticalMark.h"
 #include "EntityAsis.h"
 
 void EntityMonsterA::Start()
 {
-	
+	auto canvObj = GameObject::Find("Canvas");
+	Prefab* HPBarPrefab = PrefabUtilitys->LoadPrefab("UI_HPBarBg");
+	if (HPBarPrefab && canvObj)
+	{
+		GameObject* hpObj = PrefabUtilitys->InstantiatePrefab(HPBarPrefab, "MonAHp");
+		HPBar* hp = hpObj->GetComponentDynamicCast<HPBar>();
+		canvObj->AddChild(hpObj);
+		hp->targetIndex = GetOwner()->m_index;
+		m_currentHP = m_currHP;
+		m_maxHP = m_maxHP;
+		hp->SetMaxHP(m_maxHP);
+		hp->SetCurHP(m_currentHP);
+		hp->SetType(0);
+	}
+
+
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
 	auto childred = m_pOwner->m_childrenIndices;
@@ -24,6 +41,19 @@ void EntityMonsterA::Start()
 		if (animator)
 		{
 			m_animator = animator;
+			break;
+		}
+
+	}
+	childred = GetOwner()->m_childrenIndices;
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
 			break;
 		}
 
@@ -50,7 +80,6 @@ void EntityMonsterA::Start()
 			m_animator->SetParameter("Move", false);*/
 		}
 	}
-
 
 	for (auto& child : childred)
 	{
@@ -356,6 +385,10 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 dir = curPos - senderPos;
 
+			if (m_criticalMark)
+			{
+				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+			}
 			dir.Normalize();
 
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체

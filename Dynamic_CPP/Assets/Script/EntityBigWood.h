@@ -33,6 +33,8 @@ private:
 	Mathf::Vector3 UniformRandomUpdirection(float angle, int curindex, int maxCount);
 private:
 	[[Property]]
+	int maxHP = 100;
+	[[Property]]
 	int m_logDamage = 10;
 
 	[[Property]]

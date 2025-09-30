@@ -66,6 +66,8 @@ private:
 
 	void AwakeInvoke()
 	{
+		if (true == m_destroyMark || false == m_isEnabled) return;
+
 		if (m_isCallAwake == false)
 		{
 			Awake();
@@ -75,7 +77,7 @@ private:
 
 	void OnEnableInvoke()
 	{
-		if(false == IsEnabled()) return;
+		if (true == m_destroyMark || false == m_isEnabled) return;
 
 		if (false == m_isCallOnEnable)
 		{
@@ -86,6 +88,8 @@ private:
 
 	void StartInvoke()
 	{
+		if (true == m_destroyMark || false == m_isEnabled) return;
+
 		if (m_isCallStart == false)
 		{
 			Start();

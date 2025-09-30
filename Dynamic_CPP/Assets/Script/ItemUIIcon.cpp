@@ -12,8 +12,17 @@ void ItemUIIcon::Start()
 {
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
 	m_image = m_pOwner->GetComponent<ImageComponent>();
-	//TEST : 테스트용, 실제로는 ItemManager에서 SetTarget 해줌
-    //m_target = GameObject::Find("TestItem");
+
+    if(!GetOwner()->m_childrenIndices.empty())
+    {
+        int index = GetOwner()->m_childrenIndices[0];
+        auto bgObj = GameObject::FindIndex(index);
+        if (bgObj)
+        {
+            m_bgImage = bgObj->GetComponent<ImageComponent>();
+        }
+    }
+
     // 필요 시 초기화
     m_bobTime = 0.f;
 }
@@ -189,9 +198,6 @@ void ItemUIIcon::SetItemID(int id)
     itemID = id;
     if (m_image)
     {
-        // 기획은 이쪽이 기획의도인거 같아서 아이템 ID에 따라서 적용되도록 프리팹화 해야함.
-        //IF_TODO : IF 이미지로 구분해서 주시면 TODO-> id에 따른 이미지 변경 필요(페기)
-
         //->  TODO : itemID가 결정나면 거기에 맞춰서 아이콘을 정렬하던지, 미리 지정해서 적용하도록 처리가 필요
 
     }
@@ -201,22 +207,21 @@ void ItemUIIcon::SetItemID(int id)
 void ItemUIIcon::SetRarityID(int id)
 {
     rarityID = id;
-    if (m_image)
+    if (m_bgImage)
     {
-        //IF_TODO : IF 이미지로 구분해서 안주시면 TODO-> id에 따른 색상 변경 필요(폐기)
-        //switch (rarityID)
-        //{
-        //case 2:
-        //    m_image->color = GameInstance::GetInstance()->EpicItemColor;
-        //    break;
-        //case 1:
-        //    m_image->color = GameInstance::GetInstance()->RareItemColor;
-        //    break;
-        //case 0:
-        //default:
-        //    m_image->color = GameInstance::GetInstance()->CommonItemColor;
-        //    break;
-        //}
+        switch (rarityID)
+        {
+        case 2:
+            m_bgImage->color = GameInstance::GetInstance()->EpicItemColor;
+            break;
+        case 1:
+            m_bgImage->color = GameInstance::GetInstance()->RareItemColor;
+            break;
+        case 0:
+        default:
+            m_bgImage->color = GameInstance::GetInstance()->CommonItemColor;
+            break;
+        }
 
     }
 }
