@@ -29,6 +29,9 @@ void ItemUIIcon::Start()
 
 void ItemUIIcon::Update(float tick)
 {
+
+    constexpr int layerOrderFoward = 10;
+
     // --- 0) 카메라/스크린 좌표 계산 (원래 코드) ---
     auto cameraPtr = CameraManagement->GetLastCamera();
     if (!cameraPtr || !m_rect || !m_target || !m_itemComp) return;
@@ -76,6 +79,8 @@ void ItemUIIcon::Update(float tick)
         m_popupElapsed = 0.f;
         m_isPopupComplete = false;   // 팝업 완료 플래그 초기화
         m_bobbing = false;   // 팝업 동안 보빙 표시 꺼둠
+
+        if (!m_popupRaised) { ApplyOrderDelta(+layerOrderFoward); m_popupRaised = true; }
     }
     // true -> false : 팝업 해제 트윈 시작 (팝업 완료된 상태에서만)
     else if (prev && !cur && m_isPopupComplete)
@@ -84,6 +89,7 @@ void ItemUIIcon::Update(float tick)
         m_popupInit = false;
         m_popupElapsed = 0.f;
         // 보빙은 트윈 끝난 후 재개
+        if (!m_dismissRaised) { ApplyOrderDelta(+layerOrderFoward); m_dismissRaised = true; }
     }
 
     // --- 2) 트윈 처리 ---
@@ -110,6 +116,8 @@ void ItemUIIcon::Update(float tick)
             m_isPopupComplete = true;  // 팝업 도착 완료
             m_phase = PopupPhase::None;
             m_rect->SetAnchoredPosition({ tx, ty });
+
+            if (m_popupRaised) { ApplyOrderDelta(-layerOrderFoward); m_popupRaised = false; } // ← 복구
         }
         else
         {
@@ -142,6 +150,8 @@ void ItemUIIcon::Update(float tick)
             m_isPopupComplete = false;  // 해제 완료
             m_bobbing = true;   // 보빙 재개 (원하면 true로 돌려둠)
             m_rect->SetAnchoredPosition({ baseX, baseY });
+
+            if (m_dismissRaised) { ApplyOrderDelta(-layerOrderFoward); m_dismissRaised = false; }
 
             if (m_isPurchased && m_image) {
                 m_image->SetEnabled(false);
@@ -226,3 +236,8 @@ void ItemUIIcon::SetRarityID(int id)
     }
 }
 
+void ItemUIIcon::ApplyOrderDelta(int delta)
+{
+    if (m_image) { int cur = m_image->GetLayerOrder();   m_image->SetOrder(cur + delta); }
+    if (m_bgImage) { int cur = m_bgImage->GetLayerOrder(); m_bgImage->SetOrder(cur + delta); }
+}
