@@ -350,7 +350,7 @@ void EntityMonsterA::DeadEvent()
 {
 	EndDeadAnimation = true;
 
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeadEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)
 	{
 		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");

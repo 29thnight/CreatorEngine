@@ -12,6 +12,7 @@
 #include "HPBar.h"
 #include "EntityAsis.h"
 #include "CriticalMark.h"
+#include "PlayEffectAll.h"
 void TestMonsterB::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -506,5 +507,14 @@ void TestMonsterB::ShootingAttack()
 void TestMonsterB::DeadEvent()
 {
 	EndDeadAnimation = true;
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}
 }
 

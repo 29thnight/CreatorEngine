@@ -26,7 +26,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 3.0,
-                            "lifeTime": 4.0,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -139,7 +139,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 8.613321304321289,
+                            "currentTime": 184.40081787109375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -190,16 +190,18 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 2.0,
-                                "y": 2.0
+                                "x": 3.0,
+                                "y": 3.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
-                            "useRandomScale": 1
+                            "useOscillation": 0,
+                            "useRandomScale": 0
                         },
                         "state": {
                             "isInitialized": true,
@@ -404,7 +406,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 8.613321304321289,
+                            "currentTime": 20.703163146972656,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -518,6 +520,7 @@
                                 "y": 1.2000000476837158,
                                 "z": 1.2000000476837158
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 1.0,
                             "startSize": {
@@ -525,6 +528,7 @@
                                 "y": 0.699999988079071,
                                 "z": 0.699999988079071
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 1
                         },
                         "state": {
@@ -689,7 +693,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 8.613321304321289,
+                            "currentTime": 20.755115509033203,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -803,6 +807,7 @@
                                 "y": 1.2000000476837158,
                                 "z": 1.2000000476837158
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 1.0,
                             "startSize": {
@@ -810,6 +815,7 @@
                                 "y": 0.699999988079071,
                                 "z": 0.699999988079071
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 1
                         },
                         "state": {
@@ -974,7 +980,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 8.613321304321289,
+                            "currentTime": 21.76004409790039,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1088,6 +1094,7 @@
                                 "y": 1.2000000476837158,
                                 "z": 1.2000000476837158
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 1.0,
                             "startSize": {
@@ -1095,6 +1102,7 @@
                                 "y": 0.699999988079071,
                                 "z": 0.699999988079071
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 1
                         },
                         "state": {
@@ -1253,7 +1261,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 3.461095094680786,
+                            "currentTime": 20.46453094482422,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.3400000035762787,

@@ -13,6 +13,7 @@
 #include "EntityAsis.h"
 #include "GameManager.h"
 #include "CriticalMark.h"
+#include "PlayEffectAll.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -631,6 +632,15 @@ void EntityEleteMonster::Dead()
 void EntityEleteMonster::DeadEvent()
 {
 	EndDeadAnimation = true;
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}
 }
 
 void EntityEleteMonster::RotateToTarget()
