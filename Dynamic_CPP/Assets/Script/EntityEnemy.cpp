@@ -197,7 +197,7 @@ void EntityEnemy::Update(float tick)
 
 
 
-void EntityEnemy::SendDamage(Entity* sender, int damage)
+void EntityEnemy::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 
 	if (sender)

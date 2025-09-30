@@ -28,9 +28,13 @@ void TerrainMaterial::Initialize(UINT width, UINT height)
 
 }
 
-
 void TerrainMaterial::ClearLayers()
 {
+    ComPtr<ID3D11Multithread> mt{};
+    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+    mt->SetMultithreadProtected(TRUE);
+    DirectX::MTGuard lock(mt.Get());
+
     m_layerBufferData.useLayer = false;
     m_layerBufferData.numLayers = 0;
     for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i) { m_layerBufferData.layerTilling[i] = { 1.0f, 0.0f, 0.0f, 0.0f }; }
@@ -52,10 +56,12 @@ void TerrainMaterial::ClearLayers()
 
 void TerrainMaterial::InitSplatMapTextureArray(UINT width, UINT height, UINT layerCount)
 {
-    m_splatMapTextureArray.Reset();
-    m_splatMapSRV.Reset();
-
 	if (layerCount == 0) return;
+
+    ComPtr<ID3D11Multithread> mt{};
+    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+    mt->SetMultithreadProtected(TRUE);
+    DirectX::MTGuard lock(mt.Get());
 
 	D3D11_TEXTURE2D_DESC desc = {};
 	desc.Width = width;
@@ -87,6 +93,11 @@ void TerrainMaterial::UpdateSplatMapPatch(UINT layerIndex, int offsetX, int offs
 {
 	if (!m_splatMapTextureArray) return;
 
+    ComPtr<ID3D11Multithread> mt{};
+    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+    mt->SetMultithreadProtected(TRUE);
+    DirectX::MTGuard lock(mt.Get());
+
 	D3D11_BOX destBox;
 	destBox.left = offsetX;
 	destBox.right = offsetX + patchW;
@@ -109,17 +120,26 @@ void TerrainMaterial::UpdateSplatMapPatch(UINT layerIndex, int offsetX, int offs
 	);
 }
 
-
 // 상수 버퍼만 업데이트하는 가벼운 함수
 void TerrainMaterial::UpdateBuffer(const TerrainLayerBuffer& layers)
 {
-	m_layerBufferData = layers;
-	DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
-}
+    ComPtr<ID3D11Multithread> mt{};
+    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+    mt->SetMultithreadProtected(TRUE);
+    DirectX::MTGuard lock(mt.Get());
 
+	m_layerBufferData = layers;
+
+    DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
+}
 
 void TerrainMaterial::MateialDataUpdate(int width, int height, std::vector<TerrainLayer>& layers, std::vector<std::vector<float>>& layerHeightMap)
 {
+    ComPtr<ID3D11Multithread> mt{};
+    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+    mt->SetMultithreadProtected(TRUE);
+    DirectX::MTGuard lock(mt.Get());
+
     m_width = width;
     m_height = height;
 
@@ -143,7 +163,7 @@ void TerrainMaterial::MateialDataUpdate(int width, int height, std::vector<Terra
         uavDesc.Texture2DArray.MipSlice = 0; uavDesc.Texture2DArray.FirstArraySlice = 0;
         uavDesc.Texture2DArray.ArraySize = desc.ArraySize;
         DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_layerTextureArray, &uavDesc, &p_outTextureUAV);
-
+    
         DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
         ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
         DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);

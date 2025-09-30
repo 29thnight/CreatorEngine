@@ -38,8 +38,7 @@ public:
 	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
-
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 	virtual void OnRay() override {}
 	void Heal(int healAmount);
 	[[Method]]
@@ -64,11 +63,13 @@ public:
 	bool AddWeapon(Weapon* weapon);
 	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
-	void FindNearObject(GameObject* gameObject);
+	void FindNearObject(GameObject* _gameObject);
 
 	//플레이어 기본
 	[[Property]]
 	int playerIndex = 0;
+	[[Property]]
+	PlayerType m_playerType = PlayerType::Male;
 	[[Property]]
 	float moveSpeed = 0.025f;
 	[[Property]]
@@ -274,15 +275,14 @@ public:
 
 	GameObject* BombIndicator = nullptr;
 
-	SoundComponent* m_ActionSound; //칼 휘두름, 탄 발사, 잡기,던지기,죽음,부활 등 행동사운드
-	SoundComponent* m_MoveSound;   //대시, 걷기 등 이동중사운드
+	SoundComponent* m_ActionSound = nullptr; //칼 휘두름, 탄 발사, 잡기,던지기,부활, 무기교체 등 행동사운드
+	SoundComponent* m_SpecialActionSound = nullptr; //무기 부셔짐,공격차징 등
+	SoundComponent* m_DamageSound = nullptr; //피격 스턴,사운드
+	SoundComponent* m_MoveSound = nullptr;   //대시, 걷기 등 이동중사운드
 	//이펙트 사운드는 따로 몬스터이펙트등 모아서 관리 or 플레이어껀 따로
 
 	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
-
-	[[Method]]
-	void TestKillPlayer();
 
 	[[Property]]
 	float testHitPowerX = 1.5f;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
@@ -291,3 +291,5 @@ public:
 	[[Method]]
 	void TestHit();
 };
+
+void  PlayHitEffect(GameObject* _hitowner,HitInfo hitinfo);  //플레이어가 떄렸을때 나올이펙트 //맞은사람,맞았을때정보 입력 sendDamge 안에서사용

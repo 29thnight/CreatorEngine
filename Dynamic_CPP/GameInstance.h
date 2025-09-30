@@ -29,6 +29,8 @@ public:
 	bool IsLoadSceneComplete() const { return m_isLoadSceneComplete; }
 	void SetNextSceneName(const std::string& sceneName) { m_nextSceneName = sceneName; }
 	const std::string& GetNextSceneName() const { return m_nextSceneName; }
+	void SetBeyondSceneName(const std::string& sceneName) { m_beyondSceneName = sceneName; }
+	const std::string& GetBeyondSceneName() const { return m_beyondSceneName; }
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	void RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
@@ -71,6 +73,7 @@ private:
 	int m_RewardAmount{};
 	bool m_isLoadSceneComplete{ false };
 	bool m_isInitialize{ false };
+	//임시 씬 로드용
 	std::string m_nextSceneName{};
 	std::string m_beyondSceneName{}; //로딩씬 전용
 	// 로드된 씬들을 저장하는 맵

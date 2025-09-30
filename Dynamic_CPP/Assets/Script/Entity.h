@@ -1,7 +1,16 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-
+#include "ItemType.h"
+struct HitInfo
+{
+	Mathf::Vector3 attakerPos{};     //떄린애 worldpos
+	Mathf::Vector3 hitPos{};         //맞은애맞은위치 (콜리전반응위치 등)
+	Mathf::Vector3 hitNormal{};
+	Mathf::Vector3 KnockbackForce{}; //맞은애를 넉백시킬거리
+	ItemType itemType = ItemType::None;
+	BulletType bulletType = BulletType::Normal;
+};
 class Entity : public ModuleBehavior
 {
 public:
@@ -21,7 +30,7 @@ public:
 	virtual void OnDestroy() override  {}
 public:
 	virtual void Interact() {}
-	virtual void SendDamage(Entity* sender, int damage) {}
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) {} //09-25 sehwan HitInfo 추가
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce) {}
 	virtual void OnRay() {};
 	virtual void AttakRay() {};

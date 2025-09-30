@@ -39,45 +39,10 @@
 #include "SoundComponent.h"
 #include "Core.Random.h"
 #include "WeaponCapsule.h"
-std::vector<std::string> dashSounds
-{
-	"Dodge 1_Movement_01",
-	"Dodge 1_Movement_02",
-	"Dodge 1_Movement_03",
-	"Dodge 1_Slow_Armour_01",
-	"Dodge 1_Slow_Armour_02",
-	"Dodge 1_Slow_Armour_03",
-	"Dodge 2_Movement_01",
-	"Dodge 2_Movement_02",
-	"Dodge 2_Movement_03"
-};
-std::vector<std::string> stepSounds
-{
-	"Step_Movement_Small_01",
-	"Step_Movement_Small_02",
-	"Step_Movement_Small_03"
-
-};
-std::vector<std::string> normalBulletSounds
-{
-	"Electric_Attack_01",
-	"Electric_Attack_02",
-	"Electric_Attack_03"
-
-
-};
-std::vector<std::string> specialBulletSounds
-{
-	"Electric_Skill_01",
-	"Electric_Skill_02"
-};
-std::vector<std::string> MeleeChargeSounds
-{
-	"Nunchaku Attack_Skill_Bass_01",
-	"Nunchaku Attack_Skill_Bass_02",
-	"Nunchaku Attack_Skill_Bass_03"
-
-};
+#include "EntityEleteMonster.h"
+#include "SFXPoolManager.h"
+#include "SoundName.h"
+#include "SwordHitEffect.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -103,6 +68,8 @@ void Player::Start()
 	std::string ShootPosTagName = "ShootTag";
 	std::string ActionSoundName = "PlayerActionSound";
 	std::string MoveSoundName   = "PlayerMoveSound";
+	std::string SpecialActionSound = "PlayerSpecialActionSound";
+	std::string DamageSound = "PlayerDamageSound";
 	for (auto& child : childred)
 	{
 		GameObject* childObj = GameObject::FindIndex(child);
@@ -112,14 +79,23 @@ void Player::Start()
 			{
 				shootPosObj = childObj;
 			}
-			else if (childObj->RemoveSuffixNumberTag() == ActionSoundName)
+			else if (childObj->m_tag == ActionSoundName)
 			{
 				m_ActionSound = childObj->GetComponent<SoundComponent>();
 				
 			}
-			else if (childObj->RemoveSuffixNumberTag() == MoveSoundName)
+			else if (childObj->m_tag == MoveSoundName)
 			{
 				m_MoveSound = childObj->GetComponent<SoundComponent>();
+			}
+			else if (childObj->m_tag == SpecialActionSound)
+			{
+				m_SpecialActionSound = childObj->GetComponent<SoundComponent>();
+
+			}
+			else if (childObj->m_tag == DamageSound)
+			{
+				m_DamageSound = childObj->GetComponent<SoundComponent>();
 			}
 		}
 	}
@@ -218,10 +194,13 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
-	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
-	dashEffect = dashObj->AddComponent<EffectComponent>();
-	dashEffect->Awake();
-	dashEffect->m_effectTemplateName = "testdash";
+	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
+
+	if (dashObj)
+	{
+		dashEffect = dashObj->AddComponent<EffectComponent>();
+		dashEffect->m_effectTemplateName = "testdash";
+	}
 
 	auto gmobj = GameObject::Find("GameManager");
 	if (gmobj)
@@ -244,12 +223,16 @@ void Player::Start()
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(false);
 
-		BombIndicator = PrefabUtilitys->InstantiatePrefab(IndicatorPrefab, "bombIndicator");
-		auto bombindicator = BombIndicator->GetComponent<CurveIndicator>();
-		bombindicator->EnableIndicator(false);
 
 	}
 
+	Prefab* bombIndicatorPrefab = PrefabUtilitys->LoadPrefab("BombIndicator");
+	if(bombIndicatorPrefab)
+	{
+
+		BombIndicator = PrefabUtilitys->InstantiatePrefab(bombIndicatorPrefab, "bombIndicator");
+		BombIndicator->SetEnabled(false);
+	}
 	//idle에 move 도포함
 	BitFlag idleBit;
 	idleBit.Set(PlayerStateFlag::CanMove);
@@ -311,18 +294,19 @@ void Player::Update(float tick)
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
-	dashObj->m_transform.SetPosition(pos);
+	if(dashObj)
+		dashObj->m_transform.SetPosition(pos);
 
 	if (catchedObject)
 	{
 		UpdateChatchObject();
 	}
 
-	if (m_nearObject) {
+	/*if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
-	}
+	}*/
 
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
@@ -383,8 +367,7 @@ void Player::Update(float tick)
 
 	if (BombIndicator)
 	{
-		auto curveindicator = BombIndicator->GetComponent<CurveIndicator>();
-		curveindicator->EnableIndicator(onBombIndicate);
+		BombIndicator->SetEnabled(onBombIndicate);
 	}
 
 	///test sehwan
@@ -510,7 +493,7 @@ void Player::LateUpdate(float tick)
 	
 }
 
-void Player::SendDamage(Entity* sender, int damage)
+void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	
 	//엘리트 보스몹에게 피격시에만 피격 애니메이션 출력 및DropCatchItem();  그외는 단순 HP깍기 + 캐릭터 깜빡거리는 연출등
@@ -519,11 +502,43 @@ void Player::SendDamage(Entity* sender, int damage)
 	if (sender)
 	{
 		if (true == IsInvincibility()) return;
+		if (true == isStun) return;
 		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		// hit
 		//DropCatchItem();
-		
+		EntityEleteMonster* elete = dynamic_cast<EntityEleteMonster*>(sender);
+		if (elete)
+		{
+			Transform* transform = GetOwner()->GetComponent<Transform>();
+			Mathf::Vector3 myPos = transform->GetWorldPosition();
+			Mathf::Vector3 dir =  hitinfo.attakerPos - myPos;
+			dir.Normalize();
+			dir.y = 0;
+			float targetYaw = std::atan2(dir.z, dir.x) - (XM_PI / 2.0);
+			targetYaw = -targetYaw;
+			DirectX::SimpleMath::Quaternion lookQuat = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0, 0);
+			transform->SetRotation(lookQuat);
+
+			DirectX::SimpleMath::Vector3 baseForward(0, 0, 1); // 모델 기준 Forward
+			DirectX::SimpleMath::Vector3 forward = DirectX::SimpleMath::Vector3::Transform(baseForward, lookQuat);
+			if (m_animator)
+			{
+				m_animator->SetParameter("OnHit", true);
+				//Mathf::Vector3 forward = player->m_transform.GetForward();
+				Mathf::Vector3 horizontal = -forward * testHitPowerX;
+				Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,testHitPowerY ,horizontal.z };
+				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+				controller->TriggerForcedMove(knockbackVeocity);
+			}
+		}
 		Damage(damage);
+
+		if (m_DamageSound)
+		{
+			int rand = Random<int>(0, DamageSounds.size() - 1).Generate();
+			m_DamageSound->clipKey = DamageSounds[rand];
+			m_DamageSound->PlayOneShot();
+		}
 		SetInvincibility(HitGracePeriodTime);
 	}
 }
@@ -655,15 +670,16 @@ void Player::Catch()
 	if (m_nearObject != nullptr && catchedObject == nullptr)
 	{
 
-		EntityItem* item = m_nearObject->GetComponent<EntityItem>();
+		EntityItem* item = m_nearObject->GetComponentDynamicCast<EntityItem>();
 		if (item)
 		{
 			m_animator->SetParameter("OnGrab", true);
 			catchedObject = item;
-			m_nearObject = nullptr;
 			catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 			catchedObject->SetThrowOwner(this);
 		}
+
+
 		/*switch (item->itemType)
 		{
 		case EItemType::Flower:
@@ -675,6 +691,13 @@ void Player::Catch()
 		case EItemType::Mushroom:
 			Sound->playOneShot();
 		}*/
+		WeaponCapsule* weaponCapsule = m_nearObject->GetComponentDynamicCast<WeaponCapsule>();
+		if (weaponCapsule)
+		{
+			weaponCapsule->CatchCapsule(this);
+		}
+
+		m_nearObject = nullptr;
 	}
 }
 
@@ -854,6 +877,13 @@ void Player::Charging()
 	{
 		startAttack = false;
 		isCharging = true;    //true 일동안 chargeTime 상승중
+
+		if (m_SpecialActionSound)
+		{
+				int rand = Random<int>(0, MeleeChargingSounds.size() - 1).Generate();
+				m_SpecialActionSound->clipKey = MeleeChargingSounds[rand];
+				m_SpecialActionSound->PlayOneShot();
+		}
 	}
 	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
 }
@@ -935,8 +965,10 @@ void Player::PlaySlashEvent()
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash1Offset;
-
-		m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
+		}
 		if (isChargeAttack)
 		{
 			effectOffset = slashChargeOffset;
@@ -1119,10 +1151,15 @@ void Player::SwapWeaponLeft()
 
 		CancelChargeAttack();
 
-		
+
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
 
 		
-
 		LOG("Swap Left" + std::to_string(m_weaponIndex));
 	}
 }
@@ -1162,6 +1199,13 @@ void Player::SwapWeaponRight()
 
 		CancelChargeAttack(); 
 
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
+
 		LOG("Swap Right" + std::to_string(m_weaponIndex));
 	}
 }
@@ -1176,6 +1220,13 @@ void Player::SwapBasicWeapon()
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
 		m_curWeapon->SetEnabled(true);
 		canChangeSlot = false;
+
+		if (m_ActionSound)
+		{
+			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
+			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->PlayOneShot();
+		}
 	}
 	countRangeAttack = 0;
 	m_comboCount = 0;
@@ -1241,6 +1292,14 @@ void Player::DeleteCurWeapon()
 	m_curWeapon->GetOwner()->Destroy();
 	if (it != m_weaponInventory.end())
 	{
+		if (m_curWeapon->itemType != ItemType::Bomb) //basic인건 위에서 검사하니까 붐이아닌지만 체크
+		{
+			int rand = Random<int>(0, WeaponBreakSounds.size() - 1).Generate();
+			m_SpecialActionSound->clipKey = WeaponBreakSounds[rand];
+			m_SpecialActionSound->PlayOneShot();
+		}
+
+
 		SwapBasicWeapon();
 		handSocket->DetachObject((*it)->GetOwner());
 		m_weaponInventory.erase(it);
@@ -1255,12 +1314,22 @@ void Player::DeleteCurWeapon()
 				m_AddWeaponEvent.UnsafeBroadcast(nullptr, i);
 			}
 		}
+		
 	}
 }
 
-void Player::FindNearObject(GameObject* gameObject)
+void Player::FindNearObject(GameObject* _gameObject)
 {
-	if (gameObject->GetComponent<EntityItem>() == nullptr) return;
+	GameObject* gameObject = nullptr;
+	if (_gameObject->GetComponent<EntityItem>() != nullptr)
+	{
+		gameObject = _gameObject;
+	}
+	if (_gameObject->GetComponent<WeaponCapsule>() != nullptr)
+	{
+		gameObject = _gameObject;
+	}
+	if (gameObject == nullptr)  return;
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	auto objectPos = gameObject->m_transform.GetWorldPosition();
 	XMVECTOR diff = XMVectorSubtract(playerPos, objectPos);
@@ -1316,8 +1385,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	onIndicate = true;
 	if (BombIndicator)
 	{
-		auto curveindicator = BombIndicator->GetComponent<CurveIndicator>();
-		curveindicator->SetIndicator(pos, bombThrowPosition, ThrowPowerY);
+		BombIndicator->m_transform.SetPosition(bombThrowPosition);
 	}
 
 	Mathf::Vector3 targetdir = bombThrowPosition - pos;
@@ -1346,8 +1414,10 @@ void Player::MeleeAttack()
 	float distacne = 2.0f;
 	if (m_curWeapon)
 	{
-		distacne = m_curWeapon->itemAckRange; //사거리도 차지면 다름
+		distacne = m_curWeapon->itemAckRange; 
 	}
+	if (isChargeAttack)
+		distacne = m_curWeapon->chgRange;
 	float damage = calculDamge(isChargeAttack);
 
 	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10;
@@ -1375,7 +1445,24 @@ void Player::MeleeAttack()
 		auto entity = object->GetComponentDynamicCast<Entity>();
 		if (entity) {
 			auto [iter, inserted] = AttackTarget.insert(entity);
-			if (inserted) (*iter)->SendDamage(this, damage);
+			HitInfo hitinfo;
+			hitinfo.itemType = m_curWeapon->itemType;
+			hitinfo.hitPos = hit.point;
+			hitinfo.attakerPos = GetOwner()->m_transform.GetWorldPosition();
+			hitinfo.hitNormal = hit.normal;
+			hitinfo.KnockbackForce = { m_curWeapon->itemKnockback ,0,m_curWeapon->itemKnockback };
+			if (inserted) (*iter)->SendDamage(this, damage, hitinfo);
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					int rand = Random<int>(0, MeleeStrikeSounds.size() - 1).Generate();
+					pool->PlayOneShot(MeleeStrikeSounds[rand]);
+				}
+			}
+
+			
 		}
 	}
 }
@@ -1394,7 +1481,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1 << 8 | 1 << 10;; //일단 다떄림
+	RangeInfo.layerMask = 1 << 8 | 1 << 10;; 
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();
@@ -1561,6 +1648,12 @@ void Player::ShootChargeBullet()
 				bullet->Initialize(this, pos, ShootDir, m_curWeapon->chgAckDmg);
 			}
 		}
+
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = RangeChargeSounds[0];
+			m_ActionSound->PlayOneShot();
+		}
 	}
 
 }
@@ -1574,9 +1667,15 @@ void Player::ThrowBomb()
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 		bombObj->GetComponent<Transform>()->SetPosition(pos);
 		Bomb* bomb = bombObj->GetComponent<Bomb>();
-		bomb->ThrowBomb(this, pos, bombThrowPosition, calculDamge());
+		bomb->ThrowBomb(this, pos, bombThrowPosition, m_curWeapon->bombThrowDuration,m_curWeapon->bombRadius, calculDamge());
 		onBombIndicate = false;
 		m_curWeapon->SetEnabled(false);
+		
+		if(m_ActionSound)
+		{
+			m_ActionSound->clipKey = "Weapon_Whoosh_Low_2";
+			m_ActionSound->PlayOneShot();
+		}
 	}
 
 }
@@ -1634,10 +1733,6 @@ void Player::OnCollisionExit(const Collision& collision)
 }
 
 
-void Player::TestKillPlayer()
-{
-	SendDamage(nullptr,100);
-}
 
 void Player::TestHit()
 {
@@ -1655,4 +1750,77 @@ void Player::TestHit()
 	controller->TriggerForcedMove(knockbackVeocity);
 	//넉백이 끝날떄까지 x z testHitPowerX  // y testHitPowerY;
 
+}
+
+
+
+void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
+{
+	if (hitinfo.itemType == ItemType::Basic || hitinfo.itemType == ItemType::Melee)
+	{
+		//근접공격타격이벤트
+		Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("SwordHit");
+		if (HirPrefab)
+		{
+			GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
+			auto swordHitEffect = HirObj->GetComponent<SwordHitEffect>();
+			Transform* hitTransform = HirObj->GetComponent<Transform>();
+			hitTransform->SetPosition(hitinfo.hitPos);
+			Vector3 normal = hitinfo.hitNormal;
+			normal.Normalize();
+
+			// 보조 업 벡터 (노말이랑 평행하지 않게 선택)
+			Vector3 up = Vector3::UnitY;
+			if (fabsf(up.Dot(normal)) > 0.99f)
+				up = Vector3::UnitX;
+
+			// 오른쪽 벡터
+			Vector3 right = up.Cross(normal);
+			right.Normalize();
+
+			// 다시 업 보정
+			up = normal.Cross(right);
+			up.Normalize();
+
+			// 회전행렬 → 쿼터니언
+			Matrix rotMat;
+			rotMat.Right(right);
+			rotMat.Up(up);
+			rotMat.Forward(normal);
+
+			Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMat);
+			hitTransform->SetRotation(rot);
+			swordHitEffect->Initialize();
+		}
+
+	}
+	else if (hitinfo.itemType == ItemType::Range)
+	{
+		if (hitinfo.bulletType == BulletType::Normal)
+		{
+			Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("BulletNormalHit");
+			if (HirPrefab)
+			{
+				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
+				auto rangeHitEffect = HirObj->GetComponent<SwordHitEffect>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				Transform* hitTransform = HirObj->GetComponent<Transform>();
+				hitTransform->SetPosition(hitinfo.hitPos);
+
+				rangeHitEffect->Initialize();
+			}
+		}
+		else
+		{
+			Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("BulletSpecialHit");
+			if (HirPrefab)
+			{
+				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
+				auto rangeHitEffect = HirObj->GetComponent<SwordHitEffect>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				Transform* hitTransform = HirObj->GetComponent<Transform>();
+				hitTransform->SetPosition(hitinfo.hitPos);
+
+				rangeHitEffect->Initialize();
+			}
+		}
+	}
 }

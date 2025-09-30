@@ -91,6 +91,11 @@ public:
     // 전체 버텍스 업데이트
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
     {
+        ComPtr<ID3D11Multithread> mt{};
+        DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+        mt->SetMultithreadProtected(TRUE);
+        DirectX::MTGuard lock(mt.Get());
+
         D3D11_MAPPED_SUBRESOURCE mapped = {};
         HRESULT hr = DirectX11::DeviceStates->g_pDeviceContext->Map(
             m_vertexBuffer.Get(),
@@ -109,6 +114,11 @@ public:
     // 패치(사각형 영역) 단위로 버퍼 업데이트
     void UpdateVertexBufferPatch(const Vertex* src, uint32_t offsetX, uint32_t offsetY, uint32_t patchW, uint32_t patchH)
     {
+        ComPtr<ID3D11Multithread> mt{};
+        DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
+        mt->SetMultithreadProtected(TRUE);
+        DirectX::MTGuard lock(mt.Get());
+
         D3D11_MAPPED_SUBRESOURCE mapped = {};
         auto context = DirectX11::DeviceStates->g_pDeviceContext;
 

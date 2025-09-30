@@ -219,7 +219,7 @@ void ShaderResourceSystem::CSOAllCleanup()
 
 static bool ExtractStageAndName(const file::path& hlsl, std::string& stage, std::string& name)
 {
-	// ±ÔÄ¢: <Name>.<stage>.hlsl  (¿¹: "VertexShader.vs.hlsl")
+	// ê·œì¹™: <Name>.<stage>.hlsl  (ì˜ˆ: "VertexShader.vs.hlsl")
 	if (hlsl.extension() != ".hlsl") return false;
 	file::path stem1 = hlsl.stem();         // "VertexShader.vs"
 	file::path stem2 = stem1.stem();        // "VertexShader"
@@ -231,28 +231,28 @@ static bool ExtractStageAndName(const file::path& hlsl, std::string& stage, std:
 	return !stage.empty() && !name.empty();
 }
 
-// NEW: °³º° ½ºÅ©¸³Æ® Ã³¸®
+// NEW: ê°œë³„ ìŠ¤í¬ë¦½íŠ¸ ì²˜ë¦¬
 static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
 {
 	auto pso = std::make_shared<ShaderPSO>();
 
 	auto bindFile = [&](const std::string& path) {
 		if (path.empty()) return;
-		file::path p = PathFinder::RelativeToShader() / path; // Shader Æú´õ ±âÁØ
-		// ÇÊ¿ä½Ã ¸ÕÀú ÄÄÆÄÀÏ/µî·Ï (ÀÌ¹Ì µî·ÏµÅÀÖÀ¸¸é ³»ºÎ¿¡¼­ µ¤¾î¾¸)
+		file::path p = PathFinder::RelativeToShader() / path; // Shader í´ë” ê¸°ì¤€
+		// í•„ìš”ì‹œ ë¨¼ì € ì»´íŒŒì¼/ë“±ë¡ (ì´ë¯¸ ë“±ë¡ë¼ìˆìœ¼ë©´ ë‚´ë¶€ì—ì„œ ë®ì–´ì”€)
 		try { ShaderSystem->AddShaderFromPath(p); }
 		catch (...) {}
 
 		std::string stage, base;
 		if (!ExtractStageAndName(p, stage, base)) return;
 
-		if		(stage == "vs") pso->m_vertexShader		= &ShaderSystem->VertexShaders[base];
-		else if (stage == "ps") pso->m_pixelShader		= &ShaderSystem->PixelShaders[base];
-		else if (stage == "gs") pso->m_geometryShader	= &ShaderSystem->GeometryShaders[base];
-		else if (stage == "hs") pso->m_hullShader		= &ShaderSystem->HullShaders[base];
-		else if (stage == "ds") pso->m_domainShader		= &ShaderSystem->DomainShaders[base];
-		else if (stage == "cs") pso->m_computeShader	= &ShaderSystem->ComputeShaders[base];
-	};
+		if (stage == "vs") pso->m_vertexShader = &ShaderSystem->VertexShaders[base];
+		else if (stage == "ps") pso->m_pixelShader = &ShaderSystem->PixelShaders[base];
+		else if (stage == "gs") pso->m_geometryShader = &ShaderSystem->GeometryShaders[base];
+		else if (stage == "hs") pso->m_hullShader = &ShaderSystem->HullShaders[base];
+		else if (stage == "ds") pso->m_domainShader = &ShaderSystem->DomainShaders[base];
+		else if (stage == "cs") pso->m_computeShader = &ShaderSystem->ComputeShaders[base];
+		};
 
 	bindFile(desc.pass.vs);
 	bindFile(desc.pass.ps);
@@ -261,18 +261,18 @@ static std::shared_ptr<ShaderPSO> BuildPSOFromDesc(const ShaderAssetDesc& desc)
 	bindFile(desc.pass.ds);
 	bindFile(desc.pass.cs);
 
-	if(!pso->m_vertexShader || !pso->m_pixelShader)
+	if (!pso->m_vertexShader || !pso->m_pixelShader)
 	{
-		// ÃÖ¼ÒÇÑ ¹öÅØ½º/ÇÈ¼¿ ¼ÎÀÌ´õ´Â ¸ğµÎ À¯È¿ÇØ¾ß ÇÔ
+		// ìµœì†Œí•œ ë²„í…ìŠ¤/í”½ì…€ ì…°ì´ë”ëŠ” ëª¨ë‘ ìœ íš¨í•´ì•¼ í•¨
 		Debug->LogWarning("ShaderPSO '" + desc.name + "' has no valid vertex/pixel/compute shader.");
 		return nullptr;
 	}
 
-	// ÀÚµ¿ ¸®ÇÃ·º¼ÇÀ¸·Î cbuffer/SRV ½½·Ô »ı¼º
+	// ìë™ ë¦¬í”Œë ‰ì…˜ìœ¼ë¡œ cbuffer/SRV ìŠ¬ë¡¯ ìƒì„±
 	pso->ReflectConstantBuffers();
 	pso->CreateInputLayoutFromShader();
 
-	// TODO: queueTag/keywords ·»´õ Å¥/Å°¿öµå ½Ã½ºÅÛ°ú ¿¬µ¿(¿É¼Ç)
+	// TODO: queueTag/keywords ë Œë” í/í‚¤ì›Œë“œ ì‹œìŠ¤í…œê³¼ ì—°ë™(ì˜µì…˜)
 	return pso;
 }
 
@@ -285,7 +285,7 @@ void ShaderResourceSystem::LoadShaderAssets()
 		{
 			if (dir.is_directory() || dir.path().extension() != ".shader") continue;
 
-			// ½ºÅ©¸³Æ® ÀĞ±â
+			// ìŠ¤í¬ë¦½íŠ¸ ì½ê¸°
 			std::string src;
 			{
 				std::ifstream f(dir.path());
@@ -295,10 +295,10 @@ void ShaderResourceSystem::LoadShaderAssets()
 			ShaderAssetDesc desc{};
 			if (!ParseShaderDSL(src, desc)) continue;
 
-			// ÀÌ¸§ ¾øÀ¸¸é ÆÄÀÏ¸í¿¡¼­ ÃßÃâ
+			// ì´ë¦„ ì—†ìœ¼ë©´ íŒŒì¼ëª…ì—ì„œ ì¶”ì¶œ
 			std::string assetName = !desc.name.empty() ? desc.name : dir.path().stem().string();
 
-			// PSO ¸¸µé°í µî·Ï
+			// PSO ë§Œë“¤ê³  ë“±ë¡
 			auto pso = BuildPSOFromDesc(desc);
 			if (pso)
 			{
@@ -378,7 +378,7 @@ void ShaderResourceSystem::RegisterSelectShaderContext()
 			}
 			ImGui::EndListBox();
 		}
-	});
+		});
 	ImGui::GetContext("SelectShader").Close();
 
 	ImGui::ContextRegister("SelectImageCustomShader", true, [this]() {
@@ -399,7 +399,7 @@ void ShaderResourceSystem::RegisterSelectShaderContext()
 			}
 			ImGui::EndListBox();
 		}
-	});
+		});
 	ImGui::GetContext("SelectImageCustomShader").Close();
 }
 
@@ -516,7 +516,7 @@ void ShaderResourceSystem::AddShader(const std::string& name, const std::string&
 
 void ShaderResourceSystem::EraseShader(const std::string& name, const std::string& ext)
 {
-	if(ext == "vs")
+	if (ext == "vs")
 	{
 		VertexShaders.erase(name);
 	}

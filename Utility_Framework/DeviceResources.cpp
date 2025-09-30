@@ -463,9 +463,9 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         swapChainFullscreenDesc.RefreshRate.Numerator = 0;
         swapChainFullscreenDesc.RefreshRate.Denominator = 1;
-        swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+        swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_STRETCHED;
         swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-        swapChainFullscreenDesc.Windowed = TRUE;
+        swapChainFullscreenDesc.Windowed = FALSE;
 
 
         ComPtr<IDXGISwapChain1> swapChain;
@@ -678,9 +678,9 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
 
     swapChainFullscreenDesc.RefreshRate.Numerator = 0;
     swapChainFullscreenDesc.RefreshRate.Denominator = 1;
-    swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+    swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_STRETCHED;
     swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-    swapChainFullscreenDesc.Windowed = TRUE;
+    swapChainFullscreenDesc.Windowed = FALSE;
 
     ComPtr<IDXGISwapChain1> swapChain;
     DirectX11::ThrowIfFailed(
@@ -688,7 +688,7 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
             m_d3dDevice.Get(),
             m_window->GetHandle(),
             &swapChainDesc,
-            &swapChainFullscreenDesc,
+            nullptr,
             nullptr,
             &swapChain
         )

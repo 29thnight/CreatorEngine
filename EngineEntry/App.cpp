@@ -18,7 +18,6 @@
 #include "DeviceState.h"
 #include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
-#include "Camera.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -141,6 +140,7 @@ void Core::App::RegisterHandler(CoreWindow& coreWindow)
 {
     coreWindow.RegisterHandler(WM_INPUT,		this, &App::ProcessRawInput);
 	coreWindow.RegisterHandler(WM_SIZE,			this, &App::HandleResizeEvent);
+	coreWindow.RegisterHandler(WM_SYSKEYDOWN,	this, &App::HandleMaximizeEvent);
     coreWindow.RegisterHandler(WM_KEYDOWN,		this, &App::HandleCharEvent);
     coreWindow.RegisterHandler(WM_CLOSE,		this, &App::Shutdown);
     coreWindow.RegisterHandler(WM_DROPFILES,	this, &App::HandleDropFileEvent);
@@ -249,6 +249,18 @@ LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 	m_main->InvokeResizeFlag();
 
+	return 0;
+}
+
+LRESULT Core::App::HandleMaximizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	const bool altDown = (lParam & (1 << 29)) != 0; // KF_ALTDOWN
+	if (wParam == VK_RETURN && altDown)
+	{
+		m_main->InvokeResizeFlag();
+		return 0;           // 여기서 0을 반환하면 아래의 삑(Beep) 방지에 도움
+	}
+	
 	return 0;
 }
 

@@ -32,6 +32,7 @@ void PlayerBombAttack::Enter()
 	{
 		m_player->ChangeState("Attack");
 		m_player->isAttacking = true;
+		m_player->m_animator->SetUseLayer(1, false);
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 		//m_player->m_animator->SetUseLayer(1, false);

@@ -41,6 +41,7 @@ public:
 
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
+	bool isAttackRoll = false;
 	bool isBoxAttack = false; //박스 공격중인지 여부
 	bool isMelee = false; //근접공격을 할지 원거리 공격을 할지
 
@@ -94,7 +95,7 @@ public:
 	
 	void AttackBoxOff(); //공격 박스 비활성화
 
-	void SendDamage(Entity* sender, int damage) override; //근접 공격시 데미지 전달
+	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override; //근접 공격시 데미지 전달
 
 	[[Method]]
 	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사

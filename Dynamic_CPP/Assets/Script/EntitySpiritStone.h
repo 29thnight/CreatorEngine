@@ -23,7 +23,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
 	[[Property]]
 	int m_stoneReward = 0;

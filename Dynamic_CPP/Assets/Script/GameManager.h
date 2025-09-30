@@ -7,6 +7,7 @@
 class Entity;
 class ActionMap;
 class Weapon;
+class SFXPoolManager;
 class GameManager : public ModuleBehavior
 {
 public:
@@ -73,6 +74,9 @@ public:
 
 	std::vector<Entity*>& GetResourcePool();
 	std::vector<Weapon*>& GetWeaponPiecePool();
+
+	void PushSFXPool(SFXPoolManager* _SFXPool);
+	SFXPoolManager* GetSFXPool();
 private:
 	std::vector<Entity*> m_entities;
 	std::vector<Entity*> m_resourcePool;
@@ -80,6 +84,7 @@ private:
 	std::vector<Entity*> m_players;
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 
+	SFXPoolManager* SFXPool;
 private:
 	void CheatMiningResource();
 

@@ -184,13 +184,16 @@ void ItemUIIcon::SetTarget(GameObject* target)
         }
     }
 }
-
 void ItemUIIcon::SetItemID(int id)
 {
     itemID = id;
     if (m_image)
     {
-        //IF_TODO : IF 이미지로 구분해서 주시면 TODO-> id에 따른 이미지 변경 필요
+        // 기획은 이쪽이 기획의도인거 같아서 아이템 ID에 따라서 적용되도록 프리팹화 해야함.
+        //IF_TODO : IF 이미지로 구분해서 주시면 TODO-> id에 따른 이미지 변경 필요(페기)
+
+        //->  TODO : itemID가 결정나면 거기에 맞춰서 아이콘을 정렬하던지, 미리 지정해서 적용하도록 처리가 필요
+
     }
 
 }
@@ -200,21 +203,20 @@ void ItemUIIcon::SetRarityID(int id)
     rarityID = id;
     if (m_image)
     {
-        //(현재 적용)
-        //IF_TODO : IF 이미지로 구분해서 안주시면 TODO-> id에 따른 색상 변경 필요
-        switch (rarityID)
-        {
-        case 2:
-            m_image->color = GameInstance::GetInstance()->EpicItemColor;
-            break;
-        case 1:
-            m_image->color = GameInstance::GetInstance()->RareItemColor;
-            break;
-        case 0:
-        default:
-            m_image->color = GameInstance::GetInstance()->CommonItemColor;
-            break;
-        }
+        //IF_TODO : IF 이미지로 구분해서 안주시면 TODO-> id에 따른 색상 변경 필요(폐기)
+        //switch (rarityID)
+        //{
+        //case 2:
+        //    m_image->color = GameInstance::GetInstance()->EpicItemColor;
+        //    break;
+        //case 1:
+        //    m_image->color = GameInstance::GetInstance()->RareItemColor;
+        //    break;
+        //case 0:
+        //default:
+        //    m_image->color = GameInstance::GetInstance()->CommonItemColor;
+        //    break;
+        //}
 
     }
 }

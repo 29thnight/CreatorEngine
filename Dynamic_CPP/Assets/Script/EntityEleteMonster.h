@@ -140,7 +140,7 @@ public:
 
 	void RotateToTarget(); //타겟 바라보기
 
-	void SendDamage(Entity* sender, int damage) override;
+	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
 	//텔레포트
 	// 주어진 위치가 텔레포트 가능한지 검사하는 헬퍼 함수

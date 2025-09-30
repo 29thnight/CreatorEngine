@@ -15,7 +15,7 @@ public:
 	// New purpose: bind a runtime variable into EventManager so objectives can be late-bound
 	// Defaults to varName="targetTag"
 	void SetManager(EventManager* mgr) { m_mgr = mgr; }
-   void Configure(int eventId, const std::string& varName, const std::string& value);
+	void Configure(int eventId, const std::string& varName, const std::string& value);
 
 	virtual void Awake() override;
 

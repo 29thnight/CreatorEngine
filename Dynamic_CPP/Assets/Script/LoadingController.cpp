@@ -2,6 +2,7 @@
 #include "ImageComponent.h"
 #include "TextComponent.h"
 #include "GameInstance.h"
+#include "GameManager.h"
 #include "pch.h"
 
 void LoadingController::Start()
@@ -12,6 +13,27 @@ void LoadingController::Start()
 	if (child)
 	{
 		m_loadingText = child->GetComponent<TextComponent>();
+	}
+
+	GameObject* gmObj = GameObject::Find("GameManager");
+	if (gmObj)
+	{
+		m_gameManager = gmObj->GetComponent<GameManager>();
+		if (m_gameManager)
+		{
+			std::string loadSceneName = GameInstance::GetInstance()->GetBeyondSceneName();
+			if (!loadSceneName.empty())
+			{
+				m_gameManager->m_nextSceneName = loadSceneName;
+				m_gameManager->LoadNextScene();
+			}
+			else
+			{
+				m_gameManager->m_nextSceneName = "0926Test";
+				m_gameManager->LoadNextScene();
+			}
+			GameInstance::GetInstance()->SetBeyondSceneName("");
+		}
 	}
 }
 
@@ -39,6 +61,11 @@ void LoadingController::Update(float tick)
 				m_loadingText->SetMessage(kFrames[m_dotIdx]);
 			}
 		}
+	}
+	else
+	{
+		m_loadingImage->SetEnabled(false);
+		m_loadingText->SetMessage("Load Complete");
 	}
 }
 

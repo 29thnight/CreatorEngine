@@ -73,13 +73,13 @@ void TestMonsterB::Start()
 		m_projectiles.push_back(PrefabObject1);
 		m_projectiles.push_back(PrefabObject2);
 	}
-
+	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
 
 	blackBoard->SetValueAsInt("MaxHP", m_maxHP); //최대 체력
-	blackBoard->SetValueAsInt("CurrHP", m_currHP); //현재 체력
+	blackBoard->SetValueAsInt("CurrHP", m_currentHP); //현재 체력
 
 	blackBoard->SetValueAsFloat("MoveSpeed", m_moveSpeed); //이동 속도
 	blackBoard->SetValueAsFloat("ChaseRange", m_chaseRange); // 추적 거리
@@ -205,6 +205,10 @@ void TestMonsterB::Update(float tick)
 		m_state = "Attack";
 	}
 
+	if (isAttackRoll) {
+		RotateToTarget();
+	}
+
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
 		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
@@ -302,7 +306,7 @@ void TestMonsterB::AttackBoxOff()
 	isBoxAttack = false;
 }
 
-void TestMonsterB::SendDamage(Entity* sender, int damage)
+void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{
@@ -369,7 +373,10 @@ void TestMonsterB::SendDamage(Entity* sender, int damage)
 //원거리 투척 
 void TestMonsterB::ShootingAttack()
 {
+	
 	if (target == nullptr) return;
+
+	isAttackRoll = false;
 	
 	GameObject* PrefabObject = m_projectiles[m_projectileIndex];
 	if (PrefabObject) {

@@ -25,9 +25,11 @@ void ItemUIPopup::Start()
     //타이틀의 자식 -> 설명
     //설명의 자식 -> 버튼
     //버튼의 자식 -> 구매
-    // 0: Title, 1: Description, 2: Button, 3: Purchase
+    // 0: Title, 1: Description, 2: priceIcon, 3: PurchaseButton, 4: priceText, 5: PurchaseText
+    constexpr int childMax = 6;
+
     GameObject* cur = GetOwner();
-    for (int depth = 0; depth < 4; ++depth)
+    for (int depth = 0; depth < childMax; ++depth)
     {
         if (!cur || cur->m_childrenIndices.empty()) return;
 
@@ -49,19 +51,30 @@ void ItemUIPopup::Start()
         case 3: 
             m_purchase = cur->GetComponent<ImageComponent>();  
             break; // Purchase
+        case 4:
+            m_priceText = cur->GetComponent<TextComponent>();
+            break;
+        case 5:
+            m_purchaseText = cur->GetComponent<TextComponent>();
+            break;
         }
     }
 
-    if (m_purchase)
-    {
-        m_purchase->SetFloat2("centerUV", centerUV);
-        m_purchase->SetFloat("radiusUV", radiusUV);
-        m_purchase->SetFloat("percent", percent);
-        m_purchase->SetFloat("startAngle", startAngle);
-        m_purchase->SetInt("clockwise", clockwise);
-        m_purchase->SetFloat("featherAngle", featherAngle);
-        m_purchase->SetFloat4("tint", tint);
-    }
+    //if (m_purchaseText)
+    //{
+    //    m_purchaseText->SetMessage("구매");
+    //}
+
+    //if (m_purchase)
+    //{
+    //    m_purchase->SetFloat2("centerUV", centerUV);
+    //    m_purchase->SetFloat("radiusUV", radiusUV);
+    //    m_purchase->SetFloat("percent", percent);
+    //    m_purchase->SetFloat("startAngle", startAngle);
+    //    m_purchase->SetInt("clockwise", clockwise);
+    //    m_purchase->SetFloat("featherAngle", featherAngle);
+    //    m_purchase->SetFloat4("tint", tint);
+    //}
 }
 
 void ItemUIPopup::Update(float tick)
@@ -69,10 +82,10 @@ void ItemUIPopup::Update(float tick)
 	using namespace Mathf;
 
     m_lastDelta = tick;
-
-	if (!m_rect     || !m_iconObj   || !m_icon      || !m_image     || 
-        !m_iconRect || !m_button    || !m_purchase  || !m_descComp ||
-        !m_nameComp || !m_input) //안전한 실행을 위한 과한 nullptr 검사 
+    //안전한 실행을 위한 과한 nullptr 검사
+	if (!m_rect     || !m_iconObj   || !m_icon          || !m_image     || 
+        !m_iconRect || !m_button    || !m_purchase      || !m_descComp  ||
+        !m_nameComp || !m_input     || !m_purchaseText  || !m_priceText ) 
     {
         return;
     }
@@ -92,14 +105,28 @@ void ItemUIPopup::Update(float tick)
     switch (rarityID)
     {
     case 2:
-        m_image->color = GameInstance::GetInstance()->EpicItemColor;
+        m_nameComp->SetColor(GameInstance::GetInstance()->EpicItemColor);
         break;
     case 1:
-        m_image->color = GameInstance::GetInstance()->RareItemColor;
+        m_nameComp->SetColor(GameInstance::GetInstance()->RareItemColor);
         break;
     case 0:
     default:
-        m_image->color = GameInstance::GetInstance()->CommonItemColor;
+        m_nameComp->SetColor(GameInstance::GetInstance()->CommonItemColor);
+        break;
+    }
+
+    switch (rarityID)
+    {
+    case 2:
+        m_image->SetTexture((int)ItemRarity::Epic);
+        break;
+    case 1:
+        m_image->SetTexture((int)ItemRarity::Rare);
+        break;
+    case 0:
+    default:
+        m_image->SetTexture((int)ItemRarity::Common);
         break;
     }
 
@@ -132,33 +159,36 @@ void ItemUIPopup::Update(float tick)
     if (m_popupSize == m_targetSize)
     {
         // 팝업 유지될 경우 이미지 활성화 텍스트 활성화
-        m_nameComp->SetEnabled(true);
-        m_descComp->SetEnabled(true);
-        m_button->SetEnabled(true);
-        m_purchase->SetEnabled(true);
+        m_nameComp->GetOwner()->SetEnabled(true);
+        //m_descComp->SetEnabled(true);
+        //m_button->SetEnabled(true);
+        //m_purchase->SetEnabled(true);
         // 게임 인스턴스에서 정보 받아와서 텍스트 메세지 전달
         auto* itemInfo = GameInstance::GetInstance()->GetItemInfo(itemID, rarityID);
         if (itemInfo)
         {
             m_nameComp->SetMessage(itemInfo->name);
             m_descComp->SetMessage(itemInfo->description);
+            m_priceText->SetMessage(std::to_string(itemInfo->price));
         }
         else
         {
             m_nameComp->SetMessage("");
             m_descComp->SetMessage("");
+            m_priceText->SetMessage("");
         }
     }
     else
     {
         //아닌 경우 비활성화
-        m_nameComp->SetEnabled(false);
-        m_descComp->SetEnabled(false);
-        m_button->SetEnabled(false);
-        m_purchase->SetEnabled(false);
+        m_nameComp->GetOwner()->SetEnabled(false);
+        //m_descComp->SetEnabled(false);
+        //m_button->SetEnabled(false);
+        //m_purchase->SetEnabled(false);
         // 이후 텍스트 메세지 리셋
         m_nameComp->SetMessage("");
         m_descComp->SetMessage("");
+        m_priceText->SetMessage("");
     }
 
     m_prevPopupActive = popupActive;
@@ -187,16 +217,16 @@ void ItemUIPopup::PurshaseButton()
         : std::clamp(m_selectHold / m_requiredSelectHold, 0.f, 1.f);
     percent = progress;
 
-    if (m_purchase)
-    {
-        m_purchase->SetFloat2("centerUV", centerUV);
-        m_purchase->SetFloat("radiusUV", radiusUV);
-        m_purchase->SetFloat("percent", percent);
-        m_purchase->SetFloat("startAngle", startAngle);
-        m_purchase->SetInt("clockwise", clockwise);
-        m_purchase->SetFloat("featherAngle", featherAngle);
-        m_purchase->SetFloat4("tint", tint);
-    }
+    //if (m_purchase)
+    //{
+    //    m_purchase->SetFloat2("centerUV", centerUV);
+    //    m_purchase->SetFloat("radiusUV", radiusUV);
+    //    m_purchase->SetFloat("percent", percent);
+    //    m_purchase->SetFloat("startAngle", startAngle);
+    //    m_purchase->SetInt("clockwise", clockwise);
+    //    m_purchase->SetFloat("featherAngle", featherAngle);
+    //    m_purchase->SetFloat4("tint", tint);
+    //}
 
     if (!m_isSelectComplete && m_selectHold >= m_requiredSelectHold)
     {
@@ -212,14 +242,14 @@ void ItemUIPopup::ReleaseKey()
 {
     m_selectHold = 0.f;
     percent = 0.f;                  // 게이지 리셋
-    if (m_purchase)
-    {
-        m_purchase->SetFloat2("centerUV", centerUV);
-        m_purchase->SetFloat("radiusUV", radiusUV);
-        m_purchase->SetFloat("percent", percent);
-        m_purchase->SetFloat("startAngle", startAngle);
-        m_purchase->SetInt("clockwise", clockwise);
-        m_purchase->SetFloat("featherAngle", featherAngle);
-        m_purchase->SetFloat4("tint", tint);
-    }
+    //if (m_purchase)
+    //{
+    //    m_purchase->SetFloat2("centerUV", centerUV);
+    //    m_purchase->SetFloat("radiusUV", radiusUV);
+    //    m_purchase->SetFloat("percent", percent);
+    //    m_purchase->SetFloat("startAngle", startAngle);
+    //    m_purchase->SetInt("clockwise", clockwise);
+    //    m_purchase->SetFloat("featherAngle", featherAngle);
+    //    m_purchase->SetFloat4("tint", tint);
+    //}
 }

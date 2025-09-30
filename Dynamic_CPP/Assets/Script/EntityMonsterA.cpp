@@ -7,7 +7,8 @@
 #include "RaycastHelper.h"
 #include "Animator.h"
 #include "CharacterControllerComponent.h"
-
+#include "SwordHitEffect.h"
+#include "PrefabUtility.h"
 void EntityMonsterA::Start()
 {
 	
@@ -61,6 +62,8 @@ void EntityMonsterA::Start()
 
 	}
 
+
+	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
@@ -293,7 +296,7 @@ void EntityMonsterA::RotateToTarget()
 	}
 }
 
-void EntityMonsterA::SendDamage(Entity* sender, int damage)
+void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{
@@ -323,8 +326,8 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage)
 			//std::cout << "EntityMonsterA SendDamage CurrHP : " << m_currentHP << std::endl;
 
 
-
 			
+			PlayHitEffect(this->GetOwner(), hitinfo);
 
 
 			if (m_currentHP <= 0)

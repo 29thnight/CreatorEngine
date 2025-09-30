@@ -2,12 +2,14 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Entity.h"
+#include "TBoss1.generated.h"
 
 class BehaviorTreeComponent;
 class BlackBoard;
 class TBoss1 : public Entity
 {
 public:
+   ReflectTBoss1
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(TBoss1)
 	virtual void Awake() override {}
@@ -27,7 +29,7 @@ public:
 	
 	BehaviorTreeComponent* BT = nullptr;
 	BlackBoard* BB = nullptr;
-
+	
 	//hp
 	[[Property]]
 	int m_MaxHp = 1000;
@@ -65,6 +67,15 @@ public:
 
 	GameObject* m_target = nullptr;
 
+	//보스만 특수하게 
+	GameObject* m_chunsik = nullptr;
+	float m_chunsikRadius = 20.f;
+
+	void RotateToTarget();
+
+	//BP0033,0034 용 광역 패턴 사용시 장판패턴이 전체가 다 종료되었는지를 확인하고 전체가 종료 될때 까지 행동을 막는 함수
+	bool usePatten = false;
+	void PattenActionIdle();
 
 	[[Method]]
 	void BP0031();

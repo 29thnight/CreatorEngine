@@ -23,6 +23,7 @@ ReflectionScriptField(EntityAsis) \
 		meta_property(maxTailCapacity) \
 		meta_property(maxPollutionGauge) \
 		meta_property(pollutionCoreAmount) \
+		meta_property(bigWoodDetectRadius) \
 		meta_property(m_pathRadius) \
 		meta_property(m_pathEndRadius) \
 		meta_property(m_predictNextTime) \

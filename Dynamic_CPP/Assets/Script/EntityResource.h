@@ -24,13 +24,14 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
 	[[Property]]
 	int  itemCode = 0;
 	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
-
+	[[Property]]
+	int maxHP = 1.f;
 private:
 	CriticalMark* m_criticalMark;
 	[[Property]]

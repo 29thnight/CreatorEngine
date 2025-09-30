@@ -80,7 +80,7 @@ void DirectX11::GameMain::Initialize()
     SceneManagers->ManagerInitialize();
     PhysicsManagers->Initialize();
 
-    std::wstring sceneName = /*EngineSettingInstance->GetStartupSceneName()*/L"real8pre.creator";
+    std::wstring sceneName = EngineSettingInstance->GetStartupSceneName();
     file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
     SceneManagers->LoadSceneImmediate(scenePath.string());
 
@@ -184,9 +184,9 @@ void DirectX11::GameMain::CreateWindowSizeDependentResources()
 void DirectX11::GameMain::Update()
 {
     // EditorUpdate
-    EngineSettingInstance->frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+    EngineSettingInstance->frameDeltaTime = Time->GetElapsedSeconds();
 
-    m_timeSystem.Tick([&]
+    Time->Tick([&]
     {
         InfoWindow();
         InputManagement->Update(EngineSettingInstance->frameDeltaTime);
@@ -209,7 +209,7 @@ void DirectX11::GameMain::Update()
 bool DirectX11::GameMain::ExecuteRenderPass()
 {
     // 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-    if (m_timeSystem.GetFrameCount() == 0)
+    if (Time->GetFrameCount() == 0)
     {
         return false;
     }
@@ -227,13 +227,13 @@ void DirectX11::GameMain::InfoWindow()
     woss.precision(6);
 	woss << EngineSettingInstance->GetBuildGameName()
         << L"Width: "
-        << DeviceState::g_Viewport.Width
+        << DeviceStates->g_Viewport.Width
         << L" Height: "
-        << DeviceState::g_Viewport.Height
+        << DeviceStates->g_Viewport.Height
         << L" FPS: "
-        << m_timeSystem.GetFramesPerSecond()
+        << Time->GetFramesPerSecond()
         << L" FrameCount: "
-        << m_timeSystem.GetFrameCount()
+        << Time->GetFrameCount()
         << "<Dx11>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
@@ -257,7 +257,7 @@ void DirectX11::GameMain::DisableOrEnable()
 void DirectX11::GameMain::CommandBuildThread()
 {
     // 처음 업데이트하기 전에 아무 것도 하지 마세요.
-    if (m_timeSystem.GetFrameCount() == 0)
+    if (Time->GetFrameCount() == 0)
     {
         //RenderCommandFence.Signal();
         EngineSettingInstance->renderBarrier.ArriveAndWait();

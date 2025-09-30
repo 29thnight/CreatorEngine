@@ -9,7 +9,7 @@
 #include "CharacterControllerComponent.h"
 #include "PrefabUtility.h"
 #include "MonEleteProjetile.h"
-
+#include "GameManager.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -79,12 +79,13 @@ void EntityEleteMonster::Start()
 		m_projectiles.push_back(PrefabObject2);
 	}
 
+	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
 
 	blackBoard->SetValueAsInt("MaxHP", m_maxHP); //최대 체력
-	blackBoard->SetValueAsInt("CurrHP", m_currHP); //현재 체력
+	blackBoard->SetValueAsInt("CurrHP", m_currentHP); //현재 체력
 
 	blackBoard->SetValueAsFloat("MoveSpeed", m_moveSpeed); //이동 속도
 	blackBoard->SetValueAsFloat("ChaseRange", m_chaseRange); // 추적 거리
@@ -106,6 +107,7 @@ void EntityEleteMonster::Start()
 
 void EntityEleteMonster::Update(float tick)
 {
+	if (blackBoard == nullptr) return;
 	bool hasIdentity = blackBoard->HasKey("Identity");
 	if (hasIdentity) {
 		std::string Identity = blackBoard->GetValueAsString("Identity");
@@ -566,7 +568,7 @@ void EntityEleteMonster::RotateToTarget()
 	}
 }
 
-void EntityEleteMonster::SendDamage(Entity* sender, int damage)
+void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (sender)
 	{

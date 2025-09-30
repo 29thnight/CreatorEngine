@@ -26,7 +26,7 @@ public:
 	virtual void OnDestroy() override {}
 public:
 	virtual void Interact() override {}
-	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
 	bool AddItem(EntityItem* item);
 	void Purification(float tick);
@@ -34,6 +34,8 @@ public:
 	void Stun();
 	// 현재 들고있는 아이템을 떨구는 함수 (index로 가능)
 	bool DropItem();
+
+	int CheckBigWood();
 
 	// 0~1
 	float GetPollutionGaugePercent();
@@ -92,6 +94,9 @@ private:
 
 	[[Property]]
 	int		pollutionCoreAmount{ 1 };			// 오염도 게이지 최대치 도달 시 생성되는 오염 결정 개수
+
+	[[Property]]
+	float   bigWoodDetectRadius{ 2.f };
 
 private:
 	float	m_currentTailPurificationDuration{}; // 꼬리 정화 연출 소요 시간

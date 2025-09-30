@@ -1,0 +1,893 @@
+m_name: EffectSoundManager
+m_isEnabled: true
+m_instanceID: 2312871527
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: EffectSoundManager
+    m_isEnabled: true
+    m_instanceID: 3413378504
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 245
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326]
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_attachedSoketID: 0
+    m_collisionType: 0
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - ModuleBehavior: 1399118904
+        m_name: SFXPoolManager
+        m_isEnabled: true
+        m_instanceID: 4065872134
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 681bf65b-0fa9-5e9d-9304-f346d838a19a
+    children:
+      - GameObject: 2166264123
+        m_name: SFXSound
+        m_isEnabled: true
+        m_instanceID: 3718149870
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 245
+        m_index: 307
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 1108253202
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (1)
+        m_isEnabled: true
+        m_instanceID: 4137174676
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 308
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 3001340672
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (2)
+        m_isEnabled: true
+        m_instanceID: 2900631638
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 309
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 914121800
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (3)
+        m_isEnabled: true
+        m_instanceID: 3070481935
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 310
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 3366509482
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (4)
+        m_isEnabled: true
+        m_instanceID: 739323769
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 311
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 401210459
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (5)
+        m_isEnabled: true
+        m_instanceID: 1934216606
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 312
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 671316054
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (6)
+        m_isEnabled: true
+        m_instanceID: 814423044
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 313
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 1128235113
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (7)
+        m_isEnabled: true
+        m_instanceID: 3825965956
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 314
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 2498267644
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (8)
+        m_isEnabled: true
+        m_instanceID: 1873194322
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 315
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 161720139
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (9)
+        m_isEnabled: true
+        m_instanceID: 450498712
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 316
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 4220109241
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (10)
+        m_isEnabled: true
+        m_instanceID: 1150887888
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 317
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 1292922836
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (11)
+        m_isEnabled: true
+        m_instanceID: 3631207410
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 318
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 1852686541
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (12)
+        m_isEnabled: true
+        m_instanceID: 2701958825
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 319
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 3527445872
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (13)
+        m_isEnabled: true
+        m_instanceID: 3613641344
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 320
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 1440216014
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (14)
+        m_isEnabled: true
+        m_instanceID: 2989337339
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 321
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 1605712700
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (15)
+        m_isEnabled: true
+        m_instanceID: 839659274
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 322
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 81097929
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (16)
+        m_isEnabled: true
+        m_instanceID: 3751631344
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 323
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 3172675002
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (17)
+        m_isEnabled: true
+        m_instanceID: 188536213
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 324
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 3111193637
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (18)
+        m_isEnabled: true
+        m_instanceID: 1405558153
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 325
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 3860316315
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~
+      - GameObject: 2166264123
+        m_name: SFXSound (19)
+        m_isEnabled: true
+        m_instanceID: 1269967275
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 245
+        m_index: 326
+        m_parentIndex: 245
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 0
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - SoundComponent: 330975562
+            m_name: SoundComponent
+            m_isEnabled: true
+            m_instanceID: 828236075
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            clipKey: ""
+            bus: 1
+            volume: 1
+            pitch: 1
+            priority: 128
+            loop: false
+            playOnStart: false
+            spatial: false
+            spatialBlend: 1
+            minDistance: 1
+            maxDistance: 50
+            useReverbSend: false
+            reverbLevel: 0
+            reverbIndex: 0
+            rolloff: 1
+            velocity: {x: 0, y: 0, z: 0}
+            localRolloffCurve: ~

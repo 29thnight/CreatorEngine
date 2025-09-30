@@ -13,11 +13,12 @@ public:
 	virtual void Update(float tick) override;
 
 private:
+	class GameManager* m_gameManager{ nullptr };
 	class ImageComponent* m_loadingImage{ nullptr };
 	class TextComponent* m_loadingText{ nullptr };
 
 	[[Property]]
-	float m_rotateDegree{ 0.5f };
+	float m_rotateDegree{ 3.f };
 	float m_dotTimer = 0.0f;
 	int   m_dotIdx = 0;
 };

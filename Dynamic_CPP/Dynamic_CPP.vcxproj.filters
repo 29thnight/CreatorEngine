@@ -123,9 +123,6 @@
 		<ClInclude Include="Assets\Script\TweenManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -606,7 +603,19 @@
 		<ClInclude Include="Assets\Script\PlayerThrow.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\TimerTrigger.h">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\BP003.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SFXPoolManager.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SwordHitEffect.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayEffectAll.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -1067,7 +1076,19 @@
 		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
 			<Filter>Script</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\TimerTrigger.cpp">
+			<Filter>Script\ScriptClass\Event</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\BP003.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SFXPoolManager.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwordHitEffect.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayEffectAll.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

@@ -3,8 +3,12 @@
 #include "Shader.h"
 #include "Delegate.h"
 #include "DLLAcrossSingleton.h"
+#include "VisualShaderPSO.h"
+#include <memory>
 
-class ShaderPSO; // Àü¹æ ¼±¾ð
+//class VisualShaderPSO; // visual shader pipeline
+//        
+class ShaderPSO; // Ã€Ã¼Â¹Ã¦ Â¼Â±Â¾Ã°
 class Material;
 class ImageComponent;
 class ShaderResourceSystem final : public DLLCore::Singleton<ShaderResourceSystem>
@@ -46,6 +50,7 @@ public:
 	std::unordered_map<std::string, ComputeShader>	ComputeShaders;
 
 	std::unordered_map<std::string, std::shared_ptr<ShaderPSO>> ShaderAssets;
+	std::unordered_map<std::string, std::shared_ptr<VisualShaderPSO>> VisualShaderAssets;
 
 	Core::Delegate<void> m_shaderReloadedDelegate;
 

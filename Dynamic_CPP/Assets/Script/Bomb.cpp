@@ -5,6 +5,11 @@
 #include "Explosion.h"
 #include "Entity.h"
 #include "Player.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
+#include "Core.Random.h"
+#include "SoundName.h"
+
 void Bomb::Start()
 {
 	
@@ -49,7 +54,7 @@ void Bomb::Update(float tick)
 				GameObject* ExplosionObj = PrefabUtilitys->InstantiatePrefab(ExplosionPrefab, "Explosion");
 				auto explosion = ExplosionObj->GetComponent<Explosion>();
 				ExplosionObj->GetComponent<Transform>()->SetPosition(m_targetPos);
-				explosionRadius = explosion->explosionRadius;
+				explosionRadius = radius;
 				explosion->Initialize(m_ownerPlayer);
 			}
 
@@ -60,6 +65,21 @@ void Bomb::Update(float tick)
 			explosionInfo.position = transform->GetWorldPosition();
 			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
 
+
+			auto GMobj = GameObject::Find("GameManager");
+			if (GMobj)
+			{
+				GameManager* GM = GMobj->GetComponent<GameManager>();
+				if (GM)
+				{
+					auto pool = GM->GetSFXPool();
+					if (pool)
+					{
+						int rand = Random<int>(0, ExplosionSounds.size() - 1).Generate();
+						pool->PlayOneShot(ExplosionSounds[rand]);
+					}
+				}
+			}
 
  			for (auto& hit : hits)
 			{
@@ -101,13 +121,15 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 }
 
 
-void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos, float _damage)
+void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _targetPos,float bombThrowDuration, float _radius, float _damage)
 {
 	isThrow = true;
 	m_ownerPlayer = _owner;
 	m_startPos = _startPos;
 	m_targetPos = _targetPos;
 	m_damage = _damage;
+	duration = bombThrowDuration;
+	radius = _radius;
 	m_throwPowerY = 4.0f;
 }
 

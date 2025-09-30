@@ -3,6 +3,7 @@
 #include "ImageComponent.h"
 #include "InputManager.h"
 #include "GameInstance.h"
+#include "GameManager.h"
 #include "pch.h"
 
 void SwitchingSceneTrigger::Start()
@@ -22,13 +23,19 @@ void SwitchingSceneTrigger::Start()
 			m_switchingText->SetAlpha(0);
 		}
 	}
+
+	GameObject* gmObj = GameObject::Find("GameManager");
+	if (gmObj)
+	{
+		m_gameManager = gmObj->GetComponent<GameManager>();
+	}
 }
 
 void SwitchingSceneTrigger::Update(float tick)
 {
 	if (!m_buttonText || !m_switchingText) return;
 
-	if (!GameInstance::GetInstance()->IsLoadSceneComplete())
+	if (GameInstance::GetInstance()->IsLoadSceneComplete())
 	{
 		if (!m_isFadeInComplete)
 		{
@@ -43,12 +50,22 @@ void SwitchingSceneTrigger::Update(float tick)
 			}
 		}
 	}
+	else
+	{
+		m_buttonText->SetAlpha(0);
+		m_switchingText->SetAlpha(0);
+	}
 
 	if (m_isFadeInComplete)
 	{
 		//여기서 씬 전환
-		if (InputManagement->IsControllerButtonDown(0, ControllerButton::A))
+		if (InputManagement->IsControllerButtonDown(0, ControllerButton::A) || 
+			InputManagement->IsControllerButtonDown(1, ControllerButton::A))
 		{
+			if (m_gameManager)
+			{
+				m_gameManager->SwitchNextScene();
+			}
 		}
 	}
 }
