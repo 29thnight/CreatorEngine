@@ -12,6 +12,7 @@
 #include "HPBar.h"
 
 #include "CriticalMark.h"
+#include "PlayEffectAll.h"
 void EntityMonsterA::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -327,6 +328,16 @@ void EntityMonsterA::Dead()
 void EntityMonsterA::DeadEvent()
 {
 	EndDeadAnimation = true;
+
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeadEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}
 	//GetOwner()->Destroy(); //&&&&&풀에 넣기
 	//monster death Effect 생성
 }
