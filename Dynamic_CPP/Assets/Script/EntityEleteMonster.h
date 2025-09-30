@@ -113,7 +113,7 @@ public:
 	[[Method]]
 	void ShootingAttack(); //원거리 공격 방식 - 투사체 발사
 
-	void ChaseTarget(); //타겟 추적
+	void ChaseTarget(float deltatime); //타겟 추적
 
 	void StartRetreat();
 

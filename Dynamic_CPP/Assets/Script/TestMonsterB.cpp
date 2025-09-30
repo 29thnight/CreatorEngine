@@ -247,7 +247,7 @@ void TestMonsterB::Dead()
 	GetOwner()->SetLayer("Water");
 }
 
-void TestMonsterB::ChaseTarget()
+void TestMonsterB::ChaseTarget(float deltatime)
 {
 	if (target && !isDead)
 	{
@@ -257,14 +257,36 @@ void TestMonsterB::ChaseTarget()
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
+
+			m_state = "Chase";
 			Mathf::Vector3 targetpos = targetTransform->GetWorldPosition();
 			Mathf::Vector3 dir = targetpos - pos;
 			dir.y = 0.f;
+
+			bool useChaseOutTime = blackBoard->HasKey("ChaseOutTime");
+			float outTime = 0.0f;
+
+			if (useChaseOutTime)
+			{
+				outTime = blackBoard->GetValueAsFloat("ChaseOutTime");
+			}
+
+			std::cout << "dist " << dir.Length() << std::endl;
+
+			if (dir.Length() < m_chaseRange)
+			{
+				outTime = m_rangeOutDuration; // Reset outTime if within range
+			}
+			else {
+				outTime -= deltatime; // Decrease outTime if not within range
+			}
+			blackBoard->SetValueAsString("State", m_state);
+			blackBoard->SetValueAsFloat("ChaseOutTime", outTime);
+
 			dir.Normalize();
 
 			if (controller) {
 				controller->Move({ dir.x * m_moveSpeed, dir.z * m_moveSpeed });
-				m_state = "Chase";
 			}
 
 

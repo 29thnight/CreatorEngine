@@ -86,7 +86,7 @@ public:
 
 	void Dead(); //磷澜 贸府
 
-	void ChaseTarget(); //鸥百 眠利
+	void ChaseTarget(float deltatime); //鸥百 眠利
 
 	void RotateToTarget(); //鸥百 官扼焊扁
 
