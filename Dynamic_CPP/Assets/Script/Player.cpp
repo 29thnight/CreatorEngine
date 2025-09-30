@@ -43,6 +43,7 @@
 #include "SFXPoolManager.h"
 #include "SoundName.h"
 #include "SwordHitEffect.h"
+#include "PlayEffectAll.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -666,6 +667,16 @@ void Player::PlaySoundStep()
 	m_MoveSound->clipKey = stepSounds[rand];
 	m_MoveSound->PlayOneShot();
 
+	Prefab* run = PrefabUtilitys->LoadPrefab("run1");
+	if (run) {
+		GameObject* runeff = PrefabUtilitys->InstantiatePrefab(run, "runEff");
+		auto pos = GetOwner()->m_transform.GetWorldPosition();
+		pos += -GetOwner()->m_transform.GetForward() * 0.3f;
+		pos.m128_f32[1] += 0.3f;
+		runeff->m_transform.SetWorldPosition(pos);
+
+		runeff->GetComponentDynamicCast<PlayEffectAll>()->Initialize();
+	}
 }
 
 void Player::CatchAndThrow()
