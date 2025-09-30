@@ -8,7 +8,7 @@
     "particleSystems": [
         {
             "isRunning": false,
-            "maxParticles": 1,
+            "maxParticles": 3,
             "modules": [
                 {
                     "data": {
@@ -26,11 +26,11 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 1.0,
+                            "lifeTime": 3.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.5,
+                                "y": 0.5
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -56,11 +56,56 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 3
                         }
                     },
                     "stage": 2,
                     "type": "SpawnModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
+                        "colorGradient": [
+                            {
+                                "color": {
+                                    "w": 1.0,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
+                                "time": 0.0
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
+                                "time": 0.703000009059906
+                            }
+                        ],
+                        "colorParams": {
+                            "customFunctionType": 0,
+                            "customParam1": 0.0,
+                            "customParam2": 0.0,
+                            "customParam3": 0.0,
+                            "customParam4": 0.0,
+                            "discreteColorsSize": 0,
+                            "gradientSize": 2,
+                            "transitionMode": 0
+                        },
+                        "discreteColors": [],
+                        "easing": {
+                            "enabled": false
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 3
+                        }
+                    },
+                    "stage": 2,
+                    "type": "ColorModuleCS",
                     "useEasing": false
                 }
             ],
@@ -88,7 +133,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
