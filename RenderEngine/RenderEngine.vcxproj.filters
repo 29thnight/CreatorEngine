@@ -566,6 +566,9 @@
     <ClCompile Include="MeshSizeModuleCS.cpp">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClCompile>
+    <ClCompile Include="TrailModuleCS.cpp">
+      <Filter>RenderPass\EffectPass\555.Generate</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -937,6 +940,9 @@
     <ClInclude Include="MeshSizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClInclude>
+    <ClInclude Include="TrailModuleCS.h">
+      <Filter>RenderPass\EffectPass\555.Generate</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -1271,6 +1277,12 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpriteAnimationB.ps.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillboardTrail.vs.hlsl">
+      <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailModule.cs.hlsl">
+      <Filter>Shaders\Effect\2D</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

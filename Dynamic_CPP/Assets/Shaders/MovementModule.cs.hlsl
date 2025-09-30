@@ -244,30 +244,31 @@ float3 GetWindForce(float3 position, float time)
 }
 
 // 궤도 운동 계산
-float3 GetOrbitalVelocity(float3 position, float time, float3 birthPosition, float age, float lifeTime, uint particleIndex)
+float3 GetOrbitalVelocity(float3 position, uint particleIndex)
 {
-    if (lifeTime <= 0)
-        return float3(0, 0, 0);
-    
-    // 파티클별 고정 각도 오프셋 (전체 파티클 수로 360도 균등 분배)
-    float angleStep = 6.28318 / (float) maxParticles;
+    float angleStep = 6.28318 / max((float) maxParticles, 1.0);
     float baseAngle = (float) particleIndex * angleStep;
+    float currentAngle = baseAngle + (currentTime * orbitalSpeed);
     
-    // 시간에 따른 회전 + 고정 오프셋
-    float angle = age * orbitalSpeed + baseAngle;
+    float3 center = orbitalCenter;
     
-    // 궤도 위치 계산 (birthPosition을 중심으로)
-    float3 orbitalCenter = birthPosition;
-    float3 targetPosition = orbitalCenter + float3(
-        cos(angle) * orbitalRadius,
+    float3 targetPosition = center + float3(
+        cos(currentAngle) * orbitalRadius,
         0,
-        sin(angle) * orbitalRadius
+        sin(currentAngle) * orbitalRadius
     );
     
-    // 목표 위치로 이동하는 속도 (강한 복원력)
-    return (targetPosition - position) * 20.0;
+    float3 toTarget = targetPosition - position;
+    float distance = length(toTarget);
+    
+    if (distance > 0.001)
+    {
+        float adjustSpeed = orbitalSpeed * 100.0;
+        return normalize(toTarget) * min(distance * adjustSpeed, orbitalRadius * orbitalSpeed * 2.0);
+    }
+    
+    return float3(0, 0, 0);
 }
-
 
 float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex, float particleAge)
 {
@@ -336,25 +337,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (velocityMode == 4) // Orbital
         {
-            // 파티클별 고정 각도 오프셋
-            float angleStep = 6.28318 / max((float) maxParticles, 1.0);
-            float baseAngle = (float) particleIndex * angleStep;
-    
-            // 시간 기반 회전 (orbitalSpeed는 초당 회전수)
-            float currentAngle = baseAngle + (currentTime * orbitalSpeed);
-    
-            // 궤도 중심점 (orbitalCenter 사용)
-            float3 center = orbitalCenter;
-    
-            // 궤도 위치 계산
-            particle.position = center + float3(
-                cos(currentAngle) * orbitalRadius,
-                0,
-                sin(currentAngle) * orbitalRadius
-            );
-    
-            // velocity 초기화
-            particle.velocity = float3(0, 0, 0);
+            additionalVelocity += GetOrbitalVelocity(particle.position, particleIndex);
         }
         else if (velocityMode == 5) // explosive
         {

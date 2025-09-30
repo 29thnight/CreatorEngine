@@ -9,6 +9,7 @@ enum class EffectModuleType
     MovementModule,
     ColorModule,
     SizeModule,
+    TrailModuleCS,
     TrailModule,
     MeshColorModule,
     MeshMovementModule,
@@ -78,6 +79,7 @@ private:
         {"Movement Module", EffectModuleType::MovementModule},
         {"Color Module", EffectModuleType::ColorModule},
         {"Size Module", EffectModuleType::SizeModule},
+        {"Trail Module CS", EffectModuleType::TrailModuleCS},
         {"Mesh Spawn Module", EffectModuleType::MeshSpawnModule},
         {"Mesh Color Module", EffectModuleType::MeshColorModule},
         {"Mesh Movement Module", EffectModuleType::MeshMovementModule},
@@ -160,6 +162,7 @@ private:
     void RenderColorModuleEditor(ColorModuleCS* colorModule);
     void RenderSizeModuleEditor(SizeModuleCS* sizeModule);
     void RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule);
+    void RenderTrailModuleGPUEditor(TrailModuleCS* trailModule);
 
     // 3D 모듈용 설정 메서드
     void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);

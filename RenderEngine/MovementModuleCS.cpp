@@ -367,6 +367,12 @@ void MovementModuleCS::SetWindEffect(const Mathf::Vector3& direction, float stre
     m_paramsDirty = true;
 }
 
+void MovementModuleCS::SetOrbitalCenter(const Mathf::Vector3& center)
+{
+    m_orbitalData.center = center;
+    m_paramsDirty = true;
+}
+
 void MovementModuleCS::SetOrbitalMotion(const Mathf::Vector3& center, float radius, float speed, const Mathf::Vector3& axis)
 {
     m_orbitalData.center = center;
