@@ -172,6 +172,8 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     {
         for (auto& comp : obj->m_components)
         {
+            if (!comp) continue;
+
             auto script = std::dynamic_pointer_cast<ModuleBehavior>(comp);
             if (script)
             {

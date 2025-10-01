@@ -15,7 +15,7 @@ void HPBar::Start()
         {
             if (auto go = scene->GetGameObject(targetIndex))
             {
-                m_target = go.get();
+                m_target = go;
             }
         }
     }
@@ -32,7 +32,7 @@ void HPBar::Start()
 
 void HPBar::LateUpdate(float)
 {
-    if (nullptr == m_target || nullptr == m_rect || nullptr == m_image)
+    if (m_target.expired() || nullptr == m_rect || nullptr == m_image)
     {
         m_rect = m_pOwner->GetComponent<RectTransformComponent>();
         if (GameObject::IsValidIndex(targetIndex))
@@ -41,7 +41,7 @@ void HPBar::LateUpdate(float)
             {
                 if (auto go = scene->GetGameObject(targetIndex))
                 {
-                    m_target = go.get();
+                    m_target = go;
                 }
             }
         }
@@ -57,20 +57,21 @@ void HPBar::LateUpdate(float)
         return;
     }
 
+    auto target_ptr = m_target.lock();
     //rectTransform update
     auto cameraPtr = CameraManagement->GetLastCamera();
-    if (!cameraPtr)
+    if (!cameraPtr || !target_ptr)
         return;
     Camera* camera = cameraPtr.get();
 
-    auto player = m_target->GetComponentDynamicCast<Entity>();
+    auto player = target_ptr->GetComponentDynamicCast<Entity>();
     if (player)
     {
         m_currentHP = player->m_currentHP;
         m_maxHP = player->m_maxHP;
     }
 
-    Mathf::Vector3 worldPos = m_target->m_transform.GetWorldPosition();
+    Mathf::Vector3 worldPos = target_ptr->m_transform.GetWorldPosition();
     auto view = camera->CalculateView();
     auto proj = camera->CalculateProjection();
     auto viewProj = XMMatrixMultiply(view, proj);

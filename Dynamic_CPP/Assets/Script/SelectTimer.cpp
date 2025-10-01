@@ -13,7 +13,7 @@ void SelectTimer::Start()
 		if(gameManager)
 		{
 			gameManager->m_nextSceneName = "LoadingScene";
-			GameInstance::GetInstance()->SetBeyondSceneName("0926Test");
+			GameInstance::GetInstance()->SetBeyondSceneName("Fin_Ingame_017");
 			gameManager->LoadNextScene();
 		}
 	}

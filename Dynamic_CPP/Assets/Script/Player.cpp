@@ -624,6 +624,10 @@ void Player::Damage(int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
+	if(GM && GM->TestCameraControll)
+	{ 
+		return;
+	}
 	if (OnMoveBomb)
 	{
 		MoveBombThrowPosition(dir);
@@ -964,7 +968,6 @@ void Player::EndAttack()
 
 float Player::calculDamge(bool isCharge)
 {
-
 	float finalDamge = 0;
 	finalDamge += Atk;
 	
