@@ -43,6 +43,7 @@ public:
 
 	GameObject* target = nullptr;
 	bool isDead = false;
+	GameObject* deadObj = nullptr;
 	[[Method]]
 	void DeadEvent();
 	bool EndDeadAnimation = false;

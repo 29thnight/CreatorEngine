@@ -319,6 +319,61 @@ void Player::Start()
 	m_animator->SetUseLayer(1, false);
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
+
+
+
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
+	if (SlashPrefab)
+	{
+		slash1 = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash1");
+	}
+	Prefab* SlashPrefab2 = PrefabUtilitys->LoadPrefab("SlashEffect2");
+	if (SlashPrefab2)
+	{
+		slash2 = PrefabUtilitys->InstantiatePrefab(SlashPrefab2, "Slash2");
+	}
+	Prefab* SlashPrefab3 = PrefabUtilitys->LoadPrefab("SlashEffect3");
+	if (SlashPrefab3)
+	{
+		slash3 = PrefabUtilitys->InstantiatePrefab(SlashPrefab3, "Slash3");
+	}
+
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	if (bulletprefab)
+	{
+		for (int i = 0; i < 101; i++)
+		{
+			
+			auto normalbullet = PrefabUtilitys->InstantiatePrefab(bulletprefab, "normalbullet");
+			normalBullets.push_back(normalbullet);
+			normalbullet->SetEnabled(false);
+		}
+	}
+	bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
+	if (bulletprefab)
+	{
+		for (int i = 0; i < 21; i++)
+		{
+
+			auto specialbullet = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
+			specialBullets.push_back(specialbullet);
+			specialbullet->SetEnabled(false);
+		}
+	}
+
+
+	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
+	if (bombprefab)
+	{
+		for (int i = 0; i < 50; i++)
+		{
+
+			GameObject* bomb = PrefabUtilitys->InstantiatePrefab(bombprefab, "bomb");
+			bombs.push_back(bomb);
+			bomb->SetEnabled(false);
+		}
+	}
+
 }
 
 void Player::Update(float tick)
@@ -1002,11 +1057,10 @@ float Player::calculDamge(bool isCharge)
 void Player::PlaySlashEvent()
 {
 
-	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
-	if (SlashPrefab)
+	if (slash1)
 	{
-		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
-		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		
+		auto Slashscript = slash1->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
@@ -1022,7 +1076,7 @@ void Player::PlaySlashEvent()
 			m_ActionSound->clipKey = MeleeChargeSounds[rand];
 		}
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
-		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+		slash1->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
@@ -1031,7 +1085,7 @@ void Player::PlaySlashEvent()
 
 		//Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(180.f));
 		//Quaternion finalRot = rot * lookRot;
-		SlashObj->GetComponent<Transform>()->SetRotation(lookRot);
+		slash1->GetComponent<Transform>()->SetRotation(lookRot);
 
 
 		Slashscript->Initialize();
@@ -1049,16 +1103,15 @@ void Player::PlaySlashEvent()
 void Player::PlaySlashEvent2()
 {
 	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect2");
-	if (SlashPrefab)
+	if (slash2)
 	{
-		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
-		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		auto Slashscript = slash2->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash2Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
-		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+		slash2->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
@@ -1067,7 +1120,7 @@ void Player::PlaySlashEvent2()
 
 		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
 		Quaternion finalRot = rot * lookRot;
-		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
+		slash2->GetComponent<Transform>()->SetRotation(finalRot);
 
 		Slashscript->Initialize();
 		if (m_ActionSound)
@@ -1080,16 +1133,14 @@ void Player::PlaySlashEvent2()
 
 void Player::PlaySlashEvent3()
 {
-	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect3");
-	if (SlashPrefab)
+	if (slash3)
 	{
-		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
-		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		auto Slashscript = slash3->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		Mathf::Vector3 effectPos = myPos;
-		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+		slash3->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Slashscript->Initialize();
@@ -1616,10 +1667,14 @@ void Player::ShootBullet()
 
 void Player::ShootNormalBullet()
 {
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
-	if (bulletprefab && player)
+	//Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	if (normalBullets.size() <= 2) return;
+	GameObject* bulletObj = normalBullets.back();
+	normalBullets.pop_back();
+	if (bulletObj)
 	{
-		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
+		bulletObj->SetEnabled(true);
+		//bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (shootPosObj)
@@ -1643,11 +1698,15 @@ void Player::ShootNormalBullet()
 
 void Player::ShootSpecialBullet()
 {
+	if (specialBullets.size() <= 2) return;
 	//Todo:: pool에서찾고 없으면 프리팹에서 생성
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
-	if (bulletprefab && player)
+	//Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
+	GameObject* bulletObj = specialBullets.back();
+	specialBullets.pop_back();
+	if (bulletObj)
 	{
-		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
+		bulletObj->SetEnabled(true);
+		//GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 
@@ -1672,9 +1731,11 @@ void Player::ShootSpecialBullet()
 
 void Player::ShootChargeBullet()
 {
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	if (normalBullets.size() <= 7) return;
+	GameObject* bulletObj = normalBullets.back();
+	normalBullets.pop_back();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
-	if (bulletprefab && player)
+	if (bulletObj)
 	{
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 		if (shootPosObj)
@@ -1687,7 +1748,6 @@ void Player::ShootChargeBullet()
 		{
 			for (int i = -halfCount; i <= halfCount; i++)
 			{
-				GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 				NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 				int Shootangle = m_curWeapon->ChargeAttackBulletAngle * i;
 				Mathf::Vector3 ShootDir = XMVector3TransformNormal(OrgionShootDir,
@@ -1707,10 +1767,12 @@ void Player::ShootChargeBullet()
 
 void Player::ThrowBomb()
 {
-	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
-	if (bombprefab)
+	GameObject* bombObj = bombs.back();
+	bombs.pop_back();
+	
+	if (bombObj)
 	{
-		GameObject* bombObj = PrefabUtilitys->InstantiatePrefab(bombprefab, "Bomb");
+		
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 		bombObj->GetComponent<Transform>()->SetPosition(pos);
 		Bomb* bomb = bombObj->GetComponent<Bomb>();

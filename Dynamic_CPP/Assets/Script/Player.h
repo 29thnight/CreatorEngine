@@ -16,6 +16,9 @@ class Entity;
 class EntityItem;
 class EntityEnemy;
 class SoundComponent;
+class NormalBullet;
+class SpecialBullet;
+class GameObject;
 class Player : public Entity
 {
 public:
@@ -173,6 +176,9 @@ public:
 	float bombMoveSpeed = 0.005f;  //폭탄도착지점 조절 스피드
  	void MeleeAttack();
 	void RangeAttack();
+
+	std::vector<GameObject*> normalBullets;
+	std::vector<GameObject*> specialBullets;
 	[[Method]]
 	void ShootBullet();
 	[[Method]]
@@ -180,6 +186,7 @@ public:
 	[[Method]]
 	void ShootSpecialBullet();
 	void ShootChargeBullet();
+	std::vector<GameObject*> bombs;
 	[[Method]]
 	void ThrowBomb();
 
@@ -198,6 +205,10 @@ public:
 	bool startRay = false;
 
 	float calculDamge(bool isCharge = false);
+	
+	GameObject* slash1 = nullptr;
+	GameObject* slash2 = nullptr;
+	GameObject* slash3 = nullptr;
 	[[Method]]
 	void PlaySlashEvent(); //검기 이펙트 + 사운드 출력
 	[[Property]]
