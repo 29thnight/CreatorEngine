@@ -7,6 +7,7 @@
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
 #include "Resource.h"
+#include <strsafe.h>       // StringCchCopyW
 
 #pragma warning(disable: 28251)
 #define MAIN_ENTRY int WINAPI
@@ -118,6 +119,10 @@ private:
     std::unordered_map<UINT, MessageHandler> m_handlers;
 	static MessageHandler m_CreateEventHandler;
 
+    // 표시 모드 전환 상태 & 대상 모니터 장치 이름
+    bool    m_displayModeChanged = false;
+    wchar_t m_targetDeviceName[CCHDEVICENAME] = { 0 };
+
     void RegisterWindowClass() const
     {
         WNDCLASS wc = {};
@@ -183,22 +188,83 @@ private:
 
         DragAcceptFiles(m_hWnd, TRUE);
 
-        // 2) 현재 모니터 전체 크기로 확장 (Borderless Fullscreen)
-        MONITORINFO mi{ sizeof(mi) };
+        //// 2) 현재 모니터 전체 크기로 확장 (Borderless Fullscreen)
+        //MONITORINFO mi{ sizeof(mi) };
+        //HMONITOR mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+        //GetMonitorInfo(mon, &mi);
+
+        //SetWindowPos(
+        //    m_hWnd, HWND_TOP,
+        //    mi.rcMonitor.left, mi.rcMonitor.top,
+        //    mi.rcMonitor.right - mi.rcMonitor.left,
+        //    mi.rcMonitor.bottom - mi.rcMonitor.top,
+        //    SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+
+        //ShowWindow(m_hWnd, SW_SHOW); // SWP_SHOWWINDOW로 이미 표시됨
+        //UpdateWindow(m_hWnd);
+
+                // 2) 현재 창이 올라간 모니터 정보 획득 (디바이스 이름 포함)
+        MONITORINFOEXW mi = {};
+        mi.cbSize = sizeof(MONITORINFOEXW);
         HMONITOR mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-        GetMonitorInfo(mon, &mi);
+        if (GetMonitorInfoW(mon, reinterpret_cast<MONITORINFO*>(&mi)))
+        {
+            // 디바이스명 복사
+            StringCchCopyW(m_targetDeviceName, _countof(m_targetDeviceName), mi.szDevice);
 
-        SetWindowPos(
-            m_hWnd, HWND_TOP,
-            mi.rcMonitor.left, mi.rcMonitor.top,
-            mi.rcMonitor.right - mi.rcMonitor.left,
-            mi.rcMonitor.bottom - mi.rcMonitor.top,
-            SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+            // 3) 대상 모니터 표시모드(해상도/주사율) 강제 적용
+            const int desiredHz = 0; // 60/120/144 등 지정 가능, 0이면 OS 기본
+            if (ApplyDisplayModeToMonitor(m_targetDeviceName, m_width, m_height, desiredHz))
+            {
+                m_displayModeChanged = true;
+            }
 
-        ShowWindow(m_hWnd, SW_SHOW); // SWP_SHOWWINDOW로 이미 표시됨
-        UpdateWindow(m_hWnd);
+            // 4) 창을 모니터 영역으로 확장 (Borderless Fullscreen)
+            SetWindowPos(
+                m_hWnd, HWND_TOP,
+                0,0,1920,1080,
+               /* mi.rcMonitor.left, mi.rcMonitor.top,
+                mi.rcMonitor.right - mi.rcMonitor.left,
+                mi.rcMonitor.bottom - mi.rcMonitor.top,*/
+                SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+
+            ShowWindow(m_hWnd, SW_SHOW);
+            UpdateWindow(m_hWnd);
+        }
+        else
+        {
+            // 모니터 정보 실패 시: 최소한 전체 화면 크기로만 확장
+            SetWindowPos(
+                m_hWnd, HWND_TOP,
+                0, 0,
+                m_width, m_height,
+                SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+
+            ShowWindow(m_hWnd, SW_SHOW);
+            UpdateWindow(m_hWnd);
+        }
 #endif // BUILD_FLAG
 
+    }
+
+    bool ApplyDisplayModeToMonitor(const wchar_t* deviceName, int width, int height, int refreshHz)
+    {
+        if (!deviceName || !deviceName[0]) return false;
+
+        DEVMODEW dm = {};
+        dm.dmSize = sizeof(DEVMODEW);
+        dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
+        dm.dmPelsWidth = static_cast<DWORD>(width);
+        dm.dmPelsHeight = static_cast<DWORD>(height);
+
+        if (refreshHz > 0)
+        {
+            dm.dmDisplayFrequency = static_cast<DWORD>(refreshHz);
+            dm.dmFields |= DM_DISPLAYFREQUENCY;
+        }
+
+        LONG r = ChangeDisplaySettingsExW(deviceName, &dm, nullptr, CDS_FULLSCREEN, nullptr);
+        return (r == DISP_CHANGE_SUCCESSFUL);
     }
 
 public:

@@ -284,6 +284,8 @@ public:
 	GameObject* stunObj = nullptr;
 	EffectComponent* stunEffect = nullptr;
 
+	std::vector<EffectComponent*>	m_runEffects;
+	int								m_runIndex = 0;
 	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
 
