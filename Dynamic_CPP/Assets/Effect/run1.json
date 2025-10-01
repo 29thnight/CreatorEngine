@@ -68,7 +68,7 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 1.0,
+                                    "w": 0.0,
                                     "x": 1.0,
                                     "y": 1.0,
                                     "z": 1.0
@@ -77,12 +77,21 @@
                             },
                             {
                                 "color": {
+                                    "w": 0.9960784316062927,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
+                                "time": 0.03099999949336052
+                            },
+                            {
+                                "color": {
                                     "w": 0.0,
                                     "x": 1.0,
                                     "y": 1.0,
                                     "z": 1.0
                                 },
-                                "time": 0.703000009059906
+                                "time": 0.699999988079071
                             }
                         ],
                         "colorParams": {
@@ -92,7 +101,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 2,
+                            "gradientSize": 3,
                             "transitionMode": 0
                         },
                         "discreteColors": [],

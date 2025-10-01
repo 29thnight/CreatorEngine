@@ -80,6 +80,7 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
     scene.UseModel(deferredPtr);
     for (auto& obj : scene.GetScene()->m_SceneObjects) 
     {
+        if (obj == nullptr)continue;
         if (obj->IsDestroyMark()) continue;
         if (obj->HasComponent<TerrainComponent>()) 
         {
