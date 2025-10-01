@@ -544,7 +544,8 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		// hit
 		//DropCatchItem();
 		EntityEleteMonster* elete = dynamic_cast<EntityEleteMonster*>(sender);
-		if (elete)
+		Damage(damage);
+		if (elete && isStun == false) //엘리트고 아직 죽지않았으면
 		{
 			Transform* transform = GetOwner()->GetComponent<Transform>();
 			Mathf::Vector3 myPos = transform->GetWorldPosition();
@@ -568,7 +569,6 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				controller->TriggerForcedMove(knockbackVeocity);
 			}
 		}
-		Damage(damage);
 
 		if (m_DamageSound)
 		{
