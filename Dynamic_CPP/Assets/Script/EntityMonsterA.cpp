@@ -31,7 +31,11 @@ void EntityMonsterA::Start()
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
 	}
-
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+	}
 
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
@@ -366,10 +370,9 @@ void EntityMonsterA::DeadEvent()
 {
 	EndDeadAnimation = true;
 
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
-	if (deadPrefab)
+	if (deadObj)
 	{
-		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		
 		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);

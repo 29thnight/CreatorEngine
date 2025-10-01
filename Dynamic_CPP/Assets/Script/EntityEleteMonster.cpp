@@ -632,7 +632,7 @@ void EntityEleteMonster::Dead()
 void EntityEleteMonster::DeadEvent()
 {
 	EndDeadAnimation = true;
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	/*Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)
 	{
 		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
@@ -640,7 +640,7 @@ void EntityEleteMonster::DeadEvent()
 		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 		deadEffect->Initialize();
-	}
+	}*/
 }
 
 void EntityEleteMonster::RotateToTarget()
