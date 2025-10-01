@@ -208,6 +208,15 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
+	Prefab* run = PrefabUtilitys->LoadPrefab("run1");
+	if (run && player) {
+		for (int i = 0; i < 5; i++) {
+			GameObject* runeffect = PrefabUtilitys->InstantiatePrefab(run, "runEff");
+			EffectComponent* ef = runeffect->GetComponentDynamicCast<EffectComponent>();
+			m_runEffects.push_back(ef);
+		}
+	}
+
 	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
 	if (dashObj)
 	{
@@ -671,16 +680,12 @@ void Player::PlaySoundStep()
 	m_MoveSound->clipKey = stepSounds[rand];
 	m_MoveSound->PlayOneShot();
 
-	Prefab* run = PrefabUtilitys->LoadPrefab("run1");
-	if (run) {
-		GameObject* runeff = PrefabUtilitys->InstantiatePrefab(run, "runEff");
-		auto pos = GetOwner()->m_transform.GetWorldPosition();
-		pos += -GetOwner()->m_transform.GetForward() * 0.3f;
-		pos.m128_f32[1] += 0.3f;
-		runeff->m_transform.SetWorldPosition(pos);
-
-		runeff->GetComponentDynamicCast<PlayEffectAll>()->Initialize();
-	}
+	m_runIndex = (m_runIndex + 1) % m_runEffects.size();
+	auto pos = GetOwner()->m_transform.GetWorldPosition();
+	pos += -GetOwner()->m_transform.GetForward() * 0.3f;
+	pos.m128_f32[1] += 0.3f;
+	m_runEffects[m_runIndex]->GetOwner()->m_transform.SetWorldPosition(pos);
+	m_runEffects[m_runIndex]->Apply();
 }
 
 void Player::CatchAndThrow()
