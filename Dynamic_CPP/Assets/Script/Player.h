@@ -22,7 +22,7 @@ public:
    ReflectPlayer
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Player)
-	virtual void Awake() override {};
+	virtual void Awake() override;
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 
@@ -77,7 +77,6 @@ public:
 	float baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
 	[[Property]]
 	int maxHP = 100;
-	int curHP = maxHP;
 	std::string curStateName = "Idle";
 	std::unordered_map<std::string, BitFlag> playerState;           //스테이트별 행동제어용
 	void ChangeState(std::string _stateName);

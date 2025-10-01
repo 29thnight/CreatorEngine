@@ -36,7 +36,7 @@ void PlayerStun::Enter()
 		m_player->DropCatchItem();
 		m_player->onBombIndicate = false;
 		m_player->m_curWeapon->SetEnabled(false);
-		//m_player->m_animator->SetUseLayer(1, false);
+		m_player->m_animator->SetUseLayer(1, false);
 		if (m_player->stunEffect)
 		{
 			m_player->stunEffect->Apply();
@@ -92,6 +92,6 @@ void PlayerStun::Exit()
 		{
 			m_player->stunEffect->StopEffect();
 		}
-		//m_player->m_animator->SetUseLayer(1, true);
+		m_player->m_animator->SetUseLayer(1, true);
 	}
 }

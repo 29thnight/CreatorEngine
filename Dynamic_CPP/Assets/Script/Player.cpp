@@ -44,6 +44,16 @@
 #include "SoundName.h"
 #include "SwordHitEffect.h"
 #include "PlayEffectAll.h"
+void Player::Awake()
+{
+	auto gmobj = GameObject::Find("GameManager");
+	if (gmobj)
+	{
+		GM = gmobj->GetComponent<GameManager>();
+		GM->PushEntity(this);
+		GM->PushPlayer(this);
+	}
+}
 void Player::Start()
 {
 	player = GetOwner();
@@ -139,6 +149,7 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
+				m_maxHP = maxHP;
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
@@ -215,13 +226,13 @@ void Player::Start()
 		dashEffect->m_effectTemplateName = "testdash";
 	}
 
-	auto gmobj = GameObject::Find("GameManager");
-	if (gmobj)
-	{
-		GM = gmobj->GetComponent<GameManager>();
-		GM->PushEntity(this);
-		GM->PushPlayer(this);
-	}
+	//auto gmobj = GameObject::Find("GameManager"); //awake로 옮김
+	//if (gmobj)
+	//{
+	//	GM = gmobj->GetComponent<GameManager>();
+	//	GM->PushEntity(this);
+	//	GM->PushPlayer(this);
+	//}
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
 

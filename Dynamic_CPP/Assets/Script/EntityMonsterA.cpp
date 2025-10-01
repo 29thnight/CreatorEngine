@@ -14,6 +14,7 @@
 #include "EntityAsis.h"
 
 #include "PlayEffectAll.h"
+#include "GameManager.h"
 void EntityMonsterA::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -94,7 +95,12 @@ void EntityMonsterA::Start()
 
 	}
 
-
+	GameObject* GMObj = GameObject::Find("GameManager");
+	GameManager* GM = nullptr;
+	if (GMObj)
+	{
+		 GM = GMObj->GetComponent<GameManager>();
+	}
 	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
@@ -110,6 +116,16 @@ void EntityMonsterA::Start()
 	blackBoard->SetValueAsFloat("AtkRange", m_attackRange); //근접 공격 거리
 	blackBoard->SetValueAsInt("AttackDamage", m_attackDamage); //근접 공격 데미지
 
+	if (GM)
+	{
+		std::vector<Entity*> players = GM->GetPlayers();
+		if(!players.empty())
+			blackBoard->SetValueAsString("Player1", players[0]->GetOwner()->ToString());
+		if (players.size() >= 2)
+		{
+			blackBoard->SetValueAsString("Player2", players[1]->GetOwner()->ToString());
+		}
+	}
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
