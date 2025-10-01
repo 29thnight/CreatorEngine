@@ -37,7 +37,7 @@ PixelOutput main(PixelInput input)
     
     float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, input.texCoord);
     
-    if (diffuseColor.a < 0.1)
+    if (diffuseColor.a < 0.01)
         discard;
     
     if (input.alpha <= 0.01)

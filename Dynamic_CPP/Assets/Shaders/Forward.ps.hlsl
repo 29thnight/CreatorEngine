@@ -269,8 +269,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         
         float3 fresnel = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
         float3 finalColor = transmissionColor * (1.0 - fresnel) + reflectionColor * fresnel;
-        float dott = abs(dot(surf.N, surf.V));
-        finalColor = finalColor * dott + gAlbedo.rgb * pow(1.0 - dott, 5) * 15;
+        //float dott = abs(dot(surf.N, surf.V));
+        //finalColor = finalColor * dott + gAlbedo.rgb * pow(1.0 - dott, 5) * 15;
         float3 colour = finalColor + emissive.rgb;
         return float4(colour, 1);
     }
