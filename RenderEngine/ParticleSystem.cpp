@@ -35,10 +35,6 @@ void ParticleSystem::Play()
 	m_isPaused = false;
 	m_activeParticleCount = 0;
 
-	for (auto& particle : m_particleData)
-	{
-		particle.isActive = 0;
-	}
 	InitializeParticleIndices();
 }
 
