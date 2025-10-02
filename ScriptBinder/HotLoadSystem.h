@@ -109,7 +109,8 @@ public:
 		std::unique_lock lock(m_scriptFileMutex);
 		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
 		{
-			return std::get<0>(tuple) == gameObject && std::get<2>(tuple) == name;
+			return std::get<0>(tuple).lock() == gameObject->shared_from_this() 
+				&& std::get<2>(tuple) == name;
 		});
 	}
 
@@ -201,6 +202,7 @@ public:
 	{
 		if (!m_AniBehaviorFunc) return nullptr;
 		return m_AniBehaviorFunc(name);
+		//WARN : APP Vrifier - Stop #3
 	}
 
 	void DestroyAniBehavior(AniBehavior* aniBehavior) const
@@ -280,8 +282,8 @@ private:
 	ListAniBehaviorNamesFunc				m_listAniBehaviorNamesFunc{};
 
 private:
-	using ModuleBehaviorIndexVector			= std::vector<std::tuple<GameObject*, size_t, std::string>>;
-	using ModuleBehaviorMetaVector			= std::vector<std::tuple<GameObject*, size_t, MetaYml::Node>>;
+	using ModuleBehaviorIndexVector			= std::vector<std::tuple<std::weak_ptr<GameObject>, size_t, std::string>>;
+	using ModuleBehaviorMetaVector			= std::vector<std::tuple<std::weak_ptr<GameObject>, size_t, MetaYml::Node>>;
 	using AniBehaviorVector					= std::vector<AnimationState*>;
 	
 	// 스크립트 컴포넌트 인덱스와 메타 정보 저장

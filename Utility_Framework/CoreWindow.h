@@ -28,6 +28,9 @@ public:
 
     ~CoreWindow()
     {
+        // ▼ 변경: 정확 원복 함수 사용
+        RestoreDisplayMode();
+
         if (m_hWnd)
         {
             DestroyWindow(m_hWnd);
@@ -123,6 +126,10 @@ private:
     bool    m_displayModeChanged = false;
     wchar_t m_targetDeviceName[CCHDEVICENAME] = { 0 };
 
+    // ▼ 추가: 원래 표시 모드 저장용
+    DEVMODEW m_originalMode{};
+    bool     m_hasOriginalMode = false;
+
     void RegisterWindowClass() const
     {
         WNDCLASS wc = {};
@@ -188,22 +195,7 @@ private:
 
         DragAcceptFiles(m_hWnd, TRUE);
 
-        //// 2) 현재 모니터 전체 크기로 확장 (Borderless Fullscreen)
-        //MONITORINFO mi{ sizeof(mi) };
-        //HMONITOR mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-        //GetMonitorInfo(mon, &mi);
-
-        //SetWindowPos(
-        //    m_hWnd, HWND_TOP,
-        //    mi.rcMonitor.left, mi.rcMonitor.top,
-        //    mi.rcMonitor.right - mi.rcMonitor.left,
-        //    mi.rcMonitor.bottom - mi.rcMonitor.top,
-        //    SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
-
-        //ShowWindow(m_hWnd, SW_SHOW); // SWP_SHOWWINDOW로 이미 표시됨
-        //UpdateWindow(m_hWnd);
-
-                // 2) 현재 창이 올라간 모니터 정보 획득 (디바이스 이름 포함)
+        // 2) 현재 창이 올라간 모니터 정보 획득 (디바이스 이름 포함)
         MONITORINFOEXW mi = {};
         mi.cbSize = sizeof(MONITORINFOEXW);
         HMONITOR mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
@@ -211,6 +203,9 @@ private:
         {
             // 디바이스명 복사
             StringCchCopyW(m_targetDeviceName, _countof(m_targetDeviceName), mi.szDevice);
+
+            // ▼ 추가: 해상도 바꾸기 전에 원래 모드 저장
+            CaptureOriginalDisplayMode(m_targetDeviceName);
 
             // 3) 대상 모니터 표시모드(해상도/주사율) 강제 적용
             const int desiredHz = 0; // 60/120/144 등 지정 가능, 0이면 OS 기본
@@ -222,10 +217,8 @@ private:
             // 4) 창을 모니터 영역으로 확장 (Borderless Fullscreen)
             SetWindowPos(
                 m_hWnd, HWND_TOP,
-                0,0,1920,1080,
-               /* mi.rcMonitor.left, mi.rcMonitor.top,
-                mi.rcMonitor.right - mi.rcMonitor.left,
-                mi.rcMonitor.bottom - mi.rcMonitor.top,*/
+                0, 0,
+                m_width, m_height,
                 SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
 
             ShowWindow(m_hWnd, SW_SHOW);
@@ -265,6 +258,40 @@ private:
 
         LONG r = ChangeDisplaySettingsExW(deviceName, &dm, nullptr, CDS_FULLSCREEN, nullptr);
         return (r == DISP_CHANGE_SUCCESSFUL);
+    }
+
+    bool CaptureOriginalDisplayMode(const wchar_t* deviceName)
+    {
+        if (!deviceName || !deviceName[0]) return false;
+
+        ZeroMemory(&m_originalMode, sizeof(m_originalMode));
+        m_originalMode.dmSize = sizeof(DEVMODEW);
+
+        // 현재 설정(enum current) 그대로 가져오기
+        if (EnumDisplaySettingsExW(deviceName, ENUM_CURRENT_SETTINGS, &m_originalMode, 0))
+        {
+            m_hasOriginalMode = true;
+            return true;
+        }
+        return false;
+    }
+
+    void RestoreDisplayMode()
+    {
+        if (m_displayModeChanged && m_targetDeviceName[0] != L'\0')
+        {
+            if (m_hasOriginalMode)
+            {
+                // 정확히 기존 모드로
+                ChangeDisplaySettingsExW(m_targetDeviceName, &m_originalMode, nullptr, 0, nullptr);
+            }
+            else
+            {
+                // 정보가 없으면 기본으로 롤백
+                ChangeDisplaySettingsExW(m_targetDeviceName, nullptr, nullptr, 0, nullptr);
+            }
+            m_displayModeChanged = false;
+        }
     }
 
 public:

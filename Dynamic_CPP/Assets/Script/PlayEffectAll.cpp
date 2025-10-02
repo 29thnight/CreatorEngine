@@ -15,10 +15,12 @@ void PlayEffectAll::Start()
 			}
 		}
 	}
+	isstart = true;
 }
 
 void PlayEffectAll::Update(float tick)
 {
+	if (m_isCallStart == false)return;
 	if (true == beLateFrame && false == OnEffect)
 	{
 		OnEffect = true;

@@ -35,6 +35,7 @@ void EntityMonsterA::Start()
 	if (deadPrefab)
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
 	}
 
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -122,13 +123,13 @@ void EntityMonsterA::Start()
 
 	if (GM)
 	{
-		std::vector<Entity*> players = GM->GetPlayers();
-		if(!players.empty())
-			blackBoard->SetValueAsString("Player1", players[0]->GetOwner()->ToString());
-		if (players.size() >= 2)
-		{
-			blackBoard->SetValueAsString("Player2", players[1]->GetOwner()->ToString());
-		}
+		//std::vector<Entity*> players = GM->GetPlayers();
+		//if(!players.empty())
+		//	blackBoard->SetValueAsString("Player1", players[0]->GetOwner()->ToString());
+		//if (players.size() >= 2)
+		//{
+		//	blackBoard->SetValueAsString("Player2", players[1]->GetOwner()->ToString());
+		//}
 	}
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
@@ -149,12 +150,14 @@ void EntityMonsterA::Start()
 void EntityMonsterA::Update(float tick)
 {
 
+
 	if (blackBoard == nullptr)
 	{
 		return;
 	}
 
-	
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetBaseSpeed(m_moveSpeed);
 
 	std::cout << m_state << std::endl;
 
@@ -372,7 +375,7 @@ void EntityMonsterA::DeadEvent()
 
 	if (deadObj)
 	{
-		
+		deadObj->SetEnabled(true);
 		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);

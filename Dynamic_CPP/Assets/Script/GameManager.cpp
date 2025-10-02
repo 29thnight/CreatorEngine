@@ -62,6 +62,11 @@ void GameManager::Update(float tick)
 	static float rewardTimer = 0.f;
 	rewardTimer += tick;
 
+	if (InputManagement->IsKeyPressed(KeyBoard::Escape))
+	{
+		SceneManagers->SetDecommissioning();
+	}
+
 	if(rewardTimer >= 1.f)
 	{
 		rewardTimer = 0.f;

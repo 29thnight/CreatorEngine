@@ -26,4 +26,5 @@ private:
 	std::vector<EffectComponent*> m_effects;
 	bool beLateFrame = false; //setposion으로 정한 위치가 한프레임 늦어서 이렇게 조절
 	bool OnEffect = false;
+
 };

@@ -252,11 +252,16 @@ void ModelLoader::ProcessMaterials()
 
 Material* ModelLoader::GenerateMaterial(int index)
 {
-	std::string baseName = "DefaultMaterial";
+    std::string baseName{};
 	if (index > -1)
 	{
 		baseName = m_AIScene->mMaterials[index]->GetName().C_Str();
 	}
+
+    if (baseName.empty())
+    {
+        baseName = "DefaultMaterial";
+    }
 
 	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
 	m_fileGuid = modelFileNode["guid"].as<std::string>();
