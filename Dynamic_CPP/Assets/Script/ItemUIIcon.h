@@ -30,6 +30,7 @@ public:
 	void SetTarget(class GameObject* target);
 	void SetItemID(int id);
 	void SetRarityID(int id);
+	void ApplyOrderDelta(int delta);
 	int GetItemID() const { return itemID; }
 	int GetRarityID() const { return rarityID;  }
 
@@ -85,4 +86,7 @@ private:
 	bool            m_prevIsSetPopup{ false };
 	int             m_enterCount{ 0 };          // 트리거 진입 횟수 (중첩 방지용)
 	PopupPhase		m_phase{ PopupPhase::None };
+	bool			m_isElevated = false;
+	bool			m_popupRaised = false;    // 팝업 트윈 시작 시 +10 했는지
+	bool			m_dismissRaised = false;  // 해제 트윈 시작 시 +10 했는지
 };

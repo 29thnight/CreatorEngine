@@ -114,6 +114,7 @@ Output main(PS_INPUT input) : SV_Target
     decalUV = (decalUV + sliceIndex) * sliceUV;
     
     float4 decalSample = g_decalTexture.Sample(g_linearSampler, decalUV);
+    
     decalSample.rgb = pow(decalSample.rgb, 2.2);
     
     float3 nTex = g_decalNormalTexture.Sample(g_linearSampler, decalUV).xyz * 2 - 1;
@@ -129,7 +130,7 @@ Output main(PS_INPUT input) : SV_Target
     // 데칼 텍스처의 알파 값을 이용해 기본 알베도 색상과 혼합
     float3 finalColor = lerp(baseAlbedo.rgb, decalSample.rgb, decalSample.a);
     Output output;
-    output.outDiffuse = (g_useFlags & USE_DIFFUSE) != 0 ? float4(finalColor, baseAlbedo.a) : float4(0, 0, 0, 0);
+    output.outDiffuse = (g_useFlags & USE_DIFFUSE) != 0 ? float4(finalColor, decalSample.a) : float4(0, 0, 0, 0);
     output.outNormal = (g_useFlags & USE_NORMAL) != 0 ? float4(nWS * 0.5 + 0.5, 0) : float4(0, 1, 0, 0);
     output.outORM = (g_useFlags & USE_ORM) != 0 ? float4(orm, baseORM.a) : float4(0, 0, 1, 0);
     

@@ -368,6 +368,9 @@ void EffectEditor::RenderModuleDetailEditor()
 	else if (auto* sizeModule = dynamic_cast<SizeModuleCS*>(targetModule)) {
 		RenderSizeModuleEditor(sizeModule);
 	}
+	else if (auto* trailModule = dynamic_cast<TrailModuleCS*>(targetModule)) {
+		RenderTrailModuleGPUEditor(trailModule);
+	}
 	else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(targetModule)) {
 		RenderMeshSpawnModuleEditor(meshSpawnModule);
 	}
@@ -676,6 +679,9 @@ void EffectEditor::RenderModifyEmitterEditor()
 		}
 		else if (dynamic_cast<SizeModuleCS*>(&module)) {
 			moduleName = "Size Module";
+		}
+		else if (dynamic_cast<TrailModuleCS*>(&module)) {
+			moduleName = "Trail Module CS";
 		}
 		else if (dynamic_cast<MeshSpawnModuleCS*>(&module)) {
 			moduleName = "Mesh Spawn Module";
@@ -1187,6 +1193,12 @@ void EffectEditor::AddSelectedModule()
 		if (!targetSystem->GetModule<SizeModuleCS>()) {
 			targetSystem->AddModule<SizeModuleCS>();
 			targetSystem->GetModule<SizeModuleCS>()->Initialize();
+		}
+		break;
+	case EffectModuleType::TrailModuleCS:
+		if (!targetSystem->GetModule<TrailModuleCS>()) {
+			targetSystem->AddModule<TrailModuleCS>();
+			targetSystem->GetModule<TrailModuleCS>()->Initialize();
 		}
 		break;
 	case EffectModuleType::TrailModule:
@@ -3007,6 +3019,66 @@ void EffectEditor::RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardM
 			ImGui::Text("Current Preview Frame: %u", currentPreviewFrame);
 		}
 	}
+}
+
+void EffectEditor::RenderTrailModuleGPUEditor(TrailModuleCS* trailModule)
+{
+	if (!trailModule)
+		return;
+
+	ImGui::PushID("TrailModuleCS");
+
+	if (ImGui::CollapsingHeader("Trail Spawn Settings", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		bool enabled = trailModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Trail", &enabled))
+		{
+			trailModule->SetEnabled(enabled);
+		}
+
+		float minDistance = trailModule->GetMinDistance();
+		if (ImGui::DragFloat("Min Distance", &minDistance, 0.01f, 0.01f, 10.0f))
+		{
+			trailModule->SetMinDistance(minDistance);
+		}
+
+		float lifetime = trailModule->GetTrailLifetime();
+		if (ImGui::DragFloat("Trail Lifetime", &lifetime, 0.1f, 0.1f, 10.0f))
+		{
+			trailModule->SetTrailLifetime(lifetime);
+		}
+
+		ImGui::Separator();
+
+		float size[2] = { trailModule->GetParticleSize().x, trailModule->GetParticleSize().y };
+		if (ImGui::DragFloat2("Particle Size", size, 0.01f, 0.01f, 10.0f))
+		{
+			trailModule->SetParticleSize(XMFLOAT2(size[0], size[1]));
+		}
+
+		XMFLOAT4 color = trailModule->GetParticleColor();
+		float colorArray[4] = { color.x, color.y, color.z, color.w };
+		if (ImGui::ColorEdit4("Trail Color", colorArray))
+		{
+			trailModule->SetParticleColor(XMFLOAT4(colorArray[0], colorArray[1], colorArray[2], colorArray[3]));
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Trail Statistics"))
+	{
+		ImGui::Text("Module Initialized: %s", trailModule->IsInitialized() ? "Yes" : "No");
+		ImGui::Text("Trail Capacity: %u", trailModule->GetParticleCapacity());
+	}
+
+	if (ImGui::CollapsingHeader("Trail Reset"))
+	{
+		if (ImGui::Button("Reset Trail", ImVec2(200, 0)))
+		{
+			trailModule->ResetForReuse();
+		}
+	}
+
+	ImGui::PopID();
 }
 
 void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModule)

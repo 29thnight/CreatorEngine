@@ -43,6 +43,17 @@
 #include "SFXPoolManager.h"
 #include "SoundName.h"
 #include "SwordHitEffect.h"
+#include "PlayEffectAll.h"
+void Player::Awake()
+{
+	auto gmobj = GameObject::Find("GameManager");
+	if (gmobj)
+	{
+		GM = gmobj->GetComponent<GameManager>();
+		GM->PushEntity(this);
+		GM->PushPlayer(this);
+	}
+}
 void Player::Start()
 {
 	player = GetOwner();
@@ -102,6 +113,18 @@ void Player::Start()
 
 	handSocket = m_animator->MakeSocket("handsocket", "Sword", aniOwner);
 
+	leftEarSokcet = m_animator->MakeSocket("leftEarsocket", "ear_L", aniOwner);
+	rightEarSokcet = m_animator->MakeSocket("rightEarsocket", "ear_R", aniOwner);
+
+	stunObj = SceneManagers->GetActiveScene()->CreateGameObject("StunEffect").get();
+	if (stunObj)
+	{
+		stunEffect = stunObj->AddComponent<EffectComponent>();
+		stunEffect->m_effectTemplateName = "Stun";
+	}
+
+
+
 	GameObject* uiController{};
 	if(0 == playerIndex)
 	{
@@ -126,6 +149,7 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
+				m_maxHP = maxHP;
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
@@ -195,21 +219,29 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
-	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
+	Prefab* run = PrefabUtilitys->LoadPrefab("run1");
+	if (run && player) {
+		for (int i = 0; i < 5; i++) {
+			GameObject* runeffect = PrefabUtilitys->InstantiatePrefab(run, "runEff");
+			EffectComponent* ef = runeffect->GetComponentDynamicCast<EffectComponent>();
+			m_runEffects.push_back(ef);
+		}
+	}
 
+	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
 	if (dashObj)
 	{
 		dashEffect = dashObj->AddComponent<EffectComponent>();
 		dashEffect->m_effectTemplateName = "testdash";
 	}
 
-	auto gmobj = GameObject::Find("GameManager");
-	if (gmobj)
-	{
-		GM = gmobj->GetComponent<GameManager>();
-		GM->PushEntity(this);
-		GM->PushPlayer(this);
-	}
+	//auto gmobj = GameObject::Find("GameManager"); //awake로 옮김
+	//if (gmobj)
+	//{
+	//	GM = gmobj->GetComponent<GameManager>();
+	//	GM->PushEntity(this);
+	//	GM->PushPlayer(this);
+	//}
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
 
@@ -287,6 +319,61 @@ void Player::Start()
 	m_animator->SetUseLayer(1, false);
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
+
+
+
+	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
+	if (SlashPrefab)
+	{
+		slash1 = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash1");
+	}
+	Prefab* SlashPrefab2 = PrefabUtilitys->LoadPrefab("SlashEffect2");
+	if (SlashPrefab2)
+	{
+		slash2 = PrefabUtilitys->InstantiatePrefab(SlashPrefab2, "Slash2");
+	}
+	Prefab* SlashPrefab3 = PrefabUtilitys->LoadPrefab("SlashEffect3");
+	if (SlashPrefab3)
+	{
+		slash3 = PrefabUtilitys->InstantiatePrefab(SlashPrefab3, "Slash3");
+	}
+
+	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	if (bulletprefab)
+	{
+		for (int i = 0; i < 101; i++)
+		{
+			
+			auto normalbullet = PrefabUtilitys->InstantiatePrefab(bulletprefab, "normalbullet");
+			normalBullets.push_back(normalbullet);
+			normalbullet->SetEnabled(false);
+		}
+	}
+	bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
+	if (bulletprefab)
+	{
+		for (int i = 0; i < 21; i++)
+		{
+
+			auto specialbullet = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
+			specialBullets.push_back(specialbullet);
+			specialbullet->SetEnabled(false);
+		}
+	}
+
+
+	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
+	if (bombprefab)
+	{
+		for (int i = 0; i < 50; i++)
+		{
+
+			GameObject* bomb = PrefabUtilitys->InstantiatePrefab(bombprefab, "bomb");
+			bombs.push_back(bomb);
+			bomb->SetEnabled(false);
+		}
+	}
+
 }
 
 void Player::Update(float tick)
@@ -297,6 +384,7 @@ void Player::Update(float tick)
 	pos.y += 0.5;
 	if(dashObj)
 		dashObj->m_transform.SetPosition(pos);
+
 
 	if (catchedObject)
 	{
@@ -404,93 +492,96 @@ void Player::Update(float tick)
 void Player::LateUpdate(float tick)
 {
 
-	//if (isStun)
-	//{
-	//	
-	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	//	auto cam = camComponent->GetCamera();
-	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	if (GM&& GM->TestCameraControll == false)
+	{
+		if (isStun)
+		{
 
-	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	//	float w = XMVectorGetW(clipSpacePos);
-	//	if (w < 0.001f) {
-	//		// 원래 위치 반환.
-	//		GetOwner()->m_transform.SetPosition(worldpos);
-	//		return;
-	//	}
-	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+			auto cam = camComponent->GetCamera();
+			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	//	float x = XMVectorGetX(ndcPos);
-	//	float y = XMVectorGetY(ndcPos);
-	//	x = abs(x);
-	//	y = abs(y);
+			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+			float w = XMVectorGetW(clipSpacePos);
+			if (w < 0.001f) {
+				// 원래 위치 반환.
+				GetOwner()->m_transform.SetPosition(worldpos);
+				return;
+			}
+			XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	//	float clamp_limit = 0.9f;
-	//	if (x < clamp_limit && y < clamp_limit)
-	//	{
-	//		return;
-	//	}
-	//	{
-	//		//이미화면밖임
-	//		stunRespawnElapsedTime += tick;
-	//		if (stunRespawnTime <= stunRespawnElapsedTime)
-	//		{
+			float x = XMVectorGetX(ndcPos);
+			float y = XMVectorGetY(ndcPos);
+			x = abs(x);
+			y = abs(y);
 
-	//			auto& asiss = GM->GetAsis();
-	//			if (!asiss.empty())
-	//			{
-	//				auto asis = asiss[0]->GetOwner();
-	//				Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
-	//				Mathf::Vector3 asisForward = asis->m_transform.GetForward();
+			float clamp_limit = 0.9f;
+			if (x < clamp_limit && y < clamp_limit)
+			{
+				return;
+			}
+			{
+				//이미화면밖임
+				stunRespawnElapsedTime += tick;
+				if (stunRespawnTime <= stunRespawnElapsedTime)
+				{
 
-	//				Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{5, 0, 5};
+					auto& asiss = GM->GetAsis();
+					if (!asiss.empty())
+					{
+						auto asis = asiss[0]->GetOwner();
+						Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+						Mathf::Vector3 asisForward = asis->m_transform.GetForward();
 
-	//				GetOwner()->m_transform.SetPosition(newWorldPos);
-	//				stunRespawnElapsedTime = 0;
-	//			}
-	//		}
-	//	}
-	//}
-	//else
-	//{
-	//	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	//	auto cam = camComponent->GetCamera();
-	//	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	//	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+						Mathf::Vector3 newWorldPos = asisPos + Mathf::Vector3{ 5, 0, 5 };
 
-	//	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	//	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	//	float w = XMVectorGetW(clipSpacePos);
-	//	if (w < 0.001f) {
-	//		// 원래 위치 반환.
-	//		GetOwner()->m_transform.SetPosition(worldpos);
-	//		return;
-	//	}
-	//	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+						GetOwner()->m_transform.SetPosition(newWorldPos);
+						stunRespawnElapsedTime = 0;
+					}
+				}
+			}
+		}
+		else
+		{
+			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+			auto cam = camComponent->GetCamera();
+			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	//	float x = XMVectorGetX(ndcPos);
-	//	float y = XMVectorGetY(ndcPos);
-	//	x = abs(x);
-	//	y = abs(y);
+			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+			float w = XMVectorGetW(clipSpacePos);
+			if (w < 0.001f) {
+				// 원래 위치 반환.
+				GetOwner()->m_transform.SetPosition(worldpos);
+				return;
+			}
+			XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	//	float clamp_limit = 0.9f;
-	//	if (x < clamp_limit && y < clamp_limit)
-	//	{
-	//		return;
-	//	}
+			float x = XMVectorGetX(ndcPos);
+			float y = XMVectorGetY(ndcPos);
+			x = abs(x);
+			y = abs(y);
 
-	//	XMVECTOR clampedNdcPos = XMVectorClamp(
-	//		ndcPos,
-	//		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-	//		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	//	);
-	//	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	//	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+			float clamp_limit = 0.9f;
+			if (x < clamp_limit && y < clamp_limit)
+			{
+				return;
+			}
 
-	//	GetOwner()->m_transform.SetPosition(newWorldPos);
-	//}
+			XMVECTOR clampedNdcPos = XMVectorClamp(
+				ndcPos,
+				XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+				XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+			);
+			XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+			XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+
+			GetOwner()->m_transform.SetPosition(newWorldPos);
+		}
+	}
 	
 }
 
@@ -508,7 +599,8 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		// hit
 		//DropCatchItem();
 		EntityEleteMonster* elete = dynamic_cast<EntityEleteMonster*>(sender);
-		if (elete)
+		Damage(damage);
+		if (elete && isStun == false) //엘리트고 아직 죽지않았으면
 		{
 			Transform* transform = GetOwner()->GetComponent<Transform>();
 			Mathf::Vector3 myPos = transform->GetWorldPosition();
@@ -532,7 +624,6 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				controller->TriggerForcedMove(knockbackVeocity);
 			}
 		}
-		Damage(damage);
 
 		if (m_DamageSound)
 		{
@@ -608,6 +699,10 @@ void Player::Damage(int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
+	if(GM && GM->TestCameraControll)
+	{ 
+		return;
+	}
 	if (OnMoveBomb)
 	{
 		MoveBombThrowPosition(dir);
@@ -651,6 +746,12 @@ void Player::PlaySoundStep()
 	m_MoveSound->clipKey = stepSounds[rand];
 	m_MoveSound->PlayOneShot();
 
+	m_runIndex = (m_runIndex + 1) % m_runEffects.size();
+	auto pos = GetOwner()->m_transform.GetWorldPosition();
+	pos += -GetOwner()->m_transform.GetForward() * 0.3f;
+	pos.m128_f32[1] += 0.3f;
+	m_runEffects[m_runIndex]->GetOwner()->m_transform.SetWorldPosition(pos);
+	m_runEffects[m_runIndex]->Apply();
 }
 
 void Player::CatchAndThrow()
@@ -938,7 +1039,6 @@ void Player::EndAttack()
 
 float Player::calculDamge(bool isCharge)
 {
-
 	float finalDamge = 0;
 	finalDamge += Atk;
 	
@@ -957,11 +1057,10 @@ float Player::calculDamge(bool isCharge)
 void Player::PlaySlashEvent()
 {
 
-	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
-	if (SlashPrefab)
+	if (slash1)
 	{
-		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
-		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		
+		auto Slashscript = slash1->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
@@ -977,7 +1076,7 @@ void Player::PlaySlashEvent()
 			m_ActionSound->clipKey = MeleeChargeSounds[rand];
 		}
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
-		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+		slash1->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
@@ -986,7 +1085,7 @@ void Player::PlaySlashEvent()
 
 		//Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(180.f));
 		//Quaternion finalRot = rot * lookRot;
-		SlashObj->GetComponent<Transform>()->SetRotation(lookRot);
+		slash1->GetComponent<Transform>()->SetRotation(lookRot);
 
 
 		Slashscript->Initialize();
@@ -1004,16 +1103,15 @@ void Player::PlaySlashEvent()
 void Player::PlaySlashEvent2()
 {
 	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect2");
-	if (SlashPrefab)
+	if (slash2)
 	{
-		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
-		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		auto Slashscript = slash2->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash2Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
-		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+		slash2->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
@@ -1022,7 +1120,7 @@ void Player::PlaySlashEvent2()
 
 		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
 		Quaternion finalRot = rot * lookRot;
-		SlashObj->GetComponent<Transform>()->SetRotation(finalRot);
+		slash2->GetComponent<Transform>()->SetRotation(finalRot);
 
 		Slashscript->Initialize();
 		if (m_ActionSound)
@@ -1035,16 +1133,14 @@ void Player::PlaySlashEvent2()
 
 void Player::PlaySlashEvent3()
 {
-	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect3");
-	if (SlashPrefab)
+	if (slash3)
 	{
-		GameObject* SlashObj = PrefabUtilitys->InstantiatePrefab(SlashPrefab, "Slash");
-		auto Slashscript = SlashObj->GetComponent<SlashEffect>();
+		auto Slashscript = slash3->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		Mathf::Vector3 effectPos = myPos;
-		SlashObj->GetComponent<Transform>()->SetPosition(effectPos);
+		slash3->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Slashscript->Initialize();
@@ -1571,10 +1667,14 @@ void Player::ShootBullet()
 
 void Player::ShootNormalBullet()
 {
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
-	if (bulletprefab && player)
+	//Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	if (normalBullets.size() <= 2) return;
+	GameObject* bulletObj = normalBullets.back();
+	normalBullets.pop_back();
+	if (bulletObj)
 	{
-		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
+		bulletObj->SetEnabled(true);
+		//bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (shootPosObj)
@@ -1598,11 +1698,15 @@ void Player::ShootNormalBullet()
 
 void Player::ShootSpecialBullet()
 {
+	if (specialBullets.size() <= 2) return;
 	//Todo:: pool에서찾고 없으면 프리팹에서 생성
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
-	if (bulletprefab && player)
+	//Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletSpecial");
+	GameObject* bulletObj = specialBullets.back();
+	specialBullets.pop_back();
+	if (bulletObj)
 	{
-		GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
+		bulletObj->SetEnabled(true);
+		//GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "specialbullet");
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 
@@ -1627,9 +1731,11 @@ void Player::ShootSpecialBullet()
 
 void Player::ShootChargeBullet()
 {
-	Prefab* bulletprefab = PrefabUtilitys->LoadPrefab("BulletNormal");
+	if (normalBullets.size() <= 7) return;
+	GameObject* bulletObj = normalBullets.back();
+	normalBullets.pop_back();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
-	if (bulletprefab && player)
+	if (bulletObj)
 	{
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 		if (shootPosObj)
@@ -1642,7 +1748,6 @@ void Player::ShootChargeBullet()
 		{
 			for (int i = -halfCount; i <= halfCount; i++)
 			{
-				GameObject* bulletObj = PrefabUtilitys->InstantiatePrefab(bulletprefab, "bullet");
 				NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
 				int Shootangle = m_curWeapon->ChargeAttackBulletAngle * i;
 				Mathf::Vector3 ShootDir = XMVector3TransformNormal(OrgionShootDir,
@@ -1662,10 +1767,12 @@ void Player::ShootChargeBullet()
 
 void Player::ThrowBomb()
 {
-	Prefab* bombprefab = PrefabUtilitys->LoadPrefab("Bomb");
-	if (bombprefab)
+	GameObject* bombObj = bombs.back();
+	bombs.pop_back();
+	
+	if (bombObj)
 	{
-		GameObject* bombObj = PrefabUtilitys->InstantiatePrefab(bombprefab, "Bomb");
+		
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 		bombObj->GetComponent<Transform>()->SetPosition(pos);
 		Bomb* bomb = bombObj->GetComponent<Bomb>();

@@ -24,4 +24,11 @@ private:
 	class TextComponent* rewardText = nullptr;
 	class ImageComponent* rewardImage = nullptr;
 	class GameManager* gameManager = nullptr;
+
+private:
+	int   m_prevReward{};
+	float m_prevRatio{};
+	bool  m_activeEffect{ false };
+	float m_elapsed{};
+	float m_setEffectTime{ 1.5f };
 };

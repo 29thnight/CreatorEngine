@@ -61,7 +61,7 @@ float4 main(VSOutput input) : SV_TARGET
     float d = saturate(alpha - s);
     
     // 파티클 수명에 따른 디졸브 임계값 계산
-    float dissolveThreshold = saturate(input.Age);
+    float dissolveThreshold = saturate(input.Age / animationDuration);
     
     // 디졸브 효과: 마스크값이 임계값보다 낮으면 픽셀 폐기
     if (dissolve < dissolveThreshold)

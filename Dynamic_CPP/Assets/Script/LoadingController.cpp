@@ -29,7 +29,7 @@ void LoadingController::Start()
 			}
 			else
 			{
-				m_gameManager->m_nextSceneName = "0926Test";
+				m_gameManager->m_nextSceneName = "Fin_Ingame_017";
 				m_gameManager->LoadNextScene();
 			}
 			GameInstance::GetInstance()->SetBeyondSceneName("");

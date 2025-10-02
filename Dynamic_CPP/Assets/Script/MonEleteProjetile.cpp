@@ -4,6 +4,9 @@
 #include "Camera.h"
 #include "EffectComponent.h"
 #include "Core.Minimal.h"
+#include "PlayEffectAll.h"`
+#include "PrefabUtility.h"
+#include "SphereColliderComponent.h"
 void MonEleteProjetile::Start()
 {
 	if (nullptr == m_effect)
@@ -113,9 +116,30 @@ void MonEleteProjetile::Action(GameObject* target)
 
 	HitInfo hitInfo;
 	hitInfo.attakerPos = GetOwner()->m_transform.GetWorldPosition();
-	hitInfo.hitPos = {};
+	auto collider = GetComponent<SphereColliderComponent>();
+	float myRadius = collider->GetRadius();
+	Mathf::Vector3 mypos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 otherpos = target->m_transform.GetWorldPosition();
+	Mathf::Vector3 dir = otherpos - mypos;
+	dir.Normalize();
+	Mathf::Vector3 contactPoint = mypos + dir * myRadius;
+	hitInfo.hitPos = contactPoint;
 	Entity* targetEntity = target->GetComponentDynamicCast<Entity>();
 	targetEntity->SendDamage(ownerEntity, m_Damege, hitInfo);
+
+
+	Prefab* hitPrefab = PrefabUtilitys->LoadPrefab("EliteAtkHitEffect");
+	if (hitPrefab)
+	{
+		GameObject* hitObj = PrefabUtilitys->InstantiatePrefab(hitPrefab, "monhitEffect");
+		auto hitEffect = hitObj->GetComponent<PlayEffectAll>();
+		hitObj->GetComponent<Transform>()->SetPosition(contactPoint);
+		hitEffect->Initialize();
+	}
+
+
+
+
 
 	//todo : 여기서 이제 뚫고 갈건지 비화성화 할건지? 일단은 일회성으로 사라지게 하자
 	RevertPool();

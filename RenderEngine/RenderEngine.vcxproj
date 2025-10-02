@@ -266,6 +266,7 @@
     <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
+    <ClCompile Include="TrailModuleCS.cpp" />
     <ClCompile Include="VisualShaderDSL.cpp" />
     <ClCompile Include="VisualShaderPSO.cpp" />
     <ClCompile Include="ShaderPSO.cpp" />
@@ -372,6 +373,7 @@
     <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ShaderDSL.h" />
+    <ClInclude Include="TrailModuleCS.h" />
     <ClInclude Include="VisualShaderDSL.h" />
     <ClInclude Include="VisualShaderPSO.h" />
     <ClInclude Include="ShaderPSO.h" />
@@ -553,6 +555,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillboardTrail.vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Blit.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -627,6 +634,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshRandomSprite.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\RandomSpriteM.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
@@ -638,6 +650,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TestVertexWind.vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailModule.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

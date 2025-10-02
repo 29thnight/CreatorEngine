@@ -541,6 +541,7 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 		Models[name] = model;
 		return model.get();
 	}
+	return nullptr;
 }
 
 void DataSystem::LoadTextures()

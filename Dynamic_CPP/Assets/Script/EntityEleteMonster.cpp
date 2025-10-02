@@ -13,6 +13,7 @@
 #include "EntityAsis.h"
 #include "GameManager.h"
 #include "CriticalMark.h"
+#include "PlayEffectAll.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -631,6 +632,15 @@ void EntityEleteMonster::Dead()
 void EntityEleteMonster::DeadEvent()
 {
 	EndDeadAnimation = true;
+	/*Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}*/
 }
 
 void EntityEleteMonster::RotateToTarget()
@@ -672,6 +682,7 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
 			}
+			PlayHitEffect(this->GetOwner(), hitinfo);
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
 			*/
 			/*Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
@@ -690,28 +701,7 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 
 
-			/*크리티컬 마크 이펙트
-			int playerIndex = player->playerIndex;
-			m_currentHP -= std::max(damage, 0);
-			if (true == criticalMark.TryCriticalHit(playerIndex))
-			{
-				if (markEffect)
-				{
-					if (criticalMark.markIndex == 0)
-					{
-						markEffect->PlayEffectByName("red");
-					}
-					else if (criticalMark.markIndex == 1)
-					{
-						markEffect->PlayEffectByName("blue");
-					}
-					else
-					{
-						markEffect->StopEffect();
-					}
-				}
-			}*/
-
+			
 
 			if (m_currentHP <= 0)
 			{

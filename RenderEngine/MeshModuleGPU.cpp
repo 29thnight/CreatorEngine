@@ -737,8 +737,6 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 }
             }
 
-            m_model = DataSystems->LoadCashedModel(modelName);
-
             if (m_model) {
                 m_meshType = MeshType::Model;
             }

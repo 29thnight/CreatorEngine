@@ -359,6 +359,7 @@ void EntityAsis::PathMove(float tick)
 	int pathSize = points.size();
 	if (pathSize == 0) return;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;
+	if (nextPointIndex == 0) return; // 시연용 코드
 	Vector3 currentPosition = GetOwner()->m_transform.GetWorldPosition();
 	Quaternion currentRotation = GetOwner()->m_transform.GetWorldQuaternion();
 	currentRotation.Normalize();

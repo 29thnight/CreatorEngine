@@ -4,6 +4,11 @@
 #include "EffectProxyController.h"
 #include "EffectRenderProxy.h"
 
+#ifdef _DEBUG
+#include "InputManager.h"
+#endif
+
+
 void EffectComponent::Initialize()
 {
     EffectRenderProxy* proxy = EffectCommandQueue->RegisterProxy((EffectComponent*)this);
@@ -46,6 +51,12 @@ void EffectComponent::Initialize()
 
 void EffectComponent::Update(float tick)
 {
+#ifdef _DEBUG
+    if (InputManagement->IsKeyDown('M')) {
+        Apply();
+    }
+#endif
+
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
 
     if (m_pendingPlay)

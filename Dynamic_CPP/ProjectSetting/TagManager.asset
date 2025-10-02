@@ -11,6 +11,7 @@ tags:
   - PlayerActionSound
   - PlayerDamageSound
   - PlayerSpecialActionSound
+  - CriticalMark
 layers:
   - Default
   - TransparentFX

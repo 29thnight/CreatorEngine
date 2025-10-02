@@ -30,6 +30,8 @@ public:
 	[[Method]]
 	void ReleaseKey();
 
+	void CalcLayerOrder(int add);
+
 public:
 	//버튼 홀드 구매 이미지 컴포넌트 업데이트 용
 	[[Property]]
@@ -82,5 +84,4 @@ private:
 	float           m_lastDelta{};
 	float           m_selectHold{};
 	bool			m_prevPopupActive{ false };
-
 };

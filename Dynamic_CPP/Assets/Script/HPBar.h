@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "HPBar.generated.h"
+#include "GameObject.h"
 
 class HPBar : public ModuleBehavior
 {
@@ -49,7 +50,7 @@ public:
 
 
 private:
-	class GameObject* m_target = nullptr;
+	std::weak_ptr<GameObject> m_target;
 	class RectTransformComponent* m_rect = nullptr;
 	class ImageComponent* m_image = nullptr;
 

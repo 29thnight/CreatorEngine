@@ -13,6 +13,7 @@
 #include "MeshColorModuleCS.h"
 #include "MeshMovementModuleCS.h"
 #include "MeshSizeModuleCS.h"
+#include "TrailModuleCS.h"
 
 enum class ParticleDataType
 {

@@ -59,26 +59,12 @@ void ItemUIPopup::Start()
             break;
         }
     }
-
-    //if (m_purchaseText)
-    //{
-    //    m_purchaseText->SetMessage("구매");
-    //}
-
-    //if (m_purchase)
-    //{
-    //    m_purchase->SetFloat2("centerUV", centerUV);
-    //    m_purchase->SetFloat("radiusUV", radiusUV);
-    //    m_purchase->SetFloat("percent", percent);
-    //    m_purchase->SetFloat("startAngle", startAngle);
-    //    m_purchase->SetInt("clockwise", clockwise);
-    //    m_purchase->SetFloat("featherAngle", featherAngle);
-    //    m_purchase->SetFloat4("tint", tint);
-    //}
 }
 
 void ItemUIPopup::Update(float tick)
 {
+    constexpr int layerOrderFoward = 10;
+
 	using namespace Mathf;
 
     m_lastDelta = tick;
@@ -160,9 +146,7 @@ void ItemUIPopup::Update(float tick)
     {
         // 팝업 유지될 경우 이미지 활성화 텍스트 활성화
         m_nameComp->GetOwner()->SetEnabled(true);
-        //m_descComp->SetEnabled(true);
-        //m_button->SetEnabled(true);
-        //m_purchase->SetEnabled(true);
+
         // 게임 인스턴스에서 정보 받아와서 텍스트 메세지 전달
         auto* itemInfo = GameInstance::GetInstance()->GetItemInfo(itemID, rarityID);
         if (itemInfo)
@@ -182,9 +166,7 @@ void ItemUIPopup::Update(float tick)
     {
         //아닌 경우 비활성화
         m_nameComp->GetOwner()->SetEnabled(false);
-        //m_descComp->SetEnabled(false);
-        //m_button->SetEnabled(false);
-        //m_purchase->SetEnabled(false);
+
         // 이후 텍스트 메세지 리셋
         m_nameComp->SetMessage("");
         m_descComp->SetMessage("");
@@ -217,17 +199,6 @@ void ItemUIPopup::PurshaseButton()
         : std::clamp(m_selectHold / m_requiredSelectHold, 0.f, 1.f);
     percent = progress;
 
-    //if (m_purchase)
-    //{
-    //    m_purchase->SetFloat2("centerUV", centerUV);
-    //    m_purchase->SetFloat("radiusUV", radiusUV);
-    //    m_purchase->SetFloat("percent", percent);
-    //    m_purchase->SetFloat("startAngle", startAngle);
-    //    m_purchase->SetInt("clockwise", clockwise);
-    //    m_purchase->SetFloat("featherAngle", featherAngle);
-    //    m_purchase->SetFloat4("tint", tint);
-    //}
-
     if (!m_isSelectComplete && m_selectHold >= m_requiredSelectHold)
     {
         m_isSelectComplete = true;
@@ -242,14 +213,29 @@ void ItemUIPopup::ReleaseKey()
 {
     m_selectHold = 0.f;
     percent = 0.f;                  // 게이지 리셋
-    //if (m_purchase)
-    //{
-    //    m_purchase->SetFloat2("centerUV", centerUV);
-    //    m_purchase->SetFloat("radiusUV", radiusUV);
-    //    m_purchase->SetFloat("percent", percent);
-    //    m_purchase->SetFloat("startAngle", startAngle);
-    //    m_purchase->SetInt("clockwise", clockwise);
-    //    m_purchase->SetFloat("featherAngle", featherAngle);
-    //    m_purchase->SetFloat4("tint", tint);
-    //}
+}
+
+void ItemUIPopup::CalcLayerOrder(int add)
+{
+    //이미지
+    int popupLayer = m_image->GetLayerOrder();
+    m_image->SetOrder(popupLayer + add);
+    //이름
+    int nameLayer = m_nameComp->GetLayerOrder();
+    m_nameComp->SetOrder(nameLayer + add);
+    //설명
+    int descLayer = m_descComp->GetLayerOrder();
+    m_descComp->SetOrder(descLayer + add);
+    //버튼
+    int buttonLayer = m_button->GetLayerOrder();
+    m_button->SetOrder(buttonLayer + add);
+    //구매버튼
+    int purchaseLayer = m_purchase->GetLayerOrder();
+    m_purchase->SetOrder(purchaseLayer + add);
+    //가격텍스트
+    int priceLayer = m_priceText->GetLayerOrder();
+    m_priceText->SetOrder(priceLayer + add);
+    //구매텍스트
+    int purchaseTextLayer = m_purchaseText->GetLayerOrder();
+    m_purchaseText->SetOrder(purchaseTextLayer + add);
 }

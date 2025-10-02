@@ -12,6 +12,7 @@
 #include "HPBar.h"
 #include "EntityAsis.h"
 #include "CriticalMark.h"
+#include "PlayEffectAll.h"
 void TestMonsterB::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -401,7 +402,7 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			hittimer = m_MaxknockBackTime;
 			hitPos = p;
 			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
-
+			PlayHitEffect(this->GetOwner(), hitinfo);
 
 
 
@@ -412,28 +413,6 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			//std::cout << "EntityMonsterA SendDamage CurrHP : " << m_currentHP << std::endl;
 
 
-
-			/*크리티컬 마크 이펙트
-			int playerIndex = player->playerIndex;
-			m_currentHP -= std::max(damage, 0);
-			if (true == criticalMark.TryCriticalHit(playerIndex))
-			{
-				if (markEffect)
-				{
-					if (criticalMark.markIndex == 0)
-					{
-						markEffect->PlayEffectByName("red");
-					}
-					else if (criticalMark.markIndex == 1)
-					{
-						markEffect->PlayEffectByName("blue");
-					}
-					else
-					{
-						markEffect->StopEffect();
-					}
-				}
-			}*/
 
 
 			if (m_currentHP <= 0)
@@ -506,5 +485,14 @@ void TestMonsterB::ShootingAttack()
 void TestMonsterB::DeadEvent()
 {
 	EndDeadAnimation = true;
+	/*Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+		deadEffect->Initialize();
+	}*/
 }
 
