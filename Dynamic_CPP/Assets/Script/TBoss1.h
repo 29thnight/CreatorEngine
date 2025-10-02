@@ -27,9 +27,30 @@ public:
 	virtual void OnDestroy() override  {}
 
 	
+
+	// 패턴 타입을 지정하여 외부에서 패턴 시작을 명령합니다.
+	enum class EPatternType {
+		None,
+		BP0034
+		// 다른 패턴들을 여기에 추가...
+	};
+
+	enum class EPatternPhase {
+		Inactive,
+		Spawning,
+		Waiting,
+	};
+
+	EPatternType  m_activePattern = EPatternType::None;
+	EPatternPhase m_patternPhase = EPatternPhase::Inactive;
+
 	BehaviorTreeComponent* BT = nullptr;
 	BlackBoard* BB = nullptr;
-	
+
+	GameObject* Player1 = nullptr; //들고 있자
+	GameObject* Player2 = nullptr; 
+
+	GameObject* m_target = nullptr;
 	//hp
 	[[Property]]
 	int m_MaxHp = 1000;
@@ -45,10 +66,12 @@ public:
 
 	//range
 	[[Property]]
-	float BP001Dist = 5.0f; //데미지 들어갈 거리 
-	float BP001Widw = 1.0f; //데미지 들어갈 폭    -> 모션 보이는 것보다 크거나 작을수 있음
+	float BP001RadiusSize = 1.0f; //투사체 사이즈
+	float BP001Speed = 2.0f;
+	float BP001Delay = 5.0f;
 	[[Property]]
-	float BP002RadiusSize = 1.0f; //투사체 사이즈
+	float BP002Dist = 5.0f; //데미지 들어갈 거리 
+	float BP002Widw = 1.0f; //데미지 들어갈 폭    -> 모션 보이는 것보다 크거나 작을수 있음
 	[[Property]]
 	float BP003RadiusSize = 5.0f; //폭파시 체크 범위 
 
@@ -65,7 +88,6 @@ public:
 	std::vector<GameObject*> BP001Objs;
 	std::vector<GameObject*> BP003Objs;
 
-	GameObject* m_target = nullptr;
 
 	//보스만 특수하게 
 	GameObject* m_chunsik = nullptr;
@@ -73,11 +95,31 @@ public:
 
 	void RotateToTarget();
 
+	//void StartPattern(EPatternType type); //쓸까 말까 고민중
+
+
 	//BP0033,0034 용 광역 패턴 사용시 장판패턴이 전체가 다 종료되었는지를 확인하고 전체가 종료 될때 까지 행동을 막는 함수
 	bool usePatten = false;
+	int pattenIndex = 0;
 	std::vector<std::pair<int, Mathf::Vector3>> BP0034Points;
 	float bp0034Timer = 0.0f;
-	void PattenActionIdle();	
+	float delay = 1.0f;
+	void UpdatePattern(float tick);
+	void Update_BP0034(float tick);
+	void Calculate_BP0034();
+	void EndPattern();
+
+
+	[[Method]]
+	void BP0011();
+	[[Method]]
+	void BP0012();
+	[[Method]]
+	void BP0013();
+	[[Method]]
+	void BP0014();
+
+
 
 
 	[[Method]]

@@ -1,0 +1,115 @@
+m_name: map1_rock03
+m_isEnabled: true
+m_instanceID: 1566552705
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: map1_rock03
+    m_isEnabled: true
+    m_instanceID: 3179157477
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 112
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [113]
+    m_prefabFileGuid: 08d681e1-d2e3-52cc-b3f2-cb6862c1e006
+    m_attachedSoketID: 0
+    m_collisionType: 11
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Rock
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_isEnabled: true
+        m_instanceID: 1902312256
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_isEnabled: true
+        m_instanceID: 171909877
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 7.4000001, y: 7.9000001, z: 1.70000005}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        m_name: EntityRock
+        m_isEnabled: true
+        m_instanceID: 321200205
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
+    children:
+      - GameObject: 2166264123
+        m_name: map1_rock03
+        m_isEnabled: true
+        m_instanceID: 451169856
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 112
+        m_index: 113
+        m_parentIndex: 112
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 3421879147
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: Material.002(1)
+              m_baseColorTexName: Rock03_low_tripo_material_e6272f1f-a370-4fa1-a792-5249aae71df6_BaseColor.png
+              m_normalTexName: Rock03_low_tripo_material_e6272f1f-a370-4fa1-a792-5249aae71df6_Normal.png
+              m_ORM_TexName: Rock03_low_tripo_material_e6272f1f-a370-4fa1-a792-5249aae71df6_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 42b79616-edfa-566e-a419-2dbd8a637edf
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: mesh.002
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false

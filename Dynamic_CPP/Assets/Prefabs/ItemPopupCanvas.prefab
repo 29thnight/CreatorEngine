@@ -1,22 +1,22 @@
 m_name: ItemPopupCanvas
 m_isEnabled: true
-m_instanceID: 4101047697
+m_instanceID: 2811273977
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: ItemPopupCanvas
     m_isEnabled: true
-    m_instanceID: 3008541598
+    m_instanceID: 3973949498
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-    m_index: 119
+    m_index: 122
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [122, 123, 124, 125, 126, 127]
-    m_prefabFileGuid: 675c6e8a-114b-5f94-b828-c650b4c86fc4
+    m_childrenIndices: [123, 124, 125, 126, 133, 140]
+    m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RectTransformComponent: 3002078429
         m_name: RectTransformComponent
         m_isEnabled: true
-        m_instanceID: 546511639
+        m_instanceID: 3653550493
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_anchorMin: {x: 0.5, y: 0.5}
         m_anchorMax: {x: 0.5, y: 0.5}
@@ -38,7 +38,7 @@ PrefabNode:
       - Canvas: 2773063417
         m_name: Component
         m_isEnabled: true
-        m_instanceID: 1523090869
+        m_instanceID: 23467467
         m_FileID: 00000000-0000-0000-0000-000000000000
         CanvasOrder: 0
         CanvasName: ItemPopupCanvas
@@ -46,85 +46,17 @@ PrefabNode:
       - GameObject: 2166264123
         m_name: ItemIcon0
         m_isEnabled: true
-        m_instanceID: 1252782006
+        m_instanceID: 2493162594
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 119
-        m_index: 122
-        m_parentIndex: 119
-        m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
-        m_attachedSoketID: 0
-        m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 5
-        m_tag: Untagged
-        m_layer: Default
-        m_components:
-          - RectTransformComponent: 3002078429
-            m_name: RectTransformComponent
-            m_isEnabled: true
-            m_instanceID: 468586041
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_anchorMin: {x: 0.5, y: 0.5}
-            m_anchorMax: {x: 0.5, y: 0.5}
-            m_anchoredPosition: {x: 2500, y: 540}
-            m_sizeDelta: {x: 410, y: 614}
-            m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 2295, y: 233, width: 410, height: 614}
-          - ImageComponent: 1187169862
-            m_name: ImageComponent
-            m_isEnabled: true
-            m_instanceID: 620465056
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 1
-            m_ownerCanvasName: ItemPopupCanvas
-            navigations: ~
-            m_customPixelShaderPath: ""
-            curindex: 0
-            color: {r: 1, g: 1, b: 1, a: 1}
-            rotate: 0
-            origin: {x: 205, y: 307}
-            unionScale: 1
-            clipDirection: 0
-            clipPercent: 1
-            texturePaths: [TestIcon.png]
-          - ModuleBehavior: 1399118904
-            m_playerID: -1
-            m_isSetPopup: false
-            itemID: 0
-            rarityID: 0
-            screenOffset: {x: 0, y: -50}
-            popupOffset: {x: 0, y: -200}
-            m_duration: 0.300000012
-            m_bobbing: true
-            m_bobTime: 0
-            m_bobAmp0: 7
-            m_bobFreq: 0.600000024
-            m_bobPhase: 0
-            m_bobDamping: 0
-            m_name: ItemUIIcon
-            m_isEnabled: true
-            m_instanceID: 4035717890
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
-      - GameObject: 2166264123
-        m_name: ItemIcon1
-        m_isEnabled: true
-        m_instanceID: 928778598
-        m_transform:
-          position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 119
+          m_parentID: 122
         m_index: 123
-        m_parentIndex: 119
+        m_parentIndex: 122
         m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: [147]
+        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -135,18 +67,18 @@ PrefabNode:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
             m_isEnabled: true
-            m_instanceID: 613736346
+            m_instanceID: 3668485743
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
             m_anchoredPosition: {x: 2500, y: 540}
-            m_sizeDelta: {x: 410, y: 614}
+            m_sizeDelta: {x: 259, y: 346}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 2295, y: 233, width: 410, height: 614}
+            m_worldRect: {x: 2370.5, y: 367, width: 259, height: 346}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_isEnabled: true
-            m_instanceID: 3262284933
+            m_instanceID: 3634680723
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 1
             m_ownerCanvasName: ItemPopupCanvas
@@ -155,11 +87,11 @@ PrefabNode:
             curindex: 0
             color: {r: 1, g: 1, b: 1, a: 1}
             rotate: 0
-            origin: {x: 205, y: 307}
+            origin: {x: 129.5, y: 173}
             unionScale: 1
             clipDirection: 0
             clipPercent: 1
-            texturePaths: [TestIcon.png]
+            texturePaths: [store_item01.png]
           - ModuleBehavior: 1399118904
             m_playerID: -1
             m_isSetPopup: false
@@ -176,168 +108,23 @@ PrefabNode:
             m_bobDamping: 0
             m_name: ItemUIIcon
             m_isEnabled: true
-            m_instanceID: 2505885784
+            m_instanceID: 3557723232
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
-      - GameObject: 2166264123
-        m_name: ItemIcon2
-        m_isEnabled: true
-        m_instanceID: 634822679
-        m_transform:
-          position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 119
-        m_index: 124
-        m_parentIndex: 119
-        m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
-        m_attachedSoketID: 0
-        m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 5
-        m_tag: Untagged
-        m_layer: Default
-        m_components:
-          - RectTransformComponent: 3002078429
-            m_name: RectTransformComponent
-            m_isEnabled: true
-            m_instanceID: 3827177767
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_anchorMin: {x: 0.5, y: 0.5}
-            m_anchorMax: {x: 0.5, y: 0.5}
-            m_anchoredPosition: {x: 2500, y: 540}
-            m_sizeDelta: {x: 410, y: 614}
-            m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 2295, y: 233, width: 410, height: 614}
-          - ImageComponent: 1187169862
-            m_name: ImageComponent
-            m_isEnabled: true
-            m_instanceID: 1025137926
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 1
-            m_ownerCanvasName: ItemPopupCanvas
-            navigations: ~
-            m_customPixelShaderPath: ""
-            curindex: 0
-            color: {r: 1, g: 1, b: 1, a: 1}
-            rotate: 0
-            origin: {x: 205, y: 307}
-            unionScale: 1
-            clipDirection: 0
-            clipPercent: 1
-            texturePaths: [TestIcon.png]
-          - ModuleBehavior: 1399118904
-            m_playerID: -1
-            m_isSetPopup: false
-            itemID: 0
-            rarityID: 0
-            screenOffset: {x: 0, y: -50}
-            popupOffset: {x: 0, y: -200}
-            m_duration: 0.300000012
-            m_bobbing: true
-            m_bobTime: 0
-            m_bobAmp0: 7
-            m_bobFreq: 0.600000024
-            m_bobPhase: 0
-            m_bobDamping: 0
-            m_name: ItemUIIcon
-            m_isEnabled: true
-            m_instanceID: 2817989027
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
-      - GameObject: 2166264123
-        m_name: ItemPopup0
-        m_isEnabled: true
-        m_instanceID: 2930487705
-        m_transform:
-          position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 119
-        m_index: 125
-        m_parentIndex: 119
-        m_rootIndex: 0
-        m_childrenIndices: [130]
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
-        m_attachedSoketID: 0
-        m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 5
-        m_tag: Untagged
-        m_layer: Default
-        m_components:
-          - RectTransformComponent: 3002078429
-            m_name: RectTransformComponent
-            m_isEnabled: true
-            m_instanceID: 420335863
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_anchorMin: {x: 0.5, y: 0.5}
-            m_anchorMax: {x: 0.5, y: 0.5}
-            m_anchoredPosition: {x: 2900, y: 540}
-            m_sizeDelta: {x: 410, y: 614}
-            m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
-          - ImageComponent: 1187169862
-            m_name: ImageComponent
-            m_isEnabled: true
-            m_instanceID: 1168668902
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
-            m_ownerCanvasName: ItemPopupCanvas
-            navigations: ~
-            m_customPixelShaderPath: ""
-            curindex: 0
-            color: {r: 1, g: 1, b: 1, a: 1}
-            rotate: 0
-            origin: {x: 205, y: 307}
-            unionScale: 1
-            clipDirection: 0
-            clipPercent: 1
-            texturePaths: [TestUI.png]
-          - ModuleBehavior: 1399118904
-            centerUV: "[not suport type]"
-            radiusUV: 1
-            percent: 1
-            startAngle: 9.80000019
-            clockwise: 1
-            featherAngle: 0.5
-            tint: "[not suport type]"
-            itemID: 0
-            rarityID: 0
-            m_baseSize: {x: 0, y: 0}
-            m_popupSize: {x: 410, y: 614}
-            m_targetSize: {x: 0, y: 0}
-            m_duration: 0.300000012
-            m_requiredSelectHold: 0.5
-            m_name: ItemUIPopup
-            m_isEnabled: true
-            m_instanceID: 3814637453
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
-          - PlayerInputComponent: 2504506805
-            m_name: PlayerInputComponent
-            m_isEnabled: true
-            m_instanceID: 2226247307
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            controllerIndex: 0
-            m_actionMapName: PlayerPerchase
-            m_scriptName: ""
         children:
           - GameObject: 2166264123
-            m_name: ItemName (0)
+            m_name: store_item01_bg
             m_isEnabled: true
-            m_instanceID: 3958801967
+            m_instanceID: 2106195487
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 125
-            m_index: 130
-            m_parentIndex: 125
+              m_parentID: 123
+            m_index: 147
+            m_parentIndex: 123
             m_rootIndex: 0
-            m_childrenIndices: [131]
+            m_childrenIndices: ~
             m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
             m_attachedSoketID: 0
             m_collisionType: 0
@@ -349,25 +136,388 @@ PrefabNode:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
                 m_isEnabled: true
-                m_instanceID: 1319019631
+                m_instanceID: 2353902443
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 0, y: -188}
-                m_sizeDelta: {x: 500, y: 500}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 259, y: 346}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 2650, y: 102, width: 500, height: 500}
+                m_worldRect: {x: 2370.5, y: 367, width: 259, height: 346}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: true
+                m_instanceID: 3872982331
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: ItemPopupCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 129.5, y: 173}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [store_item01_bg.png]
+      - GameObject: 2166264123
+        m_name: ItemIcon1
+        m_isEnabled: true
+        m_instanceID: 110786614
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 122
+        m_index: 124
+        m_parentIndex: 122
+        m_rootIndex: 0
+        m_childrenIndices: [148]
+        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 3265168989
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 2500, y: 540}
+            m_sizeDelta: {x: 259, y: 346}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 2370.5, y: 367, width: 259, height: 346}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 2224504061
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 1
+            m_ownerCanvasName: ItemPopupCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 129.5, y: 173}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [store_item01.png]
+          - ModuleBehavior: 1399118904
+            m_playerID: -1
+            m_isSetPopup: false
+            itemID: 0
+            rarityID: 0
+            screenOffset: {x: 0, y: -50}
+            popupOffset: {x: 0, y: -200}
+            m_duration: 0.300000012
+            m_bobbing: true
+            m_bobTime: 0
+            m_bobAmp0: 7
+            m_bobFreq: 0.600000024
+            m_bobPhase: 0
+            m_bobDamping: 0
+            m_name: ItemUIIcon
+            m_isEnabled: true
+            m_instanceID: 1600273089
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
+        children:
+          - GameObject: 2166264123
+            m_name: store_item01_bg (1)
+            m_isEnabled: true
+            m_instanceID: 1829549822
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 124
+            m_index: 148
+            m_parentIndex: 124
+            m_rootIndex: 0
+            m_childrenIndices: ~
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 0
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: true
+                m_instanceID: 1620980457
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 259, y: 346}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 2370.5, y: 367, width: 259, height: 346}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: true
+                m_instanceID: 2418355510
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: ItemPopupCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 129.5, y: 173}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [store_item01_bg.png]
+      - GameObject: 2166264123
+        m_name: ItemIcon2
+        m_isEnabled: true
+        m_instanceID: 2894791198
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 122
+        m_index: 125
+        m_parentIndex: 122
+        m_rootIndex: 0
+        m_childrenIndices: [149]
+        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 22389866
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 2500, y: 540}
+            m_sizeDelta: {x: 259, y: 346}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 2370.5, y: 367, width: 259, height: 346}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 3285497124
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 1
+            m_ownerCanvasName: ItemPopupCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 129.5, y: 173}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [store_item01.png]
+          - ModuleBehavior: 1399118904
+            m_playerID: -1
+            m_isSetPopup: false
+            itemID: 0
+            rarityID: 0
+            screenOffset: {x: 0, y: -50}
+            popupOffset: {x: 0, y: -200}
+            m_duration: 0.300000012
+            m_bobbing: true
+            m_bobTime: 0
+            m_bobAmp0: 7
+            m_bobFreq: 0.600000024
+            m_bobPhase: 0
+            m_bobDamping: 0
+            m_name: ItemUIIcon
+            m_isEnabled: true
+            m_instanceID: 3937726668
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
+        children:
+          - GameObject: 2166264123
+            m_name: store_item01_bg (2)
+            m_isEnabled: true
+            m_instanceID: 4222473753
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 125
+            m_index: 149
+            m_parentIndex: 125
+            m_rootIndex: 0
+            m_childrenIndices: ~
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 0
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: true
+                m_instanceID: 409205939
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 0}
+                m_sizeDelta: {x: 259, y: 346}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 2370.5, y: 367, width: 259, height: 346}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_isEnabled: true
+                m_instanceID: 1076077460
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 0
+                m_ownerCanvasName: ItemPopupCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                curindex: 0
+                color: {r: 1, g: 1, b: 1, a: 1}
+                rotate: 0
+                origin: {x: 129.5, y: 173}
+                unionScale: 1
+                clipDirection: 0
+                clipPercent: 1
+                texturePaths: [store_item01_bg.png]
+      - GameObject: 2166264123
+        m_name: ItemPopup0
+        m_isEnabled: true
+        m_instanceID: 3589926980
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 122
+        m_index: 126
+        m_parentIndex: 122
+        m_rootIndex: 0
+        m_childrenIndices: [127]
+        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 5
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_isEnabled: true
+            m_instanceID: 3753231906
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 4500, y: 540}
+            m_sizeDelta: {x: 259, y: 346}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_isEnabled: true
+            m_instanceID: 3220739951
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            m_ownerCanvasName: ItemPopupCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            curindex: 0
+            color: {r: 1, g: 1, b: 1, a: 1}
+            rotate: 0
+            origin: {x: 129.5, y: 173}
+            unionScale: 1
+            clipDirection: 0
+            clipPercent: 1
+            texturePaths: [store_box01.png, store_box02.png, store_box03.png]
+          - ModuleBehavior: 1399118904
+            centerUV: "[not suport type]"
+            radiusUV: 1
+            percent: 1
+            startAngle: 9.80000019
+            clockwise: 1
+            featherAngle: 0.5
+            tint: "[not suport type]"
+            itemID: 0
+            rarityID: 0
+            m_baseSize: {x: 0, y: 0}
+            m_popupSize: {x: 0, y: 0}
+            m_targetSize: {x: 0, y: 0}
+            m_duration: 0.300000012
+            m_requiredSelectHold: 0.5
+            m_name: ItemUIPopup
+            m_isEnabled: true
+            m_instanceID: 1913914809
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
+          - PlayerInputComponent: 2504506805
+            m_name: PlayerInputComponent
+            m_isEnabled: true
+            m_instanceID: 1400068694
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            controllerIndex: 0
+            m_actionMapName: PlayerPerchase
+            m_scriptName: ""
+        children:
+          - GameObject: 2166264123
+            m_name: ItemName (3)
+            m_isEnabled: true
+            m_instanceID: 548937259
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 126
+            m_index: 127
+            m_parentIndex: 126
+            m_rootIndex: 0
+            m_childrenIndices: [128]
+            m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+            m_attachedSoketID: 0
+            m_collisionType: 0
+            m_isStatic: false
+            m_gameObjectType: 5
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_isEnabled: true
+                m_instanceID: 1068797799
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: -97}
+                m_sizeDelta: {x: 300, y: 300}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 4350, y: 293, width: 300, height: 300}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_isEnabled: true
-                m_instanceID: 1230488959
+                m_instanceID: 1408736440
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 1
                 m_ownerCanvasName: ItemPopupCanvas
                 navigations: ~
                 m_customPixelShaderPath: ""
-                fontPath: SB_Aggro_m_21pt.spritefont
-                message: Item
+                fontPath: gmaket_bold_26pt.spritefont
+                message: ItemName
                 relpos: {x: 0, y: 0}
                 color: {r: 0, g: 0, b: 0, a: 1}
                 fontSize: 1
@@ -375,19 +525,19 @@ PrefabNode:
                 manualRect: {x: 0, y: 0, width: 0, height: 0}
             children:
               - GameObject: 2166264123
-                m_name: ItemDesc (0)
+                m_name: ItemDesc (3)
                 m_isEnabled: true
-                m_instanceID: 2531573321
+                m_instanceID: 1276175532
                 m_transform:
                   position: {x: 0, y: 0, z: 0, w: 1}
                   rotation: {x: 0, y: 0, z: 0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 1}
-                  m_parentID: 130
-                m_index: 131
-                m_parentIndex: 130
+                  m_parentID: 127
+                m_index: 128
+                m_parentIndex: 127
                 m_rootIndex: 0
-                m_childrenIndices: [132]
-                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_childrenIndices: [129]
+                m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                 m_attachedSoketID: 0
                 m_collisionType: 0
                 m_isStatic: false
@@ -398,25 +548,25 @@ PrefabNode:
                   - RectTransformComponent: 3002078429
                     m_name: RectTransformComponent
                     m_isEnabled: true
-                    m_instanceID: 3642308814
+                    m_instanceID: 805136234
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 0, y: 188}
-                    m_sizeDelta: {x: 500, y: 500}
+                    m_anchoredPosition: {x: 0, y: 157}
+                    m_sizeDelta: {x: 300, y: 300}
                     m_pivot: {x: 0.5, y: 0.5}
-                    m_worldRect: {x: 2650, y: 290, width: 500, height: 500}
+                    m_worldRect: {x: 4350, y: 450, width: 300, height: 300}
                   - TextComponent: 967791323
                     m_name: TextComponent
                     m_isEnabled: true
-                    m_instanceID: 3797111192
+                    m_instanceID: 1910382666
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     _layerorder: 1
                     m_ownerCanvasName: ItemPopupCanvas
                     navigations: ~
                     m_customPixelShaderPath: ""
-                    fontPath: SB_Aggro_m_21pt.spritefont
-                    message: Add ATK +1
+                    fontPath: gmaket_medium_20pt.spritefont
+                    message: Item Desc
                     relpos: {x: 0, y: 0}
                     color: {r: 0, g: 0, b: 0, a: 1}
                     fontSize: 1
@@ -424,19 +574,19 @@ PrefabNode:
                     manualRect: {x: 0, y: 0, width: 0, height: 0}
                 children:
                   - GameObject: 2166264123
-                    m_name: TestUIBuyButton
+                    m_name: Price
                     m_isEnabled: true
-                    m_instanceID: 746256912
+                    m_instanceID: 3455774081
                     m_transform:
                       position: {x: 0, y: 0, z: 0, w: 1}
                       rotation: {x: 0, y: 0, z: 0, w: 1}
                       scale: {x: 1, y: 1, z: 1, w: 1}
-                      m_parentID: 131
-                    m_index: 132
-                    m_parentIndex: 131
+                      m_parentID: 128
+                    m_index: 129
+                    m_parentIndex: 128
                     m_rootIndex: 0
-                    m_childrenIndices: [133]
-                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                    m_childrenIndices: [130]
+                    m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                     m_attachedSoketID: 0
                     m_collisionType: 0
                     m_isStatic: false
@@ -447,46 +597,46 @@ PrefabNode:
                       - RectTransformComponent: 3002078429
                         m_name: RectTransformComponent
                         m_isEnabled: true
-                        m_instanceID: 1420382060
+                        m_instanceID: 651799030
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_anchorMin: {x: 0.5, y: 0.5}
                         m_anchorMax: {x: 0.5, y: 0.5}
-                        m_anchoredPosition: {x: -10, y: 0}
-                        m_sizeDelta: {x: 410, y: 614}
+                        m_anchoredPosition: {x: 0, y: -60}
+                        m_sizeDelta: {x: 259, y: 346}
                         m_pivot: {x: 0.5, y: 0.5}
-                        m_worldRect: {x: 2685, y: 233, width: 410, height: 614}
+                        m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
                       - ImageComponent: 1187169862
                         m_name: ImageComponent
                         m_isEnabled: true
-                        m_instanceID: 1051654906
+                        m_instanceID: 3046957380
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 1
+                        _layerorder: 0
                         m_ownerCanvasName: ItemPopupCanvas
                         navigations: ~
                         m_customPixelShaderPath: ""
                         curindex: 0
                         color: {r: 1, g: 1, b: 1, a: 1}
                         rotate: 0
-                        origin: {x: 205, y: 307}
+                        origin: {x: 129.5, y: 173}
                         unionScale: 1
                         clipDirection: 0
                         clipPercent: 1
-                        texturePaths: [TestUIBuyButton.png]
+                        texturePaths: [store_coin.png]
                     children:
                       - GameObject: 2166264123
-                        m_name: AgreeBuyItem
+                        m_name: Button
                         m_isEnabled: true
-                        m_instanceID: 4139270251
+                        m_instanceID: 3726252662
                         m_transform:
                           position: {x: 0, y: 0, z: 0, w: 1}
                           rotation: {x: 0, y: 0, z: 0, w: 1}
                           scale: {x: 1, y: 1, z: 1, w: 1}
-                          m_parentID: 132
-                        m_index: 133
-                        m_parentIndex: 132
+                          m_parentID: 129
+                        m_index: 130
+                        m_parentIndex: 129
                         m_rootIndex: 0
-                        m_childrenIndices: ~
-                        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                        m_childrenIndices: [131]
+                        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                         m_attachedSoketID: 0
                         m_collisionType: 0
                         m_isStatic: false
@@ -497,45 +647,143 @@ PrefabNode:
                           - RectTransformComponent: 3002078429
                             m_name: RectTransformComponent
                             m_isEnabled: true
-                            m_instanceID: 277099208
+                            m_instanceID: 3688349846
                             m_FileID: 00000000-0000-0000-0000-000000000000
                             m_anchorMin: {x: 0.5, y: 0.5}
                             m_anchorMax: {x: 0.5, y: 0.5}
                             m_anchoredPosition: {x: 0, y: 0}
-                            m_sizeDelta: {x: 410, y: 614}
+                            m_sizeDelta: {x: 259, y: 346}
                             m_pivot: {x: 0.5, y: 0.5}
-                            m_worldRect: {x: 2685, y: 233, width: 410, height: 614}
+                            m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
                           - ImageComponent: 1187169862
                             m_name: ImageComponent
                             m_isEnabled: true
-                            m_instanceID: 724861425
+                            m_instanceID: 1380165897
                             m_FileID: 00000000-0000-0000-0000-000000000000
-                            _layerorder: 2
+                            _layerorder: 0
                             m_ownerCanvasName: ItemPopupCanvas
                             navigations: ~
                             m_customPixelShaderPath: ""
                             curindex: 0
                             color: {r: 1, g: 1, b: 1, a: 1}
                             rotate: 0
-                            origin: {x: 205, y: 307}
+                            origin: {x: 129.5, y: 173}
                             unionScale: 1
                             clipDirection: 0
                             clipPercent: 1
-                            texturePaths: [AgreeBuyItem.png]
+                            texturePaths: [store_key_A.png]
+                        children:
+                          - GameObject: 2166264123
+                            m_name: PriceText
+                            m_isEnabled: true
+                            m_instanceID: 2161275067
+                            m_transform:
+                              position: {x: 0, y: 0, z: 0, w: 1}
+                              rotation: {x: 0, y: 0, z: 0, w: 1}
+                              scale: {x: 1, y: 1, z: 1, w: 1}
+                              m_parentID: 130
+                            m_index: 131
+                            m_parentIndex: 130
+                            m_rootIndex: 0
+                            m_childrenIndices: [132]
+                            m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+                            m_attachedSoketID: 0
+                            m_collisionType: 0
+                            m_isStatic: false
+                            m_gameObjectType: 5
+                            m_tag: Untagged
+                            m_layer: Default
+                            m_components:
+                              - RectTransformComponent: 3002078429
+                                m_name: RectTransformComponent
+                                m_isEnabled: true
+                                m_instanceID: 2738857598
+                                m_FileID: 00000000-0000-0000-0000-000000000000
+                                m_anchorMin: {x: 0.5, y: 0.5}
+                                m_anchorMax: {x: 0.5, y: 0.5}
+                                m_anchoredPosition: {x: -33, y: 126}
+                                m_sizeDelta: {x: 150, y: 150}
+                                m_pivot: {x: 0.5, y: 0.5}
+                                m_worldRect: {x: 4392, y: 591, width: 150, height: 150}
+                              - TextComponent: 967791323
+                                m_name: TextComponent
+                                m_isEnabled: true
+                                m_instanceID: 980342069
+                                m_FileID: 00000000-0000-0000-0000-000000000000
+                                _layerorder: 1
+                                m_ownerCanvasName: ItemPopupCanvas
+                                navigations: ~
+                                m_customPixelShaderPath: ""
+                                fontPath: gmaket_medium_18pt.spritefont
+                                message: 30
+                                relpos: {x: 0, y: 0}
+                                color: {r: 1, g: 1, b: 1, a: 1}
+                                fontSize: 1
+                                useManualRect: false
+                                manualRect: {x: 0, y: 0, width: 0, height: 0}
+                            children:
+                              - GameObject: 2166264123
+                                m_name: BuyText
+                                m_isEnabled: true
+                                m_instanceID: 2467669077
+                                m_transform:
+                                  position: {x: 0, y: 0, z: 0, w: 1}
+                                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                                  scale: {x: 1, y: 1, z: 1, w: 1}
+                                  m_parentID: 131
+                                m_index: 132
+                                m_parentIndex: 131
+                                m_rootIndex: 0
+                                m_childrenIndices: ~
+                                m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+                                m_attachedSoketID: 0
+                                m_collisionType: 0
+                                m_isStatic: false
+                                m_gameObjectType: 5
+                                m_tag: Untagged
+                                m_layer: Default
+                                m_components:
+                                  - RectTransformComponent: 3002078429
+                                    m_name: RectTransformComponent
+                                    m_isEnabled: true
+                                    m_instanceID: 3094900852
+                                    m_FileID: 00000000-0000-0000-0000-000000000000
+                                    m_anchorMin: {x: 0.5, y: 0.5}
+                                    m_anchorMax: {x: 0.5, y: 0.5}
+                                    m_anchoredPosition: {x: 100, y: 0}
+                                    m_sizeDelta: {x: 150, y: 150}
+                                    m_pivot: {x: 0.5, y: 0.5}
+                                    m_worldRect: {x: 4492, y: 591, width: 150, height: 150}
+                                  - TextComponent: 967791323
+                                    m_name: TextComponent
+                                    m_isEnabled: true
+                                    m_instanceID: 3216199784
+                                    m_FileID: 00000000-0000-0000-0000-000000000000
+                                    _layerorder: 1
+                                    m_ownerCanvasName: ItemPopupCanvas
+                                    navigations: ~
+                                    m_customPixelShaderPath: ""
+                                    fontPath: gmaket_medium_18pt.spritefont
+                                    message: 구매
+                                    relpos: {x: 0, y: 0}
+                                    color: {r: 1, g: 1, b: 1, a: 1}
+                                    fontSize: 1
+                                    useManualRect: false
+                                    manualRect: {x: 0, y: 0, width: 0, height: 0}
       - GameObject: 2166264123
         m_name: ItemPopup1
         m_isEnabled: true
-        m_instanceID: 3287267175
+        m_instanceID: 3215513140
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 119
-        m_index: 126
-        m_parentIndex: 119
+          m_parentID: 122
+        m_index: 133
+        m_parentIndex: 122
         m_rootIndex: 0
         m_childrenIndices: [134]
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -546,18 +794,18 @@ PrefabNode:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
             m_isEnabled: true
-            m_instanceID: 3021781296
+            m_instanceID: 2100893070
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
-            m_anchoredPosition: {x: 2900, y: 540}
-            m_sizeDelta: {x: 410, y: 614}
+            m_anchoredPosition: {x: 4500, y: 540}
+            m_sizeDelta: {x: 259, y: 346}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
+            m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_isEnabled: true
-            m_instanceID: 2606033727
+            m_instanceID: 1217070643
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 0
             m_ownerCanvasName: ItemPopupCanvas
@@ -566,11 +814,19 @@ PrefabNode:
             curindex: 0
             color: {r: 1, g: 1, b: 1, a: 1}
             rotate: 0
-            origin: {x: 205, y: 307}
+            origin: {x: 129.5, y: 173}
             unionScale: 1
             clipDirection: 0
             clipPercent: 1
-            texturePaths: [TestUI.png]
+            texturePaths: [store_box01.png, store_box02.png, store_box03.png]
+          - PlayerInputComponent: 2504506805
+            m_name: PlayerInputComponent
+            m_isEnabled: true
+            m_instanceID: 19890291
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            controllerIndex: 0
+            m_actionMapName: PlayerPerchase
+            m_scriptName: ""
           - ModuleBehavior: 1399118904
             centerUV: "[not suport type]"
             radiusUV: 1
@@ -582,38 +838,30 @@ PrefabNode:
             itemID: 0
             rarityID: 0
             m_baseSize: {x: 0, y: 0}
-            m_popupSize: {x: 410, y: 614}
+            m_popupSize: {x: 0, y: 0}
             m_targetSize: {x: 0, y: 0}
             m_duration: 0.300000012
             m_requiredSelectHold: 0.5
             m_name: ItemUIPopup
             m_isEnabled: true
-            m_instanceID: 3964690100
+            m_instanceID: 2380353042
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
-          - PlayerInputComponent: 2504506805
-            m_name: PlayerInputComponent
-            m_isEnabled: true
-            m_instanceID: 18416098
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            controllerIndex: 0
-            m_actionMapName: PlayerPerchase
-            m_scriptName: ""
         children:
           - GameObject: 2166264123
-            m_name: ItemName (1)
+            m_name: gmaket_bold_26pt
             m_isEnabled: true
-            m_instanceID: 1544485060
+            m_instanceID: 2618024119
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 126
+              m_parentID: 133
             m_index: 134
-            m_parentIndex: 126
+            m_parentIndex: 133
             m_rootIndex: 0
             m_childrenIndices: [135]
-            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
             m_attachedSoketID: 0
             m_collisionType: 0
             m_isStatic: false
@@ -624,25 +872,25 @@ PrefabNode:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
                 m_isEnabled: true
-                m_instanceID: 2459853267
+                m_instanceID: 1380048380
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 0, y: -188}
-                m_sizeDelta: {x: 500, y: 500}
+                m_anchoredPosition: {x: 0, y: -97}
+                m_sizeDelta: {x: 300, y: 300}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 2650, y: 102, width: 500, height: 500}
+                m_worldRect: {x: 4350, y: 293, width: 300, height: 300}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_isEnabled: true
-                m_instanceID: 3757678451
+                m_instanceID: 1599639913
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 1
                 m_ownerCanvasName: ItemPopupCanvas
                 navigations: ~
                 m_customPixelShaderPath: ""
-                fontPath: SB_Aggro_m_21pt.spritefont
-                message: Item
+                fontPath: gmaket_bold_26pt.spritefont
+                message: ItemName
                 relpos: {x: 0, y: 0}
                 color: {r: 0, g: 0, b: 0, a: 1}
                 fontSize: 1
@@ -650,9 +898,9 @@ PrefabNode:
                 manualRect: {x: 0, y: 0, width: 0, height: 0}
             children:
               - GameObject: 2166264123
-                m_name: ItemDesc (1)
+                m_name: gmaket_medium_20pt
                 m_isEnabled: true
-                m_instanceID: 3990311150
+                m_instanceID: 737364136
                 m_transform:
                   position: {x: 0, y: 0, z: 0, w: 1}
                   rotation: {x: 0, y: 0, z: 0, w: 1}
@@ -661,8 +909,8 @@ PrefabNode:
                 m_index: 135
                 m_parentIndex: 134
                 m_rootIndex: 0
-                m_childrenIndices: [128]
-                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_childrenIndices: [136]
+                m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                 m_attachedSoketID: 0
                 m_collisionType: 0
                 m_isStatic: false
@@ -673,25 +921,25 @@ PrefabNode:
                   - RectTransformComponent: 3002078429
                     m_name: RectTransformComponent
                     m_isEnabled: true
-                    m_instanceID: 2843556494
+                    m_instanceID: 4277746134
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 0, y: 188}
-                    m_sizeDelta: {x: 500, y: 500}
+                    m_anchoredPosition: {x: 0, y: 157}
+                    m_sizeDelta: {x: 300, y: 300}
                     m_pivot: {x: 0.5, y: 0.5}
-                    m_worldRect: {x: 2650, y: 290, width: 500, height: 500}
+                    m_worldRect: {x: 4350, y: 450, width: 300, height: 300}
                   - TextComponent: 967791323
                     m_name: TextComponent
                     m_isEnabled: true
-                    m_instanceID: 3713109440
+                    m_instanceID: 2752822337
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     _layerorder: 1
                     m_ownerCanvasName: ItemPopupCanvas
                     navigations: ~
                     m_customPixelShaderPath: ""
-                    fontPath: SB_Aggro_m_21pt.spritefont
-                    message: Desc
+                    fontPath: gmaket_medium_20pt.spritefont
+                    message: ItemDesc
                     relpos: {x: 0, y: 0}
                     color: {r: 0, g: 0, b: 0, a: 1}
                     fontSize: 1
@@ -699,19 +947,19 @@ PrefabNode:
                     manualRect: {x: 0, y: 0, width: 0, height: 0}
                 children:
                   - GameObject: 2166264123
-                    m_name: TestUIBuyButton (1)
+                    m_name: store_coin
                     m_isEnabled: true
-                    m_instanceID: 58339796
+                    m_instanceID: 989766229
                     m_transform:
                       position: {x: 0, y: 0, z: 0, w: 1}
                       rotation: {x: 0, y: 0, z: 0, w: 1}
                       scale: {x: 1, y: 1, z: 1, w: 1}
                       m_parentID: 135
-                    m_index: 128
+                    m_index: 136
                     m_parentIndex: 135
                     m_rootIndex: 0
-                    m_childrenIndices: [136]
-                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                    m_childrenIndices: [137]
+                    m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                     m_attachedSoketID: 0
                     m_collisionType: 0
                     m_isStatic: false
@@ -722,46 +970,46 @@ PrefabNode:
                       - RectTransformComponent: 3002078429
                         m_name: RectTransformComponent
                         m_isEnabled: true
-                        m_instanceID: 202935654
+                        m_instanceID: 2861874085
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_anchorMin: {x: 0.5, y: 0.5}
                         m_anchorMax: {x: 0.5, y: 0.5}
-                        m_anchoredPosition: {x: 0, y: 0}
-                        m_sizeDelta: {x: 410, y: 614}
+                        m_anchoredPosition: {x: 0, y: -60}
+                        m_sizeDelta: {x: 259, y: 346}
                         m_pivot: {x: 0.5, y: 0.5}
-                        m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
+                        m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
                       - ImageComponent: 1187169862
                         m_name: ImageComponent
                         m_isEnabled: true
-                        m_instanceID: 1242643461
+                        m_instanceID: 2068567080
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 1
+                        _layerorder: 0
                         m_ownerCanvasName: ItemPopupCanvas
                         navigations: ~
                         m_customPixelShaderPath: ""
                         curindex: 0
                         color: {r: 1, g: 1, b: 1, a: 1}
                         rotate: 0
-                        origin: {x: 205, y: 307}
+                        origin: {x: 129.5, y: 173}
                         unionScale: 1
                         clipDirection: 0
-                        clipPercent: 0.5
-                        texturePaths: [TestUIBuyButton.png]
+                        clipPercent: 1
+                        texturePaths: [store_coin.png]
                     children:
                       - GameObject: 2166264123
-                        m_name: AgreeBuyItem (1)
+                        m_name: store_key_A
                         m_isEnabled: true
-                        m_instanceID: 188621897
+                        m_instanceID: 2229139997
                         m_transform:
                           position: {x: 0, y: 0, z: 0, w: 1}
                           rotation: {x: 0, y: 0, z: 0, w: 1}
                           scale: {x: 1, y: 1, z: 1, w: 1}
-                          m_parentID: 128
-                        m_index: 136
-                        m_parentIndex: 128
+                          m_parentID: 136
+                        m_index: 137
+                        m_parentIndex: 136
                         m_rootIndex: 0
-                        m_childrenIndices: ~
-                        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                        m_childrenIndices: [138]
+                        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                         m_attachedSoketID: 0
                         m_collisionType: 0
                         m_isStatic: false
@@ -772,45 +1020,143 @@ PrefabNode:
                           - RectTransformComponent: 3002078429
                             m_name: RectTransformComponent
                             m_isEnabled: true
-                            m_instanceID: 624425446
+                            m_instanceID: 530678508
                             m_FileID: 00000000-0000-0000-0000-000000000000
                             m_anchorMin: {x: 0.5, y: 0.5}
                             m_anchorMax: {x: 0.5, y: 0.5}
                             m_anchoredPosition: {x: 0, y: 0}
-                            m_sizeDelta: {x: 410, y: 614}
+                            m_sizeDelta: {x: 259, y: 346}
                             m_pivot: {x: 0.5, y: 0.5}
-                            m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
+                            m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
                           - ImageComponent: 1187169862
                             m_name: ImageComponent
                             m_isEnabled: true
-                            m_instanceID: 273742494
+                            m_instanceID: 1891170058
                             m_FileID: 00000000-0000-0000-0000-000000000000
-                            _layerorder: 2
+                            _layerorder: 0
                             m_ownerCanvasName: ItemPopupCanvas
                             navigations: ~
                             m_customPixelShaderPath: ""
                             curindex: 0
                             color: {r: 1, g: 1, b: 1, a: 1}
                             rotate: 0
-                            origin: {x: 205, y: 307}
+                            origin: {x: 129.5, y: 173}
                             unionScale: 1
                             clipDirection: 0
                             clipPercent: 1
-                            texturePaths: [AgreeBuyItem.png]
+                            texturePaths: [store_key_A.png]
+                        children:
+                          - GameObject: 2166264123
+                            m_name: gmaket_medium_18pt
+                            m_isEnabled: true
+                            m_instanceID: 2566861893
+                            m_transform:
+                              position: {x: 0, y: 0, z: 0, w: 1}
+                              rotation: {x: 0, y: 0, z: 0, w: 1}
+                              scale: {x: 1, y: 1, z: 1, w: 1}
+                              m_parentID: 137
+                            m_index: 138
+                            m_parentIndex: 137
+                            m_rootIndex: 0
+                            m_childrenIndices: [139]
+                            m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+                            m_attachedSoketID: 0
+                            m_collisionType: 0
+                            m_isStatic: false
+                            m_gameObjectType: 5
+                            m_tag: Untagged
+                            m_layer: Default
+                            m_components:
+                              - RectTransformComponent: 3002078429
+                                m_name: RectTransformComponent
+                                m_isEnabled: true
+                                m_instanceID: 475320904
+                                m_FileID: 00000000-0000-0000-0000-000000000000
+                                m_anchorMin: {x: 0.5, y: 0.5}
+                                m_anchorMax: {x: 0.5, y: 0.5}
+                                m_anchoredPosition: {x: -33, y: 126}
+                                m_sizeDelta: {x: 100, y: 100}
+                                m_pivot: {x: 0.5, y: 0.5}
+                                m_worldRect: {x: 4417, y: 616, width: 100, height: 100}
+                              - TextComponent: 967791323
+                                m_name: TextComponent
+                                m_isEnabled: true
+                                m_instanceID: 2957918253
+                                m_FileID: 00000000-0000-0000-0000-000000000000
+                                _layerorder: 1
+                                m_ownerCanvasName: ItemPopupCanvas
+                                navigations: ~
+                                m_customPixelShaderPath: ""
+                                fontPath: gmaket_medium_18pt.spritefont
+                                message: 30
+                                relpos: {x: 0, y: 0}
+                                color: {r: 1, g: 1, b: 1, a: 1}
+                                fontSize: 1
+                                useManualRect: false
+                                manualRect: {x: 0, y: 0, width: 0, height: 0}
+                            children:
+                              - GameObject: 2166264123
+                                m_name: gmaket_medium_18pt (1)
+                                m_isEnabled: true
+                                m_instanceID: 1308559678
+                                m_transform:
+                                  position: {x: 0, y: 0, z: 0, w: 1}
+                                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                                  scale: {x: 1, y: 1, z: 1, w: 1}
+                                  m_parentID: 138
+                                m_index: 139
+                                m_parentIndex: 138
+                                m_rootIndex: 0
+                                m_childrenIndices: ~
+                                m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+                                m_attachedSoketID: 0
+                                m_collisionType: 0
+                                m_isStatic: false
+                                m_gameObjectType: 5
+                                m_tag: Untagged
+                                m_layer: Default
+                                m_components:
+                                  - RectTransformComponent: 3002078429
+                                    m_name: RectTransformComponent
+                                    m_isEnabled: true
+                                    m_instanceID: 3220265473
+                                    m_FileID: 00000000-0000-0000-0000-000000000000
+                                    m_anchorMin: {x: 0.5, y: 0.5}
+                                    m_anchorMax: {x: 0.5, y: 0.5}
+                                    m_anchoredPosition: {x: 100, y: 0}
+                                    m_sizeDelta: {x: 150, y: 150}
+                                    m_pivot: {x: 0.5, y: 0.5}
+                                    m_worldRect: {x: 4492, y: 591, width: 150, height: 150}
+                                  - TextComponent: 967791323
+                                    m_name: TextComponent
+                                    m_isEnabled: true
+                                    m_instanceID: 3773787605
+                                    m_FileID: 00000000-0000-0000-0000-000000000000
+                                    _layerorder: 1
+                                    m_ownerCanvasName: ItemPopupCanvas
+                                    navigations: ~
+                                    m_customPixelShaderPath: ""
+                                    fontPath: gmaket_medium_18pt.spritefont
+                                    message: 구매
+                                    relpos: {x: 0, y: 0}
+                                    color: {r: 1, g: 1, b: 1, a: 1}
+                                    fontSize: 1
+                                    useManualRect: false
+                                    manualRect: {x: 0, y: 0, width: 0, height: 0}
       - GameObject: 2166264123
         m_name: ItemPopup2
         m_isEnabled: true
-        m_instanceID: 1897453818
+        m_instanceID: 2983614875
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 119
-        m_index: 127
-        m_parentIndex: 119
+          m_parentID: 122
+        m_index: 140
+        m_parentIndex: 122
         m_rootIndex: 0
-        m_childrenIndices: [138]
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: [141]
+        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -821,18 +1167,18 @@ PrefabNode:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
             m_isEnabled: true
-            m_instanceID: 4194802242
+            m_instanceID: 4160331047
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
-            m_anchoredPosition: {x: 2900, y: 540}
-            m_sizeDelta: {x: 410, y: 614}
+            m_anchoredPosition: {x: 4500, y: 540}
+            m_sizeDelta: {x: 259, y: 346}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
+            m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_isEnabled: true
-            m_instanceID: 2688670970
+            m_instanceID: 954834982
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 0
             m_ownerCanvasName: ItemPopupCanvas
@@ -841,11 +1187,19 @@ PrefabNode:
             curindex: 0
             color: {r: 1, g: 1, b: 1, a: 1}
             rotate: 0
-            origin: {x: 205, y: 307}
+            origin: {x: 129.5, y: 173}
             unionScale: 1
             clipDirection: 0
             clipPercent: 1
-            texturePaths: [TestUI.png]
+            texturePaths: [store_box01.png, store_box02.png, store_box03.png]
+          - PlayerInputComponent: 2504506805
+            m_name: PlayerInputComponent
+            m_isEnabled: true
+            m_instanceID: 2373521907
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            controllerIndex: 0
+            m_actionMapName: PlayerPerchase
+            m_scriptName: ""
           - ModuleBehavior: 1399118904
             centerUV: "[not suport type]"
             radiusUV: 1
@@ -857,38 +1211,30 @@ PrefabNode:
             itemID: 0
             rarityID: 0
             m_baseSize: {x: 0, y: 0}
-            m_popupSize: {x: 410, y: 614}
+            m_popupSize: {x: 0, y: 0}
             m_targetSize: {x: 0, y: 0}
             m_duration: 0.300000012
             m_requiredSelectHold: 0.5
             m_name: ItemUIPopup
             m_isEnabled: true
-            m_instanceID: 2045823415
+            m_instanceID: 365096727
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
-          - PlayerInputComponent: 2504506805
-            m_name: PlayerInputComponent
-            m_isEnabled: true
-            m_instanceID: 2886043806
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            controllerIndex: 0
-            m_actionMapName: PlayerPerchase
-            m_scriptName: ""
         children:
           - GameObject: 2166264123
-            m_name: ItemName (2)
+            m_name: gmaket_bold_26pt (1)
             m_isEnabled: true
-            m_instanceID: 781448667
+            m_instanceID: 4126124335
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 127
-            m_index: 138
-            m_parentIndex: 127
+              m_parentID: 140
+            m_index: 141
+            m_parentIndex: 140
             m_rootIndex: 0
-            m_childrenIndices: [137]
-            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: [142]
+            m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
             m_attachedSoketID: 0
             m_collisionType: 0
             m_isStatic: false
@@ -899,25 +1245,25 @@ PrefabNode:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
                 m_isEnabled: true
-                m_instanceID: 432923902
+                m_instanceID: 4199636240
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 0, y: -188}
-                m_sizeDelta: {x: 500, y: 500}
+                m_anchoredPosition: {x: 0, y: -107}
+                m_sizeDelta: {x: 300, y: 300}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 2650, y: 102, width: 500, height: 500}
+                m_worldRect: {x: 4350, y: 283, width: 300, height: 300}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_isEnabled: true
-                m_instanceID: 1462004071
+                m_instanceID: 3876663224
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 1
                 m_ownerCanvasName: ItemPopupCanvas
                 navigations: ~
                 m_customPixelShaderPath: ""
-                fontPath: SB_Aggro_m_21pt.spritefont
-                message: Item
+                fontPath: gmaket_bold_26pt.spritefont
+                message: ItemName
                 relpos: {x: 0, y: 0}
                 color: {r: 0, g: 0, b: 0, a: 1}
                 fontSize: 1
@@ -925,19 +1271,19 @@ PrefabNode:
                 manualRect: {x: 0, y: 0, width: 0, height: 0}
             children:
               - GameObject: 2166264123
-                m_name: ItemDesc (2)
+                m_name: gmaket_medium_20pt (1)
                 m_isEnabled: true
-                m_instanceID: 3088677897
+                m_instanceID: 2244776374
                 m_transform:
                   position: {x: 0, y: 0, z: 0, w: 1}
                   rotation: {x: 0, y: 0, z: 0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 1}
-                  m_parentID: 138
-                m_index: 137
-                m_parentIndex: 138
+                  m_parentID: 141
+                m_index: 142
+                m_parentIndex: 141
                 m_rootIndex: 0
-                m_childrenIndices: [129]
-                m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                m_childrenIndices: [143]
+                m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                 m_attachedSoketID: 0
                 m_collisionType: 0
                 m_isStatic: false
@@ -948,25 +1294,25 @@ PrefabNode:
                   - RectTransformComponent: 3002078429
                     m_name: RectTransformComponent
                     m_isEnabled: true
-                    m_instanceID: 1070179367
+                    m_instanceID: 2255087363
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 0, y: 188}
-                    m_sizeDelta: {x: 500, y: 500}
+                    m_anchoredPosition: {x: 0, y: 167}
+                    m_sizeDelta: {x: 300, y: 300}
                     m_pivot: {x: 0.5, y: 0.5}
-                    m_worldRect: {x: 2650, y: 290, width: 500, height: 500}
+                    m_worldRect: {x: 4350, y: 450, width: 300, height: 300}
                   - TextComponent: 967791323
                     m_name: TextComponent
                     m_isEnabled: true
-                    m_instanceID: 2494699329
+                    m_instanceID: 3591687921
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     _layerorder: 1
                     m_ownerCanvasName: ItemPopupCanvas
                     navigations: ~
                     m_customPixelShaderPath: ""
-                    fontPath: SB_Aggro_m_21pt.spritefont
-                    message: ""
+                    fontPath: gmaket_medium_20pt.spritefont
+                    message: ItemDesc
                     relpos: {x: 0, y: 0}
                     color: {r: 0, g: 0, b: 0, a: 1}
                     fontSize: 1
@@ -974,19 +1320,19 @@ PrefabNode:
                     manualRect: {x: 0, y: 0, width: 0, height: 0}
                 children:
                   - GameObject: 2166264123
-                    m_name: TestUIBuyButton (2)
+                    m_name: store_coin (1)
                     m_isEnabled: true
-                    m_instanceID: 475475498
+                    m_instanceID: 2448934208
                     m_transform:
                       position: {x: 0, y: 0, z: 0, w: 1}
                       rotation: {x: 0, y: 0, z: 0, w: 1}
                       scale: {x: 1, y: 1, z: 1, w: 1}
-                      m_parentID: 137
-                    m_index: 129
-                    m_parentIndex: 137
+                      m_parentID: 142
+                    m_index: 143
+                    m_parentIndex: 142
                     m_rootIndex: 0
-                    m_childrenIndices: [139]
-                    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                    m_childrenIndices: [144]
+                    m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                     m_attachedSoketID: 0
                     m_collisionType: 0
                     m_isStatic: false
@@ -997,18 +1343,18 @@ PrefabNode:
                       - RectTransformComponent: 3002078429
                         m_name: RectTransformComponent
                         m_isEnabled: true
-                        m_instanceID: 1938722799
+                        m_instanceID: 333775355
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_anchorMin: {x: 0.5, y: 0.5}
                         m_anchorMax: {x: 0.5, y: 0.5}
-                        m_anchoredPosition: {x: 0, y: 0}
-                        m_sizeDelta: {x: 410, y: 614}
+                        m_anchoredPosition: {x: 0, y: -60}
+                        m_sizeDelta: {x: 259, y: 346}
                         m_pivot: {x: 0.5, y: 0.5}
-                        m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
+                        m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
                       - ImageComponent: 1187169862
                         m_name: ImageComponent
                         m_isEnabled: true
-                        m_instanceID: 1585075713
+                        m_instanceID: 597236497
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         _layerorder: 1
                         m_ownerCanvasName: ItemPopupCanvas
@@ -1017,26 +1363,26 @@ PrefabNode:
                         curindex: 0
                         color: {r: 1, g: 1, b: 1, a: 1}
                         rotate: 0
-                        origin: {x: 205, y: 307}
+                        origin: {x: 129.5, y: 173}
                         unionScale: 1
                         clipDirection: 0
-                        clipPercent: 0.479999989
-                        texturePaths: [TestUIBuyButton.png]
+                        clipPercent: 1
+                        texturePaths: [store_coin.png]
                     children:
                       - GameObject: 2166264123
-                        m_name: AgreeBuyItem (2)
+                        m_name: store_key_A (1)
                         m_isEnabled: true
-                        m_instanceID: 1694937848
+                        m_instanceID: 2399597838
                         m_transform:
                           position: {x: 0, y: 0, z: 0, w: 1}
                           rotation: {x: 0, y: 0, z: 0, w: 1}
                           scale: {x: 1, y: 1, z: 1, w: 1}
-                          m_parentID: 129
-                        m_index: 139
-                        m_parentIndex: 129
+                          m_parentID: 143
+                        m_index: 144
+                        m_parentIndex: 143
                         m_rootIndex: 0
-                        m_childrenIndices: ~
-                        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+                        m_childrenIndices: [145]
+                        m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
                         m_attachedSoketID: 0
                         m_collisionType: 0
                         m_isStatic: false
@@ -1047,28 +1393,126 @@ PrefabNode:
                           - RectTransformComponent: 3002078429
                             m_name: RectTransformComponent
                             m_isEnabled: true
-                            m_instanceID: 3531657437
+                            m_instanceID: 2547118047
                             m_FileID: 00000000-0000-0000-0000-000000000000
                             m_anchorMin: {x: 0.5, y: 0.5}
                             m_anchorMax: {x: 0.5, y: 0.5}
                             m_anchoredPosition: {x: 0, y: 0}
-                            m_sizeDelta: {x: 410, y: 614}
+                            m_sizeDelta: {x: 259, y: 346}
                             m_pivot: {x: 0.5, y: 0.5}
-                            m_worldRect: {x: 2695, y: 233, width: 410, height: 614}
+                            m_worldRect: {x: 4370.5, y: 367, width: 259, height: 346}
                           - ImageComponent: 1187169862
                             m_name: ImageComponent
                             m_isEnabled: true
-                            m_instanceID: 2594611985
+                            m_instanceID: 3190437910
                             m_FileID: 00000000-0000-0000-0000-000000000000
-                            _layerorder: 2
+                            _layerorder: 1
                             m_ownerCanvasName: ItemPopupCanvas
                             navigations: ~
                             m_customPixelShaderPath: ""
                             curindex: 0
                             color: {r: 1, g: 1, b: 1, a: 1}
                             rotate: 0
-                            origin: {x: 205, y: 307}
+                            origin: {x: 129.5, y: 173}
                             unionScale: 1
                             clipDirection: 0
                             clipPercent: 1
-                            texturePaths: [AgreeBuyItem.png]
+                            texturePaths: [store_key_A.png]
+                        children:
+                          - GameObject: 2166264123
+                            m_name: gmaket_medium_18pt (2)
+                            m_isEnabled: true
+                            m_instanceID: 2081993682
+                            m_transform:
+                              position: {x: 0, y: 0, z: 0, w: 1}
+                              rotation: {x: 0, y: 0, z: 0, w: 1}
+                              scale: {x: 1, y: 1, z: 1, w: 1}
+                              m_parentID: 144
+                            m_index: 145
+                            m_parentIndex: 144
+                            m_rootIndex: 0
+                            m_childrenIndices: [146]
+                            m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+                            m_attachedSoketID: 0
+                            m_collisionType: 0
+                            m_isStatic: false
+                            m_gameObjectType: 5
+                            m_tag: Untagged
+                            m_layer: Default
+                            m_components:
+                              - RectTransformComponent: 3002078429
+                                m_name: RectTransformComponent
+                                m_isEnabled: true
+                                m_instanceID: 3802489070
+                                m_FileID: 00000000-0000-0000-0000-000000000000
+                                m_anchorMin: {x: 0.5, y: 0.5}
+                                m_anchorMax: {x: 0.5, y: 0.5}
+                                m_anchoredPosition: {x: -33, y: 126}
+                                m_sizeDelta: {x: 150, y: 150}
+                                m_pivot: {x: 0.5, y: 0.5}
+                                m_worldRect: {x: 4392, y: 591, width: 150, height: 150}
+                              - TextComponent: 967791323
+                                m_name: TextComponent
+                                m_isEnabled: true
+                                m_instanceID: 2420162995
+                                m_FileID: 00000000-0000-0000-0000-000000000000
+                                _layerorder: 1
+                                m_ownerCanvasName: ItemPopupCanvas
+                                navigations: ~
+                                m_customPixelShaderPath: ""
+                                fontPath: gmaket_medium_18pt.spritefont
+                                message: 30
+                                relpos: {x: 0, y: 0}
+                                color: {r: 1, g: 1, b: 1, a: 1}
+                                fontSize: 1
+                                useManualRect: false
+                                manualRect: {x: 0, y: 0, width: 0, height: 0}
+                            children:
+                              - GameObject: 2166264123
+                                m_name: gmaket_medium_18pt (3)
+                                m_isEnabled: true
+                                m_instanceID: 126562613
+                                m_transform:
+                                  position: {x: 0, y: 0, z: 0, w: 1}
+                                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                                  scale: {x: 1, y: 1, z: 1, w: 1}
+                                  m_parentID: 145
+                                m_index: 146
+                                m_parentIndex: 145
+                                m_rootIndex: 0
+                                m_childrenIndices: ~
+                                m_prefabFileGuid: 06acfa55-bef0-548b-ad16-0b551ad06844
+                                m_attachedSoketID: 0
+                                m_collisionType: 0
+                                m_isStatic: false
+                                m_gameObjectType: 5
+                                m_tag: Untagged
+                                m_layer: Default
+                                m_components:
+                                  - RectTransformComponent: 3002078429
+                                    m_name: RectTransformComponent
+                                    m_isEnabled: true
+                                    m_instanceID: 2379596002
+                                    m_FileID: 00000000-0000-0000-0000-000000000000
+                                    m_anchorMin: {x: 0.5, y: 0.5}
+                                    m_anchorMax: {x: 0.5, y: 0.5}
+                                    m_anchoredPosition: {x: 100, y: 0}
+                                    m_sizeDelta: {x: 150, y: 150}
+                                    m_pivot: {x: 0.5, y: 0.5}
+                                    m_worldRect: {x: 4492, y: 591, width: 150, height: 150}
+                                  - TextComponent: 967791323
+                                    m_name: TextComponent
+                                    m_isEnabled: true
+                                    m_instanceID: 690666132
+                                    m_FileID: 00000000-0000-0000-0000-000000000000
+                                    _layerorder: 1
+                                    m_ownerCanvasName: ItemPopupCanvas
+                                    navigations: ~
+                                    m_customPixelShaderPath: ""
+                                    fontPath: gmaket_medium_18pt.spritefont
+                                    message: 구매
+                                    relpos: {x: 0, y: 0}
+                                    color: {r: 1, g: 1, b: 1, a: 1}
+                                    fontSize: 1
+                                    useManualRect: false
+                                    manualRect: {x: 0, y: 0, width: 0, height: 0}

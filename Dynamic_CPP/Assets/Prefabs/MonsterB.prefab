@@ -1,6 +1,6 @@
 m_name: MonsterB
 m_isEnabled: true
-m_instanceID: 2702712536
+m_instanceID: 668215800
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -8,7 +8,7 @@ PrefabNode:
     m_isEnabled: true
     m_instanceID: 840891527
     m_transform:
-      position: {x: 0, y: 0, z: 0, w: 1}
+      position: {x: 0, y: 0, z: 9.69295911e-07, w: 1}
       rotation: {x: 0, y: 1, z: 0, w: -1.80182923e-07}
       scale: {x: 1, y: 1.00000155, z: 1.00000155, w: 0}
       m_parentID: 0
@@ -67,7 +67,7 @@ PrefabNode:
         m_rangedAttackCoolTime: 2
         m_name: TestMonsterB
         m_isEnabled: true
-        m_instanceID: 1575412156
+        m_instanceID: 760612161
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 743f36a0-bbce-5055-bd12-682a814bab61
       - BehaviorTreeComponent: 1234464095
@@ -1308,6 +1308,6 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: CriticalMark
             m_isEnabled: true
-            m_instanceID: 3595852699
+            m_instanceID: 3017077975
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245

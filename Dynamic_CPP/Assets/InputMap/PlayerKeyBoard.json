@@ -73,6 +73,30 @@
             "scpritName": "Player"
         },
         {
+            "actionName": "NormalBullet",
+            "actionType": "Button",
+            "funName": "TestHit",
+            "inputType": "KeyBoard",
+            "key0": "N",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "SpecilBullet",
+            "actionType": "Button",
+            "funName": "ShootSpecialBullet",
+            "inputType": "KeyBoard",
+            "key0": "M",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
             "actionName": "SwapWeaponLeft",
             "actionType": "Button",
             "funName": "SwapWeaponLeft",

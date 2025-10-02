@@ -50,6 +50,7 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 			hitinfo.bulletType = bulletType;
 			if (enemy)
 			{
+				LOG("EnemyHit!");
 				enemy->SendDamage(m_ownerPlayer, m_damage, hitinfo);
 				hasAttacked = true;
 				GetOwner()->Destroy(); //지우지말고 BulletPool만들기
