@@ -186,6 +186,11 @@ public:
 	void AutoConnectModules();
 
 	void AutoConnectTrailModules();
+
+	float GetDelayTime() const { return m_delayTime; }
+	void SetDelayTime(float delay) { m_delayTime = delay; }
+	bool IsDelaying() const { return m_isDelaying; }
+
 public:
 	std::string m_name{};
 private:
@@ -207,9 +212,14 @@ private:
 
 protected:
 	// 렌더 초기화 메소드는 rendermodule에서 정의.
+	float m_delayTime = 0.0f;
+	float m_delayTimer = 0.0f;
+	bool m_isDelaying = false;
+
 	float m_effectProgress = 0.0f;
 	bool m_isRunning;
 	bool m_isPaused = false;
+
 	std::vector<ParticleData> m_particleData;
 	LinkedList<ParticleModule> m_moduleList;
 	int m_activeParticleCount = 0;
