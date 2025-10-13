@@ -571,20 +571,9 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	camera.UpdateBuffer(deferredPtr);
 
 	constexpr size_t kMaxInstancesPerDraw = 2048;
-	//std::unordered_map<std::pair<HashedGuid, HashedGuid>, std::vector<FoliageInstance*>> instanceMap;
 	for(auto& proxy : data->m_foliageQueue)
 	{
-		std::unordered_map<uint32, std::vector<FoliageInstance*>> instanceMap;
-		for(auto& instance : proxy->m_foliageInstances)
-		{
-			uint32 key = instance.m_foliageTypeID;
-			if(!instance.m_isCulled)
-			{
-				instanceMap[key].push_back(&instance);
-			}
-		}
-
-		for(auto& [key, instances] : instanceMap)
+		for(auto& [key, instances] : proxy->instanceMap)
 		{
 			if (instances.empty()) continue;
 			auto& firstInstance = instances.front();

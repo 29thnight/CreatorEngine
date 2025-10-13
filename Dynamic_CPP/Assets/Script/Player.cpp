@@ -385,7 +385,9 @@ void Player::Update(float tick)
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	if(dashObj)
+	{
 		dashObj->m_transform.SetPosition(pos);
+	}
 
 
 	if (catchedObject)

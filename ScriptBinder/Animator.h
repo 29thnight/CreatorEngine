@@ -26,11 +26,16 @@ public:
     virtual ~Animator()
     {
         m_animationControllers.clear();
-        for (auto& param : Parameters)
+
         {
-            delete param; // 하나씩 해제
+            std::unique_lock lock(m_paramMutex);
+            for (auto& param : Parameters)
+            {
+                delete param; // 하나씩 해제
+            }
+            Parameters.clear(); // 벡터 비우기
         }
-        Parameters.clear(); // 벡터 비우기
+
         for (auto& socket : socketvec)
         {
             delete socket;
@@ -74,7 +79,6 @@ public:
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
 
-
     std::vector<Socket*> socketvec;
     bool HasSocket()
     { 
@@ -85,10 +89,13 @@ public:
     [[Property]]
     std::vector<ConditionParameter*> Parameters;
 
+    std::mutex m_paramMutex;
+
     void ClearControllersAndParams();
     template<typename T>
     void AddParameter(const std::string valuename, T value, ValueType vType)
     {
+        std::unique_lock lock(m_paramMutex);
         for (auto& parm : Parameters)
         {
             if (parm->name == valuename)
@@ -120,27 +127,34 @@ public:
         std::string valueName = baseName;
         int index = 0;
         bool isDuplicate = true;
-        while (isDuplicate)
         {
-            isDuplicate = false;
-            for (auto& parm : Parameters)
+            std::unique_lock lock(m_paramMutex);
+            while (isDuplicate)
             {
-                if (parm->name == valueName)
+                isDuplicate = false;
+                for (auto& parm : Parameters)
                 {
-                    isDuplicate = true;
-                    valueName = baseName + std::to_string(++index);
-                    break;
+                    if (parm->name == valueName)
+                    {
+                        isDuplicate = true;
+                        valueName = baseName + std::to_string(++index);
+                        break;
+                    }
                 }
             }
         }
         ConditionParameter* newParameter = new ConditionParameter(0, vType, valueName);
-        Parameters.push_back(newParameter);
+        {
+            std::unique_lock lock(m_paramMutex);
+            Parameters.push_back(newParameter);
+        }
         return newParameter;
     }
 
     template<typename T>
     void SetParameter(const std::string valuename, T Value)
     {
+        std::unique_lock lock(m_paramMutex);
         if (Parameters.empty()) return;
         for (auto& param : Parameters)
         {

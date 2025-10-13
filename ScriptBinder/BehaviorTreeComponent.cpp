@@ -42,7 +42,7 @@ void BehaviorTreeComponent::Awake()
 	Initialize();
 }
 
-void BehaviorTreeComponent::Update(float deltaSecond)
+void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 {
 	if (GetOwner()->m_isEnabled == false) return;
 
@@ -56,7 +56,8 @@ void BehaviorTreeComponent::OnDestroy()
 {
 	if (m_pBlackboard)
 	{
-		m_pBlackboard = nullptr;
+		/*m_pBlackboard = nullptr;*/
+		Memory::SafeDelete(m_pBlackboard);
 		AIManagers->RemoveBlackBoard(name);
 	}
 	m_built.clear(); // Àçºôµå ´ëºñ

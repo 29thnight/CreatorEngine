@@ -1,6 +1,7 @@
 #pragma once
 #include "SpinLock.h"
 #include "Delegate.h"
+#include "Benchmark.hpp"
 
 namespace Core
 {

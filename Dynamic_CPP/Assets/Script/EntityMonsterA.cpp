@@ -149,8 +149,6 @@ void EntityMonsterA::Start()
 
 void EntityMonsterA::Update(float tick)
 {
-
-
 	if (blackBoard == nullptr)
 	{
 		return;
@@ -166,16 +164,16 @@ void EntityMonsterA::Update(float tick)
 	bool hasP2 = blackBoard->HasKey("Player2");
 
 	GameObject* Asis = nullptr;
-	if (hasAsis) {
-		Asis = blackBoard->GetValueAsGameObject("Asis");
+	if (hasAsis && !m_asis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
 	}
 	GameObject* player1 = nullptr;
-	if (hasP1){
-		player1 = blackBoard->GetValueAsGameObject("Player1");
+	if (hasP1 && !m_player1){
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
 	}
 	GameObject* player2 = nullptr;
-	if (hasP2) {
-		player2 = blackBoard->GetValueAsGameObject("Player2");
+	if (hasP2 && !m_player2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
 	
 	Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -187,35 +185,35 @@ void EntityMonsterA::Update(float tick)
 	float distAsis = FLT_MAX;
 	float distPlayer1 = FLT_MAX;
 	float distPlayer2 = FLT_MAX;
-	if (Asis) {
-		asisPos = Asis->m_transform.GetWorldPosition();
+	if (m_asis) {
+		asisPos = m_asis->m_transform.GetWorldPosition();
 		distAsis = Mathf::Vector3::DistanceSquared(asisPos, pos);
 	}
-	if (player1) {
-		player1Pos = player1->m_transform.GetWorldPosition();
+	if (m_player1) {
+		player1Pos = m_player1->m_transform.GetWorldPosition();
 		distPlayer1 = Mathf::Vector3::DistanceSquared(player1Pos, pos);
 	}
-	if (player2) {
-		player2Pos = player2->m_transform.GetWorldPosition();
+	if (m_player2) {
+		player2Pos = m_player2->m_transform.GetWorldPosition();
 		distPlayer2 = Mathf::Vector3::DistanceSquared(player2Pos, pos);
 	}
 	GameObject* closedTarget = nullptr;
 	float closedDist = FLT_MAX;
 	if (distPlayer1 < distPlayer2) 
 	{
-		closedTarget = player1;
+		closedTarget = m_player1;
 		closedDist = distPlayer1;
 	}
 	else 
 	{
-		closedTarget = player2;
+		closedTarget = m_player2;
 		closedDist = distPlayer2;
 	}
 
 	if (isAsisAction) {
 		if (distAsis < closedDist)
 		{
-			closedTarget = Asis;
+			closedTarget = m_asis;
 			closedDist = distAsis;
 		}
 	}
@@ -238,8 +236,8 @@ void EntityMonsterA::Update(float tick)
 		if (count > 0) {
 			for (auto& hit : hitResults) {
 				std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-				if (hit.gameObject->GetHashedName().ToString() == player1->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString()== player2->GetHashedName().ToString()) //player
+				if (hit.gameObject->GetHashedName().ToString() == m_player1->GetHashedName().ToString()
+					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()) //player
 				{
 					std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();
@@ -251,12 +249,10 @@ void EntityMonsterA::Update(float tick)
 		}
 	}
 	
-	
 	if (isAttack) {
 		m_state = "Attack";
 	}
 	
-
 	if (EndDeadAnimation)
 	{
 		deadElapsedTime += tick;
@@ -271,7 +267,6 @@ void EntityMonsterA::Update(float tick)
 		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
 	}
 	
-
 	if (m_state == "Chase") {
 		m_animator->SetParameter("Move", true);
 	}

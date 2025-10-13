@@ -90,14 +90,6 @@ void GameManager::Update(float tick)
 			displayPollutionGaugeRatio = 0;
 		}
 	}
-
-	if (!m_asis.empty())
-	{
-		if(m_asis.front())
-		{
-			auto asis = static_cast<EntityAsis*>(m_asis.front());
-		}
-	}
 }
 
 void GameManager::OnDisable()

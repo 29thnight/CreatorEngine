@@ -299,7 +299,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							Meta::Deserialize(sharedState.get(), state);
 							animationController->StateVec.push_back(sharedState);
 							animationController->StateNameSet.insert(sharedState->m_name);
-							animationController->States.insert(std::make_pair(sharedState->m_name, animationController->StateVec.size() - 1));
+							animationController->m_nameToState.insert(std::make_pair(sharedState->m_name, sharedState));
 							sharedState->m_ownerController = animationController.get();
 							sharedState->SetBehaviour(sharedState->behaviourName);
 							if (state["Transitions"])
@@ -324,8 +324,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 											newcondition.m_ownerController = animationController.get();
 											newcondition.SetValue(newcondition.valueName);
 											sharedTransition->conditions.push_back(newcondition);
-											
-				
 										}
 									}
 								}

@@ -114,6 +114,7 @@ public:
 	//foliage type
 	std::vector<FoliageInstance>	m_foliageInstances{};
 	std::vector<FoliageType>		m_foliageTypes{};
+	std::unordered_map<uint32, std::vector<FoliageInstance*>> instanceMap;
 
 public:
 	//decal type

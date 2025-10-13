@@ -513,7 +513,8 @@ void RenderScene::UpdateCommand(ImageComponent* imagePtr)
 {
 	if (!InvaildCheckImage(imagePtr)) 
 	{
-		throw std::runtime_error("InvaildCheckImage");
+		return;
+		//throw std::runtime_error("InvaildCheckImage");
 	}
 	ProxyCommand moveCommand = MakeProxyCommand(imagePtr);
 	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
@@ -566,7 +567,8 @@ void RenderScene::UpdateCommand(TextComponent* textPtr)
 {
 	if (!InvaildCheckText(textPtr)) 
 	{
-		throw std::runtime_error("InvaildCheckText");
+		return;
+		//throw std::runtime_error("InvaildCheckText");
 	}
 	ProxyCommand moveCommand = MakeProxyCommand(textPtr);
 	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));

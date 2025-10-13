@@ -598,12 +598,9 @@ void ModelLoader::LoadModelFromAsset()
     uint32_t meshCount{};
     uint32_t materialCount{};
 
-    Benchmark asset;
     file.read(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
     file.read(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
     file.read(reinterpret_cast<char*>(&materialCount), sizeof(materialCount));
-
-    std::cout << "LoadModelFromAsset base : " << asset.GetElapsedTime() << std::endl;
 
     LoadSkeleton(file);
     LoadNodes(file, nodeCount);
@@ -652,7 +649,7 @@ void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
 
 void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 {
-    Benchmark asset;
+    //Benchmark asset;
     m_model->m_Meshes.reserve(size);
     for (uint32_t i = 0; i < size; ++i)
     {
@@ -685,12 +682,12 @@ void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 
         m_model->m_Meshes.push_back(mesh);
     }
-    std::cout << "LoadMesh base : " << asset.GetElapsedTime() << std::endl;
+    //std::cout << "LoadMesh base : " << asset.GetElapsedTime() << std::endl;
 }
 
 void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 {
-    Benchmark asset;
+    //Benchmark asset;
     double stringTime{};
     m_model->m_Materials.reserve(size);
     for (uint32_t i = 0; i < size; ++i)
@@ -711,8 +708,6 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         {
             mat->m_materialInfo.m_IOR = 1.5f;
         }
-
-
 
         auto readString = [&](std::string& outStr)
         {
@@ -743,6 +738,32 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         Benchmark sasset;
 		mat->ConvertToLinearSpace(true);
 
+        //if (mat->m_materialInfo.m_useBaseColor)
+        //{
+        //    if (Texture* tex = GenerateTexture(mat->m_baseColorTexName, false))
+        //        mat->UseBaseColorMap(tex);
+        //}
+        //if (mat->m_materialInfo.m_useNormalMap)
+        //{
+        //    if (Texture* tex = GenerateTexture(mat->m_normalTexName))
+        //        mat->UseNormalMap(tex);
+        //}
+        //if (mat->m_materialInfo.m_useOccRoughMetal)
+        //{
+        //    if (Texture* tex = GenerateTexture(mat->m_ORM_TexName))
+        //        mat->UseOccRoughMetalMap(tex);
+        //}
+        //if (mat->m_materialInfo.m_useAOMap)
+        //{
+        //    if (Texture* tex = GenerateTexture(mat->m_AO_TexName))
+        //        mat->UseAOMap(tex);
+        //}
+        //if (mat->m_materialInfo.m_useEmissive)
+        //{
+        //    if (Texture* tex = GenerateTexture(mat->m_EmissiveTexName))
+        //        mat->UseEmissiveMap(tex);
+        //}
+
         std::vector<std::future<void>> futs;
         futs.reserve(5);
 
@@ -754,45 +775,62 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 
         futs.emplace_back(std::async(std::launch::async, [mat, this] {
             if (mat->m_materialInfo.m_useNormalMap)
+            {
                 if (Texture* t = GenerateTexture(mat->m_normalTexName))
+                {
                     mat->UseNormalMap(t);
+                }
+            }
         }));
 
-        futs.emplace_back(std::async(std::launch::async, [mat, this] {
+        futs.emplace_back(std::async(std::launch::async, [mat, this] 
+        {
             if (mat->m_materialInfo.m_useOccRoughMetal)
+            {
                 if (Texture* t = GenerateTexture(mat->m_ORM_TexName))
+                {
                     mat->UseOccRoughMetalMap(t);
+                }
+            }
         }));
 
         futs.emplace_back(std::async(std::launch::async, [mat, this] {
             if (mat->m_materialInfo.m_useAOMap)
+            {
                 if (Texture* t = GenerateTexture(mat->m_AO_TexName))
+                {
                     mat->UseAOMap(t);
+                }
+            }
         }));
 
         futs.emplace_back(std::async(std::launch::async, [mat, this] {
             if (mat->m_materialInfo.m_useEmissive)
+            {
                 if (Texture* t = GenerateTexture(mat->m_EmissiveTexName))
+                {
                     mat->UseEmissiveMap(t);
+                }
+            }
         }));
 
         for (auto& f : futs) f.get();
 
         stringTime = sasset.GetElapsedTime();
 
-        std::cout << "Texture" << stringTime << std::endl;
+        //std::cout << "Texture" << stringTime << std::endl;
 
-		DataSystems->Materials[mat->m_name] = mat;
+        DataSystems->InsertMaterial(mat);
 
         m_model->m_Materials.push_back(mat.get());
 
     }
-    std::cout << "LoadMaterial base : " << asset.GetElapsedTime() << std::endl;
+    //std::cout << "LoadMaterial base : " << asset.GetElapsedTime() << std::endl;
 }
 
 void ModelLoader::LoadSkeleton(std::ifstream& infile)
 {
-    Benchmark asset;
+    //Benchmark asset;
     bool hasSkeleton{};
     infile.read(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
     if (!hasSkeleton)
@@ -922,7 +960,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
 	m_model->m_animator->m_Skeleton = skeleton;
 	m_model->m_animator->m_Motion.m_guid = guid;
 
-    std::cout << "LoadSkeleton base : " << asset.GetElapsedTime() << std::endl;
+    //std::cout << "LoadSkeleton base : " << asset.GetElapsedTime() << std::endl;
 }
 
 void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
@@ -1244,14 +1282,14 @@ Texture* ModelLoader::GenerateTexture(std::string_view textureName, bool isCompr
         return nullptr;
 
     file::path path(textureName);
-    Texture* texture = DataSystems->LoadMaterialTexture(path.string(), isCompress);
+    auto texture = DataSystems->LoadSharedMaterialTexture(path.string(), isCompress);
     if (texture)
     {
         texture->m_name = std::string(textureName);
         {
             std::unique_lock lock(m_modelMutex);
-            m_model->m_Textures.push_back(texture);
+            m_model->m_Textures.push_back(texture.get());
         }
     }
-    return texture;
+    return texture.get();
 }

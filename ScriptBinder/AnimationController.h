@@ -25,10 +25,9 @@ public:
 	AnimationState* m_curState = nullptr;
 	AnimationState* m_nextState = nullptr;
 	bool needBlend =false;
-	std::unordered_map<std::string, size_t> States;
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
-
+	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
 	std::set<std::string> StateNameSet;
 
 	
@@ -98,6 +97,5 @@ private:
 	int m_nextAnimationIndex = -1;
 	//지금일어나는중인 전이 - 블렌드시간 탈출시간등
 	AniTransition* m_curTrans{};
-	
 };
 

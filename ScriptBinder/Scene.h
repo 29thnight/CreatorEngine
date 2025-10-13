@@ -41,6 +41,7 @@ public:
 
     [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
+	std::future<void> m_AIFuture;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);

@@ -461,19 +461,23 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 {
 	file::path modelPath = m_assetMetaRegistry->GetPath(guid);
 	std::string name = modelPath.stem().string();
-	if (Models.find(name) != Models.end())
 	{
-		Debug->Log("ModelLoader::LoadModel : Model already loaded");
-		auto model = Models[name].get();
-		return model;
+		std::unique_lock lock(m_modelMutex);
+		if (Models.find(name) != Models.end())
+		{
+			Debug->Log("ModelLoader::LoadModel : Model already loaded");
+			auto model = Models[name].get();
+			return model;
+		}
 	}
 
 	Model* model = Model::LoadModel(modelPath.string());
 	if (model)
 	{
-
-		Models[name] = std::shared_ptr<Model>(model);
-
+		{
+			std::unique_lock lock(m_modelMutex);
+			Models[name] = std::shared_ptr<Model>(model);
+		}
 		return model;
 	}
 	else
@@ -502,7 +506,10 @@ void DataSystem::LoadModel(std::string_view filePath)
 	Managed::SharedPtr<Model> model = Model::LoadModelShared(destination.string());
 	if (model)
 	{
-		Models[name] = model;
+		{
+			std::unique_lock lock(m_modelMutex);
+			Models[name] = model;
+		}
 	}
 	else
 	{
@@ -520,10 +527,13 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 	}
 
 	std::string name = file::path(filePath).stem().string();
-	if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
 	{
-		Debug->Log("ModelLoader::LoadModel : Model already loaded");
-		return Models[name].get();
+		std::unique_lock lock(m_modelMutex);
+		if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
+		{
+			Debug->Log("ModelLoader::LoadModel : Model already loaded");
+			return Models[name].get();
+		}
 	}
 
 	Managed::SharedPtr<Model> model{};
@@ -540,7 +550,10 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 
 	if (model)
 	{
-		Models[name] = model;
+		{
+			std::unique_lock lock(m_modelMutex);
+			Models[name] = model;
+		}
 		return model.get();
 	}
 
@@ -555,33 +568,39 @@ void DataSystem::LoadMaterials()
 {
 }
 
+void DataSystem::InsertMaterial(std::shared_ptr<Material> material)
+{
+	std::unique_lock lock(m_materialMutex);
+	std::string& mat_name = material->m_name;
+	Materials[mat_name] = material;
+}
+
 void DataSystem::SaveMaterial(Material* material)
 {
 #ifndef BUILD_FLAG
-        if (!material)
-                return;
+    if (!material) return;
 
-        file::path savePath = PathFinder::Relative("Materials\\") / (material->m_name + ".asset");
-        std::ofstream fout(savePath);
-        if (fout.is_open())
+    file::path savePath = PathFinder::Relative("Materials\\") / (material->m_name + ".asset");
+    std::ofstream fout(savePath);
+    if (fout.is_open())
+    {
+        YAML::Node node = Meta::Serialize(material);
+        if (!material->m_cbufferValues.empty())
         {
-                YAML::Node node = Meta::Serialize(material);
-                if (!material->m_cbufferValues.empty())
-                {
-                        YAML::Node cbNode;
-                        for (auto& [name, data] : material->m_cbufferValues)
-                        {
-                            YAML::Node entry;
-                            entry["name"] = name;
-                            entry["data"] = YAML::Binary(data.data(), data.size());
-                            cbNode.push_back(entry);
-                        }
-                        node["constant_buffers"] = cbNode;
-                }
-                fout << node;
-                fout.close();
-                ForceCreateYamlMetaFile(savePath);
+            YAML::Node cbNode;
+            for (auto& [name, data] : material->m_cbufferValues)
+            {
+				YAML::Node entry;
+				entry["name"] = name;
+				entry["data"] = YAML::Binary(data.data(), data.size());
+				cbNode.push_back(entry);
+            }
+            node["constant_buffers"] = cbNode;
         }
+        fout << node;
+        fout.close();
+        ForceCreateYamlMetaFile(savePath);
+    }
 #endif // !BUILD_FLAG
 }
 
@@ -802,7 +821,6 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
 	}
 
     auto texture = Texture::LoadSharedFromPath(destination.string(), isCompress);
-
     if (texture)
     {
 		{
@@ -817,6 +835,40 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
     }
 
     return nullptr;
+}
+
+std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view filePath, bool isCompress)
+{
+	file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
+	std::string key = file::path(destination).stem().string();
+
+	// 1차 조회 (락 짧게)
+	{
+		std::unique_lock lock(m_textureMutex);
+		if (auto it = Textures.find(key); it != Textures.end())
+			return it->second; // shared_ptr 복사로 참조 증가
+	}
+
+	// 로드 (락 없이 I/O)
+	auto loaded = Texture::LoadSharedFromPath(destination.string(), isCompress);
+	if (!loaded)
+	{
+		Debug->LogError("TextureLoader::LoadTexture : file not found");
+		return nullptr;
+	}
+
+	// 삽입 단계: 이미 다른 스레드가 넣었을 수 있으니 '덮어쓰지 말고' 기존 걸 사용
+	{
+		std::unique_lock lock(m_textureMutex);
+		auto [it, inserted] = Textures.emplace(key, loaded);
+		if (!inserted)
+		{
+			// 누군가 먼저 넣은 경우: 그걸 사용 (중복 로드였지만 dangling 방지)
+			return it->second;
+		}
+	}
+
+	return loaded;
 }
 
 Material* DataSystem::CreateMaterial()

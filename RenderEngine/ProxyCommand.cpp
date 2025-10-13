@@ -11,6 +11,7 @@
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
 #include "ShaderSystem.h"
+#include <execution>
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -230,6 +231,56 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 		}
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
+
+		using BucketMap = std::unordered_map<uint32, std::vector<FoliageInstance*>>;
+		constexpr size_t SHARDS = 64;
+
+		auto& instances = proxyObject->m_foliageInstances;
+		instances.clear();
+
+		std::array<BucketMap, SHARDS> shardMaps;
+		std::array<std::mutex, SHARDS> shardLocks;
+
+		// 1) 병렬 수집 (샤딩 + 얕은 락)
+		std::for_each(std::execution::par, instances.begin(), instances.end(),
+		[&](FoliageInstance& inst)
+		{
+			if (inst.m_isCulled) return;
+
+			uint32 key = inst.m_foliageTypeID;
+			size_t shard = (std::hash<uint32>{}(key))& (SHARDS - 1);
+
+			// 샤드 단위 잠금
+			std::scoped_lock lk(shardLocks[shard]);
+			shardMaps[shard][key].push_back(&inst);
+		});
+
+		// 2) 키별 총량 계산(미리 capacity 확보용)
+		std::unordered_map<uint32, size_t> totalCounts;
+		for (auto& sm : shardMaps)
+		{
+			for (auto& [k, v] : sm)
+			{
+				totalCounts[k] += v.size();
+			}
+		}
+
+		// 3) 원본 instanceMap에 정확히 reserve
+		for (auto& [k, c] : totalCounts)
+		{
+			auto& dst = proxyObject->instanceMap[k];
+			dst.reserve(dst.size() + c);
+		}
+
+		// 4) 샤드 → 원본으로 머지(단일 스레드, 선형 머지)
+		for (auto& sm : shardMaps)
+		{
+			for (auto& [k, v] : sm)
+			{
+				auto& dst = proxyObject->instanceMap[k];
+				dst.insert(dst.end(), v.begin(), v.end());
+			}
+		}
 	};
 }
 
