@@ -421,6 +421,12 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 			timeScale = effectJson["timeScale"];
 		}
 
+		if (effectJson.contains("emitterTimings") && effectJson["emitterTimings"].is_array()) {
+			for (const auto& delay : effectJson["emitterTimings"]) {
+				emitterDelays.push_back(delay.get<float>());
+			}
+		}
+
 		if (effectJson.contains("particleSystems") && effectJson["particleSystems"].is_array()) {
 			for (const auto& psJson : effectJson["particleSystems"]) {
 				ParticleSystemConfig psConfig;
@@ -515,8 +521,13 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 
 		// ParticleSystem 교체
 		effect->ClearParticleSystems();
-		for (const auto& ps : deserializedEffect->GetAllParticleSystems()) {
+		for (size_t i = 0; i < deserializedEffect->GetAllParticleSystems().size(); ++i) {
+			const auto& ps = deserializedEffect->GetAllParticleSystems()[i];
 			effect->AddParticleSystem(ps);
+
+			// 딜레이 정보 복원
+			float delay = deserializedEffect->GetEmitterStartDelay(i);
+			effect->SetEmitterStartDelay(i, delay);
 		}
 	}
 

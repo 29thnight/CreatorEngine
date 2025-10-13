@@ -35,6 +35,7 @@ public:
 	nlohmann::json originalJson;
 
 	std::vector<ParticleSystemConfig> particleSystemConfigs;
+	std::vector<float> emitterDelays;
 
 	std::string name{};
 	float duration = 1.0f;
@@ -103,7 +104,7 @@ private:
 
 
 	// 풀 설정
-	static const int DEFAULT_POOL_SIZE = 50;  // 동시 이펙트 최대 개수
+	static const int DEFAULT_POOL_SIZE = 100;  // 동시 이펙트 최대 개수
 	static const int MAX_PARTICLES_PER_SYSTEM = 10000;  // 시스템당 최대 파티클 수
 
 	std::queue<std::unique_ptr<EffectBase>> cleanupQueue;

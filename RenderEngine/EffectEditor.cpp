@@ -157,10 +157,12 @@ void EffectEditor::ExportToManager(const std::string& effectName)
 	tempEffect->SetLoop(m_effectLoop);
 	tempEffect->SetDuration(m_effectDuration);
 
-	for (const auto& tempEmitter : m_tempEmitters) {
+	for (size_t i = 0; i < m_tempEmitters.size(); ++i) {
+		const auto& tempEmitter = m_tempEmitters[i];
 		if (tempEmitter.particleSystem) {
 			tempEmitter.particleSystem->m_name = tempEmitter.name;
 			tempEffect->AddParticleSystem(tempEmitter.particleSystem);
+			tempEffect->SetEmitterStartDelay(i, tempEmitter.startDelay);
 		}
 	}
 
@@ -465,6 +467,9 @@ void EffectEditor::RenderMainEditor()
 
 					ImGui::Text("Emitter %d: %s", i, m_tempEmitters[i].name.c_str());
 
+					if (ImGui::DragFloat("Start Delay", &m_tempEmitters[i].startDelay, 0.01f, 0.0f, 10.0f, "%.2fs")) {
+						// 값이 변경됨
+					}
 					// 에미터 오프셋 설정 (이펙트 기준점에서의 상대 위치)
 					if (m_tempEmitters[i].particleSystem) {
 						Mathf::Vector3 currentPos = m_tempEmitters[i].particleSystem->GetPosition();
@@ -1287,15 +1292,16 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 		tempEffect->SetLoop(m_effectLoop);
 		tempEffect->SetDuration(m_effectDuration);
 
-		for (const auto& tempEmitter : m_tempEmitters) {
+		for (size_t i = 0; i < m_tempEmitters.size(); ++i) {
+			const auto& tempEmitter = m_tempEmitters[i];
 			if (tempEmitter.particleSystem) {
 				tempEmitter.particleSystem->m_name = tempEmitter.name;
 				tempEffect->AddParticleSystem(tempEmitter.particleSystem);
+				tempEffect->SetEmitterStartDelay(i, tempEmitter.startDelay);
 			}
 		}
 
 		nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
-
 		ExportToManager(tempEffect->GetName());
 
 		std::ofstream file(filepath);
@@ -1344,22 +1350,23 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 				std::string savedName = tempEmitter.particleSystem->m_name;
 				tempEmitter.name = savedName.empty() ? ("LoadedEmitter_" + std::to_string(i + 1)) : savedName;
 				tempEmitter.isPlaying = false;
+				tempEmitter.startDelay = loadedEffect->GetEmitterStartDelay(i);
 
 				m_tempEmitters.push_back(tempEmitter);
 
-				std::cout << "Emitter " << i << " added. Checking references..." << std::endl;
-				if (tempEmitter.particleSystem) {
-					const auto& renderModules = tempEmitter.particleSystem->GetRenderModules();
-					std::cout << "  RenderModules count: " << renderModules.size() << std::endl;
-					for (size_t j = 0; j < renderModules.size(); ++j) {
-						auto renderModule = renderModules[j];
-						std::cout << "    Module[" << j << "] ptr: " << renderModule << std::endl;
-						if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
-							Texture* tex = meshModule->GetAssignedTexture();
-							std::cout << "      Texture: " << (tex ? tex->m_name : "NONE") << std::endl;
-						}
-					}
-				}
+				//std::cout << "Emitter " << i << " added. Checking references..." << std::endl;
+				//if (tempEmitter.particleSystem) {
+				//	const auto& renderModules = tempEmitter.particleSystem->GetRenderModules();
+				//	std::cout << "  RenderModules count: " << renderModules.size() << std::endl;
+				//	for (size_t j = 0; j < renderModules.size(); ++j) {
+				//		auto renderModule = renderModules[j];
+				//		std::cout << "    Module[" << j << "] ptr: " << renderModule << std::endl;
+				//		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
+				//			Texture* tex = meshModule->GetAssignedTexture();
+				//			std::cout << "      Texture: " << (tex ? tex->m_name : "NONE") << std::endl;
+				//		}
+				//	}
+				//}
 			}
 
 			m_loadedEffect = std::move(loadedEffect);

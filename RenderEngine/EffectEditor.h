@@ -27,6 +27,7 @@ struct TempEmitterInfo {
     std::shared_ptr<ParticleSystem> particleSystem;
     bool isPlaying = false;
     std::string name;
+    float startDelay = 0.0f;
 };
 
 class EffectEditor
