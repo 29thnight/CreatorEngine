@@ -5,11 +5,10 @@
 #include "EngineSetting.h"
 
 class ModuleBehavior;
-class GameObject;
 class AnimationState;
 class SceneManager;
 class PhysicsManager;
-class GameObjectPool;
+class GameObject;
 class AniBehavior;
 class PhysicX;
 class Scene;
@@ -21,9 +20,6 @@ namespace BT
 	class ConditionDecoratorNode;
 }
 #pragma region DLLFunctionPtr
-//Object Pool 관련 함수 포인터 정의
-typedef void (*SetObjectAllocFunc)(Singleton<GameObjectPool>::FGetInstance);
-
 // 모듈 스크립트 관련 함수 포인터 정의
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef void (*ModuleBehaviorDeleteFunc)(ModuleBehavior* behavior);
@@ -98,21 +94,9 @@ public:
 		m_scriptDeleteFunc(script);
 	}
 
-	void CollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
-	{
-		std::unique_lock lock(m_scriptFileMutex);
-		m_scriptComponentIndexs.emplace_back(gameObject, index, name);
-	}
+	void CollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name);
 
-	void UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
-	{
-		std::unique_lock lock(m_scriptFileMutex);
-		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
-		{
-			return std::get<0>(tuple).lock() == gameObject->shared_from_this() 
-				&& std::get<2>(tuple) == name;
-		});
-	}
+	void UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name);
 
 	bool IsScriptExists(std::string_view name) const
 	{
@@ -282,8 +266,8 @@ private:
 	ListAniBehaviorNamesFunc				m_listAniBehaviorNamesFunc{};
 
 private:
-	using ModuleBehaviorIndexVector			= std::vector<std::tuple<std::weak_ptr<GameObject>, size_t, std::string>>;
-	using ModuleBehaviorMetaVector			= std::vector<std::tuple<std::weak_ptr<GameObject>, size_t, MetaYml::Node>>;
+	using ModuleBehaviorIndexVector			= std::vector<std::tuple<std::weak_ptr<class GameObject>, size_t, std::string>>;
+	using ModuleBehaviorMetaVector			= std::vector<std::tuple<std::weak_ptr<class GameObject>, size_t, MetaYml::Node>>;
 	using AniBehaviorVector					= std::vector<AnimationState*>;
 	
 	// 스크립트 컴포넌트 인덱스와 메타 정보 저장

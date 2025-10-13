@@ -151,6 +151,8 @@ public:
 	std::string selectedMetaFilePath{};
 	std::optional<YAML::Node> selectedFileMetaNode{};
 
+	std::mutex m_textureMutex;
+
 	//--------- Icon for ImGui
 	Texture* TextureIcon{};
 	Texture* ModelIcon{};

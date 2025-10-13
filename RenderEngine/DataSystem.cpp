@@ -792,17 +792,23 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
 
     std::string name = file::path(filePath).stem().string();
-    if (Textures.find(name) != Textures.end())
-    {
-        Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
-        return Textures[name].get();
-    }
+	{
+		std::unique_lock lock(m_textureMutex);
+		if (Textures.find(name) != Textures.end())
+		{
+			Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+			return Textures[name].get();
+		}
+	}
 
     auto texture = Texture::LoadSharedFromPath(destination.string(), isCompress);
 
     if (texture)
     {
-		Textures[name] = texture;
+		{
+			std::unique_lock lock(m_textureMutex);
+			Textures[name] = texture;
+		}
         return texture.get();
     }
     else
@@ -1561,24 +1567,30 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
 		file::path name = entry.assetName;
-		switch (type)
+
+		SceneManagers->m_threadPool->Enqueue([this, type, name]
 		{
-		case ManagedAssetType::Model:
-			LoadModel(entry.assetName);
-			break;
-		case ManagedAssetType::Material:
-			LoadMaterial(entry.assetName);
-			break;
-		case ManagedAssetType::Texture:
-			LoadTexture(entry.assetName);
-			break;
-		case ManagedAssetType::SpriteFont:
-			LoadSFont(name.wstring());
-			break;
-		default:
-			break;
-		}
+			switch (type)
+			{
+			case ManagedAssetType::Model:
+				LoadModel(name.string());
+				break;
+			case ManagedAssetType::Material:
+				LoadMaterial(name.string());
+				break;
+			case ManagedAssetType::Texture:
+				LoadTexture(name.string());
+				break;
+			case ManagedAssetType::SpriteFont:
+				LoadSFont(name.wstring());
+				break;
+			default:
+				break;
+			}
+		});
 	}
+
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 }
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)

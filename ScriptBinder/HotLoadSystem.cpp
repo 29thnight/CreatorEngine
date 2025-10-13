@@ -452,7 +452,7 @@ void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<
 				auto scriptName = scriptComponent->m_name.ToString();
 				if (!scriptName.empty())
 				{
-					m_scriptComponentIndexs.emplace_back(gameObject, index, std::move(scriptName));
+					m_scriptComponentIndexs.emplace_back(gameObject->weak_from_this(), index, std::move(scriptName));
 				}
 			}
 		}
@@ -1675,6 +1675,22 @@ void HotLoadSystem::CreateAniBehaviorScript(std::string_view name)
 		}
 	}
 #endif
+}
+
+void HotLoadSystem::CollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
+{
+	std::unique_lock lock(m_scriptFileMutex);
+	m_scriptComponentIndexs.emplace_back(gameObject->weak_from_this(), index, name);
+}
+
+void HotLoadSystem::UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
+{
+	std::unique_lock lock(m_scriptFileMutex);
+	std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
+		{
+			return std::get<0>(tuple).lock() == gameObject->shared_from_this()
+				&& std::get<2>(tuple) == name;
+		});
 }
 
 void HotLoadSystem::ResetAniBehaviorPtr()
