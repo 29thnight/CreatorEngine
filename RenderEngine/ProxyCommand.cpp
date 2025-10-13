@@ -45,6 +45,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	HashedGuid matGuid				= proxyObject->m_materialGuid;
 	HashedGuid originMatGuid		= pComponent->m_Material->m_materialGuid;
 	bool isEnableLOD				= pComponent->m_isEnableLOD;
+	uint32 bitflag					= pComponent->m_bitflag;
 
 	Mathf::xMatrix* palletePtr{ nullptr };
 	bool isAnimationUpdate{ false };
@@ -102,6 +103,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		proxyObject->m_isShadowCast		= isShadowCast;
 		proxyObject->m_isShadowRecive	= isShadowRecive;
 		proxyObject->m_EnableLOD		= isEnableLOD;
+		proxyObject->m_bitflag			= bitflag;
 
 		if(isLightMappingUpdatable)
 		{

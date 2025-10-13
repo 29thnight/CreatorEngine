@@ -55,7 +55,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     }
 
     [unroll]
-    for (int i = 0; i < MAX_LIGHTS; ++i)
+    for (int i = 0; i < 4; ++i)
     {
         Light light = Lights[i];
         if (light.status == LIGHT_DISABLED)

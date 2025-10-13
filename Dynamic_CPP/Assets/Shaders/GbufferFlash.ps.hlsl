@@ -30,7 +30,6 @@ cbuffer PBRMaterial : register(b0)
     int gNormalState;
     int gConvertToLinear;
     
-    uint bitflag;
     float gIOR;
 }
 
@@ -44,6 +43,11 @@ cbuffer TimeBuffer : register(b5)
 cbuffer FlashBuffer : register(b6)
 {
     float flashStrength;
+}
+
+cbuffer MeshRendererBuffer : register(b7)
+{
+    uint bitflag;
 }
 
 cbuffer TerrainLayerConstants : register(b12)

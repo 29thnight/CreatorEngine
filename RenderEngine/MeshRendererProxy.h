@@ -39,9 +39,10 @@ public:
 		HashedGuid materialGuid{};
 		bool       LODEnabled{ false };
 		uint32	   LODLevel{ 0 };
+		uint32	   bitflag{ 0 };
 
-		ProxyFilter(size_t animatorGuid, size_t materialGuid, bool LODEnabled, uint32 LODLevel)
-			: animatorGuid(animatorGuid), materialGuid(materialGuid), LODEnabled(LODEnabled), LODLevel(LODLevel) {
+		ProxyFilter(size_t animatorGuid, size_t materialGuid, bool LODEnabled, uint32 LODLevel, uint32 bitflag)
+			: animatorGuid(animatorGuid), materialGuid(materialGuid), LODEnabled(LODEnabled), LODLevel(LODLevel), bitflag(bitflag) {
 		}
 
 		auto operator<=>(const ProxyFilter& other) const = default;
@@ -94,6 +95,7 @@ public:
 	Mathf::xMatrix*					m_finalTransforms{};
 	LightMapping					m_LightMapping;
 	uint32							m_currLOD{ 0 };
+	uint32							m_bitflag{ 0 };
 
 	bool							m_isEnableShadow{ true };
 	bool							m_isShadowCast{ true };

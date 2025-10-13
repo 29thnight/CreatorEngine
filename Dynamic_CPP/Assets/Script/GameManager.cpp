@@ -100,11 +100,7 @@ void GameManager::OnDisable()
 		auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();
 		if (meshrenderer)
 		{
-			auto material = meshrenderer->m_Material;
-			if (material)
-			{
-				material->m_materialInfo.m_bitflag = 0;
-			}
+			meshrenderer->m_bitflag = 0;
 		}
 	}
 }
