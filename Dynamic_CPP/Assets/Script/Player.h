@@ -127,7 +127,7 @@ public:
 	[[Property]]
 	int  dashAmount = 1;   //최대대시가능 횟수
 	bool isDashing = false; //대쉬중
-	float m_dashElapsedTime = 0.f;  //미사용중
+	float m_dashElapsedTime = 0.f;  //
 	float m_dashCoolElapsedTime = 0.f; //
 	[[Property]]
 	float dubbleDashTime = 0.5f; //더블대쉬 가능한시간

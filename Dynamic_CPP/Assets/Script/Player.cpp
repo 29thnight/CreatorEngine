@@ -388,6 +388,14 @@ void Player::Update(float tick)
 		dashObj->m_transform.SetPosition(pos);
 
 
+	if (isDashing)
+	{
+		m_dashElapsedTime += tick;
+		if (m_dashElapsedTime >= m_dashTime)
+		{
+			player->GetComponent<CharacterControllerComponent>()->StopForcedMove(); 
+		}
+	}
 	if (catchedObject)
 	{
 		UpdateChatchObject();
@@ -901,13 +909,24 @@ void Player::Dash()
 	if (false == CheckState(PlayerStateFlag::CanDash))  return;
 	//대쉬 애니메이션중엔 적통과
 	m_animator->SetParameter("OnDash", true);
-	Mathf::Vector3 forward = player->m_transform.GetForward();
-	Mathf::Vector3 horizontal = forward * dashDistacne;
-	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,0,horizontal.z };
+	//Mathf::Vector3 forward = player->m_transform.GetForward();
+	//Mathf::Vector3 horizontal = forward * dashDistacne;
 
-	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
- 	controller->TriggerForcedMove(knockbackVeocity);
+
+
+	//float knockbackSpeed = dashDistacne / m_dashTime;
+
+	//Mathf::Vector3 horizontalDir = forward;
+	//horizontalDir.y = 0.0f;
+	//horizontalDir.Normalize();
+
+	//// 속도 벡터 계산
+	//Mathf::Vector3 knockbackVelocity = horizontalDir * knockbackSpeed;
+
+	//auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+ //	controller->TriggerForcedMove(knockbackVelocity);
 	//isDashing = true;
+	//m_dashElapsedTime = 0;
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
 	m_curDashCount++;
