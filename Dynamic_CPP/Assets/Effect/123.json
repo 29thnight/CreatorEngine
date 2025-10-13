@@ -7,7 +7,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "1",
+    "name": "123",
     "particleSystems": [
         {
             "isRunning": false,
@@ -60,10 +60,10 @@
                         },
                         "trailParams": {
                             "endWidth": 0.10000000149011612,
-                            "maxTrailPoints": 100,
-                            "minDistance": 0.10000000149011612,
-                            "startWidth": 1.0,
-                            "trailLifetime": 2.0,
+                            "maxTrailPoints": 500,
+                            "minDistance": 0.0010000000474974513,
+                            "startWidth": 20.0,
+                            "trailLifetime": 0.9900000095367432,
                             "useLengthBasedUV": true
                         }
                     },
@@ -96,10 +96,10 @@
                         "renderStates": {
                             "blendPreset": 1,
                             "depthPreset": 2,
-                            "rasterizerPreset": 1
+                            "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "Dash",
+                            "pixelShader": "TrailPixel",
                             "vertexShader": "TrailVertex"
                         },
                         "textures": [
