@@ -65,7 +65,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     };
     
     int flagnumber = firstbitlow(centerflag);
-    int colorVelocity = colors[flagnumber - 1].a;
+    int colorVelocity = colors[flagnumber].a;
     
     for (int i = 0; i < 4; i++) 
     {
@@ -77,7 +77,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             {
                 if (centerflag & (1 << j))
                 {
-                    color += colors[j - 1] * colors[j - 1].a;
+                    color += colors[j] * colors[j].a;
                 }
             }
         }
