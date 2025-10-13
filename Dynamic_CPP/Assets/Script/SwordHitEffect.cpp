@@ -15,12 +15,12 @@ void SwordHitEffect::Start()
 			}
 		}
 	}
-
 	
 }
 
 void SwordHitEffect::Update(float tick)
 {
+	if (m_isCallStart == false)return;
 	if (true == beLateFrame && false == OnEffect)
 	{
 		OnEffect = true;

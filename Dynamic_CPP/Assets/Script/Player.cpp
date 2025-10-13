@@ -53,6 +53,8 @@ void Player::Awake()
 		GM->PushEntity(this);
 		GM->PushPlayer(this);
 	}
+	//TODO : 원인 찾을것
+	moveSpeed = 0.1f;
 }
 void Player::Start()
 {
@@ -1732,10 +1734,16 @@ void Player::ShootSpecialBullet()
 void Player::ShootChargeBullet()
 {
 	if (normalBullets.size() <= 7) return;
-	GameObject* bulletObj = normalBullets.back();
-	normalBullets.pop_back();
+	std::vector<GameObject*> charepool;
+	for (int i = 0; i < 5; i++)
+	{
+		GameObject* bulletObj = normalBullets.back();
+		normalBullets.pop_back();
+		
+		charepool.push_back(bulletObj);
+	}
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
-	if (bulletObj)
+	if (!charepool.empty())
 	{
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 		if (shootPosObj)
@@ -1748,7 +1756,13 @@ void Player::ShootChargeBullet()
 		{
 			for (int i = -halfCount; i <= halfCount; i++)
 			{
-				NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
+				if (charepool.empty()) return;
+				NormalBullet* bullet = charepool.back()->GetComponent<NormalBullet>();
+				
+				bullet->GetOwner()->SetEnabled(true);
+
+				charepool.pop_back();
+					//bulletObj->GetComponent<NormalBullet>();
 				int Shootangle = m_curWeapon->ChargeAttackBulletAngle * i;
 				Mathf::Vector3 ShootDir = XMVector3TransformNormal(OrgionShootDir,
 					XMMatrixRotationY(XMConvertToRadians(Shootangle)));
@@ -1763,12 +1777,18 @@ void Player::ShootChargeBullet()
 		}
 	}
 
+
+
+
+
+	
 }
 
 void Player::ThrowBomb()
 {
 	GameObject* bombObj = bombs.back();
 	bombs.pop_back();
+	bombObj->SetEnabled(true);
 	
 	if (bombObj)
 	{

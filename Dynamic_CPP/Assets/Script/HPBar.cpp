@@ -61,7 +61,10 @@ void HPBar::LateUpdate(float)
     //rectTransform update
     auto cameraPtr = CameraManagement->GetLastCamera();
     if (!cameraPtr || !target_ptr)
+    {
+        //GetOwner()->Destroy();
         return;
+    }
     Camera* camera = cameraPtr.get();
 
     auto player = target_ptr->GetComponentDynamicCast<Entity>();

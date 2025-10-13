@@ -480,6 +480,8 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	{
 		Debug->LogError("ModelLoader::LoadModel : Model file not found");
 	}
+
+	return nullptr;
 }
 
 void DataSystem::LoadModel(std::string_view filePath)
@@ -541,6 +543,7 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 		Models[name] = model;
 		return model.get();
 	}
+
 	return nullptr;
 }
 
@@ -584,51 +587,51 @@ void DataSystem::SaveMaterial(Material* material)
 
 Material* DataSystem::LoadMaterial(std::string_view name)
 {
-        std::string materialName = name.data();
-        if (Materials.find(materialName) != Materials.end())
-        {
-                Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
-                return Materials[materialName].get();
-        }
+    std::string materialName = name.data();
+    if (Materials.find(materialName) != Materials.end())
+    {
+		Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
+		return Materials[materialName].get();
+    }
 #ifndef BUILD_FLAG
-        file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
-        if (!file::exists(loadPath))
+    file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
+    if (!file::exists(loadPath))
+    {
+		return nullptr;
+    }
+
+    MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
+    auto material = std::make_shared<Material>();
+    Meta::Deserialize(material.get(), node);
+    if (auto cbs = node["constant_buffers"])
+    {
+        for (auto cbEntry : cbs)
         {
-                return nullptr;
+            std::string cbName = cbEntry["name"].as<std::string>();
+            YAML::Binary bin = cbEntry["data"].as<YAML::Binary>();
+            std::vector<uint8_t> data(bin.data(), bin.data() + bin.size());
+            material->m_cbufferValues.emplace(std::move(cbName), std::move(data));
         }
+    }
 
-        MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
-        auto material = std::make_shared<Material>();
-        Meta::Deserialize(material.get(), node);
-        if (auto cbs = node["constant_buffers"])
+    auto loadTex = [this](const std::string& texName, Texture*& texPtr, bool compress = false)
+    {
+        if (!texName.empty())
         {
-                for (auto cbEntry : cbs)
-                {
-                        std::string cbName = cbEntry["name"].as<std::string>();
-                        YAML::Binary bin = cbEntry["data"].as<YAML::Binary>();
-                        std::vector<uint8_t> data(bin.data(), bin.data() + bin.size());
-                        material->m_cbufferValues.emplace(std::move(cbName), std::move(data));
-                }
+            texPtr = LoadMaterialTexture(texName, compress);
         }
+    };
 
-        auto loadTex = [this](const std::string& texName, Texture*& texPtr, bool compress = false)
-        {
-                if (!texName.empty())
-                {
-                        texPtr = LoadMaterialTexture(texName, compress);
-                }
-        };
+    loadTex(material->m_baseColorTexName, material->m_pBaseColor, true);
+    loadTex(material->m_normalTexName, material->m_pNormal);
+    loadTex(material->m_ORM_TexName, material->m_pOccRoughMetal);
+    loadTex(material->m_AO_TexName, material->m_AOMap);
+    loadTex(material->m_EmissiveTexName, material->m_pEmissive);
 
-        loadTex(material->m_baseColorTexName, material->m_pBaseColor, true);
-        loadTex(material->m_normalTexName, material->m_pNormal);
-        loadTex(material->m_ORM_TexName, material->m_pOccRoughMetal);
-        loadTex(material->m_AO_TexName, material->m_AOMap);
-        loadTex(material->m_EmissiveTexName, material->m_pEmissive);
-
-        Materials[material->m_name] = material;
-        return material.get();
+    Materials[material->m_name] = material;
+    return material.get();
 #else
-        return nullptr;
+    return nullptr;
 #endif
 }
 
@@ -654,6 +657,8 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 	{
 		Debug->LogError("ModelLoader::LoadModel : Model file not found");
 	}
+
+	return nullptr;
 }
 
 Texture* DataSystem::LoadTexture(std::string_view filePath, TextureFileType type)
@@ -787,17 +792,23 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
 
     std::string name = file::path(filePath).stem().string();
-    if (Textures.find(name) != Textures.end())
-    {
-        Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
-        return Textures[name].get();
-    }
+	{
+		std::unique_lock lock(m_textureMutex);
+		if (Textures.find(name) != Textures.end())
+		{
+			Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+			return Textures[name].get();
+		}
+	}
 
     auto texture = Texture::LoadSharedFromPath(destination.string(), isCompress);
 
     if (texture)
     {
-		Textures[name] = texture;
+		{
+			std::unique_lock lock(m_textureMutex);
+			Textures[name] = texture;
+		}
         return texture.get();
     }
     else
@@ -1556,24 +1567,30 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
 		file::path name = entry.assetName;
-		switch (type)
+
+		SceneManagers->m_threadPool->Enqueue([this, type, name]
 		{
-		case ManagedAssetType::Model:
-			LoadModel(entry.assetName);
-			break;
-		case ManagedAssetType::Material:
-			LoadMaterial(entry.assetName);
-			break;
-		case ManagedAssetType::Texture:
-			LoadTexture(entry.assetName);
-			break;
-		case ManagedAssetType::SpriteFont:
-			LoadSFont(name.wstring());
-			break;
-		default:
-			break;
-		}
+			switch (type)
+			{
+			case ManagedAssetType::Model:
+				LoadModel(name.string());
+				break;
+			case ManagedAssetType::Material:
+				LoadMaterial(name.string());
+				break;
+			case ManagedAssetType::Texture:
+				LoadTexture(name.string());
+				break;
+			case ManagedAssetType::SpriteFont:
+				LoadSFont(name.wstring());
+				break;
+			default:
+				break;
+			}
+		});
 	}
+
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 }
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)

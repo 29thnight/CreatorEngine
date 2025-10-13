@@ -6,6 +6,7 @@ using namespace Mathf;
 
 void Weapon::Start()
 {
+	curDur = durMax;
 }
 
 void Weapon::Update(float tick)

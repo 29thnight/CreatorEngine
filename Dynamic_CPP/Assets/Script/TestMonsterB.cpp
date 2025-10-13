@@ -147,7 +147,8 @@ void TestMonsterB::Update(float tick)
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
-
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetBaseSpeed(m_moveSpeed);
 	GameObject* Asis = nullptr;
 	if (hasAsis) {
 		Asis = blackBoard->GetValueAsGameObject("Asis");

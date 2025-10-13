@@ -165,13 +165,13 @@ void HotLoadSystem::ReloadDynamicLibrary()
 			if (!validNames.count(name))
 			{
 				std::cout << "Invalid Script : " << name << " (GameObject index: " << index << ")\n";
-				gameObject = nullptr; // GameObject도 nullptr로 설정
+				gameObject.reset(); // GameObject도 nullptr로 설정
 			}
 		}
 
 		std::erase_if(m_scriptComponentIndexs, [](const auto& tuple)
 		{
-			return std::get<0>(tuple) == nullptr; // GameObject가 nullptr인 경우 제거
+			return true == std::get<0>(tuple).expired(); // GameObject가 nullptr인 경우 제거
 		});
 
 		ReplaceScriptComponent();
@@ -236,20 +236,25 @@ void HotLoadSystem::ReplaceScriptComponent()
 		for (auto& gameObject : gameObjects)
 			gameObjectSet.insert(gameObject.get());
 
-		auto findMetaNode = [this](GameObject* obj, size_t idx) -> MetaYml::Node*
+		auto findMetaNode = [this](auto obj, size_t idx) -> MetaYml::Node*
 		{
 			auto it = std::ranges::find_if(m_scriptComponentMetaIndexs,
-				[obj, idx](const auto& entry)
+				[obj, idx](const auto& entry) -> bool
 				{
 					const auto& [metaGameObject, metaIndex, node] = entry;
-					return metaGameObject == obj && metaIndex == idx;
+					if (obj || metaGameObject.expired()) return false;
+
+					return metaGameObject.lock() == obj && metaIndex == idx;
 				});
 			return it != m_scriptComponentMetaIndexs.end() ? &std::get<2>(*it) : nullptr;
 		};
 
-		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+		for (auto& [weakObject, index, name] : m_scriptComponentIndexs)
 		{
-			if (!gameObjectSet.contains(gameObject)) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
+			auto gameObject = weakObject.lock();
+			if (!gameObject) continue;
+
+			if (!gameObjectSet.contains(gameObject.get())) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
 
 			std::shared_ptr<ModuleBehavior> newScript = std::shared_ptr<ModuleBehavior>(
 				ScriptManager->CreateMonoBehavior(name.data()),
@@ -264,7 +269,7 @@ void HotLoadSystem::ReplaceScriptComponent()
 				continue;
 			}
 
-			newScript->SetOwner(gameObject);
+			newScript->SetOwner(gameObject.get());
 
 
 			if (SceneManagers->m_isGameStart)
@@ -334,20 +339,26 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 	for (auto& gameObject : gameObjects)
 		gameObjectSet.insert(gameObject.get());
 
-	auto findMetaNode = [this](GameObject* obj, size_t idx) -> MetaYml::Node*
+	auto findMetaNode = [this](auto obj, size_t idx) -> MetaYml::Node*
 	{
 		auto it = std::find_if(m_scriptComponentMetaIndexs.begin(), m_scriptComponentMetaIndexs.end(),
 		[obj, idx](const auto& entry)
 		{
 			const auto& [metaGameObject, metaIndex, node] = entry;
-			return metaGameObject == obj && metaIndex == idx;
+
+			if (metaGameObject.expired()) return false;
+
+			return metaGameObject.lock() == obj && metaIndex == idx;
 		});
 		return it != m_scriptComponentMetaIndexs.end() ? &std::get<2>(*it) : nullptr;
 	};
 
-	for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+	for (auto& [weakObject, index, name] : m_scriptComponentIndexs)
 	{
-		if (!gameObjectSet.contains(gameObject)) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
+		auto gameObject = weakObject.lock();
+		if (!gameObject) continue;
+
+		if (!gameObjectSet.contains(gameObject.get())) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
 
 		std::shared_ptr<ModuleBehavior> newScript = std::shared_ptr<ModuleBehavior>(
 			ScriptManager->CreateMonoBehavior(name.data()),
@@ -367,7 +378,7 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 			ScriptManager->BindScriptEvents(newScript.get(), name);
 		}
 
-		newScript->SetOwner(gameObject);
+		newScript->SetOwner(gameObject.get());
 		auto sharedScript = std::reinterpret_pointer_cast<Component>(newScript);
 		if (index >= gameObject->m_components.size())
 		{
@@ -441,7 +452,7 @@ void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<
 				auto scriptName = scriptComponent->m_name.ToString();
 				if (!scriptName.empty())
 				{
-					m_scriptComponentIndexs.emplace_back(gameObject, index, std::move(scriptName));
+					m_scriptComponentIndexs.emplace_back(gameObject->weak_from_this(), index, std::move(scriptName));
 				}
 			}
 		}
@@ -1666,6 +1677,22 @@ void HotLoadSystem::CreateAniBehaviorScript(std::string_view name)
 #endif
 }
 
+void HotLoadSystem::CollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
+{
+	std::unique_lock lock(m_scriptFileMutex);
+	m_scriptComponentIndexs.emplace_back(gameObject->weak_from_this(), index, name);
+}
+
+void HotLoadSystem::UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
+{
+	std::unique_lock lock(m_scriptFileMutex);
+	std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
+		{
+			return std::get<0>(tuple).lock() == gameObject->shared_from_this()
+				&& std::get<2>(tuple) == name;
+		});
+}
+
 void HotLoadSystem::ResetAniBehaviorPtr()
 {
 	std::unique_lock lock(m_scriptFileMutex);
@@ -1698,9 +1725,11 @@ void HotLoadSystem::Compile()
 #ifndef BUILD_FLAG
 		AIManagers->ClearTreeInAIComponent();
 
-		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+		for (auto& [weakObject, index, name] : m_scriptComponentIndexs)
 		{
-			if (gameObject->m_components.empty()) continue;
+			//WARN : APP Vrifier - Stop #2
+			auto gameObject = weakObject.lock();
+			if (!gameObject || gameObject->m_components.empty()) continue;
 
 			auto script = std::dynamic_pointer_cast<ModuleBehavior>(gameObject->m_components[index]);
 			if (nullptr != script)

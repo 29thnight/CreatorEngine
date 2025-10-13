@@ -162,6 +162,8 @@ void EntityEleteMonster::Update(float tick)
 		std::string Identity = blackBoard->GetValueAsString("Identity");
 	}
 
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetBaseSpeed(m_moveSpeed);
 	//TPCooldown update
 	bool hasTPCooldown = blackBoard->HasKey("TeleportCooldown");
 	bool hasRTCooldown = blackBoard->HasKey("ReteatCooldown");

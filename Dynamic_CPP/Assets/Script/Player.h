@@ -4,12 +4,11 @@
 #include "Player.generated.h"
 #include "ItemType.h"
 #include "BitFlag.h"
+
 class Animator;
 class Socket;
 class EffectComponent;
 class CharacterControllerComponent;
-
-
 class GameManager;
 class Weapon;
 class Entity;
@@ -74,10 +73,10 @@ public:
 	[[Property]]
 	PlayerType m_playerType = PlayerType::Male;
 	[[Property]]
-	float moveSpeed = 0.025f;
+	float moveSpeed = 0.1;
 	[[Property]]
 	float chargingMoveSpeed = 0.0125f; // 차징중 이동속도  //미사용중
-	float baseMoveSpeed = 0.025f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
+	float baseMoveSpeed = 0.1f;  //기본 이동속도         //chargingMoveSpeed 사용하게되면 필요
 	[[Property]]
 	int maxHP = 100;
 	std::string curStateName = "Idle";
