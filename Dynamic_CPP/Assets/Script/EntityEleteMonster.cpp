@@ -710,6 +710,8 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				isDead = true;
 				Dead();
+				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+				controller->Move({ 0, 0 });
 				DeadEvent(); //Die 애니메이션나오면 거기로 옮길것
 			}
 		}

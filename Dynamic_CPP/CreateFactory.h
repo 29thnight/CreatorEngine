@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "ControllerVibration.h"
 #include "ObjectPoolManager.h"
 #include "EntityMonsterBaseGate.h"
 #include "PlayEffectAll.h"

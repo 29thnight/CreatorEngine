@@ -46,6 +46,7 @@
 #include "PlayEffectAll.h"
 #include "ObjectPoolManager.h"
 #include "ObjectPool.h"
+#include "ControllerVibration.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -55,8 +56,6 @@ void Player::Awake()
 		GM->PushEntity(this);
 		GM->PushPlayer(this);
 	}
-	//TODO : 원인 찾을것
-	moveSpeed = 0.1f;
 }
 void Player::Start()
 {
@@ -204,27 +203,6 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
-	/*Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
-	if (meleeweapon && player)
-	{
-		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeweapon");
-		auto weapon = weaponObj->GetComponent<Weapon>();
-		AddWeapon(weapon);
-	}
-	Prefab* rangeweapon = PrefabUtilitys->LoadPrefab("WeaponWand");
-	if (rangeweapon && player)
-	{
-		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(rangeweapon, "rangeweapon");
-		auto weapon = weaponObj->GetComponent<Weapon>();
-		AddWeapon(weapon);
-	}
-	Prefab* bombweapon = PrefabUtilitys->LoadPrefab("WeaponBomb");
-	if (bombweapon && player)
-	{
-		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(bombweapon, "bombweapon");
-		auto weapon = weaponObj->GetComponent<Weapon>();
-		AddWeapon(weapon);
-	}*/
 
 	Prefab* run = PrefabUtilitys->LoadPrefab("run1");
 	if (run && player) {
@@ -235,7 +213,7 @@ void Player::Start()
 		}
 	}
 
-	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
+	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("dasheffect").get();
 	if (dashObj)
 	{
 		dashEffect = dashObj->AddComponent<EffectComponent>();
@@ -425,12 +403,6 @@ void Player::Update(float tick)
 		BombIndicator->SetEnabled(onBombIndicate);
 	}
 
-	///test sehwan
-	/*if(InputManagement->IsKeyDown('V'))
-	{
-		auto input = GetOwner()->GetComponent<PlayerInputComponent>();
-		input->SetControllerVibration(3.f, 1.0, 1.0, 1.0, 1.0);
-	}*/
 
 	if (true == OnInvincibility)
 	{
@@ -590,6 +562,18 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,HitKnockbackPower.y ,horizontal.z };
 				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 				controller->TriggerForcedMove(knockbackVeocity);
+
+				auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+				if (GM)
+				{
+					auto data = GM->GetControllerVibration();
+					if (data)
+					{
+						float power = data->PlayerHitPower;
+						float time = data->PlayerHitTime;
+						input->SetControllerVibration(time, power, power, power, power);
+					}
+				}
 			}
 		}
 
