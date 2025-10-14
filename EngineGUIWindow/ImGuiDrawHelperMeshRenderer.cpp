@@ -49,6 +49,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
             }
             ImGui::EndPopup();
         }
+		ImGui::DragScalar("Bitflag", ImGuiDataType_U32, &meshRenderer->m_bitflag);
         ImGui::PopStyleVar(2);
 	}
 
@@ -69,7 +70,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 			ImGui::SliderFloat("IOR", &mat_info.m_IOR, 0.01f, 4.f);
 
-			ImGui::DragScalar("bitflag", ImGuiDataType_U32, &mat_info.m_bitflag);
+			//ImGui::DragScalar("bitflag", ImGuiDataType_U32, &mat_info.m_bitflag);
 
 			std::string shaderName = "No Shader";
 			if (!meshRenderer->m_Material->m_shaderPSOName.empty())

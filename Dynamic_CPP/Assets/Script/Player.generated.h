@@ -38,8 +38,6 @@ ReflectionScriptField(Player) \
 		meta_property(ResurrectionHP) \
 		meta_property(ResurrectionGracePeriod) \
 		meta_property(SlotChangeCooldown) \
-		meta_property(testHitPowerX) \
-		meta_property(testHitPowerY) \
 	}); \
 	MethodField \
 	({ \
@@ -70,7 +68,6 @@ ReflectionScriptField(Player) \
 		meta_method(PlaySlashEvent) \
 		meta_method(PlaySlashEvent2) \
 		meta_method(PlaySlashEvent3) \
-		meta_method(TestHit) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };

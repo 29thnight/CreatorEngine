@@ -22,8 +22,6 @@ cbuffer MaterialInfomation
     bool32		  m_useNormalMap{};
     bool32		  m_convertToLinearSpace{ false };
     [[Property]]
-    UINT          m_bitflag{};
-    [[Property]]
     float         m_IOR{ 1.5f };
 
    ReflectMaterialInfomation

@@ -63,9 +63,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     int2 pos[4] = {
         {0,1},{-1,0},{1,0},{0,-1}
     };
+    
+    int flagnumber = firstbitlow(centerflag);
+    int colorVelocity = colors[flagnumber].a;
+    
     for (int i = 0; i < 4; i++) 
     {
-        uint otherflag = MaskedTexture.Load(int3((int2)DTid.xy + pos[i] * (int)outlineVelocity, 0));
+        uint otherflag = MaskedTexture.Load(int3((int2) DTid.xy + pos[i] * colorVelocity, 0));
 
         if (((otherflag ^ centerflag) & allflag) != 0) 
         {
@@ -73,7 +77,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             {
                 if (centerflag & (1 << j))
                 {
-                    color += colors[j - 1];
+                    color += colors[j] * colors[j].a;
                 }
             }
         }

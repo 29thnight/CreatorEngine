@@ -43,8 +43,7 @@ cbuffer PBRMaterial : register(b0)
     int gUseEmmisive;
     int gNormalState;
     int gConvertToLinear;
-
-    uint bitflag;
+    
     float gIOR;
 }
 
@@ -59,6 +58,11 @@ cbuffer TimeBuffer : register(b5)
     float totalTime;
     float deltaTime;
     uint totalFrame;
+}
+
+cbuffer MeshRendererBuffer : register(b7)
+{
+    uint bitflag;
 }
 
 struct PixelShaderInput

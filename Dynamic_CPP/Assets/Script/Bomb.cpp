@@ -9,7 +9,7 @@
 #include "SFXPoolManager.h"
 #include "Core.Random.h"
 #include "SoundName.h"
-
+#include "ObjectPoolManager.h"
 void Bomb::Start()
 {
 	
@@ -65,23 +65,7 @@ void Bomb::Update(float tick)
 			explosionInfo.position = transform->GetWorldPosition();
 			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
 
-
-			auto GMobj = GameObject::Find("GameManager");
-			if (GMobj)
-			{
-				GameManager* GM = GMobj->GetComponent<GameManager>();
-				if (GM)
-				{
-					auto pool = GM->GetSFXPool();
-					if (pool)
-					{
-						int rand = Random<int>(0, ExplosionSounds.size() - 1).Generate();
-						pool->PlayOneShot(ExplosionSounds[rand]);
-					}
-				}
-			}
-
- 			for (auto& hit : hits)
+			for (auto& hit : hits)
 			{
 				auto object = hit.gameObject;
 				if (object == GetOwner()) continue;
@@ -94,7 +78,34 @@ void Bomb::Update(float tick)
 			}
 
 
-			GetOwner()->Destroy(); //&&&&& 풀에넣기
+			auto GMobj = GameObject::Find("GameManager");
+			if (GMobj)
+			{
+				GameManager* GM = GMobj->GetComponent<GameManager>();
+				if (GM)
+				{
+					auto pool = GM->GetSFXPool();
+					if (pool)
+					{
+						int rand = Random<int>(0, ExplosionSounds.size() - 1).Generate();
+						pool->PlayOneShot(ExplosionSounds[rand]);
+						elapsedTime = 0;
+					}
+				}
+			}
+
+
+			if (GMobj)
+			{
+				auto GM = GMobj->GetComponent<GameManager>();
+				if (GM && GM->GetObjectPoolManager() != nullptr)
+				{
+					GM->GetObjectPoolManager()->GetBombPool()->Push(this->GetOwner());
+					isThrow = false;
+					isBound = false;
+				}
+
+			}
 		}
 	}
 
@@ -131,6 +142,7 @@ void Bomb::ThrowBomb(Player* _owner,Mathf::Vector3 _startPos, Mathf::Vector3 _ta
 	duration = bombThrowDuration;
 	radius = _radius;
 	m_throwPowerY = 4.0f;
+	elapsedTime = 0.f;
 }
 
 void Bomb::BoundBomb(Mathf::Vector3 _targetPos)

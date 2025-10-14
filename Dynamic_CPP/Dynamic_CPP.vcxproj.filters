@@ -243,9 +243,6 @@
 		<ClInclude Include="AniBehaviorFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -622,6 +619,15 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\ReachEventTrigger.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="SoundName.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="ObjectPool.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\ObjectPoolManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -1101,6 +1107,15 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ReachEventTrigger.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="SoundName.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="ObjectPool.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ObjectPoolManager.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

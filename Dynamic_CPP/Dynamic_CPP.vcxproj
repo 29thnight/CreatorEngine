@@ -202,6 +202,7 @@
 		<ClInclude Include="DebugLog.h" />
 		<ClInclude Include="GameInstance.h" />
 		<ClInclude Include="ItemType.h" />
+		<ClInclude Include="ObjectPool.h" />
 		<ClInclude Include="PlayerState.h" />
 		<ClInclude Include="RaycastHelper.h" />
 		<ClInclude Include="BTActionFactory.h" />
@@ -308,9 +309,11 @@
 		<ClInclude Include="Assets\Script\PlayEffectAll.h" />
 		<ClInclude Include="Assets\Script\EntityMonsterBaseGate.h" />
 		<ClInclude Include="Assets\Script\ReachEventTrigger.h" />
+		<ClInclude Include="Assets\Script\ObjectPoolManager.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\CameraMove.cpp" />
+		<ClCompile Include="Assets\Script\Entity.cpp" />
 		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp" />
 		<ClCompile Include="Assets\Script\EventManager.cpp" />
 		<ClCompile Include="Assets\Script\EventTarget.cpp" />
@@ -320,6 +323,7 @@
 		<ClCompile Include="Assets\Script\TimerTrigger.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
 		<ClCompile Include="GameInstance.cpp" />
+		<ClCompile Include="ObjectPool.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />
 		<ClCompile Include="pch.cpp">
@@ -778,6 +782,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ReachEventTrigger.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ObjectPoolManager.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

@@ -33,6 +33,10 @@ struct alignas(16) WindBuffer {
 	float windWaveFrequency;
 };
 
+struct alignas(16) MeshrendererBuffer {
+	uint32 bitflag;
+};
+
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -102,6 +106,7 @@ GBufferPass::GBufferPass()
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_TimeBuffer = DirectX11::CreateBuffer(sizeof(TimeBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_windBuffer = DirectX11::CreateBuffer(sizeof(WindBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_meshRendererBuffer = DirectX11::CreateBuffer(sizeof(MeshrendererBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	for (uint32 i = 0; i < MAX_BONES; i++)
 	{
@@ -195,6 +200,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 				proxy->m_Mesh->m_hashingMesh,
 				proxy->m_EnableLOD,
 				proxy->GetLODLevel(&camera),
+				proxy->m_bitflag
 			};
 			instanceGroups[key].push_back(std::move(proxy));
 		}
@@ -225,6 +231,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 7, 1, m_meshRendererBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
@@ -243,7 +250,12 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		Material* mat = proxy->m_Material;
 		auto matinfo = mat->m_materialInfo;
-		matinfo.m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+		proxy->m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+
+		MeshrendererBuffer mbuffer;
+		mbuffer.bitflag = proxy->m_bitflag;
+		DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+
 		if (proxy->m_materialGuid != currentMaterialGuid)
 		{
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
@@ -277,7 +289,12 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// Only update material state if it has changed from the previous group.
 		Material* mat = firstProxy->m_Material;
 		auto matinfo = mat->m_materialInfo;
-		matinfo.m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+		firstProxy->m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+
+		MeshrendererBuffer mbuffer;
+		mbuffer.bitflag = firstProxy->m_bitflag;
+		DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+
 		if (groupMaterialGuid != currentMaterialGuid)
 		{
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
@@ -347,6 +364,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			// PSO는 그룹 단위로 1회 Apply
 			customPSO->Apply(deferredPtr);
 
+			MeshrendererBuffer mbuffer;
+			mbuffer.bitflag = proxy->m_bitflag;
+			DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
 			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
 			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
@@ -361,6 +382,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
 			unsigned int frameCount = Time->GetFrameCount();
 			proxy->m_Material->TrySetValue("TimeBuffer", "totalFrame", &frameCount, sizeof(unsigned int));
+			proxy->m_Material->TrySetValue("MeshRendererBuffer", "bitflag", &proxy->m_bitflag, sizeof(unsigned int));
 			proxy->m_Material->TrySetMaterialInfo();
 			//Cbuffer를 View 전용 컨테이너로 복사
 			proxy->m_Material->UpdateCBufferView();
@@ -403,6 +425,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			// PSO는 그룹 단위로 1회 Apply
 			customPSO->Apply(deferredPtr);
 
+			MeshrendererBuffer mbuffer;
+			mbuffer.bitflag = proxy->m_bitflag;
+			DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
 			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
 			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
@@ -418,6 +444,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
 			unsigned int frameCount = Time->GetFrameCount();
 			proxy->m_Material->TrySetValue("TimeBuffer", "totalFrame", &frameCount, sizeof(unsigned int));
+			proxy->m_Material->TrySetValue("MeshRendererBuffer", "bitflag", &proxy->m_bitflag, sizeof(unsigned int));
 			proxy->m_Material->TrySetMaterialInfo();
 
 			//Cbuffer를 View 전용 컨테이너로 복사

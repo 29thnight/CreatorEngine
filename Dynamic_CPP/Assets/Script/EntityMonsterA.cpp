@@ -144,7 +144,7 @@ void EntityMonsterA::Start()
 	if (hasP2) {
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
-
+	HitImpulseStart();
 }
 
 void EntityMonsterA::Update(float tick)
@@ -281,6 +281,8 @@ void EntityMonsterA::Update(float tick)
 		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
 		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
+
+	HitImpulseUpdate(tick);
 
 	// test code start
 	if (InputManagement->IsKeyDown('M'))
@@ -444,6 +446,9 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				isDead = true;
 				Dead();
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}

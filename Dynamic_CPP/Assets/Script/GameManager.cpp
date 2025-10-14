@@ -100,11 +100,7 @@ void GameManager::OnDisable()
 		auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();
 		if (meshrenderer)
 		{
-			auto material = meshrenderer->m_Material;
-			if (material)
-			{
-				material->m_materialInfo.m_bitflag = 0;
-			}
+			meshrenderer->m_bitflag = 0;
 		}
 	}
 }
@@ -317,6 +313,16 @@ void GameManager::PushSFXPool(SFXPoolManager* _SFXPool)
 SFXPoolManager* GameManager::GetSFXPool()
 {
 	return SFXPool;
+}
+
+void GameManager::PushObjectPoolManager(ObjectPoolManager* _objPoolManager)
+{
+	objectPoolManager = _objPoolManager;
+}
+
+ObjectPoolManager* GameManager::GetObjectPoolManager()
+{
+	return objectPoolManager;
 }
 
 void GameManager::CheatMiningResource()

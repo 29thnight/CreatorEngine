@@ -43,4 +43,7 @@ public:
 	void RevertPool();
 private:
 	EffectComponent* m_effect = nullptr;
+	float KnockbackDistacneX = 0;
+	float KnockbackDistacneY = 0;
+	float KnockbackTime = 0;
 };
