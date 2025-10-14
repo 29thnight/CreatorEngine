@@ -15,6 +15,7 @@ ReflectionScriptField(Player) \
 		meta_property(DropPowerX) \
 		meta_property(DropPowerY) \
 		meta_property(detectAngle) \
+		meta_property(detectDistance) \
 		meta_property(dashDistacne) \
 		meta_property(m_dashTime) \
 		meta_property(dashCooldown) \

@@ -60,7 +60,11 @@ public:
 	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
 	bool IsGameStart() const { return m_isGameStart; }
-	void SetGameStart(bool isStart) { m_isGameStart = isStart; }
+	void SetGameStart(bool isStart);
+
+	bool IsGamePaused() const { return m_isGamePaused; }
+	void SetGamePaused(bool isPaused);
+	void ToggleGamePaused();
 
 	bool IsEditorSceneLoaded() const { return m_isEditorSceneLoaded; }
     InputActionManager* GetInputActionManager() { return m_inputActionManager; }
@@ -94,6 +98,7 @@ public:
 	Core::Delegate<void>                AssetLoadEvent{};
 
     std::atomic_bool                    m_isGameStart{ false };
+    std::atomic_bool                    m_isGamePaused{ false };
 	std::atomic_bool			        m_isEditorSceneLoaded{ false };
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
@@ -101,7 +106,7 @@ public:
     ThreadPool<std::function<void()>>*  m_threadPool{ nullptr };
 
     std::future<Scene*>                 m_loadingSceneFuture;
-    InputActionManager*                 m_inputActionManager{ nullptr };  //TODO: »èÁ¦Ã³¸® ¾øÀ½ ÇÊ¿ä½Ã Ãß°¡ÇØ¾ßÇÔ //sehwan&&&&&
+    InputActionManager*                 m_inputActionManager{ nullptr };  //TODO: ì‚­ì œì²˜ë¦¬ ì—†ìŒ í•„ìš”ì‹œ ì¶”ê°€í•´ì•¼í•¨ //sehwan&&&&&
 private:
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();

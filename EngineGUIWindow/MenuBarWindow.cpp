@@ -483,19 +483,39 @@ void MenuBarWindow::RenderMenuBar()
 
             ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 1));
 
-            if (ImGui::Button(SceneManagers->m_isGameStart ? ICON_FA_STOP : ICON_FA_PLAY))
+            const bool isGameRunning = SceneManagers->IsGameStart();
+            if (ImGui::Button(isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY))
             {
                 Meta::UndoCommandManager->ClearGameMode();
-				SceneManagers->m_isGameStart = !SceneManagers->m_isGameStart;
-				Meta::UndoCommandManager->m_isGameMode = SceneManagers->m_isGameStart;
+                SceneManagers->SetGameStart(!isGameRunning);
+                Meta::UndoCommandManager->m_isGameMode = SceneManagers->IsGameStart();
             }
 
             ImVec2 curPos = ImGui::GetCursorPos();
             ImGui::SetCursorPos(ImVec2(curPos.x, 1));
 
-			if (ImGui::Button(ICON_FA_PAUSE))
-			{
-			}
+            const bool canPause = SceneManagers->IsGameStart();
+            ImGui::BeginDisabled(!canPause);
+            const bool isPaused = SceneManagers->IsGamePaused();
+            if (canPause && isPaused)
+            {
+                const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
+                ImGui::PushStyleColor(ImGuiCol_Button, active);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
+            }
+
+            const char* pauseIcon = isPaused ? ICON_FA_PLAY : ICON_FA_PAUSE;
+            if (ImGui::Button(pauseIcon))
+            {
+                SceneManagers->ToggleGamePaused();
+            }
+
+            if (canPause && isPaused)
+            {
+                ImGui::PopStyleColor(3);
+            }
+            ImGui::EndDisabled();
 
             ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
             bool style = static_cast<bool>(DataSystems->GetContentsBrowserStyle());
