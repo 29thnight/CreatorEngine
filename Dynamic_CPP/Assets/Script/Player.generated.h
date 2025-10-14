@@ -55,6 +55,7 @@ ReflectionScriptField(Player) \
 		meta_method(Dash) \
 		meta_method(PlaySoundDash) \
 		meta_method(Cancancel) \
+		meta_method(MeleeChargeAttack) \
 		meta_method(ShootBullet) \
 		meta_method(ShootNormalBullet) \
 		meta_method(ShootSpecialBullet) \

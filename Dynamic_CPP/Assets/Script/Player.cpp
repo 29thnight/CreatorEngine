@@ -47,6 +47,7 @@
 #include "ObjectPoolManager.h"
 #include "ObjectPool.h"
 #include "ControllerVibration.h"
+#include "SwordProjectile.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -1550,6 +1551,30 @@ void Player::MeleeAttack()
 			}
 
 			
+		}
+	}
+}
+
+void Player::MeleeChargeAttack()
+{
+	if (!GM || GM->GetObjectPoolManager() == nullptr) return;
+	if (isChargeAttack == false) return;
+	auto poolmanager = GM->GetObjectPoolManager();
+	auto swordProjec = poolmanager->GetSwordProjectile();
+	GameObject* SwordObj = swordProjec->Pop();
+	if (SwordObj)
+	{
+		SwordProjectile* Projectile = SwordObj->GetComponentDynamicCast<SwordProjectile>();
+		Mathf::Vector3  myPos = player->m_transform.GetWorldPosition();
+		Mathf::Vector3  myForward = player->m_transform.GetForward();
+
+		Mathf::Vector3 effectPos = myPos + myForward * slashChargeOffset;
+		effectPos.y += 0.9f;
+
+		if (m_curWeapon)
+		{
+			Projectile->Initialize(this, effectPos, player->m_transform.GetForward(), calculDamge(true));
+
 		}
 	}
 }
