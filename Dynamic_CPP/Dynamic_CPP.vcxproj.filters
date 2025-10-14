@@ -633,6 +633,9 @@
 		<ClInclude Include="Assets\Script\ControllerVibration.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\SwordProjectile.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1122,6 +1125,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ControllerVibration.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwordProjectile.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

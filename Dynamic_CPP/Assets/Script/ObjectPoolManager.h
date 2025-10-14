@@ -25,9 +25,11 @@ public:
 	ObjectPool* GetNormalBulletPool() { return &normalBulletPool;}
 	ObjectPool* GetSpecialBulletPool() { return &specialBulletPool; }
 	ObjectPool* GetBombPool() { return &bombPool; }
+	ObjectPool* GetSwordProjectile() { return &swordProjectilePool; }
 private:
 
 	ObjectPool normalBulletPool;
 	ObjectPool specialBulletPool;
 	ObjectPool bombPool;
+	ObjectPool swordProjectilePool;
 };

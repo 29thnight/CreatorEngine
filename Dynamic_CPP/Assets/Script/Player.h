@@ -174,6 +174,8 @@ public:
 	[[Property]]
 	float bombMoveSpeed = 0.005f;  //폭탄도착지점 조절 스피드
  	void MeleeAttack();
+	[[Method]]
+	void MeleeChargeAttack();
 	void RangeAttack();
 
 	[[Method]]
