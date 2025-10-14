@@ -15,6 +15,7 @@
 
 #include "PlayEffectAll.h"
 #include "GameManager.h"
+#include "Weapon.h"
 void EntityMonsterA::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -417,7 +418,11 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 			if (m_criticalMark)
 			{
-				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					damage *= player->m_curWeapon->coopCrit;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+				}
 			}
 			dir.Normalize();
 
