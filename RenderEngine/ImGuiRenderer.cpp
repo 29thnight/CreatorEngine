@@ -4,9 +4,12 @@
 #include "DeviceState.h"
 #include "DataSystem.h"
 #include "Profiler.h"
+#include "EngineSetting.h"
 #include "imgui_internal.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+
+static float g_LastAppliedScale = 0.8f;
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -25,7 +28,8 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 16.0f);
 	io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
 	io.Fonts->Build();
-	io.FontGlobalScale = 0.8f;
+	g_LastAppliedScale = EngineSettingInstance->GetImGuiScale();
+	io.FontGlobalScale = g_LastAppliedScale;
     // Setup Dear ImGui style
 	ImGuiStyle* style = &ImGui::GetStyle();
 #pragma region "ImGuiStyle"
@@ -78,7 +82,7 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	style->Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.25f, 0.00f, 0.00f, 1.00f);
 	style->Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.25f, 1.00f, 0.00f, 0.43f);
 
-	style->ScaleAllSizes(0.8f);
+	style->ScaleAllSizes(EngineSettingInstance->GetImGuiScale());
 
 #pragma endregion
     // Setup Platform/Renderer backends
@@ -96,6 +100,41 @@ ImGuiRenderer::~ImGuiRenderer()
 {
     Shutdown();
 	m_deviceResources.reset();
+}
+
+void ApplyImGuiScaleDynamically(float newScale, bool rebuildFonts = false)
+{
+	ImGuiIO& io = ImGui::GetIO();
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	// 1) 스타일 사이즈를 '증분 비율'로 스케일 (누적 방지)
+	float ratio = (g_LastAppliedScale > 0.0f) ? (newScale / g_LastAppliedScale) : newScale;
+	style.ScaleAllSizes(ratio);
+
+	// 2) 렌더링 폰트 스케일 (즉시 적용/가벼움)
+	io.FontGlobalScale = newScale;
+
+	g_LastAppliedScale = newScale;
+
+	// 3) 더 선명하게 만들고 싶으면 폰트 아틀라스 재빌드(옵션)
+	if (rebuildFonts)
+	{
+		// 기존 폰트 정리 후 원하는 크기로 다시 추가
+		io.Fonts->Clear();
+
+		static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+		ImFontConfig icons_config;
+		ImFontConfig font_config;
+		icons_config.MergeMode = true; // Merge icon font to the previous font if you want to have both icons and text
+		io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 16.0f);
+		io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
+		io.Fonts->Build();
+
+		// 백엔드에 따라 디바이스 오브젝트 무효화/재생성
+		// (DX11 + Win32 예시)
+		ImGui_ImplDX11_InvalidateDeviceObjects();
+		ImGui_ImplDX11_CreateDeviceObjects();
+	}
 }
 
 void ImGuiRenderer::BeginRender()
@@ -120,6 +159,19 @@ void ImGuiRenderer::BeginRender()
 	{
 		io.DisplaySize = newSize;
 		io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+	}
+
+	//io.FontGlobalScale = EngineSettingInstance->GetImGuiScale();
+	//ImGuiStyle* style = &ImGui::GetStyle();
+	//style->ScaleAllSizes(EngineSettingInstance->GetImGuiScale());
+	float targetScale = EngineSettingInstance->GetImGuiScale();
+	static float lastRequested = -1.f;
+
+	if (lastRequested != targetScale)
+	{
+		// 필요시 두 번째 인자를 true로 주면 폰트 재빌드(더 선명)
+		ApplyImGuiScaleDynamically(targetScale, /*rebuildFonts=*/false);
+		lastRequested = targetScale;
 	}
 	
 	ImGui_ImplDX11_NewFrame();

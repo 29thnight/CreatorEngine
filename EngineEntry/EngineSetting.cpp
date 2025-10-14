@@ -57,6 +57,7 @@ bool EngineSetting::SaveSettings()
 	file::path startupSceneName = m_startupSceneName;
 	rootNode["buildGameName"] = buildGameProjectName.string();
 	rootNode["startupSceneName"] = startupSceneName.string();
+	rootNode["imguiScale"] = m_imguiScale;
 
 	settingsFile << rootNode;
 
@@ -100,6 +101,11 @@ bool EngineSetting::LoadSettings()
 	file::path startupSceneName = rootNode["startupSceneName"].as<std::string>("SampleScene");
 	m_buildGameName = buildGameProjectName.wstring();
 	m_startupSceneName = startupSceneName.wstring();
+
+	if(rootNode["imguiScale"])
+	{
+		m_imguiScale = rootNode["imguiScale"].as<float>();
+	}
 
 	return isSuccess;
 }

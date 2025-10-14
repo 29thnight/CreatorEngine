@@ -5,11 +5,11 @@
 
 struct TrailConstantBuffer
 {
-    Mathf::Matrix world;
-    Mathf::Matrix view;
-    Mathf::Matrix projection;
-    Mathf::Vector3 cameraPosition;
-    float time;
+    Mathf::Matrix world{};
+    Mathf::Matrix view{};
+    Mathf::Matrix projection{};
+    Mathf::Vector3 cameraPosition{};
+    float time{};
 };
 
 class TrailRenderModule : public RenderModules, public ISerializable
@@ -46,14 +46,14 @@ private:
     void UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf::Matrix& view, const Mathf::Matrix& projection);
 
 private:
-    ComPtr<ID3D11Buffer> m_constantBuffer;
-    TrailConstantBuffer m_constantBufferData;
+    ComPtr<ID3D11Buffer> m_constantBuffer{};
+    TrailConstantBuffer m_constantBufferData{};
 
-    TrailGenerateModule* m_trailModule;
-    ID3D11ShaderResourceView* m_particleSRV;
-    UINT m_instanceCount;
+    TrailGenerateModule* m_trailModule{};
+    ID3D11ShaderResourceView* m_particleSRV{};
+    UINT m_instanceCount{};
 
-    Texture* m_dissolveTexture;      // 하이라이트용 디졸브
-    Texture* m_dissolveTexture2;     // 사라짐용 디졸브  
-    Texture* m_backgroundTexture;    // 백그라운드
+    Texture* m_dissolveTexture{};      // 하이라이트용 디졸브
+    Texture* m_dissolveTexture2{};     // 사라짐용 디졸브  
+    Texture* m_backgroundTexture{};    // 백그라운드
 };

@@ -73,7 +73,7 @@ void TrailGenerateModule::Update(float delta)
         else if ((m_currentTime - m_lastAutoAddTime) >= m_autoAddInterval)
         {
             float moveDistance = Mathf::Vector3::Distance(currentPos, m_lastPosition);
-            
+
             // 움직이고 있으면 새 포인트 추가
             if (moveDistance >= m_minDistance)
             {
@@ -97,7 +97,7 @@ void TrailGenerateModule::Update(float delta)
             m_lastPosition = currentPos;
             m_lastAutoAddTime = m_currentTime;
         }
-
+    }
     // 수명이 완전히 지난 포인트만 제거 (충분한 페이드아웃 시간 확보)
     bool pointsRemoved = false;
     while (!m_trailPoints.empty())
