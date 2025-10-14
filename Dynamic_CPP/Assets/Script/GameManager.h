@@ -9,6 +9,7 @@ class Entity;
 class ActionMap;
 class Weapon;
 class SFXPoolManager;
+class ControllerVibration;
 class GameManager : public ModuleBehavior
 {
 public:
@@ -84,6 +85,9 @@ public:
 	SFXPoolManager* GetSFXPool();
 	void PushObjectPoolManager(ObjectPoolManager* _objPoolManager);
 	ObjectPoolManager* GetObjectPoolManager();
+
+	void PushControllerVibration(ControllerVibration* _ControllerVibration);
+	ControllerVibration* GetControllerVibration();
 private:
 	std::vector<Entity*> m_entities;
 	std::vector<Entity*> m_resourcePool;
@@ -93,6 +97,8 @@ private:
 
 	SFXPoolManager* SFXPool;
 	ObjectPoolManager* objectPoolManager;
+	ControllerVibration* ControllerVibrationData;
+
 private:
 	void CheatMiningResource();
 

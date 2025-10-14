@@ -1,22 +1,22 @@
 m_name: GameManager
 m_isEnabled: true
-m_instanceID: 1308988322
+m_instanceID: 4036530984
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: GameManager
     m_isEnabled: true
-    m_instanceID: 3939075635
+    m_instanceID: 377440229
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 118
+    m_index: 66
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
-    m_prefabFileGuid: e9744788-aefe-58e6-ae5a-4796ece1aadb
+    m_prefabFileGuid: 2153d54b-7749-5487-91bf-d7369246db92
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -29,13 +29,13 @@ PrefabNode:
         m_nextSceneName: ""
         m_name: GameManager
         m_isEnabled: true
-        m_instanceID: 3075878217
+        m_instanceID: 296251493
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 43eba570-3946-5cc3-a3a5-e27244333fdb
       - ModuleBehavior: 1399118904
         m_name: EventManager
         m_isEnabled: true
-        m_instanceID: 315277566
+        m_instanceID: 2440152169
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: d93fe2e4-bc27-5eef-afdf-14505544d1a8
       - ModuleBehavior: 1399118904
@@ -44,6 +44,14 @@ PrefabNode:
         EpicItemColor: {r: 0.855334759, g: 0, b: 1, a: 1}
         m_name: ItemManager
         m_isEnabled: true
-        m_instanceID: 503598729
+        m_instanceID: 1688004467
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 9c8a984c-3a09-55da-83cf-883260c998b5
+      - ModuleBehavior: 1399118904
+        PlayerHitPower: 0.150000006
+        PlayerHitTime: 0.200000003
+        m_name: ControllerVibration
+        m_isEnabled: true
+        m_instanceID: 1780873419
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: b9ea1e33-fe85-55e1-b641-86c60461dc8a
