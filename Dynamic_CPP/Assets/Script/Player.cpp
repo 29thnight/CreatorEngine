@@ -973,11 +973,13 @@ void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀�
 
 void Player::StartRay()
 {
+	if (isCharging == true) return;
 	startRay = true;
 }
 
 void Player::EndRay()
 {
+	if (isCharging == true) return;
 	startRay = false;
 }
 
