@@ -329,7 +329,11 @@ void Player::Update(float tick)
 	{
 		dashObj->m_transform.SetPosition(pos);
 	}
-
+	if (healEffect)
+	{
+		pos.y += 0.5f;
+		healEffect->GetOwner()->m_transform.SetPosition(pos);
+	}
 
 	if (catchedObject)
 	{
@@ -599,9 +603,6 @@ void Player::Heal(int healAmount)
 			hpbar->SetCurHP(m_currentHP);
 		}
 	}
-	Mathf::Vector3 healpos = m_transform->GetWorldPosition();
-	healpos.y += 1.0f;
-	healEffect->GetOwner()->GetComponent<Transform>()->SetPosition(healpos);
 	healEffect->Apply();
 	//힐 이펙트 출력
 }
@@ -1745,7 +1746,6 @@ void Player::ShootSpecialBullet()
 	GameObject* bulletObj = specialBullets->Pop();
 	if (bulletObj)
 	{
-		bulletObj->SetEnabled(true);
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
 		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 
@@ -1893,11 +1893,6 @@ void Player::OnCollisionExit(const Collision& collision)
 		m_nearObject = nullptr;
 	}
 }
-
-
-
-
-
 
 
 void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)

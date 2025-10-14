@@ -37,7 +37,7 @@ void SpecialBullet::Update(float tick)
 			auto GM = GMobj->GetComponent<GameManager>();
 			if (GM && GM->GetObjectPoolManager() != nullptr)
 			{
-				GM->GetObjectPoolManager()->GetNormalBulletPool()->Push(this->GetOwner());
+				GM->GetObjectPoolManager()->GetSpecialBulletPool()->Push(this->GetOwner());
 				m_effect->StopEffect();
 			}
 		}
@@ -95,7 +95,6 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 
 				Mathf::Vector3 scale = collision.thisObj->m_transform.GetWorldScale();
 				float radius = GetOwner()->GetComponent<SphereColliderComponent>()->GetRadius();
-				explosionRadius = radius;
 				float myRadius = explosionRadius;
 				Mathf::Vector3 mypos = bulletInfo.position;
 				
