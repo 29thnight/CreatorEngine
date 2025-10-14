@@ -189,7 +189,7 @@ public:
 			uint64		TicksEnd = 0;		// The ticks at the end of this event
 			uint32		LineNumber : 16;		// Line number of file in which this event is recorded
 			uint32		ThreadIndex : 11;		// Thread Index of the thread that recorderd this event
-			uint32		Depth : 5;		// Depth of the event
+			uint32		Depth : 10;		// Depth of the event
 		};
 
 		std::vector<Span<const Event>>	EventsPerThread;	// Events per thread of the frame

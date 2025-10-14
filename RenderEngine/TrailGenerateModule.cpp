@@ -64,6 +64,7 @@ void TrailGenerateModule::Update(float delta)
     if (m_autoGenerateFromPosition)
     {
         bool shouldAdd = false;
+        Mathf::Vector3 currentPos = m_position + m_positionOffset;
 
         if (m_trailPoints.empty())
         {
@@ -71,71 +72,71 @@ void TrailGenerateModule::Update(float delta)
         }
         else if ((m_currentTime - m_lastAutoAddTime) >= m_autoAddInterval)
         {
-            Mathf::Vector3 currentPos = m_position + m_positionOffset;
-            if (Mathf::Vector3::Distance(currentPos, m_lastPosition) >= m_minDistance)
+            float moveDistance = Mathf::Vector3::Distance(currentPos, m_lastPosition);
+
+            // 움직이고 있으면 새 포인트 추가
+            if (moveDistance >= m_minDistance)
             {
                 shouldAdd = true;
+            }
+            // 움직이지 않아도 트레일이 완전히 사라질 때까지는 현재 위치에 포인트 추가
+            else if (!m_trailPoints.empty())
+            {
+                float oldestAge = m_currentTime - m_trailPoints[0].timestamp;
+                // 가장 오래된 포인트가 아직 살아있으면 계속 추가
+                if (oldestAge < m_trailLifetime * 0.9f)
+                {
+                    shouldAdd = true;
+                }
             }
         }
 
         if (shouldAdd)
         {
-            Mathf::Vector3 newPos = m_position + m_positionOffset;
-            AddPoint(newPos, m_startWidth, m_startColor);
-            m_lastPosition = newPos;
+            AddPoint(currentPos, m_startWidth, m_startColor);
+            m_lastPosition = currentPos;
             m_lastAutoAddTime = m_currentTime;
         }
     }
 
-    // 수명 관리 - 순차적 제거로 변경 (앞쪽부터)
+    // 수명이 완전히 지난 포인트만 제거 (충분한 페이드아웃 시간 확보)
     bool pointsRemoved = false;
     while (!m_trailPoints.empty())
     {
         float age = m_currentTime - m_trailPoints[0].timestamp;
 
-        // 수명이 다한 포인트를 앞에서부터 순차 제거
-        if (age > m_trailLifetime * 1.1f)
+        if (age > m_trailLifetime)
         {
             m_trailPoints.erase(m_trailPoints.begin());
             pointsRemoved = true;
         }
         else
         {
-            break; // 첫 번째가 살아있으면 나머지도 살아있음
+            break;
         }
     }
 
-    if (pointsRemoved)
+    if (pointsRemoved || m_trailPoints.size() >= 2)
     {
         m_meshDirty = true;
     }
 
-    // 이징 효과 적용
-    if (m_useEasing && !m_trailPoints.empty())
+    if (m_useEasing)
     {
-        float normalizedTime = fmod(m_currentTime, m_easingDuration) / m_easingDuration;
-        float easedValue = ApplyEasing(normalizedTime);
-
-        for (auto& point : m_trailPoints)
-        {
-            float age = m_currentTime - point.timestamp;
-            float lifeRatio = 1.0f - (age / m_trailLifetime);
-
-            // 이징 효과 적용
-            float easingEffect = 1.0f + easedValue * 0.2f;
-            point.width *= easingEffect;
-
-            // 수명에 따른 투명도 조절
-            point.color.w *= std::max(0.0f, lifeRatio);
-        }
         m_meshDirty = true;
     }
 
-    // 메쉬 업데이트
     if (m_meshDirty && m_trailPoints.size() >= 2)
     {
         GenerateMesh();
         m_meshDirty = false;
+    }
+    else if (m_trailPoints.size() < 2)
+    {
+        m_vertexCount = 0;
+        m_indexCount = 0;
+        m_vertices.clear();
+        m_indices.clear();
     }
 }
 
@@ -197,31 +198,40 @@ void TrailGenerateModule::GenerateMesh()
 
 void TrailGenerateModule::GenerateRibbonMesh()
 {
+    float normalizedTime = 0.0f;
+    float easedValue = 0.0f;
+
+    if (m_useEasing)
+    {
+        normalizedTime = fmod(m_currentTime, m_easingDuration) / m_easingDuration;
+        easedValue = ApplyEasing(normalizedTime);
+    }
+
     for (size_t i = 0; i < m_trailPoints.size(); ++i)
     {
         const TrailPoint& point = m_trailPoints[i];
 
-        float lifeRatio = 1.0f;
-        if (m_trailLifetime > 0.0f)
-        {
-            float age = m_currentTime - point.timestamp;
-            lifeRatio = 1.0f - (age / m_trailLifetime);
-            lifeRatio = std::max(0.0f, std::min(1.0f, lifeRatio));
+        float age = m_currentTime - point.timestamp;
+        float lifeRatio = 1.0f - (age / m_trailLifetime);
+        lifeRatio = std::max(0.0f, std::min(1.0f, lifeRatio));
 
-            // 끝부분에서 더 빠르게 페이드아웃
-            if (lifeRatio < 0.3f)
-            {
-                float fadeRatio = lifeRatio / 0.3f;
-                lifeRatio = fadeRatio * fadeRatio;
-            }
-        }
+        if (lifeRatio < 0.01f)
+            continue;
 
         float width = Mathf::Lerp(m_endWidth, m_startWidth, lifeRatio) * point.width;
+
+        if (m_useEasing)
+        {
+            float easingEffect = 1.0f + easedValue * 0.2f;
+            width *= easingEffect;
+        }
+
         Mathf::Vector4 color = Mathf::Vector4::Lerp(m_endColor, m_startColor, lifeRatio);
         color = Mathf::Vector4::Lerp(color, point.color, 0.5f);
 
-        // 투명도 추가 조정으로 부드러운 페이드
+        // 투명도만으로 자연스럽게 페이드아웃
         color.w *= lifeRatio;
+
 
         Mathf::Vector3 forward = CalculateForwardVector(i);
         Mathf::Vector3 right = CalculateRightVector(forward, point.position);
@@ -245,9 +255,10 @@ void TrailGenerateModule::GenerateRibbonMesh()
         m_vertices.push_back(rightVertex);
 
         // 인덱스 생성
-        if (i > 0)
+        if (i > 0 && m_vertices.size() >= 4)
         {
-            UINT baseIndex = static_cast<UINT>((i - 1) * 2);
+            UINT currentVertexCount = static_cast<UINT>(m_vertices.size());
+            UINT baseIndex = currentVertexCount - 4;
 
             // 첫 번째 삼각형
             m_indices.push_back(baseIndex);
@@ -264,30 +275,35 @@ void TrailGenerateModule::GenerateRibbonMesh()
 
 void TrailGenerateModule::GenerateTubeMesh()
 {
+    float normalizedTime = 0.0f;
+    float easedValue = 0.0f;
+
+    if (m_useEasing)
+    {
+        normalizedTime = fmod(m_currentTime, m_easingDuration) / m_easingDuration;
+        easedValue = ApplyEasing(normalizedTime);
+    }
+
     for (size_t i = 0; i < m_trailPoints.size(); ++i)
     {
         const TrailPoint& point = m_trailPoints[i];
 
-        float lifeRatio = 1.0f;
-        if (m_trailLifetime > 0.0f)
-        {
-            float age = m_currentTime - point.timestamp;
-            lifeRatio = 1.0f - (age / m_trailLifetime);
-            lifeRatio = std::max(0.0f, std::min(1.0f, lifeRatio));
-
-            // 끝부분에서 더 빠르게 페이드아웃
-            if (lifeRatio < 0.3f)
-            {
-                float fadeRatio = lifeRatio / 0.3f;
-                lifeRatio = fadeRatio * fadeRatio;
-            }
-        }
+        float age = m_currentTime - point.timestamp;
+        float lifeRatio = 1.0f - (age / m_trailLifetime);
+        lifeRatio = std::max(0.0f, std::min(1.0f, lifeRatio));
 
         float radius = (Mathf::Lerp(m_endWidth, m_startWidth, lifeRatio) * point.width) * 0.5f;
+
+        if (m_useEasing)
+        {
+            float easingEffect = 1.0f + easedValue * 0.2f;
+            radius *= easingEffect;
+        }
+
         Mathf::Vector4 color = Mathf::Vector4::Lerp(m_endColor, m_startColor, lifeRatio);
         color = Mathf::Vector4::Lerp(color, point.color, 0.5f);
 
-        // 투명도 추가 조정
+        // 투명도만으로 자연스럽게 페이드아웃
         color.w *= lifeRatio;
 
         Mathf::Vector3 forward = CalculateForwardVector(i);

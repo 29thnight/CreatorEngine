@@ -25,6 +25,7 @@ void Animator::Update(float tick)
 		animationController->Update(tick);
 	}
 
+	std::unique_lock lock(m_paramMutex);
 	for (auto& param : Parameters)
 	{
 		if (param->vType == ValueType::Trigger)
@@ -208,6 +209,7 @@ void Animator::ClearControllersAndParams()
 {
 	m_animationControllers.clear();
 
+	std::unique_lock lock(m_paramMutex);
 	for (auto* p : Parameters)
 	{
 		delete p;  
@@ -217,6 +219,7 @@ void Animator::ClearControllersAndParams()
 
 void Animator::DeleteParameter(int index)
 {
+	std::unique_lock lock(m_paramMutex);
 	if (index >= 0 && index < Parameters.size())
 	{
 		for (auto& controller : m_animationControllers)
@@ -243,6 +246,7 @@ void Animator::DeleteParameter(int index)
 
 ConditionParameter* Animator::FindParameter(std::string valueName)
 {
+	std::unique_lock lock(m_paramMutex);
 	for (auto& parameter : Parameters)
 	{
 		if (parameter->name == valueName)
@@ -266,9 +270,13 @@ void Animator::SerializeControllers(std::string _jsonName)
 	}
 	json["Controllers"] = controllerArray;
 	nlohmann::json paramArray = nlohmann::json::array();
-	for (auto& param : Parameters)
+
 	{
-		paramArray.push_back(param->Serialize());
+		std::unique_lock lock(m_paramMutex);
+		for (auto& param : Parameters)
+		{
+			paramArray.push_back(param->Serialize());
+		}
 	}
 	json["Parameters"] = paramArray;
 	file::path filepath = PathFinder::AnimatorjsonPath(_jsonName);
@@ -306,11 +314,12 @@ void Animator::DeserializeControllers(std::string _filename)
 	}
 
 	nlohmann::json json;
-	try {
+	try 
+	{
 		file >> json;
 	}
-
-	catch (std::exception& e) {
+	catch (std::exception& e) 
+	{
 		std::cerr << "JSON parsing error: " << e.what() << std::endl;
 	}
 
@@ -319,14 +328,22 @@ void Animator::DeserializeControllers(std::string _filename)
 	{
 		int param_vType = parameterJson["param_vType"];
 		ValueType paramvType = ValueType::Float;
-		if (param_vType == 0)
+		switch (param_vType)
+		{
+		case 0:
 			paramvType = ValueType::Float;
-		else if (param_vType == 1)
+			break;
+		case 1:
 			paramvType = ValueType::Int;
-		else if (param_vType == 2)
+			break;
+		case 2:
 			paramvType = ValueType::Bool;
-		else if (param_vType == 3)
+			break;
+		case 3:
 			paramvType = ValueType::Trigger;
+			break;
+		}
+
 		ConditionParameter* param = AddDefaultParameter(paramvType);
 		param->name = parameterJson["param_name"];
 	}
@@ -388,18 +405,29 @@ void Animator::DeserializeControllers(std::string _filename)
 					curcodition->SetCondition(condionJson["valueName"]);
 					ConditionType ctype = ConditionType::Greater;
 
-					if (condionJson["cType"] == 1)
+					int type = condionJson["cType"].get<int>();
+
+					switch (type)
+					{
+					case 1:
 						ctype = ConditionType::Less;
-					else if (condionJson["cType"] == 2)
+						break;
+					case 2:
 						ctype = ConditionType::Equal;
-					else if (condionJson["cType"] == 3)
+						break;
+					case 3:
 						ctype = ConditionType::NotEqual;
-					else if (condionJson["cType"] == 4)
+						break;
+					case 4:
 						ctype = ConditionType::True;
-					else if (condionJson["cType"] == 5)
+						break;
+					case 5:
 						ctype = ConditionType::False;
-					else
+						break;
+					default:
 						ctype = ConditionType::Less;
+						break;
+					}
 					curcodition->cType = ctype;
 
 					curcodition->CompareParameter.fValue = condionJson["fValue"];
@@ -410,9 +438,6 @@ void Animator::DeserializeControllers(std::string _filename)
 				}
 			}
 		}
-
-
 		curController->SetCurState(contorllerJson["m_curState"]);
-
 	}
 }

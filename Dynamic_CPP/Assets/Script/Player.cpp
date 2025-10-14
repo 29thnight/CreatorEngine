@@ -385,7 +385,9 @@ void Player::Update(float tick)
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	if(dashObj)
+	{
 		dashObj->m_transform.SetPosition(pos);
+	}
 
 
 	if (isDashing)
@@ -1855,7 +1857,7 @@ void Player::OnTriggerExit(const Collision& collision)
 	{
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
-			nearMesh->m_Material->m_materialInfo.m_bitflag = 0;
+			nearMesh->m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }
@@ -1875,7 +1877,7 @@ void Player::OnCollisionExit(const Collision& collision)
 	{
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
-			nearMesh->m_Material->m_materialInfo.m_bitflag = 0;
+			nearMesh->m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }

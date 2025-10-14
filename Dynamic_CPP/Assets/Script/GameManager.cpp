@@ -90,14 +90,6 @@ void GameManager::Update(float tick)
 			displayPollutionGaugeRatio = 0;
 		}
 	}
-
-	if (!m_asis.empty())
-	{
-		if(m_asis.front())
-		{
-			auto asis = static_cast<EntityAsis*>(m_asis.front());
-		}
-	}
 }
 
 void GameManager::OnDisable()
@@ -108,11 +100,7 @@ void GameManager::OnDisable()
 		auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();
 		if (meshrenderer)
 		{
-			auto material = meshrenderer->m_Material;
-			if (material)
-			{
-				material->m_materialInfo.m_bitflag = 0;
-			}
+			meshrenderer->m_bitflag = 0;
 		}
 	}
 }

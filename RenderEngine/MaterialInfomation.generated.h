@@ -8,7 +8,6 @@ ReflectionField(MaterialInfomation) \
 		meta_property(m_baseColor) \
 		meta_property(m_metallic) \
 		meta_property(m_roughness) \
-		meta_property(m_bitflag) \
 		meta_property(m_IOR) \
 	}); \
 	FieldEnd(MaterialInfomation, PropertyOnly) \

@@ -21,9 +21,12 @@
 #include "UIManager.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
+#include "AIManager.h"
 #include <execution>
 #include <queue>
 #include <algorithm>
+
+using namespace std::literals;
 
 #include "Profiler.h"
 Scene::Scene()
@@ -512,6 +515,12 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
+	//여기서 반드시 블로킹해서 BT 업데이트를 마친다.
+	if (m_AIFuture.valid())
+	{
+		m_AIFuture.get();
+	}
+
 	PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
 	PROFILE_CPU_END();
@@ -519,6 +528,11 @@ void Scene::Update(float deltaSecond)
 	PROFILE_CPU_BEGIN("UpdateEvent");
     UpdateEvent.Broadcast(deltaSecond);
 	PROFILE_CPU_END();
+	//여기서 병렬처리 -> 이렇게되면 반드시 업데이트에서만 BT 갱신 및 설정이 완료되어야 함.
+	m_AIFuture = std::async(std::launch::async, [deltaSecond]
+	{	
+		AIManagers->InternalAIUpdate(deltaSecond); 
+	});
 
 	PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
@@ -535,6 +549,12 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
+	//여기서 한번 체크
+	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
+	{
+		m_AIFuture.get();
+	}
+
     LateUpdateEvent.Broadcast(deltaSecond);
 
 	std::vector<MeshRenderer*> allMeshes = m_allMeshRenderers;
@@ -648,15 +668,35 @@ void Scene::LateUpdate(float deltaSecond)
 
 		SceneManagers->m_threadPool->NotifyAllAndWait();
 	}
+
+	//여기서 한번 체크
+	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
+	{
+		m_AIFuture.get();
+	}
 }
 
 void Scene::OnDisable()
 {
+	//여기서 한번 체크
+	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
+	{
+		m_AIFuture.get();
+	}
+
+	PROFILE_CPU_BEGIN("OnDisable");
     OnDisableEvent.Broadcast();
+	PROFILE_CPU_END();
 }
 
 void Scene::OnDestroy()
 {
+	//여기서 한번 체크
+	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
+	{
+		m_AIFuture.get();
+	}
+
 	PROFILE_CPU_BEGIN("OnDestroyBroadcast");
     OnDestroyEvent.Broadcast();
 	PROFILE_CPU_END();

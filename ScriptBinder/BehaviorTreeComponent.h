@@ -25,7 +25,7 @@ public:
 	// IAIComponent 인터페이스 구현
 	void Initialize() override;
 	void Awake() override;
-	void Update(float deltaSecond) override;
+	void InternalAIUpdate(float deltaSecond) override;
 	void OnDestroy() override;
 	BlackBoard* GetBlackBoard();
 private:

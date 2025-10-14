@@ -12,6 +12,7 @@ ReflectionFieldInheritance(MeshRenderer, Component) \
 		meta_property(m_shadowRecive) \
 		meta_property(m_shadowCast) \
 		meta_property(m_isEnableLOD) \
+		meta_property(m_bitflag) \
 	}); \
 	FieldEnd(MeshRenderer, PropertyOnlyInheritance) \
 };

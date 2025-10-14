@@ -28,6 +28,12 @@ protected:
     float m_duration = -1.0f;  // -1이면 무한
     float m_currentTime = 0.0f;
 
+    struct EmitterTiming {
+        float startDelay = 0.0f;        // 이 emitter가 시작되는 시간
+        bool hasStarted = false;         // 시작 여부
+    };
+    std::vector<EmitterTiming> m_emitterTimings;
+
 public:
     EffectBase() = default;
     virtual ~EffectBase() = default;
@@ -36,10 +42,8 @@ public:
     virtual void Update(float delta) {
         if (m_state != EffectState::Playing && m_state != EffectState::Finished) return;
 
-        // 시간 업데이트
         m_currentTime += delta * m_timeScale;
 
-        // 진행률 계산
         float progressRatio = 0.0f;
         bool isInfinite = (m_duration < 0);
 
@@ -50,12 +54,24 @@ public:
             progressRatio = std::clamp(m_currentTime / m_duration, 0.0f, 1.0f);
         }
 
-        // ParticleSystem 업데이트 (Finished 상태에서도 계속)
-        for (auto& ps : m_particleSystems) {
-            if (ps) {
-                ps->SetEffectProgress(progressRatio);
-                ps->Update(delta * m_timeScale);
+        // Emitter별 시작 시간 체크 및 업데이트
+        for (size_t i = 0; i < m_particleSystems.size(); ++i) {
+            auto& ps = m_particleSystems[i];
+            if (!ps) continue;
+
+            // 아직 시작 안한 emitter면 시간 체크
+            if (!m_emitterTimings[i].hasStarted) {
+                if (m_currentTime >= m_emitterTimings[i].startDelay) {
+                    m_emitterTimings[i].hasStarted = true;
+                    ps->Play();
+                }
+                else {
+                    continue;  // 아직 시작 시간 안됨
+                }
             }
+
+            ps->SetEffectProgress(progressRatio);
+            ps->Update(delta * m_timeScale);
         }
 
         // duration이 끝나면 Finished 상태로 변경 (Stop 대신)
@@ -90,10 +106,16 @@ public:
         m_state = EffectState::Playing;
         m_currentTime = 0.0f;
 
-        // 모든 ParticleSystem 재생
-        for (auto& ps : m_particleSystems) {
-            if (ps) {
-                ps->Play();
+        // 모든 emitter의 시작 플래그 리셋
+        for (auto& timing : m_emitterTimings) {
+            timing.hasStarted = false;
+        }
+
+        // delay=0인 emitter들만 즉시 시작
+        for (size_t i = 0; i < m_particleSystems.size(); ++i) {
+            if (m_emitterTimings[i].startDelay == 0.0f) {
+                m_particleSystems[i]->Play();
+                m_emitterTimings[i].hasStarted = true;
             }
         }
     }
@@ -102,12 +124,13 @@ public:
         m_state = EffectState::Stopped;
         m_currentTime = 0.0f;
 
-        // 모든 ParticleSystem 정지
-        for (auto& ps : m_particleSystems) {
-            if (ps) {
-                ps->Stop();
-                ps->ResumeSpawning();
+        // 모든 emitter 정지 및 플래그 리셋
+        for (size_t i = 0; i < m_particleSystems.size(); ++i) {
+            if (m_particleSystems[i]) {
+                m_particleSystems[i]->Stop();
+                m_particleSystems[i]->ResumeSpawning();
             }
+            m_emitterTimings[i].hasStarted = false;
         }
     }
 
@@ -169,18 +192,18 @@ public:
 
     // 풀링을 위한 재사용 리셋
     virtual void ResetForReuse() {
-        // 상태 강제 정지
         m_state = EffectState::Stopped;
         m_currentTime = 0.0f;
-
-        // 위치/회전 초기화
         m_position = Mathf::Vector3(0, 0, 0);
         m_rotation = Mathf::Vector3(0, 0, 0);
 
-        // GPU 작업 완료 대기
+        // Timing 정보 리셋
+        for (auto& timing : m_emitterTimings) {
+            timing.hasStarted = false;
+        }
+
         WaitForGPUCompletion();
 
-        // ParticleSystem들 리셋
         for (auto& ps : m_particleSystems) {
             if (ps) {
                 ps->ResetForReuse();
@@ -238,10 +261,12 @@ public:
     void AddParticleSystem(std::shared_ptr<ParticleSystem> ps) {
         if (ps) {
             m_particleSystems.push_back(ps);
-            // 현재 Effect 상태에 맞게 ParticleSystem 설정
-            if (m_state == EffectState::Playing) {
-                ps->Play();
-            }
+
+            // Timing 정보도 함께 추가
+            EmitterTiming timing;
+            timing.startDelay = 0.0f;
+            timing.hasStarted = false;
+            m_emitterTimings.push_back(timing);
         }
     }
 
@@ -249,10 +274,14 @@ public:
         if (index >= 0 && index < m_particleSystems.size()) {
             m_particleSystems.erase(m_particleSystems.begin() + index);
         }
+        if (index < m_emitterTimings.size()) {
+            m_emitterTimings.erase(m_emitterTimings.begin() + index);
+        }
     }
 
     void ClearParticleSystems() {
         m_particleSystems.clear();
+        m_emitterTimings.clear();  // Timing도 함께 클리어
     }
 
     // Getter/Setter
@@ -287,5 +316,18 @@ public:
 
     const std::vector<std::shared_ptr<ParticleSystem>>& GetAllParticleSystems() const {
         return m_particleSystems;
+    }
+
+    void SetEmitterStartDelay(int index, float delay) {
+        if (index >= 0 && index < m_emitterTimings.size()) {
+            m_emitterTimings[index].startDelay = delay;
+        }
+    }
+
+    float GetEmitterStartDelay(int index) const {
+        if (index >= 0 && index < m_emitterTimings.size()) {
+            return m_emitterTimings[index].startDelay;
+        }
+        return 0.0f;
     }
 };

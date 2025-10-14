@@ -49,6 +49,8 @@ public:
     bool m_shadowCast = true;
     [[Property]]
     bool m_isEnableLOD{ false };
+    [[Property]]
+    uint32 m_bitflag{ 0 };
 
 private:
 	bool m_isNeedUpdateCulling{ false };

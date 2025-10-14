@@ -73,6 +73,7 @@ private:
 	Scene* m_scene{};
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
+	std::mutex m_modelMutex;
 
 	std::vector<std::shared_ptr<GameObject>> m_gameObjects{};
 	std::vector<std::string> m_cashedObjectName{};

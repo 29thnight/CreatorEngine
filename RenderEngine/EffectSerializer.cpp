@@ -15,11 +15,15 @@ nlohmann::json EffectSerializer::SerializeEffect(const EffectBase& effect)
     json["currentTime"] = effect.GetCurrentTime();
 
     json["particleSystems"] = nlohmann::json::array();
-    for (const auto& ps : effect.GetAllParticleSystems())
+    json["emitterTimings"] = nlohmann::json::array();
+
+    for (size_t i = 0; i < effect.GetAllParticleSystems().size(); ++i)
     {
+        const auto& ps = effect.GetAllParticleSystems()[i];
         if (ps)
         {
             json["particleSystems"].push_back(SerializeParticleSystem(*ps));
+            json["emitterTimings"].push_back(effect.GetEmitterStartDelay(i));
         }
     }
 
@@ -47,12 +51,19 @@ std::unique_ptr<EffectBase> EffectSerializer::DeserializeEffect(const nlohmann::
 
     if (json.contains("particleSystems"))
     {
-        for (const auto& psJson : json["particleSystems"])
+        for (size_t i = 0; i < json["particleSystems"].size(); ++i)
         {
+            const auto& psJson = json["particleSystems"][i];
             auto particleSystem = DeserializeParticleSystem(psJson);
             if (particleSystem)
             {
                 effect->AddParticleSystem(particleSystem);
+
+                if (json.contains("emitterTimings") && i < json["emitterTimings"].size())
+                {
+                    float delay = json["emitterTimings"][i];
+                    effect->SetEmitterStartDelay(i, delay);
+                }
             }
         }
     }
