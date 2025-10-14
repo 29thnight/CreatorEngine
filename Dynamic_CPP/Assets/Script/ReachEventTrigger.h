@@ -14,7 +14,6 @@ public:
 	virtual void OnTriggerStay(const Collision& collision) override;
 	virtual void OnTriggerExit(const Collision& collision) override;
 
-
 public:
 	[[Property]]
 	int m_triggerIndex{ 0 };
@@ -30,6 +29,9 @@ public:
 	// 플레이어/주체 식별 (필요 시 사용)
 	[[Property]] 
 	int m_playerId{ -1 };
+	// 모두 통과해야하는지
+	[[Property]]
+	bool m_allPlayerPass{ false };
 
 private:
 	bool EmitIfAllowed(const Collision& c);
@@ -40,7 +42,7 @@ private:
 	bool ShouldEmitOnStay() const { return m_emitOnStay; }
 	bool ShouldEmitOnExit() const { return m_emitOnExit; }
 
-
+	std::unordered_set<int> onTriggeredPlayer{};
 	class EventManager* m_mgr{ nullptr };
 	bool m_alreadyEmitted{ false };
 };

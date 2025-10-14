@@ -11,6 +11,7 @@ ReflectionScriptField(ReachEventTrigger) \
 		meta_property(m_emitOnExit) \
 		meta_property(m_once) \
 		meta_property(m_playerId) \
+		meta_property(m_allPlayerPass) \
 	}); \
 	FieldEnd(ReachEventTrigger, PropertyOnly) \
 };

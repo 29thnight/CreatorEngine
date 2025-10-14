@@ -1,6 +1,7 @@
 #include "ReachEventTrigger.h"
 #include "EventManager.h"
 #include "GameInstance.h"
+#include "Player.h"
 #include "pch.h"
 
 void ReachEventTrigger::Awake()
@@ -34,8 +35,37 @@ bool ReachEventTrigger::EmitIfAllowed(const Collision& c)
 	if (!m_mgr) return false;
 
 	const std::string actorTag = ResolveActorTag(c); // Ãæµ¹ °´Ã¼ÀÇ Tag
+	int currPlayerID{ -1 };
 
-	m_mgr->EmitReachedTrigger(actorTag, m_triggerIndex);
+	if(!m_allPlayerPass)
+	{
+		if (c.otherObj->HasComponent<Player>())
+		{
+			auto playerComp = c.otherObj->GetComponentDynamicCast<Player>();
+			if (playerComp)
+			{
+				if (-1 != m_playerId && playerComp->playerIndex == m_playerId)
+				{
+					currPlayerID = playerComp->playerIndex;
+				}
+			}
+		}
+
+		m_mgr->EmitReachedTrigger(actorTag, m_triggerIndex, currPlayerID);
+	}
+	else
+	{
+		if (c.otherObj->HasComponent<Player>())
+		{
+			auto playerComp = c.otherObj->GetComponentDynamicCast<Player>();
+			if (playerComp)
+			{
+				currPlayerID = playerComp->playerIndex;
+			}
+		}
+
+		m_mgr->EmitReachedTrigger(actorTag, m_triggerIndex, currPlayerID);
+	}
 
 	if (m_once) m_alreadyEmitted = true;
 	return true;
