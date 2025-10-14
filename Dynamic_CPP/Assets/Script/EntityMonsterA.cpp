@@ -446,6 +446,8 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				isDead = true;
 				Dead();
+				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+				controller->Move({ 0, 0 });
 			}
 			else {
 				HitImpulse();

@@ -17,6 +17,7 @@ void ObjectPoolManager::Start()
 	normalBulletPool.InitializePool("BulletNormal", 50);
 	specialBulletPool.InitializePool("BulletSpecial",20);
 	bombPool.InitializePool("Bomb", 20);
+	swordProjectilePool.InitializePool("SwordProjectile",5);
 
 
 }

@@ -325,6 +325,16 @@ ObjectPoolManager* GameManager::GetObjectPoolManager()
 	return objectPoolManager;
 }
 
+void GameManager::PushControllerVibration(ControllerVibration* _ControllerVibration)
+{
+	ControllerVibrationData = _ControllerVibration;
+}
+
+ControllerVibration* GameManager::GetControllerVibration()
+{
+	return ControllerVibrationData;
+}
+
 void GameManager::CheatMiningResource()
 {
 	auto cam = GameObject::Find("Main Camera");

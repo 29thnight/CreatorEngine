@@ -1,12 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "ObjectPool.h"
-class ObjectPool;
-class ObjectPoolManager : public ModuleBehavior
+#include "ControllerVibration.generated.h"
+class ControllerVibration : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(ObjectPoolManager)
+   ReflectControllerVibration
+	[[ScriptReflectionField]]
+	MODULE_BEHAVIOR_BODY(ControllerVibration)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -21,15 +22,8 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-
-	ObjectPool* GetNormalBulletPool() { return &normalBulletPool;}
-	ObjectPool* GetSpecialBulletPool() { return &specialBulletPool; }
-	ObjectPool* GetBombPool() { return &bombPool; }
-	ObjectPool* GetSwordProjectile() { return &swordProjectilePool; }
-private:
-
-	ObjectPool normalBulletPool;
-	ObjectPool specialBulletPool;
-	ObjectPool bombPool;
-	ObjectPool swordProjectilePool;
+	[[Property]]
+	float PlayerHitPower = 0.5f;
+	[[Property]]
+	float PlayerHitTime = 0.1f;
 };
