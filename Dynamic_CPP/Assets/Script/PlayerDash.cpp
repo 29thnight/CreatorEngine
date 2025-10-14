@@ -34,6 +34,10 @@ void PlayerDash::Enter()
 		m_player->ChangeState("Dash");
 		m_player->SetInvincibility(m_player->dashGracePeriod);
 		m_player->DropCatchItem();
+		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0 ,0 });
+
+
 
 		float knockbackSpeed = m_player->dashDistacne / m_player->m_dashTime;
 		Mathf::Vector3 forward = m_player->player->m_transform.GetForward();
@@ -45,7 +49,7 @@ void PlayerDash::Enter()
 		Mathf::Vector3 knockbackVelocity = horizontalDir * knockbackSpeed;
 
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
-		controller->TriggerForcedMove(knockbackVelocity);
+		controller->TriggerForcedMove(knockbackVelocity, m_player->m_dashTime);
 
 		m_player->isDashing = true;
 		m_player->m_dashElapsedTime = 0.f;
@@ -53,8 +57,6 @@ void PlayerDash::Enter()
 		//m_player->m_animator->SetUseLayer(1, false);
 		if (m_player->dashEffect)
 			m_player->dashEffect->Apply();
-		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
-		controller->Move({0 ,0 });
 	}
 }
 
