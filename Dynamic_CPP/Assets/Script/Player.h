@@ -99,7 +99,9 @@ public:
 	[[Property]]
 	float DropPowerY = 0.f;
 	[[Property]]
-	float detectAngle = 30.f;      //물체 던질떄 indicator on/off 정할 각도  
+	float detectAngle = 60.f;      //물체 던질떄 indicator on/off 정할 각도 
+	[[Property]]
+	float detectDistance = 4.f;      //물체 던질떄 indicator on/off 정할 각도  
 
 	float m_nearDistance = FLT_MAX;
 	EntityItem* catchedObject = nullptr;
