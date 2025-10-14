@@ -55,122 +55,122 @@ void AnimationController::SetCurState(std::string stateName)
 std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 #pragma region OLD_CODE
-	//if (!m_curState)
-	//{
-	//	if (!StateVec.size() >= 2)   //0번은 anystate라없음
-	//	{
-	//		if (StateVec[1].get()->m_name != "Ani State")
-	//		{
-	//			m_curState = StateVec[1].get();
-	//		}
-	//		else
-	//		{
-	//			m_curState = StateVec[0].get();
-	//		}
-	//	}
-	//	else
-	//	{
-	//		return nullptr;
-	//	}
-	//}
-
-	//if (m_curState == nullptr) return nullptr;
-
-
-	//AnimationState* aniState = GetAniState().get();
-	//if (aniState)
-	//{
-	//	if (!aniState->Transitions.empty())
-	//	{
-	//		for (auto& trans : aniState->Transitions)
-	//		{
-	//			if (trans->hasExitTime)
-	//			{
-	//				if (trans->GetExitTime() >= curAnimationProgress)
-	//					continue;
-	//			}
-	//			if (true == trans->CheckTransiton())
-	//			{
-	//				if (trans->nextState != nullptr && m_curState != trans->nextState)
-	//				{
-	//					return trans;
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
-
-
-	//AnimationState* transState = m_curState;
-	//if (m_isBlend)
-	//{
-	//	transState = m_nextState;
-	//}
-	//if (transState->Transitions.empty()) return nullptr;
-
-	//
-	//for (auto& trans : transState->Transitions)
-	//{
-	//	if (m_isBlend)
-	//	{
-	//		if (true == trans->CheckTransiton(true))
-	//		{
-	//			return trans;
-	//		}
-	//	}
-	//	else
-	//	{
-	//		if (true == trans->CheckTransiton())
-	//		{
-	//			return trans;
-	//		}
-	//	}
-	//}
-	//return nullptr;
-#pragma endregion
-	if (!m_curState) 
+	if (!m_curState)
 	{
-		if (StateVec.size() >= 2) 
+		if (!StateVec.size() >= 2)   //0번은 anystate라없음
 		{
-			m_curState = (StateVec[1]->m_name != "Ani State") ? StateVec[1].get() : StateVec[0].get();
+			if (StateVec[1].get()->m_name != "Ani State")
+			{
+				m_curState = StateVec[1].get();
+			}
+			else
+			{
+				m_curState = StateVec[0].get();
+			}
 		}
-		else 
+		else
 		{
 			return nullptr;
 		}
 	}
 
-	// 1) AnyState 캐시 사용
-	if (auto aniState = GetAniState()) 
-	{
-		for (auto& trans : aniState->Transitions) 
-		{
-			if (trans->hasExitTime && trans->GetExitTime() >= curAnimationProgress)
-				continue;
+	if (m_curState == nullptr) return nullptr;
 
-			if (trans->CheckTransiton()) 
+
+	AnimationState* aniState = GetAniState().get();
+	if (aniState)
+	{
+		if (!aniState->Transitions.empty())
+		{
+			for (auto& trans : aniState->Transitions)
 			{
-				// BUG FIX: 세미콜론 제거
-				if (trans->nextState != nullptr && m_curState != trans->nextState)
-					return trans;
+				if (trans->hasExitTime)
+				{
+					if (trans->GetExitTime() >= curAnimationProgress)
+						continue;
+				}
+				if (true == trans->CheckTransiton())
+				{
+					if (trans->nextState != nullptr && m_curState != trans->nextState)
+					{
+						return trans;
+					}
+				}
 			}
 		}
 	}
 
-	// 2) 현재 참조할 상태의 전이 집합을 1번만 결정
-	AnimationState* transState = m_isBlend ? m_nextState : m_curState;
-	if (!transState || transState->Transitions.empty()) return nullptr;
 
-	const bool checkBlend = m_isBlend;
-	for (auto& trans : transState->Transitions) 
+	AnimationState* transState = m_curState;
+	if (m_isBlend)
 	{
-		if (trans->hasExitTime && trans->GetExitTime() >= (checkBlend ? nextAnimationProgress : curAnimationProgress))
-			continue;
+		transState = m_nextState;
+	}
+	if (transState->Transitions.empty()) return nullptr;
 
-		if (trans->CheckTransiton(checkBlend))
-			return trans;
+	
+	for (auto& trans : transState->Transitions)
+	{
+		if (m_isBlend)
+		{
+			if (true == trans->CheckTransiton(true))
+			{
+				return trans;
+			}
+		}
+		else
+		{
+			if (true == trans->CheckTransiton())
+			{
+				return trans;
+			}
+		}
 	}
 	return nullptr;
+#pragma endregion
+	//if (!m_curState) 
+	//{
+	//	if (StateVec.size() >= 2) 
+	//	{
+	//		m_curState = (StateVec[1]->m_name != "Ani State") ? StateVec[1].get() : StateVec[0].get();
+	//	}
+	//	else 
+	//	{
+	//		return nullptr;
+	//	}
+	//}
+
+	//// 1) AnyState 캐시 사용
+	//if (auto aniState = GetAniState()) 
+	//{
+	//	for (auto& trans : aniState->Transitions) 
+	//	{
+	//		if (trans->hasExitTime && trans->GetExitTime() >= curAnimationProgress)
+	//			continue;
+
+	//		if (trans->CheckTransiton()) 
+	//		{
+	//			// BUG FIX: 세미콜론 제거
+	//			if (trans->nextState != nullptr && m_curState != trans->nextState)
+	//				return trans;
+	//		}
+	//	}
+	//}
+
+	//// 2) 현재 참조할 상태의 전이 집합을 1번만 결정
+	//AnimationState* transState = m_isBlend ? m_nextState : m_curState;
+	//if (!transState || transState->Transitions.empty()) return nullptr;
+
+	//const bool checkBlend = m_isBlend;
+	//for (auto& trans : transState->Transitions) 
+	//{
+	//	if (trans->hasExitTime && trans->GetExitTime() >= (checkBlend ? nextAnimationProgress : curAnimationProgress))
+	//		continue;
+
+	//	if (trans->CheckTransiton(checkBlend))
+	//		return trans;
+	//}
+	//return nullptr;
 }
 
 

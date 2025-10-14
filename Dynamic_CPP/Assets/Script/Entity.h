@@ -7,7 +7,8 @@ struct HitInfo
 	Mathf::Vector3 attakerPos{};     //떄린애 worldpos
 	Mathf::Vector3 hitPos{};         //맞은애맞은위치 (콜리전반응위치 등)
 	Mathf::Vector3 hitNormal{};
-	Mathf::Vector3 KnockbackForce{}; //맞은애를 넉백시킬거리
+	Mathf::Vector2 KnockbackForce{}; //맞은애를 넉백시킬거리 X,Y
+	float          KnockbackTime = 0;
 	ItemType itemType = ItemType::None;
 	BulletType bulletType = BulletType::Normal;
 };

@@ -36,7 +36,12 @@ void EntityEleteMonster::Start()
 		hp->SetType(0);
 		hp->screenOffset = { 0, -100 };
 	}
-
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
 	auto childred = m_pOwner->m_childrenIndices;
@@ -637,15 +642,11 @@ void EntityEleteMonster::Dead()
 void EntityEleteMonster::DeadEvent()
 {
 	EndDeadAnimation = true;
-	/*Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
-	if (deadPrefab)
-	{
-		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
-		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
-		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
-		deadEffect->Initialize();
-	}*/
+	deadObj->SetEnabled(true);
+	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+	deadEffect->Initialize();
 }
 
 void EntityEleteMonster::RotateToTarget()

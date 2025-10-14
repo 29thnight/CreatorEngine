@@ -47,7 +47,7 @@ public:
 
 	GameObject* target = nullptr; //타겟 오브젝트 
 	bool isDead = false; //죽음 여부 
-
+	GameObject* deadObj = nullptr;
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
 	//bool isBoxAttack = false; //박스 공격중인지 여부 => 근접 공격 실행 X
@@ -155,7 +155,12 @@ public:
 	// 최종 위치로 텔레포트하고, 밀어낼 몬스터들을 밀어내는 헬퍼 함수
 	void PushAndTeleportTo(const Mathf::Vector3& finalPos, const std::vector<GameObject*>& monstersToPush);
 
-
+	[[Property]]
+	float KnockbackDistacneX = 0.04f;
+	[[Property]]
+	float KnockbackDistacneY = 0.14f;
+	[[Property]]
+	float KnockbackTime = 0;
 	////넥백처리 -> 넉백 X
 	//float hittimer = 0.f;
 	//Mathf::Vector3 hitPos;

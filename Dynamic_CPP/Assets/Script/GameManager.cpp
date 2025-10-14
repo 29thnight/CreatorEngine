@@ -315,6 +315,16 @@ SFXPoolManager* GameManager::GetSFXPool()
 	return SFXPool;
 }
 
+void GameManager::PushObjectPoolManager(ObjectPoolManager* _objPoolManager)
+{
+	objectPoolManager = _objPoolManager;
+}
+
+ObjectPoolManager* GameManager::GetObjectPoolManager()
+{
+	return objectPoolManager;
+}
+
 void GameManager::CheatMiningResource()
 {
 	auto cam = GameObject::Find("Main Camera");

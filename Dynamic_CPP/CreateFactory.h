@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "ObjectPoolManager.h"
 #include "EntityMonsterBaseGate.h"
 #include "PlayEffectAll.h"
 #include "SwordHitEffect.h"

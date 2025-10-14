@@ -7,6 +7,7 @@
 #include "PlayEffectAll.h"`
 #include "PrefabUtility.h"
 #include "SphereColliderComponent.h"
+#include "EntityEleteMonster.h"
 void MonEleteProjetile::Start()
 {
 	if (nullptr == m_effect)
@@ -82,10 +83,18 @@ void MonEleteProjetile::Update(float tick)
 void MonEleteProjetile::Initallize(Entity* owner, int damage, float speed, Mathf::Vector3 dir)
 {
 	ownerEntity = owner;
+	EntityEleteMonster* elete = dynamic_cast<EntityEleteMonster*>(owner);
+	if (elete)
+	{
+		KnockbackDistacneX = elete->KnockbackDistacneX;
+		KnockbackDistacneY = elete->KnockbackDistacneY;
+		KnockbackTime = elete->KnockbackTime;
+	}
 	m_Damege = damage;
 	m_Speed = speed;
 	m_Dir = dir;
 	isInitialize = true;
+
 	if (nullptr == m_effect)
 	{
 		auto childred = GetOwner()->m_childrenIndices;
@@ -125,6 +134,8 @@ void MonEleteProjetile::Action(GameObject* target)
 	Mathf::Vector3 contactPoint = mypos + dir * myRadius;
 	hitInfo.hitPos = contactPoint;
 	Entity* targetEntity = target->GetComponentDynamicCast<Entity>();
+	hitInfo.KnockbackForce = { KnockbackDistacneX ,KnockbackDistacneY};
+	hitInfo.KnockbackTime = KnockbackTime;
 	targetEntity->SendDamage(ownerEntity, m_Damege, hitInfo);
 
 

@@ -4,6 +4,7 @@
 #include "GameManager.generated.h"
 #include "GameInstance.h"
 
+class ObjectPoolManager;
 class Entity;
 class ActionMap;
 class Weapon;
@@ -81,6 +82,8 @@ public:
 
 	void PushSFXPool(SFXPoolManager* _SFXPool);
 	SFXPoolManager* GetSFXPool();
+	void PushObjectPoolManager(ObjectPoolManager* _objPoolManager);
+	ObjectPoolManager* GetObjectPoolManager();
 private:
 	std::vector<Entity*> m_entities;
 	std::vector<Entity*> m_resourcePool;
@@ -89,6 +92,7 @@ private:
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 
 	SFXPoolManager* SFXPool;
+	ObjectPoolManager* objectPoolManager;
 private:
 	void CheatMiningResource();
 
