@@ -426,7 +426,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	auto& selectedObjects = scene->m_selectedSceneObjects;
 
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
-	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end();
+	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end() || scene->m_selectedSceneObject == obj.get();
 	if (isSelected)
 	{
 		flags |= ImGuiTreeNodeFlags_Selected;

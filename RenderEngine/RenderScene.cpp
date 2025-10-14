@@ -334,7 +334,7 @@ ProxyCommand RenderScene::MakeProxyCommand(FoliageComponent* foliagePtr)
 {
     if (!InvaildCheckFoliage(foliagePtr))
     {
-            throw std::runtime_error("InvaildCheckFoliage");
+		throw std::runtime_error("InvaildCheckFoliage");
     }
 
     ProxyCommand command(foliagePtr);

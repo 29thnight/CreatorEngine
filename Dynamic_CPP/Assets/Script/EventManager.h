@@ -70,6 +70,7 @@ private:
 	void ResolveVariables(int id);
 	static EventCategory ParseCategory(const std::string& s);
 	static PlayerScope ParsePlayerScope(const std::string& s);
+	static AdvancePolicy ParseAdvancePolicy(int i);
 	static ObjectiveType ParseObjectiveType(const std::string& s);
 
 	// Parse objectives from a single CSV column: "Objectives"

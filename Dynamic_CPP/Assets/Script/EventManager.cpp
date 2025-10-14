@@ -272,12 +272,16 @@ void EventManager::LoadDefinitions()
             def.scene = HasColumn(row, "Scene") ? row["Scene"].as<std::string>() : std::string{};
             def.category = ParseCategory(HasColumn(row, "Category") ? row["Category"].as<std::string>() : "Quest");
             def.playerScope = ParsePlayerScope(HasColumn(row, "PlayerScope") ? row["PlayerScope"].as<std::string>() : "Shared");
-			def.advance = AdvancePolicy::Manual; // Å×½ºÆ® default
+            if (HasColumn(row, "AdvancePolicy")) 
+            {
+                def.advance = ParseAdvancePolicy(row["AdvancePolicy"].as<int>());
+            }
             def.priorId = HasColumn(row, "PriorQuestID") ? row["PriorQuestID"].as<int>() : 0;
             def.nextId = HasColumn(row, "NextQuestID") ? row["NextQuestID"].as<int>() : 0;
             def.uiText = HasColumn(row, "Description") ? row["Description"].as<std::string>() : std::string{};
-
-            // objectives left empty for tutorial CSV; fill from scripting or separate table
+            if (HasColumn(row, "Objectives")) {
+                ParseObjectivesDSL(row["Objectives"].as<std::string>(), def);
+            }
 
             m_indexById[def.id] = m_definitions.size();
             m_definitions.emplace_back(std::move(def));
@@ -336,6 +340,14 @@ PlayerScope EventManager::ParsePlayerScope(const std::string& s)
     if (s == "X") return PlayerScope::AnyPlayer;
     if (s == "non") return PlayerScope::None;
     return PlayerScope::Shared;
+}
+
+AdvancePolicy EventManager::ParseAdvancePolicy(int i)
+{
+    //std::string t = s; std::transform(t.begin(), t.end(), t.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+    if (i == 0) return AdvancePolicy::AutoAdvance;
+    if (i == 1) return AdvancePolicy::WaitForNextTrigger;
+        return AdvancePolicy::Manual; // default
 }
 
 ObjectiveType EventManager::ParseObjectiveType(const std::string& s)
