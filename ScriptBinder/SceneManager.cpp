@@ -188,6 +188,7 @@ void SceneManager::EndOfFrame()
 
 void SceneManager::Pausing()
 {
+    m_activeScene.load()->CullMeshData();
 }
 
 void SceneManager::DisableOrEnable()

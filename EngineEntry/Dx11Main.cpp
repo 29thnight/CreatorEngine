@@ -157,7 +157,7 @@ void DirectX11::Dx11Main::Initialize()
             CommandBuildThread();
         }
 
-                isCB_Thread_End = true;
+        isCB_Thread_End = true;
         CoUninitialize();
     });
 
