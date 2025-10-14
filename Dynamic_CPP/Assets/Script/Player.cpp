@@ -63,7 +63,7 @@ void Player::Start()
 	player = GetOwner();
 	
 	auto childred = player->m_childrenIndices;
-
+	m_transform = player->GetComponent<Transform>();
 	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
@@ -126,16 +126,19 @@ void Player::Start()
 		stunEffect = stunObj->AddComponent<EffectComponent>();
 		stunEffect->m_effectTemplateName = "Stun";
 	}
+	Prefab* healprefab = PrefabUtilitys->LoadPrefab("HealEffect");
+	if (healprefab && player) 
+	{
+		GameObject* healEffcet = PrefabUtilitys->InstantiatePrefab(healprefab, "healeffcet");
+		healEffect = healEffcet->GetComponentDynamicCast<EffectComponent>();
+	}
 
-
-
-	GameObject* uiController{};
 	if(0 == playerIndex)
 	{
-		GameObject* uiController = GameObject::Find("P1_UIController");
-		if (uiController)
+		m_uiController = GameObject::Find("P1_UIController");
+		if (m_uiController)
 		{
-			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+			auto weaponSlotController = m_uiController->GetComponent<WeaponSlotController>();
 			if (weaponSlotController)
 			{
 				weaponSlotController->m_AddWeaponHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
@@ -146,10 +149,10 @@ void Player::Start()
 			}
 		}
 
-		auto HPbar = GameObject::Find("P1_HPBar");
-		if (HPbar)
+		m_HPbar = GameObject::Find("P1_HPBar");
+		if (m_HPbar)
 		{
-			auto hpbar = HPbar->GetComponent<HPBar>();
+			auto hpbar = m_HPbar->GetComponent<HPBar>();
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
@@ -163,10 +166,10 @@ void Player::Start()
 	}
 	else
 	{
-		GameObject* uiController = GameObject::Find("P2_UIController");
-		if (uiController)
+		m_uiController = GameObject::Find("P2_UIController");
+		if (m_uiController)
 		{
-			auto weaponSlotController = uiController->GetComponent<WeaponSlotController>();
+			auto weaponSlotController = m_uiController->GetComponent<WeaponSlotController>();
 			if (weaponSlotController)
 			{
 				weaponSlotController->m_AddWeaponHandle = m_AddWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::AddWeapon);
@@ -177,10 +180,10 @@ void Player::Start()
 			}
 		}
 
-		auto HPbar = GameObject::Find("P2_HPBar");
-		if (HPbar)
+		m_HPbar = GameObject::Find("P2_HPBar");
+		if (m_HPbar)
 		{
-			auto hpbar = HPbar->GetComponent<HPBar>();
+			auto hpbar = m_HPbar->GetComponent<HPBar>();
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
@@ -201,7 +204,7 @@ void Player::Start()
 		AddWeapon(weapon);
 	}
 
-	Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
+	/*Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
 	if (meleeweapon && player)
 	{
 		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeweapon");
@@ -221,7 +224,7 @@ void Player::Start()
 		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(bombweapon, "bombweapon");
 		auto weapon = weaponObj->GetComponent<Weapon>();
 		AddWeapon(weapon);
-	}
+	}*/
 
 	Prefab* run = PrefabUtilitys->LoadPrefab("run1");
 	if (run && player) {
@@ -239,13 +242,6 @@ void Player::Start()
 		dashEffect->m_effectTemplateName = "testdash";
 	}
 
-	//auto gmobj = GameObject::Find("GameManager"); //awake로 옮김
-	//if (gmobj)
-	//{
-	//	GM = gmobj->GetComponent<GameManager>();
-	//	GM->PushEntity(this);
-	//	GM->PushPlayer(this);
-	//}
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
 
@@ -346,7 +342,7 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
-
+	Cheat(); 
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
@@ -588,8 +584,10 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				m_animator->SetParameter("OnHit", true);
 				//Mathf::Vector3 forward = player->m_transform.GetForward();
-				Mathf::Vector3 horizontal = -forward * testHitPowerX;
-				Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,testHitPowerY ,horizontal.z };
+				HitKnockbackPower = hitinfo.KnockbackForce;
+				HItKnockbackTime = hitinfo.KnockbackTime;
+				Mathf::Vector3 horizontal = -forward * HitKnockbackPower.x;
+				Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,HitKnockbackPower.y ,horizontal.z };
 				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 				controller->TriggerForcedMove(knockbackVeocity);
 			}
@@ -608,15 +606,19 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 void Player::Heal(int healAmount)
 {
 	m_currentHP = std::min(m_currentHP + healAmount, m_maxHP);
-	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
-	if (HPbar)
+	if (m_HPbar)
 	{
-		auto hpbar = HPbar->GetComponent<HPBar>();
+		auto hpbar = m_HPbar->GetComponent<HPBar>();
 		if (hpbar)
 		{
 			hpbar->SetCurHP(m_currentHP);
 		}
 	}
+	Mathf::Vector3 healpos = m_transform->GetWorldPosition();
+	healpos.y += 1.0f;
+	healEffect->GetOwner()->GetComponent<Transform>()->SetPosition(healpos);
+	healEffect->Apply();
+	//힐 이펙트 출력
 }
 
 void Player::ChangeState(std::string _stateName)
@@ -637,10 +639,9 @@ void Player::SetCurHP(int hp)
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 	}
-	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
-	if (HPbar)
+	if (m_HPbar)
 	{
-		auto hpbar = HPbar->GetComponent<HPBar>();
+		auto hpbar = m_HPbar->GetComponent<HPBar>();
 		if (hpbar)
 		{
 			hpbar->SetCurHP(m_currentHP);
@@ -1176,7 +1177,7 @@ void Player::OnHit()
 	}
 }
 
-void Player::Knockback(Mathf::Vector2 _KnockbackForce)
+void Player::SendKnockBack(Entity* sender,Mathf::Vector2 _KnockbackForce)
 {
 	Mathf::Vector3 forward = player->m_transform.GetForward();
 	Mathf::Vector3 horizontal = -forward * _KnockbackForce.x;
@@ -1184,6 +1185,41 @@ void Player::Knockback(Mathf::Vector2 _KnockbackForce)
 
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->TriggerForcedMove(knockbackVeocity);
+}
+
+void Player::Cheat()
+{
+	if (InputManagement->IsKeyDown('1'))
+	{
+		Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("WeaponMelee");
+		if (meleeweapon && player)
+		{
+			GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeweapon");
+			auto weapon = weaponObj->GetComponent<Weapon>();
+			AddWeapon(weapon);
+		}
+	}
+	if (InputManagement->IsKeyDown('2'))
+	{
+		Prefab* rangeweapon = PrefabUtilitys->LoadPrefab("WeaponWand");
+		if (rangeweapon && player)
+		{
+			GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(rangeweapon, "rangeweapon");
+			auto weapon = weaponObj->GetComponent<Weapon>();
+			AddWeapon(weapon);
+		}
+	}
+	if (InputManagement->IsKeyDown('3'))
+	{
+		Prefab* bombweapon = PrefabUtilitys->LoadPrefab("WeaponBomb");
+		if (bombweapon && player)
+		{
+			GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(bombweapon, "bombweapon");
+			auto weapon = weaponObj->GetComponent<Weapon>();
+			AddWeapon(weapon);
+		}
+	}
+	
 }
 
 void Player::SwapWeaponLeft()
@@ -1849,23 +1885,7 @@ void Player::OnCollisionExit(const Collision& collision)
 
 
 
-void Player::TestHit()
-{
-	DropCatchItem();
-	if (m_animator)
-	{
-		m_animator->SetParameter("OnHit", true);
-	}
 
-	Mathf::Vector3 forward = player->m_transform.GetForward();
-
-	Mathf::Vector3 horizontal = -forward * testHitPowerX;
-	Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,testHitPowerY ,horizontal.z };
-	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->TriggerForcedMove(knockbackVeocity);
-	//넉백이 끝날떄까지 x z testHitPowerX  // y testHitPowerY;
-
-}
 
 
 
@@ -1874,7 +1894,7 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 	if (hitinfo.itemType == ItemType::Basic || hitinfo.itemType == ItemType::Melee)
 	{
 		//근접공격타격이벤트
-		Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("SwordHit");
+		Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("SwordHitEffect");
 		if (HirPrefab)
 		{
 			GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");

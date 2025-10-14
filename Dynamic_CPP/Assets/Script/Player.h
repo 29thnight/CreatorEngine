@@ -248,10 +248,12 @@ public:
 	bool IsInvincibility() { return OnInvincibility; }
 	bool sucessResurrection = false;  
 	
+	Mathf::Vector2 HitKnockbackPower = {}; //떄린애가 넘겨줄값들
+	float  HItKnockbackTime = 0.f;
 	void SetInvincibility(float _GracePeriodTime); //무적설정 무적시간전달
 	void EndInvincibility(); //무적 강제종료
 	void OnHit(); //히트 애니메이션이 발동될떄만 씀 
-	void Knockback(Mathf::Vector2 _KnockbackForce);
+	void SendKnockBack(Entity* sender,Mathf::Vector2 _KnockbackForce) override;
 
 	//무기
 	[[Property]]
@@ -290,20 +292,22 @@ public:
 	Socket* rightEarSokcet = nullptr;
 	GameObject* stunObj = nullptr;
 	EffectComponent* stunEffect = nullptr;
-
+	EffectComponent* healEffect = nullptr;
 	std::vector<EffectComponent*>	m_runEffects;
 	int								m_runIndex = 0;
 	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
 
 
-	[[Property]]
-	float testHitPowerX = 1.5f;                     //기본공격력   // (기본공격력 + 무기공격력  ) * 크리티컬 배율 
-	[[Property]]
-	float testHitPowerY = 0.1f;
-	[[Method]]
-	void TestHit();
 private:
+	//치트들 담긴함수 
+	void Cheat();
+	Transform* m_transform = nullptr;
+
+
+	//UI들
+	GameObject* m_uiController = nullptr;
+	GameObject* m_HPbar = nullptr;
 };
 
 void  PlayHitEffect(GameObject* _hitowner,HitInfo hitinfo);  //플레이어가 떄렸을때 나올이펙트 //맞은사람,맞았을때정보 입력 sendDamge 안에서사용

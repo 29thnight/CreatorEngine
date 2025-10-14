@@ -155,7 +155,12 @@ public:
 	// 최종 위치로 텔레포트하고, 밀어낼 몬스터들을 밀어내는 헬퍼 함수
 	void PushAndTeleportTo(const Mathf::Vector3& finalPos, const std::vector<GameObject*>& monstersToPush);
 
-
+	[[Property]]
+	float KnockbackDistacneX = 0.04f;
+	[[Property]]
+	float KnockbackDistacneY = 0.14f;
+	[[Property]]
+	float KnockbackTime = 0;
 	////넥백처리 -> 넉백 X
 	//float hittimer = 0.f;
 	//Mathf::Vector3 hitPos;
