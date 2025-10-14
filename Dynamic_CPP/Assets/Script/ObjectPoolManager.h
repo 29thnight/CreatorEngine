@@ -1,19 +1,17 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Bullet.h"
-#include "SpecialBullet.generated.h"
-
-class SpecialBullet : public Bullet
+#include "ModuleBehavior.h"
+#include "ObjectPool.h"
+class ObjectPool;
+class ObjectPoolManager : public ModuleBehavior
 {
 public:
-   ReflectSpecialBullet
-	   [[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(SpecialBullet)
+	MODULE_BEHAVIOR_BODY(ObjectPoolManager)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
-	virtual void OnTriggerEnter(const Collision& collision) override;
-	virtual void OnTriggerStay(const Collision& collision) override;
+	virtual void OnTriggerEnter(const Collision& collision) override {}
+	virtual void OnTriggerStay(const Collision& collision) override {}
 	virtual void OnTriggerExit(const Collision& collision) override {}
 	virtual void OnCollisionEnter(const Collision& collision) override {}
 	virtual void OnCollisionStay(const Collision& collision) override {}
@@ -23,10 +21,13 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void Initialize(Player* owner, Mathf::Vector3 originpos, Mathf::Vector3 dir, int _damage) override;
-	[[Property]]
-	float rangedProjSpd = 1.0f; //발사체 이동속도
-	[[Property]]
-	float rangedProjDist = 10.f; //발사체 최대 이동거리
-	float explosionRadius = 3.0f; //범위공격 반경
+
+	ObjectPool* GetNormalBulletPool() { return &normalBulletPool;}
+	ObjectPool* GetSpecialBulletPool() { return &specialBulletPool; }
+	ObjectPool* GetBombPool() { return &bombPool; }
+private:
+
+	ObjectPool normalBulletPool;
+	ObjectPool specialBulletPool;
+	ObjectPool bombPool;
 };

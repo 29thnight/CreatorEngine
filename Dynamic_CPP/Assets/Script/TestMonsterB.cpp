@@ -30,6 +30,13 @@ void TestMonsterB::Start()
 		hp->SetType(0);
 	}
 
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
+
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
 	auto childred = m_pOwner->m_childrenIndices;
@@ -486,14 +493,14 @@ void TestMonsterB::ShootingAttack()
 void TestMonsterB::DeadEvent()
 {
 	EndDeadAnimation = true;
-	/*Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)
 	{
-		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(true);
 		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 		deadEffect->Initialize();
-	}*/
+	}
 }
 

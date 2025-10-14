@@ -176,8 +176,6 @@ public:
  	void MeleeAttack();
 	void RangeAttack();
 
-	std::vector<GameObject*> normalBullets;
-	std::vector<GameObject*> specialBullets;
 	[[Method]]
 	void ShootBullet();
 	[[Method]]
@@ -185,7 +183,6 @@ public:
 	[[Method]]
 	void ShootSpecialBullet();
 	void ShootChargeBullet();
-	std::vector<GameObject*> bombs;
 	[[Method]]
 	void ThrowBomb();
 

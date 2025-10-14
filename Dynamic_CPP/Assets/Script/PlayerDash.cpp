@@ -48,7 +48,6 @@ void PlayerDash::Enter()
 		// 속도 벡터 계산
 		Mathf::Vector3 knockbackVelocity = horizontalDir * knockbackSpeed;
 
-		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->TriggerForcedMove(knockbackVelocity, m_player->m_dashTime);
 
 		m_player->isDashing = true;
@@ -78,8 +77,8 @@ void PlayerDash::Exit()
 		if (m_player->dashEffect)
 			m_player->dashEffect->StopEffect();
 		//m_player->player->GetComponent<CharacterControllerComponent>()->StopForcedMove(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
-		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
-		controller->Move({ 0 ,0 });
+		//auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
+		//controller->Move({ 0 ,0 });
 	}
 
 }

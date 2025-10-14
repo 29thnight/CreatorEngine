@@ -14,6 +14,13 @@ void ObjectPool::InitializePool(std::string _prefabName, int size)
 	}
 }
 
+bool ObjectPool::Empty()
+{
+	if(pool.empty())
+		return true;
+	return false;
+}
+
 void ObjectPool::Push(GameObject* gameObj)
 {
 	if (!gameObj)
