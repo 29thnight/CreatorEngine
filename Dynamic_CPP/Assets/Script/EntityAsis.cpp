@@ -118,6 +118,9 @@ void EntityAsis::Start()
 		if (point3 != nullptr)
 			points.push_back(point3->GetComponent<Transform>()->GetWorldPosition());
 	}
+
+	HitImpulseStart();
+
 #ifdef _DEBUG
 	DebugPoint = GameObject::Find("DebugPoint");
 #endif // _DEBUG
@@ -180,6 +183,17 @@ void EntityAsis::Update(float tick)
 	m_currentGracePeriod -= tick;
 	m_currentStaggerDuration -= tick;
 
+	HitImpulseUpdate(tick);
+	//auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	//float m_currentStaggerRatio = m_currentStaggerDuration / staggerDuration;
+	//float maxImpuleSize = 1.2f;
+	//for (auto& m : meshren) {
+	//	//m->m_Material->TrySetFloat("flashStrength", m_currentStaggerDuration);
+	//	m->m_Material->TrySetValue("ImpulseScale", "maxImpulse", &maxImpuleSize, sizeof(maxImpuleSize));
+	//	m->m_Material->TrySetValue("ImpulseScale", "lerpValue", &m_currentStaggerRatio, sizeof(m_currentStaggerRatio));
+	//	m->m_Material->TrySetValue("FlashBuffer", "flashStrength", &m_currentStaggerRatio, sizeof(m_currentStaggerRatio));
+	//}
+
 	if (m_currentStaggerDuration <= 0.f) {
 		m_animator->SetParameter("OnMove", false);
 		if (!isBigWoodDetect)
@@ -206,6 +220,7 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	m_currentStaggerDuration = staggerDuration; // 경직
 	m_currentGracePeriod = graceperiod;			// 무적
 	m_currentTailPurificationDuration = 0.f;	// 진행중인 정화 취소
+	HitImpulse();
 
 	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
 	bool isDroped = DropItem();

@@ -5,6 +5,12 @@
 #include "EntityAsis.h"
 void EntitySpiritStone::Start()
 {
+	HitImpulseStart();
+}
+
+void EntitySpiritStone::Update(float tick)
+{
+	HitImpulseUpdate(tick);
 }
 
 void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
@@ -41,6 +47,7 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		}
 		else
 		{
+			HitImpulse();
 			// 데미지를 받았지만 아직 살아있는 경우.
 			/*if (m_onDamageEvent.IsBound())
 			{

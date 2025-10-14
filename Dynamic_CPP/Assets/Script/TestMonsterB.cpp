@@ -138,7 +138,7 @@ void TestMonsterB::Start()
 	if (hasP2) {
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
-
+	HitImpulseStart();
 }
 
 void TestMonsterB::Update(float tick)
@@ -287,6 +287,7 @@ void TestMonsterB::Update(float tick)
 			}
 		}
 	}
+	HitImpulseUpdate(tick);
 }
 
 void TestMonsterB::Dead()
@@ -420,6 +421,9 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				isDead = true;
 				Dead();
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}

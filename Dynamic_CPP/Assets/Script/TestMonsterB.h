@@ -9,6 +9,7 @@ class BlackBoard;
 class Animator;
 class EffectComponent;
 class CriticalMark;
+//¿ø°Å¸®¸÷
 class TestMonsterB : public Entity
 {
 public:

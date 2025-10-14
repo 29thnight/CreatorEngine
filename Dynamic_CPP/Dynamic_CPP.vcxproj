@@ -310,6 +310,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\CameraMove.cpp" />
+		<ClCompile Include="Assets\Script\Entity.cpp" />
 		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp" />
 		<ClCompile Include="Assets\Script\EventManager.cpp" />
 		<ClCompile Include="Assets\Script\EventTarget.cpp" />

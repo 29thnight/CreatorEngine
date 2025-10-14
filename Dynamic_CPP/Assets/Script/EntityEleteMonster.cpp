@@ -152,6 +152,8 @@ void EntityEleteMonster::Start()
 	blackBoard->SetValueAsFloat("RetreatRange", m_retreatRange);
 	blackBoard->SetValueAsFloat("TeleportDistance", m_teleportDistance);
 	blackBoard->SetValueAsFloat("TeleportCollTime", m_teleportCoolTime);
+
+	HitImpulseStart();
 }
 
 void EntityEleteMonster::Update(float tick)
@@ -209,6 +211,7 @@ void EntityEleteMonster::Update(float tick)
 		}
 	}
 
+	HitImpulseUpdate(tick);
 
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
@@ -710,6 +713,9 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				isDead = true;
 				Dead();
 				DeadEvent(); //Die 애니메이션나오면 거기로 옮길것
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}
