@@ -1,13 +1,16 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
+    "emitterTimings": [
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "gghit3",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 10,
             "modules": [
                 {
@@ -93,22 +96,22 @@
                             {
                                 "direction": [
                                     0.0,
-                                    0.0,
-                                    -1.0
+                                    1.0,
+                                    0.0
                                 ],
                                 "duration": 0.10000000149011612,
                                 "force": 20.0,
                                 "range": 0.18299999833106995,
-                                "triggerTime": 0.20000000298023224,
+                                "triggerTime": 0.0,
                                 "type": 1
                             }
                         ],
                         "meshParams": {
                             "gravityStrength": 0.0,
-                            "useGravity": 0
+                            "useGravity": 1
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 140.95408630371094,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -155,17 +158,17 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 0.10000000149011612,
-                                "y": 0.10000000149011612,
-                                "z": 1.0
+                                "x": 0.009999999776482582,
+                                "y": 0.009999999776482582,
+                                "z": 0.10000000149011612
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.10000000149011612,
-                                "y": 0.10000000149011612,
-                                "z": 1.0
+                                "x": 0.014000000432133675,
+                                "y": 0.009999999776482582,
+                                "z": 0.10000000149011612
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0

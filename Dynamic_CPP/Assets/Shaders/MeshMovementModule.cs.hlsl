@@ -340,10 +340,21 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             float3 dir = normalize(particle.velocity);
     
-                // velocity 방향을 회전각으로 변환 (화살이 날아가는 방향으로)
-            particle.rotation.y = atan2(-dir.x, dir.z); // yaw (좌우 회전)
-            particle.rotation.x = -asin(dir.y); // pitch (위아래 회전)
-                // roll(Z)은 rotationSpeed에 맡김
+            // velocity 방향을 회전각으로 변환 (화살이 날아가는 방향으로)
+            // y축 방향일 때를 위한 예외 처리 추가
+            float horizontalLength = sqrt(dir.x * dir.x + dir.z * dir.z);
+            
+            if (horizontalLength > 0.001)
+            {
+                particle.rotation.y = atan2(-dir.x, dir.z); // yaw (좌우 회전)
+                particle.rotation.x = -asin(dir.y); // pitch (위아래 회전)
+            }
+            else
+            {
+                // 거의 순수 y축 방향일 때
+                particle.rotation.y = 0.0; // 정면 유지
+                particle.rotation.x = (dir.y > 0) ? -1.5708 : 1.5708; // ±90도 (위/아래)
+            }
         }
         
         // 파티클 회전 업데이트 (로컬 회전)
