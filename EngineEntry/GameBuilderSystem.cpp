@@ -44,7 +44,7 @@ void GameBuilderSystem::BuildGame()
 	// 예: m_buildSlnPath와 m_buildCommand를 사용하여 빌드 수행
 	try
 	{
-		RunMsbuildWithLiveLogAndProgress(m_scriptBuildCommand);
+		RunMsbuildWithLiveLogAndProgress(m_scriptBuildCommand, L"Script Compile...");
 		RunMsbuildWithLiveLogAndProgress(m_buildCommand);
 	}
 	catch (const std::exception& e)

@@ -106,6 +106,9 @@
     <Filter Include="Core.definition\Type">
       <UniqueIdentifier>{82770586-7f15-4429-8c83-84bf5f361838}</UniqueIdentifier>
     </Filter>
+    <Filter Include="EngineBootstrap">
+      <UniqueIdentifier>{a7991059-5026-4fa6-aec1-3f56f6d5e3e4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -311,6 +314,9 @@
     </ClInclude>
     <ClInclude Include="Paklib.hpp">
       <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineBootstrap.h">
+      <Filter>EngineBootstrap</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
