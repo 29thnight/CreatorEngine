@@ -371,6 +371,15 @@ void Player::Update(float tick)
 			m_comboElapsedTime = 0.f;
 		}
 	}
+	if (isAttacking == false && canRapidfire)
+	{
+		rapidfireElapsedTime += tick;
+		if (rapidfireElapsedTime >= rapidfireTime)
+		{
+			canRapidfire = false;
+			rapidfireElapsedTime = 0;
+		}
+	}
 	if (isCharging)
 	{
 		m_chargingTime += tick;
@@ -918,7 +927,14 @@ void Player::StartAttack()
 				}
 				else
 				{
-					m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+					if (canRapidfire)
+					{
+						m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+					}
+					else
+					{
+						m_animator->SetParameter("RangeAttackReady", true);
+					}
 				}
 			}
 			if (m_curWeapon->itemType == ItemType::Bomb)
@@ -1211,6 +1227,27 @@ void Player::Cheat()
 	
 }
 
+void Player::DetectResource()
+{
+	std::vector<HitResult> hits;
+	OverlapInput RangeInfo;
+	RangeInfo.layerMask = 1 << 8 | 1 << 10; 
+	Transform transform = GetOwner()->m_transform;
+	RangeInfo.position = transform.GetWorldPosition();
+	PhysicsManagers->SphereOverlap(RangeInfo, detectRadius, hits);
+
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+		if (auto entity = object->GetComponentDynamicCast<Entity>())
+		{
+			entity->OnOutLine();
+
+		}
+	}
+}
+
 void Player::SwapWeaponLeft()
 {
 	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
@@ -1233,7 +1270,7 @@ void Player::SwapWeaponLeft()
 		OnMoveBomb = false;
 		onBombIndicate = false;
 		m_comboCount = 0;
-
+		canRapidfire = false;
 		/*startAttack = false;
 		isAttacking = false;
 		m_chargingTime = 0;
@@ -1281,7 +1318,7 @@ void Player::SwapWeaponRight()
 		OnMoveBomb = false;
 		onBombIndicate = false;
 		m_comboCount = 0;
-
+		canRapidfire = false;
 		/*startAttack = false;
 		isAttacking = false;
 		m_chargingTime = 0;
@@ -1321,6 +1358,7 @@ void Player::SwapBasicWeapon()
 	CancelChargeAttack();
 	countRangeAttack = 0;
 	m_comboCount = 0;
+	canRapidfire = false;
 }
 
 void Player::AddMeleeWeapon()
@@ -1459,6 +1497,7 @@ void Player::CancelChargeAttack()
 	isAttacking = false;
 	m_chargingTime = 0;
 	isCharging = false;
+	canRapidfire = false;
 	if (chargeEffect)
 	{
 		chargeEffect->StopEffect();

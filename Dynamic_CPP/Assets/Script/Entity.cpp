@@ -31,3 +31,29 @@ void Entity::HitImpulseUpdate(float tick)
 		m->m_Material->TrySetValue("FlashBuffer", "flashStrength", &ratio, floatSize);
 	}
 }
+
+void Entity::UpdateOutLine(float tick)
+{
+	if (OnOutline == true)
+	{
+		detectElapsedTime += tick;
+		if (detectElapsedTime >= detectTime)
+		{
+			OnOutline = 0;
+			auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+			for (auto& m : meshren)
+			{
+				m->m_bitflag = 0;
+			}
+		}
+	}
+}
+
+void Entity::OnOutLine()
+{
+	auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for (auto& m : meshren)
+	{
+		m->m_bitflag = 1;
+	}
+}

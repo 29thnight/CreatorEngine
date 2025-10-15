@@ -47,6 +47,13 @@ public:
 	float m_currentHitImpulseDuration{ 0.f };
 	float m_maxHitImpulseSize{ 1.2f };
 
+	float detectTime = 2.0f;
+	float detectElapsedTime = 0.f;
+	bool  OnOutline = false;
+	void  UpdateOutLine(float tick);
+	void  OnOutLine();
+
+
 	bool isKnockBack = false;
 	float KnockBackElapsedTime = 0.f;
 	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
