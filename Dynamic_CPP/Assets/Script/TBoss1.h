@@ -6,6 +6,7 @@
 
 class BehaviorTreeComponent;
 class BlackBoard;
+class RigidBodyComponent;
 class TBoss1 : public Entity
 {
 public:
@@ -31,6 +32,15 @@ public:
 	// 패턴 타입을 지정하여 외부에서 패턴 시작을 명령합니다.
 	enum class EPatternType {
 		None,
+		BP0011,
+		BP0012,
+		BP0013,
+		BP0014,
+		BP0021,
+		BP0022,
+		BP0031,
+		BP0032,
+		BP0033,
 		BP0034
 		// 다른 패턴들을 여기에 추가...
 	};
@@ -41,11 +51,20 @@ public:
 		Waiting,
 	};
 
+	std::string m_state = "Idle";
+	std::string m_identity = "Boss1";
+
+
 	EPatternType  m_activePattern = EPatternType::None;
 	EPatternPhase m_patternPhase = EPatternPhase::Inactive;
 
+	EPatternType GetActivePattern() const { return m_activePattern; }
+	EPatternPhase GetPatternPhase() const { return m_patternPhase; }
+
 	BehaviorTreeComponent* BT = nullptr;
 	BlackBoard* BB = nullptr;
+
+	RigidBodyComponent* m_rigid = nullptr;
 
 	GameObject* Player1 = nullptr; //들고 있자
 	GameObject* Player2 = nullptr; 
@@ -91,24 +110,58 @@ public:
 
 	//보스만 특수하게 
 	GameObject* m_chunsik = nullptr;
-	float m_chunsikRadius = 20.f;
+	float m_chunsikRadius = 10.f;
 
 	void RotateToTarget();
-
+	void ShootProjectile(int index, Mathf::Vector3 pos,Mathf::Vector3 dir);
+	void SweepAttack(Mathf::Vector3 pos, Mathf::Vector3 dir); //박스 스윕 공격
+	void MoveToChunsik(float tick); //춘식이 위치로 이동
+	void BurrowMove(float tick); //땅파고 이동
 	//void StartPattern(EPatternType type); //쓸까 말까 고민중
-
 
 	//BP0033,0034 용 광역 패턴 사용시 장판패턴이 전체가 다 종료되었는지를 확인하고 전체가 종료 될때 까지 행동을 막는 함수
 	bool usePatten = false;
 	int pattenIndex = 0;
 	std::vector<std::pair<int, Mathf::Vector3>> BP0034Points;
-	float bp0034Timer = 0.0f;
-	float delay = 1.0f;
+	float BPTimer = 0.0f;
+	float BP0013delay = 1.0f;
+	float BP0034delay = 1.0f;
 	void UpdatePattern(float tick);
+	void Update_BP0011(float tick);
+	void Update_BP0013(float tick);
+	void Update_BP0021(float tick);
+	void Update_BP0022(float tick);
+	void Update_BP0031(float tick);
+	void Update_BP0032(float tick);
+	void Update_BP0033(float tick);
 	void Update_BP0034(float tick);
 	void Calculate_BP0034();
 	void EndPattern();
 
+
+	bool isMoved = false;
+	bool isAttacked = false;
+	bool isBurrow = false;
+	float burrowTimer = 0.f;
+	float hazardTimer = 0.f;
+	float hazardInterval = 8.f; //바닥 패턴 주기
+	int actionCount = 0; // 행동 횟수 일정 이상시 강제 대기 상태 
+
+
+	int p1Count = 0;
+	int p2Count = 0;
+	void SelectTarget();
+
+
+
+
+	[[Method]]
+	void Burrow(); //땅파고 들어감
+	[[Method]]
+	void Protrude(); //타겟 위치로 튀어나옴
+	[[Method]]
+	void ProtrudeChunsik(); //춘식이 위치로 튀어나옴
+	
 
 	[[Method]]
 	void BP0011();
@@ -119,8 +172,10 @@ public:
 	[[Method]]
 	void BP0014();
 
-
-
+	[[Method]]
+	void BP0021();
+	[[Method]]
+	void BP0022();
 
 	[[Method]]
 	void BP0031();

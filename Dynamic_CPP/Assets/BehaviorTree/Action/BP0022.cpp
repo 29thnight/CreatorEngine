@@ -1,11 +1,11 @@
-#include "BP0031.h"
+#include "BP0022.h"
 #include "pch.h"
 #include "TBoss1.h"
 
-NodeStatus BP0031::Tick(float deltatime, BlackBoard& blackBoard)
+NodeStatus BP0022::Tick(float deltatime, BlackBoard& blackBoard)
 {
     TBoss1* script = m_owner->GetComponent<TBoss1>();
-    if (script->GetActivePattern() != TBoss1::EPatternType::BP0031)
+    if (script->GetActivePattern() != TBoss1::EPatternType::BP0022)
     {
         // 안전장치: 만약 다른 패턴이 이미 실행 중이라면, 이 노드는 실패 처리합니다.
         if (script->GetActivePattern() != TBoss1::EPatternType::None)
@@ -13,8 +13,8 @@ NodeStatus BP0031::Tick(float deltatime, BlackBoard& blackBoard)
             return NodeStatus::Failure;
         }
 
-        // 보스에게 BP0031 패턴 시작을 '요청'합니다.
-        script->BP0031();
+        // 보스에게 BP0022 패턴 시작을 '요청'합니다.
+        script->BP0022();
     }
 
     // --- 상태 감시 역할 ---

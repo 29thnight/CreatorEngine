@@ -11,6 +11,8 @@ void SlashEffect::Start()
 
 void SlashEffect::Update(float tick)
 {
+	if(!initialized)
+		return;
 	if (true == beLateFrame && false == OnEffect)
 	{
 		OnEffect = true;
@@ -42,5 +44,6 @@ void SlashEffect::Initialize()
 	}
 	beLateFrame = false;
 	OnEffect = false;
+	initialized = true;
 }
 

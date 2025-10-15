@@ -17,10 +17,15 @@ ReflectionScriptField(TBoss1) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(Burrow) \
+		meta_method(Protrude) \
+		meta_method(ProtrudeChunsik) \
 		meta_method(BP0011) \
 		meta_method(BP0012) \
 		meta_method(BP0013) \
 		meta_method(BP0014) \
+		meta_method(BP0021) \
+		meta_method(BP0022) \
 		meta_method(BP0031) \
 		meta_method(BP0032) \
 		meta_method(BP0033) \

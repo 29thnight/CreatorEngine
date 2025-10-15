@@ -39,3 +39,13 @@ Boss1:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Chunsik
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Chunsik
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
