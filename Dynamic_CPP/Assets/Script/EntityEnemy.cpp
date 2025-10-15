@@ -60,6 +60,8 @@ void EntityEnemy::Start()
 		}
 
 	}*/
+
+	HitImpulseStart();
 }
 
 void EntityEnemy::OnTriggerEnter(const Collision& collision)
@@ -163,6 +165,8 @@ void EntityEnemy::Update(float tick)
 		blackBoard->SetValueAsInt("AttackCount", attackCount);
 	}
 
+	HitImpulseUpdate(tick);
+
 	//MeleeAttack();
 	//if (isKnockBack)
 	//{
@@ -243,6 +247,9 @@ void EntityEnemy::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (m_currentHP <= 0)
 			{
 				isDead = true;
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}

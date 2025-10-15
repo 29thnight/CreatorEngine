@@ -36,6 +36,10 @@ struct alignas(16) WindBuffer {
 	float windWaveFrequency;
 };
 
+struct alignas(16) MeshrendererBuffer {
+	uint32 bitflag;
+};
+
 ForwardPass::ForwardPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -95,6 +99,7 @@ ForwardPass::ForwardPass()
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_TimeBuffer = DirectX11::CreateBuffer(sizeof(TimeBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_windBuffer = DirectX11::CreateBuffer(sizeof(WindBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_meshRendererBuffer = DirectX11::CreateBuffer(sizeof(MeshrendererBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	constexpr uint32 MAX_INSTANCES = 2048; // Max number of instances per draw call
 	m_maxInstanceCount = MAX_INSTANCES;
@@ -259,6 +264,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 				proxy->m_Mesh->m_hashingMesh,
 				proxy->m_EnableLOD,
 				proxy->GetLODLevel(&camera),
+				proxy->m_bitflag
 			};
 			instanceGroups[key].push_back(std::move(proxy));
 		}
@@ -284,6 +290,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 7, 1, m_meshRendererBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
@@ -298,6 +305,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	if (lightManager->hasLightWithShadows) {
 		DirectX11::PSSetShaderResources(deferredPtr, 4, 1, &renderData->m_shadowMapTexture->m_pSRV);
 		DirectX11::PSSetConstantBuffer(deferredPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+		DirectX11::PSSetConstantBuffer(deferredPtr, 11, 1, &lightManager->m_pLightCountBuffer);
 		lightManager->PSBindCloudShadowMap(deferredPtr);
 	}
 
@@ -318,7 +326,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		Material* mat = proxy->m_Material;
 		auto matinfo = mat->m_materialInfo;
-		matinfo.m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+		proxy->m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
 		if (proxy->m_materialGuid != currentMaterialGuid)
 		{
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
@@ -329,6 +337,9 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
 			currentMaterialGuid = proxy->m_materialGuid;
 		}
+		MeshrendererBuffer mbuffer;
+		mbuffer.bitflag = proxy->m_bitflag;
+		DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
 
 		proxy->Draw(deferredPtr);
 	}
@@ -339,6 +350,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, m_instanceBufferSRV.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 7, 1, m_meshRendererBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
@@ -355,7 +367,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// Only update material state if it has changed from the previous group.
 		Material* mat = firstProxy->m_Material;
 		auto matinfo = mat->m_materialInfo;
-		matinfo.m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+		firstProxy->m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
 		if (groupMaterialGuid != currentMaterialGuid)
 		{
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
@@ -365,6 +377,10 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
 			if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
 		}
+
+		MeshrendererBuffer mbuffer;
+		mbuffer.bitflag = firstProxy->m_bitflag;
+		DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
 
 		// --- Update the instance data buffer using UpdateSubresource ---
 		// This is safer for deferred contexts than Map/Unmap.
@@ -450,6 +466,10 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 			// ±âÁ¸ forward binding
 			{
+				MeshrendererBuffer mbuffer;
+				mbuffer.bitflag = proxy->m_bitflag;
+				DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+
 				DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
 				DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
 				DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
@@ -457,6 +477,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 				//DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 				DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
 				DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+				DirectX11::PSSetConstantBuffer(deferredPtr, 7, 1, m_meshRendererBuffer.GetAddressOf());
 				DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
 				DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
@@ -549,6 +570,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(deferredPtr, 7, 1, m_meshRendererBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
 
@@ -570,20 +592,9 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	camera.UpdateBuffer(deferredPtr);
 
 	constexpr size_t kMaxInstancesPerDraw = 2048;
-	//std::unordered_map<std::pair<HashedGuid, HashedGuid>, std::vector<FoliageInstance*>> instanceMap;
 	for(auto& proxy : data->m_foliageQueue)
 	{
-		std::unordered_map<uint32, std::vector<FoliageInstance*>> instanceMap;
-		for(auto& instance : proxy->m_foliageInstances)
-		{
-			uint32 key = instance.m_foliageTypeID;
-			if(!instance.m_isCulled)
-			{
-				instanceMap[key].push_back(&instance);
-			}
-		}
-
-		for(auto& [key, instances] : instanceMap)
+		for(auto& [key, instances] : proxy->instanceMap)
 		{
 			if (instances.empty()) continue;
 			auto& firstInstance = instances.front();
@@ -594,8 +605,14 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 			if (!mesh || !mat) continue;
 
 			auto matinfo = mat->m_materialInfo;
-			matinfo.m_bitflag |= foliageType.m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
-			
+			proxy->m_bitflag |= foliageType.m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
+
+
+			MeshrendererBuffer mbuffer;
+			mbuffer.bitflag = proxy->m_bitflag;
+			DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+
+
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
 			
 			if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);

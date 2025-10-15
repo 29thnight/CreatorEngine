@@ -22,6 +22,9 @@ ReflectionScriptField(EntityEleteMonster) \
 		meta_property(m_avoidanceStrength) \
 		meta_property(m_teleportDistance) \
 		meta_property(m_teleportCoolTime) \
+		meta_property(KnockbackDistacneX) \
+		meta_property(KnockbackDistacneY) \
+		meta_property(KnockbackTime) \
 	}); \
 	MethodField \
 	({ \

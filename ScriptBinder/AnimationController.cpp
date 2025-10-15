@@ -16,8 +16,6 @@ AnimationController::~AnimationController()
 	DeleteAvatarMask();
 }
 
-
-
 bool AnimationController::BlendingAnimation(float tick)
 {
 	blendingTime += tick;
@@ -56,19 +54,24 @@ void AnimationController::SetCurState(std::string stateName)
 
 std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
+#pragma region OLD_CODE
 	if (!m_curState)
 	{
 		if (!StateVec.size() >= 2)   //0번은 anystate라없음
 		{
 			if (StateVec[1].get()->m_name != "Ani State")
+			{
 				m_curState = StateVec[1].get();
+			}
 			else
+			{
 				m_curState = StateVec[0].get();
-
-			
+			}
 		}
 		else
+		{
 			return nullptr;
+		}
 	}
 
 	if (m_curState == nullptr) return nullptr;
@@ -88,8 +91,10 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 				}
 				if (true == trans->CheckTransiton())
 				{
-					if (trans->nextState != nullptr && m_curState != trans->nextState);
-					return trans;
+					if (trans->nextState != nullptr && m_curState != trans->nextState)
+					{
+						return trans;
+					}
 				}
 			}
 		}
@@ -122,13 +127,55 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		}
 	}
 	return nullptr;
+#pragma endregion
+	//if (!m_curState) 
+	//{
+	//	if (StateVec.size() >= 2) 
+	//	{
+	//		m_curState = (StateVec[1]->m_name != "Ani State") ? StateVec[1].get() : StateVec[0].get();
+	//	}
+	//	else 
+	//	{
+	//		return nullptr;
+	//	}
+	//}
+
+	//// 1) AnyState 캐시 사용
+	//if (auto aniState = GetAniState()) 
+	//{
+	//	for (auto& trans : aniState->Transitions) 
+	//	{
+	//		if (trans->hasExitTime && trans->GetExitTime() >= curAnimationProgress)
+	//			continue;
+
+	//		if (trans->CheckTransiton()) 
+	//		{
+	//			// BUG FIX: 세미콜론 제거
+	//			if (trans->nextState != nullptr && m_curState != trans->nextState)
+	//				return trans;
+	//		}
+	//	}
+	//}
+
+	//// 2) 현재 참조할 상태의 전이 집합을 1번만 결정
+	//AnimationState* transState = m_isBlend ? m_nextState : m_curState;
+	//if (!transState || transState->Transitions.empty()) return nullptr;
+
+	//const bool checkBlend = m_isBlend;
+	//for (auto& trans : transState->Transitions) 
+	//{
+	//	if (trans->hasExitTime && trans->GetExitTime() >= (checkBlend ? nextAnimationProgress : curAnimationProgress))
+	//		continue;
+
+	//	if (trans->CheckTransiton(checkBlend))
+	//		return trans;
+	//}
+	//return nullptr;
 }
 
 
 void AnimationController::UpdateState()
 {
-
-	
 	auto trans = CheckTransition();
 	/*if (needBlend)
 	{
@@ -252,10 +299,11 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 		state->m_isAny = true;
 	state->AnimationIndex = animationIndex;
 	//state->SetBehaviour(stateName);
-	States.insert(std::make_pair(stateName, StateVec.size()));
+	//States.insert(std::make_pair(stateName, StateVec.size()));
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
 	StateNameSet.insert(stateName);
+	m_nameToState[stateName] = state;
 	return state.get();
 }
 
@@ -273,6 +321,7 @@ std::shared_ptr<AnimationState> AnimationController::CreateState_UI()
 	StateNameSet.insert(uniqueName);
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
+	m_nameToState[uniqueName] = state;
 	return state;
 }
 
@@ -292,14 +341,12 @@ void AnimationController::DeleteState(std::string stateName)
 	for (auto& state : StateVec)
 	{
 		auto& transitions = state->Transitions;
-		
-				transitions.erase(
-					std::remove_if(transitions.begin(), transitions.end(),
-						[&](const std::shared_ptr<AniTransition>& t)
-						{
-							return t->GetCurState() == stateName || t->GetNextState() == stateName;
-						}),
-					transitions.end());
+
+		std::erase_if(transitions, [&](const std::shared_ptr<AniTransition>& t)
+		{
+			return t->GetCurState() == stateName 
+				|| t->GetNextState() == stateName;
+		});
 	}
 	if (it != StateVec.end())
 	{
@@ -315,14 +362,12 @@ void AnimationController::DeleteTransiton(const std::string& fromStateName, cons
 	if (!state) return;
 
 	auto& transitions = state->Transitions;
-
-	transitions.erase(
-		std::remove_if(transitions.begin(), transitions.end(),
-			[&](const std::shared_ptr<AniTransition>& t)
-			{
-				return t->GetCurState() == fromStateName && t->GetNextState() == toStateName;
-			}),
-		transitions.end());
+	
+	std::erase_if(transitions, [&](const std::shared_ptr<AniTransition>& t)
+	{
+		return t->GetCurState() == fromStateName 
+			&& t->GetNextState() == toStateName;
+	});
 }
 
 AnimationState* AnimationController::FindState(std::string stateName)
@@ -340,14 +385,12 @@ AnimationState* AnimationController::FindState(std::string stateName)
 
 AniTransition* AnimationController::CreateTransition(const std::string& curStateName, const std::string& nextStateName)
 {
-	
 	auto curstate = FindState(curStateName);
 	if (!curstate) return nullptr;
 	for (auto& trans : curstate->Transitions)
 	{
 		if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
 			return trans.get();
-
 	}
 	
 	auto nextstate = FindState(nextStateName);
@@ -363,7 +406,6 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 
 
 void AnimationController::CreateMask()
-
 {
 	if (!m_avatarMask)
 	{
@@ -372,7 +414,6 @@ void AnimationController::CreateMask()
 		m_avatarMask = new AvatarMask;
 		m_avatarMask->RootMask = m_avatarMask->MakeBoneMask(m_owner->m_Skeleton->m_rootBone);
 	}
-	
 }
 
 void AnimationController::ReCreateMask(AvatarMask* mask)

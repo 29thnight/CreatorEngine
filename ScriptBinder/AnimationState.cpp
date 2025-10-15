@@ -48,7 +48,12 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 		behaviour = nullptr;
 	}
 
-	//behaviour = AnimationFactorys->CreateBehaviour(name);
+	if (behaviourName.empty())
+	{
+		return;
+	}
+
+	//behaviour = AnimationFactorys->CreateBehaviour(name); //WARN : APP Vrifier - Stop #4
 	behaviour = std::shared_ptr<AniBehavior>(ScriptManager->CreateAniBehavior(behaviourName.c_str()),
 		[](AniBehavior* ptr)
 		{

@@ -61,6 +61,7 @@ public:
     const RenderPassSettings& GetRenderPassSettings() const { return m_renderPassSettings; }
 	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_contentsBrowserStyle; }
 	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_contentsBrowserStyle = style; }
+	float GetImGuiScale() { return m_imguiScale; }
 
 	void SetImGuiInitialized(bool isInitialized)
 	{
@@ -92,6 +93,7 @@ public:
 	Fence RenderCommandFence;
 	Fence RHICommandFence;
 	TerrainBrush* terrainBrush = nullptr;
+	float m_imguiScale{ 0.8f };
 
 private:
     std::atomic_bool m_isGameView{ false };
@@ -101,6 +103,7 @@ private:
     bool m_isEditorMode{ true };
 	bool m_isMinimized{ false };
 	bool m_isDebugMode{ false };
+
 
 	MSVCVersion m_msvcVersion{ MSVCVersion::None };
     RenderPassSettings m_renderPassSettings{};

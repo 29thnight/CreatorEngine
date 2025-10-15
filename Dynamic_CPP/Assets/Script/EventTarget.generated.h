@@ -6,8 +6,7 @@ ReflectionScriptField(EventTarget) \
 	PropertyField \
 	({ \
 		meta_property(m_eventId) \
-		meta_property(m_varName) \
-		meta_property(m_value) \
+		meta_property(m_runtimeTag) \
 	}); \
 	MethodField \
 	({ \

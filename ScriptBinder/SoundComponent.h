@@ -19,6 +19,7 @@ public:
 
 	void Start() override;
 	void Update(float tick) override;
+	void LateUpdate(float tick) override;
 	void OnDestroy() override;
 
 	[[Method]]

@@ -2,6 +2,10 @@
 #include "AIManager.h"
 #include "BehaviorTreeComponent.h"
 #include "StateMachineComponent.h"
+#include "SceneManager.h"
+#include "MeshRenderer.h"
+#include "Camera.h"
+//#include <execution>
 
 BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
 {
@@ -23,6 +27,55 @@ void AIManager::RemoveBlackBoard(const std::string& aiName)
 		std::erase_if(m_blackBoards, [&](const BlackBoard& bb) { return &bb == it->second; });
 		m_blackBoardFind.erase(it);
 	}
+}
+
+void AIManager::InternalAIUpdate(float deltaSeconds)
+{
+	std::vector<IAIComponent*> compVec{};
+	auto camera = CameraManagement->GetLastCamera();
+	if (!camera) return;
+
+	for (auto& [obj, comp] : m_aiComponentMap)
+	{
+		if (!obj || !comp) continue;
+
+		if (obj->m_ownerScene != SceneManagers->GetActiveScene()) continue;
+
+		DirectX::BoundingBox objBox{};
+		objBox.Extents = { 3.f, 3.f, 3.f };
+
+		auto meshComp = obj->GetComponent<MeshRenderer>();
+		if (meshComp)
+		{
+			objBox = meshComp->GetBoundingBox();
+		}
+		else
+		{
+			DirectX::BoundingBox localObjBox{ objBox };
+			auto mat = obj->m_transform.GetWorldMatrix();
+			localObjBox.Transform(objBox, mat);
+		}
+
+		auto frustum = camera->GetFrustum();
+		if (frustum.Intersects(objBox))
+		{
+			compVec.push_back(comp);
+		}
+	}
+
+	auto updateFunc = [deltaSeconds](IAIComponent* comp)
+	{
+		try
+		{
+			comp->InternalAIUpdate(deltaSeconds);
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "InternalAIUpdate Exception : " << e.what() << std::endl;
+		}
+	};
+
+	std::ranges::for_each(compVec.begin(), compVec.end(), updateFunc);
 }
 
 void AIManager::RegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent)
@@ -70,6 +123,7 @@ void AIManager::InitalizeBehaviorTreeSystem()
 	m_btActionNodeNames.clear();
 	m_btConditionNodeNames.clear();
 	m_btConditionDecoratorNodeNames.clear();
+	//InternalAIUpdateEvent.Clear();
 
 	// 파라미터가 없는 노드 등록
 	BTNodeFactory->Register("RootSequence", []()

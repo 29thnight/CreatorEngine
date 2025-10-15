@@ -856,7 +856,7 @@ void SceneRenderer::CreateCommandListPass()
 		for (auto& instanceID : data->GetUIRenderDataBuffer())
 		{
 			auto proxy = renderScene->FindUIProxy(instanceID);
-			if (nullptr != proxy)
+			if (nullptr != proxy && proxy->IsEnabled())
 			{
 				data->PushUIRenderQueue(proxy);
 			}

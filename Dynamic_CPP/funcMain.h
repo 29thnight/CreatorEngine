@@ -192,6 +192,10 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("SwordProjectile", []() { return new SwordProjectile(); });
+		CreateFactory::GetInstance()->RegisterFactory("ControllerVibration", []() { return new ControllerVibration(); });
+		CreateFactory::GetInstance()->RegisterFactory("ObjectPoolManager", []() { return new ObjectPoolManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("ReachEventTrigger", []() { return new ReachEventTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("BP001", []() { return new BP001(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterBaseGate", []() { return new EntityMonsterBaseGate(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayEffectAll", []() { return new PlayEffectAll(); });

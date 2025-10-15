@@ -40,6 +40,7 @@ private:
 	ComPtr<ID3D11Buffer> m_instanceBuffer;
 	ComPtr<ID3D11Buffer> m_TimeBuffer;
 	ComPtr<ID3D11Buffer> m_windBuffer;
+	ComPtr<ID3D11Buffer> m_meshRendererBuffer;
 	ComPtr<ID3D11ShaderResourceView> m_instanceBufferSRV;
 	ComPtr<ID3D11DepthStencilState> m_depthNoWrite;
 	ComPtr<ID3D11BlendState1> m_blendPassState;

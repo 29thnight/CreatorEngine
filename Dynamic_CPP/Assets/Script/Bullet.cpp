@@ -43,7 +43,6 @@ void Bullet::Initialize(Player* owner,Mathf::Vector3 originpos,Mathf::Vector3 di
 	m_moveDir = dir;
 	m_damage = _damage;
 	hasAttacked = false;
-	lifeTime = 5.f;
 
 	if (nullptr == m_effect)
 	{

@@ -184,7 +184,9 @@ void DirectX11::GameMain::CreateWindowSizeDependentResources()
 void DirectX11::GameMain::Update()
 {
     // EditorUpdate
-    EngineSettingInstance->frameDeltaTime = Time->GetElapsedSeconds();
+    const bool isPaused = SceneManagers->IsGamePaused();
+    const double deltaSeconds = Time->GetElapsedSeconds();
+    EngineSettingInstance->frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
 
     Time->Tick([&]
     {
@@ -192,9 +194,16 @@ void DirectX11::GameMain::Update()
         InputManagement->Update(EngineSettingInstance->frameDeltaTime);
 
         SceneManagers->Initialization();
-        SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
-        SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
-        SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+        if (!SceneManagers->IsGamePaused())
+        {
+            SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
+            SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
+            SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+        }
+        else
+        {
+            SceneManagers->Pausing();
+        }
     });
 
     EngineSettingInstance->renderBarrier.ArriveAndWait();
@@ -204,6 +213,12 @@ void DirectX11::GameMain::Update()
     //RenderCommandFence.Begin();
     //RenderCommandFence.Wait();
     EngineSettingInstance->renderBarrier.ArriveAndWait();
+
+    if (SceneManagers->IsDecommissioning())
+    {
+        HWND handle = m_deviceResources->GetWindow()->GetHandle();
+        PostMessage(handle, WM_CLOSE, 0, 0);
+    }
 }
 
 bool DirectX11::GameMain::ExecuteRenderPass()

@@ -210,6 +210,7 @@ protected:
 	float m_effectProgress = 0.0f;
 	bool m_isRunning;
 	bool m_isPaused = false;
+
 	std::vector<ParticleData> m_particleData;
 	LinkedList<ParticleModule> m_moduleList;
 	int m_activeParticleCount = 0;

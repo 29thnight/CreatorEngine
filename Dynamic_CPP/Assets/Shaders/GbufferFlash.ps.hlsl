@@ -6,6 +6,7 @@
 #define BUMP_MAP 2
 
 #define MAX_TERRAIN_LAYERS 16
+#define PI 3.141592
 
 Texture2D Albedo : register(t0);
 Texture2D NormalMap : register(t1);
@@ -30,7 +31,6 @@ cbuffer PBRMaterial : register(b0)
     int gNormalState;
     int gConvertToLinear;
     
-    uint bitflag;
     float gIOR;
 }
 
@@ -44,6 +44,11 @@ cbuffer TimeBuffer : register(b5)
 cbuffer FlashBuffer : register(b6)
 {
     float flashStrength;
+}
+
+cbuffer MeshRendererBuffer : register(b7)
+{
+    uint bitflag;
 }
 
 cbuffer TerrainLayerConstants : register(b12)
@@ -193,11 +198,16 @@ GBufferOutput main(PixelShaderInput IN)
     }
     
     roughness = max(roughness, 0.1f);
-    OUT.diffuse = flashStrength > 0 ? lerp(float4(0, 0, 0, 1), float4(albedo.rgb, 1), flashStrength) : float4(albedo.rgb, 1);
+    
+    float s = sin(PI * flashStrength);
+    
+    //OUT.diffuse = flashStrength > 0 ? lerp(float4(0, 0, 0, 1), float4(albedo.rgb, 1), flashStrength) : float4(albedo.rgb, 1);
+    OUT.diffuse = flashStrength > 0 ? lerp(float4(1, 0.2, 0.2, 1), float4(0, 0, 0, 1), s) : float4(albedo.rgb, 1);
     OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, ior);
     float3 normalResult = surf.N * 0.5 + 0.5;
     OUT.normal = float4(normalResult, 1); // 여기 나중에 normal.w 까지 받아서 행렬변환한곳 오류날 가능성 있음.
-    OUT.emissive = flashStrength > 0 ? lerp(float4(2, 0, 0, 1), float4(2, 2, 2, 1), flashStrength) : emissive;
+    //OUT.emissive = flashStrength > 0 ? lerp(float4(2, 0, 0, 1), float4(2, 2, 2, 1), flashStrength) : emissive;
+    OUT.emissive = flashStrength > 0 ? lerp(float4(0, 0, 0, 0), float4(2, 2, 2, 1), flashStrength) : float4(0, 0, 0, 0);
 
     OUT.bitmask = bit;
 

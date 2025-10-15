@@ -338,11 +338,9 @@ void InputManager::SetControllerVibration(DWORD Index, float leftMotorSpeed, flo
     vibration.highFrequency = highFre;    // 고주파 모터 진동 강도
     vibration.leftTrigger = leftMotorSpeed;   // 왼쪽 트리거 진동 강도
     vibration.rightTrigger = rightMotorSpeed;
-    for (int _index = 0;_index < MAX_CONTROLLER; _index++)
-    {
-        if (device[_index] == nullptr) continue;
-        device[_index]->SetRumbleState(&vibration);
-    }
+    if (device[Index] == nullptr) return;
+    device[Index]->SetRumbleState(&vibration);
+    
 }
 
 void InputManager::UpdateControllerVibration(float tick)

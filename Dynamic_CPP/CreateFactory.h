@@ -3,6 +3,10 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SwordProjectile.h"
+#include "ControllerVibration.h"
+#include "ObjectPoolManager.h"
+#include "ReachEventTrigger.h"
 #include "BP001.h"
 #include "EntityMonsterBaseGate.h"
 #include "PlayEffectAll.h"

@@ -7,12 +7,14 @@ void SlashEffect::Start()
 	{
 		m_effect = GetOwner()->GetComponent<EffectComponent>();
 	}
+	 isstart = true;
+
 }
 
 void SlashEffect::Update(float tick)
 {
-	if(!initialized)
-		return;
+	if (m_isCallStart == false)return;
+
 	if (true == beLateFrame && false == OnEffect)
 	{
 		OnEffect = true;
@@ -30,10 +32,10 @@ void SlashEffect::Update(float tick)
 
 
 	//들고있는 이펙트 재생끝나면 알아서 풀로 들어가게끔 
-	if (m_effect->m_isPlaying == false)
+	/*if (m_effect->m_isPlaying == false)
 	{
 		GetOwner()->Destroy();
-	}
+	}*/
 }
 
 void SlashEffect::Initialize()
@@ -44,6 +46,5 @@ void SlashEffect::Initialize()
 	}
 	beLateFrame = false;
 	OnEffect = false;
-	initialized = true;
 }
 

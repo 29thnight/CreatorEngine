@@ -1,13 +1,21 @@
 {
     "currentTime": 0.0,
     "duration": -1.0,
+    "emitterTimings": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
     "name": "shoot1",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 10,
             "modules": [
                 {
@@ -217,7 +225,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -286,12 +294,14 @@
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.5,
                                 "y": 0.5
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -403,7 +413,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -461,6 +471,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 50.0,
                             "randomFactor": 0.4000000059604645,
@@ -469,7 +482,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 32.775970458984375,
+                            "currentTime": 5.009293556213379,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -668,6 +681,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 50.0,
                             "randomFactor": 0.4000000059604645,
@@ -676,7 +692,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 81.12799072265625,
+                            "currentTime": 40.15338134765625,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -746,7 +762,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "SpinCircle",
+                            "pixelShader": "Spincircle",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -817,7 +833,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -951,7 +967,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1020,12 +1036,14 @@
                                 "x": 3.0,
                                 "y": 3.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {

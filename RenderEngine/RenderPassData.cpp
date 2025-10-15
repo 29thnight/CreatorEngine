@@ -215,7 +215,7 @@ void RenderPassData::SortRenderQueue()
 {
 	if (!m_deferredQueue.empty())
 	{
-		std::sort(
+		std::ranges::sort(
 			m_deferredQueue.begin(),
 			m_deferredQueue.end(),
 			SortByAnimationAndMaterialGuid
@@ -224,7 +224,7 @@ void RenderPassData::SortRenderQueue()
 
 	if (!m_forwardQueue.empty())
 	{
-		std::sort(
+		std::ranges::sort(
 			m_forwardQueue.begin(),
 			m_forwardQueue.end(),
 			SortByAnimationAndMaterialGuid
@@ -274,27 +274,12 @@ void RenderPassData::SortUIRenderQueue()
 {
 	if (!m_UIRenderQueue.empty())
 	{
-		std::sort(
-			m_UIRenderQueue.begin(),
-			m_UIRenderQueue.end(),
-			[](UIRenderProxy* a, UIRenderProxy* b) {
-				int layerA = 0;
-				int layerB = 0;
-				if (std::holds_alternative<UIRenderProxy::ImageData>(a->m_data)) {
-					layerA = std::get<UIRenderProxy::ImageData>(a->m_data).layerOrder;
-				}
-				else if (std::holds_alternative<UIRenderProxy::TextData>(a->m_data)) {
-					layerA = std::get<UIRenderProxy::TextData>(a->m_data).layerOrder;
-				}
-				if (std::holds_alternative<UIRenderProxy::ImageData>(b->m_data)) {
-					layerB = std::get<UIRenderProxy::ImageData>(b->m_data).layerOrder;
-				}
-				else if (std::holds_alternative<UIRenderProxy::TextData>(b->m_data)) {
-					layerB = std::get<UIRenderProxy::TextData>(b->m_data).layerOrder;
-				}
-				return layerA < layerB;
-			}
-		);
+		std::ranges::sort(m_UIRenderQueue, [](const auto& lhs, const auto& rhs)
+		{
+			if (lhs->GetCanvasOrder() != rhs->GetCanvasOrder())
+				return lhs->GetCanvasOrder() < rhs->GetCanvasOrder();
+			return lhs->GetLayerOrder() < rhs->GetLayerOrder();
+		});
 	}
 }
 

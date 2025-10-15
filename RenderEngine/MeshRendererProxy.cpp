@@ -125,6 +125,14 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
         m_instancedID = component->GetInstanceID();
     }
     m_proxyType = PrimitiveProxyType::FoliageComponent;
+    for (auto& instance : m_foliageInstances)
+    {
+        uint32 key = instance.m_foliageTypeID;
+        if (!instance.m_isCulled)
+        {
+            instanceMap[key].push_back(&instance);
+        }
+    }
 }
 
 PrimitiveRenderProxy::~PrimitiveRenderProxy()
@@ -146,6 +154,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_isCulled(other.m_isCulled),
     m_isStatic(other.m_isStatic),
     m_EnableLOD(other.m_EnableLOD),
+    m_bitflag(other.m_bitflag),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
     m_isEnableShadow(other.m_isEnableShadow),
     m_isShadowCast(other.m_isShadowCast),
@@ -165,7 +174,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_customPSOName(other.m_customPSOName),
     m_customPSO(other.m_customPSO),
     m_billboardType(other.m_billboardType),
-    m_billboardAxis(other.m_billboardAxis)
+    m_billboardAxis(other.m_billboardAxis),
+    m_foliageInstances(other.m_foliageInstances)
 {
 }
 
@@ -184,6 +194,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_isCulled(other.m_isCulled),
     m_isStatic(other.m_isStatic),
     m_EnableLOD(other.m_EnableLOD),
+    m_bitflag(other.m_bitflag),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
 	m_isEnableShadow(other.m_isEnableShadow),
     m_isShadowCast(other.m_isShadowCast),
@@ -203,7 +214,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_customPSOName(std::move(other.m_customPSOName)),
     m_customPSO(std::move(other.m_customPSO)),
     m_billboardType(other.m_billboardType),
-    m_billboardAxis(other.m_billboardAxis)
+    m_billboardAxis(other.m_billboardAxis),
+    m_foliageInstances(std::move(other.m_foliageInstances))
 {
 }
 

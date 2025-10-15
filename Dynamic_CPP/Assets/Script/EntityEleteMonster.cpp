@@ -36,7 +36,12 @@ void EntityEleteMonster::Start()
 		hp->SetType(0);
 		hp->screenOffset = { 0, -100 };
 	}
-
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 	enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
 	auto childred = m_pOwner->m_childrenIndices;
@@ -152,6 +157,8 @@ void EntityEleteMonster::Start()
 	blackBoard->SetValueAsFloat("RetreatRange", m_retreatRange);
 	blackBoard->SetValueAsFloat("TeleportDistance", m_teleportDistance);
 	blackBoard->SetValueAsFloat("TeleportCollTime", m_teleportCoolTime);
+
+	HitImpulseStart();
 }
 
 void EntityEleteMonster::Update(float tick)
@@ -162,6 +169,8 @@ void EntityEleteMonster::Update(float tick)
 		std::string Identity = blackBoard->GetValueAsString("Identity");
 	}
 
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetBaseSpeed(m_moveSpeed);
 	//TPCooldown update
 	bool hasTPCooldown = blackBoard->HasKey("TeleportCooldown");
 	bool hasRTCooldown = blackBoard->HasKey("ReteatCooldown");
@@ -207,6 +216,7 @@ void EntityEleteMonster::Update(float tick)
 		}
 	}
 
+	HitImpulseUpdate(tick);
 
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
@@ -632,15 +642,11 @@ void EntityEleteMonster::Dead()
 void EntityEleteMonster::DeadEvent()
 {
 	EndDeadAnimation = true;
-	/*Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
-	if (deadPrefab)
-	{
-		GameObject* deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
-		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
-		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
-		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
-		deadEffect->Initialize();
-	}*/
+	deadObj->SetEnabled(true);
+	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+	deadEffect->Initialize();
 }
 
 void EntityEleteMonster::RotateToTarget()
@@ -707,7 +713,12 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				isDead = true;
 				Dead();
+				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+				controller->Move({ 0, 0 });
 				DeadEvent(); //Die 애니메이션나오면 거기로 옮길것
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}

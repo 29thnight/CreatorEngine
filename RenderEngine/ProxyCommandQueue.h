@@ -20,7 +20,7 @@ private:
 public:
 	void Execute()
 	{
-		auto& currFrameQueue = PrepareFrameProxy();
+		/*auto& currFrameQueue = PrepareFrameProxy();
 		while (!currFrameQueue.empty())
 		{
 			ProxyCommand command;
@@ -36,6 +36,18 @@ public:
 					continue;
 				}
 			}
+		}*/
+
+		const auto frameIndex = m_frame.load(std::memory_order_relaxed);
+		const std::array<size_t, 3> queueOrder{
+				(frameIndex + 1) % m_proxyFrameCommands.size(),
+				frameIndex % m_proxyFrameCommands.size(),
+				(frameIndex + 2) % m_proxyFrameCommands.size()
+		};
+
+		for (const size_t queueIndex : queueOrder)
+		{
+			DrainQueue(m_proxyFrameCommands[queueIndex]);
 		}
 	}
 
@@ -51,10 +63,27 @@ public:
 	}
 
 private:
-	ImplProxyCommandQueue& PrepareFrameProxy()
+	//ImplProxyCommandQueue& PrepareFrameProxy()
+	//{
+	//	size_t prevFrame = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	//	return m_proxyFrameCommands[prevFrame];
+	//}
+
+	void DrainQueue(ImplProxyCommandQueue& queue)
 	{
-		size_t prevFrame = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
-		return m_proxyFrameCommands[prevFrame];
+		ProxyCommand command;
+		while (queue.try_pop(command))
+		{
+			try
+			{
+				command.ProxyCommandExecute();
+			}
+			catch (const std::exception& e)
+			{
+				Debug->LogWarning(e.what());
+				continue;
+			}
+		}
 	}
 
 private:

@@ -43,29 +43,32 @@ void SoundComponent::Update(float tick)
             _velocity = ToFVec(velocity);
             channel3D->set3DAttributes(&_pos, &_velocity);
         }
+    }
+}
 
-        // ── 로컬 Rolloff 오버라이드 적용 ──
-        if (spatial && rolloff == Rolloff::Custom) 
+void SoundComponent::LateUpdate(float tick)
+{
+    // ── 로컬 Rolloff 오버라이드 적용 ──
+    if (spatial && rolloff == Rolloff::Custom)
+    {
+        FMOD_VECTOR lis{};
+        if (Sound->getListenerPosition(lis))
         {
-            FMOD_VECTOR lis{};
-            if (Sound->getListenerPosition(lis)) 
-            {
-                float dx = position.x - lis.x;
-                float dy = position.y - lis.y;
-                float dz = position.z - lis.z;
-                float d = std::sqrt(dx * dx + dy * dy + dz * dz);
+            float dx = position.x - lis.x;
+            float dy = position.y - lis.y;
+            float dz = position.z - lis.z;
+            float d = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-                float w2D = 1.f, w3D = 0.f;
-                // (동일: equal-power 블렌드)
-                // ComputeEqualPower(...) 를 동일하게 사용
-                // t=spatialBlend
-                w2D = cosf(spatialBlend * (3.14159265f * 0.5f));
-                w3D = sinf(spatialBlend * (3.14159265f * 0.5f));
+            float w2D = 1.f, w3D = 0.f;
+            // (동일: equal-power 블렌드)
+            // ComputeEqualPower(...) 를 동일하게 사용
+            // t=spatialBlend
+            w2D = cosf(spatialBlend * (3.14159265f * 0.5f));
+            w3D = sinf(spatialBlend * (3.14159265f * 0.5f));
 
-                float att = SampleLocalRolloff(d);
-                if (channel2D) channel2D->setVolume(volume * w2D);
-                if (channel3D) channel3D->setVolume(volume * w3D * att);
-            }
+            float att = SampleLocalRolloff(d);
+            if (channel2D) channel2D->setVolume(volume * w2D);
+            if (channel3D) channel3D->setVolume(volume * w3D * att);
         }
     }
 }

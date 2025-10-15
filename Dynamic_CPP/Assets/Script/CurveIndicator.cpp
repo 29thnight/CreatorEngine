@@ -39,8 +39,8 @@ void CurveIndicator::Update(float tick)
 		//float t = index / count;
 		float d = indicatorInterval * index;
 		float t = d / length;
-		Vector3 p0 = Lerp(endPos, pB, t);
-		Vector3 p1 = Lerp(pB, pA, t);
+		Vector3 p0 = Lerp(pA, pB, t);
+		Vector3 p1 = Lerp(pB, endPos, t);
 		Vector3 p01 = Lerp(p0, p1, t);
 		indicator->m_transform.SetPosition(p01);
 		float alpha = sinf(t);

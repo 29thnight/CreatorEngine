@@ -201,6 +201,7 @@ bool PhysicX::Initialize()
 	m_cudaContextManager = PxCreateCudaContextManager(*m_foundation, cudaDesc);
 	if (!m_cudaContextManager || !m_cudaContextManager->contextIsValid())
 	{
+		//WARN : APP Vrifier - Stop #1
 		if (m_cudaContextManager)
 			m_cudaContextManager->release();
 		m_cudaContextManager = nullptr;

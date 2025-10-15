@@ -148,19 +148,19 @@ Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
 		assetPath = assetPath.replace_extension(".asset");
 		if (file::exists(assetPath))
 		{
-			Benchmark asset;
+			//Benchmark asset;
 			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
 			model = Managed::SharedPtr<Model>(loader.LoadModel());
 			model->path = path_;
 			model->m_numTotalMeshes = static_cast<int>(model->m_Meshes.size());
 
-			std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
+			//std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
 
 			return model;
 		}
 		else
 		{
-			Benchmark assimp;
+			//Benchmark assimp;
 
 			flag settings = aiProcess_LimitBoneWeights
 				| aiProcessPreset_TargetRealtime_Fast
@@ -224,7 +224,7 @@ Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
 			model->path = path_;
 			model->m_numTotalMeshes = static_cast<int>(model->m_Meshes.size());
 
-			std::cout << assimp.GetElapsedTime() << " ms to load model from assimp file: " << path_.string() << std::endl;
+			//std::cout << assimp.GetElapsedTime() << " ms to load model from assimp file: " << path_.string() << std::endl;
 
 			return model;
 		}

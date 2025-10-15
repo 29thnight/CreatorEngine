@@ -420,14 +420,6 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 		);
 	}
 
-	/*file::path tempPath = matPath;
-	tempPath.replace_filename(tempPath.stem().wstring() + L"asd");
-	tempPath.replace_extension(".dds");
-	const wchar_t* name = matPath.filename().c_str();
-	const DirectX::Image* img = image.GetImage(0, 0, 0);
-	DirectX::SaveToDDSFile(image.GetImages(),
-		image.GetImageCount(),
-		image.GetMetadata(), DDS_FLAGS_NONE, tempPath.c_str());*/
 	if (isCompress)
 	{
 		ScratchImage compressedImage{};
@@ -454,14 +446,6 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	}
 
 	auto texture = shared_alloc<Texture>();
-
-	/*tempPath.replace_filename(tempPath.stem().wstring() + L"aaa");
-	tempPath.replace_extension(".dds");
-
-	const DirectX::Image* img2 = image.GetImage(0, 0, 0);
-	DirectX::SaveToDDSFile(image.GetImages(),
-		image.GetImageCount(),
-		image.GetMetadata(), DDS_FLAGS_NONE, tempPath.c_str());*/
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceViewEx(

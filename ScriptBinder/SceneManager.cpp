@@ -13,11 +13,43 @@
 #include "ReflectionRegister.h"
 #include <algorithm>
 #include "IRegistableEvent.h"
+#include "TimeSystem.h"
+
+void SceneManager::SetGameStart(bool isStart)
+{
+    if (!isStart)
+    {
+        SetGamePaused(false);
+    }
+
+    m_isGameStart = isStart;
+}
+
+void SceneManager::SetGamePaused(bool isPaused)
+{
+    if (!m_isGameStart && isPaused)
+    {
+        return;
+    }
+
+    const bool previousState = m_isGamePaused.exchange(isPaused);
+    if (previousState == isPaused)
+    {
+        return;
+    }
+
+    Time->ResetElapsedTime();
+}
+
+void SceneManager::ToggleGamePaused()
+{
+    SetGamePaused(!IsGamePaused());
+}
 
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
-	ComponentFactorys->Initialize();
+        ComponentFactorys->Initialize();
 	m_threadPool = new ThreadPool;
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
@@ -156,6 +188,7 @@ void SceneManager::EndOfFrame()
 
 void SceneManager::Pausing()
 {
+    m_activeScene.load()->CullMeshData();
 }
 
 void SceneManager::DisableOrEnable()
@@ -417,8 +450,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();
 #ifdef BUILD_FLAG
-        SceneManagers->m_isGameStart = true;
-		std::cout << "Scene loaded: " << loadSceneName << std::endl;
+        SceneManagers->SetGameStart(true);
+                std::cout << "Scene loaded: " << loadSceneName << std::endl;
 #endif
         m_activeScene.load()->Reset();
 	}

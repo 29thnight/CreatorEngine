@@ -30,11 +30,12 @@ void EntityResource::Start()
 	}
 
 	m_currentHP = maxHP;
-
+	HitImpulseStart();
 }
 
 void EntityResource::Update(float tick)
 {
+	HitImpulseUpdate(tick);
 }
 void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
@@ -155,6 +156,9 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 					pung->m_transform.SetPosition(pos);
 					pung->GetComponent<EffectComponent>()->Apply();
 				}
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}
