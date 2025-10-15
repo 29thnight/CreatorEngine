@@ -21,7 +21,7 @@ void SwordProjectile::Start()
 	}
 }
 
-void SwordProjectile::OnCollisionEnter(const Collision& collision)
+void SwordProjectile::OnTriggerEnter(const Collision& collision)
 {
 	auto collider = GetComponent<BoxColliderComponent>();
 	Mathf::Vector3 boxExtent = collider->GetBoxInfo().boxExtent;
@@ -41,6 +41,8 @@ void SwordProjectile::OnCollisionEnter(const Collision& collision)
 		if (inserted) (*iter)->SendDamage(m_ownerPlayer, m_damage, hitinfo);
 	}
 }
+
+
 
 void SwordProjectile::Update(float tick)
 {

@@ -3,21 +3,15 @@
 #include "GameManager.h"
 void ObjectPoolManager::Start()
 {
-	auto gameManager = GameObject::Find("GameManager");
-	if (gameManager)
+	auto gm = GetOwner()->GetComponent<GameManager>();
+	if (gm)
 	{
-		auto gm = gameManager->GetComponent<GameManager>();
-		if (gm)
-		{
-			gm->PushObjectPoolManager(this);
-		}
+		gm->PushObjectPoolManager(this);
+		normalBulletPool.InitializePool("BulletNormal", 30);
+		specialBulletPool.InitializePool("BulletSpecial", 10);
+		bombPool.InitializePool("Bomb", 15);
+		swordProjectilePool.InitializePool("SwordProjectile", 5);
 	}
-
-
-	normalBulletPool.InitializePool("BulletNormal", 50);
-	specialBulletPool.InitializePool("BulletSpecial",20);
-	bombPool.InitializePool("Bomb", 20);
-	swordProjectilePool.InitializePool("SwordProjectile",5);
 
 
 }

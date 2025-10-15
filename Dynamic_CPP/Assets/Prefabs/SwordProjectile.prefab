@@ -1,12 +1,12 @@
 m_name: SwordProjectile
 m_isEnabled: true
-m_instanceID: 1154459818
+m_instanceID: 1550227441
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: SwordProjectile
     m_isEnabled: true
-    m_instanceID: 1052338478
+    m_instanceID: 4224801384
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -16,7 +16,7 @@ PrefabNode:
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: [4]
-    m_prefabFileGuid: 8b2cede8-82a3-572c-bd4c-5d12ee9f0c72
+    m_prefabFileGuid: 08519221-6a8e-50c7-956c-33dea55037f2
     m_attachedSoketID: 0
     m_collisionType: 12
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2611299058
+        m_instanceID: 3761088915
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,22 +43,24 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 2858211228
+        m_instanceID: 3849294721
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 1, y: 1, z: 1}
+        m_boxExtent: {x: 0.800000012, y: 0.899999976, z: 2.0999999}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
+        rangedProjSpd: 0.100000001
+        rangedProjDist: 5
         m_name: SwordProjectile
         m_isEnabled: true
-        m_instanceID: 2576358569
+        m_instanceID: 181795601
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 8e2034f5-ac3b-5563-af29-e64f395e6ed4
     children:
       - GameObject: 2166264123
         m_name: gumgil
         m_isEnabled: true
-        m_instanceID: 152163783
+        m_instanceID: 2981548357
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -68,7 +70,7 @@ PrefabNode:
         m_parentIndex: 3
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 8b2cede8-82a3-572c-bd4c-5d12ee9f0c72
+        m_prefabFileGuid: 08519221-6a8e-50c7-956c-33dea55037f2
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -79,7 +81,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 1391222176
+            m_instanceID: 3847021999
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: shoot1
             m_isPlaying: true
