@@ -659,6 +659,7 @@ void SceneRenderer::SceneRendering()
 			EffectManagers->Execute(*m_renderScene, *camera);
 			m_EffectEditor->Render(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
+			DirectX11::DeviceStates->g_pDeviceContext->Flush();
 			DirectX11::EndEvent();
 			PROFILE_CPU_END();
 		}

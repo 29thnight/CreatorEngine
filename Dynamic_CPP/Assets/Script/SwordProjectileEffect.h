@@ -19,4 +19,6 @@ public:
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
+
+	float m_time = 0.0f;
 };
