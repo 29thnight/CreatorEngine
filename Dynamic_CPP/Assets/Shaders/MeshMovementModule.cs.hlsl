@@ -100,6 +100,48 @@ RWStructuredBuffer<MeshParticleData> ParticlesOutput : register(u0);
 // 스레드 그룹 크기 정의
 #define THREAD_GROUP_SIZE 1024
 
+float3x3 CreateRotationMatrixX(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        1, 0, 0,
+        0, c, -s,
+        0, s, c
+    );
+}
+
+float3x3 CreateRotationMatrixY(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        c, 0, s,
+        0, 1, 0,
+        -s, 0, c
+    );
+}
+
+float3x3 CreateRotationMatrixZ(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        c, -s, 0,
+        s, c, 0,
+        0, 0, 1
+    );
+}
+
+float3x3 CreateRotationMatrix(float3 rotation)
+{
+    float3x3 rotX = CreateRotationMatrixX(rotation.x);
+    float3x3 rotY = CreateRotationMatrixY(rotation.y);
+    float3x3 rotZ = CreateRotationMatrixZ(rotation.z);
+    
+    return mul(mul(rotZ, rotY), rotX);
+}
+
 // 간단한 노이즈 함수
 float noise(float2 uv)
 {
@@ -156,6 +198,10 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout MeshPartic
     float3 dominantDirection = float3(0, 0, 0);
     float maxStrength = 0.0;
     
+    // spawn 시점의 초기 회전 복원
+    float3 spawnRotation = float3(particle.pad3, particle.pad4, particle.pad5);
+    float3x3 rotationMatrix = CreateRotationMatrix(spawnRotation);
+    
     for (int i = 0; i < impulseCount; i++)
     {
         float timeDiff = abs(normalizedAge - Impulses[i].triggerTime);
@@ -168,30 +214,27 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout MeshPartic
             uint seed1 = particleIndex * 73856093u ^ (i * 19349663u);
             uint seed2 = particleIndex * 83492791u ^ (i * 41943041u);
             
-            float3 baseDir = normalize(Impulses[i].direction);
-            float3 finalDirection;
+            float3 localDir = normalize(Impulses[i].direction);
+            float3 finalLocalDirection;
             
             if (Impulses[i].spreadType == 0)
             {
-                // 직선 (분산 없음)
-                finalDirection = baseDir;
+                finalLocalDirection = localDir;
             }
             else if (Impulses[i].spreadType == 1)
             {
-                // 원뿔형 분산 (샷건)
                 float angle = Hash(seed1) * 6.28318;
                 float radius = Hash(seed2) * Impulses[i].spreadRange;
                 
-                float3 up = abs(baseDir.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
-                float3 right = normalize(cross(baseDir, up));
-                up = normalize(cross(right, baseDir));
+                float3 up = abs(localDir.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
+                float3 right = normalize(cross(localDir, up));
+                up = normalize(cross(right, localDir));
                 
                 float3 spreadOffset = (right * cos(angle) + up * sin(angle)) * radius;
-                finalDirection = normalize(baseDir + spreadOffset);
+                finalLocalDirection = normalize(localDir + spreadOffset);
             }
             else if (Impulses[i].spreadType == 2)
             {
-                // 구형 분산 (폭발)
                 float angle = Hash(seed1) * 6.28318;
                 float elevation = (Hash(seed2) - 0.5) * 1.57079;
                 
@@ -201,23 +244,20 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout MeshPartic
                     sin(angle) * cos(elevation)
                 );
                 
-                finalDirection = normalize(baseDir + spreadDir * Impulses[i].spreadRange);
+                finalLocalDirection = normalize(localDir + spreadDir * Impulses[i].spreadRange);
             }
             
-            totalImpulse += finalDirection * Impulses[i].force * strength;
+            // spawn 시점의 회전을 기준으로 월드 방향 변환
+            float3 worldDirection = mul(rotationMatrix, finalLocalDirection);
+            
+            totalImpulse += worldDirection * Impulses[i].force * strength;
             
             if (strength > maxStrength)
             {
                 maxStrength = strength;
-                dominantDirection = finalDirection;
+                dominantDirection = worldDirection;
             }
         }
-    }
-    
-    if (maxStrength > 0.001)
-    {
-        particle.pad3 = dominantDirection;
-        particle.pad4 = maxStrength;
     }
     
     return totalImpulse;
@@ -281,22 +321,6 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     float randomFactor = 1.0 + (noise(noiseInput) - 0.5) * explosiveRandom;
     
     return explosionDir * explosiveSpeed * speedDecay * randomFactor;
-}
-
-float3x3 CreateRotationMatrix(float3 rotation)
-{
-    float cx = cos(rotation.x);
-    float sx = sin(rotation.x);
-    float cy = cos(rotation.y);
-    float sy = sin(rotation.y);
-    float cz = cos(rotation.z);
-    float sz = sin(rotation.z);
-    
-    float3x3 rotX = float3x3(1, 0, 0, 0, cx, -sx, 0, sx, cx);
-    float3x3 rotY = float3x3(cy, 0, sy, 0, 1, 0, -sy, 0, cy);
-    float3x3 rotZ = float3x3(cz, -sz, 0, sz, cz, 0, 0, 0, 1);
-    
-    return mul(mul(rotZ, rotY), rotX);
 }
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]

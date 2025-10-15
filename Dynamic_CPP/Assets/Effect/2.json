@@ -16,7 +16,7 @@
                 {
                     "data": {
                         "autoGeneration": {
-                            "autoAddInterval": 0.0010000000474974513,
+                            "autoAddInterval": 0.05000000074505806,
                             "autoGenerateFromPosition": true
                         },
                         "easing": {
@@ -62,8 +62,8 @@
                             "endWidth": 0.10000000149011612,
                             "maxTrailPoints": 500,
                             "minDistance": 0.0010000000474974513,
-                            "startWidth": 2.0959999561309814,
-                            "trailLifetime": 10.0,
+                            "startWidth": 1.0,
+                            "trailLifetime": 1.0299999713897705,
                             "useLengthBasedUV": true
                         }
                     },
@@ -88,7 +88,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "time": 5031.37548828125
+                            "time": 239.97576904296875
                         },
                         "renderState": {
                             "instanceCount": 1
@@ -105,12 +105,12 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "glowblurry",
+                                "name": "Flash21",
                                 "slot": 0
                             }
                         ],
                         "trailModule": {
-                            "connected": false
+                            "connected": true
                         }
                     },
                     "type": "TrailRenderModule"

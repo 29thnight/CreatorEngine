@@ -11,7 +11,7 @@
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 10,
+            "maxParticles": 5,
             "modules": [
                 {
                     "data": {
@@ -42,7 +42,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 5.0,
+                            "lifeTime": 2.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -74,7 +74,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 5
                         }
                     },
                     "stage": 2,
@@ -95,13 +95,13 @@
                         "impulses": [
                             {
                                 "direction": [
-                                    0.0,
                                     1.0,
+                                    0.0,
                                     0.0
                                 ],
                                 "duration": 0.10000000149011612,
-                                "force": 20.0,
-                                "range": 0.18299999833106995,
+                                "force": 3.2660000324249268,
+                                "range": 0.27900001406669617,
                                 "triggerTime": 0.0,
                                 "type": 1
                             }
@@ -111,7 +111,7 @@
                             "useGravity": 1
                         },
                         "movementParams": {
-                            "currentTime": 140.95408630371094,
+                            "currentTime": 273.31640625,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -130,7 +130,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 5
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -160,7 +160,7 @@
                             "endSize": {
                                 "x": 0.009999999776482582,
                                 "y": 0.009999999776482582,
-                                "z": 0.10000000149011612
+                                "z": 0.05000000074505806
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
@@ -168,14 +168,14 @@
                             "startSize": {
                                 "x": 0.014000000432133675,
                                 "y": 0.009999999776482582,
-                                "z": 0.10000000149011612
+                                "z": 0.05000000074505806
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 5
                         }
                     },
                     "stage": 2,
@@ -208,7 +208,7 @@
                             "hasModel": false
                         },
                         "renderState": {
-                            "instanceCount": 10
+                            "instanceCount": 5
                         },
                         "renderStates": {
                             "blendPreset": 2,
