@@ -339,27 +339,30 @@ void GameInstance::UnloadScene(const std::string& sceneName)
 	// Unload only if the scene is loaded
 }
 
-void GameInstance::LoadImidiateNextScene()
+void GameInstance::LoadSettingedScene(int sceneType)
 {
-	if (m_nextSceneName.empty()) {
-		LOG("Next scene name is empty.");
-		return;
-	}
-	LoadScene(m_nextSceneName);
-	Scene* loadedScene = m_loadingSceneFuture.get();
-	if (loadedScene)
+	auto it = m_settingedSceneNames.find(static_cast<SceneType>(sceneType));
+	if (it != m_settingedSceneNames.end()) 
 	{
-		m_loadedScenes[m_nextSceneName] = loadedScene;
-		m_isLoadSceneComplete = true;
-		LOG("Scene loaded: " + m_nextSceneName);
-	}
+		LoadScene(it->second);
+	} 
 	else 
 	{
-		LOG("Failed to load scene: " + m_nextSceneName);
-		return;
+		LOG("No settinged scene for type: " + std::to_string(sceneType));
 	}
-	SwitchScene(m_nextSceneName);
-	m_isLoadSceneComplete = false;
+}
+
+void GameInstance::SwitchSettingedScene(int sceneType)
+{
+	auto it = m_settingedSceneNames.find(static_cast<SceneType>(sceneType));
+	if (it != m_settingedSceneNames.end()) 
+	{
+		SwitchScene(it->second);
+	} 
+	else 
+	{
+		LOG("No settinged scene for type: " + std::to_string(sceneType));
+	}
 }
 
 void GameInstance::SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)

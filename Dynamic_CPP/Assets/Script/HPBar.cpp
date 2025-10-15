@@ -3,34 +3,11 @@
 #include "SceneManager.h"
 #include "Camera.h"
 #include "ImageComponent.h"
-#include "Player.h"
+#include "Entity.h"
 #include "pch.h"
 
 void HPBar::Start()
 {
-#pragma region OLD_CODE
- //   m_rect = m_pOwner->GetComponent<RectTransformComponent>();
- //   if (GameObject::IsValidIndex(targetIndex))
- //   {
- //       if (auto scene = SceneManagers->GetActiveScene())
- //       {
- //           if (auto go = scene->GetGameObject(targetIndex))
- //           {
- //               m_target = go;
- //           }
- //       }
- //   }
-
-	//auto childIndex = m_pOwner->m_childrenIndices[0];
- //   auto childObj = GameObject::FindIndex(childIndex);
- //   auto imageComp = childObj->GetComponent<ImageComponent>();
- //   if (imageComp)
- //   {
- //       m_image = imageComp;
- //       m_image->SetTexture(m_type);
- //   }
-#pragma endregion
-
     m_rect = m_pOwner->GetComponent<RectTransformComponent>();
     if (GameObject::IsValidIndex(targetIndex))
     {

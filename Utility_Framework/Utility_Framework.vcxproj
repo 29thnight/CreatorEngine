@@ -62,6 +62,7 @@
     <ClInclude Include="EngineBootstrap.h" />
     <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
+    <ClInclude Include="GlobalImGuiContext.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />
     <ClInclude Include="Paklib.hpp" />

@@ -24,19 +24,19 @@ public:
 
 public:
 	//Scene Management
-	void LoadScene(const std::string& sceneName);
-	void SwitchScene(const std::string& sceneName);
-	void UnloadScene(const std::string& sceneName);
+	void LoadScene(int sceneType);
+	void SwitchScene(int sceneType);
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	void RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	float GetAsisPollutionGaugeRatio();
+	void SetLoadingReq(bool req = true) { m_isLoadingReq = req; }
 
 	// Test for Scene Management
 	[[Method]]
-	void LoadTestScene();
+	void LoadPrevScene();
 	[[Method]]
-	void SwitchTestScene();
+	void SwitchPrevScene();
 	[[Method]]
 	void LoadNextScene();
 	[[Method]]
@@ -46,7 +46,10 @@ public:
 	[[Property]]
 	bool m_isTestReward{ false };
 	[[Property]]
-	std::string m_nextSceneName{};
+	int m_prevSceneIndex{ 0 };
+	[[Property]]
+	int m_nextSceneIndex{ 0 };
+	bool m_isLoadingReq{ false };
 	// Player Stat
 	[[Method]]
 	void ApplyGlobalEnhancementsToAllPlayers();

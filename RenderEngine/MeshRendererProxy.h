@@ -16,6 +16,7 @@ enum class PrimitiveProxyType
    TerrainComponent,
    DecalComponent,
    SpriteRenderer,
+   Expired,
 };
 
 class Material;

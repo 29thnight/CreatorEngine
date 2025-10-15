@@ -594,6 +594,8 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	constexpr size_t kMaxInstancesPerDraw = 2048;
 	for(auto& proxy : data->m_foliageQueue)
 	{
+		if (!proxy || (int)proxy->m_proxyType != (int)PrimitiveProxyType::FoliageComponent) continue;
+
 		for(auto& [key, instances] : proxy->instanceMap)
 		{
 			if (instances.empty()) continue;

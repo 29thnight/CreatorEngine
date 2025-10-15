@@ -517,6 +517,8 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 
 	for (auto& terrainProxy : data->m_terrainQueue) 
 	{
+		if (!terrainProxy || (int)terrainProxy->m_proxyType != (int)PrimitiveProxyType::TerrainComponent) continue;
+
 		auto terrainMesh = terrainProxy->m_terrainMesh;
 		auto terrainMaterial = terrainProxy->m_terrainMaterial;
 

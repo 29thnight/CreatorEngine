@@ -106,19 +106,14 @@ void GameManager::OnDisable()
 	}
 }
 
-void GameManager::LoadScene(const std::string& sceneName)
+void GameManager::LoadScene(int sceneType)
 {
-	GameInstance::GetInstance()->LoadScene(sceneName);
+	GameInstance::GetInstance()->LoadSettingedScene(sceneType);
 }
 
-void GameManager::SwitchScene(const std::string& sceneName)
+void GameManager::SwitchScene(int sceneType)
 {
-	GameInstance::GetInstance()->SwitchScene(sceneName);
-}
-
-void GameManager::UnloadScene(const std::string& sceneName)
-{
-	GameInstance::GetInstance()->UnloadScene(sceneName);
+	GameInstance::GetInstance()->SwitchSettingedScene(sceneType);
 }
 
 void GameManager::SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)
@@ -152,31 +147,42 @@ float GameManager::GetAsisPollutionGaugeRatio()
 	}
 }
 
-void GameManager::LoadTestScene()
+void GameManager::LoadPrevScene()
 {
-	LoadScene("CreateUIPrefabV2");
 }
 
-void GameManager::SwitchTestScene()
+void GameManager::SwitchPrevScene()
 {
-	SwitchScene("CreateUIPrefabV2");
 }
 
 void GameManager::LoadNextScene()
 {
-	if (m_nextSceneName.empty()) return;
-
-	LoadScene(m_nextSceneName);
+	if(m_isLoadingReq)
+	{
+		GameInstance::GetInstance()->SetAfterLoadSceneIndex(m_nextSceneIndex);
+		LoadScene((int)SceneType::Loading);
+	}
+	else
+	{
+		LoadScene(m_nextSceneIndex);
+	}
 }
 
 void GameManager::SwitchNextScene()
 {
-	if (m_nextSceneName.empty() || !GameInstance::GetInstance()->IsLoadSceneComplete()) 
+	if (!GameInstance::GetInstance()->IsLoadSceneComplete()) 
 	{
 		return;
 	}
 
-	SwitchScene(m_nextSceneName);
+	if (m_isLoadingReq)
+	{
+		SwitchScene((int)SceneType::Loading);
+	}
+	else
+	{
+		LoadScene(m_nextSceneIndex);
+	}
 }
 
 void GameManager::LoadImidiateNextScene()

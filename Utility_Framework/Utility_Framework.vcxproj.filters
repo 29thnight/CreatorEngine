@@ -318,6 +318,9 @@
     <ClInclude Include="EngineBootstrap.h">
       <Filter>EngineBootstrap</Filter>
     </ClInclude>
+    <ClInclude Include="GlobalImGuiContext.h">
+      <Filter>EngineBootstrap</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
