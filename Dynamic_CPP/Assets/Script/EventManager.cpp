@@ -219,11 +219,12 @@ void EventManager::EmitAbilityUsed(const std::string& ability, const std::string
     BroadcastSignal(s);
 }
 
-void EventManager::EmitReachedTrigger(const std::string& actorTag, int triggerIndex)
+void EventManager::EmitReachedTrigger(const std::string& actorTag, int triggerIndex, int playerId)
 {
     EventSignal s{ EventSignalType::ReachedTrigger };
     s.a = actorTag;
     s.i = triggerIndex;
+    s.playerId = playerId;
     BroadcastSignal(s);
 }
 
@@ -272,12 +273,17 @@ void EventManager::LoadDefinitions()
             def.scene = HasColumn(row, "Scene") ? row["Scene"].as<std::string>() : std::string{};
             def.category = ParseCategory(HasColumn(row, "Category") ? row["Category"].as<std::string>() : "Quest");
             def.playerScope = ParsePlayerScope(HasColumn(row, "PlayerScope") ? row["PlayerScope"].as<std::string>() : "Shared");
-			def.advance = AdvancePolicy::Manual; // 테스트 default
+            if (HasColumn(row, "AdvancePolicy")) 
+            {
+                auto str = row["AdvancePolicy"].as<std::string>();
+                def.advance = ParseAdvancePolicy(str);
+            }
             def.priorId = HasColumn(row, "PriorQuestID") ? row["PriorQuestID"].as<int>() : 0;
             def.nextId = HasColumn(row, "NextQuestID") ? row["NextQuestID"].as<int>() : 0;
             def.uiText = HasColumn(row, "Description") ? row["Description"].as<std::string>() : std::string{};
-
-            // objectives left empty for tutorial CSV; fill from scripting or separate table
+            if (HasColumn(row, "Objectives")) {
+                ParseObjectivesDSL(row["Objectives"].as<std::string>(), def);
+            }
 
             m_indexById[def.id] = m_definitions.size();
             m_definitions.emplace_back(std::move(def));
@@ -324,18 +330,34 @@ void EventManager::ResolveVariables(int id)
 
 EventCategory EventManager::ParseCategory(const std::string& s)
 {
-    if (s == "UI") return EventCategory::UI;
-    if (s == "Trigger") return EventCategory::Trigger;
-    if (s == "non") return EventCategory::Non;
+    auto str = Utf8ToAnsi(s);
+    if (str == "UI") return EventCategory::UI;
+    if (str == "Trigger") return EventCategory::Trigger;
+    if (str == "Non") return EventCategory::Non;
     return EventCategory::Quest;
 }
 
 PlayerScope EventManager::ParsePlayerScope(const std::string& s)
 {
-    if (s == "O") return PlayerScope::AllPlayersIndividually;
-    if (s == "X") return PlayerScope::AnyPlayer;
-    if (s == "non") return PlayerScope::None;
+    auto str = Utf8ToAnsi(s);
+    if (str == "AllPlayersIndividually") return PlayerScope::AllPlayersIndividually;
+    if (str == "AnyPlayer") return PlayerScope::AnyPlayer;
+    if (str == "None") return PlayerScope::None;
     return PlayerScope::Shared;
+}
+
+AdvancePolicy EventManager::ParseAdvancePolicy(std::string& s)
+{
+    // 2) 소문자화 (unsigned char 캐스팅 주의)
+    std::transform(s.begin(), s.end(), s.begin(),
+        [](unsigned char c) { return (char)std::tolower(c); });
+
+    auto str = Utf8ToAnsi(s);
+
+    // 3) 이제 s로 비교!
+    if (str == "autoadvance")        return AdvancePolicy::AutoAdvance;
+    if (str == "waitfornexttrigger") return AdvancePolicy::WaitForNextTrigger;
+    return AdvancePolicy::Manual;
 }
 
 ObjectiveType EventManager::ParseObjectiveType(const std::string& s)

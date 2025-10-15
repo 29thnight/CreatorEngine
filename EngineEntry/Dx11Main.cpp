@@ -157,7 +157,7 @@ void DirectX11::Dx11Main::Initialize()
             CommandBuildThread();
         }
 
-                isCB_Thread_End = true;
+        isCB_Thread_End = true;
         CoUninitialize();
     });
 
@@ -245,7 +245,9 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-    EngineSettingInstance->frameDeltaTime = Time->GetElapsedSeconds();
+    const bool isPaused = SceneManagers->IsGamePaused();
+    const double deltaSeconds = Time->GetElapsedSeconds();
+    EngineSettingInstance->frameDeltaTime = isPaused ? 0.0 : deltaSeconds;
 
     PROFILE_CPU_BEGIN("GameLogic");
     Time->Tick([&]
@@ -253,7 +255,7 @@ void DirectX11::Dx11Main::Update()
         InfoWindow();
         InputManagement->Update(EngineSettingInstance->frameDeltaTime);
 #ifdef EDITOR
-        if(!SceneManagers->m_isGameStart)
+        if(!SceneManagers->IsGameStart())
         {
             SceneManagers->Editor();
             SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
@@ -261,11 +263,19 @@ void DirectX11::Dx11Main::Update()
         }
         else
         {
-			SceneManagers->Editor();
+            SceneManagers->Editor();
             SceneManagers->Initialization();
-			SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
-            SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
-            SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+
+            if (!SceneManagers->IsGamePaused())
+            {
+                SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
+                SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
+                SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+            }
+            else
+            {
+                SceneManagers->Pausing();
+            }
         }
 #endif // !EDITOR
     });

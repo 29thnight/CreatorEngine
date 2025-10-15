@@ -15,6 +15,7 @@
 
 #include "PlayEffectAll.h"
 #include "GameManager.h"
+#include "Weapon.h"
 void EntityMonsterA::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -144,13 +145,11 @@ void EntityMonsterA::Start()
 	if (hasP2) {
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
-
+	HitImpulseStart();
 }
 
 void EntityMonsterA::Update(float tick)
 {
-
-
 	if (blackBoard == nullptr)
 	{
 		return;
@@ -166,16 +165,16 @@ void EntityMonsterA::Update(float tick)
 	bool hasP2 = blackBoard->HasKey("Player2");
 
 	GameObject* Asis = nullptr;
-	if (hasAsis) {
-		Asis = blackBoard->GetValueAsGameObject("Asis");
+	if (hasAsis && !m_asis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
 	}
 	GameObject* player1 = nullptr;
-	if (hasP1){
-		player1 = blackBoard->GetValueAsGameObject("Player1");
+	if (hasP1 && !m_player1){
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
 	}
 	GameObject* player2 = nullptr;
-	if (hasP2) {
-		player2 = blackBoard->GetValueAsGameObject("Player2");
+	if (hasP2 && !m_player2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
 	
 	Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -187,35 +186,35 @@ void EntityMonsterA::Update(float tick)
 	float distAsis = FLT_MAX;
 	float distPlayer1 = FLT_MAX;
 	float distPlayer2 = FLT_MAX;
-	if (Asis) {
-		asisPos = Asis->m_transform.GetWorldPosition();
+	if (m_asis) {
+		asisPos = m_asis->m_transform.GetWorldPosition();
 		distAsis = Mathf::Vector3::DistanceSquared(asisPos, pos);
 	}
-	if (player1) {
-		player1Pos = player1->m_transform.GetWorldPosition();
+	if (m_player1) {
+		player1Pos = m_player1->m_transform.GetWorldPosition();
 		distPlayer1 = Mathf::Vector3::DistanceSquared(player1Pos, pos);
 	}
-	if (player2) {
-		player2Pos = player2->m_transform.GetWorldPosition();
+	if (m_player2) {
+		player2Pos = m_player2->m_transform.GetWorldPosition();
 		distPlayer2 = Mathf::Vector3::DistanceSquared(player2Pos, pos);
 	}
 	GameObject* closedTarget = nullptr;
 	float closedDist = FLT_MAX;
 	if (distPlayer1 < distPlayer2) 
 	{
-		closedTarget = player1;
+		closedTarget = m_player1;
 		closedDist = distPlayer1;
 	}
 	else 
 	{
-		closedTarget = player2;
+		closedTarget = m_player2;
 		closedDist = distPlayer2;
 	}
 
 	if (isAsisAction) {
 		if (distAsis < closedDist)
 		{
-			closedTarget = Asis;
+			closedTarget = m_asis;
 			closedDist = distAsis;
 		}
 	}
@@ -238,8 +237,8 @@ void EntityMonsterA::Update(float tick)
 		if (count > 0) {
 			for (auto& hit : hitResults) {
 				std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-				if (hit.gameObject->GetHashedName().ToString() == player1->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString()== player2->GetHashedName().ToString()) //player
+				if (hit.gameObject->GetHashedName().ToString() == m_player1->GetHashedName().ToString()
+					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()) //player
 				{
 					std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();
@@ -251,12 +250,10 @@ void EntityMonsterA::Update(float tick)
 		}
 	}
 	
-	
 	if (isAttack) {
 		m_state = "Attack";
 	}
 	
-
 	if (EndDeadAnimation)
 	{
 		deadElapsedTime += tick;
@@ -271,7 +268,6 @@ void EntityMonsterA::Update(float tick)
 		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
 	}
 	
-
 	if (m_state == "Chase") {
 		m_animator->SetParameter("Move", true);
 	}
@@ -286,6 +282,8 @@ void EntityMonsterA::Update(float tick)
 		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
 		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
+
+	HitImpulseUpdate(tick);
 
 	// test code start
 	if (InputManagement->IsKeyDown('M'))
@@ -420,7 +418,11 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 			if (m_criticalMark)
 			{
-				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					damage *= player->m_curWeapon->coopCrit;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+				}
 			}
 			dir.Normalize();
 
@@ -449,6 +451,11 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				isDead = true;
 				Dead();
+				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+				controller->Move({ 0, 0 });
+			}
+			else {
+				HitImpulse();
 			}
 		}
 	}

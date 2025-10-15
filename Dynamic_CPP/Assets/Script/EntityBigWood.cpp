@@ -7,11 +7,14 @@
 #include "TweenManager.h"
 #include "EntityAsis.h"
 #include "InputManager.h"
+#include "Material.h"
+#include "MeshRenderer.h"
 
 void EntityBigWood::Start()
 {
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
+	HitImpulseStart();
 }
 
 void EntityBigWood::OnTriggerEnter(const Collision& collision)
@@ -26,6 +29,14 @@ void EntityBigWood::OnCollisionEnter(const Collision& collision)
 	// 아시스가 부딪히면 아시스에게 데미지를 줌.
 	EntityAsis* asis = collision.otherObj->GetComponent<EntityAsis>();
 	HitAsis(asis);
+}
+
+void EntityBigWood::Update(float tick)
+{
+	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::M)) {
+		SendDamage(nullptr, 10);
+	}
+	HitImpulseUpdate(tick);
 }
 
 void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
@@ -160,6 +171,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	}
 	else
 	{
+		HitImpulse();
 		// 데미지를 받았지만 아직 살아있는 경우.
 		/*if (m_onDamageEvent.IsBound())
 		{

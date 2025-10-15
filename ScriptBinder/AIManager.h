@@ -28,6 +28,8 @@ public:
 
 	void UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent);
 
+	void InternalAIUpdate(float deltaSeconds);
+
 	BT::BTNode::NodePtr CreateNode(std::string_view nodeName);
 
 	void ClearTreeInAIComponent();
@@ -80,6 +82,7 @@ private:
 	std::vector<std::string> m_btActionNodeNames{};
 	std::vector<std::string> m_btConditionNodeNames{};
 	std::vector<std::string> m_btConditionDecoratorNodeNames{};
+	Core::Delegate<void, float>	InternalAIUpdateEvent{};
 
 	BlackBoard m_globalBB;
 	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용

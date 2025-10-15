@@ -5,7 +5,9 @@
 #include "DebugLog.h"
 #include "Entity.h"
 #include "SphereColliderComponent.h"
-
+#include "ObjectPoolManager.h"
+#include "GameManager.h"
+#include "EffectComponent.h"
 void NormalBullet::Start()
 {
 	__super::Start();
@@ -22,7 +24,42 @@ void NormalBullet::Update(float tick)
 	lifeTime -= tick;
 	if (lifeTime <= 0)
 	{
-		GetOwner()->Destroy();
+		auto GMobj = GameObject::Find("GameManager");
+		if (GMobj)
+		{
+			auto GM = GMobj->GetComponent<GameManager>();
+			if (GM && GM->GetObjectPoolManager() != nullptr)
+			{
+				GM->GetObjectPoolManager()->GetNormalBulletPool()->Push(this->GetOwner());
+				m_effect->StopEffect();
+			}
+
+		}
+		lifeTime = rangedProjDist;
+	}
+}
+
+void NormalBullet::Initialize(Player* owner, Mathf::Vector3 originpos, Mathf::Vector3 dir, int _damage)
+{
+	Transform* transform = GetOwner()->GetComponent<Transform>();
+	transform->SetPosition(originpos);
+	m_ownerPlayer = owner;
+	m_moveDir = dir;
+	m_damage = _damage;
+	hasAttacked = false;
+	lifeTime = rangedProjDist;
+	beLateFrame = false;
+	OnEffect = false;
+
+	if (nullptr == m_effect)
+	{
+		auto childred = GetOwner()->m_childrenIndices;
+		for (auto& child : childred)
+		{
+
+			m_effect = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+			break;
+		}
 	}
 }
 
@@ -52,7 +89,18 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 			{
 				enemy->SendDamage(m_ownerPlayer, m_damage, hitinfo);
 				hasAttacked = true;
-				GetOwner()->Destroy(); //지우지말고 BulletPool만들기
+
+				auto GMobj = GameObject::Find("GameManager");
+				if (GMobj)
+				{
+					auto GM = GMobj->GetComponent<GameManager>();
+					if (GM && GM->GetObjectPoolManager() != nullptr)
+					{
+						GM->GetObjectPoolManager()->GetNormalBulletPool()->Push(this->GetOwner());
+						m_effect->StopEffect();
+					}
+					
+				}
 
 			}
 		}

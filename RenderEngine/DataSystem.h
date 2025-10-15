@@ -12,6 +12,9 @@
 #include "EngineSetting.h"
 #include "AssetBundle.h"
 
+template <typename T>
+using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
+
 // Main system for storing runtime data
 class ModelLoader;
 class Model;
@@ -91,9 +94,11 @@ public:
 	void CopyTextureSelectType(std::string_view filePath, TextureFileType type);
 	//Resource Material
 	void LoadMaterials();
+	void InsertMaterial(std::shared_ptr<Material> material);
 	void SaveMaterial(Material* material);
 	Material* LoadMaterial(std::string_view name);
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
+	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	// File Operations //파일 시스템에 접근이 가능하기 문에 보안상 이슈가 있을 가능성 있음
@@ -132,12 +137,12 @@ public:
 	void RemoveSupportExtension(std::string_view ext);
 	bool IsSupportExtension(std::string_view ext) const;
 
-	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
-	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
-	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
-	std::unordered_map<std::string, std::shared_ptr<Texture>> UITextures;
-	std::unordered_map<std::string, std::shared_ptr<Texture>> SpriteSheets;
-	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
+	DataContainer<Model>		Models;
+	DataContainer<Material>		Materials;
+	DataContainer<Texture>		Textures;
+	DataContainer<Texture>		UITextures;
+	DataContainer<Texture>		SpriteSheets;
+	DataContainer<SpriteFont>	SFonts;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 
 	static ImGuiTextFilter filter;
@@ -152,6 +157,8 @@ public:
 	std::optional<YAML::Node> selectedFileMetaNode{};
 
 	std::mutex m_textureMutex;
+	std::mutex m_materialMutex;
+	std::mutex m_modelMutex;
 
 	//--------- Icon for ImGui
 	Texture* TextureIcon{};

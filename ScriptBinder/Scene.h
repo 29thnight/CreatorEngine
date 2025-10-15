@@ -41,6 +41,7 @@ public:
 
     [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
+	std::future<void> m_AIFuture;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
@@ -64,6 +65,7 @@ public:
 	void AddRootGameObject(std::string_view name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
+	void CullMeshData();
 
     std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = -1);
 

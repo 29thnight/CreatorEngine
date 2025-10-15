@@ -186,6 +186,7 @@
                         },
                         "shaders": {
                             "pixelShader": "Glow",
+                            "pixelShader": "glow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [

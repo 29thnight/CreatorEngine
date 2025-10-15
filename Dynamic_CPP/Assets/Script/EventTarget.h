@@ -18,16 +18,19 @@ public:
 	void Configure(int eventId, const std::string& varName, const std::string& value);
 
 	virtual void Awake() override;
+	virtual void OnTriggerEnter(const Collision& collision) override;
+	virtual void OnDestroy() override;
 
 	[[Method]]
 	void Apply();
 
+	int playerID{ -1 };
+
 private:
 	[[Property]]
 	int m_eventId{ 0 };
+	std::string m_targetTag{ "targetTag" };
 	[[Property]]
-	std::string m_varName{ "targetTag" };
-	[[Property]]
-	std::string m_value{};
+	std::string m_runtimeTag{};
 	EventManager* m_mgr{ nullptr };
 };

@@ -211,41 +211,95 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
             return dx * dx + dz * dz <= brush.m_radius * brush.m_radius;
         }), m_foliageInstances.end());
 }
+//helper
+std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
+{
+    std::vector<std::pair<size_t, size_t>> ranges;
+    if (count == 0)
+        return ranges;
+
+    unsigned int hwThreads = std::thread::hardware_concurrency();
+    if (hwThreads == 0) hwThreads = 4; // 안전 기본값 (미검출 시)
+
+    const size_t numSplits = hwThreads * 2 + 1;
+    ranges.reserve(numSplits);
+
+    const size_t chunk = (count + numSplits - 1) / numSplits; // ceil(count / numSplits)
+    size_t begin = 0;
+
+    for (size_t i = 0; i < numSplits; ++i)
+    {
+        size_t end = std::min(begin + chunk, count);
+        if (begin >= end)
+            break;
+        ranges.emplace_back(begin, end);
+        begin = end;
+    }
+
+    return ranges;
+}
 
 void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
 {
     if (!camera) return;
     if (m_foliageTypes.empty()) return;
 
-    for (auto& foliage : m_foliageInstances)
+    const size_t count = m_foliageInstances.size();
+    if (count == 0) return;
+
+    // 프러스텀은 값 캡처(스레드 안전)
+    const auto frustum = camera->GetFrustum();
+
+    auto process_range = [&](size_t begin, size_t end)
     {
-        if (foliage.m_foliageTypeID > m_foliageTypes.size()) continue;
-
-        Mathf::Vector3 position = foliage.m_position;
-        Mathf::Vector3 rotation = foliage.m_rotation;
-        Mathf::Vector3 scale = foliage.m_scale;
-
-        foliage.m_worldMatrix = Mathf::Matrix::CreateScale(scale) *
-            Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
-            Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
-            Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
-            Mathf::Matrix::CreateTranslation(position);
-
-        const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
-        Mesh* mesh = foliageType.m_mesh;
-        if (mesh == nullptr) continue;
-
-        DirectX::BoundingBox boundingBox = mesh->GetBoundingBox();
-        DirectX::BoundingBox transformedBox;
-        boundingBox.Transform(transformedBox, foliage.m_worldMatrix);
-
-        if (camera->GetFrustum().Intersects(transformedBox))
+        for (size_t i = begin; i < end; ++i)
         {
-            foliage.m_isCulled = false;
+            auto& foliage = m_foliageInstances[i];
+
+            // 경계 체크 보정: >=
+            if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
+                continue;
+
+            const Mathf::Vector3 position = foliage.m_position;
+            const Mathf::Vector3 rotation = foliage.m_rotation;
+            const Mathf::Vector3 scale = foliage.m_scale;
+
+            foliage.m_worldMatrix =
+                Mathf::Matrix::CreateScale(scale) *
+                Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+                Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+                Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+                Mathf::Matrix::CreateTranslation(position);
+
+            const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
+            Mesh* mesh = foliageType.m_mesh;
+            if (!mesh)
+            {
+                foliage.m_isCulled = true; // 안전 기본값
+                continue;
+            }
+
+            DirectX::BoundingBox box = mesh->GetBoundingBox();
+            DirectX::BoundingBox tbox;
+            box.Transform(tbox, foliage.m_worldMatrix);
+
+            foliage.m_isCulled = !frustum.Intersects(tbox);
         }
-        else
-        {
-			foliage.m_isCulled = true;
-        }
+    };
+
+    auto ranges = DivideRangeAuto(m_foliageInstances.size());
+
+    std::vector<std::future<void>> tasks;
+    tasks.reserve(ranges.size());
+
+    for (auto& [begin, end] : ranges)
+    {
+        tasks.emplace_back(std::async(std::launch::async, process_range, begin, end));
+    }
+
+    // 완료 대기
+    for (auto& f : tasks)
+    {
+        if (f.valid()) f.get();
     }
 }

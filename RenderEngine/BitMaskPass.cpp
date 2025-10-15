@@ -155,7 +155,10 @@ void BitMaskPass::ControlPanel()
     ImGui::Checkbox("Enable Outline blur", &blurOutline);
     ImGui::DragFloat("Outline Velocity", &outlineVelocity);
     for (int i = 0; i < 8; i++) {
-        ImGui::DragFloat4(("Color" + std::to_string(i)).c_str(), &m_colors[i].x, 0.01f, 0.f, 1.f, "%.2f");
+        ImGui::PushID(i);
+        ImGui::ColorEdit4(("Color" + std::to_string(i)).c_str(), &m_colors[i].x);
+        ImGui::DragFloat("ColorVelocity", &m_colors[i].w, 1.f);
+        ImGui::PopID();
     }
     ImGui::PopID();
 }

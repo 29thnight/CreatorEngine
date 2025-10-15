@@ -23,7 +23,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-
+	virtual void Initialize(Player* owner, Mathf::Vector3 originpos, Mathf::Vector3 dir, int _damage) override;
 	[[Property]]
 	float rangedProjSpd = 1.0f; //발사체 이동속도
 	[[Property]]

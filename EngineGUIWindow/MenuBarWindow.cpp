@@ -421,8 +421,8 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     m_bShowInputActionMapWindow = true;
                 }
-                
                 ImGui::PopStyleColor();
+
                 ImGui::EndMenu();
             }
             ImGui::PopStyleColor();
@@ -453,7 +453,29 @@ void MenuBarWindow::RenderMenuBar()
                     m_bShowRenderDebugWindow = true;
 				}
 
-                ImGui::PopStyleColor();
+                ImVec4 colFrameBg = ImVec4(0.93f, 0.93f, 0.94f, 1.00f);
+                ImVec4 colFrameBgHovered = ImVec4(0.89f, 0.90f, 0.92f, 1.00f);
+                ImVec4 colFrameBgActive = ImVec4(0.85f, 0.86f, 0.89f, 1.00f);
+
+                ImVec4 colGrab = ImVec4(0.27f, 0.45f, 0.87f, 0.95f); // 은은한 블루
+                ImVec4 colGrabActive = ImVec4(0.20f, 0.38f, 0.80f, 1.00f); // 살짝 진하게
+
+                ImVec4 colText = ImVec4(0.12f, 0.12f, 0.13f, 1.00f); // 다크 그레이(가독성)
+                ImVec4 colBorder = ImVec4(0.10f, 0.10f, 0.12f, 0.20f); // 낮은 투명도의 미세한 윤곽
+
+                ImGui::PushStyleColor(ImGuiCol_Text, colText);
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, colFrameBg);
+                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, colFrameBgHovered);
+                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, colFrameBgActive);
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab, colGrab);
+                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, colGrabActive);
+                ImGui::PushStyleColor(ImGuiCol_Border, colBorder);
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+
+                ImGui::DragFloat("ImGuiScale", &EngineSettingInstance->m_imguiScale, 0.1f, 0.8f, 1.5f);
+                ImGui::PopStyleVar(2);
+                ImGui::PopStyleColor(8);
                 ImGui::EndMenu();
             }
             ImGui::PopStyleColor();
@@ -461,19 +483,39 @@ void MenuBarWindow::RenderMenuBar()
 
             ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 1));
 
-            if (ImGui::Button(SceneManagers->m_isGameStart ? ICON_FA_STOP : ICON_FA_PLAY))
+            const bool isGameRunning = SceneManagers->IsGameStart();
+            if (ImGui::Button(isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY))
             {
                 Meta::UndoCommandManager->ClearGameMode();
-				SceneManagers->m_isGameStart = !SceneManagers->m_isGameStart;
-				Meta::UndoCommandManager->m_isGameMode = SceneManagers->m_isGameStart;
+                SceneManagers->SetGameStart(!isGameRunning);
+                Meta::UndoCommandManager->m_isGameMode = SceneManagers->IsGameStart();
             }
 
             ImVec2 curPos = ImGui::GetCursorPos();
             ImGui::SetCursorPos(ImVec2(curPos.x, 1));
 
-			if (ImGui::Button(ICON_FA_PAUSE))
-			{
-			}
+            const bool canPause = SceneManagers->IsGameStart();
+            ImGui::BeginDisabled(!canPause);
+            const bool isPaused = SceneManagers->IsGamePaused();
+            if (canPause && isPaused)
+            {
+                const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
+                ImGui::PushStyleColor(ImGuiCol_Button, active);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
+            }
+
+            const char* pauseIcon = isPaused ? ICON_FA_PLAY : ICON_FA_PAUSE;
+            if (ImGui::Button(pauseIcon))
+            {
+                SceneManagers->ToggleGamePaused();
+            }
+
+            if (canPause && isPaused)
+            {
+                ImGui::PopStyleColor(3);
+            }
+            ImGui::EndDisabled();
 
             ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
             bool style = static_cast<bool>(DataSystems->GetContentsBrowserStyle());

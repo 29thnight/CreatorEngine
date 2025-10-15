@@ -7,7 +7,8 @@ struct HitInfo
 	Mathf::Vector3 attakerPos{};     //떄린애 worldpos
 	Mathf::Vector3 hitPos{};         //맞은애맞은위치 (콜리전반응위치 등)
 	Mathf::Vector3 hitNormal{};
-	Mathf::Vector3 KnockbackForce{}; //맞은애를 넉백시킬거리
+	Mathf::Vector2 KnockbackForce{}; //맞은애를 넉백시킬거리 X,Y
+	float          KnockbackTime = 0;
 	ItemType itemType = ItemType::None;
 	BulletType bulletType = BulletType::Normal;
 };
@@ -34,9 +35,16 @@ public:
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce) {}
 	virtual void OnRay() {};
 	virtual void AttakRay() {};
+	void HitImpulseStart();
+	void HitImpulse();
+	virtual void HitImpulseUpdate(float tick);
+
 	int m_currentHP{ 1 };
 	int m_maxHP{ 100 };
 
+	float m_maxHitImpulseDuration{ 0.3f };
+	float m_currentHitImpulseDuration{ 0.f };
+	float m_maxHitImpulseSize{ 1.2f };
 
 	bool isKnockBack = false;
 	float KnockBackElapsedTime = 0.f;

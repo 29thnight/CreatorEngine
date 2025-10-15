@@ -57,7 +57,7 @@ public:
 	void EmitEnemyKilled(const std::string& groupOrTag, int playerId = -1);
 	void EmitInteracted(const std::string& actorTag, const std::string& withTag, int playerId = -1);
 	void EmitAbilityUsed(const std::string& ability, const std::string& contextTag = std::string{}, int playerId = -1);
-	void EmitReachedTrigger(const std::string& actorTag, int triggerIndex);
+	void EmitReachedTrigger(const std::string& actorTag, int triggerIndex, int playerId = -1);
 	void EmitPurchased(const std::string& itemTag, int count = 1, int playerId = -1);
 	void EmitDebuffApplied(int playerId, const std::string& debuffTag);
 	void EmitDebuffRemoved(int playerId, const std::string& debuffTag);
@@ -70,6 +70,7 @@ private:
 	void ResolveVariables(int id);
 	static EventCategory ParseCategory(const std::string& s);
 	static PlayerScope ParsePlayerScope(const std::string& s);
+	static AdvancePolicy ParseAdvancePolicy(std::string& s);
 	static ObjectiveType ParseObjectiveType(const std::string& s);
 
 	// Parse objectives from a single CSV column: "Objectives"

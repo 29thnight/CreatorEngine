@@ -4,10 +4,12 @@
 #include "GameManager.generated.h"
 #include "GameInstance.h"
 
+class ObjectPoolManager;
 class Entity;
 class ActionMap;
 class Weapon;
 class SFXPoolManager;
+class ControllerVibration;
 class GameManager : public ModuleBehavior
 {
 public:
@@ -81,6 +83,11 @@ public:
 
 	void PushSFXPool(SFXPoolManager* _SFXPool);
 	SFXPoolManager* GetSFXPool();
+	void PushObjectPoolManager(ObjectPoolManager* _objPoolManager);
+	ObjectPoolManager* GetObjectPoolManager();
+
+	void PushControllerVibration(ControllerVibration* _ControllerVibration);
+	ControllerVibration* GetControllerVibration();
 private:
 	std::vector<Entity*> m_entities;
 	std::vector<Entity*> m_resourcePool;
@@ -89,6 +96,9 @@ private:
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 
 	SFXPoolManager* SFXPool;
+	ObjectPoolManager* objectPoolManager;
+	ControllerVibration* ControllerVibrationData;
+
 private:
 	void CheatMiningResource();
 

@@ -28,11 +28,7 @@ void EntityItem::Start()
 	auto meshrenderer = GetOwner()->GetComponent<MeshRenderer>();
 	if (meshrenderer)
 	{
-		auto material = meshrenderer->m_Material;
-		if (material)
-		{
-			material->m_materialInfo.m_bitflag = 0;
-		}
+		meshrenderer->m_bitflag = 0;
 	}
 	auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 	rigid->LockAngularXYZ();

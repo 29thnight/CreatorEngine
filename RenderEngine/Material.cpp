@@ -489,7 +489,6 @@ void Material::TrySetMaterialInfo()
     TrySetInt("PBRMaterial", "gNormalState", m_materialInfo.m_useNormalMap);
     TrySetInt("PBRMaterial", "gConvertToLinear", m_materialInfo.m_convertToLinearSpace);
 
-	TrySetInt("PBRMaterial", "bitflag", m_materialInfo.m_bitflag);
 	TrySetFloat("PBRMaterial", "gIOR", m_materialInfo.m_IOR);
 }
 
