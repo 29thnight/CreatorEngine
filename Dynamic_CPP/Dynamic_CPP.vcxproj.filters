@@ -633,6 +633,9 @@
 		<ClInclude Include="Assets\Script\SwordProjectile.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\SwordProjectileEffect.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1129,6 +1132,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Entity.cpp">
 			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwordProjectileEffect.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
