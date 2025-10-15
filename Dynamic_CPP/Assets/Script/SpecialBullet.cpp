@@ -9,6 +9,7 @@
 #include "GameManager.h"
 #include "ObjectPoolManager.h"
 #include "EffectComponent.h"
+#include "PrefabUtility.h"
 void SpecialBullet::Start()
 {
 	__super::Start();
@@ -98,7 +99,14 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				float myRadius = explosionRadius;
 				Mathf::Vector3 mypos = bulletInfo.position;
 				
-
+				//test
+				Prefab* test = PrefabUtilitys->LoadPrefab("TestSphere");
+				if (test)
+				{
+					GameObject* testObj = PrefabUtilitys->InstantiatePrefab(test, "test");
+					testObj->GetComponent<Transform>()->SetPosition(mypos);
+					testObj->GetComponent<SphereColliderComponent>()->SetRadius(myRadius);
+				}
 
 				for (auto& hit : hits)
 				{
@@ -108,7 +116,9 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 					dir.Normalize();
 					Mathf::Vector3 contactPoint = mypos + dir * myRadius;
 					HitInfo hitinfo;
-					hitinfo.hitPos = contactPoint;
+					//hitinfo.hitPos = contactPoint;
+					otherpos.y += 1.f;
+					hitinfo.hitPos = otherpos;
 					hitinfo.itemType = ItemType::Range;
 					hitinfo.bulletType = BulletType::Special;
 					if (object == GetOwner()) continue;

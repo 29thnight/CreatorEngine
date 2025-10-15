@@ -9,6 +9,7 @@ struct HitInfo
 	Mathf::Vector3 hitNormal{};
 	Mathf::Vector2 KnockbackForce{}; //맞은애를 넉백시킬거리 X,Y
 	float          KnockbackTime = 0;
+	bool isCritical = false;
 	ItemType itemType = ItemType::None;
 	BulletType bulletType = BulletType::Normal;
 };

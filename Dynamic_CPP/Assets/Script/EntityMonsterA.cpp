@@ -260,6 +260,15 @@ void EntityMonsterA::Update(float tick)
 		if (deadDestroyTime <= deadElapsedTime)
 		{
 			GetOwner()->Destroy();
+			if (deadObj)
+			{
+				deadObj->SetEnabled(true);
+				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				deadPos.y += 0.7f;
+				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+				deadEffect->Initialize();
+			}
 		}
 	}
 
@@ -371,14 +380,15 @@ void EntityMonsterA::DeadEvent()
 {
 	EndDeadAnimation = true;
 
-	if (deadObj)
+	/*if (deadObj)
 	{
 		deadObj->SetEnabled(true);
 		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+		deadPos.y += 0.7f;
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 		deadEffect->Initialize();
-	}
+	}*/
 	//GetOwner()->Destroy(); //&&&&&풀에 넣기
 	//monster death Effect 생성
 }
@@ -421,6 +431,7 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
 				{
 					damage *= player->m_curWeapon->coopCrit;
+					hitinfo.isCritical = true;
 					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
 				}
 			}

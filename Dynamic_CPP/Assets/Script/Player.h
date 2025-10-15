@@ -307,7 +307,7 @@ private:
 	//치트들 담긴함수 
 	void Cheat();
 	Transform* m_transform = nullptr;
-
+	EffectComponent* chargeEffect = nullptr;
 
 	//UI들
 	GameObject* m_uiController = nullptr;

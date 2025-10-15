@@ -1,22 +1,22 @@
-m_name: BulletSpecialHit
+m_name: CriticaHitEffect
 m_isEnabled: true
-m_instanceID: 848712395
+m_instanceID: 3679276482
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: BulletSpecialHit
+    m_name: CriticaHitEffect
     m_isEnabled: true
-    m_instanceID: 286967032
+    m_instanceID: 147420091
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 7
+    m_index: 4
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [8]
-    m_prefabFileGuid: e08718fd-cf9d-5c6f-a952-bbe2f63d2765
+    m_childrenIndices: [3]
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -27,24 +27,24 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         m_name: PlayEffectAll
         m_isEnabled: true
-        m_instanceID: 276066960
+        m_instanceID: 1293565067
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: c7c326fe-0faf-582a-8d39-77bdcb01da94
     children:
       - GameObject: 2166264123
-        m_name: Hiteffect
+        m_name: effect
         m_isEnabled: true
-        m_instanceID: 1097850083
+        m_instanceID: 3522922877
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 7
-        m_index: 8
-        m_parentIndex: 7
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 4
+        m_index: 3
+        m_parentIndex: 4
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: e08718fd-cf9d-5c6f-a952-bbe2f63d2765
+        m_prefabFileGuid: 62a20307-475f-507d-8919-3ecae0fbcc5f
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -55,13 +55,13 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 2181912348
+            m_instanceID: 2257843628
             m_FileID: 00000000-0000-0000-0000-000000000000
-            m_effectTemplateName: Bullethit2
+            m_effectTemplateName: crit3
             m_isPlaying: true
             m_isPaused: false
             m_timeScale: 1
             m_loop: false
-            m_duration: 1
+            m_duration: 0.300000012
             m_useAbsolutePosition: false
-            m_effectInstanceName: Bullethit2_obj2124036939
+            m_effectInstanceName: crit3_obj3522922877

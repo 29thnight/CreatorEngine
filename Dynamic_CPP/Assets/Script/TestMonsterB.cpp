@@ -13,6 +13,7 @@
 #include "EntityAsis.h"
 #include "CriticalMark.h"
 #include "PlayEffectAll.h"
+#include "Weapon.h"
 void TestMonsterB::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -284,6 +285,17 @@ void TestMonsterB::Update(float tick)
 		if (deadDestroyTime <= deadElapsedTime)
 		{
 			GetOwner()->Destroy();
+			if (deadObj)
+			{
+				deadObj->SetEnabled(true);
+				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				deadPos.y += 0.7f;
+				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+				deadEffect->Initialize();
+			}
+
+
 
 			for (auto& bullet : m_projectiles)
 			{
@@ -403,7 +415,12 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			dir.Normalize();
 			if (m_criticalMark)
 			{
-				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					damage *= player->m_curWeapon->coopCrit;
+					hitinfo.isCritical = true;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+				}
 			}
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
 			*/
@@ -499,14 +516,13 @@ void TestMonsterB::ShootingAttack()
 void TestMonsterB::DeadEvent()
 {
 	EndDeadAnimation = true;
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
-	if (deadPrefab)
+	/*if (deadObj)
 	{
 		deadObj->SetEnabled(true);
 		auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 		Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
 		deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 		deadEffect->Initialize();
-	}
+	}*/
 }
 

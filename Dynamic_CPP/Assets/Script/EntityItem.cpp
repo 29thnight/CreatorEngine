@@ -12,6 +12,8 @@
 #include "GameObject.h"
 #include "TweenManager.h"
 #include "DebugLog.h"
+#include "SceneManager.h"
+#include "EffectComponent.h"
 using namespace Mathf;
 void EntityItem::Start()
 {
@@ -38,7 +40,9 @@ void EntityItem::Start()
 	box->SetStaticFriction(100.f);
 	box->SetDynamicFriction(100.f);
 
-
+	auto newEffect = SceneManagers->GetActiveScene()->CreateGameObject("effect",GameObjectType::Empty,GetOwner()->m_index);
+	m_effect = newEffect->AddComponent<EffectComponent>();
+	m_effect->m_effectTemplateName = "resourceView";
 	if (itemCode == 0)
 	{
 		itemType = EItemType::Mushroom;
@@ -51,6 +55,7 @@ void EntityItem::Start()
 	{
 		itemType = EItemType::Fruit;
 	}
+	m_effect->Apply();
 }
 
 void EntityItem::OnTriggerEnter(const Collision& collision)
@@ -121,6 +126,10 @@ void EntityItem::Update(float tick)
 				rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 				rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 				m_state = EItemState::NONE;
+				if (m_effect->m_isPlaying == false)
+				{
+					m_effect->Apply();
+				}
 			};
 		}
 		else
@@ -192,6 +201,10 @@ void EntityItem::Update(float tick)
 			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			m_state = EItemState::NONE;
+			if (m_effect->m_isPlaying == false)
+			{
+				m_effect->Apply();
+			}
 		}
 	}
 
@@ -256,6 +269,7 @@ void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float 
 void EntityItem::SetThrowOwner(Player* player)
 {
 	throwOwner = player;
+	m_effect->StopEffect();
 	//asisTail = GameObject::Find("AsisTail");
 	//startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	//m_state = EItemState::CATCHED;

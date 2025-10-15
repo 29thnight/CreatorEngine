@@ -34,42 +34,6 @@ void WeaponCapsule::Update(float tick)
 			}
 			else //타겟지점도착 같은타입 weapon 생성해서 player에게 주기 //
 			{
-				//Prefab* weaponPrefab;
-				//if (weaponCode == 1)  
-				//{
-				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
-				//}
-				//else if (weaponCode == 2)  
-				//{
-				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
-				//}
-				//else if (weaponCode == 3)  
-				//{
-				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBomb");
-				//}
-				//else
-				//{
-				//	weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponBasic");
-				//}
-				//
-				//if (weaponPrefab && ownerPlayer)
-				//{
-				//	GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(weaponPrefab, "Weapon");
-				//	auto weapon = weaponObj->GetComponent<Weapon>();
-				//	Player* player= ownerPlayer->GetComponent<Player>();
-				//	bool Success = player->AddWeapon(weapon); //AddWeapon 실패시 그냥 바닥에 둥둥 떠있기   and 둥둥떠있는중 플레이어가 집으면 addweapon 다시시도
-				//	if (Success)
-				//	{
-				//		GetOwner()->Destroy();
-				//	}
-				//	else
-				//	{
-				//		ownerPlayer = nullptr;
-				//		//바닥에 둥둥
-				//	}
-
-				//}
-
 				TryAddWeapon();
 			}
 		}
