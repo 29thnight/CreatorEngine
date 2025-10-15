@@ -22,6 +22,13 @@ void GameBuilderSystem::Initialize()
 			+ L"/m /t:Build /p:Configuration=GameBuild /p:Platform=x64 /nologo"
 			+ L"\"";
 
+		std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
+		m_scriptBuildCommand = std::wstring(L"cmd /c \"")
+			+ L"\"" + m_MSBuildPath + L"\" "
+			+ L"\"" + slnPath + L"\" "
+			+ L"/m /t:Build /p:Configuration=GameBuild /p:Platform=x64 /nologo"
+			+ L"\"";
+
 		m_isInitialized = true;
 	}
 }
@@ -37,6 +44,7 @@ void GameBuilderSystem::BuildGame()
 	// 예: m_buildSlnPath와 m_buildCommand를 사용하여 빌드 수행
 	try
 	{
+		RunMsbuildWithLiveLogAndProgress(m_scriptBuildCommand);
 		RunMsbuildWithLiveLogAndProgress(m_buildCommand);
 	}
 	catch (const std::exception& e)

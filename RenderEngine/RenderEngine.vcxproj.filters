@@ -306,6 +306,9 @@
     <Filter Include="Shaders\Effect\Special\3D">
       <UniqueIdentifier>{5cc2eb6b-2c4a-46c7-b5d8-289ccc3f4534}</UniqueIdentifier>
     </Filter>
+    <Filter Include="EditorAddon">
+      <UniqueIdentifier>{3ce26bab-5de8-4630-bed5-b6abcb2dc09f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -942,6 +945,9 @@
     </ClInclude>
     <ClInclude Include="TrailModuleCS.h">
       <Filter>RenderPass\EffectPass\555.Generate</Filter>
+    </ClInclude>
+    <ClInclude Include="ICustomEditor.h">
+      <Filter>EditorAddon</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

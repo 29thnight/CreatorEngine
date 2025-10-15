@@ -1,7 +1,6 @@
 #include "GameManager.h"
 #include "pch.h"
 #include "SceneManager.h"
-#include "InputActionManager.h"
 #include "Entity.h"
 #include "MeshRenderer.h"
 #include "Material.h"
@@ -16,6 +15,8 @@
 #include "EntityAsis.h"
 #include "Player.h"
 #include "SFXPoolManager.h"
+#include "GameInstance.h"
+
 void GameManager::Awake()
 {
 	LOG("GameManager Awake");
@@ -198,63 +199,59 @@ void GameManager::ApplyGlobalEnhancementsToAllPlayers()
 void GameManager::ApplyGlobalEnhancementsToPlayer(Player* player)
 {
 	if (!player) return;
-	EnsureBaseSnapshot(player);
 
-	auto& snap = m_baseByPlayer[player];
-	auto* gi = GameInstance::GetInstance();
+    // 최초 1회: 기준 스냅샷 확보(강화 누적값과 독립적인 '기준값')
+    EnsureBaseSnapshot(player);
 
-	// ---- 전역 강화치 조회 & 적용 ----
-	// 1) 이동속도: 곱산(float)
-	//    최종: baseMoveSpeed * (1 + MoveSpeedUp 누적 비율)
-	{
-		float finalMove = gi->ApplyToBaseFloat(ItemEnhancementType::MoveSpeedUp, snap.baseMoveSpeed);
-		player->moveSpeed = finalMove;                       // Player::moveSpeed에 반영 :contentReference[oaicite:9]{index=9}
-	}
+    auto& snap = m_baseByPlayer[player];
+    auto* gi   = GameInstance::GetInstance();
 
-	// 2) 대시 횟수: 가산(int)
-	//    최종: baseDashAmount + DashCountUp 누적
-	{
-		int finalDash = gi->ApplyToBaseInt(ItemEnhancementType::DashCountUp, snap.baseDashAmount);
-		player->dashAmount = finalDash;                      // Player::dashAmount 반영 :contentReference[oaicite:10]{index=10}
-	}
+    // 1) 이동속도 (float, Mul) : base * (1 + v)
+    {
+        const float finalMove = gi->ApplyToBaseFloat(ItemEnhancementType::MoveSpeedUp, snap.baseMoveSpeed);
+        player->moveSpeed = finalMove;
+    }
 
-	// 3) 공격력: 가산(int)
-	//    최종: baseAtk + Atk 누적
-	{
-		int finalAtk = gi->ApplyToBaseInt(ItemEnhancementType::Atk, snap.baseAtk);
-		player->Atk = finalAtk;                              // Player::Atk 반영 :contentReference[oaicite:11]{index=11}
-	}
+    // 2) 대시 횟수 (int, Add) : base + v
+    {
+        const int finalDash = gi->ApplyToBaseInt(ItemEnhancementType::DashCountUp, snap.baseDashAmount);
+        player->dashAmount = finalDash;
+    }
 
-	// 4) 공격속도 배수: 곱산(float)
-	//    최종: baseAtkSpeedMult * (1 + AtkSpeedUp 누적 비율)
-	{
-		float finalAtkSpd = gi->ApplyToBaseFloat(ItemEnhancementType::AtkSpeedUp, snap.baseAtkSpeedMult);
-		player->MultipleAttackSpeed = finalAtkSpd;           // Player::MultipleAttackSpeed 반영 :contentReference[oaicite:12]{index=12}
-	}
+    // 3) 공격력 (int, Add) : base + v
+    {
+        const int finalAtk = gi->ApplyToBaseInt(ItemEnhancementType::Atk, snap.baseAtk);
+        player->Atk = finalAtk;
+    }
 
-	// 5) 최대 체력: **Entity::m_maxHP** 기준으로 가산(int)
-	//    최종: baseMaxHP + MaxHPUp 누적    (Player::maxHP 사용 금지!)
-	{
-		Entity* e = static_cast<Entity*>(player);
-		int oldMax = e->m_maxHP;
-		int finalMax = gi->ApplyToBaseInt(ItemEnhancementType::MaxHPUp, snap.baseMaxHP);
-		e->m_maxHP = finalMax;                               // Entity::m_maxHP 반영 :contentReference[oaicite:13]{index=13}
+    // 4) 공격속도 배수 (float, Mul) : base * (1 + v)
+    {
+        const float finalAtkSpd = gi->ApplyToBaseFloat(ItemEnhancementType::AtkSpeedUp, snap.baseAtkSpeedMult);
+        player->MultipleAttackSpeed = finalAtkSpd;
+    }
 
-		// 현재 HP 보정 정책(택1)
-		// A) 비율 유지:
-		// float ratio = (oldMax > 0) ? (float)e->m_currentHP / (float)oldMax : 1.f;
-		// e->m_currentHP = (int)std::round(finalMax * ratio);
+    // 5) 최대 체력 (int, Add) : Entity::m_maxHP 기준으로 적용
+    {
+        Entity* e = static_cast<Entity*>(player);
+        const int oldMax  = e->m_maxHP;
+        const int finalMax = gi->ApplyToBaseInt(ItemEnhancementType::MaxHPUp, snap.baseMaxHP);
+        e->m_maxHP = finalMax;
 
-		// B) 최대치 증가분만큼 현재 HP도 올림(과잉 회복 방지):
-		int delta = finalMax - oldMax;
-		if (delta > 0) e->m_currentHP = std::min(e->m_currentHP + delta, finalMax);
-	}
+        // 현재 HP 보정 정책: 최대치 증가분만큼 현재 HP도 올림(초과 회복 방지)
+        const int delta = finalMax - oldMax;
+        if (delta > 0)
+            e->m_currentHP = std::min(e->m_currentHP + delta, finalMax);
+        else
+            e->m_currentHP = std::min(e->m_currentHP, finalMax);
+    }
+
+    // (옵션) 6) 투척 거리 증가 (float, Add) : 필요 시 플레이어나 무기 시스템에 반영
+    // 예: player->ThrowRange 가 있다면
+     {
+         const float finalThrowRange = gi->ApplyToBaseFloat(ItemEnhancementType::ThrowRangeUp, snap.baseThrowRange);
+         player->detectDistance = finalThrowRange;
+     }
 }
-
-
-
-
-
 
 void GameManager::PushEntity(Entity* entity)
 {
@@ -371,7 +368,8 @@ void GameManager::EnsureBaseSnapshot(Player* player)
 
 	// Entity(부모) 쪽 최대체력 기준값
 	Entity* e = static_cast<Entity*>(player);
-	snap.baseMaxHP = e->m_maxHP;                             // Player의 maxHP 말고 Entity::m_maxHP 사용 :contentReference[oaicite:8]{index=8}
+	snap.baseMaxHP = e->m_maxHP; // Player의 maxHP 말고 Entity::m_maxHP 사용 :contentReference[oaicite:8]{index=8}
+	snap.baseThrowRange = player->detectDistance;
 
 	snap.initialized = true;
 }

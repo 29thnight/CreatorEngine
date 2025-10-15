@@ -19,17 +19,8 @@ public:
 	// 기본 함수들
 	virtual void Awake() override;
 	virtual void Start() override;
-	virtual void FixedUpdate(float fixedTick) override {}
-	virtual void OnTriggerEnter(const Collision& collision) override {}
-	virtual void OnTriggerStay(const Collision& collision) override {}
-	virtual void OnTriggerExit(const Collision& collision) override {}
-	virtual void OnCollisionEnter(const Collision& collision) override {}
-	virtual void OnCollisionStay(const Collision& collision) override {}
-	virtual void OnCollisionExit(const Collision& collision) override {}
 	virtual void Update(float tick) override;
-	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override;
-	virtual void OnDestroy() override  {}
 
 public:
 	//Scene Management
@@ -62,13 +53,12 @@ public:
 
 	void ApplyGlobalEnhancementsToPlayer(class Player* player);
 
-	int selectPlayerCount{};
-	bool startSelectTimer{ false };
-	float displayPollutionGaugeRatio{}; //테스트 용
+	int		selectPlayerCount{};
+	bool	startSelectTimer{ false };
+	float	displayPollutionGaugeRatio{}; //테스트 용
 
 public:
-	bool TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
-	
+	bool	TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
 
 	GameObject* testCamera = nullptr;
 	void PushEntity(Entity* entity);
@@ -89,15 +79,15 @@ public:
 	void PushControllerVibration(ControllerVibration* _ControllerVibration);
 	ControllerVibration* GetControllerVibration();
 private:
-	std::vector<Entity*> m_entities;
-	std::vector<Entity*> m_resourcePool;
-	std::vector<Weapon*> m_weaponPiecePool;
-	std::vector<Entity*> m_players;
-	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
+	std::vector<Entity*>	m_entities{};
+	std::vector<Entity*>	m_resourcePool{};
+	std::vector<Weapon*>	m_weaponPiecePool{};
+	std::vector<Entity*>	m_players{};
+	std::vector<Entity*>	m_asis{};		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 
-	SFXPoolManager* SFXPool;
-	ObjectPoolManager* objectPoolManager;
-	ControllerVibration* ControllerVibrationData;
+	SFXPoolManager*			SFXPool{};
+	ObjectPoolManager*		objectPoolManager{};
+	ControllerVibration*	ControllerVibrationData{};
 
 private:
 	void CheatMiningResource();
@@ -111,9 +101,10 @@ private:
 
 		// Entity 쪽(최대체력은 Entity 사용)
 		int   baseMaxHP{ 0 };               // Entity::m_maxHP 초기값 스냅샷
+		float baseThrowRange{ 0 };
 		bool  initialized{ false };
 	};
-	std::unordered_map<class Player*, PlayerBaseSnapshot> m_baseByPlayer;
+	std::unordered_map<class Player*, PlayerBaseSnapshot> m_baseByPlayer{};
 
 	void EnsureBaseSnapshot(class Player* player);
 

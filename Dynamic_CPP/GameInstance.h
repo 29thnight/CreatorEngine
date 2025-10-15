@@ -52,8 +52,7 @@ public:
 	void RemoveEnhancementDelta(SourceKey key);
 
 	// 조회/적용
-	int   GetAdd(ItemEnhancementType t) const;
-	float GetMul(ItemEnhancementType t) const;
+	float GetEnhancement(ItemEnhancementType t) const;
 	int   ApplyToBaseInt(ItemEnhancementType t, int base)   const;
 	float ApplyToBaseFloat(ItemEnhancementType t, float base) const;
 
@@ -86,8 +85,11 @@ private:
 	std::unordered_map<ItemUniqueID, ItemInfo, ItemUniqueIDHash> m_itemInfoMap;
 	int m_maxItemID{ 0 };
 
-	int   m_addInt[MAX_ENHANCEMENT_TYPE] = {};
-	float m_mulFloat[MAX_ENHANCEMENT_TYPE] = {};
+	//int   m_addInt[MAX_ENHANCEMENT_TYPE] = {};
+	//float m_addFloat[MAX_ENHANCEMENT_TYPE] = {};
+	//float m_mulFloat[MAX_ENHANCEMENT_TYPE] = {};
+
+	float m_enhancementValue[MAX_ENHANCEMENT_TYPE] = {};
 
 	std::unordered_map<SourceKey, AnyDelta> m_applied;
 };
@@ -95,17 +97,12 @@ private:
 template<ItemEnhancementType T>
 void GameInstance::AddEnhancementDelta(SourceKey key, const EnhancementDelta<T>& d)
 {
-	// 이미 있으면 제거(갱신)
+	// 갱신 시 기존 제거
 	RemoveEnhancementDelta(key);
 
 	constexpr int idx = static_cast<int>(T);
-	if constexpr (std::same_as<typename EnhancementDelta<T>::value_type, int>) 
-	{
-		m_addInt[idx] += d.value;
-	}
-	else 
-	{
-		m_mulFloat[idx] += d.value; // 0.10f == +10%
-	}
-	m_applied.emplace(key, d); // AnyDelta로 저장(variant)
+	if (idx < 0 || idx >= MAX_ENHANCEMENT_TYPE) return;
+
+	m_enhancementValue[idx] += static_cast<float>(d.value);
+	m_applied.emplace(key, d);
 }

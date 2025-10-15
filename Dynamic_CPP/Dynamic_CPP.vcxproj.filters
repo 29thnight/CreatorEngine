@@ -480,9 +480,6 @@
 		<ClInclude Include="ItemType.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass\Util</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
@@ -1129,6 +1126,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SwordProjectile.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Entity.cpp">
+			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

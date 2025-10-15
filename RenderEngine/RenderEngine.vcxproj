@@ -356,6 +356,7 @@
     <ClInclude Include="EffectProxyController.h" />
     <ClInclude Include="EffectRenderProxy.h" />
     <ClInclude Include="EffectSerializer.h" />
+    <ClInclude Include="ICustomEditor.h" />
     <ClInclude Include="KeyFrameEvent.h" />
     <ClInclude Include="LineModuleCS.h" />
     <ClInclude Include="MaterialFlowInformation.h" />

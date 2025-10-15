@@ -4,6 +4,7 @@
 #include "Player.generated.h"
 #include "ItemType.h"
 #include "BitFlag.h"
+#include "ICustomEditor.h"
 
 class Animator;
 class Socket;
