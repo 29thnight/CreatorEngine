@@ -654,11 +654,21 @@ void SceneRenderer::SceneRendering()
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
 			float deltaTime = Time->GetElapsedSeconds();
+			PROFILE_CPU_BEGIN("m_EffectEditor->Update");
 			m_EffectEditor->Update(deltaTime);
+			PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("EffectManagers->Update");
 			EffectManagers->Update(deltaTime);
+			PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("EffectManagers->Execute");
 			EffectManagers->Execute(*m_renderScene, *camera);
+			PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("m_EffectEditor->Render");
 			m_EffectEditor->Render(*m_renderScene, *camera);
+			PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("RenderStatistics->UpdateRenderState");
 			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
+			PROFILE_CPU_END();
 			DirectX11::EndEvent();
 			PROFILE_CPU_END();
 		}

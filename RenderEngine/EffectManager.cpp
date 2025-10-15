@@ -4,6 +4,7 @@
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
 #include "EffectSerializer.h"
+#include "Profiler.h"
 
 void EffectManager::Initialize()
 {
@@ -60,7 +61,11 @@ void EffectManager::Update(float delta)
 	auto it = activeEffects.begin();
 	while (it != activeEffects.end()) {
 		auto& effect = it->second;
+
+		PROFILE_CPU_BEGIN("effect->Update");
+		std::cout << "Updating effect: " << effect->GetName() << std::endl;
 		effect->Update(delta);
+		PROFILE_CPU_END();
 
 		// 풀 반환 조건을 더 관대하게 수정
 		bool shouldReturn = false;
@@ -79,8 +84,12 @@ void EffectManager::Update(float delta)
 			it = activeEffects.erase(it);
 
 			// GPU 작업 완료 대기 후 풀에 반환
+			PROFILE_CPU_BEGIN("WaitForGPUCompletion");
 			effectToReturn->WaitForGPUCompletion();
+			PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("ReturnToPool");
 			ReturnToPool(std::move(effectToReturn));
+			PROFILE_CPU_END();
 		}
 		else {
 			++it;
