@@ -51,8 +51,21 @@ void EffectManager::Initialize()
 void EffectManager::Execute(RenderScene& scene, Camera& camera)
 {
 	EffectProxyController::GetInstance()->ExecuteEffectCommands();
+
+	std::vector<EffectBase*> activeEffectList;
+	activeEffectList.reserve(activeEffects.size());
+
 	for (auto& [key, effect] : activeEffects) {
-		effect->Render(scene, camera);
+		if (effect->GetState() != EffectState::Stopped) {
+			activeEffectList.push_back(effect.get());
+		}
+	}
+
+	// 렌더링 전에 한 번만 공통 상태 설정
+	if (!activeEffectList.empty()) {
+		for (auto* effect : activeEffectList) {
+			effect->Render(scene, camera);
+		}
 	}
 }
 
@@ -61,11 +74,7 @@ void EffectManager::Update(float delta)
 	auto it = activeEffects.begin();
 	while (it != activeEffects.end()) {
 		auto& effect = it->second;
-
-		PROFILE_CPU_BEGIN("effect->Update");
-		std::cout << "Updating effect: " << effect->GetName() << std::endl;
 		effect->Update(delta);
-		PROFILE_CPU_END();
 
 		// 풀 반환 조건을 더 관대하게 수정
 		bool shouldReturn = false;
@@ -83,13 +92,6 @@ void EffectManager::Update(float delta)
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
 
-			// GPU 작업 완료 대기 후 풀에 반환
-			PROFILE_CPU_BEGIN("WaitForGPUCompletion");
-			effectToReturn->WaitForGPUCompletion();
-			PROFILE_CPU_END();
-			PROFILE_CPU_BEGIN("ReturnToPool");
-			ReturnToPool(std::move(effectToReturn));
-			PROFILE_CPU_END();
 		}
 		else {
 			++it;
