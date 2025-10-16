@@ -18,10 +18,5 @@ void SwordProjectileEffect::Start()
 
 void SwordProjectileEffect::Update(float tick)
 {
-	auto transform = GetOwner()->GetComponent<Transform>();
-
-	m_time += tick;
-	float offset = sin(m_time * 10.0f) * 10.0f;
-	transform->SetPosition({ offset, 0, 0 });
 }
 

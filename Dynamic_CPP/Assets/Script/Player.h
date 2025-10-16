@@ -48,7 +48,8 @@ public:
 	void SetCurHP(int hp);
 	[[Method]]
 	void Damage(int damage);
-
+	bool onHit = false;
+	float blinkElaspedTime = 0.f;
 	Core::Delegate<void, Weapon*, int>	m_AddWeaponEvent;
 	Core::Delegate<void, Weapon*, int>	m_UpdateDurabilityEvent;
 	Core::Delegate<void, Weapon*, int>	m_ChargingWeaponEvent;
@@ -316,6 +317,9 @@ private:
 	void DetectResource();
 	Transform* m_transform = nullptr;
 	EffectComponent* chargeEffect = nullptr;
+	bool OnresurrectionEffect = false;
+	EffectComponent* resurrectionEffect = nullptr;
+	float resurrectionEffectElaspedTime = 0.f;
 
 	//UIµé
 	GameObject* m_uiController = nullptr;

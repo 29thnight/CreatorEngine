@@ -61,6 +61,8 @@ void Player::Awake()
 void Player::Start()
 {
 	m_maxHitImpulseSize = 1.0f;
+	m_maxHitImpulseDuration = 0.2f;
+
 	HitImpulseStart();
 	player = GetOwner();
 	
@@ -141,6 +143,13 @@ void Player::Start()
 		chargeEffect = chargeEffcetObj->GetComponentDynamicCast<EffectComponent>();
 	}
 
+	Prefab* Resurrprefab = PrefabUtilitys->LoadPrefab("ResurrectionEffect");
+	if (Resurrprefab)
+	{
+		GameObject* ResurrpreObj = PrefabUtilitys->InstantiatePrefab(Resurrprefab, "resurrEffect");
+		resurrectionEffect = ResurrpreObj->GetComponentDynamicCast<EffectComponent>();
+	}
+
 
 	if(0 == playerIndex)
 	{
@@ -196,6 +205,7 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
+				m_maxHP = maxHP;
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
@@ -356,7 +366,12 @@ void Player::Update(float tick)
 		chargePos.y += 0.7f;
 		chargeEffect->GetOwner()->m_transform.SetPosition(chargePos);
 	}
-
+	if (resurrectionEffect)
+	{
+		Mathf::Vector3 resurrPos = pos;
+		resurrPos.y += 1.4f;
+		resurrectionEffect->GetOwner()->m_transform.SetPosition(resurrPos);
+	}
 	if (catchedObject)
 	{
 		UpdateChatchObject();
@@ -434,7 +449,6 @@ void Player::Update(float tick)
 		BombIndicator->SetEnabled(onBombIndicate);
 	}
 
-
 	if (true == OnInvincibility)
 	{
 		GracePeriodElpasedTime += tick;
@@ -442,10 +456,28 @@ void Player::Update(float tick)
 		{
 			OnInvincibility = false;
 			GracePeriodElpasedTime = 0.f;
+			if (OnresurrectionEffect)
+			{
+				OnresurrectionEffect = false;
+				resurrectionEffect->StopEffect();
+			}
+			if (onHit)
+			{
+				onHit = false;
+			}
 		}
 		else
 		{
-			//깜빡깜빡 tick당한번 or 0.n초당 규철이가 작성할예정
+			if(onHit) //맞아서 무적인경우
+			{
+				blinkElaspedTime += tick;
+				if (blinkElaspedTime >= m_maxHitImpulseDuration)
+				{
+					HitImpulse();
+					blinkElaspedTime = 0.f;
+				}
+			}
+
 		}
 	}
 
@@ -667,15 +699,16 @@ void Player::Damage(int damage)
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 	}
-	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
-	if (HPbar)
+	if (m_HPbar)
 	{
-		auto hpbar = HPbar->GetComponent<HPBar>();
+		auto hpbar = m_HPbar->GetComponent<HPBar>();
 		if (hpbar)
 		{
 			hpbar->SetCurHP(m_currentHP);
 		}
 	}
+	onHit = true;
+	HitImpulse();
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -1158,7 +1191,11 @@ void Player::Resurrection()
 	Heal(ResurrectionHP);
 	ResurrectionElapsedTime = 0;
 	SetInvincibility(ResurrectionGracePeriod);
-	
+	if (resurrectionEffect)
+	{
+		OnresurrectionEffect = true;
+		resurrectionEffect->Apply();
+	}
 }
 
 void Player::SetInvincibility(float _GracePeriodTime)
