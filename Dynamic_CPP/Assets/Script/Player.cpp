@@ -60,6 +60,8 @@ void Player::Awake()
 }
 void Player::Start()
 {
+	m_maxHitImpulseSize = 1.0f;
+	HitImpulseStart();
 	player = GetOwner();
 	
 	auto childred = player->m_childrenIndices;
@@ -324,11 +326,16 @@ void Player::Start()
 		slash3 = PrefabUtilitys->InstantiatePrefab(SlashPrefab3, "Slash3");
 	}
 
+
+
+
 }
 
 void Player::Update(float tick)
 {
 	Cheat(); 
+	DetectResource();
+	HitImpulseUpdate(tick);
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	if(dashObj)
@@ -355,11 +362,6 @@ void Player::Update(float tick)
 		UpdateChatchObject();
 	}
 
-	/*if (m_nearObject) {
-		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
-		if (nearMesh)
-			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
-	}*/
 
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
@@ -447,13 +449,11 @@ void Player::Update(float tick)
 		}
 	}
 
-
-
-
 	if (m_animator)
 	{
 		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
 	}
+
 }
 
 void Player::LateUpdate(float tick)
@@ -1231,7 +1231,7 @@ void Player::DetectResource()
 {
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1 << 8 | 1 << 10; 
+	RangeInfo.layerMask = 1 << 8 | 1 << 9 ; 
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	PhysicsManagers->SphereOverlap(RangeInfo, detectRadius, hits);
@@ -1917,9 +1917,6 @@ void Player::OnTriggerExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
-		if (nearMesh)
-			nearMesh->m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }
@@ -1937,9 +1934,6 @@ void Player::OnCollisionExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
-		if (nearMesh)
-			nearMesh->m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }
