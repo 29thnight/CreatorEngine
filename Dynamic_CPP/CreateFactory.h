@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SwordProjectileEffect.h"
 #include "SwordProjectile.h"
 #include "ControllerVibration.h"
 #include "ObjectPoolManager.h"

@@ -238,7 +238,6 @@ void ParticleSystem::UpdateGenerateModule(float delta)
 
 void ParticleSystem::ExecuteSimulationModules(float delta)
 {
-	// 현재 읽기/쓰기 버퍼 결정
 	ID3D11UnorderedAccessView* inputUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
 	ID3D11ShaderResourceView* inputSRV = m_usingBufferA ? m_particleSRV_A : m_particleSRV_B;
 	ID3D11UnorderedAccessView* outputUAV = m_usingBufferA ? m_particleUAV_B : m_particleUAV_A;
@@ -246,12 +245,10 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 
 	int executedModuleCount = 0;
 
-	// 활성화된 모듈만 실행
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
 	{
 		ParticleModule& module = *it;
 
-		// 비활성화된 모듈은 건너뛰기 (버퍼 스왑도 하지 않음)
 		if (!module.IsEnabled()) {
 			continue;
 		}
@@ -259,23 +256,18 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 		if (module.IsGenerateModule())
 			continue;
 
-		// 버퍼 설정 및 실행
 		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
 		module.Update(delta);
 
 		executedModuleCount++;
 
-		// 실제로 실행된 모듈에 대해서만 버퍼 스왑
 		std::swap(inputUAV, outputUAV);
 		std::swap(inputSRV, outputSRV);
 	}
 
-	// 실제 실행된 모듈 개수가 홀수면 최종 버퍼 상태 변경
 	if (executedModuleCount % 2 == 1) {
 		m_usingBufferA = !m_usingBufferA;
 	}
-
-	DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
 void ParticleSystem::SyncEmitterTransform()
@@ -482,7 +474,7 @@ void ParticleSystem::InitializeParticleIndices()
 	ID3D11UnorderedAccessView* particleUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
 
 	// 초기화 완료 후 GPU 동기화
-	DirectX11::DeviceStates->g_pDeviceContext->Flush();
+	//DirectX11::DeviceStates->g_pDeviceContext->Flush();
 }
 
 void ParticleSystem::SetParticleDatatype(ParticleDataType type)
@@ -707,10 +699,10 @@ void ParticleSystem::WaitForGPUCompletion()
 {
 	// 실제 GPU 대기는 필요 없음
 	// 각 모듈의 WaitForGPUCompletion도 실제로는 아무 작업 안함
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
-		ParticleModule& module = *it;
-		module.WaitForGPUCompletion(); // 빈 함수
-	}
+	//for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+	//	ParticleModule& module = *it;
+	//	module.WaitForGPUCompletion(); // 빈 함수
+	//}
 }
 
 //***********************************************************************************************************************************************************

@@ -98,6 +98,7 @@ void TrailGenerateModule::Update(float delta)
             m_lastAutoAddTime = m_currentTime;
         }
     }
+    
     // 수명이 완전히 지난 포인트만 제거 (충분한 페이드아웃 시간 확보)
     bool pointsRemoved = false;
     while (!m_trailPoints.empty())

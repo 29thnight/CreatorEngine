@@ -143,45 +143,48 @@ void GameInstance::RemoveEnhancementDelta(SourceKey key)
 	auto it = m_applied.find(key);
 	if (it == m_applied.end()) return;
 
-	std::visit([&](auto&& held) {
-		constexpr ItemEnhancementType T = std::decay_t<decltype(held)>::type;
+	std::visit([&](auto&& held)
+	{
+		using D = std::decay_t<decltype(held)>;
+		constexpr ItemEnhancementType T = D::type;
 		constexpr int idx = static_cast<int>(T);
-		if constexpr (std::same_as<typename std::decay_t<decltype(held)>::value_type, int>) {
-			m_addInt[idx] -= held.value;
-		}
-		else {
-			m_mulFloat[idx] -= held.value;
-		}
-		}, it->second);
+		if (idx < 0 || idx >= MAX_ENHANCEMENT_TYPE) return;
+
+		m_enhancementValue[idx] -= static_cast<float>(held.value);
+	}, it->second);
 
 	m_applied.erase(it);
 }
 
-int GameInstance::GetAdd(ItemEnhancementType t) const
+float GameInstance::GetEnhancement(ItemEnhancementType t) const
 {
-	return m_addInt[static_cast<int>(t)];
-}
-
-float GameInstance::GetMul(ItemEnhancementType t) const
-{
-	return m_mulFloat[static_cast<int>(t)];
+	const int idx = static_cast<int>(t);
+	if (idx < 0 || idx >= MAX_ENHANCEMENT_TYPE) return 0.f;
+	return m_enhancementValue[idx];
 }
 
 int GameInstance::ApplyToBaseInt(ItemEnhancementType t, int base) const
 {
-	float result = (static_cast<float>(base + GetAdd(t))) * (1.f + GetMul(t));
+	const float v = GetEnhancement(t);
+	const auto  c = CalcOf(t);
+	const float result = (c == EnhancementCalcType::Add)
+		? (static_cast<float>(base) + v)
+		: (static_cast<float>(base) * (1.f + v));
 	return static_cast<int>(std::lround(result));
 }
 
 float GameInstance::ApplyToBaseFloat(ItemEnhancementType t, float base) const
 {
-	return (base + static_cast<float>(GetAdd(t))) * (1.f + GetMul(t));
+	const float v = GetEnhancement(t);
+	const auto  c = CalcOf(t);
+	return (c == EnhancementCalcType::Add)
+		? (base + v)
+		: (base * (1.f + v));
 }
 
 void GameInstance::ResetAllEnhancements()
 {
-	std::fill(std::begin(m_addInt), std::end(m_addInt), 0);
-	std::fill(std::begin(m_mulFloat), std::end(m_mulFloat), 0.f);
+	std::fill(std::begin(m_enhancementValue), std::end(m_enhancementValue), 0.f); // ★
 	m_applied.clear();
 }
 
@@ -195,36 +198,45 @@ void GameInstance::ApplyItemEnhancement(const ItemInfo& info)
 	switch (t)
 	{
 	case ItemEnhancementType::MaxHPUp:
-		AddEnhancementDelta<ItemEnhancementType::MaxHPUp>(key,
-			EnhancementDelta<ItemEnhancementType::MaxHPUp>::Make(info.enhancementValue));
+		AddEnhancementDelta<ItemEnhancementType::MaxHPUp>(
+			key, EnhancementDelta<ItemEnhancementType::MaxHPUp>::Make(info.enhancementValue));
 		break;
+
 	case ItemEnhancementType::Atk:
-		AddEnhancementDelta<ItemEnhancementType::Atk>(key,
-			EnhancementDelta<ItemEnhancementType::Atk>::Make(info.enhancementValue));
+		AddEnhancementDelta<ItemEnhancementType::Atk>(
+			key, EnhancementDelta<ItemEnhancementType::Atk>::Make(info.enhancementValue));
 		break;
+
 	case ItemEnhancementType::DashCountUp:
-		AddEnhancementDelta<ItemEnhancementType::DashCountUp>(key,
-			EnhancementDelta<ItemEnhancementType::DashCountUp>::Make(info.enhancementValue));
+		AddEnhancementDelta<ItemEnhancementType::DashCountUp>(
+			key, EnhancementDelta<ItemEnhancementType::DashCountUp>::Make(info.enhancementValue));
 		break;
+
 	case ItemEnhancementType::WeaponDurabilityUp:
-		AddEnhancementDelta<ItemEnhancementType::WeaponDurabilityUp>(key,
-			EnhancementDelta<ItemEnhancementType::WeaponDurabilityUp>::Make(info.enhancementValue));
+		AddEnhancementDelta<ItemEnhancementType::WeaponDurabilityUp>(
+			key, EnhancementDelta<ItemEnhancementType::WeaponDurabilityUp>::Make(info.enhancementValue));
 		break;
 
 	case ItemEnhancementType::MoveSpeedUp: {
-		// CSV가 10(%)면 0.10f로 변환 권장
-		float mul = static_cast<float>(info.enhancementValue) * 0.01f;
-		AddEnhancementDelta<ItemEnhancementType::MoveSpeedUp>(key,
-			EnhancementDelta<ItemEnhancementType::MoveSpeedUp>::Make(mul));
+		float mul = static_cast<float>(info.enhancementValue) * 0.01f; // 10 → 0.10
+		AddEnhancementDelta<ItemEnhancementType::MoveSpeedUp>(
+			key, EnhancementDelta<ItemEnhancementType::MoveSpeedUp>::Make(mul));
 		break;
 	}
 	case ItemEnhancementType::AtkSpeedUp: {
 		float mul = static_cast<float>(info.enhancementValue) * 0.01f;
-		AddEnhancementDelta<ItemEnhancementType::AtkSpeedUp>(key,
-			EnhancementDelta<ItemEnhancementType::AtkSpeedUp>::Make(mul));
+		AddEnhancementDelta<ItemEnhancementType::AtkSpeedUp>(
+			key, EnhancementDelta<ItemEnhancementType::AtkSpeedUp>::Make(mul));
 		break;
 	}
-	default: break;
+	case ItemEnhancementType::ThrowRangeUp: { // ★ float 가산
+		float add = static_cast<float>(info.enhancementValue);
+		AddEnhancementDelta<ItemEnhancementType::ThrowRangeUp>(
+			key, EnhancementDelta<ItemEnhancementType::ThrowRangeUp>::Make(add));
+		break;
+	}
+	default:
+		break;
 	}
 }
 
@@ -277,8 +289,10 @@ void GameInstance::LoadSceneSettings()
 
 	if(const auto* sec = loadINI.TryGetSection("Scenes"))
 	{
-		for (const auto& [k, v] : *sec) {
-			if (auto t = FromKey(k)) {
+		for (const auto& [k, v] : *sec) 
+		{
+			if (auto t = FromKey(k)) 
+			{
 				m_settingedSceneNames[*t] = v; // INI 값이 있으면 덮어씀
 			}
 		}
@@ -297,7 +311,8 @@ void GameInstance::AsyncSceneLoadUpdate()
 			m_isLoadSceneComplete = true;
 			LOG("Scene loaded: " + sceneName);
 		}
-		else {
+		else 
+		{
 			LOG("Failed to load scene.");
 		}
 	}
@@ -324,27 +339,30 @@ void GameInstance::UnloadScene(const std::string& sceneName)
 	// Unload only if the scene is loaded
 }
 
-void GameInstance::LoadImidiateNextScene()
+void GameInstance::LoadSettingedScene(int sceneType)
 {
-	if (m_nextSceneName.empty()) {
-		LOG("Next scene name is empty.");
-		return;
-	}
-	LoadScene(m_nextSceneName);
-	Scene* loadedScene = m_loadingSceneFuture.get();
-	if (loadedScene)
+	auto it = m_settingedSceneNames.find(static_cast<SceneType>(sceneType));
+	if (it != m_settingedSceneNames.end()) 
 	{
-		m_loadedScenes[m_nextSceneName] = loadedScene;
-		m_isLoadSceneComplete = true;
-		LOG("Scene loaded: " + m_nextSceneName);
-	}
+		LoadScene(it->second);
+	} 
 	else 
 	{
-		LOG("Failed to load scene: " + m_nextSceneName);
-		return;
+		LOG("No settinged scene for type: " + std::to_string(sceneType));
 	}
-	SwitchScene(m_nextSceneName);
-	m_isLoadSceneComplete = false;
+}
+
+void GameInstance::SwitchSettingedScene(int sceneType)
+{
+	auto it = m_settingedSceneNames.find(static_cast<SceneType>(sceneType));
+	if (it != m_settingedSceneNames.end()) 
+	{
+		SwitchScene(it->second);
+	} 
+	else 
+	{
+		LOG("No settinged scene for type: " + std::to_string(sceneType));
+	}
 }
 
 void GameInstance::SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir)

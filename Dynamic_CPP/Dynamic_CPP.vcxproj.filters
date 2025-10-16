@@ -480,9 +480,6 @@
 		<ClInclude Include="ItemType.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Script\ScriptClass\Util</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
 			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
@@ -634,6 +631,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\SwordProjectile.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SwordProjectileEffect.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\BP001.h">
@@ -1161,6 +1161,12 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SwordProjectile.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Entity.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwordProjectileEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\BP001.cpp">

@@ -268,6 +268,11 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.rotationSpeed = gRotationSpeed;
     particle.rotation = gEmitterRotation;
     
+    // pad3에 초기 회전 저장 (impulse 계산용)
+    particle.pad3 = gEmitterRotation.x;
+    particle.pad4 = gEmitterRotation.y;
+    particle.pad5 = gEmitterRotation.z;
+
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
     particle.color = gColor;

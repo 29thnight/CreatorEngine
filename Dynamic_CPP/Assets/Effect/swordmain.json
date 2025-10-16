@@ -7,10 +7,10 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "1",
+    "name": "swordmain",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -98,7 +98,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 128.4262237548828,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
