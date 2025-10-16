@@ -20,13 +20,15 @@ NodeStatus BossIdleAction::Tick(float deltatime, BlackBoard& blackBoard)
 			duration = 0.0f;
 			blackBoard.SetValueAsFloat("IdleTime", duration);
 			LOG("Boss Idle end to atteck");
-			//test code 
+
+			//test code  
 			//Idle Time end demage add 5 as test phase2
 			float hp = blackBoard.GetValueAsInt("CurrHP");
 			hp -= 5;
 			LOG("Test Code excute Boss Demage 5");
 			blackBoard.SetValueAsInt("CurrHP",hp);
 			//test code end
+
 			return NodeStatus::Success; //end Idle
 		}
 

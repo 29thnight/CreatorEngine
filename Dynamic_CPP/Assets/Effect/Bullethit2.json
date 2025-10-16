@@ -1,9 +1,9 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "Bullethit2",
     "particleSystems": [
         {
@@ -1729,11 +1729,6 @@
                                 "y": 0.25678110122680664,
                                 "z": 1.0
                             },
-                            "initialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
                             "lifeTime": 1.2000000476837158,
                             "renderMode": 0,
                             "textureIndex": 0,
@@ -1790,7 +1785,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 913.2109375,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1841,7 +1836,6 @@
                                 "y": 0.5,
                                 "z": 0.5
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
@@ -1849,7 +1843,6 @@
                                 "y": 0.25,
                                 "z": 0.25
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1919,7 +1912,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1945,11 +1938,6 @@
                                 "x": 0.0,
                                 "y": 0.25678110122680664,
                                 "z": 1.0
-                            },
-                            "initialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
                             },
                             "lifeTime": 1.2000000476837158,
                             "renderMode": 0,
@@ -2007,7 +1995,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 913.2109375,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -2058,7 +2046,6 @@
                                 "y": 0.5,
                                 "z": 0.5
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
@@ -2066,7 +2053,6 @@
                                 "y": 0.25,
                                 "z": 0.25
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -2136,7 +2122,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -2162,11 +2148,6 @@
                                 "x": 0.0,
                                 "y": 0.25678110122680664,
                                 "z": 1.0
-                            },
-                            "initialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
                             },
                             "lifeTime": 1.2000000476837158,
                             "renderMode": 0,
@@ -2224,7 +2205,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 913.2109375,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -2275,7 +2256,6 @@
                                 "y": 0.5,
                                 "z": 0.5
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
@@ -2283,7 +2263,6 @@
                                 "y": 0.25,
                                 "z": 0.25
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -2353,7 +2332,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -2379,11 +2358,6 @@
                                 "x": 0.0,
                                 "y": 0.25678110122680664,
                                 "z": 1.0
-                            },
-                            "initialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
                             },
                             "lifeTime": 1.2000000476837158,
                             "renderMode": 0,
@@ -2441,7 +2415,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 913.2109375,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -2492,7 +2466,6 @@
                                 "y": 0.5,
                                 "z": 0.5
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
@@ -2500,7 +2473,6 @@
                                 "y": 0.25,
                                 "z": 0.25
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -2570,7 +2542,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -2639,14 +2611,12 @@
                                 "x": 0.5,
                                 "y": 0.5
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 2.0,
                                 "y": 2.0
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -2758,7 +2728,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -2827,14 +2797,12 @@
                                 "x": 0.5,
                                 "y": 0.5
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.5,
                                 "y": 1.5
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -2946,7 +2914,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -3015,14 +2983,12 @@
                                 "x": 2.0,
                                 "y": 2.0
                             },
-                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
-                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
