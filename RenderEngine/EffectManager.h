@@ -89,6 +89,8 @@ public:
 		bool& outLoop,
 		float& outDuration);
 
+	bool IsAlive(const std::string& customInstanceId);
+
 private:
 	// 템플릿 설정들 (JSON에서 로드)
 	std::unordered_map<std::string, UniversalEffectTemplate> templates;

@@ -97,6 +97,7 @@ UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
     data.layerOrder = image->GetLayerOrder();
     data.clipDirection = image->clipDirection;
     data.clipPercent   = image->clipPercent;
+	data.filpEffect = (SpriteEffects)image->uiEffects;
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
@@ -125,6 +126,7 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.maxSize    = text->stretchSize;
     data.stretchX   = text->isStretchX;
     data.stretchY   = text->isStretchY;
+    data.filpEffect = (SpriteEffects)text->uiEffects;
     m_data          = data;
     m_instancedID   = text->GetInstanceID();
 }
@@ -140,6 +142,7 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
     data.origin             = { sprite->uiinfo.size.x * 0.5f, sprite->uiinfo.size.y * 0.5f };
     data.position           = sprite->pos;
     data.scale              = sprite->scale;
+    data.filpEffect = (SpriteEffects)sprite->uiEffects;
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
@@ -229,7 +232,7 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                             info.color,
                             info.rotation,
                             info.origin,
-                            DirectX::SpriteEffects_None,
+                            info.filpEffect,
                             static_cast<float>(info.layerOrder) / MaxOreder);
                     }
                 }
@@ -265,7 +268,7 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         0.0f,
                         origin,
                         scale,
-                        DirectX::SpriteEffects_None,
+                        info.filpEffect,
                         static_cast<float>(info.layerOrder) / MaxOreder);
                 }
             }
@@ -284,7 +287,7 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         DirectX::Colors::White,
                         0.f,
                         1.f,
-                        DirectX::SpriteEffects_None,
+                        info.filpEffect,
 						static_cast<float>(info.layerOrder) / MaxOreder
                     );
                 }

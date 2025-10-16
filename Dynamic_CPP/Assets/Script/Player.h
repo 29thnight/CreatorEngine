@@ -313,6 +313,7 @@ public:
 private:
 	//치트들 담긴함수 
 	void Cheat();
+	void SwapWeaponInternal(int dir);
 	//상호 작용가능한 리소스탐지 //EntityResource, item, weaponCapsule
 	void DetectResource();
 	Transform* m_transform = nullptr;

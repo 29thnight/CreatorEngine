@@ -1,13 +1,17 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0,
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
     "name": "gumgi3",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -33,6 +37,11 @@
                                 "x": 0.06440294533967972,
                                 "y": 0.03758964315056801,
                                 "z": 0.3173598647117615
+                            },
+                            "initialRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -87,6 +96,7 @@
                                 "y": 2.0,
                                 "z": 2.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
@@ -94,6 +104,7 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -122,7 +133,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 270.466552734375,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -232,7 +243,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -258,6 +269,11 @@
                                 "x": 0.06440294533967972,
                                 "y": 0.03758964315056801,
                                 "z": 0.3173598647117615
+                            },
+                            "initialRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -312,6 +328,7 @@
                                 "y": 2.0,
                                 "z": 2.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
@@ -319,6 +336,7 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -347,7 +365,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 229.28456115722656,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {

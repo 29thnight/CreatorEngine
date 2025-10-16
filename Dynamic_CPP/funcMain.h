@@ -197,6 +197,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("ControllerVibration", []() { return new ControllerVibration(); });
 		CreateFactory::GetInstance()->RegisterFactory("ObjectPoolManager", []() { return new ObjectPoolManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("ReachEventTrigger", []() { return new ReachEventTrigger(); });
+		CreateFactory::GetInstance()->RegisterFactory("BP001", []() { return new BP001(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterBaseGate", []() { return new EntityMonsterBaseGate(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayEffectAll", []() { return new PlayEffectAll(); });
 		CreateFactory::GetInstance()->RegisterFactory("SwordHitEffect", []() { return new SwordHitEffect(); });
@@ -267,6 +268,13 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+		ActionCreateFactory::GetInstance()->RegisterFactory("BurrowMove", []() { return new BurrowMove(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0014", []() { return new BP0014(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0013", []() { return new BP0013(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0022", []() { return new BP0022(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0021", []() { return new BP0021(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0012", []() { return new BP0012(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP0011", []() { return new BP0011(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BP0034", []() { return new BP0034(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BP0033", []() { return new BP0033(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BP0032", []() { return new BP0032(); });
@@ -311,6 +319,8 @@ extern "C"
 	EXPORT_API void InitConditionDecoratorFactory()
 	{
 		// Register the factory function for BTConditionDecorator Automation
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("ActionCountCheck", []() { return new ActionCountCheck(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsHazadPatten", []() { return new IsHazadPatten(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsUseAsis", []() { return new IsUseAsis(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsStartBoss", []() { return new IsStartBoss(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsInitialize", []() { return new IsInitialize(); });

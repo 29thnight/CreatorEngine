@@ -53,6 +53,7 @@ using namespace Microsoft::WRL;
 #include <vector>
 #include <cstdint>
 #include <ranges>
+#include <latch>
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"

@@ -274,18 +274,35 @@ void EntityEleteMonster::UpdatePlayer()
 	float distAsis = FLT_MAX;
 	float distPlayer1 = FLT_MAX;
 	float distPlayer2 = FLT_MAX;
+
+	Player* p1Script = nullptr;
+	Player* p2Script = nullptr;
+
 	if (Asis) {
 		asisPos = Asis->m_transform.GetWorldPosition();
 		distAsis = Mathf::Vector3::DistanceSquared(asisPos, pos);
 	}
 	if (player1) {
 		player1Pos = player1->m_transform.GetWorldPosition();
+		p1Script = m_player1->GetComponentDynamicCast<Player>();
 		distPlayer1 = Mathf::Vector3::DistanceSquared(player1Pos, pos);
 	}
 	if (player2) {
 		player2Pos = player2->m_transform.GetWorldPosition();
+		p2Script = m_player2->GetComponentDynamicCast<Player>();
 		distPlayer2 = Mathf::Vector3::DistanceSquared(player2Pos, pos);
 	}
+
+	if (p1Script)
+	{
+		if (p1Script->isStun) distPlayer1 = FLT_MAX;
+	}
+
+	if (p2Script)
+	{
+		if (p2Script->isStun) distPlayer2 = FLT_MAX;
+	}
+
 	GameObject* closedTarget = nullptr;
 	float closedDist = FLT_MAX;
 	if (distPlayer1 < distPlayer2)
@@ -306,10 +323,23 @@ void EntityEleteMonster::UpdatePlayer()
 			closedDist = distAsis;
 		}
 	}
+
 	if (closedTarget) {
-		target = closedTarget;
-		blackBoard->SetValueAsGameObject("ClosedTarget", closedTarget->ToString());
-		blackBoard->SetValueAsGameObject("Target", closedTarget->ToString());
+		if (closedDist == FLT_MAX) {
+			target = nullptr;
+			blackBoard->SetValueAsGameObject("ClosedTarget", "");
+			blackBoard->SetValueAsGameObject("Target", "");
+		}
+		else {
+			target = closedTarget;
+			blackBoard->SetValueAsGameObject("ClosedTarget", closedTarget->ToString());
+			blackBoard->SetValueAsGameObject("Target", closedTarget->ToString());
+		}
+	}
+	else {
+		target = nullptr;
+		blackBoard->SetValueAsGameObject("ClosedTarget", "");
+		blackBoard->SetValueAsGameObject("Target", "");
 	}
 }
 

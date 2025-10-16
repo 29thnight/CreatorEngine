@@ -8,6 +8,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [3270138650]
+    ChildWeights: ~
     Position: {x: 166, y: -67}
   - ID: 3270138650
     Type: 3
@@ -18,4 +19,5 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: ~
+    ChildWeights: ~
     Position: {x: 166, y: 104}

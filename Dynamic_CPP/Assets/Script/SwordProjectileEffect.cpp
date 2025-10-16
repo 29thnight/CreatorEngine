@@ -18,5 +18,6 @@ void SwordProjectileEffect::Start()
 
 void SwordProjectileEffect::Update(float tick)
 {
+
 }
 

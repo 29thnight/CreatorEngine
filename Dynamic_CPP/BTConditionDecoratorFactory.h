@@ -4,6 +4,8 @@
 #include "BTHeader.h"
 
 // Automation include ConditionDecoratorNodeClass header
+#include "ActionCountCheck.h"
+#include "IsHazadPatten.h"
 #include "IsUseAsis.h"
 #include "BP2IsPatten.h"
 #include "IsInitialize.h"
