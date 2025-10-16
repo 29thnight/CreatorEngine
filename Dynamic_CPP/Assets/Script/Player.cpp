@@ -48,6 +48,7 @@
 #include "ObjectPool.h"
 #include "ControllerVibration.h"
 #include "SwordProjectile.h"
+#include "SwordProjectileEffect.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -1618,6 +1619,14 @@ void Player::MeleeChargeAttack()
 
 		Mathf::Vector3 effectPos = myPos + myForward * slashChargeOffset;
 		effectPos.y += 0.9f;
+
+
+		Mathf::Vector3 up = Mathf::Vector3::Up;
+		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
+		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
+		SwordObj->GetComponent<Transform>()->SetRotation(lookRot);
+
+
 
 		if (m_curWeapon)
 		{

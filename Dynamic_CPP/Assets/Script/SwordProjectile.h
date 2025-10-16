@@ -35,7 +35,7 @@ private:
 	Player* m_ownerPlayer = nullptr;
 	bool beLateFrame = false; //setposion으로 정한 위치가 한프레임 늦어서 이렇게 조절
 	bool OnEffect = false;
-	EffectComponent* m_effect = nullptr;
+	std::vector<EffectComponent*> m_effects;
 	std::unordered_set<Entity*> targets;
 	[[Property]]
 	float rangedProjSpd = 0.1f; //발사체 이동속도
