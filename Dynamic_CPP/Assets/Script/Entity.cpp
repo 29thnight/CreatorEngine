@@ -32,3 +32,8 @@ void Entity::HitImpulseUpdate(float tick)
 		m->m_Material->TrySetValue("FlashBuffer", "flashFrequency", &m_hitImpulseFrequency, floatSize);
 	}
 }
+
+void Entity::StopHitImpulse()
+{
+	m_currentHitImpulseDuration = 0.f;
+}

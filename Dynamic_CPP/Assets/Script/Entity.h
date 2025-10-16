@@ -38,6 +38,7 @@ public:
 	void HitImpulseStart();
 	void HitImpulse();
 	virtual void HitImpulseUpdate(float tick);
+	void StopHitImpulse();
 
 	int m_currentHP{ 1 };
 	int m_maxHP{ 100 };
