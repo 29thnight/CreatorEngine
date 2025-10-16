@@ -81,6 +81,8 @@ public:
 	std::optional<int4> GetInt4(std::string_view name) const;
 	void SetInt4(std::string_view name, const int4& value);
 
+	[[Property]]
+	UIEffects uiEffects{};
     [[Property]]
 	int _layerorder{};
 	[[Property]]

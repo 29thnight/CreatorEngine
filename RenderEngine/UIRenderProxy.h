@@ -23,13 +23,14 @@ public:
         std::shared_ptr<Texture>                texture{ nullptr };
         DirectX::XMFLOAT2                       origin{};
         Mathf::Vector3                          position{};
+        float                                   rotation{ 0.f };
         Mathf::Color4                           color{ 1.f, 1.f, 1.f, 1.f };
         Mathf::Vector2                          scale{ 1.f, 1.f };
-        float                                   rotation{ 0.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
-        ClipDirection                           clipDirection{ ClipDirection::None };
         float                                   clipPercent{ 1.f };
+        SpriteEffects                           filpEffect{ SpriteEffects_None };
+        ClipDirection                           clipDirection{ ClipDirection::None };
     };
 
     struct TextData
@@ -38,10 +39,11 @@ public:
         std::string                             message;
         Mathf::Color4                           color{ DirectX::Colors::Black };
         DirectX::XMFLOAT2                       position{};
+        Mathf::Vector2                          maxSize{};
         float                                   fontSize{ 5.f };
         int                                     canvasOrder{ 0 };
         int                                     layerOrder{ 0 };
-        Mathf::Vector2                          maxSize{};
+        SpriteEffects                           filpEffect{ SpriteEffects_None };
         bool                                    stretchX{ false };
         bool                                    stretchY{ false };
     };
@@ -58,6 +60,7 @@ public:
         int                                     layerOrder{ 0 };
         float                                   deltaTime{};
 		float                                   frameDuration{ 0.1f };
+        SpriteEffects                           filpEffect{ SpriteEffects_None };
 		bool                                    isPreview{ false };
 	};
 

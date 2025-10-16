@@ -284,16 +284,8 @@ void Player::Start()
 	//대쉬중에는 아무조작도 불가능
 	BitFlag dashBit;
 	playerState["Dash"] = dashBit;
-
-
-
 	ChangeState("Idle");
 
-	/*auto meshrenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
-	for(auto& meshrenderer : meshrenderers)
-	{
-		meshrenderer->m_Material = meshrenderer->m_Material->Instantiate(meshrenderer->m_Material, "cloneMat");
-	}*/
 	Debug->Log("Player Start");
 	m_animator->SetUseLayer(1, false);
 	m_maxHP = maxHP;

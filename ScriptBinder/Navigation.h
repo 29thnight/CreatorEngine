@@ -21,6 +21,14 @@ enum class ClipDirection : std::uint8_t
 };
 AUTO_REGISTER_ENUM(ClipDirection)
 
+enum class UIEffects
+{
+	UIEffects_None = 0x0,
+	UIEffects_FlipHorizontally = 0x1,
+	UIEffects_FlipVertically = 0x2
+};
+AUTO_REGISTER_ENUM(UIEffects)
+
 struct Navigation
 {
 	[[Property]]
