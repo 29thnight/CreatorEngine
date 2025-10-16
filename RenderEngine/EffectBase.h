@@ -91,17 +91,20 @@ public:
         }
 
         if (m_state == EffectState::Finished) {
-            m_finishedTime += delta;
+            m_finishedTime += delta * m_timeScale;
 
             // 3초 후 또는 모든 파티클이 사라지면 Stopped로 전환
             if (m_finishedTime >= dieDelay) {
                 m_state = EffectState::Stopped;
                 m_finishedTime = 0.0f;
-                for (auto& ps : m_particleSystems) {
-                    if (ps) {
-                        ps->Stop();
-                        ps->ResumeSpawning();
+
+                // 시작된 것들만 정리
+                for (size_t i = 0; i < m_particleSystems.size(); ++i) {
+                    if (m_particleSystems[i] && m_emitterTimings[i].hasStarted) {
+                        m_particleSystems[i]->Stop();
+                        m_particleSystems[i]->ResumeSpawning();
                     }
+                    m_emitterTimings[i].hasStarted = false;
                 }
             }
         }
@@ -141,12 +144,15 @@ public:
     virtual void Stop() {
         m_state = EffectState::Stopped;
         m_currentTime = 0.0f;
+        m_finishedTime = 0.0f;
 
         // 모든 emitter 정지 및 플래그 리셋
         for (size_t i = 0; i < m_particleSystems.size(); ++i) {
             if (m_particleSystems[i]) {
-                m_particleSystems[i]->Stop();
-                m_particleSystems[i]->ResumeSpawning();
+                if (m_emitterTimings[i].hasStarted) {
+                    m_particleSystems[i]->Stop();
+                    m_particleSystems[i]->ResumeSpawning();
+                }
             }
             m_emitterTimings[i].hasStarted = false;
         }
