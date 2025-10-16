@@ -27,11 +27,6 @@ void EntityItem::Start()
 		}
 	}
 
-	auto meshrenderer = GetOwner()->GetComponent<MeshRenderer>();
-	if (meshrenderer)
-	{
-		meshrenderer->m_bitflag = 0;
-	}
 	auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 	rigid->LockAngularXYZ();
 	rigid->SetLinearDamping(0.1f);
@@ -218,7 +213,8 @@ void EntityItem::Update(float tick)
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 	}
-		
+	
+	UpdateOutLine(tick);
 	
 }
 void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)

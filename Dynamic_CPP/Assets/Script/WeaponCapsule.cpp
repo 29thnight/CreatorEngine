@@ -57,6 +57,8 @@ void WeaponCapsule::Update(float tick)
 		}
 		
 	}
+
+	UpdateOutLine(tick);
 }
 
 void WeaponCapsule::CatchCapsule(Player* _player)

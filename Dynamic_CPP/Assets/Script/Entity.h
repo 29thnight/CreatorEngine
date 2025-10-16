@@ -47,7 +47,7 @@ public:
 	float m_currentHitImpulseDuration{ 0.f };
 	float m_maxHitImpulseSize{ 1.2f };
 
-	float detectTime = 2.0f;
+	float detectTime = 1.0f;
 	float detectElapsedTime = 0.f;
 	bool  OnOutline = false;
 	void  UpdateOutLine(float tick);

@@ -39,7 +39,8 @@ void Entity::UpdateOutLine(float tick)
 		detectElapsedTime += tick;
 		if (detectElapsedTime >= detectTime)
 		{
-			OnOutline = 0;
+			OnOutline = false;
+			detectElapsedTime = 0;
 			auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
 			for (auto& m : meshren)
 			{
@@ -56,4 +57,5 @@ void Entity::OnOutLine()
 	{
 		m->m_bitflag = 1;
 	}
+	OnOutline = true;
 }

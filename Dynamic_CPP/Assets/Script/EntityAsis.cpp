@@ -55,11 +55,6 @@ void EntityAsis::Start()
 		}
 	}
 
-	auto meshrenderer = GetOwner()->GetComponent<MeshRenderer>();
-	if (meshrenderer)
-	{
-		meshrenderer->m_bitflag = 0;
-	}
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
