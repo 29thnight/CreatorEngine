@@ -11,6 +11,8 @@ enum class ItemEnhancementType
 	Atk = 4,
 	DashCountUp = 5,
 	WeaponDurabilityUp = 6,
+	ThrowRangeUp = 7,
+	Max,
 };
 
 enum class ItemRarity
@@ -26,7 +28,7 @@ enum class EnhancementCalcType
 	Mul = 1,
 };
 
-constexpr int MAX_ENHANCEMENT_TYPE = 7;
+constexpr int MAX_ENHANCEMENT_TYPE = static_cast<int>(ItemEnhancementType::Max);
 
 struct ItemInfo
 {
@@ -60,6 +62,24 @@ template<> struct StatMeta<ItemEnhancementType::DashCountUp> { using value_type 
 template<> struct StatMeta<ItemEnhancementType::WeaponDurabilityUp> { using value_type = int;   static constexpr EnhancementCalcType calc = EnhancementCalcType::Add; };
 template<> struct StatMeta<ItemEnhancementType::MoveSpeedUp> { using value_type = float; static constexpr EnhancementCalcType calc = EnhancementCalcType::Mul; };
 template<> struct StatMeta<ItemEnhancementType::AtkSpeedUp> { using value_type = float; static constexpr EnhancementCalcType calc = EnhancementCalcType::Mul; };
+template<> struct StatMeta<ItemEnhancementType::ThrowRangeUp> { using value_type = float;   static constexpr EnhancementCalcType calc = EnhancementCalcType::Add; };
+
+constexpr EnhancementCalcType CalcOf(ItemEnhancementType t) 
+{
+	switch (t) 
+	{
+	case ItemEnhancementType::MoveSpeedUp:
+	case ItemEnhancementType::AtkSpeedUp:
+		return EnhancementCalcType::Mul;
+	case ItemEnhancementType::MaxHPUp:
+	case ItemEnhancementType::Atk:
+	case ItemEnhancementType::DashCountUp:
+	case ItemEnhancementType::WeaponDurabilityUp:
+	case ItemEnhancementType::ThrowRangeUp:
+	default:
+		return EnhancementCalcType::Add;
+	}
+}
 
 // °³³ä(Concepts): ½ºÅÈ T¿¡ ¸Â´Â °ª Å¸ÀÔ¸¸ Çã¿ë
 template<ItemEnhancementType T, typename V>
@@ -67,13 +87,13 @@ concept ValueMatchesStat = std::same_as<V, typename StatMeta<T>::value_type>;
 
 // ÇïÆÛ
 constexpr inline bool IsFloatStat(ItemEnhancementType t) {
-	return t == ItemEnhancementType::MoveSpeedUp || t == ItemEnhancementType::AtkSpeedUp;
+	return t == ItemEnhancementType::MoveSpeedUp || t == ItemEnhancementType::AtkSpeedUp || t == ItemEnhancementType::ThrowRangeUp;
 }
 
 inline bool IsFloatStat(int t) 
 {
 	ItemEnhancementType et = static_cast<ItemEnhancementType>(t);
-	return et == ItemEnhancementType::MoveSpeedUp || et == ItemEnhancementType::AtkSpeedUp;
+	return et == ItemEnhancementType::MoveSpeedUp || et == ItemEnhancementType::AtkSpeedUp || et == ItemEnhancementType::ThrowRangeUp;
 }
 
 template<ItemEnhancementType T>
@@ -104,5 +124,6 @@ using AnyDelta = std::variant<
 	EnhancementDelta<ItemEnhancementType::AtkSpeedUp>,
 	EnhancementDelta<ItemEnhancementType::Atk>,
 	EnhancementDelta<ItemEnhancementType::DashCountUp>,
-	EnhancementDelta<ItemEnhancementType::WeaponDurabilityUp>
+	EnhancementDelta<ItemEnhancementType::WeaponDurabilityUp>,
+	EnhancementDelta<ItemEnhancementType::ThrowRangeUp>
 >;

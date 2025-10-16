@@ -21,18 +21,10 @@ void LoadingController::Start()
 		m_gameManager = gmObj->GetComponent<GameManager>();
 		if (m_gameManager)
 		{
-			std::string loadSceneName = GameInstance::GetInstance()->GetBeyondSceneName();
-			if (!loadSceneName.empty())
-			{
-				m_gameManager->m_nextSceneName = loadSceneName;
-				m_gameManager->LoadNextScene();
-			}
-			else
-			{
-				m_gameManager->m_nextSceneName = "Fin_Ingame_017";
-				m_gameManager->LoadNextScene();
-			}
-			GameInstance::GetInstance()->SetBeyondSceneName("");
+			int loadSceneType = GameInstance::GetInstance()->GetAfterLoadSceneIndex();
+			m_gameManager->m_nextSceneIndex = loadSceneType;
+			m_gameManager->LoadNextScene();
+			GameInstance::GetInstance()->SetAfterLoadSceneIndex(); // √ ±‚»≠
 		}
 	}
 }

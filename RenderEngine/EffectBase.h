@@ -240,19 +240,19 @@ public:
 
     // GPU 작업 완료 대기
     void WaitForGPUCompletion() {
-        for (auto& ps : m_particleSystems) {
-            if (ps) {
-                ps->WaitForGPUCompletion();
-            }
-        }
+        //for (auto& ps : m_particleSystems) {
+        //    if (ps) {
+        //        ps->WaitForGPUCompletion();
+        //    }
+        //}
 
         // 전체 GPU 파이프라인 플러시
-        if (DirectX11::DeviceStates->g_pDeviceContext) {
-            DirectX11::DeviceStates->g_pDeviceContext->Flush();
-
-            // 추가 동기화 (필요한 경우)
-            //std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+        //if (DirectX11::DeviceStates->g_pDeviceContext) {
+        //    DirectX11::DeviceStates->g_pDeviceContext->Flush();
+        //
+        //    // 추가 동기화 (필요한 경우)
+        //    //std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        //}
     }
 
     const Mathf::Vector3& GetRotation() const { return m_rotation; }

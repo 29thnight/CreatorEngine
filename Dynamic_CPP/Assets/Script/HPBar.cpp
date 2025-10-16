@@ -3,7 +3,7 @@
 #include "SceneManager.h"
 #include "Camera.h"
 #include "ImageComponent.h"
-#include "Player.h"
+#include "Entity.h"
 #include "pch.h"
 
 void HPBar::Start()
@@ -13,20 +13,24 @@ void HPBar::Start()
     {
         if (auto scene = SceneManagers->GetActiveScene())
         {
-            if (auto go = scene->GetGameObject(targetIndex))
+            if (auto go = scene->TryGetGameObject(targetIndex))
             {
                 m_target = go;
             }
         }
     }
 
-	auto childIndex = m_pOwner->m_childrenIndices[0];
-    auto childObj = GameObject::FindIndex(childIndex);
-    auto imageComp = childObj->GetComponent<ImageComponent>();
-    if (imageComp)
+    if (!m_pOwner->m_childrenIndices.empty())
     {
-        m_image = imageComp;
-        m_image->SetTexture(m_type);
+        auto childIndex = m_pOwner->m_childrenIndices.front();
+        if (auto childObj = GameObject::FindIndex(childIndex))
+        {
+            if (auto imageComp = childObj->GetComponent<ImageComponent>())
+            {
+                m_image = imageComp;
+                m_image->SetTexture(m_type);
+            }
+        }
     }
 }
 
@@ -39,20 +43,24 @@ void HPBar::LateUpdate(float)
         {
             if (auto scene = SceneManagers->GetActiveScene())
             {
-                if (auto go = scene->GetGameObject(targetIndex))
+                if (auto go = scene->TryGetGameObject(targetIndex))
                 {
                     m_target = go;
                 }
             }
         }
 
-        auto childIndex = m_pOwner->m_childrenIndices[0];
-        auto childObj = GameObject::FindIndex(childIndex);
-        auto imageComp = childObj->GetComponent<ImageComponent>();
-        if (imageComp)
+        if (!m_pOwner->m_childrenIndices.empty())
         {
-            m_image = imageComp;
-            m_image->SetTexture(m_type);
+            auto childIndex = m_pOwner->m_childrenIndices.front();
+            if (auto childObj = GameObject::FindIndex(childIndex))
+            {
+                if (auto imageComp = childObj->GetComponent<ImageComponent>())
+                {
+                    m_image = imageComp;
+                    m_image->SetTexture(m_type);
+                }
+            }
         }
         return;
     }

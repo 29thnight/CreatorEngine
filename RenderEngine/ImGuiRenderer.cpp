@@ -7,6 +7,7 @@
 #include "EngineSetting.h"
 #include "imgui_internal.h"
 #include "IconsFontAwesome6.h"
+#include "GlobalImGuiContext.h"
 #include "fa.h"
 
 static float g_LastAppliedScale = 0.8f;
@@ -71,8 +72,14 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 {
     //아래 렌더러	초기화 코드를 여기에 추가합니다.
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+	GlobalImGuiContext::GetInstance()->SetContext(ImGui::CreateContext());
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	ImGui::GetAllocatorFunctions(
+		&GlobalImGuiContext::GetInstance()->p_alloc_func, 
+		&GlobalImGuiContext::GetInstance()->p_free_func, 
+		&GlobalImGuiContext::GetInstance()->p_user_data
+	);
 
 	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 

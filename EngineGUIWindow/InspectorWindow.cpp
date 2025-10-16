@@ -5,7 +5,7 @@
 #include "Scene.h"
 #include "Object.h"
 #include "GameObject.h"
-#include "Model.h"
+#include "ICustomEditor.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
@@ -175,7 +175,15 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					}
 					else if (nullptr != moduleBehavior)
 					{
-						ImGuiDrawHelperModuleBehavior(moduleBehavior);
+						auto customInspector = std::dynamic_pointer_cast<ICustomEditor>(component);
+						if (customInspector)
+						{
+							customInspector->OnInspectorGUI();
+						}
+						else
+						{
+							ImGuiDrawHelperModuleBehavior(moduleBehavior);
+						}
 					}
 					else if (componentTypeID == type_guid(Animator))
 					{
@@ -257,7 +265,15 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					}
 					else if (type)
 					{
-						Meta::DrawObject(component.get(), *type);
+						auto customInspector = std::dynamic_pointer_cast<ICustomEditor>(component);
+						if (customInspector)
+						{
+							customInspector->OnInspectorGUI();
+						}
+						else
+						{
+							Meta::DrawObject(component.get(), *type);
+						}
 					}
 				}
 			}

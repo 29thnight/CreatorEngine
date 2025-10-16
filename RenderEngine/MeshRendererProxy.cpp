@@ -261,6 +261,7 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
 
 void PrimitiveRenderProxy::DestroyProxy()
 {
+	m_proxyType = PrimitiveProxyType::Expired;
     RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
 }
 

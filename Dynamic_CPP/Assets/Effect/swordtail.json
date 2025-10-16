@@ -7,7 +7,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "2",
+    "name": "swordtail",
     "particleSystems": [
         {
             "isRunning": false,
@@ -26,8 +26,8 @@
                         },
                         "endColor": {
                             "w": 0.0,
-                            "x": 1.0,
-                            "y": 1.0,
+                            "x": 0.0,
+                            "y": 0.20000000298023224,
                             "z": 1.0
                         },
                         "orientation": {
@@ -54,16 +54,16 @@
                         },
                         "startColor": {
                             "w": 1.0,
-                            "x": 1.0,
-                            "y": 1.0,
+                            "x": 0.0,
+                            "y": 0.5,
                             "z": 1.0
                         },
                         "trailParams": {
                             "endWidth": 0.10000000149011612,
                             "maxTrailPoints": 500,
-                            "minDistance": 0.0010000000474974513,
+                            "minDistance": 0.09849999845027924,
                             "startWidth": 1.0,
-                            "trailLifetime": 1.0299999713897705,
+                            "trailLifetime": 2.0199999809265137,
                             "useLengthBasedUV": true
                         }
                     },
@@ -99,7 +99,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "Dash",
+                            "pixelShader": "TrailPixel",
                             "vertexShader": "TrailVertex"
                         },
                         "textures": [
@@ -110,7 +110,7 @@
                             }
                         ],
                         "trailModule": {
-                            "connected": true
+                            "connected": false
                         }
                     },
                     "type": "TrailRenderModule"

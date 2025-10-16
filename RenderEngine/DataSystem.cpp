@@ -572,6 +572,33 @@ void DataSystem::InsertMaterial(std::shared_ptr<Material> material)
 {
 	std::unique_lock lock(m_materialMutex);
 	std::string& mat_name = material->m_name;
+	std::string baseName = mat_name;
+	std::string uniqueName = baseName;
+	auto m_fileGuid = material->m_fileGuid;
+	int suffix = 1;
+
+	while (true)
+	{
+		auto iter = DataSystems->Materials.find(uniqueName);
+		if (iter != DataSystems->Materials.end())
+		{
+			if (iter->second->m_fileGuid == m_fileGuid)
+			{
+				return;
+			}
+			else
+			{
+				// 이름 충돌 발생 → 이름 뒤에 (숫자) 붙이기
+				uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
+			}
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	mat_name = uniqueName;
 	Materials[mat_name] = material;
 }
 

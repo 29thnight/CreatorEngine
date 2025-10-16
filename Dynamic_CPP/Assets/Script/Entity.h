@@ -39,6 +39,7 @@ public:
 	void HitImpulseStart();
 	void HitImpulse();
 	virtual void HitImpulseUpdate(float tick);
+	void StopHitImpulse();
 
 	int m_currentHP{ 1 };
 	int m_maxHP{ 100 };
@@ -46,6 +47,7 @@ public:
 	float m_maxHitImpulseDuration{ 0.3f };
 	float m_currentHitImpulseDuration{ 0.f };
 	float m_maxHitImpulseSize{ 1.2f };
+	float m_hitImpulseFrequency{ 1.f };
 
 	float detectTime = 1.0f;
 	float detectElapsedTime = 0.f;

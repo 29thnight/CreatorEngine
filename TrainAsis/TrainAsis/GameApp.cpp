@@ -21,6 +21,7 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include "InputActionManager.h"
+#include "EngineBootstrap.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -28,79 +29,11 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
-	HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-	if (FAILED(hr))
-	{
-		return hr;
-	}
-
-	Meta::RegisterClassInitalize();
-	Meta::VectorFactoryRegistry::GetInstance();
-	Meta::VectorInvokerRegistry::GetInstance();
-	PathFinder::Initialize();
-	Log::Initialize();
-
-	EngineSettingInstance->Initialize();
-
-	//½ÃÀÛ
-	CoreWindow::RegisterCreateEventHandler([](HWND hWnd, WPARAM wParam, LPARAM lParam) -> LRESULT
-	{
-		return 0;
-	});
-
-	static DebugStreamBuf debugBuf(std::cout.rdbuf());
-	std::cout.rdbuf(&debugBuf);
-
-	{
-		GameBuilder::App app;
-		app.Initialize(hInstance, L"How To Train Asis", 1920, 1080);
-		app.Finalize();
-	}
-
-	CameraContainer::Destroy();
-	ComponentFactory::Destroy();
-	HotLoadSystem::Destroy();
-	SceneManager::Destroy();
-	PhysicsManager::Destroy();
-	PhysicX::Destroy();
-	EngineSetting::Destroy();
-	TagManager::Destroy();
-	EffectManager::Destroy();
-	EffectProxyController::Destroy();
-	InputManager::Destroy();
-	DataSystem::Destroy();
-	PrefabUtility::Destroy();
-	ShaderResourceSystem::Destroy();
-	Meta::RegisterClassFinalize();
-	Meta::VectorFactoryRegistry::Destroy();
-	Meta::VectorInvokerRegistry::Destroy();
-	DirectX11::DeviceResourceManager::Destroy();
-
-	Log::Finalize();
-
-	CoUninitialize();
-
-	return 0;
+	return EngineBootstrap::Run<GameBuilder::App>(hInstance, L"Kori: the Spritail", 1920, 1080);
 }
 
 void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
-	DirectX11::DeviceResourceManager::GetInstance();
-	ShaderResourceSystem::GetInstance();
-	EngineSetting::GetInstance();
-	TagManager::GetInstance();
-	InputManager::GetInstance();
-	PrefabUtility::GetInstance();
-	EffectManager::GetInstance();
-	EffectProxyController::GetInstance();
-	DataSystem::GetInstance();
-	PhysicX::GetInstance();
-	PhysicsManager::GetInstance();
-	SceneManager::GetInstance();
-	HotLoadSystem::GetInstance();
-	ComponentFactory::GetInstance();
-	CameraContainer::GetInstance();
-
 	CoreWindow coreWindow(hInstance, title, width, height);
 	CoreWindow::SetDumpType(DUMP_TYPE::DUNP_TYPE_MINI);
 	m_hWnd = coreWindow.GetHandle();

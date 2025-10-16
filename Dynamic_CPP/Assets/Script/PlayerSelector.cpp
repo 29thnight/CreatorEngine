@@ -1,4 +1,5 @@
 #include "PlayerSelector.h"
+#include <imgui.h>
 #include "pch.h"
 void PlayerSelector::Start()
 {
@@ -92,5 +93,15 @@ void PlayerSelector::Notify(const SelectorState& s)
     {
         o->OnSelectorChanged(s);
     }
+}
+
+void PlayerSelector::OnInspectorGUI()
+{
+    ImGui::Text("Player 0: %s (axis=%d)",
+        (m_slot[0] == SelectorSlot::Left) ? "Left" : (m_slot[0] == SelectorSlot::Right) ? "Right" : "Neutral",
+        m_axis[0]);
+    ImGui::Text("Player 1: %s (axis=%d)",
+        (m_slot[1] == SelectorSlot::Left) ? "Left" : (m_slot[1] == SelectorSlot::Right) ? "Right" : "Neutral",
+        m_axis[1]);
 }
 

@@ -65,6 +65,7 @@ public:
 	void AddRootGameObject(std::string_view name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
+	void CullMeshData();
 
     std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = -1);
 

@@ -648,6 +648,22 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
+		// EffectPass
+		{
+			PROFILE_CPU_BEGIN("EffectPass");
+			DirectX11::BeginEvent(L"EffectPass");
+			Benchmark banch;
+			float deltaTime = Time->GetElapsedSeconds();
+			m_EffectEditor->Update(deltaTime);
+			EffectManagers->Update(deltaTime);
+			EffectManagers->Execute(*m_renderScene, *camera);
+			m_EffectEditor->Render(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
+			DirectX11::DeviceStates->g_pDeviceContext->Flush();
+			DirectX11::EndEvent();
+			PROFILE_CPU_END();
+		}
+
 		//SSS
 		{
 			PROFILE_CPU_BEGIN("SubsurfaceScatteringPass");
@@ -744,21 +760,6 @@ void SceneRenderer::SceneRendering()
 			Benchmark banch;
 			m_pColorGradingPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ColorGradingPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-			PROFILE_CPU_END();
-		}
-
-		// EffectPass
-		{
-			PROFILE_CPU_BEGIN("EffectPass");
-			DirectX11::BeginEvent(L"EffectPass");
-			Benchmark banch;
-			float deltaTime = Time->GetElapsedSeconds();
-			m_EffectEditor->Update(deltaTime);
-			EffectManagers->Update(deltaTime);
-			EffectManagers->Execute(*m_renderScene, *camera);
-			m_EffectEditor->Render(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 			PROFILE_CPU_END();
 		}

@@ -12,8 +12,7 @@ void SelectTimer::Start()
 		gameManager = gameManagerObj->GetComponent<GameManager>();
 		if(gameManager)
 		{
-			gameManager->m_nextSceneName = "LoadingScene";
-			GameInstance::GetInstance()->SetBeyondSceneName("Fin_Ingame_017");
+			gameManager->SetLoadingReq();
 			gameManager->LoadNextScene();
 		}
 	}

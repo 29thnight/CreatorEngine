@@ -24,6 +24,7 @@ enum class ContentsBrowserStyle
 	Tree,
 };
 
+struct ImGuiContext;
 class EngineSetting : public DLLCore::Singleton<EngineSetting>
 {
 private:

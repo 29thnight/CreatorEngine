@@ -76,7 +76,7 @@ public:
 	size_t GetActiveEffectCount() const { return activeEffects.size(); }
 
 	// 읽기만 effects에 접근은 오로지 매니저에서만
-	const std::unordered_map<std::string, UniversalEffectTemplate> GetEffectTemplates() const { return templates; }
+	const std::unordered_map<std::string, UniversalEffectTemplate>& GetEffectTemplates() const { return templates; }
 
 	void RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson);
 
@@ -104,7 +104,7 @@ private:
 
 
 	// 풀 설정
-	static const int DEFAULT_POOL_SIZE = 100;  // 동시 이펙트 최대 개수
+	static const int DEFAULT_POOL_SIZE = 50;  // 동시 이펙트 최대 개수
 	static const int MAX_PARTICLES_PER_SYSTEM = 10000;  // 시스템당 최대 파티클 수
 
 	std::queue<std::unique_ptr<EffectBase>> cleanupQueue;

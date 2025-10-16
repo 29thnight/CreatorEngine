@@ -20,6 +20,7 @@ private:
 	std::wstring m_buildSlnPath{};
 	std::wstring m_MSBuildPath{};
 	std::wstring m_buildCommand{};
+	std::wstring m_scriptBuildCommand{};
 	bool m_isInitialized{ false };
 };
 #endif // !DYNAMICCPP_EXPORTS

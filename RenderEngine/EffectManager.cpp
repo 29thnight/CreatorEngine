@@ -4,6 +4,7 @@
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
 #include "EffectSerializer.h"
+#include "Profiler.h"
 
 void EffectManager::Initialize()
 {
@@ -50,8 +51,21 @@ void EffectManager::Initialize()
 void EffectManager::Execute(RenderScene& scene, Camera& camera)
 {
 	EffectProxyController::GetInstance()->ExecuteEffectCommands();
+
+	std::vector<EffectBase*> activeEffectList;
+	activeEffectList.reserve(activeEffects.size());
+
 	for (auto& [key, effect] : activeEffects) {
-		effect->Render(scene, camera);
+		if (effect->GetState() != EffectState::Stopped) {
+			activeEffectList.push_back(effect.get());
+		}
+	}
+
+	// 렌더링 전에 한 번만 공통 상태 설정
+	if (!activeEffectList.empty()) {
+		for (auto* effect : activeEffectList) {
+			effect->Render(scene, camera);
+		}
 	}
 }
 
@@ -78,9 +92,6 @@ void EffectManager::Update(float delta)
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
 
-			// GPU 작업 완료 대기 후 풀에 반환
-			effectToReturn->WaitForGPUCompletion();
-			ReturnToPool(std::move(effectToReturn));
 		}
 		else {
 			++it;
