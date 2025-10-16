@@ -45,6 +45,7 @@ public:
 	float m_maxHitImpulseDuration{ 0.3f };
 	float m_currentHitImpulseDuration{ 0.f };
 	float m_maxHitImpulseSize{ 1.2f };
+	float m_hitImpulseFrequency{ 1.f };
 
 	bool isKnockBack = false;
 	float KnockBackElapsedTime = 0.f;
