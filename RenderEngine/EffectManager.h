@@ -76,7 +76,7 @@ public:
 	size_t GetActiveEffectCount() const { return activeEffects.size(); }
 
 	// 읽기만 effects에 접근은 오로지 매니저에서만
-	const std::unordered_map<std::string, UniversalEffectTemplate> GetEffectTemplates() const { return templates; }
+	const std::unordered_map<std::string, UniversalEffectTemplate>& GetEffectTemplates() const { return templates; }
 
 	void RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson);
 
