@@ -1221,9 +1221,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Dash.ps.hlsl">
       <Filter>Shaders\Effect\Generate</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Glow.ps.hlsl">
-      <Filter>Shaders\Effect\Special\2D</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Spike.vs.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
@@ -1263,9 +1260,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\RandomSpriteM.ps.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GGlow.ps.hlsl">
-      <Filter>Shaders\Effect\Special\2D</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Board.vs.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
@@ -1295,6 +1289,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\VertexShaderImpulseScale.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GGlow.ps.hlsl">
+      <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

@@ -1081,6 +1081,7 @@ void SceneRenderer::PrepareRender()
 	
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
+	PROFILE_CPU_BEGIN("CopySceneData");
 	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
 	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
@@ -1088,162 +1089,200 @@ void SceneRenderer::PrepareRender()
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
 	std::vector<SpriteSheetComponent*> spriteComponents = UIManagers->SpriteSheets;
+	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
+	PROFILE_CPU_END();
 
-	m_threadPool->Enqueue([=, texts = std::move(textComponents)]
+	//매쉬 청크 단위로 쪼개서 멀티스레드 처리
+	const size_t N = allMeshes.size();
+	const size_t workers = std::max<size_t>(1, m_threadPool->GetThreadCount());
+	const size_t tasks = std::max<size_t>(1, std::min(workers, N));
+	const size_t chunk = (N + tasks - 1) / tasks;
+
+	PROFILE_CPU_BEGIN("UpdateCommand");
+	if (!textComponents.empty())
 	{
-		for (auto& text : texts)
+		m_threadPool->Enqueue([&, texts = std::move(textComponents)]
 		{
-			try
+			for (auto& text : texts)
 			{
 				auto owner = text->GetOwner();
 				if (nullptr == owner) continue;
 				auto scene = owner->GetScene();
 
-				if(scene && scene == m_currentScene)
+				if (scene && scene == m_currentScene)
 				{
-					renderScene->UpdateCommand(text);
+					try
+					{
+						renderScene->UpdateCommand(text);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating text command: " << e.what() << std::endl;
+					}
 				}
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating text command: " << e.what() << std::endl;
-			}
-		}
-	});
+		});
+	}
 
-	m_threadPool->Enqueue([=, images = std::move(imageComponents)]
+	if (!imageComponents.empty())
 	{
-		for (auto& image : images)
+		m_threadPool->Enqueue([&, images = std::move(imageComponents)]
 		{
-			try
+			for (auto& image : images)
 			{
 				auto owner = image->GetOwner();
 				if (nullptr == owner) continue;
 				auto scene = owner->GetScene();
-				if(scene && scene == m_currentScene)
+				if (scene && scene == m_currentScene)
 				{
-					renderScene->UpdateCommand(image);
+					try
+					{
+						renderScene->UpdateCommand(image);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating image command: " << e.what() << std::endl;
+					}
 				}
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating image command: " << e.what() << std::endl;
-			}
-		}
-	});
+		});
+	}
 
-	m_threadPool->Enqueue([=, sprites = std::move(spriteComponents)]
+	if (!spriteComponents.empty())
 	{
-		for (auto& sprite : sprites)
+		m_threadPool->Enqueue([&, sprites = std::move(spriteComponents)]
 		{
-			try
+			for (auto& sprite : sprites)
 			{
 				auto owner = sprite->GetOwner();
 				if (nullptr == owner) continue;
 				auto scene = owner->GetScene();
-				if(scene && scene == m_currentScene)
+				if (scene && scene == m_currentScene)
 				{
-					renderScene->UpdateCommand(sprite);
+					try
+					{
+						renderScene->UpdateCommand(sprite);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+					}
+				}
+
+			}
+		});
+	}
+
+	if (!terrainComponents.empty())
+	{
+		m_threadPool->Enqueue([&, terrainComponents]
+		{
+			for (auto& terrain : terrainComponents)
+			{
+				try
+				{
+					renderScene->UpdateCommand(terrain);
+				}
+				catch (const std::exception& e)
+				{
+					std::cerr << "Error updating terrain command: " << e.what() << std::endl;
 				}
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating sprite command: " << e.what() << std::endl;
-			}
-		}
-	});
+		});
+	}
 
-	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
-
-	m_threadPool->Enqueue([=]
+	if (N > 0)
 	{
-		for (auto& terrain : terrainComponents)
+		for (size_t t = 0; t < tasks; ++t)
 		{
-			try
-			{
-				renderScene->UpdateCommand(terrain);
-			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating terrain command: " << e.what() << std::endl;
-			}
-		}
-	});
+			const size_t begin = t * chunk;
+			const size_t end = std::min(N, begin + chunk);
 
-	m_threadPool->Enqueue([=, meshes = std::move(allMeshes)]
-	{
-		for (auto& mesh : meshes)
-		{
-			try
+			m_threadPool->Enqueue([&, begin, end, renderScene]
 			{
-				renderScene->UpdateCommand(mesh);
-			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating mesh command: " << e.what() << std::endl;
-			}
-		}
-	});
+				for (size_t i = begin; i < end; ++i)
+				{
+					auto* mesh = allMeshes[i];
+					if (!mesh) continue;
 
-	m_threadPool->Enqueue([=]
-	{
-		for (auto& foliage : foliageComponents)
-		{
-			try
-			{
-				renderScene->UpdateCommand(foliage);
-			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating foliage command: " << e.what() << std::endl;
-			}
-		}
-	});
+					try
+					{
+						renderScene->UpdateCommand(mesh);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating mesh command: " << e.what() << '\n';
+					}
+				}
+			});
+		};
+	}
 
-	m_threadPool->Enqueue([=]
+	if (!foliageComponents.empty())
 	{
-		for (auto& decal : decalComponents)
+		m_threadPool->Enqueue([&, foliageComponents]
 		{
-			try
+			for (auto& foliage : foliageComponents)
 			{
-				renderScene->UpdateCommand(decal);
+				try
+				{
+					renderScene->UpdateCommand(foliage);
+				}
+				catch (const std::exception& e)
+				{
+					std::cerr << "Error updating foliage command: " << e.what() << std::endl;
+				}
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating decal command: " << e.what() << std::endl;
-			}
-		}
-	});
+		});
+	}
 
-	m_threadPool->Enqueue([=]
+	if (!decalComponents.empty())
 	{
-		for (auto& sprite : spriteRenderers)
+		m_threadPool->Enqueue([&, decalComponents]
 		{
-			try
+			for (auto& decal : decalComponents)
+			{
+				try
+				{
+					renderScene->UpdateCommand(decal);
+				}
+				catch (const std::exception& e)
+				{
+					std::cerr << "Error updating decal command: " << e.what() << std::endl;
+				}
+			}
+		});
+	}
+
+	if (!spriteRenderers.empty())
+	{
+		m_threadPool->Enqueue([&, spriteRenderers]
+		{
+			for (auto& sprite : spriteRenderers)
 			{
 				auto owner = sprite->GetOwner();
 				if (nullptr == owner) continue;
 				auto scene = owner->GetScene();
-				if(scene && scene == m_currentScene)
+				if (scene && scene == m_currentScene)
 				{
-					renderScene->UpdateCommand(sprite);
+					try
+					{
+						renderScene->UpdateCommand(sprite);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+					}
 				}
+
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Error updating sprite command: " << e.what() << std::endl;
-			}
-		}
-	});
+		});
+	}
+
+	m_threadPool->NotifyAllAndWait();
+	PROFILE_CPU_END();
 
 	EffectProxyController::GetInstance()->PrepareCommandBehavior();
-	//for (auto& mesh : staticMeshes)
-	//{
-	//	if (false == mesh->IsEnabled() || 
-	//		false == mesh->IsNeedUpdateCulling()) continue;
-
-	//	CullingManagers->UpdateMesh(mesh);
-	//}
 
 	for (auto camera : CameraManagement->GetCameras())
 	{
@@ -1252,65 +1291,9 @@ void SceneRenderer::PrepareRender()
 		if (!RenderPassData::VaildCheck(camera.get())) return;
 		auto data = RenderPassData::GetData(camera.get());
 
-		//std::vector<MeshRenderer*> culledMeshes;
-		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
-
-		m_threadPool->Enqueue([=]
-		{
-			for (auto& terrainComponent : terrainComponents)
-			{
-				if (terrainComponent->IsEnabled())
-				{
-					auto proxy = renderScene->FindProxy(terrainComponent->GetInstanceID());
-					if(proxy)
-					{
-						data->PushRenderQueue(proxy);
-					}
-				}
-			}
-
-			for (auto& foliageComponent : foliageComponents)
-			{
-				if (foliageComponent->IsEnabled())
-				{
-					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
-					if (proxy)
-					{
-						data->PushRenderQueue(proxy);
-					}
-				}
-			}
-
-			for (auto& decalComponent : decalComponents) {
-				if (decalComponent->IsEnabled())
-				{
-					auto proxy = renderScene->FindProxy(decalComponent->GetInstanceID());
-					if (proxy)
-					{
-						data->PushRenderQueue(proxy);
-					}
-				}
-			}
-
-			for (auto& sprite : spriteRenderers)
-			{
-				if (sprite->IsEnabled())
-				{
-					auto proxy = renderScene->FindProxy(sprite->GetInstanceID());
-					if (proxy)
-					{
-						data->PushRenderQueue(proxy);
-					}
-				}
-			}
-
-			data->UpdateData(camera.get());
-
-			data->AddFrame();
-		});
+		data->UpdateData(camera.get());
+		data->AddFrame();
 	}
-
-	m_threadPool->NotifyAllAndWait();
 
 	SwapEvent();
 	ProxyCommandQueue->AddFrame();

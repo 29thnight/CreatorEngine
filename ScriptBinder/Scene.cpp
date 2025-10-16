@@ -19,6 +19,7 @@
 #include "TextComponent.h"
 #include "TagManager.h"
 #include "UIManager.h"
+#include "DecalComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include "AIManager.h"
@@ -405,6 +406,7 @@ void Scene::CullMeshData()
 	std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
 	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
 	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+	std::vector<SpriteRenderer*> spriteRenderers = m_spriteRenderers;
 	std::vector<SpriteSheetComponent*> spriteSheetComponents = UIManagers->SpriteSheets;
 	std::vector<DecalComponent*> decalComponents = m_decalComponents;
 
@@ -414,98 +416,138 @@ void Scene::CullMeshData()
 		auto data = RenderPassData::GetData(camera.get());
 
 		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& mesh : allMeshes)
 			{
-				for (auto& mesh : allMeshes)
-				{
-					if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-					data->PushShadowRenderData(mesh->GetInstanceID());
-				}
-			});
+				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+				data->PushShadowRenderData(mesh->GetInstanceID());
+			}
+		});
 
 		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& culledMesh : staticMeshes)
 			{
-				for (auto& culledMesh : staticMeshes)
-				{
-					if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
+				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
 
-					auto frustum = camera->GetFrustum();
-					if (frustum.Intersects(culledMesh->GetBoundingBox()))
-					{
-						data->PushCullData(culledMesh->GetInstanceID());
-					}
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(culledMesh->GetBoundingBox()))
+				{
+					data->PushCullData(culledMesh->GetInstanceID());
 				}
-			});
+			}
+		});
 
 		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& skinnedMesh : skinnedMeshes)
 			{
-				for (auto& skinnedMesh : skinnedMeshes)
-				{
-					if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
+				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
 
-					auto frustum = camera->GetFrustum();
-					if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
-					{
-						data->PushCullData(skinnedMesh->GetInstanceID());
-					}
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
+				{
+					data->PushCullData(skinnedMesh->GetInstanceID());
 				}
-			});
+			}
+		});
 
 		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& terrainComponent : terrainComponents)
 			{
-				for (auto& image : imageComponents)
-				{
-					if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
+				if (false == terrainComponent->IsEnabled() || false == terrainComponent->GetOwner()->IsEnabled()) continue;
 
-					auto owner = image->GetOwner();
-					if (nullptr == owner) continue;
-
-					auto scene = owner->GetScene();
-
-					// (G) UI 중복 렌더 가드:
-					//  - 같은 씬이면 렌더
-					//  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
-					if (scene && (scene == this ||
-						(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-					{
-						data->PushUIRenderData(image->GetInstanceID());
-					}
-				}
-			});
+				data->PushCullData(terrainComponent->GetInstanceID());
+			}
+		});
 
 		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& foliageComponent : foliageComponents)
 			{
-				for (auto& text : textComponents)
-				{
-					if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
+				if (false == foliageComponent->IsEnabled() || false == foliageComponent->GetOwner()->IsEnabled()) continue;
 
-					auto owner = text->GetOwner();
-					if (nullptr == owner) continue;
-
-					auto scene = owner->GetScene();
-
-					if (scene && (scene == this ||
-						(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-					{
-						data->PushUIRenderData(text->GetInstanceID());
-					}
-				}
-			});
+				data->PushCullData(foliageComponent->GetInstanceID());
+			}
+		});
 
 		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& decalComponent : decalComponents)
 			{
-				for (auto& spriteSheet : spriteSheetComponents)
+				if (false == decalComponent->IsEnabled() || false == decalComponent->GetOwner()->IsEnabled()) continue;
+
+				data->PushCullData(decalComponent->GetInstanceID());
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& sprite : spriteRenderers)
+			{
+				if (false == sprite->IsEnabled() || false == sprite->GetOwner()->IsEnabled()) continue;
+
+				data->PushCullData(sprite->GetInstanceID());
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& image : imageComponents)
+			{
+				if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
+
+				auto owner = image->GetOwner();
+				if (nullptr == owner) continue;
+
+				auto scene = owner->GetScene();
+
+				// (G) UI 중복 렌더 가드:
+				//  - 같은 씬이면 렌더
+				//  - DDOL이면 "활성 씬 소속"인 경우에만 렌더
+				if (scene && (scene == this ||
+					(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
 				{
-					if (false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
-					auto owner = spriteSheet->GetOwner();
-					if (nullptr == owner) continue;
-					auto scene = owner->GetScene();
-					if (scene && (scene == this ||
-						(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
-					{
-						data->PushUIRenderData(spriteSheet->GetInstanceID());
-					}
+					data->PushUIRenderData(image->GetInstanceID());
 				}
-			});
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& text : textComponents)
+			{
+				if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
+
+				auto owner = text->GetOwner();
+				if (nullptr == owner) continue;
+
+				auto scene = owner->GetScene();
+
+				if (scene && (scene == this ||
+					(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+				{
+					data->PushUIRenderData(text->GetInstanceID());
+				}
+			}
+		});
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& spriteSheet : spriteSheetComponents)
+			{
+				if (false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
+				auto owner = spriteSheet->GetOwner();
+				if (nullptr == owner) continue;
+				auto scene = owner->GetScene();
+				if (scene && (scene == this ||
+					(owner->IsDontDestroyOnLoad() && scene == SceneManagers->GetActiveScene())))
+				{
+					data->PushUIRenderData(spriteSheet->GetInstanceID());
+				}
+			}
+		});
 
 		SceneManagers->m_threadPool->NotifyAllAndWait();
 	}
