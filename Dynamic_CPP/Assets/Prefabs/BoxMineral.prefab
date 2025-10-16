@@ -1,22 +1,22 @@
-m_name: BoxMineral
+m_name: BoxMineral_Prefab
 m_isEnabled: true
-m_instanceID: 1434565725
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_instanceID: 2168077476
+m_fileGuid: dc8e7be2-af81-5180-8253-f45304b5995e
 PrefabNode:
   - GameObject: 2166264123
     m_name: BoxMineral
     m_isEnabled: true
-    m_instanceID: 2809525509
+    m_instanceID: 2079499853
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 7
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [8]
-    m_prefabFileGuid: 544a0479-3241-5b1d-93df-100277c9bed8
+    m_childrenIndices: [2]
+    m_prefabFileGuid: dc8e7be2-af81-5180-8253-f45304b5995e
     m_attachedSoketID: 0
     m_collisionType: 9
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 860712289
+        m_instanceID: 3431377232
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 338298121
+        m_instanceID: 852730525
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.300000012, y: 0.300000012, z: 0.300000012}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -52,27 +52,27 @@ PrefabNode:
         indicatorDistacne: 15
         itemCode: 2
         itemType: 2
-        itemReward: 0
+        itemReward: 70
         m_name: EntityItem
         m_isEnabled: true
-        m_instanceID: 4244342992
+        m_instanceID: 3109663743
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 2170a86b-cda4-5c0c-ab27-ebb53252ee19
     children:
       - GameObject: 2166264123
         m_name: Obj_B_Inter_stone
         m_isEnabled: true
-        m_instanceID: 3586034554
+        m_instanceID: 734923133
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 7
-        m_index: 8
-        m_parentIndex: 7
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 544a0479-3241-5b1d-93df-100277c9bed8
+        m_prefabFileGuid: dc8e7be2-af81-5180-8253-f45304b5995e
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -83,7 +83,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1219776454
+            m_instanceID: 2860465725
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Obj_B_Inter_stone
@@ -97,6 +97,7 @@ PrefabNode:
                 m_metallic: 1
                 m_roughness: 1
                 m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}

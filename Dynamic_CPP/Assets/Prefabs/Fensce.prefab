@@ -1,0 +1,115 @@
+m_name: Fensce
+m_isEnabled: true
+m_instanceID: 1409068124
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: Fensce
+    m_isEnabled: true
+    m_instanceID: 2197476368
+    m_transform:
+      position: {x: -18.5960827, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 138
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [139]
+    m_prefabFileGuid: 08d681e1-d2e3-52cc-b3f2-cb6862c1e006
+    m_attachedSoketID: 0
+    m_collisionType: 1
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_isEnabled: true
+        m_instanceID: 285311823
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_isEnabled: true
+        m_instanceID: 1376448568
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 2.4000001, y: 9.30000019, z: 0.400000006}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        m_name: EntityRock
+        m_isEnabled: true
+        m_instanceID: 913410547
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
+    children:
+      - GameObject: 2166264123
+        m_name: Fensce
+        m_isEnabled: true
+        m_instanceID: 1449351789
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 138
+        m_index: 139
+        m_parentIndex: 138
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 4138540025
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: Material.001
+              m_baseColorTexName: Fence_L_TT_checker_512x512_UV_GRID_001_BaseColor.png
+              m_normalTexName: Fence_L_TT_checker_512x512_UV_GRID_001_Normal.png
+              m_ORM_TexName: Fence_L_TT_checker_512x512_UV_GRID_001_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 1a41af7d-b7e1-5202-b674-2533b25d416a
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: SM_wooden_boards_03.003
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false

@@ -1,0 +1,197 @@
+m_name: ResourceF;ower
+m_isEnabled: true
+m_instanceID: 1562736393
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: ResourceF;ower
+    m_isEnabled: true
+    m_instanceID: 644380890
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 147
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [148]
+    m_prefabFileGuid: e7e739d6-b39f-5049-b1a8-5f9f9ef0d307
+    m_attachedSoketID: 0
+    m_collisionType: 8
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: EntityResource
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_isEnabled: true
+        m_instanceID: 3981503867
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 2
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: true
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_isEnabled: true
+        m_instanceID: 3897141321
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 1.20000005, y: 2.0999999, z: 0.699999988}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        itemCode: 2
+        itemType: 2
+        m_name: EntityResource
+        m_isEnabled: true
+        m_instanceID: 3516852042
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+    children:
+      - GameObject: 2166264123
+        m_name: item_flower_re
+        m_isEnabled: true
+        m_instanceID: 170591556
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 147
+        m_index: 148
+        m_parentIndex: 147
+        m_rootIndex: 0
+        m_childrenIndices: [149, 150]
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components: ~
+        children:
+          - GameObject: 2166264123
+            m_name: Cylinder.002-0
+            m_isEnabled: true
+            m_instanceID: 441198276
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 148
+            m_index: 149
+            m_parentIndex: 148
+            m_rootIndex: 0
+            m_childrenIndices: ~
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 0
+            m_isStatic: false
+            m_gameObjectType: 3
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - MeshRenderer: 659998325
+                m_name: MeshRenderer
+                m_isEnabled: true
+                m_instanceID: 2727127330
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_Material:
+                  m_name: item_flower_bush
+                  m_baseColorTexName: item_flower_bush.png
+                  m_normalTexName: ""
+                  m_ORM_TexName: ""
+                  m_AO_TexName: ""
+                  m_EmissiveTexName: ""
+                  m_materialInfo:
+                    m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                    m_metallic: 0
+                    m_roughness: 0.699999988
+                    m_bitflag: 0
+                  m_flowInfo:
+                    m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                    m_uvScroll: {x: 0, y: 0}
+                  m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                  m_renderingMode: 0
+                  m_shaderPSOName: ""
+                m_Mesh:
+                  m_name: Cylinder.002-0
+                  m_materialIndex: 0
+                  m_LODThresholds: ~
+                m_LightMapping:
+                  lightmapIndex: -1
+                  ligthmapResolution: 0
+                  lightmapScale: 1
+                  lightmapOffset: {x: 0, y: 0}
+                  lightmapTiling: {x: 0, y: 0}
+                m_isSkinnedMesh: false
+                m_shadowRecive: true
+                m_shadowCast: true
+                m_isEnableLOD: false
+          - GameObject: 2166264123
+            m_name: Cylinder.002-1
+            m_isEnabled: true
+            m_instanceID: 2242904648
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 148
+            m_index: 150
+            m_parentIndex: 148
+            m_rootIndex: 0
+            m_childrenIndices: ~
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_attachedSoketID: 0
+            m_collisionType: 0
+            m_isStatic: false
+            m_gameObjectType: 3
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - MeshRenderer: 659998325
+                m_name: MeshRenderer
+                m_isEnabled: true
+                m_instanceID: 1314298058
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_Material:
+                  m_name: item_flower
+                  m_baseColorTexName: item_flower_DefaultMaterial_BaseColor.png
+                  m_normalTexName: item_flower_DefaultMaterial_Normal.png
+                  m_ORM_TexName: item_flower_DefaultMaterial_OcclusionRoughnessMetallic.png
+                  m_AO_TexName: ""
+                  m_EmissiveTexName: ""
+                  m_materialInfo:
+                    m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                    m_metallic: 1
+                    m_roughness: 1
+                    m_bitflag: 0
+                  m_flowInfo:
+                    m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                    m_uvScroll: {x: 0, y: 0}
+                  m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                  m_renderingMode: 0
+                  m_shaderPSOName: ""
+                m_Mesh:
+                  m_name: Cylinder.002-1
+                  m_materialIndex: 1
+                  m_LODThresholds: ~
+                m_LightMapping:
+                  lightmapIndex: -1
+                  ligthmapResolution: 0
+                  lightmapScale: 1
+                  lightmapOffset: {x: 0, y: 0}
+                  lightmapTiling: {x: 0, y: 0}
+                m_isSkinnedMesh: false
+                m_shadowRecive: true
+                m_shadowCast: true
+                m_isEnableLOD: false

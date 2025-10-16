@@ -4,6 +4,13 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
+#include "BurrowMove.h"
+#include "BP0014.h"
+#include "BP0013.h"
+#include "BP0022.h"
+#include "BP0021.h"
+#include "BP0012.h"
+#include "BP0011.h"
 #include "BP0034.h"
 #include "BP0033.h"
 #include "BP0032.h"

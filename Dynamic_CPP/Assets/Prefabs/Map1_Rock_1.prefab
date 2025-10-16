@@ -1,0 +1,115 @@
+m_name: Map1_Rock_1
+m_isEnabled: true
+m_instanceID: 551484664
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: Map1_Rock_1
+    m_isEnabled: true
+    m_instanceID: 3205795417
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 207
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [208]
+    m_prefabFileGuid: 3f500e0e-6d31-54dc-a804-928f3eb8f2f6
+    m_attachedSoketID: 0
+    m_collisionType: 11
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Rock
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_isEnabled: true
+        m_instanceID: 2775813619
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_isEnabled: true
+        m_instanceID: 228692930
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 12.5, y: 11.6000004, z: 4}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        m_name: EntityRock
+        m_isEnabled: true
+        m_instanceID: 3501686893
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
+    children:
+      - GameObject: 2166264123
+        m_name: Map1_Rock_1 (3)
+        m_isEnabled: true
+        m_instanceID: 480509629
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 0.5, y: 0.5, z: 0.5, w: 0}
+          m_parentID: 207
+        m_index: 208
+        m_parentIndex: 207
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 3f500e0e-6d31-54dc-a804-928f3eb8f2f6
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 2004132099
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: map1_rock_01
+              m_baseColorTexName: Map_Rock_01_low_DefaultMaterial_BaseColor.png
+              m_normalTexName: Map_Rock_01_low_DefaultMaterial_Normal.png
+              m_ORM_TexName: Map_Rock_01_low_DefaultMaterial_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: b25aab81-cff0-57c3-a235-395bf73e04aa
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Rock01_low
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false

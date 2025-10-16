@@ -1,0 +1,115 @@
+m_name: De_bush_01
+m_isEnabled: true
+m_instanceID: 3567666076
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: De_bush_01
+    m_isEnabled: true
+    m_instanceID: 270423019
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 4
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [127]
+    m_prefabFileGuid: 08d681e1-d2e3-52cc-b3f2-cb6862c1e006
+    m_attachedSoketID: 0
+    m_collisionType: 1
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_isEnabled: true
+        m_instanceID: 3672375937
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_isEnabled: true
+        m_instanceID: 1947290931
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 2.20000005, y: 2.20000005, z: 2}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        m_name: EntityRock
+        m_isEnabled: true
+        m_instanceID: 1829612471
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
+    children:
+      - GameObject: 2166264123
+        m_name: De_bush_01
+        m_isEnabled: true
+        m_instanceID: 2501986740
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 4
+        m_index: 127
+        m_parentIndex: 4
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 2222075295
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: MI_plants_01_Inst
+              m_baseColorTexName: T_plants_BaseColor-safasfw.png
+              m_normalTexName: T_plants_Normal.png
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 0
+                m_roughness: 0.55278641
+                m_bitflag: 0
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 5bee493d-844e-5e5d-a2d0-3dda59935aef
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: SM_bush_02
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false

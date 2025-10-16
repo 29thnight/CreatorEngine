@@ -8,6 +8,7 @@
 #include "ControllerVibration.h"
 #include "ObjectPoolManager.h"
 #include "ReachEventTrigger.h"
+#include "BP001.h"
 #include "EntityMonsterBaseGate.h"
 #include "PlayEffectAll.h"
 #include "SwordHitEffect.h"

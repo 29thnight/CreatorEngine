@@ -1,6 +1,6 @@
 m_name: Canvas
 m_isEnabled: true
-m_instanceID: 2472568817
+m_instanceID: 1701113898
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -80,7 +80,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 3580196983
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -130,7 +130,7 @@ PrefabNode:
                 m_isEnabled: true
                 m_instanceID: 1294674600
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 0
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -179,7 +179,7 @@ PrefabNode:
                 m_isEnabled: true
                 m_instanceID: 573291086
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -193,7 +193,7 @@ PrefabNode:
               - ModuleBehavior: 1399118904
                 m_name: EventSelector
                 m_isEnabled: true
-                m_instanceID: 46305287
+                m_instanceID: 516827686
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 7dd2631c-8345-589e-98f4-0d3b3f1e8f32
       - GameObject: 2166264123
@@ -225,22 +225,22 @@ PrefabNode:
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
             m_anchoredPosition: {x: 940, y: 87}
-            m_sizeDelta: {x: 120, y: 74}
+            m_sizeDelta: {x: 198, y: 111}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 880, y: 50, width: 120, height: 74}
+            m_worldRect: {x: 841, y: 31.5, width: 198, height: 111}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_isEnabled: true
             m_instanceID: 243041742
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
             curindex: 0
             color: {r: 1, g: 1, b: 1, a: 1}
             rotate: 0
-            origin: {x: 60, y: 37}
+            origin: {x: 99, y: 55.5}
             unionScale: 1
             clipDirection: 0
             clipPercent: 1
@@ -275,26 +275,26 @@ PrefabNode:
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
                 m_anchoredPosition: {x: 0, y: 0}
-                m_sizeDelta: {x: 120, y: 49}
+                m_sizeDelta: {x: 198, y: 111}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 880, y: 62.5, width: 120, height: 49}
+                m_worldRect: {x: 841, y: 31.5, width: 198, height: 111}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
                 m_isEnabled: true
                 m_instanceID: 3663288938
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 0
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
                 curindex: 0
                 color: {r: 1, g: 1, b: 1, a: 1}
                 rotate: 0
-                origin: {x: 60, y: 24.5}
+                origin: {x: 99, y: 55.5}
                 unionScale: 1
                 clipDirection: 4
-                clipPercent: 0.600000024
-                texturePaths: [GamFill.png]
+                clipPercent: 1
+                texturePaths: [GamFill.png, GemFull.png]
           - GameObject: 2166264123
             m_name: SB_Aggro_36pt
             m_isEnabled: true
@@ -323,16 +323,16 @@ PrefabNode:
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 19, y: 9}
-                m_sizeDelta: {x: 100, y: 100}
+                m_anchoredPosition: {x: 39, y: 5}
+                m_sizeDelta: {x: 250, y: 250}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 909, y: 46, width: 100, height: 100}
+                m_worldRect: {x: 854, y: -33, width: 250, height: 250}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_isEnabled: true
                 m_instanceID: 3510988354
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 3
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -340,13 +340,13 @@ PrefabNode:
                 message: 00
                 relpos: {x: 0, y: 0}
                 color: {r: 1, g: 1, b: 1, a: 1}
-                fontSize: 0.600000024
+                fontSize: 0.800000012
                 useManualRect: false
                 manualRect: {x: 0, y: 0, width: 0, height: 0}
               - ModuleBehavior: 1399118904
                 m_name: RewardObserver
                 m_isEnabled: true
-                m_instanceID: 1342898121
+                m_instanceID: 9300745
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 7cd0138d-2c25-5c2f-b614-9f52bfb81b93
       - GameObject: 2166264123
@@ -435,7 +435,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 3804474791
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -451,7 +451,7 @@ PrefabNode:
             m_playerIndex: 0
             m_name: WeaponSlotController
             m_isEnabled: true
-            m_instanceID: 2772365040
+            m_instanceID: 3734997171
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 95f39a7d-dfda-55cc-b847-770fe20c1e1d
       - GameObject: 2166264123
@@ -491,7 +491,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 3676306260
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -507,7 +507,7 @@ PrefabNode:
             m_playerIndex: 1
             m_name: WeaponSlotController
             m_isEnabled: true
-            m_instanceID: 1683535865
+            m_instanceID: 1998724220
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 95f39a7d-dfda-55cc-b847-770fe20c1e1d
       - GameObject: 2166264123
@@ -547,7 +547,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 4048256586
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -562,7 +562,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 3502897372
+            m_instanceID: 2001819374
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -603,7 +603,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 3220660075
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -653,7 +653,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2095950038
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -703,7 +703,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 100187394
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -717,7 +717,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 2325593836
+                        m_instanceID: 647075845
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -757,7 +757,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 4235234203
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -779,7 +779,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 150869697
+                m_instanceID: 646882155
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -820,7 +820,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 1466628627
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -870,7 +870,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1410626718
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -884,7 +884,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 4076197729
+                        m_instanceID: 3172860723
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -924,7 +924,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 785396932
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -946,7 +946,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 3202754436
+                m_instanceID: 1192520936
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -987,7 +987,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2943670678
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -1037,7 +1037,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1938675
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -1051,7 +1051,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3928015278
+                        m_instanceID: 2431042175
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -1091,7 +1091,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 3298858174
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -1113,7 +1113,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 2209486085
+                m_instanceID: 2826899015
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -1154,7 +1154,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2129135136
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -1204,7 +1204,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 3313682831
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -1218,7 +1218,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3925940723
+                        m_instanceID: 2245560560
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -1258,7 +1258,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 672183178
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -1273,7 +1273,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 374904427
+            m_instanceID: 3447835866
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -1314,7 +1314,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2632049203
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -1364,7 +1364,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 903749269
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -1414,7 +1414,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1126620576
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -1428,7 +1428,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 4188304836
+                        m_instanceID: 3456073554
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -1468,7 +1468,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 4197368383
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -1490,7 +1490,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 735236702
+                m_instanceID: 3599374169
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -1531,7 +1531,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 3350353308
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -1581,7 +1581,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 4224616202
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -1595,7 +1595,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 2432441768
+                        m_instanceID: 2176073512
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -1635,7 +1635,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 1024791930
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -1657,7 +1657,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 10392489
+                m_instanceID: 960916263
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -1698,7 +1698,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 4113289549
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -1748,7 +1748,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 3800621086
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -1762,7 +1762,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 1154789974
+                        m_instanceID: 3035341412
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -1802,7 +1802,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 1662413494
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -1824,7 +1824,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 201437730
+                m_instanceID: 2846214158
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -1865,7 +1865,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2636672551
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -1915,7 +1915,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 2217228379
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -1929,7 +1929,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 1071966317
+                        m_instanceID: 2434434815
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -1969,7 +1969,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 378001799
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -1984,7 +1984,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 1273710470
+            m_instanceID: 1595081119
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -2025,7 +2025,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2407709541
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -2075,7 +2075,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 4176872443
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -2125,7 +2125,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1206613704
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -2139,7 +2139,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 4165542545
+                        m_instanceID: 4169737618
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -2179,7 +2179,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 659690686
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -2201,7 +2201,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 475992908
+                m_instanceID: 656600548
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -2242,7 +2242,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 4147040562
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -2292,7 +2292,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 3636352695
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -2306,7 +2306,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 321865775
+                        m_instanceID: 2730054926
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -2346,7 +2346,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 4064366408
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -2368,7 +2368,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 2114455317
+                m_instanceID: 1585435666
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -2409,7 +2409,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 3062676780
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -2459,7 +2459,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 3154982059
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -2473,7 +2473,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 715276453
+                        m_instanceID: 739087760
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -2513,7 +2513,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 3101649943
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -2563,7 +2563,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 4006542262
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -2613,7 +2613,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 2772087567
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -2627,7 +2627,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 1870039788
+                        m_instanceID: 2513135417
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -2667,7 +2667,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 2306492956
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -2682,7 +2682,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 3013864628
+            m_instanceID: 2088538887
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -2723,7 +2723,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2698839847
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -2773,7 +2773,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 485020931
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -2823,7 +2823,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 2885082328
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -2871,7 +2871,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 3121067838
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -2893,7 +2893,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 3870616568
+                m_instanceID: 1366743115
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -2934,7 +2934,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 4096803447
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -2984,7 +2984,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 302444510
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -2998,7 +2998,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 343862659
+                        m_instanceID: 3635149107
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -3038,7 +3038,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 111240178
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -3060,7 +3060,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 1742849173
+                m_instanceID: 3749845805
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -3101,7 +3101,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 736117990
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -3151,7 +3151,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1386053221
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -3165,7 +3165,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 107410896
+                        m_instanceID: 372923062
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -3205,7 +3205,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2512161763
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -3227,7 +3227,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 2153477732
+                m_instanceID: 1376703861
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -3268,7 +3268,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2364511194
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -3318,7 +3318,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 3558961294
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -3332,7 +3332,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 2675890607
+                        m_instanceID: 267131630
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -3364,9 +3364,9 @@ PrefabNode:
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
             m_anchoredPosition: {x: 0, y: -13}
-            m_sizeDelta: {x: 185, y: 17}
+            m_sizeDelta: {x: 184, y: 24}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: -92.5, y: -21.5, width: 185, height: 17}
+            m_worldRect: {x: -92, y: -25, width: 184, height: 24}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_isEnabled: true
@@ -3379,7 +3379,7 @@ PrefabNode:
             curindex: 0
             color: {r: 1, g: 1, b: 1, a: 1}
             rotate: 0
-            origin: {x: 92.5, y: 8.5}
+            origin: {x: 92, y: 12}
             unionScale: 1
             clipDirection: 0
             clipPercent: 1
@@ -3389,7 +3389,7 @@ PrefabNode:
             screenOffset: {x: 0, y: -150}
             m_name: HPBar
             m_isEnabled: true
-            m_instanceID: 460872878
+            m_instanceID: 3115777797
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7689d2c5-c56a-5ed5-a571-6f14df67e148
         children:
@@ -3422,9 +3422,9 @@ PrefabNode:
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
                 m_anchoredPosition: {x: 0, y: 0}
-                m_sizeDelta: {x: 185, y: 17}
+                m_sizeDelta: {x: 184, y: 24}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: -92.5, y: -21.5, width: 185, height: 17}
+                m_worldRect: {x: -92, y: -25, width: 184, height: 24}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
                 m_isEnabled: true
@@ -3437,11 +3437,11 @@ PrefabNode:
                 curindex: 0
                 color: {r: 1, g: 1, b: 1, a: 1}
                 rotate: 0
-                origin: {x: 92.5, y: 8.5}
+                origin: {x: 92, y: 12}
                 unionScale: 1
                 clipDirection: 1
                 clipPercent: 1
-                texturePaths: [UI_HPBarCur.png]
+                texturePaths: [UI_HPBarCur.png, UI_HPBarCur2.png]
       - GameObject: 2166264123
         m_name: P2_WeaponSlot(0)
         m_isEnabled: true
@@ -3479,7 +3479,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 486430628
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -3494,7 +3494,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 4152363601
+            m_instanceID: 3646821748
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -3535,7 +3535,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 188261825
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -3585,7 +3585,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 1120442877
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -3635,7 +3635,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 3981912102
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -3649,7 +3649,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 188364776
+                        m_instanceID: 1336007465
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -3689,7 +3689,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2763743271
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -3711,7 +3711,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 1018105949
+                m_instanceID: 885075067
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -3752,7 +3752,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 3468411796
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -3802,7 +3802,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 2400781520
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -3816,7 +3816,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3595167532
+                        m_instanceID: 2749954143
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -3856,7 +3856,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2163045658
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -3878,7 +3878,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 3514291729
+                m_instanceID: 3814124184
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -3919,7 +3919,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 1486973125
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -3969,7 +3969,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 694015479
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -3983,7 +3983,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3769300974
+                        m_instanceID: 3105594118
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -4023,7 +4023,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 4110163441
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -4045,7 +4045,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 234536403
+                m_instanceID: 3198327877
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -4086,7 +4086,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 1566912161
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -4136,7 +4136,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 4078999993
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -4150,7 +4150,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 2027786243
+                        m_instanceID: 2532825402
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -4190,7 +4190,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 999034546
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -4205,7 +4205,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 2904666528
+            m_instanceID: 3557976481
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -4246,7 +4246,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 230006958
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -4296,7 +4296,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 1673943568
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -4346,7 +4346,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 227387968
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -4360,7 +4360,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 4100886281
+                        m_instanceID: 1868065462
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -4400,7 +4400,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2219016554
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -4422,7 +4422,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 713013759
+                m_instanceID: 1196501546
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -4463,7 +4463,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 812902734
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -4513,7 +4513,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 749770036
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -4527,7 +4527,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 1086864619
+                        m_instanceID: 844671285
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -4567,7 +4567,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 4244193308
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -4589,7 +4589,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 40559660
+                m_instanceID: 4015564297
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -4630,7 +4630,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 3090562897
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -4680,7 +4680,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1395718275
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -4694,7 +4694,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3395651071
+                        m_instanceID: 896252650
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -4734,7 +4734,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2548566881
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -4756,7 +4756,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 2451599910
+                m_instanceID: 688976357
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -4797,7 +4797,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 332243529
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -4847,7 +4847,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 1764434380
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -4861,7 +4861,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 105938406
+                        m_instanceID: 2814484986
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -4901,7 +4901,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 473772494
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -4916,7 +4916,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 2938438118
+            m_instanceID: 3464471398
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -4957,7 +4957,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2534069413
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -5007,7 +5007,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 3408977540
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -5057,7 +5057,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 4182402992
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -5071,7 +5071,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 623630236
+                        m_instanceID: 505898367
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -5111,7 +5111,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2311234799
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -5133,7 +5133,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 288492503
+                m_instanceID: 2390493901
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -5174,7 +5174,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2040449257
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -5224,7 +5224,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 462091146
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -5238,7 +5238,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3225241322
+                        m_instanceID: 1631694459
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -5278,7 +5278,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2680068429
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -5300,7 +5300,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 1009455740
+                m_instanceID: 1704354104
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -5341,7 +5341,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 123213274
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -5391,7 +5391,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 4213450231
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -5405,7 +5405,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 703971212
+                        m_instanceID: 1070508809
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -5445,7 +5445,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 3264377205
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -5467,7 +5467,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 2095899910
+                m_instanceID: 283582690
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -5508,7 +5508,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 998190573
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -5558,7 +5558,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 888160504
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -5606,7 +5606,7 @@ PrefabNode:
             m_isEnabled: true
             m_instanceID: 3742636324
             m_FileID: 00000000-0000-0000-0000-000000000000
-            _layerorder: 0
+            _layerorder: 1
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
@@ -5621,7 +5621,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
             m_isEnabled: true
-            m_instanceID: 4256837911
+            m_instanceID: 3452559745
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
         children:
@@ -5662,7 +5662,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2449932874
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: ""
@@ -5712,7 +5712,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2289916304
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -5762,7 +5762,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 298854950
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -5776,7 +5776,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3794066673
+                        m_instanceID: 1998303408
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -5816,7 +5816,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 2406991676
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -5838,7 +5838,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 2997459967
+                m_instanceID: 836192037
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -5879,7 +5879,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 3955462163
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -5929,7 +5929,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 118438209
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -5943,7 +5943,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 871459420
+                        m_instanceID: 3098118568
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -5983,7 +5983,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 807821289
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -6005,7 +6005,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 3036211431
+                m_instanceID: 2553553436
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -6046,7 +6046,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 2160424490
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -6096,7 +6096,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 2372605004
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -6110,7 +6110,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 3910741315
+                        m_instanceID: 436151354
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
           - GameObject: 2166264123
@@ -6150,7 +6150,7 @@ PrefabNode:
                 m_isEnabled: false
                 m_instanceID: 131176091
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 m_ownerCanvasName: Canvas
                 navigations: ~
                 m_customPixelShaderPath: CustomUIShader
@@ -6172,7 +6172,7 @@ PrefabNode:
                 tint: "[not suport type]"
                 m_name: UIGageTest
                 m_isEnabled: true
-                m_instanceID: 1398782199
+                m_instanceID: 3271018979
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
             children:
@@ -6213,7 +6213,7 @@ PrefabNode:
                     m_isEnabled: false
                     m_instanceID: 1954714553
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     m_ownerCanvasName: Canvas
                     navigations: ~
                     m_customPixelShaderPath: ""
@@ -6263,7 +6263,7 @@ PrefabNode:
                         m_isEnabled: false
                         m_instanceID: 2324124644
                         m_FileID: 00000000-0000-0000-0000-000000000000
-                        _layerorder: 3
+                        _layerorder: 4
                         m_ownerCanvasName: Canvas
                         navigations: ~
                         m_customPixelShaderPath: ""
@@ -6277,7 +6277,7 @@ PrefabNode:
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
                         m_isEnabled: true
-                        m_instanceID: 4288250216
+                        m_instanceID: 272671598
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
       - GameObject: 2166264123
@@ -6309,9 +6309,9 @@ PrefabNode:
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
             m_anchoredPosition: {x: 1920, y: -13}
-            m_sizeDelta: {x: 185, y: 17}
+            m_sizeDelta: {x: 184, y: 24}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 1827.5, y: -21.5, width: 185, height: 17}
+            m_worldRect: {x: 1828, y: -25, width: 184, height: 24}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_isEnabled: true
@@ -6324,7 +6324,7 @@ PrefabNode:
             curindex: 0
             color: {r: 1, g: 1, b: 1, a: 1}
             rotate: 0
-            origin: {x: 92.5, y: 8.5}
+            origin: {x: 92, y: 12}
             unionScale: 1
             clipDirection: 0
             clipPercent: 1
@@ -6334,7 +6334,7 @@ PrefabNode:
             screenOffset: {x: 0, y: -150}
             m_name: HPBar
             m_isEnabled: true
-            m_instanceID: 2052833157
+            m_instanceID: 2692191303
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7689d2c5-c56a-5ed5-a571-6f14df67e148
         children:
@@ -6367,9 +6367,9 @@ PrefabNode:
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
                 m_anchoredPosition: {x: 0, y: 0}
-                m_sizeDelta: {x: 185, y: 17}
+                m_sizeDelta: {x: 184, y: 24}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 1827.5, y: -21.5, width: 185, height: 17}
+                m_worldRect: {x: 1828, y: -25, width: 184, height: 24}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
                 m_isEnabled: true
@@ -6382,8 +6382,8 @@ PrefabNode:
                 curindex: 0
                 color: {r: 1, g: 1, b: 1, a: 1}
                 rotate: 0
-                origin: {x: 92.5, y: 8.5}
+                origin: {x: 92, y: 12}
                 unionScale: 1
                 clipDirection: 1
                 clipPercent: 1
-                texturePaths: [UI_HPBarCur.png]
+                texturePaths: [UI_HPBarCur.png, UI_HPBarCur2.png]
