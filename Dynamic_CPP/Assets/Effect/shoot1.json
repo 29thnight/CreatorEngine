@@ -762,7 +762,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "Spincircle",
+                            "pixelShader": "SpinCircle",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
