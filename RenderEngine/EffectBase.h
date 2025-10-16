@@ -27,6 +27,8 @@ protected:
     bool m_loop = true;
     float m_duration = -1.0f;  // -1이면 무한
     float m_currentTime = 0.0f;
+    float dieDelay = 3.0f;
+    float m_finishedTime = 0.0f;
 
     struct EmitterTiming {
         float startDelay = 0.0f;        // 이 emitter가 시작되는 시간
@@ -75,7 +77,7 @@ public:
         }
 
         // duration이 끝나면 Finished 상태로 변경 (Stop 대신)
-        if (!isInfinite && m_duration > 0 && m_currentTime >= (m_duration * m_timeScale)) {
+        if (!isInfinite && m_duration > 0 && m_currentTime >= m_duration) {
             if (m_state == EffectState::Playing) {
                 m_state = EffectState::Finished;
 
@@ -83,6 +85,22 @@ public:
                 for (auto& ps : m_particleSystems) {
                     if (ps) {
                         ps->StopSpawning();
+                    }
+                }
+            }
+        }
+
+        if (m_state == EffectState::Finished) {
+            m_finishedTime += delta;
+
+            // 3초 후 또는 모든 파티클이 사라지면 Stopped로 전환
+            if (m_finishedTime >= dieDelay) {
+                m_state = EffectState::Stopped;
+                m_finishedTime = 0.0f;
+                for (auto& ps : m_particleSystems) {
+                    if (ps) {
+                        ps->Stop();
+                        ps->ResumeSpawning();
                     }
                 }
             }

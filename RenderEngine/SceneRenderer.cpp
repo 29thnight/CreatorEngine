@@ -512,6 +512,10 @@ void SceneRenderer::SceneRendering()
 		}
 	}
 
+	float deltaTime = Time->GetElapsedSeconds();
+	m_EffectEditor->Update(deltaTime);
+	EffectManagers->Update(deltaTime);
+
 	for (auto& camera : CameraManagement->GetCameras())
 	{
 		if (!RenderPassData::VaildCheck(camera.get())) continue;
@@ -653,9 +657,6 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_BEGIN("EffectPass");
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
-			float deltaTime = Time->GetElapsedSeconds();
-			m_EffectEditor->Update(deltaTime);
-			EffectManagers->Update(deltaTime);
 			EffectManagers->Execute(*m_renderScene, *camera);
 			m_EffectEditor->Render(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());

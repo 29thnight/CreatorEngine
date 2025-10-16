@@ -72,15 +72,6 @@ void EffectComponent::Update(float tick)
         m_pendingPlay = false;
     }
 
-    if (m_isPlaying)
-    {
-        m_currentTime += tick;
-    }
-    if (m_duration > 0 && m_currentTime > m_duration && m_isPlaying)
-    {
-        StopEffect();
-    }
-
     if (!proxy->GetInstanceName().empty() && m_effectInstanceName != proxy->GetInstanceName())
     {
         m_effectInstanceName = proxy->GetInstanceName();
@@ -104,6 +95,15 @@ void EffectComponent::Update(float tick)
         proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->UpdateScale(worldScale);
         proxy->PushCommand(EffectCommandType::SetScale);
+    }
+
+    if (m_isPlaying) {
+        m_currentTime += Time->GetElapsedSeconds() * m_timeScale;
+
+        // Component 레벨에서 duration 체크
+        if (m_duration > 0 && m_currentTime > m_duration) {
+            m_isPlaying = false;
+        }
     }
 }
 
