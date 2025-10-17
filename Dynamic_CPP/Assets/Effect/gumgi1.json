@@ -1,13 +1,16 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
     "name": "gumgi1",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -30,11 +33,16 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.06440294533967972,
-                                "y": 0.03758964315056801,
-                                "z": 0.3173598647117615
+                                "x": 0.24313725531101227,
+                                "y": 0.4156862795352936,
+                                "z": 0.529411792755127
                             },
-                            "lifeTime": 1.0,
+                            "initialRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "lifeTime": 0.5,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -90,7 +98,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 146.50271606445313,
+                            "currentTime": 4.335960865020752,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -161,7 +169,7 @@
                         "renderStates": {
                             "blendPreset": 1,
                             "depthPreset": 2,
-                            "rasterizerPreset": 1
+                            "rasterizerPreset": 2
                         },
                         "shaders": {
                             "pixelShader": "gg",
