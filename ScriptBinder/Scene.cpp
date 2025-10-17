@@ -570,8 +570,29 @@ std::vector<std::shared_ptr<GameObject>> Scene::CreateGameObjects(size_t createS
 
 void Scene::Reset()
 {
-    ScriptManager->SetReload(true);
-    ScriptManager->ReplaceScriptComponent();
+	if(ScriptManager->IsDerty())
+	{
+		ScriptManager->SetReload(true);
+		ScriptManager->ReplaceScriptComponent();
+		ScriptManager->DertyFlagClear();
+	}
+	else
+	{
+		for (const auto& obj : m_SceneObjects)
+		{
+			if (!obj) continue;
+
+			auto scripts = obj->GetComponents<ModuleBehavior>();
+			for (auto& script : scripts)
+			{
+				auto name = script->m_name;
+				if (script && SceneManagers->m_isGameStart)
+				{
+					ScriptManager->BindScriptEvents(script, name.ToString());
+				}
+			}
+		}
+	}
 }
 
 void Scene::Awake()

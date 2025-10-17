@@ -9,26 +9,32 @@
 void HPBar::Start()
 {
     m_rect = m_pOwner->GetComponent<RectTransformComponent>();
-    if (GameObject::IsValidIndex(targetIndex))
+    if (m_target.expired())
     {
-        if (auto scene = SceneManagers->GetActiveScene())
+        if (nullptr != m_rect || nullptr != m_image)
         {
-            if (auto go = scene->TryGetGameObject(targetIndex))
+            if (GameObject::IsValidIndex(targetIndex))
             {
-                m_target = go;
+                if (auto scene = SceneManagers->GetActiveScene())
+                {
+                    if (auto go = scene->TryGetGameObject(targetIndex))
+                    {
+                        m_target = go;
+                    }
+                }
             }
-        }
-    }
 
-    if (!m_pOwner->m_childrenIndices.empty())
-    {
-        auto childIndex = m_pOwner->m_childrenIndices.front();
-        if (auto childObj = GameObject::FindIndex(childIndex))
-        {
-            if (auto imageComp = childObj->GetComponent<ImageComponent>())
+            if (!m_pOwner->m_childrenIndices.empty())
             {
-                m_image = imageComp;
-                m_image->SetTexture(m_type);
+                auto childIndex = m_pOwner->m_childrenIndices.front();
+                if (auto childObj = GameObject::FindIndex(childIndex))
+                {
+                    if (auto imageComp = childObj->GetComponent<ImageComponent>())
+                    {
+                        m_image = imageComp;
+                        m_image->SetTexture(m_type);
+                    }
+                }
             }
         }
     }
@@ -38,30 +44,7 @@ void HPBar::LateUpdate(float)
 {
     if (m_target.expired() || nullptr == m_rect || nullptr == m_image)
     {
-        m_rect = m_pOwner->GetComponent<RectTransformComponent>();
-        if (GameObject::IsValidIndex(targetIndex))
-        {
-            if (auto scene = SceneManagers->GetActiveScene())
-            {
-                if (auto go = scene->TryGetGameObject(targetIndex))
-                {
-                    m_target = go;
-                }
-            }
-        }
-
-        if (!m_pOwner->m_childrenIndices.empty())
-        {
-            auto childIndex = m_pOwner->m_childrenIndices.front();
-            if (auto childObj = GameObject::FindIndex(childIndex))
-            {
-                if (auto imageComp = childObj->GetComponent<ImageComponent>())
-                {
-                    m_image = imageComp;
-                    m_image->SetTexture(m_type);
-                }
-            }
-        }
+		GetOwner()->Destroy();
         return;
     }
 

@@ -24,6 +24,8 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void SetTarget(std::shared_ptr<GameObject> target) { m_target = target; }
+
 	[[Property]]
 	GameObject::Index targetIndex = GameObject::INVALID_INDEX;
 

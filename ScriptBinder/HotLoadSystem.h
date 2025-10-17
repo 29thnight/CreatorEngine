@@ -79,6 +79,9 @@ public:
 	// 에니메이션 FSM 스크립트 생성
 	void CreateAniBehaviorScript(std::string_view name);
 
+	bool IsDerty() const { return m_isCompileDertyFlag; }
+	void DertyFlagClear() { m_isCompileDertyFlag = false; }
+
 #pragma region Script Build Helper
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
@@ -284,6 +287,7 @@ private:
 	std::mutex								m_scriptFileMutex{};
 	std::atomic_bool						m_isReloading{ false };
 	std::atomic_bool						m_isCompileEventInvoked{ false };
+	std::atomic_bool                        m_isCompileDertyFlag{ false };
 	file::file_time_type					m_lastWriteFileTime{};
 };
 

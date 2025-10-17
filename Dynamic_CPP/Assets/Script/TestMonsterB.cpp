@@ -28,6 +28,7 @@ void TestMonsterB::Start()
 		hp->SetMaxHP(m_maxHP);
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
+		hp->SetTarget(GetOwner()->shared_from_this());
 	}
 
 	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");

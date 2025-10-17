@@ -87,125 +87,190 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     //pass 생성
     //shadowMapPass 는 RenderScene의 맴버
     //gBufferPass
-    m_pGBufferPass = std::make_unique<GBufferPass>();
-	ID3D11RenderTargetView* views[]{
-		m_diffuseTexture->GetRTV(),
-		m_metalRoughTexture->GetRTV(),
-		m_normalTexture->GetRTV(),
-		m_emissiveTexture->GetRTV(),
-		m_bitmaskTexture->GetRTV()
-	};
-	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
-	m_pGBufferPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
+	m_threadPool->Enqueue([this]()
+	{
+		m_pGBufferPass = std::make_unique<GBufferPass>();
+		ID3D11RenderTargetView* views[]{
+			m_diffuseTexture->GetRTV(),
+			m_metalRoughTexture->GetRTV(),
+			m_normalTexture->GetRTV(),
+			m_emissiveTexture->GetRTV(),
+			m_bitmaskTexture->GetRTV()
+		};
+		m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
+		m_pGBufferPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
+	});
 
     //ssaoPass
-    m_pSSAOPass = std::make_unique<SSAOPass>();
-    m_pSSAOPass->Initialize(
-        ao,
-        m_deviceResources->GetDepthStencilViewSRV(),
-        m_normalTexture,
-		m_diffuseTexture
-    );
-    m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
+	m_threadPool->Enqueue([this, ao]()
+	{
+		m_pSSAOPass = std::make_unique<SSAOPass>();
+		m_pSSAOPass->Initialize(
+			ao,
+			m_deviceResources->GetDepthStencilViewSRV(),
+			m_normalTexture,
+			m_diffuseTexture
+		);
+		m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
+	});
 
     //deferredPass
-    m_pDeferredPass = std::make_unique<DeferredPass>();
-    m_pDeferredPass->Initialize(
-        m_diffuseTexture,
-        m_metalRoughTexture,
-        m_normalTexture,
-        m_emissiveTexture,
-		m_bitmaskTexture
-    );
-    m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pDeferredPass = std::make_unique<DeferredPass>();
+		m_pDeferredPass->Initialize(
+			m_diffuseTexture,
+			m_metalRoughTexture,
+			m_normalTexture,
+			m_emissiveTexture,
+			m_bitmaskTexture
+		);
+		m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
+	});
 
 	//forwardPass
-	m_pForwardPass = std::make_unique<ForwardPass>();
-	m_pForwardPass->SetTexture(m_normalTexture.get());
-	m_pForwardPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
+	m_threadPool->Enqueue([this]()
+	{
+		m_pForwardPass = std::make_unique<ForwardPass>();
+		m_pForwardPass->SetTexture(m_normalTexture.get());
+		m_pForwardPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings());
+	});
 
 	//skyBoxPass
-	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_currentSkyTextureName = PathFinder::Relative("HDR\\rustig_koppie_puresky_8k.hdr").string();
-	m_pSkyBoxPass->Initialize(m_currentSkyTextureName);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
+		m_currentSkyTextureName = PathFinder::Relative("HDR\\rustig_koppie_puresky_8k.hdr").string();
+		m_pSkyBoxPass->Initialize(m_currentSkyTextureName);
+	});
 	
 	//toneMapPass
-	m_pToneMapPass = std::make_unique<ToneMapPass>();
-	m_pToneMapPass->Initialize(
-		m_toneMappedColourTexture
-	);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pToneMapPass = std::make_unique<ToneMapPass>();
+		m_pToneMapPass->Initialize(
+			m_toneMappedColourTexture
+		);
 
-    m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
+		m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
+	});
 	//spritePass
-	m_pSpritePass = std::make_unique<SpritePass>();
+	m_threadPool->Enqueue([this]()
+	{
+		m_pSpritePass = std::make_unique<SpritePass>();
+	});
 	//m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
 
 	//blitPass
-	m_pBlitPass = std::make_unique<BlitPass>();
-	m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
+	m_threadPool->Enqueue([this]()
+	{
+		m_pBlitPass = std::make_unique<BlitPass>();
+		m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
+	});
 
-	//PositionMapPass
-	m_pPositionMapPass = std::make_unique<PositionMapPass>();
+	m_threadPool->Enqueue([this]()
+	{
+		//PositionMapPass
+		m_pPositionMapPass = std::make_unique<PositionMapPass>();
+		//LightMap
+		lightMap.Initialize();
+	});
 
-	//LightMap
-	lightMap.Initialize();
 
 	//SSR
-	m_pScreenSpaceReflectionPass = std::make_unique<ScreenSpaceReflectionPass>();
-	m_pScreenSpaceReflectionPass->Initialize(m_diffuseTexture.get(),
-		m_metalRoughTexture.get(),
-		m_normalTexture.get(),
-		m_emissiveTexture.get(),
-		m_bitmaskTexture.get()
-	);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pScreenSpaceReflectionPass = std::make_unique<ScreenSpaceReflectionPass>();
+		m_pScreenSpaceReflectionPass->Initialize(m_diffuseTexture.get(),
+			m_metalRoughTexture.get(),
+			m_normalTexture.get(),
+			m_emissiveTexture.get(),
+			m_bitmaskTexture.get()
+		);
+	});
 
 	//SSS
-	m_pSubsurfaceScatteringPass = std::make_unique<SubsurfaceScatteringPass>();
-	m_pSubsurfaceScatteringPass->Initialize(m_diffuseTexture.get(),
-		m_metalRoughTexture.get()
-	);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pSubsurfaceScatteringPass = std::make_unique<SubsurfaceScatteringPass>();
+		m_pSubsurfaceScatteringPass->Initialize(m_diffuseTexture.get(),
+			m_metalRoughTexture.get()
+		);
+	});
 
 	//Vignette
-	m_pVignettePass = std::make_unique<VignettePass>();
-    m_pVignettePass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().vignette);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pVignettePass = std::make_unique<VignettePass>();
+		m_pVignettePass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().vignette);
+	});
 
 	//ColorGrading
-	m_pColorGradingPass = std::make_unique<ColorGradingPass>();
-	m_pColorGradingPass->Initialize();
-    m_pColorGradingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().colorGrading);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pColorGradingPass = std::make_unique<ColorGradingPass>();
+		m_pColorGradingPass->Initialize();
+		m_pColorGradingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().colorGrading);
+	});
 	//m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
 
 	//VolumetricFog
-	m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
-	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
-	m_pVolumetricFogPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().volumetricFog);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
+		m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
+		m_pVolumetricFogPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().volumetricFog);
+	});
 
-	m_pUIPass = std::make_unique<UIPass>();
-	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
+	m_threadPool->Enqueue([this]()
+	{
+		m_pUIPass = std::make_unique<UIPass>();
+		m_pUIPass->Initialize(m_toneMappedColourTexture.get());
+	});
 
 	//AAPass
-	m_pAAPass = std::make_unique<AAPass>();
-    m_pAAPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().aa);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pAAPass = std::make_unique<AAPass>();
+		m_pAAPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().aa);
+	});
 
-	m_pPostProcessingPass = std::make_unique<PostProcessingPass>();
-    m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bloom);
+	m_threadPool->Enqueue([this]()
+	{
+		m_pPostProcessingPass = std::make_unique<PostProcessingPass>();
+		m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bloom);
+	});
 
 	//lightmapPass
-	m_pLightMapPass = std::make_unique<LightMapPass>();
+	m_threadPool->Enqueue([this]()
+	{
+		m_pLightMapPass = std::make_unique<LightMapPass>();
+	});
 
 
 	//SSGIPass
-	m_pSSGIPass = std::make_unique<SSGIPass>();
-	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get(), m_metalRoughTexture.get(), ao.get());
-    m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
+	m_threadPool->Enqueue([this, ao]()
+	{
+		m_pSSGIPass = std::make_unique<SSGIPass>();
+		m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get(), m_metalRoughTexture.get(), ao.get());
+		m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
+	});
 
 	//BitmaskPass
-	m_pBitMaskPass = std::make_unique<BitMaskPass>();
-	m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
+	m_threadPool->Enqueue([this]()
+	{
+		m_pBitMaskPass = std::make_unique<BitMaskPass>();
+		m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
+	});
 
 	//DecalPass
-	m_pDecalPass = std::make_unique<DecalPass>();
-	m_pDecalPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_metalRoughTexture.get());
+	m_threadPool->Enqueue([this]()
+	{
+		m_pDecalPass = std::make_unique<DecalPass>();
+		m_pDecalPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_metalRoughTexture.get());
+	});
+
+	m_threadPool->NotifyAllAndWait();
 
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 	{
@@ -375,61 +440,84 @@ void SceneRenderer::InitializeShadowMapDesc()
 
 void SceneRenderer::InitializeTextures()
 {
-	auto diffuseTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"DiffuseRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_diffuseTexture.swap(diffuseTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto diffuseTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"DiffuseRTV",
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_diffuseTexture.swap(diffuseTexture);
+	});
 
-	auto metalRoughTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"MetalRoughRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_metalRoughTexture.swap(metalRoughTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto metalRoughTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"MetalRoughRTV",
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_metalRoughTexture.swap(metalRoughTexture);
+	});
 
-	auto normalTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"NormalRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_normalTexture.swap(normalTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto normalTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"NormalRTV",
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_normalTexture.swap(normalTexture);
+	});
 
-	auto emissiveTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"EmissiveRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_emissiveTexture.swap(emissiveTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto emissiveTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"EmissiveRTV",
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_emissiveTexture.swap(emissiveTexture);
+	});
 
-	auto bitmaskTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"BitmaskRTV",
-		DXGI_FORMAT_R32_UINT
-	);
-	m_bitmaskTexture.swap(bitmaskTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto bitmaskTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"BitmaskRTV",
+			DXGI_FORMAT_R32_UINT
+		);
+		m_bitmaskTexture.swap(bitmaskTexture);
+	});
 
-	auto toneMappedColourTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"ToneMappedColourRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_toneMappedColourTexture.swap(toneMappedColourTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto toneMappedColourTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"ToneMappedColourRTV",
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_toneMappedColourTexture.swap(toneMappedColourTexture);
+	});
 
-	auto lightingTexture = TextureHelper::CreateSharedRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
-		"LightingRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_lightingTexture.swap(lightingTexture);
+	m_threadPool->Enqueue([this]()
+	{
+		auto lightingTexture = TextureHelper::CreateSharedRenderTexture(
+			DirectX11::DeviceStates->g_ClientRect.width,
+			DirectX11::DeviceStates->g_ClientRect.height,
+			"LightingRTV",
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_lightingTexture.swap(lightingTexture);
+	});
+
+	m_threadPool->NotifyAllAndWait();
 }
 
 void SceneRenderer::NewCreateSceneInitialize()

@@ -35,6 +35,7 @@ void EntityEleteMonster::Start()
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
 		hp->screenOffset = { 0, -100 };
+		hp->SetTarget(GetOwner()->shared_from_this());
 	}
 	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)
