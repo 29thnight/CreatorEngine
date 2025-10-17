@@ -180,6 +180,8 @@ public:
 	Mathf::Vector3 bombThrowPosition = {0,0,0};
 	Mathf::Vector3 bombThrowPositionoffset = { 0,0,0 };
 	[[Property]]
+	float MaxThrowDistance = 2.5f;
+	[[Property]]
 	float bombMoveSpeed = 0.005f;  //ÆøÅºµµÂøÁöÁ¡ Á¶Àý ½ºÇÇµå
  	void MeleeAttack();
 	[[Method]]

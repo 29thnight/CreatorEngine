@@ -1517,24 +1517,98 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	bombThrowPositionoffset.x += offsetX;
 	bombThrowPositionoffset.z += offsetZ;
 
+	bombThrowPositionoffset.x = std::clamp(bombThrowPositionoffset.x, -MaxThrowDistance, MaxThrowDistance);
+	bombThrowPositionoffset.z = std::clamp(bombThrowPositionoffset.z, -MaxThrowDistance, MaxThrowDistance);
 	Transform* transform = GetOwner()->GetComponent<Transform>();
 	Mathf::Vector3 pos = transform->GetWorldPosition();
+
+
+
 	bombThrowPosition = pos + bombThrowPositionoffset;
-	bombThrowPosition.y = pos.y + 0.1f;
+
+
+
+	Mathf::Vector3 targetdir = bombThrowPosition - pos;
+	targetdir.Normalize();
+	float yaw = atan2(targetdir.x, targetdir.z); // z가 앞, x가 옆일 때
+	Quaternion rotation = Quaternion::CreateFromAxisAngle(Mathf::Vector3::Up, yaw);
+
+
+	transform->SetWorldRotation(rotation);
+
+	Mathf::Vector3 forwardRayOrgion = pos;
+
+	std::vector<HitResult>  forwardhits;
+	float forwardDistance = std::max(std::abs(bombThrowPositionoffset.x), std::abs(bombThrowPositionoffset.z));
+	unsigned int forwardLayerMask = 1 << 11;
+	int size = RaycastAll(forwardRayOrgion, targetdir,forwardDistance, forwardLayerMask, forwardhits);
+	float min = 0;
+	for (auto& forwardHit : forwardhits)
+	{
+		if (forwardHit.gameObject->m_tag != "Wall")
+		{
+			continue;
+		}
+		if (min == 0)
+		{
+			min = std::abs((forwardRayOrgion - forwardHit.point).Length());
+
+
+			bombThrowPosition = forwardHit.point;
+
+		}
+		else
+		{
+			float newMin = std::abs((forwardRayOrgion - forwardHit.point).Length());
+
+			if (newMin < min)
+			{
+				min = newMin;
+				bombThrowPosition = forwardHit.point;
+				
+			}
+		}
+
+	}
+	
+
+	Mathf::Quaternion bombrotat{};
+	if (camera)
+	{
+		Mathf::Vector3 cameraPos = camera->m_transform.GetWorldPosition();
+		Mathf::Vector3 dir = bombThrowPosition - cameraPos;
+
+		Mathf::Vector3 rayOrigin = cameraPos;
+		dir.Normalize();
+		std::vector<HitResult> hits;
+
+		float distacne = 200.0f;
+
+		unsigned int layerMask = 1 << 11;
+		bombThrowPosition.y = pos.y + 0.1f;
+		int size = RaycastAll(rayOrigin, dir, distacne, layerMask, hits);
+		
+		for (auto& hit : hits)
+		{
+			if (hit.gameObject->m_tag == "Wall")
+			{
+				continue;
+			}
+
+			bombThrowPosition.y = hit.point.y + 0.1f;
+		}
+
+	}
+
+	//
 	onIndicate = true;
 	if (BombIndicator)
 	{
 		BombIndicator->m_transform.SetPosition(bombThrowPosition);
 	}
 
-	Mathf::Vector3 targetdir = bombThrowPosition - pos;
-	targetdir.Normalize();
-	float yaw = atan2(targetdir.x, targetdir.z); // z가 앞, x가 옆일 때
-	Quaternion rotation = Quaternion::CreateFromAxisAngle(Mathf::Vector3::Up, yaw);
 	
 
-	transform->SetWorldRotation(rotation);
-	
 
 
 }
@@ -1777,18 +1851,38 @@ void Player::ShootNormalBullet()
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	GameObject* bulletObj = normalBullets->Pop();
+	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3 shootPos = pos;
+	bool nearTarget = false;
+	//쏘기직전에 적이 가까이왔으면 발사대신 떄리기 or 가까이에서 발사? 
+	if (curTarget)
+	{
+		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+		float length = (targetPos - pos).Length();
+		length = std::abs(length);
+		if (length <= 2.0f)
+		{
+			nearTarget = true;
+		}
+
+		curTarget->SendDamage();
+	}
 	if (bulletObj)
 	{
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
-		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (shootPosObj)
 		{
-			pos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->m_transform.GetWorldPosition();
 		}
 		
+		if (nearTarget)
+		{
+			shootPos.x = pos.x;
+			shootPos.z = pos.z;
+		}
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge());
+			bullet->Initialize(this, shootPos, player->m_transform.GetForward(), calculDamge());
 		}
 
 		if (m_ActionSound)
