@@ -1,22 +1,22 @@
-m_name: EntityBigWood_Prefab
+m_name: EntityBigWood
 m_isEnabled: true
-m_instanceID: 3449454539
-m_fileGuid: 474f39f8-43b5-5252-bc3f-254c1eff743c
+m_instanceID: 1026534366
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: EntityBigWood
     m_isEnabled: true
-    m_instanceID: 2901941750
+    m_instanceID: 1230191771
     m_transform:
-      position: {x: 0, y: 0, z: 0, w: 1}
-      rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
-      m_parentID: 0
-    m_index: 1
-    m_parentIndex: 0
+      position: {x: 37.0211792, y: 0, z: 13.668664, w: 1}
+      rotation: {x: -0, y: 0.0598356351, z: -0, w: 0.998208225}
+      scale: {x: 2.08164048, y: 2.08164001, z: 2.08164048, w: 0}
+      m_parentID: 15
+    m_index: 369
+    m_parentIndex: 15
     m_rootIndex: 0
-    m_childrenIndices: ~
-    m_prefabFileGuid: 474f39f8-43b5-5252-bc3f-254c1eff743c
+    m_childrenIndices: [370]
+    m_prefabFileGuid: 5e43dc33-ebec-516a-9f69-64a02747e17f
     m_attachedSoketID: 0
     m_collisionType: 8
     m_isStatic: false
@@ -24,29 +24,12 @@ PrefabNode:
     m_tag: Untagged
     m_layer: EntityResource
     m_components:
-      - ModuleBehavior: 1399118904
-        m_logDamage: 10
-        type1: 2
-        type1Count: 2
-        type2: 0
-        type2Count: 3
-        type3: 1
-        type3Count: 1
-        m_rewardRandomRange: 3
-        m_rewardUpAngle: 120
-        m_minRewardUpForce: 2
-        m_maxRewardUpForce: 3
-        m_name: EntityBigWood
-        m_isEnabled: true
-        m_instanceID: 4091777646
-        m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptGuid: 6ba269df-fdf2-5eb0-b248-d4dc49cdbd06
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 3275033220
+        m_instanceID: 2822780231
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_bodyType: 2
+        m_bodyType: 0
         LinearDamping: 0.00999999978
         m_mass: 70
         maxLinearVelocity: 1.00000003e+16
@@ -55,13 +38,91 @@ PrefabNode:
         maxDepenetrationVelocity: 1.00000003e+32
         m_useGravity: false
         m_setTrigger: false
-        m_setKinematic: true
+        m_setKinematic: false
         m_collisionEnabled: true
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 1252433666
+        m_instanceID: 174075807
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_boxExtent: {x: 1, y: 1, z: 1}
+        m_boxExtent: {x: 0.699999988, y: 4.19999981, z: 2.4000001}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        maxHP: 120
+        m_logDamage: 10
+        type1: 3
+        type1Count: 0
+        type2: 1
+        type2Count: 0
+        type3: 2
+        type3Count: 0
+        m_rewardRandomRange: 3
+        m_rewardUpAngle: 60
+        m_minRewardUpForce: 70
+        m_maxRewardUpForce: 100
+        m_name: EntityBigWood
+        m_isEnabled: true
+        m_instanceID: 1508028304
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 6ba269df-fdf2-5eb0-b248-d4dc49cdbd06
+    children:
+      - GameObject: 2166264123
+        m_name: log_03 (2)
+        m_isEnabled: true
+        m_instanceID: 2665058807
+        m_transform:
+          position: {x: 1.90734863e-06, y: 0, z: -9.53674316e-07, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 0.999999642, y: 0.999999642, z: 0.999999642, w: 0}
+          m_parentID: 369
+        m_index: 370
+        m_parentIndex: 369
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 5e43dc33-ebec-516a-9f69-64a02747e17f
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 1265764646
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: Tree_De.001(4)
+              m_baseColorTexName: Tree_TT_checker_512x512_UV_GRID_BaseColor.png
+              m_normalTexName: Tree_TT_checker_512x512_UV_GRID_Normal.png
+              m_ORM_TexName: Tree_TT_checker_512x512_UV_GRID_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_IOR: 0.909530282
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 94d36b8e-cf4c-5701-957b-0096ccd477b3
+              m_renderingMode: 0
+              m_shaderPSOName: FlashShader
+            m_Mesh:
+              m_name: SM_TreeLogOakESimple.001
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+            m_bitflag: 0
