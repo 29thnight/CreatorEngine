@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "PlayEffectAll.h"
 #include "PrefabUtility.h"
+#include "SphereColliderComponent.h"
 void MonsterProjectile::Start()
 {
 }
@@ -39,6 +40,15 @@ void MonsterProjectile::Update(float tick)
         input.rotation = SimpleMath::Quaternion::Identity;
 
         PhysicsManagers->SphereOverlap(input, m_radius, results);
+
+        //test
+        Prefab* test = PrefabUtilitys->LoadPrefab("TestSphere");
+        if (test)
+        {
+            GameObject* testObj = PrefabUtilitys->InstantiatePrefab(test, "test");
+            testObj->GetComponent<Transform>()->SetPosition(currentPos);
+            testObj->GetComponent<SphereColliderComponent>()->SetRadius(m_radius);
+        }
         
         Prefab* PungPrefab = PrefabUtilitys->LoadPrefab("MonProjectileEffect");
         if (PungPrefab)

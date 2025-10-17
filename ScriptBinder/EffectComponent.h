@@ -75,8 +75,11 @@ public:
     [[Property]]
     std::string m_effectInstanceName;
 
-private:
+    [[Property]]
     float m_currentTime = 0;
+
+private:
+
 
     Mathf::Vector3 m_lastPosition;
     Mathf::Vector3 m_lastRotation;

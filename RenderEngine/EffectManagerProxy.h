@@ -169,9 +169,10 @@ public:
         return cmd;
     }
 
-    //static uint32_t GetCurrentInstanceCounter() {
-    //    return EffectManagers->GetInstanceId();
-    //}
+    static bool IsAlive(const std::string& customInstanceId)
+    {
+        return EffectManagers->IsAlive(customInstanceId);
+    }
 
     // 명령 실행
     void Execute()

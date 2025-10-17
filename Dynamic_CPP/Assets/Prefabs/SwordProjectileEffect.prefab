@@ -1,12 +1,12 @@
 m_name: SwordProjectileEffect
 m_isEnabled: true
-m_instanceID: 2308005927
+m_instanceID: 1641713671
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: SwordProjectileEffect
     m_isEnabled: true
-    m_instanceID: 1892410402
+    m_instanceID: 2421042319
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -27,29 +27,30 @@ PrefabNode:
       - EffectComponent: 3131036541
         m_name: EffectComponent
         m_isEnabled: true
-        m_instanceID: 2283770135
+        m_instanceID: 4023843784
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_effectTemplateName: swordmain
-        m_isPlaying: true
+        m_isPlaying: false
         m_isPaused: false
         m_timeScale: 1
         m_loop: true
         m_duration: -1
         m_useAbsolutePosition: false
-        m_effectInstanceName: swordmain_obj3682682871
+        m_effectInstanceName: swordmain_obj2421042319
+        m_currentTime: 36.9571762
       - ModuleBehavior: 1399118904
         m_name: SwordProjectileEffect
         m_isEnabled: true
-        m_instanceID: 1203787794
+        m_instanceID: 1278117668
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 20595eb3-e632-5477-86b0-9dc10ce40884
     children:
       - GameObject: 2166264123
         m_name: GameObject
         m_isEnabled: true
-        m_instanceID: 4054468746
+        m_instanceID: 3867492275
         m_transform:
-          position: {x: -1.15854895, y: 2.38418579e-07, z: 1.99532151, w: 1}
+          position: {x: -2.02544999, y: 2.38418579e-07, z: -0.502095699, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
@@ -68,7 +69,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 2693073533
+            m_instanceID: 1341837152
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: swordtail
             m_isPlaying: true
@@ -78,12 +79,13 @@ PrefabNode:
             m_duration: -1
             m_useAbsolutePosition: false
             m_effectInstanceName: swordtail_obj4265257194
+            m_currentTime: 59.2528648
       - GameObject: 2166264123
         m_name: GameObject (1)
         m_isEnabled: true
-        m_instanceID: 3184019853
+        m_instanceID: 3683878918
         m_transform:
-          position: {x: -2.43972373, y: 0, z: -0.105797827, w: 1}
+          position: {x: -1.48783517, y: 0, z: -1.93487513, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
@@ -102,7 +104,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 3144412296
+            m_instanceID: 1438666297
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: swordtail
             m_isPlaying: true
@@ -112,12 +114,13 @@ PrefabNode:
             m_duration: -1
             m_useAbsolutePosition: false
             m_effectInstanceName: swordtail_obj3877618471
+            m_currentTime: 59.2528648
       - GameObject: 2166264123
         m_name: GameObject (2)
         m_isEnabled: true
-        m_instanceID: 2249909728
+        m_instanceID: 1050581667
         m_transform:
-          position: {x: -1.58406663, y: -2.38418579e-07, z: -1.66754985, w: 1}
+          position: {x: 0.340708822, y: 0, z: -2.3284893, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
@@ -136,7 +139,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 3680774222
+            m_instanceID: 1741199027
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: swordtail
             m_isPlaying: true
@@ -146,12 +149,13 @@ PrefabNode:
             m_duration: -1
             m_useAbsolutePosition: false
             m_effectInstanceName: swordtail_obj1985442154
+            m_currentTime: 59.2528648
       - GameObject: 2166264123
         m_name: GameObject (3)
         m_isEnabled: true
-        m_instanceID: 388702671
+        m_instanceID: 3890069702
         m_transform:
-          position: {x: -0.0448648632, y: 0, z: -2.12583017, w: 1}
+          position: {x: 1.32371902, y: 0, z: -1.63060331, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
@@ -170,7 +174,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 2013255924
+            m_instanceID: 4060741776
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: swordtail
             m_isPlaying: true
@@ -180,12 +184,13 @@ PrefabNode:
             m_duration: -1
             m_useAbsolutePosition: false
             m_effectInstanceName: swordtail_obj2766033577
+            m_currentTime: 59.2528648
       - GameObject: 2166264123
         m_name: GameObject (4)
         m_isEnabled: true
-        m_instanceID: 2199398154
+        m_instanceID: 52895214
         m_transform:
-          position: {x: 1.31807709, y: 0, z: -1.62508237, w: 1}
+          position: {x: 2.20623851, y: 0, z: 0.490502238, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
@@ -204,7 +209,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 2767338502
+            m_instanceID: 1918079097
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: swordtail
             m_isPlaying: true
@@ -214,3 +219,4 @@ PrefabNode:
             m_duration: -1
             m_useAbsolutePosition: false
             m_effectInstanceName: swordtail_obj302792098
+            m_currentTime: 59.2528648

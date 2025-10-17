@@ -392,6 +392,9 @@
 		<ClInclude Include="Assets\Script\ObjectPoolManager.h" />
 		<ClInclude Include="Assets\Script\ControllerVibration.h" />
 		<ClInclude Include="Assets\Script\SwordProjectile.h" />
+		<ClInclude Include="Assets\Script\PlayerRangeAttackReady.h" />
+		<ClInclude Include="Assets\Script\PlayerRangeAttackEnd.h" />
+		<ClInclude Include="Assets\Script\PlayerRangeAttackSpecial.h" />
 		<ClInclude Include="Assets\Script\SwordProjectileEffect.h" />
 		<ClInclude Include="Assets\Script\BP001.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsHazadPatten.h" />
@@ -1062,6 +1065,18 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttackReady.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttackEnd.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttackSpecial.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 	</ItemGroup>
 	<Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

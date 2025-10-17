@@ -33,6 +33,34 @@ void Entity::HitImpulseUpdate(float tick)
 	}
 }
 
+void Entity::UpdateOutLine(float tick)
+{
+	if (OnOutline == true)
+	{
+		detectElapsedTime += tick;
+		if (detectElapsedTime >= detectTime)
+		{
+			OnOutline = false;
+			detectElapsedTime = 0;
+			auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+			for (auto& m : meshren)
+			{
+				m->m_bitflag = 0;
+			}
+		}
+	}
+}
+
+void Entity::OnOutLine()
+{
+	auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for (auto& m : meshren)
+	{
+		m->m_bitflag = 1;
+	}
+	OnOutline = true;
+}
+
 void Entity::StopHitImpulse()
 {
 	m_currentHitImpulseDuration = 0.f;

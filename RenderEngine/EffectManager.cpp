@@ -91,7 +91,7 @@ void EffectManager::Update(float delta)
 		if (shouldReturn) {
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
-
+			ReturnToPool(std::move(effectToReturn));
 		}
 		else {
 			++it;
@@ -319,6 +319,15 @@ bool EffectManager::GetTemplateSettings(const std::string& templateName, float& 
 		outLoop = templateConfig.loop;
 		outDuration = templateConfig.duration;
 		return true;
+	}
+	return false;
+}
+
+bool EffectManager::IsAlive(const std::string& customInstanceId)
+{
+	auto it = activeEffects.find(customInstanceId);
+	if (it != activeEffects.end()) {
+		return it->second->GetState() != EffectState::Stopped;
 	}
 	return false;
 }

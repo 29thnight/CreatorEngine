@@ -1,11 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "CriticalMark.generated.h"
 
 class EffectComponent;
 class CriticalMark : public ModuleBehavior
 {
 public:
+   ReflectCriticalMark
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(CriticalMark)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -27,7 +30,11 @@ private:
 	EffectComponent* markEffect = nullptr;
 	bool OnMark = false;
 	bool canMark = true;  //마크 생성가능
+	[[Property]]
 	float markDuration = 5.0f; //마크지속시간
 	float markElaspedTime = 0.f;
+	[[Property]]
+	float markCoolDown = 5.0f;
+	float markCoolElaspedTime = 0.f;;
 	int markIndex = -1;
 };

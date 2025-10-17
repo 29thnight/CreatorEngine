@@ -3,6 +3,9 @@
 #include "Export.h"
 
 // Automation include AniScriptClass header
+#include "PlayerRangeAttackSpecial.h"
+#include "PlayerRangeAttackEnd.h"
+#include "PlayerRangeAttackReady.h"
 #include "PlayerThrow.h"
 #include "PlayerGrab.h"
 #include "PlayerBombCharing.h"

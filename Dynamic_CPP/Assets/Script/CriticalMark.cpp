@@ -24,7 +24,12 @@ void CriticalMark::Update(float tick)
 
 	if (false == canMark)
 	{
-
+		markCoolElaspedTime += tick;
+		if (markCoolDown <= markCoolElaspedTime)
+		{
+			canMark = true;
+			markCoolElaspedTime = 0;
+		}
 	}
 }
 

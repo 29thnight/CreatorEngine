@@ -55,11 +55,6 @@ void EntityAsis::Start()
 		}
 	}
 
-	auto meshrenderer = GetOwner()->GetComponent<MeshRenderer>();
-	if (meshrenderer)
-	{
-		meshrenderer->m_bitflag = 0;
-	}
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
@@ -303,64 +298,12 @@ void EntityAsis::Purification(float tick)
 			auto player = item->GetThrowOwner();
 				
 			item->SetThrowOwner(nullptr);
-			//Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
-			//if (meleeweapon && player)
-			//{
-			//	GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeWeapon");
-			//	//플레이어 방향으로 웨폰날리기
-			//	auto weaponcom = weaponObj->GetComponent<Weapon>();
-			//	weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
-			//}
-
-			Prefab* weaponCapsuleprefab = PrefabUtilitys->LoadPrefab("WeaponCapsule");
-			if (weaponCapsuleprefab && player)
-			{
-				GameObject* weaponCapsule = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
-				//플레이어 방향으로 웨폰날리기
-				auto weaponcapcom = weaponCapsule->GetComponent<WeaponCapsule>();
-				weaponcapcom->weaponCode = static_cast<int>(item->itemType);  //아이템 코드에 대응되는 무기 생성    //필요시 weaponCode 추가구현
-				weaponcapcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
-
-			}
+			auto weaponCapsule = MakeWeaponCapsule(static_cast<int>(item->itemType));
+			weaponCapsule->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
 			item->GetOwner()->Destroy();
 
-			/*static int index = 1;
-			std::string weaponName = "MeleeWeapon";
-			auto curweapon = GameObject::Find(weaponName);
-			if (curweapon)
-			{
-				auto weapon2 = curweapon->GetComponent<Weapon>();
-				
-				if (weapon2->OwnerPlayerIndex != -1)
-				{
-					curweapon = nullptr;
-				}
-					
-			}
-			if (!curweapon)
-			{
-				while (!curweapon && index <= 35)
-				{
-					std::string realWeaponName = weaponName + " (" + std::to_string(index) + ")";
-					curweapon = GameObject::Find(realWeaponName);
-					if (curweapon)
-					{
-						index++;
-						break;
-					}
-				}
-			}
-
-
-			if (curweapon)
-			{
-				auto weaponcom = curweapon->GetComponent<Weapon>();
-				weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
-
-			}*/
-			
 		}
 	}
 }
@@ -458,6 +401,19 @@ int EntityAsis::CheckBigWood()
 	info.position = GetOwner()->m_transform.GetWorldPosition();
 	int count = PhysicsManagers->SphereOverlap(info, bigWoodDetectRadius, hits);
 	return count;
+}
+
+WeaponCapsule* EntityAsis::MakeWeaponCapsule(int _itemCode)
+{
+	Prefab* weaponCapsuleprefab = PrefabUtilitys->LoadPrefab("WeaponCapsule");
+	if (weaponCapsuleprefab)
+	{
+		GameObject* weaponCapsuleObj = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
+		WeaponCapsule* weaponCapsule = weaponCapsuleObj->GetComponent<WeaponCapsule>();
+		weaponCapsule->weaponCode = _itemCode;
+		return weaponCapsule;
+	}
+	return nullptr;
 }
 
 float EntityAsis::GetPollutionGaugePercent()

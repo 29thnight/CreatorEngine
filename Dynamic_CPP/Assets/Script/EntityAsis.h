@@ -5,6 +5,7 @@
 #include "EntityAsis.generated.h"
 
 class EntityItem;
+class WeaponCapsule;
 class EntityAsis : public Entity
 {
 public:
@@ -37,6 +38,7 @@ public:
 
 	int CheckBigWood();
 
+	WeaponCapsule* MakeWeaponCapsule(int _itemCode);
 	// 0~1
 	float GetPollutionGaugePercent();
 

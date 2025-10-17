@@ -14,6 +14,7 @@
 #include "GameManager.h"
 #include "CriticalMark.h"
 #include "PlayEffectAll.h"
+#include "Weapon.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -675,6 +676,7 @@ void EntityEleteMonster::DeadEvent()
 	deadObj->SetEnabled(true);
 	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	deadPos.y += 0.7f;
 	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 	deadEffect->Initialize();
 }
@@ -716,7 +718,12 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			dir.Normalize();
 			if (m_criticalMark)
 			{
-				m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType));
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					damage *= player->m_curWeapon->coopCrit;
+					hitinfo.isCritical = true;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+				}
 			}
 			PlayHitEffect(this->GetOwner(), hitinfo);
 			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
