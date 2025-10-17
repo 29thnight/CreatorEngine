@@ -9,16 +9,23 @@
 #include "BoxColliderComponent.h"
 void SwordProjectile::Start()
 {
-	if (nullptr == m_effect)
-	{
-		auto childred = GetOwner()->m_childrenIndices;
-		for (auto& child : childred)
+		if (m_effects.empty())
 		{
-
-			m_effect = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
-			break;
+			auto effect = GetOwner()->GetComponent<EffectComponent>();
+			if (effect)
+			{
+				m_effects.push_back(effect);
+			}
+			auto childred = GetOwner()->m_childrenIndices;
+			for (auto& child : childred)
+			{
+				auto effectcomponent = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+				if (effectcomponent)
+				{
+					m_effects.push_back(effectcomponent);
+				}
+			}
 		}
-	}
 }
 
 void SwordProjectile::OnTriggerEnter(const Collision& collision)
@@ -46,12 +53,13 @@ void SwordProjectile::OnTriggerEnter(const Collision& collision)
 
 void SwordProjectile::Update(float tick)
 {
+	if (m_isCallStart == false)return;
 	if (true == beLateFrame && false == OnEffect)
 	{
 		OnEffect = true;
-		if (m_effect)
+		for (auto& effect : m_effects)
 		{
-			m_effect->Apply();
+			effect->Apply();
 		}
 	}
 
@@ -72,7 +80,10 @@ void SwordProjectile::Update(float tick)
 			if (GM && GM->GetObjectPoolManager() != nullptr)
 			{
 				GM->GetObjectPoolManager()->GetSwordProjectile()->Push(this->GetOwner());
-				m_effect->StopEffect();
+				for (auto& effect : m_effects)
+				{
+					effect->StopEffect();
+				}
 			}
 
 		}
@@ -92,15 +103,27 @@ void SwordProjectile::Initialize(Player* owner, Mathf::Vector3 originpos, Mathf:
 	beLateFrame = false;
 	OnEffect = false;
 	targets.clear();
-	if (nullptr == m_effect)
+
+	if (m_effects.empty())
 	{
+		auto effect = GetOwner()->GetComponent<EffectComponent>();
+		if (effect)
+		{
+			m_effects.push_back(effect);
+		}
 		auto childred = GetOwner()->m_childrenIndices;
 		for (auto& child : childred)
 		{
-
-			m_effect = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
-			break;
+			auto effectcomponent = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+			if (effectcomponent)
+			{
+				m_effects.push_back(effectcomponent);
+			}
 		}
+	}
+	for (auto& effect : m_effects)
+	{
+		effect->Apply();
 	}
 }
 

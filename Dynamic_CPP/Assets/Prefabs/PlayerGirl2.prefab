@@ -1,10 +1,10 @@
-m_name: PlayerGirl
+m_name: PlayerGirl2
 m_isEnabled: true
-m_instanceID: 1660624183
+m_instanceID: 1647048364
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: PlayerGirl
+    m_name: PlayerGirl2
     m_isEnabled: true
     m_instanceID: 1259899607
     m_transform:
@@ -88,10 +88,9 @@ PrefabNode:
         ResurrectionHP: 50
         ResurrectionGracePeriod: 3
         SlotChangeCooldown: 2
-        detectRadius: 1
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 3040571521
+        m_instanceID: 2357074195
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -557,6 +556,22 @@ PrefabNode:
                       exitTime: 0.100000001
                       blendTime: 0.200000003
                     - conditions:
+                        - valueName: RangeAttack
+                          cType: 6
+                          CompareParameter:
+                            vType: 2
+                            name: None
+                            fValue: 0
+                            iValue: 0
+                            bValue: true
+                            tValue: false
+                      m_name: Idle to RangeAttack1
+                      curStateName: Idle
+                      nextStateName: RangeAttack1
+                      hasExitTime: false
+                      exitTime: 0.100000001
+                      blendTime: 0.200000003
+                    - conditions:
                         - valueName: OnTargetBomb
                           cType: 1
                           CompareParameter:
@@ -633,22 +648,6 @@ PrefabNode:
                       m_name: Idle to RangeAttackReadey
                       curStateName: Idle
                       nextStateName: RangeAttackReadey
-                      hasExitTime: false
-                      exitTime: 0.100000001
-                      blendTime: 0.200000003
-                    - conditions:
-                        - valueName: RangeAttack
-                          cType: 6
-                          CompareParameter:
-                            vType: 2
-                            name: None
-                            fValue: 0
-                            iValue: 0
-                            bValue: true
-                            tValue: false
-                      m_name: Idle to RangeAttack1
-                      curStateName: Idle
-                      nextStateName: RangeAttack1
                       hasExitTime: false
                       exitTime: 0.100000001
                       blendTime: 0.200000003
@@ -786,6 +785,22 @@ PrefabNode:
                         exitTime: 0.100000001
                         blendTime: 0.200000003
                       - conditions:
+                          - valueName: RangeAttack
+                            cType: 6
+                            CompareParameter:
+                              vType: 2
+                              name: None
+                              fValue: 0
+                              iValue: 0
+                              bValue: true
+                              tValue: false
+                        m_name: Idle to RangeAttack1
+                        curStateName: Idle
+                        nextStateName: RangeAttack1
+                        hasExitTime: false
+                        exitTime: 0.100000001
+                        blendTime: 0.200000003
+                      - conditions:
                           - valueName: OnTargetBomb
                             cType: 1
                             CompareParameter:
@@ -862,22 +877,6 @@ PrefabNode:
                         m_name: Idle to RangeAttackReadey
                         curStateName: Idle
                         nextStateName: RangeAttackReadey
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: Idle to RangeAttack1
-                        curStateName: Idle
-                        nextStateName: RangeAttack1
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
@@ -1355,22 +1354,6 @@ PrefabNode:
                         hasExitTime: false
                         exitTime: 0.100000001
                         blendTime: 0.200000003
-                      - conditions:
-                          - valueName: RangeAttack
-                            cType: 6
-                            CompareParameter:
-                              vType: 2
-                              name: None
-                              fValue: 0
-                              iValue: 0
-                              bValue: true
-                              tValue: false
-                        m_name: RangeAttackEnd to RangeAttack1
-                        curStateName: RangeAttackEnd
-                        nextStateName: RangeAttack1
-                        hasExitTime: false
-                        exitTime: 0.100000001
-                        blendTime: 0.00999999978
                     index: 16
                     AnimationIndex: 9
                     m_isAny: false
@@ -1777,7 +1760,7 @@ PrefabNode:
                     m_uvScroll: {x: 0, y: 0}
                   m_fileGuid: 5af2e92a-3fb7-5745-9c1a-a444b7724462
                   m_renderingMode: 0
-                  m_shaderPSOName: FlashPlayerShader
+                  m_shaderPSOName: ""
                 m_Mesh:
                   m_name: Red_low-0
                   m_materialIndex: 0
@@ -1837,7 +1820,7 @@ PrefabNode:
                         m_uvScroll: {x: 0, y: 0}
                       m_fileGuid: 5af2e92a-3fb7-5745-9c1a-a444b7724462
                       m_renderingMode: 0
-                      m_shaderPSOName: FlashPlayerShader
+                      m_shaderPSOName: ""
                     m_Mesh:
                       m_name: Red_low-1
                       m_materialIndex: 1

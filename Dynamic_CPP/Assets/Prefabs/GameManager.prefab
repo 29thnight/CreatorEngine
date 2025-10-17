@@ -1,18 +1,18 @@
 m_name: GameManager
 m_isEnabled: true
-m_instanceID: 2291990128
+m_instanceID: 54738273
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: GameManager
     m_isEnabled: true
-    m_instanceID: 739754321
+    m_instanceID: 2849582889
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 3
+    m_index: 119
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
@@ -26,16 +26,17 @@ PrefabNode:
     m_components:
       - ModuleBehavior: 1399118904
         m_isTestReward: false
-        m_nextSceneName: ""
+        m_prevSceneIndex: 0
+        m_nextSceneIndex: 0
         m_name: GameManager
         m_isEnabled: true
-        m_instanceID: 1497564581
+        m_instanceID: 4099806029
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 43eba570-3946-5cc3-a3a5-e27244333fdb
       - ModuleBehavior: 1399118904
         m_name: EventManager
         m_isEnabled: true
-        m_instanceID: 687499122
+        m_instanceID: 908334275
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: d93fe2e4-bc27-5eef-afdf-14505544d1a8
       - ModuleBehavior: 1399118904
@@ -44,7 +45,7 @@ PrefabNode:
         EpicItemColor: {r: 0.855334759, g: 0, b: 1, a: 1}
         m_name: ItemManager
         m_isEnabled: true
-        m_instanceID: 1189839703
+        m_instanceID: 3559228351
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 9c8a984c-3a09-55da-83cf-883260c998b5
       - ModuleBehavior: 1399118904
@@ -52,12 +53,18 @@ PrefabNode:
         PlayerHitTime: 0.200000003
         m_name: ControllerVibration
         m_isEnabled: true
-        m_instanceID: 489759803
+        m_instanceID: 4287048862
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: b9ea1e33-fe85-55e1-b641-86c60461dc8a
       - ModuleBehavior: 1399118904
         m_name: ObjectPoolManager
         m_isEnabled: true
-        m_instanceID: 2373290751
+        m_instanceID: 2836665240
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 3cf007d1-4c42-5167-86c7-191cabfea484
+      - ModuleBehavior: 1399118904
+        m_name: TweenManager
+        m_isEnabled: true
+        m_instanceID: 1880745037
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 4c46804a-2b01-5d5c-a154-5e66877f5fe3

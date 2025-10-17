@@ -1,18 +1,18 @@
-m_name: ChargeEffect
+m_name: ResurrectionEffect
 m_isEnabled: true
-m_instanceID: 1325504151
+m_instanceID: 977820705
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
-    m_name: ChargeEffect
+    m_name: ResurrectionEffect
     m_isEnabled: true
-    m_instanceID: 4165330374
+    m_instanceID: 3350338917
     m_transform:
-      position: {x: 0, y: 0.687264204, z: 0, w: 1}
-      rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-    m_index: 3
+    m_index: 217
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: ~
@@ -27,13 +27,13 @@ PrefabNode:
       - EffectComponent: 3131036541
         m_name: EffectComponent
         m_isEnabled: true
-        m_instanceID: 3341126954
+        m_instanceID: 3071868808
         m_FileID: 00000000-0000-0000-0000-000000000000
-        m_effectTemplateName: charge3
+        m_effectTemplateName: shield5
         m_isPlaying: false
         m_isPaused: false
         m_timeScale: 1
         m_loop: true
         m_duration: -1
         m_useAbsolutePosition: false
-        m_effectInstanceName: charge3_obj4165330374
+        m_effectInstanceName: shield5_obj3350338917

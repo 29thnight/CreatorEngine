@@ -10,6 +10,8 @@
 #include "Core.Random.h"
 #include "SoundName.h"
 #include "ObjectPoolManager.h"
+#include "SceneManager.h"
+#include "SphereColliderComponent.h"
 void Bomb::Start()
 {
 	
@@ -64,6 +66,17 @@ void Bomb::Update(float tick)
 			explosionInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10;
 			explosionInfo.position = transform->GetWorldPosition();
 			PhysicsManagers->SphereOverlap(explosionInfo, explosionRadius, hits);
+
+
+			//test
+			Prefab* test = PrefabUtilitys->LoadPrefab("TestSphere");
+			if (test)
+			{
+				GameObject* testObj = PrefabUtilitys->InstantiatePrefab(test, "test");
+				testObj->GetComponent<Transform>()->SetPosition(m_targetPos);
+				testObj->GetComponent<SphereColliderComponent>()->SetRadius(radius);
+			}
+
 
 			for (auto& hit : hits)
 			{

@@ -570,8 +570,29 @@ std::vector<std::shared_ptr<GameObject>> Scene::CreateGameObjects(size_t createS
 
 void Scene::Reset()
 {
-    ScriptManager->SetReload(true);
-    ScriptManager->ReplaceScriptComponent();
+	if(ScriptManager->IsDerty())
+	{
+		ScriptManager->SetReload(true);
+		ScriptManager->ReplaceScriptComponent();
+		ScriptManager->DertyFlagClear();
+	}
+	else
+	{
+		for (const auto& obj : m_SceneObjects)
+		{
+			if (!obj) continue;
+
+			auto scripts = obj->GetComponents<ModuleBehavior>();
+			for (auto& script : scripts)
+			{
+				auto name = script->m_name;
+				if (script && SceneManagers->m_isGameStart)
+				{
+					ScriptManager->BindScriptEvents(script, name.ToString());
+				}
+			}
+		}
+	}
 }
 
 void Scene::Awake()
@@ -685,11 +706,6 @@ void Scene::Update(float deltaSecond)
 	PROFILE_CPU_BEGIN("UpdateEvent");
     UpdateEvent.Broadcast(deltaSecond);
 	PROFILE_CPU_END();
-	//여기서 병렬처리 -> 이렇게되면 반드시 업데이트에서만 BT 갱신 및 설정이 완료되어야 함.
-	m_AIFuture = std::async(std::launch::async, [deltaSecond]
-	{	
-		AIManagers->InternalAIUpdate(deltaSecond); 
-	});
 
 	PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
@@ -706,31 +722,13 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
-	//여기서 한번 체크
-	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
-	{
-		m_AIFuture.get();
-	}
-
     LateUpdateEvent.Broadcast(deltaSecond);
 
 	CullMeshData();
-
-	//여기서 한번 체크
-	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
-	{
-		m_AIFuture.get();
-	}
 }
 
 void Scene::OnDisable()
 {
-	//여기서 한번 체크
-	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
-	{
-		m_AIFuture.get();
-	}
-
 	PROFILE_CPU_BEGIN("OnDisable");
     OnDisableEvent.Broadcast();
 	PROFILE_CPU_END();
@@ -738,12 +736,6 @@ void Scene::OnDisable()
 
 void Scene::OnDestroy()
 {
-	//여기서 한번 체크
-	if (m_AIFuture.valid() && m_AIFuture.wait_for(0ms) == std::future_status::ready)
-	{
-		m_AIFuture.get();
-	}
-
 	PROFILE_CPU_BEGIN("OnDestroyBroadcast");
     OnDestroyEvent.Broadcast();
 	PROFILE_CPU_END();
@@ -756,6 +748,13 @@ void Scene::OnDestroy()
 	PROFILE_CPU_BEGIN("DestroyGameObjects");
     DestroyGameObjects();
 	PROFILE_CPU_END();
+
+	//여기서 병렬처리 -> 이렇게되면 반드시 업데이트에서만 BT 갱신 및 설정이 완료되어야 함.
+	float deltaSecond = Time->GetElapsedSeconds();
+	m_AIFuture = std::async(std::launch::async, [deltaSecond]
+	{
+		AIManagers->InternalAIUpdate(deltaSecond);
+	});
 }
 
 void Scene::AllDestroyMark()

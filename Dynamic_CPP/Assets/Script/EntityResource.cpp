@@ -51,7 +51,7 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 			}
 			m_currentHP -= std::max(damage, 0);
-
+			PlayHitEffect(this->GetOwner(), hitinfo);
 			if (m_currentHP <= 0) {
 				// dead
 
@@ -146,16 +146,17 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 
 				GetOwner()->Destroy();
-				auto pung = GameObject::Find("Pung2");
+				/*auto pung = GameObject::Find("Pung2");
 				if (pung)
 				{
 					Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 					pung->m_transform.SetPosition(pos);
 					pung->GetComponent<EffectComponent>()->Apply();
-				}
+				}*/
 			}
 			else {
 				HitImpulse();
+
 			}
 		}
 	}

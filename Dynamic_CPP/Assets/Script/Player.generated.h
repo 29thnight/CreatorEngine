@@ -24,6 +24,7 @@ ReflectionScriptField(Player) \
 		meta_property(dubbleDashTime) \
 		meta_property(Atk) \
 		meta_property(comboDuration) \
+		meta_property(rapidfireTime) \
 		meta_property(rangedAutoAimRange) \
 		meta_property(rangeAngle) \
 		meta_property(countSpecialBullet) \
@@ -39,6 +40,7 @@ ReflectionScriptField(Player) \
 		meta_property(ResurrectionHP) \
 		meta_property(ResurrectionGracePeriod) \
 		meta_property(SlotChangeCooldown) \
+		meta_property(detectRadius) \
 	}); \
 	MethodField \
 	({ \

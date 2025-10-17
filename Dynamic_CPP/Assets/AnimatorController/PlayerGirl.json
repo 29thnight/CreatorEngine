@@ -46,6 +46,24 @@
                             "hasExitTime": 0,
                             "nextStateName": "Stun",
                             "transName": "Ani State to Stun"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnDash"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Dash",
+                            "transName": "Ani State to Dash"
                         }
                     ],
                     "useMultipler": 0
@@ -94,24 +112,6 @@
                             "hasExitTime": 0,
                             "nextStateName": "MeleeAttack1",
                             "transName": "Idle to MeleeAttack1"
-                        },
-                        {
-                            "blendTime": 0.009999999776482582,
-                            "conditions": [
-                                {
-                                    "bValue": true,
-                                    "cType": 1,
-                                    "fValue": 0.0,
-                                    "iValue": 0,
-                                    "tValue": false,
-                                    "valueName": "OnDash"
-                                }
-                            ],
-                            "curStateName": "Idle",
-                            "exitTime": 0.10000000149011612,
-                            "hasExitTime": 0,
-                            "nextStateName": "Dash",
-                            "transName": "Idle to Dash"
                         },
                         {
                             "blendTime": 0.20000000298023224,
@@ -172,7 +172,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -288,24 +288,6 @@
                             "transName": "Run to MeleeAttack1"
                         },
                         {
-                            "blendTime": 0.009999999776482582,
-                            "conditions": [
-                                {
-                                    "bValue": true,
-                                    "cType": 1,
-                                    "fValue": 0.0,
-                                    "iValue": 0,
-                                    "tValue": false,
-                                    "valueName": "OnDash"
-                                }
-                            ],
-                            "curStateName": "Run",
-                            "exitTime": 0.10000000149011612,
-                            "hasExitTime": 0,
-                            "nextStateName": "Dash",
-                            "transName": "Run to Dash"
-                        },
-                        {
                             "blendTime": 0.20000000298023224,
                             "conditions": [
                                 {
@@ -412,6 +394,24 @@
                             "hasExitTime": 0,
                             "nextStateName": "RangeSpecialAttack",
                             "transName": "Run to RangeSpecialAttack"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": true,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "OnTargetBomb"
+                                }
+                            ],
+                            "curStateName": "Run",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "BombAttack",
+                            "transName": "Run to BombAttack"
                         }
                     ],
                     "useMultipler": 0
@@ -438,7 +438,7 @@
                     "useMultipler": 0
                 },
                 {
-                    "animationIndex": 10,
+                    "animationIndex": 9,
                     "animationSpeed": 2.5,
                     "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
@@ -477,7 +477,7 @@
                     "useMultipler": 1
                 },
                 {
-                    "animationIndex": 9,
+                    "animationIndex": 10,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
@@ -579,7 +579,7 @@
                     "animationIndex": 2,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "AttackSpeed",
-                    "behaviourName": "PlayerBombAttack",
+                    "behaviourName": "PlayerBombCharing",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "BombAttack",
@@ -589,7 +589,7 @@
                             "conditions": [
                                 {
                                     "bValue": true,
-                                    "cType": 0,
+                                    "cType": 1,
                                     "fValue": 0.0,
                                     "iValue": 0,
                                     "tValue": false,
@@ -606,7 +606,7 @@
                     "useMultipler": 1
                 },
                 {
-                    "animationIndex": 10,
+                    "animationIndex": 9,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "AttackSpeed",
                     "behaviourName": "PlayerAttackAH",
@@ -722,8 +722,8 @@
                 {
                     "animationIndex": 3,
                     "animationSpeed": 1.0,
-                    "animationSpeedParameterName": "None",
-                    "behaviourName": "",
+                    "animationSpeedParameterName": "AttackSpeed",
+                    "behaviourName": "PlayerBombAttack",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "ThrowBomb",
@@ -732,13 +732,13 @@
                             "blendTime": 0.20000000298023224,
                             "conditions": [],
                             "curStateName": "ThrowBomb",
-                            "exitTime": 0.10000000149011612,
-                            "hasExitTime": 0,
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
                             "nextStateName": "Idle",
                             "transName": "ThrowBomb to Idle"
                         }
                     ],
-                    "useMultipler": 0
+                    "useMultipler": 1
                 }
             ],
             "controller_name": "Main",
@@ -786,33 +786,14 @@
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Idle",
-                    "transitions": [
-                        {
-                            "blendTime": 0.20000000298023224,
-                            "conditions": [
-                                {
-                                    "bValue": true,
-                                    "cType": 4,
-                                    "fValue": 0.0,
-                                    "iValue": 0,
-                                    "tValue": false,
-                                    "valueName": "OnMove"
-                                }
-                            ],
-                            "curStateName": "Idle",
-                            "exitTime": 0.10000000149011612,
-                            "hasExitTime": 0,
-                            "nextStateName": "Run",
-                            "transName": "Idle to Run"
-                        }
-                    ],
+                    "transitions": [],
                     "useMultipler": 0
                 },
                 {
                     "animationIndex": 11,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
-                    "behaviourName": "",
+                    "behaviourName": "PlayerThrow",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Throw",
@@ -833,7 +814,7 @@
                     "animationIndex": 4,
                     "animationSpeed": 1.0,
                     "animationSpeedParameterName": "None",
-                    "behaviourName": "",
+                    "behaviourName": "PlayerGrab",
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Grab",
@@ -885,26 +866,7 @@
                     "m_isAny": false,
                     "multiplerAnimationSpeed": 1.0,
                     "state_name": "Run",
-                    "transitions": [
-                        {
-                            "blendTime": 0.20000000298023224,
-                            "conditions": [
-                                {
-                                    "bValue": true,
-                                    "cType": 5,
-                                    "fValue": 0.0,
-                                    "iValue": 0,
-                                    "tValue": false,
-                                    "valueName": "OnMove"
-                                }
-                            ],
-                            "curStateName": "Run",
-                            "exitTime": 0.10000000149011612,
-                            "hasExitTime": 0,
-                            "nextStateName": "Idle",
-                            "transName": "Run to Idle"
-                        }
-                    ],
+                    "transitions": [],
                     "useMultipler": 0
                 }
             ],

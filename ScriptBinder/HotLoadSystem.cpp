@@ -1944,6 +1944,8 @@ void HotLoadSystem::Compile()
 
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
+
+	m_isCompileDertyFlag = true;
 }
 
 void HotLoadSystem::LoadForceDLL()

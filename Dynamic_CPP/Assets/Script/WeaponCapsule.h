@@ -2,10 +2,10 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "WeaponCapsule.generated.h"
-
+#include "Entity.h"
 class Player;
 //아시스가 정화후 던져줄 웨폰캡슐 -> 플레이어에게 도달시 매칭된 weapon 생성해줌
-class WeaponCapsule : public ModuleBehavior
+class WeaponCapsule : public Entity
 {
 public:
    ReflectWeaponCapsule
