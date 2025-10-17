@@ -34,11 +34,11 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 10.0,
-                            "lifeTime": 1.0,
+                            "lifeTime": 0.5,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 0.5,
-                                "y": 0.5
+                                "x": 0.699999988079071,
+                                "y": 0.699999988079071
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -244,7 +244,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 3.0,
+                            "lifeTime": 1.5,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -291,15 +291,15 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 2.0,
-                                "y": 2.0
+                                "x": 2.799999952316284,
+                                "y": 2.799999952316284
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.5,
-                                "y": 0.5
+                                "x": 0.699999988079071,
+                                "y": 0.699999988079071
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
@@ -432,11 +432,11 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 3.0,
+                            "lifeTime": 1.5,
                             "rotateSpeed": 1.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 1.399999976158142,
+                                "y": 1.399999976158142
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -482,7 +482,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 5.009293556213379,
+                            "currentTime": 246.57720947265625,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -623,7 +623,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -642,11 +642,11 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 15.0,
+                            "lifeTime": 7.5,
                             "rotateSpeed": 1.5,
                             "size": {
-                                "x": 0.800000011920929,
-                                "y": 0.800000011920929
+                                "x": 1.1200000047683716,
+                                "y": 1.1200000047683716
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -692,7 +692,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 40.15338134765625,
+                            "currentTime": 243.57217407226563,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -845,9 +845,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 0.5,
-                                "y": 0.5,
-                                "z": 0.5
+                                "x": 0.699999988079071,
+                                "y": 0.699999988079071,
+                                "z": 0.699999988079071
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -865,7 +865,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 10.0,
+                            "lifeTime": 5.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -986,7 +986,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 2.0,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -1033,15 +1033,15 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 3.0,
-                                "y": 3.0
+                                "x": 4.199999809265137,
+                                "y": 4.199999809265137
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 1.399999976158142,
+                                "y": 1.399999976158142
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
@@ -1053,6 +1053,51 @@
                     },
                     "stage": 2,
                     "type": "SizeModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
+                        "colorGradient": [
+                            {
+                                "color": {
+                                    "w": 1.0,
+                                    "x": 0.3843137323856354,
+                                    "y": 0.3764705955982208,
+                                    "z": 1.0
+                                },
+                                "time": 0.0
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.3843137323856354,
+                                    "y": 0.3764705955982208,
+                                    "z": 1.0
+                                },
+                                "time": 0.699999988079071
+                            }
+                        ],
+                        "colorParams": {
+                            "customFunctionType": 0,
+                            "customParam1": 0.0,
+                            "customParam2": 0.0,
+                            "customParam3": 0.0,
+                            "customParam4": 0.0,
+                            "discreteColorsSize": 0,
+                            "gradientSize": 2,
+                            "transitionMode": 0
+                        },
+                        "discreteColors": [],
+                        "easing": {
+                            "enabled": false
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 1
+                        }
+                    },
+                    "stage": 2,
+                    "type": "ColorModuleCS",
                     "useEasing": false
                 }
             ],
