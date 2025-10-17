@@ -37,6 +37,7 @@ public:
 	void TestSpawn();
 
 	Mathf::Vector3 SpawnArea{};
+	std::mutex mtx;
 
 	bool triggerOnce = true;
 private:

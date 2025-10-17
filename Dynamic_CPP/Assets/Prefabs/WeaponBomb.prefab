@@ -1,22 +1,22 @@
-m_name: WeaponBomb
+m_name: WeaponBomb_Prefab
 m_isEnabled: true
-m_instanceID: 3326342118
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_instanceID: 149274494
+m_fileGuid: 280a6c30-4c4b-5cdd-9282-29b5ef41955d
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponBomb
     m_isEnabled: true
-    m_instanceID: 1901344766
+    m_instanceID: 2292361784
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 4
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [3]
-    m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
+    m_childrenIndices: [2]
+    m_prefabFileGuid: 280a6c30-4c4b-5cdd-9282-29b5ef41955d
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -26,7 +26,7 @@ PrefabNode:
     m_components:
       - ModuleBehavior: 1399118904
         itemType: 4
-        itemAckDmg: 1
+        itemAckDmg: 100
         itemAckRange: 2
         itemKnockback: 0.5
         coopCrit: 2
@@ -36,28 +36,30 @@ PrefabNode:
         chgKnockback: 1
         ChargeAttackBulletCount: 5
         ChargeAttackBulletAngle: 15
-        durMax: 10
+        durMax: 3
         durUseAtk: 1
+        bombThrowDuration: 2.5
+        bombRadius: 2.5
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 3447394707
+        m_instanceID: 2384300873
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
         m_name: Weapon_bomb_re
         m_isEnabled: true
-        m_instanceID: 2469110402
+        m_instanceID: 1692896374
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 4
-        m_index: 3
-        m_parentIndex: 4
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: 280a6c30-4c4b-5cdd-9282-29b5ef41955d
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -68,7 +70,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3829372625
+            m_instanceID: 598944820
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: weapon_bomb_re

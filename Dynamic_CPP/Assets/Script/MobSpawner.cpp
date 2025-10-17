@@ -23,8 +23,10 @@ void MobSpawner::OnCollisionEnter(const Collision& collision)
 
 void MobSpawner::Spawn()
 {
-	if (!triggerOnce) return;
-	triggerOnce = false;
+	//if (!triggerOnce) return;
+	//triggerOnce = false;
+
+	std::cout << "MobSpawner Spawn Called" << std::endl;
 
 	int index = 0;
 	int maxcount = 0;
@@ -36,14 +38,24 @@ void MobSpawner::Spawn()
 	}
 
 	for (int i = 0; i < variable; i++) {
+		Benchmark bm1{};
 		int count = mobcounts[i];
 		std::string prefabName = mobPrefabNames[i];
 
+		std::cout << "Spawning " << count << " of " << prefabName << std::endl;
 		auto prefab = PrefabUtilitys->LoadPrefab(prefabName);
+		std::cout << "Prefab loaded: " << (prefab ? "Success" : "Failed") << std::endl;
+		std::cout << "Elapsed time for loading prefab: " << bm1.GetElapsedTime() << " ms" << std::endl;
+		
+		std::cout << "Starting instantiation loop for " << prefabName << std::endl;
 		while (count > 0) {
+			Benchmark bm2{};
 			count--;
 			if (prefab) {
+				std::cout << "Instantiating prefab: " << prefabName << std::endl;
 				GameObject* obj = PrefabUtilitys->InstantiatePrefab(prefab, prefabName);
+				std::cout << "Prefab instantiated: " << (obj ? "Success" : "Failed") << std::endl;
+				std::cout << "Elapsed time for instantiation: " << bm2.GetElapsedTime() << " ms" << std::endl;
 				Mathf::Vector3 temp = UniformRandomUpdirection(120, index++, maxcount);
 				temp.y = 0;
 				temp.Normalize();

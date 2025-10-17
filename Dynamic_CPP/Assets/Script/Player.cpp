@@ -181,6 +181,7 @@ void Player::Start()
 				hpbar->SetCurHP(m_currentHP);
 				hpbar->SetType(0);
 				hpbar->SetTarget(player->shared_from_this());
+				hpbar->Init();
 			}
 		}
 	}
@@ -213,6 +214,7 @@ void Player::Start()
 				hpbar->SetCurHP(m_currentHP);
 				hpbar->SetType(1);
 				hpbar->SetTarget(player->shared_from_this());
+				hpbar->Init();
 			}
 		}
 	}

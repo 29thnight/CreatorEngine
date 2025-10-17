@@ -3,7 +3,7 @@
 
 // Log 사용 시 주석 해제
 // Log 끌 시 주석 처리
-#define ENABLE_MY_LOG
+//#define ENABLE_MY_LOG
 
 #ifdef ENABLE_MY_LOG
       // 로그가 켜져 있을 때의 동작

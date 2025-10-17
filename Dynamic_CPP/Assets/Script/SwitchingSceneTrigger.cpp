@@ -35,6 +35,12 @@ void SwitchingSceneTrigger::Start()
 	{
 		m_gameManager = gmObj->GetComponent<GameManager>();
 	}
+
+	GameObject* loadingObj = GameObject::Find("LoadingText");
+    if (loadingObj)
+    {
+        m_loadingText = loadingObj->GetComponent<TextComponent>();
+	}
 }
 
 bool SwitchingSceneTrigger::IsAnyAJustPressed()
@@ -48,6 +54,12 @@ bool SwitchingSceneTrigger::IsAnyAJustPressed()
 	m_prevA0 = a0;
 	m_prevA1 = a1;
 	return just0 || just1;
+}
+
+void SwitchingSceneTrigger::SetAlphaAll(float a)
+{
+    if (m_buttonText)    m_buttonText->SetAlpha(a);
+    if (m_switchingText) m_switchingText->SetAlpha(a);
 }
 
 void SwitchingSceneTrigger::Update(float tick)
@@ -107,6 +119,10 @@ void SwitchingSceneTrigger::Update(float tick)
         const float t = std::clamp(m_timer / std::max(0.0001f, m_fadeOutDuration), 0.f, 1.f);
         const float a = 1.f - SmoothStep(t); // Á¡Á¡ ¾îµÓ°Ô
         SetAlphaAll(a);
+        if (m_loadingText)
+        {
+            m_loadingText->SetAlpha(a);
+        }
 
         if (t >= 1.f) {
             m_phase = SwitchPhase::Switching;
@@ -123,6 +139,10 @@ void SwitchingSceneTrigger::Update(float tick)
         m_phase = SwitchPhase::Hidden;
         m_timer = 0.f;
         SetAlphaAll(0.f);
+        if (m_loadingText)
+        {
+            m_loadingText->SetAlpha(0.f);
+        }
         break;
     }
     }

@@ -27,7 +27,7 @@ void EntityEleteMonster::Start()
 	if (HPBarPrefab && canvObj)
 	{
 		GameObject* hpObj = PrefabUtilitys->InstantiatePrefab(HPBarPrefab, "MonAHp");
-		HPBar* hp = hpObj->GetComponentDynamicCast<HPBar>();
+		HPBar* hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
 		m_currentHP = m_currHP;
@@ -37,6 +37,7 @@ void EntityEleteMonster::Start()
 		hp->SetType(0);
 		hp->screenOffset = { 0, -100 };
 		hp->SetTarget(GetOwner()->shared_from_this());
+		hp->Init();
 	}
 	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)

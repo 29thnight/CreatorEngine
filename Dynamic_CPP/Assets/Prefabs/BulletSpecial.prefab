@@ -1,22 +1,22 @@
-m_name: BulletSpecial
+m_name: BulletSpecial_Prefab
 m_isEnabled: true
-m_instanceID: 1103478231
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_instanceID: 1312392417
+m_fileGuid: 1e4c7cc6-c938-5476-9018-c09d626d3d0b
 PrefabNode:
   - GameObject: 2166264123
     m_name: BulletSpecial
     m_isEnabled: true
-    m_instanceID: 2775799695
+    m_instanceID: 2109351062
     m_transform:
       position: {x: 4.55054903, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1.5, y: 1.5, z: 1.5, w: 0}
       m_parentID: 0
-    m_index: 6
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4]
-    m_prefabFileGuid: 59a1fae7-f44c-54a6-9274-cb9702ddfd17
+    m_childrenIndices: [2]
+    m_prefabFileGuid: 1e4c7cc6-c938-5476-9018-c09d626d3d0b
     m_attachedSoketID: 0
     m_collisionType: 12
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 1831530544
+        m_instanceID: 2223206506
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,35 +43,34 @@ PrefabNode:
       - SphereColliderComponent: 1490099576
         m_name: SphereColliderComponent
         m_isEnabled: true
-        m_instanceID: 1415685899
+        m_instanceID: 2224602964
         m_FileID: 00000000-0000-0000-0000-000000000000
         radius: 0.5
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        rangedProjSpd: 0.0299999993
+        rangedProjSpd: 0.150000006
         rangedProjDist: 10
-        explosionRadius: 3
         m_name: SpecialBullet
         m_isEnabled: true
-        m_instanceID: 2084414808
+        m_instanceID: 3877196695
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 0cd3c915-d85c-5c8c-9048-39ea1da6b878
     children:
       - GameObject: 2166264123
         m_name: special
         m_isEnabled: true
-        m_instanceID: 1707817950
+        m_instanceID: 1764565511
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 6
-        m_index: 4
-        m_parentIndex: 6
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: b1f6e5ef-a123-5f80-b31f-b1cfbd14420d
+        m_prefabFileGuid: 1e4c7cc6-c938-5476-9018-c09d626d3d0b
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -82,7 +81,7 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 1096632331
+            m_instanceID: 870846703
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: shoot1
             m_isPlaying: false

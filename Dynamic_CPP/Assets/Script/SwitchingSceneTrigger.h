@@ -3,7 +3,8 @@
 #include "ModuleBehavior.h"
 
 enum class SwitchPhase { Hidden, FadingIn, WaitingInput, FadingOut, Switching };
-
+class GameManager;
+class TextComponent;
 class SwitchingSceneTrigger : public ModuleBehavior
 {
 public:
@@ -13,10 +14,7 @@ public:
 
 
 	bool IsAnyAJustPressed();
-	void SetAlphaAll(float a) {
-		if (m_buttonText)    m_buttonText->SetAlpha(a);
-		if (m_switchingText) m_switchingText->SetAlpha(a);
-	}
+	void SetAlphaAll(float a);
 
 private:
 	SwitchPhase m_phase = SwitchPhase::Hidden;
@@ -34,7 +32,8 @@ private:
 	//[페이드 인 전용]
 	//지금은 spriteFont로 해서 TextComponent를 받지만, 아이콘으로 변경될 경우
 	//ImageComponent로 변경 필요
-	class GameManager* m_gameManager{ nullptr };
-	class TextComponent* m_buttonText{ nullptr };
-	class TextComponent* m_switchingText{ nullptr };
+	GameManager* m_gameManager{ nullptr };
+	TextComponent* m_buttonText{ nullptr };
+	TextComponent* m_switchingText{ nullptr };
+	TextComponent* m_loadingText{ nullptr };
 };
