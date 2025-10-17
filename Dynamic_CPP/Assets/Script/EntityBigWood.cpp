@@ -45,6 +45,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 	// 플레이어가 공격한 경우에만 처리.
 	m_currentHP -= damage;
+	PlayHitEffect(this->GetOwner(), hitinfo);
 	if (m_currentHP <= 0)
 	{
 		// 파괴 처리.
