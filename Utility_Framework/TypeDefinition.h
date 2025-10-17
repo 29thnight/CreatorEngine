@@ -6,6 +6,7 @@
 #include <typeindex>
 #include <nlohmann/json.hpp>
 #include <filesystem>
+#include <execution>
 
 namespace file = std::filesystem;
 #pragma warning(disable: 26819)
@@ -45,3 +46,14 @@ namespace System
     };
 }
 
+namespace core
+{
+    template<typename T>
+    concept IsHaveBeginEnd = requires(T a) { a.begin(); a.end(); };
+
+	template<typename PP, IsHaveBeginEnd T>
+    inline static void for_each(PP policy, T& container, auto invoke_fn)
+    {
+		std::for_each(policy, container.begin(), container.end(), invoke_fn);
+    }
+}

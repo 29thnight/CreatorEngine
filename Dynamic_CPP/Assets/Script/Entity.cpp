@@ -29,5 +29,11 @@ void Entity::HitImpulseUpdate(float tick)
 		m->m_Material->TrySetValue("ImpulseScale", "maxImpulse", &m_maxHitImpulseSize, floatSize);
 		m->m_Material->TrySetValue("ImpulseScale", "lerpValue", &ratio, floatSize);
 		m->m_Material->TrySetValue("FlashBuffer", "flashStrength", &ratio, floatSize);
+		m->m_Material->TrySetValue("FlashBuffer", "flashFrequency", &m_hitImpulseFrequency, floatSize);
 	}
+}
+
+void Entity::StopHitImpulse()
+{
+	m_currentHitImpulseDuration = 0.f;
 }

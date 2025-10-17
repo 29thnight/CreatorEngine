@@ -307,6 +307,7 @@ public:
 private:
 	//치트들 담긴함수 
 	void Cheat();
+	void SwapWeaponInternal(int dir);
 	Transform* m_transform = nullptr;
 
 

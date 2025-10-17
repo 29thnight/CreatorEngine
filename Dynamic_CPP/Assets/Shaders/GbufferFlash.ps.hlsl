@@ -44,6 +44,7 @@ cbuffer TimeBuffer : register(b5)
 cbuffer FlashBuffer : register(b6)
 {
     float flashStrength;
+    float flashFrequency;
 }
 
 cbuffer MeshRendererBuffer : register(b7)
@@ -199,7 +200,7 @@ GBufferOutput main(PixelShaderInput IN)
     
     roughness = max(roughness, 0.1f);
     
-    float s = sin(PI * flashStrength);
+    float s = sin(PI * flashStrength * flashFrequency);
     
     //OUT.diffuse = flashStrength > 0 ? lerp(float4(0, 0, 0, 1), float4(albedo.rgb, 1), flashStrength) : float4(albedo.rgb, 1);
     OUT.diffuse = flashStrength > 0 ? lerp(float4(1, 0.2, 0.2, 1), float4(0, 0, 0, 1), s) : float4(albedo.rgb, 1);

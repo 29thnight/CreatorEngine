@@ -185,8 +185,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "Glow",
-                            "pixelShader": "glow",
+                            "pixelShader": "GGlow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -609,7 +608,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "Glow",
+                            "pixelShader": "GGlow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [

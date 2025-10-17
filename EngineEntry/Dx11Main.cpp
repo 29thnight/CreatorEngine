@@ -150,7 +150,6 @@ void DirectX11::Dx11Main::Initialize()
             {
                 EngineSettingInstance->renderBarrier.ArriveAndWait();
                 EngineSettingInstance->renderBarrier.ArriveAndWait();
-                std::this_thread::yield();
                 continue;
             }
 

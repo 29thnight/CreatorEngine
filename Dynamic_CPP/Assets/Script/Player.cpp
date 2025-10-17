@@ -1210,16 +1210,23 @@ void Player::Cheat()
 	
 }
 
-void Player::SwapWeaponLeft()
+void Player::SwapWeaponInternal(int dir)
 {
 	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
 	if (false == canChangeSlot) return;
 	if (true == isCharging) return;
-	m_weaponIndex--;
-	if (m_weaponIndex <= 0)
+	if (m_weaponInventory.empty()) return;
+
+	int adjustedDirection = dir;
+	if (playerIndex == 1)
 	{
-		m_weaponIndex = 0;
+		adjustedDirection *= -1;
 	}
+
+	const int maxInventoryIndex = static_cast<int>(m_weaponInventory.size()) - 1;
+	const int maxAllowedIndex = std::max(0, std::min(3, maxInventoryIndex));
+	m_weaponIndex = std::clamp(m_weaponIndex + adjustedDirection, 0, maxAllowedIndex);
+
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
@@ -1233,13 +1240,7 @@ void Player::SwapWeaponLeft()
 		onBombIndicate = false;
 		m_comboCount = 0;
 
-		/*startAttack = false;
-		isAttacking = false;
-		m_chargingTime = 0;
-		isCharging = false;*/
-
 		CancelChargeAttack();
-
 
 		if (m_ActionSound)
 		{
@@ -1248,55 +1249,25 @@ void Player::SwapWeaponLeft()
 			m_ActionSound->PlayOneShot();
 		}
 
-		
-		LOG("Swap Left" + std::to_string(m_weaponIndex));
+		if (adjustedDirection < 0)
+		{
+			LOG("Swap Left" + std::to_string(m_weaponIndex));
+		}
+		else
+		{
+			LOG("Swap Right" + std::to_string(m_weaponIndex));
+		}
 	}
+}
+
+void Player::SwapWeaponLeft()
+{
+	SwapWeaponInternal(-1);
 }
 
 void Player::SwapWeaponRight()
 {
-	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
-	if (false == canChangeSlot) return;
-	if (true == isCharging) return;
-	m_weaponIndex++;
-	if (m_weaponIndex >= 3)
-	{
-		m_weaponIndex = 3;
-	}
-
-	if ( m_weaponInventory.size() <= m_weaponIndex)
-	{
-		m_weaponIndex--;
-	}
-	if (m_curWeapon != nullptr)
-	{
-		m_curWeapon->SetEnabled(false);
-		m_curWeapon = m_weaponInventory[m_weaponIndex];
-		m_curWeapon->SetEnabled(true);
-		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
-		m_UpdateDurabilityEvent.UnsafeBroadcast(m_curWeapon, m_weaponIndex);
-		canChangeSlot = false;
-		countRangeAttack = 0;
-		OnMoveBomb = false;
-		onBombIndicate = false;
-		m_comboCount = 0;
-
-		/*startAttack = false;
-		isAttacking = false;
-		m_chargingTime = 0;
-		isCharging = false;*/
-
-		CancelChargeAttack(); 
-
-		if (m_ActionSound)
-		{
-			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
-			m_ActionSound->clipKey = weaponSwapSounds[rand];
-			m_ActionSound->PlayOneShot();
-		}
-
-		LOG("Swap Right" + std::to_string(m_weaponIndex));
-	}
+	SwapWeaponInternal(1);
 }
 
 void Player::SwapBasicWeapon()
