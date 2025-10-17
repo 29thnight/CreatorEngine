@@ -1,22 +1,22 @@
 m_name: BoxFlower_Prefab
 m_isEnabled: true
-m_instanceID: 2121324322
-m_fileGuid: f2ef94c1-d34e-545e-9f1c-ed7c20aff060
+m_instanceID: 335824987
+m_fileGuid: b87748d9-b14e-501f-8dbb-26570f6bdef1
 PrefabNode:
   - GameObject: 2166264123
     m_name: BoxFlower
     m_isEnabled: true
-    m_instanceID: 26356614
+    m_instanceID: 4267066527
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      scale: {x: 2.20000005, y: 2.20000005, z: 2.20000005, w: 0}
       m_parentID: 0
     m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
     m_childrenIndices: [2]
-    m_prefabFileGuid: f2ef94c1-d34e-545e-9f1c-ed7c20aff060
+    m_prefabFileGuid: b87748d9-b14e-501f-8dbb-26570f6bdef1
     m_attachedSoketID: 0
     m_collisionType: 9
     m_isStatic: false
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 597832232
+        m_instanceID: 987872618
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -43,7 +43,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 1824416817
+        m_instanceID: 3914064084
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.300000012, y: 0.300000012, z: 0.300000012}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -54,14 +54,14 @@ PrefabNode:
         healAmount: 10
         m_name: EntityItemHeal
         m_isEnabled: true
-        m_instanceID: 1329336083
+        m_instanceID: 1507954153
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 1c8b5983-b84f-5ef9-bb70-55b5f4e0776a
     children:
       - GameObject: 2166264123
         m_name: Obj_Inter_flower_low
         m_isEnabled: true
-        m_instanceID: 2864446529
+        m_instanceID: 1770540039
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -71,7 +71,7 @@ PrefabNode:
         m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: f2ef94c1-d34e-545e-9f1c-ed7c20aff060
+        m_prefabFileGuid: b87748d9-b14e-501f-8dbb-26570f6bdef1
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
@@ -82,7 +82,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 4100198725
+            m_instanceID: 1567452291
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Material

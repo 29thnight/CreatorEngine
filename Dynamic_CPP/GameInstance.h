@@ -58,6 +58,10 @@ public:
 	void RemoveItemEnhancement(const ItemInfo& info);
 	bool HasApplied(int itemId, int rarity) const;
 	std::vector<ItemInfo> PickRandomUnappliedItems(int count);
+	// Game Setting
+	bool IsViveEnabled() const { return m_isViveEnabled; }
+	void SetViveEnabled(bool enable) { m_isViveEnabled = enable; }
+
 	//Item BG Color
 	Mathf::Color4	CommonItemColor{ 1.f, 1.f, 1.f, 1.f };
 	Mathf::Color4	RareItemColor{ 1.f, 1.f, 1.f, 1.f };
@@ -80,6 +84,8 @@ private:
 	int m_maxItemID{ 0 };
 	float m_enhancementValue[MAX_ENHANCEMENT_TYPE] = {};
 	std::unordered_map<SourceKey, AnyDelta> m_applied;
+	// Game Setting
+	bool m_isViveEnabled{ true };
 };
 
 template<ItemEnhancementType T>

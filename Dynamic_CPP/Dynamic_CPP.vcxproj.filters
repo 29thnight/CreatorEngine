@@ -678,6 +678,12 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\BurrowMove.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\SoundBarUI.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\ViveSwitchUI.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1219,6 +1225,12 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\BurrowMove.cpp">
 			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SoundBarUI.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ViveSwitchUI.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

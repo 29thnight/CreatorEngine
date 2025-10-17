@@ -181,7 +181,7 @@ void GameManager::SwitchNextScene()
 	}
 	else
 	{
-		LoadScene(m_nextSceneIndex);
+		SwitchScene(m_nextSceneIndex);
 	}
 }
 

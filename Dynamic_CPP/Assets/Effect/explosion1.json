@@ -1,6 +1,13 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
@@ -26,7 +33,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 2.0,
-                            "lifeTime": 3.0,
+                            "lifeTime": 1.5,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -76,12 +83,14 @@
                                 "x": 3.0,
                                 "y": 3.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -95,6 +104,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 50.0,
                             "randomFactor": 0.4000000059604645,
@@ -103,7 +115,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 836.4417724609375,
+                            "currentTime": 123.08474731445313,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -223,7 +235,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -317,7 +329,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 2.0,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -356,6 +368,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 50.0,
                             "randomFactor": 0.4000000059604645,
@@ -364,7 +379,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 836.4417724609375,
+                            "currentTime": 111.67237091064453,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -482,12 +497,14 @@
                                 "x": 0.20000000298023224,
                                 "y": 0.20000000298023224
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 0.5,
                             "randomScaleMin": 0.0,
                             "startSize": {
                                 "x": 0.800000011920929,
                                 "y": 0.800000011920929
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 1
                         },
                         "state": {
@@ -524,7 +541,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -618,7 +635,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 1.0,
+                            "lifeTime": 0.5,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -668,12 +685,14 @@
                                 "x": 6.0,
                                 "y": 6.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -710,7 +729,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -801,12 +820,14 @@
                                 "x": 2.4000000953674316,
                                 "y": 2.4000000953674316
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -834,7 +855,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 1.0,
+                            "lifeTime": 0.5,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -972,7 +993,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1066,7 +1087,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 10.0,
-                            "lifeTime": 1.0,
+                            "lifeTime": 0.5,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -1170,12 +1191,14 @@
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1212,7 +1235,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {

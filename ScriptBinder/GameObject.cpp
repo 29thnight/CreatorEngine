@@ -106,6 +106,8 @@ void GameObject::Destroy()
 
 	for (auto& component : m_components)
 	{
+		if (!component) continue;
+
 		component->Destroy();
 	}
 
@@ -343,7 +345,10 @@ GameObject* GameObject::FindInstanceID(const HashedGuid& guid)
 			return object->m_instanceID == guid;
 		});
 
-		return (*it).get();
+		if (it != gameObjects.end())
+		{
+			return (*it).get();
+		}
 	}
 
 	return nullptr;
