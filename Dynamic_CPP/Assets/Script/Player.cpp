@@ -48,6 +48,7 @@
 #include "ObjectPool.h"
 #include "ControllerVibration.h"
 #include "SwordProjectile.h"
+#include "SwordProjectileEffect.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -60,6 +61,10 @@ void Player::Awake()
 }
 void Player::Start()
 {
+	m_maxHitImpulseSize = 1.0f;
+	m_maxHitImpulseDuration = 0.2f;
+
+	HitImpulseStart();
 	player = GetOwner();
 	
 	auto childred = player->m_childrenIndices;
@@ -132,6 +137,20 @@ void Player::Start()
 		GameObject* healEffcet = PrefabUtilitys->InstantiatePrefab(healprefab, "healeffcet");
 		healEffect = healEffcet->GetComponentDynamicCast<EffectComponent>();
 	}
+	Prefab* chargeprefab = PrefabUtilitys->LoadPrefab("ChargeEffect");
+	if (chargeprefab && player)
+	{
+		GameObject* chargeEffcetObj = PrefabUtilitys->InstantiatePrefab(chargeprefab, "chargeEffect");
+		chargeEffect = chargeEffcetObj->GetComponentDynamicCast<EffectComponent>();
+	}
+
+	Prefab* Resurrprefab = PrefabUtilitys->LoadPrefab("ResurrectionEffect");
+	if (Resurrprefab)
+	{
+		GameObject* ResurrpreObj = PrefabUtilitys->InstantiatePrefab(Resurrprefab, "resurrEffect");
+		resurrectionEffect = ResurrpreObj->GetComponentDynamicCast<EffectComponent>();
+	}
+
 
 	if(0 == playerIndex)
 	{
@@ -188,6 +207,7 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
+				m_maxHP = maxHP;
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
@@ -311,34 +331,47 @@ void Player::Start()
 		slash3 = PrefabUtilitys->InstantiatePrefab(SlashPrefab3, "Slash3");
 	}
 
+
+
+
 }
 
 void Player::Update(float tick)
 {
 	Cheat(); 
+	DetectResource();
+	HitImpulseUpdate(tick);
 	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	pos.y += 0.5;
 	if(dashObj)
 	{
-		dashObj->m_transform.SetPosition(pos);
+		Mathf::Vector3 dashPos = pos;
+		dashPos.y += 0.5f;
+		dashObj->m_transform.SetPosition(dashPos);
 	}
 	if (healEffect)
 	{
-		pos.y += 0.5f;
-		healEffect->GetOwner()->m_transform.SetPosition(pos);
+		Mathf::Vector3 healPos = pos;
+		healPos.y += 1.0f;
+		healEffect->GetOwner()->m_transform.SetPosition(healPos);
 	}
-
+	if (chargeEffect)
+	{
+		Mathf::Vector3 chargePos = pos;
+		chargePos.y += 0.7f;
+		chargeEffect->GetOwner()->m_transform.SetPosition(chargePos);
+	}
+	if (resurrectionEffect)
+	{
+		Mathf::Vector3 resurrPos = pos;
+		resurrPos.y += 1.4f;
+		resurrectionEffect->GetOwner()->m_transform.SetPosition(resurrPos);
+	}
 	if (catchedObject)
 	{
 		UpdateChatchObject();
 	}
 
-	/*if (m_nearObject) {
-		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
-		if (nearMesh)
-			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
-	}*/
 
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
@@ -348,6 +381,15 @@ void Player::Update(float tick)
 		{
 			m_comboCount = 0;
 			m_comboElapsedTime = 0.f;
+		}
+	}
+	if (isAttacking == false && canRapidfire)
+	{
+		rapidfireElapsedTime += tick;
+		if (rapidfireElapsedTime >= rapidfireTime)
+		{
+			canRapidfire = false;
+			rapidfireElapsedTime = 0;
 		}
 	}
 	if (isCharging)
@@ -402,7 +444,6 @@ void Player::Update(float tick)
 		BombIndicator->SetEnabled(onBombIndicate);
 	}
 
-
 	if (true == OnInvincibility)
 	{
 		GracePeriodElpasedTime += tick;
@@ -410,20 +451,36 @@ void Player::Update(float tick)
 		{
 			OnInvincibility = false;
 			GracePeriodElpasedTime = 0.f;
+			if (OnresurrectionEffect)
+			{
+				OnresurrectionEffect = false;
+				resurrectionEffect->StopEffect();
+			}
+			if (onHit)
+			{
+				onHit = false;
+			}
 		}
 		else
 		{
-			//깜빡깜빡 tick당한번 or 0.n초당 규철이가 작성할예정
+			if(onHit) //맞아서 무적인경우
+			{
+				blinkElaspedTime += tick;
+				if (blinkElaspedTime >= m_maxHitImpulseDuration)
+				{
+					HitImpulse();
+					blinkElaspedTime = 0.f;
+				}
+			}
+
 		}
 	}
-
-
-
 
 	if (m_animator)
 	{
 		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
 	}
+
 }
 
 void Player::LateUpdate(float tick)
@@ -637,15 +694,16 @@ void Player::Damage(int damage)
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 	}
-	auto HPbar = GameObject::Find("P1_HPBar"); //이것도 P1인지 P2인지 알아야 함.
-	if (HPbar)
+	if (m_HPbar)
 	{
-		auto hpbar = HPbar->GetComponent<HPBar>();
+		auto hpbar = m_HPbar->GetComponent<HPBar>();
 		if (hpbar)
 		{
 			hpbar->SetCurHP(m_currentHP);
 		}
 	}
+	onHit = true;
+	HitImpulse();
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -897,7 +955,14 @@ void Player::StartAttack()
 				}
 				else
 				{
-					m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+					if (canRapidfire)
+					{
+						m_animator->SetParameter("RangeAttack", true); //원거리 공격 애니메이션으로
+					}
+					else
+					{
+						m_animator->SetParameter("RangeAttackReady", true);
+					}
 				}
 			}
 			if (m_curWeapon->itemType == ItemType::Bomb)
@@ -924,6 +989,10 @@ void Player::Charging()
 		startAttack = false;
 		isCharging = true;    //true 일동안 chargeTime 상승중
 
+		if (chargeEffect)
+		{
+			chargeEffect->Apply();
+		}
 		if (m_SpecialActionSound)
 		{
 				int rand = Random<int>(0, MeleeChargingSounds.size() - 1).Generate();
@@ -931,10 +1000,9 @@ void Player::Charging()
 				m_SpecialActionSound->PlayOneShot();
 		}
 	}
-	//차징 이펙트용으로 chargeStart bool값으로 첫시작때만 effect->apply() 되게끔 넣기
 }
 
-void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀예정
+void Player::ChargeAttack()  
 {
 	//여기선 차징시간이 넘으면 차징공격실행 아니면 아무것도없음 폭탄은 예외
 	isCharging = false; 
@@ -946,6 +1014,10 @@ void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀�
 	}
 	else //근거리 and 원거리 
 	{
+		if (chargeEffect)
+		{
+			chargeEffect->StopEffect();
+		}
 		if (m_chargingTime >= m_curWeapon->chgTime)  //무기별 차징시간 넘었으면
 		{
 			//차지공격나감
@@ -968,13 +1040,13 @@ void Player::ChargeAttack()  //정리되면 ChargeAttack() 으로 이름바꿀�
 
 void Player::StartRay()
 {
-	if (isCharging == true) return;
+	if (isChargeAttack == true) return;
 	startRay = true;
 }
 
 void Player::EndRay()
 {
-	if (isCharging == true) return;
+	if (isChargeAttack == true) return;
 	startRay = false;
 }
 
@@ -1003,27 +1075,13 @@ float Player::calculDamge(bool isCharge)
 void Player::PlaySlashEvent()
 {
 
-	if (slash1)
+	if (slash1 && isChargeAttack == false)
 	{
 		
 		auto Slashscript = slash1->GetComponent<SlashEffect>();
-		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash1Offset;
-		if (m_ActionSound)
-		{
-			m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
-		}
-		if (isChargeAttack)
-		{
-			effectOffset = slashChargeOffset;
-			int rand = Random<int>(0, MeleeChargeSounds.size() - 1).Generate();
-			if (m_ActionSound)
-			{
-				m_ActionSound->clipKey = MeleeChargeSounds[rand];
-			}
-		}
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
 		slash1->GetComponent<Transform>()->SetPosition(effectPos);
@@ -1032,22 +1090,15 @@ void Player::PlaySlashEvent()
 		Mathf::Vector3 up = Mathf::Vector3::Up;
 		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
 		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
-
-		//Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(180.f));
-		//Quaternion finalRot = rot * lookRot;
 		slash1->GetComponent<Transform>()->SetRotation(lookRot);
-
-
 		Slashscript->Initialize();
 
 		if (m_ActionSound)
 		{
+			m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
 			m_ActionSound->PlayOneShot();
 		}
 	}
-
-
-
 }
 
 void Player::PlaySlashEvent2()
@@ -1135,7 +1186,11 @@ void Player::Resurrection()
 	Heal(ResurrectionHP);
 	ResurrectionElapsedTime = 0;
 	SetInvincibility(ResurrectionGracePeriod);
-	
+	if (resurrectionEffect)
+	{
+		OnresurrectionEffect = true;
+		resurrectionEffect->Apply();
+	}
 }
 
 void Player::SetInvincibility(float _GracePeriodTime)
@@ -1204,6 +1259,27 @@ void Player::Cheat()
 	
 }
 
+void Player::DetectResource()
+{
+	std::vector<HitResult> hits;
+	OverlapInput RangeInfo;
+	RangeInfo.layerMask = 1 << 8 | 1 << 9 ; 
+	Transform transform = GetOwner()->m_transform;
+	RangeInfo.position = transform.GetWorldPosition();
+	PhysicsManagers->SphereOverlap(RangeInfo, detectRadius, hits);
+
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+		if (auto entity = object->GetComponentDynamicCast<Entity>())
+		{
+			entity->OnOutLine();
+
+		}
+	}
+}
+
 void Player::SwapWeaponInternal(int dir)
 {
 	if (false == CheckState(PlayerStateFlag::CanSwap)) return;
@@ -1233,6 +1309,7 @@ void Player::SwapWeaponInternal(int dir)
 		OnMoveBomb = false;
 		onBombIndicate = false;
 		m_comboCount = 0;
+		canRapidfire = false;
 
 		CancelChargeAttack();
 
@@ -1285,6 +1362,7 @@ void Player::SwapBasicWeapon()
 	CancelChargeAttack();
 	countRangeAttack = 0;
 	m_comboCount = 0;
+	canRapidfire = false;
 }
 
 void Player::AddMeleeWeapon()
@@ -1423,6 +1501,11 @@ void Player::CancelChargeAttack()
 	isAttacking = false;
 	m_chargingTime = 0;
 	isCharging = false;
+	canRapidfire = false;
+	if (chargeEffect)
+	{
+		chargeEffect->StopEffect();
+	}
 }
 
 void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
@@ -1539,10 +1622,24 @@ void Player::MeleeChargeAttack()
 		Mathf::Vector3 effectPos = myPos + myForward * slashChargeOffset;
 		effectPos.y += 0.9f;
 
+
+		Mathf::Vector3 up = Mathf::Vector3::Up;
+		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
+		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
+		SwordObj->GetComponent<Transform>()->SetRotation(lookRot);
+
+
+
 		if (m_curWeapon)
 		{
 			Projectile->Initialize(this, effectPos, player->m_transform.GetForward(), calculDamge(true));
 
+		}
+		int rand = Random<int>(0, MeleeChargeSounds.size() - 1).Generate();
+		if (m_ActionSound)
+		{
+			m_ActionSound->clipKey = MeleeChargeSounds[rand];
+			m_ActionSound->PlayOneShot();
 		}
 	}
 }
@@ -1832,9 +1929,6 @@ void Player::OnTriggerExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
-		if (nearMesh)
-			nearMesh->m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }
@@ -1852,9 +1946,6 @@ void Player::OnCollisionExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
-		if (nearMesh)
-			nearMesh->m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }
@@ -1862,15 +1953,20 @@ void Player::OnCollisionExit(const Collision& collision)
 
 void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 {
+	Prefab* HitPrefab = nullptr;
 	if (hitinfo.itemType == ItemType::Basic || hitinfo.itemType == ItemType::Melee)
 	{
 		//근접공격타격이벤트
-		Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("SwordHitEffect");
-		if (HirPrefab)
+		if(hitinfo.isCritical == false)
+			HitPrefab = PrefabUtilitys->LoadPrefab("SwordHitEffect");
+		else
+			HitPrefab = PrefabUtilitys->LoadPrefab("CriticaHitEffect");
+
+		if (HitPrefab)
 		{
-			GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
-			auto swordHitEffect = HirObj->GetComponent<SwordHitEffect>();
-			Transform* hitTransform = HirObj->GetComponent<Transform>();
+			GameObject* HitObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
+			auto swordHitEffect = HitObj->GetComponent<PlayEffectAll>();
+			Transform* hitTransform = HitObj->GetComponent<Transform>();
 			hitTransform->SetPosition(hitinfo.hitPos);
 			Vector3 normal = hitinfo.hitNormal;
 			normal.Normalize();
@@ -1904,11 +2000,14 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 	{
 		if (hitinfo.bulletType == BulletType::Normal)
 		{
-			Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("BulletNormalHit");
-			if (HirPrefab)
+			if (hitinfo.isCritical == false)
+				 HitPrefab = PrefabUtilitys->LoadPrefab("BulletNormalHit");
+			else
+				 HitPrefab = PrefabUtilitys->LoadPrefab("CriticaHitEffect");
+			if (HitPrefab)
 			{
-				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
-				auto rangeHitEffect = HirObj->GetComponent<SwordHitEffect>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
+				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 
@@ -1917,11 +2016,14 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 		}
 		else
 		{
-			Prefab* HirPrefab = PrefabUtilitys->LoadPrefab("BulletSpecialHit");
-			if (HirPrefab)
+			if (hitinfo.isCritical == false)
+				HitPrefab = PrefabUtilitys->LoadPrefab("BulletSpecialHit");
+			else
+				HitPrefab = PrefabUtilitys->LoadPrefab("CriticaHitEffect");
+			if (HitPrefab)
 			{
-				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HirPrefab, "HitEffect");
-				auto rangeHitEffect = HirObj->GetComponent<SwordHitEffect>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
+				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 

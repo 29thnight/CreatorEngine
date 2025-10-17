@@ -1,10 +1,10 @@
-#include "PlayerRangeAttack.h"
+#include "PlayerRangeAttackReady.h"
 #include "pch.h"
 #include "Animator.h"
 #include "Player.h"
 #include "CharacterControllerComponent.h"
 #include "Weapon.h"
-void PlayerRangeAttack::Enter()
+void PlayerRangeAttackReady::Enter()
 {
 	if (m_player == nullptr)
 	{
@@ -35,20 +35,21 @@ void PlayerRangeAttack::Enter()
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 		//m_player->m_animator->SetUseLayer(1, false);
-		//m_player->RangeAttack();
+		m_player->RangeAttack();
 	}
+
 }
 
-void PlayerRangeAttack::Update(float deltaTime)
+void PlayerRangeAttackReady::Update(float deltaTime)
 {
 }
 
-void PlayerRangeAttack::Exit()
+void PlayerRangeAttackReady::Exit()
 {
 	if (m_player)
 	{
 		m_player->ChangeState("Idle");
-		//m_player->isAttacking = false;
+		//m_player->isAttacking = false; //레인지어택 1-1 , 1-2도중 피격들어오면 무기내구도 소모후 공격처리 들어가야함
 		//m_player->sucessAttack = true;
 
 	}

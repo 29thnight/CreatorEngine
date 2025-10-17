@@ -48,7 +48,8 @@ public:
 	void SetCurHP(int hp);
 	[[Method]]
 	void Damage(int damage);
-
+	bool onHit = false;
+	float blinkElaspedTime = 0.f;
 	Core::Delegate<void, Weapon*, int>	m_AddWeaponEvent;
 	Core::Delegate<void, Weapon*, int>	m_UpdateDurabilityEvent;
 	Core::Delegate<void, Weapon*, int>	m_ChargingWeaponEvent;
@@ -148,6 +149,10 @@ public:
 	[[Property]]
 	float comboDuration = 0.5f;        //콤보유지시간
 	float m_comboElapsedTime = 0.f;  //콤보유지시간 체크
+	[[Property]]
+	float rapidfireTime = 0.5f;
+	float rapidfireElapsedTime = 0.f;
+	bool canRapidfire = false;
 	[[Property]]
 	float rangedAutoAimRange = 10.f; //자동조준 거리 
 	[[Property]]
@@ -303,13 +308,19 @@ public:
 	
 	bool    onBombIndicate = false;   //테스트용 폭탄인디케이터 추후 UI나 이펙트 변경
 
-
+	[[Property]]
+	float detectRadius = 1.0f;
 private:
 	//치트들 담긴함수 
 	void Cheat();
 	void SwapWeaponInternal(int dir);
+	//상호 작용가능한 리소스탐지 //EntityResource, item, weaponCapsule
+	void DetectResource();
 	Transform* m_transform = nullptr;
-
+	EffectComponent* chargeEffect = nullptr;
+	bool OnresurrectionEffect = false;
+	EffectComponent* resurrectionEffect = nullptr;
+	float resurrectionEffectElaspedTime = 0.f;
 
 	//UI들
 	GameObject* m_uiController = nullptr;

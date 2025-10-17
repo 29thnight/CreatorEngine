@@ -10,7 +10,7 @@
     "name": "swordmain",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -98,7 +98,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 74.07272338867188,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -172,7 +172,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "gg",
+                            "pixelShader": "SwordProjectile",
                             "vertexShader": "MeshParticle"
                         },
                         "textures": [

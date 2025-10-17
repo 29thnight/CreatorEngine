@@ -43,8 +43,8 @@ PixelOutput main(PixelInput input)
     float normalizedAge = input.particleAge / input.particleLifeTime;
     
     // UV 애니메이션 계산
-    float2 dissolveUV = input.texCoord * float2(3.0, 6.0);
-    dissolveUV.x += gTime;
+    float2 dissolveUV = input.texCoord * float2(1.0, 12.0);
+    dissolveUV.y += gTime;
     
     float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
 

@@ -13,6 +13,7 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 		meta_property(m_duration) \
 		meta_property(m_useAbsolutePosition) \
 		meta_property(m_effectInstanceName) \
+		meta_property(m_currentTime) \
 	}); \
 	MethodField \
 	({ \

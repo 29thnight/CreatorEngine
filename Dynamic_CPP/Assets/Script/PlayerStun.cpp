@@ -92,6 +92,6 @@ void PlayerStun::Exit()
 		{
 			m_player->stunEffect->StopEffect();
 		}
-		m_player->m_animator->SetUseLayer(1, true);
+		//m_player->m_animator->SetUseLayer(1, true);
 	}
 }

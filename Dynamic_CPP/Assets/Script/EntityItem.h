@@ -5,6 +5,7 @@
 #include "ItemType.h"
 class Player;
 class RigidBodyComponent;
+class EffectComponent;
 enum EItemState
 {
 	NONE = 0,   // 맨땅에 떨어진상태
@@ -69,6 +70,7 @@ public:
 	int itemReward = 5;
 
 	bool OnGround;
+	EffectComponent* m_effect = nullptr;
 private:
 	Player* throwOwner{ nullptr }; // 이 아이템을 던진 객체.
 };
