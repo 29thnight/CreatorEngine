@@ -78,8 +78,8 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 	{
 		//if (collision.otherObj->m_tag == "Enemy")
 		{
-			Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
-			if (enemy)
+			//Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
+			//if (enemy)
 			{
 
 				hasAttacked = true;
@@ -89,7 +89,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				std::vector<HitResult> hits;
 				OverlapInput bulletInfo;
 				
-				bulletInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10;
+				bulletInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10  | 1<< 15;
 				bulletInfo.position = transform.GetWorldPosition();
 				bulletInfo.rotation = transform.GetWorldQuaternion();
 				PhysicsManagers->SphereOverlap(bulletInfo, explosionRadius, hits);

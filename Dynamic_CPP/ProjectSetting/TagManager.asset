@@ -12,6 +12,8 @@ tags:
   - PlayerDamageSound
   - PlayerSpecialActionSound
   - CriticalMark
+  - normalModel
+  - breakModel
 layers:
   - Default
   - TransparentFX
@@ -27,3 +29,4 @@ layers:
   - Rock
   - PlayerBullet
   - EnemyBullet
+  - EnemyHome

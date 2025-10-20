@@ -14,6 +14,7 @@
 #include "CriticalMark.h"
 #include "PlayEffectAll.h"
 #include "Weapon.h"
+#include "EntityMonsterTower.h"
 void TestMonsterB::Start()
 {
 	auto canvObj = GameObject::Find("Canvas");
@@ -483,6 +484,18 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			}
 			else {
 				HitImpulse();
+			}
+		}
+		else if (auto tower = dynamic_cast<EntityMonsterTower*>(sender))
+		{
+			m_currentHP -= damage;
+			blackBoard->SetValueAsInt("CurrHP", m_currentHP);
+			if (m_currentHP <= 0)
+			{
+				isDead = true;
+				Dead();
+				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+				controller->Move({ 0, 0 });
 			}
 		}
 	}

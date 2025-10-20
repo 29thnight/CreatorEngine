@@ -28,6 +28,7 @@ ReflectionScriptField(Player) \
 		meta_property(rangedAutoAimRange) \
 		meta_property(rangeAngle) \
 		meta_property(countSpecialBullet) \
+		meta_property(MaxThrowDistance) \
 		meta_property(bombMoveSpeed) \
 		meta_property(slash1Offset) \
 		meta_property(slash2Offset) \

@@ -10,6 +10,7 @@
 #include "TutorialButton.h"
 #include "StartButton.h"
 #include "BootstrapObserver.h"
+#include "EntityMonsterTower.h"
 #include "ViveSwitchUI.h"
 #include "SoundBarUI.h"
 #include "SwordProjectileEffect.h"

@@ -199,6 +199,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("TutorialButton", []() { return new TutorialButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("StartButton", []() { return new StartButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("BootstrapObserver", []() { return new BootstrapObserver(); });
+		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterTower", []() { return new EntityMonsterTower(); });
 		CreateFactory::GetInstance()->RegisterFactory("ViveSwitchUI", []() { return new ViveSwitchUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SoundBarUI", []() { return new SoundBarUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SwordProjectileEffect", []() { return new SwordProjectileEffect(); });
