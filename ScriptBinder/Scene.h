@@ -66,6 +66,7 @@ public:
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
 	void CullMeshData();
+	void InternalPauseUpdateForUI();
 
     std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = -1);
 

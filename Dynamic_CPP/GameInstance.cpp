@@ -56,7 +56,8 @@ static inline std::string FormatDescFmtStyle(const std::string& fmt, int rawPerc
 
 void GameInstance::Initialize()
 {
-	if (m_isInitialize) {
+	if(m_isInitialize)
+	{
 		return;
 	}
 	m_isInitialize = true;
