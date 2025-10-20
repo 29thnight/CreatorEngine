@@ -63,7 +63,7 @@ void BP001::Explosion()
 	OverlapInput input;
 	input.position = pos;
 	input.rotation = Mathf::Quaternion::Identity;
-	//input.layerMask = ~0;
+	input.layerMask = 1 << 5; // 플레이어 레이어만 검사
 
 	std::vector<HitResult> res;
 
@@ -75,10 +75,10 @@ void BP001::Explosion()
 	for (auto& hit : res) {
 		//tag 판단? 레이어 판단? 이름으로 찾을까? 원한다면 바꿔도 좋고 아님 말고 필요하다면 init때 레이어 마스크까지 넘기던지
 		//플레이어만 찾자 아시스 안들어온다며
-		if (hit.gameObject->m_tag == "Player") {
-			Entity* objEntity = hit.gameObject->GetComponentDynamicCast<Entity>();
-			objEntity->SendDamage(m_ownerEntity, m_damage);
-		}
+		
+		Entity* objEntity = hit.gameObject->GetComponentDynamicCast<Entity>();
+		objEntity->SendDamage(m_ownerEntity, m_damage);
+		
 	}
 	//
 

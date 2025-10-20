@@ -18,8 +18,12 @@ ReflectionScriptField(TBoss1) \
 	MethodField \
 	({ \
 		meta_method(Burrow) \
+		meta_method(SetBurrow) \
 		meta_method(Protrude) \
+		meta_method(ProtrudeEnd) \
 		meta_method(ProtrudeChunsik) \
+		meta_method(ShootProjectile) \
+		meta_method(SweepAttack) \
 		meta_method(BP0011) \
 		meta_method(BP0012) \
 		meta_method(BP0013) \

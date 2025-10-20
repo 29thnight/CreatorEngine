@@ -103,6 +103,8 @@ public:
 	float m_teleportDistance = 5.0f; //텔레포트 시작 거리
 	[[Property]]
 	float m_teleportCoolTime = 3.0f; //텔레포트 쿨타임
+	[[Property]]
+	float m_teleportDelay = 0.5f; //텔레포트 딜레이 시간
 
 	bool m_isTeleport = false; //텔레포트 실행중
 	bool m_posset = false; //이동 완료시
@@ -134,6 +136,11 @@ public:
 		float characterShapeHalfHeight,
 		float avoidanceStrength,
 		unsigned int layerMask);
+
+
+	void StartTeleport();
+	void EndTeleport();
+
 
 	void Teleport(); // 일정 거리 이내 접근시 순간이동
 

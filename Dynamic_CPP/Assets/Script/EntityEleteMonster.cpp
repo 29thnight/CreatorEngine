@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Player.h"
 #include "EffectComponent.h"
+#include "MeshRenderer.h"
 #include "BehaviorTreeComponent.h"
 #include "Blackboard.h"
 #include "RaycastHelper.h"
@@ -605,6 +606,29 @@ DirectX::SimpleMath::Vector3 EntityEleteMonster::ObstacleAvoider(
 
 	return DirectX::SimpleMath::Vector3::Zero;
 
+}
+
+void EntityEleteMonster::StartTeleport()
+{
+	//텔레포트 시작
+	//이펙트 시작 
+	//충돌체 비활성화
+	GetOwner()->SetLayer("Water"); //왜 물로 바꾸는거야 ㅋㅋㅋㅋ
+	//모델 비활성화
+	MeshRenderer* mesh = m_pOwner->GetComponent<MeshRenderer>();
+	if (mesh) {
+		mesh->SetEnabled(false);
+	}
+
+	//일정 시간 뒤에 텔레포트 실행
+}
+
+void EntityEleteMonster::EndTeleport()
+{
+	//위치 이동 후
+	//해당 위치에 이펙트 시작
+	//해당 위치에 다른 충돌체 밀어내기
+	//충돌체 활성화
 }
 
 void EntityEleteMonster::Teleport()

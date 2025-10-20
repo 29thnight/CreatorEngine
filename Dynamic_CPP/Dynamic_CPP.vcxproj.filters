@@ -678,6 +678,12 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\BurrowMove.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\BossBurrowAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossPopupAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1219,6 +1225,12 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\BurrowMove.cpp">
 			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossBurrowAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossPopupAni.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

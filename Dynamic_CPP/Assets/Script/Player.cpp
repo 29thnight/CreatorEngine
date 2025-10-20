@@ -1546,7 +1546,8 @@ void Player::MeleeAttack()
 	direction.y = 0;
 	direction.Normalize();
 	std::vector<HitResult> hits;
-	rayOrigin.y = 0.5f;
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	rayOrigin.y = pos.y+ 0.5f;
 	
 	float distacne = 2.0f;
 	if (m_curWeapon)
