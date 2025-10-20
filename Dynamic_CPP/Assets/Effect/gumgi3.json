@@ -1,6 +1,6 @@
 {
     "currentTime": 0.0,
-    "duration": 0.5,
+    "duration": 1.0,
     "emitterTimings": [
         0.0,
         0.0
@@ -34,16 +34,16 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.3019607961177826,
-                                "y": 0.08235294371843338,
-                                "z": 0.4588235318660736
+                                "x": 0.054901961237192154,
+                                "y": 0.1764705926179886,
+                                "z": 0.21176470816135406
                             },
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 0.5,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -133,7 +133,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 1.070536732673645,
+                            "currentTime": 12.279747009277344,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -266,16 +266,16 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.3019607961177826,
-                                "y": 0.08235294371843338,
-                                "z": 0.4588235318660736
+                                "x": 0.054901961237192154,
+                                "y": 0.1764705926179886,
+                                "z": 0.21176470816135406
                             },
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 0.5,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -365,7 +365,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 1.070536732673645,
+                            "currentTime": 1.7074908018112183,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -480,5 +480,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }

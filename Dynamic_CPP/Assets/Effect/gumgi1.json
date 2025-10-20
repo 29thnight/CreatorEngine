@@ -1,6 +1,6 @@
 {
     "currentTime": 0.0,
-    "duration": 0.5,
+    "duration": 1.0,
     "emitterTimings": [
         0.0
     ],
@@ -10,7 +10,7 @@
     "name": "gumgi1",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -18,7 +18,7 @@
                         "meshParticleTemplate": {
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": 3.0,
+                                "y": 1.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -33,16 +33,16 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.24313725531101227,
-                                "y": 0.4156862795352936,
-                                "z": 0.529411792755127
+                                "x": 0.05536367744207382,
+                                "y": 0.17494714260101318,
+                                "z": 0.21299636363983154
                             },
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 0.5,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -98,7 +98,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 23.766408920288086,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -213,5 +213,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }
