@@ -23,11 +23,19 @@ void EntityMonsterTower::Start()
 		{
 			breakModel = childObj;
 		}
+
+		if (childObj->m_tag == posTag)
+		{
+			monsterSpawnPosObj = childObj;
+		}
 	}
 
 	if (breakModel)
 	{
-		breakModel->GetComponent<MeshRenderer>()->SetEnabled(false);
+		auto meshren = breakModel->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+		for (auto& m : meshren) {
+			m->SetEnabled(false);
+		}
 	}
 
 
@@ -39,6 +47,10 @@ void EntityMonsterTower::Start()
 		auto monsterScript = towerMonster->GetComponentDynamicCast<TestMonsterB>();
 		monsterScript->m_attackRange = attackRange;
 		monsterScript->m_chaseRange = attackRange;
+		if (monsterSpawnPosObj)
+		{
+			towerMonster->m_transform.SetPosition(monsterSpawnPosObj->m_transform.GetWorldPosition());
+		}
 	}
 }
 
@@ -61,11 +73,17 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
 
 		if (normalModel)
 		{
-			normalModel->GetComponent<MeshRenderer>()->SetEnabled(false);
+			auto meshren = normalModel->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+			for (auto& m : meshren) {
+				m->SetEnabled(false);
+			}
 		}
 		if (breakModel)
 		{
-			breakModel->GetComponent<MeshRenderer>()->SetEnabled(true);
+			auto meshren = breakModel->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+			for (auto& m : meshren) {
+				m->SetEnabled(true);
+			}
 		}
 
 		GetOwner()->SetLayer("Water");

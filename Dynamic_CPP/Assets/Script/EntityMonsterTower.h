@@ -31,6 +31,8 @@ private:
 	GameObject* normalModel = nullptr;
 	GameObject* breakModel = nullptr;
 	GameObject* towerMonster = nullptr;
+	GameObject* monsterSpawnPosObj = nullptr;
+	std::string posTag = "ShootTag";
 	std::string normalTag = "normalModel";
 	std::string breakTag = "breakModel";
 	[[Property]]
