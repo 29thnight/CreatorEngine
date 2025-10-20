@@ -2,7 +2,7 @@
     "currentTime": 0.0,
     "duration": 1.0,
     "emitterTimings": [
-        0.5,
+        0.25,
         0.0,
         0.0,
         0.0,
@@ -118,7 +118,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 2.7753727436065674,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
