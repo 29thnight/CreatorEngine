@@ -9,13 +9,19 @@ bool IsHazadPatten::ConditionCheck(float deltatime, const BlackBoard& blackBoard
 	if (!hasIdentity) {
 		return false;
 	}
+
 	std::string identity = blackBoard.GetValueAsString("Identity");
 	if (identity == "Boss1")
 	{
 		TBoss1* script = m_owner->GetComponent<TBoss1>();
 		float interval = script->hazardInterval;
 		if (interval < script->hazardTimer) {
+			std::cout << "IsHazadPatten : true hazardTimer " << script->hazardTimer << " interval " << interval << std::endl;
 			return true;
+		}
+		else {
+			std::cout << "IsHazadPatten : false hazardTimer " << script->hazardTimer << " interval " << interval << std::endl;
+			return false;
 		}
 	}
 

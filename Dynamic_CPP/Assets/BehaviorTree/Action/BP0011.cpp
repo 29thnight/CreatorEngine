@@ -4,33 +4,33 @@
 
 NodeStatus BP0011::Tick(float deltatime, BlackBoard& blackBoard)
 {
-	
+    const auto MY_PATTERN_TYPE = TBoss1::EPatternType::BP0011; // ì´ ë…¸ë“œì— í•´ë‹¹í•˜ëŠ” íŒ¨í„´ íƒ€ì…
     TBoss1* script = m_owner->GetComponent<TBoss1>();
-    if (script->GetActivePattern() != TBoss1::EPatternType::BP0011)
-    {
-        // ¾ÈÀüÀåÄ¡: ¸¸¾à ´Ù¸¥ ÆĞÅÏÀÌ ÀÌ¹Ì ½ÇÇà ÁßÀÌ¶ó¸é, ÀÌ ³ëµå´Â ½ÇÆĞ Ã³¸®ÇÕ´Ï´Ù.
-        if (script->GetActivePattern() != TBoss1::EPatternType::None)
-        {
-            return NodeStatus::Failure;
-        }
 
-        // º¸½º¿¡°Ô BP0034 ÆĞÅÏ ½ÃÀÛÀ» '¿äÃ»'ÇÕ´Ï´Ù.
-        script->BP0011();
+    // 1. ê°€ì¥ ë¨¼ì € 'íŒ¨í„´ì´ ë°©ê¸ˆ ëë‚¬ëŠ”ì§€' í™•ì¸
+    if (script->GetLastCompletedPattern() == MY_PATTERN_TYPE)
+    {
+        script->ConsumeLastCompletedPattern(); // ìƒíƒœë¥¼ 'ì†Œë¹„'í•˜ì—¬ ë‹¤ìŒ Tickì—ì„œ ì¬ì§„ì… ë°©ì§€
+        script->actionCount++;
+        return NodeStatus::Success; // ìµœì¢… ì„±ê³µ ì²˜ë¦¬
     }
 
-    // --- »óÅÂ °¨½Ã ¿ªÇÒ ---
-    // TBoss1 °´Ã¼´Â ÀÚ½ÅÀÇ Update() ÇÔ¼ö¿¡¼­ ½º½º·Î ÆĞÅÏÀ» ÁøÇà½ÃÅµ´Ï´Ù.
-    // ÀÌ ³ëµå´Â º¸½ºÀÇ ÇöÀç »óÅÂ(m_activePattern)¸¦ È®ÀÎÇÏ±â¸¸ ÇÏ¸é µË´Ï´Ù.
-    if (script->GetActivePattern() == TBoss1::EPatternType::None)
+    const auto currentPattern = script->GetActivePattern();
+
+    // 2. ë³´ìŠ¤ê°€ ì•„ë¬´ê²ƒë„ ì•ˆ í•˜ê³  ìˆì„ ë•Œ -> íŒ¨í„´ ì‹œì‘
+    if (currentPattern == TBoss1::EPatternType::None)
     {
-        // º¸½º°¡ ½º½º·Î ÆĞÅÏÀ» ³¡³½ °ÍÀ» È®ÀÎÇß½À´Ï´Ù.
-        // ÀÌ ³ëµåÀÇ ÀÓ¹«°¡ ¿Ï¼öµÇ¾úÀ¸¹Ç·Î Success¸¦ ¹İÈ¯ÇÕ´Ï´Ù.
-        return NodeStatus::Success;
+        script->BP0011(); // ì´ ë…¸ë“œì— ë§ëŠ” íŒ¨í„´ ì‹œì‘ í•¨ìˆ˜ í˜¸ì¶œ
+        return NodeStatus::Running;
     }
+    // 3. ìš°ë¦¬ íŒ¨í„´ì´ ì‹¤í–‰ ì¤‘ì¼ ë•Œ -> ê³„ì† Running
+    else if (currentPattern == MY_PATTERN_TYPE)
+    {
+        return NodeStatus::Running;
+    }
+    // 4. ë‹¤ë¥¸ íŒ¨í„´ì´ ì‹¤í–‰ ì¤‘ì¼ ë•Œ -> ì‹¤íŒ¨ ì²˜ë¦¬
     else
     {
-        // ¾ÆÁ÷ º¸½º°¡ BP0034 ÆĞÅÏÀ» ÁøÇà ÁßÀÎ °ÍÀ» È®ÀÎÇß½À´Ï´Ù.
-        // ´ÙÀ½ Æ½¿¡¼­ ´Ù½Ã »óÅÂ¸¦ È®ÀÎÇÒ ¼ö ÀÖµµ·Ï RunningÀ» ¹İÈ¯ÇÕ´Ï´Ù.
-        return NodeStatus::Running;
+        return NodeStatus::Failure;
     }
 }

@@ -1,0 +1,244 @@
+{
+    "Controllers": [
+        {
+            "StateVec": [
+                {
+                    "animationIndex": -1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": true,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Ani State",
+                    "transitions": [],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 5,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Idle",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeAtteckTrigger"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeCharge",
+                            "transName": "Idle to MeleeCharge"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeCharge",
+                            "transName": "Idle to RangeCharge"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Burrow",
+                            "transName": "Idle to Burrow"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "PhaseShift",
+                            "transName": "Idle to PhaseShift"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 4,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "MeleeCharge",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "MeleeCharge",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeAtteck",
+                            "transName": "MeleeCharge to MeleeAtteck"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "MeleeAtteck",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "MeleeAtteck",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "MeleeAtteck to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 4,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeCharge",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "RangeCharge",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeAtteck",
+                            "transName": "RangeCharge to RangeAtteck"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 3,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeAtteck",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "RangeAtteck",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "RangeAtteck to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 7,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Burrow",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Burrow",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Popup",
+                            "transName": "Burrow to Popup"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 8,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Popup",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Popup",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "Popup to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 6,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "PhaseShift",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "PhaseShift",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Idle",
+                            "transName": "PhaseShift to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                }
+            ],
+            "controller_name": "NewLayer0",
+            "useController": 1,
+            "useMask": 0
+        }
+    ],
+    "Parameters": [
+        {
+            "param_name": "MeleeAtteckTrigger",
+            "param_vType": 3
+        },
+        {
+            "param_name": "RangeAtteckTrigger",
+            "param_vType": 3
+        },
+        {
+            "param_name": "BurrowTrigger",
+            "param_vType": 3
+        },
+        {
+            "param_name": "ShiftTrigger",
+            "param_vType": 3
+        }
+    ]
+}

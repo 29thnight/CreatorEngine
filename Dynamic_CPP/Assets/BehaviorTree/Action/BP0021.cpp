@@ -4,32 +4,33 @@
 
 NodeStatus BP0021::Tick(float deltatime, BlackBoard& blackBoard)
 {
+    const auto MY_PATTERN_TYPE = TBoss1::EPatternType::BP0021; // 이 노드에 해당하는 패턴 타입
     TBoss1* script = m_owner->GetComponent<TBoss1>();
-    if (script->GetActivePattern() != TBoss1::EPatternType::BP0021)
-    {
-        // 안전장치: 만약 다른 패턴이 이미 실행 중이라면, 이 노드는 실패 처리합니다.
-        if (script->GetActivePattern() != TBoss1::EPatternType::None)
-        {
-            return NodeStatus::Failure;
-        }
 
-        // 보스에게 BP0034 패턴 시작을 '요청'합니다.
-        script->BP0021();
+    // 1. 가장 먼저 '패턴이 방금 끝났는지' 확인
+    if (script->GetLastCompletedPattern() == MY_PATTERN_TYPE)
+    {
+        script->ConsumeLastCompletedPattern(); // 상태를 '소비'하여 다음 Tick에서 재진입 방지
+        script->actionCount++;
+        return NodeStatus::Success; // 최종 성공 처리
     }
 
-    // --- 상태 감시 역할 ---
-    // TBoss1 객체는 자신의 Update() 함수에서 스스로 패턴을 진행시킵니다.
-    // 이 노드는 보스의 현재 상태(m_activePattern)를 확인하기만 하면 됩니다.
-    if (script->GetActivePattern() == TBoss1::EPatternType::None)
+    const auto currentPattern = script->GetActivePattern();
+
+    // 2. 보스가 아무것도 안 하고 있을 때 -> 패턴 시작
+    if (currentPattern == TBoss1::EPatternType::None)
     {
-        // 보스가 스스로 패턴을 끝낸 것을 확인했습니다.
-        // 이 노드의 임무가 완수되었으므로 Success를 반환합니다.
-        return NodeStatus::Success;
+        script->BP0021(); // 이 노드에 맞는 패턴 시작 함수 호출
+        return NodeStatus::Running;
     }
+    // 3. 우리 패턴이 실행 중일 때 -> 계속 Running
+    else if (currentPattern == MY_PATTERN_TYPE)
+    {
+        return NodeStatus::Running;
+    }
+    // 4. 다른 패턴이 실행 중일 때 -> 실패 처리
     else
     {
-        // 아직 보스가 BP0034 패턴을 진행 중인 것을 확인했습니다.
-        // 다음 틱에서 다시 상태를 확인할 수 있도록 Running을 반환합니다.
-        return NodeStatus::Running;
+        return NodeStatus::Failure;
     }
 }
