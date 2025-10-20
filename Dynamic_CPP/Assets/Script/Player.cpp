@@ -334,7 +334,21 @@ void Player::Start()
 	}
 
 
-
+	Prefab* LSlashPrefab = PrefabUtilitys->LoadPrefab("LSlashEffect1");
+	if (LSlashPrefab)
+	{
+		Lslash1 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab, "LSlash1");
+	}
+	Prefab* LSlashPrefab2 = PrefabUtilitys->LoadPrefab("LSlashEffect2");
+	if (LSlashPrefab2)
+	{
+		Lslash2 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab2, "LSlash2");
+	}
+	Prefab* LSlashPrefab3 = PrefabUtilitys->LoadPrefab("LSlashEffect3");
+	if (LSlashPrefab3)
+	{
+		Lslash3 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab3, "LSlash3");
+	}
 
 }
 
@@ -1077,22 +1091,33 @@ float Player::calculDamge(bool isCharge)
 void Player::PlaySlashEvent()
 {
 
-	if (slash1 && isChargeAttack == false)
+	if (isChargeAttack == false)
 	{
 		
-		auto Slashscript = slash1->GetComponent<SlashEffect>();
+		GameObject* Slash = nullptr;
+		if (m_curWeapon->GetItemType() == ItemType::Basic)
+		{
+			Slash = slash1;
+		}
+		else if (m_curWeapon->GetItemType() == ItemType::Melee)
+		{
+			Slash = Lslash1;
+		}
+		if (!Slash) return;
+		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash1Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
-		slash1->GetComponent<Transform>()->SetPosition(effectPos);
+		Slash->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
 		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
 		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
-		slash1->GetComponent<Transform>()->SetRotation(lookRot);
+
+		Slash->GetComponent<Transform>()->SetRotation(lookRot);
 		Slashscript->Initialize();
 
 		if (m_ActionSound)
@@ -1107,14 +1132,24 @@ void Player::PlaySlashEvent2()
 {
 	if (slash2)
 	{
-		auto Slashscript = slash2->GetComponent<SlashEffect>();
+		GameObject* Slash = nullptr;
+		if (m_curWeapon->GetItemType() == ItemType::Basic)
+		{
+			Slash = slash2;
+		}
+		else if (m_curWeapon->GetItemType() == ItemType::Melee)
+		{
+			Slash = Lslash2;
+		}
+		if (!Slash) return;
+		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash2Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
-		slash2->GetComponent<Transform>()->SetPosition(effectPos);
+		Slash->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
@@ -1123,7 +1158,7 @@ void Player::PlaySlashEvent2()
 
 		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
 		Quaternion finalRot = rot * lookRot;
-		slash2->GetComponent<Transform>()->SetRotation(finalRot);
+		Slash->GetComponent<Transform>()->SetRotation(finalRot);
 
 		Slashscript->Initialize();
 		if (m_ActionSound)
@@ -1136,15 +1171,20 @@ void Player::PlaySlashEvent2()
 
 void Player::PlaySlashEvent3()
 {
-	if (slash3)
+	if (Lslash3)
 	{
-		auto Slashscript = slash3->GetComponent<SlashEffect>();
+		GameObject* Slash = nullptr;
+		if (m_curWeapon->GetItemType() == ItemType::Melee)
+		{
+			Slash = Lslash3;
+		}
+		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		Mathf::Vector3 effectPos = myPos;
 		effectPos.y += 0.9f;
-		slash3->GetComponent<Transform>()->SetPosition(effectPos);
+		Slash->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Slashscript->Initialize();

@@ -217,6 +217,9 @@ public:
 	GameObject* slash1 = nullptr;
 	GameObject* slash2 = nullptr;
 	GameObject* slash3 = nullptr;
+	GameObject* Lslash1 = nullptr;
+	GameObject* Lslash2 = nullptr;
+	GameObject* Lslash3 = nullptr;
 	[[Method]]
 	void PlaySlashEvent(); //검기 이펙트 + 사운드 출력
 	[[Property]]
