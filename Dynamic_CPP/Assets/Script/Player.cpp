@@ -1180,6 +1180,7 @@ void Player::PlaySlashEvent3()
 		{
 			Slash = Lslash3;
 		}
+		if (!Slash) return;
 		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
@@ -1440,6 +1441,7 @@ bool Player::AddWeapon(Weapon* weapon)
 
 	weapon->SetEnabled(false);
 	int prevSize = m_weaponInventory.size();
+	weapon->Initialize();
 	m_weaponInventory.push_back(weapon);
 	m_AddWeaponEvent.UnsafeBroadcast(weapon, m_weaponInventory.size() - 1);
 	m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
@@ -1619,10 +1621,11 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	Mathf::Quaternion bombrotat{};
 	if (camera)
 	{
-		Mathf::Vector3 cameraPos = camera->m_transform.GetWorldPosition();
-		Mathf::Vector3 dir = bombThrowPosition - cameraPos;
+		Mathf::Vector3 UpPos = bombThrowPosition;  //가장위
+		UpPos.y += 100.f;
+		Mathf::Vector3 dir = bombThrowPosition - UpPos;
 
-		Mathf::Vector3 rayOrigin = cameraPos;
+		Mathf::Vector3 rayOrigin = UpPos;
 		dir.Normalize();
 		std::vector<HitResult> hits;
 

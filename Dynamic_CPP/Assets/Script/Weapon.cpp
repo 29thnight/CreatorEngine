@@ -6,12 +6,17 @@ using namespace Mathf;
 
 void Weapon::Start()
 {
-	curDur = durMax;
+	
 }
 
 void Weapon::Update(float tick)
 {
 
+}
+
+void Weapon::Initialize()
+{
+	curDur = durMax;
 }
 
 void Weapon::SetEnabled(bool able)
