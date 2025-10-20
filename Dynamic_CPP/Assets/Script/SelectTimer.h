@@ -12,6 +12,8 @@ public:
 	virtual void Start() override;
 	virtual void Update(float tick) override;
 
+	bool IsTimerOn() const { return m_isTimerOn; }
+
 private:
 	class GameManager* gameManager{};
 	class TextComponent* timerText{};
@@ -20,4 +22,5 @@ private:
 	[[Property]]
 	float m_remainTimeSetting{ 5.f };
 	float m_remainTimeInternal{};
+	bool m_isTimerOn{ false };
 };

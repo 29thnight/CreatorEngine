@@ -40,6 +40,14 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			ImGui::SameLine();
 			m_searchFilter.Draw("##HierarchyWindow Search", ImGui::GetContentRegionAvail().x);
 			ImGui::PopStyleVar();
+
+			if (SceneManagers->IsSceneLoading())
+			{
+				ImGui::Text("Not Init HierarchyWindow");
+				//ImGui::End();
+				return;
+			}
+
 			if (m_sceneRenderer)
 			{
 				scene = SceneManagers->GetActiveScene();
@@ -64,7 +72,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (!scene && !renderScene)
 				{
 					ImGui::Text("Not Init HierarchyWindow");
-					ImGui::End();
+					//ImGui::End();
 					return;
 				}
 

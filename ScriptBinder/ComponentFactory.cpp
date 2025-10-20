@@ -82,6 +82,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			scriptComponent->MakeInstanceID();
 		}
+
+		if (SceneManagers->m_isGameStart)
+		{
+			ScriptManager->BindScriptEvents(scriptComponent, scriptComponent->m_name.ToString());
+		}
+
 		return;
 	}
 
@@ -147,11 +153,26 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                             }
                         };
 
-                        loadTex(meshRenderer->m_Material->m_baseColorTexName, meshRenderer->m_Material->m_pBaseColor, true);
-                        loadTex(meshRenderer->m_Material->m_normalTexName, meshRenderer->m_Material->m_pNormal);
-                        loadTex(meshRenderer->m_Material->m_ORM_TexName, meshRenderer->m_Material->m_pOccRoughMetal);
-                        loadTex(meshRenderer->m_Material->m_AO_TexName, meshRenderer->m_Material->m_AOMap);
-                        loadTex(meshRenderer->m_Material->m_EmissiveTexName, meshRenderer->m_Material->m_pEmissive);
+						if (!meshRenderer->m_Material->m_pBaseColor || meshRenderer->m_Material->m_baseColorTexName != meshRenderer->m_Material->m_pBaseColor->m_name)
+						{
+							loadTex(meshRenderer->m_Material->m_baseColorTexName, meshRenderer->m_Material->m_pBaseColor, false);
+						}
+						if (!meshRenderer->m_Material->m_pNormal || meshRenderer->m_Material->m_normalTexName != meshRenderer->m_Material->m_pNormal->m_name)
+						{
+							loadTex(meshRenderer->m_Material->m_normalTexName, meshRenderer->m_Material->m_pNormal);
+						}
+						if (!meshRenderer->m_Material->m_pOccRoughMetal || meshRenderer->m_Material->m_ORM_TexName != meshRenderer->m_Material->m_pOccRoughMetal->m_name)
+						{
+							loadTex(meshRenderer->m_Material->m_ORM_TexName, meshRenderer->m_Material->m_pOccRoughMetal);
+						}
+						if (!meshRenderer->m_Material->m_AOMap || meshRenderer->m_Material->m_AO_TexName != meshRenderer->m_Material->m_AOMap->m_name)
+						{
+							loadTex(meshRenderer->m_Material->m_AO_TexName, meshRenderer->m_Material->m_AOMap);
+						}
+						if (!meshRenderer->m_Material->m_pEmissive || meshRenderer->m_Material->m_EmissiveTexName != meshRenderer->m_Material->m_pEmissive->m_name)
+						{
+							loadTex(meshRenderer->m_Material->m_EmissiveTexName, meshRenderer->m_Material->m_pEmissive);
+						}
                     
 						if (materialNode["m_shaderPSOName"])
 						{

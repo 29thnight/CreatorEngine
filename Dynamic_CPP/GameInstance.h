@@ -27,6 +27,7 @@ public:
 	bool IsLoadSceneComplete() const { return m_isLoadSceneComplete; }
 	int GetAfterLoadSceneIndex() const { return m_beyondSceneIndex; }
 	void SetAfterLoadSceneIndex(int type = 0) { m_beyondSceneIndex = type; }
+	void ExitGame();
 	//Scene Management(NEW)
 	void LoadSettingedScene(int sceneType);
 	void SwitchSettingedScene(int sceneType);
@@ -61,6 +62,8 @@ public:
 	// Game Setting
 	bool IsViveEnabled() const { return m_isViveEnabled; }
 	void SetViveEnabled(bool enable) { m_isViveEnabled = enable; }
+	bool IsBootstrapCompleted() const { return m_isBootstrapCompleted; }
+	void SetBootstrapCompleted(bool completed) { m_isBootstrapCompleted = completed; }
 
 	//Item BG Color
 	Mathf::Color4	CommonItemColor{ 1.f, 1.f, 1.f, 1.f };
@@ -86,6 +89,7 @@ private:
 	std::unordered_map<SourceKey, AnyDelta> m_applied;
 	// Game Setting
 	bool m_isViveEnabled{ true };
+	bool m_isBootstrapCompleted{ false };
 };
 
 template<ItemEnhancementType T>

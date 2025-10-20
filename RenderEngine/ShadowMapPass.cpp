@@ -298,6 +298,8 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* deferred
 
 	for (auto& PrimitiveRenderProxy : renderData->m_shadowRenderQueue)
 	{
+		if (!PrimitiveRenderProxy || (int)PrimitiveRenderProxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
+
 		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, deferredContextPtr1);
 
 		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;

@@ -192,6 +192,13 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("SettingWindowUI", []() { return new SettingWindowUI(); });
+		CreateFactory::GetInstance()->RegisterFactory("ExitButton", []() { return new ExitButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("CreditsButton", []() { return new CreditsButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("SettingButton", []() { return new SettingButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("TutorialButton", []() { return new TutorialButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("StartButton", []() { return new StartButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("BootstrapObserver", []() { return new BootstrapObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("ViveSwitchUI", []() { return new ViveSwitchUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SoundBarUI", []() { return new SoundBarUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SwordProjectileEffect", []() { return new SwordProjectileEffect(); });

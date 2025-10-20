@@ -57,16 +57,25 @@ inline T* GameObject::AddComponent(Args && ...args)
 template<typename T>
 inline T* GameObject::GetComponent(uint32 index)
 {
-    return std::static_pointer_cast<T>(m_components[index]).get();
+    if(!m_components.empty())
+    {
+        return std::static_pointer_cast<T>(m_components[index]).get();
+    }
+    return nullptr;
 }
 
 template<typename T>
 inline T* GameObject::GetComponent()
 {
-    auto it = m_componentIds.find(type_guid(T));
-    if (it == m_componentIds.end())
-        return nullptr;
-    return std::static_pointer_cast<T>(m_components[it->second]).get();
+    if(!m_components.empty())
+    {
+        auto it = m_componentIds.find(type_guid(T));
+        if (it == m_componentIds.end())
+            return nullptr;
+        return std::static_pointer_cast<T>(m_components[it->second]).get();
+    }
+
+    return nullptr;
 }
 
 template<typename T>
@@ -135,9 +144,12 @@ inline Transform* GameObject::GetComponent()
 template<typename T>
 inline bool GameObject::HasComponent()
 {
-	m_componentIds.find(type_guid(T));
-	return m_componentIds.find(type_guid(T)) != m_componentIds.end();
-
+    if(!m_components.empty())
+    {
+        m_componentIds.find(type_guid(T));
+        return m_componentIds.find(type_guid(T)) != m_componentIds.end();
+    }
+    return false;
 }
 
 template<typename T>

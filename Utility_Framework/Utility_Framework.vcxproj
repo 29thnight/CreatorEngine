@@ -34,6 +34,7 @@
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Barrier.h" />
+    <ClInclude Include="plf_colony.h" />
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.CountingSemaphore.h" />
     <ClInclude Include="Core.Definition.h" />
@@ -112,6 +113,11 @@
   <ItemGroup>
     <None Include="Delegate.inl" />
     <None Include="MemoryPool.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ManagedHeap\ManagedHeap\ManagedHeap.vcxproj">
+      <Project>{c4628f56-6af1-4c05-8ac8-76f039c059f9}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

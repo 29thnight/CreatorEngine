@@ -33,6 +33,8 @@ public:
 	std::vector<Navigation> GetNavigations() const { return navigations; }
 	GameObject* GetNextNavi(Direction dir);
 	bool IsNavigationThis();
+	void SetNavLock(bool lock) { isNavLocked = lock; }
+	bool IsNavLock() const { return isNavLocked; }
 
 	void DeserializeShader();
 
@@ -90,6 +92,7 @@ public:
 	[[Property]]
 	std::vector<Navigation> navigations{};
 	bool isDeserialized = false;
+	bool isNavLocked = false;
 
 private:
 	std::array<std::weak_ptr<GameObject>, NavDirectionCount> navigation;

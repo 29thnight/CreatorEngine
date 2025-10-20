@@ -177,6 +177,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	for (auto& proxy : data->m_deferredQueue)
 	{
+		if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
+
 		if (proxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
 		{
 			if (proxy->m_Material->m_shaderPSO) {
@@ -240,6 +242,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	for (auto& proxy : animatedProxies)
 	{
+		if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
+
 		scene.UpdateModel(proxy->m_worldMatrix, deferredPtr);
 
 		if (proxy->m_finalTransforms && proxy->m_animatorGuid != currentAnimatorGuid)
@@ -284,6 +288,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		const auto& groupMaterialGuid = groupKey.materialGuid;
 		auto firstProxy = proxies.front();
 
+		if (!firstProxy || (int)firstProxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
 		// *** THE KEY OPTIMIZATION IS HERE ***
 		// --- Set material once per group ---
 		// Only update material state if it has changed from the previous group.
@@ -311,6 +316,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		instanceMatrices.reserve(proxies.size());
 		for (const auto& proxy : proxies)
 		{
+			if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
+
 			instanceMatrices.push_back(proxy->m_worldMatrix);
 		}
 
@@ -361,6 +368,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
 		for (auto* proxy : proxies)
 		{
+			if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
 			// PSO는 그룹 단위로 1회 Apply
 			customPSO->Apply(deferredPtr);
 
@@ -422,6 +430,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// 머티리얼은 오직 '변경된 CBuffer'만 업로드
 		for (auto* proxy : proxies)
 		{
+			if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
 			// PSO는 그룹 단위로 1회 Apply
 			customPSO->Apply(deferredPtr);
 
