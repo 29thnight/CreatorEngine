@@ -1867,7 +1867,6 @@ void Player::ShootNormalBullet()
 			nearTarget = true;
 		}
 
-		curTarget->SendDamage();
 	}
 	if (bulletObj)
 	{
