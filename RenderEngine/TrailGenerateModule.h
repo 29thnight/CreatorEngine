@@ -104,7 +104,7 @@ public:
     Mathf::Vector3 GetCustomUpVector() const { return m_customUpVector; }
 
     Mathf::Vector3 CalculateForwardVector(size_t index) const;
-    Mathf::Vector3 CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position) const;
+    Mathf::Vector3 CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position);
     Mathf::Vector3 CalculateNormalVector(const Mathf::Vector3& forward, const Mathf::Vector3& right) const;
     Mathf::Vector3 GetTubeUpVector(const Mathf::Vector3& forward) const;
 

@@ -65,6 +65,7 @@ namespace Core
 	void Delegate<Ret, Args...>::Clear()
 	{
 		SpinLock lock(atomic_flag_);
+		isStopped_ = true;
 		callbacks_.clear();
 	}
 

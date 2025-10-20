@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "ControllerHaptics.h"
 
 class ViveSwitchUI : public ModuleBehavior
 {
@@ -24,6 +25,7 @@ private:
 	class ImageComponent*			m_btnImage = nullptr;
 
 	bool  m_isViveEnabled = false;
+	bool m_prevViveEnabled = false;
 
 	// 계산 캐시
 	float m_centerX = 0.f;      // 바 중심 x
@@ -39,4 +41,6 @@ private:
 	float m_toggleThreshold = 0.20f; // 이 이상 오른쪽이면 ON, 왼쪽이면 OFF
 	float m_cooldownSec = 0.20f; // 연타 방지 쿨다운
 	float m_cdTimer = 0.f;
+
+	ControllerHaptics m_haptics{};
 };

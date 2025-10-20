@@ -13,10 +13,11 @@ BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
 	if (m_blackBoardFind.find(aiName) != m_blackBoardFind.end())
 		return m_blackBoardFind[aiName];
 
-	m_blackBoards.emplace_back();
-	m_blackBoardFind.emplace(aiName, &m_blackBoards.back());
+	auto it = m_blackBoards.emplace();
+	auto* bb = &(*it);
+	m_blackBoardFind.emplace(aiName, bb);
 
-	return &m_blackBoards.back();
+	return bb;
 }
 
 void AIManager::RemoveBlackBoard(const std::string& aiName)
@@ -35,8 +36,9 @@ void AIManager::InternalAIUpdate(float deltaSeconds)
 	auto camera = CameraManagement->GetLastCamera();
 	if (!camera) return;
 
-	for (auto& [obj, comp] : m_aiComponentMap)
+	for (auto& [ptr, comp] : m_aiComponentMap)
 	{
+		auto obj = ptr.lock();
 		if (!obj || !comp) continue;
 
 		if (obj->m_ownerScene != SceneManagers->GetActiveScene()) continue;
@@ -84,7 +86,9 @@ void AIManager::RegisterAIComponent(GameObject* gameObject, IAIComponent* aiComp
 		return;
 
 	// GameObject와 AI 컴포넌트 매핑
-	m_aiComponentMap[gameObject] = aiComponent;
+	//m_aiComponentMap[gameObject] = aiComponent;
+
+	m_aiComponentMap.emplace(gameObject->weak_from_this(), aiComponent);
 }
 
 void AIManager::UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent)
@@ -92,11 +96,22 @@ void AIManager::UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiCo
 	if (!gameObject || !aiComponent)
 		return;
 
-	auto it = m_aiComponentMap.find(gameObject);
-	if (it != m_aiComponentMap.end() && it->second == aiComponent)
+	//auto it = m_aiComponentMap.find(gameObject);
+	//if (it != m_aiComponentMap.end() && it->second == aiComponent)
+	//{
+	//	m_aiComponentMap.erase(it);
+	//}
+
+	std::erase_if(m_aiComponentMap, [gameObject, aiComponent](const auto& pair) noexcept
 	{
-		m_aiComponentMap.erase(it);
-	}
+		const auto& [weakObj, comp] = pair;
+
+		if (weakObj.expired() || nullptr == comp)
+			return true;
+
+		auto obj = weakObj.lock();
+		return (obj.get() == gameObject && comp == aiComponent);
+	});
 }
 
 BT::BTNode::NodePtr AIManager::CreateNode(std::string_view nodeName)
@@ -108,6 +123,9 @@ void AIManager::ClearTreeInAIComponent()
 {
 	for (auto& [gameObject, aiComponent] : m_aiComponentMap)
 	{
+		if (gameObject.expired())
+			continue;
+
 		if (aiComponent->GetAIType() == AIType::BT)
 		{
 			BehaviorTreeComponent* ptr = static_cast<BehaviorTreeComponent*>(aiComponent);
@@ -220,9 +238,19 @@ void AIManager::InitalizeBehaviorTreeSystem()
 		});
 	}
 
+	// m_aiComponentMap 순회하면서 만료된 GameObject pair 정리
+	std::erase_if(m_aiComponentMap, [](const auto& pair) noexcept
+	{
+		const auto& [weakObj, comp] = pair;
+		return weakObj.expired();
+	});
 
+	// 모든 AI 컴포넌트 초기화
 	for (auto& [gameObject, aiComponent] : m_aiComponentMap)
 	{
+		if (gameObject.expired())
+			continue;
+		//지금은 BT 컴포넌트만 초기화
 		if (aiComponent->GetAIType() == AIType::BT)
 		{
 			BehaviorTreeComponent* ptr = static_cast<BehaviorTreeComponent*>(aiComponent);

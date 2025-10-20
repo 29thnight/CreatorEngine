@@ -18,7 +18,7 @@
                         "meshParticleTemplate": {
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": 5.0,
+                                "y": 0.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -42,7 +42,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 1.0,
+                            "lifeTime": 10.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -80,170 +80,6 @@
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
                     "useEasing": false
-                },
-                {
-                    "data": {
-                        "easing": {
-                            "animationType": 0,
-                            "duration": 1.0,
-                            "enabled": false,
-                            "type": 0
-                        },
-                        "sizeParams": {
-                            "endSize": {
-                                "x": 2.0,
-                                "y": 2.0,
-                                "z": 2.0
-                            },
-                            "oscillationSpeed": 5.0,
-                            "randomScaleMax": 2.0,
-                            "randomScaleMin": 0.5,
-                            "startSize": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "useOscillation": 0,
-                            "useRandomScale": 0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 1
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MeshSizeModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
-                        "easing": {
-                            "enabled": false
-                        },
-                        "explosiveData": {
-                            "initialSpeed": 50.0,
-                            "randomFactor": 0.4000000059604645,
-                            "speedDecay": 2.0,
-                            "sphereRadius": 1.0
-                        },
-                        "impulses": [],
-                        "meshParams": {
-                            "gravityStrength": 0.0,
-                            "useGravity": 0
-                        },
-                        "movementParams": {
-                            "currentTime": 192.3902587890625,
-                            "velocityMode": 0
-                        },
-                        "orbitalData": {
-                            "axis": [
-                                0.0,
-                                1.0,
-                                0.0
-                            ],
-                            "center": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "radius": 5.0,
-                            "speed": 1.0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 1
-                        },
-                        "velocityCurve": [],
-                        "windData": {
-                            "baseStrength": 1.0,
-                            "direction": [
-                                1.0,
-                                0.0,
-                                0.0
-                            ],
-                            "frequency": 1.0,
-                            "turbulence": 0.5
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MeshMovementModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
-                        "colorGradient": [
-                            {
-                                "color": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
-                                },
-                                "time": 0.0
-                            },
-                            {
-                                "color": {
-                                    "w": 0.8999999761581421,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.30000001192092896
-                            },
-                            {
-                                "color": {
-                                    "w": 0.699999988079071,
-                                    "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.699999988079071
-                            },
-                            {
-                                "color": {
-                                    "w": 0.0,
-                                    "x": 0.5,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 1.0
-                            }
-                        ],
-                        "colorParams": {
-                            "customFunctionType": 1,
-                            "customParam1": 10.0,
-                            "customParam2": 0.0,
-                            "customParam3": 0.0,
-                            "customParam4": 0.0,
-                            "discreteColorsSize": 2,
-                            "gradientSize": 4,
-                            "transitionMode": 0
-                        },
-                        "discreteColors": [
-                            {
-                                "w": 1.0,
-                                "x": 1.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            {
-                                "w": 1.0,
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 1.0
-                            }
-                        ],
-                        "easing": {
-                            "enabled": false
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 1
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MeshColorModuleCS",
-                    "useEasing": false
                 }
             ],
             "name": "NewEmitter",
@@ -277,25 +113,18 @@
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
-                            "rasterizerPreset": 1
+                            "rasterizerPreset": 2
                         },
                         "shaders": {
                             "pixelShader": "MeshDissolve",
                             "vertexShader": "MeshParticle"
                         },
-                        "spriteAnimation": {
-                            "animationDuration": -2.0,
-                            "enabled": true,
-                            "frameCount": 0,
-                            "gridColumns": 9,
-                            "gridRows": 1
-                        },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Noise62",
+                                "name": "Noise29",
                                 "slot": 0
                             }
                         ]

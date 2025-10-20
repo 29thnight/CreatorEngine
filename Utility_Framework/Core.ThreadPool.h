@@ -62,12 +62,17 @@ public:
         }
     }
 
-    void Enqueue(TaskType task)
+    template <class F>
+    void Enqueue(F&& f)
     {
         m_taskCounts.fetch_add(1, std::memory_order_relaxed);
-        ResetEvent(m_waitEvent); // 작업이 추가되었으므로 이벤트 초기화
+        ResetEvent(m_waitEvent);
 
+        // TaskType로 단 한 번만 생성
+        TaskType task(std::forward<F>(f));
+        // rvalue 오버로드로 밀어넣기 (move)
         m_tasks->push(std::move(task));
+
         m_semaphore->release();
     }
 

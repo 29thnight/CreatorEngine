@@ -45,7 +45,8 @@ public:
 	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
     void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
     void ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete = true);
-
+	void BeforeAwakeSceneLoad();
+	bool IsSceneLoading() const;
     void WaitForSceneLoad();
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
@@ -114,6 +115,7 @@ private:
     void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
 	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
 private:
+    std::atomic<Scene*>                 m_sceneToActivate{};
     std::vector<Scene*>                 m_scenes{};
     std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};
     AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
@@ -123,6 +125,7 @@ private:
     std::atomic_size_t                  m_activeSceneIndex{};
 	std::atomic_bool                    m_volumeProfileApply{ false };
     std::atomic_bool                    m_exitCommand{ false };
+    std::atomic_bool                    m_isOldSceneDelete = true;
 };
 
 static auto SceneManagers = SceneManager::GetInstance();

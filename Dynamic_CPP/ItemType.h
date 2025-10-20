@@ -42,13 +42,3 @@ enum class BulletType
 	Normal,
 	Special,
 };
-
-
-
-class Entity;
-//아마 안쓰는대 확인후 삭제예정
-struct AttackContext
-{
-	Entity* target = nullptr;
-	Mathf::Vector3 targetPosition = {};
-};

@@ -401,6 +401,8 @@ void UIManager::CheckInput()
 	auto selectUI = SelectUI.lock();
 	if (selectUI)
 	{
+		if(selectUI->GetComponent<ImageComponent>()->IsNavLock()) return;
+
 		if(0.2 < elapsed)
 		{
 			if (stickLP1.x > 0.5 || stickLP2.x > 0.5)
@@ -519,7 +521,6 @@ void UIManager::Update()
 			if (!image->isDeserialized)
 			{
 				image->DeserializeNavi();
-				image->isDeserialized = true;
 			}
 		}
 
@@ -528,7 +529,6 @@ void UIManager::Update()
 			if (!text->isDeserialized)
 			{
 				text->DeserializeNavi();
-				text->isDeserialized = true;
 			}
 		}
 
@@ -537,7 +537,6 @@ void UIManager::Update()
 			if (!spriteSheet->isDeserialized)
 			{
 				spriteSheet->DeserializeNavi();
-				spriteSheet->isDeserialized = true;
 			}
 		}
 
@@ -559,7 +558,7 @@ void UIManager::SortCanvas()
 	{
 		auto& canvases = curScene->GetCanvases();
 		std::erase_if(canvases, [](const std::weak_ptr<GameObject>& canvas) {
-			return canvas.expired() || !canvas.lock()->GetComponent<Canvas>()->IsEnabled();
+			return canvas.expired() || canvas.lock()->GetComponent<Canvas>()->IsDestroyMark();
 		});
 
 		std::ranges::sort(canvases, [](const std::weak_ptr<GameObject>& a, const std::weak_ptr<GameObject>& b) {
