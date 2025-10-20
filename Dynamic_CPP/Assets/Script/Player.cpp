@@ -334,7 +334,21 @@ void Player::Start()
 	}
 
 
-
+	Prefab* LSlashPrefab = PrefabUtilitys->LoadPrefab("LSlashEffect1");
+	if (LSlashPrefab)
+	{
+		Lslash1 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab, "LSlash1");
+	}
+	Prefab* LSlashPrefab2 = PrefabUtilitys->LoadPrefab("LSlashEffect2");
+	if (LSlashPrefab2)
+	{
+		Lslash2 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab2, "LSlash2");
+	}
+	Prefab* LSlashPrefab3 = PrefabUtilitys->LoadPrefab("LSlashEffect3");
+	if (LSlashPrefab3)
+	{
+		Lslash3 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab3, "LSlash3");
+	}
 
 }
 
@@ -1077,22 +1091,33 @@ float Player::calculDamge(bool isCharge)
 void Player::PlaySlashEvent()
 {
 
-	if (slash1 && isChargeAttack == false)
+	if (isChargeAttack == false)
 	{
 		
-		auto Slashscript = slash1->GetComponent<SlashEffect>();
+		GameObject* Slash = nullptr;
+		if (m_curWeapon->GetItemType() == ItemType::Basic)
+		{
+			Slash = slash1;
+		}
+		else if (m_curWeapon->GetItemType() == ItemType::Melee)
+		{
+			Slash = Lslash1;
+		}
+		if (!Slash) return;
+		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash1Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
-		slash1->GetComponent<Transform>()->SetPosition(effectPos);
+		Slash->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
 		Quaternion lookRot = Quaternion::CreateFromAxisAngle(up, 0); // 초기값
 		lookRot = Quaternion::CreateFromRotationMatrix(Matrix::CreateWorld(Vector3::Zero, myForward, up));
-		slash1->GetComponent<Transform>()->SetRotation(lookRot);
+
+		Slash->GetComponent<Transform>()->SetRotation(lookRot);
 		Slashscript->Initialize();
 
 		if (m_ActionSound)
@@ -1107,14 +1132,24 @@ void Player::PlaySlashEvent2()
 {
 	if (slash2)
 	{
-		auto Slashscript = slash2->GetComponent<SlashEffect>();
+		GameObject* Slash = nullptr;
+		if (m_curWeapon->GetItemType() == ItemType::Basic)
+		{
+			Slash = slash2;
+		}
+		else if (m_curWeapon->GetItemType() == ItemType::Melee)
+		{
+			Slash = Lslash2;
+		}
+		if (!Slash) return;
+		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		float effectOffset = slash2Offset;
 		Mathf::Vector3 effectPos = myPos + myForward * effectOffset;
 		effectPos.y += 0.9f;
-		slash2->GetComponent<Transform>()->SetPosition(effectPos);
+		Slash->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Mathf::Vector3 up = Mathf::Vector3::Up;
@@ -1123,7 +1158,7 @@ void Player::PlaySlashEvent2()
 
 		Quaternion rot = Quaternion::CreateFromAxisAngle(up, XMConvertToRadians(270.0f));
 		Quaternion finalRot = rot * lookRot;
-		slash2->GetComponent<Transform>()->SetRotation(finalRot);
+		Slash->GetComponent<Transform>()->SetRotation(finalRot);
 
 		Slashscript->Initialize();
 		if (m_ActionSound)
@@ -1136,15 +1171,20 @@ void Player::PlaySlashEvent2()
 
 void Player::PlaySlashEvent3()
 {
-	if (slash3)
+	if (Lslash3)
 	{
-		auto Slashscript = slash3->GetComponent<SlashEffect>();
+		GameObject* Slash = nullptr;
+		if (m_curWeapon->GetItemType() == ItemType::Melee)
+		{
+			Slash = Lslash3;
+		}
+		auto Slashscript = Slash->GetComponent<SlashEffect>();
 		//현위치에서 offset줘서 정하기
 		Mathf::Vector3 myForward = GetOwner()->m_transform.GetForward();
 		Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 		Mathf::Vector3 effectPos = myPos;
 		effectPos.y += 0.9f;
-		slash3->GetComponent<Transform>()->SetPosition(effectPos);
+		Slash->GetComponent<Transform>()->SetPosition(effectPos);
 
 
 		Slashscript->Initialize();
@@ -1519,24 +1559,98 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	bombThrowPositionoffset.x += offsetX;
 	bombThrowPositionoffset.z += offsetZ;
 
+	bombThrowPositionoffset.x = std::clamp(bombThrowPositionoffset.x, -MaxThrowDistance, MaxThrowDistance);
+	bombThrowPositionoffset.z = std::clamp(bombThrowPositionoffset.z, -MaxThrowDistance, MaxThrowDistance);
 	Transform* transform = GetOwner()->GetComponent<Transform>();
 	Mathf::Vector3 pos = transform->GetWorldPosition();
+
+
+
 	bombThrowPosition = pos + bombThrowPositionoffset;
-	bombThrowPosition.y = pos.y + 0.1f;
+
+
+
+	Mathf::Vector3 targetdir = bombThrowPosition - pos;
+	targetdir.Normalize();
+	float yaw = atan2(targetdir.x, targetdir.z); // z가 앞, x가 옆일 때
+	Quaternion rotation = Quaternion::CreateFromAxisAngle(Mathf::Vector3::Up, yaw);
+
+
+	transform->SetWorldRotation(rotation);
+
+	Mathf::Vector3 forwardRayOrgion = pos;
+
+	std::vector<HitResult>  forwardhits;
+	float forwardDistance = std::max(std::abs(bombThrowPositionoffset.x), std::abs(bombThrowPositionoffset.z));
+	unsigned int forwardLayerMask = 1 << 11;
+	int size = RaycastAll(forwardRayOrgion, targetdir,forwardDistance, forwardLayerMask, forwardhits);
+	float min = 0;
+	for (auto& forwardHit : forwardhits)
+	{
+		if (forwardHit.gameObject->m_tag != "Wall")
+		{
+			continue;
+		}
+		if (min == 0)
+		{
+			min = std::abs((forwardRayOrgion - forwardHit.point).Length());
+
+
+			bombThrowPosition = forwardHit.point;
+
+		}
+		else
+		{
+			float newMin = std::abs((forwardRayOrgion - forwardHit.point).Length());
+
+			if (newMin < min)
+			{
+				min = newMin;
+				bombThrowPosition = forwardHit.point;
+				
+			}
+		}
+
+	}
+	
+
+	Mathf::Quaternion bombrotat{};
+	if (camera)
+	{
+		Mathf::Vector3 cameraPos = camera->m_transform.GetWorldPosition();
+		Mathf::Vector3 dir = bombThrowPosition - cameraPos;
+
+		Mathf::Vector3 rayOrigin = cameraPos;
+		dir.Normalize();
+		std::vector<HitResult> hits;
+
+		float distacne = 200.0f;
+
+		unsigned int layerMask = 1 << 11;
+		bombThrowPosition.y = pos.y + 0.1f;
+		int size = RaycastAll(rayOrigin, dir, distacne, layerMask, hits);
+		
+		for (auto& hit : hits)
+		{
+			if (hit.gameObject->m_tag == "Wall")
+			{
+				continue;
+			}
+
+			bombThrowPosition.y = hit.point.y + 0.1f;
+		}
+
+	}
+
+	//
 	onIndicate = true;
 	if (BombIndicator)
 	{
 		BombIndicator->m_transform.SetPosition(bombThrowPosition);
 	}
 
-	Mathf::Vector3 targetdir = bombThrowPosition - pos;
-	targetdir.Normalize();
-	float yaw = atan2(targetdir.x, targetdir.z); // z가 앞, x가 옆일 때
-	Quaternion rotation = Quaternion::CreateFromAxisAngle(Mathf::Vector3::Up, yaw);
 	
 
-	transform->SetWorldRotation(rotation);
-	
 
 
 }
@@ -1779,18 +1893,37 @@ void Player::ShootNormalBullet()
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	GameObject* bulletObj = normalBullets->Pop();
+	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3 shootPos = pos;
+	bool nearTarget = false;
+	//쏘기직전에 적이 가까이왔으면 발사대신 떄리기 or 가까이에서 발사? 
+	if (curTarget)
+	{
+		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+		float length = (targetPos - pos).Length();
+		length = std::abs(length);
+		if (length <= 2.0f)
+		{
+			nearTarget = true;
+		}
+
+	}
 	if (bulletObj)
 	{
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
-		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 		if (shootPosObj)
 		{
-			pos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->m_transform.GetWorldPosition();
 		}
 		
+		if (nearTarget)
+		{
+			shootPos.x = pos.x;
+			shootPos.z = pos.z;
+		}
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge());
+			bullet->Initialize(this, shootPos, player->m_transform.GetForward(), calculDamge());
 		}
 
 		if (m_ActionSound)

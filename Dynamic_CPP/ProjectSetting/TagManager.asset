@@ -12,6 +12,8 @@ tags:
   - PlayerDamageSound
   - PlayerSpecialActionSound
   - CriticalMark
+  - normalModel
+  - breakModel
 layers:
   - Default
   - TransparentFX

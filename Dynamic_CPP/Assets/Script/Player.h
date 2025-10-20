@@ -180,6 +180,8 @@ public:
 	Mathf::Vector3 bombThrowPosition = {0,0,0};
 	Mathf::Vector3 bombThrowPositionoffset = { 0,0,0 };
 	[[Property]]
+	float MaxThrowDistance = 2.5f;
+	[[Property]]
 	float bombMoveSpeed = 0.005f;  //폭탄도착지점 조절 스피드
  	void MeleeAttack();
 	[[Method]]
@@ -215,6 +217,9 @@ public:
 	GameObject* slash1 = nullptr;
 	GameObject* slash2 = nullptr;
 	GameObject* slash3 = nullptr;
+	GameObject* Lslash1 = nullptr;
+	GameObject* Lslash2 = nullptr;
+	GameObject* Lslash3 = nullptr;
 	[[Method]]
 	void PlaySlashEvent(); //검기 이펙트 + 사운드 출력
 	[[Property]]
