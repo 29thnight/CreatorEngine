@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterTower", []() { return new EntityMonsterTower(); });
 		CreateFactory::GetInstance()->RegisterFactory("ViveSwitchUI", []() { return new ViveSwitchUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SoundBarUI", []() { return new SoundBarUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SwordProjectileEffect", []() { return new SwordProjectileEffect(); });

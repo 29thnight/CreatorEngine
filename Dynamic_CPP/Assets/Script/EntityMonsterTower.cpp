@@ -1,14 +1,13 @@
-#include "EntityMonsterBaseGate.h"
-#include "RigidBodyComponent.h"
-#include "BoxColliderComponent.h"
+#include "EntityMonsterTower.h"
 #include "pch.h"
+#include "TestMonsterB.h"
 #include "MeshRenderer.h"
-void EntityMonsterBaseGate::Start()
+#include "PrefabUtility.h"
+void EntityMonsterTower::Start()
 {
 	m_maxHP = maxHP;
 	m_currentHP = maxHP;
 
-	
 	HitImpulseStart();
 
 	auto childIndexs = GetOwner()->m_childrenIndices;
@@ -31,15 +30,26 @@ void EntityMonsterBaseGate::Start()
 		breakModel->GetComponent<MeshRenderer>()->SetEnabled(false);
 	}
 
+
+
+	Prefab* monsterPrefab = PrefabUtilitys->LoadPrefab("MonsterB");
+	if (monsterPrefab)
+	{
+		towerMonster = PrefabUtilitys->InstantiatePrefab(monsterPrefab, "towerPrefab");
+		auto monsterScript = towerMonster->GetComponentDynamicCast<TestMonsterB>();
+		monsterScript->m_attackRange = attackRange;
+		monsterScript->m_chaseRange = attackRange;
+	}
 }
 
-void EntityMonsterBaseGate::Update(float tick)
+void EntityMonsterTower::Update(float tick)
 {
 	HitImpulseUpdate(tick);
 }
 
-void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
+void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
 {
+
 	if (isDestroy) return;
 	HitImpulse();
 	m_currentHP -= damage;
@@ -59,8 +69,10 @@ void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitin
 		}
 
 		GetOwner()->SetLayer("Water");
-
+		if (towerMonster)
+		{
+			towerMonster->GetComponentDynamicCast<TestMonsterB>()->SendDamage(this,9999);
+		}
 	}
 }
-
 

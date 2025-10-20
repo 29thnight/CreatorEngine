@@ -2,14 +2,13 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Entity.h"
-#include "EntityMonsterBaseGate.generated.h"
-//몬스터기지 입구,출구역할
-class EntityMonsterBaseGate : public Entity
+#include "EntityMonsterTower.generated.h"
+class EntityMonsterTower : public Entity
 {
 public:
-   ReflectEntityMonsterBaseGate
+   ReflectEntityMonsterTower
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(EntityMonsterBaseGate)
+	MODULE_BEHAVIOR_BODY(EntityMonsterTower)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -25,14 +24,16 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
-
-
 private:
 	[[Property]]
 	int maxHP = 200;
 	bool isDestroy = false;
 	GameObject* normalModel = nullptr;
 	GameObject* breakModel = nullptr;
+	GameObject* towerMonster = nullptr;
 	std::string normalTag = "normalModel";
 	std::string breakTag = "breakModel";
+	[[Property]]
+	float attackRange = 10.f;
+	
 };
