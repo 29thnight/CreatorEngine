@@ -2184,7 +2184,7 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			if (HitPrefab)
 			{
 				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
-				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>();
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 
@@ -2200,7 +2200,7 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			if (HitPrefab)
 			{
 				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
-				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); 
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 
