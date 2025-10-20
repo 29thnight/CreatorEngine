@@ -504,7 +504,8 @@ Mathf::Vector3 TrailGenerateModule::CalculateForwardVector(size_t index) const
     return forward;
 }
 
-Mathf::Vector3 TrailGenerateModule::CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position) const
+// CalculateRightVector 함수 수정 (const 제거 필요)
+Mathf::Vector3 TrailGenerateModule::CalculateRightVector(const Mathf::Vector3& forward, const Mathf::Vector3& position)
 {
     Mathf::Vector3 right;
 
@@ -512,23 +513,26 @@ Mathf::Vector3 TrailGenerateModule::CalculateRightVector(const Mathf::Vector3& f
     {
     case TrailOrientation::HORIZONTAL:
     {
-        Mathf::Vector3 up = CalculateUpVector(forward, m_lastUpVector);
-        forward.Cross(up, right);
+        Mathf::Vector3 worldUp(0.0f, 1.0f, 0.0f);
+
+        // forward가 거의 수직인지 확인
+        if (abs(forward.Dot(worldUp)) > 0.99f)
+        {
+            // 수직인 경우 X축 사용
+            right = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+        }
+        else
+        {
+            // worldUp과 forward의 외적으로 right 계산
+            right = worldUp.Cross(forward);
+            right.Normalize();
+        }
         break;
     }
 
     case TrailOrientation::VERTICAL:
     {
-        Mathf::Vector3 worldRight = Mathf::Vector3(1.0f, 0.0f, 0.0f);
-        if (abs(forward.Dot(worldRight)) > 0.99f)
-        {
-            right = Mathf::Vector3(0.0f, 1.0f, 0.0f);
-        }
-        else
-        {
-            Mathf::Vector3 worldUp = Mathf::Vector3(0.0f, 1.0f, 0.0f);
-            right = worldUp;
-        }
+        right = Mathf::Vector3(0.0f, 1.0f, 0.0f);
         break;
     }
 
@@ -537,21 +541,18 @@ Mathf::Vector3 TrailGenerateModule::CalculateRightVector(const Mathf::Vector3& f
         Mathf::Vector3 customUp = m_customUpVector;
         customUp.Normalize();
 
-        // forward와 customUp이 평행한지 확인
         if (abs(forward.Dot(customUp)) > 0.99f)
         {
-            // 평행하면 fallback 벡터 사용
             Mathf::Vector3 fallback = Mathf::Vector3(1.0f, 0.0f, 0.0f);
             if (abs(forward.Dot(fallback)) > 0.99f)
             {
                 fallback = Mathf::Vector3(0.0f, 0.0f, 1.0f);
             }
-            forward.Cross(fallback, right);
+            right = customUp.Cross(fallback);
         }
         else
         {
-            // forward와 customUp의 외적으로 right 계산
-            forward.Cross(customUp, right);
+            right = customUp.Cross(forward);
         }
         break;
     }
@@ -575,15 +576,16 @@ Mathf::Vector3 TrailGenerateModule::CalculateNormalVector(const Mathf::Vector3& 
     switch (m_orientation)
     {
     case TrailOrientation::HORIZONTAL:
-        normal = m_lastUpVector;
+        // 수평 트레일은 항상 위쪽을 향함
+        normal = Mathf::Vector3(0.0f, 1.0f, 0.0f);
         break;
 
     case TrailOrientation::VERTICAL:
-        right.Cross(forward, normal);
+        normal = right.Cross(forward);
+        normal.Normalize();
         break;
 
     case TrailOrientation::CUSTOM:
-        // 커스텀 Up 벡터를 normal로 사용
         normal = m_customUpVector;
         normal.Normalize();
         break;
