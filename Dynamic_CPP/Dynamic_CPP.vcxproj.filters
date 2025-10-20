@@ -648,9 +648,6 @@
 		<ClInclude Include="Assets\Script\BP001.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsHazadPatten.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
@@ -689,6 +686,15 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\ViveSwitchUI.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossWarningAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossRangedAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossMeleeAni.h">
+			<Filter>Script</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -1202,9 +1208,6 @@
 		<ClCompile Include="Assets\Script\BP001.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsHazadPatten.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
@@ -1243,6 +1246,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ViveSwitchUI.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossRangedAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

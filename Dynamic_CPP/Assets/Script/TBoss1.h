@@ -4,6 +4,8 @@
 #include "Entity.h"
 #include "TBoss1.generated.h"
 
+class AnimationController;
+class Animator;
 class BehaviorTreeComponent;
 class BlackBoard;
 class RigidBodyComponent;
@@ -46,16 +48,22 @@ public:
 	};
 
 	enum class EPatternPhase {
-		Inactive,
-		Spawning,
-		Waiting,
+		Inactive, // 비활성
+		Warning,  // 공격 전조, 경고 시간
+		Spawning, // 공격 위치/방향 계산 확정
+		Move,          // 이동 단계 --> 패턴 중간에 이동 해야 하는 경우
+		Action,   // 실제 애니메이션 재생 및 공격 발생
+		WaitForObjects, // 생성된 오브젝트들이 모두 사라질 때까지 대기 (ex : 장판 패턴)
+		ComboInterval, // 콤보 공격 사이의 중간 대기
+		Waiting,  // 공격 후 딜레이
 	};
 
+	//보스 이동 상태 --> 특별히 이동 상태가 필요한 이유는 땅파고 이동하는 모션이 있어서
 	enum class EBossMoveState {
-		Idle,
-		Burrowing,
-		Burrowed,
-		Protruding
+		Idle, //대기 이동 가능
+		Burrowing, //땅속으로 들어가는중
+		Burrowed, //땅속에서 이동중
+		Protruding //땅속에서 나오는중
 	};
 
 	std::string m_state = "Idle";
@@ -72,11 +80,30 @@ public:
 
 	EPatternType GetLastCompletedPattern() const { return m_lastCompletedPattern; }
 	void ConsumeLastCompletedPattern() { m_lastCompletedPattern = EPatternType::None; }
+	float GetAttackWarningTime() { return AttackWarningTime; }
+
+	//디버그용 핼퍼
+	std::string GetPatternTypeToString(EPatternType type);
+	std::string GetPatternPhaseToString(EPatternPhase phase);
+
+
+	//패턴 관련 변수들
+	bool usePatten = false;
+	int pattenIndex = 0;
+	float BPTimer = 0.0f;
+
+	[[Property]]
+	float AttackWarningTime = 1.0f; //공격 경고 시간
+	[[Property]]
+	float AttackDelayTime = 0.5f; //패턴 후 딜레이 시간
+	[[Property]]
+	float ComboIntervalTime = 0.3f; // 콤보 공격 사이 대기 시간
+
 
 	BehaviorTreeComponent* BT = nullptr;
 	BlackBoard* BB = nullptr;
 	Animator* m_animator = nullptr;
-
+	AnimationController* m_anicontroller = nullptr;
 	RigidBodyComponent* m_rigid = nullptr;
 
 	GameObject* Player1 = nullptr; //들고 있자
@@ -95,11 +122,6 @@ public:
 	int BP002Damage = 5;
 	[[Property]]
 	int BP003Damage = 5;
-
-	[[Property]]
-	float AttackWarningTime = 1.0f; //공격 경고 시간
-	[[Property]]
-	float AttackDelayTime = 0.5f; //공격 딜레이 시간
 
 	//range
 	[[Property]]
@@ -138,14 +160,21 @@ public:
 	void BurrowMove(float tick); //땅파고 이동
 	//void StartPattern(EPatternType type); //쓸까 말까 고민중
 
+	void OnWarningFinished(); //전조 끝났을때 호출
+	void OnAttackActionFinished(); //공격 액션 끝났을때 호출
+	void OnMoveFinished(); // 이동 애니메이션 종료 시 호출
+
 	//BP0033,0034 용 광역 패턴 사용시 장판패턴이 전체가 다 종료되었는지를 확인하고 전체가 종료 될때 까지 행동을 막는 함수
-	bool usePatten = false;
-	int pattenIndex = 0;
+	
 	std::vector<std::pair<int, Mathf::Vector3>> BP0034Points;
-	float BPTimer = 0.0f;
 	float BP0013delay = 1.0f;
 	float BP0034delay = 1.0f;
-	void UpdatePattern(float tick);
+
+	void UpdatePatternPhase(float tick);
+	void UpdatePatternAction(float tick);
+
+
+	//void UpdatePattern(float tick);
 	void Update_BP0011(float tick);
 	void Update_BP0013(float tick);
 	void Update_BP0021(float tick);
@@ -170,6 +199,8 @@ public:
 	int p1Count = 0;
 	int p2Count = 0;
 	void SelectTarget();
+
+	void StartNextComboAttack(); // 콤보 공격용 헬퍼
 
 	int projectileIndex = 0;
 	Mathf::Vector3 projectilePos;

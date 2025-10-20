@@ -341,6 +341,9 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossMeleeAni", []() { return new BossMeleeAni(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossRangedAni", []() { return new BossRangedAni(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossWarningAni", []() { return new BossWarningAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("BossPopupAni", []() { return new BossPopupAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("BossBurrowAni", []() { return new BossBurrowAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttackSpecial", []() { return new PlayerRangeAttackSpecial(); });

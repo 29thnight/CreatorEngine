@@ -5,6 +5,9 @@ ReflectionScriptField(TBoss1) \
 { \
 	PropertyField \
 	({ \
+		meta_property(AttackWarningTime) \
+		meta_property(AttackDelayTime) \
+		meta_property(ComboIntervalTime) \
 		meta_property(m_MaxHp) \
 		meta_property(BP001Damage) \
 		meta_property(BP002Damage) \

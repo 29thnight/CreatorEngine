@@ -35,6 +35,9 @@ void TBoss1::Start()
 
 	}
 
+	if (m_animator) {
+		m_anicontroller = m_animator->m_animationControllers[0].get();
+	}
 
 	//prefab load
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
@@ -95,7 +98,7 @@ void TBoss1::Start()
 
 void TBoss1::Update(float tick)
 {
-
+	std::cout << "[TBoss1::Update] 프레임 시작. 현재 페이즈: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
 	HitImpulseUpdate(tick);
 	//test code  ==> todo : 필요에 따라 최초 타겟과 타겟을 변경하는 내용 ==> 변경기준 카운트? 거리? 랜덤?
 	//1. 보스 기준으로 가장 가까운 플레이어
@@ -111,7 +114,69 @@ void TBoss1::Update(float tick)
 		RotateToTarget();
 	}
 
-	UpdatePattern(tick);
+	// 1. Handle generic, time-based phase transitions
+	UpdatePatternPhase(tick);
+
+	// 2. Handle pattern-specific logic for the current phase
+	UpdatePatternAction(tick);
+
+
+	//UpdatePattern(tick);
+}
+
+std::string TBoss1::GetPatternTypeToString(EPatternType type)
+{
+	switch (type)
+	{	
+	case TBoss1::EPatternType::None:
+		return "none";
+	case TBoss1::EPatternType::BP0011:
+		return "BP0011";
+	case TBoss1::EPatternType::BP0012:
+		return "BP0012";
+	case TBoss1::EPatternType::BP0013:
+		return "BP0013";
+	case TBoss1::EPatternType::BP0014:
+		return "BP0014";
+	case TBoss1::EPatternType::BP0021:
+		return "BP0021";
+	case TBoss1::EPatternType::BP0022:
+		return "BP0022";
+	case TBoss1::EPatternType::BP0031:
+		return "BP0031";
+	case TBoss1::EPatternType::BP0032:
+		return "BP0032";
+	case TBoss1::EPatternType::BP0033:
+		return "BP0033";
+	case TBoss1::EPatternType::BP0034:
+		return "BP0034";
+	default:
+		return "error";
+	}
+}
+
+std::string TBoss1::GetPatternPhaseToString(EPatternPhase phase)
+{
+	switch (phase) {
+	case TBoss1::EPatternPhase::Inactive:
+		return "Inactive";
+	case TBoss1::EPatternPhase::Warning:
+		return "Warning";
+	case TBoss1::EPatternPhase::Spawning:
+		return "Spawning";
+	case TBoss1::EPatternPhase::Move:
+		return "Move";
+	case TBoss1::EPatternPhase::Action:
+		return "Action";
+	case TBoss1::EPatternPhase::WaitForObjects:
+		return "WaitForObjects";
+	case TBoss1::EPatternPhase::ComboInterval:
+		return "Action";
+	case TBoss1::EPatternPhase::Waiting:
+		return "Waiting";
+	default:
+		return "error";
+	}
 }
 
 void TBoss1::RotateToTarget()
@@ -148,13 +213,13 @@ void TBoss1::ShootIndexProjectile(int index, Mathf::Vector3 pos, Mathf::Vector3 
 
 void TBoss1::ShootProjectile()
 {
-	if (projectileIndex < 0 || projectileIndex >= BP001Objs.size()) return; // 인덱스 범위 검사
-	GameObject* obj = BP001Objs[projectileIndex];
+	if (pattenIndex < 0 || pattenIndex >= BP001Objs.size()) return; // 인덱스 범위 검사
+	GameObject* obj = BP001Objs[pattenIndex];
 	BP001* script = obj->GetComponent<BP001>();
 	obj->SetEnabled(true);
 	script->Initialize(this, projectilePos, projectileDir, BP001Damage, BP001RadiusSize, BP001Delay, BP001Speed);
 	script->isAttackStart = true;
-	projectileIndex++;
+	pattenIndex++;
 }
 
 
@@ -279,6 +344,69 @@ void TBoss1::BurrowMove(float tick)
 	}
 }
 
+void TBoss1::OnWarningFinished()
+{
+	// 2. 애니메이터의 다음 상태 전환을 허가합니다.
+	std::cout << "[TBoss1::OnWarningFinished] 진입. 현재 페이즈: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
+	if (m_animator) m_animator->SetParameter("CanTransitionToAttack", true);
+	if (m_activePattern == EPatternType::BP0022) {
+		m_patternPhase = EPatternPhase::Move;
+	}
+	else {
+		m_patternPhase = EPatternPhase::Spawning;
+	}
+	std::cout << "[TBoss1::OnWarningFinished] 종료. 새로운 페이즈: " << GetPatternPhaseToString(m_patternPhase)<< std::endl;
+}
+
+void TBoss1::OnAttackActionFinished()
+{
+	if (m_animator) m_animator->SetParameter("CanTransitionToAttack", false);
+	switch (m_activePattern)
+	{
+	case EPatternType::BP0013: 
+	{
+		pattenIndex++;
+		if (pattenIndex < 3)
+		{
+			m_patternPhase = EPatternPhase::ComboInterval;
+			BPTimer = 0.f;
+		}
+		else
+		{
+			m_patternPhase = EPatternPhase::Waiting;
+			BPTimer = 0.f;
+		}
+		break;
+	}
+	case EPatternType::BP0022:
+	{
+		pattenIndex++;
+		if (pattenIndex <= 5) // 5회 공격 콤보
+		{
+			m_patternPhase = EPatternPhase::Move; // 다음은 이동 단계
+			BPTimer = 0.f; // 이동 시간 측정용 타이머 (필요시)
+		}
+		else
+		{
+			m_patternPhase = EPatternPhase::Waiting;
+			BPTimer = 0.f;
+		}
+		break;
+	}
+	default:
+	{
+		m_patternPhase = EPatternPhase::Waiting;
+		BPTimer = 0.f;
+		break;
+	}
+	}
+}
+
+void TBoss1::OnMoveFinished()
+{
+	m_patternPhase = EPatternPhase::Spawning;
+}
+
 //void TBoss1::StartPattern(EPatternType type)
 //{
 //	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시
@@ -296,25 +424,54 @@ void TBoss1::BurrowMove(float tick)
 //	}
 //}
 
-
-
-void TBoss1::UpdatePattern(float tick)
+void TBoss1::UpdatePatternPhase(float tick)
 {
-	// 활성화된 패턴에 따라 적절한 업데이트 함수로 분기합니다.
+	std::cout << "m_patternPhase : " + GetPatternPhaseToString(m_patternPhase) << std::endl;
+	switch (m_patternPhase)
+	{
+	case EPatternPhase::ComboInterval:
+	{
+		BPTimer += tick;
+		if (BPTimer >= ComboIntervalTime)
+		{
+			StartNextComboAttack();
+		}
+		break;
+	}
+	case EPatternPhase::Waiting:
+	{
+		BPTimer += tick;
+		if (BPTimer >= AttackDelayTime)
+		{
+			EndPattern();
+		}
+		break;
+	}
+	// Warning -> Spawning transition is now handled by OnWarningFinished()
+	default:
+		break;
+	}
+}
+
+void TBoss1::UpdatePatternAction(float tick)
+{
+	std::cout << "m_activePattern : " + GetPatternTypeToString(m_activePattern) << std::endl;
 	switch (m_activePattern)
 	{
 	case EPatternType::BP0011:
 		Update_BP0011(tick);
 		break;
-	case EPatternType::BP0013:
+	case EPatternType::BP0013: 
 		Update_BP0013(tick);
 		break;
+
 	case EPatternType::BP0021:
 		Update_BP0021(tick);
 		break;
 	case EPatternType::BP0022:
 		Update_BP0022(tick);
 		break;
+
 	case EPatternType::BP0031:
 		Update_BP0031(tick);
 		break;
@@ -328,74 +485,52 @@ void TBoss1::UpdatePattern(float tick)
 		Update_BP0034(tick);
 		break;
 
-		// 다른 패턴들의 case를 여기에 추가...
-
-	case EPatternType::None:
+		// ... other patterns ...
 	default:
-		// 실행 중인 패턴이 없으면 아무것도 하지 않습니다.
 		break;
 	}
 }
+
 
 void TBoss1::Update_BP0011(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		RotateToTarget(); //패턴 시작시 타겟을 바라보게
-		//todo :: 에니메이션 재생
-		m_animator->SetParameter("RangeAtteckTrigger", true);
-		BPTimer += tick;	
-		// 오브젝트 하나를 활성화합니다.
-		Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-
-		Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
-
-		Mathf::Vector3 dir = targetPos - ownerPos;
-		dir.y = 0;
-		dir.Normalize();
-		Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
-		
-		projectilePos = pos;
-		projectileDir = dir;
-		//ShootProjectile(0, pos, dir);//--> 에니메이션에서 발사 프레임에 맞춰서 호출하는 방식으로 변경 가능
+		case EPatternPhase::Warning:
+			RotateToTarget(); //전조 모션중 타겟을 바라보게
 			
-		// 모든 오브젝트를 생성했으면 '완료 대기' 단계로 전환합니다.
-		if (projectileIndex > 0) {
-			m_patternPhase = EPatternPhase::Waiting;
-		}
-		break;
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
-
-		BPTimer += tick;
-		if (BPTimer >= 2.0f) //이 페턴은 2초후에 강제 종료 시간은 나중에 조절 가능하게
+			if (m_anicontroller && m_anicontroller->m_curState) {
+				std::string currentStateName = m_anicontroller->m_curState->m_name;
+				if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
+					m_animator->SetParameter("StartRangedAttack", true);
+				}
+			}
+			
+			
+			break;
+		case EPatternPhase::Spawning:
 		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-		//for (int i = 0; i < pattenIndex; ++i)
-		//{
-		//	if (BP001Objs[i]->IsEnabled())
-		//	{
-		//		allFinished = false; // 아직 하나라도 활성 상태이면 대기를 계속합니다.
-		//		break;
-		//	}
-		//}
+			RotateToTarget(); // Lock final direction
+			//todo :: 에니메이션 재생
+			//m_animator->SetParameter("RangeAtteckTrigger", true);
+			
+			// 방향과 위치만 정하자 
+			Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
-		if (allFinished)
-		{
-			// 모든 오브젝트가 비활성화되었으므로 패턴을 완전히 종료합니다.
-			EndPattern();
+			Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
+
+			Mathf::Vector3 dir = targetPos - ownerPos;
+			dir.y = 0;
+			dir.Normalize();
+			Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
+		
+			projectilePos = pos;
+			projectileDir = dir;
+			//ShootProjectile(0, pos, dir);//--> 에니메이션에서 발사 프레임에 맞춰서 호출하는 방식으로 변경 가능	
+			m_patternPhase = EPatternPhase::Action; // Hand off to animation
+			break;
 		}
-		break;
-	}
+	
 	}
 }
 
@@ -403,21 +538,22 @@ void TBoss1::Update_BP0013(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		BPTimer += tick;
-		if (pattenIndex < 3)
-		{
-			if (pattenIndex != 0 && BPTimer < BP0013delay)
-			{
-				break; // 딜레이가 지나지 않았으면 다음 오브젝트 생성 대기
+		case EPatternPhase::Warning:
+			RotateToTarget(); //전조 모션중 타겟을 바라보게
+			if (m_anicontroller && m_anicontroller->m_curState) {
+				std::string currentStateName = m_anicontroller->m_curState->m_name;
+				if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
+					m_animator->SetParameter("StartRangedAttack", true);
+				}
 			}
-
-			RotateToTarget(); //패턴 시작시 타겟을 바라보게
+			break;
+		case EPatternPhase::Spawning:
+		{
+			RotateToTarget(); // Lock final direction
 			//todo :: 에니메이션 재생
-			m_animator->SetParameter("RangeAtteckTrigger", true);
-
-			// 오브젝트 하나를 활성화합니다.
+			//m_animator->SetParameter("RangeAtteckTrigger", true);
+			
+			// 방향과 위치만 정하자 
 			Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
 			Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
@@ -429,49 +565,10 @@ void TBoss1::Update_BP0013(float tick)
 
 			projectilePos = pos;
 			projectileDir = dir;
-
-			if (projectileIndex > pattenIndex) {
-				pattenIndex++;
-				BPTimer -= BP0013delay;
-			}
+			//ShootProjectile(0, pos, dir);//--> 에니메이션에서 발사 프레임에 맞춰서 호출하는 방식으로 변경 가능	
+			m_patternPhase = EPatternPhase::Action; // Hand off to animation
+			break;
 		}
-		else
-		{
-			// 모든 오브젝트를 생성했으면 '완료 대기' 단계로 전환합니다.
-			m_patternPhase = EPatternPhase::Waiting;
-		}
-
-		break;
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
-
-		BPTimer += tick;
-		if (BPTimer >= 5.0f) //이 페턴은 5초후에 강제 종료 시간은 나중에 조절 가능하게
-		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-		//for (int i = 0; i < pattenIndex; ++i)
-		//{
-		//	if (BP001Objs[i]->IsEnabled())
-		//	{
-		//		allFinished = false; // 아직 하나라도 활성 상태이면 대기를 계속합니다.
-		//		break;
-		//	}
-		//}
-
-		if (allFinished)
-		{
-			// 모든 오브젝트가 비활성화되었으므로 패턴을 완전히 종료합니다.
-			EndPattern();
-		}
-		break;
-	}
 	}
 }
 
@@ -479,96 +576,50 @@ void TBoss1::Update_BP0021(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		BPTimer += tick;
-		
-		
-
-		// 모든 오브젝트를 생성했으면 '완료 대기' 단계로 전환합니다.
-		if (isAttacked){
-			m_patternPhase = EPatternPhase::Waiting;
-			break;
-		}
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
-
-		BPTimer += tick;
-		if (BPTimer >= 2.0f) //이 페턴은 2초후에 강제 종료 시간은 나중에 조절 가능하게
-		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-		
-
-		if (allFinished)
-		{
-			// 모든 오브젝트가 비활성화되었으므로 패턴을 완전히 종료합니다.
-			EndPattern();
+	case EPatternPhase::Warning:
+		// Fixed attack, do not track
+		RotateToTarget(); // Track target during warning
+		if (m_anicontroller && m_anicontroller->m_curState) {
+			std::string currentStateName = m_anicontroller->m_curState->m_name;
+			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
+				m_animator->SetParameter("StartMeleeAttack", true);
+			}
 		}
 		break;
-	}
+	case EPatternPhase::Spawning:
+		RotateToTarget(); // Lock final direction
+		m_patternPhase = EPatternPhase::Action;
+		break;
 	}
 }
 
 void TBoss1::Update_BP0022(float tick)
 {
-	// (이동 + BP0021 ) *5 
 	switch (m_patternPhase)
 	{
+	case EPatternPhase::Warning:
+		RotateToTarget(); // Track target during warning
+		if (m_anicontroller && m_anicontroller->m_curState) {
+			std::string currentStateName = m_anicontroller->m_curState->m_name;
+			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
+				m_animator->SetParameter("StartMeleeAttack", true);
+			}
+		}
+		break;
+	case EPatternPhase::Move:
+		// This phase is for movement. Assume BurrowMove is animation-driven.
+		// When movement animation is complete, OnMoveFinished() will be called.
+		// For now, we just wait for OnMoveFinished() to set the next phase.
+		BurrowMove(tick);
+		if (isMoved) {
+			m_patternPhase = EPatternPhase::Spawning;
+			 if(m_animator) m_animator->SetParameter("meleeCombo", true);
+		}
+		break;
 	case EPatternPhase::Spawning:
-	{
-		BPTimer += tick;
-		if (pattenIndex < 5) //딜레이로?? 인덱스로??
-		{
-			if (isMoved) {
-				RotateToTarget(); //패턴 시작시 타겟을 바라보게
-
-				m_animator->SetParameter("MeleeAtteckTrigger", true);
-
-				if (isAttacked)
-				{
-					pattenIndex++;
-					isAttacked = false;
-					isMoved = false;
-				}
-			}
-			else {
-				//이동
-				BurrowMove(tick);
-			}
-		}
-		else {
-			m_patternPhase = EPatternPhase::Waiting; //패턴 5회 실행 했으면 대기 단계로
-			break;
-		}
+		RotateToTarget(); // Lock final direction
+		m_patternPhase = EPatternPhase::Action;
 		break;
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		BPTimer += tick;
-		if (BPTimer >= 1.0f) //이 페턴대기는 1초후에 강제 종료 시간은 나중에 조절 가능하게
-		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-
-
-		if (allFinished)
-		{
-			// 모든 오브젝트가 비활성화되었으므로 패턴을 완전히 종료합니다.
-			EndPattern();
-		}
-		break;
-	}
 	}
 }
 
@@ -576,6 +627,11 @@ void TBoss1::Update_BP0031(float tick)
 {
 	switch (m_patternPhase)
 	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Spawning; // 장판은 전조 없음 만약에 걸리면 바로 넘기자 혹은 여기서 이동 처리 생각해 볼수도 
+		break;
 	case EPatternPhase::Spawning:
 	{
 		//비었으면 문제 인대 그럼 돌려보내
@@ -584,7 +640,7 @@ void TBoss1::Update_BP0031(float tick)
 		//todo: 일단 타겟으로 잡은 플레이어 위치만 생각 둘다 만들어 지는건 각 플레이어 방향 받아서 생각 좀 해보자
 		//Mathf::Vector3 pos = m_target->GetComponent<Transform>()->GetWorldPosition();
 		// --> 플레이어 모두
-		m_animator->SetParameter("ShiftTrigger", true);
+		//m_animator->SetParameter("ShiftTrigger", true); --> 시작 한번
 	
 		int index = 0;
 		if (Player1) {
@@ -611,10 +667,10 @@ void TBoss1::Update_BP0031(float tick)
 
 
 		pattenIndex = index;
-		m_patternPhase = EPatternPhase::Waiting;
+		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
 		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
@@ -642,6 +698,11 @@ void TBoss1::Update_BP0032(float tick)
 {
 	switch (m_patternPhase)
 	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Spawning; // 장판은 전조 없음 만약에 걸리면 바로 넘기자 혹은 여기서 이동 처리 생각해 볼수도 
+		break;
 	case EPatternPhase::Spawning:
 	{
 		//3개보다 적개 등록 됬으면 일단 에러인대 돌려보내
@@ -671,9 +732,9 @@ void TBoss1::Update_BP0032(float tick)
 		directions.push_back(dir3);
 
 		int index = 0;
-
+		//m_animator->SetParameter("ShiftTrigger", true); --> 시작 한번
 		for (auto& dir : directions) {
-			m_animator->SetParameter("ShiftTrigger", true);
+			
 
 			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
 			GameObject* floor = BP003Objs[index];
@@ -687,10 +748,10 @@ void TBoss1::Update_BP0032(float tick)
 		}
 
 		pattenIndex = index;
-		m_patternPhase = EPatternPhase::Waiting;
+		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
 		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
@@ -717,73 +778,83 @@ void TBoss1::Update_BP0033(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Move; // 장판은 전조 없음 만약에 걸리면 바로 넘기자 혹은 여기서 이동 처리 생각해 볼수도 
+		break;
+	case EPatternPhase::Move:
 		MoveToChunsik(tick);
 		if (isMoved) {
-			Transform* tr = GetOwner()->GetComponent<Transform>();
-			//if (m_chunsik) {
-			//	Mathf::Vector3 chunsik = m_chunsik->GetComponent<Transform>()->GetWorldPosition();
-			//	tr->SetWorldPosition(chunsik);
-			//	//이때 회전이나 같은 것도 알맞은 각도로 돌려 놓느것
-			//}
-			//일단 보스위치랑 전방 방향
-			Mathf::Vector3 pos = tr->GetWorldPosition();
-			Mathf::Vector3 forward = tr->GetForward();
-
-			m_animator->SetParameter("ShiftTrigger", true);
-
-			//회전축 y축 설정
-			Mathf::Vector3 up_axis(0.0f, 1.0f, 0.0f);
-
-			//전방에서 120도 240 해서 삼감 방면 방향
-			Mathf::Quaternion rot120 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(120.0f));
-			Mathf::Quaternion rot240 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(240.0f));
-
-			//3방향 
-			Mathf::Vector3 dir1 = forward; //전방
-			Mathf::Vector3 dir2 = Mathf::Vector3::Transform(forward, rot120); //120
-			Mathf::Vector3 dir3 = Mathf::Vector3::Transform(forward, rot240); //240
-
-			//하나씩 컨트롤 하기 귀찮다 벡터로 포문돌려
-			std::vector < Mathf::Vector3 > directions;
-			directions.push_back(dir1);
-			directions.push_back(dir2);
-			directions.push_back(dir3);
-
-			int index = 0;
-			
-
-			for (auto& dir : directions) {
-				//가까운거
-				Mathf::Vector3 objpos = pos + dir * 6.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
-				GameObject* floor = BP003Objs[index];
-				BP003* script = floor->GetComponent<BP003>();
-				floor->SetEnabled(true);
-				//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
-				script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
-				script->isAttackStart = true;
-
-				index++;
-
-				//먼거
-				Mathf::Vector3 objpos2 = pos + dir * 12.0f; // 12만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
-				GameObject* floor2 = BP003Objs[index];
-				BP003* script2 = floor2->GetComponent<BP003>();
-				floor2->SetEnabled(true);
-				//floor2->GetComponent<Transform>()->SetWorldPosition(objpos2);
-				script2->Initialize(this, objpos2, BP003Damage, BP003RadiusSize, BP003Delay, true);
-				script2->isAttackStart = true;
-
-				index++;
-			}
-			pattenIndex = index;
-			m_patternPhase = EPatternPhase::Waiting;
-			break; // while 루프 탈출
+			m_patternPhase = EPatternPhase::Spawning;
 		}
 		break;
+	case EPatternPhase::Spawning:
+	{
+		//MoveToChunsik(tick);
+		
+		Transform* tr = GetOwner()->GetComponent<Transform>();
+		//if (m_chunsik) {
+		//	Mathf::Vector3 chunsik = m_chunsik->GetComponent<Transform>()->GetWorldPosition();
+		//	tr->SetWorldPosition(chunsik);
+		//	//이때 회전이나 같은 것도 알맞은 각도로 돌려 놓느것
+		//}
+		//일단 보스위치랑 전방 방향
+		Mathf::Vector3 pos = tr->GetWorldPosition();
+		Mathf::Vector3 forward = tr->GetForward();
+
+		//m_animator->SetParameter("ShiftTrigger", true); --> 시작 한번
+
+		//회전축 y축 설정
+		Mathf::Vector3 up_axis(0.0f, 1.0f, 0.0f);
+
+		//전방에서 120도 240 해서 삼감 방면 방향
+		Mathf::Quaternion rot120 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(120.0f));
+		Mathf::Quaternion rot240 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(240.0f));
+
+		//3방향 
+		Mathf::Vector3 dir1 = forward; //전방
+		Mathf::Vector3 dir2 = Mathf::Vector3::Transform(forward, rot120); //120
+		Mathf::Vector3 dir3 = Mathf::Vector3::Transform(forward, rot240); //240
+
+		//하나씩 컨트롤 하기 귀찮다 벡터로 포문돌려
+		std::vector < Mathf::Vector3 > directions;
+		directions.push_back(dir1);
+		directions.push_back(dir2);
+		directions.push_back(dir3);
+
+		int index = 0;
+			
+
+		for (auto& dir : directions) {
+			//가까운거
+			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
+			GameObject* floor = BP003Objs[index];
+			BP003* script = floor->GetComponent<BP003>();
+			floor->SetEnabled(true);
+			//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
+			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
+			script->isAttackStart = true;
+
+			index++;
+
+			//먼거
+			Mathf::Vector3 objpos2 = pos + dir * 12.0f; // 12만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
+			GameObject* floor2 = BP003Objs[index];
+			BP003* script2 = floor2->GetComponent<BP003>();
+			floor2->SetEnabled(true);
+			//floor2->GetComponent<Transform>()->SetWorldPosition(objpos2);
+			script2->Initialize(this, objpos2, BP003Damage, BP003RadiusSize, BP003Delay, true);
+			script2->isAttackStart = true;
+
+			index++;
+		}
+		pattenIndex = index;
+		m_patternPhase = EPatternPhase::WaitForObjects;
+		break; // while 루프 탈출
+		
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
 		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
@@ -812,48 +883,57 @@ void TBoss1::Update_BP0034(float tick)
 	// 순차 1개씩 -> 한줄 4개 씩 
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Move; // 장판은 전조 없음 만약에 걸리면 바로 넘기자 혹은 여기서 이동 처리 생각해 볼수도 
+		break;
+	case EPatternPhase::Move:
 		MoveToChunsik(tick);
 		if (isMoved) {
-			BPTimer += tick;
-			while (BPTimer >= BP0034delay)
-			{
-				if (pattenIndex < BP0034Points.size())
-				{
-					// 오브젝트 하나를 활성화합니다. --> row 단위 4개씩
-					m_animator->SetParameter("ShiftTrigger", true);
-					int i = 0;
-					for (; i < 4;)
-					{
-					
-
-						Mathf::Vector3 objpos = BP0034Points[pattenIndex + i].second;
-						GameObject* floor = BP003Objs[pattenIndex + i];
-						BP003* script = floor->GetComponent<BP003>();
-						floor->SetEnabled(true);
-						script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
-						script->isAttackStart = true;
-						i++;
-						if (pattenIndex + i > BP0034Points.size()) {
-							i--;
-							break; // 범위를 벗어나지 않도록 검사
-						}
-					}
-					pattenIndex += i;
-					BPTimer -= BP0034delay;
-				}
-				else
-				{
-					// 모든 오브젝트를 생성했으면 '완료 대기' 단계로 전환합니다.
-					m_patternPhase = EPatternPhase::Waiting;
-					break; // while 루프 탈출
-				}
-			}
+			m_patternPhase = EPatternPhase::Spawning;
 		}
 		break;
+	case EPatternPhase::Spawning:
+	{
+		BPTimer += tick;
+		while (BPTimer >= BP0034delay)
+		{
+			if (pattenIndex < BP0034Points.size())
+			{
+				// 오브젝트 하나를 활성화합니다. --> row 단위 4개씩
+				//m_animator->SetParameter("ShiftTrigger", true); --> 시작 한번
+				int i = 0;
+				for (; i < 4;)
+				{
+					
+
+					Mathf::Vector3 objpos = BP0034Points[pattenIndex + i].second;
+					GameObject* floor = BP003Objs[pattenIndex + i];
+					BP003* script = floor->GetComponent<BP003>();
+					floor->SetEnabled(true);
+					script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
+					script->isAttackStart = true;
+					i++;
+					if (pattenIndex + i > BP0034Points.size()) {
+						i--;
+						break; // 범위를 벗어나지 않도록 검사
+					}
+				}
+				pattenIndex += i;
+				BPTimer -= BP0034delay;
+			}
+			else
+			{
+				// 모든 오브젝트를 생성했으면 '완료 대기' 단계로 전환합니다.
+				m_patternPhase = EPatternPhase::WaitForObjects;
+				break; // while 루프 탈출
+			}
+		}
+		
+		break;
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
 		// 활성화했던 모든 오브젝트를 순회하며 비활성화되었는지 확인합니다.
@@ -1015,6 +1095,12 @@ void TBoss1::EndPattern()
 	m_lastCompletedPattern = m_activePattern;
 	m_activePattern = EPatternType::None;
 	m_patternPhase = EPatternPhase::Inactive;
+	if (m_animator) {
+		m_animator->SetParameter("StartRangedAttack", false);
+		m_animator->SetParameter("StartMeleeAttack", false);
+		m_animator->SetParameter("rangedCombo", false);
+		m_animator->SetParameter("meleeCombo", false);
+	}
 }
 
 void TBoss1::SelectTarget()
@@ -1064,6 +1150,22 @@ void TBoss1::SelectTarget()
 		p2Count = 0;
 	}
 	
+}
+
+void TBoss1::StartNextComboAttack()
+{
+	m_patternPhase = EPatternPhase::Spawning;
+	BPTimer = 0.f;
+
+	switch (m_activePattern)
+	{
+	case EPatternType::BP0013: // Ranged Combo
+		if (m_animator) m_animator->SetParameter("RangedCombo", true);
+		break;
+	case EPatternType::BP0022: // Melee Combo example
+		if(m_animator) m_animator->SetParameter("MeleeCombo", true);
+		break;
+	}
 }
 
 void TBoss1::Burrow()
@@ -1156,22 +1258,13 @@ void TBoss1::ProtrudeChunsik()
 
 void TBoss1::BP0011()
 {
-	//todo : 타겟을 향해 화염 투사체를 1개 발사하여 폭발
-	//좀 더 생각 해봐야 하는 내용 보스 회전에 관하여 보스는 계속 플레이어를 따라 돌거다
-	//투사체에 대하여 어느 타이밍에 날려야 깔끔해 보이는가
-	//일단 타겟을봐
-
-	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시
-	//
+	// 타겟을 향해 화염 투사체를 1개 발사하여 폭발
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0011;
-	/* start patten end*/
-
-	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
-	projectileIndex = 0;
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	projectileIndex = 0;
+	if (m_animator) m_animator->SetParameter("StartRangedAttack", true);
 
 }
 
@@ -1183,18 +1276,15 @@ void TBoss1::BP0012()
 
 void TBoss1::BP0013()
 {
-	//todo : 타겟을 향해 화염 투사체를 3개 연속 발사하여 폭발
-	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시
-	//
+	// 타겟을 향해 화염 투사체를 3개 연속 발사하여 폭발
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0013;
-	/* start patten end*/
-
-	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
 	pattenIndex = 0;
 	projectileIndex = 0;
+	
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	if (m_animator) m_animator->SetParameter("StartRangedAttack", true);
 }
 
 void TBoss1::BP0014()
@@ -1205,61 +1295,44 @@ void TBoss1::BP0014()
 
 void TBoss1::BP0021()
 {
-	//todo : 전방으로 몸통을 휘둘러 데미지 판정
-	//
-	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시
-	//
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0021;
-	/* start patten end*/
-
-	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
-	isAttacked = false;
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
-
-	RotateToTarget(); //패턴 시작시 타겟을 바라보게
-	m_animator->SetParameter("MeleeAtteckTrigger", true);
+	//RotateToTarget(); // Lock rotation at the beginning for this fixed attack
+	if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
 }
 
 void TBoss1::BP0022()
 {
-	//todo : BP0021 * 5  매회 타겟 추적
-	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시
-	//
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0022;
-	/* start patten end*/
-
-	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
-	isAttacked = false;
-	isMoved = false;
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	isMoved = false;
+	//RotateToTarget(); // Lock rotation at the beginning for this fixed attack
+	if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+
 }
 
 void TBoss1::BP0031()
 {
-	std::cout << "BP0031" << std::endl;
+	//std::cout << "BP0031" << std::endl;
 	//target 대상 으로 하나? 내발 밑에 하나? 임의 위치 하나? 
-	//todo: --> 플레이어 수 만큼 1개씩 각 위치에
+	//플레이어 수 만큼 1개씩 각 위치에
 	
-	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시 //요 검사는 BT에서 하는게 좋지 않나?
-	//
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0031;
-	/* start patten end*/
-
-	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
+	m_patternPhase = EPatternPhase::Spawning; //
 	BPTimer = 0.f;
+	pattenIndex = 0;
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::BP0032()
 {
-	std::cout << "BP0032" << std::endl;
-	//내 주위로 3개
+	//std::cout << "BP0032" << std::endl;
+	//보스 주위로 3개
 	
 	/* start patten*/
 	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시 //요 검사는 BT에서 하는게 좋지 않나?
@@ -1271,12 +1344,13 @@ void TBoss1::BP0032()
 	m_patternPhase = EPatternPhase::Spawning;
 	pattenIndex = 0;
 	BPTimer = 0.f;
-
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::BP0033()
 {
-	std::cout << "BP0033" << std::endl;
+	//3방향 회전
+	//std::cout << "BP0033" << std::endl;
 	/* start patten*/
 	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시 //요 검사는 BT에서 하는게 좋지 않나?
 	//
@@ -1284,18 +1358,18 @@ void TBoss1::BP0033()
 	/* start patten end*/
 
 	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
+	m_patternPhase = EPatternPhase::Move;
 	pattenIndex = 0;
 	isMoved = false;
 	BPTimer = 0.f;
-
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::BP0034()
 {
-	std::cout << "BP0034" << std::endl;
+	//std::cout << "BP0034" << std::endl;
 	//적 방향을 우선으로 대각선 방향으로 맵 전체에 격자 모양으로 순차적으로 생성 폭파
-	//=> todo : 변경 라인 우선순위로 한줄씩 폭파 / 추가적으로 생성딜레이 프로퍼티 뺄것
+	// 변경 라인 우선순위로 한줄씩 폭파 / 추가적으로 생성딜레이 프로퍼티 뺄것
 
 	/* start patten*/
 	if (m_activePattern != EPatternType::None) return; // 다른 패턴이 실행 중이면 무시 //요 검사는 BT에서 하는게 좋지 않나?
@@ -1304,13 +1378,13 @@ void TBoss1::BP0034()
 	/* start patten end*/
 
 	// 1. 패턴의 단계를 '생성 중'으로 설정하고 상태 변수들을 초기화합니다.
-	m_patternPhase = EPatternPhase::Spawning;
+	m_patternPhase = EPatternPhase::Move; //중앙으로 이동
 	pattenIndex = 0;
 	isMoved = false;
 	BPTimer = 0.f;
-
 	// 2. 이 패턴에 사용할 스폰 위치를 미리 계산합니다.
 	Calculate_BP0034();
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)

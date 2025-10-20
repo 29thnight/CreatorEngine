@@ -3,6 +3,9 @@
 #include "Export.h"
 
 // Automation include AniScriptClass header
+#include "BossMeleeAni.h"
+#include "BossRangedAni.h"
+#include "BossWarningAni.h"
 #include "BossPopupAni.h"
 #include "BossBurrowAni.h"
 #include "PlayerRangeAttackSpecial.h"
