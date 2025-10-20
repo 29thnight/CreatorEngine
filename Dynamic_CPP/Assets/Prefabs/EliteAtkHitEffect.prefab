@@ -1,22 +1,22 @@
-m_name: EliteAtkHitEffect
+m_name: EliteAtkHitEffect_Prefab
 m_isEnabled: true
-m_instanceID: 1607640114
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_instanceID: 3213106034
+m_fileGuid: 091df95d-19de-59d1-9004-2e9f6be43c59
 PrefabNode:
   - GameObject: 2166264123
     m_name: EliteAtkHitEffect
     m_isEnabled: true
-    m_instanceID: 4010124805
+    m_instanceID: 3313561499
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-    m_index: 3
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4]
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [2]
+    m_prefabFileGuid: 091df95d-19de-59d1-9004-2e9f6be43c59
     m_attachedSoketID: 0
     m_collisionType: 0
     m_isStatic: false
@@ -27,24 +27,24 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         m_name: PlayEffectAll
         m_isEnabled: true
-        m_instanceID: 312124486
+        m_instanceID: 1273581806
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: c7c326fe-0faf-582a-8d39-77bdcb01da94
     children:
       - GameObject: 2166264123
         m_name: Effect
         m_isEnabled: true
-        m_instanceID: 1286465316
+        m_instanceID: 2953872678
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 3
-        m_index: 4
-        m_parentIndex: 3
+          scale: {x: 0.5, y: 0.5, z: 0.5, w: 1}
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_prefabFileGuid: 091df95d-19de-59d1-9004-2e9f6be43c59
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -55,13 +55,14 @@ PrefabNode:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 1892239890
+            m_instanceID: 938943840
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: EliteAtk1
-            m_isPlaying: true
+            m_isPlaying: false
             m_isPaused: false
-            m_timeScale: 1
+            m_timeScale: 2
             m_loop: false
             m_duration: 1
             m_useAbsolutePosition: false
             m_effectInstanceName: EliteAtk1_obj1286465316
+            m_currentTime: 1.00128222
