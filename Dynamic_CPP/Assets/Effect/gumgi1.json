@@ -1,6 +1,6 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": 0.5,
     "emitterTimings": [
         0.0
     ],
@@ -98,7 +98,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 4.335960865020752,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
