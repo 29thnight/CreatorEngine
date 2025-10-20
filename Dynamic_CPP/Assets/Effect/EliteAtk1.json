@@ -1,13 +1,20 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
     "name": "EliteAtk1",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -76,12 +83,14 @@
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -256,7 +265,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -325,12 +334,14 @@
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -442,7 +453,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -500,6 +511,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 50.0,
                             "randomFactor": 0.4000000059604645,
@@ -508,7 +522,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 33.32502746582031,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -562,12 +576,14 @@
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.10000000149011612,
                                 "y": 0.10000000149011612
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -611,13 +627,7 @@
                             "pixelShader": "GGlow",
                             "vertexShader": "BillBoard"
                         },
-                        "textures": [
-                            {
-                                "hasTexture": true,
-                                "name": "wenli_RM_01",
-                                "slot": 0
-                            }
-                        ],
+                        "textures": [],
                         "vertices": [
                             {
                                 "position": {
@@ -679,7 +689,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 10,
             "modules": [
                 {
@@ -802,12 +812,14 @@
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -925,7 +937,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -994,12 +1006,14 @@
                                 "x": 3.0,
                                 "y": 3.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1116,5 +1130,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }

@@ -46,7 +46,7 @@ PixelOutput main(PixelInput input)
     PixelOutput output;
     
     float2 animatedUV = (input.texCoord * 1.0) * float2(gridSize.x, gridSize.y);
-    animatedUV += gTime;
+    animatedUV += gTime * animationDuration;
     float4 diffuseColor = gNoiseTexture.Sample(gLinearSampler, animatedUV);
     
     float3 finalColor;
