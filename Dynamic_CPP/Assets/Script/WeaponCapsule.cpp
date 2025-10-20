@@ -3,9 +3,14 @@
 #include "Player.h"
 #include "Weapon.h"
 #include "PrefabUtility.h"
+#include "SceneManager.h"
+#include "EffectComponent.h"
 using namespace Mathf;
 void WeaponCapsule::Start()
 {
+	auto newEffect = SceneManagers->GetActiveScene()->CreateGameObject("effect", GameObjectType::Empty, GetOwner()->m_index);
+	m_effect = newEffect->AddComponent<EffectComponent>();
+	m_effect->m_effectTemplateName = "resourceView";
 }
 
 void WeaponCapsule::Update(float tick)
@@ -40,6 +45,10 @@ void WeaponCapsule::Update(float tick)
 	}
 	else
 	{
+		if (m_effect && m_effect->m_isPlaying == false)
+		{
+			m_effect->Apply();
+		}
 		Transform* transform = GetOwner()->GetComponent<Transform>();
 
 		float delta = (goingUp ? 1 : -1) * boundSpeed * tick;

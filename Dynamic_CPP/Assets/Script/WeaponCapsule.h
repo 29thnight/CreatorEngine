@@ -4,6 +4,7 @@
 #include "WeaponCapsule.generated.h"
 #include "Entity.h"
 class Player;
+class EffectComponent;
 //아시스가 정화후 던져줄 웨폰캡슐 -> 플레이어에게 도달시 매칭된 weapon 생성해줌
 class WeaponCapsule : public Entity
 {
@@ -44,4 +45,5 @@ private:
 	float boundSpeed = 0.01f; //위아래 움직일속도
 	float yBoundpos = 0.f;
 	bool  goingUp = true; //위로뜨고있는지
+	EffectComponent* m_effect = nullptr; //반짝이 이펙트
 };

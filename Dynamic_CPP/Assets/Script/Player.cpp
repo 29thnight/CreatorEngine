@@ -49,6 +49,8 @@
 #include "ControllerVibration.h"
 #include "SwordProjectile.h"
 #include "SwordProjectileEffect.h"
+#include "EntityMonsterTower.h"
+#include "EntityMonsterBaseGate.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -1675,7 +1677,7 @@ void Player::MeleeAttack()
 		distacne = m_curWeapon->chgRange;
 	float damage = calculDamge(isChargeAttack);
 
-	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10;
+	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10 | 1<< 15;
 
 	int size = RaycastAll(rayOrigin, direction, distacne, layerMask, hits);
 
@@ -1775,7 +1777,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1 << 8 | 1 << 10;; 
+	RangeInfo.layerMask = 1 << 8 | 1 << 10 | 1<< 15;
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();
@@ -1795,10 +1797,11 @@ void Player::RangeAttack()
 			if (dot > cosf(Mathf::Deg2Rad * rangeAngle * 0.5f))
 			{
 				auto [iter, inserted] = inRangeEnemy.insert(entity);
-				if (entity->GetOwner()->m_layer == "Enemy")
+				if (entity->GetOwner()->m_layer == "Enemy" || entity->GetOwner()->m_layer == "EnemyHome")
 				{
 					auto [iter, inserted] = enemis.insert(entity);
 				}
+				
 			}
 		}
 	}
@@ -1941,18 +1944,36 @@ void Player::ShootSpecialBullet()
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto specialBullets = poolmanager->GetSpecialBulletPool();
 	GameObject* bulletObj = specialBullets->Pop();
+	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3 shootPos = pos;
+	bool nearTarget = false;
 	if (bulletObj)
 	{
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
-		Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+		if (curTarget)
+		{
+			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+			float length = (targetPos - pos).Length();
+			length = std::abs(length);
+			if (length <= 2.0f)
+			{
+				nearTarget = true;
+			}
+
+		}
 
 		if (shootPosObj)
 		{
-			pos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->m_transform.GetWorldPosition();
+		}
+		if (nearTarget)
+		{
+			shootPos.x = pos.x;
+			shootPos.z = pos.z;
 		}
 		if (m_curWeapon)
 		{
-			bullet->Initialize(this, pos, player->m_transform.GetForward(), calculDamge(true));
+			bullet->Initialize(this, shootPos, player->m_transform.GetForward(), calculDamge(true));
 		}
 		int rand = Random<int>(0, specialBulletSounds.size() - 1).Generate();
 		if (m_ActionSound)
@@ -1970,19 +1991,40 @@ void Player::ShootChargeBullet()
 	if (!GM || GM->GetObjectPoolManager() == nullptr) return;
 	auto poolmanager = GM->GetObjectPoolManager();
 	auto normalBullets = poolmanager->GetNormalBulletPool();
+	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
+	Mathf::Vector3 shootPos = pos;
+	bool nearTarget = false;
 	std::vector<GameObject*> chargePool;
 	for (int i = 0; i < 5; i++)
 	{
 		GameObject* bulletObj = normalBullets->Pop();
 		chargePool.push_back(bulletObj);
 	}
-	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	if (!chargePool.empty())
 	{
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
+
+
+		if (curTarget)
+		{
+			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+			float length = (targetPos - pos).Length();
+			length = std::abs(length);
+			if (length <= 2.0f)
+			{
+				nearTarget = true;
+			}
+
+		}
 		if (shootPosObj)
 		{
-			pos = shootPosObj->m_transform.GetWorldPosition();
+			shootPos = shootPosObj->m_transform.GetWorldPosition();
+		}
+
+		if (nearTarget)
+		{
+			shootPos.x = pos.x;
+			shootPos.z = pos.z;
 		}
 		Mathf::Vector3 OrgionShootDir = player->m_transform.GetForward();
 
@@ -1996,7 +2038,7 @@ void Player::ShootChargeBullet()
 				int Shootangle = m_curWeapon->ChargeAttackBulletAngle * i;
 				Mathf::Vector3 ShootDir = XMVector3TransformNormal(OrgionShootDir,
 					XMMatrixRotationY(XMConvertToRadians(Shootangle)));
-				bullet->Initialize(this, pos, ShootDir, m_curWeapon->chgAckDmg);
+				bullet->Initialize(this, shootPos, ShootDir, m_curWeapon->chgAckDmg);
 			}
 		}
 
@@ -2142,7 +2184,7 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			if (HitPrefab)
 			{
 				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
-				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>();
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 
@@ -2158,7 +2200,7 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			if (HitPrefab)
 			{
 				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
-				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); //&&&&&나중에 용우가만든 종합이펙트스크립트로 수정
+				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); 
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 

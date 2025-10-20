@@ -1,6 +1,6 @@
 m_name: EnemyGate
 m_isEnabled: true
-m_instanceID: 668319547
+m_instanceID: 2911795948
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -8,21 +8,21 @@ PrefabNode:
     m_isEnabled: true
     m_instanceID: 2476966708
     m_transform:
-      position: {x: 0, y: 0, z: 10, w: 1}
+      position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 70
+    m_index: 69
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [71, 72]
+    m_childrenIndices: [70, 71]
     m_prefabFileGuid: 4859d5a7-1ec5-50b0-bb21-eecb84cb965f
     m_attachedSoketID: 0
     m_collisionType: 10
     m_isStatic: false
     m_gameObjectType: 0
     m_tag: Untagged
-    m_layer: Enemy
+    m_layer: EnemyHome
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
@@ -49,10 +49,10 @@ PrefabNode:
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        maxHP: 20
+        maxHP: 200
         m_name: EntityMonsterBaseGate
         m_isEnabled: true
-        m_instanceID: 2700017203
+        m_instanceID: 2123716990
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 57e346f4-474f-5eaa-a7e9-906fca4c026c
     children:
@@ -64,9 +64,9 @@ PrefabNode:
           position: {x: 0, y: 4.76837158e-07, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 70
-        m_index: 71
-        m_parentIndex: 70
+          m_parentID: 69
+        m_index: 70
+        m_parentIndex: 69
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 4859d5a7-1ec5-50b0-bb21-eecb84cb965f
@@ -119,7 +119,7 @@ PrefabNode:
             maxHP: 20
             m_name: EntityMonsterBaseGate
             m_isEnabled: true
-            m_instanceID: 1462804136
+            m_instanceID: 3672864650
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 57e346f4-474f-5eaa-a7e9-906fca4c026c
       - GameObject: 2166264123
@@ -130,9 +130,9 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 0}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 70
-        m_index: 72
-        m_parentIndex: 70
+          m_parentID: 69
+        m_index: 71
+        m_parentIndex: 69
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 4859d5a7-1ec5-50b0-bb21-eecb84cb965f
