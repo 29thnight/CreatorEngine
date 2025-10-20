@@ -600,6 +600,12 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\BurrowMove.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\BossBurrowAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossPopupAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\SoundBarUI.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -699,6 +705,14 @@
 		<ClInclude Include="Assets\Script\SettingWindowUI.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\BossWarningAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossRangedAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossMeleeAni.h">
+			<Filter>Script</Filter>
 		<ClInclude Include="Assets\Script\PlayerThrow.h">
 			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
 		</ClInclude>
@@ -1208,6 +1222,12 @@
 		<ClCompile Include="Assets\BehaviorTree\Action\BurrowMove.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\BossBurrowAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossPopupAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\SoundBarUI.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -1307,6 +1327,14 @@
 		<ClCompile Include="Assets\Script\SettingWindowUI.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossRangedAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
+			<Filter>Script</Filter>
 		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
 			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
 		</ClCompile>

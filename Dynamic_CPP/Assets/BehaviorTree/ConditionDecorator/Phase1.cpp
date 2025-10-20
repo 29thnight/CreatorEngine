@@ -13,7 +13,7 @@ bool Phase1::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	float hpRatio = static_cast<float>(hp) / static_cast<float>(maxHp);
 
 
-	LOG("HPRatio is : "<< hpRatio << " Phase1 is " << ((bool)(hpRatio > 0.5f) ? "True" : "False"));
+	//LOG("HPRatio is : "<< hpRatio << " Phase1 is " << ((bool)(hpRatio > 0.5f) ? "True" : "False"));
 	if (hpRatio > 0.5f) {
 		// 100% ~ 70% HP 
 

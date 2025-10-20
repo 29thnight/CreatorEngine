@@ -876,6 +876,8 @@ void PhysicX::CreateDynamicBody(const CapsuleColliderInfo & info, const ECollide
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
 	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material, true);
+	physx::PxTransform localPose(physx::PxQuat(physx::PxHalfPi, physx::PxVec3(0, 0, 1)));
+	shape->setLocalPose(localPose);
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
 	shape->release();
 	if (dynamicBody != nullptr)
