@@ -23,7 +23,7 @@ void EntityMonsterA::Start()
 	if (HPBarPrefab && canvObj)
 	{
 		GameObject* hpObj = PrefabUtilitys->InstantiatePrefab(HPBarPrefab, "MonAHp");
-		HPBar* hp = hpObj->GetComponentDynamicCast<HPBar>();
+		HPBar* hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
 		m_currentHP = m_currHP;
@@ -31,6 +31,8 @@ void EntityMonsterA::Start()
 		hp->SetMaxHP(m_maxHP);
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
+		hp->SetTarget(GetOwner()->shared_from_this());
+		hp->Init();
 	}
 	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)
@@ -267,11 +269,11 @@ void EntityMonsterA::Update(float tick)
 		int count = PhysicsManagers->BoxSweep(sweepInput, boxHalfExtents, hitResults);
 		if (count > 0) {
 			for (auto& hit : hitResults) {
-				std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
+				//std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 				if (hit.gameObject->GetHashedName().ToString() == m_player1->GetHashedName().ToString()
 					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()) //player
 				{
-					std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
+					//std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();
 					if (entity) {
 						entity->SendDamage(this, m_attackDamage);	
@@ -337,13 +339,13 @@ void EntityMonsterA::Update(float tick)
 
 void EntityMonsterA::AttackBoxOn()
 {
-	std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
+	//std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
 	isBoxAttack = true;
 }
 
 void EntityMonsterA::AttackBoxOff()
 {
-	std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
+	//std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
 	isBoxAttack = false;
 }
 
@@ -373,7 +375,7 @@ void EntityMonsterA::ChaseTarget(float deltatime)
 				outTime = blackBoard->GetValueAsFloat("ChaseOutTime");
 			}
 
-			std::cout << "dist "<< dir.Length() << std::endl;
+			//std::cout << "dist "<< dir.Length() << std::endl;
 
 			if (dir.Length() < m_chaseRange)
 			{

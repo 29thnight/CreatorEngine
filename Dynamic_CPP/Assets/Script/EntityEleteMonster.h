@@ -165,7 +165,7 @@ public:
 	[[Property]]
 	float KnockbackDistacneX = 0.04f;
 	[[Property]]
-	float KnockbackDistacneY = 0.14f;
+	float KnockbackDistacneY = 0.01f;
 	[[Property]]
 	float KnockbackTime = 0;
 	////³Ø¹éÃ³¸® -> ³Ë¹é X

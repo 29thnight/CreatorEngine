@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "ViveSwitchUI.h"
+#include "SoundBarUI.h"
 #include "SwordProjectileEffect.h"
 #include "SwordProjectile.h"
 #include "ControllerVibration.h"

@@ -67,7 +67,8 @@ PixelOutput main(PixelInput input)
     float3 adjustedSmoke = input.color.rgb;
     float smokeIntensity = (smokeColor.r + smokeColor.g + smokeColor.b) / 3.0;
 
-    float dissolveAlpha = smoothstep(0.45, 0.55, dissolveValue);
+    float s = 1 - sin(normalizedAge * 3.1416926);
+    float dissolveAlpha = smoothstep(s, s + 0.2, dissolveValue);
 
     float3 baseColor = adjustedSmoke;
     float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);
@@ -76,7 +77,7 @@ PixelOutput main(PixelInput input)
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
     float brightnessMask = smoothstep(0.03, 0.12, colorBrightness);
-    finalAlpha = finalAlpha * brightnessMask; // 기존 알파와 곱하기
+    finalAlpha = finalAlpha * brightnessMask * smoothstep(0.03, 0.12, emissionColor.r); // 기존 알파와 곱하기
     
     clip(finalAlpha - 0.05); // 최종 알파로 클립
     

@@ -24,6 +24,9 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void SetTarget(std::shared_ptr<GameObject> target) { m_target = target; }
+	void Init();
+
 	[[Property]]
 	GameObject::Index targetIndex = GameObject::INVALID_INDEX;
 
@@ -53,6 +56,7 @@ private:
 	std::weak_ptr<GameObject> m_target;
 	class RectTransformComponent* m_rect = nullptr;
 	class ImageComponent* m_image = nullptr;
+	class Camera* m_camera = nullptr;
 
 	int m_currentHP{};
 	int m_maxHP{};
