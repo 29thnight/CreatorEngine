@@ -121,9 +121,9 @@ public:
 
 	//대시
 	[[Property]]
-	float dashDistacne = 0.05f; // 대시속도 (dashDistacne 속도 애니메이션 재생시간동안 감) 
+	float dashDistacne = 0.05f; // 대시거리
 	[[Property]]
-	float m_dashTime = 0.15f; //현재는 애니메이션 재생시간에 맞춰서 정해짐
+	float m_dashTime = 0.15f; //
 	[[Property]]
 	float dashCooldown = 1.f; //대쉬 쿨타임
 	[[Property]]

@@ -40,6 +40,7 @@ void CriticalMark::ResetMark()
 }
 bool CriticalMark::UpdateMark(int _playerindex)
 {
+	if (canMark == false) return false;
 	if (markEffect)
 	{
 		if (markIndex == -1 && canMark == true)   //마크가없을떄 떄리면 그대로 부여
