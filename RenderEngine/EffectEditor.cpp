@@ -4631,7 +4631,7 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 		}
 
 		float animationDuration = spriteParams.animationDuration;
-		if (ImGui::SliderFloat("Animation Duration", &animationDuration, 0.1f, 10.0f, "%.2f sec")) {
+		if (ImGui::InputFloat("Animation Duration", &animationDuration, -100.0f, 100.0f, "%.2f sec")) {
 			meshModule->SetSpriteAnimation(spriteParams.frameCount, animationDuration, spriteParams.gridColumns, spriteParams.gridRows);
 		}
 
