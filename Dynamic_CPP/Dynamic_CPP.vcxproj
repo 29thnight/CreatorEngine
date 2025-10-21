@@ -411,6 +411,9 @@
 		<ClInclude Include="Assets\Script\BossPopupAni.h" />
 		<ClInclude Include="Assets\Script\SoundBarUI.h" />
 		<ClInclude Include="Assets\Script\ViveSwitchUI.h" />
+		<ClInclude Include="Assets\Script\BossWarningAni.h" />
+		<ClInclude Include="Assets\Script\BossRangedAni.h" />
+		<ClInclude Include="Assets\Script\BossMeleeAni.h" />
 		<ClInclude Include="Assets\Script\BootstrapObserver.h" />
 		<ClInclude Include="Assets\Script\StartButton.h" />
 		<ClInclude Include="Assets\Script\TutorialButton.h" />
@@ -419,9 +422,8 @@
 		<ClInclude Include="Assets\Script\ExitButton.h" />
 		<ClInclude Include="Assets\Script\SettingWindowUI.h" />
 		<ClInclude Include="Assets\Script\EntityMonsterTower.h" />
-		<ClInclude Include="Assets\Script\BossWarningAni.h" />
-		<ClInclude Include="Assets\Script\BossRangedAni.h" />
 		<ClInclude Include="Assets\Script\BossMeleeAni.h" />
+>>>>>>>>> Temporary merge branch 2
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\CameraMove.cpp" />
@@ -1108,8 +1110,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ViveSwitchUI.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -1119,9 +1119,8 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
+<<<<<<<<< Temporary merge branch 1
 		<ClCompile Include="Assets\Script\BootstrapObserver.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>

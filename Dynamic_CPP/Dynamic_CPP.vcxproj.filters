@@ -705,6 +705,14 @@
 		<ClInclude Include="Assets\Script\SettingWindowUI.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\BossWarningAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossRangedAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossMeleeAni.h">
+			<Filter>Script</Filter>
 		<ClInclude Include="Assets\Script\PlayerThrow.h">
 			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
 		</ClInclude>
@@ -1331,6 +1339,14 @@
 		<ClCompile Include="Assets\Script\SettingWindowUI.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossRangedAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
+			<Filter>Script</Filter>
 		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
 			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
 		</ClCompile>
@@ -1396,15 +1412,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityMonsterBaseGate.cpp">
 			<Filter>Script\ScriptClass\Enemy</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossRangedAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
-			<Filter>Script</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
