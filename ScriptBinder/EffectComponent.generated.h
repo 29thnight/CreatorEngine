@@ -6,14 +6,14 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 	PropertyField \
 	({ \
 		meta_property(m_effectTemplateName) \
+		meta_property(m_timeScale) \
+		meta_property(m_duration) \
 		meta_property(m_isPlaying) \
 		meta_property(m_isPaused) \
-		meta_property(m_timeScale) \
 		meta_property(m_loop) \
-		meta_property(m_duration) \
 		meta_property(m_useAbsolutePosition) \
-		meta_property(m_effectInstanceName) \
 		meta_property(m_currentTime) \
+		meta_property(m_effectInstanceName) \
 	}); \
 	MethodField \
 	({ \

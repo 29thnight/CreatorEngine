@@ -281,7 +281,7 @@ public:
 	HashingString GetSceneName() const { return m_sceneName; }
     std::vector<Texture*>		m_lightmapTextures{};
     std::vector<Texture*>		m_directionalmapTextures{};
-    Core::DelegateHandle		resetObjHandle{};
     GameObject*					m_selectedSceneObject = nullptr;
 	std::vector<GameObject*>	m_selectedSceneObjects;
+    Core::DelegateHandle		resetObjHandle{};
 };

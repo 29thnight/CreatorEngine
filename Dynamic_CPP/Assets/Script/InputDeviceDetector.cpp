@@ -55,7 +55,7 @@ void InputDeviceDetector::Update(float tick)
         if(GameInstance::GetInstance()->IsLoadSceneComplete() && nextSceneIndex == (int)SceneType::Bootstrap)
         {
 			m_isLeaveSelectScene = false;
-            m_gameManager->SwitchNextScene();
+            m_gameManager->SwitchNextSceneWithFade();
         }
     }
 }

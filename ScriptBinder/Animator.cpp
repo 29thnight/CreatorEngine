@@ -244,6 +244,51 @@ void Animator::DeleteParameter(int index)
 	}
 }
 
+ConditionParameter* Animator::AddDefaultParameter(ValueType vType)
+{
+	std::string baseName;
+	switch (vType)
+	{
+	case ValueType::Float:
+		baseName = "NewFloat";
+		break;
+	case ValueType::Int:
+		baseName = "NewInt";
+		break;
+	case ValueType::Bool:
+		baseName = "NewBool";
+		break;
+	case ValueType::Trigger:
+		baseName = "NewTrigger";
+		break;
+	}
+	std::string valueName = baseName;
+	int index = 0;
+	bool isDuplicate = true;
+	{
+		std::unique_lock lock(m_paramMutex);
+		while (isDuplicate)
+		{
+			isDuplicate = false;
+			for (auto& parm : Parameters)
+			{
+				if (parm->name == valueName)
+				{
+					isDuplicate = true;
+					valueName = baseName + std::to_string(++index);
+					break;
+				}
+			}
+		}
+	}
+	ConditionParameter* newParameter = new ConditionParameter(0, vType, valueName);
+	{
+		std::unique_lock lock(m_paramMutex);
+		Parameters.push_back(newParameter);
+	}
+	return newParameter;
+}
+
 ConditionParameter* Animator::FindParameter(std::string valueName)
 {
 	std::unique_lock lock(m_paramMutex);

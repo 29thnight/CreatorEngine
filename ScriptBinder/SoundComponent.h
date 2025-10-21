@@ -49,14 +49,9 @@ public:
 	float pitch = 1.f;
 	[[Property]]
 	int priority = 128;
-	[[Property]]
-	bool loop = false;
-	[[Property]]
-	bool playOnStart = false;
+
 
 public:
-	[[Property]]
-	bool  spatial = false;          //false = 2D, true = 블렌드(2D + 3D)
 	[[Property]]
 	float spatialBlend = 1.0f;      // 0=2D, 1=3D, 중간은 듀얼채널 crossfade
 	[[Property]]
@@ -65,8 +60,6 @@ public:
 	float maxDistance = 50.0f;
 
 public:
-	[[Property]]
-	bool   useReverbSend = false;
 	[[Property]]
 	float  reverbLevel = 0.0f;    // -80dB~+10dB 범위 권장 (FMOD send)
 	[[Property]]
@@ -89,4 +82,16 @@ private:
 
 	FMOD::Channel* channel2D = nullptr;
 	FMOD::Channel* channel3D = nullptr;
+
+public:
+	[[Property]]
+	bool loop = false;
+	[[Property]]
+	bool playOnStart = false;
+	[[Property]]
+	bool spatial = false;          //false = 2D, true = 블렌드(2D + 3D)
+	[[Property]]
+	bool useReverbSend = false;
+
+
 };

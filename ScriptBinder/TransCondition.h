@@ -62,20 +62,16 @@ public:
 	void SetCondition(std::string _parameterName);
 
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
+	nlohmann::json Serialize();
+	TransCondition Deserialize();
 	//타입 ,값 ,함수 
 	[[Property]]
 	std::string valueName = "None";
-
 	ConditionParameter* valueParameter;
 	[[Property]]
-	ConditionType cType = ConditionType::Equal;
-	[[Property]]
 	ConditionParameter CompareParameter;
-
 	AnimationController* m_ownerController{};
-
-
-	nlohmann::json Serialize();
-	TransCondition Deserialize();
+	[[Property]]
+	ConditionType cType = ConditionType::Equal;
 };
 

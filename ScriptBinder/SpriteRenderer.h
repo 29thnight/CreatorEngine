@@ -39,11 +39,10 @@ private:
     [[Property]]
     int m_orderInLayer{ 0 };
     [[Property]]
-    BillboardType m_billboardType{ BillboardType::None };
-    [[Property]]
     Mathf::Vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
+    std::shared_ptr<Texture> m_Sprite = nullptr;
+    [[Property]]
+    BillboardType m_billboardType{ BillboardType::None };
 	[[Property]]
 	bool m_enableDepth{ false };
-
-    std::shared_ptr<Texture> m_Sprite = nullptr;
 };

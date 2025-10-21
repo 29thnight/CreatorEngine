@@ -51,18 +51,6 @@ public:
 		   scene->UnCollectColliderComponent(this);
 	   }
    }
-
-	[[Property]]
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	[[Property]]
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
-	[[Property]]
-	float m_radius = 0.55f;
-	[[Property]]
-	float m_height = 2.f;
-	
-	
-	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
 	
 	void Move(const DirectX::SimpleMath::Vector2& moveInput)
 	{
@@ -74,14 +62,6 @@ public:
 	void OnStart();
 	void OnFixedUpdate(float fixedDeltaTime);
 	void OnLateUpdate(float fixedDeltaTime);
-
-	//==========================
-	Core::DelegateHandle m_onStartHandle;
-	Core::DelegateHandle m_onFixedUpdateHandle;
-	Core::DelegateHandle m_onLateUpdateHandle;
-	//==========================
-
-
 
 	//컨트롤러 정보 반환
 	CharacterControllerInfo GetControllerInfo() 
@@ -140,7 +120,6 @@ public:
 		m_rotOffset = rotation;
 	}
 
-
 	//Id
 	unsigned int GetControllerID() const
 	{
@@ -198,14 +177,8 @@ public:
 		return m_collsionCount;
 	}
 
-	//void Stun(float stunTime);
-	/*void SetKnockBack(Mathf::Vector3 knockbackVelocity);
-	void EndKnockBack();*/
-
 	//순간이동 해당 포지션 위치로 강제이동
 	void ForcedSetPosition(const DirectX::SimpleMath::Vector3& pos);
-
-
 	// CCT의 자동 회전 기능을 켜거나 끕니다.
 	void SetAutomaticRotation(bool useAuto);
 
@@ -227,24 +200,31 @@ private:
 	void OnCollisionStay(ICollider* other) override;
 	void OnCollisionExit(ICollider* other) override;
 
+public:
+	[[Property]]
+	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	[[Property]]
+	float m_radius = 0.55f;
+	[[Property]]
+	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
+	[[Property]]
+	float m_height = 2.f;
+private:
+	bool m_bIsFall{ false }; //낙하중인지 체크
+	bool m_bOnMove{ false }; //이동중인지 체크
+	bool m_bHasInput{ false }; //입력값이 있는지 체크
+	bool m_useAutomaticRotation{ true }; // 자동 회전 기능 사용 여부
 
 	Transform* m_transform;
-
 	//컨트롤러 정보
 	CharacterControllerInfo m_controllerInfo;
 	//무브먼트 정보
 	CharacterMovementInfo m_movementInfo;
-
 	//컨트롤러 아이디
 	unsigned int m_controllerID{ 0 };
-	
 	//collision
 	unsigned int m_collsionCount{ 0 };
-
-	bool m_bIsFall{ false }; //낙하중인지 체크
-	bool m_bOnMove{ false }; //이동중인지 체크
-	bool m_bHasInput{ false }; //입력값이 있는지 체크
-	
 	[[Property]]
 	float m_fBaseSpeed{ 0.025f }; //기본 속도
 	float PreSpeed = m_fBaseSpeed;
@@ -254,14 +234,8 @@ private:
 	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
 	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
 	Mathf::Vector3 preRotation;
-
 	[[Property]]
 	float m_rotationSpeed{ 0.1f }; //회전 속도
-
-	bool m_useAutomaticRotation{true}; // 자동 회전 기능 사용 여부
-
-
-
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;
 

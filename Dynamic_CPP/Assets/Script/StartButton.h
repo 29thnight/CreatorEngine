@@ -14,4 +14,6 @@ public:
 
 private:
 	using Super = ImageButton;
+
+	class GameManager* m_gameManager{ nullptr };
 };

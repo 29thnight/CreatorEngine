@@ -1,5 +1,6 @@
 ﻿#include "Transform.h"
 #include "Terrain.h"
+#include "SceneManager.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image.h"
@@ -38,7 +39,7 @@ static std::string Utf8Encode(const std::wstring& wstr)
 	return str;
 }
 
-TerrainComponent::TerrainComponent() : m_threadPool(4) 
+TerrainComponent::TerrainComponent()
 {
 	m_name = "TerrainComponent";
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<TerrainComponent>();
@@ -422,7 +423,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 	//height map
 	std::wstring heightMapPath = (terrainPath / (name + L"_HeightMap.png")).wstring();
-	m_threadPool.Enqueue(
+	SceneManagers->m_threadPool->Enqueue(
 		[this, heightMapPath]() 
 		{
 			SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
@@ -435,7 +436,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	for (size_t i = 0; i < m_layers.size(); ++i)
 	{
 		splatMapFiles[i] = name + L"_Splat_" + std::to_wstring(i) + L".png";
-		m_threadPool.Enqueue([this, i, path = (terrainPath / splatMapFiles[i]).wstring()]() {
+		SceneManagers->m_threadPool->Enqueue([this, i, path = (terrainPath / splatMapFiles[i]).wstring()]() {
 			SaveEditorSplatMap(path, i);
 			});
 	}
@@ -458,7 +459,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 			fs::path destPath = difusePath / fs::path(layer.diffuseTexturePath).filename();
 			//이미 존제하면 복	사하지 않음
 			if (!fs::exists(destPath)) {
-				m_threadPool.Enqueue(
+				SceneManagers->m_threadPool->Enqueue(
 					[src = layer.diffuseTexturePath, dst = destPath.wstring()]()
 					{
 						std::error_code ec;
@@ -475,7 +476,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	}
 
 	//스레드 대기
-	m_threadPool.NotifyAllAndWait();
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	//풀페스 저장 하면 다른 사람이 쓰김 힘듬 상대경로 쓸레
 	fs::path relheightMap = fs::relative(heightMapPath, terrainDir);

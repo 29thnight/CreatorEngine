@@ -29,9 +29,9 @@ public:
 	std::string				 m_spriteSheetPath{};
 	[[Property]]
 	float                    m_frameDuration{ 0.1f };
+	float                    m_deltaTime{};
 	[[Property]]
 	bool                     m_isLoop{ true };
 	[[Property]]
 	bool                     m_isPreview{ false };
-	float                    m_deltaTime{};
 };
