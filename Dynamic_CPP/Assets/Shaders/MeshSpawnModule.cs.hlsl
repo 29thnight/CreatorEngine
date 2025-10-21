@@ -269,7 +269,7 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     }
     else
     {
-        particle.rotation = float3(0, 0, 0);
+        particle.rotation = gEmitterRotation;
     }
 
     particle.pad3 = gEmitterRotation.x;
