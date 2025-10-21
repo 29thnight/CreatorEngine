@@ -39,6 +39,8 @@ public:
 	CriticalMark* m_criticalMark = nullptr;
 	std::vector<GameObject*> m_projectiles; // 공격 투사체
 	int m_projectileIndex = 0; // 투사체 번호
+	std::vector<MeshRenderer*> meshs;
+
 
 	GameObject* m_asis = nullptr;
 	GameObject* m_player1 =nullptr;
@@ -104,8 +106,11 @@ public:
 	[[Property]]
 	float m_teleportCoolTime = 3.0f; //텔레포트 쿨타임
 	[[Property]]
-	float m_teleportDelay = 0.5f; //텔레포트 딜레이 시간
+	float m_teleportDelay = 1.0f; //텔레포트 딜레이 시간
 
+
+	Mathf::Vector3 m_teleportDestination;   // 계산된 텔레포트 목적지를 저장할 변수
+	float m_teleportTimer = 0.0f;           // 텔레포트 딜레이를 계산하기 위한 타이머
 	bool m_isTeleport = false; //텔레포트 실행중
 	bool m_posset = false; //이동 완료시
 
@@ -139,8 +144,11 @@ public:
 
 
 	void StartTeleport();
-	void EndTeleport();
+	void EndTeleport(float tick);
 
+
+	bool CalculateTeleport(Mathf::Vector3& bestLocation); //순간이동 위치 계산
+	void PushToNuisanceObject();//순간이동 할 위치에 있는 콜리전 객체를 약간 밀어내는 로직
 
 	void Teleport(); // 일정 거리 이내 접근시 순간이동
 

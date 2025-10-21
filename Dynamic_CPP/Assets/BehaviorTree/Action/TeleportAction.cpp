@@ -35,8 +35,7 @@ NodeStatus TeleportAction::Tick(float deltatime, BlackBoard& blackBoard)
 		State = "Teleport";
 		blackBoard.SetValueAsString("State", State);
 		if (script) {
-			script->m_isTeleport = true;
-			script->Teleport();
+			script->StartTeleport();
 		}
 		return NodeStatus::Running;
 	}

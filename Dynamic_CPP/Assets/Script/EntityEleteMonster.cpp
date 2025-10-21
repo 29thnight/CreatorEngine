@@ -73,6 +73,9 @@ void EntityEleteMonster::Start()
 		}
 
 	}
+
+	meshs = m_pOwner->GetComponentsInChildren<MeshRenderer>();
+
 	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->SetAutomaticRotation(true);
 	/*if (!m_animator)
@@ -160,7 +163,7 @@ void EntityEleteMonster::Start()
 	//
 	blackBoard->SetValueAsFloat("RetreatRange", m_retreatRange);
 	blackBoard->SetValueAsFloat("TeleportDistance", m_teleportDistance);
-	blackBoard->SetValueAsFloat("TeleportCollTime", m_teleportCoolTime);
+	blackBoard->SetValueAsFloat("TeleportCooldown", m_teleportCoolTime);
 
 	HitImpulseStart();
 }
@@ -187,7 +190,7 @@ void EntityEleteMonster::Update(float tick)
 		if (TPCooltime < 0) {
 			TPCooltime = 0.0f;
 		}
-		blackBoard->SetValueAsFloat("TeleportColldown", TPCooltime);
+		blackBoard->SetValueAsFloat("TeleportCooldown", TPCooltime);
 	}
 	if (hasRTCooldown)
 	{
@@ -197,6 +200,15 @@ void EntityEleteMonster::Update(float tick)
 			RTCooltime = 0.0f;
 		}
 		blackBoard->SetValueAsFloat("ReteatCooldown", RTCooltime);
+	}
+
+	if (m_isTeleport) {
+		m_teleportTimer -= tick;
+		std::cout << "Teleporting has time : "<< m_teleportTimer << std::endl;
+		if (m_teleportTimer <= 0.0f)
+		{
+			EndTeleport(tick);
+		}
 	}
 
 	//플레이어 위치 업데이트
@@ -613,25 +625,213 @@ DirectX::SimpleMath::Vector3 EntityEleteMonster::ObstacleAvoider(
 void EntityEleteMonster::StartTeleport()
 {
 	//텔레포트 시작
-	//이펙트 시작 
-	//충돌체 비활성화
-	GetOwner()->SetLayer("Water"); //왜 물로 바꾸는거야 ㅋㅋㅋㅋ
-	//모델 비활성화
-	MeshRenderer* mesh = m_pOwner->GetComponent<MeshRenderer>();
-	if (mesh) {
-		mesh->SetEnabled(false);
+	
+	std::cout << "StartTeleport " << std::endl;
+
+	// 이미 텔레포트 중이거나 쿨타임이 차지 않았으면 시작하지 않습니다. -->//BT
+	//if (m_isTeleport || blackBoard->GetValueAsFloat("TeleportCooldown") > 0.0f) 
+	//{
+	//	return;
+	//}
+
+	Mathf::Vector3 bestLocation;
+
+	//위치 계산
+	// 1. 최적의 텔레포트 위치를 계산합니다.
+	if (CalculateTeleport(bestLocation))
+	{
+		// 2. 위치를 찾았다면, 텔레포트 과정을 시작합니다.
+		m_teleportDestination = bestLocation;
+		m_isTeleport = true;
+		m_teleportTimer = m_teleportDelay;
+
+		// TODO:이펙트 시작 telport 사라지는 이펙트
+		Prefab* tpStart = PrefabUtilitys->LoadPrefab("TPstartEffect");
+		if (tpStart) {
+			GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(tpStart, "TPstartEffect");
+			auto effect = PrefabObject1->GetComponentDynamicCast<PlayEffectAll>();
+			PrefabObject1->m_transform.SetPosition(GetOwner()->m_transform.GetWorldPosition());
+			if (effect)
+			{
+				effect->Initialize();
+			}
+		}
+		//충돌체 비활성화
+		GetOwner()->SetLayer("Water"); //왜 물로 바꾸는거야 ㅋㅋㅋㅋ
+
+		////모델 비활성화
+		for (auto child : meshs) {
+			if (child) {
+				child->SetEnabled(false);
+			}
+		}
+		
+		std::cout << "Teleport disabled mesh and layer " << std::endl;
+		
+		// 1. 목적지로 이동합니다.
+		m_pOwner->GetComponent<CharacterControllerComponent>()->ForcedSetPosition(m_teleportDestination);
+		std::cout << "EndTeleport moved ForcedSetPosition " << std::endl;
+
+		Prefab* tpIng = PrefabUtilitys->LoadPrefab("TPingEffect");
+		if (tpIng) {
+			GameObject* PrefabObject2 = PrefabUtilitys->InstantiatePrefab(tpIng, "TPingEffect");
+			auto effect = PrefabObject2->GetComponentDynamicCast<PlayEffectAll>();
+			PrefabObject2->m_transform.SetPosition(m_teleportDestination);
+			if (effect)
+			{
+				effect->Initialize();
+			}
+		}
+	}
+	else
+	{
+		// 적절한 텔레포트 위치를 찾지 못했습니다. 쿨타임을 짧게 돌려 재시도를 방지합니다.
+		std::cout << "Teleport failde not find location " << std::endl;
+		blackBoard->SetValueAsFloat("TeleportCooldown", 1.0f);
 	}
 
 	//일정 시간 뒤에 텔레포트 실행
 }
 
-void EntityEleteMonster::EndTeleport()
+void EntityEleteMonster::EndTeleport(float tick)
 {
-	//위치 이동 후
-	//해당 위치에 이펙트 시작
-	//해당 위치에 다른 충돌체 밀어내기
-	//충돌체 활성화
+	//// 1. 목적지로 이동합니다. --> start 에서 이미 이동
+	//m_pOwner->GetComponent<CharacterControllerComponent>()->ForcedSetPosition(m_teleportDestination);
+	//std::cout << "EndTeleport moved ForcedSetPosition " << std::endl;
+	
+	//// 2. 몬스터를 다시 보이게 하고 충돌을 활성화합니다.
+	for (auto child : meshs) {
+		if (child) {
+			child->SetEnabled(true);
+		}
+	}
+
+	GetOwner()->SetLayer("Enemy"); 
+
+	std::cout << "Teleport eabled mesh and layer " << std::endl;
+
+
+	// TODO: 여기에 나타나는 이펙트(VFX, SFX) 재생 코드를 추가합니다.
+	Prefab* tpEnd = PrefabUtilitys->LoadPrefab("TPendEffect");
+	if (tpEnd) {
+		GameObject* PrefabObject1 = PrefabUtilitys->InstantiatePrefab(tpEnd, "TPendEffect");
+		auto effect = PrefabObject1->GetComponentDynamicCast<PlayEffectAll>();
+		PrefabObject1->m_transform.SetPosition(GetOwner()->m_transform.GetWorldPosition());
+		if (effect)
+		{
+			effect->Initialize();
+		}
+	}
+	
+	// 3. 주변의 밀어낼 수 있는 오브젝트들을 밀어냅니다.
+	PushToNuisanceObject();
+	std::cout << "Teleport PushToNuisanceObject " << std::endl;
+
+	// 4. 텔레포트 상태를 초기화하고 쿨타임을 적용합니다.
+	m_isTeleport = false;
+	blackBoard->SetValueAsFloat("TeleportCooldown", m_teleportCoolTime);
+	std::cout << "EndTeleport end set TeleportCooldown" << std::endl;
 }
+
+/**
+ * \brief 텔레포트할 최적의 위치를 계산하여 반환합니다.
+ * \param bestLocation 찾은 최적의 위치를 담을 출력용 변수
+ * \param outMonstersToPush 해당 위치로 이동 시 밀어내야 할 몬스터 목록
+ * \return 최적의 위치를 찾았으면 true, 아니면 false
+ */
+bool EntityEleteMonster::CalculateTeleport(Mathf::Vector3& bestLocation)
+{
+	const int CANDIDATE_COUNT = 16;
+	float maxDistSq = -1.0f;
+	bool foundValidLocation = false;
+
+	if (!target) return false;
+
+	Vector3 selfPos = m_pOwner->m_transform.GetWorldPosition();
+	Vector3 targetPos = target->m_transform.GetWorldPosition();
+
+	CharacterControllerComponent* cct = m_pOwner->GetComponent<CharacterControllerComponent>();
+	float monsterRadius = cct->GetControllerInfo().radius;
+
+	for (int i = 0; i < CANDIDATE_COUNT; ++i)
+	{
+		// 1. 후보 지점 생성
+		float angle = (float)i / CANDIDATE_COUNT * 2.0f * XM_PI;
+		Vector3 dir = { cos(angle), 0, sin(angle) };
+		Vector3 candidatePos = selfPos + dir * m_teleportDistance;
+
+		// 2. 유효성 검사: 고정 장애물과 겹치는지 확인
+		// ※주의: "WALL" 레이어는 예시이며, 실제 프로젝트의 레이어 설정에 맞게 수정해야 합니다.
+		OverlapInput overlapInput;
+		overlapInput.position = candidatePos;
+		overlapInput.rotation = Mathf::Quaternion::Identity;
+		overlapInput.layerMask = ~0;//LayerMask::WALL;
+		std::vector<HitResult> hitResults;
+		
+		int hitCount = PhysicsManagers->SphereOverlap(overlapInput, monsterRadius, hitResults);
+
+		if (hitCount > 0)
+		{
+			// 고정 장애물과 겹쳤으므로 이 위치는 사용할 수 없습니다.
+			continue;
+		}
+
+		// 3. 유효한 위치이므로, 플레이어로부터 가장 먼 곳인지 확인합니다.
+		float distSqToPlayer = Vector3::DistanceSquared(candidatePos, targetPos);
+		if (distSqToPlayer > maxDistSq)
+		{
+			maxDistSq = distSqToPlayer;
+			bestLocation = candidatePos;
+			foundValidLocation = true;
+		}
+	}
+
+	return foundValidLocation;
+}
+
+void EntityEleteMonster::PushToNuisanceObject()
+{
+	CharacterControllerComponent* cct = m_pOwner->GetComponent<CharacterControllerComponent>();
+	if (!cct) return;
+
+	// 1. 현재 내 위치와 반경을 가져옵니다.
+	Vector3 currentPos = m_pOwner->m_transform.GetWorldPosition();
+	float monsterRadius = cct->GetControllerInfo().radius;
+
+	// 2. 내 위치를 기준으로 Overlap을 실행하여 밀어낼 대상을 찾습니다.
+	OverlapInput overlapInput;
+	overlapInput.position = currentPos;
+	overlapInput.rotation = Mathf::Quaternion::Identity;
+	overlapInput.layerMask = ~0; //LayerMask::MONSTER | LayerMask::PLAYER;
+	std::vector<HitResult> hitResults;
+
+	int hitCount = PhysicsManagers->SphereOverlap(overlapInput, monsterRadius, hitResults);
+
+	if (hitCount == 0) return;
+
+	// 3. 찾은 대상들을 밀어냅니다.
+	for (const auto& hit : hitResults)
+	{
+		GameObject* hitObject = hit.gameObject;
+		if (hitObject == m_pOwner) continue; // 자기 자신은 제외
+
+		CharacterControllerComponent* otherCCT = hitObject->GetComponent<CharacterControllerComponent>();
+		if (otherCCT)
+		{
+			Vector3 objpos = hitObject->m_transform.GetWorldPosition();
+			Vector3 pushDir = objpos - currentPos;
+			if (pushDir.LengthSquared() < 0.001f)
+			{
+				// 위치가 거의 겹쳐있다면 임의의 방향으로 밀어냅니다.
+				pushDir = { (float)rand() / RAND_MAX * 2.f - 1.f, 0, (float)rand() / RAND_MAX * 2.f - 1.f };
+			}
+			pushDir.Normalize();
+			// 예시: 2의 힘으로 1초간 밀어냅니다. 필요에 따라 값을 조절하세요.
+			otherCCT->TriggerForcedMove(pushDir, 0.1f);
+		}
+	}
+}
+
 
 void EntityEleteMonster::Teleport()
 {
@@ -678,7 +878,7 @@ void EntityEleteMonster::Teleport()
 			//텔레포트
 			PushAndTeleportTo(candidatePos,monstersToPush);
 			// TODO: 텔레포트 성공 후 쿨타임 적용 로직 추가
-			blackBoard->SetValueAsFloat("TeleportCooldown", m_rangedAttackCoolTime);
+			blackBoard->SetValueAsFloat("TeleportCooldown", m_teleportCoolTime);
 			m_isTeleport = false;
 			return; // 성공
 		}
@@ -791,7 +991,6 @@ bool EntityEleteMonster::IsValidTeleportLocation(const Vector3& candidatePos,  s
 {
 	// --- 검사 1: 공간 확보 및 밀어낼 몬스터 확인 (Overlap) ---
 	outMonstersToPush.clear();
-
 
 	OverlapInput overlapInput;
 	overlapInput.position = candidatePos;
