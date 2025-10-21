@@ -11,12 +11,6 @@ public:
    ReflectMeshColliderComponent
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(MeshColliderComponent)
-	[[Property]]
-	ConvexMeshColliderInfo m_Info; 
-	[[Property]]
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	[[Property]]
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	
 	void Awake() override
 	{
@@ -143,8 +137,17 @@ public:
 	EColliderType GetColliderType() const override {
 		return m_type;
 	}
+
+public:
+	[[Property]]
+	ConvexMeshColliderInfo m_Info;
+	[[Property]]
+	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 private:
 	EColliderType m_type;
+public:
+	[[Property]]
+	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+private:
 	unsigned int m_collsionCount = 0;
-	
 };

@@ -120,29 +120,25 @@ public:
 	uint32 GetCollisionType() const { return m_collisionType; }
 	Scene* GetScene() { return m_ownerScene; }
 
+	[[Property]]
+	HashedGuid m_attachedSoketID{};
     [[Property]]
 	Transform m_transform{};
-    [[Property]]
+	[[Property]]
 	GameObject::Index m_index{ INVALID_INDEX };
-    [[Property]]
+	[[Property]]
 	GameObject::Index m_parentIndex{ INVALID_INDEX };
 	//for bone update
     [[Property]]
 	GameObject::Index m_rootIndex{ 0 };
-    [[Property]]
-	std::vector<GameObject::Index> m_childrenIndices;
-	[[Property]]
-	FileGuid m_prefabFileGuid{ nullFileGuid };
-	[[Property]]
-	HashedGuid m_attachedSoketID{};
 	[[Property]]
 	uint32 m_collisionType = 0;
 	[[Property]]
-	bool m_isStatic{ false };
+	FileGuid m_prefabFileGuid{ nullFileGuid };
+    [[Property]]
+	std::vector<GameObject::Index> m_childrenIndices;
 
 public:
-	[[Property]]
-	GameObjectType m_gameObjectType{ GameObjectType::Empty };
     [[Property]]
     HashingString m_tag{ "Untagged" };
     [[Property]]
@@ -156,6 +152,11 @@ public:
 	Prefab* m_prefab{ nullptr };
 	YAML::Node m_prefabOriginal{};
 	std::string m_removedSuffixNumberTag{};
+
+	[[Property]]
+	GameObjectType m_gameObjectType{ GameObjectType::Empty };
+	[[Property]]
+	bool m_isStatic{ false };
 };
 
 #include "GameObject.inl"

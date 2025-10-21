@@ -15,14 +15,14 @@ namespace Core
 	{
 	public:
 		DelegateHandle() : id_(0) {}
-		explicit DelegateHandle(std::size_t id) : id_(id) {}
+		explicit DelegateHandle(std::uint32_t id) : id_(id) {}
 		bool IsValid() const { return id_ != 0; }
-		std::size_t GetID() const { return id_; }
+		std::uint32_t GetID() const { return id_; }
 		bool operator==(const DelegateHandle& other) const { return id_ == other.id_; }
 
 		void Reset() { id_ = 0; }
 	private:
-		std::size_t id_;
+		std::uint32_t id_;
 	};
 
 	template <typename T, typename Ret, typename... Args>
@@ -95,7 +95,7 @@ namespace Core
 
 		std::atomic_flag atomic_flag_ = ATOMIC_FLAG_INIT;
 		std::vector<CallbackInfo> callbacks_;
-		std::size_t nextID_;
+		std::uint32_t nextID_;
 		bool isStopped_ = false;
 	};
 }

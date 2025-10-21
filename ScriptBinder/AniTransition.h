@@ -29,7 +29,6 @@ public:
 
 	TransCondition* AddConditionDefault(std::string ownerValueName, ConditionType cType, ValueType vType)
 	{
-
 		TransCondition newTrans(0, cType, vType);
 		newTrans.valueName = ownerValueName;
 		newTrans.m_ownerController = m_ownerController;
@@ -38,7 +37,6 @@ public:
 		conditions.push_back(newTrans);
 
 		return &conditions.back();
-		
 	}
 	void DeleteCondition(int _index);
 	void SetCurState(std::string _curStateName);
@@ -50,39 +48,28 @@ public:
 	bool CheckTransiton(bool isBlend = false);
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
+	nlohmann::json Serialize();
+	AniTransition Deserialize();
 
 	std::vector<TransCondition> GetConditions();
+
+public:
 	[[Property]]
 	std::vector<TransCondition> conditions{};
-
 	AnimationController* m_ownerController{};
 	[[Property]]
 	std::string m_name = "NoName";
-
 	AnimationState* curState = nullptr;
 	AnimationState* nextState = nullptr;
-
 	[[Property]]
 	std::string curStateName{};
 	[[Property]]
 	std::string nextStateName{};
 	[[Property]]
-	bool hasExitTime = false;
-	[[Property]]
 	float exitTime = 0.1f;
 	[[Property]]
 	float blendTime = 0.2f;
-
-	nlohmann::json Serialize();
-	AniTransition Deserialize();
-private:
-	
-	// 전이시간이자 블렌딩될 시간
-	
-	// 애니메이션 탈출 최소시간
-	
-
-	
-	
+	[[Property]]
+	bool hasExitTime = false;
 };
 

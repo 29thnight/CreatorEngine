@@ -64,9 +64,9 @@ public:
 private:
 	unsigned int m_colliderID;
 	HeightFieldColliderInfo m_heightFieldColliderInfo; // 콜라이더 정보
+	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	EColliderType m_type{ EColliderType::COLLISION }; // 콜라이더 타입 --> 바닥은 기본 COLLISION 어차피 static 일꺼임 
 	
-	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 	// ICollider을(를) 통해 상속됨
 	//terrain collider는 rotation이 필요없음 

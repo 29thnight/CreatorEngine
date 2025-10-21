@@ -10,6 +10,16 @@
 #include <boost/uuid/uuid_io.hpp>
 #include "combaseapi.h"
 
+// 간단한 FNV-1a 64비트 constexpr 해시
+constexpr uint64_t fnv1a_64(std::string_view s) {
+	uint64_t h = 14695981039346656037ull;
+	for (unsigned char c : s) {
+		h ^= c;
+		h *= 1099511628211ull;
+	}
+	return h;
+}
+
 inline GUID GenerateGUID()
 {
 	GUID guid;
@@ -50,39 +60,24 @@ struct HashedGuid
 	size_t m_ID_Data{ 0 };
 	static constexpr size_t INVAILD_ID{ 0 };
 
-	HashedGuid() = default;
-	HashedGuid(size_t id) : m_ID_Data(id) {}
+	constexpr HashedGuid() = default;
+	constexpr HashedGuid(size_t id) : m_ID_Data(id) {}
 	~HashedGuid() = default;
 
-	HashedGuid(const HashedGuid&) = default;
-	HashedGuid(HashedGuid&&) = default;
-	HashedGuid& operator=(const HashedGuid&) = default;
-	HashedGuid& operator=(HashedGuid&&) = default;
-	HashedGuid& operator=(size_t id)
-	{
-		m_ID_Data = id;
-		return *this;
+	constexpr HashedGuid(const HashedGuid&) = default;
+	constexpr HashedGuid(HashedGuid&&) = default;
+	constexpr HashedGuid& operator=(const HashedGuid&) = default;
+	constexpr HashedGuid& operator=(HashedGuid&&) = default;
+
+	constexpr HashedGuid& operator=(size_t id) {
+		m_ID_Data = id; return *this;
 	}
 
-	friend auto operator<=>(const HashedGuid& lhs, const HashedGuid& rhs)
-	{
-		return lhs.m_ID_Data <=> rhs.m_ID_Data;
-	}
+	friend constexpr auto operator<=>(const HashedGuid& lhs, const HashedGuid& rhs) = default;
+	friend constexpr bool operator==(const HashedGuid& lhs, const HashedGuid& rhs) = default;
 
-	friend bool operator==(const HashedGuid& lhs, const HashedGuid& rhs)
-	{
-		return lhs.m_ID_Data == rhs.m_ID_Data;
-	}
-
-	bool operator==(const size_t& id) const
-	{
-		return m_ID_Data == id;
-	}
-
-	operator size_t() const
-	{
-		return m_ID_Data;
-	}
+	constexpr bool operator==(const size_t& id) const { return m_ID_Data == id; }
+	constexpr operator size_t() const { return m_ID_Data; }
 };
 
 struct FileGuid
@@ -178,6 +173,15 @@ static std::set<HashedGuid> g_guids;
 
 namespace TypeTrait
 {
+	// 컴파일타임 타입 ID 생성기(준비중)
+	template <class T>
+	consteval HashedGuid MakeTypeID() {
+		using U = std::remove_cvref_t<T>;
+		// 당신의 컴파일타임 이름 함수. TU 간 동일해야 함.
+		constexpr std::string_view name = type_name<U>();
+		return HashedGuid{ static_cast<size_t>(fnv1a_64(name)) };
+	}
+
 	class GUIDCreator
 	{
 	public:

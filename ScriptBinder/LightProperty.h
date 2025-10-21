@@ -4,7 +4,7 @@
 
 constexpr int MAX_LIGHTS = 255;
 
-enum LightType
+enum LightType : uint16_t
 {
     DirectionalLight,
     PointLight,
@@ -15,7 +15,7 @@ constexpr int LightType_InVaild = -1;
 
 AUTO_REGISTER_ENUM(LightType)
 
-enum LightStatus
+enum LightStatus : uint16_t
 {
     Disabled,
     Enabled,

@@ -262,7 +262,6 @@ void EventManager::LoadDefinitions()
     bool loaded = false;
     try
     {
-		//TODO : 올바른 경로 설정 필요
 		auto path = PathFinder::Relative("CSV\\EventDesign_Template.csv");
         CSVReader rdrNew(path.string());
         for (const auto& row : rdrNew)
