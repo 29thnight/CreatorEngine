@@ -23,8 +23,8 @@ void MobSpawner::OnCollisionEnter(const Collision& collision)
 
 void MobSpawner::Spawn()
 {
-	//if (!triggerOnce) return;
-	//triggerOnce = false;
+	if (!triggerOnce) return;
+	triggerOnce = false;
 
 	std::cout << "MobSpawner Spawn Called" << std::endl;
 

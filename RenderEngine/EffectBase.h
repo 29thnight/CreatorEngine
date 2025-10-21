@@ -327,7 +327,7 @@ public:
 
     bool IsLooping() const { return m_loop; }
     void SetLoop(bool loop) { m_loop = loop; }
-
+#undef GetCurrentTime //WARN: 이런건 좀 확인좀 해라...
     float GetCurrentTime() const { return m_currentTime; }
 
     size_t GetParticleSystemCount() const { return m_particleSystems.size(); }

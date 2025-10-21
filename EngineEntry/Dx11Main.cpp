@@ -265,10 +265,10 @@ void DirectX11::Dx11Main::Update()
             SceneManagers->Editor();
             SceneManagers->Initialization();
 
+            SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
             if (!SceneManagers->IsGamePaused())
             {
                 SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
-                SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
                 SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
             }
             else

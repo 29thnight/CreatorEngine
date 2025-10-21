@@ -1190,7 +1190,7 @@ void SceneRenderer::PrepareRender()
 	PROFILE_CPU_BEGIN("UpdateCommand");
 	if (!textComponents.empty())
 	{
-		m_threadPool->Enqueue([&, texts = std::move(textComponents)]
+		m_threadPool->Enqueue([&, renderScene, texts = std::move(textComponents)]
 		{
 			for (auto& text : texts)
 			{
@@ -1215,7 +1215,7 @@ void SceneRenderer::PrepareRender()
 
 	if (!imageComponents.empty())
 	{
-		m_threadPool->Enqueue([&, images = std::move(imageComponents)]
+		m_threadPool->Enqueue([&, renderScene, images = std::move(imageComponents)]
 		{
 			for (auto& image : images)
 			{
@@ -1239,7 +1239,7 @@ void SceneRenderer::PrepareRender()
 
 	if (!spriteComponents.empty())
 	{
-		m_threadPool->Enqueue([&, sprites = std::move(spriteComponents)]
+		m_threadPool->Enqueue([&, renderScene, sprites = std::move(spriteComponents)]
 		{
 			for (auto& sprite : sprites)
 			{
@@ -1264,9 +1264,9 @@ void SceneRenderer::PrepareRender()
 
 	if (!terrainComponents.empty())
 	{
-		m_threadPool->Enqueue([&, terrainComponents]
+		m_threadPool->Enqueue([&, renderScene, terrains = std::move(terrainComponents)]
 		{
-			for (auto& terrain : terrainComponents)
+			for (auto& terrain : terrains)
 			{
 				try
 				{
@@ -1309,9 +1309,9 @@ void SceneRenderer::PrepareRender()
 
 	if (!foliageComponents.empty())
 	{
-		m_threadPool->Enqueue([&, foliageComponents]
+		m_threadPool->Enqueue([&, renderScene, foliages = std::move(foliageComponents)]
 		{
-			for (auto& foliage : foliageComponents)
+			for (auto& foliage : foliages)
 			{
 				try
 				{
@@ -1327,9 +1327,9 @@ void SceneRenderer::PrepareRender()
 
 	if (!decalComponents.empty())
 	{
-		m_threadPool->Enqueue([&, decalComponents]
+		m_threadPool->Enqueue([&, renderScene, decals = std::move(decalComponents)]
 		{
-			for (auto& decal : decalComponents)
+			for (auto& decal : decals)
 			{
 				try
 				{
@@ -1345,9 +1345,9 @@ void SceneRenderer::PrepareRender()
 
 	if (!spriteRenderers.empty())
 	{
-		m_threadPool->Enqueue([&, spriteRenderers]
+		m_threadPool->Enqueue([&, renderScene, sprites = std::move(spriteRenderers)]
 		{
-			for (auto& sprite : spriteRenderers)
+			for (auto& sprite : sprites)
 			{
 				auto owner = sprite->GetOwner();
 				if (nullptr == owner) continue;

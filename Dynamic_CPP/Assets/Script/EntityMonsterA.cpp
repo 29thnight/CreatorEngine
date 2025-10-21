@@ -358,6 +358,7 @@ void EntityMonsterA::ChaseTarget(float deltatime)
 		CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
 		controller->SetAutomaticRotation(true);
 		Mathf::Vector3 pos = m_transform->GetWorldPosition();
+		
 		Transform* targetTransform = target->GetComponent<Transform>();
 		if (targetTransform) {
 

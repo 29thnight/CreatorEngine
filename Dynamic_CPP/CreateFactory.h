@@ -3,6 +3,13 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SettingWindowUI.h"
+#include "ExitButton.h"
+#include "CreditsButton.h"
+#include "SettingButton.h"
+#include "TutorialButton.h"
+#include "StartButton.h"
+#include "BootstrapObserver.h"
 #include "EntityMonsterTower.h"
 #include "ViveSwitchUI.h"
 #include "SoundBarUI.h"

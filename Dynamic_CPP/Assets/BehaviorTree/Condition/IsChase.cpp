@@ -82,6 +82,10 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 			//LOG("Distance to Target: " << dir.Length());
 		}
+		else {
+			//std::cout << "IsChase: ClosedTarget GameObject not found." << std::endl;
+			return false; // Handle case where closedTarget GameObject is not found
+		}
 	}
 	else {
 		return false;

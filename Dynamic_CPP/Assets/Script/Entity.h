@@ -49,6 +49,8 @@ public:
 	float m_maxHitImpulseSize{ 1.2f };
 	float m_hitImpulseFrequency{ 1.f };
 
+	float m_idleTime = 1.f;
+
 	float detectTime = 1.0f;
 	float detectElapsedTime = 0.f;
 	bool  OnOutline = false;

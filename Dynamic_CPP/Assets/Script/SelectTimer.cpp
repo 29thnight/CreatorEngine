@@ -4,16 +4,26 @@
 #include "TextComponent.h"
 #include "pch.h"
 
+inline constexpr auto IsStageOrTutorial = [](SceneType t) noexcept -> bool
+{
+	return t == SceneType::Stage || t == SceneType::Tutorial;
+};
+
 void SelectTimer::Start()
 {
 	auto gameManagerObj = GameObject::Find("GameManager");
 	if (gameManagerObj)
 	{
 		gameManager = gameManagerObj->GetComponent<GameManager>();
+
 		if(gameManager)
 		{
-			gameManager->SetLoadingReq();
-			gameManager->LoadNextScene();
+			int loadSceneType = GameInstance::GetInstance()->GetAfterLoadSceneIndex();
+			if (IsStageOrTutorial(static_cast<SceneType>(loadSceneType)))
+			{
+				gameManager->m_nextSceneIndex = loadSceneType;
+				gameManager->SetLoadingReq();
+			}
 		}
 	}
 
@@ -27,6 +37,12 @@ void SelectTimer::Update(float tick)
 	
 	if (2 <= count)
 	{
+		if (!m_isTimerOn)
+		{
+			m_isTimerOn = true;
+			gameManager->LoadNextScene();
+		}
+
 		if(0 >= m_remainTimeInternal)
 		{
 			m_remainTimeInternal = m_remainTimeSetting;
@@ -57,6 +73,7 @@ void SelectTimer::Update(float tick)
 		{
 			timerText->SetMessage("");
 			timerText->SetEnabled(false);
+			m_isTimerOn = false;
 		}
 	}
 }

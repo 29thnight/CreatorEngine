@@ -16,6 +16,7 @@ ShaderResourceSystem::~ShaderResourceSystem()
 
 void ShaderResourceSystem::Initialize()
 {
+	m_shaderReloadThreadPool = new ThreadPool<std::function<void()>>();
 	HLSLIncludeReloadShaders();
 	CSOCleanup();
 	LoadShaders();
@@ -49,18 +50,32 @@ void ShaderResourceSystem::LoadShaders()
 
 				if (hlslTime > csoTime)
 				{
-					AddShaderFromPath(dir.path());
+					m_shaderReloadThreadPool->Enqueue([this, dir]()
+					{
+						AddShaderFromPath(dir.path());
+					});
+					//AddShaderFromPath(dir.path());
 				}
 				else
 				{
-					AddShaderFromPath(cso);
+					m_shaderReloadThreadPool->Enqueue([this, cso]()
+					{
+						AddShaderFromPath(cso);
+					});
+					//AddShaderFromPath(cso);
 				}
 			}
 			else
 			{
-				AddShaderFromPath(dir.path());
+				m_shaderReloadThreadPool->Enqueue([this, dir]()
+				{
+					AddShaderFromPath(dir.path());
+				});
+				//AddShaderFromPath(dir.path());
 			}
 		}
+
+		m_shaderReloadThreadPool->NotifyAllAndWait();
 	}
 	catch (const file::filesystem_error& e)
 	{
@@ -476,37 +491,60 @@ void ShaderResourceSystem::AddShader(const std::string& name, const std::string&
 		VertexShader vs = VertexShader(name, blob);
 		vs.Compile();
 
-		VertexShaders[name] = vs;
+		{
+			std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
+			VertexShaders[name] = vs;
+		}
 	}
 	else if (ext == "hs")
 	{
 		HullShader hs = HullShader(name, blob);
 		hs.Compile();
-		HullShaders[name] = hs;
+
+		{
+			std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
+			HullShaders[name] = hs;
+		}
 	}
 	else if (ext == "ds")
 	{
 		DomainShader ds = DomainShader(name, blob);
 		ds.Compile();
-		DomainShaders[name] = ds;
+
+		{
+			std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
+			DomainShaders[name] = ds;
+		}
 	}
 	else if (ext == "gs")
 	{
 		GeometryShader gs = GeometryShader(name, blob);
 		gs.Compile();
-		GeometryShaders[name] = gs;
+
+		{
+			std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
+			GeometryShaders[name] = gs;
+		}
 	}
 	else if (ext == "ps")
 	{
 		PixelShader ps = PixelShader(name, blob);
 		ps.Compile();
-		PixelShaders[name] = ps;
+
+		{
+			std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
+			PixelShaders[name] = ps;
+		}
 	}
 	else if (ext == "cs")
 	{
 		ComputeShader cs = ComputeShader(name, blob);
 		cs.Compile();
-		ComputeShaders[name] = cs;
+
+		{
+			std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
+			ComputeShaders[name] = cs;
+		}
 	}
 	else
 	{
@@ -518,26 +556,32 @@ void ShaderResourceSystem::EraseShader(const std::string& name, const std::strin
 {
 	if (ext == "vs")
 	{
+		std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
 		VertexShaders.erase(name);
 	}
 	else if (ext == "hs")
 	{
+		std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
 		HullShaders.erase(name);
 	}
 	else if (ext == "ds")
 	{
+		std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
 		DomainShaders.erase(name);
 	}
 	else if (ext == "gs")
 	{
+		std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
 		GeometryShaders.erase(name);
 	}
 	else if (ext == "ps")
 	{
+		std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
 		PixelShaders.erase(name);
 	}
 	else if (ext == "cs")
 	{
+		std::unique_lock<std::mutex> lock(m_shaderReloadMutex);
 		ComputeShaders.erase(name);
 	}
 	else

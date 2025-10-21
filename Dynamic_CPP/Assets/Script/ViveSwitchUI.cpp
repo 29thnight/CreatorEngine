@@ -30,6 +30,8 @@ void ViveSwitchUI::Start()
 
 void ViveSwitchUI::Update(float tick)
 {
+	m_haptics.Update(tick);
+
     if (!m_barImage) return;
 
     if (m_barImage->IsNavigationThis())
@@ -133,6 +135,20 @@ void ViveSwitchUI::ApplyButton()
 
     auto pos = m_btnRect->GetAnchoredPosition();
     const float targetX = m_isViveEnabled ? m_offX : m_onX;
+
+    if (m_isViveEnabled && !m_prevViveEnabled)
+    {
+		if (InputManagement->IsControllerConnected(0))
+        {
+            m_haptics.PlayHeartbeatStrong(0, /*ampMul=*/1.2f, /*repeat=*/2);
+        }
+
+        if (InputManagement->IsControllerConnected(1))
+        {
+            m_haptics.PlayHeartbeatStrong(1, /*ampMul=*/1.2f, /*repeat=*/2);
+		}
+    }
+    m_prevViveEnabled = m_isViveEnabled;
 
     if (!m_useSmoothMove)
     {

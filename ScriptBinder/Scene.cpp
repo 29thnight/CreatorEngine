@@ -39,6 +39,34 @@ Scene::Scene()
 Scene::~Scene()
 {
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
+	AwakeEvent.Clear();
+	OnEnableEvent.Clear();
+	StartEvent.Clear();
+	FixedUpdateEvent.Clear();
+	InternalPhysicsUpdateEvent.Clear();
+	OnTriggerEnterEvent.Clear();
+	OnTriggerStayEvent.Clear();
+	OnTriggerExitEvent.Clear();
+	OnCollisionEnterEvent.Clear();
+	OnCollisionStayEvent.Clear();
+	OnCollisionExitEvent.Clear();
+	UpdateEvent.Clear();
+	LateUpdateEvent.Clear();
+	OnDisableEvent.Clear();
+	OnDestroyEvent.Clear();
+
+	m_gameObjectNameSet.clear();
+	m_globalDirtySet.clear();
+	m_lightComponents.clear();
+	m_allMeshRenderers.clear();
+	m_staticMeshRenderers.clear();
+	m_skinnedMeshRenderers.clear();
+	m_lights.clear();
+	m_terrainComponents.clear();
+	m_foliageComponents.clear();
+	m_decalComponents.clear();
+	m_spriteRenderers.clear();
+	m_SceneObjects.clear();
 }
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
@@ -172,7 +200,13 @@ std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 	{
 		return m_SceneObjects[index];
 	}
-	return m_SceneObjects[0];
+
+	if (!m_SceneObjects.empty())
+	{
+		return m_SceneObjects[0];
+	}
+
+	return nullptr;
 }
 
 std::shared_ptr<GameObject> Scene::TryGetGameObject(GameObject::Index index)
@@ -399,6 +433,8 @@ void Scene::DestroyGameObject(GameObject::Index index)
 
 void Scene::CullMeshData()
 {
+	InternalPauseUpdateForUI();
+
 	std::vector<MeshRenderer*> allMeshes = m_allMeshRenderers;
 	std::vector<MeshRenderer*> staticMeshes = m_staticMeshRenderers;
 	std::vector<MeshRenderer*> skinnedMeshes = m_skinnedMeshRenderers;
@@ -550,6 +586,30 @@ void Scene::CullMeshData()
 		});
 
 		SceneManagers->m_threadPool->NotifyAllAndWait();
+	}
+}
+
+void Scene::InternalPauseUpdateForUI()
+{
+	if (SceneManagers->IsGamePaused())
+	{
+		float deltaTime = Time->GetElapsedSeconds();
+		auto canvasObj = UIManagers->CurCanvas.lock();
+		if (!canvasObj) return;
+
+		auto canvas = canvasObj->GetComponent<Canvas>();
+		for (const auto& weak : canvas->UIObjs)
+		{
+			auto obj = weak.lock();
+			if (obj)
+			{
+				auto moduleBehaviorComponents = obj->GetComponents<ModuleBehavior>();
+				for (const auto& moduleBehavior : moduleBehaviorComponents)
+				{
+					moduleBehavior->Update(deltaTime);
+				}
+			}
+		}
 	}
 }
 
@@ -749,7 +809,7 @@ void Scene::OnDestroy()
     DestroyGameObjects();
 	PROFILE_CPU_END();
 
-	//여기서 병렬처리 -> 이렇게되면 반드시 업데이트에서만 BT 갱신 및 설정이 완료되어야 함.
+	//여기서 병렬처리
 	float deltaSecond = Time->GetElapsedSeconds();
 	m_AIFuture = std::async(std::launch::async, [deltaSecond]
 	{
@@ -1596,11 +1656,14 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 void Scene::SetInternalPhysicData()
 {
-	std::erase_if(m_colliderContainer,
-		[&](const auto& pair)
-		{
-			return pair.second.bIsDestroyed == true;
-		});
+	if(!m_colliderContainer.empty())
+	{
+		std::erase_if(m_colliderContainer,
+			[&](const auto& pair)
+			{
+				return pair.second.bIsDestroyed == true;
+			});
+	}
 
 	std::unordered_map<GameObject*, EBodyType> m_bodyType;
 
@@ -1686,7 +1749,10 @@ void Scene::AllUpdateWorldMatrix()
 		UpdateModelRecursive(index, XMMatrixIdentity());
 	};
 
-	std::for_each(std::execution::par_unseq, rootObjects.begin(), rootObjects.end(), updateFunc);
+	if (!rootObjects.empty())
+	{
+		std::for_each(std::execution::par, rootObjects.begin(), rootObjects.end(), updateFunc);
+	}
 }
 
 void Scene::AddCanvas(const std::shared_ptr<GameObject>& canvas)

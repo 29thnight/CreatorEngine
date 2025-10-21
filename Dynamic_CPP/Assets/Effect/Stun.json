@@ -1,10 +1,6 @@
 {
     "currentTime": 0.0,
     "duration": -1.0,
-    "emitterTimings": [
-        0.0,
-        0.0
-    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
@@ -80,7 +76,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 8.56683349609375,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -99,7 +95,7 @@
                                 "z": 0.0
                             },
                             "radius": 0.7360000014305115,
-                            "speed": 2.003000020980835
+                            "speed": 1.0
                         },
                         "state": {
                             "isInitialized": true,

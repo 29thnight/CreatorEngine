@@ -58,8 +58,8 @@ public:
 public:
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
 	std::vector<ImageComponent*>			Images;
-	std::vector<TextComponent*>				Texts;
-	std::vector<SpriteSheetComponent*>      SpriteSheets;
+	std::vector<TextComponent*>			Texts;
+	std::vector<SpriteSheetComponent*>    SpriteSheets;
 	//이정 캔버스
 	//현재 상호작용할 UI
 	std::weak_ptr<GameObject> CurCanvas;

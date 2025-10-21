@@ -1,20 +1,13 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
-    "emitterTimings": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
     "name": "dust",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -54,9 +47,9 @@
                             },
                             "emitterRadius": 1.0,
                             "emitterSize": {
-                                "x": 2.0,
-                                "y": 1.0,
-                                "z": 2.0
+                                "x": 3.0,
+                                "y": 2.0,
+                                "z": 3.0
                             },
                             "emitterType": 2,
                             "spawnRate": 10.0
@@ -146,7 +139,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 75.1915054321289,
+                            "currentTime": 184.40081787109375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -244,7 +237,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -325,7 +318,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -413,7 +406,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 27.80317497253418,
+                            "currentTime": 20.703163146972656,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -612,7 +605,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -700,7 +693,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 27.80317497253418,
+                            "currentTime": 20.755115509033203,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -899,7 +892,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -987,7 +980,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 27.80317497253418,
+                            "currentTime": 21.76004409790039,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1186,7 +1179,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -1268,7 +1261,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 27.80317497253418,
+                            "currentTime": 20.46453094482422,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.3400000035762787,
@@ -1420,5 +1413,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 2.0
+    "timeScale": 1.0
 }

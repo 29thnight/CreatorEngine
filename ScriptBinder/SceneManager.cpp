@@ -116,6 +116,8 @@ void SceneManager::Initialization()
         // The future is now invalid after .get(), so this block won't run again until a new scene is loaded.
     }
 
+    BeforeAwakeSceneLoad();
+
     PROFILE_CPU_BEGIN("Awake");
 	m_activeScene.load()->Awake();
     PROFILE_CPU_END();
@@ -693,57 +695,74 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 void SceneManager::ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete)
 {
     if (!sceneToActivate) return;
-    Benchmark debugTimer;
-    Scene* oldScene = m_activeScene.load();
-    oldScene->ResetSelectedSceneObject();
-    if (m_activeScene)
+
+	m_sceneToActivate = sceneToActivate;
+	m_isOldSceneDelete = isOldSceneDelete;
+}
+
+void SceneManager::BeforeAwakeSceneLoad()
+{
+    if (m_sceneToActivate.load())
     {
-        for (auto& object : m_dontDestroyOnLoadObjects)
+        Benchmark debugTimer;
+        Scene* oldScene{};
+        if (m_activeScene.load())
         {
-            auto go = std::dynamic_pointer_cast<GameObject>(object);
-            if (go)
+            oldScene = m_activeScene.load();
+            oldScene->ResetSelectedSceneObject();
+
+            for (auto& object : m_dontDestroyOnLoadObjects)
             {
-                m_activeScene.load()->DetachGameObjectHierarchy(go.get());
+                auto go = std::dynamic_pointer_cast<GameObject>(object);
+                if (go)
+                {
+                    m_activeScene.load()->DetachGameObjectHierarchy(go.get());
+                }
             }
+
+            sceneUnloadedEvent.Broadcast();
+            m_activeScene.load()->AllDestroyMark();
+            m_activeScene.load()->OnDisable();
+            m_activeScene.load()->OnDestroy();
+
+            //m_activeScene = nullptr;
+
+            if (m_isOldSceneDelete)
+            {
+                std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+            }
+
         }
 
-        sceneUnloadedEvent.Broadcast();
-        m_activeScene.load()->AllDestroyMark();
-        m_activeScene.load()->OnDisable();
-        m_activeScene.load()->OnDestroy();
+        resourceTrimEvent.Broadcast();
+        m_activeScene = m_sceneToActivate.load();
+        m_scenes.push_back(m_sceneToActivate);
+        m_activeSceneIndex = m_scenes.size() - 1;
+        // Debug log the time taken to activate the scene
+        Debug->Log(std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
 
-        //m_activeScene = nullptr;
+        Benchmark debugTimer1;
 
-        if(isOldSceneDelete)
+        RebindEventDontDestroyOnLoadObjects(m_sceneToActivate.load());
+        m_activeScene.load()->AllUpdateWorldMatrix();
+
+        activeSceneChangedEvent.Broadcast();
+        sceneLoadedEvent.Broadcast();
+
+        m_activeScene.load()->Reset();
+
+        if (m_isOldSceneDelete)
         {
-            std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+            delete oldScene;
         }
-
+        m_sceneToActivate = nullptr;
+        Debug->Log(std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
     }
+}
 
-    resourceTrimEvent.Broadcast();
-    m_activeScene = sceneToActivate;
-    m_scenes.push_back(sceneToActivate);
-    m_activeSceneIndex = m_scenes.size() - 1;
-	// Debug log the time taken to activate the scene
-	Debug->Log(std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
-
-    Benchmark debugTimer1;
-
-    RebindEventDontDestroyOnLoadObjects(sceneToActivate);
-    m_activeScene.load()->AllUpdateWorldMatrix();
-
-    activeSceneChangedEvent.Broadcast();
-    sceneLoadedEvent.Broadcast();
-
-    m_activeScene.load()->Reset();
-
-    if (isOldSceneDelete)
-    {
-        delete oldScene;
-    }
-
-	Debug->Log(std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
+bool SceneManager::IsSceneLoading() const
+{
+    return m_sceneToActivate != nullptr;
 }
 
 void SceneManager::AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr)

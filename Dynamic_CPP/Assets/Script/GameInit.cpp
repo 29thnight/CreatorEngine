@@ -8,6 +8,7 @@
 
 void GameInit::Start()
 {
+	GameInstance::GetInstance()->ResetAllEnhancements();
 	GameObject* gameManagerObj = GameObject::Find("GameManager");
 	GameObject* logoObj = GameObject::Find("GameInstituteLogo");
 	GameObject* bootBgObj = GameObject::Find("BootstrapBG");
@@ -25,6 +26,22 @@ void GameInit::Start()
 	if (bootBgObj)
 	{
 		m_bootBg = bootBgObj->GetComponent<ImageComponent>();
+		if(m_bootBg)
+		{
+			if (!GameInstance::GetInstance()->IsBootstrapCompleted())
+			{
+				GameInstance::GetInstance()->SetBootstrapCompleted(true);
+			}
+			else
+			{
+				auto canvas = m_bootBg->GetOwnerCanvas();
+				if (canvas)
+				{
+					canvas->SetCanvasOrder(0);
+					canvas->GetOwner()->SetEnabled(false);
+				}
+			}
+		}
 	}
 }
 
@@ -57,6 +74,7 @@ void GameInit::Update(float tick)
 			if (canvas)
 			{
 				canvas->SetCanvasOrder(0);
+				canvas->GetOwner()->SetEnabled(false);
 			}
 		}
 	}

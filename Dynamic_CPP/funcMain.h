@@ -192,6 +192,13 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("SettingWindowUI", []() { return new SettingWindowUI(); });
+		CreateFactory::GetInstance()->RegisterFactory("ExitButton", []() { return new ExitButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("CreditsButton", []() { return new CreditsButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("SettingButton", []() { return new SettingButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("TutorialButton", []() { return new TutorialButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("StartButton", []() { return new StartButton(); });
+		CreateFactory::GetInstance()->RegisterFactory("BootstrapObserver", []() { return new BootstrapObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityMonsterTower", []() { return new EntityMonsterTower(); });
 		CreateFactory::GetInstance()->RegisterFactory("ViveSwitchUI", []() { return new ViveSwitchUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("SoundBarUI", []() { return new SoundBarUI(); });
@@ -342,6 +349,11 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossMeleeAni", []() { return new BossMeleeAni(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossRangedAni", []() { return new BossRangedAni(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossWarningAni", []() { return new BossWarningAni(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossPopupAni", []() { return new BossPopupAni(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("BossBurrowAni", []() { return new BossBurrowAni(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttackSpecial", []() { return new PlayerRangeAttackSpecial(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttackEnd", []() { return new PlayerRangeAttackEnd(); });
 		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerRangeAttackReady", []() { return new PlayerRangeAttackReady(); });

@@ -4,6 +4,7 @@
 #include "Delegate.h"
 #include "DLLAcrossSingleton.h"
 #include "VisualShaderPSO.h"
+#include "Core.Thread.hpp"
 #include <memory>
 
 //class VisualShaderPSO; // visual shader pipeline
@@ -66,6 +67,8 @@ private:
 	bool m_isReloading = false;
 	Material* m_selectShaderTarget = nullptr;
 	ImageComponent* m_selectImageTarget = nullptr;
+	ThreadPool<std::function<void()>>* m_shaderReloadThreadPool = nullptr;
+	std::mutex m_shaderReloadMutex;
 };
 
 static auto ShaderSystem = ShaderResourceSystem::GetInstance();

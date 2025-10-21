@@ -371,6 +371,63 @@ GameObject* GameObject::FindAttachedID(const HashedGuid& guid)
 	return nullptr;
 }
 
+GameObject* GameObject::OwnerSceneFind(std::string_view name)
+{
+	Scene* scene = m_ownerScene;
+	if (scene)
+	{
+		return scene->GetGameObject(name).get();
+	}
+	return nullptr;
+}
+
+GameObject* GameObject::OwnerSceneFindIndex(GameObject::Index index)
+{
+	Scene* scene = m_ownerScene;
+	if (scene)
+	{
+		return scene->GetGameObject(index).get();
+	}
+	return nullptr;
+}
+
+GameObject* GameObject::OwnerSceneFindInstanceID(const HashedGuid& guid)
+{
+	Scene* scene = m_ownerScene;
+	if (scene)
+	{
+		auto& gameObjects = scene->m_SceneObjects;
+		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
+			{
+				return object->m_instanceID == guid;
+			});
+
+		if (it != gameObjects.end())
+		{
+			return (*it).get();
+		}
+	}
+
+	return nullptr;
+}
+
+GameObject* GameObject::OwnerSceneFindAttachedID(const HashedGuid& guid)
+{
+	Scene* scene = m_ownerScene;
+	if (scene)
+	{
+		auto& gameObjects = scene->m_SceneObjects;
+		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
+			{
+				return object->m_attachedSoketID == guid;
+			});
+		if (it != gameObjects.end())
+			return (*it).get();
+	}
+
+	return nullptr;
+}
+
 void GameObject::SetEnabled(bool able)
 {
 	if (m_isEnabled == able)

@@ -7,6 +7,7 @@
 
 class StateMachineComponent;
 class BehaviorTreeComponent;
+class GameObject;
 class AIManager : public Singleton<AIManager>
 {
 private:
@@ -86,8 +87,8 @@ private:
 
 	BlackBoard m_globalBB;
 	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용
-	std::list<BlackBoard> m_blackBoards;
-	std::unordered_map<GameObject*, IAIComponent*> m_aiComponentMap; // GameObject와 AI 컴포넌트 매핑
+	plf::colony<BlackBoard> m_blackBoards;
+	plf::colony<std::pair<std::weak_ptr<GameObject>, IAIComponent*>> m_aiComponentMap; // GameObject와 AI 컴포넌트 매핑
 };
 
 static auto& AIManagers = AIManager::GetInstance();
