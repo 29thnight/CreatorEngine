@@ -4,6 +4,8 @@
 #include "Entity.h"
 #include "TBoss1.generated.h"
 
+class AnimationController;
+class Animator;
 class BehaviorTreeComponent;
 class BlackBoard;
 class RigidBodyComponent;
@@ -29,7 +31,7 @@ public:
 
 	
 
-	// ÆĞÅÏ Å¸ÀÔÀ» ÁöÁ¤ÇÏ¿© ¿ÜºÎ¿¡¼­ ÆĞÅÏ ½ÃÀÛÀ» ¸í·ÉÇÕ´Ï´Ù.
+	// íŒ¨í„´ íƒ€ì…ì„ ì§€ì •í•˜ì—¬ ì™¸ë¶€ì—ì„œ íŒ¨í„´ ì‹œì‘ì„ ëª…ë ¹í•©ë‹ˆë‹¤.
 	enum class EPatternType {
 		None,
 		BP0011,
@@ -42,13 +44,26 @@ public:
 		BP0032,
 		BP0033,
 		BP0034
-		// ´Ù¸¥ ÆĞÅÏµéÀ» ¿©±â¿¡ Ãß°¡...
+		// ë‹¤ë¥¸ íŒ¨í„´ë“¤ì„ ì—¬ê¸°ì— ì¶”ê°€...
 	};
 
 	enum class EPatternPhase {
-		Inactive,
-		Spawning,
-		Waiting,
+		Inactive, // ë¹„í™œì„±
+		Warning,  // ê³µê²© ì „ì¡°, ê²½ê³  ì‹œê°„
+		Spawning, // ê³µê²© ìœ„ì¹˜/ë°©í–¥ ê³„ì‚° í™•ì •
+		Move,          // ì´ë™ ë‹¨ê³„ --> íŒ¨í„´ ì¤‘ê°„ì— ì´ë™ í•´ì•¼ í•˜ëŠ” ê²½ìš°
+		Action,   // ì‹¤ì œ ì• ë‹ˆë©”ì´ì…˜ ì¬ìƒ ë° ê³µê²© ë°œìƒ
+		WaitForObjects, // ìƒì„±ëœ ì˜¤ë¸Œì íŠ¸ë“¤ì´ ëª¨ë‘ ì‚¬ë¼ì§ˆ ë•Œê¹Œì§€ ëŒ€ê¸° (ex : ì¥íŒ íŒ¨í„´)
+		ComboInterval, // ì½¤ë³´ ê³µê²© ì‚¬ì´ì˜ ì¤‘ê°„ ëŒ€ê¸°
+		Waiting,  // ê³µê²© í›„ ë”œë ˆì´
+	};
+
+	//ë³´ìŠ¤ ì´ë™ ìƒíƒœ --> íŠ¹ë³„íˆ ì´ë™ ìƒíƒœê°€ í•„ìš”í•œ ì´ìœ ëŠ” ë•…íŒŒê³  ì´ë™í•˜ëŠ” ëª¨ì…˜ì´ ìˆì–´ì„œ
+	enum class EBossMoveState {
+		Idle, //ëŒ€ê¸° ì´ë™ ê°€ëŠ¥
+		Burrowing, //ë•…ì†ìœ¼ë¡œ ë“¤ì–´ê°€ëŠ”ì¤‘
+		Burrowed, //ë•…ì†ì—ì„œ ì´ë™ì¤‘
+		Protruding //ë•…ì†ì—ì„œ ë‚˜ì˜¤ëŠ”ì¤‘
 	};
 
 	std::string m_state = "Idle";
@@ -56,17 +71,42 @@ public:
 
 
 	EPatternType  m_activePattern = EPatternType::None;
+	EPatternType m_lastCompletedPattern = EPatternType::None;
 	EPatternPhase m_patternPhase = EPatternPhase::Inactive;
+	EBossMoveState m_moveState = EBossMoveState::Idle;
 
 	EPatternType GetActivePattern() const { return m_activePattern; }
 	EPatternPhase GetPatternPhase() const { return m_patternPhase; }
 
+	EPatternType GetLastCompletedPattern() const { return m_lastCompletedPattern; }
+	void ConsumeLastCompletedPattern() { m_lastCompletedPattern = EPatternType::None; }
+	float GetAttackWarningTime() { return AttackWarningTime; }
+
+	//ë””ë²„ê·¸ìš© í•¼í¼
+	std::string GetPatternTypeToString(EPatternType type);
+	std::string GetPatternPhaseToString(EPatternPhase phase);
+
+
+	//íŒ¨í„´ ê´€ë ¨ ë³€ìˆ˜ë“¤
+	bool usePatten = false;
+	int pattenIndex = 0;
+	float BPTimer = 0.0f;
+
+	[[Property]]
+	float AttackWarningTime = 1.0f; //ê³µê²© ê²½ê³  ì‹œê°„
+	[[Property]]
+	float AttackDelayTime = 0.5f; //íŒ¨í„´ í›„ ë”œë ˆì´ ì‹œê°„
+	[[Property]]
+	float ComboIntervalTime = 0.3f; // ì½¤ë³´ ê³µê²© ì‚¬ì´ ëŒ€ê¸° ì‹œê°„
+
+
 	BehaviorTreeComponent* BT = nullptr;
 	BlackBoard* BB = nullptr;
-
+	Animator* m_animator = nullptr;
+	AnimationController* m_anicontroller = nullptr;
 	RigidBodyComponent* m_rigid = nullptr;
 
-	GameObject* Player1 = nullptr; //µé°í ÀÖÀÚ
+	GameObject* Player1 = nullptr; //ë“¤ê³  ìˆì
 	GameObject* Player2 = nullptr; 
 
 	GameObject* m_target = nullptr;
@@ -75,7 +115,7 @@ public:
 	int m_MaxHp = 1000;
 	int m_CurrHp = m_MaxHp;
 
-	//damage --> ÀÌ·¸°Ô ¾ÈÇÑ°í ±×³É °ø°İ·Â¿¡ ¿¬»êÀ¸·Î ¹Ş¾Æµµ µË´Ï´Ù. ÀÏ´Ü ±ÍÂúÀ¸´Ï ´ÙÁÜ
+	//damage --> ì´ë ‡ê²Œ ì•ˆí•œê³  ê·¸ëƒ¥ ê³µê²©ë ¥ì— ì—°ì‚°ìœ¼ë¡œ ë°›ì•„ë„ ë©ë‹ˆë‹¤. ì¼ë‹¨ ê·€ì°®ìœ¼ë‹ˆ ë‹¤ì¤Œ
 	[[Property]]
 	int BP001Damage = 5;
 	[[Property]]
@@ -85,48 +125,56 @@ public:
 
 	//range
 	[[Property]]
-	float BP001RadiusSize = 1.0f; //Åõ»çÃ¼ »çÀÌÁî
+	float BP001RadiusSize = 1.0f; //íˆ¬ì‚¬ì²´ ì‚¬ì´ì¦ˆ
 	float BP001Speed = 2.0f;
 	float BP001Delay = 5.0f;
 	[[Property]]
-	float BP002Dist = 5.0f; //µ¥¹ÌÁö µé¾î°¥ °Å¸® 
-	float BP002Widw = 1.0f; //µ¥¹ÌÁö µé¾î°¥ Æø    -> ¸ğ¼Ç º¸ÀÌ´Â °Íº¸´Ù Å©°Å³ª ÀÛÀ»¼ö ÀÖÀ½
+	float BP002Dist = 5.0f; //ë°ë¯¸ì§€ ë“¤ì–´ê°ˆ ê±°ë¦¬ 
+	float BP002Widw = 1.0f; //ë°ë¯¸ì§€ ë“¤ì–´ê°ˆ í­    -> ëª¨ì…˜ ë³´ì´ëŠ” ê²ƒë³´ë‹¤ í¬ê±°ë‚˜ ì‘ì„ìˆ˜ ìˆìŒ
 	[[Property]]
-	float BP003RadiusSize = 5.0f; //ÆøÆÄ½Ã Ã¼Å© ¹üÀ§ 
+	float BP003RadiusSize = 5.0f; //í­íŒŒì‹œ ì²´í¬ ë²”ìœ„ 
 
 	//move
 	[[Property]]
 	float MoveSpeed = 1.0f;
 	
-	//coolTime ¿ä°Å °ü·ÃÇØ¼­´Â Á» ¹°¾îº¸ÀÚ
+	//coolTime ìš”ê±° ê´€ë ¨í•´ì„œëŠ” ì¢€ ë¬¼ì–´ë³´ì
 	[[Property]]
-	float BP003Delay = 1.0f; //»ı¼ºµÇ°í ÅÍÁö´Â µô·¹ÀÌ
+	float BP003Delay = 1.0f; //ìƒì„±ë˜ê³  í„°ì§€ëŠ” ë”œë ˆì´
 	
 
-	//¹ß»çÃ¼ ¿ÀºêÁ§Æ®µé
+	//ë°œì‚¬ì²´ ì˜¤ë¸Œì íŠ¸ë“¤
 	std::vector<GameObject*> BP001Objs;
 	std::vector<GameObject*> BP003Objs;
 
 
-	//º¸½º¸¸ Æ¯¼öÇÏ°Ô 
+	//ë³´ìŠ¤ë§Œ íŠ¹ìˆ˜í•˜ê²Œ 
 	GameObject* m_chunsik = nullptr;
 	float m_chunsikRadius = 10.f;
 
 	void RotateToTarget();
-	void ShootProjectile(int index, Mathf::Vector3 pos,Mathf::Vector3 dir);
-	void SweepAttack(Mathf::Vector3 pos, Mathf::Vector3 dir); //¹Ú½º ½ºÀ¬ °ø°İ
-	void MoveToChunsik(float tick); //Ãá½ÄÀÌ À§Ä¡·Î ÀÌµ¿
-	void BurrowMove(float tick); //¶¥ÆÄ°í ÀÌµ¿
-	//void StartPattern(EPatternType type); //¾µ±î ¸»±î °í¹ÎÁß
+	void ShootIndexProjectile(int index, Mathf::Vector3 pos,Mathf::Vector3 dir);
+	
+	void SweepAttackDir(Mathf::Vector3 pos, Mathf::Vector3 dir); //ë°•ìŠ¤ ìŠ¤ìœ• ê³µê²©
+	void MoveToChunsik(float tick); //ì¶˜ì‹ì´ ìœ„ì¹˜ë¡œ ì´ë™
+	void BurrowMove(float tick); //ë•…íŒŒê³  ì´ë™
+	//void StartPattern(EPatternType type); //ì“¸ê¹Œ ë§ê¹Œ ê³ ë¯¼ì¤‘
 
-	//BP0033,0034 ¿ë ±¤¿ª ÆĞÅÏ »ç¿ë½Ã ÀåÆÇÆĞÅÏÀÌ ÀüÃ¼°¡ ´Ù Á¾·áµÇ¾ú´ÂÁö¸¦ È®ÀÎÇÏ°í ÀüÃ¼°¡ Á¾·á µÉ¶§ ±îÁö Çàµ¿À» ¸·´Â ÇÔ¼ö
-	bool usePatten = false;
-	int pattenIndex = 0;
+	void OnWarningFinished(); //ì „ì¡° ëë‚¬ì„ë•Œ í˜¸ì¶œ
+	void OnAttackActionFinished(); //ê³µê²© ì•¡ì…˜ ëë‚¬ì„ë•Œ í˜¸ì¶œ
+	void OnMoveFinished(); // ì´ë™ ì• ë‹ˆë©”ì´ì…˜ ì¢…ë£Œ ì‹œ í˜¸ì¶œ
+
+	//BP0033,0034 ìš© ê´‘ì—­ íŒ¨í„´ ì‚¬ìš©ì‹œ ì¥íŒíŒ¨í„´ì´ ì „ì²´ê°€ ë‹¤ ì¢…ë£Œë˜ì—ˆëŠ”ì§€ë¥¼ í™•ì¸í•˜ê³  ì „ì²´ê°€ ì¢…ë£Œ ë ë•Œ ê¹Œì§€ í–‰ë™ì„ ë§‰ëŠ” í•¨ìˆ˜
+	
 	std::vector<std::pair<int, Mathf::Vector3>> BP0034Points;
-	float BPTimer = 0.0f;
 	float BP0013delay = 1.0f;
 	float BP0034delay = 1.0f;
-	void UpdatePattern(float tick);
+
+	void UpdatePatternPhase(float tick);
+	void UpdatePatternAction(float tick);
+
+
+	//void UpdatePattern(float tick);
 	void Update_BP0011(float tick);
 	void Update_BP0013(float tick);
 	void Update_BP0021(float tick);
@@ -144,24 +192,37 @@ public:
 	bool isBurrow = false;
 	float burrowTimer = 0.f;
 	float hazardTimer = 0.f;
-	float hazardInterval = 8.f; //¹Ù´Ú ÆĞÅÏ ÁÖ±â
-	int actionCount = 0; // Çàµ¿ È½¼ö ÀÏÁ¤ ÀÌ»ó½Ã °­Á¦ ´ë±â »óÅÂ 
+	float hazardInterval = 8.f; //ë°”ë‹¥ íŒ¨í„´ ì£¼ê¸°
+	int actionCount = 0; // í–‰ë™ íšŸìˆ˜ ì¼ì • ì´ìƒì‹œ ê°•ì œ ëŒ€ê¸° ìƒíƒœ 
 
 
 	int p1Count = 0;
 	int p2Count = 0;
 	void SelectTarget();
 
+	void StartNextComboAttack(); // ì½¤ë³´ ê³µê²©ìš© í—¬í¼
 
-
+	int projectileIndex = 0;
+	Mathf::Vector3 projectilePos;
+	Mathf::Vector3 projectileDir;
 
 	[[Method]]
-	void Burrow(); //¶¥ÆÄ°í µé¾î°¨
+	void Burrow(); //ë•…íŒŒê³  ë“¤ì–´ê°
 	[[Method]]
-	void Protrude(); //Å¸°Ù À§Ä¡·Î Æ¢¾î³ª¿È
+	void SetBurrow(); //ë•…íŒŒê³  ë“¤ì–´ê°
 	[[Method]]
-	void ProtrudeChunsik(); //Ãá½ÄÀÌ À§Ä¡·Î Æ¢¾î³ª¿È
+	void Protrude(); //íƒ€ê²Ÿ ìœ„ì¹˜ë¡œ íŠ€ì–´ë‚˜ì˜´
+	[[Method]]
+	void ProtrudeEnd(); //íƒ€ê²Ÿ ìœ„ì¹˜ë¡œ íŠ€ì–´ë‚˜ì˜´
+	[[Method]]
+	void ProtrudeChunsik(); //ì¶˜ì‹ì´ ìœ„ì¹˜ë¡œ íŠ€ì–´ë‚˜ì˜´
 	
+	[[Method]]
+	void ShootProjectile(); //ì• ë‹ˆë©”ì´ì…˜ ì´ë²¤íŠ¸ì—ì„œ í˜¸ì¶œ
+	[[Method]]
+	void SweepAttack(); //ì• ë‹ˆë©”ì´ì…˜ ì´ë²¤íŠ¸ì—ì„œ í˜¸ì¶œ
+
+
 
 	[[Method]]
 	void BP0011();
@@ -185,4 +246,6 @@ public:
 	void BP0033();
 	[[Method]]
 	void BP0034();
+
+	void SendDamage(Entity* sender, int damage, HitInfo hitInfo = HitInfo{}) override;
 };

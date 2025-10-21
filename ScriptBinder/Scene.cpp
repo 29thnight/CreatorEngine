@@ -433,6 +433,8 @@ void Scene::DestroyGameObject(GameObject::Index index)
 
 void Scene::CullMeshData()
 {
+	InternalPauseUpdateForUI();
+
 	std::vector<MeshRenderer*> allMeshes = m_allMeshRenderers;
 	std::vector<MeshRenderer*> staticMeshes = m_staticMeshRenderers;
 	std::vector<MeshRenderer*> skinnedMeshes = m_skinnedMeshRenderers;
@@ -584,6 +586,30 @@ void Scene::CullMeshData()
 		});
 
 		SceneManagers->m_threadPool->NotifyAllAndWait();
+	}
+}
+
+void Scene::InternalPauseUpdateForUI()
+{
+	if (SceneManagers->IsGamePaused())
+	{
+		float deltaTime = Time->GetElapsedSeconds();
+		auto canvasObj = UIManagers->CurCanvas.lock();
+		if (!canvasObj) return;
+
+		auto canvas = canvasObj->GetComponent<Canvas>();
+		for (const auto& weak : canvas->UIObjs)
+		{
+			auto obj = weak.lock();
+			if (obj)
+			{
+				auto moduleBehaviorComponents = obj->GetComponents<ModuleBehavior>();
+				for (const auto& moduleBehavior : moduleBehaviorComponents)
+				{
+					moduleBehavior->Update(deltaTime);
+				}
+			}
+		}
 	}
 }
 

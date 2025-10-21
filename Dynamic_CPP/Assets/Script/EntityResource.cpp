@@ -11,6 +11,7 @@
 #include "CriticalMark.h"
 #include "TweenManager.h"
 #include "Core.Random.h"
+#include "Weapon.h"
 void EntityResource::Start()
 {
 	m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
@@ -33,6 +34,7 @@ void EntityResource::Start()
 void EntityResource::Update(float tick)
 {
 	HitImpulseUpdate(tick);
+	UpdateOutLine(tick);
 }
 void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
@@ -45,9 +47,11 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			// hit
 			if (m_criticalMark)
 			{
-				if (m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
 				{
-					//크리티컬 성공
+					damage *= player->m_curWeapon->coopCrit;
+					hitinfo.isCritical = true;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
 				}
 			}
 			m_currentHP -= std::max(damage, 0);

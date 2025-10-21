@@ -1,5 +1,5 @@
 NodeList:
-  - ID: 1386118297
+  - ID: 1515199440
     Type: 2
     Name: RootSequence
     ParentID: 0
@@ -7,424 +7,457 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [3761740137]
+    Children: [2824823623]
     ChildWeights: ~
-    Position: {x: 166, y: 13}
-  - ID: 3761740137
+    Position: {x: 790, y: 125}
+  - ID: 2824823623
     Type: 3
     Name: Selector
-    ParentID: 1386118297
+    ParentID: 1515199440
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [2431771089, 3819452645, 3326592836]
+    Children: [1003104190, 1659048827, 1921647156]
     ChildWeights: ~
-    Position: {x: 150, y: 173}
-  - ID: 2431771089
+    Position: {x: 790, y: 269}
+  - ID: 1003104190
     Type: 6
     Name: ConditionDecorator
-    ParentID: 3761740137
+    ParentID: 2824823623
     IsRoot: false
     HasScript: true
     ScriptName: IsInitialize
     Policy: -858993460
-    Children: [3894963923]
+    Children: [3228993563]
     ChildWeights: ~
-    Position: {x: -186, y: 341}
-  - ID: 3894963923
+    Position: {x: 502, y: 405}
+  - ID: 3228993563
     Type: 9
     Name: Action
-    ParentID: 2431771089
+    ParentID: 1003104190
     IsRoot: false
     HasScript: true
     ScriptName: BTEntityInitAction
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: -202, y: 520}
-  - ID: 3819452645
+    Position: {x: 470, y: 648}
+  - ID: 1659048827
     Type: 2
     Name: Sequence
-    ParentID: 3761740137
+    ParentID: 2824823623
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [3850843329, 1852915842]
+    Children: [3971579445, 1317087462]
     ChildWeights: ~
-    Position: {x: 86, y: 360}
-  - ID: 3850843329
+    Position: {x: 726, y: 461}
+  - ID: 3971579445
     Type: 7
     Name: Condition
-    ParentID: 3819452645
+    ParentID: 1659048827
     IsRoot: false
     HasScript: true
     ScriptName: IsDaed
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: -10, y: 520}
-  - ID: 1852915842
+    Position: {x: 662, y: 680}
+  - ID: 1317087462
     Type: 9
     Name: Action
-    ParentID: 3819452645
+    ParentID: 1659048827
     IsRoot: false
     HasScript: true
     ScriptName: DaedAction
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 134, y: 712}
-  - ID: 3326592836
+    Position: {x: 700, y: 864}
+  - ID: 1921647156
     Type: 3
     Name: Selector
-    ParentID: 3761740137
+    ParentID: 2824823623
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [2082444805, 2340690056]
+    Children: [1537896565, 2009516491]
     ChildWeights: ~
-    Position: {x: 534, y: 237}
-  - ID: 2082444805
+    Position: {x: 1157, y: 408}
+  - ID: 1537896565
     Type: 6
     Name: ConditionDecorator
-    ParentID: 3326592836
+    ParentID: 1921647156
     IsRoot: false
     HasScript: true
     ScriptName: Phase2
     Policy: -858993460
-    Children: [2085924571]
+    Children: [2710730649]
     ChildWeights: ~
-    Position: {x: 486, y: 693}
-  - ID: 2340690056
+    Position: {x: 742, y: 1093}
+  - ID: 2009516491
     Type: 6
     Name: ConditionDecorator
-    ParentID: 3326592836
+    ParentID: 1921647156
     IsRoot: false
     HasScript: true
     ScriptName: Phase1
     Policy: -858993460
-    Children: [2190897410]
+    Children: [1462892530]
     ChildWeights: ~
-    Position: {x: 1302, y: 296}
-  - ID: 2190897410
+    Position: {x: 1574, y: 488}
+  - ID: 1462892530
     Type: 3
     Name: Selector
-    ParentID: 2340690056
+    ParentID: 2009516491
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1285238029, 3206533065, 13595769]
+    Children: [2504642396, 1857915104, 2921566595]
     ChildWeights: ~
-    Position: {x: 1302, y: 488}
-  - ID: 1285238029
+    Position: {x: 1686, y: 728}
+  - ID: 2504642396
     Type: 6
     Name: ConditionDecorator
-    ParentID: 2190897410
+    ParentID: 1462892530
     IsRoot: false
     HasScript: true
     ScriptName: IsHazadPatten
     Policy: -858993460
-    Children: [4104252735]
+    Children: [1678908398]
     ChildWeights: ~
-    Position: {x: 1158, y: 677}
-  - ID: 4104252735
-    Type: 4
-    Name: WeightedSelector
-    ParentID: 1285238029
-    IsRoot: false
-    HasScript: true
-    ScriptName: ""
-    Policy: -858993460
-    Children: [2347758144, 2937842201]
-    ChildWeights: [0.600000024, 0.400000006]
-    Position: {x: 1158, y: 872}
-  - ID: 2347758144
-    Type: 9
-    Name: Action
-    ParentID: 4104252735
-    IsRoot: false
-    HasScript: true
-    ScriptName: BP0031
-    Policy: -858993460
-    Children: ~
-    ChildWeights: ~
-    Position: {x: 1014, y: 1144}
-  - ID: 2937842201
-    Type: 9
-    Name: Action
-    ParentID: 4104252735
-    IsRoot: false
-    HasScript: true
-    ScriptName: BP0032
-    Policy: -858993460
-    Children: ~
-    ChildWeights: ~
-    Position: {x: 1238, y: 1128}
-  - ID: 3206533065
+    Position: {x: 1414, y: 952}
+  - ID: 1857915104
     Type: 6
     Name: ConditionDecorator
-    ParentID: 2190897410
+    ParentID: 1462892530
     IsRoot: false
     HasScript: true
     ScriptName: ActionCountCheck
     Policy: -858993460
-    Children: [455650634]
+    Children: [610332658]
     ChildWeights: ~
-    Position: {x: 1382, y: 677}
-  - ID: 455650634
-    Type: 2
-    Name: Sequence
-    ParentID: 3206533065
-    IsRoot: false
-    HasScript: true
-    ScriptName: ""
-    Policy: -858993460
-    Children: [3787070563, 380039801]
-    ChildWeights: ~
-    Position: {x: 1430, y: 888}
-  - ID: 3787070563
+    Position: {x: 1734, y: 933}
+  - ID: 2921566595
     Type: 9
     Name: Action
-    ParentID: 455650634
-    IsRoot: false
-    HasScript: true
-    ScriptName: DetectAndTargetingAction
-    Policy: -858993460
-    Children: ~
-    ChildWeights: ~
-    Position: {x: 1446, y: 1128}
-  - ID: 380039801
-    Type: 4
-    Name: WeightedSelector
-    ParentID: 455650634
-    IsRoot: false
-    HasScript: true
-    ScriptName: ""
-    Policy: -858993460
-    Children: [1180683202, 1957930077, 1730200714]
-    ChildWeights: [0.349999994, 0.25, 0.400000006]
-    Position: {x: 1846, y: 972}
-  - ID: 13595769
-    Type: 9
-    Name: Action
-    ParentID: 2190897410
+    ParentID: 1462892530
     IsRoot: false
     HasScript: true
     ScriptName: BossIdleAction
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 1702, y: 632}
-  - ID: 2085924571
-    Type: 3
-    Name: Selector
-    ParentID: 2082444805
-    IsRoot: false
-    HasScript: true
-    ScriptName: ""
-    Policy: -858993460
-    Children: [102268865, 2945196780]
-    ChildWeights: ~
-    Position: {x: 454, y: 920}
-  - ID: 102268865
-    Type: 6
-    Name: ConditionDecorator
-    ParentID: 2085924571
-    IsRoot: false
-    HasScript: true
-    ScriptName: IsHazadPatten
-    Policy: -858993460
-    Children: [136053753]
-    ChildWeights: ~
-    Position: {x: 102, y: 1096}
-  - ID: 136053753
+    Position: {x: 2032, y: 836}
+  - ID: 1678908398
     Type: 4
     Name: WeightedSelector
-    ParentID: 102268865
+    ParentID: 2504642396
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [341909588, 440241248, 3892412072]
-    ChildWeights: [0.400000006, 0.349999994, 0.25]
-    Position: {x: 102, y: 1258}
-  - ID: 341909588
-    Type: 9
-    Name: Action
-    ParentID: 136053753
-    IsRoot: false
-    HasScript: true
-    ScriptName: BP0033
-    Policy: -858993460
-    Children: ~
-    ChildWeights: ~
-    Position: {x: -74, y: 1496}
-  - ID: 440241248
-    Type: 9
-    Name: Action
-    ParentID: 136053753
-    IsRoot: false
-    HasScript: true
-    ScriptName: BP0034
-    Policy: -858993460
-    Children: ~
-    ChildWeights: ~
-    Position: {x: 134, y: 1512}
-  - ID: 3892412072
-    Type: 4
-    Name: WeightedSelector
-    ParentID: 136053753
-    IsRoot: false
-    HasScript: true
-    ScriptName: ""
-    Policy: -858993460
-    Children: [2477828779, 90411829]
+    Children: [490377134, 69798044]
     ChildWeights: [0.600000024, 0.400000006]
-    Position: {x: 358, y: 1499}
-  - ID: 2477828779
+    Position: {x: 1350, y: 1110}
+  - ID: 490377134
     Type: 9
     Name: Action
-    ParentID: 3892412072
+    ParentID: 1678908398
     IsRoot: false
     HasScript: true
     ScriptName: BP0031
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 214, y: 1704}
-  - ID: 90411829
+    Position: {x: 1190, y: 1336}
+  - ID: 69798044
     Type: 9
     Name: Action
-    ParentID: 3892412072
+    ParentID: 1678908398
     IsRoot: false
     HasScript: true
     ScriptName: BP0032
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 470, y: 1720}
-  - ID: 2945196780
+    Position: {x: 1414, y: 1352}
+  - ID: 610332658
     Type: 2
     Name: Sequence
-    ParentID: 2085924571
+    ParentID: 1857915104
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [811232953, 250880010]
+    Children: [3445379060, 3507376444]
     ChildWeights: ~
-    Position: {x: 566, y: 1080}
-  - ID: 811232953
+    Position: {x: 1766, y: 1144}
+  - ID: 3445379060
     Type: 9
     Name: Action
-    ParentID: 2945196780
+    ParentID: 610332658
     IsRoot: false
     HasScript: true
     ScriptName: DetectAndTargetingAction
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 566, y: 1336}
-  - ID: 250880010
+    Position: {x: 1702, y: 1320}
+  - ID: 3507376444
     Type: 4
     Name: WeightedSelector
-    ParentID: 2945196780
+    ParentID: 610332658
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [2055868187, 3108430701, 3219303628]
-    ChildWeights: [0.300000012, 0.400000006, 0.300000012]
-    Position: {x: 902, y: 1388}
-  - ID: 1180683202
+    Children: [1329787972, 1958920636]
+    ChildWeights: [0.449999988, 0.550000012]
+    Position: {x: 1990, y: 1336}
+  - ID: 1329787972
     Type: 9
     Name: Action
-    ParentID: 380039801
+    ParentID: 3507376444
     IsRoot: false
     HasScript: true
     ScriptName: BP0011
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 1670, y: 1288}
-  - ID: 1957930077
+    Position: {x: 1862, y: 1576}
+  - ID: 1958920636
     Type: 9
     Name: Action
-    ParentID: 380039801
-    IsRoot: false
-    HasScript: true
-    ScriptName: BP0012
-    Policy: -858993460
-    Children: ~
-    ChildWeights: ~
-    Position: {x: 1878, y: 1304}
-  - ID: 1730200714
-    Type: 9
-    Name: Action
-    ParentID: 380039801
+    ParentID: 3507376444
     IsRoot: false
     HasScript: true
     ScriptName: BP0021
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 2134, y: 1288}
-  - ID: 2055868187
+    Position: {x: 2086, y: 1592}
+  - ID: 2710730649
+    Type: 3
+    Name: Selector
+    ParentID: 1537896565
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2734868892, 1260922627]
+    ChildWeights: ~
+    Position: {x: 518, y: 1336}
+  - ID: 2734868892
+    Type: 6
+    Name: ConditionDecorator
+    ParentID: 2710730649
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsHazadPatten
+    Policy: -858993460
+    Children: [623519813]
+    ChildWeights: ~
+    Position: {x: 170, y: 1518}
+  - ID: 623519813
+    Type: 4
+    Name: WeightedSelector
+    ParentID: 2734868892
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [1880410951, 2532742709, 852111560]
+    ChildWeights: [0.400000006, 0.349999994, 0.25]
+    Position: {x: 46, y: 1674}
+  - ID: 1880410951
     Type: 9
     Name: Action
-    ParentID: 250880010
+    ParentID: 623519813
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP0033
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: -202, y: 1848}
+  - ID: 2532742709
+    Type: 9
+    Name: Action
+    ParentID: 623519813
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP0034
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 38, y: 1928}
+  - ID: 852111560
+    Type: 4
+    Name: WeightedSelector
+    ParentID: 623519813
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [281685144, 2180624118]
+    ChildWeights: [0.600000024, 0.400000006]
+    Position: {x: 278, y: 1944}
+  - ID: 281685144
+    Type: 9
+    Name: Action
+    ParentID: 852111560
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP0031
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 134, y: 2232}
+  - ID: 2180624118
+    Type: 9
+    Name: Action
+    ParentID: 852111560
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP0032
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 374, y: 2248}
+  - ID: 1260922627
+    Type: 2
+    Name: Sequence
+    ParentID: 2710730649
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [194414262, 3592893518]
+    ChildWeights: ~
+    Position: {x: 630, y: 1528}
+  - ID: 194414262
+    Type: 9
+    Name: Action
+    ParentID: 1260922627
+    IsRoot: false
+    HasScript: true
+    ScriptName: DetectAndTargetingAction
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 550, y: 1784}
+  - ID: 3592893518
+    Type: 4
+    Name: WeightedSelector
+    ParentID: 1260922627
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [3951927181, 963003460, 3306620243]
+    ChildWeights: [0.300000012, 0.400000006, 0.300000012]
+    Position: {x: 780, y: 1856}
+  - ID: 3951927181
+    Type: 9
+    Name: Action
+    ParentID: 3592893518
     IsRoot: false
     HasScript: true
     ScriptName: BP0022
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 694, y: 1592}
-  - ID: 3108430701
+    Position: {x: 582, y: 2056}
+  - ID: 963003460
     Type: 4
     Name: WeightedSelector
-    ParentID: 250880010
+    ParentID: 3592893518
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [94986698, 1964018223]
-    ChildWeights: [0.5, 0.5]
-    Position: {x: 966, y: 1597}
-  - ID: 94986698
+    Children: [4143132736, 2917195389]
+    ChildWeights: [0.600000024, 0.400000006]
+    Position: {x: 774, y: 2168}
+  - ID: 4143132736
     Type: 9
     Name: Action
-    ParentID: 3108430701
+    ParentID: 963003460
     IsRoot: false
     HasScript: true
     ScriptName: BP0013
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 806, y: 1800}
-  - ID: 1964018223
+    Position: {x: 614, y: 2392}
+  - ID: 2917195389
     Type: 9
     Name: Action
-    ParentID: 3108430701
+    ParentID: 963003460
     IsRoot: false
     HasScript: true
-    ScriptName: BP0014
+    ScriptName: BP0011
     Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 1030, y: 1832}
-  - ID: 3219303628
+    Position: {x: 854, y: 2440}
+  - ID: 3306620243
     Type: 2
     Name: Sequence
-    ParentID: 250880010
+    ParentID: 3592893518
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
+    Children: [3592238089, 1884530498]
+    ChildWeights: ~
+    Position: {x: 1078, y: 2013}
+  - ID: 3592238089
+    Type: 9
+    Name: Action
+    ParentID: 3306620243
+    IsRoot: false
+    HasScript: true
+    ScriptName: BurrowMove
+    Policy: -858993460
     Children: ~
     ChildWeights: ~
-    Position: {x: 1318, y: 1533}
+    Position: {x: 998, y: 2200}
+  - ID: 1884530498
+    Type: 4
+    Name: WeightedSelector
+    ParentID: 3306620243
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [1785449513, 2201317433]
+    ChildWeights: [0.449999988, 0.550000012]
+    Position: {x: 1318, y: 2171}
+  - ID: 1785449513
+    Type: 9
+    Name: Action
+    ParentID: 1884530498
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP0011
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 1190, y: 2360}
+  - ID: 2201317433
+    Type: 9
+    Name: Action
+    ParentID: 1884530498
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP0021
+    Policy: -858993460
+    Children: ~
+    ChildWeights: ~
+    Position: {x: 1414, y: 2440}

@@ -26,4 +26,10 @@ public:
 	float PlayerHitPower = 0.5f;
 	[[Property]]
 	float PlayerHitTime = 0.1f;
+
+	[[Property]]
+	float PlayerChargePower = 0.5f;
+	[[Property]]
+	float PlayerChargeTime = 0.1f;
+	
 };
