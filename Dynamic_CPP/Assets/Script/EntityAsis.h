@@ -31,7 +31,7 @@ public:
 
 	bool AddItem(EntityItem* item);
 	void Purification(float tick);
-	void PathMove(float tick);
+	bool PathMove(float tick);
 	void Stun();
 	// 현재 들고있는 아이템을 떨구는 함수 (index로 가능)
 	bool DropItem();
