@@ -53,6 +53,9 @@ cbuffer SpawnParameters : register(b0)
     
     float3 gPreviousEmitterRotation;
     uint gAllowNewSpawn;
+    
+    float3 gWorldPosition;
+    float padding;
 }
 
 // 3D 메시 파티클 템플릿
@@ -67,15 +70,13 @@ cbuffer MeshParticleTemplateParams : register(b1)
     float4 gColor;
 
     float3 gVelocity;
-    float gMinVerticalVelocity;
+    float gVelocityRandomRange;
 
     float3 gAcceleration;
-    float gMaxVerticalVelocity;
+    uint textureIndex;
 
-    float gHorizontalVelocityRange;
-    int gTextureIndex;
     int gRenderMode;
-    float templatePad6;
+    float3 gParticleRandomRotation;
 }
 
 // 버퍼 바인딩
@@ -231,7 +232,17 @@ float3 GenerateEmitterPosition(uint seed)
     float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
     float3 rotatedPos = mul(rotationMatrix, localPos);
     
-    return rotatedPos + gEmitterPosition;
+    float4x4 rotMat =
+    {
+        { rotationMatrix._11, rotationMatrix._12, rotationMatrix._13, 0 },
+        { rotationMatrix._21, rotationMatrix._22, rotationMatrix._23, 0 },
+        { rotationMatrix._31, rotationMatrix._32, rotationMatrix._33, 0 },
+        { 0, 0, 0, 1 }
+    };
+    float4 emitterPos = mul(rotMat, float4(gEmitterPosition - gWorldPosition, 1.f));
+    emitterPos.xyz += gWorldPosition;
+    
+    return rotatedPos + emitterPos.xyz;
 }
 
 // 초기 속도 생성
@@ -239,17 +250,12 @@ float3 GenerateInitialVelocity(uint seed)
 {
     float3 velocity = gVelocity;
     
-    if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
+    if (gVelocityRandomRange > 0.0)
     {
-        float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
-        float horizontalAngle = RandomFloat01(seed + 1) * 6.28318530718;
-        float horizontalMag = RandomFloat01(seed + 2) * gHorizontalVelocityRange;
-        
-        velocity += float3(
-            horizontalMag * cos(horizontalAngle),
-            verticalVel,
-            horizontalMag * sin(horizontalAngle)
-        );
+        float3 randomOffset = RandomRange3D(seed,
+            float3(-gVelocityRandomRange, -gVelocityRandomRange, -gVelocityRandomRange),
+            float3(gVelocityRandomRange, gVelocityRandomRange, gVelocityRandomRange));
+        velocity += randomOffset;
     }
     
     // 속도에도 회전 적용
@@ -263,12 +269,22 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.velocity = GenerateInitialVelocity(seed + 100);
     particle.acceleration = gAcceleration;
     
-    // Range 제거 - 단일 값 사용
     particle.scale = gScale;
     particle.rotationSpeed = gRotationSpeed;
-    particle.rotation = gEmitterRotation;
     
-    // pad3에 초기 회전 저장 (impulse 계산용)
+    // 랜덤 회전 적용
+    if (length(gParticleRandomRotation) > 0.0)
+    {
+        float3 randomRotation = RandomRange3D(seed + 200,
+            float3(-gParticleRandomRotation.x, -gParticleRandomRotation.y, -gParticleRandomRotation.z),
+            float3(gParticleRandomRotation.x, gParticleRandomRotation.y, gParticleRandomRotation.z));
+        particle.rotation = randomRotation;
+    }
+    else
+    {
+        particle.rotation = gEmitterRotation;
+    }
+
     particle.pad3 = gEmitterRotation.x;
     particle.pad4 = gEmitterRotation.y;
     particle.pad5 = gEmitterRotation.z;
@@ -276,9 +292,10 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
     particle.color = gColor;
-    particle.textureIndex = 0;
+    particle.textureIndex = textureIndex;
     particle.renderMode = gRenderMode;
     particle.isActive = 1;
+    particle.pad8 = particle.position;
 }
 
 void UpdateExistingMeshParticlePosition(inout MeshParticleData particle)

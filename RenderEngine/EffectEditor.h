@@ -34,6 +34,7 @@ class EffectEditor
 {
 public:
     EffectEditor();
+    void RenderPoolStatus();
     void Release();
 
     void SetTexture(Texture* tex);

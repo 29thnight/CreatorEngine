@@ -71,24 +71,21 @@ void EffectManager::Execute(RenderScene& scene, Camera& camera)
 
 void EffectManager::Update(float delta)
 {
+	// 정리 큐 처리 (매 프레임마다)
+	ProcessCleanupQueue();
+
+	// 강제 정리 필요한지 확인
+	if (ShouldForceCleanup()) {
+		ForceCleanupOldEffects();
+	}
+
 	auto it = activeEffects.begin();
 	while (it != activeEffects.end()) {
 		auto& effect = it->second;
 		effect->Update(delta);
 
-		// 풀 반환 조건을 더 관대하게 수정
-		bool shouldReturn = false;
-
+		// Stop 상태인 이펙트만 제거
 		if (effect->GetState() == EffectState::Stopped) {
-			shouldReturn = true;
-		}
-		// 무한 이펙트가 오래 실행되고 있으면 강제 정리 (선택적)
-		//else if (effect->GetDuration() < 0 && effect->GetCurrentTime() > 60.0f) {
-		//	effect->Stop();
-		//	shouldReturn = true;
-		//}
-
-		if (shouldReturn) {
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
 			ReturnToPool(std::move(effectToReturn));
@@ -101,6 +98,13 @@ void EffectManager::Update(float delta)
 
 std::string EffectManager::PlayEffect(const std::string& templateName)
 {
+	// 활성 이펙트 개수 체크
+	if (activeEffects.size() >= MAX_ACTIVE_EFFECTS) {
+		std::cout << "Cannot create effect: Active effect limit reached ("
+			<< MAX_ACTIVE_EFFECTS << ")" << std::endl;
+		return "";  // 생성 거부
+	}
+
 	auto templateIt = templates.find(templateName);
 	if (templateIt == templates.end()) {
 		return "";
@@ -177,6 +181,123 @@ bool EffectManager::RemoveEffect(std::string_view instanceName)
 		return true;
 	}
 	return false;
+}
+
+bool EffectManager::IsPoolHealthy() const
+{
+	std::lock_guard<std::mutex> lock(poolMutex);
+
+	bool sizeOk = universalPool.size() <= maxPoolSize;
+	bool activeOk = activeEffects.size() <= MAX_ACTIVE_EFFECTS;
+	bool cleanupOk = cleanupQueue.size() < 50; // 정리 큐도 너무 크면 안됨
+
+	return sizeOk && activeOk && cleanupOk;
+}
+
+void EffectManager::ForceCleanupOldEffects()
+{
+	if (isCleanupRunning.exchange(true)) {
+		return; // 이미 정리 중이면 스킵
+	}
+
+	std::cout << "Starting force cleanup of old effects..." << std::endl;
+
+	auto it = activeEffects.begin();
+	int cleanedCount = 0;
+
+	while (it != activeEffects.end() && cleanedCount < 10) { // 한 번에 최대 10개만
+		auto& effect = it->second;
+
+		if (effect->GetCurrentTime() > FORCE_CLEANUP_TIME &&
+			effect->GetState() != EffectState::Stopped) {
+
+			effect->Stop();
+			auto effectToReturn = std::move(effect);
+			it = activeEffects.erase(it);
+			ReturnToPool(std::move(effectToReturn));
+			cleanedCount++;
+		}
+		else {
+			++it;
+		}
+	}
+
+	lastCleanupTime = std::chrono::steady_clock::now();
+	isCleanupRunning = false;
+
+	std::cout << "Force cleanup completed. Cleaned " << cleanedCount << " effects" << std::endl;
+}
+
+void EffectManager::SetMaxPoolSize(int maxSize)
+{
+	if (maxSize < 10) {
+		std::cerr << "Warning: MaxPoolSize too small, setting to minimum (10)" << std::endl;
+		maxSize = 10;
+	}
+
+	if (maxSize > 500) {
+		std::cerr << "Warning: MaxPoolSize too large, setting to maximum (500)" << std::endl;
+		maxSize = 500;
+	}
+
+	int oldSize = maxPoolSize;
+	maxPoolSize = maxSize;
+
+	// 현재 풀 크기가 새 제한보다 크면 축소
+	{
+		std::lock_guard<std::mutex> lock(poolMutex);
+		while (universalPool.size() > maxPoolSize && !universalPool.empty()) {
+			universalPool.pop();
+			totalDestroyedEffects++;
+		}
+	}
+
+	std::cout << "MaxPoolSize changed from " << oldSize << " to " << maxPoolSize << std::endl;
+	std::cout << "Current pool size: " << GetPoolSize() << std::endl;
+}
+
+size_t EffectManager::GetTotalMemoryUsage() const
+{
+	size_t totalMemory = 0;
+
+	// 활성 이펙트 메모리 계산 (대략적인 추정)
+	totalMemory += activeEffects.size() * sizeof(EffectBase);
+
+	// 각 이펙트의 파티클 시스템 메모리 계산
+	for (const auto& [id, effect] : activeEffects) {
+		const auto& particleSystems = effect->GetAllParticleSystems();
+		for (const auto& ps : particleSystems) {
+			// 파티클 시스템당 대략적인 메모리 사용량
+			totalMemory += ps->GetMaxParticles() * 256; // 파티클당 대략 256바이트 추정
+		}
+	}
+
+	// 풀 메모리 계산
+	{
+		std::lock_guard<std::mutex> lock(poolMutex);
+		totalMemory += universalPool.size() * sizeof(EffectBase);
+		totalMemory += universalPool.size() * MAX_PARTICLES_PER_SYSTEM * 256; // 풀의 각 이펙트
+	}
+
+	// 정리 큐 메모리
+	{
+		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+		totalMemory += cleanupQueue.size() * sizeof(EffectBase);
+	}
+
+	return totalMemory;
+}
+
+void EffectManager::PrintPoolStatistics() const
+{
+	std::cout << "=== EffectManager Pool Statistics ===" << std::endl;
+	std::cout << "Pool size: " << GetPoolSize() << "/" << maxPoolSize << std::endl;
+	std::cout << "Active effects: " << activeEffects.size() << "/" << MAX_ACTIVE_EFFECTS << std::endl;
+	std::cout << "Cleanup queue: " << cleanupQueue.size() << std::endl;
+	std::cout << "Total created: " << totalCreatedEffects.load() << std::endl;
+	std::cout << "Total destroyed: " << totalDestroyedEffects.load() << std::endl;
+	std::cout << "Pool healthy: " << (IsPoolHealthy() ? "Yes" : "No") << std::endl;
+	std::cout << "====================================" << std::endl;
 }
 
 void EffectManager::RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson)
@@ -261,9 +382,12 @@ void EffectManager::InitializeUniversalPool()
 
 std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 {
+	std::lock_guard<std::mutex> lock(poolMutex);
+
 	// 풀이 비어있으면 새로 생성
 	if (universalPool.empty()) {
 		std::cout << "Pool empty, creating new effect instance" << std::endl;
+		totalCreatedEffects++;
 		auto newEffect = CreateUniversalEffect();
 		if (newEffect) {
 			return newEffect;
@@ -274,10 +398,16 @@ std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 	auto instance = std::move(universalPool.front());
 	universalPool.pop();
 
-	// 재사용 준비 상태 확인 (D3D 호출 없이)
+	if (universalPool.size() < DEFAULT_POOL_SIZE * 0.3f) { // 30% 이하로 떨어지면
+		std::cout << "Pool running low (" << universalPool.size() << "), refilling..." << std::endl;
+		RefillPoolAsync();
+	}
+
+	// 재사용 준비 상태 확인
 	if (!instance->IsReadyForReuse()) {
 		std::cerr << "Warning: Pool instance not ready for reuse!" << std::endl;
-		// 강제로 새 인스턴스 생성
+		QueueForCleanup(std::move(instance));
+		totalCreatedEffects++;
 		return CreateUniversalEffect();
 	}
 
@@ -289,22 +419,64 @@ void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 {
 	if (!effect) return;
 
-	// 1. 논리적 정리만 (D3D 호출 없음)
+	// 1. 논리적 정리
 	if (effect->GetState() != EffectState::Stopped) {
 		effect->Stop();
 	}
 
-	// 2. 논리적 리셋만 (스레드 안전)
+	// 2. 논리적 리셋
 	effect->ResetForReuse();
 
-	// 3. 바로 풀에 반환 (GPU 대기 없음)
+	std::lock_guard<std::mutex> lock(poolMutex);
+
+	// 3. 풀 크기 제한 확인
+	if (universalPool.size() >= maxPoolSize) {
+		std::cout << "Pool full (" << maxPoolSize << "), destroying effect instance" << std::endl;
+		totalDestroyedEffects++;
+		return; // effect는 자동으로 소멸됨
+	}
+
+	// 4. 풀에 반환
 	if (effect->IsReadyForReuse()) {
 		universalPool.push(std::move(effect));
 		std::cout << "Effect returned to pool. Pool size: " << universalPool.size() << std::endl;
 	}
 	else {
-		std::cerr << "Warning: Effect not ready for reuse" << std::endl;
+		std::cerr << "Warning: Effect not ready for reuse, queueing for cleanup" << std::endl;
+		QueueForCleanup(std::move(effect));
 	}
+}
+
+void EffectManager::RefillPoolAsync()
+{
+	if (isCleanupRunning.exchange(true)) {
+		return;
+	}
+
+	std::thread([this]() {
+		std::cout << "Starting async pool refill..." << std::endl;
+
+		int refillCount = 0;
+		int targetRefill = DEFAULT_POOL_SIZE / 2;
+
+		while (refillCount < targetRefill) {
+			auto newEffect = CreateUniversalEffect();
+			if (!newEffect) break;
+
+			{
+				std::lock_guard<std::mutex> lock(poolMutex);
+				if (universalPool.size() >= maxPoolSize) break;
+				universalPool.push(std::move(newEffect));
+				totalCreatedEffects++;
+				refillCount++;
+			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+
+		isCleanupRunning = false;
+		std::cout << "Pool refill completed. Added " << refillCount << " instances" << std::endl;
+		}).detach();
 }
 
 //***********************************************************************************************************************************************************
@@ -414,6 +586,177 @@ void EffectManager::DisableAllModules(EffectBase* effect)
 			renderModule->SetEnabled(false);
 		}
 	}
+}
+
+void EffectManager::CleanupAllResources()
+{
+	std::cout << "Cleaning up all EffectManager resources..." << std::endl;
+
+	// 1. 활성 이펙트들 정리
+	activeEffects.clear();
+
+	// 2. 풀 정리
+	{
+		std::lock_guard<std::mutex> lock(poolMutex);
+		while (!universalPool.empty()) {
+			universalPool.pop();
+		}
+	}
+
+	// 3. 정리 큐 정리
+	{
+		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+		while (!cleanupQueue.empty()) {
+			cleanupQueue.pop();
+		}
+	}
+
+	std::cout << "EffectManager cleanup completed. Total created: " << totalCreatedEffects.load()
+		<< ", Total destroyed: " << totalDestroyedEffects.load() << std::endl;
+}
+
+void EffectManager::ProcessCleanupQueue()
+{
+	std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+
+	// 한 번에 최대 5개씩만 처리 (프레임 드롭 방지)
+	int processCount = 0;
+	while (!cleanupQueue.empty() && processCount < 5) {
+		auto effect = std::move(cleanupQueue.front());
+		cleanupQueue.pop();
+		totalDestroyedEffects++;
+		processCount++;
+	}
+
+	// 정리 큐가 너무 크면 비동기 처리 시작
+	if (cleanupQueue.size() > 20) {
+		std::cout << "Cleanup queue too large (" << cleanupQueue.size()
+			<< "), starting async cleanup" << std::endl;
+		ProcessCleanupQueueAsync();
+	}
+}
+
+void EffectManager::QueueForCleanup(std::unique_ptr<EffectBase> effect)
+{
+	if (!effect) return;
+
+	std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+	cleanupQueue.push(std::move(effect));
+}
+
+void EffectManager::EmergencyCleanup()
+{
+	std::cout << "EMERGENCY CLEANUP INITIATED!" << std::endl;
+
+	// 1. 무한 이펙트와 오래된 이펙트 우선 정리
+	auto it = activeEffects.begin();
+	int emergencyCleanedCount = 0;
+
+	// 1단계: 무한 이펙트 전체 정리
+	while (it != activeEffects.end()) {
+		auto& effect = it->second;
+
+		if (effect->GetDuration() < 0) { // 무한 이펙트는 모두 정리
+			effect->Stop();
+			auto effectToReturn = std::move(effect);
+			it = activeEffects.erase(it);
+
+			// 긴급상황이므로 풀에 반환하지 않고 즉시 소멸
+			totalDestroyedEffects++;
+			emergencyCleanedCount++;
+		}
+		else {
+			++it;
+		}
+	}
+
+	// 2단계: 여전히 많다면 오래된 일반 이펙트도 정리
+	it = activeEffects.begin();
+	while (it != activeEffects.end() && emergencyCleanedCount < activeEffects.size() / 2) {
+		auto& effect = it->second;
+
+		if (effect->GetCurrentTime() > 10.0f) { // 10초 이상된 일반 이펙트
+			effect->Stop();
+			auto effectToReturn = std::move(effect);
+			it = activeEffects.erase(it);
+
+			totalDestroyedEffects++;
+			emergencyCleanedCount++;
+		}
+		else {
+			++it;
+		}
+	}
+
+	// 3. 정리 큐만 비우기 (풀은 건드리지 않음)
+	{
+		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+		int cleanupCount = 0;
+		while (!cleanupQueue.empty()) {
+			cleanupQueue.pop();
+			totalDestroyedEffects++;
+			cleanupCount++;
+		}
+		if (cleanupCount > 0) {
+			std::cout << "Cleared " << cleanupCount << " items from cleanup queue" << std::endl;
+		}
+	}
+
+	std::cout << "EMERGENCY CLEANUP COMPLETED! Cleaned " << emergencyCleanedCount
+		<< " active effects (prioritized infinite effects)" << std::endl;
+	std::cout << "Pool size preserved: " << GetPoolSize() << "/" << maxPoolSize << std::endl;
+}
+
+bool EffectManager::ShouldForceCleanup() const
+{
+	auto now = std::chrono::steady_clock::now();
+	auto timeSinceLastCleanup = std::chrono::duration_cast<std::chrono::seconds>(now - lastCleanupTime).count();
+
+	bool memoryPressure = (activeEffects.size() > MAX_ACTIVE_EFFECTS * 0.8f);
+	bool timeForCleanup = (timeSinceLastCleanup > 60);
+	bool emergencyNeeded = (activeEffects.size() > MAX_ACTIVE_EFFECTS * 0.95f) ||
+		(GetTotalMemoryUsage() > 500 * 1024 * 1024); // 500MB 초과시
+
+	if (emergencyNeeded) {
+		const_cast<EffectManager*>(this)->EmergencyCleanup();
+		return false; // 긴급정리 했으므로 일반 정리는 스킵
+	}
+
+	return memoryPressure || timeForCleanup;
+}
+
+void EffectManager::ProcessCleanupQueueAsync()
+{
+// 별도 스레드에서 정리 작업 수행
+	std::thread([this]() {
+		if (isCleanupRunning.exchange(true)) {
+			return; // 이미 정리 중이면 종료
+		}
+
+		std::cout << "Starting async cleanup..." << std::endl;
+
+		while (true) {
+			std::unique_ptr<EffectBase> effect = nullptr;
+
+			{
+				std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+				if (cleanupQueue.empty()) {
+					break;
+				}
+				effect = std::move(cleanupQueue.front());
+				cleanupQueue.pop();
+			}
+
+			// effect 소멸 (시간이 걸릴 수 있는 작업)
+			if (effect) {
+				totalDestroyedEffects++;
+				std::this_thread::sleep_for(std::chrono::milliseconds(1)); // CPU 양보
+			}
+		}
+
+		isCleanupRunning = false;
+		std::cout << "Async cleanup completed" << std::endl;
+		}).detach();
 }
 
 void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJson)

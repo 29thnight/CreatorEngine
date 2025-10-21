@@ -51,6 +51,7 @@
 #include "SwordProjectileEffect.h"
 #include "EntityMonsterTower.h"
 #include "EntityMonsterBaseGate.h"
+#include "GameInstance.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -637,15 +638,18 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 				controller->TriggerForcedMove(knockbackVeocity);
 
-				auto input = GetOwner()->GetComponent<PlayerInputComponent>();
-				if (GM)
+				if (true == GameInstance::GetInstance()->IsViveEnabled())
 				{
-					auto data = GM->GetControllerVibration();
-					if (data)
+					auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+					if (GM)
 					{
-						float power = data->PlayerHitPower;
-						float time = data->PlayerHitTime;
-						input->SetControllerVibration(time, power, power, power, power);
+						auto data = GM->GetControllerVibration();
+						if (data)
+						{
+							float power = data->PlayerHitPower;
+							float time = data->PlayerHitTime;
+							input->SetControllerVibration(time, power, power, power, power);
+						}
 					}
 				}
 			}
@@ -726,6 +730,7 @@ void Player::Damage(int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
+	if (!m_isCallStart) return;
 	if(GM && GM->TestCameraControll)
 	{ 
 		return;
@@ -1041,6 +1046,22 @@ void Player::ChargeAttack()
 			//차지공격나감
 			isChargeAttack = true;
 			m_curWeapon->isCompleteCharge = false;
+
+
+			if (true == GameInstance::GetInstance()->IsViveEnabled())
+			{
+				auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+				if (GM)
+				{
+					auto data = GM->GetControllerVibration();
+					if (data)
+					{
+						float power = data->PlayerChargePower;
+						float time = data->PlayerChargeTime;
+						input->SetControllerVibration(time, power);
+					}
+				}
+			}
 			if (m_curWeapon->itemType == ItemType::Melee)
 			{
 				m_animator->SetParameter("MeleeChargeAttack", true);
@@ -1216,7 +1237,7 @@ bool Player::CheckResurrectionByOther()
 		if (object == GetOwner()) continue;
 
 		auto otehrPlayer = object->GetComponent<Player>();
-		if (otehrPlayer)
+		if (otehrPlayer && otehrPlayer->isStun == false)
 			return true;
 
 	}
@@ -1340,8 +1361,12 @@ void Player::SwapWeaponInternal(int dir)
 
 	const int maxInventoryIndex = static_cast<int>(m_weaponInventory.size()) - 1;
 	const int maxAllowedIndex = std::max(0, std::min(3, maxInventoryIndex));
+	int preIndex = m_weaponIndex;
 	m_weaponIndex = std::clamp(m_weaponIndex + adjustedDirection, 0, maxAllowedIndex);
-
+	bool isChange = false;
+	if (preIndex != m_weaponIndex)
+		isChange = true;
+	if (isChange == false) return;
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
@@ -1444,7 +1469,7 @@ bool Player::AddWeapon(Weapon* weapon)
 	weapon->Initialize();
 	m_weaponInventory.push_back(weapon);
 	m_AddWeaponEvent.UnsafeBroadcast(weapon, m_weaponInventory.size() - 1);
-	m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
+	//m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
 	handSocket->AttachObject(weapon->GetOwner());
 	if (1 >= prevSize)
 	{
@@ -1455,6 +1480,7 @@ bool Player::AddWeapon(Weapon* weapon)
 
 		m_curWeapon = weapon;
 		m_curWeapon->SetEnabled(true);
+		m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponInventory.size() - 1);
 		m_weaponIndex = m_weaponInventory.size() - 1;
 	}
@@ -1629,7 +1655,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 		dir.Normalize();
 		std::vector<HitResult> hits;
 
-		float distacne = 200.0f;
+		float distacne = 100.0f;
 
 		unsigned int layerMask = 1 << 11;
 		bombThrowPosition.y = pos.y + 0.1f;
@@ -1648,7 +1674,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	}
 
 	//
-	onIndicate = true;
+	//onIndicate = true;
 	if (BombIndicator)
 	{
 		BombIndicator->m_transform.SetPosition(bombThrowPosition);
@@ -1669,8 +1695,7 @@ void Player::MeleeAttack()
 	direction.y = 0;
 	direction.Normalize();
 	std::vector<HitResult> hits;
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	rayOrigin.y = pos.y+ 0.5f;
+	rayOrigin.y +=  0.5f;
 	
 	float distacne = 2.0f;
 	if (m_curWeapon)
@@ -1771,7 +1796,7 @@ void Player::RangeAttack()
 	//원거리 무기 일때 에임보정후 발사
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	float distance;
-
+	nearTarget = false;
 	inRangeEnemy.clear();
 	std::unordered_set<Entity*> enemis; // 몹들만담기
 	curTarget = nullptr;
@@ -1864,15 +1889,22 @@ void Player::RangeAttack()
 		DirectX::SimpleMath::Quaternion lookQuat = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0, 0);
 		transform->SetRotation(lookQuat);
 
+		float length = (targetPos - myPos).Length();
+		length = std::abs(length);
+		if (length <= 2.0f)
+		{
+			nearTarget = true;
+		}
 	}
 
 
 	nearDistance = FLT_MAX;
 }
 
+
+
 void Player::ShootBullet()
 {
-
 	if (isChargeAttack)  //차지어택은 1 , 3 , 5 등 홀수갯수 발사 메인타겟 좌우 각도로 한발씩
 	{
 		ShootChargeBullet();
@@ -1902,19 +1934,19 @@ void Player::ShootNormalBullet()
 	GameObject* bulletObj = normalBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	bool nearTarget = false;
+	//bool nearTarget = false;
 	//쏘기직전에 적이 가까이왔으면 발사대신 떄리기 or 가까이에서 발사? 
-	if (curTarget)
-	{
-		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-		float length = (targetPos - pos).Length();
-		length = std::abs(length);
-		if (length <= 2.0f)
-		{
-			nearTarget = true;
-		}
+	//if (curTarget && curTarget->GetOwner())
+	//{
+	//	Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+	//	float length = (targetPos - pos).Length();
+	//	length = std::abs(length);
+	//	if (length <= 2.0f)
+	//	{
+	//		nearTarget = true;
+	//	}
 
-	}
+	//}
 	if (bulletObj)
 	{
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
@@ -1950,21 +1982,22 @@ void Player::ShootSpecialBullet()
 	GameObject* bulletObj = specialBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	bool nearTarget = false;
+	/*bool nearTarget = false;
+	if (curTarget && curTarget->GetOwner())
+	{
+		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+		float length = (targetPos - pos).Length();
+		length = std::abs(length);
+		if (length <= 2.0f)
+		{
+			nearTarget = true;
+		}
+
+	}*/
 	if (bulletObj)
 	{
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
-		if (curTarget)
-		{
-			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-			float length = (targetPos - pos).Length();
-			length = std::abs(length);
-			if (length <= 2.0f)
-			{
-				nearTarget = true;
-			}
-
-		}
+		
 
 		if (shootPosObj)
 		{
@@ -1997,7 +2030,7 @@ void Player::ShootChargeBullet()
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	bool nearTarget = false;
+	//bool nearTarget = false;
 	std::vector<GameObject*> chargePool;
 	for (int i = 0; i < 5; i++)
 	{
@@ -2009,7 +2042,7 @@ void Player::ShootChargeBullet()
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 
 
-		if (curTarget)
+		/*if (curTarget && curTarget->GetOwner())
 		{
 			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
 			float length = (targetPos - pos).Length();
@@ -2019,7 +2052,7 @@ void Player::ShootChargeBullet()
 				nearTarget = true;
 			}
 
-		}
+		}*/
 		if (shootPosObj)
 		{
 			shootPos = shootPosObj->m_transform.GetWorldPosition();

@@ -20,7 +20,7 @@ struct alignas(16) MeshParticleTemplateParams
 	UINT textureIndex;
 
 	UINT renderMode;
-	float3 particleInitialRotation;
+	float3 particleRandomRotation;
 };
 
 class MeshSpawnModuleCS : public ParticleModule , public ISerializable
@@ -72,7 +72,7 @@ public:
 	virtual void ResetForReuse();
 	virtual bool IsReadyForReuse() const;
 
-	void SetEmitterPosition(const Mathf::Vector3& position);
+	void SetEmitterPosition(const Mathf::Vector3& position, const Mathf::Vector3& worldPosition);
 	void SetEmitterRotation(const Mathf::Vector3& rotation);
 	void SetEmitterScale(const Mathf::Vector3& scale);
 
@@ -91,7 +91,7 @@ public:
 	void SetParticleAcceleration(const XMFLOAT3& acceleration);
 	void SetTextureIndex(UINT textureIndex);
 	void SetRenderMode(UINT mode);
-	void SetParticleInitialRotation(const XMFLOAT3& rotation);
+	void SetParticleRandomRotation(const XMFLOAT3& rotation);
 
 	// 상태 조회
 	const SpawnParams& GetSpawnParams() const { return m_spawnParams; }
