@@ -45,8 +45,24 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    float2 animatedUV = (input.texCoord * 1.0) * float2(gridSize.x, gridSize.y);
-    animatedUV += gTime * animationDuration;
+    float2 animatedUV = input.texCoord * float2(gridSize.x, gridSize.y);
+    
+    // frameCount를 모드로 사용
+    uint mode = frameCount;
+    
+    if (mode == 0)
+    {
+        // 기본 모드 - 일정한 속도
+        animatedUV += gTime * animationDuration;
+    }
+    else if (mode == 1)
+    {
+        // 수명에 따른 속도 변화 모드
+        float lifeProgress = input.particleAge / input.particleLifeTime;
+        float speedMultiplier = sin(lifeProgress * pi); // 0에서 시작해서 중간에 최대, 끝에서 0
+        animatedUV += gTime * animationDuration * speedMultiplier;
+    }
+    
     float4 diffuseColor = gNoiseTexture.Sample(gLinearSampler, animatedUV);
     
     float3 finalColor;
@@ -56,8 +72,7 @@ PixelOutput main(PixelInput input)
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
     float brightnessMask = smoothstep(0.1, 0.6, colorBrightness);
-    finalAlpha = finalAlpha * brightnessMask; // 기존 알파와 곱하기
-
+    finalAlpha = finalAlpha * brightnessMask;
     clip(finalAlpha - 0.05);
     output.color = float4(finalColor, finalAlpha);
     

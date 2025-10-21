@@ -3142,12 +3142,12 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 
 	// 초기 회전 설정
 	float initialRotation[3] = {
-		currentTemplate.particleInitialRotation.x,
-		currentTemplate.particleInitialRotation.y,
-		currentTemplate.particleInitialRotation.z
+		currentTemplate.particleRandomRotation.x,
+		currentTemplate.particleRandomRotation.y,
+		currentTemplate.particleRandomRotation.z
 	};
-	if (ImGui::DragFloat3("Initial Rotation", initialRotation, 1.0f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleInitialRotation(XMFLOAT3(initialRotation[0], initialRotation[1], initialRotation[2]));
+	if (ImGui::DragFloat3("Random Rotation", initialRotation, 1.0f, -360.0f, 360.0f)) {
+		meshSpawnModule->SetParticleRandomRotation(XMFLOAT3(initialRotation[0], initialRotation[1], initialRotation[2]));
 	}
 
 	// 3D 스케일 범위
