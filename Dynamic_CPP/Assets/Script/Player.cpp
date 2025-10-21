@@ -51,6 +51,7 @@
 #include "SwordProjectileEffect.h"
 #include "EntityMonsterTower.h"
 #include "EntityMonsterBaseGate.h"
+#include "GameInstance.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -637,15 +638,18 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 				controller->TriggerForcedMove(knockbackVeocity);
 
-				auto input = GetOwner()->GetComponent<PlayerInputComponent>();
-				if (GM)
+				if (true == GameInstance::GetInstance()->IsViveEnabled())
 				{
-					auto data = GM->GetControllerVibration();
-					if (data)
+					auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+					if (GM)
 					{
-						float power = data->PlayerHitPower;
-						float time = data->PlayerHitTime;
-						input->SetControllerVibration(time, power, power, power, power);
+						auto data = GM->GetControllerVibration();
+						if (data)
+						{
+							float power = data->PlayerHitPower;
+							float time = data->PlayerHitTime;
+							input->SetControllerVibration(time, power, power, power, power);
+						}
 					}
 				}
 			}
@@ -726,6 +730,7 @@ void Player::Damage(int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
+	if (!m_isCallStart) return;
 	if(GM && GM->TestCameraControll)
 	{ 
 		return;
@@ -1041,6 +1046,22 @@ void Player::ChargeAttack()
 			//차지공격나감
 			isChargeAttack = true;
 			m_curWeapon->isCompleteCharge = false;
+
+
+			if (true == GameInstance::GetInstance()->IsViveEnabled())
+			{
+				auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+				if (GM)
+				{
+					auto data = GM->GetControllerVibration();
+					if (data)
+					{
+						float power = data->PlayerChargePower;
+						float time = data->PlayerChargeTime;
+						input->SetControllerVibration(time, power);
+					}
+				}
+			}
 			if (m_curWeapon->itemType == ItemType::Melee)
 			{
 				m_animator->SetParameter("MeleeChargeAttack", true);
@@ -1216,7 +1237,7 @@ bool Player::CheckResurrectionByOther()
 		if (object == GetOwner()) continue;
 
 		auto otehrPlayer = object->GetComponent<Player>();
-		if (otehrPlayer)
+		if (otehrPlayer && otehrPlayer->isStun == false)
 			return true;
 
 	}
@@ -1340,8 +1361,12 @@ void Player::SwapWeaponInternal(int dir)
 
 	const int maxInventoryIndex = static_cast<int>(m_weaponInventory.size()) - 1;
 	const int maxAllowedIndex = std::max(0, std::min(3, maxInventoryIndex));
+	int preIndex = m_weaponIndex;
 	m_weaponIndex = std::clamp(m_weaponIndex + adjustedDirection, 0, maxAllowedIndex);
-
+	bool isChange = false;
+	if (preIndex != m_weaponIndex)
+		isChange = true;
+	if (isChange == false) return;
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
@@ -1629,7 +1654,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 		dir.Normalize();
 		std::vector<HitResult> hits;
 
-		float distacne = 200.0f;
+		float distacne = 100.0f;
 
 		unsigned int layerMask = 1 << 11;
 		bombThrowPosition.y = pos.y + 0.1f;
@@ -1648,7 +1673,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 	}
 
 	//
-	onIndicate = true;
+	//onIndicate = true;
 	if (BombIndicator)
 	{
 		BombIndicator->m_transform.SetPosition(bombThrowPosition);
@@ -1669,8 +1694,7 @@ void Player::MeleeAttack()
 	direction.y = 0;
 	direction.Normalize();
 	std::vector<HitResult> hits;
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	rayOrigin.y = pos.y+ 0.5f;
+	rayOrigin.y +=  0.5f;
 	
 	float distacne = 2.0f;
 	if (m_curWeapon)
