@@ -1,7 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GizmoRenderer.h"
 #include "SceneRenderer.h"
-#include "RenderScene.h"
+#include "SceneManager.h"
 #include "RenderState.h"
 #include "Profiler.h"
 
@@ -49,6 +49,8 @@ void GizmoRenderer::ShowGridSettings()
 void GizmoRenderer::OnDrawGizmos()
 {
 #ifndef BUILD_FLAG
+	if (SceneManagers->IsSceneLoading()) return;
+
 	PROFILE_CPU_BEGIN("OnDrawGizmos");
 	//[*] GridPass
 	{

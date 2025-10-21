@@ -100,6 +100,11 @@ public:
 	static GameObject* FindInstanceID(const HashedGuid& guid);
 	static GameObject* FindAttachedID(const HashedGuid& guid);
 
+	GameObject* OwnerSceneFind(std::string_view name);
+	GameObject* OwnerSceneFindIndex(GameObject::Index index);
+	GameObject* OwnerSceneFindInstanceID(const HashedGuid& guid);
+	GameObject* OwnerSceneFindAttachedID(const HashedGuid& guid);
+
 	static inline bool IsValidIndex(Index index)
 	{
 		return index != INVALID_INDEX;

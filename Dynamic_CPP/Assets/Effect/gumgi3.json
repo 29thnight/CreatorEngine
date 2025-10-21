@@ -34,9 +34,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.054901961237192154,
-                                "y": 0.1764705926179886,
-                                "z": 0.21176470816135406
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "initialRotation": {
                                 "x": 0.0,
@@ -133,7 +133,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 12.279747009277344,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -204,7 +204,7 @@
                         "renderStates": {
                             "blendPreset": 1,
                             "depthPreset": 2,
-                            "rasterizerPreset": 2
+                            "rasterizerPreset": 1
                         },
                         "shaders": {
                             "pixelShader": "gg",
@@ -266,9 +266,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.054901961237192154,
-                                "y": 0.1764705926179886,
-                                "z": 0.21176470816135406
+                                "x": 0.06440294533967972,
+                                "y": 0.03758964315056801,
+                                "z": 0.3173598647117615
                             },
                             "initialRotation": {
                                 "x": 0.0,
@@ -365,7 +365,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 1.7074908018112183,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -436,7 +436,7 @@
                         "renderStates": {
                             "blendPreset": 1,
                             "depthPreset": 2,
-                            "rasterizerPreset": 2
+                            "rasterizerPreset": 1
                         },
                         "shaders": {
                             "pixelShader": "gg",
@@ -480,5 +480,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 2.0
+    "timeScale": 1.0
 }

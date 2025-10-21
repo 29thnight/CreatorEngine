@@ -4,6 +4,12 @@
 
 using RenderTask = std::function<void(ID3D11DeviceContext* deferredContext)>;
 
+template<class F>
+concept RenderCallableCopyable =
+std::invocable<F&, ID3D11DeviceContext*>&&
+std::is_copy_constructible_v<std::decay_t<F>>&&
+std::is_move_constructible_v<std::decay_t<F>>;
+
 class RenderThreadPool
 {
 public:
@@ -50,14 +56,17 @@ public:
         }
     }
 
-    void Enqueue(RenderTask task)
+    template <RenderCallableCopyable F>
+    void Enqueue(F&& f)
     {
-        m_pool.Enqueue([this, task]()
-        {
-            int index = GetThreadIndex();
-            ID3D11DeviceContext* ctx = m_contexts[index];
-            task(ctx);
-        });
+        using Fn = std::decay_t<F>; // 람다 캡처에 보관될 실제 타입
+        m_pool.Enqueue([this, fn = static_cast<Fn>(std::forward<F>(f))]() mutable
+            noexcept(std::is_nothrow_invocable_v<Fn&, ID3D11DeviceContext*>)
+            {
+                const int index = GetThreadIndex();
+                ID3D11DeviceContext* ctx = m_contexts[index];
+                std::invoke(fn, ctx);
+            });
     }
 
     void NotifyAllAndWait()

@@ -62,6 +62,7 @@ using namespace Microsoft::WRL;
 #endif // !DYNAMICCPP_EXPORTS
 #include "LinkedListLib.hpp"
 //#include "flatbuffers/flatbuffers.h"
+#include "plf_colony.h"
 
 #ifndef _in
 #define _in

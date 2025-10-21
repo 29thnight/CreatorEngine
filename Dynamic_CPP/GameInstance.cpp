@@ -56,7 +56,8 @@ static inline std::string FormatDescFmtStyle(const std::string& fmt, int rawPerc
 
 void GameInstance::Initialize()
 {
-	if (m_isInitialize) {
+	if(m_isInitialize)
+	{
 		return;
 	}
 	m_isInitialize = true;
@@ -330,6 +331,7 @@ void GameInstance::SwitchScene(const std::string& sceneName)
 		LOG("Scene not loaded: " + sceneName);
 		return;
 	}
+
 	SceneManagers->ActivateScene(m_loadedScenes[sceneName]);
 	m_isLoadSceneComplete = false;
 }
@@ -337,6 +339,11 @@ void GameInstance::SwitchScene(const std::string& sceneName)
 void GameInstance::UnloadScene(const std::string& sceneName)
 {
 	// Unload only if the scene is loaded
+}
+
+void GameInstance::ExitGame()
+{
+	SceneManagers->SetDecommissioning();
 }
 
 void GameInstance::LoadSettingedScene(int sceneType)

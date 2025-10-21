@@ -66,6 +66,7 @@ public:
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
 	void CullMeshData();
+	void InternalPauseUpdateForUI();
 
     std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = -1);
 
@@ -149,10 +150,6 @@ public:
 		return allocScene;
 	}
 
-    std::atomic_bool m_isAwake{ false };
-    std::atomic_bool m_isLoaded{ false };
-    std::atomic_bool m_isDirty{ false };
-    std::atomic_bool m_isEnable{ false };
     [[Property]]
     size_t m_buildIndex{ 0 };
     [[Property]]

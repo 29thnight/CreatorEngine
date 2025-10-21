@@ -73,6 +73,13 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 		file::path selectedFileName{ DataSystems->selectedFileName };
 		file::path selectedMetaFilePath{ DataSystems->selectedMetaFilePath };
 
+		if (SceneManagers->IsSceneLoading())
+		{
+			ImGui::Text("Not Init InspectorWindow");
+			//ImGui::End();
+			return;
+		}
+
 		if (m_sceneRenderer)
 		{
 			scene = SceneManagers->GetActiveScene();
@@ -82,7 +89,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			if (!scene && !renderScene)
 			{
 				ImGui::Text("Not Init InspectorWindow");
-				ImGui::End();
+				//ImGui::End();
 				return;
 			}
 		}

@@ -78,5 +78,6 @@ private:
     static bool CheckExtension(std::string_view shaderExtension);
 
 	static std::unordered_map<std::string, ComPtr<ID3DBlob>> m_shaderCache;
+	static std::mutex m_compileMutex;
 };
 #endif // !DYNAMICCPP_EXPORTS

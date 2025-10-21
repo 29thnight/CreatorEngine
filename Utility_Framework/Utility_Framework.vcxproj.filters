@@ -109,6 +109,9 @@
     <Filter Include="EngineBootstrap">
       <UniqueIdentifier>{a7991059-5026-4fa6-aec1-3f56f6d5e3e4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Container\Plf_Colony">
+      <UniqueIdentifier>{5547a717-efc1-4308-a583-eeee5b105377}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -320,6 +323,9 @@
     </ClInclude>
     <ClInclude Include="GlobalImGuiContext.h">
       <Filter>EngineBootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="plf_colony.h">
+      <Filter>Core.Container\Plf_Colony</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

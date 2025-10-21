@@ -35,6 +35,18 @@
             "key3": "A",
             "keystate": "Released",
             "scpritName": "InputDeviceDetector"
+        },
+        {
+            "actionName": "PlayerSelectScreenLeave",
+            "actionType": "Button",
+            "funName": "LeaveSelectScene",
+            "inputType": "GamePad",
+            "key0": "B",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "InputDeviceDetector"
         }
     ],
     "mapName": "PlayerSelect"

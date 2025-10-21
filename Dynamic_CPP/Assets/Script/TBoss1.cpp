@@ -4,9 +4,11 @@
 #include "BehaviorTreeComponent.h"
 #include "PrefabUtility.h"
 #include "RigidBodyComponent.h"
+#include "Animator.h"
 #include <utility>
 #include "BP003.h"
 #include "BP001.h"
+#include "GameManager.h"
 
 void TBoss1::Start()
 {
@@ -14,20 +16,34 @@ void TBoss1::Start()
 	BB = BT->GetBlackBoard();
 	m_rigid = m_pOwner->GetComponent<RigidBodyComponent>();
 
-	//Ãá½ÄÀÌ´Â ºí·ºº¸µå¿¡¼­ Æ÷ÀÎÆ® Àâ¾Æ³õÀ»²¨´Ù. ³ªÁß¿¡ ¹Ù²Ù´ø°¡ ¸»´ø°¡
+	//ì¶˜ì‹ì´ëŠ” ë¸”ë ‰ë³´ë“œì—ì„œ í¬ì¸íŠ¸ ì¡ì•„ë†“ì„êº¼ë‹¤. ë‚˜ì¤‘ì— ë°”ê¾¸ë˜ê°€ ë§ë˜ê°€
 	bool hasChunsik = BB->HasKey("Chunsik");
 	if (hasChunsik) {
 		m_chunsik = BB->GetValueAsGameObject("Chunsik");
 	}
 
-	
+	auto childred = m_pOwner->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
 
+		if (animator)
+		{
+			m_animator = animator;
+			break;
+		}
+
+	}
+
+	if (m_animator) {
+		m_anicontroller = m_animator->m_animationControllers[0].get();
+	}
 
 	//prefab load
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
 	Prefab* BP003Prefab = PrefabUtilitys->LoadPrefab("Boss1BP003Obj");
 
-	////1¹ø ÆĞÅÏ Åõ»çÃ¼ ÃÖ´ë 10°³
+	////1ë²ˆ íŒ¨í„´ íˆ¬ì‚¬ì²´ ìµœëŒ€ 10ê°œ
 	for (size_t i = 0; i < 10; i++) {
 		std::string Projectilename = "BP001Projectile" +std::to_string(i);
 		GameObject* Prefab1 = PrefabUtilitys->InstantiatePrefab(BP001Prefab, Projectilename);
@@ -35,7 +51,7 @@ void TBoss1::Start()
 		BP001Objs.push_back(Prefab1);
 	}
 	
-	////3¹ø ÆĞÅÏ ÀåÆÇÀº ÃÖ´ë 16°³
+	////3ë²ˆ íŒ¨í„´ ì¥íŒì€ ìµœëŒ€ 16ê°œ
 	for (size_t i = 0; i < 16; i++)
 	{
 		std::string Floorname = "BP003Floor" +std::to_string(i);
@@ -44,34 +60,123 @@ void TBoss1::Start()
 		BP003Objs.push_back(Prefab2);
 	}
 
-	m_currentHP = m_maxHP;
-	//blackboard initialize
-	BB->SetValueAsString("State", m_state); //ÇöÁ¦ »óÅÂ
-	BB->SetValueAsString("Identity", m_identity); //°íÀ¯ ¾ÆÀÌµ§Æ¼Æ¼
+	GameManager* GameManagers = GameObject::Find("GameManager")->GetComponent<GameManager>();
+	if (GameManagers) {
+		auto players = GameManagers->GetPlayers();
+		if (players.size() > 0) {
+			Player1 = players[0]->GetOwner();
+			if (players.size() > 1) {
+				Player2 = players[1]->GetOwner();
+			}
+		}
+	}
 
-	BB->SetValueAsInt("MaxHP", m_maxHP); //ÃÖ´ë Ã¼·Â
-	BB->SetValueAsInt("CurrHP", m_currentHP); //ÇöÀç Ã¼·Â
+	m_currentHP = m_maxHP;
+
+	
+
+	//blackboard initialize
+	BB->SetValueAsString("State", m_state); //í˜„ì œ ìƒíƒœ
+	BB->SetValueAsString("Identity", m_identity); //ê³ ìœ  ì•„ì´ë´í‹°í‹°
+
+	BB->SetValueAsInt("MaxHP", m_maxHP); //ìµœëŒ€ ì²´ë ¥
+	BB->SetValueAsInt("CurrHP", m_currentHP); //í˜„ì¬ ì²´ë ¥
+
+	BB->SetValueAsFloat("IdleTime", m_idleTime); //ëŒ€ê¸° ì‹œê°„
+
+	if (Player1) {
+		BB->SetValueAsGameObject("1P", Player1->ToString());
+	}
+	if (Player2) {
+		BB->SetValueAsGameObject("2P", Player2->ToString());
+	}
+
+	
+	HitImpulseStart();
 
 }
 
 void TBoss1::Update(float tick)
 {
-
-	//test code  ==> todo : ÇÊ¿ä¿¡ µû¶ó ÃÖÃÊ Å¸°Ù°ú Å¸°ÙÀ» º¯°æÇÏ´Â ³»¿ë ==> º¯°æ±âÁØ Ä«¿îÆ®? °Å¸®? ·£´ı?
-	//1. º¸½º ±âÁØÀ¸·Î °¡Àå °¡±î¿î ÇÃ·¹ÀÌ¾î
-	//2. ÀÌÀü Å¸°Ù°úÀÇ ¼±ÅÃ È½¼ö Â÷ÀÌ°¡ 1 ÀÌÇÏÀÎÁö È®ÀÎ (eB_TargetNumLimit)
-
-	bool hasTarget = BB->HasKey("1P");
-	if (hasTarget) {
-		m_target = BB->GetValueAsGameObject("1P");
+	std::cout << "[TBoss1::Update] í”„ë ˆì„ ì‹œì‘. í˜„ì¬ í˜ì´ì¦ˆ: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
+	HitImpulseUpdate(tick);
+	//test code  ==> todo : í•„ìš”ì— ë”°ë¼ ìµœì´ˆ íƒ€ê²Ÿê³¼ íƒ€ê²Ÿì„ ë³€ê²½í•˜ëŠ” ë‚´ìš© ==> ë³€ê²½ê¸°ì¤€ ì¹´ìš´íŠ¸? ê±°ë¦¬? ëœë¤?
+	//1. ë³´ìŠ¤ ê¸°ì¤€ìœ¼ë¡œ ê°€ì¥ ê°€ê¹Œìš´ í”Œë ˆì´ì–´
+	//2. ì´ì „ íƒ€ê²Ÿê³¼ì˜ ì„ íƒ íšŸìˆ˜ ì°¨ì´ê°€ 1 ì´í•˜ì¸ì§€ í™•ì¸ (eB_TargetNumLimit)
+	
+	if (!m_target) {
+		SelectTarget();
 	}
+
 	hazardTimer += tick;
-	//ÆĞÅÏÀÌ ¾øÀ»¶§¸¸ È¸Àü ÆĞÅÏÁß ÇÊ¿ä½Ã ³»ºÎ¿¡¼­ È¸Àü ½ÃÅ°±â
+	//íŒ¨í„´ì´ ì—†ì„ë•Œë§Œ íšŒì „ íŒ¨í„´ì¤‘ í•„ìš”ì‹œ ë‚´ë¶€ì—ì„œ íšŒì „ ì‹œí‚¤ê¸°
 	if (m_activePattern == EPatternType::None) {
 		RotateToTarget();
 	}
 
-	UpdatePattern(tick);
+	// 1. Handle generic, time-based phase transitions
+	UpdatePatternPhase(tick);
+
+	// 2. Handle pattern-specific logic for the current phase
+	UpdatePatternAction(tick);
+
+
+	//UpdatePattern(tick);
+}
+
+std::string TBoss1::GetPatternTypeToString(EPatternType type)
+{
+	switch (type)
+	{	
+	case TBoss1::EPatternType::None:
+		return "none";
+	case TBoss1::EPatternType::BP0011:
+		return "BP0011";
+	case TBoss1::EPatternType::BP0012:
+		return "BP0012";
+	case TBoss1::EPatternType::BP0013:
+		return "BP0013";
+	case TBoss1::EPatternType::BP0014:
+		return "BP0014";
+	case TBoss1::EPatternType::BP0021:
+		return "BP0021";
+	case TBoss1::EPatternType::BP0022:
+		return "BP0022";
+	case TBoss1::EPatternType::BP0031:
+		return "BP0031";
+	case TBoss1::EPatternType::BP0032:
+		return "BP0032";
+	case TBoss1::EPatternType::BP0033:
+		return "BP0033";
+	case TBoss1::EPatternType::BP0034:
+		return "BP0034";
+	default:
+		return "error";
+	}
+}
+
+std::string TBoss1::GetPatternPhaseToString(EPatternPhase phase)
+{
+	switch (phase) {
+	case TBoss1::EPatternPhase::Inactive:
+		return "Inactive";
+	case TBoss1::EPatternPhase::Warning:
+		return "Warning";
+	case TBoss1::EPatternPhase::Spawning:
+		return "Spawning";
+	case TBoss1::EPatternPhase::Move:
+		return "Move";
+	case TBoss1::EPatternPhase::Action:
+		return "Action";
+	case TBoss1::EPatternPhase::WaitForObjects:
+		return "WaitForObjects";
+	case TBoss1::EPatternPhase::ComboInterval:
+		return "Action";
+	case TBoss1::EPatternPhase::Waiting:
+		return "Waiting";
+	default:
+		return "error";
+	}
 }
 
 void TBoss1::RotateToTarget()
@@ -96,9 +201,9 @@ void TBoss1::RotateToTarget()
 	}
 }
 
-void TBoss1::ShootProjectile(int index, Mathf::Vector3 pos, Mathf::Vector3 dir)
+void TBoss1::ShootIndexProjectile(int index, Mathf::Vector3 pos, Mathf::Vector3 dir)
 {
-	if (index < 0 || index >= BP001Objs.size()) return; // ÀÎµ¦½º ¹üÀ§ °Ë»ç
+	if (index < 0 || index >= BP001Objs.size()) return; // ì¸ë±ìŠ¤ ë²”ìœ„ ê²€ì‚¬
 	GameObject* obj = BP001Objs[index];
 	BP001* script = obj->GetComponent<BP001>();
 	obj->SetEnabled(true);
@@ -106,12 +211,25 @@ void TBoss1::ShootProjectile(int index, Mathf::Vector3 pos, Mathf::Vector3 dir)
 	script->isAttackStart = true;
 }
 
-void TBoss1::SweepAttack(Mathf::Vector3 pos, Mathf::Vector3 dir)
+void TBoss1::ShootProjectile()
 {
-	//µ¥¹ÌÁö ÆÇÁ¤ ==> ¹Ú½º ½ºÀ¬À¸·Î Ã³¸® ÇÒ±î? 
-	//¹üÀ§ : BP002Dist, BP002Widw --> ¸ğ¼Ç º¸ÀÌ´Â °Íº¸´Ù Å©°Å³ª ÀÛÀ»¼ö ÀÖÀ½
-	Mathf::Vector3 boxHalfExtents(BP002Widw * 0.5f, 2.0f, BP002Dist * 0.5f); // ³ôÀÌ 2.0f´Â ÀÓÀÇ·Î ¼³Á¤
-	Mathf::Vector3 boxCenter = pos + dir * (BP002Dist * 0.5f); // ¹Ú½º Áß½É À§Ä¡
+	if (pattenIndex < 0 || pattenIndex >= BP001Objs.size()) return; // ì¸ë±ìŠ¤ ë²”ìœ„ ê²€ì‚¬
+	GameObject* obj = BP001Objs[pattenIndex];
+	BP001* script = obj->GetComponent<BP001>();
+	obj->SetEnabled(true);
+	script->Initialize(this, projectilePos, projectileDir, BP001Damage, BP001RadiusSize, BP001Delay, BP001Speed);
+	script->isAttackStart = true;
+	pattenIndex++;
+}
+
+
+
+void TBoss1::SweepAttackDir(Mathf::Vector3 pos, Mathf::Vector3 dir)
+{
+	//ë°ë¯¸ì§€ íŒì • ==> ë°•ìŠ¤ ìŠ¤ìœ•ìœ¼ë¡œ ì²˜ë¦¬ í• ê¹Œ? 
+	//ë²”ìœ„ : BP002Dist, BP002Widw --> ëª¨ì…˜ ë³´ì´ëŠ” ê²ƒë³´ë‹¤ í¬ê±°ë‚˜ ì‘ì„ìˆ˜ ìˆìŒ
+	Mathf::Vector3 boxHalfExtents(BP002Widw * 0.5f, 2.0f, BP002Dist * 0.5f); // ë†’ì´ 2.0fëŠ” ì„ì˜ë¡œ ì„¤ì •
+	Mathf::Vector3 boxCenter = pos + dir * (BP002Dist * 0.5f); // ë°•ìŠ¤ ì¤‘ì‹¬ ìœ„ì¹˜
 	Mathf::Quaternion boxOrientation = Mathf::Quaternion::CreateFromRotationMatrix(Mathf::Matrix::CreateLookAt(Mathf::Vector3::Zero, dir, Mathf::Vector3::Up));
 	std::vector<HitResult> hitObjects;
 	SweepInput input;
@@ -119,7 +237,7 @@ void TBoss1::SweepAttack(Mathf::Vector3 pos, Mathf::Vector3 dir)
 	input.distance = BP002Dist;
 	input.startPosition = pos;
 	input.startRotation = boxOrientation;
-	input.layerMask = ~0; // ¸ğµç ·¹ÀÌ¾î °Ë»ç
+	input.layerMask = ~0; // ëª¨ë“  ë ˆì´ì–´ ê²€ì‚¬
 	int hitCount = PhysicsManagers->BoxSweep(input, boxHalfExtents, hitObjects);
 	isAttacked = true;
 	if (hitCount > 0)
@@ -129,7 +247,7 @@ void TBoss1::SweepAttack(Mathf::Vector3 pos, Mathf::Vector3 dir)
 			GameObject* hitObject = hit.gameObject;
 			if (hitObject && hitObject->m_tag == "Player")
 			{
-				// ÇÃ·¹ÀÌ¾î¿¡°Ô µ¥¹ÌÁö Àû¿ë
+				// í”Œë ˆì´ì–´ì—ê²Œ ë°ë¯¸ì§€ ì ìš©
 				Entity* entity = hitObject->GetComponentDynamicCast<Entity>();
 				if (entity)
 				{
@@ -147,6 +265,50 @@ void TBoss1::SweepAttack(Mathf::Vector3 pos, Mathf::Vector3 dir)
 	}
 }
 
+void TBoss1::SweepAttack()
+{
+	Mathf::Vector3 pos = m_pOwner->m_transform.GetWorldPosition();
+	Mathf::Vector3 dir = m_pOwner->m_transform.GetForward();
+
+	Mathf::Vector3 boxHalfExtents(BP002Widw * 0.5f, 2.0f, BP002Dist * 0.5f); // ë†’ì´ 2.0fëŠ” ì„ì˜ë¡œ ì„¤ì •
+	Mathf::Vector3 boxCenter = pos + dir * (BP002Dist * 0.5f); // ë°•ìŠ¤ ì¤‘ì‹¬ ìœ„ì¹˜
+	Mathf::Quaternion boxOrientation = Mathf::Quaternion::CreateFromRotationMatrix(Mathf::Matrix::CreateLookAt(Mathf::Vector3::Zero, dir, Mathf::Vector3::Up));
+	std::vector<HitResult> hitObjects;
+	SweepInput input;
+	input.direction = dir;
+	input.distance = BP002Dist;
+	input.startPosition = pos;
+	input.startRotation = boxOrientation;
+	input.layerMask = 1 << 5; // í”Œë ˆì´ì–´ ë ˆì´ì–´ë§Œ ê²€ì‚¬
+	int hitCount = PhysicsManagers->BoxSweep(input, boxHalfExtents, hitObjects);
+	isAttacked = true;
+	if (hitCount > 0)
+	{
+		for (const auto& hit : hitObjects)
+		{
+			GameObject* hitObject = hit.gameObject;
+			if (hitObject == this->GetOwner()) {
+				continue;
+			}
+			// í”Œë ˆì´ì–´ì—ê²Œ ë°ë¯¸ì§€ ì ìš©
+			Entity* entity = hitObject->GetComponentDynamicCast<Entity>();
+			if (entity)
+			{
+				HitInfo hitInfo;
+				hitInfo.hitPos = hit.point;
+				hitInfo.hitNormal = hit.normal;
+				hitInfo.attakerPos = pos;
+				//hitInfo.KnockbackForce
+				//hitInfo.bulletType
+				//hitInfo.itemType
+				entity->SendDamage(this, BP002Damage, hitInfo);
+			}
+			
+		}
+	}
+}
+
+
 void TBoss1::MoveToChunsik(float tick)
 {
 	if (!isMoved)
@@ -159,7 +321,6 @@ void TBoss1::MoveToChunsik(float tick)
 			if (burrowTimer >= 2.f) {
 				ProtrudeChunsik();
 				burrowTimer = 0.f;
-				isMoved = true;
 			}
 		}
 	}
@@ -170,6 +331,7 @@ void TBoss1::BurrowMove(float tick)
 	if(!isMoved)
 	{
 		if (!isBurrow) {
+			
 			Burrow();
 		}
 		else {
@@ -177,48 +339,139 @@ void TBoss1::BurrowMove(float tick)
 			if (burrowTimer >= 2.f) {
 				Protrude();
 				burrowTimer = 0.f;
-				isMoved = true;
 			}
 		}
 	}
 }
 
+void TBoss1::OnWarningFinished()
+{
+	// 2. ì• ë‹ˆë©”ì´í„°ì˜ ë‹¤ìŒ ìƒíƒœ ì „í™˜ì„ í—ˆê°€í•©ë‹ˆë‹¤.
+	std::cout << "[TBoss1::OnWarningFinished] ì§„ì…. í˜„ì¬ í˜ì´ì¦ˆ: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
+	if (m_animator) m_animator->SetParameter("CanTransitionToAttack", true);
+	if (m_activePattern == EPatternType::BP0022) {
+		m_patternPhase = EPatternPhase::Move;
+	}
+	else {
+		m_patternPhase = EPatternPhase::Spawning;
+	}
+	std::cout << "[TBoss1::OnWarningFinished] ì¢…ë£Œ. ìƒˆë¡œìš´ í˜ì´ì¦ˆ: " << GetPatternPhaseToString(m_patternPhase)<< std::endl;
+}
+
+void TBoss1::OnAttackActionFinished()
+{
+	if (m_animator) m_animator->SetParameter("CanTransitionToAttack", false);
+	switch (m_activePattern)
+	{
+	case EPatternType::BP0013: 
+	{
+		pattenIndex++;
+		if (pattenIndex < 3)
+		{
+			m_patternPhase = EPatternPhase::ComboInterval;
+			BPTimer = 0.f;
+		}
+		else
+		{
+			m_patternPhase = EPatternPhase::Waiting;
+			BPTimer = 0.f;
+		}
+		break;
+	}
+	case EPatternType::BP0022:
+	{
+		pattenIndex++;
+		if (pattenIndex <= 5) // 5íšŒ ê³µê²© ì½¤ë³´
+		{
+			m_patternPhase = EPatternPhase::Move; // ë‹¤ìŒì€ ì´ë™ ë‹¨ê³„
+			BPTimer = 0.f; // ì´ë™ ì‹œê°„ ì¸¡ì •ìš© íƒ€ì´ë¨¸ (í•„ìš”ì‹œ)
+		}
+		else
+		{
+			m_patternPhase = EPatternPhase::Waiting;
+			BPTimer = 0.f;
+		}
+		break;
+	}
+	default:
+	{
+		m_patternPhase = EPatternPhase::Waiting;
+		BPTimer = 0.f;
+		break;
+	}
+	}
+}
+
+void TBoss1::OnMoveFinished()
+{
+	m_patternPhase = EPatternPhase::Spawning;
+}
+
 //void TBoss1::StartPattern(EPatternType type)
 //{
-//	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã
+//	if (m_activePattern != EPatternType::None) return; // ë‹¤ë¥¸ íŒ¨í„´ì´ ì‹¤í–‰ ì¤‘ì´ë©´ ë¬´ì‹œ
 //
 //	m_activePattern = type;
 //
-//	// ½ÃÀÛÇÒ ÆĞÅÏ Å¸ÀÔ¿¡ µû¶ó ÀûÀıÇÑ ÃÊ±âÈ­ ÇÔ¼ö¸¦ È£ÃâÇÕ´Ï´Ù.
+//	// ì‹œì‘í•  íŒ¨í„´ íƒ€ì…ì— ë”°ë¼ ì ì ˆí•œ ì´ˆê¸°í™” í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
 //	switch (type)
 //	{
 //	case EPatternType::BP0034:
 //		BP0034();
 //		break;
 //
-//		// ´Ù¸¥ ÆĞÅÏµéÀÇ case¸¦ ¿©±â¿¡ Ãß°¡...
+//		// ë‹¤ë¥¸ íŒ¨í„´ë“¤ì˜ caseë¥¼ ì—¬ê¸°ì— ì¶”ê°€...
 //	}
 //}
 
-
-
-void TBoss1::UpdatePattern(float tick)
+void TBoss1::UpdatePatternPhase(float tick)
 {
-	// È°¼ºÈ­µÈ ÆĞÅÏ¿¡ µû¶ó ÀûÀıÇÑ ¾÷µ¥ÀÌÆ® ÇÔ¼ö·Î ºĞ±âÇÕ´Ï´Ù.
+	std::cout << "m_patternPhase : " + GetPatternPhaseToString(m_patternPhase) << std::endl;
+	switch (m_patternPhase)
+	{
+	case EPatternPhase::ComboInterval:
+	{
+		BPTimer += tick;
+		if (BPTimer >= ComboIntervalTime)
+		{
+			StartNextComboAttack();
+		}
+		break;
+	}
+	case EPatternPhase::Waiting:
+	{
+		BPTimer += tick;
+		if (BPTimer >= AttackDelayTime)
+		{
+			EndPattern();
+		}
+		break;
+	}
+	// Warning -> Spawning transition is now handled by OnWarningFinished()
+	default:
+		break;
+	}
+}
+
+void TBoss1::UpdatePatternAction(float tick)
+{
+	std::cout << "m_activePattern : " + GetPatternTypeToString(m_activePattern) << std::endl;
 	switch (m_activePattern)
 	{
 	case EPatternType::BP0011:
 		Update_BP0011(tick);
 		break;
-	case EPatternType::BP0013:
+	case EPatternType::BP0013: 
 		Update_BP0013(tick);
 		break;
+
 	case EPatternType::BP0021:
 		Update_BP0021(tick);
 		break;
 	case EPatternType::BP0022:
 		Update_BP0022(tick);
 		break;
+
 	case EPatternType::BP0031:
 		Update_BP0031(tick);
 		break;
@@ -232,69 +485,52 @@ void TBoss1::UpdatePattern(float tick)
 		Update_BP0034(tick);
 		break;
 
-		// ´Ù¸¥ ÆĞÅÏµéÀÇ case¸¦ ¿©±â¿¡ Ãß°¡...
-
-	case EPatternType::None:
+		// ... other patterns ...
 	default:
-		// ½ÇÇà ÁßÀÎ ÆĞÅÏÀÌ ¾øÀ¸¸é ¾Æ¹«°Íµµ ÇÏÁö ¾Ê½À´Ï´Ù.
 		break;
 	}
 }
+
 
 void TBoss1::Update_BP0011(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		RotateToTarget(); //ÆĞÅÏ ½ÃÀÛ½Ã Å¸°ÙÀ» ¹Ù¶óº¸°Ô
-		//todo :: ¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
-
-		BPTimer += tick;	
-		// ¿ÀºêÁ§Æ® ÇÏ³ª¸¦ È°¼ºÈ­ÇÕ´Ï´Ù.
-		Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-
-		Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
-
-		Mathf::Vector3 dir = targetPos - ownerPos;
-		dir.y = 0;
-		dir.Normalize();
-		Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
-		ShootProjectile(0, pos, dir);//--> ¿¡´Ï¸ŞÀÌ¼Ç¿¡¼­ ¹ß»ç ÇÁ·¹ÀÓ¿¡ ¸ÂÃç¼­ È£ÃâÇÏ´Â ¹æ½ÄÀ¸·Î º¯°æ °¡´É
+		case EPatternPhase::Warning:
+			RotateToTarget(); //ì „ì¡° ëª¨ì…˜ì¤‘ íƒ€ê²Ÿì„ ë°”ë¼ë³´ê²Œ
 			
-		// ¸ğµç ¿ÀºêÁ§Æ®¸¦ »ı¼ºÇßÀ¸¸é '¿Ï·á ´ë±â' ´Ü°è·Î ÀüÈ¯ÇÕ´Ï´Ù.
-		m_patternPhase = EPatternPhase::Waiting;
-		break;
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
-
-		BPTimer += tick;
-		if (BPTimer >= 2.0f) //ÀÌ ÆäÅÏÀº 2ÃÊÈÄ¿¡ °­Á¦ Á¾·á ½Ã°£Àº ³ªÁß¿¡ Á¶Àı °¡´ÉÇÏ°Ô
+			if (m_anicontroller && m_anicontroller->m_curState) {
+				std::string currentStateName = m_anicontroller->m_curState->m_name;
+				if (currentStateName == "Idle") {  //ì´ë¯¸ ëª¨ì…˜ì„ ì‹¤í–‰ ì‹œì¼°ìœ¼ë‚˜ ì „ì¡°ëª¨ì…˜ì´ ì•ˆë‚˜ê°„ ê²½ìš°
+					m_animator->SetParameter("StartRangedAttack", true);
+				}
+			}
+			
+			
+			break;
+		case EPatternPhase::Spawning:
 		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-		//for (int i = 0; i < pattenIndex; ++i)
-		//{
-		//	if (BP001Objs[i]->IsEnabled())
-		//	{
-		//		allFinished = false; // ¾ÆÁ÷ ÇÏ³ª¶óµµ È°¼º »óÅÂÀÌ¸é ´ë±â¸¦ °è¼ÓÇÕ´Ï´Ù.
-		//		break;
-		//	}
-		//}
+			RotateToTarget(); // Lock final direction
+			//todo :: ì—ë‹ˆë©”ì´ì…˜ ì¬ìƒ
+			//m_animator->SetParameter("RangeAtteckTrigger", true);
+			
+			// ë°©í–¥ê³¼ ìœ„ì¹˜ë§Œ ì •í•˜ì 
+			Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
-		if (allFinished)
-		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
-			EndPattern();
+			Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
+
+			Mathf::Vector3 dir = targetPos - ownerPos;
+			dir.y = 0;
+			dir.Normalize();
+			Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
+		
+			projectilePos = pos;
+			projectileDir = dir;
+			//ShootProjectile(0, pos, dir);//--> ì—ë‹ˆë©”ì´ì…˜ì—ì„œ ë°œì‚¬ í”„ë ˆì„ì— ë§ì¶°ì„œ í˜¸ì¶œí•˜ëŠ” ë°©ì‹ìœ¼ë¡œ ë³€ê²½ ê°€ëŠ¥	
+			m_patternPhase = EPatternPhase::Action; // Hand off to animation
+			break;
 		}
-		break;
-	}
+	
 	}
 }
 
@@ -302,68 +538,37 @@ void TBoss1::Update_BP0013(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		BPTimer += tick;
-		while (BPTimer >= BP0013delay)
-		{
-			if (pattenIndex < 3)
-			{
-				RotateToTarget(); //ÆĞÅÏ ½ÃÀÛ½Ã Å¸°ÙÀ» ¹Ù¶óº¸°Ô
-				//todo :: ¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
-
-				// ¿ÀºêÁ§Æ® ÇÏ³ª¸¦ È°¼ºÈ­ÇÕ´Ï´Ù.
-				Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-
-				Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
-
-				Mathf::Vector3 dir = targetPos - ownerPos;
-				dir.y = 0;
-				dir.Normalize();
-				Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
-				ShootProjectile(pattenIndex, pos, dir); //--> ¿¡´Ï¸ŞÀÌ¼Ç¿¡¼­ ¹ß»ç ÇÁ·¹ÀÓ¿¡ ¸ÂÃç¼­ È£ÃâÇÏ´Â ¹æ½ÄÀ¸·Î º¯°æ °¡´É
-
-				pattenIndex++;
-				BPTimer -= BP0013delay;
+		case EPatternPhase::Warning:
+			RotateToTarget(); //ì „ì¡° ëª¨ì…˜ì¤‘ íƒ€ê²Ÿì„ ë°”ë¼ë³´ê²Œ
+			if (m_anicontroller && m_anicontroller->m_curState) {
+				std::string currentStateName = m_anicontroller->m_curState->m_name;
+				if (currentStateName == "Idle") {  //ì´ë¯¸ ëª¨ì…˜ì„ ì‹¤í–‰ ì‹œì¼°ìœ¼ë‚˜ ì „ì¡°ëª¨ì…˜ì´ ì•ˆë‚˜ê°„ ê²½ìš°
+					m_animator->SetParameter("StartRangedAttack", true);
+				}
 			}
-			else
-			{
-				// ¸ğµç ¿ÀºêÁ§Æ®¸¦ »ı¼ºÇßÀ¸¸é '¿Ï·á ´ë±â' ´Ü°è·Î ÀüÈ¯ÇÕ´Ï´Ù.
-				m_patternPhase = EPatternPhase::Waiting;
-				break; // while ·çÇÁ Å»Ãâ
-			}
-		}
-		break;
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
-
-		BPTimer += tick;
-		if (BPTimer >= 5.0f) //ÀÌ ÆäÅÏÀº 5ÃÊÈÄ¿¡ °­Á¦ Á¾·á ½Ã°£Àº ³ªÁß¿¡ Á¶Àı °¡´ÉÇÏ°Ô
+			break;
+		case EPatternPhase::Spawning:
 		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-		//for (int i = 0; i < pattenIndex; ++i)
-		//{
-		//	if (BP001Objs[i]->IsEnabled())
-		//	{
-		//		allFinished = false; // ¾ÆÁ÷ ÇÏ³ª¶óµµ È°¼º »óÅÂÀÌ¸é ´ë±â¸¦ °è¼ÓÇÕ´Ï´Ù.
-		//		break;
-		//	}
-		//}
+			RotateToTarget(); // Lock final direction
+			//todo :: ì—ë‹ˆë©”ì´ì…˜ ì¬ìƒ
+			//m_animator->SetParameter("RangeAtteckTrigger", true);
+			
+			// ë°©í–¥ê³¼ ìœ„ì¹˜ë§Œ ì •í•˜ì 
+			Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
-		if (allFinished)
-		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
-			EndPattern();
+			Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
+
+			Mathf::Vector3 dir = targetPos - ownerPos;
+			dir.y = 0;
+			dir.Normalize();
+			Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
+
+			projectilePos = pos;
+			projectileDir = dir;
+			//ShootProjectile(0, pos, dir);//--> ì—ë‹ˆë©”ì´ì…˜ì—ì„œ ë°œì‚¬ í”„ë ˆì„ì— ë§ì¶°ì„œ í˜¸ì¶œí•˜ëŠ” ë°©ì‹ìœ¼ë¡œ ë³€ê²½ ê°€ëŠ¥	
+			m_patternPhase = EPatternPhase::Action; // Hand off to animation
+			break;
 		}
-		break;
-	}
 	}
 }
 
@@ -371,126 +576,50 @@ void TBoss1::Update_BP0021(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		BPTimer += tick;
-		
-		// ÆĞÅÏ ½ÃÀÛ½Ã Å¸°ÙÀ» ¹Ù¶óº¸°Ô È¸Àü ÇÏ´Âµ¥ ¿©±â¼­ Å¸°ÙÀ» µû¶ó°¡´Â°Ô ¸Â´Â°¡? 
-		Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-		//Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
-		Mathf::Vector3 forward = GetOwner()->GetComponent<Transform>()->GetForward();
-
-		//Mathf::Vector3 dir = targetPos - ownerPos;
-
-		////º¸½º È¸Àü --> ÆĞÅÏ ½ÃÀÛ½Ã È¸Àü
-		//dir.y = 0;
-		//dir.Normalize();
-				
-		//¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
-
-		//SweepAttack(ownerPos, dir); // --> ¿¡´Ï¸ŞÀÌ¼Ç¿¡¼­ ½ºÀ¬ °ø°İ ÇÁ·¹ÀÓ¿¡ ¸ÂÃç¼­ È£ÃâÇÏ´Â ¹æ½ÄÀ¸·Î º¯°æ °¡´É
-		if (BPTimer >= 2.0f){ //¿¡´Ï¸ŞÀÌ¼Ç 2ÃÊ·Î °¡Á¤
-			SweepAttack(ownerPos, forward); // --> ¿¡´Ï¸ŞÀÌ¼Ç¿¡¼­ ½ºÀ¬ °ø°İ ÇÁ·¹ÀÓ¿¡ ¸ÂÃç¼­ È£ÃâÇÏ´Â ¹æ½ÄÀ¸·Î º¯°æ °¡´É
-			BPTimer -= 2.0f;
-		}
-
-		// ¸ğµç ¿ÀºêÁ§Æ®¸¦ »ı¼ºÇßÀ¸¸é '¿Ï·á ´ë±â' ´Ü°è·Î ÀüÈ¯ÇÕ´Ï´Ù.
-		if (isAttacked){
-			m_patternPhase = EPatternPhase::Waiting;
-			break;
-		}
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
-
-		BPTimer += tick;
-		if (BPTimer >= 2.0f) //ÀÌ ÆäÅÏÀº 2ÃÊÈÄ¿¡ °­Á¦ Á¾·á ½Ã°£Àº ³ªÁß¿¡ Á¶Àı °¡´ÉÇÏ°Ô
-		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-		
-
-		if (allFinished)
-		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
-			EndPattern();
+	case EPatternPhase::Warning:
+		// Fixed attack, do not track
+		RotateToTarget(); // Track target during warning
+		if (m_anicontroller && m_anicontroller->m_curState) {
+			std::string currentStateName = m_anicontroller->m_curState->m_name;
+			if (currentStateName == "Idle") {  //ì´ë¯¸ ëª¨ì…˜ì„ ì‹¤í–‰ ì‹œì¼°ìœ¼ë‚˜ ì „ì¡°ëª¨ì…˜ì´ ì•ˆë‚˜ê°„ ê²½ìš°
+				m_animator->SetParameter("StartMeleeAttack", true);
+			}
 		}
 		break;
-	}
+	case EPatternPhase::Spawning:
+		RotateToTarget(); // Lock final direction
+		m_patternPhase = EPatternPhase::Action;
+		break;
 	}
 }
 
 void TBoss1::Update_BP0022(float tick)
 {
-	// (ÀÌµ¿ + BP0021 ) *5 
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
-		BPTimer += tick;
-		if (pattenIndex < 5) //µô·¹ÀÌ·Î?? ÀÎµ¦½º·Î??
-		{
-			//ÀÌµ¿
-			BurrowMove(tick);
-
-			if (isMoved) {
-				RotateToTarget(); //ÆĞÅÏ ½ÃÀÛ½Ã Å¸°ÙÀ» ¹Ù¶óº¸°Ô
-				
-				// ÆĞÅÏ ½ÃÀÛ½Ã Å¸°ÙÀ» ¹Ù¶óº¸°Ô È¸Àü ÇÏ´Âµ¥ ¿©±â¼­ Å¸°ÙÀ» µû¶ó°¡´Â°Ô ¸Â´Â°¡? 
-				Mathf::Vector3 ownerPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
-				//Mathf::Vector3 targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
-				Mathf::Vector3 forward = GetOwner()->GetComponent<Transform>()->GetForward();
-				
-				//Mathf::Vector3 dir = targetPos - ownerPos;
-				//dir.y = 0;
-				//dir.Normalize();
-
-				//¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
-
-				//SweepAttack(ownerPos, dir); // --> ¿¡´Ï¸ŞÀÌ¼Ç¿¡¼­ ½ºÀ¬ °ø°İ ÇÁ·¹ÀÓ¿¡ ¸ÂÃç¼­ È£ÃâÇÏ´Â ¹æ½ÄÀ¸·Î º¯°æ °¡´É
-				if (BPTimer >= 2.0f) { //¿¡´Ï¸ŞÀÌ¼Ç 2ÃÊ·Î °¡Á¤
-					SweepAttack(ownerPos, forward); // --> ¿¡´Ï¸ŞÀÌ¼Ç¿¡¼­ ½ºÀ¬ °ø°İ ÇÁ·¹ÀÓ¿¡ ¸ÂÃç¼­ È£ÃâÇÏ´Â ¹æ½ÄÀ¸·Î º¯°æ °¡´É
-					BPTimer -= 2.0f;
-				}
-				if (isAttacked)
-				{
-					pattenIndex++;
-					isAttacked = false;
-					isMoved = false;
-				}
+	case EPatternPhase::Warning:
+		RotateToTarget(); // Track target during warning
+		if (m_anicontroller && m_anicontroller->m_curState) {
+			std::string currentStateName = m_anicontroller->m_curState->m_name;
+			if (currentStateName == "Idle") {  //ì´ë¯¸ ëª¨ì…˜ì„ ì‹¤í–‰ ì‹œì¼°ìœ¼ë‚˜ ì „ì¡°ëª¨ì…˜ì´ ì•ˆë‚˜ê°„ ê²½ìš°
+				m_animator->SetParameter("StartMeleeAttack", true);
 			}
 		}
-		else {
-			m_patternPhase = EPatternPhase::Waiting; //ÆĞÅÏ 5È¸ ½ÇÇà ÇßÀ¸¸é ´ë±â ´Ü°è·Î
-			break;
+		break;
+	case EPatternPhase::Move:
+		// This phase is for movement. Assume BurrowMove is animation-driven.
+		// When movement animation is complete, OnMoveFinished() will be called.
+		// For now, we just wait for OnMoveFinished() to set the next phase.
+		BurrowMove(tick);
+		if (isMoved) {
+			m_patternPhase = EPatternPhase::Spawning;
+			 if(m_animator) m_animator->SetParameter("meleeCombo", true);
 		}
 		break;
-	}
-	case EPatternPhase::Waiting:
-	{
-		bool allFinished = true;
-		BPTimer += tick;
-		if (BPTimer >= 1.0f) //ÀÌ ÆäÅÏ´ë±â´Â 1ÃÊÈÄ¿¡ °­Á¦ Á¾·á ½Ã°£Àº ³ªÁß¿¡ Á¶Àı °¡´ÉÇÏ°Ô
-		{
-			allFinished = true;
-		}
-		else {
-			allFinished = false;
-		}
-
-
-		if (allFinished)
-		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
-			EndPattern();
-		}
+	case EPatternPhase::Spawning:
+		RotateToTarget(); // Lock final direction
+		m_patternPhase = EPatternPhase::Action;
 		break;
-	}
 	}
 }
 
@@ -498,21 +627,25 @@ void TBoss1::Update_BP0031(float tick)
 {
 	switch (m_patternPhase)
 	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Spawning; // ì¥íŒì€ ì „ì¡° ì—†ìŒ ë§Œì•½ì— ê±¸ë¦¬ë©´ ë°”ë¡œ ë„˜ê¸°ì í˜¹ì€ ì—¬ê¸°ì„œ ì´ë™ ì²˜ë¦¬ ìƒê°í•´ ë³¼ìˆ˜ë„ 
+		break;
 	case EPatternPhase::Spawning:
 	{
-		//ºñ¾úÀ¸¸é ¹®Á¦ ÀÎ´ë ±×·³ µ¹·Áº¸³»
+		//ë¹„ì—ˆìœ¼ë©´ ë¬¸ì œ ì¸ëŒ€ ê·¸ëŸ¼ ëŒë ¤ë³´ë‚´
 		if (BP003Objs.empty()) { return; }
 
-		//todo: ÀÏ´Ü Å¸°ÙÀ¸·Î ÀâÀº ÇÃ·¹ÀÌ¾î À§Ä¡¸¸ »ı°¢ µÑ´Ù ¸¸µé¾î Áö´Â°Ç °¢ ÇÃ·¹ÀÌ¾î ¹æÇâ ¹Ş¾Æ¼­ »ı°¢ Á» ÇØº¸ÀÚ
+		//todo: ì¼ë‹¨ íƒ€ê²Ÿìœ¼ë¡œ ì¡ì€ í”Œë ˆì´ì–´ ìœ„ì¹˜ë§Œ ìƒê° ë‘˜ë‹¤ ë§Œë“¤ì–´ ì§€ëŠ”ê±´ ê° í”Œë ˆì´ì–´ ë°©í–¥ ë°›ì•„ì„œ ìƒê° ì¢€ í•´ë³´ì
 		//Mathf::Vector3 pos = m_target->GetComponent<Transform>()->GetWorldPosition();
-		// --> ÇÃ·¹ÀÌ¾î ¸ğµÎ
-
-		bool hasP1 = BB->HasKey("1P");
-		bool hasP2 = BB->HasKey("2P");
+		// --> í”Œë ˆì´ì–´ ëª¨ë‘
+		//m_animator->SetParameter("ShiftTrigger", true); --> ì‹œì‘ í•œë²ˆ
+	
 		int index = 0;
-		if (hasP1) {
+		if (Player1) {
 			Mathf::Vector3 pos = BB->GetValueAsGameObject("1P")->GetComponent<Transform>()->GetWorldPosition();
-			//ÇÑ°³ 
+			//í•œê°œ 
 			BP003* script = BP003Objs[index]->GetComponent<BP003>();
 			BP003Objs[index]->SetEnabled(true);
 			//BP003Objs[0]->GetComponent<Transform>()->SetWorldPosition(pos);
@@ -521,7 +654,7 @@ void TBoss1::Update_BP0031(float tick)
 			index++;
 		}
 
-		if (hasP2)
+		if (Player2)
 		{
 			Mathf::Vector3 pos = BB->GetValueAsGameObject("2P")->GetComponent<Transform>()->GetWorldPosition();
 			BP003* script = BP003Objs[index]->GetComponent<BP003>();
@@ -534,25 +667,25 @@ void TBoss1::Update_BP0031(float tick)
 
 
 		pattenIndex = index;
-		m_patternPhase = EPatternPhase::Waiting;
-		break; // while ·çÇÁ Å»Ãâ
+		m_patternPhase = EPatternPhase::WaitForObjects;
+		break; // while ë£¨í”„ íƒˆì¶œ
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
+		// í™œì„±í™”í–ˆë˜ ëª¨ë“  ì˜¤ë¸Œì íŠ¸ë¥¼ ìˆœíšŒí•˜ë©° ë¹„í™œì„±í™”ë˜ì—ˆëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
 		for (int i = 0; i < pattenIndex; ++i)
 		{
 			if (BP003Objs[i]->IsEnabled())
 			{
-				allFinished = false; // ¾ÆÁ÷ ÇÏ³ª¶óµµ È°¼º »óÅÂÀÌ¸é ´ë±â¸¦ °è¼ÓÇÕ´Ï´Ù.
+				allFinished = false; // ì•„ì§ í•˜ë‚˜ë¼ë„ í™œì„± ìƒíƒœì´ë©´ ëŒ€ê¸°ë¥¼ ê³„ì†í•©ë‹ˆë‹¤.
 				break;
 			}
 		}
 
 		if (allFinished)
 		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
+			// ëª¨ë“  ì˜¤ë¸Œì íŠ¸ê°€ ë¹„í™œì„±í™”ë˜ì—ˆìœ¼ë¯€ë¡œ íŒ¨í„´ì„ ì™„ì „íˆ ì¢…ë£Œí•©ë‹ˆë‹¤.
 			EndPattern();
 		}
 		break;
@@ -565,42 +698,49 @@ void TBoss1::Update_BP0032(float tick)
 {
 	switch (m_patternPhase)
 	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Spawning; // ì¥íŒì€ ì „ì¡° ì—†ìŒ ë§Œì•½ì— ê±¸ë¦¬ë©´ ë°”ë¡œ ë„˜ê¸°ì í˜¹ì€ ì—¬ê¸°ì„œ ì´ë™ ì²˜ë¦¬ ìƒê°í•´ ë³¼ìˆ˜ë„ 
+		break;
 	case EPatternPhase::Spawning:
 	{
-		//3°³º¸´Ù Àû°³ µî·Ï ‰çÀ¸¸é ÀÏ´Ü ¿¡·¯ÀÎ´ë µ¹·Áº¸³»
+		//3ê°œë³´ë‹¤ ì ê°œ ë“±ë¡ ë¬ìœ¼ë©´ ì¼ë‹¨ ì—ëŸ¬ì¸ëŒ€ ëŒë ¤ë³´ë‚´
 		if (BP003Objs.size() < 3) { return; }
 
-		//ÀÏ´Ü ³»À§Ä¡¶û Àü¹æ ¹æÇâ
+		//ì¼ë‹¨ ë‚´ìœ„ì¹˜ë‘ ì „ë°© ë°©í–¥
 		Transform* tr = GetOwner()->GetComponent<Transform>();
 		Mathf::Vector3 pos = tr->GetWorldPosition();
 		Mathf::Vector3 forward = tr->GetForward();
 
-		//È¸ÀüÃà yÃà ¼³Á¤
+		//íšŒì „ì¶• yì¶• ì„¤ì •
 		Mathf::Vector3 up_axis(0.0f, 1.0f, 0.0f);
 
-		//Àü¹æ¿¡¼­ 120µµ 240 ÇØ¼­ »ï°¨ ¹æ¸é ¹æÇâ
+		//ì „ë°©ì—ì„œ 120ë„ 240 í•´ì„œ ì‚¼ê° ë°©ë©´ ë°©í–¥
 		Mathf::Quaternion rot120 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(120.0f));
 		Mathf::Quaternion rot240 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(240.0f));
 
-		//3¹æÇâ 
-		Mathf::Vector3 dir1 = forward; //Àü¹æ
+		//3ë°©í–¥ 
+		Mathf::Vector3 dir1 = forward; //ì „ë°©
 		Mathf::Vector3 dir2 = Mathf::Vector3::Transform(forward, rot120); //120
 		Mathf::Vector3 dir3 = Mathf::Vector3::Transform(forward, rot240); //240
 
-		//ÇÏ³ª¾¿ ÄÁÆ®·Ñ ÇÏ±â ±ÍÂú´Ù º¤ÅÍ·Î Æ÷¹®µ¹·Á
+		//í•˜ë‚˜ì”© ì»¨íŠ¸ë¡¤ í•˜ê¸° ê·€ì°®ë‹¤ ë²¡í„°ë¡œ í¬ë¬¸ëŒë ¤
 		std::vector < Mathf::Vector3 > directions;
 		directions.push_back(dir1);
 		directions.push_back(dir2);
 		directions.push_back(dir3);
 
 		int index = 0;
-
+		//m_animator->SetParameter("ShiftTrigger", true); --> ì‹œì‘ í•œë²ˆ
 		for (auto& dir : directions) {
-			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6¸¸Å­ ¶³¾îÁø À§Ä¡ ÀÌ ¼öÄ¡´Â ÇÁ·ÎÆÛÆ¼·Î »¬±î ÀÏ´Ü ³»°¡ °è¼Ó ÀÓÀÇ·Î ¼öÁ¤ÇØÁÖ´Â°É·Î
+			
+
+			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6ë§Œí¼ ë–¨ì–´ì§„ ìœ„ì¹˜ ì´ ìˆ˜ì¹˜ëŠ” í”„ë¡œí¼í‹°ë¡œ ëº„ê¹Œ ì¼ë‹¨ ë‚´ê°€ ê³„ì† ì„ì˜ë¡œ ìˆ˜ì •í•´ì£¼ëŠ”ê±¸ë¡œ
 			GameObject* floor = BP003Objs[index];
 			BP003* script = floor->GetComponent<BP003>();
 			floor->SetEnabled(true);
-			//floor->GetComponent<Transform>()->SetWorldPosition(objpos); = ÃÊ±âÈ­¿¡¼­
+			//floor->GetComponent<Transform>()->SetWorldPosition(objpos); = ì´ˆê¸°í™”ì—ì„œ
 			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
 			script->isAttackStart = true;
 
@@ -608,25 +748,25 @@ void TBoss1::Update_BP0032(float tick)
 		}
 
 		pattenIndex = index;
-		m_patternPhase = EPatternPhase::Waiting;
-		break; // while ·çÇÁ Å»Ãâ
+		m_patternPhase = EPatternPhase::WaitForObjects;
+		break; // while ë£¨í”„ íƒˆì¶œ
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
+		// í™œì„±í™”í–ˆë˜ ëª¨ë“  ì˜¤ë¸Œì íŠ¸ë¥¼ ìˆœíšŒí•˜ë©° ë¹„í™œì„±í™”ë˜ì—ˆëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
 		for (int i = 0; i < pattenIndex; ++i)
 		{
 			if (BP003Objs[i]->IsEnabled())
 			{
-				allFinished = false; // ¾ÆÁ÷ ÇÏ³ª¶óµµ È°¼º »óÅÂÀÌ¸é ´ë±â¸¦ °è¼ÓÇÕ´Ï´Ù.
+				allFinished = false; // ì•„ì§ í•˜ë‚˜ë¼ë„ í™œì„± ìƒíƒœì´ë©´ ëŒ€ê¸°ë¥¼ ê³„ì†í•©ë‹ˆë‹¤.
 				break;
 			}
 		}
 
 		if (allFinished)
 		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
+			// ëª¨ë“  ì˜¤ë¸Œì íŠ¸ê°€ ë¹„í™œì„±í™”ë˜ì—ˆìœ¼ë¯€ë¡œ íŒ¨í„´ì„ ì™„ì „íˆ ì¢…ë£Œí•©ë‹ˆë‹¤.
 			EndPattern();
 		}
 		break;
@@ -638,85 +778,98 @@ void TBoss1::Update_BP0033(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Move; // ì¥íŒì€ ì „ì¡° ì—†ìŒ ë§Œì•½ì— ê±¸ë¦¬ë©´ ë°”ë¡œ ë„˜ê¸°ì í˜¹ì€ ì—¬ê¸°ì„œ ì´ë™ ì²˜ë¦¬ ìƒê°í•´ ë³¼ìˆ˜ë„ 
+		break;
+	case EPatternPhase::Move:
 		MoveToChunsik(tick);
 		if (isMoved) {
-			Transform* tr = GetOwner()->GetComponent<Transform>();
-			//if (m_chunsik) {
-			//	Mathf::Vector3 chunsik = m_chunsik->GetComponent<Transform>()->GetWorldPosition();
-			//	tr->SetWorldPosition(chunsik);
-			//	//ÀÌ¶§ È¸ÀüÀÌ³ª °°Àº °Íµµ ¾Ë¸ÂÀº °¢µµ·Î µ¹·Á ³õ´À°Í
-			//}
-			//ÀÏ´Ü º¸½ºÀ§Ä¡¶û Àü¹æ ¹æÇâ
-			Mathf::Vector3 pos = tr->GetWorldPosition();
-			Mathf::Vector3 forward = tr->GetForward();
-
-			//È¸ÀüÃà yÃà ¼³Á¤
-			Mathf::Vector3 up_axis(0.0f, 1.0f, 0.0f);
-
-			//Àü¹æ¿¡¼­ 120µµ 240 ÇØ¼­ »ï°¨ ¹æ¸é ¹æÇâ
-			Mathf::Quaternion rot120 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(120.0f));
-			Mathf::Quaternion rot240 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(240.0f));
-
-			//3¹æÇâ 
-			Mathf::Vector3 dir1 = forward; //Àü¹æ
-			Mathf::Vector3 dir2 = Mathf::Vector3::Transform(forward, rot120); //120
-			Mathf::Vector3 dir3 = Mathf::Vector3::Transform(forward, rot240); //240
-
-			//ÇÏ³ª¾¿ ÄÁÆ®·Ñ ÇÏ±â ±ÍÂú´Ù º¤ÅÍ·Î Æ÷¹®µ¹·Á
-			std::vector < Mathf::Vector3 > directions;
-			directions.push_back(dir1);
-			directions.push_back(dir2);
-			directions.push_back(dir3);
-
-			int index = 0;
-
-			for (auto& dir : directions) {
-				//°¡±î¿î°Å
-				Mathf::Vector3 objpos = pos + dir * 6.0f; // 6¸¸Å­ ¶³¾îÁø À§Ä¡ ÀÌ ¼öÄ¡´Â ÇÁ·ÎÆÛÆ¼·Î »¬±î ÀÏ´Ü ³»°¡ °è¼Ó ÀÓÀÇ·Î ¼öÁ¤ÇØÁÖ´Â°É·Î
-				GameObject* floor = BP003Objs[index];
-				BP003* script = floor->GetComponent<BP003>();
-				floor->SetEnabled(true);
-				//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
-				script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
-				script->isAttackStart = true;
-
-				index++;
-
-				//¸Õ°Å
-				Mathf::Vector3 objpos2 = pos + dir * 12.0f; // 12¸¸Å­ ¶³¾îÁø À§Ä¡ ÀÌ ¼öÄ¡´Â ÇÁ·ÎÆÛÆ¼·Î »¬±î ÀÏ´Ü ³»°¡ °è¼Ó ÀÓÀÇ·Î ¼öÁ¤ÇØÁÖ´Â°É·Î
-				GameObject* floor2 = BP003Objs[index];
-				BP003* script2 = floor2->GetComponent<BP003>();
-				floor2->SetEnabled(true);
-				//floor2->GetComponent<Transform>()->SetWorldPosition(objpos2);
-				script2->Initialize(this, objpos2, BP003Damage, BP003RadiusSize, BP003Delay, true);
-				script2->isAttackStart = true;
-
-				index++;
-			}
-			pattenIndex = index;
-			m_patternPhase = EPatternPhase::Waiting;
-			break; // while ·çÇÁ Å»Ãâ
+			m_patternPhase = EPatternPhase::Spawning;
 		}
 		break;
+	case EPatternPhase::Spawning:
+	{
+		//MoveToChunsik(tick);
+		
+		Transform* tr = GetOwner()->GetComponent<Transform>();
+		//if (m_chunsik) {
+		//	Mathf::Vector3 chunsik = m_chunsik->GetComponent<Transform>()->GetWorldPosition();
+		//	tr->SetWorldPosition(chunsik);
+		//	//ì´ë•Œ íšŒì „ì´ë‚˜ ê°™ì€ ê²ƒë„ ì•Œë§ì€ ê°ë„ë¡œ ëŒë ¤ ë†“ëŠê²ƒ
+		//}
+		//ì¼ë‹¨ ë³´ìŠ¤ìœ„ì¹˜ë‘ ì „ë°© ë°©í–¥
+		Mathf::Vector3 pos = tr->GetWorldPosition();
+		Mathf::Vector3 forward = tr->GetForward();
+
+		//m_animator->SetParameter("ShiftTrigger", true); --> ì‹œì‘ í•œë²ˆ
+
+		//íšŒì „ì¶• yì¶• ì„¤ì •
+		Mathf::Vector3 up_axis(0.0f, 1.0f, 0.0f);
+
+		//ì „ë°©ì—ì„œ 120ë„ 240 í•´ì„œ ì‚¼ê° ë°©ë©´ ë°©í–¥
+		Mathf::Quaternion rot120 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(120.0f));
+		Mathf::Quaternion rot240 = Mathf::Quaternion::CreateFromAxisAngle(up_axis, Mathf::ToRadians(240.0f));
+
+		//3ë°©í–¥ 
+		Mathf::Vector3 dir1 = forward; //ì „ë°©
+		Mathf::Vector3 dir2 = Mathf::Vector3::Transform(forward, rot120); //120
+		Mathf::Vector3 dir3 = Mathf::Vector3::Transform(forward, rot240); //240
+
+		//í•˜ë‚˜ì”© ì»¨íŠ¸ë¡¤ í•˜ê¸° ê·€ì°®ë‹¤ ë²¡í„°ë¡œ í¬ë¬¸ëŒë ¤
+		std::vector < Mathf::Vector3 > directions;
+		directions.push_back(dir1);
+		directions.push_back(dir2);
+		directions.push_back(dir3);
+
+		int index = 0;
+			
+
+		for (auto& dir : directions) {
+			//ê°€ê¹Œìš´ê±°
+			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6ë§Œí¼ ë–¨ì–´ì§„ ìœ„ì¹˜ ì´ ìˆ˜ì¹˜ëŠ” í”„ë¡œí¼í‹°ë¡œ ëº„ê¹Œ ì¼ë‹¨ ë‚´ê°€ ê³„ì† ì„ì˜ë¡œ ìˆ˜ì •í•´ì£¼ëŠ”ê±¸ë¡œ
+			GameObject* floor = BP003Objs[index];
+			BP003* script = floor->GetComponent<BP003>();
+			floor->SetEnabled(true);
+			//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
+			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
+			script->isAttackStart = true;
+
+			index++;
+
+			//ë¨¼ê±°
+			Mathf::Vector3 objpos2 = pos + dir * 12.0f; // 12ë§Œí¼ ë–¨ì–´ì§„ ìœ„ì¹˜ ì´ ìˆ˜ì¹˜ëŠ” í”„ë¡œí¼í‹°ë¡œ ëº„ê¹Œ ì¼ë‹¨ ë‚´ê°€ ê³„ì† ì„ì˜ë¡œ ìˆ˜ì •í•´ì£¼ëŠ”ê±¸ë¡œ
+			GameObject* floor2 = BP003Objs[index];
+			BP003* script2 = floor2->GetComponent<BP003>();
+			floor2->SetEnabled(true);
+			//floor2->GetComponent<Transform>()->SetWorldPosition(objpos2);
+			script2->Initialize(this, objpos2, BP003Damage, BP003RadiusSize, BP003Delay, true);
+			script2->isAttackStart = true;
+
+			index++;
+		}
+		pattenIndex = index;
+		m_patternPhase = EPatternPhase::WaitForObjects;
+		break; // while ë£¨í”„ íƒˆì¶œ
+		
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
+		// í™œì„±í™”í–ˆë˜ ëª¨ë“  ì˜¤ë¸Œì íŠ¸ë¥¼ ìˆœíšŒí•˜ë©° ë¹„í™œì„±í™”ë˜ì—ˆëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
 		for (int i = 0; i < pattenIndex; ++i)
 		{
 			if (BP003Objs[i]->IsEnabled())
 			{
-				allFinished = false; // ¾ÆÁ÷ ÇÏ³ª¶óµµ È°¼º »óÅÂÀÌ¸é ´ë±â¸¦ °è¼ÓÇÕ´Ï´Ù.
+				allFinished = false; // ì•„ì§ í•˜ë‚˜ë¼ë„ í™œì„± ìƒíƒœì´ë©´ ëŒ€ê¸°ë¥¼ ê³„ì†í•©ë‹ˆë‹¤.
 				break;
 			}
 		}
 
 		if (allFinished)
 		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
+			// ëª¨ë“  ì˜¤ë¸Œì íŠ¸ê°€ ë¹„í™œì„±í™”ë˜ì—ˆìœ¼ë¯€ë¡œ íŒ¨í„´ì„ ì™„ì „íˆ ì¢…ë£Œí•©ë‹ˆë‹¤.
 			EndPattern();
 		}
 		break;
@@ -726,64 +879,76 @@ void TBoss1::Update_BP0033(float tick)
 
 void TBoss1::Update_BP0034(float tick)
 {
-	// ÇöÀç ´Ü°è(Phase)¿¡ µû¶ó ´Ù¸¥ ·ÎÁ÷À» ¼öÇàÇÕ´Ï´Ù.
-	// ¼øÂ÷ 1°³¾¿ -> ÇÑÁÙ 4°³ ¾¿ 
+	// í˜„ì¬ ë‹¨ê³„(Phase)ì— ë”°ë¼ ë‹¤ë¥¸ ë¡œì§ì„ ìˆ˜í–‰í•©ë‹ˆë‹¤.
+	// ìˆœì°¨ 1ê°œì”© -> í•œì¤„ 4ê°œ ì”© 
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Spawning:
-	{
+	case EPatternPhase::Warning:
+		// BP0034 might have a warning animation, e.g., showing where objects will spawn.
+		// RotateToTarget(); // If it tracks during warning
+		m_patternPhase = EPatternPhase::Move; // ì¥íŒì€ ì „ì¡° ì—†ìŒ ë§Œì•½ì— ê±¸ë¦¬ë©´ ë°”ë¡œ ë„˜ê¸°ì í˜¹ì€ ì—¬ê¸°ì„œ ì´ë™ ì²˜ë¦¬ ìƒê°í•´ ë³¼ìˆ˜ë„ 
+		break;
+	case EPatternPhase::Move:
 		MoveToChunsik(tick);
 		if (isMoved) {
-			BPTimer += tick;
-			while (BPTimer >= BP0034delay)
-			{
-				if (pattenIndex < BP0034Points.size())
-				{
-					// ¿ÀºêÁ§Æ® ÇÏ³ª¸¦ È°¼ºÈ­ÇÕ´Ï´Ù. --> row ´ÜÀ§ 4°³¾¿
-					int i = 0;
-					for (; i < 4;)
-					{
-						Mathf::Vector3 objpos = BP0034Points[pattenIndex + i].second;
-						GameObject* floor = BP003Objs[pattenIndex + i];
-						BP003* script = floor->GetComponent<BP003>();
-						floor->SetEnabled(true);
-						script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
-						script->isAttackStart = true;
-						i++;
-						if (pattenIndex + i > BP0034Points.size()) {
-							i--;
-							break; // ¹üÀ§¸¦ ¹ş¾î³ªÁö ¾Êµµ·Ï °Ë»ç
-						}
-					}
-					pattenIndex += i;
-					BPTimer -= BP0034delay;
-				}
-				else
-				{
-					// ¸ğµç ¿ÀºêÁ§Æ®¸¦ »ı¼ºÇßÀ¸¸é '¿Ï·á ´ë±â' ´Ü°è·Î ÀüÈ¯ÇÕ´Ï´Ù.
-					m_patternPhase = EPatternPhase::Waiting;
-					break; // while ·çÇÁ Å»Ãâ
-				}
-			}
+			m_patternPhase = EPatternPhase::Spawning;
 		}
 		break;
+	case EPatternPhase::Spawning:
+	{
+		BPTimer += tick;
+		while (BPTimer >= BP0034delay)
+		{
+			if (pattenIndex < BP0034Points.size())
+			{
+				// ì˜¤ë¸Œì íŠ¸ í•˜ë‚˜ë¥¼ í™œì„±í™”í•©ë‹ˆë‹¤. --> row ë‹¨ìœ„ 4ê°œì”©
+				//m_animator->SetParameter("ShiftTrigger", true); --> ì‹œì‘ í•œë²ˆ
+				int i = 0;
+				for (; i < 4;)
+				{
+					
+
+					Mathf::Vector3 objpos = BP0034Points[pattenIndex + i].second;
+					GameObject* floor = BP003Objs[pattenIndex + i];
+					BP003* script = floor->GetComponent<BP003>();
+					floor->SetEnabled(true);
+					script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
+					script->isAttackStart = true;
+					i++;
+					if (pattenIndex + i > BP0034Points.size()) {
+						i--;
+						break; // ë²”ìœ„ë¥¼ ë²—ì–´ë‚˜ì§€ ì•Šë„ë¡ ê²€ì‚¬
+					}
+				}
+				pattenIndex += i;
+				BPTimer -= BP0034delay;
+			}
+			else
+			{
+				// ëª¨ë“  ì˜¤ë¸Œì íŠ¸ë¥¼ ìƒì„±í–ˆìœ¼ë©´ 'ì™„ë£Œ ëŒ€ê¸°' ë‹¨ê³„ë¡œ ì „í™˜í•©ë‹ˆë‹¤.
+				m_patternPhase = EPatternPhase::WaitForObjects;
+				break; // while ë£¨í”„ íƒˆì¶œ
+			}
+		}
+		
+		break;
 	}
-	case EPatternPhase::Waiting:
+	case EPatternPhase::WaitForObjects:
 	{
 		bool allFinished = true;
-		// È°¼ºÈ­Çß´ø ¸ğµç ¿ÀºêÁ§Æ®¸¦ ¼øÈ¸ÇÏ¸ç ºñÈ°¼ºÈ­µÇ¾ú´ÂÁö È®ÀÎÇÕ´Ï´Ù.
+		// í™œì„±í™”í–ˆë˜ ëª¨ë“  ì˜¤ë¸Œì íŠ¸ë¥¼ ìˆœíšŒí•˜ë©° ë¹„í™œì„±í™”ë˜ì—ˆëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
 		for (int i = 0; i < pattenIndex; ++i)
 		{
 			if (BP003Objs[i]->IsEnabled())
 			{
-				allFinished = false; // ¾ÆÁ÷ ÇÏ³ª¶óµµ È°¼º »óÅÂÀÌ¸é ´ë±â¸¦ °è¼ÓÇÕ´Ï´Ù.
+				allFinished = false; // ì•„ì§ í•˜ë‚˜ë¼ë„ í™œì„± ìƒíƒœì´ë©´ ëŒ€ê¸°ë¥¼ ê³„ì†í•©ë‹ˆë‹¤.
 				break;
 			}
 		}
 
 		if (allFinished)
 		{
-			// ¸ğµç ¿ÀºêÁ§Æ®°¡ ºñÈ°¼ºÈ­µÇ¾úÀ¸¹Ç·Î ÆĞÅÏÀ» ¿ÏÀüÈ÷ Á¾·áÇÕ´Ï´Ù.
+			// ëª¨ë“  ì˜¤ë¸Œì íŠ¸ê°€ ë¹„í™œì„±í™”ë˜ì—ˆìœ¼ë¯€ë¡œ íŒ¨í„´ì„ ì™„ì „íˆ ì¢…ë£Œí•©ë‹ˆë‹¤.
 			EndPattern();
 		}
 		break;
@@ -793,27 +958,27 @@ void TBoss1::Update_BP0034(float tick)
 
 void TBoss1::Calculate_BP0034()
 {
-	//Ãá½ÄÀÌ¿¡¼­ °İÀÚÁ¡ °è»ê
+	//ì¶˜ì‹ì´ì—ì„œ ê²©ìì  ê³„ì‚°
 	Transform* tr = m_chunsik->GetComponent<Transform>();
 
-	//todo: ÀÏ´Ü Å¸°ÙÀ¸·Î ÀâÀº ÇÃ·¹ÀÌ¾î À§Ä¡¸¸ »ı°¢ µÑ´Ù ¸¸µé¾î Áö´Â°Ç °¢ ÇÃ·¹ÀÌ¾î ¹æÇâ ¹Ş¾Æ¼­ »ı°¢ Á» ÇØº¸ÀÚ
+	//todo: ì¼ë‹¨ íƒ€ê²Ÿìœ¼ë¡œ ì¡ì€ í”Œë ˆì´ì–´ ìœ„ì¹˜ë§Œ ìƒê° ë‘˜ë‹¤ ë§Œë“¤ì–´ ì§€ëŠ”ê±´ ê° í”Œë ˆì´ì–´ ë°©í–¥ ë°›ì•„ì„œ ìƒê° ì¢€ í•´ë³´ì
 	Mathf::Vector3 targetPos;
 
 	if (m_target) {
 		targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
 	}
-	else {//¹®Á¦°¡ »ı°Ü¼­ Å¸°ÙÀ» ÀÒ¾î ¹ö·È´Â´ë ÆĞÅÏ ¹ß»ı½Ã 
-		//ÀÏ´Ü ÇÃ·¹ÀÌ¾î1ÀÇ Æ÷Áö¼ÇÀ» °¡Á®¿ÀÀÚ -> todo
+	else {//ë¬¸ì œê°€ ìƒê²¨ì„œ íƒ€ê²Ÿì„ ìƒì–´ ë²„ë ¸ëŠ”ëŒ€ íŒ¨í„´ ë°œìƒì‹œ 
+		//ì¼ë‹¨ í”Œë ˆì´ì–´1ì˜ í¬ì§€ì…˜ì„ ê°€ì ¸ì˜¤ì -> todo
 
 	}
 
 
-	Mathf::Vector3 direction; //¿ì¼± ¹æÇâ
-	Mathf::Vector3 pos = tr->GetWorldPosition();//Ãá½ÄÀÌ À§Ä¡ 
+	Mathf::Vector3 direction; //ìš°ì„  ë°©í–¥
+	Mathf::Vector3 pos = tr->GetWorldPosition();//ì¶˜ì‹ì´ ìœ„ì¹˜ 
 	direction = targetPos - pos;
 	direction.Normalize();
 
-	// ¡Ú 1. °¡Àå °¡±î¿î 8¹æÀ§ ÃàÀ» Ã£¾Æ, ´ë°¢¼±ÀÎÁö ÆÇº°
+	// â˜… 1. ê°€ì¥ ê°€ê¹Œìš´ 8ë°©ìœ„ ì¶•ì„ ì°¾ì•„, ëŒ€ê°ì„ ì¸ì§€ íŒë³„
 	const std::vector<Mathf::Vector3> eightDirections = {
 		Mathf::Vector3(0.f, 0.f, 1.f),   // 0: N
 		Mathf::Vector3(1.f, 0.f, 1.f),   // 1: NE
@@ -837,11 +1002,11 @@ void TBoss1::Calculate_BP0034()
 		}
 	}
 
-	// ´ë°¢¼± ¹æÇâ(ÀÎµ¦½º°¡ È¦¼ö)ÀÏ °æ¿ì¿¡¸¸ 45µµ È¸Àü
+	// ëŒ€ê°ì„  ë°©í–¥(ì¸ë±ìŠ¤ê°€ í™€ìˆ˜)ì¼ ê²½ìš°ì—ë§Œ 45ë„ íšŒì „
 	bool shouldRotate = (closestDirIndex % 2 != 0);
 
 
-	// ¡Ú 2. °áÁ¤µÈ È¸Àü°ª »ı¼º (´ë°¢¼±ÀÌ ¾Æ´Ï¸é Identity, Áï 0µµ È¸Àü)
+	// â˜… 2. ê²°ì •ëœ íšŒì „ê°’ ìƒì„± (ëŒ€ê°ì„ ì´ ì•„ë‹ˆë©´ Identity, ì¦‰ 0ë„ íšŒì „)
 	Mathf::Quaternion gridRotation = Mathf::Quaternion::Identity;
 	if (shouldRotate) {
 		const float ANGLE_45_RAD = 3.1415926535f / 4.f;
@@ -853,7 +1018,7 @@ void TBoss1::Calculate_BP0034()
 	}
 
 
-	//// 3. °İÀÚ ±âº» °ª °è»ê ¹× Á¤·Ä ±ÔÄ¢ °áÁ¤ (Tilted ¹öÀü°ú µ¿ÀÏÇÑ ·ÎÁ÷)
+	//// 3. ê²©ì ê¸°ë³¸ ê°’ ê³„ì‚° ë° ì •ë ¬ ê·œì¹™ ê²°ì • (Tilted ë²„ì „ê³¼ ë™ì¼í•œ ë¡œì§)
 	//const float PI = 3.1415926535f;
 	//float circleArea = PI * m_chunsikRadius * m_chunsikRadius;
 	//float singleCellArea = circleArea / 16;
@@ -865,11 +1030,11 @@ void TBoss1::Calculate_BP0034()
 	float majorSortSign = (isMajorAxisX ? localPlayerDir.x : localPlayerDir.z) < 0.f ? 1.f : -1.f;
 	float minorSortSign = (isMajorAxisX ? localPlayerDir.z : localPlayerDir.x) < 0.f ? 1.f : -1.f;
 
-	//// 3. ¿ì¼±¼øÀ§¿Í À§Ä¡¸¦ ÀúÀåÇÒ º¤ÅÍ
+	//// 3. ìš°ì„ ìˆœìœ„ì™€ ìœ„ì¹˜ë¥¼ ì €ì¥í•  ë²¡í„°
 	////std::vector<std::pair<int, Mathf::Vector3>> placements;
 	//BP0034Points.clear();
 
-	//// 4. °İÀÚ ¼øÈ¸ (Tilted ¹öÀü°ú µ¿ÀÏÇÑ ·ÎÁ÷)
+	//// 4. ê²©ì ìˆœíšŒ (Tilted ë²„ì „ê³¼ ë™ì¼í•œ ë¡œì§)
 	//int iz = 0;
 	//for (float z = -m_chunsikRadius; z <= m_chunsikRadius; z += gridSpacing, ++iz) {
 	//	int ix = 0;
@@ -892,16 +1057,16 @@ void TBoss1::Calculate_BP0034()
 	float gridSpacing = (m_chunsikRadius * 2) / (pointsPerRow - 1);
 	BP0034Points.clear();
 
-	// 4. °İÀÚ ¼øÈ¸ (ÈÎ¾À °£´ÜÇØÁü)
+	// 4. ê²©ì ìˆœíšŒ (í›¨ì”¬ ê°„ë‹¨í•´ì§)
 	for (int iz = 0; iz < pointsPerRow; ++iz) {
 		for (int ix = 0; ix < pointsPerRow; ++ix) {
-			// -halfSize ~ +halfSize ¹üÀ§·Î ÁÂÇ¥ °è»ê
+			// -halfSize ~ +halfSize ë²”ìœ„ë¡œ ì¢Œí‘œ ê³„ì‚°
 			float x = -m_chunsikRadius + ix * gridSpacing;
 			float z = -m_chunsikRadius + iz * gridSpacing;
 
 			Mathf::Vector3 localOffset(x, 0, z);
 
-			// ¡Ú¡Ú¡Ú ¿ø ¹Û¿¡ ÀÖ´ÂÁö °Ë»çÇÏ´Â if¹®ÀÌ ÇÊ¿ä ¾ø¾îÁü! ¡Ú¡Ú¡Ú
+			// â˜…â˜…â˜… ì› ë°–ì— ìˆëŠ”ì§€ ê²€ì‚¬í•˜ëŠ” ifë¬¸ì´ í•„ìš” ì—†ì–´ì§! â˜…â˜…â˜…
 			// if (localOffset.LengthSquared() > m_chunsikRadius * m_chunsikRadius) continue;
 
 			Mathf::Vector3 rotatedOffset = Mathf::Vector3::Transform(localOffset, gridRotation);
@@ -918,7 +1083,7 @@ void TBoss1::Calculate_BP0034()
 	}
 
 
-	// 5. ¿ì¼±¼øÀ§(pair.first)¿¡ µû¶ó ±âº» ¿À¸§Â÷¼ø Á¤·Ä
+	// 5. ìš°ì„ ìˆœìœ„(pair.first)ì— ë”°ë¼ ê¸°ë³¸ ì˜¤ë¦„ì°¨ìˆœ ì •ë ¬
 	std::sort(BP0034Points.begin(), BP0034Points.end(), [](auto a, auto b) {
 		return a.first < b.first;
 		});
@@ -927,278 +1092,306 @@ void TBoss1::Calculate_BP0034()
 
 void TBoss1::EndPattern()
 {
+	m_lastCompletedPattern = m_activePattern;
 	m_activePattern = EPatternType::None;
 	m_patternPhase = EPatternPhase::Inactive;
+	if (m_animator) {
+		m_animator->SetParameter("StartRangedAttack", false);
+		m_animator->SetParameter("StartMeleeAttack", false);
+		m_animator->SetParameter("rangedCombo", false);
+		m_animator->SetParameter("meleeCombo", false);
+	}
 }
 
 void TBoss1::SelectTarget()
 {
-	//todo : Å¸°Ù ¼±ÅÃ (1P/2P) ÇÔ¼ö·Î »©´Â ÀÌÀ¯´Â ÆĞÅÏ¿¡ µû¶ó Å¸°ÙÀ» ¾ğÁ¦ ¼±ÅÃÇÒÁö ´Ù¸¦¼ö ÀÖ±â ¶§¹®
-	//½Ì±ÛÇÃ·¹ÀÌ¾î ¸ğµå °¡´É¼º ÀÖÀ¸¹Ç·Î 1P/2P°¡ ¸ğµÎ ÀÖ´ÂÁö È®ÀÎ
-	bool has1P = BB->HasKey("1P");
-	bool has2P = BB->HasKey("2P");
-	if (!has1P && !has2P) {
-		//¿¡·¯ ÇÃ·¹ÀÌ¾î¸¦ Ã£À» ¼ö ¾øÀ½
+	//todo : íƒ€ê²Ÿ ì„ íƒ (1P/2P) í•¨ìˆ˜ë¡œ ë¹¼ëŠ” ì´ìœ ëŠ” íŒ¨í„´ì— ë”°ë¼ íƒ€ê²Ÿì„ ì–¸ì œ ì„ íƒí• ì§€ ë‹¤ë¥¼ìˆ˜ ìˆê¸° ë•Œë¬¸
+	//ì‹±ê¸€í”Œë ˆì´ì–´ ëª¨ë“œ ê°€ëŠ¥ì„± ìˆìœ¼ë¯€ë¡œ 1P/2Pê°€ ëª¨ë‘ ìˆëŠ”ì§€ í™•ì¸
+	
+	if (!Player1 && !Player2) {
+		//ì—ëŸ¬ í”Œë ˆì´ì–´ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŒ
 		return;
 	}
-	if (has1P && !has2P) {
-		//1P¸¸ Á¸Àç
-		m_target = BB->GetValueAsGameObject("1P"); //¹«Á¶°Ç 1P
+	if (Player1 && !Player2) {
+		//1Pë§Œ ì¡´ì¬
+		m_target = Player1; //ë¬´ì¡°ê±´ 1P
 		return;
 	}
-	//2P¸¸ Á¸Àç ÇÏ´Â °æ¿ì°¡ ÀÖÀ»±î? --> ÀÌ°Ç ³ªÁß¿¡ »ı°¢ÇÏÀÚ
-	//¾Æ´Ï¶ó¸é µÑÀÌ ¼±ÅÃµÇ¾ú´ø È½¼ö ºñ±³
+	//2Pë§Œ ì¡´ì¬ í•˜ëŠ” ê²½ìš°ê°€ ìˆì„ê¹Œ? --> ì´ê±´ ë‚˜ì¤‘ì— ìƒê°í•˜ì
+	//ì•„ë‹ˆë¼ë©´ ë‘˜ì´ ì„ íƒë˜ì—ˆë˜ íšŸìˆ˜ ë¹„êµ
 	if (p1Count != p2Count)
 	{
 		if (p1Count < p2Count) {
-			m_target = BB->GetValueAsGameObject("1P");
+			m_target = Player1;
 			p1Count++;
 		}
 		else {
-			m_target = BB->GetValueAsGameObject("2P");
+			m_target = Player2;
 			p2Count++;
 		}
 		return;
 	}
-	//È½¼ö°¡ °°´Ù¸é?
-	//ÄÚÀÎ Åä½º Ã³·³ 2/1 È®·ü·Î 1P/2P ¼±ÅÃ
-	int randValue = rand() % 2; // 0, 1 Áß ÇÏ³ª¸¦ ·£´ıÀ¸·Î ¼±ÅÃ
+	//íšŸìˆ˜ê°€ ê°™ë‹¤ë©´?
+	//ì½”ì¸ í† ìŠ¤ ì²˜ëŸ¼ 2/1 í™•ë¥ ë¡œ 1P/2P ì„ íƒ
+	int randValue = rand() % 2; // 0, 1 ì¤‘ í•˜ë‚˜ë¥¼ ëœë¤ìœ¼ë¡œ ì„ íƒ
 	if (randValue == 0) {
-		m_target = BB->GetValueAsGameObject("1P");
+		m_target = Player1;
 		p1Count++;
 	}
 	else {
-		m_target = BB->GetValueAsGameObject("2P");
+		m_target = Player2;
 		p2Count++;
 	}
+
+	if (p1Count == p2Count)
+	{
+		//íšŸìˆ˜ê°€ ê°™ì•„ì§€ë©´ ì´ˆê¸°í™”
+		p1Count = 0;
+		p2Count = 0;
+	}
 	
+}
+
+void TBoss1::StartNextComboAttack()
+{
+	m_patternPhase = EPatternPhase::Spawning;
+	BPTimer = 0.f;
+
+	switch (m_activePattern)
+	{
+	case EPatternType::BP0013: // Ranged Combo
+		if (m_animator) m_animator->SetParameter("RangedCombo", true);
+		break;
+	case EPatternType::BP0022: // Melee Combo example
+		if(m_animator) m_animator->SetParameter("MeleeCombo", true);
+		break;
+	}
 }
 
 void TBoss1::Burrow()
 {
-	//todo : ¶¥¼ÓÀ¸·Î µé¾î°¨
-	//¶¥¼ÓÀ¸·Î µé¾î°¡´Â ¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
-	//ÀÌÈÄ ¾Èº¸ÀÌ°Ô Ã³¸®
-	//Äİ¶óÀÌ´õ ºñÈ°¼ºÈ­
-	m_rigid->SetColliderEnabled(false);
+	//todo : ë•…ì†ìœ¼ë¡œ ë“¤ì–´ê°
+	//ë•…ì†ìœ¼ë¡œ ë“¤ì–´ê°€ëŠ” ì—ë‹ˆë©”ì´ì…˜ ì¬ìƒ
+	//ì´í›„ ì•ˆë³´ì´ê²Œ ì²˜ë¦¬
+	//ì½œë¼ì´ë” ë¹„í™œì„±í™”
+	if (m_moveState == EBossMoveState::Idle) {
+		m_animator->SetParameter("BurrowTrigger", true);
+		m_rigid->SetColliderEnabled(false);
+	}
+}
+
+void TBoss1::SetBurrow()
+{
 	isBurrow = true;
+	m_moveState = EBossMoveState::Burrowed;
 }
 
 void TBoss1::Protrude()
 {
-	//todo : ¶¥¼Ó¿¡¼­ ³ª¿È
+	//todo : ë•…ì†ì—ì„œ ë‚˜ì˜´
 	
-	//Æ¢¾î³ª¿À±â Àü¿¡ ÀÌµ¿ °¡´É¿µ¿ª ¾È¿¡ ÀÖ´ÂÁö È®ÀÎ
-	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //Ãá½ÄÀÌ(Áß½É) À§Ä¡
-	//Å¸°Ù È®ÀÎ  ==> Å¸°ÙÀÌ ¾ø°Å³ª ÀÒ¾î¹ö·È´Ù¸é? ±×·¸´Ù¸é ·£´ı À§Ä¡·Î
+	//íŠ€ì–´ë‚˜ì˜¤ê¸° ì „ì— ì´ë™ ê°€ëŠ¥ì˜ì—­ ì•ˆì— ìˆëŠ”ì§€ í™•ì¸
+	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //ì¶˜ì‹ì´(ì¤‘ì‹¬) ìœ„ì¹˜
+	//íƒ€ê²Ÿ í™•ì¸  ==> íƒ€ê²Ÿì´ ì—†ê±°ë‚˜ ìƒì–´ë²„ë ¸ë‹¤ë©´? ê·¸ë ‡ë‹¤ë©´ ëœë¤ ìœ„ì¹˜ë¡œ
 	Mathf::Vector3 targetPos;
 	if(m_target)
 	{
 		targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
-		targetPos.y = chunsikPos.y; //³ôÀÌ ¸ÂÃã
+		targetPos.y = chunsikPos.y; //ë†’ì´ ë§ì¶¤
 	}
 	else {
-		//Ãá½ÄÀÌ¸¦ ±âÁØÀ¸·Î ·£´ı À§Ä¡
-		float angle = static_cast<float>(rand()) / RAND_MAX * 2.f * 3.1415926535f; // Ãá½ÄÀÌ ±âÁØ ·£´ı ¹æÇâ
-		float radius = static_cast<float>(rand()) / RAND_MAX * m_chunsikRadius; // Ãá½ÄÀÌ ±âÁØ ·£´ı °Å¸®
-		targetPos = chunsikPos + Mathf::Vector3(cos(angle) * radius, 0, sin(angle) * radius); // À§¸¦ ±âÁØÀ¸·Î ·£´ı À§Ä¡ °è»ê
+		//ì¶˜ì‹ì´ë¥¼ ê¸°ì¤€ìœ¼ë¡œ ëœë¤ ìœ„ì¹˜
+		float angle = static_cast<float>(rand()) / RAND_MAX * 2.f * 3.1415926535f; // ì¶˜ì‹ì´ ê¸°ì¤€ ëœë¤ ë°©í–¥
+		float radius = static_cast<float>(rand()) / RAND_MAX * m_chunsikRadius; // ì¶˜ì‹ì´ ê¸°ì¤€ ëœë¤ ê±°ë¦¬
+		targetPos = chunsikPos + Mathf::Vector3(cos(angle) * radius, 0, sin(angle) * radius); // ìœ„ë¥¼ ê¸°ì¤€ìœ¼ë¡œ ëœë¤ ìœ„ì¹˜ ê³„ì‚°
 	}
 
 	float dist = (targetPos - chunsikPos).Length();
 	if (dist < m_chunsikRadius)
 	{
-		//Ãá½ÄÀÌ ¹İ°æ ¾È¿¡ ÀÖÀ¸¸é Å¸°Ù À§Ä¡·Î
+		//ì¶˜ì‹ì´ ë°˜ê²½ ì•ˆì— ìˆìœ¼ë©´ íƒ€ê²Ÿ ìœ„ì¹˜ë¡œ
 	}
 	else {
-		//Ãá½ÄÀÌ ¹İ°æ ¹Û¿¡ ÀÖÀ¸¸é ¹İ°æ ¾ÈÂÊ °¡ÀåÀÚ¸®·Î
+		//ì¶˜ì‹ì´ ë°˜ê²½ ë°–ì— ìˆìœ¼ë©´ ë°˜ê²½ ì•ˆìª½ ê°€ì¥ìë¦¬ë¡œ
 		Mathf::Vector3 dir = targetPos - chunsikPos;
 		dir.Normalize();
-		targetPos = chunsikPos + dir * (m_chunsikRadius - 1.f); // ¾à°£ ¾ÈÂÊÀ¸·Î
+		targetPos = chunsikPos + dir * (m_chunsikRadius - 1.f); // ì•½ê°„ ì•ˆìª½ìœ¼ë¡œ
 	}
 
-	//º¸½º À§Ä¡ º¯°æ
-	m_pOwner->GetComponent<Transform>()->SetWorldPosition(targetPos); //ÇØ´ç À§Ä¡¿¡¼­ ¸ğ¼Ç¸¸ º¸¿©ÁÖ°í ¹Ù·Î Äİ¶óÀÌ´õ È°¼ºÈ­
-	//ÀÎµğÄÉÀÌÅÍ ÇÊ¿ä ==> ÇØ´ç À§Ä¡¿¡ ÀÎµğÄÉÀÌÅÍ »ı¼º ÈÄ Àá½Ã ´ë±â ÈÄ Æ¢¾î³ª¿À±â
+	//ë³´ìŠ¤ ìœ„ì¹˜ ë³€ê²½
+	m_pOwner->GetComponent<Transform>()->SetWorldPosition(targetPos); //í•´ë‹¹ ìœ„ì¹˜ì—ì„œ ëª¨ì…˜ë§Œ ë³´ì—¬ì£¼ê³  ë°”ë¡œ ì½œë¼ì´ë” í™œì„±í™”
+	//ì¸ë””ì¼€ì´í„° í•„ìš” ==> í•´ë‹¹ ìœ„ì¹˜ì— ì¸ë””ì¼€ì´í„° ìƒì„± í›„ ì ì‹œ ëŒ€ê¸° í›„ íŠ€ì–´ë‚˜ì˜¤ê¸°
 	
-	//¸ğµ¨ º¸ÀÌ°Ô Ã³¸® ÇÏ¸ç
+	//ëª¨ë¸ ë³´ì´ê²Œ ì²˜ë¦¬ í•˜ë©°
 
-	//¶¥¼Ó¿¡¼­ ³ª¿À´Â ¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
+	//ë•…ì†ì—ì„œ ë‚˜ì˜¤ëŠ” ì—ë‹ˆë©”ì´ì…˜ ì¬ìƒ
 
-	//¿Ã¶ó¿À¸é¼­ ÇÃ·¹ÀÌ¾î µ¥¹ÌÁö ÆÇÁ¤ + ÇÃ·¹ÀÌ¾î ³Ë¹é
-	
-	//Äİ¶óÀÌ´õ È°¼ºÈ­
+	//ì˜¬ë¼ì˜¤ë©´ì„œ í”Œë ˆì´ì–´ ë°ë¯¸ì§€ íŒì • + í”Œë ˆì´ì–´ ë„‰ë°±
+	if (m_moveState == EBossMoveState::Burrowed) {
+		m_animator->SetParameter("ProtrudeTrigger", true);
+	}
+}
+
+void TBoss1::ProtrudeEnd()
+{	
 	m_rigid->SetColliderEnabled(true);
 	isBurrow = false;
+	isMoved = true;
+	m_moveState = EBossMoveState::Idle;
 }
 
 void TBoss1::ProtrudeChunsik()
 {
-	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //Ãá½ÄÀÌ(Áß½É) À§Ä¡
-	m_pOwner->GetComponent<Transform>()->SetWorldPosition(chunsikPos); //ÇØ´ç À§Ä¡¿¡¼­ ¸ğ¼Ç¸¸ º¸¿©ÁÖ°í ¹Ù·Î Äİ¶óÀÌ´õ È°¼ºÈ­
+	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //ì¶˜ì‹ì´(ì¤‘ì‹¬) ìœ„ì¹˜
+	m_pOwner->GetComponent<Transform>()->SetWorldPosition(chunsikPos); //í•´ë‹¹ ìœ„ì¹˜ì—ì„œ ëª¨ì…˜ë§Œ ë³´ì—¬ì£¼ê³  ë°”ë¡œ ì½œë¼ì´ë” í™œì„±í™”
 
-	//ÆĞÅÏ½Ã º¸½º¸¦ Áß½ÉÀÌµ¿ ½ÃÅ°´Â ³»¿ë --> ÀÌ¶§µµ ÀÎµğÄÉÀÌÅÍ¿Í µ¥¹ÌÁö ÆÇÁ¤ÀÌ ÇÊ¿ä ÇÑ°¡?
+	//íŒ¨í„´ì‹œ ë³´ìŠ¤ë¥¼ ì¤‘ì‹¬ì´ë™ ì‹œí‚¤ëŠ” ë‚´ìš© --> ì´ë•Œë„ ì¸ë””ì¼€ì´í„°ì™€ ë°ë¯¸ì§€ íŒì •ì´ í•„ìš” í•œê°€?
 
-	//¸ğµ¨ º¸ÀÌ°Ô Ã³¸® ÇÏ¸ç
+	//ëª¨ë¸ ë³´ì´ê²Œ ì²˜ë¦¬ í•˜ë©°
 
-	//¶¥¼Ó¿¡¼­ ³ª¿À´Â ¿¡´Ï¸ŞÀÌ¼Ç Àç»ı
-	m_rigid->SetColliderEnabled(true);
-	isBurrow = false;
+	//ë•…ì†ì—ì„œ ë‚˜ì˜¤ëŠ” ì—ë‹ˆë©”ì´ì…˜ ì¬ìƒ
+	if(m_moveState == EBossMoveState::Burrowed) {
+		m_animator->SetParameter("ProtrudeTrigger", true);
+	}
 }
 
 
 void TBoss1::BP0011()
 {
-	//todo : Å¸°ÙÀ» ÇâÇØ È­¿° Åõ»çÃ¼¸¦ 1°³ ¹ß»çÇÏ¿© Æø¹ß
-	//Á» ´õ »ı°¢ ÇØºÁ¾ß ÇÏ´Â ³»¿ë º¸½º È¸Àü¿¡ °üÇÏ¿© º¸½º´Â °è¼Ó ÇÃ·¹ÀÌ¾î¸¦ µû¶ó µ¹°Å´Ù
-	//Åõ»çÃ¼¿¡ ´ëÇÏ¿© ¾î´À Å¸ÀÌ¹Ö¿¡ ³¯·Á¾ß ±ò²ûÇØ º¸ÀÌ´Â°¡
-	//ÀÏ´Ü Å¸°ÙÀ»ºÁ
-
-	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã
-	//
+	// íƒ€ê²Ÿì„ í–¥í•´ í™”ì—¼ íˆ¬ì‚¬ì²´ë¥¼ 1ê°œ ë°œì‚¬í•˜ì—¬ í­ë°œ
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0011;
-	/* start patten end*/
-
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	projectileIndex = 0;
+	if (m_animator) m_animator->SetParameter("StartRangedAttack", true);
 
 }
 
 void TBoss1::BP0012()
 {
-	//todo : 60µµ ºÎÃ¤²Ã ¹üÀ§·Î È­¿° Åõ»çÃ¼ 3°³ ¹ß»ç
+	//todo : 60ë„ ë¶€ì±„ê¼´ ë²”ìœ„ë¡œ í™”ì—¼ íˆ¬ì‚¬ì²´ 3ê°œ ë°œì‚¬
 	EndPattern();
 }
 
 void TBoss1::BP0013()
 {
-	//todo : Å¸°ÙÀ» ÇâÇØ È­¿° Åõ»çÃ¼¸¦ 3°³ ¿¬¼Ó ¹ß»çÇÏ¿© Æø¹ß
-	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã
-	//
+	// íƒ€ê²Ÿì„ í–¥í•´ í™”ì—¼ íˆ¬ì‚¬ì²´ë¥¼ 3ê°œ ì—°ì† ë°œì‚¬í•˜ì—¬ í­ë°œ
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0013;
-	/* start patten end*/
-
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
 	pattenIndex = 0;
+	projectileIndex = 0;
+	
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	if (m_animator) m_animator->SetParameter("StartRangedAttack", true);
 }
 
 void TBoss1::BP0014()
 {
-	//todo : 60µµ ºÎÃ¤²Ã ¹üÀ§·Î È­¿° Åõ»çÃ¼ 5°³¸¦ 2È¸ ¿¬¼Ó ¹ß»ç
+	//todo : 60ë„ ë¶€ì±„ê¼´ ë²”ìœ„ë¡œ í™”ì—¼ íˆ¬ì‚¬ì²´ 5ê°œë¥¼ 2íšŒ ì—°ì† ë°œì‚¬
 	EndPattern();
 }
 
 void TBoss1::BP0021()
 {
-	//todo : Àü¹æÀ¸·Î ¸öÅëÀ» ÈÖµÑ·¯ µ¥¹ÌÁö ÆÇÁ¤
-	//
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã
-	//
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0021;
-	/* start patten end*/
-
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
-	isAttacked = false;
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
-
-	RotateToTarget(); //ÆĞÅÏ ½ÃÀÛ½Ã Å¸°ÙÀ» ¹Ù¶óº¸°Ô
+	//RotateToTarget(); // Lock rotation at the beginning for this fixed attack
+	if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
 }
 
 void TBoss1::BP0022()
 {
-	//todo : BP0021 * 5  ¸ÅÈ¸ Å¸°Ù ÃßÀû
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã
-	//
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0022;
-	/* start patten end*/
-
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
-	isAttacked = false;
-	isMoved = false;
+	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	isMoved = false;
+	//RotateToTarget(); // Lock rotation at the beginning for this fixed attack
+	if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+
 }
 
 void TBoss1::BP0031()
 {
-	std::cout << "BP0031" << std::endl;
-	//target ´ë»ó À¸·Î ÇÏ³ª? ³»¹ß ¹Ø¿¡ ÇÏ³ª? ÀÓÀÇ À§Ä¡ ÇÏ³ª? 
-	//todo: --> ÇÃ·¹ÀÌ¾î ¼ö ¸¸Å­ 1°³¾¿ °¢ À§Ä¡¿¡
+	//std::cout << "BP0031" << std::endl;
+	//target ëŒ€ìƒ ìœ¼ë¡œ í•˜ë‚˜? ë‚´ë°œ ë°‘ì— í•˜ë‚˜? ì„ì˜ ìœ„ì¹˜ í•˜ë‚˜? 
+	//í”Œë ˆì´ì–´ ìˆ˜ ë§Œí¼ 1ê°œì”© ê° ìœ„ì¹˜ì—
 	
-	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã //¿ä °Ë»ç´Â BT¿¡¼­ ÇÏ´Â°Ô ÁÁÁö ¾Ê³ª?
-	//
+	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0031;
-	/* start patten end*/
-
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
-	pattenIndex = 0;
+	m_patternPhase = EPatternPhase::Spawning; //
 	BPTimer = 0.f;
+	pattenIndex = 0;
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::BP0032()
 {
-	std::cout << "BP0032" << std::endl;
-	//³» ÁÖÀ§·Î 3°³
+	//std::cout << "BP0032" << std::endl;
+	//ë³´ìŠ¤ ì£¼ìœ„ë¡œ 3ê°œ
 	
 	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã //¿ä °Ë»ç´Â BT¿¡¼­ ÇÏ´Â°Ô ÁÁÁö ¾Ê³ª?
+	if (m_activePattern != EPatternType::None) return; // ë‹¤ë¥¸ íŒ¨í„´ì´ ì‹¤í–‰ ì¤‘ì´ë©´ ë¬´ì‹œ //ìš” ê²€ì‚¬ëŠ” BTì—ì„œ í•˜ëŠ”ê²Œ ì¢‹ì§€ ì•Šë‚˜?
 	//
 	m_activePattern = EPatternType::BP0032;
 	/* start patten end*/
 
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
+	// 1. íŒ¨í„´ì˜ ë‹¨ê³„ë¥¼ 'ìƒì„± ì¤‘'ìœ¼ë¡œ ì„¤ì •í•˜ê³  ìƒíƒœ ë³€ìˆ˜ë“¤ì„ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
 	m_patternPhase = EPatternPhase::Spawning;
 	pattenIndex = 0;
 	BPTimer = 0.f;
-
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::BP0033()
 {
-	std::cout << "BP0033" << std::endl;
+	//3ë°©í–¥ íšŒì „
+	//std::cout << "BP0033" << std::endl;
 	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã //¿ä °Ë»ç´Â BT¿¡¼­ ÇÏ´Â°Ô ÁÁÁö ¾Ê³ª?
+	if (m_activePattern != EPatternType::None) return; // ë‹¤ë¥¸ íŒ¨í„´ì´ ì‹¤í–‰ ì¤‘ì´ë©´ ë¬´ì‹œ //ìš” ê²€ì‚¬ëŠ” BTì—ì„œ í•˜ëŠ”ê²Œ ì¢‹ì§€ ì•Šë‚˜?
 	//
 	m_activePattern = EPatternType::BP0033;
 	/* start patten end*/
 
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
+	// 1. íŒ¨í„´ì˜ ë‹¨ê³„ë¥¼ 'ìƒì„± ì¤‘'ìœ¼ë¡œ ì„¤ì •í•˜ê³  ìƒíƒœ ë³€ìˆ˜ë“¤ì„ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
+	m_patternPhase = EPatternPhase::Move;
 	pattenIndex = 0;
 	isMoved = false;
 	BPTimer = 0.f;
-
+	m_animator->SetParameter("ShiftTrigger", true);
 }
 
 void TBoss1::BP0034()
 {
-	std::cout << "BP0034" << std::endl;
-	//Àû ¹æÇâÀ» ¿ì¼±À¸·Î ´ë°¢¼± ¹æÇâÀ¸·Î ¸Ê ÀüÃ¼¿¡ °İÀÚ ¸ğ¾çÀ¸·Î ¼øÂ÷ÀûÀ¸·Î »ı¼º ÆøÆÄ
-	//=> todo : º¯°æ ¶óÀÎ ¿ì¼±¼øÀ§·Î ÇÑÁÙ¾¿ ÆøÆÄ / Ãß°¡ÀûÀ¸·Î »ı¼ºµô·¹ÀÌ ÇÁ·ÎÆÛÆ¼ »¬°Í
+	//std::cout << "BP0034" << std::endl;
+	//ì  ë°©í–¥ì„ ìš°ì„ ìœ¼ë¡œ ëŒ€ê°ì„  ë°©í–¥ìœ¼ë¡œ ë§µ ì „ì²´ì— ê²©ì ëª¨ì–‘ìœ¼ë¡œ ìˆœì°¨ì ìœ¼ë¡œ ìƒì„± í­íŒŒ
+	// ë³€ê²½ ë¼ì¸ ìš°ì„ ìˆœìœ„ë¡œ í•œì¤„ì”© í­íŒŒ / ì¶”ê°€ì ìœ¼ë¡œ ìƒì„±ë”œë ˆì´ í”„ë¡œí¼í‹° ëº„ê²ƒ
 
 	/* start patten*/
-	if (m_activePattern != EPatternType::None) return; // ´Ù¸¥ ÆĞÅÏÀÌ ½ÇÇà ÁßÀÌ¸é ¹«½Ã //¿ä °Ë»ç´Â BT¿¡¼­ ÇÏ´Â°Ô ÁÁÁö ¾Ê³ª?
+	if (m_activePattern != EPatternType::None) return; // ë‹¤ë¥¸ íŒ¨í„´ì´ ì‹¤í–‰ ì¤‘ì´ë©´ ë¬´ì‹œ //ìš” ê²€ì‚¬ëŠ” BTì—ì„œ í•˜ëŠ”ê²Œ ì¢‹ì§€ ì•Šë‚˜?
 	//
 	m_activePattern = EPatternType::BP0034;
 	/* start patten end*/
 
-	// 1. ÆĞÅÏÀÇ ´Ü°è¸¦ '»ı¼º Áß'À¸·Î ¼³Á¤ÇÏ°í »óÅÂ º¯¼öµéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-	m_patternPhase = EPatternPhase::Spawning;
+	// 1. íŒ¨í„´ì˜ ë‹¨ê³„ë¥¼ 'ìƒì„± ì¤‘'ìœ¼ë¡œ ì„¤ì •í•˜ê³  ìƒíƒœ ë³€ìˆ˜ë“¤ì„ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
+	m_patternPhase = EPatternPhase::Move; //ì¤‘ì•™ìœ¼ë¡œ ì´ë™
 	pattenIndex = 0;
 	isMoved = false;
 	BPTimer = 0.f;
-
-	// 2. ÀÌ ÆĞÅÏ¿¡ »ç¿ëÇÒ ½ºÆù À§Ä¡¸¦ ¹Ì¸® °è»êÇÕ´Ï´Ù.
+	// 2. ì´ íŒ¨í„´ì— ì‚¬ìš©í•  ìŠ¤í° ìœ„ì¹˜ë¥¼ ë¯¸ë¦¬ ê³„ì‚°í•©ë‹ˆë‹¤.
 	Calculate_BP0034();
+	m_animator->SetParameter("ShiftTrigger", true);
+}
+
+void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
+{
+	m_CurrHp -= damage;
+
+
+	HitImpulse();
 }
 

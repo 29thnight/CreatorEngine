@@ -40,13 +40,21 @@ void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& othe
 
 void UIComponent::DeserializeNavi()
 {
+    GameObject* thisObj = GetOwner();
+	int navCount = 0;
     for (const auto& nav : navigations)
     {
-        if (auto obj = GameObject::FindInstanceID(nav.navObject))
+        if (auto obj = thisObj->OwnerSceneFindInstanceID(nav.navObject))
         {
             navigation[(int)nav.mode] = obj->shared_from_this();
+            ++navCount;
         }
 	}
+
+    if (navigations.size() == navCount)
+    {
+        isDeserialized = true;
+    }
 }
 
 GameObject* UIComponent::GetNextNavi(Direction dir)
