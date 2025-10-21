@@ -1,12 +1,12 @@
 {
     "currentTime": 0.0,
-    "duration": -1.0,
+    "duration": 1.0,
     "emitterTimings": [
         0.0
     ],
     "isPaused": false,
     "isPlaying": false,
-    "loop": true,
+    "loop": false,
     "name": "gghit3",
     "particleSystems": [
         {
@@ -95,13 +95,13 @@
                         "impulses": [
                             {
                                 "direction": [
-                                    1.0,
                                     0.0,
-                                    0.0
+                                    0.0,
+                                    -1.0
                                 ],
-                                "duration": 0.10000000149011612,
-                                "force": 3.2660000324249268,
-                                "range": 0.27900001406669617,
+                                "duration": 0.1720000058412552,
+                                "force": 9.79800033569336,
+                                "range": 0.6809999942779541,
                                 "triggerTime": 0.0,
                                 "type": 1
                             }
@@ -111,7 +111,7 @@
                             "useGravity": 1
                         },
                         "movementParams": {
-                            "currentTime": 273.31640625,
+                            "currentTime": 35.243804931640625,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -158,17 +158,17 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 0.009999999776482582,
-                                "y": 0.009999999776482582,
-                                "z": 0.05000000074505806
+                                "x": 0.05000000074505806,
+                                "y": 0.05000000074505806,
+                                "z": 0.10000000149011612
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.014000000432133675,
-                                "y": 0.009999999776482582,
-                                "z": 0.05000000074505806
+                                "x": 0.05000000074505806,
+                                "y": 0.05000000074505806,
+                                "z": 0.10000000149011612
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
@@ -212,7 +212,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -242,5 +242,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }
