@@ -48,7 +48,7 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
     m_meshParticleTemplate.velocityRandomRange = 0.0f;
     m_meshParticleTemplate.textureIndex = 0;
-    m_meshParticleTemplate.particleInitialRotation = Mathf::Vector3(0.f, 0.f, 0.f);
+    m_meshParticleTemplate.particleRandomRotation = Mathf::Vector3(0.f, 0.f, 0.f);
 
     m_originalEmitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
     m_originalParticleScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
@@ -514,12 +514,11 @@ void MeshSpawnModuleCS::SetRenderMode(UINT mode)
     }
 }
 
-void MeshSpawnModuleCS::SetParticleInitialRotation(const XMFLOAT3& rotation)
+void MeshSpawnModuleCS::SetParticleRandomRotation(const XMFLOAT3& rotation)
 {
-    m_meshParticleTemplate.particleInitialRotation = rotation;
+    m_meshParticleTemplate.particleRandomRotation = rotation;
     m_templateDirty = true;
 }
-
 
 nlohmann::json MeshSpawnModuleCS::SerializeData() const
 {
@@ -538,7 +537,7 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
     // MeshParticleTemplateParams 직렬화
     json["meshParticleTemplate"] = {
         {"lifeTime", m_meshParticleTemplate.lifeTime},
-        {"initialRotation", EffectSerializer::SerializeVector3(m_meshParticleTemplate.particleInitialRotation)},
+        {"initialRotation", EffectSerializer::SerializeVector3(m_meshParticleTemplate.particleRandomRotation)},
         {"Scale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.Scale)},
         {"RotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.RotationSpeed)},
         {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
@@ -596,7 +595,7 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
             m_meshParticleTemplate.lifeTime = templateJson["lifeTime"];
 
         if (templateJson.contains("initialRotation"))
-            m_meshParticleTemplate.particleInitialRotation = EffectSerializer::DeserializeVector3(templateJson["initialRotation"]);
+            m_meshParticleTemplate.particleRandomRotation = EffectSerializer::DeserializeVector3(templateJson["initialRotation"]);
 
         if (templateJson.contains("Scale"))
             m_meshParticleTemplate.Scale = EffectSerializer::DeserializeXMFLOAT3(templateJson["Scale"]);
