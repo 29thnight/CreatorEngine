@@ -746,6 +746,9 @@
 		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
@@ -769,6 +772,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\WaitAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MosterMeleeAni.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CurveIndicator.cpp">
 			<Filter>Script\ScriptClass</Filter>
