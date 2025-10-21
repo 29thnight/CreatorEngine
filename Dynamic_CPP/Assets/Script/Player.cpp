@@ -2181,30 +2181,19 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			GameObject* HitObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
 			auto swordHitEffect = HitObj->GetComponent<PlayEffectAll>();
 			Transform* hitTransform = HitObj->GetComponent<Transform>();
-			hitTransform->SetPosition(hitinfo.hitPos);
 			Vector3 normal = hitinfo.hitNormal;
 			normal.Normalize();
+			hitTransform->SetPosition(hitinfo.hitPos);
+			// 노말 벡터를 Forward로 하는 회전 계산
+			XMVECTOR normalVec = XMLoadFloat3(&normal);
+			XMVECTOR upVec = XMVectorSet(0, 1, 0, 0);
+			// 노말이 거의 수직일 때 다른 업 벡터 사용
+			if (fabsf(XMVectorGetX(XMVector3Dot(normalVec, upVec))) > 0.99f)  // fabsf 추가
+				upVec = XMVectorSet(0, 0, 1, 0);
 
-			// 보조 업 벡터 (노말이랑 평행하지 않게 선택)
-			Vector3 up = Vector3::UnitY;
-			if (fabsf(up.Dot(normal)) > 0.99f)
-				up = Vector3::UnitX;
+			XMMATRIX rotMatrix = XMMatrixLookToLH(XMVectorZero(), normalVec, upVec);
+			Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMatrix);
 
-			// 오른쪽 벡터
-			Vector3 right = up.Cross(normal);
-			right.Normalize();
-
-			// 다시 업 보정
-			up = normal.Cross(right);
-			up.Normalize();
-
-			// 회전행렬 → 쿼터니언
-			Matrix rotMat;
-			rotMat.Right(right);
-			rotMat.Up(up);
-			rotMat.Forward(normal);
-
-			Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMat);
 			hitTransform->SetRotation(rot);
 			swordHitEffect->Initialize();
 		}
