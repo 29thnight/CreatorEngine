@@ -1,6 +1,6 @@
 m_name: PlayerBoy
 m_isEnabled: true
-m_instanceID: 431381076
+m_instanceID: 3928633941
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
@@ -8,14 +8,14 @@ PrefabNode:
     m_isEnabled: true
     m_instanceID: 258980749
     m_transform:
-      position: {x: 0, y: 0, z: -4.49728901e-07, w: 1}
+      position: {x: 0, y: 0, z: -7.69911992e-07, w: 1}
       rotation: {x: 0, y: 1, z: 0, w: -5.0020958e-08}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
     m_index: 4
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [5, 6, 7, 8, 9, 10]
+    m_childrenIndices: [5, 6, 7, 8, 9, 10, 180]
     m_prefabFileGuid: c0811289-30e2-5712-bae9-7f30b1d79ee5
     m_attachedSoketID: 0
     m_collisionType: 5
@@ -92,7 +92,7 @@ PrefabNode:
         detectRadius: 1
         m_name: Player
         m_isEnabled: true
-        m_instanceID: 2988105689
+        m_instanceID: 481236034
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 79f77a81-a37d-5d07-b1ef-28e72015b330
       - PlayerInputComponent: 2504506805
@@ -101,7 +101,7 @@ PrefabNode:
         m_instanceID: 3481378838
         m_FileID: 00000000-0000-0000-0000-000000000000
         controllerIndex: 0
-        m_actionMapName: PlayerKeyBoard
+        m_actionMapName: Player
         m_scriptName: ""
     children:
       - GameObject: 2166264123
@@ -440,8 +440,8 @@ PrefabNode:
                     - m_eventName: StartRay
                       m_scriptName: Player
                       m_funName: StartRay
-                      key: 0.0500000007
-                      frameKey: 2
+                      key: 0.0250000004
+                      frameKey: 1
                     - m_eventName: EndRay
                       m_scriptName: Player
                       m_funName: EndRay
@@ -450,8 +450,8 @@ PrefabNode:
                     - m_eventName: PlaySlashEvent3
                       m_scriptName: Player
                       m_funName: PlaySlashEvent3
-                      key: 0.0500000007
-                      frameKey: 2
+                      key: 0.0250000004
+                      frameKey: 1
                 - m_name: Ani_PC2_throw
                   m_isLoop: false
                   m_keyFrameEvent:
@@ -3047,3 +3047,62 @@ PrefabNode:
                 m_tag: Untagged
                 m_layer: Default
                 m_components: ~
+      - GameObject: 2166264123
+        m_name: indicator_pc2
+        m_isEnabled: true
+        m_instanceID: 3794519013
+        m_transform:
+          position: {x: 0, y: -9.53674316e-07, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 4
+        m_index: 180
+        m_parentIndex: 4
+        m_rootIndex: 0
+        m_childrenIndices: ~
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_attachedSoketID: 0
+        m_collisionType: 0
+        m_isStatic: false
+        m_gameObjectType: 3
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_isEnabled: true
+            m_instanceID: 282309259
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: indicator_pc2
+              m_baseColorTexName: indicator_pc2.png
+              m_normalTexName: ""
+              m_ORM_TexName: ""
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 0
+                m_roughness: 0.5
+                m_IOR: 1.5
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: b88c254c-c688-570c-b239-c8d1f46a286f
+              m_renderingMode: 1
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Plane.004
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+            m_bitflag: 0
