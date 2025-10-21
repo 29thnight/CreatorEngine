@@ -269,7 +269,7 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     }
     else
     {
-        particle.rotation = float3(0, 0, 0);
+        particle.rotation = gEmitterRotation;
     }
 
     particle.pad3 = gEmitterRotation.x;
@@ -282,6 +282,7 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.textureIndex = textureIndex;
     particle.renderMode = gRenderMode;
     particle.isActive = 1;
+    particle.pad8 = particle.position;
 }
 
 void UpdateExistingMeshParticlePosition(inout MeshParticleData particle)

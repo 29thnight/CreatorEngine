@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("TestShader", []() { return new TestShader(); });
 		CreateFactory::GetInstance()->RegisterFactory("SettingWindowUI", []() { return new SettingWindowUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("ExitButton", []() { return new ExitButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("CreditsButton", []() { return new CreditsButton(); });

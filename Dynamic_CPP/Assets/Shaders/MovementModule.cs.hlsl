@@ -94,6 +94,48 @@ RWStructuredBuffer<ParticleData> ParticlesOutput : register(u0);
 // 스레드 그룹 크기 정의
 #define THREAD_GROUP_SIZE 1024
 
+float3x3 CreateRotationMatrixX(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        1, 0, 0,
+        0, c, -s,
+        0, s, c
+    );
+}
+
+float3x3 CreateRotationMatrixY(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        c, 0, s,
+        0, 1, 0,
+        -s, 0, c
+    );
+}
+
+float3x3 CreateRotationMatrixZ(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        c, -s, 0,
+        s, c, 0,
+        0, 0, 1
+    );
+}
+
+float3x3 CreateRotationMatrix(float3 rotation)
+{
+    float3x3 rotX = CreateRotationMatrixX(rotation.x);
+    float3x3 rotY = CreateRotationMatrixY(rotation.y);
+    float3x3 rotZ = CreateRotationMatrixZ(rotation.z);
+    
+    return mul(mul(rotZ, rotY), rotX);
+}
+
 // 간단한 노이즈 함수
 float noise(float2 uv)
 {
@@ -170,6 +212,9 @@ float3 GetImpulseForce(float normalizedAge, uint particleIndex, inout ParticleDa
             
             float3 baseDir = normalize(Impulses[i].direction);
             float3 finalDirection;
+            
+            float3x3 rot = CreateRotationMatrix(float3(particle.pad1, particle.pad2, particle.pad3));
+            baseDir = mul(rot, baseDir);
             
             if (Impulses[i].spreadType == 0)
             {
@@ -368,11 +413,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else
         {
-            particle.rotation += particle.rotatespeed * deltaTime;
+            //particle.rotation += particle.rotatespeed * deltaTime;
         }
         
         // 위치 및 회전 업데이트
         particle.position += particle.velocity * deltaTime;
+        particle.pad5 += particle.velocity * deltaTime;
         particle.rotation += particle.rotatespeed * deltaTime;
     }
     

@@ -83,6 +83,11 @@ cbuffer MeshMovementParams : register(b0)
     int velocityCurveSize;
     int impulseCount;
     float2 pad2;
+    
+    float3 emitterPosition;
+    float emitterPad1;
+    float3 emitterRotation;
+    float emitterPad2;
 };
 
 // 파티클 버퍼 (읽기)
@@ -389,6 +394,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         
         // 위치 업데이트 (월드 공간에서)
         particle.position += particle.velocity * deltaTime;
+        particle.pad8 += particle.velocity * deltaTime;
         
     }
     
