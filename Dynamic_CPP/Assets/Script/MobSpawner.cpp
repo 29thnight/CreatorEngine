@@ -1,6 +1,7 @@
 #include "MobSpawner.h"
 #include "pch.h"
 #include "PrefabUtility.h"
+#include "EventTarget.h"
 #include "Player.h"
 void MobSpawner::Start()
 {
@@ -62,6 +63,16 @@ void MobSpawner::Spawn()
 				temp *= spawnRadius;
 				temp.y += 0.5f;
 				obj->m_transform.SetPosition(SpawnArea + temp);
+				if(0 != m_eventId && !m_runtimeTag.empty())
+				{
+					auto eventTargetBase = obj->AddScriptComponent("EventTarget");
+					// Configure EventTarget : TESTING
+					auto eventTarget = dynamic_cast<EventTarget*>(eventTargetBase);
+					if (eventTarget)
+					{
+						eventTarget->Configure(m_eventId, "targetTag", m_runtimeTag);
+					}
+				}
 			}
 		}
 	}
