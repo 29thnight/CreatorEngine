@@ -15,6 +15,7 @@ ReflectionScriptField(InputDeviceDetector) \
 		meta_method(MoveSelector, "dir") \
 		meta_method(CharSelect) \
 		meta_method(ReleaseKey) \
+		meta_method(LeaveSelectScene) \
 	}); \
 	FieldEnd(InputDeviceDetector, PropertyAndMethod) \
 };

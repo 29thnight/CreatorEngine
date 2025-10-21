@@ -8,8 +8,14 @@
 void RewardObserver::Start()
 {
 	rewardText = GetOwner()->GetComponent<TextComponent>();
-	rewardImage = GameObject::Find("GamFill")->GetComponent<ImageComponent>();
-	gameManager = GameObject::Find("GameManager")->GetComponent<GameManager>();
+    if(auto obj = GameObject::Find("GamFill"))
+    {
+        rewardImage = obj->GetComponent<ImageComponent>();
+    }
+	if (auto obj = GameObject::Find("GameManager"))
+    {
+        gameManager = obj->GetComponent<GameManager>();
+    }
 }
 
 void RewardObserver::Update(float tick)

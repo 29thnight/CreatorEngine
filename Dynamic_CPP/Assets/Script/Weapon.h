@@ -26,7 +26,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void Attack(Player* _Owner, AttackContext _attackContext = {}) {}
+	void Initialize();
 	void SetEnabled(bool able);
 	ItemType GetItemType() { return itemType; }
 	//기본무기 검사(내구도 없음)

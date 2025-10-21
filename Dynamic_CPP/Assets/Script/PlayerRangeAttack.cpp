@@ -35,7 +35,7 @@ void PlayerRangeAttack::Enter()
 		auto controller = m_player->player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0 ,0 });
 		//m_player->m_animator->SetUseLayer(1, false);
-		//m_player->RangeAttack();
+		m_player->RangeAttack();
 	}
 }
 

@@ -24,6 +24,9 @@ constexpr int MAX__COMPILE_ITERATION = 4;
 
 void HotLoadSystem::Initialize()
 {
+	m_scriptComponentIndexs.reserve(1300);
+	m_scriptComponentMetaIndexs.reserve(1300);
+
     std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
 	msbuildPath = EngineSettingInstance->GetMsbuildPath();
 	if (msbuildPath.empty())

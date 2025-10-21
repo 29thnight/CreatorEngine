@@ -35,7 +35,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
 	CoreWindow coreWindow(hInstance, title, width, height);
-	CoreWindow::SetDumpType(DUMP_TYPE::DUNP_TYPE_MINI);
+	CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
 	m_hWnd = coreWindow.GetHandle();
 	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
 	SetWindow(coreWindow);

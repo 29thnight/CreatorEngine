@@ -120,7 +120,10 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 		}
     }
 
-	obj->m_instanceID = newInstanceID;
+    if (type != GameObjectType::UI)
+    {
+        obj->m_instanceID = newInstanceID;
+    }
 	obj->m_name = newHashedName;
     obj->m_index = newIndex;
     obj->m_parentIndex = parent;
@@ -168,19 +171,19 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         }
     }
 
-    if(SceneManagers->m_isGameStart)
-    {
-        for (auto& comp : obj->m_components)
-        {
-            if (!comp) continue;
+    //if(SceneManagers->m_isGameStart)
+    //{
+    //    for (auto& comp : obj->m_components)
+    //    {
+    //        if (!comp) continue;
 
-            auto script = std::dynamic_pointer_cast<ModuleBehavior>(comp);
-            if (script)
-            {
-                ScriptManager->BindScriptEvents(script.get(), script->m_name.ToString());
-            }
-        }
-    }
+    //        auto script = std::dynamic_pointer_cast<ModuleBehavior>(comp);
+    //        if (script)
+    //        {
+    //            ScriptManager->BindScriptEvents(script.get(), script->m_name.ToString());
+    //        }
+    //    }
+    //}
 
     if (node["children"])
     {

@@ -149,10 +149,6 @@ public:
 		return allocScene;
 	}
 
-    std::atomic_bool m_isAwake{ false };
-    std::atomic_bool m_isLoaded{ false };
-    std::atomic_bool m_isDirty{ false };
-    std::atomic_bool m_isEnable{ false };
     [[Property]]
     size_t m_buildIndex{ 0 };
     [[Property]]

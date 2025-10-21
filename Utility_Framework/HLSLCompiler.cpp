@@ -3,16 +3,20 @@
 #include "FileIO.h"
 
 std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
+std::mutex HLSLCompiler::m_compileMutex;
 
 ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 {
     file::path filePath{ filepath };
 	std::string fileExtension = filePath.extension().string();
 
-	if (m_shaderCache.find(filePath.string()) != m_shaderCache.end())
-	{
-		return m_shaderCache[filePath.string()];
-	}
+    {
+		std::unique_lock<std::mutex> lock(m_compileMutex);
+        if (m_shaderCache.find(filePath.string()) != m_shaderCache.end())
+        {
+            return m_shaderCache[filePath.string()];
+        }
+    }
 
     ComPtr<ID3DBlob> shaderBlob;
     ComPtr<ID3DBlob> errorBlob;
@@ -66,7 +70,10 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 
 		if (SUCCEEDED(hResult))
 		{
-			m_shaderCache[filePath.string()] = shaderBlob;
+            {
+				std::unique_lock<std::mutex> lock(m_compileMutex);
+                m_shaderCache[filePath.string()] = shaderBlob;
+            }
             std::string csoPath = PathFinder::RelativeToPrecompiledShader().string() + filePath.stem().string() + ".cso";
 			FileWriter writer{ csoPath };
 			writer.write(static_cast<char*>(shaderBlob->GetBufferPointer()), shaderBlob->GetBufferSize());
@@ -106,7 +113,10 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 			throw std::runtime_error("Failed to read compiled shader file");
 		}
 
-		m_shaderCache[filePath.string()] = shaderBlob;
+        {
+            std::unique_lock<std::mutex> lock(m_compileMutex);
+            m_shaderCache[filePath.string()] = shaderBlob;
+        }
 
     }
 

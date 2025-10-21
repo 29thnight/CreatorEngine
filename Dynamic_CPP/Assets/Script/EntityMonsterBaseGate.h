@@ -26,9 +26,13 @@ public:
 
 	void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
 
+
 private:
 	[[Property]]
-	int maxHP = 20;
-	[[Property]]
-	int halfDestroyedHP = 10;  //비율로하거나 고정값으로 하거나 이떄가되면 모델변경 or 텍스쳐변경or 애니메이션등
+	int maxHP = 200;
+	bool isDestroy = false;
+	GameObject* normalModel = nullptr;
+	GameObject* breakModel = nullptr;
+	std::string normalTag = "normalModel";
+	std::string breakTag = "breakModel";
 };

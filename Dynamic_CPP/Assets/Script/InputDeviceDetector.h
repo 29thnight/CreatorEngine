@@ -20,17 +20,20 @@ public:
 	void CharSelect();
 	[[Method]]
 	void ReleaseKey();
+	[[Method]]
+	void LeaveSelectScene();
 
 	void SetPlayerIndex(int index) { m_playerIndex = index; }
 	int GetPlayerIndex() const { return m_playerIndex; }
 	bool IsSelectComplete() const { return m_isSelectComplete; }
 
 private:
-	class GameObject* m_gameManagerObj = nullptr;
-	class GameManager* m_gameManager = nullptr;
-	class PlayerSelector* m_playerSelector = nullptr;
-	class ImageComponent* leftPos = nullptr;
-	class ImageComponent* rightPos = nullptr;
+	class GameObject*		m_gameManagerObj = nullptr;
+	class GameManager*		m_gameManager = nullptr;
+	class PlayerSelector*	m_playerSelector = nullptr;
+	class ImageComponent*	leftPos = nullptr;
+	class ImageComponent*	rightPos = nullptr;
+	class SelectTimer*		m_selectTimer = nullptr;
 
 private:
 	// 입력/리피트 파라미터
@@ -57,6 +60,7 @@ private:
 	float m_selectHold{};
 
 	bool m_isSelectComplete{ false };
+	bool m_isLeaveSelectScene{ false };
 
 	CharType charType{};
 	PlayerDir dir{};

@@ -4,6 +4,7 @@
 #include "PlayerInput.h"
 #include "PlayerSelector.h"
 #include "ImageComponent.h"
+#include "SelectTimer.h"
 #include "pch.h"
 
 static int SignAxis(float x, float dead)
@@ -37,18 +38,33 @@ void InputDeviceDetector::Start()
         RPosTex = righttargetObj->GetComponent<ImageComponent>();
         if (RPosTex) rightPos = RPosTex;
     }
+
+	GameObject* timerObj = nullptr;
+    if (timerObj = GameObject::Find("CharSelectTimer"))
+    {
+        m_selectTimer = timerObj->GetComponent<SelectTimer>();
+	}
 }
 
 void InputDeviceDetector::Update(float tick)
 {
 	m_lastDelta = tick;
+	if (m_isLeaveSelectScene)
+    {
+		int& nextSceneIndex = m_gameManager->m_nextSceneIndex;
+        if(GameInstance::GetInstance()->IsLoadSceneComplete() && nextSceneIndex == (int)SceneType::Bootstrap)
+        {
+			m_isLeaveSelectScene = false;
+            m_gameManager->SwitchNextScene();
+        }
+    }
 }
 
 void InputDeviceDetector::MoveSelector(Mathf::Vector2 dir)
 {
 	if (!m_isCallStart) return;
 
-    if (!m_isCallStart || !m_playerSelector || m_isSelectComplete) return;
+    if (!m_playerSelector || m_isSelectComplete) return;
 
 	m_p.axisDiscrete = SignAxis(dir.x, m_deadZone);
 
@@ -153,5 +169,20 @@ void InputDeviceDetector::CharSelect()
 void InputDeviceDetector::ReleaseKey()
 {
     m_selectHold = 0.f;
+}
+
+void InputDeviceDetector::LeaveSelectScene()
+{
+    if (!m_isCallStart) return;
+
+    if (!m_selectTimer || m_selectTimer->IsTimerOn()) return;
+
+    if (!m_isLeaveSelectScene && m_gameManager)
+    {
+        m_gameManager->m_nextSceneIndex = 0;
+        m_gameManager->SetLoadingReq(false);
+        m_gameManager->LoadNextScene();
+        m_isLeaveSelectScene = true;
+    }
 }
 

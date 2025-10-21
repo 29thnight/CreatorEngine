@@ -1293,9 +1293,11 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GGlow.ps.hlsl">
       <Filter>Shaders\Effect\Special\2D</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SwordProjectile.ps.hlsl" />
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GbufferFlashPlayer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SwordProjectile.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
