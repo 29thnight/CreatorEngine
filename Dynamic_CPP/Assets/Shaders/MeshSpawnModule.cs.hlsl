@@ -276,9 +276,9 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     if (length(gParticleRandomRotation) > 0.0)
     {
         float3 randomRotation = RandomRange3D(seed + 200,
-            float3(-gParticleRandomRotation.x, -gParticleRandomRotation.y, -gParticleRandomRotation.z),
-            float3(gParticleRandomRotation.x, gParticleRandomRotation.y, gParticleRandomRotation.z));
-        particle.rotation = randomRotation;
+        float3(-gParticleRandomRotation.x, -gParticleRandomRotation.y, -gParticleRandomRotation.z),
+        float3(gParticleRandomRotation.x, gParticleRandomRotation.y, gParticleRandomRotation.z));
+        particle.rotation = gEmitterRotation + randomRotation;
     }
     else
     {
