@@ -17,7 +17,6 @@ EffectEditor::EffectEditor()
 		{
 			ImGui::GetContext("EffectList").Close();
 		}
-
 		// 리스트박스
 		if (ImGui::BeginListBox("##EffectList"))
 		{
@@ -32,6 +31,22 @@ EffectEditor::EffectEditor()
 		});
 	ImGui::GetContext("EffectList").Close();
 
+	// Pool Status 창 등록
+	ImGui::ContextRegister("PoolStatus", false, [&]() {
+		// 제목과 X 버튼을 같은 줄에
+		ImGui::Text("Effect Pool Status");
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 30);
+		if (ImGui::SmallButton(ICON_FA_X))
+		{
+			ImGui::GetContext("PoolStatus").Close();
+		}
+
+		ImGui::Separator();
+		RenderPoolStatus();
+		});
+	ImGui::GetContext("PoolStatus").Close();
+
 	// 메인 에디터 창 등록
 	ImGui::ContextRegister("EffectEdit", false, [&]() {
 		if (ImGui::BeginMenuBar())
@@ -40,6 +55,10 @@ EffectEditor::EffectEditor()
 			if (ImGui::Button("Effect List"))
 			{
 				ImGui::GetContext("EffectList").Open(); // 리스트 창 열기
+			}
+			if (ImGui::Button("Pool Status"))
+			{
+				ImGui::GetContext("PoolStatus").Open(); // Pool Status 창 열기
 			}
 			ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 30);
 			if (ImGui::SmallButton(ICON_FA_X))
@@ -53,6 +72,115 @@ EffectEditor::EffectEditor()
 	ImGui::GetContext("EffectEdit").Close();
 }
 
+void EffectEditor::RenderPoolStatus()
+{
+	auto* effectManager = EffectManager::GetInstance();
+	if (!effectManager) {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "EffectManager not available");
+		return;
+	}
+
+	// 기본 통계
+	ImGui::Columns(2, "PoolStats", false);
+	ImGui::SetColumnWidth(0, 120);
+
+	// Pool 크기
+	ImGui::Text("Pool Size:");
+	ImGui::NextColumn();
+	int poolSize = effectManager->GetPoolSize();
+	int maxPoolSize = effectManager->GetMaxPoolSize();
+	ImGui::Text("%d / %d", poolSize, maxPoolSize);
+
+	float poolUsageRatio = (float)poolSize / maxPoolSize;
+	if (poolUsageRatio > 0.8f) {
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(High)");
+	}
+	ImGui::NextColumn();
+
+	// 활성 이펙트
+	ImGui::Text("Active Effects:");
+	ImGui::NextColumn();
+	int activeCount = effectManager->GetActiveEffectCount();
+	int maxActiveEffects = effectManager->GetMaxActiveEffects();
+	ImGui::Text("%d / %d", activeCount, maxActiveEffects);
+
+	float activeUsageRatio = (float)activeCount / maxActiveEffects;
+	if (activeUsageRatio > 0.8f) {
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(High)");
+	}
+	ImGui::NextColumn();
+
+	// 정리 큐
+	ImGui::Text("Cleanup Queue:");
+	ImGui::NextColumn();
+	int cleanupQueueSize = effectManager->GetCleanupQueueSize();
+	ImGui::Text("%d", cleanupQueueSize);
+	if (cleanupQueueSize > 20) {
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(High)");
+	}
+	ImGui::NextColumn();
+
+	// Pool 상태
+	ImGui::Text("Pool Health:");
+	ImGui::NextColumn();
+	bool isHealthy = effectManager->IsPoolHealthy();
+	if (isHealthy) {
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Healthy");
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Unhealthy");
+	}
+	ImGui::NextColumn();
+
+	// 메모리 사용량
+	ImGui::Text("Memory Usage:");
+	ImGui::NextColumn();
+	size_t totalMemory = effectManager->GetTotalMemoryUsage();
+	float memoryMB = totalMemory / (1024.0f * 1024.0f);
+	ImGui::Text("%.1f MB", memoryMB);
+	ImGui::NextColumn();
+
+	ImGui::Columns(1);
+
+	// 통계 정보
+	ImGui::Separator();
+	ImGui::Text("Lifetime Statistics:");
+
+	ImGui::Columns(2, "LifetimeStats", false);
+	ImGui::SetColumnWidth(0, 120);
+
+	ImGui::Text("Total Created:");
+	ImGui::NextColumn();
+	ImGui::Text("%d", effectManager->GetTotalCreatedEffects());
+	ImGui::NextColumn();
+
+	ImGui::Text("Total Destroyed:");
+	ImGui::NextColumn();
+	ImGui::Text("%d", effectManager->GetTotalDestroyedEffects());
+	ImGui::NextColumn();
+
+	ImGui::Columns(1);
+
+	// 제어 버튼들
+	ImGui::Separator();
+
+	if (ImGui::Button("Print Pool Statistics")) {
+		effectManager->PrintPoolStatistics();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Force Cleanup")) {
+		effectManager->ForceCleanupOldEffects();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Emergency Cleanup")) {
+		effectManager->EmergencyCleanup();
+	}
+}
 void EffectEditor::Release()
 {
 	m_tempEmitters.clear();
