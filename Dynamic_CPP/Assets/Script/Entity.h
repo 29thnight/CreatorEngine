@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "ItemType.h"
+#include "Entity.generated.h"
 struct HitInfo
 {
 	Mathf::Vector3 attakerPos{};     //‹š¸°¾Ö worldpos
@@ -16,6 +17,8 @@ struct HitInfo
 class Entity : public ModuleBehavior
 {
 public:
+   ReflectEntity
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Entity)
 	virtual void Awake() override {}
 	virtual void Start() override {}
@@ -42,6 +45,7 @@ public:
 	void StopHitImpulse();
 
 	int m_currentHP{ 1 };
+	[[Property]]
 	int m_maxHP{ 100 };
 
 	float m_maxHitImpulseDuration{ 0.3f };
@@ -50,6 +54,7 @@ public:
 	float m_hitImpulseFrequency{ 1.f };
 
 	float m_idleTime = 1.f;
+
 
 	float detectTime = 1.0f;
 	float detectElapsedTime = 0.f;

@@ -458,6 +458,15 @@ void Player::Update(float tick)
 		sucessResurrection = false;
 	}
 
+	if (curDashTime >= 0.f)
+	{
+		curDashTime -= tick;
+		if (curDashTime <= 0.f)
+		{
+			m_animator->SetParameter("EndDash",true);
+		}
+	}
+
 	if (BombIndicator)
 	{
 		BombIndicator->SetEnabled(onBombIndicate);
@@ -860,8 +869,8 @@ void Player::UpdateChatchObject()
 	auto forward = GetOwner()->m_transform.GetForward();
 	auto world = GetOwner()->m_transform.GetWorldPosition();
 	XMVECTOR forwardVec = XMLoadFloat3(&forward);
-	XMVECTOR offsetPos = world + forwardVec * 1.0f;
-	offsetPos.m128_f32[1] = 1.0f;
+	Mathf::Vector3 offsetPos = world + forwardVec * 1.0f;
+	offsetPos.y += 1.0f;
 	//&&&&& 포지션 소켓에 붙여서 옮겨야 할수도
 	catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 	//asis와 거리계속 갱신
@@ -1655,7 +1664,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 		dir.Normalize();
 		std::vector<HitResult> hits;
 
-		float distacne = 100.0f;
+		float distacne = 150.0f;
 
 		unsigned int layerMask = 1 << 11;
 		bombThrowPosition.y = pos.y + 0.1f;
@@ -1667,7 +1676,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 			{
 				continue;
 			}
-
+			//Ground 등체크해서 땅바닥바로위처리등 
 			bombThrowPosition.y = hit.point.y + 0.1f;
 		}
 

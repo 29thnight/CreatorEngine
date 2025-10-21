@@ -40,6 +40,7 @@ void PlayerDash::Enter()
 
 
 		float knockbackSpeed = m_player->dashDistacne / m_player->m_dashTime;
+		m_player->curDashTime = m_player->m_dashTime;
 		Mathf::Vector3 forward = m_player->player->m_transform.GetForward();
 		Mathf::Vector3 horizontalDir = forward;
 		horizontalDir.y = 0.0f;

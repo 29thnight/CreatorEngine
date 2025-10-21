@@ -1,22 +1,22 @@
-m_name: WeaponMelee_Prefab
+m_name: WeaponMelee
 m_isEnabled: true
-m_instanceID: 2057737871
-m_fileGuid: a1ba67db-84f2-514c-ab28-032280c3ea21
+m_instanceID: 2535591205
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponMelee
     m_isEnabled: true
-    m_instanceID: 1328531459
+    m_instanceID: 1051163191
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1
+    m_index: 183
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [2]
-    m_prefabFileGuid: a1ba67db-84f2-514c-ab28-032280c3ea21
+    m_childrenIndices: [184]
+    m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -31,7 +31,7 @@ PrefabNode:
         itemKnockback: 0.5
         coopCrit: 2
         chgTime: 0.200000003
-        chgAckDmg: 5
+        chgAckDmg: 60
         chgRange: 6
         chgKnockback: 1
         ChargeAttackBulletCount: 5
@@ -42,24 +42,24 @@ PrefabNode:
         bombRadius: 2.5
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 1781989110
+        m_instanceID: 4174286039
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
         m_name: Weapon_sword02_re
         m_isEnabled: true
-        m_instanceID: 451137883
+        m_instanceID: 2212477327
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1
-        m_index: 2
-        m_parentIndex: 1
+          m_parentID: 183
+        m_index: 184
+        m_parentIndex: 183
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: a1ba67db-84f2-514c-ab28-032280c3ea21
+        m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -70,7 +70,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1952944403
+            m_instanceID: 3639533479
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_sword02_re
@@ -83,7 +83,6 @@ PrefabNode:
                 m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 1
                 m_roughness: 1
-                m_bitflag: 0
                 m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
@@ -105,3 +104,4 @@ PrefabNode:
             m_shadowRecive: true
             m_shadowCast: true
             m_isEnableLOD: false
+            m_bitflag: 0

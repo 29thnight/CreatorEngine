@@ -124,6 +124,7 @@ public:
 	float dashDistacne = 0.05f; // 대시거리
 	[[Property]]
 	float m_dashTime = 0.15f; //
+	float curDashTime = 0.f;
 	[[Property]]
 	float dashCooldown = 1.f; //대쉬 쿨타임
 	[[Property]]
