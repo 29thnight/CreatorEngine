@@ -188,6 +188,8 @@ public:
 	void MeleeChargeAttack();
 	void RangeAttack();
 
+
+	bool nearTarget = false;
 	[[Method]]
 	void ShootBullet();
 	[[Method]]

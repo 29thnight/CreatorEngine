@@ -1469,7 +1469,7 @@ bool Player::AddWeapon(Weapon* weapon)
 	weapon->Initialize();
 	m_weaponInventory.push_back(weapon);
 	m_AddWeaponEvent.UnsafeBroadcast(weapon, m_weaponInventory.size() - 1);
-	m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
+	//m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
 	handSocket->AttachObject(weapon->GetOwner());
 	if (1 >= prevSize)
 	{
@@ -1480,6 +1480,7 @@ bool Player::AddWeapon(Weapon* weapon)
 
 		m_curWeapon = weapon;
 		m_curWeapon->SetEnabled(true);
+		m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponInventory.size() - 1);
 		m_weaponIndex = m_weaponInventory.size() - 1;
 	}
@@ -1795,7 +1796,7 @@ void Player::RangeAttack()
 	//원거리 무기 일때 에임보정후 발사
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	float distance;
-
+	nearTarget = false;
 	inRangeEnemy.clear();
 	std::unordered_set<Entity*> enemis; // 몹들만담기
 	curTarget = nullptr;
@@ -1888,15 +1889,22 @@ void Player::RangeAttack()
 		DirectX::SimpleMath::Quaternion lookQuat = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0, 0);
 		transform->SetRotation(lookQuat);
 
+		float length = (targetPos - myPos).Length();
+		length = std::abs(length);
+		if (length <= 2.0f)
+		{
+			nearTarget = true;
+		}
 	}
 
 
 	nearDistance = FLT_MAX;
 }
 
+
+
 void Player::ShootBullet()
 {
-
 	if (isChargeAttack)  //차지어택은 1 , 3 , 5 등 홀수갯수 발사 메인타겟 좌우 각도로 한발씩
 	{
 		ShootChargeBullet();
@@ -1926,19 +1934,19 @@ void Player::ShootNormalBullet()
 	GameObject* bulletObj = normalBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	bool nearTarget = false;
+	//bool nearTarget = false;
 	//쏘기직전에 적이 가까이왔으면 발사대신 떄리기 or 가까이에서 발사? 
-	if (curTarget)
-	{
-		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-		float length = (targetPos - pos).Length();
-		length = std::abs(length);
-		if (length <= 2.0f)
-		{
-			nearTarget = true;
-		}
+	//if (curTarget && curTarget->GetOwner())
+	//{
+	//	Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+	//	float length = (targetPos - pos).Length();
+	//	length = std::abs(length);
+	//	if (length <= 2.0f)
+	//	{
+	//		nearTarget = true;
+	//	}
 
-	}
+	//}
 	if (bulletObj)
 	{
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
@@ -1974,21 +1982,22 @@ void Player::ShootSpecialBullet()
 	GameObject* bulletObj = specialBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	bool nearTarget = false;
+	/*bool nearTarget = false;
+	if (curTarget && curTarget->GetOwner())
+	{
+		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
+		float length = (targetPos - pos).Length();
+		length = std::abs(length);
+		if (length <= 2.0f)
+		{
+			nearTarget = true;
+		}
+
+	}*/
 	if (bulletObj)
 	{
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
-		if (curTarget)
-		{
-			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-			float length = (targetPos - pos).Length();
-			length = std::abs(length);
-			if (length <= 2.0f)
-			{
-				nearTarget = true;
-			}
-
-		}
+		
 
 		if (shootPosObj)
 		{
@@ -2021,7 +2030,7 @@ void Player::ShootChargeBullet()
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	bool nearTarget = false;
+	//bool nearTarget = false;
 	std::vector<GameObject*> chargePool;
 	for (int i = 0; i < 5; i++)
 	{
@@ -2033,7 +2042,7 @@ void Player::ShootChargeBullet()
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 
 
-		if (curTarget)
+		/*if (curTarget && curTarget->GetOwner())
 		{
 			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
 			float length = (targetPos - pos).Length();
@@ -2043,7 +2052,7 @@ void Player::ShootChargeBullet()
 				nearTarget = true;
 			}
 
-		}
+		}*/
 		if (shootPosObj)
 		{
 			shootPos = shootPosObj->m_transform.GetWorldPosition();
