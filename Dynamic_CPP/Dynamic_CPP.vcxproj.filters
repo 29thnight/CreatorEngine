@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project xmlns:ns0="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+<Project ToolsVersion="4.0">
 	<ItemGroup>
 		<Filter Include="Common">
 			<UniqueIdentifier>{6c135c64-11ba-4567-bb91-1959a29ec409}</UniqueIdentifier>
@@ -70,14 +70,14 @@
 		<Filter Include="Script\ScriptClass\UI\LoadingScreen">
 			<UniqueIdentifier>{d1e093f4-2c0a-4329-b161-895423827b5e}</UniqueIdentifier>
 		</Filter>
-		<Filter Include="Script\ScriptClass\AnimainBehavior">
-			<UniqueIdentifier>{352a2d7f-e291-40f4-bbfb-cfe9db5defc2}</UniqueIdentifier>
-		</Filter>
 		<Filter Include="Script\ScriptClass\Effect">
 			<UniqueIdentifier>{3f419c88-8e4f-4000-80c0-e4152fac4006}</UniqueIdentifier>
 		</Filter>
 		<Filter Include="Script\ScriptClass\Enemy">
 			<UniqueIdentifier>{f3defae6-0c72-4547-8833-b4f6dc7f1717}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="Script\ScriptClass\UI\CharSelectScreen">
+			<UniqueIdentifier>{019a933b-c1ca-42dc-83e6-8e3a16ea5354}</UniqueIdentifier>
 		</Filter>
 	</ItemGroup>
 	<ItemGroup>
@@ -92,9 +92,6 @@
 		</ClInclude>
 		<ClInclude Include="CreateFactory.h">
 			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestBehavior.h">
-			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\Entity.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
@@ -120,23 +117,11 @@
 		<ClInclude Include="BTActionFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\InverseKinematic.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="RaycastHelper.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityResource.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityEnemy.h">
-			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -201,12 +186,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsReteat.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
@@ -254,9 +233,6 @@
 		</ClInclude>
 		<ClInclude Include="AniBehaviorFactory.h">
 			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityEnemy.h">
-			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
@@ -312,20 +288,11 @@
 		<ClInclude Include="Assets\Script\TBoss1.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="DebugLog.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\CriticalMark.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\MonsterProjectile.h">
 			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="PlayerState.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="GameInstance.h">
-			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EventTarget.h">
 			<Filter>Script\ScriptClass\Event</Filter>
@@ -336,20 +303,8 @@
 		<ClInclude Include="Assets\Script\ITriggerCondition.h">
 			<Filter>Script\ScriptClass\Event</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\WeaponSlot.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\WeaponSlotController.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityRock.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityMonsterA.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Bomb.h">
-			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\MobSpawner.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -360,19 +315,10 @@
 		<ClInclude Include="Assets\Script\ItemComponent.h">
 			<Filter>Script\ScriptClass\Items</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\Entity.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityAsis.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityBigWood.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityItem.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityItemHeal.h">
@@ -381,50 +327,11 @@
 		<ClInclude Include="Assets\Script\EntityMonsterA.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityResource.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityRock.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntitySpiritStone.h">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TestBehavior.h">
 			<Filter>Script\ScriptClass\Test</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntitySpiritStone.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityItemHeal.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\CriticalMark.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\RewardObserver.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EventSelector.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityBigWood.h">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestMonsterB.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\MonsterProjectile.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="PlayerState.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="GameInstance.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EventTarget.h">
-			<Filter>Script\ScriptClass\Event</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TestEnemy.h">
 			<Filter>Script\ScriptClass\Test</Filter>
@@ -441,53 +348,11 @@
 		<ClInclude Include="Assets\Script\EventManager.h">
 			<Filter>Script\ScriptClass\Event</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\CameraMove.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\TweenManager.h">
 			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\ItemManager.h">
 			<Filter>Script\ScriptClass\Manager</Filter>
-		</ClInclude>
-		<ClInclude Include="ItemType.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\MovingUILayer.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\LoadingController.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\MovingUILayer.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\UIGageTest.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\EventSelector.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerSelector.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\RewardObserver.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\MovingUILayer.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\ItemPopup.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\WeaponSlot.h">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\WeaponSlotController.h">
-			<Filter>Script\ScriptClass\UI</Filter>
 		</ClInclude>
 		<ClInclude Include="RaycastHelper.h">
 			<Filter>Script\ScriptClass\Util</Filter>
@@ -495,58 +360,13 @@
 		<ClInclude Include="Assets\Script\MosterMeleeAni.h">
 			<Filter>AnimationBehavior</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerDash.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerHit.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerStun.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\MobSpawner.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerSelector.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\ImageButton.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\GameInit.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEleteMonster.h">
 			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEffect.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
-			<Filter>Script</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\IllustrationMove.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\ImageSlideshow.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\MonEleteProjetile.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\SelectTimer.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TimerTrigger.h">
@@ -558,17 +378,8 @@
 		<ClInclude Include="Assets\Script\ReachEventTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="SoundName.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
-		<ClInclude Include="ObjectPool.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\ControllerVibration.h">
 			<Filter>Script\ScriptClass\Bullet</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\SwordProjectileEffect.h">
-			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\BP001.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -600,18 +411,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\BurrowMove.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\BossBurrowAni.h">
-			<Filter>Script</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\BossPopupAni.h">
-			<Filter>Script</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\SoundBarUI.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\StartButton.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\ImageButton.h">
 			<Filter>Script\ScriptClass\Util</Filter>
 		</ClInclude>
@@ -624,14 +423,8 @@
 		<ClInclude Include="Assets\Script\SettingButton.h">
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\ViveSwitchUI.h">
-			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\TutorialButton.h">
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TweenManager.h">
-			<Filter>Script\ScriptClass\Util</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\HPBar.h">
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
@@ -643,9 +436,6 @@
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\ItemUIPopup.h">
-			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\BootstrapObserver.h">
@@ -663,92 +453,6 @@
 		<ClInclude Include="Assets\Script\UIGageTest.h">
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\MosterMeleeAni.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerDash.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerGrab.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerHit.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttackEnd.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttackReady.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttackSpecial.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerStun.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerThrow.h">
-			<Filter>AnimationBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\SettingWindowUI.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\BossWarningAni.h">
-			<Filter>Script</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\BossRangedAni.h">
-			<Filter>Script</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\BossMeleeAni.h">
-			<Filter>Script</Filter>
-		<ClInclude Include="Assets\Script\PlayerThrow.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerStun.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttackSpecial.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttackReady.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttackEnd.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerHit.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerGrab.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerDash.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayEffectAll.h">
 			<Filter>Script\ScriptClass\Effect</Filter>
 		</ClInclude>
@@ -760,12 +464,6 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\SwordProjectileEffect.h">
 			<Filter>Script\ScriptClass\Effect</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\GameManager.h">
-			<Filter>Script\ScriptClass\Manager</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\TweenManager.h">
-			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\SFXPoolManager.h">
 			<Filter>Script\ScriptClass\Manager</Filter>
@@ -779,6 +477,126 @@
 		<ClInclude Include="Assets\Script\EntityMonsterBaseGate.h">
 			<Filter>Script\ScriptClass\Enemy</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\ImageSlideshow.h">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SoundBarUI.h">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponSlotController.h">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\WeaponSlot.h">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\ViveSwitchUI.h">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EventSelector.h">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClInclude>
+		<ClInclude Include="ItemType.h">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerThrow.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerBombAttack.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerBombCharing.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerDash.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerGrab.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerHit.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerRangeAttack.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerRangeAttackEnd.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerRangeAttackReady.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerRangeAttackSpecial.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerStun.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossBurrowAni.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossMeleeAni.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossPopupAni.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossRangedAni.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\BossWarningAni.h">
+			<Filter>AnimationBehavior</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SettingWindowUI.h">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="GameInstance.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="ControllerHaptics.h">
+			<Filter>Script\ScriptClass\Util</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestEffect.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SwordProjectile.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="SoundName.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="PlayerState.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="ObjectPool.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="DebugLog.h">
+			<Filter>Script\ScriptClass\Util</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerSelector.h">
+			<Filter>Script\ScriptClass\UI\CharSelectScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SelectTimer.h">
+			<Filter>Script\ScriptClass\UI\CharSelectScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\StartButton.h">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\RewardObserver.h">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\InputDeviceDetector.h">
+			<Filter>Script\ScriptClass\UI\CharSelectScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\MovingUILayer.h">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestShader.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -786,12 +604,6 @@
 		</ClCompile>
 		<ClCompile Include="pch.cpp">
 			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="RaycastHelper.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestBehavior.cpp">
-			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityAsis.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
@@ -802,31 +614,16 @@
 		<ClCompile Include="Assets\Script\Player.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\GameManager.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestEnemy.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityResource.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TweenManager.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClInclude Include="Assets\Script\Weapon.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClCompile Include="Assets\Script\Weapon.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
@@ -937,9 +734,6 @@
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
@@ -1006,9 +800,6 @@
 		<ClCompile Include="Assets\Script\CriticalMark.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="GameInstance.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\CameraMove.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -1017,9 +808,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EventTarget.cpp">
 			<Filter>Script\ScriptClass\Event</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Bomb.cpp">
-			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\MobSpawner.cpp">
 			<Filter>Script\ScriptClass</Filter>
@@ -1030,41 +818,14 @@
 		<ClCompile Include="Assets\Script\ItemComponent.cpp">
 			<Filter>Script\ScriptClass\Items</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityAsis.cpp">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityBigWood.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityItem.cpp">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityMonsterA.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\WeaponSlot.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\WeaponSlotController.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestMonsterB.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\MonsterProjectile.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\RewardObserver.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EventSelector.cpp">
-			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityRock.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
@@ -1078,16 +839,7 @@
 		<ClCompile Include="Assets\Script\EntityResource.cpp">
 			<Filter>Script\ScriptClass\Entity</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityRock.cpp">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntitySpiritStone.cpp">
-			<Filter>Script\ScriptClass\Entity</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\TestBehavior.cpp">
-			<Filter>Script\ScriptClass\Test</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEnemy.cpp">
 			<Filter>Script\ScriptClass\Test</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestMonsterB.cpp">
@@ -1099,15 +851,6 @@
 		<ClCompile Include="Assets\Script\GameManager.cpp">
 			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\CriticalMark.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityBigWood.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="GameInstance.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\EventManager.cpp">
 			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClCompile>
@@ -1117,67 +860,19 @@
 		<ClCompile Include="Assets\Script\ItemManager.cpp">
 			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EventSelector.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\MovingUILayer.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\UIGageTest.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerSelector.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\RewardObserver.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\WeaponSlot.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\WeaponSlotController.cpp">
-			<Filter>Script\ScriptClass\UI</Filter>
-		</ClCompile>
 		<ClCompile Include="RaycastHelper.cpp">
 			<Filter>Script\ScriptClass\Util</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\MosterMeleeAni.cpp">
 			<Filter>AnimationBehavior</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerDash.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerHit.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerStun.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityEleteMonster.cpp">
 			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEffect.cpp">
-			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\IllustrationMove.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\ImageSlideshow.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\MonEleteProjetile.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\SelectTimer.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TimerTrigger.cpp">
@@ -1189,17 +884,8 @@
 		<ClCompile Include="Assets\Script\ReachEventTrigger.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="SoundName.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
-		<ClCompile Include="ObjectPool.cpp">
-			<Filter>Common\SourceFile</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\ControllerVibration.cpp">
 			<Filter>Script\ScriptClass\Bullet</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackSpecial.cpp">
-			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Entity.cpp">
 			<Filter>Common\SourceFile</Filter>
@@ -1234,18 +920,6 @@
 		<ClCompile Include="Assets\BehaviorTree\Action\BurrowMove.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\BossBurrowAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossPopupAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\SoundBarUI.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\StartButton.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\ImageButton.cpp">
 			<Filter>Script\ScriptClass\Util</Filter>
 		</ClCompile>
@@ -1258,14 +932,8 @@
 		<ClCompile Include="Assets\Script\SettingButton.cpp">
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\ViveSwitchUI.cpp">
-			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\TutorialButton.cpp">
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TweenManager.cpp">
-			<Filter>Script\ScriptClass\Util</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\HPBar.cpp">
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
@@ -1277,9 +945,6 @@
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ItemUIPopup.cpp">
-			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\InputDeviceDetector.cpp">
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\BootstrapObserver.cpp">
@@ -1297,92 +962,6 @@
 		<ClCompile Include="Assets\Script\UIGageTest.cpp">
 			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\MosterMeleeAni.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerBombCharing.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerDash.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerGrab.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerHit.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackEnd.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackReady.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackSpecial.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerStun.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
-			<Filter>AnimationBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\SettingWindowUI.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossRangedAni.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
-			<Filter>Script</Filter>
-		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerStun.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackSpecial.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackReady.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttackEnd.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerHit.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerGrab.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerDash.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerBombCharing.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
-			<Filter>Script\ScriptClass\AnimainBehavior</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayEffectAll.cpp">
 			<Filter>Script\ScriptClass\Effect</Filter>
 		</ClCompile>
@@ -1395,13 +974,7 @@
 		<ClCompile Include="Assets\Script\SwordProjectileEffect.cpp">
 			<Filter>Script\ScriptClass\Effect</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\GameManager.cpp">
-			<Filter>Script\ScriptClass\Manager</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\SFXPoolManager.cpp">
-			<Filter>Script\ScriptClass\Manager</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\TweenManager.cpp">
 			<Filter>Script\ScriptClass\Manager</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\ObjectPoolManager.cpp">
@@ -1412,6 +985,114 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityMonsterBaseGate.cpp">
 			<Filter>Script\ScriptClass\Enemy</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ImageSlideshow.cpp">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SoundBarUI.cpp">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponSlotController.cpp">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\WeaponSlot.cpp">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\ViveSwitchUI.cpp">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EventSelector.cpp">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerBombAttack.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerBombCharing.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerDash.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerGrab.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerHit.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttack.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttackEnd.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttackReady.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerRangeAttackSpecial.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerStun.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerThrow.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossBurrowAni.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossMeleeAni.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossPopupAni.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossRangedAni.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossWarningAni.cpp">
+			<Filter>AnimationBehavior</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SettingWindowUI.cpp">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="GameInstance.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="ObjectPool.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SwordProjectile.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestEffect.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="SoundName.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerSelector.cpp">
+			<Filter>Script\ScriptClass\UI\CharSelectScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SelectTimer.cpp">
+			<Filter>Script\ScriptClass\UI\CharSelectScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\StartButton.cpp">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\RewardObserver.cpp">
+			<Filter>Script\ScriptClass\UI\InGameUI</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\InputDeviceDetector.cpp">
+			<Filter>Script\ScriptClass\UI\CharSelectScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MovingUILayer.cpp">
+			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestShader.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

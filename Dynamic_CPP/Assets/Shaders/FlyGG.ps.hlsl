@@ -1,4 +1,5 @@
 // MeshParticlePS.hlsl - 3D 메시 파티클 픽셀 셰이더
+
 struct PixelInput
 {
     float4 position : SV_POSITION;
@@ -14,9 +15,7 @@ struct PixelInput
     uint renderMode : RENDER_MODE;
     float particleAge : PARTICLE_AGE;
     float particleLifeTime : PARTICLE_LIFETIME;
-
 };
-
 struct PixelOutput
 {
     float4 color : SV_Target;
@@ -35,45 +34,38 @@ cbuffer SpriteAnimationBuffer : register(b4)
     uint2 gridSize; // 스프라이트 시트 격자 크기 (columns, rows)
 };
 
-Texture2D gNoiseTexture : register(t0);
-
+Texture2D gDiffuseTexture : register(t0);
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
-#define pi 3.1415926
 
 PixelOutput main(PixelInput input)
 {
     PixelOutput output;
+    float normalizedTime = fmod(input.particleAge, animationDuration) / animationDuration;
+    uint currentFrame = (uint) (normalizedTime * frameCount) % frameCount;
     
-    float2 animatedUV = input.texCoord * float2(gridSize.x, gridSize.y);
+    float normalizedAge = input.particleAge / input.particleLifeTime;
+    uint maxAniFrame = gridSize.x * gridSize.y;
+    uint curAniFrame = normalizedAge * maxAniFrame;
     
-    // frameCount를 모드로 사용
-    uint mode = frameCount;
+    float2 frameSize = float2(1.0f / gridSize.x, 1.0f / gridSize.y);
+    uint frameX = currentFrame % gridSize.x;
+    uint frameY = currentFrame / gridSize.x;
     
-    if (mode == 0)
-    {
-        // 기본 모드 - 일정한 속도
-        animatedUV += gTime * animationDuration;
-    }
-    else if (mode == 1)
-    {
-        // 수명에 따른 속도 변화 모드
-        float lifeProgress = input.particleAge / input.particleLifeTime;
-        float speedMultiplier = sin(lifeProgress * pi); // 0에서 시작해서 중간에 최대, 끝에서 0
-        animatedUV += gTime * animationDuration * speedMultiplier;
-    }
+    float2 frameOffset = float2(frameX * frameSize.x, frameY * frameSize.y);
+    float2 animatedUV = frameOffset + (input.texCoord * frameSize);
     
-    float4 diffuseColor = gNoiseTexture.Sample(gLinearSampler, animatedUV);
+    float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, animatedUV);
     
-    float3 finalColor;
-    finalColor = input.color.rgb * diffuseColor.rgb;
+    if (diffuseColor.a < 0.01)
+        discard;
     
-    float finalAlpha = input.alpha;
+    if (input.alpha <= 0.01)
+        discard;
     
-    float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
-    float brightnessMask = smoothstep(0.1, 0.6, colorBrightness);
-    finalAlpha = finalAlpha * brightnessMask;
-    clip(finalAlpha - 0.05);
+    float3 finalColor = input.color.rgb * diffuseColor.rgb;
+    
+    float finalAlpha = input.alpha * diffuseColor.a;
     output.color = float4(finalColor, finalAlpha);
     
     return output;

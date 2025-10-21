@@ -481,3 +481,4 @@ GEMINI.md
 gemini_worker/
 /RenderEngine/DataSystem.cpp
 /Dependency(추후 vcpkg 종속 제거용)/x64-windows
+/Dynamic_CPP/Dynamic_CPP.vcxproj.filters.bak

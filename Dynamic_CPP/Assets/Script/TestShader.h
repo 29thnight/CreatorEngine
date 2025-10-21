@@ -1,13 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "ControllerVibration.generated.h"
-class ControllerVibration : public ModuleBehavior
+#include "TestShader.generated.h"
+
+class TestShader : public ModuleBehavior
 {
 public:
-   ReflectControllerVibration
+   ReflectTestShader
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(ControllerVibration)
+	MODULE_BEHAVIOR_BODY(TestShader)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -23,13 +24,20 @@ public:
 	virtual void OnDestroy() override  {}
 
 	[[Property]]
-	float PlayerHitPower = 0.5f;
+	float lerpValue{};
 	[[Property]]
-	float PlayerHitTime = 0.1f;
+	float maxScale{};
+	[[Property]]
+	float scaleFrequency{};
+	[[Property]]
+	float rotFrequency{};
 
 	[[Property]]
-	float PlayerChargePower = 0.5f;
+	float flashStrength{};
 	[[Property]]
-	float PlayerChargeTime = 0.1f;
-	
+	float flashFrequency{};
+
+	float t = 0.f;
+	[[Property]]
+	float timeScale = 1.f;
 };
