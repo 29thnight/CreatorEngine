@@ -40,13 +40,15 @@ void CameraMove::LateUpdate(float tick)
 			if (distance > detectRange)
 			{
 				targetPosition = targetPos;
+				followTimer += tick / followSpeed / 3.f;
+			}
+			else {
 				followTimer = 0.f;
 			}
 
-			followTimer += tick / followSpeed / 3.f;
 			if (followTimer > followSpeed)
 			{
-
+				followTimer = followSpeed;
 			}
 
 			Mathf::Vector3 dir = targetPosition - currentPos;
