@@ -33,41 +33,15 @@ void RigidBodyComponent::OnDestroy()
 	Physics->DestroyActor(GetOwner()->GetInstanceID()); // PhysX 액터 제거 요청
 }
 
-void RigidBodyComponent::LockLinearXZ()
-{
-	m_isLockLinearX = true;
-	m_isLockLinearZ = true;
-}
-
-void RigidBodyComponent::UnLockLinearXZ()
-{
-	m_isLockLinearX = false;
-	m_isLockLinearZ = false;
-}
-
-void RigidBodyComponent::LockAngularXYZ()
-{
-	m_isLockAngularX = true;
-	m_isLockAngularY = true;
-	m_isLockAngularZ = true;
-}
-
-void RigidBodyComponent::UnLockAngularXYZ()
-{
-	m_isLockAngularX = false;
-	m_isLockAngularY = false;
-	m_isLockAngularZ = false;
-}
-
 void RigidBodyComponent::SetAngularDamping(float _AngularDamping)
 {
-	isRigidbodyDirty = true;
+	SetDirty(true);
 	AngularDamping = _AngularDamping;
 }
 
 void RigidBodyComponent::SetLinearDamping(float _LinearDamping)
 {
-	isRigidbodyDirty = true;
+	SetDirty(true);
 	LinearDamping = _LinearDamping;
 }
 
@@ -79,7 +53,7 @@ void RigidBodyComponent::AddForce(const Mathf::Vector3& force, EForceMode mode)
 
 void RigidBodyComponent::SetMass(float _mass)
 {
-	isRigidbodyDirty = true;
+	SetDirty(true);
 	m_mass = _mass;
 }
 

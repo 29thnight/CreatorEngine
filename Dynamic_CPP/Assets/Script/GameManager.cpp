@@ -16,13 +16,14 @@
 #include "Player.h"
 #include "SFXPoolManager.h"
 #include "GameInstance.h"
+#include "SceneTransitionUI.h"
 
 void GameManager::Awake()
 {
 	LOG("GameManager Awake");
 	//앞으론 언리얼 처럼 게임인스턴스를 활용해서 전역 설정값 관리
 	GameInstance::GetInstance()->Initialize();
-	
+
 	auto resourcePool = GameObject::Find("ResourcePool");
 	auto weaponPiecePool = GameObject::Find("WeaponPiecePool");
 
@@ -53,6 +54,18 @@ void GameManager::Awake()
 void GameManager::Start()
 {
 	LOG("GameManager Start");
+
+	auto transitionUIObj = GameObject::Find("SceneTransition");
+	if (transitionUIObj) {
+		m_sceneTransitionUI = transitionUIObj->GetComponent<SceneTransitionUI>();
+		if (m_sceneTransitionUI)
+		{
+			m_sceneTransitionUI->FadeOut(0.3f);
+		}
+	}
+	else {
+		LOG("not assigned SceneTransitionUI");
+	}
 }
 
 void GameManager::Update(float tick)
@@ -147,14 +160,6 @@ float GameManager::GetAsisPollutionGaugeRatio()
 	}
 }
 
-void GameManager::LoadPrevScene()
-{
-}
-
-void GameManager::SwitchPrevScene()
-{
-}
-
 void GameManager::LoadNextScene()
 {
 	if(m_isLoadingReq)
@@ -183,6 +188,32 @@ void GameManager::SwitchNextScene()
 	{
 		SwitchScene(m_nextSceneIndex);
 	}
+}
+
+void GameManager::SwitchNextSceneWithFade()
+{
+	if (m_isSwitching) return;                    // 이미 진행 중
+	if (!GameInstance::GetInstance()->IsLoadSceneComplete()) return;
+	if (!m_sceneTransitionUI) { // 페이더 없으면 즉시 전환 (폴백)
+		SwitchNextScene();
+		return;
+	}
+
+	m_isSwitching = true;
+	m_sceneTransitionUI->FadeIn(m_fadeInDuration, [this]()    // 페이드 인 완료 콜백
+	{
+		if (m_isLoadingReq) {
+			SwitchScene(static_cast<int>(SceneType::Loading));
+		}
+		else {
+			SwitchScene(m_nextSceneIndex);
+		}
+
+		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
+		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
+		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:
+		m_isSwitching = false;
+	});
 }
 
 void GameManager::LoadImidiateNextScene()

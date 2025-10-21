@@ -365,6 +365,7 @@ void GameInstance::SwitchSettingedScene(int sceneType)
 	if (it != m_settingedSceneNames.end()) 
 	{
 		SwitchScene(it->second);
+		m_currentSceneType = static_cast<SceneType>(sceneType);
 	} 
 	else 
 	{

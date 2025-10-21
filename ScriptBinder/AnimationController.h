@@ -24,18 +24,47 @@ public:
 	[[Property]]
 	AnimationState* m_curState = nullptr;
 	AnimationState* m_nextState = nullptr;
-	bool needBlend =false;
+	Animator* m_owner{};
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
 	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
 	std::set<std::string> StateNameSet;
 
-	
-
 	[[Property]]
 	NodeEditor* m_nodeEditor;
 	[[Property]]
 	std::shared_ptr<AnimationState> m_anyState;
+	DirectX::XMMATRIX m_FinalTransforms[512]{};
+	DirectX::XMMATRIX m_LocalTransforms[512]{};
+
+	float m_timeElapsed;
+	float m_nextTimeElapsed;
+	[[Property]]
+	AvatarMask* m_avatarMask{};
+	float curAnimationProgress = 0.f;
+	float preCurAnimationProgress = 0.f;
+	float nextAnimationProgress = 0.f;
+	float preNextAnimationProgress = 0.f;
+private:
+	AniTransition* m_curTrans{};
+	float blendingTime = 0;
+	int m_AnimationIndex = 0;
+	int m_nextAnimationIndex = -1;
+	//지금일어나는중인 전이 - 블렌드시간 탈출시간등
+
+public:
+	bool needBlend = false;
+	bool m_isBlend = false;
+	//컨트롤러 바꿔치기용
+	[[Property]]
+	bool useController = true;
+	bool m_useLayer = true;
+
+	[[Property]]
+	bool useMask = false;
+	bool endAnimation = false;
+
+public:
 	bool BlendingAnimation(float tick);
 	Animator* GetOwner() { return m_owner; };
 	void SetCurState(std::string stateName);
@@ -60,42 +89,12 @@ public:
 	void CreateMask();
 	void ReCreateMask(AvatarMask* mask);//팩토리에서 옮길때 쓸용
 	void DeleteAvatarMask(); 
-	Animator* m_owner{};
-	float m_timeElapsed;
-	float m_nextTimeElapsed;
-	bool m_isBlend = false;
-
-
 
 
 	nlohmann::json Serialize();
 	void Deserialize();
 
-
-	//컨트롤러 바꿔치기용
-	[[Property]]
-	bool useController = true; 
-
-	bool m_useLayer = true;
 	void SetUseLayer(bool _useLayer);
 	bool IsUseLayer() { return m_useLayer;}
-	DirectX::XMMATRIX m_FinalTransforms[512]{};
-
-	DirectX::XMMATRIX m_LocalTransforms[512]{};
-	[[Property]]
-	AvatarMask* m_avatarMask{};
-	[[Property]]
-	bool useMask = false;
-	float curAnimationProgress = 0.f;
-	float preCurAnimationProgress = 0.f;
-	float nextAnimationProgress = 0.f;
-	float preNextAnimationProgress = 0.f;
-	bool endAnimation = false;
-private:
-	float blendingTime = 0;
-	int m_AnimationIndex = 0;
-	int m_nextAnimationIndex = -1;
-	//지금일어나는중인 전이 - 블렌드시간 탈출시간등
-	AniTransition* m_curTrans{};
 };
 

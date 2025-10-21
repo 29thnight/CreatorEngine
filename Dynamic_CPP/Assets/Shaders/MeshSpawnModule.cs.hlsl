@@ -53,6 +53,9 @@ cbuffer SpawnParameters : register(b0)
     
     float3 gPreviousEmitterRotation;
     uint gAllowNewSpawn;
+    
+    float3 gWorldPosition;
+    float padding;
 }
 
 // 3D 메시 파티클 템플릿
@@ -229,7 +232,17 @@ float3 GenerateEmitterPosition(uint seed)
     float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
     float3 rotatedPos = mul(rotationMatrix, localPos);
     
-    return rotatedPos + gEmitterPosition;
+    float4x4 rotMat =
+    {
+        { rotationMatrix._11, rotationMatrix._12, rotationMatrix._13, 0 },
+        { rotationMatrix._21, rotationMatrix._22, rotationMatrix._23, 0 },
+        { rotationMatrix._31, rotationMatrix._32, rotationMatrix._33, 0 },
+        { 0, 0, 0, 1 }
+    };
+    float4 emitterPos = mul(rotMat, float4(gEmitterPosition - gWorldPosition, 1.f));
+    emitterPos.xyz += gWorldPosition;
+    
+    return rotatedPos + emitterPos.xyz;
 }
 
 // 초기 속도 생성
@@ -263,9 +276,9 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     if (length(gParticleRandomRotation) > 0.0)
     {
         float3 randomRotation = RandomRange3D(seed + 200,
-            float3(-gParticleRandomRotation.x, -gParticleRandomRotation.y, -gParticleRandomRotation.z),
-            float3(gParticleRandomRotation.x, gParticleRandomRotation.y, gParticleRandomRotation.z));
-        particle.rotation = randomRotation;
+        float3(-gParticleRandomRotation.x, -gParticleRandomRotation.y, -gParticleRandomRotation.z),
+        float3(gParticleRandomRotation.x, gParticleRandomRotation.y, gParticleRandomRotation.z));
+        particle.rotation = gEmitterRotation + randomRotation;
     }
     else
     {

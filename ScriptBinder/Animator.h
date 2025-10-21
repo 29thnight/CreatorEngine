@@ -62,6 +62,17 @@ public:
     GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);
     Socket* FindSocket(std::string_view socketName);
+    bool HasSocket() { return !socketvec.empty(); };
+    void ClearControllersAndParams();
+    template<typename T>
+    void AddParameter(const std::string valuename, T value, ValueType vType);
+    void DeleteParameter(int index);
+    ConditionParameter* AddDefaultParameter(ValueType vType);
+    template<typename T>
+    void SetParameter(const std::string valuename, T Value);
+    ConditionParameter* FindParameter(std::string valueName);
+
+public:
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
     float m_TimeElapsed{};
@@ -69,7 +80,6 @@ public:
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_localTransforms[MAX_BONES]{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
-    bool m_isBlend = false;
     float blendT = 0;
     [[Property]]
     int m_AnimIndex{};
@@ -78,95 +88,42 @@ public:
     [[Property]]
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
-
     std::vector<Socket*> socketvec;
-    bool HasSocket()
-    { 
-        return !socketvec.empty();
-    };
     [[Property]]
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     [[Property]]
     std::vector<ConditionParameter*> Parameters;
-
     std::mutex m_paramMutex;
 
-    void ClearControllersAndParams();
-    template<typename T>
-    void AddParameter(const std::string valuename, T value, ValueType vType)
-    {
-        std::unique_lock lock(m_paramMutex);
-        for (auto& parm : Parameters)
-        {
-            if (parm->name == valuename)
-                return;
-        }
-        ConditionParameter* newParameter = new ConditionParameter(value, vType, valuename);
-        Parameters.push_back(newParameter);
-    }
-    void DeleteParameter(int index);
-
-    ConditionParameter* AddDefaultParameter(ValueType vType)
-    {
-        std::string baseName;
-        switch (vType)
-        {
-        case ValueType::Float:
-            baseName = "NewFloat";
-            break;
-        case ValueType::Int:
-            baseName = "NewInt";
-            break;
-        case ValueType::Bool:
-            baseName = "NewBool";
-            break;
-        case ValueType::Trigger:
-            baseName = "NewTrigger";
-            break;
-        }
-        std::string valueName = baseName;
-        int index = 0;
-        bool isDuplicate = true;
-        {
-            std::unique_lock lock(m_paramMutex);
-            while (isDuplicate)
-            {
-                isDuplicate = false;
-                for (auto& parm : Parameters)
-                {
-                    if (parm->name == valueName)
-                    {
-                        isDuplicate = true;
-                        valueName = baseName + std::to_string(++index);
-                        break;
-                    }
-                }
-            }
-        }
-        ConditionParameter* newParameter = new ConditionParameter(0, vType, valueName);
-        {
-            std::unique_lock lock(m_paramMutex);
-            Parameters.push_back(newParameter);
-        }
-        return newParameter;
-    }
-
-    template<typename T>
-    void SetParameter(const std::string valuename, T Value)
-    {
-        std::unique_lock lock(m_paramMutex);
-        if (Parameters.empty()) return;
-        for (auto& param : Parameters)
-        {
-            if (param->name == valuename)
-            {
-                param->UpdateParameter(Value);
-            }
-        }
-    }
-  
-    ConditionParameter* FindParameter(std::string valueName);
+    bool m_isBlend = false;
 private:
     bool m_IsEnabled = false;
     
 };
+
+template<typename T>
+inline void Animator::AddParameter(const std::string valuename, T value, ValueType vType)
+{
+    std::unique_lock lock(m_paramMutex);
+    for (auto& parm : Parameters)
+    {
+        if (parm->name == valuename)
+            return;
+    }
+    ConditionParameter* newParameter = new ConditionParameter(value, vType, valuename);
+    Parameters.push_back(newParameter);
+}
+
+template<typename T>
+inline void Animator::SetParameter(const std::string valuename, T Value)
+{
+    std::unique_lock lock(m_paramMutex);
+    if (Parameters.empty()) return;
+    for (auto& param : Parameters)
+    {
+        if (param->name == valuename)
+        {
+            param->UpdateParameter(Value);
+        }
+    }
+}

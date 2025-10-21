@@ -3,10 +3,11 @@
 void ObjectPool::InitializePool(std::string _prefabName, int size)
 {
 	prefabName = _prefabName;
+	pool.reserve(size);
 	Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName);
 	if (prefab)
 	{
-		for(int i=0;i<size;i++)
+		for(int i=0;i < size; i++)
 		{
 			GameObject* gameObj = PrefabUtilitys->InstantiatePrefab(prefab, "GameObject");
 			Push(gameObj);
@@ -31,7 +32,6 @@ void ObjectPool::Push(GameObject* gameObj)
 		return;
 	gameObj->SetEnabled(false);
 	pool.push_back(gameObj);
-
 }
 
 GameObject* ObjectPool::Pop()
@@ -39,7 +39,7 @@ GameObject* ObjectPool::Pop()
 	if(pool.empty())
 	{
 		Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName);
-		for(int i =0;i<10; i++) 
+		for(int i = 0; i < 10; i++) 
 		{
 			if (prefab)
 			{

@@ -64,6 +64,15 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 		rigid->UseGravity(true);
 	}
 
+	if (collision.otherObj->m_tag == "Ground")
+	{
+		//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		m_state = EItemState::NONE;
+		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
+		rigid->UseGravity(false);
+	}
+
 	
 	//LOG("OnTriggerEnter Item");
 }

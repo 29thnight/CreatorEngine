@@ -34,36 +34,26 @@ public:
 
 	// Test for Scene Management
 	[[Method]]
-	void LoadPrevScene();
-	[[Method]]
-	void SwitchPrevScene();
-	[[Method]]
 	void LoadNextScene();
 	[[Method]]
 	void SwitchNextScene();
 	[[Method]]
+	void SwitchNextSceneWithFade();
+	[[Method]]
 	void LoadImidiateNextScene();
-	[[Property]]
-	bool m_isTestReward{ false };
 	[[Property]]
 	int m_prevSceneIndex{ 0 };
 	[[Property]]
 	int m_nextSceneIndex{ 0 };
-	bool m_isLoadingReq{ false };
-	// Player Stat
-	[[Method]]
-	void ApplyGlobalEnhancementsToAllPlayers();
-
-	void ApplyGlobalEnhancementsToPlayer(class Player* player);
-
-	int		selectPlayerCount{};
-	bool	startSelectTimer{ false };
-	float	displayPollutionGaugeRatio{}; //테스트 용
-
+	[[Property]]
+	bool						m_isTestReward{ false };
+	bool						m_isLoadingReq{ false };
+	bool						startSelectTimer{ false };
+	bool						m_isSwitching = false;             // 중복 트리거 방지
+	int							selectPlayerCount{};
+	GameObject*					testCamera = nullptr;
+	// ~Test for Scene Management
 public:
-	bool	TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
-
-	GameObject* testCamera = nullptr;
 	void PushEntity(Entity* entity);
 	void PushPlayer(Entity* player);
 	void PushAsis(Entity* asis);
@@ -73,21 +63,30 @@ public:
 
 	std::vector<Entity*>& GetResourcePool();
 	std::vector<Weapon*>& GetWeaponPiecePool();
-
+	// SFX Pool Manager
 	void PushSFXPool(SFXPoolManager* _SFXPool);
 	SFXPoolManager* GetSFXPool();
 	void PushObjectPoolManager(ObjectPoolManager* _objPoolManager);
 	ObjectPoolManager* GetObjectPoolManager();
-
+	// Controller Vibration
 	void PushControllerVibration(ControllerVibration* _ControllerVibration);
 	ControllerVibration* GetControllerVibration();
+	// Player Stat
+	[[Method]]
+	void ApplyGlobalEnhancementsToAllPlayers();
+	void ApplyGlobalEnhancementsToPlayer(class Player* player);
+	// Reward Management
+	void InitReward(int amount);
+	void AddReward(int amount);
+	int GetReward();
 private:
+	//Entities
 	std::vector<Entity*>	m_entities{};
 	std::vector<Entity*>	m_resourcePool{};
 	std::vector<Weapon*>	m_weaponPiecePool{};
 	std::vector<Entity*>	m_players{};
 	std::vector<Entity*>	m_asis{};		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
-
+	//Pool Managers
 	SFXPoolManager*			SFXPool{};
 	ObjectPoolManager*		objectPoolManager{};
 	ControllerVibration*	ControllerVibrationData{};
@@ -112,8 +111,9 @@ private:
 	void EnsureBaseSnapshot(class Player* player);
 
 public:
-	void InitReward(int amount);
-	void AddReward(int amount);
-	int GetReward();
+	class SceneTransitionUI*	m_sceneTransitionUI{ nullptr };
+	float						displayPollutionGaugeRatio{}; //테스트 용
+	float						m_fadeInDuration = 0.3f;          // 필요시 인스펙터/ini로
+	bool						TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
 };
 

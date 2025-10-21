@@ -42,17 +42,19 @@ public:
     [[Property]]
     LightMapping m_LightMapping;
     [[Property]]
-	bool m_isSkinnedMesh{ false };
-    [[Property]]
-    bool m_shadowRecive = true;
-	[[Property]]
-    bool m_shadowCast = true;
-    [[Property]]
-    bool m_isEnableLOD{ false };
-    [[Property]]
     uint32 m_bitflag{ 0 };
 
 private:
-	bool m_isNeedUpdateCulling{ false };
 	std::unordered_set<OctreeNode*> m_OctreeNodes;
+	bool m_isNeedUpdateCulling{ false };
+
+public: 
+    [[Property]]
+    bool m_isSkinnedMesh{ false };
+    [[Property]]
+    bool m_shadowRecive = true;
+    [[Property]]
+    bool m_shadowCast = true;
+    [[Property]]
+    bool m_isEnableLOD{ false };
 };

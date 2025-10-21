@@ -109,15 +109,23 @@ public:
     uint32 GetSelectedLayerId() const { return m_selectedLayerID; }
     void SetSelectedLayerId(uint32 layerId) { m_selectedLayerID = layerId; }
 
+private:
+
+    void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
+    bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
+
+    void SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex);
+    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
+    bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
+
+public:
     [[Property]]
 	FileGuid m_trrainAssetGuid{};// 에셋 가이드
     std::wstring m_terrainTargetPath{};
-    bool m_initComplete{ false };
 
 private:
     friend class ProxyCommand;
 
-	uint32 m_terrainID{ 0 }; // 지형 ID
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;
     std::vector<TerrainLayer>            m_layers; // 레이어 정보들
@@ -134,20 +142,17 @@ private:
     float m_maxHeight{ 500.0f }; // 최대 높이
     //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
 
-    ThreadPool<std::function<void()>> m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
+    //ThreadPool<std::function<void()>> m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
 
     //== 에디터 전용
     //== window 공용으로 사용가능
     uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
-    //== window 공용으로 사용 불가능
-	std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
     //== 에디터 전용
     uint32                               m_nextLayerID{ 0 }; // 다음 레이어 ID
+    //== window 공용으로 사용 불가능
+	std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
+    uint32 m_terrainID{ 0 }; // 지형 ID
 
-    void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
-    bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
-
-    void SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex);
-    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
-    bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
+public:
+    bool m_initComplete{ false };
 };

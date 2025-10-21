@@ -31,6 +31,7 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.forceRotationUpdate = 0;
     m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.worldPosition = XMFLOAT3(0.f, 0.f, 0.f);
     m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
 
     // 3D 메시 파티클 템플릿 기본값
@@ -204,7 +205,7 @@ void MeshSpawnModuleCS::OnSystemResized(UINT maxParticles)
 
 void MeshSpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
 {
-    SetEmitterPosition(newPosition);
+    SetEmitterPosition(newPosition, Mathf::Vector3::Zero);
 }
 
 void MeshSpawnModuleCS::ResetForReuse()
@@ -230,6 +231,8 @@ void MeshSpawnModuleCS::ResetForReuse()
     m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.forceRotationUpdate = 0;
+
+    m_spawnParams.worldPosition = XMFLOAT3(0.f, 0.f, 0.f);
 }
 
 bool MeshSpawnModuleCS::IsReadyForReuse() const
@@ -349,7 +352,7 @@ void MeshSpawnModuleCS::ReleaseResources()
 }
 
 // emitterPosition 설정 메서드 추가
-void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
+void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position, const Mathf::Vector3& worldPosition)
 {
     Mathf::Vector3 newPos = position;
     Mathf::Vector3 currentPos(
@@ -368,6 +371,7 @@ void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
 
         // 새 위치 설정
         m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
+        m_spawnParams.worldPosition = worldPosition;
 
         m_forcePositionUpdate = true;
         m_spawnParamsDirty = true;

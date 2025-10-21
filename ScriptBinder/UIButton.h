@@ -7,7 +7,7 @@
 #include "UIButton.generated.h"
 
 //UI 처리용
-enum class UIColliderType
+enum class UIColliderType : uint8_t
 {
 	Box,
 	Circle,
@@ -34,10 +34,12 @@ public:
     [[Method]]
 	void Click();
 
-	bool isClick = false;
 private:
 	DirectX::BoundingOrientedBox obBox;
-	UIColliderType type = UIColliderType::Box;
 	std::function<void()> m_clickFunction;
+	UIColliderType type = UIColliderType::Box;
+
+public:
+	bool isClick = false;
 };
 

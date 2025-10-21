@@ -4,8 +4,8 @@
 #include "AniBehavior.h"
 #include "AnimationState.generated.h"
 #include <nlohmann/json.hpp>
-class AnimationController;
 
+class AnimationController;
 class AnimationState
 {	
 public:
@@ -32,6 +32,8 @@ public:
 	void UpdateAnimationSpeed();
 	nlohmann::json Serialize();
 	AnimationState Deserialize();
+
+public:
 	[[Property]]
 	std::string m_name{};
 	[[Property]]
@@ -44,8 +46,6 @@ public:
 	int index =0; 
 	[[Property]]
 	int AnimationIndex = 0;
-	[[Property]]
-	bool m_isAny = false;
 	
 	//기본속도
 	[[Property]]
@@ -55,9 +55,11 @@ public:
 	float multiplerAnimationSpeed = 1;
 	[[Property]]
 	std::string animationSpeedParameterName = "None";
-	[[Property]]
-	bool useMultipler = false;
 	//상태의 애니메이션 시간 상하체 분리후 합칠떄쓸용
 	float m_animationTimeElapsed = 0;
+	[[Property]]
+	bool m_isAny = false;
+	[[Property]]
+	bool useMultipler = false;
 };
 

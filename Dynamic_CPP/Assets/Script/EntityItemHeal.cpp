@@ -9,6 +9,14 @@ void EntityItemHeal::Start()
 void EntityItemHeal::OnTriggerEnter(const Collision& collision)
 {
 	//플레이어에 닿으면 피회복  얘가하거나 or 플레이어가 하거나
+	if (collision.otherObj->m_tag == "Ground")
+	{
+		//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+		rigid->UseGravity(false);
+	}
 
 }
 

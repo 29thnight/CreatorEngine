@@ -81,15 +81,16 @@ public:
 		box.Extents = m_editorBoundingBox.Extents;
 		return box;
 	}
+private:
+    BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 
-    [[Property]]
-    int m_lightIndex{ -1 };
-
+public:
     Mathf::Vector4 m_position{};
     Mathf::Vector4 m_direction{ -1, -1, 1, 0 };
     [[Property]]
     Mathf::Color4  m_color{ 1, 1, 1, 1 };
-
+    [[Property]]
+    int m_lightIndex{ -1 };
     [[Property]]
     float m_constantAttenuation{ 1.f };
     [[Property]]
@@ -98,16 +99,13 @@ public:
     float m_quadraticAttenuation{ 0.032f };
     [[Property]]
     float m_spotLightAngle{ 30.f };
-
-    [[Property]]
-    LightType m_lightType{ DirectionalLight };
-    [[Property]]
-    LightStatus m_lightStatus{ Enabled };
     [[Property]]
     float m_intencity{ 1.f };
 	[[Property]]
 	float m_range{ 10.f };
+    [[Property]]
+    LightType m_lightType{ DirectionalLight };
+    [[Property]]
+    LightStatus m_lightStatus{ Enabled };
 
-private:
-    BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 };

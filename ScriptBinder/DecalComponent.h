@@ -53,13 +53,13 @@ public:
 	[[Property]]
     int sliceNumber = 0;
     [[Property]]
-    bool useAnimation = false;
-    [[Property]]
     float slicePerSeconds = 1.f;
+    float timer = 0.f;
+    [[Property]]
+    bool useAnimation = false;
     [[Property]]
     bool isLoop = true;
 
-    float timer = 0.f;
 
 
     ////option 

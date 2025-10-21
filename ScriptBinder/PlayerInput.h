@@ -12,11 +12,7 @@ public:
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(PlayerInputComponent)
 	
-
 	void Update(float tick) override;
-	//쓸 컨트롤러 인덱스 키보드,마우스는 0만지원
-	[[Property]]
-	int controllerIndex = 0;
 
 	void SetActionMap(std::string mapName);
 	void SetActionMap(ActionMap* _actionMap);
@@ -30,6 +26,9 @@ public:
 	[[Property]]
 	std::string m_scriptName{};
 
+	//쓸 컨트롤러 인덱스 키보드,마우스는 0만지원
+	[[Property]]
+	int controllerIndex = 0;
 	//컴포넌트 생성시 자동으로 인풋액션매니저가 수집 -> 수집된 컴포넌트 순회하면서 등록된맵의 키바인딩된 키가 체크될시 
 	//컴포넌트 주인의 스크립트들을 순회하면서 있는 함수 실행시켜줌
 };
