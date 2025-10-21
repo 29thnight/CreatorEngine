@@ -206,7 +206,16 @@ float3 GenerateEmitterPosition(uint seed)
     float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
     float3 rotatedPos = mul(rotationMatrix, localPos);
     
-    return rotatedPos + gEmitterPosition;
+    float4x4 rotMat =
+    {
+        { rotationMatrix._11, rotationMatrix._12, rotationMatrix ._13, 0},
+        { rotationMatrix._21, rotationMatrix._22, rotationMatrix ._23, 0},
+        { rotationMatrix._31, rotationMatrix._32, rotationMatrix ._33, 0},
+        { 0, 0, 0, 1 }
+    };
+    float4 emitterPos = mul(rotMat, float4(gEmitterPosition, 1.f));
+    
+    return rotatedPos + emitterPos.xyz;
 }
 
 // 초기 속도 생성
@@ -286,6 +295,10 @@ void UpdateExistingParticleRotation(inout ParticleData particle)
     
     particle.position = rotatedRelativePos + gEmitterPosition;
     particle.velocity = mul(deltaRotationMatrix, particle.velocity);
+    
+    particle.pad1 = gEmitterRotation.x;
+    particle.pad2 = gEmitterRotation.y;
+    particle.pad3 = gEmitterRotation.z;
 }
 
 #define THREAD_GROUP_SIZE 1024

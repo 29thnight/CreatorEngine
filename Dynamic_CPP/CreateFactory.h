@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TestShader.h"
 #include "SettingWindowUI.h"
 #include "ExitButton.h"
 #include "CreditsButton.h"

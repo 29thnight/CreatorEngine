@@ -282,6 +282,7 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.textureIndex = textureIndex;
     particle.renderMode = gRenderMode;
     particle.isActive = 1;
+    particle.pad8 = particle.position;
 }
 
 void UpdateExistingMeshParticlePosition(inout MeshParticleData particle)

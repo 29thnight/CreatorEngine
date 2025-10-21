@@ -1296,11 +1296,32 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GbufferFlashPlayer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoradUniquePos.vs.hlsl">
+      <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoardRotate.vs.hlsl">
+      <Filter>Shaders\Effect\Special\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleDissolveG.ps.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleDissolve4.ps.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleDissolve3.ps.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshDissolve.ps.hlsl">
       <Filter>Shaders\Effect\Special\3D</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SwordProjectile.ps.hlsl">
       <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\VertexBossBomb.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GbufferBossBomb.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
