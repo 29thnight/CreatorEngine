@@ -42,6 +42,7 @@ void SwordProjectile::OnTriggerEnter(const Collision& collision)
 	HitInfo hitinfo;
 	hitinfo.hitPos = contactPoint;
 	hitinfo.itemType = ItemType::Melee;
+	hitinfo.hitNormal = -GetOwner()->m_transform.GetForward();
 	if (enemy)
 	{
 		auto [iter, inserted] = targets.insert(enemy);
