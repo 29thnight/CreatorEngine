@@ -121,6 +121,13 @@
                             "pixelShader": "MeshDissolve",
                             "vertexShader": "MeshParticle"
                         },
+                        "spriteAnimation": {
+                            "animationDuration": 1.0,
+                            "enabled": true,
+                            "frameCount": 0,
+                            "gridColumns": 5,
+                            "gridRows": 5
+                        },
                         "textures": [
                             {
                                 "hasTexture": true,
