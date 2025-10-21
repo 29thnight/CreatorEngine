@@ -31,5 +31,11 @@ public:
 	float PlayerChargePower = 0.5f;
 	[[Property]]
 	float PlayerChargeTime = 0.1f;
+
+
+	[[Property]]
+	float PlayerChargeEndPower = 0.25f;
+	[[Property]]
+	float PlayerChargeEndTime = 0.1f;
 	
 };

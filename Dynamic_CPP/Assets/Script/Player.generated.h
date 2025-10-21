@@ -42,6 +42,11 @@ ReflectionScriptField(Player) \
 		meta_property(ResurrectionGracePeriod) \
 		meta_property(SlotChangeCooldown) \
 		meta_property(detectRadius) \
+		meta_property(OnAttackStep) \
+		meta_property(Attack1StepDistance) \
+		meta_property(Attack1StepTime) \
+		meta_property(Attack2StepDistance) \
+		meta_property(Attack2StepTime) \
 	}); \
 	MethodField \
 	({ \
