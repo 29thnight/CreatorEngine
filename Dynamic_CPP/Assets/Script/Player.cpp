@@ -1934,19 +1934,7 @@ void Player::ShootNormalBullet()
 	GameObject* bulletObj = normalBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	//bool nearTarget = false;
-	//쏘기직전에 적이 가까이왔으면 발사대신 떄리기 or 가까이에서 발사? 
-	//if (curTarget && curTarget->GetOwner())
-	//{
-	//	Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-	//	float length = (targetPos - pos).Length();
-	//	length = std::abs(length);
-	//	if (length <= 2.0f)
-	//	{
-	//		nearTarget = true;
-	//	}
 
-	//}
 	if (bulletObj)
 	{
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
@@ -1982,18 +1970,8 @@ void Player::ShootSpecialBullet()
 	GameObject* bulletObj = specialBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	/*bool nearTarget = false;
-	if (curTarget && curTarget->GetOwner())
-	{
-		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-		float length = (targetPos - pos).Length();
-		length = std::abs(length);
-		if (length <= 2.0f)
-		{
-			nearTarget = true;
-		}
 
-	}*/
+
 	if (bulletObj)
 	{
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
@@ -2030,7 +2008,6 @@ void Player::ShootChargeBullet()
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	//bool nearTarget = false;
 	std::vector<GameObject*> chargePool;
 	for (int i = 0; i < 5; i++)
 	{
@@ -2042,17 +2019,7 @@ void Player::ShootChargeBullet()
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 
 
-		/*if (curTarget && curTarget->GetOwner())
-		{
-			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-			float length = (targetPos - pos).Length();
-			length = std::abs(length);
-			if (length <= 2.0f)
-			{
-				nearTarget = true;
-			}
-
-		}*/
+		
 		if (shootPosObj)
 		{
 			shootPos = shootPosObj->m_transform.GetWorldPosition();
