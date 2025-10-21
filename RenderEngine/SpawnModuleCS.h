@@ -85,7 +85,7 @@ public:
     UINT GetParticleCapacity() const { return m_particleCapacity; }
 
     // 스폰 설정 메서드들
-    void SetEmitterPosition(const Mathf::Vector3& position);
+    void SetEmitterPosition(const Mathf::Vector3& position, const Mathf::Vector3& worldPosition);
     void SetEmitterRotation(const Mathf::Vector3& rotation);
     void SetEmitterScale(const Mathf::Vector3& scale);
 

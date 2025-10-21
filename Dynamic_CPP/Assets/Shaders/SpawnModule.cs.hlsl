@@ -43,6 +43,9 @@ cbuffer SpawnParameters : register(b0)
     
     float3 gPreviousEmitterRotation;
     uint gAllowNewSpawn;
+    
+    float3 gWorldPosition;
+    float padding;
 }
 
 // 파티클 템플릿
@@ -213,7 +216,8 @@ float3 GenerateEmitterPosition(uint seed)
         { rotationMatrix._31, rotationMatrix._32, rotationMatrix ._33, 0},
         { 0, 0, 0, 1 }
     };
-    float4 emitterPos = mul(rotMat, float4(gEmitterPosition, 1.f));
+    float4 emitterPos = mul(rotMat, float4(gEmitterPosition - gWorldPosition, 1.f));
+    emitterPos.xyz += gWorldPosition;
     
     return rotatedPos + emitterPos.xyz;
 }
