@@ -398,6 +398,11 @@ std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 	auto instance = std::move(universalPool.front());
 	universalPool.pop();
 
+	if (universalPool.size() < DEFAULT_POOL_SIZE * 0.3f) { // 30% 이하로 떨어지면
+		std::cout << "Pool running low (" << universalPool.size() << "), refilling..." << std::endl;
+		RefillPoolAsync();
+	}
+
 	// 재사용 준비 상태 확인
 	if (!instance->IsReadyForReuse()) {
 		std::cerr << "Warning: Pool instance not ready for reuse!" << std::endl;
@@ -440,6 +445,38 @@ void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 		std::cerr << "Warning: Effect not ready for reuse, queueing for cleanup" << std::endl;
 		QueueForCleanup(std::move(effect));
 	}
+}
+
+void EffectManager::RefillPoolAsync()
+{
+	if (isCleanupRunning.exchange(true)) {
+		return;
+	}
+
+	std::thread([this]() {
+		std::cout << "Starting async pool refill..." << std::endl;
+
+		int refillCount = 0;
+		int targetRefill = DEFAULT_POOL_SIZE / 2;
+
+		while (refillCount < targetRefill) {
+			auto newEffect = CreateUniversalEffect();
+			if (!newEffect) break;
+
+			{
+				std::lock_guard<std::mutex> lock(poolMutex);
+				if (universalPool.size() >= maxPoolSize) break;
+				universalPool.push(std::move(newEffect));
+				totalCreatedEffects++;
+				refillCount++;
+			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+
+		isCleanupRunning = false;
+		std::cout << "Pool refill completed. Added " << refillCount << " instances" << std::endl;
+		}).detach();
 }
 
 //***********************************************************************************************************************************************************
@@ -611,15 +648,15 @@ void EffectManager::EmergencyCleanup()
 {
 	std::cout << "EMERGENCY CLEANUP INITIATED!" << std::endl;
 
-	// 1. 모든 비필수 활성 이펙트 즉시 정지
+	// 1. 무한 이펙트와 오래된 이펙트 우선 정리
 	auto it = activeEffects.begin();
 	int emergencyCleanedCount = 0;
 
-	while (it != activeEffects.end() && emergencyCleanedCount < activeEffects.size() / 2) {
+	// 1단계: 무한 이펙트 전체 정리
+	while (it != activeEffects.end()) {
 		auto& effect = it->second;
 
-		// 오래된 이펙트나 무한 이펙트 우선 정리
-		if (effect->GetCurrentTime() > 5.0f || effect->GetDuration() < 0) {
+		if (effect->GetDuration() < 0) { // 무한 이펙트는 모두 정리
 			effect->Stop();
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
@@ -633,28 +670,41 @@ void EffectManager::EmergencyCleanup()
 		}
 	}
 
-	// 2. 풀 크기 강제 축소
-	{
-		std::lock_guard<std::mutex> lock(poolMutex);
-		int targetPoolSize = maxPoolSize / 4; // 25%로 축소
+	// 2단계: 여전히 많다면 오래된 일반 이펙트도 정리
+	it = activeEffects.begin();
+	while (it != activeEffects.end() && emergencyCleanedCount < activeEffects.size() / 2) {
+		auto& effect = it->second;
 
-		while (universalPool.size() > targetPoolSize && !universalPool.empty()) {
-			universalPool.pop();
+		if (effect->GetCurrentTime() > 10.0f) { // 10초 이상된 일반 이펙트
+			effect->Stop();
+			auto effectToReturn = std::move(effect);
+			it = activeEffects.erase(it);
+
 			totalDestroyedEffects++;
+			emergencyCleanedCount++;
+		}
+		else {
+			++it;
 		}
 	}
 
-	// 3. 정리 큐 강제 비우기
+	// 3. 정리 큐만 비우기 (풀은 건드리지 않음)
 	{
 		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
+		int cleanupCount = 0;
 		while (!cleanupQueue.empty()) {
 			cleanupQueue.pop();
 			totalDestroyedEffects++;
+			cleanupCount++;
+		}
+		if (cleanupCount > 0) {
+			std::cout << "Cleared " << cleanupCount << " items from cleanup queue" << std::endl;
 		}
 	}
 
 	std::cout << "EMERGENCY CLEANUP COMPLETED! Cleaned " << emergencyCleanedCount
-		<< " active effects and reduced pool size" << std::endl;
+		<< " active effects (prioritized infinite effects)" << std::endl;
+	std::cout << "Pool size preserved: " << GetPoolSize() << "/" << maxPoolSize << std::endl;
 }
 
 bool EffectManager::ShouldForceCleanup() const

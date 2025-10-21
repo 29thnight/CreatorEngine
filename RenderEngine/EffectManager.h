@@ -148,6 +148,7 @@ private:
 	std::unique_ptr<EffectBase> CreateUniversalEffect();
 	std::unique_ptr<EffectBase> AcquireFromPool();
 	void ReturnToPool(std::unique_ptr<EffectBase> effect);
+	void RefillPoolAsync();
 
 	// ¿Ã∆Â∆Æ º≥¡§
 	void ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig);
