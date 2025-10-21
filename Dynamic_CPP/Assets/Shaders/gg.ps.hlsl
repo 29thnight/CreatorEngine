@@ -67,8 +67,9 @@ PixelOutput main(PixelInput input)
     float3 adjustedSmoke = input.color.rgb;
     float smokeIntensity = (smokeColor.r + smokeColor.g + smokeColor.b) / 3.0;
 
-    float s = 1 - sin(normalizedAge * 3.1416926);
-    float dissolveAlpha = smoothstep(s, s + 0.5, dissolveValue);
+    float f1 = 1 - smoothstep(0, 0.4, normalizedAge) + smoothstep(0.4, 1, normalizedAge);
+
+    float dissolveAlpha = smoothstep(f1 - 0.1, f1 + 0.1, dissolveValue);
 
     float3 baseColor = adjustedSmoke;
     float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);
