@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("BossBomb", []() { return new BossBomb(); });
 		CreateFactory::GetInstance()->RegisterFactory("MobSpawnerBound", []() { return new MobSpawnerBound(); });
 		CreateFactory::GetInstance()->RegisterFactory("SceneTransitionUI", []() { return new SceneTransitionUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestShader", []() { return new TestShader(); });

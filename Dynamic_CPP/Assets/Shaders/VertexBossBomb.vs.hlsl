@@ -83,9 +83,11 @@ VertexShaderOutput main(AppData IN)
         IN.binormal = normalize(mul(boneTransform, float4(IN.binormal, 0.0f)));
         
     }
-
-    float zRotation = sin(lerpValue * 3.141592 * rotFrequency) * 45.f * 0.0174533;
-    float scale = sin(lerpValue * 3.141592 * scaleFrequency) * 0.5 + 0.5;
+    
+    float smooth = lerp(0.2, 1.2, lerpValue) - 0.2f;
+    
+    float zRotation = sin(smooth * 3.141592 * rotFrequency) * 45.f * 0.0174533;
+    float scale = sin(smooth * 3.141592 * scaleFrequency) * 0.5 + 0.5;
     scale = lerp(1, maxScale, scale);
     
     float4x4 rotMat =

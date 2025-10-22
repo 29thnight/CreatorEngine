@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "BossBomb.h"
 #include "MobSpawnerBound.h"
 #include "SceneTransitionUI.h"
 #include "TestShader.h"

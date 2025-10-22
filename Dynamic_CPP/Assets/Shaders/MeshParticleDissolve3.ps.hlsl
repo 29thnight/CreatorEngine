@@ -47,17 +47,17 @@ PixelOutput main(PixelInput input)
     
     float normalizedAge = input.particleAge / input.particleLifeTime;
     float smoothDissolveDownUp = 1 - smoothstep(0.7, 1.0, normalizedAge);
-    //float smooth = smoothstep(normalizedAge, normalizedAge + 0.2, smoothDissolveDownUp);
+    float smooth = smoothstep(normalizedAge, normalizedAge + 0.2, smoothDissolveDownUp);
     
     
-    float2 animatedUV = input.texCoord * float2(gridSize.x, gridSize.y);
+    float2 animatedUV = input.texCoord.yx * float2(gridSize.x, gridSize.y);
     animatedUV += gTime * animationDuration;
-    animatedUV.y -= normalizedAge * 2;
+    animatedUV.x -= normalizedAge * 2;
     float4 diffuseColor = gNoiseTexture.Sample(gLinearSampler, animatedUV);
     
     float3 finalColor = input.color.rgb * diffuseColor.rgb;
     
-    float finalAlpha = input.alpha;
+    float finalAlpha = input.alpha * diffuseColor.a * smooth;
 
     clip(finalAlpha - 0.05);
     output.color = float4(finalColor, finalAlpha);

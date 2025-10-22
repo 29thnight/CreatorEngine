@@ -2011,18 +2011,19 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 
 				bool windChanged = false;
 
-				if (ImGui::DragFloat3("Wind Direction", windDirection, 0.1f, -1.0f, 1.0f))
+				static float windYaw = 0.0f;   // Y축 회전 (-180~180도)
+				static float windPitch = 0.0f; // X축 회전 (-90~90도)
+
+				if (ImGui::SliderFloat("Wind Yaw", &windYaw, -180.0f, 180.0f) ||
+					ImGui::SliderFloat("Wind Pitch", &windPitch, -90.0f, 90.0f))
 				{
-					// 정규화
-					float length = sqrt(windDirection[0] * windDirection[0] +
-						windDirection[1] * windDirection[1] +
-						windDirection[2] * windDirection[2]);
-					if (length > 0.001f)
-					{
-						windDirection[0] /= length;
-						windDirection[1] /= length;
-						windDirection[2] /= length;
-					}
+					float yawRad = windYaw * 3.14159f / 180.0f;
+					float pitchRad = windPitch * 3.14159f / 180.0f;
+
+					windDirection[0] = cos(pitchRad) * sin(yawRad);
+					windDirection[1] = sin(pitchRad);
+					windDirection[2] = cos(pitchRad) * cos(yawRad);
+
 					windChanged = true;
 				}
 

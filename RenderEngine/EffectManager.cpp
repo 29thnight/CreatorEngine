@@ -208,8 +208,7 @@ void EffectManager::ForceCleanupOldEffects()
 	while (it != activeEffects.end() && cleanedCount < 10) { // 한 번에 최대 10개만
 		auto& effect = it->second;
 
-		if (effect->GetCurrentTime() > FORCE_CLEANUP_TIME &&
-			effect->GetState() != EffectState::Stopped) {
+		if (effect->GetState() != EffectState::Stopped) {
 
 			effect->Stop();
 			auto effectToReturn = std::move(effect);
@@ -711,18 +710,14 @@ bool EffectManager::ShouldForceCleanup() const
 {
 	auto now = std::chrono::steady_clock::now();
 	auto timeSinceLastCleanup = std::chrono::duration_cast<std::chrono::seconds>(now - lastCleanupTime).count();
-
 	bool memoryPressure = (activeEffects.size() > MAX_ACTIVE_EFFECTS * 0.8f);
-	bool timeForCleanup = (timeSinceLastCleanup > 60);
 	bool emergencyNeeded = (activeEffects.size() > MAX_ACTIVE_EFFECTS * 0.95f) ||
 		(GetTotalMemoryUsage() > 500 * 1024 * 1024); // 500MB 초과시
-
 	if (emergencyNeeded) {
 		const_cast<EffectManager*>(this)->EmergencyCleanup();
 		return false; // 긴급정리 했으므로 일반 정리는 스킵
 	}
-
-	return memoryPressure || timeForCleanup;
+	return memoryPressure;
 }
 
 void EffectManager::ProcessCleanupQueueAsync()
