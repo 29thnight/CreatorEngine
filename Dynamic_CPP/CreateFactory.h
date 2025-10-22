@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "MobSpawnerBound.h"
 #include "SceneTransitionUI.h"
 #include "TestShader.h"
 #include "SettingWindowUI.h"

@@ -18,7 +18,7 @@ public:
 	virtual void OnCollisionEnter(const Collision& collision) override;
 	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
-	virtual void Update(float tick) override {}
+	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
@@ -38,6 +38,13 @@ public:
 	[[Property]]
 	float spawnRadius = 5.f;
 
+	[[Property]]
+	bool isBound = false;
+	[[Property]]
+	float spawnTimer = 4.0f; //Timer 간격마다 소환
+	float respawnElapsedTime = 0.f;
+	[[Property]]
+	bool  isActive   = true;       //활성화된후 타이머 on 
 
 	Mathf::Vector3 SpawnArea{};
 

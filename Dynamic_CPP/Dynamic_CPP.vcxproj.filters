@@ -597,6 +597,9 @@
 		<ClInclude Include="Assets\Script\SceneTransitionUI.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\MobSpawnerBound.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1092,6 +1095,9 @@
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\SceneTransitionUI.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MobSpawnerBound.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

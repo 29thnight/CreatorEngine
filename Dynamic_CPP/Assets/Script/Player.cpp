@@ -224,8 +224,9 @@ void Player::Start()
 
 	Prefab* basicWeapon = PrefabUtilitys->LoadPrefab("WeaponBasic");
 	Weapon* weapon = nullptr;
-	if (basicWeapon && player)
+	if (basicWeapon && player && m_weaponInventory.empty())
 	{
+
 		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(basicWeapon, "BasicWeapon");
 		weapon = weaponObj->GetComponent<Weapon>();
 		AddWeapon(weapon);
@@ -353,6 +354,9 @@ void Player::Start()
 		Lslash3 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab3, "LSlash3");
 	}
 
+
+
+	m_input = GetOwner()->GetComponent<PlayerInputComponent>();
 }
 
 void Player::Update(float tick)
@@ -417,7 +421,22 @@ void Player::Update(float tick)
 		m_curWeapon->chargingPersent = m_chargingTime / m_curWeapon->chgTime;
 		if (!isChargeAttack && m_chargingTime >= m_curWeapon->chgTime) //차징시간이 무기 차징시간보다 길면
 		{
-			m_curWeapon->isCompleteCharge = true;
+			if (m_curWeapon->isCompleteCharge == false)
+			{
+				m_curWeapon->isCompleteCharge = true;
+				if (m_input && GM  && true == GameInstance::GetInstance()->IsViveEnabled())
+				{
+					auto data = GM->GetControllerVibration();
+					if (data)
+					{
+						float power = data->PlayerChargeEndPower;
+						float time = data->PlayerChargeEndTime;
+						m_input->SetControllerVibration(time, power);
+					}
+					
+				}
+			}
+
 		}
 		else
 		{
@@ -649,7 +668,7 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 				if (true == GameInstance::GetInstance()->IsViveEnabled())
 				{
-					auto input = GetOwner()->GetComponent<PlayerInputComponent>();
+					
 					if (GM)
 					{
 						auto data = GM->GetControllerVibration();
@@ -657,7 +676,10 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 						{
 							float power = data->PlayerHitPower;
 							float time = data->PlayerHitTime;
-							input->SetControllerVibration(time, power, power, power, power);
+							if (m_input)
+							{
+								m_input->SetControllerVibration(time, power, power, power, power);
+							}
 						}
 					}
 				}
@@ -1059,7 +1081,6 @@ void Player::ChargeAttack()
 
 			if (true == GameInstance::GetInstance()->IsViveEnabled())
 			{
-				auto input = GetOwner()->GetComponent<PlayerInputComponent>();
 				if (GM)
 				{
 					auto data = GM->GetControllerVibration();
@@ -1067,7 +1088,10 @@ void Player::ChargeAttack()
 					{
 						float power = data->PlayerChargePower;
 						float time = data->PlayerChargeTime;
-						input->SetControllerVibration(time, power);
+						if (m_input)
+						{
+							m_input->SetControllerVibration(time, power);
+						}
 					}
 				}
 			}

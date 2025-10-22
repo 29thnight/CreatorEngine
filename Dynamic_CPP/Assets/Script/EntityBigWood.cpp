@@ -163,7 +163,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			}
 		}
 
-
+		SetAlive(false);
 		GetOwner()->Destroy();
 		/*auto pung = GameObject::Find("Pung2");
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();

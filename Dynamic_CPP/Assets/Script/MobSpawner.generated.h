@@ -10,6 +10,9 @@ ReflectionScriptField(MobSpawner) \
 		meta_property(m_eventId) \
 		meta_property(m_runtimeTag) \
 		meta_property(spawnRadius) \
+		meta_property(isBound) \
+		meta_property(spawnTimer) \
+		meta_property(isActive) \
 	}); \
 	MethodField \
 	({ \

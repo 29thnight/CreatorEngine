@@ -47,7 +47,7 @@ void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitin
 	if (m_currentHP <= 0)
 	{
 		isDestroy = true;
-
+		SetAlive(false);
 
 		if (normalModel)
 		{

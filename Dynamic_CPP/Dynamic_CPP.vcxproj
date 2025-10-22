@@ -424,6 +424,7 @@
 		<ClInclude Include="Assets\Script\EntityMonsterTower.h" />
 		<ClInclude Include="Assets\Script\SceneTransitionUI.h" />
 		<ClInclude Include="Assets\Script\TestShader.h" />
+		<ClInclude Include="Assets\Script\MobSpawnerBound.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\CameraMove.cpp" />
@@ -1161,6 +1162,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestShader.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\MobSpawnerBound.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

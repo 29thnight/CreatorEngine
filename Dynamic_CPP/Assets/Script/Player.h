@@ -19,6 +19,7 @@ class SoundComponent;
 class NormalBullet;
 class SpecialBullet;
 class GameObject;
+class PlayerInputComponent;
 class Player : public Entity
 {
 public:
@@ -344,6 +345,7 @@ private:
 	//UI들
 	GameObject* m_uiController = nullptr;
 	GameObject* m_HPbar = nullptr;
+	PlayerInputComponent* m_input = nullptr;
 };
 
 void  PlayHitEffect(GameObject* _hitowner,HitInfo hitinfo);  //플레이어가 떄렸을때 나올이펙트 //맞은사람,맞았을때정보 입력 sendDamge 안에서사용
