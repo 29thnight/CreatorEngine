@@ -1,33 +1,31 @@
-m_name: BoxFlower_Prefab
+m_name: BoxFlower
+m_instanceID: 4257353798
 m_isEnabled: true
-m_instanceID: 335824987
-m_fileGuid: b87748d9-b14e-501f-8dbb-26570f6bdef1
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: BoxFlower
+    m_instanceID: 3570612601
     m_isEnabled: true
-    m_instanceID: 4267066527
+    m_attachedSoketID: 0
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 2.20000005, y: 2.20000005, z: 2.20000005, w: 0}
       m_parentID: 0
-    m_index: 1
+    m_index: 3
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [2]
-    m_prefabFileGuid: b87748d9-b14e-501f-8dbb-26570f6bdef1
-    m_attachedSoketID: 0
     m_collisionType: 9
-    m_isStatic: false
-    m_gameObjectType: 0
+    m_prefabFileGuid: 33f233b8-1507-5e1e-89b9-14007244931a
+    m_childrenIndices: [4]
     m_tag: Untagged
     m_layer: Entityitem
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
+        m_instanceID: 486514022
         m_isEnabled: true
-        m_instanceID: 987872618
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -42,8 +40,8 @@ PrefabNode:
         m_collisionEnabled: true
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
+        m_instanceID: 380053189
         m_isEnabled: true
-        m_instanceID: 3914064084
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.300000012, y: 0.300000012, z: 0.300000012}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -51,38 +49,38 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         itemCode: 4
         itemType: 4
-        healAmount: 10
+        healAmount: 30
         m_name: EntityItemHeal
+        m_instanceID: 1783260325
         m_isEnabled: true
-        m_instanceID: 1507954153
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 1c8b5983-b84f-5ef9-bb70-55b5f4e0776a
+    m_gameObjectType: 0
+    m_isStatic: false
     children:
       - GameObject: 2166264123
         m_name: Obj_Inter_flower_low
+        m_instanceID: 1863476631
         m_isEnabled: true
-        m_instanceID: 1770540039
+        m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 1
-        m_index: 2
-        m_parentIndex: 1
+          m_parentID: 3
+        m_index: 4
+        m_parentIndex: 3
         m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: b87748d9-b14e-501f-8dbb-26570f6bdef1
-        m_attachedSoketID: 0
         m_collisionType: 1
-        m_isStatic: false
-        m_gameObjectType: 3
+        m_prefabFileGuid: 33f233b8-1507-5e1e-89b9-14007244931a
+        m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
+            m_instanceID: 3019242056
             m_isEnabled: true
-            m_instanceID: 1567452291
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Material
@@ -95,7 +93,6 @@ PrefabNode:
                 m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 1
                 m_roughness: 1
-                m_bitflag: 0
                 m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
@@ -113,7 +110,10 @@ PrefabNode:
               lightmapScale: 1
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
             m_isSkinnedMesh: false
             m_shadowRecive: true
             m_shadowCast: true
             m_isEnableLOD: false
+        m_gameObjectType: 3
+        m_isStatic: false

@@ -532,7 +532,7 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-
+	if (!m_isCallStart) return;
 	if (GM&& GM->TestCameraControll == false)
 	{
 		if (isStun)
