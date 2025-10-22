@@ -24,6 +24,9 @@ ReflectionScriptField(EntityAsis) \
 		meta_property(maxPollutionGauge) \
 		meta_property(pollutionCoreAmount) \
 		meta_property(bigWoodDetectRadius) \
+		meta_property(ResurrectionRange) \
+		meta_property(ResurrectionTime) \
+		meta_property(ResurrectionHP) \
 		meta_property(m_pathRadius) \
 		meta_property(m_pathEndRadius) \
 		meta_property(m_predictNextTime) \

@@ -695,7 +695,6 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		SetInvincibility(HitGracePeriodTime);
 	}
 }
-
 void Player::Heal(int healAmount)
 {
 	m_currentHP = std::min(m_currentHP + healAmount, m_maxHP);

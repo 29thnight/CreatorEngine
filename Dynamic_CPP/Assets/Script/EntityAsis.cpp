@@ -92,6 +92,13 @@ void EntityAsis::Start()
 		m_animator = GetOwner()->GetComponent<Animator>();
 	}
 
+
+
+	m_maxHP = maxHP;
+	m_currentHP = m_maxHP;
+
+
+
 	auto paths = GameObject::Find("Paths");
 	if (paths) {
 		for (auto& index : paths->m_childrenIndices) {
@@ -115,7 +122,7 @@ void EntityAsis::Start()
 	}
 
 	HitImpulseStart();
-
+	
 #ifdef _DEBUG
 	DebugPoint = GameObject::Find("DebugPoint");
 #endif // _DEBUG
@@ -190,6 +197,18 @@ void EntityAsis::Update(float tick)
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
 		SendDamage(nullptr, 10);
 	}
+	if(isStun)
+	{
+		if (CheckResurrectionByPlayer() == true)
+		{
+			ResurrectionElapsedTime += tick;
+			if (ResurrectionElapsedTime >= ResurrectionTime)
+			{
+				Resurrection();
+			}
+		}
+		
+	}
 
 	bool isBigWoodDetect = CheckBigWood();
 
@@ -229,6 +248,7 @@ void EntityAsis::Update(float tick)
 
 void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (isStun) return;
 	if (m_currentGracePeriod > 0.f) {
 		// 무적이지만 히트 사운드나 별도 처리시 여기서 처리.
 		return;
@@ -249,6 +269,8 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	LOG("EntityAsis: Current HP: " << m_currentHP);
 	if(m_currentHP <= 0)
 	{
+		isStun = true;
+		//스턴 이펙트 or 애니메이션 같은거 따로 추가되는지 체크
 		// 스턴
 	}
 }
@@ -341,6 +363,7 @@ void EntityAsis::Purification(float tick)
 
 bool EntityAsis::PathMove(float tick)
 {
+	if (isStun == true) return false;
 	int pathSize = points.size();
 	if (pathSize == 0) return false;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;
@@ -473,6 +496,42 @@ EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 	return purificationItem;
 }
 
+bool EntityAsis::CheckResurrectionByPlayer()
+{
+	std::vector<HitResult> hits;
+	OverlapInput reviveInfo;
+	Transform transform = GetOwner()->m_transform;
+	reviveInfo.layerMask = 1 << 5; //Player만 체크
+	reviveInfo.position = transform.GetWorldPosition();
+	reviveInfo.rotation = transform.GetWorldQuaternion();
+	PhysicsManagers->SphereOverlap(reviveInfo, ResurrectionRange, hits);
+
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+
+		auto otehrPlayer = object->GetComponent<Player>();
+		if (otehrPlayer && otehrPlayer->isStun == false)
+			return true;
+
+	}
+
+	return false;
+}
+
+void EntityAsis::Resurrection()
+{
+	Heal(ResurrectionHP);
+	isStun = false;
+	ResurrectionElapsedTime = 0;
+}
+
+void EntityAsis::Heal(int _heal)
+{
+	m_currentHP = std::min(m_currentHP + _heal, m_maxHP);
+}
+
 void EntityAsis::AddPollutionGauge(int amount)
 {
 	m_currentPollutionGauge += amount;
@@ -492,4 +551,9 @@ void EntityAsis::AddPollutionGauge(int amount)
 			gm->AddReward(reward);
 		}
 	}
+}
+
+bool EntityAsis::IsStun()
+{
+	return isStun;
 }
