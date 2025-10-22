@@ -17,6 +17,14 @@ ReflectionScriptField(TBoss1) \
 		meta_property(BP003RadiusSize) \
 		meta_property(MoveSpeed) \
 		meta_property(BP003Delay) \
+		meta_property(BP0031_MIN_ITEM) \
+		meta_property(BP0031_MAX_ITEM) \
+		meta_property(BP0032_MIN_ITEM) \
+		meta_property(BP0032_MAX_ITEM) \
+		meta_property(BP0033_MIN_ITEM) \
+		meta_property(BP0033_MAX_ITEM) \
+		meta_property(BP0034_MIN_ITEM) \
+		meta_property(BP0034_MAX_ITEM) \
 	}); \
 	MethodField \
 	({ \

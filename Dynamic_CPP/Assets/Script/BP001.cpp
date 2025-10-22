@@ -1,6 +1,8 @@
 #include "BP001.h"
 #include "pch.h"
 #include "Entity.h"
+#include "PrefabUtility.h"
+#include "EffectComponent.h"
 void BP001::Start()
 {
 }
@@ -49,7 +51,7 @@ void BP001::Initialize(Entity* owner, Mathf::Vector3 pos, Mathf::Vector3 dir, in
 	m_delay = delay;
 	m_speed = speed;
 	isExplode = false; //폭파 여부 초기화
-
+	GetOwner()->GetComponent<EffectComponent>()->Apply();
 	isInitialize = true;
 }
 
@@ -68,7 +70,12 @@ void BP001::Explosion()
 	std::vector<HitResult> res;
 
 	//이때 추가 이펙트나 인디케이터 주던가 말던가
-
+	Prefab* ExplosionEff = nullptr;
+	ExplosionEff = PrefabUtilitys->LoadPrefab("BossExplosion");
+	GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(ExplosionEff, "entityItem");
+	itemObj->GetComponent<Transform>()->SetWorldPosition(pos);
+	itemObj->GetComponent<EffectComponent>()->Apply();
+	GetOwner()->GetComponent<EffectComponent>()->StopEffect();
 	PhysicsManagers->SphereOverlap(input, m_radius, res);
 
 	//쿼리 감지시 데미지 처리
