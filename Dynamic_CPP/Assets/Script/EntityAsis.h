@@ -132,6 +132,7 @@ private:
 
 	int currentPointIndex = 0;
 
+	Mathf::Vector3 evasionDirection = { 0.f,0.f,0.f };
 private:
 	[[Property]]
 	float m_pathRadius = 1.f;

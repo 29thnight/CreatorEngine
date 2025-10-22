@@ -29,7 +29,12 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	
+
+	struct PatternItemInfo{
+		int totalPatternCount;
+		int minItemCount;   // 드랍될 아이템의 최소 개수
+		int maxItemCount;   // 드랍될 아이템의 최대 개수
+	};
 
 	// 패턴 타입을 지정하여 외부에서 패턴 시작을 명령합니다.
 	enum class EPatternType {
@@ -141,11 +146,37 @@ public:
 	//coolTime 요거 관련해서는 좀 물어보자
 	[[Property]]
 	float BP003Delay = 1.0f; //생성되고 터지는 딜레이
+
+
+	[[Property]]
+	int BP0031_MIN_ITEM = 2;
+	[[Property]]
+	int BP0031_MAX_ITEM = 2;
+
+	[[Property]]
+	int BP0032_MIN_ITEM = 2;
+	[[Property]]
+	int BP0032_MAX_ITEM = 3;
+
+	[[Property]]
+	int BP0033_MIN_ITEM = 2;
+	[[Property]]
+	int BP0033_MAX_ITEM = 3;
+
+	[[Property]]
+	int BP0034_MIN_ITEM = 4;
+	[[Property]]
+	int BP0034_MAX_ITEM = 5;
+
+
 	
 
 	//발사체 오브젝트들
 	std::vector<GameObject*> BP001Objs;
 	std::vector<GameObject*> BP003Objs;
+
+
+	
 
 
 	//보스만 특수하게 
@@ -206,6 +237,11 @@ public:
 	Mathf::Vector3 projectilePos;
 	Mathf::Vector3 projectileDir;
 
+	std::map<EPatternType, PatternItemInfo> m_patternItemData;
+	std::vector<bool> m_patternItemFlags;
+	void SetupPatternItemData(int players);
+	void PrepareItemDropsForPattern(EPatternType patternType);
+
 	[[Method]]
 	void Burrow(); //땅파고 들어감
 	[[Method]]
@@ -222,7 +258,7 @@ public:
 	[[Method]]
 	void SweepAttack(); //애니메이션 이벤트에서 호출
 
-
+	
 
 	[[Method]]
 	void BP0011();

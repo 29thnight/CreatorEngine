@@ -2,10 +2,18 @@
 #include "Entity.h"
 #include "pch.h"
 #include "PrefabUtility.h"
+#include "MeshRenderer.h"
+#include "Material.h"
 #include "Core.Random.h"
+#include "EffectComponent.h"
 #include "TweenManager.h"
+
 void BP003::Start()
 {
+	meshRenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for (auto& m : meshRenderers) {
+		m->m_Material = m->m_Material->Instantiate(m->m_Material, "clonebomb");
+	}
 }
 
 void BP003::Update(float tick)
@@ -59,6 +67,9 @@ void BP003::Update(float tick)
 	if (m_timer > m_delay) {
 		Explosion(); 
 	}
+	else {
+		ShaderUpdate();
+	}
 
 	if (ownerDestory) {
 		GetOwner()->SetEnabled(false); //보스 죽으면 기능정지
@@ -66,11 +77,12 @@ void BP003::Update(float tick)
 	}
 }
 
-void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radius, float delay, bool useOrbiting, bool clockwise)
+void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radius, float delay,bool itemDrop, bool useOrbiting, bool clockwise)
 {
 	m_ownerEntity = owner;
 	m_damage = damage;
 	m_radius = radius;
+	m_itemDrop = itemDrop;
 	m_delay = delay;
 	m_timer = 0.0f;
 
@@ -87,9 +99,23 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 	m_orbitAngle = atan2(toMe.z, toMe.x); //소환됬을때의 각도-->회전시 일정한 값을 
 	m_orbitDistance = toMe.Length(); //소환됬을때 거리 -->회전식 일정한 거리가 떨어져 있을수 있도록
 	
-
+	auto effcomp = GetOwner()->GetComponent<EffectComponent>();
+	effcomp->Apply();
 
 	isInitialize = true;
+}
+
+void BP003::ShaderUpdate()
+{
+	float t = m_timer / m_delay;
+	for (auto& m : meshRenderers) {
+		m->m_Material->TrySetValue("Param", "lerpValue", &t, sizeof(float));
+		m->m_Material->TrySetValue("Param", "maxScale", &maxScale, sizeof(float));
+		m->m_Material->TrySetValue("Param", "scaleFrequency", &scaleFrequency, sizeof(float));
+		m->m_Material->TrySetValue("Param", "rotFrequency", &rotFrequency, sizeof(float));
+		m->m_Material->TrySetValue("FlashBuffer", "flashStrength", &t, sizeof(float));
+		m->m_Material->TrySetValue("FlashBuffer", "flashFrequency", &flashFrequency, sizeof(float));
+	}
 }
 
 void BP003::Explosion()
@@ -106,6 +132,12 @@ void BP003::Explosion()
 	std::vector<HitResult> res;
 
 	//이때 추가 이펙트나 인디케이터 주던가 말던가
+	Prefab* ExplosionEff = nullptr;
+	ExplosionEff = PrefabUtilitys->LoadPrefab("BossExplosion");
+	GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(ExplosionEff, "entityItem");
+	itemObj->GetComponent<Transform>()->SetWorldPosition(pos);
+	itemObj->GetComponent<EffectComponent>()->Apply();
+
 
 	PhysicsManagers->SphereOverlap(input, m_radius, res);
 
@@ -118,83 +150,81 @@ void BP003::Explosion()
 		objEntity->SendDamage(m_ownerEntity, m_damage);
 	}
 
-	//아이템 드랍 필요 없으면 주석 나중에 프로퍼티 빼야할지도....
-	Random<int> randcount(0,2);
-	Random<int> randtype(0, 3);
-
-	int count = randcount();
-	if (count != 0) {
-		for (size_t i = 0; i < count; i++)
-		{
-			int type = randtype();
-			Prefab* itemPrefab = nullptr;
-			switch (type)
-			{
-			case 0 :
-				itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom");
-				break;
-			case 1 :
-				itemPrefab = PrefabUtilitys->LoadPrefab("BoxMineral");
-				break;
-			case 2 : 
-				itemPrefab = PrefabUtilitys->LoadPrefab("BoxFruit");
-				break;
-			case 3 :
-				itemPrefab = PrefabUtilitys->LoadPrefab("BoxFlower");
-				break;
-			default:
-				break;
-			}
-
-			if (itemPrefab)
-			{
-				GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
-				Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
-				spawnPos.y += 0.1f;
-				itemObj->m_transform.SetPosition(spawnPos);
-
-				Random<float> randX(-3.0f, 3.0f);
-				Random<float> randY(0.2f, 1.f);
-				Random<float> randZ(-3.0f, 3.0f);
-
-				float randx = randX();
-				float randy = randY();
-				float randz = randZ();
-
-				Mathf::Vector3 temp = { randx, randy,randz };
-				float f = Random<float>(2.f, 3.f).Generate();
-				auto tween = std::make_shared<Tweener<float>>(
-					[=]() { return 0.f; },
-					[=](float val) {
-						Mathf::Vector3 pos = spawnPos;
-						float force = f; // 중력 비슷하게 y축 곡선
-						pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
-						pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
-						pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val)
-							+ force * (1 - (2 * val - 1) * (2 * val - 1));
-						itemObj->m_transform.SetPosition(pos);
-					},
-					1.f,
-					.5f,
-					[](float t) { return Easing::Linear(t); }
-				);
-
-
-				auto GM = GameObject::Find("GameManager");
-				if (GM)
-				{
-					auto tweenManager = GM->GetComponent<TweenManager>();
-					if (tweenManager)
-					{
-						tweenManager->AddTween(tween);
-					}
-				}
-			}
-		}
+	// 아이템 드랍 불값으로 판정 겟수 한게 고정
+	if (m_itemDrop) {  
+		ItemDrop();
 	}
 
 	m_timer = 0.0f;
 	GetOwner()->SetEnabled(false);
+}
 
+void BP003::ItemDrop()
+{
+	Random<int> randtype(0, 3); //타입은 4개 종류 랜덤
+
+	int type = randtype();
+	Prefab* itemPrefab = nullptr;
+	switch (type)
+	{
+	case 0:
+		itemPrefab = PrefabUtilitys->LoadPrefab("BoxMushroom");
+		break;
+	case 1:
+		itemPrefab = PrefabUtilitys->LoadPrefab("BoxMineral");
+		break;
+	case 2:
+		itemPrefab = PrefabUtilitys->LoadPrefab("BoxFruit");
+		break;
+	case 3:
+		itemPrefab = PrefabUtilitys->LoadPrefab("BoxFlower");
+		break;
+	default:
+		break;
+	}
+
+	if (itemPrefab)
+	{
+		GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
+		Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
+		spawnPos.y += 0.1f;
+		itemObj->m_transform.SetPosition(spawnPos);
+
+		Random<float> randX(-3.0f, 3.0f);
+		Random<float> randY(0.2f, 1.f);
+		Random<float> randZ(-3.0f, 3.0f);
+
+		float randx = randX();
+		float randy = randY();
+		float randz = randZ();
+
+		Mathf::Vector3 temp = { randx, randy,randz };
+		float f = Random<float>(2.f, 3.f).Generate();
+		auto tween = std::make_shared<Tweener<float>>(
+			[=]() { return 0.f; },
+			[=](float val) {
+				Mathf::Vector3 pos = spawnPos;
+				float force = f; // 중력 비슷하게 y축 곡선
+				pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
+				pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
+				pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val)
+					+ force * (1 - (2 * val - 1) * (2 * val - 1));
+				itemObj->m_transform.SetPosition(pos);
+			},
+			1.f,
+			.5f,
+			[](float t) { return Easing::Linear(t); }
+		);
+
+		auto GM = GameObject::Find("GameManager");
+		if (GM)
+		{
+			auto tweenManager = GM->GetComponent<TweenManager>();
+			if (tweenManager)
+			{
+				tweenManager->AddTween(tween);
+			}
+		}
+	}
 }
 

@@ -141,6 +141,15 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 			}
 		}
 	}
+
+	// 몬스터와 닿았을 때 회피 방향 설정
+	if ((collision.otherObj->m_collisionType | 1 << 10) > 0) {
+		Mathf::Vector3 targetToward = collision.otherObj->m_transform.GetWorldPosition() - GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+		float dot = forward.Dot(targetToward);
+		if (dot > 0.f)
+			evasionDirection = Mathf::Vector3::Reflect(targetToward, forward);
+	}
 }
 
 void EntityAsis::OnCollisionEnter(const Collision& collision)
@@ -161,6 +170,15 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 				// 획득했을 때 처리.
 			}
 		}
+	}
+
+	// 몬스터와 닿았을 때 회피 방향 설정
+	if ((collision.otherObj->m_collisionType | 1 << 10) > 0) {
+		Mathf::Vector3 targetToward = collision.otherObj->m_transform.GetWorldPosition() - GetOwner()->m_transform.GetWorldPosition();
+		Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+		float dot = forward.Dot(targetToward);
+		if (dot > 0.f)
+			evasionDirection = Mathf::Vector3::Reflect(targetToward, forward);
 	}
 }
 
@@ -342,6 +360,8 @@ bool EntityAsis::PathMove(float tick)
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
 	Vector3 dir = Mathf::Normalize(points[nextPointIndex] - points[currentPointIndex]);
+	dir = Mathf::Normalize(dir + evasionDirection);
+	evasionDirection = Mathf::Vector3::Zero;
 	Vector3 endResult = points[nextPointIndex] - dir * m_pathEndRadius;
 	Vector3 startResult = points[currentPointIndex] + dir * m_pathEndRadius;
 	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
