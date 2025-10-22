@@ -225,7 +225,6 @@ void TBoss1::ShootProjectile()
 	obj->SetEnabled(true);
 	script->Initialize(this, projectilePos, projectileDir, BP001Damage, BP001RadiusSize, BP001Delay, BP001Speed);
 	script->isAttackStart = true;
-	pattenIndex++;
 }
 
 
@@ -387,10 +386,11 @@ void TBoss1::OnAttackActionFinished()
 	case EPatternType::BP0022:
 	{
 		pattenIndex++;
-		if (pattenIndex <= 5) // 5회 공격 콤보
+		if (pattenIndex < 5) // 5회 공격 콤보
 		{
 			m_patternPhase = EPatternPhase::Move; // 다음은 이동 단계
 			BPTimer = 0.f; // 이동 시간 측정용 타이머 (필요시)
+			isMoved = false;
 		}
 		else
 		{
@@ -608,7 +608,7 @@ void TBoss1::Update_BP0022(float tick)
 		if (m_anicontroller && m_anicontroller->m_curState) {
 			std::string currentStateName = m_anicontroller->m_curState->m_name;
 			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
-				m_animator->SetParameter("StartMeleeAttack", true);
+				m_animator->SetParameter("WarningTrigger", true);
 			}
 		}
 		break;
@@ -618,14 +618,27 @@ void TBoss1::Update_BP0022(float tick)
 		// For now, we just wait for OnMoveFinished() to set the next phase.
 		BurrowMove(tick);
 		if (isMoved) {
-			m_patternPhase = EPatternPhase::Spawning;
-			 if(m_animator) m_animator->SetParameter("meleeCombo", true);
+			if (m_anicontroller && m_anicontroller->m_curState) {
+				std::string currentStateName = m_anicontroller->m_curState->m_name;
+				if (currentStateName == "Idle") {
+					m_patternPhase = EPatternPhase::Spawning;
+					if (m_animator) m_animator->SetParameter("MeleeCombo", true);
+				}
+			}
 		}
 		break;
 	case EPatternPhase::Spawning:
 		RotateToTarget(); // Lock final direction
 		m_patternPhase = EPatternPhase::Action;
 		break;
+	/*case EPatternPhase::Action:
+		if (m_anicontroller && m_anicontroller->m_curState) {
+			std::string currentStateName = m_anicontroller->m_curState->m_name;
+			if (currentStateName != "MeleeComboAtteck") {
+				if (m_animator) m_animator->SetParameter("MeleeCombo", true);
+			}
+		}
+		break;*/
 	}
 }
 
@@ -1323,6 +1336,7 @@ void TBoss1::BP0011()
 	m_activePattern = EPatternType::BP0011;
 	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
+	pattenIndex = 0;
 	projectileIndex = 0;
 	if (m_animator) m_animator->SetParameter("StartRangedAttack", true);
 
@@ -1358,6 +1372,7 @@ void TBoss1::BP0021()
 	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0021;
 	m_patternPhase = EPatternPhase::Warning;
+	pattenIndex = 0;
 	BPTimer = 0.f;
 	//RotateToTarget(); // Lock rotation at the beginning for this fixed attack
 	if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
@@ -1368,10 +1383,11 @@ void TBoss1::BP0022()
 	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0022;
 	m_patternPhase = EPatternPhase::Warning;
+	pattenIndex = 0;
 	BPTimer = 0.f;
 	isMoved = false;
 	//RotateToTarget(); // Lock rotation at the beginning for this fixed attack
-	if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+	if (m_animator) m_animator->SetParameter("WarningTrigger", true);
 
 }
 

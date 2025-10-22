@@ -32,12 +32,20 @@ void BossBurrowAni::Enter()
 
 void BossBurrowAni::Update(float deltaTime)
 {
+    AnimationController* controller = m_ownerController;
+    auto progress = controller->curAnimationProgress;
+    TBoss1* boss = m_boss->GetComponent<TBoss1>();
+    if (boss) {
+        if (progress > 0.99) {
+            boss->SetBurrow();
+        }
+    }
 }
 
 void BossBurrowAni::Exit()
 {
-    TBoss1* boss = m_boss->GetComponent<TBoss1>();
+    /*TBoss1* boss = m_boss->GetComponent<TBoss1>();
     if (boss) {
         boss->SetBurrow();
-    }
+    }*/
 }
