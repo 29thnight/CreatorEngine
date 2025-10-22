@@ -208,8 +208,7 @@ void EffectManager::ForceCleanupOldEffects()
 	while (it != activeEffects.end() && cleanedCount < 10) { // 한 번에 최대 10개만
 		auto& effect = it->second;
 
-		if (effect->GetCurrentTime() > FORCE_CLEANUP_TIME &&
-			effect->GetState() != EffectState::Stopped) {
+		if (effect->GetState() != EffectState::Stopped) {
 
 			effect->Stop();
 			auto effectToReturn = std::move(effect);
