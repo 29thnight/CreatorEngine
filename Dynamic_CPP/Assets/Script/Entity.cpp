@@ -61,6 +61,16 @@ void Entity::OnOutLine()
 	OnOutline = true;
 }
 
+void Entity::SetAlive(bool isAlive)
+{
+	IsAlive = isAlive;
+}
+
+bool Entity::GetAlive()
+{
+	return IsAlive;
+}
+
 void Entity::StopHitImpulse()
 {
 	m_currentHitImpulseDuration = 0.f;

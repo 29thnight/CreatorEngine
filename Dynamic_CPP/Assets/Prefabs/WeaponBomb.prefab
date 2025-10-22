@@ -1,26 +1,24 @@
 m_name: WeaponBomb
+m_instanceID: 1593867992
 m_isEnabled: true
-m_instanceID: 675065295
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponBomb
+    m_instanceID: 2603446572
     m_isEnabled: true
-    m_instanceID: 2139669640
+    m_attachedSoketID: 0
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 181
+    m_index: 3
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [182]
-    m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
-    m_attachedSoketID: 0
     m_collisionType: 1
-    m_isStatic: false
-    m_gameObjectType: 0
+    m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
+    m_childrenIndices: [4]
     m_tag: Untagged
     m_layer: Default
     m_components:
@@ -29,48 +27,48 @@ PrefabNode:
         itemAckDmg: 100
         itemAckRange: 2
         itemKnockback: 0.5
-        coopCrit: 2
+        coopCrit: 1.5
         chgTime: 0.200000003
         chgAckDmg: 5
         chgRange: 4
         chgKnockback: 1
         ChargeAttackBulletCount: 5
         ChargeAttackBulletAngle: 15
-        durMax: 3
+        durMax: 1
         durUseAtk: 1
         bombThrowDuration: 1
         bombRadius: 2.5
         m_name: Weapon
+        m_instanceID: 3537424416
         m_isEnabled: true
-        m_instanceID: 3027458367
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
+    m_gameObjectType: 0
+    m_isStatic: false
     children:
       - GameObject: 2166264123
         m_name: Weapon_bomb_re
+        m_instanceID: 3850545383
         m_isEnabled: true
-        m_instanceID: 745986737
+        m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 181
-        m_index: 182
-        m_parentIndex: 181
+          m_parentID: 3
+        m_index: 4
+        m_parentIndex: 3
         m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
-        m_attachedSoketID: 0
         m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 3
+        m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
+        m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
+            m_instanceID: 2255052514
             m_isEnabled: true
-            m_instanceID: 2779487923
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: weapon_bomb_re
@@ -100,8 +98,10 @@ PrefabNode:
               lightmapScale: 1
               lightmapOffset: {x: 0, y: 0}
               lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
             m_isSkinnedMesh: false
             m_shadowRecive: true
             m_shadowCast: true
             m_isEnableLOD: false
-            m_bitflag: 0
+        m_gameObjectType: 3
+        m_isStatic: false

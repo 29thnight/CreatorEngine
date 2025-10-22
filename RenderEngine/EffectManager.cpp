@@ -710,18 +710,14 @@ bool EffectManager::ShouldForceCleanup() const
 {
 	auto now = std::chrono::steady_clock::now();
 	auto timeSinceLastCleanup = std::chrono::duration_cast<std::chrono::seconds>(now - lastCleanupTime).count();
-
 	bool memoryPressure = (activeEffects.size() > MAX_ACTIVE_EFFECTS * 0.8f);
-	bool timeForCleanup = (timeSinceLastCleanup > 60);
 	bool emergencyNeeded = (activeEffects.size() > MAX_ACTIVE_EFFECTS * 0.95f) ||
 		(GetTotalMemoryUsage() > 500 * 1024 * 1024); // 500MB 초과시
-
 	if (emergencyNeeded) {
 		const_cast<EffectManager*>(this)->EmergencyCleanup();
 		return false; // 긴급정리 했으므로 일반 정리는 스킵
 	}
-
-	return memoryPressure || timeForCleanup;
+	return memoryPressure;
 }
 
 void EffectManager::ProcessCleanupQueueAsync()

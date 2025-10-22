@@ -3,6 +3,7 @@
 #include "ModuleBehavior.h"
 #include "ItemType.h"
 #include "Entity.generated.h"
+#include <memory>
 struct HitInfo
 {
 	Mathf::Vector3 attakerPos{};     //떄린애 worldpos
@@ -69,4 +70,9 @@ public:
 
 	Core::Delegate<void> m_onDeathEvent;
 	Core::Delegate<void> m_onDamageEvent;
+	
+	void SetAlive(bool isAlive);
+	bool GetAlive();
+private:
+	bool IsAlive = true;  //Detrsoty는 안됬지만 로직상 Dead상태등 //ex 문부서짐, 통나무 파괴됨 등
 };

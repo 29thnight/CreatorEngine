@@ -11,21 +11,72 @@ void MobSpawner::Start()
 void MobSpawner::OnTriggerEnter(const Collision& collision)
 {
 	Player* p = collision.otherObj->GetComponent<Player>();
-	if(p != nullptr)
-		Spawn();
+	if (p != nullptr)
+	{
+		if (isBound == false)
+		{
+			Spawn();
+			isActive = true;
+		}
+		else
+		{
+			if (triggerOnce == true)
+			{
+				Spawn();
+				isActive = true;
+				triggerOnce = false;
+			}
+		}
+	}
 }
 
 void MobSpawner::OnCollisionEnter(const Collision& collision)
 {
 	Player* p = collision.otherObj->GetComponent<Player>();
 	if (p != nullptr)
+	{
+		if (isBound == false)
+		{
+			isActive = true;
+			Spawn();
+			
+		}
+		else
+		{
+			if (triggerOnce == true)
+			{
+				isActive = true;
+				triggerOnce = false;
+				Spawn();
+				
+			}
+		}
+	}
+}
+
+void MobSpawner::Update(float tick)
+{
+	if (!isBound || !isActive) return;
+
+	respawnElapsedTime += tick;
+
+	if (spawnTimer <= respawnElapsedTime)
+	{
 		Spawn();
+		respawnElapsedTime = 0.f;
+	}
+
 }
 
 void MobSpawner::Spawn()
 {
-	if (!triggerOnce) return;
-	triggerOnce = false;
+	if (isActive == false) return;
+	//바운드스포너가 아닐떈 한번만
+	if (isBound == false)
+	{
+		if (!triggerOnce) return;
+		triggerOnce = false;
+	}
 
 	std::cout << "MobSpawner Spawn Called" << std::endl;
 
@@ -82,6 +133,7 @@ void MobSpawner::Spawn()
 
 void MobSpawner::TestSpawn()
 {
+	isActive = true;
 	Spawn();
 }
 

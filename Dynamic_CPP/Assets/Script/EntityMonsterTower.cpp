@@ -69,8 +69,7 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
 	if (m_currentHP <= 0)
 	{
 		isDestroy = true;
-
-
+		SetAlive(false);
 		if (normalModel)
 		{
 			auto meshren = normalModel->GetComponentsInchildrenDynamicCast<MeshRenderer>();
