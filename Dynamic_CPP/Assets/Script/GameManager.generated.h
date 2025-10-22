@@ -13,7 +13,10 @@ ReflectionScriptField(GameManager) \
 	({ \
 		meta_method(LoadNextScene) \
 		meta_method(SwitchNextScene) \
+		meta_method(LoadPrevScene) \
+		meta_method(SwitchPrevScene) \
 		meta_method(SwitchNextSceneWithFade) \
+		meta_method(SwitchPrevSceneWithFade) \
 		meta_method(LoadImidiateNextScene) \
 		meta_method(ApplyGlobalEnhancementsToAllPlayers) \
 	}); \

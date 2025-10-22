@@ -25,7 +25,7 @@ inline std::string ExecuteVsWhere()
 	si.hStdError = hWritePipe;
 	si.dwFlags |= STARTF_USESTDHANDLES;
 
-	std::string cmd = std::string("\"") + VSWHERE_PATH + "\" -latest -products * -property installationPath";
+	std::string cmd = std::string("\"") + VSWHERE_PATH + "\" -prerelease -latest -products * -property installationPath";
 
 	if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 	{
@@ -74,6 +74,7 @@ public:
 	file::path PrecompiledShaderPath{};
 	std::wstring MsbuildPreviewExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
 	std::wstring MsbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
+	std::wstring MSBuild18var = L"C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\MSBuild\\Current\\Bin\\MSBuild.exe";
     file::path DynamicSolutionDir{};
 	file::path BaseProjectPath{};
 	file::path ProjectSettingsPath{};
@@ -209,6 +210,11 @@ public:
 	static inline std::wstring MsbuildPreviewPath()
 	{
 		return InternalPath::GetInstance()->MsbuildPreviewExe;
+	}
+
+	static inline std::wstring MSBuild18Path()
+	{
+		return InternalPath::GetInstance()->MSBuild18var;
 	}
 
     static inline std::wstring MsbuildPath()

@@ -28,6 +28,10 @@ bool EngineSetting::Initialize()
 	{
 		m_msvcVersion = MSVCVersion::Comunity2022;
 	}
+	else if (output.find("18") != std::string::npos)
+	{
+		m_msvcVersion = MSVCVersion::Comunity2026Insideration;
+	}
 	else
 	{
 		m_msvcVersion = MSVCVersion::None;

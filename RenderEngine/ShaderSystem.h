@@ -9,7 +9,7 @@
 
 //class VisualShaderPSO; // visual shader pipeline
 //        
-class ShaderPSO; // Àü¹æ ¼±¾ð
+class ShaderPSO;
 class Material;
 class ImageComponent;
 class ShaderResourceSystem final : public DLLCore::Singleton<ShaderResourceSystem>

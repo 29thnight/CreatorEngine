@@ -14,6 +14,7 @@ inline constexpr std::string_view ToKey(SceneType t) {
 	case SceneType::Tutorial:   return "Tutorial";
 	case SceneType::Boss:       return "Boss";
 	case SceneType::Credits:    return "Credits";
+	case SceneType::GameOver:   return "GameOver";
 	}
 	return "Unknown";
 }
@@ -26,6 +27,7 @@ inline std::optional<SceneType> FromKey(std::string_view k) {
 	if (k == "Tutorial")   return SceneType::Tutorial;
 	if (k == "Boss")       return SceneType::Boss;
 	if (k == "Credits")    return SceneType::Credits;
+	if (k == "GameOver")   return SceneType::GameOver;
 	return std::nullopt;
 }
 
@@ -341,6 +343,16 @@ void GameInstance::UnloadScene(const std::string& sceneName)
 	// Unload only if the scene is loaded
 }
 
+void GameInstance::PauseGame()
+{
+	SceneManagers->SetGamePaused(true);
+}
+
+void GameInstance::ResumeGame()
+{
+	SceneManagers->SetGamePaused(false);
+}
+
 void GameInstance::ExitGame()
 {
 	SceneManagers->SetDecommissioning();
@@ -364,6 +376,7 @@ void GameInstance::SwitchSettingedScene(int sceneType)
 	auto it = m_settingedSceneNames.find(static_cast<SceneType>(sceneType));
 	if (it != m_settingedSceneNames.end()) 
 	{
+		m_prevSceneType = m_currentSceneType;
 		SwitchScene(it->second);
 		m_currentSceneType = static_cast<SceneType>(sceneType);
 	} 

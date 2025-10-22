@@ -585,6 +585,13 @@ namespace Mathf
 		}
 	};
 
+	template<>
+	struct LerpHelper<Mathf::Vector2> {
+		static Mathf::Vector2 Apply(const Mathf::Vector2& a, const Mathf::Vector2& b, float t) {
+			return { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
+		}
+	};
+
 	// Vector3 타입에 대한 템플릿 특수화
 	template<>
 	struct LerpHelper<Mathf::Vector3> {

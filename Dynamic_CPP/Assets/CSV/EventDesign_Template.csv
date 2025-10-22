@@ -1,4 +1,4 @@
 ID,QuestName,Scene,Category,PlayerScope,PriorQuestID,NextQuestID,AdvancePolicy,Description,Objectives
-3201,Test,Test,Quest,Shared,0,4101,0,지정 자원 3개 파괴,Destroy tag=$targetTag required=3
-4101,GoToGate,Test,Quest,Shared,3201,4102,0,게이트 위치로 이동,ReachTrigger actor=Player index=1
-4102,GateOpen,Test,UI,Shared,4101,0,2,게이트가 열렸습니다.,null
+3201,Test,Test,Quest,Shared,0,4101,AutoAdvance,지정 자원 3개 파괴,Destroy tag=$targetTag required=3
+4101,GoToGate,Test,Quest,Shared,3201,4102,AutoAdvance,게이트 위치로 이동,ReachTrigger actor=Player index=1
+4102,GateOpen,Test,UI,Shared,4101,0,Manual,게이트가 열렸습니다.,null

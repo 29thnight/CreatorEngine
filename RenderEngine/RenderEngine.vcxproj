@@ -369,6 +369,7 @@
     <ClInclude Include="MovementModuleCS.h" />
     <ClInclude Include="ParticleModule.h" />
     <ClInclude Include="ParticleSystem.h" />
+    <ClInclude Include="PremitiveRenderProxy.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderDebugManager.h" />

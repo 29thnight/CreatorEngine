@@ -37,7 +37,6 @@ public:
 	std::string m_runtimeTag{};
 	[[Property]]
 	float spawnRadius = 5.f;
-
 	[[Property]]
 	bool isBound = false;
 	[[Property]]
@@ -47,7 +46,6 @@ public:
 	bool  isActive   = true;       //활성화된후 타이머 on 
 
 	Mathf::Vector3 SpawnArea{};
-
 	bool triggerOnce = true;
 private:
 	double radical_inverse_base2(unsigned int n);
