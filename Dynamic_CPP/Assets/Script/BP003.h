@@ -27,7 +27,7 @@ public:
 	float m_radius = 0.0f;
 	//pos를 가지고 있을까? 아님 보스에서 다 정해 줄까? 일단 보스가 전체적으로 다 정해주는걸로 
 	//터지는 시간은 장판 패턴에 따라? 아니면 시간을 정해두고? 일단 정할수 있게 해두자
-	float m_delay = 0.0f;
+	float m_delay = 0.0f;  //maxTime
 	float m_timer = 0.0f;
 
 	bool isInitialize = false;
@@ -47,11 +47,27 @@ public:
 
 	bool m_itemDrop = false;
 
+
+	// vs
+	[[Property]]
+	float maxScale{};
+	[[Property]]
+	float scaleFrequency{};
+	[[Property]]
+	float rotFrequency{};
+
+	// ps
+	[[Property]]
+	float flashFrequency{};
+
+	std::vector<MeshRenderer*> meshRenderers;
+
+
 	//음... 보스위치 기준으로 기준으로 하느냐? 춘식이 위치 기준으로 하는냐 인대... 이 친구들은 일단 보스 위치 기준으로 하자. 그럼 변수 추가 없어도 될듯
 
 	//그럼 소유하는 엔티티랑 데미지,범위,시간 만 받으면 되려나?
 	void Initialize(Entity* owner,Mathf::Vector3 pos, int damage, float radius, float delay, bool itemDrop, bool useOrbiting = false,bool clockwise =true);
-
+	void ShaderUpdate();
 	void Explosion(); //폭발하며 주변 대미지;
 	void ItemDrop(); //아이템 드롭
 };

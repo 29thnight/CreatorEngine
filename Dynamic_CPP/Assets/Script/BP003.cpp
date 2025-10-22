@@ -2,10 +2,18 @@
 #include "Entity.h"
 #include "pch.h"
 #include "PrefabUtility.h"
+#include "MeshRenderer.h"
+#include "Material.h"
 #include "Core.Random.h"
+#include "EffectComponent.h"
 #include "TweenManager.h"
+
 void BP003::Start()
 {
+	meshRenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
+	for (auto& m : meshRenderers) {
+		m->m_Material = m->m_Material->Instantiate(m->m_Material, "clonebomb");
+	}
 }
 
 void BP003::Update(float tick)
@@ -59,6 +67,9 @@ void BP003::Update(float tick)
 	if (m_timer > m_delay) {
 		Explosion(); 
 	}
+	else {
+		ShaderUpdate();
+	}
 
 	if (ownerDestory) {
 		GetOwner()->SetEnabled(false); //보스 죽으면 기능정지
@@ -88,9 +99,23 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 	m_orbitAngle = atan2(toMe.z, toMe.x); //소환됬을때의 각도-->회전시 일정한 값을 
 	m_orbitDistance = toMe.Length(); //소환됬을때 거리 -->회전식 일정한 거리가 떨어져 있을수 있도록
 	
-
+	auto effcomp = GetOwner()->GetComponent<EffectComponent>();
+	effcomp->Apply();
 
 	isInitialize = true;
+}
+
+void BP003::ShaderUpdate()
+{
+	float t = m_timer / m_delay;
+	for (auto& m : meshRenderers) {
+		m->m_Material->TrySetValue("Param", "lerpValue", &t, sizeof(float));
+		m->m_Material->TrySetValue("Param", "maxScale", &maxScale, sizeof(float));
+		m->m_Material->TrySetValue("Param", "scaleFrequency", &scaleFrequency, sizeof(float));
+		m->m_Material->TrySetValue("Param", "rotFrequency", &rotFrequency, sizeof(float));
+		m->m_Material->TrySetValue("FlashBuffer", "flashStrength", &t, sizeof(float));
+		m->m_Material->TrySetValue("FlashBuffer", "flashFrequency", &flashFrequency, sizeof(float));
+	}
 }
 
 void BP003::Explosion()
@@ -107,6 +132,12 @@ void BP003::Explosion()
 	std::vector<HitResult> res;
 
 	//이때 추가 이펙트나 인디케이터 주던가 말던가
+	Prefab* ExplosionEff = nullptr;
+	ExplosionEff = PrefabUtilitys->LoadPrefab("BossExplosion");
+	GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(ExplosionEff, "entityItem");
+	itemObj->GetComponent<Transform>()->SetWorldPosition(pos);
+	itemObj->GetComponent<EffectComponent>()->Apply();
+
 
 	PhysicsManagers->SphereOverlap(input, m_radius, res);
 
@@ -126,7 +157,6 @@ void BP003::Explosion()
 
 	m_timer = 0.0f;
 	GetOwner()->SetEnabled(false);
-
 }
 
 void BP003::ItemDrop()
