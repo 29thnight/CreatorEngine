@@ -100,6 +100,14 @@ private:
 	[[Property]]
 	float   bigWoodDetectRadius{ 2.f };
 
+	bool isStun = false; //asis 피0됬을때 행동불능
+	[[Property]]
+	float ResurrectionRange = 5.f;   //부활가능한 트리거 콜라이더 크기 다른플레이어가 이범위안이면 부활  
+	[[Property]]
+	float ResurrectionTime = 3.f;
+	float ResurrectionElapsedTime;
+	[[Property]]
+	int ResurrectionHP = 50;   //부활시 회복하는 HP &비율
 private:
 	float	m_currentTailPurificationDuration{}; // 꼬리 정화 연출 소요 시간
 	float	m_currentStaggerDuration{ 0 };	// 현재 경직 시간
@@ -109,9 +117,12 @@ private:
 	// Reward 관련.
 private:
 	int		m_currentPollutionGauge{ 0 }; // 현재 오염도 게이지
+	bool CheckResurrectionByPlayer();
+	void Resurrection();
+	void Heal(int _heal);
 public:
 	void AddPollutionGauge(int amount);
-
+	bool IsStun();
 	// Move (Path)
 private:
 	GameObject* m_playerObject{ nullptr };

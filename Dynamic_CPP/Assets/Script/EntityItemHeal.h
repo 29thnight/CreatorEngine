@@ -5,6 +5,7 @@
 #include "ItemType.h"
 #include "EntityItemHeal.generated.h"
 
+class EffectComponent;
 //가까이 다가가면 플레이어 HP 회복되는 아이템 //던지기 등 로직이 없어 따로 스크립트
 class EntityItemHeal : public Entity
 {
@@ -37,6 +38,7 @@ public:
 private:
 	[[Property]]
 	int healAmount = 10;
+	EffectComponent* m_effect = nullptr;
 
 	bool canHeal = true; //플레이어 2명다 충돌해도 한명만 힐해야 하니까
 };

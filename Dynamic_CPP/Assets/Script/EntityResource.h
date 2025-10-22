@@ -4,6 +4,7 @@
 #include "ItemType.h"
 #include "EntityResource.generated.h"
 class CriticalMark;
+class EffectComponent;
 class EntityResource : public Entity
 {
 public:
@@ -31,6 +32,7 @@ public:
 	[[Property]]
 	int maxHP = 1.f;
 private:
+	EffectComponent* m_effect = nullptr;
 	CriticalMark* m_criticalMark;
 	[[Property]]
 	float m_minRewardUpForce = 2.f;
