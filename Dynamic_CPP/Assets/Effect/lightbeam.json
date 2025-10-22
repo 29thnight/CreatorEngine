@@ -7,10 +7,10 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "1",
+    "name": "lightbeam",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 100,
             "modules": [
                 {
@@ -22,9 +22,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 2.0,
+                                "x": 1.0,
                                 "y": 1.0,
-                                "z": 1.9900000095367432
+                                "z": 3.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -70,7 +70,7 @@
                                 "z": 0.5
                             },
                             "emitterType": 0,
-                            "spawnRate": 1000.0
+                            "spawnRate": 100.0
                         },
                         "state": {
                             "isInitialized": true,
@@ -79,40 +79,6 @@
                     },
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
-                        "easing": {
-                            "animationType": 0,
-                            "duration": 1.0,
-                            "enabled": false,
-                            "type": 0
-                        },
-                        "sizeParams": {
-                            "endSize": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "oscillationSpeed": 5.0,
-                            "randomScaleMax": 2.0,
-                            "randomScaleMin": 0.5,
-                            "startSize": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "useOscillation": 0,
-                            "useRandomScale": 0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 100
-                        }
-                    },
-                    "stage": 2,
-                    "type": "MeshSizeModuleCS",
                     "useEasing": false
                 }
             ],
