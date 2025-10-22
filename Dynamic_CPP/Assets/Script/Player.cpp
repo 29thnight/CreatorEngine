@@ -1565,7 +1565,8 @@ void Player::FindNearObject(GameObject* _gameObject)
 	GameObject* gameObject = nullptr;
 	if (_gameObject->GetComponent<EntityItem>() != nullptr)
 	{
-		gameObject = _gameObject;
+		if(_gameObject->GetComponent<EntityItem>()->m_state == EItemState::NONE)
+			gameObject = _gameObject;
 	}
 	if (_gameObject->GetComponent<WeaponCapsule>() != nullptr)
 	{

@@ -95,13 +95,7 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 void EntityItem::Update(float tick)
 {
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	if (abs(pos.y) <= 0.05f)
-	{
-		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-		rigid->UseGravity(false);
-	}
+	
 	if (m_state == EItemState::THROWN)
 	{
 		if (!isTargettingTail)
@@ -216,6 +210,14 @@ void EntityItem::Update(float tick)
 	if (m_state == EItemState::FALLED)
 	{
 		//Áß·Â¿¡ÀÇÇØ ¶³¾îÁü //¹Ù´Ú plane °´Ã¼ Àü¸Ê¿¡ ±ò¾Æ¾ß ÇÒµíÇÔ 
+		if (abs(pos.y) <= 0.05f)
+		{
+			auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+			rigid->UseGravity(false);
+			m_state = EItemState::NONE;
+		}
 	}
 	if (m_state == EItemState::NONE)
 	{
@@ -257,7 +259,7 @@ void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2
 	Mathf::Vector3 offset = {ownerForward.x * distance.x,0, ownerForward.z * distance.x};
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
-	endPos.y += 0.2f;
+	endPos.y = endPos.y + 0.2f - 1.0f;
 }
 
 void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float height)
@@ -269,7 +271,7 @@ void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float 
 	timer = 0.f;
 	throwDistacneY = height;
 	endPos = startPos + velocity;
-	endPos.y = 0.2f;
+	endPos.y = endPos.y + 0.2f - 1.0f;
 }
 
 void EntityItem::SetThrowOwner(Player* player)
