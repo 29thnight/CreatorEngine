@@ -1,6 +1,13 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
@@ -139,7 +146,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 184.40081787109375,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -237,7 +244,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -406,7 +413,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 20.703163146972656,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -573,7 +580,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -693,7 +700,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 20.755115509033203,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -860,7 +867,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -980,7 +987,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 21.76004409790039,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1147,7 +1154,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -1261,7 +1268,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 20.46453094482422,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.3400000035762787,
@@ -1327,7 +1334,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
