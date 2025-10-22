@@ -1,15 +1,15 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "CameraMove.generated.h"
+#include "BossBomb.generated.h"
 
-class GameManager;
-class CameraMove : public ModuleBehavior
+class MeshRenderer;
+class BossBomb : public ModuleBehavior
 {
 public:
-   ReflectCameraMove
+   ReflectBossBomb
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(CameraMove)
+	MODULE_BEHAVIOR_BODY(BossBomb)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,29 +20,43 @@ public:
 	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
 	virtual void Update(float tick) override;
-	virtual void LateUpdate(float tick) override;
+	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+public:
+	[[Property]]
+	float maxTime{ 1.f };
+
+	// vs
+	[[Property]]
+	float maxScale{};
+	[[Property]]
+	float scaleFrequency{};
+	[[Property]]
+	float rotFrequency{};
+
+	// ps
+	[[Property]]
+	float flashFrequency{};
+
+	[[Property]]
+	float timeScale = 1.f;
+
+	[[Property]]
+	float explosionRadius = 3.f;
+	[[Property]]
+	float explosionDamage = 10.f;
+
+public:
+	void Initialize();
+	void ShaderUpdate();
+	void Explosion();
 private:
-	GameObject* target = nullptr;
-	GameManager* GM = nullptr;
-	[[Property]]
-	float followSpeed{ 1.0f };
-	[[Property]]
-	Mathf::Vector3 offset{ 0.f, 20.f, -11.5f };
-	[[Property]]
-	float detectRange{ 1.f };
+	float currentTime = 0.f;
+	bool isExplosion = false;
+	std::vector<MeshRenderer*> meshRenderers;
 
+	UINT layermask = 1 << 5;
 
-	[[Method]]
-	void OnCameraControll();
-	[[Method]]
-	void OffCameraCOntroll();
-	[[Method]]
-	void CameraMoveFun(Mathf::Vector2 dir);
-	[[Property]]
-	float cameraMoveSpeed = 0.05f;
-
-	Mathf::Vector3 targetPosition{ 0.f, 0.f, 0.f };
 };
