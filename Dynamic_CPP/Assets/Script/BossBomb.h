@@ -1,13 +1,15 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
-#include "ControllerVibration.generated.h"
-class ControllerVibration : public ModuleBehavior
+#include "BossBomb.generated.h"
+
+class MeshRenderer;
+class BossBomb : public ModuleBehavior
 {
 public:
-   ReflectControllerVibration
+   ReflectBossBomb
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(ControllerVibration)
+	MODULE_BEHAVIOR_BODY(BossBomb)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -22,20 +24,39 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+public:
 	[[Property]]
-	float PlayerHitPower = 0.5f;
+	float maxTime{ 1.f };
+
+	// vs
 	[[Property]]
-	float PlayerHitTime = 0.1f;
+	float maxScale{};
+	[[Property]]
+	float scaleFrequency{};
+	[[Property]]
+	float rotFrequency{};
+
+	// ps
+	[[Property]]
+	float flashFrequency{};
 
 	[[Property]]
-	float PlayerChargePower = 0.5f;
-	[[Property]]
-	float PlayerChargeTime = 0.1f;
-
+	float timeScale = 1.f;
 
 	[[Property]]
-	float PlayerChargeEndPower = 0.25f;
+	float explosionRadius = 3.f;
 	[[Property]]
-	float PlayerChargeEndTime = 0.1f;
-	
+	float explosionDamage = 10.f;
+
+public:
+	void Initialize();
+	void ShaderUpdate();
+	void Explosion();
+private:
+	float currentTime = 0.f;
+	bool isExplosion = false;
+	std::vector<MeshRenderer*> meshRenderers;
+
+	UINT layermask = 1 << 5;
+
 };

@@ -36,24 +36,25 @@ void CameraMove::LateUpdate(float tick)
 			currentPos.y = 0.f;
 			float distance = Mathf::Vector3::Distance(targetPos, currentPos);
 
+
+			float followTimer = 0.f;
+
 			if (distance > detectRange)
 			{
 				targetPosition = targetPos;
-				followTimer = 0.f;
+				followTimer = tick / followSpeed / 3.f;
 			}
-
-			followTimer += tick / followSpeed / 3.f;
-			if (followTimer > followSpeed)
-			{
-
+			else {
+				followTimer = 0.f;
 			}
 
 			Mathf::Vector3 dir = targetPosition - currentPos;
 			dir.y = 0.f;
 			dir.Normalize();
 
+
 			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
-			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer / followSpeed) + offset);
+			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset);
 
 
 			//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);

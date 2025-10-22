@@ -44,7 +44,5 @@ private:
 	[[Property]]
 	float cameraMoveSpeed = 0.05f;
 
-
-	float followTimer{ 0.f };
 	Mathf::Vector3 targetPosition{ 0.f, 0.f, 0.f };
 };

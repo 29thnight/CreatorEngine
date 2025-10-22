@@ -134,7 +134,7 @@ private:
 	static const int MAX_PARTICLES_PER_SYSTEM = 10000;
 	int maxPoolSize = 100;                              // 런타임 변경 가능
 	static const int MAX_ACTIVE_EFFECTS = 200;          // 활성 이펙트 최대 개수
-	static constexpr float FORCE_CLEANUP_TIME = 30.0f;      // 강제 정리 시간 (초)
+	static constexpr float FORCE_CLEANUP_TIME = 1200.0f;      // 강제 정리 시간 (초)
 
 	// 메모리 추적
 	std::atomic<size_t> totalCreatedEffects{ 0 };
