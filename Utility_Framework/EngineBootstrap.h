@@ -24,6 +24,9 @@ namespace EngineBootstrap
 {
     inline void InitializeRuntime()
     {
+        static DebugStreamBuf debugBuf(std::cout.rdbuf());
+        std::cout.rdbuf(&debugBuf);
+
         Meta::RegisterClassInitalize();
         Meta::VectorFactoryRegistry::GetInstance();
         Meta::VectorInvokerRegistry::GetInstance();
@@ -36,9 +39,6 @@ namespace EngineBootstrap
         {
             return 0;
         });
-
-        static DebugStreamBuf debugBuf(std::cout.rdbuf());
-        std::cout.rdbuf(&debugBuf);
 
         DirectX11::DeviceResourceManager::GetInstance();
         ShaderResourceSystem::GetInstance();

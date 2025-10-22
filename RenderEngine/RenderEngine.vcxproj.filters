@@ -234,9 +234,6 @@
     <Filter Include="Objects\CullingBox">
       <UniqueIdentifier>{54c9e5dd-94e1-4189-a183-76aae2bdf312}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Objects\MeshRendererProxy">
-      <UniqueIdentifier>{cc1b22ae-ef48-47f8-86aa-41aa5e558789}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Objects\Camera">
       <UniqueIdentifier>{bb8be9e6-5794-4727-90b2-edd452792566}</UniqueIdentifier>
     </Filter>
@@ -308,6 +305,27 @@
     </Filter>
     <Filter Include="EditorAddon">
       <UniqueIdentifier>{3ce26bab-5de8-4630-bed5-b6abcb2dc09f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy">
+      <UniqueIdentifier>{cc1b22ae-ef48-47f8-86aa-41aa5e558789}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy\MeshRenderProxy">
+      <UniqueIdentifier>{37a99670-1ac2-44e2-ab7d-d8d3aa5f0197}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy\TerrainRenderProxy">
+      <UniqueIdentifier>{f3908965-ec34-4680-baa3-9b59cbd80469}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy\FoliageRenderProxy">
+      <UniqueIdentifier>{7f5692f3-0862-4548-b4cd-2d4eb0aacefc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy\DecalRenderProxy">
+      <UniqueIdentifier>{33904e30-cd83-42f3-a4f0-6ef2acad7ef3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy\SpriteRenderProxy">
+      <UniqueIdentifier>{6726d863-d479-43b3-ac2c-704aa2b84dd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\PrimitiveRenderProxy\OldProxyClass">
+      <UniqueIdentifier>{11c686be-cfdd-476f-9296-966aa8b90e50}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -485,9 +503,6 @@
     <ClCompile Include="ProxyCommand.cpp">
       <Filter>ProxyCommandQueue\ProxyCommand</Filter>
     </ClCompile>
-    <ClCompile Include="MeshRendererProxy.cpp">
-      <Filter>Objects\MeshRendererProxy</Filter>
-    </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>Objects\Camera</Filter>
     </ClCompile>
@@ -571,6 +586,9 @@
     </ClCompile>
     <ClCompile Include="TrailModuleCS.cpp">
       <Filter>RenderPass\EffectPass\555.Generate</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshRendererProxy.cpp">
+      <Filter>Objects\PrimitiveRenderProxy\OldProxyClass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -784,9 +802,6 @@
     <ClInclude Include="CullingBox.h">
       <Filter>Objects\CullingBox</Filter>
     </ClInclude>
-    <ClInclude Include="MeshRendererProxy.h">
-      <Filter>Objects\MeshRendererProxy</Filter>
-    </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Objects\Camera</Filter>
     </ClInclude>
@@ -948,6 +963,12 @@
     </ClInclude>
     <ClInclude Include="ICustomEditor.h">
       <Filter>EditorAddon</Filter>
+    </ClInclude>
+    <ClInclude Include="PremitiveRenderProxy.h">
+      <Filter>Objects\PrimitiveRenderProxy</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRendererProxy.h">
+      <Filter>Objects\PrimitiveRenderProxy\OldProxyClass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

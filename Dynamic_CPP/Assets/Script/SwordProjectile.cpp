@@ -9,23 +9,23 @@
 #include "BoxColliderComponent.h"
 void SwordProjectile::Start()
 {
-		if (m_effects.empty())
+	if (m_effects.empty())
+	{
+		auto effect = GetOwner()->GetComponent<EffectComponent>();
+		if (effect)
 		{
-			auto effect = GetOwner()->GetComponent<EffectComponent>();
-			if (effect)
+			m_effects.push_back(effect);
+		}
+		auto childred = GetOwner()->m_childrenIndices;
+		for (auto& child : childred)
+		{
+			auto effectcomponent = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+			if (effectcomponent)
 			{
-				m_effects.push_back(effect);
-			}
-			auto childred = GetOwner()->m_childrenIndices;
-			for (auto& child : childred)
-			{
-				auto effectcomponent = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
-				if (effectcomponent)
-				{
-					m_effects.push_back(effectcomponent);
-				}
+				m_effects.push_back(effectcomponent);
 			}
 		}
+	}
 }
 
 void SwordProjectile::OnTriggerEnter(const Collision& collision)

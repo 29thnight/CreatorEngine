@@ -16,6 +16,7 @@ enum class MSVCVersion
 	None = 0,
 	Comunity2022,
 	Comunity2022Preview,
+	Comunity2026Insideration,
 };
 
 enum class ContentsBrowserStyle
@@ -44,6 +45,8 @@ public:
 			return PathFinder::MsbuildPath();
 		case MSVCVersion::Comunity2022Preview:
 			return PathFinder::MsbuildPreviewPath();
+		case MSVCVersion::Comunity2026Insideration:
+			return PathFinder::MSBuild18Path();
 		default:
 			return L"";
 		}

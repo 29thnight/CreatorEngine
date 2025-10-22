@@ -8,6 +8,7 @@
 #include "InputActionManager.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
+#include "KoriEmoteSystem.h"
 
 #include "Animator.h"
 #include "Player.h"
@@ -55,6 +56,11 @@ void EntityAsis::Start()
 		}
 	}
 
+	auto emoteObj = GameObject::Find("KoriEmoteSystem");
+	if (emoteObj)
+	{
+		m_emoteSystem = emoteObj->GetComponent<KoriEmoteSystem>();
+	}
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
@@ -85,12 +91,6 @@ void EntityAsis::Start()
 	{
 		m_animator = GetOwner()->GetComponent<Animator>();
 	}
-
-
-
-
-
-
 
 	auto paths = GameObject::Find("Paths");
 	if (paths) {
@@ -239,7 +239,10 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	m_currentGracePeriod = graceperiod;			// 무적
 	m_currentTailPurificationDuration = 0.f;	// 진행중인 정화 취소
 	HitImpulse();
-
+	if(m_emoteSystem)
+	{
+		m_emoteSystem->PlaySick();
+	}
 	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
 	bool isDroped = DropItem();
 
@@ -316,6 +319,11 @@ void EntityAsis::Purification(float tick)
 
 			// 재화 지급
 			AddPollutionGauge(item->itemReward);
+			// 정화 이모트 재생
+			if (m_emoteSystem)
+			{
+				m_emoteSystem->PlaySmile();
+			}
 
 			// 이부분은 아이템에 등록된 정화무기가 될것.
 			auto player = item->GetThrowOwner();
@@ -399,6 +407,11 @@ bool EntityAsis::PathMove(float tick)
 
 void EntityAsis::Stun()
 {
+	// 스턴 이모트 재생
+	if (m_emoteSystem)
+	{
+		m_emoteSystem->PlayStunned();
+	}
 }
 
 bool EntityAsis::DropItem()

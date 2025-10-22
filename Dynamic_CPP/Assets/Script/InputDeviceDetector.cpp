@@ -112,7 +112,7 @@ void InputDeviceDetector::CharSelect()
 {
     if (!m_isCallStart) return;
 
-    if (!m_gameManager || !m_playerSelector) return;
+    if (!m_gameManager || !m_playerSelector || m_isApply) return;
 
     m_selectHold += m_lastDelta;
 
@@ -146,7 +146,9 @@ void InputDeviceDetector::CharSelect()
             {
                 rightPos->color = { 1, 0, 0, 1 };
             }
+            m_isApply = true;
         }
+
     }
     else if (m_isSelectComplete && m_selectHold >= m_requiredSelectHold)
     {
@@ -163,19 +165,21 @@ void InputDeviceDetector::CharSelect()
         }
         m_selectHold = 0.f;
         m_isSelectComplete = false;
+        m_isApply = true;
     }
 }
 
 void InputDeviceDetector::ReleaseKey()
 {
     m_selectHold = 0.f;
+	m_isApply = false;
 }
 
 void InputDeviceDetector::LeaveSelectScene()
 {
     if (!m_isCallStart) return;
 
-    if (!m_selectTimer || m_selectTimer->IsTimerOn()) return;
+    if (!m_selectTimer || m_selectTimer->IsTimerOn() || m_isSelectComplete) return;
 
     if (!m_isLeaveSelectScene && m_gameManager)
     {

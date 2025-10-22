@@ -3,8 +3,12 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "KoriEmoteSystem.h"
 #include "BossBomb.h"
 #include "MobSpawnerBound.h"
+#include "MenuKeyObserver.h"
+#include "ReturnMainScene.h"
+#include "RestartButton.h"
 #include "SceneTransitionUI.h"
 #include "TestShader.h"
 #include "SettingWindowUI.h"

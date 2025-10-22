@@ -81,6 +81,12 @@ void GameManager::Update(float tick)
 		SceneManagers->SetDecommissioning();
 	}
 
+	if (m_isGameOver)
+	{
+		SwitchNextSceneWithFade();
+		return;
+	}
+
 	if(rewardTimer >= 1.f)
 	{
 		rewardTimer = 0.f;
@@ -102,6 +108,32 @@ void GameManager::Update(float tick)
 		else
 		{
 			displayPollutionGaugeRatio = 0;
+		}
+	}
+
+	int deadCount = 0;
+	if (!m_isGameOver)
+	{
+		for (auto& player : m_players)
+		{
+			if (0 >= player->m_currentHP)
+			{
+				++deadCount;
+			}
+		}
+
+		if (deadCount >= m_players.size() && m_players.size() > 0)
+		{
+			//모든 플레이어가 죽음
+			int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
+			if (currentScene != (int)SceneType::Stage && currentScene != (int)SceneType::Boss)
+			{
+				GameInstance::GetInstance()->SetCurrentSceneType((int)SceneType::Stage);
+			}
+			m_nextSceneIndex = (int)SceneType::GameOver;
+			m_isLoadingReq = false;
+			LoadNextScene();
+			m_isGameOver = true;
 		}
 	}
 }
@@ -190,6 +222,38 @@ void GameManager::SwitchNextScene()
 	}
 }
 
+void GameManager::LoadPrevScene()
+{
+	// 이전 씬의 경우 다음 씬과는 다르게 정보를 GameInstance에서 관리하고 있기 때문에 갱신이 필요함.
+	m_prevSceneIndex = GameInstance::GetInstance()->GetPrevSceneType();
+	if (m_isLoadingReq)
+	{
+		GameInstance::GetInstance()->SetAfterLoadSceneIndex(m_prevSceneIndex);
+		LoadScene((int)SceneType::Loading);
+	}
+	else
+	{
+		LoadScene(m_prevSceneIndex);
+	}
+}
+
+void GameManager::SwitchPrevScene()
+{
+	if (!GameInstance::GetInstance()->IsLoadSceneComplete())
+	{
+		return;
+	}
+
+	if (m_isLoadingReq)
+	{
+		SwitchScene((int)SceneType::Loading);
+	}
+	else
+	{
+		SwitchScene(m_prevSceneIndex);
+	}
+}
+
 void GameManager::SwitchNextSceneWithFade()
 {
 	if (m_isSwitching) return;                    // 이미 진행 중
@@ -209,6 +273,32 @@ void GameManager::SwitchNextSceneWithFade()
 			SwitchScene(m_nextSceneIndex);
 		}
 
+		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
+		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
+		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:
+		m_isSwitching = false;
+	});
+}
+
+void GameManager::SwitchPrevSceneWithFade()
+{
+	if (m_isSwitching) return;                    // 이미 진행 중
+	if (!GameInstance::GetInstance()->IsLoadSceneComplete()) return;
+	if (!m_sceneTransitionUI) { // 페이더 없으면 즉시 전환 (폴백)
+		SwitchPrevScene();
+		return;
+	}
+	m_isSwitching = true;
+	m_sceneTransitionUI->FadeIn(m_fadeInDuration, [this]()    // 페이드 인 완료 콜백
+	{
+		if (m_isLoadingReq) 
+		{
+			SwitchScene(static_cast<int>(SceneType::Loading));
+		}
+		else 
+		{
+			SwitchScene(m_prevSceneIndex);
+		}
 		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
 		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
 		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:

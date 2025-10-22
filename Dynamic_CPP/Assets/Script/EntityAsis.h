@@ -6,6 +6,7 @@
 
 class EntityItem;
 class WeaponCapsule;
+class KoriEmoteSystem;
 class EntityAsis : public Entity
 {
 public:
@@ -48,6 +49,7 @@ public:
 		return static_cast<float>(m_currentPollutionGauge) / static_cast<float>(maxPollutionGauge);
 	}
 private:
+	KoriEmoteSystem* m_emoteSystem = nullptr;
 	Animator* m_animator = nullptr;
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
 

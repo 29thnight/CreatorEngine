@@ -42,8 +42,8 @@ public:
 	}
 
 protected:
-	bool m_isCompiled{ false };
 	ComPtr<ID3DBlob> m_blob;
+	bool m_isCompiled{ false };
 };
 
 template<typename T>
@@ -111,7 +111,7 @@ public:
 		return *this;
 	}
 
-	std::string m_shader_identifier{};
+	std::string	m_shader_identifier{};
 	T*			m_shader{ nullptr };
 	IShader*	m_interface{ nullptr };
 };
