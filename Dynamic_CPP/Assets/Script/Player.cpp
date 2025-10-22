@@ -813,7 +813,10 @@ void Player::PlaySoundStep()
 	auto pos = GetOwner()->m_transform.GetWorldPosition();
 	pos += -GetOwner()->m_transform.GetForward() * 0.3f;
 	pos.m128_f32[1] += 0.3f;
+	auto forwardVec = GetOwner()->m_transform.GetForward();
+	auto rot = Quaternion::LookRotation(forwardVec, Vector3::Up);
 	m_runEffects[m_runIndex]->GetOwner()->m_transform.SetWorldPosition(pos);
+	m_runEffects[m_runIndex]->GetOwner()->m_transform.SetWorldRotation(rot);
 	m_runEffects[m_runIndex]->Apply();
 }
 
