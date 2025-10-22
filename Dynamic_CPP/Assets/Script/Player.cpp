@@ -361,6 +361,8 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
+
+	
 	Cheat(); 
 	DetectResource();
 	HitImpulseUpdate(tick);

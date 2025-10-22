@@ -160,7 +160,6 @@ void EntityMonsterA::Update(float tick)
 	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->SetBaseSpeed(m_moveSpeed);
 
-	std::cout << m_state << std::endl;
 
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
