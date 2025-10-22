@@ -8,7 +8,7 @@
 extern float MaxOreder;
 
 //아직안씀 
-enum class UItype
+enum class UItype : uint16_t
 {
 	Image,
 	Text,
@@ -37,10 +37,6 @@ public:
 	bool IsNavLock() const { return isNavLocked; }
 
 	void DeserializeShader();
-
-	Mathf::Vector3 pos{ 960, 540, 0 };
-	Mathf::Vector2 scale{ 1, 1 };
-	UItype type = UItype::None;
 
 	static bool CompareLayerOrder(UIComponent* a, UIComponent* b)
 	{
@@ -83,17 +79,23 @@ public:
 	std::optional<int4> GetInt4(std::string_view name) const;
 	void SetInt4(std::string_view name, const int4& value);
 
+public:
+	Mathf::Vector3 pos{ 960, 540, 0 };
+	[[Property]]
+	int _layerorder{};
+
+	UItype type = UItype::None;
+	bool isDeserialized = false;
+	bool isNavLocked = false;
 	[[Property]]
 	UIEffects uiEffects{};
-    [[Property]]
-	int _layerorder{};
+
+	Mathf::Vector2 scale{ 1, 1 };
+
 	[[Property]]
 	std::string m_ownerCanvasName{};
 	[[Property]]
 	std::vector<Navigation> navigations{};
-	bool isDeserialized = false;
-	bool isNavLocked = false;
-
 private:
 	std::array<std::weak_ptr<GameObject>, NavDirectionCount> navigation;
 	Canvas* ownerCanvas = nullptr;

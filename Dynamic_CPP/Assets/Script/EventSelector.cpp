@@ -26,7 +26,7 @@ void EventSelector::Update(float tick)
 	std::string msg;
 	for (int id : activeIds)
 	{
-		auto def = eventMgr->GetEventDefinition(id);
+		EventDefinition* def = eventMgr->GetEventDefinition(id);
 		if (def)
 		{
 			m_textComponent->SetMessage(def->uiText);

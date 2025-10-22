@@ -190,11 +190,16 @@ void EntityAsis::Update(float tick)
 	//}
 
 	if (m_currentStaggerDuration <= 0.f) {
-		m_animator->SetParameter("OnMove", false);
 		if (!isBigWoodDetect)
 		{
-			PathMove(tick);
-			m_animator->SetParameter("OnMove", true);
+			if (true == PathMove(tick))
+			{
+				m_animator->SetParameter("OnMove", true);
+			}
+			else
+			{
+				m_animator->SetParameter("OnMove", false);
+			}
 		}
 		m_purificationAngle += tick * 5.f;
 		Purification(tick);
@@ -308,12 +313,12 @@ void EntityAsis::Purification(float tick)
 	}
 }
 
-void EntityAsis::PathMove(float tick)
+bool EntityAsis::PathMove(float tick)
 {
 	int pathSize = points.size();
-	if (pathSize == 0) return;
+	if (pathSize == 0) return false;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;
-	if (nextPointIndex == 0) return; // 시연용 코드
+	if (nextPointIndex == 0) return false; // 시연용 코드
 	Vector3 currentPosition = GetOwner()->m_transform.GetWorldPosition();
 	Quaternion currentRotation = GetOwner()->m_transform.GetWorldQuaternion();
 	currentRotation.Normalize();
@@ -367,6 +372,9 @@ void EntityAsis::PathMove(float tick)
 	if (newDistance <= m_pathEndRadius) {
 		currentPointIndex = nextPointIndex; // Loop through the points
 	}
+
+
+	return true;
 }
 
 void EntityAsis::Stun()

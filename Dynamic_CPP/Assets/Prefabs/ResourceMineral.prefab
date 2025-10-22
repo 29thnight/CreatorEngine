@@ -1,21 +1,21 @@
 m_name: ResourceMineral
 m_isEnabled: true
-m_instanceID: 2753052341
+m_instanceID: 4195054722
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: ResourceMineral
     m_isEnabled: true
-    m_instanceID: 4104535538
+    m_instanceID: 548201205
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 13
+    m_index: 320
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [14, 15]
+    m_childrenIndices: [321, 322]
     m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
     m_attachedSoketID: 0
     m_collisionType: 8
@@ -27,7 +27,7 @@ PrefabNode:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2703297940
+        m_instanceID: 2642300482
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -43,31 +43,33 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 1290941221
+        m_instanceID: 765117185
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 0.5, y: 1, z: 0.5}
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
-        itemCode: 2
         itemType: 2
+        maxHP: 40
+        m_minRewardUpForce: 2
+        m_maxRewardUpForce: 3
         m_name: EntityResource
         m_isEnabled: true
-        m_instanceID: 1463546527
+        m_instanceID: 1348717273
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
     children:
       - GameObject: 2166264123
-        m_name: obj_Inter_stone
+        m_name: obj_Inter_stone (1)
         m_isEnabled: true
-        m_instanceID: 518659754
+        m_instanceID: 1119530243
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 13
-        m_index: 14
-        m_parentIndex: 13
+          m_parentID: 320
+        m_index: 321
+        m_parentIndex: 320
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
@@ -81,7 +83,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3792993953
+            m_instanceID: 269963449
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: obj_Inter_stone
@@ -94,13 +96,13 @@ PrefabNode:
                 m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 1
                 m_roughness: 1
-                m_bitflag: 0
+                m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: 2a243319-656e-556a-bfec-2d0fa8c9e5df
               m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_shaderPSOName: FlashShader
             m_Mesh:
               m_name: Plane.010
               m_materialIndex: 0
@@ -115,17 +117,18 @@ PrefabNode:
             m_shadowRecive: true
             m_shadowCast: true
             m_isEnableLOD: false
+            m_bitflag: 0
       - GameObject: 2166264123
-        m_name: CriticalMark (2)
+        m_name: CriticalMark (9)
         m_isEnabled: true
-        m_instanceID: 2008783052
+        m_instanceID: 536009314
         m_transform:
           position: {x: 0, y: 1.82164216, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 13
-        m_index: 15
-        m_parentIndex: 13
+          m_parentID: 320
+        m_index: 322
+        m_parentIndex: 320
         m_rootIndex: 0
         m_childrenIndices: ~
         m_prefabFileGuid: 634930ed-f0ed-5e99-9ba4-c9d02e67417e
@@ -133,13 +136,13 @@ PrefabNode:
         m_collisionType: 0
         m_isStatic: false
         m_gameObjectType: 0
-        m_tag: Untagged
+        m_tag: CriticalMark
         m_layer: Default
         m_components:
           - EffectComponent: 3131036541
             m_name: EffectComponent
             m_isEnabled: true
-            m_instanceID: 391271598
+            m_instanceID: 1355012073
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: "Null"
             m_isPlaying: false
@@ -149,9 +152,12 @@ PrefabNode:
             m_duration: -1
             m_useAbsolutePosition: false
             m_effectInstanceName: ""
+            m_currentTime: 0
           - ModuleBehavior: 1399118904
+            markDuration: 5
+            markCoolDown: 5
             m_name: CriticalMark
             m_isEnabled: true
-            m_instanceID: 4082081097
+            m_instanceID: 804853208
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245

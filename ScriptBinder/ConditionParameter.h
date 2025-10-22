@@ -16,7 +16,7 @@ enum class ConditionType
 AUTO_REGISTER_ENUM(ConditionType)
 
 
-enum class ValueType
+enum class ValueType : std::uint16_t
 {
 	Float,
 	Int,
@@ -118,8 +118,10 @@ public:
 			break;
 		}
 	}
-	[[Property]]
-	ValueType vType =ValueType::Float;
+	nlohmann::json Serialize();
+	void Deserialize();
+
+public:
 	[[Property]]
 	std::string name = "None";
 	[[Property]]
@@ -127,11 +129,9 @@ public:
 	[[Property]]
 	int iValue{};
 	[[Property]]
+	ValueType vType =ValueType::Float;
+	[[Property]]
 	bool bValue{};
-	nlohmann::json Serialize();
-	void Deserialize();
-
-	//Trigger   basic = false,
 	[[Property]]
 	bool tValue{false};
 };

@@ -111,8 +111,8 @@ private:
 	std::shared_ptr<Camera> m_pCamera{ nullptr };
 	[[Property]]
 	Camera* m_Camera{ nullptr };
+	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 	[[Property]]
 	int m_cameraIndex{ -1 };
-	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 	bool m_IsEnabled{ false };
 };

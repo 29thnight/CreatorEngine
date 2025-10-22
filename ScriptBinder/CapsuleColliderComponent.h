@@ -44,12 +44,18 @@ public:
 	[[Property]]
 	float m_radius{ 1.0f };
 	[[Property]]
-	float m_height{ 1.0f };
-	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	[[Property]]
+	float m_height{ 1.0f };
 
+private:
+	EColliderType m_type;
+	CapsuleColliderInfo m_Info;
+	int m_collsionCount{ 0 };
+
+public:
 	//info
 	float GetRadius()
 	{
@@ -154,8 +160,6 @@ public:
 		return m_rotOffset;
 	}
 
-	
-
 	//콜리전 이벤트
 	void OnTriggerEnter(ICollider* other) override;
 	void OnTriggerStay(ICollider* other) override;
@@ -163,8 +167,4 @@ public:
 	void OnCollisionEnter(ICollider* other) override;
 	void OnCollisionStay(ICollider* other) override;
 	void OnCollisionExit(ICollider* other) override;
-private:
-	EColliderType m_type;
-	int m_collsionCount{ 0 };
-	CapsuleColliderInfo m_Info;
 };

@@ -23,21 +23,23 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	[[Method]]
+	void TestSpawn(); 
 	void Spawn();
 
 	[[Property]]
 	std::vector<std::string> mobPrefabNames;
 	[[Property]]
 	std::vector<int> mobcounts;
-
+	[[Property]]
+	int m_eventId{ 0 };
+	[[Property]]
+	std::string m_runtimeTag{};
 	[[Property]]
 	float spawnRadius = 5.f;
 
-	[[Method]]
-	void TestSpawn();
 
 	Mathf::Vector3 SpawnArea{};
-	std::mutex mtx;
 
 	bool triggerOnce = true;
 private:

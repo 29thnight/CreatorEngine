@@ -594,7 +594,7 @@
 		<ClInclude Include="Assets\Script\MovingUILayer.h">
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\TestShader.h">
+		<ClInclude Include="Assets\Script\SceneTransitionUI.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -1091,7 +1091,7 @@
 		<ClCompile Include="Assets\Script\MovingUILayer.cpp">
 			<Filter>Script\ScriptClass\UI\TitleScreen</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\TestShader.cpp">
+		<ClCompile Include="Assets\Script\SceneTransitionUI.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

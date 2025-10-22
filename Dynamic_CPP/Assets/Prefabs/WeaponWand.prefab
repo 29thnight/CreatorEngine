@@ -1,22 +1,22 @@
-m_name: WeaponWand_Prefab
+m_name: WeaponWand
 m_isEnabled: true
-m_instanceID: 361284838
-m_fileGuid: a47e9e6a-36e8-5673-a973-67d18bcd665f
+m_instanceID: 2921298055
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponWand
     m_isEnabled: true
-    m_instanceID: 441734945
+    m_instanceID: 1968624249
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1
+    m_index: 185
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [2]
-    m_prefabFileGuid: a47e9e6a-36e8-5673-a973-67d18bcd665f
+    m_childrenIndices: [186]
+    m_prefabFileGuid: daa1d7b2-8722-5501-917a-6e205a13a46f
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -42,24 +42,24 @@ PrefabNode:
         bombRadius: 2.5
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 959556279
+        m_instanceID: 3457946195
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
         m_name: Weapon_wand_re
         m_isEnabled: true
-        m_instanceID: 2114901841
+        m_instanceID: 4096280199
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1
-        m_index: 2
-        m_parentIndex: 1
+          m_parentID: 185
+        m_index: 186
+        m_parentIndex: 185
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: a47e9e6a-36e8-5673-a973-67d18bcd665f
+        m_prefabFileGuid: daa1d7b2-8722-5501-917a-6e205a13a46f
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -70,7 +70,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3883153485
+            m_instanceID: 2837571330
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_wand_re
@@ -83,7 +83,6 @@ PrefabNode:
                 m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 1
                 m_roughness: 1
-                m_bitflag: 0
                 m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
@@ -105,3 +104,4 @@ PrefabNode:
             m_shadowRecive: true
             m_shadowCast: true
             m_isEnableLOD: false
+            m_bitflag: 0

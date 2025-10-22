@@ -79,9 +79,9 @@ public:
 	DirectX::SimpleMath::Quaternion GetRotationOffset() override { return m_rotOffset; }
 
 private:
+	SphereColliderInfo m_Info;
 	EColliderType m_type;
 	unsigned int m_collsionCount = 0;
-	SphereColliderInfo m_Info;
 	// ICollider을(를) 통해 상속됨
 	void OnTriggerEnter(ICollider* other) override { ++m_collsionCount; }
 	void OnTriggerStay(ICollider* other) override {}

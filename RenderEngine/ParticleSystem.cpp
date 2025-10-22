@@ -164,13 +164,13 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 
 		SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module);
 		if (spawnModule) {
-			spawnModule->SetEmitterPosition(finalWorldPosition);
+			spawnModule->SetEmitterPosition(finalWorldPosition, m_effectBasePosition);
 			continue;
 		}
 
 		MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module);
 		if (meshSpawnModule) {
-			meshSpawnModule->SetEmitterPosition(finalWorldPosition);
+			meshSpawnModule->SetEmitterPosition(finalWorldPosition, m_effectBasePosition);
 			continue;
 		}
 

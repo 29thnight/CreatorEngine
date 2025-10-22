@@ -37,7 +37,11 @@ public:
 
 protected:
     friend class SceneObject;
-
+    enum : uint8_t {
+        FLAG_AWAKE_CALLED = 1u << 0,
+        FLAG_START_CALLED = 1u << 1,
+        FLAG_PREV_ENABLED = 1u << 2,
+    };
     /**
      * @brief Unregisters the component from all events it was subscribed to.
      */
@@ -52,9 +56,25 @@ protected:
     Core::DelegateHandle m_onEnableEventHandle{};
     Core::DelegateHandle m_onDisableEventHandle{};
     Core::DelegateHandle m_onDestroyEventHandle{};
-    bool isAwakeCalled{ false };
-    bool isStartCalled{ false };
-	bool isPrevEnabled{ true };
+ //   bool isAwakeCalled{ false };
+ //   bool isStartCalled{ false };
+	//bool isPrevEnabled{ true };
+    std::atomic<uint8_t> m_flags{ FLAG_PREV_ENABLED };
+
+    bool testFlag(uint8_t m) const noexcept {
+        return (m_flags.load(std::memory_order_relaxed) & m) != 0;
+    }
+
+    void setFlag(uint8_t m, bool v) noexcept {
+        uint8_t f = m_flags.load(std::memory_order_relaxed);
+        do {
+            uint8_t nf = v ? uint8_t(f | m) : uint8_t(f & ~m);
+            if (m_flags.compare_exchange_weak(f, nf,
+                std::memory_order_acq_rel,
+                std::memory_order_relaxed))
+                break;
+        } while (true);
+    }
 };
 
 
@@ -87,42 +107,61 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
 
     // Cast 'this' to the actual derived component type.
     T* derived_component = static_cast<T*>(this);
-	bool& isAwakeCalled = this->isAwakeCalled;
-	bool& isStartCalled = this->isStartCalled;
 
     // Use 'if constexpr' (C++17) to check for overridden methods at compile time.
     // This is the core of the optimization: we only generate registration code
     // and subscribe to events if the component has actually implemented the method.
 
     if constexpr (&T::Awake != &IRegistableEvent::Awake) {
-        this->m_awakeEventHandle = scene->AwakeEvent.AddLambda([derived_component, &isAwakeCalled]()
-        { 
+        //this->m_awakeEventHandle = scene->AwakeEvent.AddLambda([derived_component, &isAwakeCalled]()
+        //{ 
+        //    //auto sceneObject = derived_component->GetOwner();
+        //    //if (isAwakeCalled == true) return;
+        //    //if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
+        //    //{
+        //    //    return;
+        //    //}
+        //    //else if (!isAwakeCalled)
+        //    //{
+        //    //    isAwakeCalled = true;
+        //    //    derived_component->Awake();
+        //    //}
+        //});
+
+        this->m_awakeEventHandle = scene->AwakeEvent.AddLambda([derived_component, this]()
+        {
             auto sceneObject = derived_component->GetOwner();
-            if (isAwakeCalled == true) return;
-            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
-            {
-                return;
-            }
-            else if (!isAwakeCalled)
-            {
-                isAwakeCalled = true;
-                derived_component->Awake();
-            }
+            if (this->testFlag(FLAG_AWAKE_CALLED)) return;
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark()) return;
+
+            this->setFlag(FLAG_AWAKE_CALLED, true);
+            derived_component->Awake();
         });
+
     }
     if constexpr (&T::Start != &IRegistableEvent::Start) {
-        this->m_startEventHandle = scene->StartEvent.AddLambda([derived_component, &isStartCalled]()
-        { 
+        //this->m_startEventHandle = scene->StartEvent.AddLambda([derived_component, &isStartCalled]()
+        //{ 
+        //    auto sceneObject = derived_component->GetOwner();
+        //    if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
+        //    {
+        //        return;
+        //    }
+        //    else if (!isStartCalled)
+        //    {
+        //        derived_component->Start();
+        //        isStartCalled = true;
+        //    }
+        //});
+
+        this->m_startEventHandle = scene->StartEvent.AddLambda([derived_component, this]()
+        {
             auto sceneObject = derived_component->GetOwner();
-            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark())
-            {
-                return;
-            }
-            else if (!isStartCalled)
-            {
-                derived_component->Start();
-                isStartCalled = true;
-            }
+            if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark()) return;
+            if (this->testFlag(FLAG_START_CALLED)) return;
+
+            derived_component->Start();
+            this->setFlag(FLAG_START_CALLED, true);
         });
     }
     if constexpr (&T::Update != &IRegistableEvent::Update) {
@@ -168,31 +207,57 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         });
     }
     if constexpr (&T::OnEnable != &IRegistableEvent::OnEnable) {
-        this->m_onEnableEventHandle = scene->OnEnableEvent.AddLambda([derived_component]() 
-        { 
-            auto sceneObject = derived_component->GetOwner();
-            if (sceneObject)
+        //this->m_onEnableEventHandle = scene->OnEnableEvent.AddLambda([derived_component]() 
+        //{ 
+        //    auto sceneObject = derived_component->GetOwner();
+        //    if (sceneObject)
+        //    {
+        //        bool isCurrEnabled = derived_component->IsEnabled();
+        //        if (isCurrEnabled != isPrevEnabled && false == isPrevEnabled)
+        //        {
+        //            derived_component->OnEnable();
+        //            isPrevEnabled = isCurrEnabled;
+        //        }
+        //    }
+        //});
+
+        this->m_onEnableEventHandle = scene->OnEnableEvent.AddLambda([derived_component, this]()
+        {
+            if (auto so = derived_component->GetOwner())
             {
-                bool isCurrEnabled = derived_component->IsEnabled();
-                if (isCurrEnabled != isPrevEnabled && false == isPrevEnabled)
-                {
+                const bool curr = derived_component->IsEnabled();
+                const bool prev = this->testFlag(FLAG_PREV_ENABLED);
+                if (!prev && curr) {
                     derived_component->OnEnable();
-                    isPrevEnabled = isCurrEnabled;
+                    this->setFlag(FLAG_PREV_ENABLED, true);
                 }
             }
         });
     }
     if constexpr (&T::OnDisable != &IRegistableEvent::OnDisable) {
-        this->m_onDisableEventHandle = scene->OnDisableEvent.AddLambda([derived_component]() 
-        { 
-            auto sceneObject = derived_component->GetOwner();
-            if (sceneObject)
+        //this->m_onDisableEventHandle = scene->OnDisableEvent.AddLambda([derived_component]() 
+        //{ 
+        //    auto sceneObject = derived_component->GetOwner();
+        //    if (sceneObject)
+        //    {
+        //        bool isCurrEnabled = derived_component->IsEnabled();
+        //        if (isCurrEnabled != isPrevEnabled && true == isPrevEnabled)
+        //        {
+        //            derived_component->OnDisable();
+        //            isPrevEnabled = isCurrEnabled;
+        //        }
+        //    }
+        //});
+
+        this->m_onDisableEventHandle = scene->OnDisableEvent.AddLambda([derived_component, this]()
+        {
+            if (auto so = derived_component->GetOwner())
             {
-                bool isCurrEnabled = derived_component->IsEnabled();
-                if (isCurrEnabled != isPrevEnabled && true == isPrevEnabled)
-                {
+                const bool curr = derived_component->IsEnabled();
+                const bool prev = this->testFlag(FLAG_PREV_ENABLED);
+                if (prev && !curr) {
                     derived_component->OnDisable();
-                    isPrevEnabled = isCurrEnabled;
+                    this->setFlag(FLAG_PREV_ENABLED, false);
                 }
             }
         });

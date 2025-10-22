@@ -55,39 +55,38 @@ public:
 
     // 이펙트 설정들
     [[Property]]
+    float m_timeScale = 1.0f;
+
+    [[Property]]
+    float m_duration = -1.0f;
+
+    [[Property]]
     bool m_isPlaying = false;
 
     [[Property]]
     bool m_isPaused = false;
 
     [[Property]]
-    float m_timeScale = 1.0f;
-
-    [[Property]]
     bool m_loop = true;
 
     [[Property]]
-    float m_duration = -1.0f;
+    bool m_useAbsolutePosition = false;
 
     [[Property]]
-    bool m_useAbsolutePosition = false;
+    float m_currentTime = 0;
     
     [[Property]]
     std::string m_effectInstanceName;
 
-    [[Property]]
-    float m_currentTime = 0;
 
 private:
-
-
     Mathf::Vector3 m_lastPosition;
     Mathf::Vector3 m_lastRotation;
     Mathf::Vector3 m_lastScale;
 
     void DestroyCurrentEffect();
     void ForeceUpdatePosition();
-
+    //WARN : bitflag 좀 써라!!!
     bool m_timeScaleModified = false;
     bool m_loopModified = false;
     bool m_durationModified = false;

@@ -1181,12 +1181,6 @@ void SceneRenderer::PrepareRender()
 	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
 	PROFILE_CPU_END();
 
-	//매쉬 청크 단위로 쪼개서 멀티스레드 처리
-	const size_t N = allMeshes.size();
-	const size_t workers = std::max<size_t>(1, m_threadPool->GetThreadCount());
-	const size_t tasks = std::max<size_t>(1, std::min(workers, N));
-	const size_t chunk = (N + tasks - 1) / tasks;
-
 	PROFILE_CPU_BEGIN("UpdateCommand");
 	if (!textComponents.empty())
 	{
@@ -1280,31 +1274,23 @@ void SceneRenderer::PrepareRender()
 		});
 	}
 
-	if (N > 0)
+	if (!allMeshes.empty())
 	{
-		for (size_t t = 0; t < tasks; ++t)
+		m_threadPool->Enqueue([&, meshes = std::move(allMeshes)]
 		{
-			const size_t begin = t * chunk;
-			const size_t end = std::min(N, begin + chunk);
-
-			m_threadPool->Enqueue([&, begin, end, renderScene]
+			for (auto& mesh : meshes)
 			{
-				for (size_t i = begin; i < end; ++i)
+				if (!mesh) continue;
+				try
 				{
-					auto* mesh = allMeshes[i];
-					if (!mesh) continue;
-
-					try
-					{
-						renderScene->UpdateCommand(mesh);
-					}
-					catch (const std::exception& e)
-					{
-						std::cerr << "Error updating mesh command: " << e.what() << '\n';
-					}
+					renderScene->UpdateCommand(mesh);
 				}
-			});
-		};
+				catch (const std::exception& e)
+				{
+					std::cerr << "Error updating mesh command: " << e.what() << '\n';
+				}
+			}
+		});
 	}
 
 	if (!foliageComponents.empty())

@@ -235,7 +235,7 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)
 	Mathf::Vector3 offset = {ownerForward.x * distance.x,0, ownerForward.z * distance.x };
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
-	endPos.y = 0.2f;
+	endPos.y += 0.2f;
 }
 void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2 distance,bool indicate)
 {
@@ -256,7 +256,7 @@ void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2
 	Mathf::Vector3 offset = {ownerForward.x * distance.x,0, ownerForward.z * distance.x};
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
-	endPos.y = 0.2f;
+	endPos.y += 0.2f;
 }
 
 void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float height)

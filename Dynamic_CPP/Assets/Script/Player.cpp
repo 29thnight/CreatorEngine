@@ -458,6 +458,15 @@ void Player::Update(float tick)
 		sucessResurrection = false;
 	}
 
+	if (curDashTime >= 0.f)
+	{
+		curDashTime -= tick;
+		if (curDashTime <= 0.f)
+		{
+			m_animator->SetParameter("EndDash",true);
+		}
+	}
+
 	if (BombIndicator)
 	{
 		BombIndicator->SetEnabled(onBombIndicate);
@@ -860,8 +869,8 @@ void Player::UpdateChatchObject()
 	auto forward = GetOwner()->m_transform.GetForward();
 	auto world = GetOwner()->m_transform.GetWorldPosition();
 	XMVECTOR forwardVec = XMLoadFloat3(&forward);
-	XMVECTOR offsetPos = world + forwardVec * 1.0f;
-	offsetPos.m128_f32[1] = 1.0f;
+	Mathf::Vector3 offsetPos = world + forwardVec * 1.0f;
+	offsetPos.y += 1.0f;
 	//&&&&& 포지션 소켓에 붙여서 옮겨야 할수도
 	catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 	//asis와 거리계속 갱신
@@ -1655,7 +1664,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 		dir.Normalize();
 		std::vector<HitResult> hits;
 
-		float distacne = 100.0f;
+		float distacne = 150.0f;
 
 		unsigned int layerMask = 1 << 11;
 		bombThrowPosition.y = pos.y + 0.1f;
@@ -1667,7 +1676,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 			{
 				continue;
 			}
-
+			//Ground 등체크해서 땅바닥바로위처리등 
 			bombThrowPosition.y = hit.point.y + 0.1f;
 		}
 
@@ -1934,19 +1943,7 @@ void Player::ShootNormalBullet()
 	GameObject* bulletObj = normalBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	//bool nearTarget = false;
-	//쏘기직전에 적이 가까이왔으면 발사대신 떄리기 or 가까이에서 발사? 
-	//if (curTarget && curTarget->GetOwner())
-	//{
-	//	Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-	//	float length = (targetPos - pos).Length();
-	//	length = std::abs(length);
-	//	if (length <= 2.0f)
-	//	{
-	//		nearTarget = true;
-	//	}
 
-	//}
 	if (bulletObj)
 	{
 		NormalBullet* bullet = bulletObj->GetComponent<NormalBullet>();
@@ -1982,18 +1979,8 @@ void Player::ShootSpecialBullet()
 	GameObject* bulletObj = specialBullets->Pop();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	/*bool nearTarget = false;
-	if (curTarget && curTarget->GetOwner())
-	{
-		Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-		float length = (targetPos - pos).Length();
-		length = std::abs(length);
-		if (length <= 2.0f)
-		{
-			nearTarget = true;
-		}
 
-	}*/
+
 	if (bulletObj)
 	{
 		SpecialBullet* bullet = bulletObj->GetComponent<SpecialBullet>();
@@ -2030,7 +2017,6 @@ void Player::ShootChargeBullet()
 	auto normalBullets = poolmanager->GetNormalBulletPool();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
-	//bool nearTarget = false;
 	std::vector<GameObject*> chargePool;
 	for (int i = 0; i < 5; i++)
 	{
@@ -2042,17 +2028,7 @@ void Player::ShootChargeBullet()
 		int halfCount = m_curWeapon->ChargeAttackBulletCount / 2;
 
 
-		/*if (curTarget && curTarget->GetOwner())
-		{
-			Mathf::Vector3 targetPos = curTarget->GetOwner()->m_transform.GetWorldPosition();
-			float length = (targetPos - pos).Length();
-			length = std::abs(length);
-			if (length <= 2.0f)
-			{
-				nearTarget = true;
-			}
-
-		}*/
+		
 		if (shootPosObj)
 		{
 			shootPos = shootPosObj->m_transform.GetWorldPosition();
@@ -2181,30 +2157,19 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			GameObject* HitObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
 			auto swordHitEffect = HitObj->GetComponent<PlayEffectAll>();
 			Transform* hitTransform = HitObj->GetComponent<Transform>();
-			hitTransform->SetPosition(hitinfo.hitPos);
 			Vector3 normal = hitinfo.hitNormal;
 			normal.Normalize();
+			hitTransform->SetPosition(hitinfo.hitPos);
+			// 노말 벡터를 Forward로 하는 회전 계산
+			XMVECTOR normalVec = XMLoadFloat3(&normal);
+			XMVECTOR upVec = XMVectorSet(0, 1, 0, 0);
+			// 노말이 거의 수직일 때 다른 업 벡터 사용
+			if (fabsf(XMVectorGetX(XMVector3Dot(normalVec, upVec))) > 0.99f)  // fabsf 추가
+				upVec = XMVectorSet(0, 0, 1, 0);
 
-			// 보조 업 벡터 (노말이랑 평행하지 않게 선택)
-			Vector3 up = Vector3::UnitY;
-			if (fabsf(up.Dot(normal)) > 0.99f)
-				up = Vector3::UnitX;
+			XMMATRIX rotMatrix = XMMatrixLookToLH(XMVectorZero(), normalVec, upVec);
+			Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMatrix);
 
-			// 오른쪽 벡터
-			Vector3 right = up.Cross(normal);
-			right.Normalize();
-
-			// 다시 업 보정
-			up = normal.Cross(right);
-			up.Normalize();
-
-			// 회전행렬 → 쿼터니언
-			Matrix rotMat;
-			rotMat.Right(right);
-			rotMat.Up(up);
-			rotMat.Forward(normal);
-
-			Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMat);
 			hitTransform->SetRotation(rot);
 			swordHitEffect->Initialize();
 		}

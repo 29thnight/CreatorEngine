@@ -482,7 +482,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 246.57720947265625,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -692,7 +692,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 243.57217407226563,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -762,7 +762,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "SpinCircle",
+                            "pixelShader": "SSpincircle",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [

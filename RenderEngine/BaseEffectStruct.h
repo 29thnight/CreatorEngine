@@ -110,6 +110,9 @@ struct alignas(16) SpawnParams
 
 	Mathf::Vector3 previousEmitterRotation;
 	UINT allowNewSpawn;
+
+	Mathf::Vector3 worldPosition;
+	float padding;
 };
 
 enum class VelocityMode

@@ -72,7 +72,7 @@ public:
 	virtual void ResetForReuse();
 	virtual bool IsReadyForReuse() const;
 
-	void SetEmitterPosition(const Mathf::Vector3& position);
+	void SetEmitterPosition(const Mathf::Vector3& position, const Mathf::Vector3& worldPosition);
 	void SetEmitterRotation(const Mathf::Vector3& rotation);
 	void SetEmitterScale(const Mathf::Vector3& scale);
 

@@ -6,8 +6,8 @@ ReflectionField(TransCondition) \
 	PropertyField \
 	({ \
 		meta_property(valueName) \
-		meta_property(cType) \
 		meta_property(CompareParameter) \
+		meta_property(cType) \
 	}); \
 	FieldEnd(TransCondition, PropertyOnly) \
 };

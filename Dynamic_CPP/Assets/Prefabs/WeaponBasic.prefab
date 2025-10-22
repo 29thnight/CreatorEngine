@@ -1,22 +1,22 @@
-m_name: WeaponBasic_Prefab
+m_name: WeaponBasic
 m_isEnabled: true
-m_instanceID: 2136718564
-m_fileGuid: b9b5214a-48ef-5de9-b9b2-9a789ea78de5
+m_instanceID: 1733689653
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponBasic
     m_isEnabled: true
-    m_instanceID: 1982527595
+    m_instanceID: 2218333927
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1
+    m_index: 179
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [2]
-    m_prefabFileGuid: b9b5214a-48ef-5de9-b9b2-9a789ea78de5
+    m_childrenIndices: [180]
+    m_prefabFileGuid: d4191843-1cd4-5054-9fb9-920d7bef8db1
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -42,24 +42,24 @@ PrefabNode:
         bombRadius: 2.5
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 3735711764
+        m_instanceID: 630534302
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
     children:
       - GameObject: 2166264123
         m_name: Weapon_sword01_re
         m_isEnabled: true
-        m_instanceID: 1800101447
+        m_instanceID: 3604952655
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1
-        m_index: 2
-        m_parentIndex: 1
+          m_parentID: 179
+        m_index: 180
+        m_parentIndex: 179
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: b9b5214a-48ef-5de9-b9b2-9a789ea78de5
+        m_prefabFileGuid: d4191843-1cd4-5054-9fb9-920d7bef8db1
         m_attachedSoketID: 0
         m_collisionType: 0
         m_isStatic: false
@@ -70,7 +70,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 4195023042
+            m_instanceID: 627527468
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_sword01_re
@@ -83,7 +83,6 @@ PrefabNode:
                 m_baseColor: {r: 1, g: 1, b: 1, a: 1}
                 m_metallic: 1
                 m_roughness: 1
-                m_bitflag: 0
                 m_IOR: 1.5
               m_flowInfo:
                 m_windVector: {x: 0, y: 0, z: 0, w: 0}
@@ -105,3 +104,4 @@ PrefabNode:
             m_shadowRecive: true
             m_shadowCast: true
             m_isEnableLOD: false
+            m_bitflag: 0
