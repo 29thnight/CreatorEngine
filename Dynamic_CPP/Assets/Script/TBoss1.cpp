@@ -6,6 +6,7 @@
 #include "RigidBodyComponent.h"
 #include "Animator.h"
 #include <utility>
+#include "Core.Random.h"
 #include "BP003.h"
 #include "BP001.h"
 #include "GameManager.h"
@@ -60,9 +61,11 @@ void TBoss1::Start()
 		BP003Objs.push_back(Prefab2);
 	}
 
+	int playersCount = 0;
 	GameManager* GameManagers = GameObject::Find("GameManager")->GetComponent<GameManager>();
 	if (GameManagers) {
 		auto players = GameManagers->GetPlayers();
+		playersCount = players.size();
 		if (players.size() > 0) {
 			Player1 = players[0]->GetOwner();
 			if (players.size() > 1) {
@@ -70,6 +73,9 @@ void TBoss1::Start()
 			}
 		}
 	}
+
+	SetupPatternItemData(playersCount);
+
 
 	m_currentHP = m_maxHP;
 
@@ -649,7 +655,12 @@ void TBoss1::Update_BP0031(float tick)
 			BP003* script = BP003Objs[index]->GetComponent<BP003>();
 			BP003Objs[index]->SetEnabled(true);
 			//BP003Objs[0]->GetComponent<Transform>()->SetWorldPosition(pos);
-			script->Initialize(this, pos, BP003Damage, BP003RadiusSize, BP003Delay);
+			bool drop = false;
+			if (index < m_patternItemFlags.size()) {
+				drop = m_patternItemFlags[index];
+			}
+			
+			script->Initialize(this, pos, BP003Damage, BP003RadiusSize, BP003Delay, drop);
 			script->isAttackStart = true;
 			index++;
 		}
@@ -660,7 +671,12 @@ void TBoss1::Update_BP0031(float tick)
 			BP003* script = BP003Objs[index]->GetComponent<BP003>();
 			BP003Objs[index]->SetEnabled(true);
 			//BP003Objs[0]->GetComponent<Transform>()->SetWorldPosition(pos);
-			script->Initialize(this, pos, BP003Damage, BP003RadiusSize, BP003Delay);
+			bool drop = false;
+			if (index < m_patternItemFlags.size()) {
+				drop = m_patternItemFlags[index];
+			}
+
+			script->Initialize(this, pos, BP003Damage, BP003RadiusSize, BP003Delay, drop);
 			script->isAttackStart = true;
 			index++;
 		}
@@ -740,8 +756,12 @@ void TBoss1::Update_BP0032(float tick)
 			GameObject* floor = BP003Objs[index];
 			BP003* script = floor->GetComponent<BP003>();
 			floor->SetEnabled(true);
+			bool drop = false;
+			if (index < m_patternItemFlags.size()) {
+				drop = m_patternItemFlags[index];
+			}
 			//floor->GetComponent<Transform>()->SetWorldPosition(objpos); = 초기화에서
-			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
+			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop);
 			script->isAttackStart = true;
 
 			index++;
@@ -833,7 +853,11 @@ void TBoss1::Update_BP0033(float tick)
 			BP003* script = floor->GetComponent<BP003>();
 			floor->SetEnabled(true);
 			//floor->GetComponent<Transform>()->SetWorldPosition(objpos);
-			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, true, false);
+			bool drop = false;
+			if (index < m_patternItemFlags.size()) {
+				drop = m_patternItemFlags[index];
+			}
+			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop, true, false);
 			script->isAttackStart = true;
 
 			index++;
@@ -844,7 +868,11 @@ void TBoss1::Update_BP0033(float tick)
 			BP003* script2 = floor2->GetComponent<BP003>();
 			floor2->SetEnabled(true);
 			//floor2->GetComponent<Transform>()->SetWorldPosition(objpos2);
-			script2->Initialize(this, objpos2, BP003Damage, BP003RadiusSize, BP003Delay, true);
+			bool drop2 = false;
+			if (index < m_patternItemFlags.size()) {
+				drop2 = m_patternItemFlags[index];
+			}
+			script2->Initialize(this, objpos2, BP003Damage, BP003RadiusSize, BP003Delay, drop2, true);
 			script2->isAttackStart = true;
 
 			index++;
@@ -906,13 +934,15 @@ void TBoss1::Update_BP0034(float tick)
 				int i = 0;
 				for (; i < 4;)
 				{
-					
-
 					Mathf::Vector3 objpos = BP0034Points[pattenIndex + i].second;
 					GameObject* floor = BP003Objs[pattenIndex + i];
 					BP003* script = floor->GetComponent<BP003>();
 					floor->SetEnabled(true);
-					script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay);
+					bool drop = false;
+					if (pattenIndex + i < m_patternItemFlags.size()) {
+						drop = m_patternItemFlags[pattenIndex + i];
+					}
+					script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop,false);
 					script->isAttackStart = true;
 					i++;
 					if (pattenIndex + i > BP0034Points.size()) {
@@ -1168,6 +1198,36 @@ void TBoss1::StartNextComboAttack()
 	}
 }
 
+void TBoss1::SetupPatternItemData(int players)
+{
+	m_patternItemData[EPatternType::BP0031] = { players,BP0031_MIN_ITEM ,BP0031_MAX_ITEM };
+	m_patternItemData[EPatternType::BP0032] = { 3,BP0032_MIN_ITEM ,BP0032_MAX_ITEM };
+	m_patternItemData[EPatternType::BP0033] = { 6,BP0033_MIN_ITEM ,BP0033_MAX_ITEM };
+	m_patternItemData[EPatternType::BP0034] = { 16,BP0034_MIN_ITEM ,BP0034_MAX_ITEM };
+}
+
+void TBoss1::PrepareItemDropsForPattern(EPatternType patternType)
+{
+	const auto& info = m_patternItemData[patternType];
+	int totalCount = info.totalPatternCount;
+	Random<int> randItemCount(info.minItemCount, info.maxItemCount);
+	int itemsToDrop = randItemCount();
+
+	if (itemsToDrop > totalCount) itemsToDrop = totalCount;
+
+	std::vector<int> indices(totalCount);
+	std::iota(indices.begin(), indices.end(), 0);
+	
+	std::random_device rd;
+	std::mt19937 g(rd());
+
+	std::shuffle(indices.begin(), indices.end(),g);
+	m_patternItemFlags.assign(totalCount, false);
+	for (int i = 0; i < itemsToDrop; ++i) {
+		m_patternItemFlags[indices[i]] = true;
+	}
+}
+
 void TBoss1::Burrow()
 {
 	//todo : 땅속으로 들어감
@@ -1326,6 +1386,7 @@ void TBoss1::BP0031()
 	m_patternPhase = EPatternPhase::Spawning; //
 	BPTimer = 0.f;
 	pattenIndex = 0;
+	PrepareItemDropsForPattern(m_activePattern);
 	m_animator->SetParameter("ShiftTrigger", true);
 }
 
@@ -1344,6 +1405,7 @@ void TBoss1::BP0032()
 	m_patternPhase = EPatternPhase::Spawning;
 	pattenIndex = 0;
 	BPTimer = 0.f;
+	PrepareItemDropsForPattern(m_activePattern);
 	m_animator->SetParameter("ShiftTrigger", true);
 }
 
@@ -1362,6 +1424,7 @@ void TBoss1::BP0033()
 	pattenIndex = 0;
 	isMoved = false;
 	BPTimer = 0.f;
+	PrepareItemDropsForPattern(m_activePattern);
 	m_animator->SetParameter("ShiftTrigger", true);
 }
 
@@ -1383,6 +1446,7 @@ void TBoss1::BP0034()
 	isMoved = false;
 	BPTimer = 0.f;
 	// 2. 이 패턴에 사용할 스폰 위치를 미리 계산합니다.
+	PrepareItemDropsForPattern(m_activePattern);
 	Calculate_BP0034();
 	m_animator->SetParameter("ShiftTrigger", true);
 }
