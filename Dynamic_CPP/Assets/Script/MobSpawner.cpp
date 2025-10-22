@@ -13,8 +13,20 @@ void MobSpawner::OnTriggerEnter(const Collision& collision)
 	Player* p = collision.otherObj->GetComponent<Player>();
 	if (p != nullptr)
 	{
-		Spawn();
-		isActive = true;
+		if (isBound == false)
+		{
+			Spawn();
+			isActive = true;
+		}
+		else
+		{
+			if (triggerOnce == true)
+			{
+				Spawn();
+				isActive = true;
+				triggerOnce = false;
+			}
+		}
 	}
 }
 
@@ -23,8 +35,22 @@ void MobSpawner::OnCollisionEnter(const Collision& collision)
 	Player* p = collision.otherObj->GetComponent<Player>();
 	if (p != nullptr)
 	{
-		Spawn();
-		isActive = true;
+		if (isBound == false)
+		{
+			isActive = true;
+			Spawn();
+			
+		}
+		else
+		{
+			if (triggerOnce == true)
+			{
+				isActive = true;
+				triggerOnce = false;
+				Spawn();
+				
+			}
+		}
 	}
 }
 
