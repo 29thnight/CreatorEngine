@@ -318,6 +318,17 @@ public:
 
 	[[Property]]
 	float detectRadius = 1.0f;
+
+	[[Property]]
+	bool  OnAttackStep = true;
+	[[Property]]
+	float Attack1StepDistance = 0.01f;
+	[[Property]]
+	float Attack1StepTime = 0.01f;
+	[[Property]]
+	float Attack2StepDistance = 0.01f;
+	[[Property]]
+	float Attack2StepTime = 0.01f;
 private:
 	//치트들 담긴함수 
 	void Cheat();
