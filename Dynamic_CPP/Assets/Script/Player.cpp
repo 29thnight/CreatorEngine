@@ -362,7 +362,27 @@ void Player::Start()
 void Player::Update(float tick)
 {
 
-	
+	//Test sehwan
+
+	/*if (InputManagement->IsKeyDown('G'))
+	{
+		auto data =GameInstance::GetInstance()->GetPlayData();
+		data->SavePlayerData(this);
+	}
+
+	if (InputManagement->IsKeyDown('H'))
+	{
+		auto data = GameInstance::GetInstance()->GetPlayData();
+		data->LoadPlayerData(playerIndex);
+	}
+	if (InputManagement->IsKeyDown('L'))
+	{
+		auto sound = GameInstance::GetInstance()->GetSoundName();
+		sound->LoadSoundNameFromCSV();
+	}*/
+
+
+
 	Cheat(); 
 	DetectResource();
 	HitImpulseUpdate(tick);
@@ -690,8 +710,7 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 		if (m_DamageSound)
 		{
-			int rand = Random<int>(0, DamageSounds.size() - 1).Generate();
-			m_DamageSound->clipKey = DamageSounds[rand];
+			m_DamageSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerHit");
 			m_DamageSound->PlayOneShot();
 		}
 		SetInvincibility(HitGracePeriodTime);
@@ -806,8 +825,7 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 void Player::PlaySoundStep()
 {
 	if (m_MoveSound == nullptr) return;
-	int rand = Random<int>(0, stepSounds.size() - 1).Generate();
-	m_MoveSound->clipKey = stepSounds[rand];
+	m_MoveSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("StepSound");
 	m_MoveSound->PlayOneShot();
 
 	m_runIndex = (m_runIndex + 1) % m_runEffects.size();
@@ -974,8 +992,8 @@ void Player::Dash()
 void Player::PlaySoundDash()
 {
 	if (m_MoveSound == nullptr) return;
-	int rand = Random<int>(0, dashSounds.size()-1).Generate();
-	m_MoveSound->clipKey = dashSounds[rand];
+
+	m_MoveSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("DashSound");
 	m_MoveSound->PlayOneShot();
 }
 
@@ -1053,8 +1071,7 @@ void Player::Charging()
 		}
 		if (m_SpecialActionSound)
 		{
-				int rand = Random<int>(0, MeleeChargingSounds.size() - 1).Generate();
-				m_SpecialActionSound->clipKey = MeleeChargingSounds[rand];
+				m_SpecialActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ChargingSound");
 				m_SpecialActionSound->PlayOneShot();
 		}
 	}
@@ -1182,7 +1199,7 @@ void Player::PlaySlashEvent()
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = "Blackguard Sound - Shinobi Fight - Swing Whoosh ";
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Slash1");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1223,7 +1240,7 @@ void Player::PlaySlashEvent2()
 		Slashscript->Initialize();
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = "HD Audio - Unarmed Combat - Whoosh Quick";
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Slash2");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1251,7 +1268,7 @@ void Player::PlaySlashEvent3()
 		Slashscript->Initialize();
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = "Vadi Sound - Swift - Fast Rope Whoosh Whipping ";
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Slash3");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1422,8 +1439,7 @@ void Player::SwapWeaponInternal(int dir)
 
 		if (m_ActionSound)
 		{
-			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
-			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponSwapSounds");
 			m_ActionSound->PlayOneShot();
 		}
 
@@ -1461,8 +1477,7 @@ void Player::SwapBasicWeapon()
 
 		if (m_ActionSound)
 		{
-			int rand = Random<int>(0, weaponSwapSounds.size() - 1).Generate();
-			m_ActionSound->clipKey = weaponSwapSounds[rand];
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("weaponSwapSounds");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1536,8 +1551,7 @@ void Player::DeleteCurWeapon()
 	{
 		if (m_curWeapon->itemType != ItemType::Bomb) //basic인건 위에서 검사하니까 붐이아닌지만 체크
 		{
-			int rand = Random<int>(0, WeaponBreakSounds.size() - 1).Generate();
-			m_SpecialActionSound->clipKey = WeaponBreakSounds[rand];
+			m_SpecialActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponBreakSound");
 			m_SpecialActionSound->PlayOneShot();
 		}
 
@@ -1781,8 +1795,7 @@ void Player::MeleeAttack()
 				auto pool = GM->GetSFXPool();
 				if (pool)
 				{
-					int rand = Random<int>(0, MeleeStrikeSounds.size() - 1).Generate();
-					pool->PlayOneShot(MeleeStrikeSounds[rand]);
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MeleeStrikeSound"));
 				}
 			}
 
@@ -1820,10 +1833,9 @@ void Player::MeleeChargeAttack()
 			Projectile->Initialize(this, effectPos, player->m_transform.GetForward(), calculDamge(true));
 
 		}
-		int rand = Random<int>(0, MeleeChargeSounds.size() - 1).Generate();
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = MeleeChargeSounds[rand];
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MeleeChargeSound");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1993,8 +2005,7 @@ void Player::ShootNormalBullet()
 
 		if (m_ActionSound)
 		{
-			int rand = Random<int>(0, normalBulletSounds.size() - 1).Generate();
-			m_ActionSound->clipKey = normalBulletSounds[rand];
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("NormalBulletSound");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2028,10 +2039,9 @@ void Player::ShootSpecialBullet()
 		{
 			bullet->Initialize(this, shootPos, player->m_transform.GetForward(), calculDamge(true));
 		}
-		int rand = Random<int>(0, specialBulletSounds.size() - 1).Generate();
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = specialBulletSounds[rand];
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("SpecialBulletSound");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2086,7 +2096,7 @@ void Player::ShootChargeBullet()
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = RangeChargeSounds[0];
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("RangeChargeSound");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2116,7 +2126,7 @@ void Player::ThrowBomb()
 		
 		if(m_ActionSound)
 		{
-			m_ActionSound->clipKey = "Weapon_Whoosh_Low_2";
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ThrowBomb");
 			m_ActionSound->PlayOneShot();
 		}
 	}
