@@ -1,0 +1,162 @@
+m_name: PauseBox
+m_instanceID: 1391671931
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: PauseBox
+    m_instanceID: 1735511716
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_parentID: 3
+    m_index: 4
+    m_parentIndex: 3
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [5, 6]
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RectTransformComponent: 3002078429
+        m_name: RectTransformComponent
+        m_instanceID: 1427391800
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_anchorMin: {x: 0.5, y: 0.5}
+        m_anchorMax: {x: 0.5, y: 0.5}
+        m_anchoredPosition: {x: 960, y: 540}
+        m_sizeDelta: {x: 1188, y: 816}
+        m_pivot: {x: 0.5, y: 0.5}
+        m_worldRect: {x: 366, y: 132, width: 1188, height: 816}
+      - ImageComponent: 1187169862
+        m_name: ImageComponent
+        m_instanceID: 994085412
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        _layerorder: 0
+        uiEffects: 0
+        m_ownerCanvasName: SettingCanvas
+        navigations: ~
+        m_customPixelShaderPath: ""
+        texturePaths: [pop_pause_box.png]
+        color: {r: 1, g: 1, b: 1, a: 1}
+        curindex: 0
+        rotate: 0
+        origin: {x: 594, y: 408}
+        unionScale: 1
+        clipPercent: 1
+        clipDirection: 0
+    m_gameObjectType: 5
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: title_btt
+        m_instanceID: 466114270
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 4
+        m_index: 5
+        m_parentIndex: 4
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 3944604225
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 0, y: 0}
+            m_sizeDelta: {x: 350, y: 92}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 785, y: 494, width: 350, height: 92}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 1711863642
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: SettingCanvas
+            navigations:
+              - mode: 1
+                navObject: 1799549867
+              - mode: 0
+                navObject: 1735511716
+            m_customPixelShaderPath: ""
+            texturePaths: [title_btt.png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 175, y: 46}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 0
+        m_gameObjectType: 5
+        m_isStatic: false
+      - GameObject: 2166264123
+        m_name: title_btt (1)
+        m_instanceID: 1799549867
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 4
+        m_index: 6
+        m_parentIndex: 4
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 534259328
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 0, y: 143}
+            m_sizeDelta: {x: 350, y: 92}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 785, y: 637, width: 350, height: 92}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 766075192
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: SettingCanvas
+            navigations:
+              - mode: 0
+                navObject: 466114270
+            m_customPixelShaderPath: ""
+            texturePaths: [title_btt.png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 175, y: 46}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 0
+        m_gameObjectType: 5
+        m_isStatic: false

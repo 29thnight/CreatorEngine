@@ -45,11 +45,16 @@ public:
 	Mathf::Vector2 GetRelativePosition() const { return relpos; }
 	void SetRelativePosition(const Mathf::Vector2& pos) { relpos = pos; }
 
+	void SetHorizontalAlignment(TextAlignment alignment) { horizontalAlignment = alignment; }
+	TextAlignment GetHorizontalAlignment() const { return horizontalAlignment; }
+
 	Mathf::Rect GetManualRect() const { return manualRect; }
 	void SetManualRect(const Mathf::Rect& rect) { manualRect = rect; }
 
 	bool IsUsingManualRect() const { return useManualRect; }
 	void SetUseManualRect(bool use) { useManualRect = use; }
+
+	Mathf::Vector2 GetStretchSize() const { return stretchSize; }
 
 private:
 	friend class UIRenderProxy;
@@ -69,12 +74,16 @@ private:
     Mathf::Rect manualRect{};
     // Calculated in Update: maximum render area from parent RectTransform
     Mathf::Vector2 stretchSize{ 0.f, 0.f };
-
     [[Property]]
     float fontSize{ 1.f };
+	[[Property]]
+	TextAlignment horizontalAlignment{ TextAlignment::Center };
     [[Property]]
     bool useManualRect{ false };
     bool isStretchX{ false };
     bool isStretchY{ false };
+public:
+	[[Property]]
+	Mathf::Vector2 m_textMeasureSize{ 0.f };
 };
 

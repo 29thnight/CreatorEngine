@@ -30,7 +30,10 @@ private:
     TextComponent*          m_textComponent{ nullptr };
     ImageComponent*         m_imageComponent{ nullptr };
 	ImageComponent*         m_iconComponent{ nullptr };
+    ImageComponent*         m_chkboxIconComponent{ nullptr };
+    ImageComponent*         m_chkIconComponent{ nullptr };
     RectTransformComponent* m_rectTransform{ nullptr };
+
     //EffectComponent*      m_effectComponent{ nullptr };
 
     [[Property]]

@@ -26,23 +26,44 @@ void TextComponent::Awake()
 
 void TextComponent::Update(float tick)
 {
+    const float currentZ = pos.z;
+
+    isStretchX = false;
+    isStretchY = false;
+    stretchSize = { 0.f, 0.f };
+
+    Mathf::Vector2 topLeft{};
+    Mathf::Vector2 size{};
+    bool hasLayout = false;
+
     if (useManualRect)
     {
-        pos = { manualRect.x, manualRect.y };
-        stretchSize = { manualRect.width, manualRect.height };
-        isStretchX = true;
-        isStretchY = true;
+        topLeft = { manualRect.x, manualRect.y };
+        size = { manualRect.width, manualRect.height };
+        hasLayout = true;
     }
     else if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
     {
         const auto& worldRect = rect->GetWorldRect();
-        const auto& pivot = rect->GetPivot();
-        pos = { worldRect.x + worldRect.width * pivot.x,
-                worldRect.y + worldRect.height * pivot.y };
-        stretchSize = { worldRect.width * pivot.x, worldRect.height * pivot.x };
+        topLeft = { worldRect.x, worldRect.y };
+        size = { worldRect.width, worldRect.height };
+        hasLayout = true;
+    }
 
-        isStretchX = true;
-        isStretchY = true;
+    if (hasLayout)
+    {
+        const float verticalCenter = topLeft.y + size.y * 0.5f;
+        float horizontalPos = topLeft.x;
+
+        if (horizontalAlignment == TextAlignment::Center)
+        {
+            horizontalPos += size.x * 0.5f;
+        }
+
+        pos = { horizontalPos, verticalCenter, currentZ };
+        stretchSize = size;
+        isStretchX = size.x > 0.f;
+        isStretchY = size.y > 0.f;
     }
     //pos += relpos;
 

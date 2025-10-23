@@ -2,12 +2,13 @@
 #include "BTEnum.h"
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
+#include "ManagedHeapObject.h"
 #include <memory>
 #include <random>
 
 namespace BT
 {
-	class BTNode
+	class BTNode : public Managed::HeapObject
 	{
 	public:
 		using NodePtr = std::shared_ptr<BTNode>;

@@ -11,7 +11,9 @@ ReflectionFieldInheritance(TextComponent, UIComponent) \
 		meta_property(color) \
 		meta_property(manualRect) \
 		meta_property(fontSize) \
+		meta_property(horizontalAlignment) \
 		meta_property(useManualRect) \
+		meta_property(m_textMeasureSize) \
 	}); \
 	FieldEnd(TextComponent, PropertyOnlyInheritance) \
 };
