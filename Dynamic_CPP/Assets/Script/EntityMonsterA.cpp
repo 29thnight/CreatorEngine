@@ -270,7 +270,8 @@ void EntityMonsterA::Update(float tick)
 			for (auto& hit : hitResults) {
 				//std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 				if (hit.gameObject->GetHashedName().ToString() == m_player1->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()) //player
+					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()
+					|| hit.gameObject->GetHashedName().ToString() == m_asis->GetHashedName().ToString()) //player
 				{
 					//std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();

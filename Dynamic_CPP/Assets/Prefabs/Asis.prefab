@@ -76,6 +76,7 @@ PrefabNode:
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
         m_height: 2
+        m_height: 0.100000001
     m_gameObjectType: 0
     m_isStatic: false
     children:
