@@ -33,6 +33,30 @@ void EventSelector::Start()
         m_rectTransform = grandParentObj->GetComponent<RectTransformComponent>();
 	}
 
+    if(!GetOwner()->m_childrenIndices.empty())
+    {
+        int childInded = GetOwner()->m_childrenIndices[0];
+        int chkIconIndex{};
+        GameObject* chkboxObj = GameObject::FindIndex(childInded);
+        if (chkboxObj)
+        {
+            m_chkboxIconComponent = chkboxObj->GetComponent<ImageComponent>();
+			if (!chkboxObj->m_childrenIndices.empty())
+            {
+                chkIconIndex = chkboxObj->m_childrenIndices[0];
+            }
+        }
+
+        if (chkIconIndex != GameObject::INVALID_INDEX)
+        {
+            GameObject* chkIconObj = GameObject::FindIndex(chkIconIndex);
+            if (chkIconObj)
+            {
+                m_chkIconComponent = chkIconObj->GetComponent<ImageComponent>();
+            }
+        }
+    }
+
     if (m_textComponent)
     {
         m_baseTextColor     = m_textComponent->GetColor();
@@ -54,6 +78,7 @@ void EventSelector::Start()
         m_animStartPos      = m_hiddenPosition;
         m_animTargetPos     = m_visiblePosition;
         m_rectTransform->SetAnchoredPosition(m_hiddenPosition);
+		m_rectTransform->SetSizeDelta(Mathf::Vector2(500.f, 47.f));
         m_initializedPositions = true;
     }
 
@@ -272,6 +297,10 @@ void EventSelector::UpdateState(float tick)
             m_pendingEventId.reset();
             m_pendingMessage.clear();
             BeginEnter(nextId, std::move(nextMessage));
+            if (m_chkIconComponent)
+            {
+                m_chkIconComponent->SetEnabled(false);
+            }
         }
         break;
     case UiState::Entering:
@@ -302,9 +331,9 @@ void EventSelector::UpdateState(float tick)
         break;
     case UiState::Completing:
     {
-        if (!m_effectPlayed/* && m_effectComponent && !m_completionEffectName.empty()*/)
+        if (!m_effectPlayed && m_chkIconComponent)
         {
-            //m_effectComponent->PlayEffectByName(m_completionEffectName);
+			m_chkIconComponent->SetEnabled(true);
             m_effectPlayed = true;
         }
 

@@ -111,24 +111,24 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     auto* canvas = text->GetOwnerCanvas();
 
     TextData data{};
-    data.font       = text->font;
-    data.message    = text->message;
-    data.color      = text->color;
+    data.font = text->font;
+    data.message = text->message;
+    data.color = text->color;
 
-    const auto centeredPosition = Mathf::Vector2(text->pos) + text->stretchSize * 0.5f;
-    data.position   = { centeredPosition.x, centeredPosition.y };
-    data.fontSize   = text->fontSize;
+    data.position = { text->pos.x, text->pos.y };
+    data.fontSize = text->fontSize;
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
     }
     data.layerOrder = text->GetLayerOrder();
-    data.maxSize    = text->stretchSize;
-    data.stretchX   = text->isStretchX;
-    data.stretchY   = text->isStretchY;
+    data.maxSize = text->stretchSize;
+    data.stretchX = text->isStretchX;
+    data.stretchY = text->isStretchY;
+    data.alignment = text->GetHorizontalAlignment();
     data.filpEffect = (SpriteEffects)text->uiEffects;
-    m_data          = data;
-    m_instancedID   = text->GetInstanceID();
+    m_data = data;
+    m_instancedID = text->GetInstanceID();
 }
 
 UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
@@ -244,6 +244,7 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                     DirectX::XMVECTOR sizeVec = info.font->MeasureString(info.message.c_str());
                     DirectX::XMFLOAT2 size{};
                     DirectX::XMStoreFloat2(&size, sizeVec);
+					m_textMeasureSize = Mathf::Vector2(size.x, size.y);
 
                     float scale = info.fontSize;
                     if (info.stretchX || info.stretchY)
@@ -258,12 +259,24 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         scale *= factor;
                     }
 
-                    DirectX::XMFLOAT2 origin{ size.x * 0.5f, size.y * 0.5f };
+                    DirectX::XMFLOAT2 origin{};
+                    DirectX::XMFLOAT2 drawPosition{ info.position.x, info.position.y };
+
+                    switch (info.alignment)
+                    {
+                    case TextAlignment::Left:
+                        origin = { 0.f, size.y * 0.5f };
+                        break;
+                    case TextAlignment::Center:
+                    default:
+                        origin = { size.x * 0.5f, size.y * 0.5f };
+                        break;
+                    }
 
                     info.font->DrawString(
                         spriteBatch.get(),
                         info.message.c_str(),
-                        { info.position.x, info.position.y },
+                        drawPosition,
                         info.color,
                         0.0f,
                         origin,

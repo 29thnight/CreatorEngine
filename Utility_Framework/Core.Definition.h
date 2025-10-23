@@ -54,6 +54,9 @@ using namespace Microsoft::WRL;
 #include <cstdint>
 #include <ranges>
 #include <latch>
+#include <cstddef>
+#include <iterator>
+#include <memory_resource>
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"

@@ -48,7 +48,7 @@ private:
 	EKoriEmoteState					m_previousState{ EKoriEmoteState::Smile };
 	Mathf::Vector2                  m_baseAnchoredPos{};
     [[Property]]
-	Mathf::Vector2					m_emoteOffset{ 50.f, 50.f };
+	Mathf::Vector2					m_emoteOffset{ 150.f, -150.f };
     [[Property]]
 	float							m_emoteChangeInterval{ 5.f };
 

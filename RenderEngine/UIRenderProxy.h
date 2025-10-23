@@ -13,6 +13,7 @@ class ImageComponent;
 class TextComponent;
 class SpriteSheetComponent;
 enum class ClipDirection : std::uint8_t;
+enum class TextAlignment : std::uint8_t;
 // Proxy responsible for drawing UI elements without keeping component pointers.
 class UIRenderProxy : public std::enable_shared_from_this<UIRenderProxy>
 {
@@ -46,6 +47,7 @@ public:
         SpriteEffects                           filpEffect{ SpriteEffects_None };
         bool                                    stretchX{ false };
         bool                                    stretchY{ false };
+        TextAlignment                           alignment{ TextAlignment::Center };
     };
 
     struct SpriteSheetData
@@ -106,6 +108,7 @@ private:
 	ComPtr<ID3D11Buffer>                                 m_customPixelBuffer{ nullptr };
 	std::vector<std::byte>                               m_customPixelCPUBuffer{};
     uint32                                               m_customPixelBufferSize{};
+	mutable Mathf::Vector2 								 m_textMeasureSize{ 0.f };
 	bool                                                 m_isEnabled{ true };
 };
 #endif // !DYNAMICCPP_EXPORTS

@@ -505,6 +505,10 @@ void EntityAsis::Resurrection()
 	Heal(ResurrectionHP);
 	isStun = false;
 	ResurrectionElapsedTime = 0;
+	if (m_emoteSystem)
+	{
+		m_emoteSystem->PlayHappy();
+	}
 }
 
 void EntityAsis::Heal(int _heal)

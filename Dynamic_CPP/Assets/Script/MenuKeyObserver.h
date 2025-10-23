@@ -11,5 +11,6 @@ public:
 
 private:
 	bool m_isMenuOpened{ false };
-	class GameManager* m_gameManager{ nullptr };
+	//class GameManager* m_gameManager{ nullptr };
+	class GameObject* m_menuCanvasObject{ nullptr };
 };

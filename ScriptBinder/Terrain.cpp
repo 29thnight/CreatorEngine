@@ -591,9 +591,21 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	int tmpWidth = metaData["width"].get<int>();
 	int tmpHeight = metaData["height"].get<int>();
 	fs::path heightMapPath = fs::path(metaData["heightmap"].get<std::string>());
-	auto tmpHeightMap = std::vector<float>(tmpWidth * tmpHeight, 0.0f);
-	auto tmpLayerHeightMap = std::vector<std::vector<float>>(4, std::vector<float>(tmpWidth * tmpHeight, 0.0f)); //4개 레이어로 초기화
-	auto tmpLayerDescs = std::vector<TerrainLayer>();
+	
+	std::array<std::byte, 1 << 20> stackBuffer{};
+	std::pmr::monotonic_buffer_resource tempResource(stackBuffer.data(), stackBuffer.size(), std::pmr::new_delete_resource());
+	const size_t cellCount = static_cast<size_t>(tmpWidth) * static_cast<size_t>(tmpHeight);
+	
+	PmrFloatVector tmpHeightMap{ &tempResource };
+	tmpHeightMap.resize(cellCount, 0.0f);
+	PmrLayerWeightMap tmpLayerHeightMap{ &tempResource };
+
+	std::pmr::vector<TerrainLayer> tmpLayerDescs{ &tempResource };
+	tmpLayerDescs.reserve(metaData["layers"].size());
+
+	//auto tmpHeightMap = std::vector<float>(tmpWidth * tmpHeight, 0.0f);
+	//auto tmpLayerHeightMap = std::vector<std::vector<float>>(4, std::vector<float>(tmpWidth * tmpHeight, 0.0f)); //4개 레이어로 초기화
+	//auto tmpLayerDescs = std::vector<TerrainLayer>();
 	heightMapPath = isRelative ? PathFinder::TerrainSourcePath(heightMapPath.string()) : heightMapPath; //상대경로로 변환
 	//헤이트맵 임시저장
 	LoadEditorHeightMap(heightMapPath, tmpWidth, tmpHeight,  metaData["minHeight"].get<float>(), metaData["maxHeight"].get<float>(), tmpHeightMap);
@@ -604,10 +616,14 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		// 신규 포맷 로드
 		const auto& splatmapPaths = metaData["splatmaps"];
 		tmpLayerHeightMap.resize(splatmapPaths.size());
+		for (auto& layer : tmpLayerHeightMap)
+		{
+			layer.resize(cellCount, 0.0f);
+		}
 		for (size_t i = 0; i < splatmapPaths.size(); ++i)
 		{
 			fs::path splatPath = fs::path(splatmapPaths[i].get<std::string>());
-			splatPath= isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
+			splatPath = isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
 			// 각 흑백 스플랫맵을 로드
 			LoadEditorSplatMap(splatPath, tmpWidth, tmpHeight, i, tmpLayerHeightMap);
 		}
@@ -618,8 +634,34 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		fs::path splatPath = fs::path(metaData["splatmap"].get<std::string>());
 		splatPath = isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
 		// RGBA 스플랫맵을 로드하여 채널 분리
+		tmpLayerHeightMap.resize(4);
+		for (auto& layer : tmpLayerHeightMap)
+		{
+			layer.resize(cellCount, 0.0f);
+		}
 		LoadEditorSplatMap_Compat(splatPath, tmpWidth, tmpHeight, tmpLayerHeightMap);
 	}
+	//if (version >= 2)
+	//{
+	//	// 신규 포맷 로드
+	//	const auto& splatmapPaths = metaData["splatmaps"];
+	//	tmpLayerHeightMap.resize(splatmapPaths.size());
+	//	for (size_t i = 0; i < splatmapPaths.size(); ++i)
+	//	{
+	//		fs::path splatPath = fs::path(splatmapPaths[i].get<std::string>());
+	//		splatPath= isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
+	//		// 각 흑백 스플랫맵을 로드
+	//		LoadEditorSplatMap(splatPath, tmpWidth, tmpHeight, i, tmpLayerHeightMap);
+	//	}
+	//}
+	//else
+	//{
+	//	// 구버전 포맷 로드 (호환성 코드)
+	//	fs::path splatPath = fs::path(metaData["splatmap"].get<std::string>());
+	//	splatPath = isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
+	//	// RGBA 스플랫맵을 로드하여 채널 분리
+	//	LoadEditorSplatMap_Compat(splatPath, tmpWidth, tmpHeight, tmpLayerHeightMap);
+	//}
 	//fs::path splatMapPath = fs::path(metaData["splatmap"].get<std::string>());
 	//splatMapPath = isRelative ? PathFinder::TerrainSourcePath(splatMapPath.string()) : splatMapPath; //상대경로로 변환
 	////스플랫맵 임시저장
@@ -671,7 +713,8 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	std::swap(m_width, tmpWidth);
 	std::swap(m_height, tmpHeight);
 	Resize(m_width, m_height); // 높이맵 크기 변경
-	std::swap(m_heightMap, tmpHeightMap);
+	//std::swap(m_heightMap, tmpHeightMap);
+	std::copy(tmpHeightMap.begin(), tmpHeightMap.end(), m_heightMap.begin());
 	RecalculateNormalsPatch(0, 0, m_width, m_height); // 높이맵 변경 후 노말 재계산
 	//메쉬 업데이트
 	std::vector<Vertex> patchVerts;
@@ -698,28 +741,57 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	//	(uint32_t)m_height
 	//); // 높이맵 변경 후 메쉬 업데이트
 	//InitSplatMapTexture(m_width, m_height); // 스플랫맵 텍스처 초기화
-	std::swap(m_layerHeightMap, tmpLayerHeightMap);
+	//std::swap(m_layerHeightMap, tmpLayerHeightMap);
+	////UpdateSplatMapPatch(0, 0, m_width, m_height); // 스플랫맵 패치 업데이트
+	//std::swap(m_layers, tmpLayerDescs);
+	//m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // 레이어 정보 업데이트
+	//m_nextLayerID = tmpNextLayerID;
+	//m_selectedLayerID = 0xFFFFFFFF; // 선택된 레이어 초기화
+	////LoadLayers();	
+
+
+	////로드 완료 후 리소스 해제
+	//tmpHeightMap.clear();
+	//tmpLayerHeightMap.clear();
+	//for (auto& layer : tmpLayerDescs) {
+	//	if (layer.diffuseTexture) {
+	//		//DeallocateResource<Texture>(layer.diffuseTexture);
+	//		delete layer.diffuseTexture;
+	//		//layer.diffuseTexture->Release();
+	//		layer.diffuseTexture = nullptr;
+	//	}
+	//}
+	//tmpLayerDescs.clear();
+	//auto renderScene = SceneManagers->GetRenderScene();
+	std::vector<std::vector<float>> loadedLayerHeightMap;
+	loadedLayerHeightMap.reserve(tmpLayerHeightMap.size());
+	for (auto& layer : tmpLayerHeightMap)
+	{
+		loadedLayerHeightMap.emplace_back(layer.begin(), layer.end());
+	}
+	std::swap(m_layerHeightMap, loadedLayerHeightMap);
 	//UpdateSplatMapPatch(0, 0, m_width, m_height); // 스플랫맵 패치 업데이트
-	std::swap(m_layers, tmpLayerDescs);
+	std::vector<TerrainLayer> loadedLayerDescs(
+		std::make_move_iterator(tmpLayerDescs.begin()),
+		std::make_move_iterator(tmpLayerDescs.end()));
+	std::swap(m_layers, loadedLayerDescs);
 	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // 레이어 정보 업데이트
 	m_nextLayerID = tmpNextLayerID;
 	m_selectedLayerID = 0xFFFFFFFF; // 선택된 레이어 초기화
-	//LoadLayers();	
+	//LoadLayers();
 
 
 	//로드 완료 후 리소스 해제
-	tmpHeightMap.clear();
-	tmpLayerHeightMap.clear();
-	for (auto& layer : tmpLayerDescs) {
+	for (auto& layer : loadedLayerDescs) {
 		if (layer.diffuseTexture) {
-			//DeallocateResource<Texture>(layer.diffuseTexture);
 			delete layer.diffuseTexture;
-			//layer.diffuseTexture->Release();
 			layer.diffuseTexture = nullptr;
 		}
 	}
-	tmpLayerDescs.clear();
+	loadedLayerDescs.clear();
+	loadedLayerHeightMap.clear();
 	auto renderScene = SceneManagers->GetRenderScene();
+
 	auto proxy = renderScene->FindProxy(GetInstanceID());
 	if (proxy)
 	{
@@ -793,28 +865,36 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath,float 
     
 }
 
-//void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath)
-//{
-//	int w = m_width;
-//	int h = m_height;
-//	std::vector<uint8_t> buffer(w * h * 4, 0); // RGBA 4채널
-//	for (int i = 0; i < w * h; ++i) {
-//		for (int c = 0; c<4&& c < m_layers.size(); ++c){
-//			buffer[i * 4 + c] = static_cast<uint8_t>(std::clamp(m_layerHeightMap[c][i], 0.0f, 1.0f) * 255.0f);
-//		}
-//	}
-//	auto utf8Path = Utf8Encode(pngPath);
-//	if (
-//		stbi_write_png(
-//			utf8Path.c_str(),
-//			w, h,
-//			4,
-//			buffer.data(),
-//			w * 4
-//		) == 0) {
-//		throw std::runtime_error("Failed to save splat map to PNG: " + utf8Path);
-//	}
-//}
+bool TerrainComponent::LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, PmrFloatVector& out)
+{
+
+	int width, height, channels;
+	auto pathUtf8 = pngPath.string();
+
+	// comp=4 for RGBA8
+	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 4);
+	if (!data)
+		return false;
+
+	size_t N = static_cast<size_t>(width) * height;
+	out.resize(N);
+
+	for (size_t i = 0; i < N; ++i)
+	{
+		uint32_t b0 = data[i * 4 + 0];
+		uint32_t b1 = data[i * 4 + 1];
+		uint32_t b2 = data[i * 4 + 2];
+		uint32_t b3 = data[i * 4 + 3];
+		uint32_t bits = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+
+		float f;
+		std::memcpy(&f, &bits, sizeof(f));
+		out[i] = f;
+	}
+
+	stbi_image_free(data);
+	return true;
+}
 
 // 신규: 단일 레이어의 가중치 맵을 흑백 PNG로 저장
 void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex)
@@ -827,40 +907,6 @@ void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath, int layer
 	auto utf8Path = Utf8Encode(pngPath);
 	stbi_write_png(utf8Path.c_str(), w, h, 1, buffer.data(), w * 1); // 1 = Grayscale
 }
-
-//bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out)
-//{
-//	int width, height, channels;
-//	auto path = pngPath.string();
-//	unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-//	if (!data || width != dataWidth || height != dataHeight) {
-//		Debug->LogError("Failed to load splat map from PNG: " + path);
-//		if (data) {
-//			stbi_image_free(data);
-//		}
-//		return false;
-//	}
-//	out.resize(4);
-//	for (size_t i = 0; i < 4; ++i) {
-//		out[i].resize(width * height, 0.0f);
-//
-//		for (int y = 0; y < height; ++y) {
-//			for (int x = 0; x < width; ++x) {
-//				int idx = y * width + x;
-//				unsigned char* pixel = &data[(y * width + x) * channels];
-//				if (i < channels) {
-//					out[i][idx] = pixel[i] / 255.0f; // R, G, B, A 채널에 가중치 저장
-//				}
-//			}
-//		}
-//
-//	}
-//
-//	stbi_image_free(data);
-//	return true;
-//
-//
-//}
 
 // 신규: 단일 흑백 PNG를 읽어 특정 레이어의 가중치 맵으로 로드
 bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out)
@@ -886,6 +932,42 @@ bool TerrainComponent::LoadEditorSplatMap_Compat(std::filesystem::path& pngPath,
 
 	out.assign(4, std::vector<float>(width * height));
 	for (int i = 0; i < width * height; ++i) {
+		out[0][i] = data[i * 4 + 0] / 255.0f; // R -> Layer 0
+		out[1][i] = data[i * 4 + 1] / 255.0f; // G -> Layer 1
+		out[2][i] = data[i * 4 + 2] / 255.0f; // B -> Layer 2
+		out[3][i] = data[i * 4 + 3] / 255.0f; // A -> Layer 3
+	}
+	stbi_image_free(data);
+	return true;
+}
+
+bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, PmrLayerWeightMap& out)
+{
+	int width, height, channels;
+	unsigned char* data = stbi_load(pngPath.string().c_str(), &width, &height, &channels, 1); // 1 = Grayscale
+	if (!data || width != dataWidth || height != dataHeight) { /* ... 에러 처리 ... */ return false; }
+
+	out[layerIndex].resize(width * height);
+	for (int i = 0; i < width * height; ++i) {
+		out[layerIndex][i] = data[i] / 255.0f;
+	}
+	stbi_image_free(data);
+	return true;
+}
+
+bool TerrainComponent::LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, PmrLayerWeightMap& out)
+{
+	int width, height, channels;
+	unsigned char* data = stbi_load(pngPath.string().c_str(), &width, &height, &channels, 4); // 4 = RGBA
+	if (!data || width != dataWidth || height != dataHeight) { /* ... 에러 처리 ... */ return false; }
+
+	const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+	out.resize(4);
+	for (auto& layer : out)
+	{
+		layer.resize(pixelCount);
+	}
+	for (size_t i = 0; i < pixelCount; ++i) {
 		out[0][i] = data[i * 4 + 0] / 255.0f; // R -> Layer 0
 		out[1][i] = data[i * 4 + 1] / 255.0f; // G -> Layer 1
 		out[2][i] = data[i * 4 + 2] / 255.0f; // B -> Layer 2
@@ -954,40 +1036,6 @@ void TerrainComponent::OnDestroy()
 		renderScene->UnregisterCommand(this);
 	}
 }
-
-//void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling)
-//{
-//	TerrainLayer newLayer;
-//	newLayer.m_layerID = m_nextLayerID++;
-//	newLayer.tilling = tilling;
-//	newLayer.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
-//	newLayer.diffuseTexturePath = path;
-//	newLayer.tilling = tilling;
-//	// diffuseTexture 로드
-//
-//	m_pMaterial->AddLayer(newLayer); // 머티리얼에 레이어 추가
-//	m_layers.push_back(newLayer);
-//	m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
-//	std::vector<BYTE> splatMapData(m_width * m_height * 4, 0); // RGBA 4채널 초기화
-//
-//	for (int y = 0; y < m_height; ++y)
-//	{
-//		for (int x = 0; x < m_width; ++x)
-//		{
-//			int idx = y * m_width + x;
-//			int dstOffset = (y * m_width + x) * 4; // RGBA 4채널
-//
-//			// 레이어 가중치 계산
-//			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // 최대 4개 레이어만 사용
-//			{
-//				float w = std::clamp(m_layerHeightMap[layerIdx][idx], 0.0f, 1.0f);
-//				splatMapData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A 채널에 가중치 저장
-//			}
-//		}
-//	}
-//
-//	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, splatMapData); // layer 추가 후 스플랫맵 업데이트
-//}
 
 void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling)
 {

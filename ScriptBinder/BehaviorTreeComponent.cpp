@@ -104,31 +104,6 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 
 	node->SetOwner(GetOwner());
 
-	//for (const auto& childID : buildNode->Children)
-	//{
-	//	BTNode::NodePtr childNode = BuildTreeRecursively(childID, graph);
-
-	//	if (auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node))
-	//	{
-	//		composite->AddChild(childNode);
-	//	}
-	//	else if (auto decorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-	//	{
-	//		if (!decorator->IsOutpinConnected())
-	//		{
-	//			decorator->SetChild(childNode);
-	//		}
-	//		else
-	//		{
-	//			Debug->LogWarning("Decorator node already has a child: " + node->GetName());
-	//		}
-	//	}
-	//	else
-	//	{
-	//		// Action / Condition node  ڽ 
-	//	}
-	//}
-
 	for (size_t i = 0; i < buildNode->Children.size(); ++i)
 	{
 		const auto& childID = buildNode->Children[i];
@@ -180,27 +155,38 @@ BlackBoard* BehaviorTreeComponent::GetBlackBoard()
 
 void BehaviorTreeComponent::GraphToBuild()
 {
-	file::path BTpath = DataSystems->GetFilePath(m_BehaviorTreeGuid);
-	if (!BTpath.empty() && file::exists(BTpath))
+	Benchmark bm;
+	std::shared_ptr<BTBuildGraph> cachedGraph = AIManagers->GetBTBuildGraphCache(m_BehaviorTreeGuid);
+	if (cachedGraph)
 	{
-		BTBuildGraph graph;
-		auto node = MetaYml::LoadFile(BTpath.string());
-		const MetaYml::Node& nodeList = node["NodeList"];
-		if (nodeList && nodeList.IsSequence())
-		{
-			graph.CleanUp();
-			for (const auto& node : nodeList)
-			{
-				graph.DeserializeSingleNode(node);
-			}
-		}
-
-		m_root = BuildTree(graph);
+		m_root = BuildTree(*cachedGraph);
 	}
 	else
 	{
-		Debug->LogError("Behavior Tree file does not exist: " + BTpath.string());
+		file::path BTpath = DataSystems->GetFilePath(m_BehaviorTreeGuid);
+		if (!BTpath.empty() && file::exists(BTpath))
+		{
+			std::shared_ptr<BTBuildGraph> graph = std::make_shared<BTBuildGraph>();
+			auto node = MetaYml::LoadFile(BTpath.string());
+			const MetaYml::Node& nodeList = node["NodeList"];
+			if (nodeList && nodeList.IsSequence())
+			{
+				graph->CleanUp();
+				for (const auto& node : nodeList)
+				{
+					graph->DeserializeSingleNode(node);
+				}
+			}
+			AIManagers->SetBTBuildGraphCache(m_BehaviorTreeGuid, graph);
+
+			m_root = BuildTree(*graph);
+		}
+		else
+		{
+			Debug->LogError("Behavior Tree file does not exist: " + BTpath.string());
+		}
 	}
+	std::cout << "Behavior Tree Build Time: " << bm.GetElapsedTime() << " ms\n";
 }
 
 
