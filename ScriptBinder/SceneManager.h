@@ -111,9 +111,9 @@ public:
 private:
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();
-    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
-    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
-	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
+    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::Node& itNode);
+    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::Node& itNode);
+        void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::Node& itNode);
 private:
     std::atomic<Scene*>                 m_sceneToActivate{};
     std::vector<Scene*>                 m_scenes{};

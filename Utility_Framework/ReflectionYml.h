@@ -4,7 +4,7 @@
 #include "IObject.h"
 #include "DataSystem.h"
 #include "ModuleBehavior.h"
-#include <yaml-cpp/yaml.h>
+#include "MetaYaml.h"
 
 namespace Meta
 {
@@ -21,7 +21,6 @@ namespace Meta
 	}
 }
 
-namespace MetaYml = YAML;
 using namespace TypeTrait;
 class GameObject;
 constexpr size_t ComponentTypeID = 3079321533;
@@ -316,22 +315,22 @@ namespace Meta
 				auto* script = static_cast<ModuleBehavior*>(instance);
 				const auto& scriptType = script->ScriptReflect();
 
-				MetaYml::Node scriptNode = Serialize(instance, scriptType);
-				for (const auto& it : scriptNode)
-				{
-					node[it.first.Scalar()] = it.second;
-				}
+                                MetaYml::Node scriptNode = Serialize(instance, scriptType);
+                                for (const auto& [key, value] : scriptNode.MapItems())
+                                {
+                                        node[key] = value;
+                                }
 			}
 		}
 
 		// 부모 먼저 직렬화
 		if (type.parent)
 		{
-			MetaYml::Node parentNode = Serialize(instance, *type.parent);
-			for (const auto& it : parentNode)
-			{
-				node[it.first.Scalar()] = it.second;
-			}
+                        MetaYml::Node parentNode = Serialize(instance, *type.parent);
+                        for (const auto& [key, value] : parentNode.MapItems())
+                        {
+                                node[key] = value;
+                        }
 		}
 
 		// 프로퍼티 순회
@@ -527,12 +526,12 @@ namespace Meta
 			return nullptr;
 
 		// 1. key가 typeName이고, value가 typeID일 가능성 → 우선순위 높게
-		for (const auto& kv : node)
-		{
-			if (kv.first.IsScalar() && kv.second.IsScalar())
-			{
-				std::string typeName = kv.first.as<std::string>();
-				std::size_t typeID = kv.second.as<std::size_t>();
+                for (const auto& [key, value] : node.MapItems())
+                {
+                        if (value.IsScalar())
+                        {
+                                std::string typeName = key;
+                                std::size_t typeID = value.as<std::size_t>();
 
 				const Meta::Type* type = MetaDataRegistry->Find(typeName);
 				if (type && type->typeID == typeID)
@@ -543,14 +542,14 @@ namespace Meta
 		}
 
 		// 2. fallback: key가 typeName이고 value가 map인 경우 (Unreal 스타일)
-		for (const auto& kv : node)
-		{
-			if (kv.first.IsScalar() && kv.second.IsMap())
-			{
-				std::string typeName = kv.first.as<std::string>();
-				return MetaDataRegistry->Find(typeName);
-			}
-		}
+                for (const auto& [key, value] : node.MapItems())
+                {
+                        if (value.IsMap())
+                        {
+                                std::string typeName = key;
+                                return MetaDataRegistry->Find(typeName);
+                        }
+                }
 
 		// 3. fallback: typeID 필드가 있는 경우
 		if (node["typeID"])
@@ -604,9 +603,9 @@ namespace Meta
 					continue;
 				}
 
-				if (prop.isVector && !prop.isElementPointer)
-				{
-					const YAML::Node& arrayNode = node[prop.name];
+                                if (prop.isVector && !prop.isElementPointer)
+                                {
+                                        const MetaYml::Node& arrayNode = node[prop.name];
 					if (!arrayNode || !arrayNode.IsSequence())
 						continue;
 
@@ -750,7 +749,7 @@ namespace Meta
 			const auto& currProp = currentNode[prop.name];
 			const auto& prevProp = prevNode[prop.name];
 
-			if (currProp && prevProp && YAML::Dump(currProp) == YAML::Dump(prevProp))
+                        if (currProp && prevProp && MetaYml::Dump(currProp) == MetaYml::Dump(prevProp))
 			{
 				patchedNode[prop.name] = newNode[prop.name];
 			}

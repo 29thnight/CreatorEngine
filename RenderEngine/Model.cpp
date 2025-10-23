@@ -4,6 +4,7 @@
 #include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "Mesh.h"
+#include "MetaYaml.h"
 #include "Material.h"
 #include "Texture.h"
 #include "SceneManager.h"

@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "DataSystem.h"
 #include "EngineSetting.h"
+#include "MetaYaml.h"
 
 void VolumeComponent::Awake()
 {

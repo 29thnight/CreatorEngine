@@ -14,28 +14,29 @@
 #include "Terrain.h"
 #include "TerrainCollider.h"
 #include "CharacterControllerComponent.h"
+#include "MetaYaml.h"
 
 class Scene;
 void PhysicsManager::Initialize()
 {
-	// PhysicsManager ÃÊ±âÈ­
+	// PhysicsManager Ê±È­
 	m_bIsInitialized = Physics->Initialize();
 	
-	// ¾À ·Îµå, ¾ð·Îµå, º¯°æ ÀÌº¥Æ® ÇÚµé·¯ µî·Ï
+	//  Îµ, Îµ,  ÌºÆ® Úµé·¯ 
 	m_OnSceneLoadHandle		= sceneLoadedEvent.AddRaw(this, &PhysicsManager::OnLoadScene);
 	m_OnSceneUnloadHandle	= sceneUnloadedEvent.AddRaw(this, &PhysicsManager::OnUnloadScene);
 	m_OnChangeSceneHandle	= SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
 
-	// ¹°¸® ¿£Áø ÄÝ¹é ÇÔ¼ö ¼³Á¤
+	//   Ý¹ Ô¼ 
 	Physics->SetCallBackCollisionFunction([this](const CollisionData& data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
 	});
 	
-	//±âº» ÀüÃ¼ Ãæµ¹ ¸ÅÆ®¸¯½º ¼³Á¤
+	//âº» Ã¼ æµ¹ Æ® 
 	std::vector<std::vector<uint8_t>> collisionGrid;
 	collisionGrid.resize(32);
 	for (auto& row : collisionGrid) {
-		row.resize(32, 1); // ±âº»ÀûÀ¸·Î ¸ðµç Ãæµ¹Ã¼°¡ Ãæµ¹ °¡´ÉÇÏµµ·Ï ¼³Á¤
+		row.resize(32, 1); // âº»  æµ¹Ã¼ æµ¹ Ïµ 
 	}
 	SetCollisionMatrix(collisionGrid);
 
@@ -45,41 +46,41 @@ void PhysicsManager::Update(float fixedDeltaTime)
 {
 	if (!m_bIsInitialized) return;
 	
-	// ÄÝ¹é ÀÌº¥Æ® ÃÊ±âÈ­
+	// Ý¹ ÌºÆ® Ê±È­
 	m_callbacks.clear();
 	SetPhysicData();
-	// ¹°¸® ¿£Áø¿¡ º¯°æ »çÇ× Àû¿ë
+	//     
 	//Benchmark bm;
 	ApplyPendingChanges();
-	// ¹°¸® ¿£Áø ¾÷µ¥ÀÌÆ®
+	//   Æ®
 	Physics->Update(fixedDeltaTime);
 	//std::cout << " Physics->Update" << bm.GetElapsedTime() << std::endl;
 	
-	// 1¼øÀ§: GetPhysicData()
-	// ¹°¸® ½Ã¹Ä·¹ÀÌ¼ÇÀÇ °á°ú¸¦ ¸ðµç °ÔÀÓ¿ÀºêÁ§Æ®ÀÇ Transform¿¡ ¸ÕÀú µ¿±âÈ­ÇÕ´Ï´Ù.
-	// ÀÌ·¸°Ô ÇØ¾ß ¼¼»óÀÇ ¸ðµç °´Ã¼°¡ ¹°¸®ÀûÀ¸·Î ¿Ã¹Ù¸¥ ÃÖ½Å À§Ä¡¿¡ ÀÖ°Ô µË´Ï´Ù.
+	// 1: GetPhysicData()
+	//  Ã¹Ä·Ì¼   Ó¿Æ® Transform  È­Õ´Ï´.
+	// Ì· Ø¾   Ã¼  Ã¹Ù¸ Ö½ Ä¡ Ö° Ë´Ï´.
 	GetPhysicData();
 
-	// 2¼øÀ§: ProcessCallback()
-	// ¸ðµç °´Ã¼ÀÇ À§Ä¡°¡ ÃÖ½Å »óÅÂ·Î µ¿±âÈ­µÇ¾úÀ¸¹Ç·Î, ÀÌÁ¦ ÀÌ À§Ä¡¸¦ ±âÁØÀ¸·Î
-	// OnCollisionEnter, OnTriggerEnter µîÀÇ ÀÌº¥Æ® ½ºÅ©¸³Æ®¸¦ ½ÇÇàÇÏ´Â °ÍÀÌ ¾ÈÀüÇÏ°í Á¤È®ÇÕ´Ï´Ù.
-	// ¸¸¾à ÀÌ ¼ø¼­°¡ ¹Ý´ë°¡ µÇ¸é, ½ºÅ©¸³Æ®´Â 'ÀÌÀü ÇÁ·¹ÀÓÀÇ À§Ä¡'¸¦ ±âÁØÀ¸·Î ·ÎÁ÷À» ½ÇÇàÇÏ´Â ¿À·ù°¡ ¹ß»ýÇÒ ¼ö ÀÖ½À´Ï´Ù.
+	// 2: ProcessCallback()
+	//  Ã¼ Ä¡ Ö½ Â· È­Ç¾Ç·,   Ä¡ 
+	// OnCollisionEnter, OnTriggerEnter  ÌºÆ® Å©Æ® Ï´  Ï° È®Õ´Ï´.
+	//    Ý´ë°¡ Ç¸, Å©Æ® '  Ä¡'   Ï´  ß»  Ö½Ï´.
 	ProcessCallback();
 
-	// 3¼øÀ§: ApplyPendingControllerPositionChanges()
-	// ÇØ´ç ÇÁ·¹ÀÓÀÇ ¸ðµç ¹°¸®Àû »óÈ£ÀÛ¿ë°ú ÀÌº¥Æ® Ã³¸®°¡ ¿ÏÀüÈ÷ ³¡³µ½À´Ï´Ù.
-	// ÀÌÁ¦ ¸ðµç Á¤»êÀÌ ³¡³­ »óÅÂ¿¡¼­, '¹«ÇÑ º¹µµ'¿Í °°Àº Æ¯¼öÇÑ °ÔÀÓÇÃ·¹ÀÌ È¿°ú(¼ø°£ÀÌµ¿)¸¦
-	// ¸Ç ¸¶Áö¸·¿¡ Àû¿ëÇÏ¿© ´ÙÀ½ ÇÁ·¹ÀÓÀ» ÁØºñ½ÃÅµ´Ï´Ù.
+	// 3: ApplyPendingControllerPositionChanges()
+	// Ø´    È£Û¿ ÌºÆ® Ã³  Ï´.
+	//     Â¿, ' '  Æ¯ Ã· È¿(Ìµ)
+	//   Ï¿   ØºÅµÏ´.
 	ApplyPendingControllerPositionChanges();
 }
 void PhysicsManager::Shutdown()
 {
-	// ¹°¸® ¿£Áø ¾À º¯°æ
+	//    
 	Physics->ChangeScene();
-	//ÄÁÅ×ÀÌ³Ê Á¦°Å
+	//Ì³ 
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	Container.clear();
-	// ¹°¸® ¿£Áø Á¾·á
+	//   
 	Physics->UnInitialize();
 
 	SaveCollisionMatrix();
@@ -127,7 +128,7 @@ void PhysicsManager::ProcessCallback()
 
 		if (isSameID || lhs == iterEnd || rhs == iterEnd)
 		{
-			//ÀÚ½ÅÀÇ ÄÝ¶óÀÌ´õ¿Í Ãæµ¹ ÀÌ°Å³ª Ãæµ¹Ã¼°¡ ¾ø¾î Á³À» °æ¿ì -> error
+			//Ú½ Ý¶Ì´ æµ¹ Ì°Å³ æµ¹Ã¼    -> error
 			Debug->LogError("Collision Callback Error lfs :" + std::to_string(data.thisId) + " ,rhs : " + std::to_string(data.otherId));
 			continue;
 		}
@@ -288,7 +289,7 @@ int PhysicsManager::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Ve
 			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
 			finalHit.layer = hit.hitObjectLayer;
 
-			//// ÁÂÇ¥°è º¯È¯ (¿Þ¼Õ -> ¿À¸¥¼Õ)
+			//// Ç¥ È¯ (Þ¼ -> )
 			//ConvertVectorPxToDx(hit.hitPoint, finalHit.point);
 			// ConvertVectorPxToDx(hit.hitNormal, finalHit.normal);
 			finalHit.point = hit.hitPoint;
@@ -726,7 +727,7 @@ void PhysicsManager::SetPhysicData()
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
-		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
+		//todo : CCT,Controller,ragdoll,capsule,?ì¤‘??deformeSuface
 		//sleeping
 		bool enable = colliderInfo.gameObject->IsEnabled();
 
@@ -926,29 +927,29 @@ void PhysicsManager::GetPhysicData()
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
-// ÆæµùµÈ CCT À§Ä¡ º¯°æ ¿äÃ»À» ÀÏ°ý Ã³¸®ÇÏ´Â ÇÔ¼ö
+//  CCT Ä¡  Ã» Ï° Ã³Ï´ Ô¼
 void PhysicsManager::ApplyPendingControllerPositionChanges()
 {
 	if (!Physics || m_pendingControllerPositions.empty()) return;
 
-	// ID¸¦ ÅëÇØ °ÔÀÓ¿ÀºêÁ§Æ®¸¦ Ã£±â À§ÇØ ÄÝ¶óÀÌ´õ ÄÁÅ×ÀÌ³Ê¿¡ Á¢±ÙÇÕ´Ï´Ù.
+	// ID  Ó¿Æ® Ã£  Ý¶Ì´ Ì³Ê¿ Õ´Ï´.
 	auto& colliderContainer = SceneManagers->GetActiveScene()->m_colliderContainer;
 
 	for (const auto& change : m_pendingControllerPositions)
 	{
-		// 1. PhysX ¿£Áø ³»ºÎÀÇ ÄÁÆ®·Ñ·¯ À§Ä¡¸¦ °­Á¦·Î ¼³Á¤ÇÕ´Ï´Ù.
+		// 1. PhysX   Æ®Ñ· Ä¡  Õ´Ï´.
 		Physics->SetControllerPosition(change.id, change.position);
 
-		// 2. ÇØ´ç ID¸¦ °¡Áø °ÔÀÓ¿ÀºêÁ§Æ®¸¦ Ã£½À´Ï´Ù.
+		// 2. Ø´ ID  Ó¿Æ® Ã£Ï´.
 		auto it = colliderContainer.find(change.id);
 		if (it != colliderContainer.end())
 		{
 			auto& colliderInfo = it->second;
 			if (colliderInfo.gameObject)
 			{
-				// 3. (ÇÙ½É) °ÔÀÓ¿ÀºêÁ§Æ®ÀÇ Transform ÄÄÆ÷³ÍÆ® À§Ä¡µµ Áï½Ã µ¿±âÈ­ÇÕ´Ï´Ù.
-				// CCTÀÇ °æ¿ì ÀÏ¹ÝÀûÀ¸·Î ¿ÀÇÁ¼ÂÀÌ ¾ø°Å³ª, ÀÖ´õ¶óµµ ¼ø°£ÀÌµ¿Àº ±âÁØÁ¡À» ±âÁØÀ¸·Î ÇÏ´Â °ÍÀÌ ¸íÈ®ÇÕ´Ï´Ù.
-				// ¸¸¾à ¿ÀÇÁ¼ÂÀ» °í·ÁÇØ¾ß ÇÑ´Ù¸é, change.position¿¡¼­ ¿ÀÇÁ¼ÂÀ» »©ÁØ °ªÀ» SetWorldPosition¿¡ ³Ñ°ÜÁÖ¾î¾ß ÇÕ´Ï´Ù.
+				// 3. (Ù½) Ó¿Æ® Transform Æ® Ä¡  È­Õ´Ï´.
+				// CCT  Ï¹  Å³, Ö´ Ìµ   Ï´  È®Õ´Ï´.
+				//   Ø¾ Ñ´Ù¸, change.position    SetWorldPosition Ñ°Ö¾ Õ´Ï´.
 				colliderInfo.gameObject->m_transform.SetWorldPosition(change.position);
 			}
 		}
@@ -1002,7 +1003,7 @@ void PhysicsManager::LoadCollisionMatrix()
 			}
 			else
 			{
-				m_collisionMatrix[i][j] = true; // ±âº»°ª ¼³Á¤
+				m_collisionMatrix[i][j] = true; // âº» 
 			}
 		}
 	}

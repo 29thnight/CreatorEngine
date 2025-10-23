@@ -921,7 +921,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	m_isEditorSceneLoaded = false;
 }
 
-void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::Node& itNode)
 {
     if (type->typeID == type_guid(GameObject))
     {
@@ -964,7 +964,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
     }
 }
 
-void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::Node& itNode)
 {
     if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
     {
@@ -1010,7 +1010,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
     }
 }
 
-void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::Node& itNode)
 {
     if (type->typeID == type_guid(GameObject))
     {

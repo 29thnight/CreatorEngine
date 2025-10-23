@@ -63,7 +63,7 @@ void ComponentFactory::Initialize()
    }
 }
 
-void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame)
+void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::Node& itNode, bool isEditorToGame)
 {
 	if (itNode["ModuleBehavior"])
 	{

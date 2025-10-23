@@ -30,7 +30,7 @@ void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
 	auto& instances = m_instanceMap[prefab->GetFileGuid()];
     if(std::find(instances.begin(), instances.end(), instance) != instances.end())
     {
-        return; // ÀÌ¹Ì µî·ÏµÈ ÀÎ½ºÅÏ½º´Â Áßº¹ µî·ÏÇÏÁö ¾ÊÀ½
+        return; // Ì¹ Ïµ Î½Ï½ ßº  
     }
     else
     {
@@ -56,7 +56,7 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         {
             const auto& currComp = currentNode["m_components"];
             const auto& prevComp = obj->m_prefabOriginal["m_components"];
-            if (currComp && prevComp && YAML::Dump(currComp) == YAML::Dump(prevComp))
+            if (currComp && prevComp && MetaYml::Dump(currComp) == MetaYml::Dump(prevComp))
                 updateComponents = true;
         }
 

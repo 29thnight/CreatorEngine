@@ -5,6 +5,7 @@
 #include "Scene.h"
 #include "Camera.h"
 #include <random>
+#include "MetaYaml.h"
 
 void FoliageComponent::Awake()
 {
@@ -219,7 +220,7 @@ std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
         return ranges;
 
     unsigned int hwThreads = std::thread::hardware_concurrency();
-    if (hwThreads == 0) hwThreads = 4; // 안전 기본값 (미검출 시)
+    if (hwThreads == 0) hwThreads = 4; //  羞� (隔 )
 
     const size_t numSplits = hwThreads * 2 + 1;
     ranges.reserve(numSplits);
@@ -247,7 +248,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
     const size_t count = m_foliageInstances.size();
     if (count == 0) return;
 
-    // 프러스텀은 값 캡처(스레드 안전)
+    //   캡처( )
     const auto frustum = camera->GetFrustum();
 
     auto process_range = [&](size_t begin, size_t end)
@@ -256,7 +257,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
         {
             auto& foliage = m_foliageInstances[i];
 
-            // 경계 체크 보정: >=
+            //  체크 : >=
             if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
                 continue;
 
@@ -275,7 +276,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
             Mesh* mesh = foliageType.m_mesh;
             if (!mesh)
             {
-                foliage.m_isCulled = true; // 안전 기본값
+                foliage.m_isCulled = true; //  羞�
                 continue;
             }
 
@@ -297,7 +298,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
         tasks.emplace_back(std::async(std::launch::async, process_range, begin, end));
     }
 
-    // 완료 대기
+    // 狗 
     for (auto& f : tasks)
     {
         if (f.valid()) f.get();

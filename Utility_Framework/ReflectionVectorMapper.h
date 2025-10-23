@@ -1,14 +1,14 @@
 #pragma once
-#include <yaml-cpp/yaml.h>
+#include "MetaYaml.h"
 
 namespace Meta
 {
-	extern void Deserialize(void* object, const Type& type, const YAML::Node& node);
+        extern void Deserialize(void* object, const Type& type, const MetaYml::Node& node);
 
 	template<typename T>
 	struct TypeMapper
 	{
-		static void InvokeForVector(void* vecPtr, const YAML::Node& arrayNode, const Type* elementType)
+                static void InvokeForVector(void* vecPtr, const MetaYml::Node& arrayNode, const Type* elementType)
 		{
 			auto typedVec = reinterpret_cast<std::vector<T>*>(vecPtr);
 			typedVec->clear();

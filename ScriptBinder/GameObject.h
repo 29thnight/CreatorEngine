@@ -5,7 +5,7 @@
 #include "Transform.h"
 #include "GameObjectType.h"
 #include "GameObject.generated.h"
-#include <yaml-cpp/yaml.h>
+#include "MetaYaml.h"
 
 class Scene;
 class Bone;
@@ -150,7 +150,7 @@ public:
 
 	Scene* m_ownerScene{ nullptr };
 	Prefab* m_prefab{ nullptr };
-	YAML::Node m_prefabOriginal{};
+    MetaYml::Node m_prefabOriginal{};
 	std::string m_removedSuffixNumberTag{};
 
 	[[Property]]

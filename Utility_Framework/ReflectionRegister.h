@@ -9,7 +9,6 @@
 #include <typeindex>
 #include <stack>
 #include <unordered_set>
-#include <yaml-cpp/yaml.h>
 
 class ComponentFactory;
 namespace Meta

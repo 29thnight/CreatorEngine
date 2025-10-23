@@ -1,13 +1,14 @@
 #include "BehaviorTreeComponent.h"
 #include "SceneManager.h"
 #include "NodeFactory.h"
+#include "MetaYaml.h"
 
 void BehaviorTreeComponent::Initialize()
 {
 	AIManagers->RegisterAIComponent(GetOwner(), this);
 	if (m_BlackBoardGuid != nullFileGuid)
 	{
-		//TODO: ºí·¢º¸µå ÀÎ½ºÅÏ½º »ý¼º ÁØºñ
+		//TODO:  Î½Ï½  Øº
 		m_pBlackboard = new BlackBoard();
 
 		file::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);
@@ -60,7 +61,7 @@ void BehaviorTreeComponent::OnDestroy()
 		Memory::SafeDelete(m_pBlackboard);
 		AIManagers->RemoveBlackBoard(name);
 	}
-	m_built.clear(); // Àçºôµå ´ëºñ
+	m_built.clear(); //  
 	AIManagers->UnRegisterAIComponent(GetOwner(), this);
 }
 
@@ -70,7 +71,7 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTree(const BTBuildGraph& graph)
 	if (rootID.m_ID_Data == HashedGuid::INVAILD_ID)
 		throw std::runtime_error("BTTreeBuilder: No root node found.");
 
-	m_built.clear(); // Àçºôµå ´ëºñ
+	m_built.clear(); //  
 	return BuildTreeRecursively(rootID, graph);
 }
 
@@ -124,7 +125,7 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 	//	}
 	//	else
 	//	{
-	//		// Action / Condition node ¡æ ÀÚ½Ä ¾øÀ½
+	//		// Action / Condition node  Ú½ 
 	//	}
 	//}
 

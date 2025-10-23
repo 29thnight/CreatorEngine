@@ -6,10 +6,7 @@
 #include "Core.Barrier.h"
 #include "RenderPassSettings.h"
 #include "DLLAcrossSingleton.h"
-#include <yaml-cpp/yaml.h>
 #include "TerrainBuffers.h"
-
-namespace MetaYml = YAML;
 
 enum class MSVCVersion
 {

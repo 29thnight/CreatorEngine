@@ -2,10 +2,11 @@
 #include "GameObject.h"
 #include "Transform.h"
 #include "SceneManager.h"
+#include "MetaYaml.h"
 
 BlackBoardValue& BlackBoard::GetOrCreate(const std::string& key)
 {
-	return m_values[key]; // default »ý¼º
+	return m_values[key]; // default 
 }
 
 const BlackBoardValue& BlackBoard::GetChecked(const std::string& key, BlackBoardType expected) const
