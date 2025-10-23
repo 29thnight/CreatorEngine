@@ -70,6 +70,7 @@ void GameInstance::Initialize()
 
 	std::string csvFileName = "ItemEnhancementSetting.csv";
 	LoadItemInfoFromCSV(csvFileName);
+	m_soundName.LoadSoundNameFromCSV();
 
 }
 

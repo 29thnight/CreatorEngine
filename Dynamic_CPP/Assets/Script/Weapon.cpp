@@ -19,6 +19,11 @@ void Weapon::Initialize()
 	curDur = durMax;
 }
 
+void Weapon::Initialize(int _curDur)
+{
+	curDur = _curDur;
+}
+
 void Weapon::SetEnabled(bool able)
 {
 	GetOwner()->SetEnabled(able);

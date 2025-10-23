@@ -38,6 +38,7 @@ void MonsterProjectile::Update(float tick)
 
         input.position = currentPos;
         input.rotation = SimpleMath::Quaternion::Identity;
+        input.layerMask = 1 << 5 | 1 << 7;
 
         PhysicsManagers->SphereOverlap(input, m_radius, results);
 
@@ -63,11 +64,9 @@ void MonsterProjectile::Update(float tick)
 
 
         for (auto& res : results) {
-            if (res.gameObject->GetHashedName().ToString() == "1P" || res.gameObject->GetHashedName().ToString() == "2P") {
-                auto entity = res.gameObject->GetComponentDynamicCast<Entity>();
-                if (entity) {
-                    entity->SendDamage(m_owner, m_damege);
-                }
+            auto entity = res.gameObject->GetComponentDynamicCast<Entity>();
+            if (entity) {
+                entity->SendDamage(m_owner, m_damege);
             }
         }
 

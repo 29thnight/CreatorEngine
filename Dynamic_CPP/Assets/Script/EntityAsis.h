@@ -109,7 +109,7 @@ private:
 	float ResurrectionTime = 3.f;
 	float ResurrectionElapsedTime;
 	[[Property]]
-	int ResurrectionHP = 50;   //부활시 회복하는 HP &비율
+	int ResurrectionHP = 50;   //부활시 회복하는 HP 
 private:
 	float	m_currentTailPurificationDuration{}; // 꼬리 정화 연출 소요 시간
 	float	m_currentStaggerDuration{ 0 };	// 현재 경직 시간
@@ -134,7 +134,6 @@ private:
 
 	int currentPointIndex = 0;
 
-	Mathf::Vector3 evasionDirection = { 0.f,0.f,0.f };
 private:
 	[[Property]]
 	float m_pathRadius = 1.f;
