@@ -21,6 +21,14 @@ RigidBody::~RigidBody()
 void RigidBody::UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, unsigned int* collisionMatrix, void* userData)
 {
 	physx::PxShape* newShape = physics->createShape(newGeometry, *material, true);
+	physx::PxGeometryType::Enum geomType = newGeometry.getType();
+
+	// [핵심 수정] 생성 시와 동일하게 Y축으로 세우는 로컬 회전을 적용합니다!
+	if (geomType == physx::PxGeometryType::eCAPSULE) {
+		physx::PxTransform localPose(physx::PxQuat(physx::PxHalfPi, physx::PxVec3(0, 0, 1)));
+		newShape->setLocalPose(localPose);
+	}
+
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];
