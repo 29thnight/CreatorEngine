@@ -34,3 +34,4 @@ layers:
   - PlayerBullet
   - EnemyBullet
   - EnemyHome
+  - Ground

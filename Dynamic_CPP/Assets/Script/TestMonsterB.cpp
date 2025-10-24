@@ -505,12 +505,17 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		{
 			m_currentHP -= damage;
 			blackBoard->SetValueAsInt("CurrHP", m_currentHP);
+			
 			if (m_currentHP <= 0)
 			{
 				isDead = true;
 				Dead();
 				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
 				controller->Move({ 0, 0 });
+			}
+			else
+			{
+				HitImpulse();
 			}
 		}
 	}

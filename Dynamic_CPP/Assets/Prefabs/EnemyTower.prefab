@@ -1,33 +1,31 @@
 m_name: EnemyTower
+m_instanceID: 2885814655
 m_isEnabled: true
-m_instanceID: 2219967439
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: EnemyTower
+    m_instanceID: 1936724224
     m_isEnabled: true
-    m_instanceID: 1689970382
+    m_attachedSoketID: 0
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 170
+    m_index: 306
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [171, 178, 181]
+    m_collisionType: 14
     m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-    m_attachedSoketID: 0
-    m_collisionType: 10
-    m_isStatic: false
-    m_gameObjectType: 0
+    m_childrenIndices: [307, 314, 317]
     m_tag: Untagged
     m_layer: EnemyHome
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
+        m_instanceID: 2736852996
         m_isEnabled: true
-        m_instanceID: 214513016
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
         LinearDamping: 0.00999999978
@@ -42,8 +40,8 @@ PrefabNode:
         m_collisionEnabled: true
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
+        m_instanceID: 2678811427
         m_isEnabled: true
-        m_instanceID: 3182399660
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 1.79999995, y: 5.0999999, z: 2.29999995}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -52,36 +50,36 @@ PrefabNode:
         maxHP: 20
         attackRange: 10
         m_name: EntityMonsterTower
+        m_instanceID: 1991894957
         m_isEnabled: true
-        m_instanceID: 4155863863
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: f2c0b89d-570d-5afd-b9c8-80330489b63e
+    m_gameObjectType: 0
+    m_isStatic: false
     children:
       - GameObject: 2166264123
         m_name: Tower
+        m_instanceID: 2616238470
         m_isEnabled: true
-        m_instanceID: 1003758668
-        m_transform:
-          position: {x: 0, y: 5.96046448e-08, z: 0, w: 0}
-          rotation: {x: 0, y: 0, z: 0, w: 1}
-          scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 170
-        m_index: 171
-        m_parentIndex: 170
-        m_rootIndex: 0
-        m_childrenIndices: [172, 177]
-        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
         m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 5.96046448e-08, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 306
+        m_index: 307
+        m_parentIndex: 306
+        m_rootIndex: 0
         m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 3
+        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+        m_childrenIndices: [308, 313]
         m_tag: normalModel
         m_layer: Default
         m_components:
           - Animator: 1291484284
             m_name: Animator
+            m_instanceID: 2826058931
             m_isEnabled: true
-            m_instanceID: 2383920302
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
               m_animations:
@@ -100,54 +98,54 @@ PrefabNode:
             m_Motion: 973cd024-df46-55f0-9960-0df808e992da
             m_animationControllers: ~
             Parameters: ~
+        m_gameObjectType: 3
+        m_isStatic: false
         children:
           - GameObject: 2166264123
             m_name: flag_back_L
+            m_instanceID: 3220147169
             m_isEnabled: true
-            m_instanceID: 2303153474
+            m_attachedSoketID: 0
             m_transform:
               position: {x: -0.0966579169, y: 4.28325701, z: 2.41563272, w: 1}
               rotation: {x: -0.70710659, y: 0, z: -0, w: 0.707106948}
               scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-              m_parentID: 171
-            m_index: 172
-            m_parentIndex: 171
+              m_parentID: 307
+            m_index: 308
+            m_parentIndex: 307
             m_rootIndex: 0
-            m_childrenIndices: [173, 174]
-            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-            m_attachedSoketID: 0
             m_collisionType: 0
-            m_isStatic: false
-            m_gameObjectType: 3
+            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+            m_childrenIndices: [309, 310]
             m_tag: Untagged
             m_layer: Default
             m_components: ~
+            m_gameObjectType: 3
+            m_isStatic: false
             children:
               - GameObject: 2166264123
                 m_name: orc_guard_tower_Lv3_flag_back
+                m_instanceID: 3804186092
                 m_isEnabled: true
-                m_instanceID: 824949648
+                m_attachedSoketID: 0
                 m_transform:
                   position: {x: 0, y: 0, z: -0, w: 1}
                   rotation: {x: -0, y: 0, z: -0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 0}
-                  m_parentID: 172
-                m_index: 173
-                m_parentIndex: 172
+                  m_parentID: 308
+                m_index: 309
+                m_parentIndex: 308
                 m_rootIndex: 0
-                m_childrenIndices: ~
-                m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-                m_attachedSoketID: 0
                 m_collisionType: 0
-                m_isStatic: false
-                m_gameObjectType: 3
+                m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+                m_childrenIndices: ~
                 m_tag: Untagged
                 m_layer: Default
                 m_components:
                   - MeshRenderer: 659998325
                     m_name: MeshRenderer
+                    m_instanceID: 1674818149
                     m_isEnabled: true
-                    m_instanceID: 3283454291
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_Material:
                       m_name: flag_back_L
@@ -177,101 +175,101 @@ PrefabNode:
                       lightmapScale: 1
                       lightmapOffset: {x: 0, y: 0}
                       lightmapTiling: {x: 0, y: 0}
+                    m_bitflag: 0
                     m_isSkinnedMesh: true
                     m_shadowRecive: true
                     m_shadowCast: true
                     m_isEnableLOD: false
-                    m_bitflag: 0
+                m_gameObjectType: 3
+                m_isStatic: false
               - GameObject: 2166264123
                 m_name: Bone_root
+                m_instanceID: 4050516540
                 m_isEnabled: true
-                m_instanceID: 2301473873
+                m_attachedSoketID: 0
                 m_transform:
                   position: {x: -4.57966998e-16, y: 0.578373015, z: -3.76928256e-07, w: 1}
                   rotation: {x: 1.06994989e-07, y: 0.707106829, z: 0.707106829, w: -2.24807117e-10}
                   scale: {x: 0.999999881, y: 0.99999994, z: 0.99999994, w: 0}
-                  m_parentID: 172
-                m_index: 174
-                m_parentIndex: 172
+                  m_parentID: 308
+                m_index: 310
+                m_parentIndex: 308
                 m_rootIndex: 4
-                m_childrenIndices: [175]
-                m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-                m_attachedSoketID: 0
                 m_collisionType: 0
-                m_isStatic: false
-                m_gameObjectType: 4
+                m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+                m_childrenIndices: [311]
                 m_tag: Untagged
                 m_layer: Default
                 m_components: ~
+                m_gameObjectType: 4
+                m_isStatic: false
                 children:
                   - GameObject: 2166264123
                     m_name: Bone_01
+                    m_instanceID: 2259864704
                     m_isEnabled: true
-                    m_instanceID: 161021497
+                    m_attachedSoketID: 0
                     m_transform:
                       position: {x: -4.69896122e-10, y: 8.52525019e-08, z: 1.8687679e-08, w: 1}
                       rotation: {x: 0.707106948, y: 4.25847198e-08, z: 0.70710665, w: -2.51214747e-15}
                       scale: {x: 0.99999994, y: 0.99999994, z: 0.99999994, w: 0}
-                      m_parentID: 174
-                    m_index: 175
-                    m_parentIndex: 174
+                      m_parentID: 310
+                    m_index: 311
+                    m_parentIndex: 310
                     m_rootIndex: 4
-                    m_childrenIndices: [176]
-                    m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-                    m_attachedSoketID: 0
                     m_collisionType: 0
-                    m_isStatic: false
-                    m_gameObjectType: 4
+                    m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+                    m_childrenIndices: [312]
                     m_tag: Untagged
                     m_layer: Default
                     m_components: ~
+                    m_gameObjectType: 4
+                    m_isStatic: false
                     children:
                       - GameObject: 2166264123
                         m_name: Bone_02
+                        m_instanceID: 3773388361
                         m_isEnabled: true
-                        m_instanceID: 3956454078
+                        m_attachedSoketID: 0
                         m_transform:
                           position: {x: 1.39770165e-07, y: 0.788137496, z: -6.58798172e-09, w: 1}
                           rotation: {x: 3.4239811e-08, y: -0.70710665, z: 6.18213747e-08, w: 0.707106948}
                           scale: {x: 0.999999881, y: 0.999999881, z: 0.999999881, w: 0}
-                          m_parentID: 175
-                        m_index: 176
-                        m_parentIndex: 175
+                          m_parentID: 311
+                        m_index: 312
+                        m_parentIndex: 311
                         m_rootIndex: 4
-                        m_childrenIndices: ~
-                        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-                        m_attachedSoketID: 0
                         m_collisionType: 0
-                        m_isStatic: false
-                        m_gameObjectType: 4
+                        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+                        m_childrenIndices: ~
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
+                        m_gameObjectType: 4
+                        m_isStatic: false
           - GameObject: 2166264123
             m_name: tower_L
+            m_instanceID: 1056800808
             m_isEnabled: true
-            m_instanceID: 2875617684
+            m_attachedSoketID: 0
             m_transform:
               position: {x: 0, y: 0, z: -0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 171
-            m_index: 177
-            m_parentIndex: 171
+              m_parentID: 307
+            m_index: 313
+            m_parentIndex: 307
             m_rootIndex: 0
-            m_childrenIndices: ~
-            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-            m_attachedSoketID: 0
             m_collisionType: 0
-            m_isStatic: false
-            m_gameObjectType: 3
+            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+            m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
+                m_instanceID: 3647526130
                 m_isEnabled: true
-                m_instanceID: 4045920248
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
                   m_name: tower
@@ -301,58 +299,58 @@ PrefabNode:
                   lightmapScale: 1
                   lightmapOffset: {x: 0, y: 0}
                   lightmapTiling: {x: 0, y: 0}
+                m_bitflag: 0
                 m_isSkinnedMesh: true
                 m_shadowRecive: true
                 m_shadowCast: true
                 m_isEnableLOD: false
-                m_bitflag: 0
+            m_gameObjectType: 3
+            m_isStatic: false
       - GameObject: 2166264123
         m_name: TowerB
+        m_instanceID: 1915900075
         m_isEnabled: true
-        m_instanceID: 129054165
+        m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: -5.96046448e-08, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 170
-        m_index: 178
-        m_parentIndex: 170
+          m_parentID: 306
+        m_index: 314
+        m_parentIndex: 306
         m_rootIndex: 0
-        m_childrenIndices: [179, 180]
-        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-        m_attachedSoketID: 0
         m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 3
+        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+        m_childrenIndices: [315, 316]
         m_tag: breakModel
         m_layer: Default
         m_components: ~
+        m_gameObjectType: 3
+        m_isStatic: false
         children:
           - GameObject: 2166264123
             m_name: tower_L.001_cell.445-0
+            m_instanceID: 1528134139
             m_isEnabled: true
-            m_instanceID: 1438909062
+            m_attachedSoketID: 0
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 178
-            m_index: 179
-            m_parentIndex: 178
+              m_parentID: 314
+            m_index: 315
+            m_parentIndex: 314
             m_rootIndex: 0
-            m_childrenIndices: ~
-            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-            m_attachedSoketID: 0
             m_collisionType: 0
-            m_isStatic: false
-            m_gameObjectType: 3
+            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+            m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
+                m_instanceID: 3697085007
                 m_isEnabled: true
-                m_instanceID: 1493542115
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
                   m_name: tower(1)
@@ -382,36 +380,36 @@ PrefabNode:
                   lightmapScale: 1
                   lightmapOffset: {x: 0, y: 0}
                   lightmapTiling: {x: 0, y: 0}
+                m_bitflag: 0
                 m_isSkinnedMesh: false
                 m_shadowRecive: true
                 m_shadowCast: true
                 m_isEnableLOD: false
-                m_bitflag: 0
+            m_gameObjectType: 3
+            m_isStatic: false
           - GameObject: 2166264123
             m_name: tower_L.001_cell.445-1
+            m_instanceID: 3397590323
             m_isEnabled: true
-            m_instanceID: 1262956046
+            m_attachedSoketID: 0
             m_transform:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 178
-            m_index: 180
-            m_parentIndex: 178
+              m_parentID: 314
+            m_index: 316
+            m_parentIndex: 314
             m_rootIndex: 0
-            m_childrenIndices: ~
-            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
-            m_attachedSoketID: 0
             m_collisionType: 0
-            m_isStatic: false
-            m_gameObjectType: 3
+            m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+            m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
+                m_instanceID: 2195361022
                 m_isEnabled: true
-                m_instanceID: 669846819
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
                   m_name: flag_left_L(1)
@@ -441,29 +439,31 @@ PrefabNode:
                   lightmapScale: 1
                   lightmapOffset: {x: 0, y: 0}
                   lightmapTiling: {x: 0, y: 0}
+                m_bitflag: 0
                 m_isSkinnedMesh: false
                 m_shadowRecive: true
                 m_shadowCast: true
                 m_isEnableLOD: false
-                m_bitflag: 0
+            m_gameObjectType: 3
+            m_isStatic: false
       - GameObject: 2166264123
         m_name: MonsterSpawnPos
+        m_instanceID: 1264063713
         m_isEnabled: true
-        m_instanceID: 588627350
+        m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 5.19999981, z: 0.50385648, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 170
-        m_index: 181
-        m_parentIndex: 170
+          m_parentID: 306
+        m_index: 317
+        m_parentIndex: 306
         m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
-        m_attachedSoketID: 0
         m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 0
+        m_prefabFileGuid: 347b4d80-4ec2-5166-974a-c9f7bffca263
+        m_childrenIndices: ~
         m_tag: ShootTag
         m_layer: Default
         m_components: ~
+        m_gameObjectType: 0
+        m_isStatic: false

@@ -1666,7 +1666,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 
 	std::vector<HitResult>  forwardhits;
 	float forwardDistance = std::max(std::abs(bombThrowPositionoffset.x), std::abs(bombThrowPositionoffset.z));
-	unsigned int forwardLayerMask = 1 << 11;
+	unsigned int forwardLayerMask = 1 << 15;
 	int size = RaycastAll(forwardRayOrgion, targetdir,forwardDistance, forwardLayerMask, forwardhits);
 	float min = 0;
 	for (auto& forwardHit : forwardhits)
@@ -1760,7 +1760,7 @@ void Player::MeleeAttack()
 		distacne = m_curWeapon->chgRange;
 	float damage = calculDamge(isChargeAttack);
 
-	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10 | 1<< 15;
+	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10 | 1<< 14;
 
 	int size = RaycastAll(rayOrigin, direction, distacne, layerMask, hits);
 
@@ -1858,7 +1858,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1 << 8 | 1 << 10 | 1<< 15;
+	RangeInfo.layerMask = 1 << 8 | 1 << 10 | 1<< 14;
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();
