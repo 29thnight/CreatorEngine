@@ -109,6 +109,12 @@ public:
 	float m_teleportDelay = 1.0f; //텔레포트 딜레이 시간
 
 
+	float m_obstacleAvoidanceDistance = 5.0f;
+	float m_avoidanceAngle = 30.0f;
+	float m_avoidanceSteeringForce = 2.0f;
+
+
+
 	Mathf::Vector3 m_teleportDestination;   // 계산된 텔레포트 목적지를 저장할 변수
 	float m_teleportTimer = 0.0f;           // 텔레포트 딜레이를 계산하기 위한 타이머
 	bool m_isTeleport = false; //텔레포트 실행중

@@ -190,6 +190,9 @@ public:
 	void StopForcedMove();
 
 	bool IsInForcedMove() const;
+
+	void SetLookDirection(const DirectX::SimpleMath::Vector3& direction);
+	void ClearLookDirection();
 private: 
 
 	//collision event
@@ -215,6 +218,9 @@ private:
 	bool m_bOnMove{ false }; //이동중인지 체크
 	bool m_bHasInput{ false }; //입력값이 있는지 체크
 	bool m_useAutomaticRotation{ true }; // 자동 회전 기능 사용 여부
+
+	DirectX::SimpleMath::Vector3 m_lookDirection;
+	bool m_hasCustomLookDirection = false;
 
 	Transform* m_transform;
 	//컨트롤러 정보
