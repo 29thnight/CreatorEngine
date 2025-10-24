@@ -11,6 +11,8 @@ public:
 
 private:
 	bool m_isMenuOpened{ false };
+	float m_lastDelta{ 0.f };
+	float m_elapsedTime{ 0.f };
 	//class GameManager* m_gameManager{ nullptr };
 	class GameObject* m_menuCanvasObject{ nullptr };
 };

@@ -31,6 +31,7 @@ private:
 	class GameObject*		m_gameManagerObj = nullptr;
 	class GameManager*		m_gameManager = nullptr;
 	class PlayerSelector*	m_playerSelector = nullptr;
+	class ImageComponent*	m_controllerImage = nullptr;
 	class ImageComponent*	leftPos = nullptr;
 	class ImageComponent*	rightPos = nullptr;
 	class SelectTimer*		m_selectTimer = nullptr;

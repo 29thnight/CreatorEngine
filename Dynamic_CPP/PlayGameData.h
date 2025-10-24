@@ -23,7 +23,6 @@ struct PlayerData
 struct AsisData
 {
 	int curHP = 1;
-	
 };
 
 
