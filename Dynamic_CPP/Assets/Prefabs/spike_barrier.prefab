@@ -1,0 +1,116 @@
+m_name: spike_barrier
+m_instanceID: 3287310938
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: spike_barrier
+    m_instanceID: 1721276967
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 219.96666, y: 0, z: -23.4881744, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 256
+    m_index: 1018
+    m_parentIndex: 256
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [390]
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_instanceID: 1517594416
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 4.5, y: 5.80000019, z: 1.10000002}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0.300000012, z: 0, w: 1}
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_instanceID: 198562850
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - ModuleBehavior: 1399118904
+        m_name: EntityRock
+        m_instanceID: 2909861378
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
+    m_gameObjectType: 0
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: spike_barrier (1)
+        m_instanceID: 412577644
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0.291869968, z: -0, w: 0.956458032}
+          scale: {x: 1.77999985, y: 1.77999985, z: 1.77999985, w: 0}
+          m_parentID: 1018
+        m_index: 390
+        m_parentIndex: 1018
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_instanceID: 3614448214
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: spike_barrier
+              m_baseColorTexName: plank_coll1_DefaultMaterial_BaseColor.png
+              m_normalTexName: plank_coll1_DefaultMaterial_Normal.png
+              m_ORM_TexName: plank_coll1_DefaultMaterial_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_IOR: 1.5
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: a52d4e26-344c-56a7-a69a-fdcba832df7e
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Mesh.125
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+        m_gameObjectType: 3
+        m_isStatic: false

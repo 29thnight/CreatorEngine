@@ -606,6 +606,24 @@ void Scene::InternalPauseUpdateForUI()
 			auto obj = weak.lock();
 			if (obj)
 			{
+				auto imageComponents = obj->GetComponents<ImageComponent>();
+				for (const auto& imageComponent : imageComponents)
+				{
+					imageComponent->Update(deltaTime);
+				}
+
+				auto textComponents = obj->GetComponents<TextComponent>();
+				for (const auto& textComponent : textComponents)
+				{
+					textComponent->Update(deltaTime);
+				}
+
+				auto spriteSheetComponents = obj->GetComponents<SpriteSheetComponent>();
+				for (const auto& spriteSheetComponent : spriteSheetComponents)
+				{
+					spriteSheetComponent->Update(deltaTime);
+				}
+
 				auto inputComponents = obj->GetComponents<PlayerInputComponent>();
 				for (const auto& inputComponent : inputComponents)
 				{
