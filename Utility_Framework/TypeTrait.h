@@ -73,8 +73,14 @@ struct HashedGuid
 		m_ID_Data = id; return *this;
 	}
 
-	friend constexpr auto operator<=>(const HashedGuid& lhs, const HashedGuid& rhs) = default;
-	friend constexpr bool operator==(const HashedGuid& lhs, const HashedGuid& rhs) = default;
+	friend constexpr auto operator<=>(const HashedGuid& lhs, const HashedGuid& rhs)
+	{
+		return lhs.m_ID_Data <=> rhs.m_ID_Data;
+	}
+	friend constexpr bool operator==(const HashedGuid& lhs, const HashedGuid& rhs) 
+	{
+		return lhs.m_ID_Data == rhs.m_ID_Data;
+	}
 
 	constexpr bool operator==(const size_t& id) const { return m_ID_Data == id; }
 	constexpr operator size_t() const { return m_ID_Data; }

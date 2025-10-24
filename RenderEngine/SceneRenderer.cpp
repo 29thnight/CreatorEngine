@@ -41,7 +41,7 @@
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
-	m_deviceResources(deviceResources)
+	m_deviceResources(deviceResources), m_frameMemoryResource(m_frameScratchBuffer.data(), m_frameScratchBuffer.size(), std::pmr::get_default_resource())
 {
     InitializeDeviceState();
     InitializeShadowMapDesc();
@@ -574,6 +574,7 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 	PROFILE_CPU_BEGIN("PrepareRender");
 	PrepareRender();
 	PROFILE_CPU_END();
+	m_frameMemoryResource.release();
 }
 
 void SceneRenderer::SceneRendering()
@@ -1167,26 +1168,50 @@ void SceneRenderer::PrepareRender()
 {
 	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
 	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
-	
+
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
 	PROFILE_CPU_BEGIN("CopySceneData");
-	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
-	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
-	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
-	std::vector<SpriteRenderer*> spriteRenderers = m_currentScene->GetSpriteRenderers();
-	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
-	std::vector<TextComponent*> textComponents = UIManagers->Texts;
-	std::vector<SpriteSheetComponent*> spriteComponents = UIManagers->SpriteSheets;
-	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
+	const auto& meshSource = m_currentScene->GetMeshRenderers();
+	std::pmr::vector<MeshRenderer*> allMeshes{ &m_frameMemoryResource };
+	allMeshes.assign(meshSource.begin(), meshSource.end());
+
+	const auto& terrainSource = m_currentScene->GetTerrainComponent();
+	std::pmr::vector<TerrainComponent*> terrainComponents{ &m_frameMemoryResource };
+	terrainComponents.assign(terrainSource.begin(), terrainSource.end());
+
+	const auto& foliageSource = m_currentScene->GetFoliageComponents();
+	std::pmr::vector<FoliageComponent*> foliageComponents{ &m_frameMemoryResource };
+	foliageComponents.assign(foliageSource.begin(), foliageSource.end());
+
+	const auto& spriteRendererSource = m_currentScene->GetSpriteRenderers();
+	std::pmr::vector<SpriteRenderer*> spriteRenderers{ &m_frameMemoryResource };
+	spriteRenderers.assign(spriteRendererSource.begin(), spriteRendererSource.end());
+
+	const auto& imageSource = UIManagers->Images;
+	std::pmr::vector<ImageComponent*> imageComponents{ &m_frameMemoryResource };
+	imageComponents.assign(imageSource.begin(), imageSource.end());
+
+	const auto& textSource = UIManagers->Texts;
+	std::pmr::vector<TextComponent*> textComponents{ &m_frameMemoryResource };
+	textComponents.assign(textSource.begin(), textSource.end());
+
+	const auto& spriteSheetSource = UIManagers->SpriteSheets;
+	std::pmr::vector<SpriteSheetComponent*> spriteComponents{ &m_frameMemoryResource };
+	spriteComponents.assign(spriteSheetSource.begin(), spriteSheetSource.end());
+
+	const auto& decalSource = m_currentScene->GetDecalComponents();
+	std::pmr::vector<DecalComponent*> decalComponents{ &m_frameMemoryResource };
+	decalComponents.assign(decalSource.begin(), decalSource.end());
 	PROFILE_CPU_END();
 
 	PROFILE_CPU_BEGIN("UpdateCommand");
 	if (!textComponents.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, texts = std::move(textComponents)]
+		const auto textSpan = std::span<TextComponent* const>{ textComponents.data(), textComponents.size() };
+		m_threadPool->Enqueue([&, renderScene, textSpan]
 		{
-			for (auto& text : texts)
+			for (TextComponent* text : textSpan)
 			{
 				auto owner = text->GetOwner();
 				if (nullptr == owner) continue;
@@ -1209,9 +1234,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!imageComponents.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, images = std::move(imageComponents)]
+		const auto imageSpan = std::span<ImageComponent* const>{ imageComponents.data(), imageComponents.size() };
+		m_threadPool->Enqueue([&, renderScene, imageSpan]
 		{
-			for (auto& image : images)
+			for (ImageComponent* image : imageSpan)
 			{
 				auto owner = image->GetOwner();
 				if (nullptr == owner) continue;
@@ -1233,9 +1259,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!spriteComponents.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, sprites = std::move(spriteComponents)]
+		const auto spriteComponentSpan = std::span<SpriteSheetComponent* const>{ spriteComponents.data(), spriteComponents.size() };
+		m_threadPool->Enqueue([&, renderScene, spriteComponentSpan]
 		{
-			for (auto& sprite : sprites)
+			for (SpriteSheetComponent* sprite : spriteComponentSpan)
 			{
 				auto owner = sprite->GetOwner();
 				if (nullptr == owner) continue;
@@ -1258,9 +1285,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!terrainComponents.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, terrains = std::move(terrainComponents)]
+		const auto terrainSpan = std::span<TerrainComponent* const>{ terrainComponents.data(), terrainComponents.size() };
+		m_threadPool->Enqueue([&, renderScene, terrainSpan]
 		{
-			for (auto& terrain : terrains)
+			for (TerrainComponent* terrain : terrainSpan)
 			{
 				try
 				{
@@ -1276,9 +1304,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!allMeshes.empty())
 	{
-		m_threadPool->Enqueue([&, meshes = std::move(allMeshes)]
+		const auto meshSpan = std::span<MeshRenderer* const>{ allMeshes.data(), allMeshes.size() };
+		m_threadPool->Enqueue([&, meshSpan]
 		{
-			for (auto& mesh : meshes)
+			for (MeshRenderer* mesh : meshSpan)
 			{
 				if (!mesh) continue;
 				try
@@ -1295,9 +1324,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!foliageComponents.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, foliages = std::move(foliageComponents)]
+		const auto foliageSpan = std::span<FoliageComponent* const>{ foliageComponents.data(), foliageComponents.size() };
+		m_threadPool->Enqueue([&, foliageSpan]
 		{
-			for (auto& foliage : foliages)
+			for (FoliageComponent* foliage : foliageSpan)
 			{
 				try
 				{
@@ -1313,9 +1343,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!decalComponents.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, decals = std::move(decalComponents)]
+		const auto decalSpan = std::span<DecalComponent* const>{ decalComponents.data(), decalComponents.size() };
+		m_threadPool->Enqueue([&, decalSpan]
 		{
-			for (auto& decal : decals)
+			for (DecalComponent* decal : decalSpan)
 			{
 				try
 				{
@@ -1331,9 +1362,10 @@ void SceneRenderer::PrepareRender()
 
 	if (!spriteRenderers.empty())
 	{
-		m_threadPool->Enqueue([&, renderScene, sprites = std::move(spriteRenderers)]
+		const auto spriteRendererSpan = std::span<SpriteRenderer* const>{ spriteRenderers.data(), spriteRenderers.size() };
+		m_threadPool->Enqueue([&, renderScene, spriteRendererSpan]
 		{
-			for (auto& sprite : sprites)
+			for (SpriteRenderer* sprite : spriteRendererSpan)
 			{
 				auto owner = sprite->GetOwner();
 				if (nullptr == owner) continue;

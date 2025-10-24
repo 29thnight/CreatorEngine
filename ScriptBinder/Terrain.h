@@ -20,25 +20,25 @@ class TerrainComponent : public Component, public RegistableEvent<TerrainCompone
 {
 public:
     ReflectTerrainComponent
-    [[Serializable(Inheritance:Component)]]
-    TerrainComponent();
+        [[Serializable(Inheritance:Component)]]
+        TerrainComponent();
     virtual ~TerrainComponent() = default;
 
-    [[Property]] 
+    [[Property]]
     int m_width{ 100 };
-    [[Property]] 
+    [[Property]]
     int m_height{ 100 };
 
     // 초기화
     void Initialize();
-    
-	// 가로 세로 크기 변경
+
+    // 가로 세로 크기 변경
     void Resize(int newWidth, int newHeight);
 
     virtual void Awake() override;
     virtual void OnDestroy() override;
 
-	//에디터 save/load
+    //에디터 save/load
     void Save(const std::wstring& assetRoot, const std::wstring& name);
     bool Load(const std::wstring& filePath);
 
@@ -58,37 +58,37 @@ public:
     //레이어 정보 업데이트
     void UpdateLayerDesc();
 
-	//layer 관련 함수 -> m_layers 벡터에 추가/삭제 m_pMaterial->다시로드
-	void AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling);
+    //layer 관련 함수 -> m_layers 벡터에 추가/삭제 m_pMaterial->다시로드
+    void AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling);
     void RemoveLayer(uint32_t layerID);
-	void ClearLayers();
+    void ClearLayers();
 
     void RefreshTexture();
 
     std::vector<TerrainLayer> GetLayerCount() const { return m_layers; }
-	TerrainLayer* GetLayerDesc(uint32_t layerID)
-	{
-		for (auto& desc : m_layers)
-		{
-			if (desc.m_layerID == layerID)
-			{
-				return &desc;
-			}
-		}
-		return nullptr; // 해당 레이어 ID가 없을 경우 nullptr 반환
-		//throw std::runtime_error("Layer ID not found");
-	}
+    TerrainLayer* GetLayerDesc(uint32_t layerID)
+    {
+        for (auto& desc : m_layers)
+        {
+            if (desc.m_layerID == layerID)
+            {
+                return &desc;
+            }
+        }
+        return nullptr; // 해당 레이어 ID가 없을 경우 nullptr 반환
+        //throw std::runtime_error("Layer ID not found");
+    }
 
-	std::vector<const char*> GetLayerNames()
-	{
-		m_layerNames.clear(); // 이전 이름들 초기화
-		for (const auto& desc : m_layers)
-		{
-			m_layerNames.push_back(desc.layerName.c_str());
-		}
-		return m_layerNames;
-	}
-    	
+    std::vector<const char*> GetLayerNames()
+    {
+        m_layerNames.clear(); // 이전 이름들 초기화
+        for (const auto& desc : m_layers)
+        {
+            m_layerNames.push_back(desc.layerName.c_str());
+        }
+        return m_layerNames;
+    }
+
     // 현재 브러시 정보 저장/반환
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
@@ -104,28 +104,23 @@ public:
 
     // Mesh 접근자
     std::shared_ptr<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }
-	TerrainMaterial* GetMaterial() const { return m_pMaterial; }
+    TerrainMaterial* GetMaterial() const { return m_pMaterial; }
 
     uint32 GetSelectedLayerId() const { return m_selectedLayerID; }
     void SetSelectedLayerId(uint32 layerId) { m_selectedLayerID = layerId; }
-
-    using PmrFloatVector = std::pmr::vector<float>;
-    using PmrLayerWeightMap = std::pmr::vector<PmrFloatVector>;
 
 private:
 
     void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
     bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
-    bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, PmrFloatVector& out);
 
     void SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex);
     bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
     bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
-    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, PmrLayerWeightMap& out);
-    bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, PmrLayerWeightMap& out);
+
 public:
     [[Property]]
-	FileGuid m_trrainAssetGuid{};// 에셋 가이드
+    FileGuid m_trrainAssetGuid{};// 에셋 가이드
     std::wstring m_terrainTargetPath{};
 
 private:
@@ -137,8 +132,8 @@ private:
     std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
-    
-	std::shared_ptr<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
+
+    std::shared_ptr<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
     //TerrainMesh* m_pMesh{ nullptr };
     TerrainMaterial* m_pMaterial{ nullptr }; // 지형 재질 layer의 => texture, 셰이더 등
     TerrainBrush* m_currentBrush{ nullptr };
@@ -155,7 +150,7 @@ private:
     //== 에디터 전용
     uint32                               m_nextLayerID{ 0 }; // 다음 레이어 ID
     //== window 공용으로 사용 불가능
-	std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
+    std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
     uint32 m_terrainID{ 0 }; // 지형 ID
 
 public:
