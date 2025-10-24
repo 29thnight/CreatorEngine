@@ -146,7 +146,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -375,7 +375,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 1,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
