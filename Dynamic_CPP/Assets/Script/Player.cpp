@@ -1666,7 +1666,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 
 	std::vector<HitResult>  forwardhits;
 	float forwardDistance = std::max(std::abs(bombThrowPositionoffset.x), std::abs(bombThrowPositionoffset.z));
-	unsigned int forwardLayerMask = 1 << 11;
+	unsigned int forwardLayerMask = 1 << 15;
 	int size = RaycastAll(forwardRayOrgion, targetdir,forwardDistance, forwardLayerMask, forwardhits);
 	float min = 0;
 	for (auto& forwardHit : forwardhits)
