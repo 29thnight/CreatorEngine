@@ -29,6 +29,10 @@ void EntityResource::Start()
 
 	m_currentHP = maxHP;
 	HitImpulseStart();
+	auto newEffect = SceneManagers->GetActiveScene()->CreateGameObject("effect", GameObjectType::Empty, GetOwner()->m_index);
+	m_effect = newEffect->AddComponent<EffectComponent>();
+	m_effect->m_effectTemplateName = "resourceView";
+	m_effect->Apply();
 }
 
 void EntityResource::Update(float tick)

@@ -158,6 +158,7 @@ void AnimationJob::Update(float deltaTime)
                 AnimationController* animationcontroller = nullptr;
                 if (animator->m_animationControllers.empty()) //아예없으면
                 {
+                    if (skeleton->m_animations.empty()) return;
                     Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
                     animator->m_TimeElapsed += delta * animation.m_ticksPerSecond;
 
@@ -196,6 +197,7 @@ void AnimationJob::Update(float deltaTime)
                 else //한개만 있으면
                 {
                     animationcontroller = animator->m_animationControllers[0].get();
+                    if (skeleton->m_animations.empty()) return;
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += delta * animation.m_ticksPerSecond;
                     //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;

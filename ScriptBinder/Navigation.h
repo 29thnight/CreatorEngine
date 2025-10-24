@@ -60,3 +60,10 @@ cbuffer ImageInfo
 	float2 size;
 	float2 screenSize;
 };
+
+enum class TextAlignment : std::uint8_t
+{
+	Left,
+	Center,
+};
+AUTO_REGISTER_ENUM(TextAlignment);

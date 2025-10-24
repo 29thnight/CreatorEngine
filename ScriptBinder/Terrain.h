@@ -109,15 +109,20 @@ public:
     uint32 GetSelectedLayerId() const { return m_selectedLayerID; }
     void SetSelectedLayerId(uint32 layerId) { m_selectedLayerID = layerId; }
 
+    using PmrFloatVector = std::pmr::vector<float>;
+    using PmrLayerWeightMap = std::pmr::vector<PmrFloatVector>;
+
 private:
 
     void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
     bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
+    bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, PmrFloatVector& out);
 
     void SaveEditorSplatMap(const std::wstring& pngPath, int layerIndex);
     bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
     bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
-
+    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, PmrLayerWeightMap& out);
+    bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, PmrLayerWeightMap& out);
 public:
     [[Property]]
 	FileGuid m_trrainAssetGuid{};// 에셋 가이드

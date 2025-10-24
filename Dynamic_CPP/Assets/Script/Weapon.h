@@ -27,6 +27,7 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void Initialize();
+	void Initialize(int _curDur);
 	void SetEnabled(bool able);
 	ItemType GetItemType() { return itemType; }
 	//기본무기 검사(내구도 없음)

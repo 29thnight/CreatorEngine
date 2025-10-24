@@ -2,13 +2,16 @@
 #include "Core.Minimal.h"
 #include "ItemInfo.h"
 #include "DLLAcrossSingleton.h"
+#include "PlayGameData.h"
+#include "SoundName.h"
 //input device
 static constexpr int MAX_INPUT_DEVICE = 2;
 enum class CharType { None = 0, Man = 1, Woman = 2 };
 enum class PlayerDir { None = 0, Left = 1, Right = 2 };
-enum class SceneType { Bootstrap, SelectChar, Loading, Stage, Tutorial, Boss, Credits };
+enum class SceneType { Bootstrap, SelectChar, Loading, Stage, Tutorial, Boss, Credits, GameOver };
 
 class EventManager;
+class PlayGameData;
 class GameInstance : public DLLCore::Singleton<GameInstance>
 {
 private:
@@ -29,13 +32,19 @@ public:
 	bool IsLoadSceneComplete() const { return m_isLoadSceneComplete; }
 	int GetAfterLoadSceneIndex() const { return m_beyondSceneIndex; }
 	void SetAfterLoadSceneIndex(int type = 0) { m_beyondSceneIndex = type; }
-	void ExitGame();
 
 public:
 	//Scene Management(NEW)
 	void LoadSettingedScene(int sceneType);
 	void SwitchSettingedScene(int sceneType);
+	void ReloadPrevScene() { LoadSettingedScene(static_cast<int>(m_prevSceneType)); }
+	void SwitchToPrevScene() { SwitchSettingedScene(static_cast<int>(m_prevSceneType)); }
 	int GetCurrentSceneType() const { return static_cast<int>(m_currentSceneType); }
+	int GetPrevSceneType() const { return static_cast<int>(m_prevSceneType); }
+	void SetCurrentSceneType(int sceneType) { m_currentSceneType = static_cast<SceneType>(sceneType); }
+	void PauseGame();
+	void ResumeGame();
+	void ExitGame();
 
 public:
 	// Input Device Management
@@ -76,7 +85,8 @@ public:
 	void RemoveItemEnhancement(const ItemInfo& info);
 	bool HasApplied(int itemId, int rarity) const;
 	std::vector<ItemInfo> PickRandomUnappliedItems(int count);
-
+	PlayGameData*         GetPlayData() { return &m_playData;}
+	SoundNames*           GetSoundName(){ return &m_soundName;}
 public:
 	// Game Setting
 	bool IsViveEnabled() const { return m_isViveEnabled; }
@@ -100,6 +110,7 @@ private:
 	// 로딩 이후 전환 씬 인덱스 관리용
 	int												m_beyondSceneIndex{ 0 };
 	SceneType										m_currentSceneType{ SceneType::Bootstrap };
+	SceneType										m_prevSceneType{ SceneType::Bootstrap };
 
 private:
 	// 로드된 씬들을 저장하는 맵
@@ -111,7 +122,8 @@ private:
 	// 오른쪽 왼쪽 UI 구분용 Left: 0, Right: 1
 	PlayerInputDiviceArr							m_playerInputDevices;
 	std::future<Scene*>								m_loadingSceneFuture;
-
+	PlayGameData                                    m_playData;
+	SoundNames                                      m_soundName;
 private:
 	using ItemInfoMap = std::unordered_map<ItemUniqueID, ItemInfo, ItemUniqueIDHash>;
 	// Item Info Management

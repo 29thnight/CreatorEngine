@@ -474,6 +474,7 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
 	if (iter == renderScene->m_uiProxyMap.end() || !iter->second) return;
 	std::weak_ptr<UIRenderProxy> weakProxyObject = iter->second->shared_from_this();
 
+	pComponent->m_textMeasureSize = weakProxyObject.lock()->m_textMeasureSize;
 	auto font = pComponent->font;
 	auto message = pComponent->message;
     auto color = pComponent->color;
@@ -488,9 +489,11 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
     auto maxSize = pComponent->stretchSize;
     bool stretchX = pComponent->isStretchX;
     bool stretchY = pComponent->isStretchY;
+	auto alignment = pComponent->GetHorizontalAlignment();
 	bool isEnable = owner->IsEnabled();
 
-    m_updateFunction = [weakProxyObject, canvasOrder, isEnable, font, message, color, position, fontSize, layerOrder, maxSize, stretchX, stretchY]()
+    m_updateFunction = [weakProxyObject, canvasOrder, isEnable, font, message, 
+		color, position, fontSize, layerOrder, maxSize, stretchX, stretchY, alignment]()
     {
         if (auto proxyObject = weakProxyObject.lock())
         {
@@ -505,6 +508,7 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
             data.maxSize = maxSize;
             data.stretchX = stretchX;
             data.stretchY = stretchY;
+			data.alignment = alignment;
             proxyObject->m_data = std::move(data);
             proxyObject->m_isEnabled = isEnable;
         }

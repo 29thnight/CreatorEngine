@@ -23,7 +23,7 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 1.0,
+                                "w": 0.19607843458652496,
                                 "x": 1.0,
                                 "y": 1.0,
                                 "z": 1.0
@@ -73,27 +73,27 @@
                             {
                                 "color": {
                                     "w": 0.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
+                                    "x": 0.4274509847164154,
+                                    "y": 0.4274509847164154,
+                                    "z": 0.4274509847164154
                                 },
                                 "time": 0.0
                             },
                             {
                                 "color": {
-                                    "w": 0.9960784316062927,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
+                                    "w": 0.5882353186607361,
+                                    "x": 0.4274509847164154,
+                                    "y": 0.4274509847164154,
+                                    "z": 0.4274509847164154
                                 },
                                 "time": 0.03099999949336052
                             },
                             {
                                 "color": {
                                     "w": 0.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
+                                    "x": 0.4274509847164154,
+                                    "y": 0.4274509847164154,
+                                    "z": 0.4274509847164154
                                 },
                                 "time": 0.699999988079071
                             }
@@ -227,7 +227,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -239,10 +239,10 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 1.0,
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "w": 0.3921568691730499,
+                                "x": 0.4274509847164154,
+                                "y": 0.4274509847164154,
+                                "z": 0.4274509847164154
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
@@ -297,9 +297,9 @@
                         "impulses": [
                             {
                                 "direction": {
-                                    "x": -1.0,
+                                    "x": 0.0,
                                     "y": 0.0,
-                                    "z": 0.0
+                                    "z": 1.0
                                 },
                                 "duration": 0.10000000149011612,
                                 "force": 20.0,
@@ -309,7 +309,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 117.58722686767578,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -375,12 +375,12 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 1,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
                             "pixelShader": "RandomSpriteM",
-                            "vertexShader": "BillBoard"
+                            "vertexShader": "BillBoardRotate"
                         },
                         "spriteAnimation": {
                             "animationDuration": 0.0,

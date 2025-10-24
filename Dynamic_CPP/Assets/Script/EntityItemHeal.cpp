@@ -1,8 +1,15 @@
 #include "EntityItemHeal.h"
 #include "pch.h"
 #include "RigidBodyComponent.h"
+#include "EffectComponent.h"
 void EntityItemHeal::Start()
 {
+
+
+	auto newEffect = SceneManagers->GetActiveScene()->CreateGameObject("effect", GameObjectType::Empty, GetOwner()->m_index);
+	m_effect = newEffect->AddComponent<EffectComponent>();
+	m_effect->m_effectTemplateName = "resourceView";
+	m_effect->Apply();
 	
 }
 

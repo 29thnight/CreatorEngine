@@ -115,6 +115,14 @@ public:
         return CSVCell(m_row[it->second]);
     }
 
+    CSVCell operator[](const int _index) const
+    {
+        if (_index >= m_row.size())
+            throw std::out_of_range("Index out of range");
+        return CSVCell(m_row[_index]);
+    }
+
+    int GetSize() const { return m_row.size(); }
 private:
     const std::vector<std::string>& m_row;
     const std::unordered_map<std::string, std::size_t>& m_headerMap;

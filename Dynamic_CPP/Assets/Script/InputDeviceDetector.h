@@ -61,6 +61,7 @@ private:
 
 	bool m_isSelectComplete{ false };
 	bool m_isLeaveSelectScene{ false };
+	bool m_isApply{ false };
 
 	CharType charType{};
 	PlayerDir dir{};

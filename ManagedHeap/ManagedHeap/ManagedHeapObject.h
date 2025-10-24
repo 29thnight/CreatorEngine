@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <utility>
 #include <concepts>
+#include <string>
 #include "MemoryManager.h"
 
 namespace Managed
@@ -44,11 +45,14 @@ namespace Managed
     };
 }
 
-
 // 1. Custom allocator that uses MyAlloc/MyFree
 template<typename T>
 struct MyAllocator {
     using value_type = T;
+    using propagate_on_container_move_assignment = std::true_type;
+    using propagate_on_container_copy_assignment = std::true_type;
+    using propagate_on_container_swap = std::true_type;
+    using is_always_equal = std::true_type; // 상태가 없다면 true
 
     MyAllocator() = default;
 

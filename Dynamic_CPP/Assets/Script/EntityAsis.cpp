@@ -8,6 +8,7 @@
 #include "InputActionManager.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
+#include "KoriEmoteSystem.h"
 
 #include "Animator.h"
 #include "Player.h"
@@ -55,6 +56,11 @@ void EntityAsis::Start()
 		}
 	}
 
+	auto emoteObj = GameObject::Find("KoriEmoteSystem");
+	if (emoteObj)
+	{
+		m_emoteSystem = emoteObj->GetComponent<KoriEmoteSystem>();
+	}
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
@@ -88,7 +94,8 @@ void EntityAsis::Start()
 
 
 
-
+	m_maxHP = maxHP;
+	m_currentHP = m_maxHP;
 
 
 
@@ -115,7 +122,7 @@ void EntityAsis::Start()
 	}
 
 	HitImpulseStart();
-
+	
 #ifdef _DEBUG
 	DebugPoint = GameObject::Find("DebugPoint");
 #endif // _DEBUG
@@ -140,15 +147,6 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 			}
 		}
 	}
-
-	// 몬스터와 닿았을 때 회피 방향 설정
-	if ((collision.otherObj->m_collisionType | 1 << 10) > 0) {
-		Mathf::Vector3 targetToward = collision.otherObj->m_transform.GetWorldPosition() - GetOwner()->m_transform.GetWorldPosition();
-		Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
-		float dot = forward.Dot(targetToward);
-		if (dot > 0.f)
-			evasionDirection = Mathf::Vector3::Reflect(targetToward, forward);
-	}
 }
 
 void EntityAsis::OnCollisionEnter(const Collision& collision)
@@ -170,15 +168,6 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 			}
 		}
 	}
-
-	// 몬스터와 닿았을 때 회피 방향 설정
-	if ((collision.otherObj->m_collisionType | 1 << 10) > 0) {
-		Mathf::Vector3 targetToward = collision.otherObj->m_transform.GetWorldPosition() - GetOwner()->m_transform.GetWorldPosition();
-		Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
-		float dot = forward.Dot(targetToward);
-		if (dot > 0.f)
-			evasionDirection = Mathf::Vector3::Reflect(targetToward, forward);
-	}
 }
 
 void EntityAsis::Update(float tick)
@@ -189,6 +178,18 @@ void EntityAsis::Update(float tick)
 
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
 		SendDamage(nullptr, 10);
+	}
+	if(isStun)
+	{
+		if (CheckResurrectionByPlayer() == true)
+		{
+			ResurrectionElapsedTime += tick;
+			if (ResurrectionElapsedTime >= ResurrectionTime)
+			{
+				Resurrection();
+			}
+		}
+		
 	}
 
 	bool isBigWoodDetect = CheckBigWood();
@@ -229,6 +230,7 @@ void EntityAsis::Update(float tick)
 
 void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (isStun) return;
 	if (m_currentGracePeriod > 0.f) {
 		// 무적이지만 히트 사운드나 별도 처리시 여기서 처리.
 		return;
@@ -239,13 +241,18 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	m_currentGracePeriod = graceperiod;			// 무적
 	m_currentTailPurificationDuration = 0.f;	// 진행중인 정화 취소
 	HitImpulse();
-
+	if(m_emoteSystem)
+	{
+		m_emoteSystem->PlaySick();
+	}
 	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
 	bool isDroped = DropItem();
 
 	LOG("EntityAsis: Current HP: " << m_currentHP);
 	if(m_currentHP <= 0)
 	{
+		isStun = true;
+		//스턴 이펙트 or 애니메이션 같은거 따로 추가되는지 체크
 		// 스턴
 	}
 }
@@ -316,6 +323,11 @@ void EntityAsis::Purification(float tick)
 
 			// 재화 지급
 			AddPollutionGauge(item->itemReward);
+			// 정화 이모트 재생
+			if (m_emoteSystem)
+			{
+				m_emoteSystem->PlaySmile();
+			}
 
 			// 이부분은 아이템에 등록된 정화무기가 될것.
 			auto player = item->GetThrowOwner();
@@ -333,6 +345,7 @@ void EntityAsis::Purification(float tick)
 
 bool EntityAsis::PathMove(float tick)
 {
+	if (isStun == true) return false;
 	int pathSize = points.size();
 	if (pathSize == 0) return false;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;
@@ -343,8 +356,6 @@ bool EntityAsis::PathMove(float tick)
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
 	Vector3 dir = Mathf::Normalize(points[nextPointIndex] - points[currentPointIndex]);
-	dir = Mathf::Normalize(dir + evasionDirection);
-	evasionDirection = Mathf::Vector3::Zero;
 	Vector3 endResult = points[nextPointIndex] - dir * m_pathEndRadius;
 	Vector3 startResult = points[currentPointIndex] + dir * m_pathEndRadius;
 	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
@@ -399,6 +410,11 @@ bool EntityAsis::PathMove(float tick)
 
 void EntityAsis::Stun()
 {
+	// 스턴 이모트 재생
+	if (m_emoteSystem)
+	{
+		m_emoteSystem->PlayStunned();
+	}
 }
 
 bool EntityAsis::DropItem()
@@ -460,6 +476,46 @@ EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 	return purificationItem;
 }
 
+bool EntityAsis::CheckResurrectionByPlayer()
+{
+	std::vector<HitResult> hits;
+	OverlapInput reviveInfo;
+	Transform transform = GetOwner()->m_transform;
+	reviveInfo.layerMask = 1 << 5; //Player만 체크
+	reviveInfo.position = transform.GetWorldPosition();
+	reviveInfo.rotation = transform.GetWorldQuaternion();
+	PhysicsManagers->SphereOverlap(reviveInfo, ResurrectionRange, hits);
+
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == GetOwner()) continue;
+
+		auto otehrPlayer = object->GetComponent<Player>();
+		if (otehrPlayer && otehrPlayer->isStun == false)
+			return true;
+
+	}
+
+	return false;
+}
+
+void EntityAsis::Resurrection()
+{
+	Heal(ResurrectionHP);
+	isStun = false;
+	ResurrectionElapsedTime = 0;
+	if (m_emoteSystem)
+	{
+		m_emoteSystem->PlayHappy();
+	}
+}
+
+void EntityAsis::Heal(int _heal)
+{
+	m_currentHP = std::min(m_currentHP + _heal, m_maxHP);
+}
+
 void EntityAsis::AddPollutionGauge(int amount)
 {
 	m_currentPollutionGauge += amount;
@@ -479,4 +535,9 @@ void EntityAsis::AddPollutionGauge(int amount)
 			gm->AddReward(reward);
 		}
 	}
+}
+
+bool EntityAsis::IsStun()
+{
+	return isStun;
 }

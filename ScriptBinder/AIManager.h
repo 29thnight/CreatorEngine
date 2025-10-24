@@ -77,6 +77,21 @@ public:
 		return m_btConditionDecoratorNodeNames;
 	}
 
+	std::shared_ptr<BTBuildGraph> GetBTBuildGraphCache(const FileGuid& fileGuid)
+	{
+		auto it = m_btBuildGraphCache.find(fileGuid);
+		if (it != m_btBuildGraphCache.end())
+		{
+			return it->second;
+		}
+		return nullptr;
+	}
+
+	void SetBTBuildGraphCache(const FileGuid& fileGuid, std::shared_ptr<BTBuildGraph> graph)
+	{
+		m_btBuildGraphCache[fileGuid] = graph;
+	}
+
 private:
 	friend class HotLoadSystem;
 
@@ -89,6 +104,7 @@ private:
 	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용
 	plf::colony<BlackBoard> m_blackBoards;
 	plf::colony<std::pair<std::weak_ptr<GameObject>, IAIComponent*>> m_aiComponentMap; // GameObject와 AI 컴포넌트 매핑
+	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 
 static auto& AIManagers = AIManager::GetInstance();

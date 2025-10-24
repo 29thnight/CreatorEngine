@@ -21,7 +21,5 @@ void TestEffect::Update(float tick)
 	{
 		m_Effect->GetComponent<EffectComponent>()->Apply();
 	}
-	
-	
 }
 

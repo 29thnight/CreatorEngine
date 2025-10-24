@@ -38,20 +38,26 @@ public:
 	[[Method]]
 	void SwitchNextScene();
 	[[Method]]
+	void LoadPrevScene();
+	[[Method]]
+	void SwitchPrevScene();
+	[[Method]]
 	void SwitchNextSceneWithFade();
+	[[Method]]
+	void SwitchPrevSceneWithFade();
 	[[Method]]
 	void LoadImidiateNextScene();
 	[[Property]]
-	int m_prevSceneIndex{ 0 };
+	int			m_prevSceneIndex{ 0 };
 	[[Property]]
-	int m_nextSceneIndex{ 0 };
+	int			m_nextSceneIndex{ 0 };
 	[[Property]]
-	bool						m_isTestReward{ false };
-	bool						m_isLoadingReq{ false };
-	bool						startSelectTimer{ false };
-	bool						m_isSwitching = false;             // 중복 트리거 방지
-	int							selectPlayerCount{};
-	GameObject*					testCamera = nullptr;
+	bool		m_isTestReward{ false };
+	bool		m_isLoadingReq{ false };
+	bool		startSelectTimer{ false };
+	bool		m_isSwitching = false;
+	int			selectPlayerCount{};
+	GameObject*	testCamera = nullptr;
 	// ~Test for Scene Management
 public:
 	void PushEntity(Entity* entity);
@@ -113,7 +119,8 @@ private:
 public:
 	class SceneTransitionUI*	m_sceneTransitionUI{ nullptr };
 	float						displayPollutionGaugeRatio{}; //테스트 용
-	float						m_fadeInDuration = 0.3f;          // 필요시 인스펙터/ini로
+	float						m_fadeInDuration = 0.3f; // 필요시 인스펙터/ini로
 	bool						TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
+	bool						m_isGameOver = false;
 };
 
