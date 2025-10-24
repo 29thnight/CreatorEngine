@@ -19,6 +19,9 @@
 #include "WeaponCapsule.h"
 #include "DebugLog.h"
 #include "Core.Random.h"
+#include "EntityBigWood.h"
+#include "EntityMonsterBaseGate.h"
+#include "EntityMonsterTower.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -219,6 +222,10 @@ void EntityAsis::Update(float tick)
 			{
 				m_animator->SetParameter("OnMove", false);
 			}
+		}
+		else
+		{
+			m_animator->SetParameter("OnMove", false);
 		}
 		m_purificationAngle += tick * 5.f;
 		Purification(tick);
@@ -441,9 +448,24 @@ int EntityAsis::CheckBigWood()
 {
 	std::vector<HitResult> hits;
 	OverlapInput info;
-	info.layerMask = 1 << 8;
+	info.layerMask = 1 << 8 | 1 << 14;
 	info.position = GetOwner()->m_transform.GetWorldPosition();
-	int count = PhysicsManagers->SphereOverlap(info, bigWoodDetectRadius, hits);
+	int count = 0;
+	PhysicsManagers->SphereOverlap(info, bigWoodDetectRadius, hits);
+	for (auto& hit : hits)
+	{
+		if (hit.gameObject->GetComponentDynamicCast<EntityBigWood>() != nullptr)
+		{
+			count++;
+			break;
+		}
+		
+		if (hit.gameObject->GetComponentDynamicCast<EntityMonsterBaseGate>() != nullptr)
+		{
+			count++;
+			break;
+		}
+	}
 	return count;
 }
 
@@ -514,6 +536,11 @@ void EntityAsis::Resurrection()
 void EntityAsis::Heal(int _heal)
 {
 	m_currentHP = std::min(m_currentHP + _heal, m_maxHP);
+}
+
+void EntityAsis::SetCurHP(int hp)
+{
+	m_currentHP = hp;
 }
 
 void EntityAsis::AddPollutionGauge(int amount)

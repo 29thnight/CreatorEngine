@@ -7,7 +7,8 @@
 class SoundNames
 {
 public:
-
+	SoundNames();
+	~SoundNames();
 	void LoadSoundNameFromCSV();
 	//해당 태그에 있는 사운드이름중 하나
 	std::string GetSoudNameRandom(const std::string& soundTag); 

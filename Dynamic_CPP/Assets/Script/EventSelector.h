@@ -32,7 +32,10 @@ private:
 	ImageComponent*         m_iconComponent{ nullptr };
     ImageComponent*         m_chkboxIconComponent{ nullptr };
     ImageComponent*         m_chkIconComponent{ nullptr };
+	RectTransformComponent* m_textRectTransform{ nullptr };
     RectTransformComponent* m_rectTransform{ nullptr };
+	RectTransformComponent* m_chkboxRectTransform{ nullptr };
+	RectTransformComponent* m_chkIconRectTransform{ nullptr };
 
     //EffectComponent*      m_effectComponent{ nullptr };
 
@@ -44,8 +47,9 @@ private:
     [[Property]]
     float m_slideOutDuration{ 0.25f };
     [[Property]]
-    float m_hiddenOffset{ 420.f };
+    float m_hiddenOffset{ 910.f };
     float m_stateTimer{ 0.f };
+	float m_effectTimer{ 0.f };
 
     bool m_effectPlayed{ false };
     bool m_initializedPositions{ false };
@@ -61,6 +65,7 @@ private:
     Mathf::Vector2 m_hiddenPosition{};
     Mathf::Vector2 m_animStartPos{};
     Mathf::Vector2 m_animTargetPos{};
+	Mathf::Vector2 m_bgSize{ 400.f, 47.f };
 
     Mathf::Color4 m_baseImageColor{ 1.f, 1.f, 1.f, 1.f };
     Mathf::Color4 m_baseTextColor{ 1.f, 1.f, 1.f, 1.f };

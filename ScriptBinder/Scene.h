@@ -236,12 +236,14 @@ private:
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
     void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive = false);
+	void UpdateUIRecursive(GameObject::Index objIndex, bool recursive = false);
 
 private:
 	void SetInternalPhysicData();
 
 public:
     void AllUpdateWorldMatrix();
+	void AllUIUpdateWorldMatrix();
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};

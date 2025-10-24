@@ -18,6 +18,8 @@
 #include "Weapon.h"
 void EntityMonsterA::Start()
 {
+	m_currentHP = maxHP;
+	m_maxHP = maxHP;
 	auto canvObj = GameObject::Find("Canvas");
 	Prefab* HPBarPrefab = PrefabUtilitys->LoadPrefab("UI_HPBarBg");
 	if (HPBarPrefab && canvObj)
@@ -26,8 +28,7 @@ void EntityMonsterA::Start()
 		HPBar* hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
-		m_currentHP = m_currHP;
-		m_maxHP = m_maxHP;
+		m_currentHP = m_maxHP;
 		hp->SetMaxHP(m_maxHP);
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
@@ -91,17 +92,7 @@ void EntityMonsterA::Start()
 		}
 	}
 
-	for (auto& child : childred)
-	{
-		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
 
-		if (criticalmark)
-		{
-			markEffect = criticalmark;
-			break;
-		}
-
-	}
 
 	GameObject* GMObj = GameObject::Find("GameManager");
 	GameManager* GM = nullptr;
@@ -109,7 +100,6 @@ void EntityMonsterA::Start()
 	{
 		 GM = GMObj->GetComponent<GameManager>();
 	}
-	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
@@ -269,9 +259,9 @@ void EntityMonsterA::Update(float tick)
 		if (count > 0) {
 			for (auto& hit : hitResults) {
 				//std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-				if (hit.gameObject->GetHashedName().ToString() == m_player1->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString() == m_asis->GetHashedName().ToString()) //player
+				if (hit.gameObject->GetHashedName() == m_player1->GetHashedName()
+					|| hit.gameObject->GetHashedName() == m_player2->GetHashedName()
+					|| hit.gameObject->GetHashedName() == m_asis->GetHashedName()) //player
 				{
 					//std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();
@@ -305,17 +295,41 @@ void EntityMonsterA::Update(float tick)
 		}
 	}
 
+	if (isDead)
+	{
+		deadBugElaspedTime += tick;
+		if (deadBugElaspedTime >= deadBugTime)
+		{
+			if (false == GetOwner()->IsDestroyMark())
+			{
+				GetOwner()->Destroy();
+				if (deadObj)
+				{
+					deadObj->SetEnabled(true);
+					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					deadPos.y += 0.7f;
+					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+					deadEffect->Initialize();
+				}
+			}
+		}
+	}
+
+
 	bool haskey = blackBoard->HasKey("IsAttacking");
 	if (haskey) {
 		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
 	}
 	
+	Benchmark bm;
 	if (m_state == "Chase") {
 		m_animator->SetParameter("Move", true);
 	}
 	else {
 		m_animator->SetParameter("Move", false);
 	}
+	std::cout << "MonsterA State Time : " << bm.GetElapsedTime() << std::endl;
 
 	//피격 흔들림 처리
 	if (hittimer > 0.f) {

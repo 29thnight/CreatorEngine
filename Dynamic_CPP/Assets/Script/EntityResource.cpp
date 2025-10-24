@@ -14,7 +14,6 @@
 #include "Weapon.h"
 void EntityResource::Start()
 {
-	m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
 
 	auto owner = GetOwner();
 	auto childred = owner->m_childrenIndices;

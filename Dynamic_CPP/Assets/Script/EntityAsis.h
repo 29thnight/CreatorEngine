@@ -123,6 +123,7 @@ private:
 	void Resurrection();
 	void Heal(int _heal);
 public:
+	void SetCurHP(int hp);
 	void AddPollutionGauge(int amount);
 	bool IsStun();
 	// Move (Path)

@@ -4,7 +4,7 @@
 
 class Weapon;
 class Player;
-class Asis;
+class EntityAsis;
 
 struct WeaponData
 {
@@ -45,7 +45,7 @@ public:
 	void SavePlayerData(Player* player);  //보스씬가기전에 현재 상태저장
 	void LoadPlayerData(int _playerIndex); //보스씬등 도착시 데이터 로드
 
-	void SaveAsisData(Asis* asis);
+	void SaveAsisData(EntityAsis* asis);
 	void LoadAsisData();
 };
 

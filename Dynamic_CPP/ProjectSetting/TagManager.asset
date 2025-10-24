@@ -18,7 +18,6 @@ tags:
   - Asis
   - Host
   - Target
-  - Ground
 layers:
   - Default
   - TransparentFX
@@ -35,3 +34,4 @@ layers:
   - PlayerBullet
   - EnemyBullet
   - EnemyHome
+  - Ground

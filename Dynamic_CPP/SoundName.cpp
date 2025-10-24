@@ -83,6 +83,14 @@
 //
 //};
 
+SoundNames::SoundNames()
+{
+}
+
+SoundNames::~SoundNames()
+{
+}
+
 void SoundNames::LoadSoundNameFromCSV()
 {
 	soundMap.clear();

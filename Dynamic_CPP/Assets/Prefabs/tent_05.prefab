@@ -1,0 +1,116 @@
+m_name: tent_05
+m_instanceID: 165835789
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: tent_05
+    m_instanceID: 1415953971
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 219.166092, y: 0, z: 27.7792912, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 0.5, y: 0.5, z: 0.5, w: 0}
+      m_parentID: 256
+    m_index: 1029
+    m_parentIndex: 256
+    m_rootIndex: 0
+    m_collisionType: 11
+    m_prefabFileGuid: 3a151a90-b36f-5009-af53-4ab15c9f5079
+    m_childrenIndices: [1030]
+    m_tag: Untagged
+    m_layer: Rock
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_instanceID: 1807433343
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: false
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_instanceID: 2263223441
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 1.79999995, y: 8.10000038, z: 0.400000006}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        m_name: EntityRock
+        m_instanceID: 2245152766
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 9c5972d7-06ff-5f3c-b3f3-c22a1f5dd1eb
+    m_gameObjectType: 0
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: tent_05
+        m_instanceID: 392188591
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 1029
+        m_index: 1030
+        m_parentIndex: 1029
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_instanceID: 2655649545
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: tent_02(2)
+              m_baseColorTexName: tent_02_L_tent_02_BaseColor.png
+              m_normalTexName: tent_02_L_tent_02_Normal.png
+              m_ORM_TexName: tent_02_L_tent_02_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_IOR: 1.5
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 0c28338f-6a3d-5b6c-b34d-b7cec9154947
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Mesh.008
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+        m_gameObjectType: 3
+        m_isStatic: false

@@ -66,6 +66,12 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
 	HitImpulse();
 	m_currentHP -= damage;
 
+	if (towerMonster)
+	{
+		towerMonster->GetComponentDynamicCast<TestMonsterB>()->SendDamage(this, 0);
+	}
+
+
 	if (m_currentHP <= 0)
 	{
 		isDestroy = true;

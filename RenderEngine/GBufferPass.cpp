@@ -448,7 +448,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
-			proxy->m_Material->TrySetValue("BoneTransformation", "BoneTransforms", proxy->m_finalTransforms, sizeof(Mathf::xMatrix) * 50);
+			if(proxy->m_finalTransforms)
+			{
+				proxy->m_Material->TrySetValue("BoneTransformation", "BoneTransforms", proxy->m_finalTransforms, sizeof(Mathf::xMatrix) * 50);
+			}
 			proxy->m_Material->TrySetFloat("TimeBuffer", "totalTime", Time->GetTotalSeconds());
 			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
 			unsigned int frameCount = Time->GetFrameCount();

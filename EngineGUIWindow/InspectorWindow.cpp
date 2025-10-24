@@ -608,10 +608,10 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
 	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
 	{
-		for (int i = 0; i < layerCount; ++i)
+		for (int i = 0; i <= layerCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == layerCount - 1) // "Add Layer" 항목
+			if (i == layerCount) // "Add Layer" 항목
 			{
 				if (ImGui::Selectable("Add Layer"))
 				{
