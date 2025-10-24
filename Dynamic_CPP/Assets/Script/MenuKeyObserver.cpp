@@ -29,10 +29,10 @@ void MenuKeyObserver::Update(float tick)
 	{
 		if (m_elapsedTime < 1.3f) return; // 디바운스 처리
 
-		m_isMenuOpened = !m_isMenuOpened;
+		GameInstance::GetInstance()->m_isIngameMenuOpen = !GameInstance::GetInstance()->m_isIngameMenuOpen;
 		if (!m_menuCanvasObject) return;
 
-		if(!m_isMenuOpened)
+		if(!GameInstance::GetInstance()->m_isIngameMenuOpen)
 		{
 			GameInstance::GetInstance()->PauseGame();
 			m_menuCanvasObject->SetEnabled(true);

@@ -16,6 +16,7 @@ namespace
 void EventSelector::Start()
 {
 	m_textComponent = GetOwner()->GetComponent<TextComponent>();
+	m_textRectTransform = GetOwner()->GetComponent<RectTransformComponent>();
     //TODO : 찾아라 드래곤볼 해야함.
     //m_imageComponent = GetOwner()->GetComponent<ImageComponent>();
     //m_rectTransform = GetOwner()->GetComponent<RectTransformComponent>();
@@ -41,6 +42,7 @@ void EventSelector::Start()
         if (chkboxObj)
         {
             m_chkboxIconComponent = chkboxObj->GetComponent<ImageComponent>();
+			m_chkboxRectTransform = chkboxObj->GetComponent<RectTransformComponent>();
 			if (!chkboxObj->m_childrenIndices.empty())
             {
                 chkIconIndex = chkboxObj->m_childrenIndices[0];
@@ -52,6 +54,7 @@ void EventSelector::Start()
             GameObject* chkIconObj = GameObject::FindIndex(chkIconIndex);
             if (chkIconObj)
             {
+				m_chkIconRectTransform = chkIconObj->GetComponent<RectTransformComponent>();
                 m_chkIconComponent = chkIconObj->GetComponent<ImageComponent>();
             }
         }
@@ -78,7 +81,7 @@ void EventSelector::Start()
         m_animStartPos      = m_hiddenPosition;
         m_animTargetPos     = m_visiblePosition;
         m_rectTransform->SetAnchoredPosition(m_hiddenPosition);
-		m_rectTransform->SetSizeDelta(Mathf::Vector2(500.f, 47.f));
+		m_rectTransform->SetSizeDelta(m_bgSize);
         m_initializedPositions = true;
     }
 
@@ -131,6 +134,24 @@ void EventSelector::Update(float tick)
 
     HandleActiveEvent(activeId, activeText);
     UpdateState(tick);
+    if (m_textComponent)
+    {
+        auto vec2 = m_textComponent->m_textMeasureSize;
+        if (m_chkboxRectTransform && m_textRectTransform)
+        {
+            auto chkboxPos = m_chkboxRectTransform->GetAnchoredPosition();
+            float textPosX = m_textRectTransform->GetAnchoredPosition().x;
+            float textRectSizeX = m_textRectTransform->GetSizeDelta().x;
+            float textMeasureX = vec2.x;
+            float iconSizeX = m_chkboxIconComponent->uiinfo.size.x;
+
+            float chkboxPosX = textPosX - (textRectSizeX / 2.f) + textMeasureX + (iconSizeX / 2.f) + 15.f;
+
+            chkboxPosX = std::clamp(chkboxPosX, 350.f, 610.f);
+
+            m_chkboxRectTransform->SetAnchoredPosition({ chkboxPosX, chkboxPos.y });
+        }
+    }
 }
 
 void EventSelector::HandleActiveEvent(const std::optional<int>& activeId, const std::string& activeText)
@@ -210,6 +231,12 @@ void EventSelector::BeginEnter(int eventId, std::string message)
     if (m_textComponent)
     {
         m_textComponent->SetMessage(m_currentMessage);
+    }
+
+    if (!m_effectPlayed && m_chkIconComponent)
+    {
+        m_chkIconComponent->SetEnabled(false);
+        m_effectPlayed = false;
     }
 
     if (m_rectTransform && m_initializedPositions)
@@ -319,6 +346,16 @@ void EventSelector::UpdateState(float tick)
             if (m_rectTransform && m_initializedPositions)
             {
                 m_rectTransform->SetAnchoredPosition(m_visiblePosition);
+                if (m_textComponent)
+                {
+                    auto vec2 = m_textComponent->m_textMeasureSize;
+                    if (0 < vec2.x)
+                    {
+						float doubleX = vec2.x * 2.f;
+						doubleX = std::clamp(doubleX, 400.f, 900.f);
+						m_rectTransform->SetSizeDelta({ doubleX + 20.f, m_bgSize.y });
+                    }
+                }
             }
         }
         break;
@@ -331,22 +368,31 @@ void EventSelector::UpdateState(float tick)
         break;
     case UiState::Completing:
     {
+        m_effectTimer += tick;
         if (!m_effectPlayed && m_chkIconComponent)
         {
-			m_chkIconComponent->SetEnabled(true);
+            m_chkIconComponent->SetEnabled(true);
+        }
+
+        if (m_effectTimer >= 0.8f)
+        {
             m_effectPlayed = true;
         }
 
-        const float duration = std::max(m_slideOutDuration, kMinDuration);
-        m_stateTimer += tick;
-        const float normalized = std::clamp(m_stateTimer / duration, 0.f, 1.f);
-        const float eased = Mathf::Easing::EaseInQuad(normalized);
-        ApplyAnimation(eased);
-        SetVisualAlpha(1.f - eased);
-
-        if (normalized >= 1.f)
+        if (m_effectPlayed)
         {
-            FinishCompletion();
+            m_effectTimer = 0.f;
+            const float duration = std::max(m_slideOutDuration, kMinDuration);
+            m_stateTimer += tick;
+            const float normalized = std::clamp(m_stateTimer / duration, 0.f, 1.f);
+            const float eased = Mathf::Easing::EaseInQuad(normalized);
+            ApplyAnimation(eased);
+            SetVisualAlpha(1.f - eased);
+
+            if (normalized >= 1.f)
+            {
+                FinishCompletion();
+            }
         }
         break;
     }

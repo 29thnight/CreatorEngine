@@ -598,6 +598,8 @@ void Scene::InternalPauseUpdateForUI()
 		auto canvasObj = UIManagers->CurCanvas.lock();
 		if (!canvasObj) return;
 
+		AllUIUpdateWorldMatrix();
+
 		auto canvas = canvasObj->GetComponent<Canvas>();
 		for (const auto& weak : canvas->UIObjs)
 		{
@@ -1661,6 +1663,43 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	}
 }
 
+void Scene::UpdateUIRecursive(GameObject::Index objIndex, bool recursive)
+{
+	if (objIndex == GameObject::INVALID_INDEX || objIndex < 0 ||
+		static_cast<size_t>(objIndex) >= m_SceneObjects.size())
+	{
+		return;
+	}
+
+	const auto& obj = m_SceneObjects[objIndex];
+	if (!obj || obj->IsDestroyMark())
+	{
+		return;
+	}
+
+	if (obj->GetType() == GameObjectType::UI)
+	{
+		const auto& RectTransform = obj->GetComponent<RectTransformComponent>();
+		const auto& objParent = m_SceneObjects[obj->m_parentIndex];
+		if (!RectTransform || !RectTransform->IsEnabled() || !objParent)
+		{
+			return;
+		}
+		const auto& ParentRectTransform = objParent->GetComponent<RectTransformComponent>();
+		if (!ParentRectTransform || !ParentRectTransform->IsEnabled())
+		{
+			return;
+		}
+		RectTransform->UpdateLayout(ParentRectTransform->GetWorldRect());
+	}
+
+	for (auto& childIndex : obj->m_childrenIndices)
+	{
+		if (childIndex == obj->m_index) continue;
+		UpdateUIRecursive(childIndex, recursive);
+	}
+}
+
 void Scene::SetInternalPhysicData()
 {
 	if(!m_colliderContainer.empty())
@@ -1754,6 +1793,22 @@ void Scene::AllUpdateWorldMatrix()
 	auto updateFunc = [this](GameObject::Index index)
 	{
 		UpdateModelRecursive(index, XMMatrixIdentity());
+	};
+
+	if (!rootObjects.empty())
+	{
+		std::for_each(std::execution::par, rootObjects.begin(), rootObjects.end(), updateFunc);
+	}
+}
+
+void Scene::AllUIUpdateWorldMatrix()
+{
+	if (m_SceneObjects.empty()) return;
+
+	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
+	auto updateFunc = [this](GameObject::Index index)
+	{
+		UpdateUIRecursive(index);
 	};
 
 	if (!rootObjects.empty())

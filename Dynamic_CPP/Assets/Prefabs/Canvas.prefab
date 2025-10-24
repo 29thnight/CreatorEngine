@@ -1,5 +1,5 @@
 m_name: Canvas
-m_instanceID: 3172964486
+m_instanceID: 2176596565
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
@@ -69,10 +69,10 @@ PrefabNode:
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
-            m_anchoredPosition: {x: 178, y: 101}
+            m_anchoredPosition: {x: 172, y: 101}
             m_sizeDelta: {x: 50, y: 47}
             m_pivot: {x: 0.5, y: 0.5}
-            m_worldRect: {x: 153, y: 77.5, width: 50, height: 47}
+            m_worldRect: {x: 147, y: 77.5, width: 50, height: 47}
           - ImageComponent: 1187169862
             m_name: ImageComponent
             m_instanceID: 2073147694
@@ -123,7 +123,7 @@ PrefabNode:
                 m_anchoredPosition: {x: -131, y: 0}
                 m_sizeDelta: {x: 44, y: 34}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 25, y: 84, width: 44, height: 34}
+                m_worldRect: {x: 19, y: 84, width: 44, height: 34}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
                 m_instanceID: 398929080
@@ -171,10 +171,10 @@ PrefabNode:
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 144, y: 3}
-                    m_sizeDelta: {x: 470, y: 300}
+                    m_anchoredPosition: {x: 292, y: 1}
+                    m_sizeDelta: {x: 503, y: 37}
                     m_pivot: {x: 0.5, y: 0.5}
-                    m_worldRect: {x: -44, y: -46, width: 470, height: 300}
+                    m_worldRect: {x: 81.5, y: 83.5, width: 503, height: 37}
                   - TextComponent: 967791323
                     m_name: TextComponent
                     m_instanceID: 3932429670
@@ -191,14 +191,16 @@ PrefabNode:
                     color: {r: 0.686274529, g: 0.917647064, b: 0.956862748, a: 1}
                     manualRect: {x: 143, y: 103, width: 279, height: 26}
                     fontSize: 1
+                    horizontalAlignment: 0
                     useManualRect: false
+                    m_textMeasureSize: {x: 84, y: 36.7999992}
                   - ModuleBehavior: 1399118904
                     m_defaultMessage: No Active Event
                     m_slideInDuration: 0.349999994
                     m_slideOutDuration: 0.25
                     m_hiddenOffset: 420
                     m_name: EventSelector
-                    m_instanceID: 625715135
+                    m_instanceID: 3042280992
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_scriptGuid: 7dd2631c-8345-589e-98f4-0d3b3f1e8f32
@@ -231,10 +233,10 @@ PrefabNode:
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_anchorMin: {x: 0.5, y: 0.5}
                         m_anchorMax: {x: 0.5, y: 0.5}
-                        m_anchoredPosition: {x: 200, y: -3}
+                        m_anchoredPosition: {x: 17, y: 1}
                         m_sizeDelta: {x: 32, y: 31}
                         m_pivot: {x: 0.5, y: 0.5}
-                        m_worldRect: {x: 375, y: 85.5, width: 32, height: 31}
+                        m_worldRect: {x: 334, y: 87.5, width: 32, height: 31}
                       - ImageComponent: 1187169862
                         m_name: ImageComponent
                         m_instanceID: 140919947
@@ -285,7 +287,7 @@ PrefabNode:
                             m_anchoredPosition: {x: 0, y: 0}
                             m_sizeDelta: {x: 32, y: 31}
                             m_pivot: {x: 0.5, y: 0.5}
-                            m_worldRect: {x: 375, y: 85.5, width: 32, height: 31}
+                            m_worldRect: {x: 334, y: 87.5, width: 32, height: 31}
                           - ImageComponent: 1187169862
                             m_name: ImageComponent
                             m_instanceID: 756401784
@@ -453,10 +455,12 @@ PrefabNode:
                 color: {r: 1, g: 1, b: 1, a: 1}
                 manualRect: {x: 0, y: 0, width: 0, height: 0}
                 fontSize: 0.800000012
+                horizontalAlignment: 1
                 useManualRect: false
+                m_textMeasureSize: {x: 82, y: 57.5999985}
               - ModuleBehavior: 1399118904
                 m_name: RewardObserver
-                m_instanceID: 3262981340
+                m_instanceID: 596874834
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 7cd0138d-2c25-5c2f-b614-9f52bfb81b93
@@ -502,7 +506,7 @@ PrefabNode:
             m_ownerCanvasName: Canvas
             navigations: ~
             m_customPixelShaderPath: ""
-            texturePaths: [SettingButton.png, menu.png]
+            texturePaths: [menu.png]
             color: {r: 1, g: 1, b: 1, a: 1}
             curindex: 0
             rotate: 0
@@ -512,7 +516,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: MenuKeyObserver
-            m_instanceID: 2771814818
+            m_instanceID: 1023457473
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 4d8d8322-15ca-5a28-8528-4cf379bdd05e
@@ -569,7 +573,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_playerIndex: 1
             m_name: WeaponSlotController
-            m_instanceID: 2372971312
+            m_instanceID: 646838920
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 95f39a7d-dfda-55cc-b847-770fe20c1e1d
@@ -625,7 +629,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 1689988225
+            m_instanceID: 2663268699
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -780,10 +784,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 49000257
+                        m_instanceID: 1780824842
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -846,7 +852,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 3670423359
+                m_instanceID: 3021680538
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -950,10 +956,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 176121232
+                        m_instanceID: 2223533440
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -1016,7 +1024,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 1134811531
+                m_instanceID: 3919994887
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -1120,10 +1128,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2119787531
+                        m_instanceID: 1573701969
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -1186,7 +1196,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 3291899377
+                m_instanceID: 53701754
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -1290,10 +1300,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1509943102
+                        m_instanceID: 4085392746
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -1349,7 +1361,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 4048241092
+            m_instanceID: 2389791857
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -1504,10 +1516,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2988943147
+                        m_instanceID: 4081529556
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -1570,7 +1584,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 3894540561
+                m_instanceID: 2800562594
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -1674,10 +1688,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 4038099641
+                        m_instanceID: 2232690665
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -1740,7 +1756,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 3031617323
+                m_instanceID: 1971463134
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -1844,10 +1860,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 778042300
+                        m_instanceID: 1680194895
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -1910,7 +1928,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 2888994907
+                m_instanceID: 2597632927
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -2014,10 +2032,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 3587865834
+                        m_instanceID: 2018258049
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -2073,7 +2093,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 894719004
+            m_instanceID: 2413169654
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -2228,10 +2248,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1298327016
+                        m_instanceID: 3674318901
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -2294,7 +2316,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 501095595
+                m_instanceID: 1029265649
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -2398,10 +2420,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1883467265
+                        m_instanceID: 3318401329
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -2464,7 +2488,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 1047030244
+                m_instanceID: 1319207394
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -2568,10 +2592,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1426742575
+                        m_instanceID: 1086064805
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -2725,10 +2751,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2888921328
+                        m_instanceID: 521975571
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -2784,7 +2812,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 1560490961
+            m_instanceID: 2388532252
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -2939,7 +2967,9 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                     m_gameObjectType: 5
                     m_isStatic: false
           - GameObject: 2166264123
@@ -2999,7 +3029,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 2312399213
+                m_instanceID: 2726171570
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -3103,10 +3133,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2927506725
+                        m_instanceID: 1963155100
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -3169,7 +3201,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 3058352690
+                m_instanceID: 3308031345
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -3273,10 +3305,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1922471465
+                        m_instanceID: 332854261
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -3339,7 +3373,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 2682772681
+                m_instanceID: 2906556577
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -3443,10 +3477,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1311779592
+                        m_instanceID: 2129048219
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -3504,7 +3540,7 @@ PrefabNode:
             targetIndex: -1
             screenOffset: {x: 0, y: -150}
             m_name: HPBar
-            m_instanceID: 2163869940
+            m_instanceID: 1540907371
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7689d2c5-c56a-5ed5-a571-6f14df67e148
@@ -3611,7 +3647,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 2635749712
+            m_instanceID: 3215210603
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -3766,10 +3802,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2899792614
+                        m_instanceID: 38891462
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -3832,7 +3870,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 4030510102
+                m_instanceID: 1531265793
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -3936,10 +3974,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1043750614
+                        m_instanceID: 4253978994
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -4002,7 +4042,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 3976340837
+                m_instanceID: 3565596498
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -4106,10 +4146,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 169478266
+                        m_instanceID: 1844452331
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -4172,7 +4214,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 648751422
+                m_instanceID: 1117808378
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -4276,10 +4318,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 3642128807
+                        m_instanceID: 411130881
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -4335,7 +4379,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 3339266767
+            m_instanceID: 3774541789
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -4490,10 +4534,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1477693396
+                        m_instanceID: 2851092829
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -4556,7 +4602,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 1421108064
+                m_instanceID: 3141554237
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -4660,10 +4706,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2890332763
+                        m_instanceID: 3585313093
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -4726,7 +4774,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 1081082746
+                m_instanceID: 108683677
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -4830,10 +4878,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 271694422
+                        m_instanceID: 130767696
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -4896,7 +4946,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 2114183927
+                m_instanceID: 4038144120
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -5000,10 +5050,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1385971720
+                        m_instanceID: 3618611102
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -5059,7 +5111,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 2450611280
+            m_instanceID: 4157464559
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -5214,10 +5266,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 3150970829
+                        m_instanceID: 4277102832
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -5280,7 +5334,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 2024437374
+                m_instanceID: 2700502538
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -5384,10 +5438,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 3546406869
+                        m_instanceID: 545547258
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -5450,7 +5506,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 1704719159
+                m_instanceID: 1270733713
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -5554,10 +5610,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 3115192001
+                        m_instanceID: 2813319351
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -5620,7 +5678,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 669186270
+                m_instanceID: 3490246324
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -5724,7 +5782,9 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                     m_gameObjectType: 5
                     m_isStatic: false
       - GameObject: 2166264123
@@ -5777,7 +5837,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: WeaponSlot
-            m_instanceID: 4166083084
+            m_instanceID: 3583784389
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7688b7e4-3532-5536-a284-914e72c2379d
@@ -5932,10 +5992,12 @@ PrefabNode:
                         color: {r: 1, g: 0.882352948, b: 0.431372553, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 2338664730
+                        m_instanceID: 85515210
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -5998,7 +6060,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 2640302247
+                m_instanceID: 3878675930
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -6102,10 +6164,12 @@ PrefabNode:
                         color: {r: 0.78039217, g: 1, b: 1, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 1175738806
+                        m_instanceID: 531448475
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -6168,7 +6232,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 1817299635
+                m_instanceID: 624364508
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -6272,10 +6336,12 @@ PrefabNode:
                         color: {r: 1, g: 0.807843149, b: 0.870588243, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 4185135782
+                        m_instanceID: 2415711055
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -6338,7 +6404,7 @@ PrefabNode:
                 featherAngle: 0.5
                 tint: "[not suport type]"
                 m_name: UIGageTest
-                m_instanceID: 550304432
+                m_instanceID: 870477263
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 186f05fa-45dd-52f1-acdd-8870a8591fdc
@@ -6442,10 +6508,12 @@ PrefabNode:
                         color: {r: 1, g: 0.78039217, b: 0.764705896, a: 1}
                         manualRect: {x: 0, y: 0, width: 0, height: 0}
                         fontSize: 1
+                        horizontalAlignment: 1
                         useManualRect: false
+                        m_textMeasureSize: {x: 0, y: 0}
                       - ModuleBehavior: 1399118904
                         m_name: WeaponSlotDurFont
-                        m_instanceID: 505737629
+                        m_instanceID: 4051075733
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_scriptGuid: 9f136090-58db-5e45-9b80-2dacdcd6a89f
@@ -6503,7 +6571,7 @@ PrefabNode:
             targetIndex: -1
             screenOffset: {x: 0, y: -150}
             m_name: HPBar
-            m_instanceID: 2338229570
+            m_instanceID: 2966781541
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7689d2c5-c56a-5ed5-a571-6f14df67e148
@@ -6611,7 +6679,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_playerIndex: 0
             m_name: WeaponSlotController
-            m_instanceID: 2832118683
+            m_instanceID: 1200013428
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 95f39a7d-dfda-55cc-b847-770fe20c1e1d

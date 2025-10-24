@@ -94,6 +94,8 @@ public:
 	bool IsBootstrapCompleted() const { return m_isBootstrapCompleted; }
 	void SetBootstrapCompleted(bool completed) { m_isBootstrapCompleted = completed; }
 
+	bool m_isIngameMenuOpen{ false };
+
 public:
 	//Item BG Color
 	Mathf::Color4									CommonItemColor{ 1.f, 1.f, 1.f, 1.f };
