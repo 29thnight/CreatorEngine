@@ -30,6 +30,7 @@ void RestartButton::ClickFunction()
 	if (!m_gameManager || m_isClicked)
 		return;
 
+	GameInstance::GetInstance()->ResumeGame();
 	m_gameManager->m_isLoadingReq = true;
 	m_gameManager->LoadPrevScene();
 	m_imageComponent->SetNavLock(true);

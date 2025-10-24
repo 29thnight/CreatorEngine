@@ -19,6 +19,7 @@
 #include "TextComponent.h"
 #include "TagManager.h"
 #include "UIManager.h"
+#include "PlayerInput.h"
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
@@ -603,6 +604,12 @@ void Scene::InternalPauseUpdateForUI()
 			auto obj = weak.lock();
 			if (obj)
 			{
+				auto inputComponents = obj->GetComponents<PlayerInputComponent>();
+				for (const auto& inputComponent : inputComponents)
+				{
+					inputComponent->Update(deltaTime);
+				}
+
 				auto moduleBehaviorComponents = obj->GetComponents<ModuleBehavior>();
 				for (const auto& moduleBehavior : moduleBehaviorComponents)
 				{

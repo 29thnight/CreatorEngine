@@ -1,0 +1,17 @@
+{
+    "actions": [
+        {
+            "actionName": "Menu",
+            "actionType": "Button",
+            "funName": "OberveMenuKeyPress",
+            "inputType": "GamePad",
+            "key0": "Start",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Pressed",
+            "scpritName": "MenuKeyObserver"
+        }
+    ],
+    "mapName": "PlayerMenuKey"
+}

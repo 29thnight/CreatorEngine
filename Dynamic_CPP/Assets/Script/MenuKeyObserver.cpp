@@ -22,10 +22,13 @@ void MenuKeyObserver::Start()
 
 void MenuKeyObserver::Update(float tick)
 {
-	const bool isMenuKeyPressed0 = InputManagement->IsControllerButtonPressed(0, ControllerButton::START_BUTTON);
-	const bool isMenuKeyPressed1 = InputManagement->IsControllerButtonPressed(1, ControllerButton::START_BUTTON);
+	m_elapsedTime += tick;
+	bool isMenuKeyPressed0 = InputManagement->IsControllerButtonReleased(0, ControllerButton::START_BUTTON);
+	bool isMenuKeyPressed1 = InputManagement->IsControllerButtonReleased(1, ControllerButton::START_BUTTON);
 	if ((isMenuKeyPressed0 || isMenuKeyPressed1))
 	{
+		if (m_elapsedTime < 1.3f) return; // 디바운스 처리
+
 		m_isMenuOpened = !m_isMenuOpened;
 		if (!m_menuCanvasObject) return;
 
@@ -39,6 +42,7 @@ void MenuKeyObserver::Update(float tick)
 			GameInstance::GetInstance()->ResumeGame();
 			m_menuCanvasObject->SetEnabled(false);
 		}
+		m_elapsedTime = 0.f;
 	}
 }
 

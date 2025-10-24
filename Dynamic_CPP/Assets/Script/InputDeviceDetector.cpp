@@ -16,6 +16,8 @@ static int SignAxis(float x, float dead)
 
 void InputDeviceDetector::Start()
 {
+	m_controllerImage = m_pOwner->GetComponent<ImageComponent>();
+
     m_gameManagerObj = GameObject::Find("GameManager");
     if (m_gameManagerObj)
     {
@@ -116,6 +118,11 @@ void InputDeviceDetector::CharSelect()
 
     m_selectHold += m_lastDelta;
 
+	constexpr int ACTIVE = 1; // 선택 완료 텍스처 인덱스
+	constexpr int INACTIVE = 0; // 선택 대기 텍스처 인덱스
+	constexpr int CON_SELECT_NONE = 0;  // 컨트롤러 이미지 - 선택 안됨
+	constexpr int CON_SELECT_WOMAN = 1; // 컨트롤러 이미지 - 여자
+	constexpr int CON_SELECT_MAN = 2;   // 컨트롤러 이미지 - 남자
     // 아직 선택 전이고, 일정 시간 이상 홀드되면 "선택 확정"
     if (!m_isSelectComplete && m_selectHold >= m_requiredSelectHold)
     {
@@ -140,11 +147,15 @@ void InputDeviceDetector::CharSelect()
             m_selectHold = 0.f;
             if (charType == CharType::Woman)
             {
-                leftPos->color = { 1, 0, 0, 1 };
+                //leftPos->color = { 1, 0, 0, 1 };
+                leftPos->SetTexture(ACTIVE);
+                m_controllerImage->SetTexture(CON_SELECT_WOMAN);
             }
             else if (charType == CharType::Man)
             {
-                rightPos->color = { 1, 0, 0, 1 };
+                //rightPos->color = { 1, 0, 0, 1 };
+				rightPos->SetTexture(ACTIVE);
+                m_controllerImage->SetTexture(CON_SELECT_MAN);
             }
             m_isApply = true;
         }
@@ -157,11 +168,15 @@ void InputDeviceDetector::CharSelect()
         m_gameManager->RemovePlayerInputDevice(m_playerIndex, charType, dir);
         if (charType == CharType::Woman)
         {
-            leftPos->color = { 1, 1, 1, 1 };
+            //leftPos->color = { 1, 1, 1, 1 };
+			leftPos->SetTexture(INACTIVE);
+            m_controllerImage->SetTexture(CON_SELECT_NONE);
         }
         else if (charType == CharType::Man)
         {
-            rightPos->color = { 1, 1, 1, 1 };
+            //rightPos->color = { 1, 1, 1, 1 };
+			rightPos->SetTexture(INACTIVE);
+            m_controllerImage->SetTexture(CON_SELECT_NONE);
         }
         m_selectHold = 0.f;
         m_isSelectComplete = false;
