@@ -7,7 +7,7 @@
 #include "Blackboard.h"
 #include "RaycastHelper.h"
 #include "Animator.h"
-#include "CharacterControllerComponent.h"tick
+#include "CharacterControllerComponent.h"
 #include "PrefabUtility.h"
 #include "MonEleteProjetile.h"
 #include "HPBar.h"
@@ -23,6 +23,8 @@ struct Feeler {
 
 void EntityEleteMonster::Start()
 {
+	m_currentHP = maxHP;
+	m_maxHP = maxHP;
 	auto canvObj = GameObject::Find("Canvas");
 	Prefab* HPBarPrefab = PrefabUtilitys->LoadPrefab("UI_HPBarBg");
 	if (HPBarPrefab && canvObj)
@@ -31,8 +33,7 @@ void EntityEleteMonster::Start()
 		HPBar* hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
-		m_currentHP = m_currHP;
-		m_maxHP = m_maxHP;
+		m_currentHP = m_maxHP;
 		hp->SetMaxHP(m_maxHP);
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
@@ -130,7 +131,6 @@ void EntityEleteMonster::Start()
 		m_projectiles.push_back(PrefabObject2);
 	}
 
-	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티

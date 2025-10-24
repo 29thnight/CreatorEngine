@@ -765,6 +765,7 @@ void Player::Damage(int damage)
 	m_currentHP -= std::max(damage, 0);
 	if (m_currentHP <= 0)
 	{
+		m_currentHP = 0;
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 	}
