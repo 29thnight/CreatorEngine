@@ -7,7 +7,7 @@
 #include "Blackboard.h"
 #include "RaycastHelper.h"
 #include "Animator.h"
-#include "CharacterControllerComponent.h"
+#include "CharacterControllerComponent.h"tick
 #include "PrefabUtility.h"
 #include "MonEleteProjetile.h"
 #include "HPBar.h"
@@ -233,7 +233,7 @@ void EntityEleteMonster::Update(float tick)
 
 	if (isDead)
 	{
-		deadBugElaspedTime += 4.0f;
+		deadBugElaspedTime += tick;
 		if (deadBugElaspedTime >= deadBugTime)
 		{
 			if (false == GetOwner()->IsDestroyMark())

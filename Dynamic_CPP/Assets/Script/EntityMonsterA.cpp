@@ -297,7 +297,7 @@ void EntityMonsterA::Update(float tick)
 
 	if (isDead)
 	{
-		deadBugElaspedTime += 4.0f;
+		deadBugElaspedTime += tick;
 		if (deadBugElaspedTime >= deadBugTime)
 		{
 			if (false == GetOwner()->IsDestroyMark())
