@@ -6,7 +6,7 @@ ReflectionScriptField(EntityMonsterA) \
 	PropertyField \
 	({ \
 		meta_property(isAsisAction) \
-		meta_property(m_maxHP) \
+		meta_property(maxHP) \
 		meta_property(m_enemyReward) \
 		meta_property(m_moveSpeed) \
 		meta_property(m_chaseRange) \

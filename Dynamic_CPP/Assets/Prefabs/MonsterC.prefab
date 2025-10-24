@@ -1,11 +1,11 @@
 m_name: MonsterC
-m_instanceID: 3447855332
+m_instanceID: 3215014894
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: MonsterC
-    m_instanceID: 2784594775
+    m_instanceID: 899090735
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -13,18 +13,18 @@ PrefabNode:
       rotation: {x: 0, y: 1, z: 0, w: -1.37443735e-07}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 82
+    m_index: 270
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 10
     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-    m_childrenIndices: [83, 133]
+    m_childrenIndices: [271, 321]
     m_tag: Untagged
     m_layer: Enemy
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
-        m_instanceID: 2980593174
+        m_instanceID: 2564152340
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
@@ -40,7 +40,7 @@ PrefabNode:
         m_collisionEnabled: true
       - CharacterControllerComponent: 939015310
         m_name: CharacterControllerComponent
-        m_instanceID: 257809911
+        m_instanceID: 3205191925
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_posOffset: {x: 0, y: 1.5, z: 0}
@@ -52,7 +52,7 @@ PrefabNode:
         m_rotationSpeed: 6
       - BehaviorTreeComponent: 1234464095
         m_name: BehaviorTreeComponent
-        m_instanceID: 3091808125
+        m_instanceID: 2888738396
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         name: Mage
@@ -82,7 +82,7 @@ PrefabNode:
         KnockbackDistacneY: 0.00999999978
         KnockbackTime: 0
         m_name: EntityEleteMonster
-        m_instanceID: 4188755474
+        m_instanceID: 2977841771
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 2c35f895-1e24-59bb-a08c-ff1b7caa2617
@@ -91,26 +91,26 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: jusulsa
-        m_instanceID: 602863049
+        m_instanceID: 2743950324
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 1, z: 0, w: -6.06165216e-08}
           scale: {x: 0.00999999978, y: 0.00999999978, z: 0.00999999978, w: 0}
-          m_parentID: 82
-        m_index: 83
-        m_parentIndex: 82
+          m_parentID: 270
+        m_index: 271
+        m_parentIndex: 270
         m_rootIndex: 0
         m_collisionType: 0
         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-        m_childrenIndices: [84, 87]
+        m_childrenIndices: [272, 275]
         m_tag: Untagged
         m_layer: Default
         m_components:
           - Animator: 1291484284
             m_name: Animator
-            m_instanceID: 1288498874
+            m_instanceID: 1018953852
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Skeleton:
@@ -313,26 +313,26 @@ PrefabNode:
         children:
           - GameObject: 2166264123
             m_name: mon
-            m_instanceID: 186857346
+            m_instanceID: 686770948
             m_isEnabled: true
             m_attachedSoketID: 0
             m_transform:
               position: {x: 0, y: 0, z: -0, w: 1}
               rotation: {x: -0, y: 0, z: -0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 0}
-              m_parentID: 83
-            m_index: 84
-            m_parentIndex: 83
+              m_parentID: 271
+            m_index: 272
+            m_parentIndex: 271
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-            m_childrenIndices: [85]
+            m_childrenIndices: [273]
             m_tag: Untagged
             m_layer: Default
             m_components:
               - MeshRenderer: 659998325
                 m_name: MeshRenderer
-                m_instanceID: 992797607
+                m_instanceID: 1282495010
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_Material:
@@ -373,26 +373,26 @@ PrefabNode:
             children:
               - GameObject: 2166264123
                 m_name: mon (1)
-                m_instanceID: 2242927323
+                m_instanceID: 2687076488
                 m_isEnabled: true
                 m_attachedSoketID: 0
                 m_transform:
                   position: {x: 0, y: 0, z: -0, w: 1}
                   rotation: {x: -0, y: 0, z: -0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 0}
-                  m_parentID: 84
-                m_index: 85
-                m_parentIndex: 84
+                  m_parentID: 272
+                m_index: 273
+                m_parentIndex: 272
                 m_rootIndex: 0
                 m_collisionType: 0
                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                m_childrenIndices: [86]
+                m_childrenIndices: [274]
                 m_tag: Untagged
                 m_layer: Default
                 m_components:
                   - MeshRenderer: 659998325
                     m_name: MeshRenderer
-                    m_instanceID: 1570853646
+                    m_instanceID: 2123033204
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_Material:
@@ -433,16 +433,16 @@ PrefabNode:
                 children:
                   - GameObject: 2166264123
                     m_name: mon (2)
-                    m_instanceID: 873249827
+                    m_instanceID: 2599110161
                     m_isEnabled: true
                     m_attachedSoketID: 0
                     m_transform:
                       position: {x: 0, y: 0, z: -0, w: 1}
                       rotation: {x: -0, y: 0, z: -0, w: 1}
                       scale: {x: 1, y: 1, z: 1, w: 0}
-                      m_parentID: 85
-                    m_index: 86
-                    m_parentIndex: 85
+                      m_parentID: 273
+                    m_index: 274
+                    m_parentIndex: 273
                     m_rootIndex: 0
                     m_collisionType: 0
                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -452,7 +452,7 @@ PrefabNode:
                     m_components:
                       - MeshRenderer: 659998325
                         m_name: MeshRenderer
-                        m_instanceID: 4115451547
+                        m_instanceID: 2198847673
                         m_isEnabled: true
                         m_FileID: 00000000-0000-0000-0000-000000000000
                         m_Material:
@@ -492,20 +492,20 @@ PrefabNode:
                     m_isStatic: false
           - GameObject: 2166264123
             m_name: mixamorig:Spine (2)
-            m_instanceID: 1318850485
+            m_instanceID: 631496048
             m_isEnabled: true
             m_attachedSoketID: 0
             m_transform:
               position: {x: 7.27595761e-12, y: 173.466507, z: -32.2677116, w: 1}
               rotation: {x: -0.0260958597, y: -1.13725557e-13, z: -1.06617799e-14, w: 0.999659479}
               scale: {x: 1, y: 0.999999881, z: 1, w: 0}
-              m_parentID: 83
-            m_index: 87
-            m_parentIndex: 83
+              m_parentID: 271
+            m_index: 275
+            m_parentIndex: 271
             m_rootIndex: 4
             m_collisionType: 0
             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-            m_childrenIndices: [88]
+            m_childrenIndices: [276]
             m_tag: Untagged
             m_layer: Default
             m_components: ~
@@ -514,20 +514,20 @@ PrefabNode:
             children:
               - GameObject: 2166264123
                 m_name: mixamorig:Spine1 (2)
-                m_instanceID: 275083387
+                m_instanceID: 1948100739
                 m_isEnabled: true
                 m_attachedSoketID: 0
                 m_transform:
                   position: {x: -1.21449222e-11, y: 15.3588238, z: -4.32756053e-10, w: 1}
                   rotation: {x: 1.67638081e-08, y: 5.66171493e-14, z: 7.88361686e-15, w: 1}
                   scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                  m_parentID: 87
-                m_index: 88
-                m_parentIndex: 87
+                  m_parentID: 275
+                m_index: 276
+                m_parentIndex: 275
                 m_rootIndex: 4
                 m_collisionType: 0
                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                m_childrenIndices: [89]
+                m_childrenIndices: [277]
                 m_tag: Untagged
                 m_layer: Default
                 m_components: ~
@@ -536,20 +536,20 @@ PrefabNode:
                 children:
                   - GameObject: 2166264123
                     m_name: mixamorig:Spine2 (2)
-                    m_instanceID: 2136396652
+                    m_instanceID: 364200584
                     m_isEnabled: true
                     m_attachedSoketID: 0
                     m_transform:
                       position: {x: -1.23391349e-11, y: 17.5529346, z: -1.90779338e-06, w: 1}
                       rotation: {x: 5.58793616e-08, y: 5.68434189e-14, z: -3.55271368e-15, w: 1}
                       scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                      m_parentID: 88
-                    m_index: 89
-                    m_parentIndex: 88
+                      m_parentID: 276
+                    m_index: 277
+                    m_parentIndex: 276
                     m_rootIndex: 4
                     m_collisionType: 0
                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                    m_childrenIndices: [90, 92, 108, 124, 127, 130]
+                    m_childrenIndices: [278, 280, 296, 312, 315, 318]
                     m_tag: Untagged
                     m_layer: Default
                     m_components: ~
@@ -558,20 +558,20 @@ PrefabNode:
                     children:
                       - GameObject: 2166264123
                         m_name: mixamorig:Neck (2)
-                        m_instanceID: 2107208806
+                        m_instanceID: 3565823896
                         m_isEnabled: true
                         m_attachedSoketID: 0
                         m_transform:
                           position: {x: -3.46944739e-12, y: 23.3829708, z: 3.81423661e-06, w: 1}
                           rotation: {x: 0.0260957889, y: 5.68627786e-14, z: -7.10784733e-15, w: 0.999659479}
                           scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
-                          m_parentID: 89
-                        m_index: 90
-                        m_parentIndex: 89
+                          m_parentID: 277
+                        m_index: 278
+                        m_parentIndex: 277
                         m_rootIndex: 4
                         m_collisionType: 0
                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                        m_childrenIndices: [91]
+                        m_childrenIndices: [279]
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
@@ -580,16 +580,16 @@ PrefabNode:
                         children:
                           - GameObject: 2166264123
                             m_name: mixamorig:Head (2)
-                            m_instanceID: 2208019655
+                            m_instanceID: 1732951725
                             m_isEnabled: true
                             m_attachedSoketID: 0
                             m_transform:
                               position: {x: 8.88178506e-12, y: 21.9053783, z: -3.73618536e-06, w: 1}
                               rotation: {x: 1.77636912e-15, y: -1.13686838e-13, z: -0, w: 1}
                               scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                              m_parentID: 90
-                            m_index: 91
-                            m_parentIndex: 90
+                              m_parentID: 278
+                            m_index: 279
+                            m_parentIndex: 278
                             m_rootIndex: 4
                             m_collisionType: 0
                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -601,20 +601,20 @@ PrefabNode:
                             m_isStatic: false
                       - GameObject: 2166264123
                         m_name: mixamorig:LeftShoulder (2)
-                        m_instanceID: 3690754850
+                        m_instanceID: 615876483
                         m_isEnabled: true
                         m_attachedSoketID: 0
                         m_transform:
                           position: {x: 19.8723526, y: 15.4828978, z: -0.00181420322, w: 1}
                           rotation: {x: 0.551502049, y: 0.442676157, z: 0.551448047, w: -0.442479789}
                           scale: {x: 0.999999881, y: 0.999999881, z: 0.99999994, w: 0}
-                          m_parentID: 89
-                        m_index: 92
-                        m_parentIndex: 89
+                          m_parentID: 277
+                        m_index: 280
+                        m_parentIndex: 277
                         m_rootIndex: 4
                         m_collisionType: 0
                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                        m_childrenIndices: [93]
+                        m_childrenIndices: [281]
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
@@ -623,20 +623,20 @@ PrefabNode:
                         children:
                           - GameObject: 2166264123
                             m_name: mixamorig:LeftArm (2)
-                            m_instanceID: 3616993887
+                            m_instanceID: 3962982760
                             m_isEnabled: true
                             m_attachedSoketID: 0
                             m_transform:
                               position: {x: 1.89896673e-06, y: 38.4964905, z: 1.90734863e-05, w: 1}
                               rotation: {x: -0.217401475, y: 0.376432925, z: 0.0994724929, w: 0.895064354}
                               scale: {x: 1, y: 0.99999994, z: 1, w: 0}
-                              m_parentID: 92
-                            m_index: 93
-                            m_parentIndex: 92
+                              m_parentID: 280
+                            m_index: 281
+                            m_parentIndex: 280
                             m_rootIndex: 4
                             m_collisionType: 0
                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                            m_childrenIndices: [94]
+                            m_childrenIndices: [282]
                             m_tag: Untagged
                             m_layer: Default
                             m_components: ~
@@ -645,20 +645,20 @@ PrefabNode:
                             children:
                               - GameObject: 2166264123
                                 m_name: mixamorig:LeftForeArm (2)
-                                m_instanceID: 1504529087
+                                m_instanceID: 1306594117
                                 m_isEnabled: true
                                 m_attachedSoketID: 0
                                 m_transform:
                                   position: {x: 6.67572021e-06, y: 29.4525261, z: -3.81469727e-06, w: 1}
                                   rotation: {x: 0.136291012, y: 0.580658734, z: 0.151801705, w: 0.788172901}
                                   scale: {x: 1.00000012, y: 1.00000012, z: 1.00000012, w: 0}
-                                  m_parentID: 93
-                                m_index: 94
-                                m_parentIndex: 93
+                                  m_parentID: 281
+                                m_index: 282
+                                m_parentIndex: 281
                                 m_rootIndex: 4
                                 m_collisionType: 0
                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                m_childrenIndices: [95, 99, 103, 105]
+                                m_childrenIndices: [283, 287, 291, 293]
                                 m_tag: Untagged
                                 m_layer: Default
                                 m_components: ~
@@ -667,20 +667,20 @@ PrefabNode:
                                 children:
                                   - GameObject: 2166264123
                                     m_name: mixamorig:LeftHand (2)
-                                    m_instanceID: 3279331297
+                                    m_instanceID: 2797386902
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: -2.47955322e-05, y: 38.6143913, z: 1.49607658e-05, w: 1}
                                       rotation: {x: -0.025604248, y: -0.000889721734, z: 0.112261236, w: 0.99334842}
                                       scale: {x: 1, y: 1, z: 1, w: 0}
-                                      m_parentID: 94
-                                    m_index: 95
-                                    m_parentIndex: 94
+                                      m_parentID: 282
+                                    m_index: 283
+                                    m_parentIndex: 282
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [96]
+                                    m_childrenIndices: [284]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -689,20 +689,20 @@ PrefabNode:
                                     children:
                                       - GameObject: 2166264123
                                         m_name: mixamorig:LeftHandIndex1 (2)
-                                        m_instanceID: 966103908
+                                        m_instanceID: 96992286
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: 2.57492065e-05, y: 24.1405468, z: -1.90734863e-06, w: 1}
                                           rotation: {x: 0.239719927, y: 0.0123488884, z: -0.335056663, w: 0.911108673}
                                           scale: {x: 0.999999881, y: 1, z: 0.999999881, w: 0}
-                                          m_parentID: 95
-                                        m_index: 96
-                                        m_parentIndex: 95
+                                          m_parentID: 283
+                                        m_index: 284
+                                        m_parentIndex: 283
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                        m_childrenIndices: [97]
+                                        m_childrenIndices: [285]
                                         m_tag: Untagged
                                         m_layer: Default
                                         m_components: ~
@@ -711,20 +711,20 @@ PrefabNode:
                                         children:
                                           - GameObject: 2166264123
                                             m_name: mixamorig:LeftHandIndex2 (2)
-                                            m_instanceID: 84528098
+                                            m_instanceID: 3820289425
                                             m_isEnabled: true
                                             m_attachedSoketID: 0
                                             m_transform:
                                               position: {x: -9.53674316e-06, y: 10.6224928, z: -1.14440918e-05, w: 1}
                                               rotation: {x: -0.127289191, y: -0.00324627594, z: 0.213226527, w: 0.968669891}
                                               scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                              m_parentID: 96
-                                            m_index: 97
-                                            m_parentIndex: 96
+                                              m_parentID: 284
+                                            m_index: 285
+                                            m_parentIndex: 284
                                             m_rootIndex: 4
                                             m_collisionType: 0
                                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                            m_childrenIndices: [98]
+                                            m_childrenIndices: [286]
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
@@ -733,16 +733,16 @@ PrefabNode:
                                             children:
                                               - GameObject: 2166264123
                                                 m_name: mixamorig:LeftHandIndex3 (2)
-                                                m_instanceID: 1568446831
+                                                m_instanceID: 729351968
                                                 m_isEnabled: true
                                                 m_attachedSoketID: 0
                                                 m_transform:
                                                   position: {x: -3.81469727e-06, y: 10.3884678, z: -5.7220459e-06, w: 1}
                                                   rotation: {x: -0.0126249343, y: -0.000701688754, z: 0.0263291523, w: 0.99957341}
                                                   scale: {x: 1, y: 1, z: 1, w: 0}
-                                                  m_parentID: 97
-                                                m_index: 98
-                                                m_parentIndex: 97
+                                                  m_parentID: 285
+                                                m_index: 286
+                                                m_parentIndex: 285
                                                 m_rootIndex: 4
                                                 m_collisionType: 0
                                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -753,21 +753,21 @@ PrefabNode:
                                                 m_gameObjectType: 4
                                                 m_isStatic: false
                                   - GameObject: 2166264123
-                                    m_name: Bone.001
-                                    m_instanceID: 2249390588
+                                    m_name: Bone.001 (2)
+                                    m_instanceID: 3143175239
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: -2.47955322e-05, y: 38.6143913, z: 1.49607658e-05, w: 1}
                                       rotation: {x: -0.202804238, y: -0.306791633, z: -0.00749734044, w: 0.929888785}
                                       scale: {x: 0.999999881, y: 0.999999881, z: 1, w: 0}
-                                      m_parentID: 94
-                                    m_index: 99
-                                    m_parentIndex: 94
+                                      m_parentID: 282
+                                    m_index: 287
+                                    m_parentIndex: 282
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [100]
+                                    m_childrenIndices: [288]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -775,21 +775,21 @@ PrefabNode:
                                     m_isStatic: false
                                     children:
                                       - GameObject: 2166264123
-                                        m_name: Bone
-                                        m_instanceID: 1990636651
+                                        m_name: Bone (2)
+                                        m_instanceID: 3910503303
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: 1.43051147e-06, y: 19.8952332, z: -7.62939453e-06, w: 1}
                                           rotation: {x: 0.008953535, y: 0.00850830134, z: -0.0038913216, w: 0.999916196}
                                           scale: {x: 1.00000012, y: 1, z: 1.00000012, w: 0}
-                                          m_parentID: 99
-                                        m_index: 100
-                                        m_parentIndex: 99
+                                          m_parentID: 287
+                                        m_index: 288
+                                        m_parentIndex: 287
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                        m_childrenIndices: [101]
+                                        m_childrenIndices: [289]
                                         m_tag: Untagged
                                         m_layer: Default
                                         m_components: ~
@@ -797,21 +797,21 @@ PrefabNode:
                                         m_isStatic: false
                                         children:
                                           - GameObject: 2166264123
-                                            m_name: Bone.002
-                                            m_instanceID: 4290469781
+                                            m_name: Bone.002 (2)
+                                            m_instanceID: 1883486080
                                             m_isEnabled: true
                                             m_attachedSoketID: 0
                                             m_transform:
                                               position: {x: 6.19888306e-06, y: 11.2201653, z: -1.04904175e-05, w: 1}
                                               rotation: {x: -0.0151237156, y: -0.00650151633, z: -0.0910051093, w: 0.995714366}
                                               scale: {x: 0.999999821, y: 0.999999762, z: 0.999999881, w: 0}
-                                              m_parentID: 100
-                                            m_index: 101
-                                            m_parentIndex: 100
+                                              m_parentID: 288
+                                            m_index: 289
+                                            m_parentIndex: 288
                                             m_rootIndex: 4
                                             m_collisionType: 0
                                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                            m_childrenIndices: [102]
+                                            m_childrenIndices: [290]
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
@@ -819,17 +819,17 @@ PrefabNode:
                                             m_isStatic: false
                                             children:
                                               - GameObject: 2166264123
-                                                m_name: Bone.005
-                                                m_instanceID: 277301340
+                                                m_name: Bone.005 (4)
+                                                m_instanceID: 3765699489
                                                 m_isEnabled: true
                                                 m_attachedSoketID: 0
                                                 m_transform:
                                                   position: {x: 4.76837158e-06, y: 10.8010178, z: -4.76837158e-06, w: 1}
                                                   rotation: {x: -0.0479546785, y: -0.0157532487, z: -0.118626267, w: 0.991655231}
                                                   scale: {x: 0.99999994, y: 1.00000012, z: 1.00000012, w: 0}
-                                                  m_parentID: 101
-                                                m_index: 102
-                                                m_parentIndex: 101
+                                                  m_parentID: 289
+                                                m_index: 290
+                                                m_parentIndex: 289
                                                 m_rootIndex: 4
                                                 m_collisionType: 0
                                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -840,21 +840,21 @@ PrefabNode:
                                                 m_gameObjectType: 4
                                                 m_isStatic: false
                                   - GameObject: 2166264123
-                                    m_name: Bone.003
-                                    m_instanceID: 751734199
+                                    m_name: Bone.003 (2)
+                                    m_instanceID: 1017325488
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: -2.47955322e-05, y: 38.6143913, z: 1.49607658e-05, w: 1}
                                       rotation: {x: -0.519738674, y: -0.228581727, z: -0.144261941, w: 0.810438514}
                                       scale: {x: 1, y: 1, z: 1.00000012, w: 0}
-                                      m_parentID: 94
-                                    m_index: 103
-                                    m_parentIndex: 94
+                                      m_parentID: 282
+                                    m_index: 291
+                                    m_parentIndex: 282
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [104]
+                                    m_childrenIndices: [292]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -862,17 +862,17 @@ PrefabNode:
                                     m_isStatic: false
                                     children:
                                       - GameObject: 2166264123
-                                        m_name: Bone.004
-                                        m_instanceID: 2112802144
+                                        m_name: Bone.004 (4)
+                                        m_instanceID: 1155647844
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: 2.86102295e-06, y: 18.6609783, z: -7.62939453e-06, w: 1}
                                           rotation: {x: 0.0401514731, y: -0.0162187517, z: -0.136803299, w: 0.989651322}
                                           scale: {x: 0.99999994, y: 0.999999762, z: 0.999999702, w: 0}
-                                          m_parentID: 103
-                                        m_index: 104
-                                        m_parentIndex: 103
+                                          m_parentID: 291
+                                        m_index: 292
+                                        m_parentIndex: 291
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -883,21 +883,21 @@ PrefabNode:
                                         m_gameObjectType: 4
                                         m_isStatic: false
                                   - GameObject: 2166264123
-                                    m_name: Bone.006
-                                    m_instanceID: 2440020096
+                                    m_name: Bone.006 (4)
+                                    m_instanceID: 519598016
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: -2.47955322e-05, y: 38.6143913, z: 1.49607658e-05, w: 1}
                                       rotation: {x: 0.305056512, y: -0.364849508, z: 0.060074497, w: 0.877619803}
                                       scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                      m_parentID: 94
-                                    m_index: 105
-                                    m_parentIndex: 94
+                                      m_parentID: 282
+                                    m_index: 293
+                                    m_parentIndex: 282
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [106]
+                                    m_childrenIndices: [294]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -905,21 +905,21 @@ PrefabNode:
                                     m_isStatic: false
                                     children:
                                       - GameObject: 2166264123
-                                        m_name: Bone.007
-                                        m_instanceID: 3804106530
+                                        m_name: Bone.007 (4)
+                                        m_instanceID: 1437583848
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: 1.23977661e-05, y: 21.5814266, z: 6.67572021e-06, w: 1}
                                           rotation: {x: 0.0148476288, y: -0.0080055166, z: -0.0542602576, w: 0.998384356}
                                           scale: {x: 0.999999881, y: 1.00000012, z: 0.999999881, w: 0}
-                                          m_parentID: 105
-                                        m_index: 106
-                                        m_parentIndex: 105
+                                          m_parentID: 293
+                                        m_index: 294
+                                        m_parentIndex: 293
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                        m_childrenIndices: [107]
+                                        m_childrenIndices: [295]
                                         m_tag: Untagged
                                         m_layer: Default
                                         m_components: ~
@@ -928,16 +928,16 @@ PrefabNode:
                                         children:
                                           - GameObject: 2166264123
                                             m_name: Bone.008
-                                            m_instanceID: 773226837
+                                            m_instanceID: 3857323273
                                             m_isEnabled: true
                                             m_attachedSoketID: 0
                                             m_transform:
                                               position: {x: -1.62124634e-05, y: 12.2381477, z: -1.62124634e-05, w: 1}
                                               rotation: {x: -0.023987364, y: 0.000148996376, z: 0.107759014, w: 0.993887603}
                                               scale: {x: 1, y: 0.999999881, z: 0.999999881, w: 0}
-                                              m_parentID: 106
-                                            m_index: 107
-                                            m_parentIndex: 106
+                                              m_parentID: 294
+                                            m_index: 295
+                                            m_parentIndex: 294
                                             m_rootIndex: 4
                                             m_collisionType: 0
                                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -949,20 +949,20 @@ PrefabNode:
                                             m_isStatic: false
                       - GameObject: 2166264123
                         m_name: mixamorig:RightShoulder (2)
-                        m_instanceID: 1482710107
+                        m_instanceID: 676941344
                         m_isEnabled: true
                         m_attachedSoketID: 0
                         m_transform:
                           position: {x: -19.8723526, y: 15.5059242, z: -0.442557961, w: 1}
                           rotation: {x: 0.557300806, y: -0.437497973, z: -0.545040846, w: -0.448265404}
                           scale: {x: 0.999999821, y: 1, z: 1, w: 0}
-                          m_parentID: 89
-                        m_index: 108
-                        m_parentIndex: 89
+                          m_parentID: 277
+                        m_index: 296
+                        m_parentIndex: 277
                         m_rootIndex: 4
                         m_collisionType: 0
                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                        m_childrenIndices: [109]
+                        m_childrenIndices: [297]
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
@@ -971,20 +971,20 @@ PrefabNode:
                         children:
                           - GameObject: 2166264123
                             m_name: mixamorig:RightArm (2)
-                            m_instanceID: 3547905592
+                            m_instanceID: 389031471
                             m_isEnabled: true
                             m_attachedSoketID: 0
                             m_transform:
                               position: {x: -1.07288361e-06, y: 38.4964828, z: -7.15255737e-07, w: 1}
                               rotation: {x: -0.225674838, y: -0.307654887, z: -0.0753630996, w: 0.921270788}
                               scale: {x: 1, y: 0.999999821, z: 0.999999821, w: 0}
-                              m_parentID: 108
-                            m_index: 109
-                            m_parentIndex: 108
+                              m_parentID: 296
+                            m_index: 297
+                            m_parentIndex: 296
                             m_rootIndex: 4
                             m_collisionType: 0
                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                            m_childrenIndices: [110]
+                            m_childrenIndices: [298]
                             m_tag: Untagged
                             m_layer: Default
                             m_components: ~
@@ -993,20 +993,20 @@ PrefabNode:
                             children:
                               - GameObject: 2166264123
                                 m_name: mixamorig:RightForeArm (2)
-                                m_instanceID: 1760362352
+                                m_instanceID: 2174801711
                                 m_isEnabled: true
                                 m_attachedSoketID: 0
                                 m_transform:
                                   position: {x: 1.04904175e-05, y: 25.4373722, z: -1.14440918e-05, w: 1}
                                   rotation: {x: 0.110568464, y: -0.55736953, z: -0.170803443, w: 0.804947257}
                                   scale: {x: 1, y: 1.00000024, z: 0.99999994, w: 0}
-                                  m_parentID: 109
-                                m_index: 110
-                                m_parentIndex: 109
+                                  m_parentID: 297
+                                m_index: 298
+                                m_parentIndex: 297
                                 m_rootIndex: 4
                                 m_collisionType: 0
                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                m_childrenIndices: [111, 115, 118, 122]
+                                m_childrenIndices: [299, 303, 306, 310]
                                 m_tag: Untagged
                                 m_layer: Default
                                 m_components: ~
@@ -1015,20 +1015,20 @@ PrefabNode:
                                 children:
                                   - GameObject: 2166264123
                                     m_name: RightHand01
-                                    m_instanceID: 2311986366
+                                    m_instanceID: 953437859
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: 5.7220459e-06, y: 42.9884987, z: 2.86102295e-06, w: 1}
                                       rotation: {x: -0.0724308267, y: -0.0078744581, z: 0.0227102693, w: 0.997083783}
                                       scale: {x: 0.999999821, y: 0.999999881, z: 0.99999994, w: 0}
-                                      m_parentID: 110
-                                    m_index: 111
-                                    m_parentIndex: 110
+                                      m_parentID: 298
+                                    m_index: 299
+                                    m_parentIndex: 298
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [112]
+                                    m_childrenIndices: [300]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -1037,20 +1037,20 @@ PrefabNode:
                                     children:
                                       - GameObject: 2166264123
                                         m_name: mixamorig:RightHandIndex1 (2)
-                                        m_instanceID: 1108662646
+                                        m_instanceID: 921454811
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: -1.90734863e-05, y: 19.0776558, z: 7.62939453e-06, w: 1}
                                           rotation: {x: -0.0661501437, y: -0.00419655815, z: 0.107208073, w: 0.99202472}
                                           scale: {x: 1, y: 1, z: 0.99999994, w: 0}
-                                          m_parentID: 111
-                                        m_index: 112
-                                        m_parentIndex: 111
+                                          m_parentID: 299
+                                        m_index: 300
+                                        m_parentIndex: 299
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                        m_childrenIndices: [113]
+                                        m_childrenIndices: [301]
                                         m_tag: Untagged
                                         m_layer: Default
                                         m_components: ~
@@ -1059,20 +1059,20 @@ PrefabNode:
                                         children:
                                           - GameObject: 2166264123
                                             m_name: mixamorig:RightHandIndex2 (2)
-                                            m_instanceID: 686698395
+                                            m_instanceID: 2374867183
                                             m_isEnabled: true
                                             m_attachedSoketID: 0
                                             m_transform:
                                               position: {x: -3.14712524e-05, y: 9.24757195, z: -7.62939453e-06, w: 1}
                                               rotation: {x: -0.052814126, y: 0.000323954358, z: -0.0387859531, w: 0.997850835}
                                               scale: {x: 0.99999994, y: 1.00000012, z: 1.00000012, w: 0}
-                                              m_parentID: 112
-                                            m_index: 113
-                                            m_parentIndex: 112
+                                              m_parentID: 300
+                                            m_index: 301
+                                            m_parentIndex: 300
                                             m_rootIndex: 4
                                             m_collisionType: 0
                                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                            m_childrenIndices: [114]
+                                            m_childrenIndices: [302]
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
@@ -1081,16 +1081,16 @@ PrefabNode:
                                             children:
                                               - GameObject: 2166264123
                                                 m_name: mixamorig:RightHandIndex3 (2)
-                                                m_instanceID: 553024476
+                                                m_instanceID: 2449609750
                                                 m_isEnabled: true
                                                 m_attachedSoketID: 0
                                                 m_transform:
                                                   position: {x: 9.53674316e-07, y: 10.8145027, z: -7.62939453e-06, w: 1}
                                                   rotation: {x: 0.0900417194, y: 0.00171851576, z: 0.00301526883, w: 0.995931923}
                                                   scale: {x: 1.00000012, y: 1.00000012, z: 1.00000012, w: 0}
-                                                  m_parentID: 113
-                                                m_index: 114
-                                                m_parentIndex: 113
+                                                  m_parentID: 301
+                                                m_index: 302
+                                                m_parentIndex: 301
                                                 m_rootIndex: 4
                                                 m_collisionType: 0
                                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1102,20 +1102,20 @@ PrefabNode:
                                                 m_isStatic: false
                                   - GameObject: 2166264123
                                     m_name: RightHand03
-                                    m_instanceID: 190904748
+                                    m_instanceID: 4050289181
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: 0.339398384, y: 43.6542435, z: 0.602653503, w: 1}
                                       rotation: {x: 0.360001266, y: 0.100257672, z: -0.15379031, w: 0.914710939}
                                       scale: {x: 0.99999994, y: 0.999999881, z: 0.999999881, w: 0}
-                                      m_parentID: 110
-                                    m_index: 115
-                                    m_parentIndex: 110
+                                      m_parentID: 298
+                                    m_index: 303
+                                    m_parentIndex: 298
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [116]
+                                    m_childrenIndices: [304]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -1124,20 +1124,20 @@ PrefabNode:
                                     children:
                                       - GameObject: 2166264123
                                         m_name: mixamorig:RightHandIndex8
-                                        m_instanceID: 1556565871
+                                        m_instanceID: 2848185402
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: -7.53998756e-06, y: 21.7317715, z: 1.07288361e-05, w: 1}
                                           rotation: {x: -0.00134714891, y: -0.0132117188, z: 0.160984114, w: 0.986867666}
                                           scale: {x: 1, y: 0.999999821, z: 0.999999762, w: 0}
-                                          m_parentID: 115
-                                        m_index: 116
-                                        m_parentIndex: 115
+                                          m_parentID: 303
+                                        m_index: 304
+                                        m_parentIndex: 303
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                        m_childrenIndices: [117]
+                                        m_childrenIndices: [305]
                                         m_tag: Untagged
                                         m_layer: Default
                                         m_components: ~
@@ -1146,16 +1146,16 @@ PrefabNode:
                                         children:
                                           - GameObject: 2166264123
                                             m_name: mixamorig:RightHandIndex9
-                                            m_instanceID: 2469903977
+                                            m_instanceID: 1747066312
                                             m_isEnabled: true
                                             m_attachedSoketID: 0
                                             m_transform:
                                               position: {x: 4.76837158e-07, y: 13.636488, z: -1.04904175e-05, w: 1}
                                               rotation: {x: -0.00178015314, y: -0.000846523268, z: -0.0138096083, w: 0.999902725}
                                               scale: {x: 1, y: 1, z: 1, w: 0}
-                                              m_parentID: 116
-                                            m_index: 117
-                                            m_parentIndex: 116
+                                              m_parentID: 304
+                                            m_index: 305
+                                            m_parentIndex: 304
                                             m_rootIndex: 4
                                             m_collisionType: 0
                                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1167,20 +1167,20 @@ PrefabNode:
                                             m_isStatic: false
                                   - GameObject: 2166264123
                                     m_name: RightHand02
-                                    m_instanceID: 2639191188
+                                    m_instanceID: 2503546012
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: 5.7220459e-06, y: 42.9884987, z: 2.86102295e-06, w: 1}
                                       rotation: {x: 0.137707382, y: 0.165753588, z: -0.106230393, w: 0.97070986}
                                       scale: {x: 0.999999881, y: 0.999999702, z: 0.999999881, w: 0}
-                                      m_parentID: 110
-                                    m_index: 118
-                                    m_parentIndex: 110
+                                      m_parentID: 298
+                                    m_index: 306
+                                    m_parentIndex: 298
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [119]
+                                    m_childrenIndices: [307]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -1189,20 +1189,20 @@ PrefabNode:
                                     children:
                                       - GameObject: 2166264123
                                         m_name: mixamorig:RightHandIndex5
-                                        m_instanceID: 713448669
+                                        m_instanceID: 3230439978
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: 7.39097595e-06, y: 21.7762299, z: 3.81469727e-06, w: 1}
                                           rotation: {x: -0.0555596054, y: -0.0158378296, z: 0.217336804, w: 0.97438544}
                                           scale: {x: 1.00000012, y: 0.999999881, z: 1, w: 0}
-                                          m_parentID: 118
-                                        m_index: 119
-                                        m_parentIndex: 118
+                                          m_parentID: 306
+                                        m_index: 307
+                                        m_parentIndex: 306
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                        m_childrenIndices: [120]
+                                        m_childrenIndices: [308]
                                         m_tag: Untagged
                                         m_layer: Default
                                         m_components: ~
@@ -1211,20 +1211,20 @@ PrefabNode:
                                         children:
                                           - GameObject: 2166264123
                                             m_name: mixamorig:RightHandIndex6
-                                            m_instanceID: 577220869
+                                            m_instanceID: 857632044
                                             m_isEnabled: true
                                             m_attachedSoketID: 0
                                             m_transform:
                                               position: {x: 1.65849924e-05, y: 11.2275457, z: -4.94718552e-06, w: 1}
                                               rotation: {x: -0.046073731, y: -0.00358415372, z: 0.0753389448, w: 0.996086538}
                                               scale: {x: 1, y: 1.00000012, z: 1.00000012, w: 0}
-                                              m_parentID: 119
-                                            m_index: 120
-                                            m_parentIndex: 119
+                                              m_parentID: 307
+                                            m_index: 308
+                                            m_parentIndex: 307
                                             m_rootIndex: 4
                                             m_collisionType: 0
                                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                            m_childrenIndices: [121]
+                                            m_childrenIndices: [309]
                                             m_tag: Untagged
                                             m_layer: Default
                                             m_components: ~
@@ -1233,16 +1233,16 @@ PrefabNode:
                                             children:
                                               - GameObject: 2166264123
                                                 m_name: mixamorig:RightHandIndex7
-                                                m_instanceID: 337295587
+                                                m_instanceID: 177874516
                                                 m_isEnabled: true
                                                 m_attachedSoketID: 0
                                                 m_transform:
                                                   position: {x: -1.66594982e-05, y: 9.17439842, z: 3.81469727e-06, w: 1}
                                                   rotation: {x: 0.00966223981, y: 0.0353136584, z: -0.110931292, w: 0.993153512}
                                                   scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
-                                                  m_parentID: 120
-                                                m_index: 121
-                                                m_parentIndex: 120
+                                                  m_parentID: 308
+                                                m_index: 309
+                                                m_parentIndex: 308
                                                 m_rootIndex: 4
                                                 m_collisionType: 0
                                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1254,20 +1254,20 @@ PrefabNode:
                                                 m_isStatic: false
                                   - GameObject: 2166264123
                                     m_name: RightHand04
-                                    m_instanceID: 1312782298
+                                    m_instanceID: 2805191004
                                     m_isEnabled: true
                                     m_attachedSoketID: 0
                                     m_transform:
                                       position: {x: 5.7220459e-06, y: 42.9884987, z: 2.86102295e-06, w: 1}
                                       rotation: {x: -0.485099196, y: 0.184073493, z: -0.0176358167, w: 0.854683995}
                                       scale: {x: 0.999999821, y: 0.99999994, z: 0.999999881, w: 0}
-                                      m_parentID: 110
-                                    m_index: 122
-                                    m_parentIndex: 110
+                                      m_parentID: 298
+                                    m_index: 310
+                                    m_parentIndex: 298
                                     m_rootIndex: 4
                                     m_collisionType: 0
                                     m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                                    m_childrenIndices: [123]
+                                    m_childrenIndices: [311]
                                     m_tag: Untagged
                                     m_layer: Default
                                     m_components: ~
@@ -1276,16 +1276,16 @@ PrefabNode:
                                     children:
                                       - GameObject: 2166264123
                                         m_name: mixamorig:RightHandIndex4
-                                        m_instanceID: 3495890463
+                                        m_instanceID: 1849136977
                                         m_isEnabled: true
                                         m_attachedSoketID: 0
                                         m_transform:
                                           position: {x: -7.34739297e-06, y: 15.9944353, z: -1.59285846e-05, w: 1}
                                           rotation: {x: -0.0337996297, y: 0.00126034266, z: 0.286248088, w: 0.957558393}
                                           scale: {x: 0.99999994, y: 0.999999881, z: 1, w: 0}
-                                          m_parentID: 122
-                                        m_index: 123
-                                        m_parentIndex: 122
+                                          m_parentID: 310
+                                        m_index: 311
+                                        m_parentIndex: 310
                                         m_rootIndex: 4
                                         m_collisionType: 0
                                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1297,20 +1297,20 @@ PrefabNode:
                                         m_isStatic: false
                       - GameObject: 2166264123
                         m_name: cape01
-                        m_instanceID: 3561172397
+                        m_instanceID: 3533985382
                         m_isEnabled: true
                         m_attachedSoketID: 0
                         m_transform:
                           position: {x: 53.9368515, y: -27.4711018, z: 41.2450256, w: 1}
                           rotation: {x: 0.898044467, y: 0.0605787151, z: -0.385487288, w: 0.203090847}
                           scale: {x: 1, y: 1, z: 1, w: 0}
-                          m_parentID: 89
-                        m_index: 124
-                        m_parentIndex: 89
+                          m_parentID: 277
+                        m_index: 312
+                        m_parentIndex: 277
                         m_rootIndex: 4
                         m_collisionType: 0
                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                        m_childrenIndices: [125]
+                        m_childrenIndices: [313]
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
@@ -1319,20 +1319,20 @@ PrefabNode:
                         children:
                           - GameObject: 2166264123
                             m_name: cape02
-                            m_instanceID: 325484448
+                            m_instanceID: 1796655947
                             m_isEnabled: true
                             m_attachedSoketID: 0
                             m_transform:
                               position: {x: -4.76837158e-06, y: 52.1214142, z: -9.53674316e-06, w: 1}
                               rotation: {x: -0.00682826061, y: 0.00112134963, z: 0.0259741805, w: 0.999638677}
                               scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
-                              m_parentID: 124
-                            m_index: 125
-                            m_parentIndex: 124
+                              m_parentID: 312
+                            m_index: 313
+                            m_parentIndex: 312
                             m_rootIndex: 4
                             m_collisionType: 0
                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                            m_childrenIndices: [126]
+                            m_childrenIndices: [314]
                             m_tag: Untagged
                             m_layer: Default
                             m_components: ~
@@ -1341,16 +1341,16 @@ PrefabNode:
                             children:
                               - GameObject: 2166264123
                                 m_name: cape03
-                                m_instanceID: 3521370465
+                                m_instanceID: 467192939
                                 m_isEnabled: true
                                 m_attachedSoketID: 0
                                 m_transform:
                                   position: {x: -2.86102295e-06, y: 43.3151855, z: 3.81469727e-06, w: 1}
                                   rotation: {x: -0.0549348257, y: 0.0189800486, z: 0.0331346877, w: 0.997759521}
                                   scale: {x: 0.999999821, y: 0.999999881, z: 0.99999994, w: 0}
-                                  m_parentID: 125
-                                m_index: 126
-                                m_parentIndex: 125
+                                  m_parentID: 313
+                                m_index: 314
+                                m_parentIndex: 313
                                 m_rootIndex: 4
                                 m_collisionType: 0
                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1362,20 +1362,20 @@ PrefabNode:
                                 m_isStatic: false
                       - GameObject: 2166264123
                         m_name: cape04
-                        m_instanceID: 3032930613
+                        m_instanceID: 2477583789
                         m_isEnabled: true
                         m_attachedSoketID: 0
                         m_transform:
                           position: {x: 1.17053783, y: -29.2596951, z: 47.5409698, w: 1}
                           rotation: {x: 0.910660386, y: -0.0743568316, z: -0.363358974, w: 0.182041317}
                           scale: {x: 0.999999881, y: 0.999999821, z: 0.99999845, w: 0}
-                          m_parentID: 89
-                        m_index: 127
-                        m_parentIndex: 89
+                          m_parentID: 277
+                        m_index: 315
+                        m_parentIndex: 277
                         m_rootIndex: 4
                         m_collisionType: 0
                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                        m_childrenIndices: [128]
+                        m_childrenIndices: [316]
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
@@ -1384,20 +1384,20 @@ PrefabNode:
                         children:
                           - GameObject: 2166264123
                             m_name: cape05
-                            m_instanceID: 3322905381
+                            m_instanceID: 3659097163
                             m_isEnabled: true
                             m_attachedSoketID: 0
                             m_transform:
                               position: {x: 5.36441803e-07, y: 49.5178566, z: -8.46385956e-06, w: 1}
                               rotation: {x: -0.050783813, y: -0.0386914313, z: 0.0473853089, w: 0.996834338}
                               scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                              m_parentID: 127
-                            m_index: 128
-                            m_parentIndex: 127
+                              m_parentID: 315
+                            m_index: 316
+                            m_parentIndex: 315
                             m_rootIndex: 4
                             m_collisionType: 0
                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                            m_childrenIndices: [129]
+                            m_childrenIndices: [317]
                             m_tag: Untagged
                             m_layer: Default
                             m_components: ~
@@ -1406,16 +1406,16 @@ PrefabNode:
                             children:
                               - GameObject: 2166264123
                                 m_name: cape06
-                                m_instanceID: 2747034493
+                                m_instanceID: 3620058504
                                 m_isEnabled: true
                                 m_attachedSoketID: 0
                                 m_transform:
                                   position: {x: -6.55651093e-07, y: 49.1637192, z: 2.50339508e-06, w: 1}
                                   rotation: {x: 0.00756609207, y: 0.0225078911, z: -0.0224621687, w: 0.999465704}
                                   scale: {x: 0.99999994, y: 1.00000012, z: 0.999999881, w: 0}
-                                  m_parentID: 128
-                                m_index: 129
-                                m_parentIndex: 128
+                                  m_parentID: 316
+                                m_index: 317
+                                m_parentIndex: 316
                                 m_rootIndex: 4
                                 m_collisionType: 0
                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1427,20 +1427,20 @@ PrefabNode:
                                 m_isStatic: false
                       - GameObject: 2166264123
                         m_name: cape07
-                        m_instanceID: 2910667559
+                        m_instanceID: 283118498
                         m_isEnabled: true
                         m_attachedSoketID: 0
                         m_transform:
                           position: {x: -51.531826, y: -22.9898624, z: 33.2086601, w: 1}
                           rotation: {x: 0.910905361, y: -0.193462744, z: -0.346185952, w: 0.113925464}
                           scale: {x: 1.00000024, y: 1, z: 1.00000036, w: 0}
-                          m_parentID: 89
-                        m_index: 130
-                        m_parentIndex: 89
+                          m_parentID: 277
+                        m_index: 318
+                        m_parentIndex: 277
                         m_rootIndex: 4
                         m_collisionType: 0
                         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                        m_childrenIndices: [131]
+                        m_childrenIndices: [319]
                         m_tag: Untagged
                         m_layer: Default
                         m_components: ~
@@ -1449,20 +1449,20 @@ PrefabNode:
                         children:
                           - GameObject: 2166264123
                             m_name: cape08
-                            m_instanceID: 3856513436
+                            m_instanceID: 2009665192
                             m_isEnabled: true
                             m_attachedSoketID: 0
                             m_transform:
                               position: {x: -3.81469727e-06, y: 49.7535133, z: -4.76837158e-06, w: 1}
                               rotation: {x: -0.1018112, y: -0.0195245184, z: 0.026471002, w: 0.994259775}
                               scale: {x: 1, y: 1.00000012, z: 1, w: 0}
-                              m_parentID: 130
-                            m_index: 131
-                            m_parentIndex: 130
+                              m_parentID: 318
+                            m_index: 319
+                            m_parentIndex: 318
                             m_rootIndex: 4
                             m_collisionType: 0
                             m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
-                            m_childrenIndices: [132]
+                            m_childrenIndices: [320]
                             m_tag: Untagged
                             m_layer: Default
                             m_components: ~
@@ -1471,16 +1471,16 @@ PrefabNode:
                             children:
                               - GameObject: 2166264123
                                 m_name: cape09
-                                m_instanceID: 1819608360
+                                m_instanceID: 1305964913
                                 m_isEnabled: true
                                 m_attachedSoketID: 0
                                 m_transform:
                                   position: {x: -7.62939453e-06, y: 54.2296524, z: 6.91413879e-06, w: 1}
                                   rotation: {x: 0.119062439, y: 0.0232448447, z: -0.0638743192, w: 0.990557373}
                                   scale: {x: 0.99999994, y: 1, z: 1, w: 0}
-                                  m_parentID: 131
-                                m_index: 132
-                                m_parentIndex: 131
+                                  m_parentID: 319
+                                m_index: 320
+                                m_parentIndex: 319
                                 m_rootIndex: 4
                                 m_collisionType: 0
                                 m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1492,16 +1492,16 @@ PrefabNode:
                                 m_isStatic: false
       - GameObject: 2166264123
         m_name: CriticalMark (2)
-        m_instanceID: 75278109
+        m_instanceID: 1995834536
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 4.04878092, z: 0, w: 1}
           rotation: {x: -0, y: -1.42108547e-14, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 82
-        m_index: 133
-        m_parentIndex: 82
+          m_parentID: 270
+        m_index: 321
+        m_parentIndex: 270
         m_rootIndex: 0
         m_collisionType: 0
         m_prefabFileGuid: db2043ef-8c55-5df6-b7e1-e5aea58038b4
@@ -1509,25 +1509,11 @@ PrefabNode:
         m_tag: CriticalMark
         m_layer: Default
         m_components:
-          - EffectComponent: 3131036541
-            m_name: EffectComponent
-            m_instanceID: 2127692361
-            m_isEnabled: true
-            m_FileID: 00000000-0000-0000-0000-000000000000
-            m_effectTemplateName: red
-            m_timeScale: 1
-            m_duration: -1
-            m_isPlaying: true
-            m_isPaused: false
-            m_loop: true
-            m_useAbsolutePosition: false
-            m_currentTime: 248.404343
-            m_effectInstanceName: red_obj219611964
           - ModuleBehavior: 1399118904
             markDuration: 5
             markCoolDown: 5
             m_name: CriticalMark
-            m_instanceID: 4078016360
+            m_instanceID: 1612737604
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245

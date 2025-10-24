@@ -23,6 +23,8 @@ struct Feeler {
 
 void EntityEleteMonster::Start()
 {
+	m_currentHP = maxHP;
+	m_maxHP = maxHP;
 	auto canvObj = GameObject::Find("Canvas");
 	Prefab* HPBarPrefab = PrefabUtilitys->LoadPrefab("UI_HPBarBg");
 	if (HPBarPrefab && canvObj)
@@ -31,8 +33,7 @@ void EntityEleteMonster::Start()
 		HPBar* hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
-		m_currentHP = m_currHP;
-		m_maxHP = m_maxHP;
+		m_currentHP = m_maxHP;
 		hp->SetMaxHP(m_maxHP);
 		hp->SetCurHP(m_currentHP);
 		hp->SetType(0);
@@ -116,17 +117,7 @@ void EntityEleteMonster::Start()
 
 
 
-	for (auto& child : childred)
-	{
-		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
-
-		if (criticalmark)
-		{
-			markEffect = criticalmark;
-			break;
-		}
-
-	}
+	
 
 	//투사체 프리펩 가져오기 //todo : mage 투사체 붙이기
 	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonEleteProjectile");
@@ -140,7 +131,6 @@ void EntityEleteMonster::Start()
 		m_projectiles.push_back(PrefabObject2);
 	}
 
-	m_currentHP = m_maxHP;
 	//blackboard initialize
 	blackBoard->SetValueAsString("State", m_state); //현제 상태
 	blackBoard->SetValueAsString("Identity", m_identity); //고유 아이덴티티
@@ -229,8 +219,39 @@ void EntityEleteMonster::Update(float tick)
 		if (deadDestroyTime <= deadElapsedTime)
 		{
 			GetOwner()->Destroy();
+			if (deadObj)
+			{
+				deadObj->SetEnabled(true);
+				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				deadPos.y += 0.7f;
+				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+				deadEffect->Initialize();
+			}
 		}
 	}
+
+	if (isDead)
+	{
+		deadBugElaspedTime += tick;
+		if (deadBugElaspedTime >= deadBugTime)
+		{
+			if (false == GetOwner()->IsDestroyMark())
+			{
+				GetOwner()->Destroy();
+				if (deadObj)
+				{
+					deadObj->SetEnabled(true);
+					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					deadPos.y += 0.7f;
+					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+					deadEffect->Initialize();
+				}
+			}
+		}
+	}
+
 
 	HitImpulseUpdate(tick);
 

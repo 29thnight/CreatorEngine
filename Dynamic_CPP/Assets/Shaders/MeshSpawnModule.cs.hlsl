@@ -368,29 +368,41 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         if (gAllowNewSpawn)
         {
-            float particleSpawnTime = float(particleIndex) / gSpawnRate;
-            float spawnCycle = float(gMaxParticles) / gSpawnRate;
-            float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
-        
-            bool shouldSpawn = false;
-        
-            if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
-            {
-                shouldSpawn = true;
-            }
-            else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
-                 cycleTime < (spawnCycle + particleSpawnTime + (1.0 / gSpawnRate)))
-            {
-                shouldSpawn = true;
-            }
-        
-            if (shouldSpawn)
+        // SpawnRate가 MaxParticles보다 크거나 같으면 모든 파티클을 동시에 생성
+            if (gSpawnRate >= gMaxParticles)
             {
                 uint seed = WangHash(particleIndex * 12345 + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
                 InitializeMeshParticle(particle, seed);
             }
+            else
+            {
+            // 기존 순차 생성 로직
+                float particleSpawnTime = float(particleIndex) / gSpawnRate;
+                float spawnCycle = float(gMaxParticles) / gSpawnRate;
+                float cycleTime = fmod(gCurrentTime, spawnCycle);
+            
+                float prevTime = cycleTime - gDeltaTime;
+                if (prevTime < 0.0)
+                    prevTime += spawnCycle;
+            
+                bool shouldSpawn = false;
+            
+                if (prevTime < cycleTime)
+                {
+                    shouldSpawn = (particleSpawnTime > prevTime && particleSpawnTime <= cycleTime);
+                }
+                else
+                {
+                    shouldSpawn = (particleSpawnTime > prevTime || particleSpawnTime <= cycleTime);
+                }
+            
+                if (shouldSpawn)
+                {
+                    uint seed = WangHash(particleIndex * 12345 + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
+                    InitializeMeshParticle(particle, seed);
+                }
+            }
         }
-        
     }
     
     gParticlesOutput[particleIndex] = particle;

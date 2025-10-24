@@ -30,7 +30,7 @@ public:
 	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
 	[[Property]]
-	int maxHP = 1.f;
+	int maxHP = 1;
 private:
 	EffectComponent* m_effect = nullptr;
 	CriticalMark* m_criticalMark;

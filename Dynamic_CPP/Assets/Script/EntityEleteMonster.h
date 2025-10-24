@@ -49,6 +49,8 @@ public:
 
 	GameObject* target = nullptr; //타겟 오브젝트 
 	bool isDead = false; //죽음 여부 
+	float deadBugElaspedTime = 0.f;
+	float deadBugTime = 4.0f;
 	GameObject* deadObj = nullptr;
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부
@@ -58,8 +60,8 @@ public:
 	[[Property]]
 	bool isAsisAction = false; //asis 행동중인지 여부
 	[[Property]]
-	int m_maxHP = 100;
-	int m_currHP = m_maxHP;
+	int maxHP = 350;
+	int m_currHP = maxHP;
 	[[Property]]
 	float m_enemyReward = 10.f; //처치시 플레이어에게 주는 보상
 	//이동 및 추적

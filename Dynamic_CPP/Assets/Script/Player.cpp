@@ -374,12 +374,13 @@ void Player::Update(float tick)
 	{
 		auto data = GameInstance::GetInstance()->GetPlayData();
 		data->LoadPlayerData(playerIndex);
-	}
-	if (InputManagement->IsKeyDown('L'))
-	{
-		auto sound = GameInstance::GetInstance()->GetSoundName();
-		sound->LoadSoundNameFromCSV();
 	}*/
+
+	//if (InputManagement->IsKeyDown('L'))
+	//{
+	//	auto sound = GameInstance::GetInstance()->GetSoundName();
+	//	//sound->LoadSoundNameFromCSV();
+	//}
 
 
 
@@ -764,6 +765,7 @@ void Player::Damage(int damage)
 	m_currentHP -= std::max(damage, 0);
 	if (m_currentHP <= 0)
 	{
+		m_currentHP = 0;
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 	}
