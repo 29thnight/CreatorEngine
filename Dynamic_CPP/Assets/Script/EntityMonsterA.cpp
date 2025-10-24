@@ -259,9 +259,9 @@ void EntityMonsterA::Update(float tick)
 		if (count > 0) {
 			for (auto& hit : hitResults) {
 				//std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-				if (hit.gameObject->GetHashedName().ToString() == m_player1->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString()== m_player2->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString() == m_asis->GetHashedName().ToString()) //player
+				if (hit.gameObject->GetHashedName() == m_player1->GetHashedName()
+					|| hit.gameObject->GetHashedName() == m_player2->GetHashedName()
+					|| hit.gameObject->GetHashedName() == m_asis->GetHashedName()) //player
 				{
 					//std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponentDynamicCast<Entity>();
@@ -322,12 +322,14 @@ void EntityMonsterA::Update(float tick)
 		isAttackAnimation = blackBoard->GetValueAsBool("IsAttacking");
 	}
 	
+	Benchmark bm;
 	if (m_state == "Chase") {
 		m_animator->SetParameter("Move", true);
 	}
 	else {
 		m_animator->SetParameter("Move", false);
 	}
+	std::cout << "MonsterA State Time : " << bm.GetElapsedTime() << std::endl;
 
 	//피격 흔들림 처리
 	if (hittimer > 0.f) {
