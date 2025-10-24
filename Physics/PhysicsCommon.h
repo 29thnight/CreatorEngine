@@ -79,7 +79,12 @@ struct PhysicsTransform
 //RigidBody의 GetSetData를 위한 구조체
 struct RigidBodyGetSetData
 {
-	DirectX::SimpleMath::Matrix  transform = {};	//트렌스폼
+	DirectX::SimpleMath::Vector3 position = {};
+	DirectX::SimpleMath::Quaternion rotation = {};
+	DirectX::SimpleMath::Vector3 scale = {};
+
+	bool isGeometryDirty = false;
+
 	DirectX::SimpleMath::Vector3 linearVelocity = {};	//직선 방향 속도 
 	DirectX::SimpleMath::Vector3 angularVelocity = {};	//회전 방향 속도
 	unsigned int LayerNumber = UINT_MAX;	//레이어 넘버

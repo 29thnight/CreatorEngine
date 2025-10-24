@@ -164,6 +164,25 @@ Mathf::xMatrix Transform::GetInverseMatrix() const
 	return m_inverseMatrix;
 }
 
+//add joker1092
+Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
+{
+	// 로컬 회전과 위치만으로 행렬을 구성합니다.
+	Mathf::xMatrix localMatrix_NoScale = DirectX::XMMatrixRotationQuaternion(rotation);
+	localMatrix_NoScale *= DirectX::XMMatrixTranslationFromVector(position);
+
+	// 부모가 있다면, 부모의 스케일 없는 월드 행렬을 재귀적으로 곱해줍니다.
+	if (m_owner && GameObject::IsValidIndex(m_owner->m_parentIndex))
+	{
+		if (auto parent = m_owner->GetScene()->TryGetGameObject(m_owner->m_parentIndex))
+		{
+			return XMMatrixMultiply(localMatrix_NoScale, parent->m_transform.GetWorldMatrix_NoScale());
+		}
+	}
+
+	return localMatrix_NoScale;
+}
+
 void Transform::UpdateLocalMatrix()
 {
 	if (m_dirty)

@@ -1214,7 +1214,7 @@ void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
 				Physics->CreateStaticBody(sphereInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
-					PhysicsManager::ColliderInfo{ m_boxTypeId,
+					PhysicsManager::ColliderInfo{ m_sphereTypeId,
 						ptr,
 						ptr->GetOwner(),
 						ptr,
@@ -1228,7 +1228,7 @@ void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
-						m_boxTypeId,
+						m_sphereTypeId,
 						ptr,
 						ptr->GetOwner(),
 						ptr,
@@ -1279,7 +1279,7 @@ void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
 				Physics->CreateStaticBody(capsuleInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
-					PhysicsManager::ColliderInfo{ m_boxTypeId,
+					PhysicsManager::ColliderInfo{ m_capsuleTypeId,
 						ptr,
 						ptr->GetOwner(),
 						ptr,
@@ -1293,7 +1293,7 @@ void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
-						m_boxTypeId,
+						m_capsuleTypeId,
 						ptr,
 						ptr->GetOwner(),
 						ptr,

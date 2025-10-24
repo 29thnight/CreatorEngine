@@ -523,22 +523,33 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	std::cout << "PhysicsManager::AddCollider(Capsule) - GameObject InstanceID: " << gameObjectID << std::endl;
 	capsuleInfo.colliderInfo.id = gameObjectID;
 	capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	capsuleInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	capsuleInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
-	capsuleInfo.colliderInfo.collsionTransform.localMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.localScale, capsuleInfo.colliderInfo.collsionTransform.localRotation, capsuleInfo.colliderInfo.collsionTransform.localPosition);
-	capsuleInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.worldScale, capsuleInfo.colliderInfo.collsionTransform.worldRotation, capsuleInfo.colliderInfo.collsionTransform.worldPosition);
-	//offset 
-	if (posOffset != DirectX::SimpleMath::Vector3::Zero)
-	{
-		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
-		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._42 = 0.0f;
-		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._43 = 0.0f;
-		posOffset = DirectX::SimpleMath::Vector3::Transform(posOffset, capsuleInfo.colliderInfo.collsionTransform.worldMatrix);
-		capsuleInfo.colliderInfo.collsionTransform.worldPosition += posOffset;
-		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._41 = capsuleInfo.colliderInfo.collsionTransform.worldPosition.x;
-		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._42 = capsuleInfo.colliderInfo.collsionTransform.worldPosition.y;
-		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._43 = capsuleInfo.colliderInfo.collsionTransform.worldPosition.z;
-	}
+
+	Mathf::Matrix worldMatrix_NoScale = transform.GetWorldMatrix_NoScale();
+	Mathf::Quaternion pureWorldRot;
+	Mathf::Vector3 pureWorldPos;
+	Mathf::Vector3 scale;
+	worldMatrix_NoScale.Decompose(scale, pureWorldRot, pureWorldPos);
+
+	Mathf::Quaternion offsetRot = capsule->GetRotationOffset();
+	Mathf::Vector3 offsetPos = capsule->GetPositionOffset();
+
+	Mathf::Quaternion finalWorldRot = Mathf::Quaternion::Concatenate(offsetRot, pureWorldRot);
+	Mathf::Vector3 finalWorldPos = pureWorldPos + Mathf::Vector3::Transform(offsetPos, pureWorldRot);
+
+	// 3. `collsionTransform` 구조체를 올바른 데이터로 채웁니다.
+	auto& collsionTransform = capsuleInfo.colliderInfo.collsionTransform;
+	collsionTransform.worldPosition = finalWorldPos; // 순수 위치
+	collsionTransform.worldRotation = finalWorldRot; // 순수 회전
+	collsionTransform.worldScale = transform.GetWorldScale(); // 스케일은 따로 저장
+	
+	// 로컬 정보는 기존처럼 채워넣습니다.
+	collsionTransform.localMatrix = transform.GetLocalMatrix();
+	collsionTransform.localMatrix.Decompose(
+		collsionTransform.localScale,
+		collsionTransform.localRotation,
+		collsionTransform.localPosition
+	);
+	
 	capsule->SetCapsuleInfoMation(capsuleInfo);
 }
 
@@ -780,7 +791,31 @@ void PhysicsManager::SetPhysicData()
 
 			//Benchmark bm1;
 			RigidBodyGetSetData data;
-			data.transform = transform.GetWorldMatrix();
+			if (colliderInfo.gameObject->m_tag == "Asis") {
+				int a = 0;
+			}
+			Mathf::Matrix worldMatrix_NoScale = transform.GetWorldMatrix_NoScale();
+			Mathf::Quaternion pureWorldRot;
+			Mathf::Vector3 pureWorldPos;
+			Mathf::Vector3 scale;
+			worldMatrix_NoScale.Decompose(scale, pureWorldRot, pureWorldPos);
+
+			// 2. 콜라이더의 로컬 오프셋을 가져옵니다.  
+			auto offset = colliderInfo.collider->GetPositionOffset();
+			auto rotOffset = colliderInfo.collider->GetRotationOffset();
+
+			auto type = colliderInfo.collider->GetColliderType();
+
+			// 3. 오프셋을 적용하여 물리 객체의 '최종 월드 Pose'를 계산합니다
+			data.rotation = Mathf::Quaternion::Concatenate(rotOffset, pureWorldRot);
+			data.position = pureWorldPos + DirectX::SimpleMath::Vector3::Transform(offset, pureWorldRot);
+			// 4. 월드 스케일 값을 따로 가져옵니다.  
+			data.scale = transform.GetWorldScale();
+			if(data.scale != rigidbody->GetScale())
+			{
+				data.isGeometryDirty = true;
+			}
+
 			data.angularVelocity = rigidbody->GetAngularVelocity();
 			data.linearVelocity = rigidbody->GetLinearVelocity();
 			data.isLockLinearX = rigidbody->IsLockLinearX();
@@ -813,21 +848,7 @@ void PhysicsManager::SetPhysicData()
 
 			data.isDirty = rigidbody->IsRigidbodyDirty();
 			rigidbody->DevelopOnlyDirtySet(false);
-
-			if (offset != DirectX::SimpleMath::Vector3::Zero) 
-			{
-				data.transform._41 = 0.0f;
-				data.transform._42 = 0.0f;
-				data.transform._43 = 0.0f;
-
-				auto pos = transform.GetWorldPosition();
-				auto vecPos = DirectX::SimpleMath::Vector3(pos);
-				offset = DirectX::SimpleMath::Vector3::Transform(offset, data.transform);
-				data.transform._41 = vecPos.x + offset.x;
-				data.transform._42 = vecPos.y + offset.y;
-				data.transform._43 = vecPos.z + offset.z;
-
-			}
+			
 
 			//std::cout << " PhysicsManager::SetPhysicData CCT elses RigidBodyGetSetData Set  : " << bm1.GetElapsedTime() << std::endl;
 
@@ -898,29 +919,27 @@ void PhysicsManager::GetPhysicData()
 			rigidbody->SetLockAngularY(data.isLockAngularY);
 			rigidbody->SetLockAngularZ(data.isLockAngularZ);
 
-			auto matrix = data.transform;
+			DirectX::SimpleMath::Vector3 pos = data.position;
+			DirectX::SimpleMath::Quaternion rotation = data.rotation;
+			DirectX::SimpleMath::Vector3 scale = data.scale;
 
-			if (offset != DirectX::SimpleMath::Vector3::Zero) {
+			auto posOffset = ColliderInfo.collider->GetPositionOffset();
+			auto rotOffset = ColliderInfo.collider->GetRotationOffset();
 
-				DirectX::SimpleMath::Vector3 pos, scale;
-				DirectX::SimpleMath::Quaternion rotation;
-				matrix.Decompose(scale, rotation, pos);
-				matrix._41 = 0.0f;
-				matrix._42 = 0.0f;
-				matrix._43 = 0.0f;
+			// 2. 회전 역연산: 물리 월드에서 받은 회전값(data.rotation)에서 콜라이더의 회전 오프셋을 제거합니다.
+			Mathf::Quaternion pureWorldRot;
+			rotOffset.Inverse(pureWorldRot);
+			pureWorldRot = Mathf::Quaternion::Concatenate(pureWorldRot, data.rotation);
 
-				offset = DirectX::SimpleMath::Vector3::Transform(offset, matrix);
-				pos -= offset;
+			// 3. 위치 역연산: 위에서 계산한 '순수 월드 회전'을 사용하여 위치 오프셋의 영향을 제거합니다.
+			Mathf::Vector3 pureWorldPos = data.position - DirectX::SimpleMath::Vector3::Transform(posOffset,
+				pureWorldRot);
 
-				matrix._41 = pos.x;
-				matrix._42 = pos.y;
-				matrix._43 = pos.z;
-				transform.SetPosition(pos);
-
-			}
+			DirectX::SimpleMath::Matrix matrix = DirectX::SimpleMath::Matrix::CreateScale(scale)
+				* DirectX::SimpleMath::Matrix::CreateFromQuaternion(pureWorldRot)
+				* DirectX::SimpleMath::Matrix::CreateTranslation(pureWorldPos);
 
 			transform.SetAndDecomposeMatrix(matrix, true);
-
 		}
 	}
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;

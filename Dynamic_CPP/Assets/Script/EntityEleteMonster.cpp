@@ -449,8 +449,44 @@ void EntityEleteMonster::ChaseTarget(float deltatime)
 
 			dir.Normalize();
 
+			//avoid logic
+			Mathf::Vector3 avoidanceForce(0.f, 0.f, 0.f);
+			bool obstacleDetected = false;
+
+			Mathf::Vector3 forwardDir = m_transform->GetForward();
+			Mathf::Matrix rotLeft = Mathf::Matrix::CreateRotationY(Mathf::ToRadians(-m_avoidanceAngle));
+			Mathf::Matrix rotRight = Mathf::Matrix::CreateRotationY(Mathf::ToRadians(m_avoidanceAngle));
+			Mathf::Vector3 leftFeelerDir = Mathf::Vector3::TransformNormal(forwardDir, rotLeft);
+			Mathf::Vector3 rightFeelerDir = Mathf::Vector3::TransformNormal(forwardDir, rotRight);
+			std::vector<Mathf::Vector3> feelerDirs = { forwardDir, leftFeelerDir, rightFeelerDir };
+
+			for (const auto& feelerDir : feelerDirs)
+			{
+				HitResult res;
+				
+				if (Raycast(m_transform->GetWorldPosition(), feelerDir, m_obstacleAvoidanceDistance, ~0, res))
+				{
+					 if (res.gameObject != m_pOwner && res.gameObject != target)
+					{
+						obstacleDetected = true;
+						avoidanceForce += -feelerDir;
+					}
+				}
+			}
+			Mathf::Vector3 finalDir = dir;
+			if (obstacleDetected)
+			{
+				avoidanceForce.Normalize();
+				finalDir = dir + avoidanceForce * m_avoidanceSteeringForce;
+			}
+			finalDir.Normalize();
+			//
+
 			if (controller) {
-				controller->Move({ dir.x * m_moveSpeed, dir.z * m_moveSpeed });
+				//look dir
+				controller->SetLookDirection({ dir.x, 0.f, dir.z });
+				//look dir
+				controller->Move({ finalDir.x * m_moveSpeed, finalDir.z * m_moveSpeed });
 			}
 
 

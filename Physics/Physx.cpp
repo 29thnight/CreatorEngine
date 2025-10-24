@@ -874,16 +874,30 @@ void PhysicX::CreateDynamicBody(const SphereColliderInfo & info, const ECollider
 
 void PhysicX::CreateDynamicBody(const CapsuleColliderInfo & info, const EColliderType & colliderType,  bool isKinematic)
 {
+
+	const auto& collsionTransform = info.colliderInfo.collsionTransform;
+
+	// 2. 전달받은 worldScale과 원본 radius/height로 최종 지오메트리를 계산합니다.
+	float finalRadius = info.radius * std::max(collsionTransform.worldScale.x, collsionTransform.worldScale.z);
+	float finalHeight = info.height * collsionTransform.worldScale.y;
+
+	// 3. 계산된 최종 크기로 PxShape을 생성합니다.
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material, true);
+	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(finalRadius, finalHeight / 2.f), *material, true);
+
 	physx::PxTransform localPose(physx::PxQuat(physx::PxHalfPi, physx::PxVec3(0, 0, 1)));
 	shape->setLocalPose(localPose);
+
+	// 4. `SettingDynamicBody`는 이제 스케일이 적용된 Shape과, 순수 Pose가 담긴 info를 전달받게 됩니다.
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
+
 	shape->release();
+
+	// 5. 생성된 Body 객체에도 최종 계산된 크기를 저장해줍니다.
 	if (dynamicBody != nullptr)
 	{
-		dynamicBody->SetRadius(info.radius);
-		dynamicBody->SetHalfHeight(info.height);
+		dynamicBody->SetRadius(finalRadius);
+		dynamicBody->SetHalfHeight(finalHeight / 2.f);
 	}
 }
 
@@ -1047,21 +1061,14 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		DirectX::SimpleMath::Quaternion rotation;
 		
 		DirectX::SimpleMath::Vector3 scale = dynamicBody->GetScale();
-		DirectX::SimpleMath::Vector3 offsetPos = dynamicBody->GetOffsetPosition();//ridid body의 오프셋 위치
-		DirectX::SimpleMath::Quaternion offsetRotate = dynamicBody->GetOffsetRotation();//ridid body의 오프셋 회전
 
 		ConvertVectorPxToDx(pxTransform.p, position);
 		ConvertQuaternionPxToDx(pxTransform.q, rotation);
-
-		DirectX::SimpleMath::Quaternion finalrotation = rotation * offsetRotate; //오프셋 회전 적용
-		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offsetPos,rotation);
-
-		DirectX::SimpleMath::Vector3 finalPosition = position + rotatedOffsetPos; //오프셋 위치 적용
 		
-		rigidBodyData.transform =	DirectX::SimpleMath::Matrix::CreateScale(scale) *
-									DirectX::SimpleMath::Matrix::CreateFromQuaternion(finalrotation) *
-									DirectX::SimpleMath::Matrix::CreateTranslation(finalPosition);
-		
+		rigidBodyData.position = position;
+		rigidBodyData.rotation = rotation;
+		rigidBodyData.scale = scale;
+
 		ConvertVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
 		DirectX::SimpleMath::Vector3& velocity = rigidBodyData.linearVelocity;
 
@@ -1110,21 +1117,14 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		physx::PxTransform pxTransform = pxBody->getGlobalPose();
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Quaternion rotation;
-
-		DirectX::SimpleMath::Vector3 scale = staticBody->GetScale();
-		DirectX::SimpleMath::Vector3 offsetPos = staticBody->GetOffsetPosition();//ridid body의 오프셋 위치
-		DirectX::SimpleMath::Quaternion offsetRotate = staticBody->GetOffsetRotation();//ridid body의 오프셋 회전
+		DirectX::SimpleMath::Vector3 scale = dynamicBody->GetScale();
 
 		ConvertVectorPxToDx(pxTransform.p, position);
 		ConvertQuaternionPxToDx(pxTransform.q, rotation);
 
-		DirectX::SimpleMath::Quaternion finalrotation = rotation * offsetRotate; //오프셋 회전 적용
-		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offsetPos, rotation);
-
-		DirectX::SimpleMath::Vector3 finalPosition = position + rotatedOffsetPos; //오프셋 위치 적용
-		rigidBodyData.transform =	DirectX::SimpleMath::Matrix::CreateScale(scale) * 
-									DirectX::SimpleMath::Matrix::CreateFromQuaternion(finalrotation) * 
-									DirectX::SimpleMath::Matrix::CreateTranslation(finalPosition);
+		rigidBodyData.position = position;
+		rigidBodyData.rotation = rotation;
+		rigidBodyData.scale = scale;
 	}
 
 	return rigidBodyData;
@@ -1166,27 +1166,11 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 	if (staticBody)
 	{
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
-		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
 
 		physx::PxTransform pxTransform;
-		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Vector3 scale;
-		DirectX::SimpleMath::Quaternion rotation;
-		dxMatrix.Decompose(scale, rotation, position);
-
-		DirectX::SimpleMath::Vector3 offPos = staticBody->GetOffsetPosition();
-		DirectX::SimpleMath::Quaternion offRot = staticBody->GetOffsetRotation();
-
-		DirectX::SimpleMath::Quaternion invOffsetRot;
-		offRot.Inverse(invOffsetRot);
-		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
-
-		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
-		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
-
-		ConvertVectorDxToPx(bodyPosition, pxTransform.p);
-		ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
+		ConvertVectorDxToPx(rigidBodyData.position, pxTransform.p);
+		ConvertQuaternionDxToPx(rigidBodyData.rotation, pxTransform.q);		
 
 		//CopyMatrixDxToPx(dxMatrix, pxTransform);
 
@@ -1262,6 +1246,10 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 		}
 
+		if (rigidBodyData.isGeometryDirty) {
+			dynamicBody->SetConvertScale(rigidBodyData.scale, m_physics, m_collisionMatrix);
+		}
+
 		if (rigidBodyData.moveDirty) {
 			pxBody->setKinematicTarget(
 				PxTransform(PxVec3(
@@ -1271,38 +1259,16 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 			);
 		}
 		else {
-			DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
+			
 			physx::PxTransform pxTransform;
-			DirectX::SimpleMath::Vector3 position;
-			DirectX::SimpleMath::Vector3 scale;
-			DirectX::SimpleMath::Quaternion rotation;
-			dxMatrix.Decompose(scale, rotation, position);
+			ConvertVectorDxToPx(rigidBodyData.position, pxTransform.p);
+			ConvertQuaternionDxToPx(rigidBodyData.rotation, pxTransform.q);
 
-			DirectX::SimpleMath::Vector3 offPos = dynamicBody->GetOffsetPosition();
-			DirectX::SimpleMath::Quaternion offRot = dynamicBody->GetOffsetRotation();
-
-			DirectX::SimpleMath::Quaternion invOffsetRot;
-			offRot.Inverse(invOffsetRot);
-			DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
-
-			DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
-			DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
-
-			ConvertVectorDxToPx(bodyPosition, pxTransform.p);
-			ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
-
-			//CopyMatrixDxToPx(dxMatrix, pxTransform);
 			physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
-			/*if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+
+
+			if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
 				pxBody->setGlobalPose(pxTransform);
-			}*/
-			pxBody->setGlobalPose(pxTransform);
-			if (scale.x > 0.0f && scale.y > 0.0f && scale.z > 0.0f)
-			{
-				dynamicBody->SetConvertScale(scale, m_physics, m_collisionMatrix);
-			}
-			else {
-				Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
 			}
 		}
 		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
