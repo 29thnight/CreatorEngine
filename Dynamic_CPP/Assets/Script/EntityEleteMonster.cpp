@@ -116,17 +116,7 @@ void EntityEleteMonster::Start()
 
 
 
-	for (auto& child : childred)
-	{
-		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
-
-		if (criticalmark)
-		{
-			markEffect = criticalmark;
-			break;
-		}
-
-	}
+	
 
 	//투사체 프리펩 가져오기 //todo : mage 투사체 붙이기
 	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonEleteProjectile");
@@ -229,8 +219,39 @@ void EntityEleteMonster::Update(float tick)
 		if (deadDestroyTime <= deadElapsedTime)
 		{
 			GetOwner()->Destroy();
+			if (deadObj)
+			{
+				deadObj->SetEnabled(true);
+				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				deadPos.y += 0.7f;
+				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+				deadEffect->Initialize();
+			}
 		}
 	}
+
+	if (isDead)
+	{
+		deadBugElaspedTime += 4.0f;
+		if (deadBugElaspedTime >= deadBugTime)
+		{
+			if (false == GetOwner()->IsDestroyMark())
+			{
+				GetOwner()->Destroy();
+				if (deadObj)
+				{
+					deadObj->SetEnabled(true);
+					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					deadPos.y += 0.7f;
+					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+					deadEffect->Initialize();
+				}
+			}
+		}
+	}
+
 
 	HitImpulseUpdate(tick);
 

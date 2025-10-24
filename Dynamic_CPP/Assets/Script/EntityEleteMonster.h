@@ -49,6 +49,8 @@ public:
 
 	GameObject* target = nullptr; //타겟 오브젝트 
 	bool isDead = false; //죽음 여부 
+	float deadBugElaspedTime = 0.f;
+	float deadBugTime = 4.0f;
 	GameObject* deadObj = nullptr;
 	bool isAttack = false; //공격중인지 여부
 	bool isAttackAnimation = false; //공격 에니메이션 실행중인지 여부

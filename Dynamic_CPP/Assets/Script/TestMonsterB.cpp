@@ -93,17 +93,7 @@ void TestMonsterB::Start()
 	}
 
 
-	for (auto& child : childred)
-	{
-		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
 
-		if (criticalmark)
-		{
-			markEffect = criticalmark;
-			break;
-		}
-
-	}
 
 	//투사체 프리펩 가져오기
 	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonBProjetile");
@@ -340,6 +330,31 @@ void TestMonsterB::Update(float tick)
 			}
 		}
 	}
+
+
+	if (isDead)
+	{
+		deadBugElaspedTime += 4.0f;
+		if (deadBugElaspedTime >= deadBugTime)
+		{
+			if (false == GetOwner()->IsDestroyMark())
+			{
+				GetOwner()->Destroy();
+				if (deadObj)
+				{
+					deadObj->SetEnabled(true);
+					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					deadPos.y += 0.7f;
+					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+					deadEffect->Initialize();
+				}
+			}
+		}
+	}
+
+
+
 	HitImpulseUpdate(tick);
 }
 

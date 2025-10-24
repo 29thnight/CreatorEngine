@@ -516,6 +516,11 @@ void EntityAsis::Heal(int _heal)
 	m_currentHP = std::min(m_currentHP + _heal, m_maxHP);
 }
 
+void EntityAsis::SetCurHP(int hp)
+{
+	m_currentHP = hp;
+}
+
 void EntityAsis::AddPollutionGauge(int amount)
 {
 	m_currentPollutionGauge += amount;

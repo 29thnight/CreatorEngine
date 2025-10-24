@@ -374,12 +374,13 @@ void Player::Update(float tick)
 	{
 		auto data = GameInstance::GetInstance()->GetPlayData();
 		data->LoadPlayerData(playerIndex);
-	}
-	if (InputManagement->IsKeyDown('L'))
-	{
-		auto sound = GameInstance::GetInstance()->GetSoundName();
-		sound->LoadSoundNameFromCSV();
 	}*/
+
+	//if (InputManagement->IsKeyDown('L'))
+	//{
+	//	auto sound = GameInstance::GetInstance()->GetSoundName();
+	//	//sound->LoadSoundNameFromCSV();
+	//}
 
 
 

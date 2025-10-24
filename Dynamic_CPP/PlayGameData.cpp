@@ -4,6 +4,7 @@
 #include "Player.h"
 #include "Weapon.h"
 #include "PrefabUtility.h"
+#include "EntityAsis.h"
 PlayGameData::PlayGameData()
 {
 }
@@ -119,11 +120,31 @@ void PlayGameData::LoadPlayerData(int _playerIndex)
 	}
 }
 
-void PlayGameData::SaveAsisData(Asis* asis)
+void PlayGameData::SaveAsisData(EntityAsis* asis)
 {
+	hasData = true;
+	auto& data = asisData;
+	data.curHP = asis->m_currentHP;
 }
 
 void PlayGameData::LoadAsisData()
 {
 	if (hasData == false) return;
+
+
+	auto GMObj = GameObject::Find("GameManager");
+	if (GMObj)
+	{
+		GameManager* GM = GMObj->GetComponent<GameManager>();
+		if (GM)
+		{
+			if (!GM->GetAsis().empty())
+			{
+				auto asis = GM->GetAsis()[0];
+				EntityAsis* Asis = dynamic_cast<EntityAsis*>(asis);
+				if (Asis)
+					Asis->SetCurHP(asisData.curHP);
+			}
+		}
+	}
 }

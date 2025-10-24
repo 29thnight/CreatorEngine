@@ -43,6 +43,8 @@ public:
 
 	GameObject* target = nullptr;
 	bool isDead = false;
+	float deadBugElaspedTime = 0.f;
+	float deadBugTime = 4.0f;
 	GameObject* deadObj = nullptr;
 	[[Method]]
 	void DeadEvent();

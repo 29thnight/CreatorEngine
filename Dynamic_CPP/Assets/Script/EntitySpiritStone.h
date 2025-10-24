@@ -3,6 +3,8 @@
 #include "Entity.h"
 #include "EntitySpiritStone.generated.h"
 
+class CriticalMark;
+class EffectComponent;
 class EntitySpiritStone : public Entity
 {
 public:
@@ -27,4 +29,9 @@ public:
 
 	[[Property]]
 	int m_stoneReward = 0;
+private:
+	[[Property]]
+	int maxHP = 80;
+	EffectComponent* m_effect = nullptr;
+	CriticalMark* m_criticalMark;
 };
