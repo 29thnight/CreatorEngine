@@ -1,4 +1,5 @@
-![스크린샷 2025-06-25 134455](https://github.com/user-attachments/assets/c1db44ad-d6b4-4733-b9cc-2d9e14a09823)
+<img width="508" height="252" alt="title_logo" src="https://github.com/user-attachments/assets/6629d62f-83b2-4e3e-866e-65dedafb3400" />
+
 
 # Creator Engine - for [Kori The Spritail] Project
 
