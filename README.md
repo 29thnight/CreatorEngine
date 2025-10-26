@@ -1,8 +1,8 @@
 <img width="508" height="252" alt="title_logo" src="https://github.com/user-attachments/assets/6629d62f-83b2-4e3e-866e-65dedafb3400" />
-<img width="567" height="446" alt="Creator_Engine_CIW" src="https://github.com/user-attachments/assets/6a0b5eef-23e6-4932-ae04-28ed3136f5a4" />
+<img src="https://github.com/user-attachments/assets/b9a0307e-6e61-4c6f-8d68-44f74e6d1609" alt="Creator Engine" height="80">
 
 
-# Creator Engine - for [Kori The Spritail] Project
+# CreatorEngine — for <a>Kori The Spritail</a> Project
 
 플랫폼 : Windows
 
