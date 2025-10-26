@@ -80,6 +80,8 @@ public:
 	
 	void DevelopOnlyDirtySet(bool dirty) { SetDirty(dirty); }
 	bool IsRigidbodyDirty() const { return TestFlag(RB_DIRTY); }
+	Mathf::Vector3 GetScale() const { return m_scale; }
+	void SetScale(Mathf::Vector3& scale) { m_scale = scale; }
 private:
 	// 모든 상태 변경을 PhysicsManager에 알리는 헬퍼 함수
 	void NotifyPhysicsStateChange();
@@ -112,6 +114,7 @@ private:
 	[[Property]]
 	bool m_collisionEnabled = true; // 콜라이더 활성화 여부
 	Mathf::Vector3 velocity{};
+	Mathf::Vector3 m_scale{};
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;

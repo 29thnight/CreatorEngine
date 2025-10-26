@@ -42,6 +42,7 @@ public:
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
 	Mathf::xMatrix GetInverseMatrix() const;
+	Mathf::xMatrix GetWorldMatrix_NoScale() const; //add joker1092 :: need for physics
 
 	void UpdateLocalMatrix();
 	Mathf::xMatrix UpdateWorldMatrix();

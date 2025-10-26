@@ -49,15 +49,14 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	if (m_useAutomaticRotation)
 	{
 		constexpr float rotationOffsetSquare = 0.5f * 0.5f;
-		float inputSquare = input.LengthSquared();
-		DirectX::SimpleMath::Vector3 flatInput = input;
-		flatInput.y = 0.f;
+		DirectX::SimpleMath::Vector3 lookDir = m_hasCustomLookDirection ? m_lookDirection : input;
+		lookDir.y = 0.f;
 
-		if (flatInput.LengthSquared() >= rotationOffsetSquare) {
-			flatInput.Normalize();
+		if (lookDir.LengthSquared() >= rotationOffsetSquare) {
+			lookDir.Normalize();
 
 			// yaw 계산: Z가 앞이므로 (z, x) 순서 주의
-			float targetYaw = std::atan2(flatInput.z,flatInput.x) - (XM_PI / 2.0);  // 라디안 값
+			float targetYaw = std::atan2(lookDir.z, lookDir.x) - (XM_PI / 2.0);  // 라디안 값
 			targetYaw = -targetYaw;
 
 			// 현재 회전에서 yaw만 추출
@@ -74,6 +73,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 		}
 	}
 
+	ClearLookDirection();
 }
 
 void CharacterControllerComponent::OnLateUpdate(float fixedDeltaTime)
@@ -112,6 +112,17 @@ void CharacterControllerComponent::StopForcedMove()
 bool CharacterControllerComponent::IsInForcedMove() const
 {
 	return Physics->IsInForcedMove(m_controllerInfo.id);
+}
+
+void CharacterControllerComponent::SetLookDirection(const DirectX::SimpleMath::Vector3& direction)
+{
+	m_lookDirection = direction;
+	m_hasCustomLookDirection = true;
+}
+
+void CharacterControllerComponent::ClearLookDirection()
+{
+	m_hasCustomLookDirection = false;
 }
 
 void CharacterControllerComponent::OnTriggerEnter(ICollider* other)

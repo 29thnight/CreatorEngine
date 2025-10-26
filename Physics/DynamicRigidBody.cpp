@@ -35,15 +35,10 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	shape->setContactOffset(0.02f);
 	shape->setRestOffset(0.01f);
 
-	DirectX::SimpleMath::Matrix transform = colliderInfo.collsionTransform.worldMatrix;
+	const auto& collsionTransform = colliderInfo.collsionTransform;
 	physx::PxTransform transformPx;
-	//CopyMatrixDxToPx(transform, transformPx);
-	DirectX::SimpleMath::Vector3 scale;
-	DirectX::SimpleMath::Quaternion rot;
-	DirectX::SimpleMath::Vector3 pos;
-	transform.Decompose(scale, rot, pos); // 스케일, 회전, 위치 분해
-	ConvertVectorDxToPx(pos, transformPx.p);
-	ConvertQuaternionDxToPx(rot, transformPx.q); // 회전 변환
+	ConvertVectorDxToPx(collsionTransform.worldPosition, transformPx.p);
+	ConvertQuaternionDxToPx(collsionTransform.worldRotation, transformPx.q);
 
 	m_rigidDynamic = physics->createRigidDynamic(transformPx);
 
@@ -171,10 +166,10 @@ void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eCAPSULE)
 	{
 		physx::PxCapsuleGeometry capsuleGeometry = static_cast<const physx::PxCapsuleGeometry&>(shape->getGeometry());
-		float maxScale =  std::max<float>(scale.y, scale.z);
-		capsuleGeometry.radius = m_radius * maxScale;
-
-		capsuleGeometry.halfHeight = m_halfHeight * scale.x;
+		float radiusScale =  std::max<float>(scale.x, scale.z);
+		
+		capsuleGeometry.radius = m_radius * radiusScale;
+		capsuleGeometry.halfHeight = m_halfHeight * scale.y;
 		m_rigidDynamic->detachShape(*shape);
 		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidDynamic, capsuleGeometry, physics, material, collisionMatrix, userData);
