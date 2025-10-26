@@ -22,6 +22,20 @@ GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_v
     return obj;
 }
 
+GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name)
+{
+    if (!prefab || !targetScene)
+        return nullptr;
+    GameObject* obj = prefab->Instantiate(targetScene, name);
+    if (obj)
+    {
+        obj->m_prefab = const_cast<Prefab*>(prefab);
+        obj->m_prefabFileGuid = prefab->GetFileGuid();
+        RegisterInstance(obj, prefab);
+    }
+	return obj;
+}
+
 void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
 {
     if (!instance || !prefab)
@@ -135,4 +149,12 @@ Prefab* PrefabUtility::LoadPrefab(const std::string& path)
     }
 
 	return nullptr;
+}
+
+Prefab* PrefabUtility::LoadPrefabGuid(const FileGuid& guid)
+{
+    auto path = DataSystems->GetFilePath(guid);
+    if (path.empty())
+        return nullptr;
+	return LoadPrefabFullPath(path.string());
 }

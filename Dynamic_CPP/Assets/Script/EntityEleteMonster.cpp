@@ -105,19 +105,15 @@ void EntityEleteMonster::Start()
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
 
-	if (hasAsis) {
+	if (hasAsis && !m_asis) {
 		m_asis = blackBoard->GetValueAsGameObject("Asis");
 	}
-	if (hasP1) {
+	if (hasP1 && !m_player1) {
 		m_player1 = blackBoard->GetValueAsGameObject("Player1");
 	}
-	if (hasP2) {
+	if (hasP2 && !m_player2) {
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
-
-
-
-	
 
 	//투사체 프리펩 가져오기 //todo : mage 투사체 붙이기
 	Prefab* projectilePrefab = PrefabUtilitys->LoadPrefab("MonEleteProjectile");

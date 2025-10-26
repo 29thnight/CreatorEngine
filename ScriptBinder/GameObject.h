@@ -143,7 +143,7 @@ public:
     HashingString m_tag{ "Untagged" };
     [[Property]]
     HashingString m_layer{ "Default" };
-	
+
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};

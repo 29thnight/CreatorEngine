@@ -145,22 +145,22 @@ void TestMonsterB::Start()
 void TestMonsterB::Update(float tick)
 {
 	if (blackBoard == nullptr) return;
+	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->SetBaseSpeed(m_moveSpeed);
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
-	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-	controller->SetBaseSpeed(m_moveSpeed);
-	GameObject* Asis = nullptr;
-	if (hasAsis) {
-		Asis = blackBoard->GetValueAsGameObject("Asis");
+
+	if (hasAsis && !m_asis) {
+		m_asis = blackBoard->GetValueAsGameObject("Asis");
 	}
-	GameObject* player1 = nullptr;
-	if (hasP1) {
-		player1 = blackBoard->GetValueAsGameObject("Player1");
+
+	if (hasP1 && !m_player1) {
+		m_player1 = blackBoard->GetValueAsGameObject("Player1");
 	}
-	GameObject* player2 = nullptr;
-	if (hasP2) {
-		player2 = blackBoard->GetValueAsGameObject("Player2");
+
+	if (hasP2 && !m_player2) {
+		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
 
 	Transform* m_transform = m_pOwner->GetComponent<Transform>();
@@ -176,17 +176,17 @@ void TestMonsterB::Update(float tick)
 	Player* p1Script = nullptr;
 	Player* p2Script = nullptr;
 
-	if (Asis) {
-		asisPos = Asis->m_transform.GetWorldPosition();
+	if (m_asis) {
+		asisPos = m_asis->m_transform.GetWorldPosition();
 		distAsis = Mathf::Vector3::DistanceSquared(asisPos, pos);
 	}
-	if (player1) {
-		player1Pos = player1->m_transform.GetWorldPosition();
+	if (m_player1) {
+		player1Pos = m_player1->m_transform.GetWorldPosition();
 		p1Script = m_player1->GetComponentDynamicCast<Player>();
 		distPlayer1 = Mathf::Vector3::DistanceSquared(player1Pos, pos);
 	}
-	if (player2) {
-		player2Pos = player2->m_transform.GetWorldPosition();
+	if (m_player2) {
+		player2Pos = m_player2->m_transform.GetWorldPosition();
 		p2Script = m_player2->GetComponentDynamicCast<Player>();
 		distPlayer2 = Mathf::Vector3::DistanceSquared(player2Pos, pos);
 	}
@@ -206,19 +206,19 @@ void TestMonsterB::Update(float tick)
 	float closedDist = FLT_MAX;
 	if (distPlayer1 < distPlayer2)
 	{
-		closedTarget = player1;
+		closedTarget = m_player1;
 		closedDist = distPlayer1;
 	}
 	else
 	{
-		closedTarget = player2;
+		closedTarget = m_player2;
 		closedDist = distPlayer2;
 	}
 
 	if (isAsisAction) {
 		if (distAsis < closedDist)
 		{
-			closedTarget = Asis;
+			closedTarget = m_asis;
 			closedDist = distAsis;
 		}
 	}
@@ -245,7 +245,6 @@ void TestMonsterB::Update(float tick)
 
 	}
 
-
 	if (closedDist < m_attackRange) {
 		isMelee = false;
 	}
@@ -267,8 +266,8 @@ void TestMonsterB::Update(float tick)
 		if (count > 0) {
 			for (auto& hit : hitResults) {
 				//std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-				if (hit.gameObject->GetHashedName().ToString() == player1->GetHashedName().ToString()
-					|| hit.gameObject->GetHashedName().ToString() == player2->GetHashedName().ToString()) //player
+				if (hit.gameObject->GetHashedName() == player1->GetHashedName()
+					|| hit.gameObject->GetHashedName() == player2->GetHashedName()) //player
 				{
 					//std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponent<Entity>();

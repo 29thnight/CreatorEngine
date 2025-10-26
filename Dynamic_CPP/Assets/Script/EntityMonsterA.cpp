@@ -150,20 +150,16 @@ void EntityMonsterA::Update(float tick)
 	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->SetBaseSpeed(m_moveSpeed);
 
-
 	bool hasAsis = blackBoard->HasKey("Asis");
 	bool hasP1 = blackBoard->HasKey("Player1");
 	bool hasP2 = blackBoard->HasKey("Player2");
 
-	GameObject* Asis = nullptr;
 	if (hasAsis && !m_asis) {
 		m_asis = blackBoard->GetValueAsGameObject("Asis");
 	}
-	GameObject* player1 = nullptr;
 	if (hasP1 && !m_player1){
 		m_player1 = blackBoard->GetValueAsGameObject("Player1");
 	}
-	GameObject* player2 = nullptr;
 	if (hasP2 && !m_player2) {
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}

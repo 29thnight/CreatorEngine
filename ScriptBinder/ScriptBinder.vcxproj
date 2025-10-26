@@ -263,6 +263,7 @@
     <ClCompile Include="DecalComponent.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
+    <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
     <ClCompile Include="SoundComponent.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
@@ -305,8 +306,10 @@
     <ClInclude Include="FoliageComponent.h" />
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
+    <ClInclude Include="MonoManager.h" />
     <ClInclude Include="MSBuildHelper.h" />
     <ClInclude Include="Navigation.h" />
+    <ClInclude Include="Object_Binding.h" />
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="CurvePoint.h" />
     <ClInclude Include="ScriptStringModule.h" />

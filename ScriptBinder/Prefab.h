@@ -18,6 +18,7 @@ public:
     static Prefab* CreateFromGameObject(const GameObject* source, std::string_view name = "");
 
     GameObject* Instantiate(std::string_view newName = "") const;
+    GameObject* Instantiate(Scene* targetScene, std::string_view newName = "") const;
 
     const MetaYml::Node& GetPrefabData() const { return m_prefabData; }
     void SetPrefabData(const MetaYml::Node& node) { m_prefabData = node; }

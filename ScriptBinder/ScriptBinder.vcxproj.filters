@@ -186,13 +186,19 @@
     <Filter Include="Classes\Resources\Sound">
       <UniqueIdentifier>{a2c4428d-0d20-4142-846f-1b2cba944fdf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\HotLoadSystem\MonoLibSystem">
+      <UniqueIdentifier>{edff1b14-cef3-4872-bec8-ee09f63a343c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\HotLoadSystem\ModuleHotLoadSystem">
+      <UniqueIdentifier>{5d36d20f-4df5-4a91-b22d-c1103736560e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\HotLoadSystem\MonoLibSystem\Test">
+      <UniqueIdentifier>{a8caaf63-9b01-447d-aac7-6b1bc39f4fb8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="HotLoadSystem.cpp">
-      <Filter>Managers\HotLoadSystem</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
       <Filter>Managers\SceneManager</Filter>
@@ -338,14 +344,20 @@
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>
-    <ClCompile Include="SpriteSheetComponent.cpp">
-      <Filter>Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="SpriteRenderer.cpp">
-      <Filter>Classes</Filter>
-    </ClCompile>
     <ClCompile Include="SoundComponent.cpp">
       <Filter>Classes\Components\SoundComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteSheetComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteRenderer.cpp">
+      <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
+    </ClCompile>
+    <ClCompile Include="HotLoadSystem.cpp">
+      <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="MonoManager.cpp">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -357,9 +369,6 @@
     </ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="HotLoadSystem.h">
-      <Filter>Managers\HotLoadSystem</Filter>
     </ClInclude>
     <ClInclude Include="LightProperty.h">
       <Filter>Classes\Resources\Light</Filter>
@@ -619,9 +628,6 @@
     <ClInclude Include="AniBehavior.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="MSBuildHelper.h">
-      <Filter>Managers\HotLoadSystem</Filter>
-    </ClInclude>
     <ClInclude Include="KeyBitFlag.h">
       <Filter>Managers\InputManager\Helper</Filter>
     </ClInclude>
@@ -657,6 +663,18 @@
     </ClInclude>
     <ClInclude Include="CurvePoint.h">
       <Filter>Classes\Resources\Sound</Filter>
+    </ClInclude>
+    <ClInclude Include="HotLoadSystem.h">
+      <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="MSBuildHelper.h">
+      <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="Object_Binding.h">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
+    </ClInclude>
+    <ClInclude Include="MonoManager.h">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

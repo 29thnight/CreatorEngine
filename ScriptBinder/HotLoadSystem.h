@@ -40,12 +40,6 @@ typedef const char** (*ListBTConditionDecoratorNodeNamesFunc)(int*);
 typedef AniBehavior* (*AniBehaviorFunc)(const char*);
 typedef void (*AniBehaviorDeleteFunc)(AniBehavior* AniBehavior);
 typedef const char** (*ListAniBehaviorNamesFunc)(int*);
-
-// 씬 매니저와 행동 트리 노드 팩토리 업데이트 함수 포인터 정의[deprecated]
-typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
-typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
-typedef void (*SetPhysicsManagerFunc)(Singleton<PhysicsManager>::FGetInstance);
-typedef void (*SetPhysxFunc)(Singleton<PhysicX>::FGetInstance);
 #pragma endregion
 
 class HotLoadSystem : public DLLCore::Singleton<HotLoadSystem>

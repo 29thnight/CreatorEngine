@@ -2,6 +2,7 @@
 #include "GameObject.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
+#include "Scene.h"
 
 Prefab::Prefab(std::string_view name, const GameObject* source)
     : Object(name)
@@ -52,6 +53,40 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
     }
 
 	std::cout << "Prefab instantiated in " << bm.GetElapsedTime() << " ms\n";
+
+    return rootObject;
+}
+
+GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
+{
+    if (!m_prefabData)
+        return nullptr;
+
+    Scene* scene = targetScene;
+    if (!scene)
+        return nullptr;
+
+    if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
+        return nullptr;
+    Benchmark bm;
+    auto gameObjNode = m_prefabData["GameObject"];
+
+    GameObject* rootObject = nullptr;
+
+    for (std::size_t i = 0; i < m_prefabData.size(); ++i)
+    {
+        const MetaYml::Node& gameObjNode = m_prefabData[i];
+
+        // 첫 번째 GameObject에만 overrideName 적용
+        std::string_view nameOverride = (i == 0) ? newName : "";
+
+        GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+
+        if (i == 0)
+            rootObject = instantiated;
+    }
+
+    std::cout << "Prefab instantiated in " << bm.GetElapsedTime() << " ms\n";
 
     return rootObject;
 }
@@ -201,6 +236,7 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         }
     }
 
+    obj->m_prefabFileGuid = m_fileGuid;
     obj->m_prefab = const_cast<Prefab*>(this);
     obj->m_prefabFileGuid = GetFileGuid();
     obj->m_prefabOriginal = node;

@@ -85,9 +85,6 @@
     <Filter Include="WindowsApplication\WinProcProxy">
       <UniqueIdentifier>{55aca1da-4552-4b1a-acbc-ece6e62d9cb0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.CircleQueue">
-      <UniqueIdentifier>{73ca2cda-8e59-4929-83b0-9ca662a4a885}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.AngelScriptBind">
       <UniqueIdentifier>{1904637c-0eba-4cc6-8b16-001793e77563}</UniqueIdentifier>
     </Filter>
@@ -111,6 +108,9 @@
     </Filter>
     <Filter Include="Core.Container\Plf_Colony">
       <UniqueIdentifier>{5547a717-efc1-4308-a583-eeee5b105377}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Container\Core.CircleQueue">
+      <UniqueIdentifier>{73ca2cda-8e59-4929-83b0-9ca662a4a885}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -289,7 +289,7 @@
       <Filter>WindowsApplication\WinProcProxy</Filter>
     </ClInclude>
     <ClInclude Include="CircleQueue.hpp">
-      <Filter>Core.CircleQueue</Filter>
+      <Filter>Core.Container\Core.CircleQueue</Filter>
     </ClInclude>
     <ClInclude Include="DLLRefHelper.h">
       <Filter>Utility</Filter>

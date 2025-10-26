@@ -294,7 +294,32 @@ public:
         }
 
         if (!root["guid"])
-            root["guid"] = GUIDCreator::MakeFileGUID(targetFile.filename().string()).ToString();
+        {
+            if (targetFile.extension() == ".prefab")
+            {
+                auto node = YAML::LoadFile(targetFile.string());
+                YAML::Node pn = node["PrefabNode"];
+                if (pn && pn.IsSequence())
+                {
+                    for (std::size_t i = 0; i < pn.size(); ++i)
+                    {
+                        const YAML::Node& elem = pn[i]; // 각 요소는 Map
+                        // 예시 구조에서 m_prefabFileGuid는 elem 바로 아래에 존재
+                        YAML::Node guidNode = elem["m_prefabFileGuid"];
+                        if (guidNode && guidNode.IsScalar())
+                        {
+                            // 첫 매치 사용
+                            root["guid"] = guidNode.Scalar();
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                root["guid"] = GUIDCreator::MakeFileGUID(targetFile.filename().string()).ToString();
+            }
+        }
 
         root["importSettings"]["extension"] = targetFile.extension().string();
         try
