@@ -3,7 +3,7 @@
 # CreatorEngine — for <a>Kori The Spritail</a> Project
 
 <h1 align="center">
-<img src="https://github.com/user-attachments/assets/b9a0307e-6e61-4c6f-8d68-44f74e6d1609" alt="Creator Engine" height="80">
+<img src="https://github.com/user-attachments/assets/052ee7f2-f02f-4c9f-9eb3-43673b9c4fe2" alt="Creator Engine" height="150">
 </h1>
 
 플랫폼 : Windows
