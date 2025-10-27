@@ -14,6 +14,7 @@
 #include "DebugLog.h"
 #include "SceneManager.h"
 #include "EffectComponent.h"
+#include "EntityMonsterBaseGate.h"
 using namespace Mathf;
 void EntityItem::Start()
 {
@@ -27,9 +28,9 @@ void EntityItem::Start()
 		}
 	}
 
-	auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-	rigid->LockAngularXYZ();
-	rigid->SetLinearDamping(0.1f);
+	m_rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+	m_rigid->LockAngularXYZ();
+	m_rigid->SetLinearDamping(0.1f);
 	auto box = GetOwner()->GetComponent<BoxColliderComponent>();
 	box->SetRestitution(0.f);
 	box->SetStaticFriction(100.f);
@@ -58,22 +59,28 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 {
 	if (collision.otherObj->m_tag == "Wall")
 	{
-		//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
-		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		m_state = EItemState::FALLED;
 		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
-		rigid->UseGravity(true);
+		if(m_rigid)
+			m_rigid->UseGravity(true);
 	}
 
 	if (collision.otherObj->m_tag == "Ground")
 	{
-		//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
-		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		m_state = EItemState::NONE;
 		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
-		rigid->UseGravity(false);
-	}
+		if (m_rigid)
+			m_rigid->UseGravity(false);
+	}	
 
+	if (collision.otherObj->GetComponent<EntityMonsterBaseGate>() != nullptr)
+	{
+
+		m_state = EItemState::FALLED;
+		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
+		if (m_rigid)
+			m_rigid->UseGravity(true);
+	}
 	
 	//LOG("OnTriggerEnter Item");
 }
@@ -109,7 +116,6 @@ void EntityItem::Update(float tick)
 			Vector3 pB = ((endPos - startPos) / 2) + startPos;
 			pB.y += throwDistacneY;
 			Vector3 pA = startPos;
-			auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 			timer += tick * speed; // 10sec
 			if (timer < 1.f) {
 				Vector3 p0 = Lerp(pA, pB, timer);
@@ -119,16 +125,15 @@ void EntityItem::Update(float tick)
 			}
 			else
 			{
-				//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
-				GetOwner()->GetComponent<RigidBodyComponent>()->UseGravity(false);
 				speed = 2.f;
-				rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-				rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-				m_state = EItemState::NONE;
-				/*if (m_effect->m_isPlaying == false)
+				if (m_rigid)
 				{
-					m_effect->Apply();
-				}*/
+					m_rigid->UseGravity(false);
+					m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+					m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+				}
+				m_state = EItemState::NONE;
+
 			};
 		}
 		else
@@ -146,7 +151,6 @@ void EntityItem::Update(float tick)
 				Vector3 pB = ((tailPos - startPos) / 2) + startPos;
 				pB.y += throwDistacneY;
 				Vector3 pA = startPos;
-				auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 				timer += tick * speed; // 10sec
 				if (timer < 1.f) {
 					Vector3 p0 = Lerp(pA, pB, timer);
@@ -157,11 +161,14 @@ void EntityItem::Update(float tick)
 				else
 				{
 
-					//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
-					GetOwner()->GetComponent<RigidBodyComponent>()->UseGravity(false);
+	
 					speed = 2.f;
-					rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-					rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+					if (m_rigid)
+					{
+						m_rigid->UseGravity(false);
+						m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+						m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+					}
 					m_state = EItemState::NONE;
 				};
 			}
@@ -181,7 +188,6 @@ void EntityItem::Update(float tick)
 		Vector3 pB = ((endPos - startPos) / 2) + startPos;
 		Vector3 pA = startPos;
 		pB.y += throwDistacneY;
-		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		timer += tick * speed;
 		timer = std::min(timer, 1.0f); // 1.0 이상 못 넘어가게 제한
 
@@ -195,15 +201,15 @@ void EntityItem::Update(float tick)
 		else
 		{
 			myTr->SetPosition(endPos);  // 위치 보정 필수!
-			rigid->SetIsTrigger(false);
-			speed = 2.f;
-			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-			m_state = EItemState::NONE;
-			/*if (m_effect->m_isPlaying == false)
+
+			if (m_rigid)
 			{
-				m_effect->Apply();
-			}*/
+				m_rigid->SetIsTrigger(false);
+				m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+				m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+			}
+			speed = 2.f;
+			m_state = EItemState::NONE;
 		}
 	}
 
@@ -212,18 +218,23 @@ void EntityItem::Update(float tick)
 		//중력에의해 떨어짐 //바닥 plane 객체 전맵에 깔아야 할듯함 
 		if (abs(pos.y) <= 0.05f)
 		{
-			auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-			rigid->UseGravity(false);
+			if (m_rigid)
+			{
+				m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+				m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+				m_rigid->UseGravity(false);
+			}
+			
 			m_state = EItemState::NONE;
 		}
 	}
 	if (m_state == EItemState::NONE)
 	{
-		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+		if (m_rigid)
+		{
+			m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+			m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+		}
 	}
 	
 	UpdateOutLine(tick);

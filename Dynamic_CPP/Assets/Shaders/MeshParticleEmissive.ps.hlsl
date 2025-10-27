@@ -37,7 +37,7 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    if (input.worldPos.y <= 0.0)
+    if (input.worldPos.y <= -0.1)
         discard;
     
     float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, input.texCoord);

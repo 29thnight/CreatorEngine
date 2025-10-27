@@ -124,35 +124,38 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
     Texture* icon = nullptr;
 	for (auto& [type, object] : gizmoTargetComponent)
 	{
-        bool isMainLight = false;
-		auto lightComponent = object->GetComponent<LightComponent>();
-
-		if(lightComponent)
+		switch (type)
 		{
-			switch (type)
-			{
-			case 0:
-				icon = CameraIcon;
-				break;
-			case 1:
-				isMainLight = (MAIN_LIGHT_INDEX == lightComponent->m_lightIndex);
-				icon = GetLightIcon(lightComponent->m_lightType, isMainLight);
-				break;
-			default:
-				continue;
-			}
-
-			if (nullptr != icon)
-			{
-				DirectX11::PSSetShaderResources(0, 1, &icon->m_pSRV);
-			}
-			GizmoPos _pos{ .pos = Mathf::Vector3(object->m_transform.GetWorldPosition()) };
-			_pos.pos.y -= 0.5f;
-			DirectX11::UpdateBuffer(m_positionBuffer.Get(), &_pos);
-			DirectX11::UpdateBuffer(m_sizeBuffer.Get(), &size);
-
-			DirectX11::Draw(1, 0);
+		case 0:
+		{
+			icon = CameraIcon;
+			break;
 		}
+		case 1:
+		{
+			bool isMainLight = false;
+			auto lightComponent = object->GetComponent<LightComponent>();
+			if (!lightComponent) continue;
+
+			isMainLight = (MAIN_LIGHT_INDEX == lightComponent->m_lightIndex);
+			icon = GetLightIcon(lightComponent->m_lightType, isMainLight);
+			break;
+		}
+		default:
+			continue;
+		}
+
+		if (nullptr != icon)
+		{
+			DirectX11::PSSetShaderResources(0, 1, &icon->m_pSRV);
+		}
+		GizmoPos _pos{ .pos = Mathf::Vector3(object->m_transform.GetWorldPosition()) };
+		_pos.pos.y -= 0.5f;
+		DirectX11::UpdateBuffer(m_positionBuffer.Get(), &_pos);
+		DirectX11::UpdateBuffer(m_sizeBuffer.Get(), &size);
+
+		DirectX11::Draw(1, 0);
+
 	}
 
 	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

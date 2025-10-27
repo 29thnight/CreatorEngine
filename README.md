@@ -1,6 +1,10 @@
-![스크린샷 2025-06-25 134455](https://github.com/user-attachments/assets/c1db44ad-d6b4-4733-b9cc-2d9e14a09823)
+<img width="508" height="252" alt="title_logo" src="https://github.com/user-attachments/assets/6629d62f-83b2-4e3e-866e-65dedafb3400" />
 
-# Creator Engine - for 아시스 길들이기 Project
+# CreatorEngine — for <a>Kori The Spritail</a> Project
+
+<h1 align="center">
+<img src="https://github.com/user-attachments/assets/052ee7f2-f02f-4c9f-9eb3-43673b9c4fe2" alt="Creator Engine" height="150">
+</h1>
 
 플랫폼 : Windows
 
@@ -13,6 +17,8 @@
 ## CreatorEngine 기술 스택 및 라이브러리 개요
 
 CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈형 런타임을 중심으로 구축된 인하우스 게임/툴 엔진입니다. 엔진은 실시간 에디터, 런타임 빌드 파이프라인, 스크립트 핫리로드 등 제작 파이프라인 전반을 아우르는 기능을 제공합니다.
+
+<img width="1917" height="1108" alt="스크린샷 2025-10-26 213538" src="https://github.com/user-attachments/assets/8eb2e961-ec65-457b-b90b-1f17bb39c18f" />
 
 ### 플랫폼 & 언어 타깃
 - **운영 체제**: Win32/Win64 환경을 대상으로 하며, 엔진 엔트리 포인트에서 WinAPI 창 관리·메시지 루프와 DX11 초기화를 수행합니다.
@@ -43,7 +49,7 @@ CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈�
 
 #### 스크립팅 & 핫리로드
 ~~- **Mono/C# 연동**: 게임 오브젝트에 Mono 기반 스크립트 컴포넌트를 부착하고, 수명 주기를 C++에서 관리합니다.~~
-- **핫리로드 파이프라인**: 런타임에서 MSBuild를 호출해 스크립트 솔루션을 빌드하고, DLL을 재로딩하여 새로운 스크립트를 자동 반영합니다.
+- **핫리로드 파이프라인**: 런타임에서 MSBuild를 호출해 스크립트 솔루션(`Dynamic_CPP`)을 빌드하고, DLL을 재로딩하여 새로운 스크립트를 자동 반영합니다.
 
 ### 데이터, 메타 & 직렬화
 - **JSON 직렬화**: nlohmann::json을 사용해 파티클 이펙트, 렌더 모듈, 벡터 타입 등을 직렬화/역직렬화합니다.
@@ -58,7 +64,7 @@ CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈�
 - **열거형 리플렉션**: magic_enum을 이용해 런타임 열거형 이름/값 테이블을 생성하고 리플렉션 레지스트리에 등록합니다.
 
 ### 프로젝트 모듈 구성
-CreatorEngine은 복수의 Visual Studio 프로젝트로 분리되어 있으며, 렌더링(`RenderEngine`), 물리(`Physics`), 스크립트 바인더(`ScriptBinder`), 공용 유틸리티(`Utility_Framework`) 등이 각각 DLL/정적 라이브러리로 빌드됩니다. 엔진 부트스트랩(`EngineEntry`)은 이러한 모듈을 초기화하고, 렌더 루프·사운드 업데이트·스크립트 재빌드 트리거 등 주요 시스템을 오케스트레이션합니다.
+CreatorEngine은 복수의 Visual Studio 프로젝트로 분리되어 있으며, 렌더링(`RenderEngine`), 물리(`Physics`), 스크립트 바인더(`ScriptBinder`), 공용 유틸리티(`Utility_Framework`) 등이 각각 DLL/정적 라이브러리로 빌드됩니다. 엔진 부트스트랩(`EngineEntry`)은 이러한 모듈을 초기화하고, 렌더 루프·사운드 업데이트·스크립트 재빌드 트리거 등 주요 시스템을 조율합니다.
 
 ---
 이 문서는 CreatorEngine의 핵심 기술 스택과 외부 라이브러리 사용 현황을 요약하여, 신규 기여자와 협업자가 엔진 구조를 빠르게 이해할 수 있도록 돕습니다.

@@ -1,5 +1,7 @@
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
+#include "ImageComponent.h"
+#include "GameInstance.h"
 #include "pch.h"
 
 void WeaponSlotController::Awake()
@@ -22,7 +24,18 @@ void WeaponSlotController::Awake()
 
 void WeaponSlotController::Start()
 {
+	m_selectionImageComponent = GetComponent<ImageComponent>();
 	//TODO : 플레이어 오브젝트의 종류를(여성케릭인지 남성케릭인지) 인식해야함.
+	if (!m_selectionImageComponent) return;
+
+	constexpr int CONVERT_TYPE = 1;
+	auto type = GameInstance::GetInstance()->GetPlayerCharType(PlayerDir(m_playerIndex + CONVERT_TYPE));
+
+	if (type != CharType::None && m_playerIndex != (int)type - CONVERT_TYPE)
+	{
+		m_selectionImageComponent->SetTexture(1); //각각 반대되는 케릭터의 텍스처로 설정
+		m_selectionImageComponent->uiEffects = UIEffects::UIEffects_FlipHorizontally;
+	}
 }
 
 void WeaponSlotController::Update(float tick)

@@ -621,6 +621,8 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 			if (instances.empty()) continue;
 			auto& firstInstance = instances.front();
 
+			if (proxy->m_foliageTypes.empty()) continue;
+
 			auto& foliageType = proxy->m_foliageTypes[key];
 			Mesh* mesh		= foliageType.m_mesh;
 			Material* mat	= foliageType.m_material;

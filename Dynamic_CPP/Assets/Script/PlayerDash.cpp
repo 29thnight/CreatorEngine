@@ -57,6 +57,8 @@ void PlayerDash::Enter()
 		//m_player->m_animator->SetUseLayer(1, false);
 		if (m_player->dashEffect)
 			m_player->dashEffect->Apply();
+
+		m_player->EndRay();
 	}
 }
 

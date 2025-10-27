@@ -135,7 +135,7 @@ void Bomb::OnTriggerEnter(const Collision& collision)
 		float boundPower = 2.0f;
 		dir.Normalize();
 		dir = -dir;
-		Mathf::Vector3 boundTargetPos = boundPower * dir;
+		Mathf::Vector3 boundTargetPos = curPos + (boundPower * dir);
 		boundTargetPos.y = 0.f;
 
 		BoundBomb(boundTargetPos);

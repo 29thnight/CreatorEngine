@@ -355,6 +355,8 @@ void UIManager::DeleteCanvas(const std::shared_ptr<GameObject>& canvas)
 
 void UIManager::CheckInput()
 {
+	if (SceneManagers->IsSceneLoading()) return;
+
 	auto curCanvasObj = CurCanvas.lock();
 	float tick = Time->GetElapsedSeconds();
 
@@ -401,13 +403,14 @@ void UIManager::CheckInput()
 	auto selectUI = SelectUI.lock();
 	if (selectUI)
 	{
-		if(selectUI->GetComponent<ImageComponent>()->IsNavLock()) return;
+		auto imageComponent = selectUI->GetComponent<ImageComponent>();
+		if(!imageComponent || imageComponent->IsNavLock()) return;
 
 		if(0.2 < elapsed)
 		{
 			if (stickLP1.x > 0.5 || stickLP2.x > 0.5)
 			{
-				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Right);
+				auto navi = imageComponent->GetNextNavi(Direction::Right);
 				if (navi)
 				{
 					SelectUI = navi->shared_from_this();
@@ -416,7 +419,7 @@ void UIManager::CheckInput()
 			}
 			if (stickLP1.x < -0.5 || stickLP2.x < -0.5)
 			{
-				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Left);
+				auto navi = imageComponent->GetNextNavi(Direction::Left);
 				if (navi)
 				{
 					SelectUI = navi->shared_from_this();
@@ -425,7 +428,7 @@ void UIManager::CheckInput()
 			}
 			if (stickLP1.y > 0.5 || stickLP2.y > 0.5)
 			{
-				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Up);
+				auto navi = imageComponent->GetNextNavi(Direction::Up);
 				if (navi)
 				{
 					SelectUI = navi->shared_from_this();
@@ -434,7 +437,7 @@ void UIManager::CheckInput()
 			}
 			if (stickLP1.y < -0.5 || stickLP2.y < -0.5)
 			{
-				auto navi = selectUI->GetComponent<ImageComponent>()->GetNextNavi(Direction::Down);
+				auto navi = imageComponent->GetNextNavi(Direction::Down);
 				if (navi)
 				{
 					SelectUI = navi->shared_from_this();

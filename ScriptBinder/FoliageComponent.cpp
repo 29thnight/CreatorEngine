@@ -4,6 +4,7 @@
 #include "Terrain.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "SceneManager.h"
 #include <random>
 
 void FoliageComponent::Awake()
@@ -254,6 +255,8 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
     {
         for (size_t i = begin; i < end; ++i)
         {
+            if (i >= m_foliageInstances.size()) return;
+
             auto& foliage = m_foliageInstances[i];
 
             // 경계 체크 보정: >=
@@ -279,11 +282,18 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
                 continue;
             }
 
-            DirectX::BoundingBox box = mesh->GetBoundingBox();
-            DirectX::BoundingBox tbox;
-            box.Transform(tbox, foliage.m_worldMatrix);
+            if(SceneManagers->IsGameStart())
+            {
+                DirectX::BoundingBox box = mesh->GetBoundingBox();
+                DirectX::BoundingBox tbox;
+                box.Transform(tbox, foliage.m_worldMatrix);
 
-            foliage.m_isCulled = !frustum.Intersects(tbox);
+                foliage.m_isCulled = !frustum.Intersects(tbox);
+            }
+            else
+            {
+				foliage.m_isCulled = false;
+            }
         }
     };
 

@@ -309,6 +309,7 @@ void Player::Start()
 
 	//대쉬중에는 아무조작도 불가능
 	BitFlag dashBit;
+	dashBit.Set(PlayerStateFlag::CanDash);
 	playerState["Dash"] = dashBit;
 	ChangeState("Idle");
 
@@ -1664,7 +1665,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 
 	std::vector<HitResult>  forwardhits;
 	float forwardDistance = std::max(std::abs(bombThrowPositionoffset.x), std::abs(bombThrowPositionoffset.z));
-	unsigned int forwardLayerMask = 1 << 15;
+	unsigned int forwardLayerMask = 1 << 11;
 	int size = RaycastAll(forwardRayOrgion, targetdir,forwardDistance, forwardLayerMask, forwardhits);
 	float min = 0;
 	for (auto& forwardHit : forwardhits)
@@ -1709,7 +1710,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 
 		float distacne = 150.0f;
 
-		unsigned int layerMask = 1 << 11;
+		unsigned int layerMask = 1 << 15;
 		bombThrowPosition.y = pos.y + 0.1f;
 		int size = RaycastAll(rayOrigin, dir, distacne, layerMask, hits);
 		

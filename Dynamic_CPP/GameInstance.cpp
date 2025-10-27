@@ -324,6 +324,7 @@ void GameInstance::AsyncSceneLoadUpdate()
 
 void GameInstance::LoadScene(const std::string& sceneName)
 {
+	m_isLoadSceneComplete = false;
 	file::path fullPath = PathFinder::Relative("Scenes\\") / std::string(sceneName + ".creator");
 	m_loadingSceneFuture = SceneManagers->LoadSceneAsync(fullPath.string());
 }
@@ -342,6 +343,11 @@ void GameInstance::SwitchScene(const std::string& sceneName)
 void GameInstance::UnloadScene(const std::string& sceneName)
 {
 	// Unload only if the scene is loaded
+}
+
+bool GameInstance::IsLoadSceneComplete() const
+{
+	return m_isLoadSceneComplete;
 }
 
 void GameInstance::PauseGame()
@@ -417,4 +423,16 @@ void GameInstance::RemovePlayerInputDevice(int playerIndex, CharType charType, P
 	{
 		LOG("RemovePlayerInputDevice: mismatch, nothing removed for player " + std::to_string(playerIndex));
 	}
+}
+
+CharType GameInstance::GetPlayerCharType(PlayerDir playerDir) const
+{
+	for (const auto& [charType, dir] : m_playerInputDevices)
+	{
+		if (dir == playerDir)
+		{
+			return charType;
+		}
+	}
+	return CharType::None;
 }

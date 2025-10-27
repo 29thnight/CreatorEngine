@@ -136,8 +136,6 @@ private:
 
 	ThreadPool<std::function<void()>>*			m_threadPool = nullptr;
 	std::unique_ptr<RenderThreadPool>			m_commandThreadPool = nullptr;
-	std::array<std::byte, 128 * 1024>			m_frameScratchBuffer{};
-	std::pmr::monotonic_buffer_resource			m_frameMemoryResource;
 #endif // !DYNAMICCPP_EXPORTS
 	//Editor Camera
 	std::shared_ptr<Camera>						m_pEditorCamera{};
