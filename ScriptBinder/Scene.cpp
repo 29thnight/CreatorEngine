@@ -699,6 +699,12 @@ void Scene::Start()
 
 void Scene::FixedUpdate(float deltaSecond)
 {
+	//여기서 반드시 블로킹해서 BT 업데이트를 마친다.
+	if (m_AIFuture.valid())
+	{
+		m_AIFuture.get();
+	}
+
 #ifndef BUILD_FLAG
 	PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();	// render 단계에서 imgui를 통해 transform의 변경이 있으므로 디버그모드에서만 사용.
@@ -780,12 +786,6 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
-	//여기서 반드시 블로킹해서 BT 업데이트를 마친다.
-	if (m_AIFuture.valid())
-	{
-		m_AIFuture.get();
-	}
-
 	PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
 	PROFILE_CPU_END();
