@@ -309,6 +309,7 @@ void Player::Start()
 
 	//대쉬중에는 아무조작도 불가능
 	BitFlag dashBit;
+	dashBit.Set(PlayerStateFlag::CanDash);
 	playerState["Dash"] = dashBit;
 	ChangeState("Idle");
 
