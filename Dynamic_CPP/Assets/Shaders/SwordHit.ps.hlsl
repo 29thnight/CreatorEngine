@@ -1,21 +1,13 @@
 // MeshParticlePS.hlsl - 3D 메시 파티클 픽셀 셰이더
-
-struct PixelInput
+struct VSOutput
 {
-    float4 position : SV_POSITION;
-    float3 worldPos : WORLD_POSITION;
-    float3 particleCenter : PARTICLE_CENTER;
-    float3 localPos : LOCAL_POSITION; // 원본 로컬 위치
-    float3 particleScale : PARTICLE_SCALE;
-    float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD0;
-    float4 color : COLOR;
-    float3 viewDir : VIEW_DIR;
-    float alpha : ALPHA;
-    uint renderMode : RENDER_MODE;
-    float particleAge : PARTICLE_AGE;
-    float particleLifeTime : PARTICLE_LIFETIME;
+    float4 Position : SV_POSITION;
+    float2 TexCoord : TEXCOORD0;
+    uint TexIndex : TEXCOORD1;
+    float4 Color : COLOR0;
+    float Age : TEXCOORD2;
 };
+
 struct PixelOutput
 {
     float4 color : SV_Target;
@@ -27,94 +19,50 @@ cbuffer TimeBuffer : register(b3)
     float3 gPadding;
 };
 
-cbuffer SpriteAnimationBuffer : register(b4)
+cbuffer SpriteAnimationBuffer : register(b0)
 {
     uint frameCount; // 총 프레임 수
     float animationDuration;
     uint2 gridSize; // 스프라이트 시트 격자 크기 (columns, rows)
 };
 
-Texture2D gDiffuseTexture : register(t0);
+Texture2D gMaskTexture : register(t0);
+
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
 
-// Hash 함수 (랜덤값 생성용)
-float Hash(uint seed)
-{
-    seed = (seed ^ 61u) ^ (seed >> 16u);
-    seed *= 9u;
-    seed = seed ^ (seed >> 4u);
-    seed *= 0x27d4eb2du;
-    seed = seed ^ (seed >> 15u);
-    return float(seed) * (1.0f / 4294967296.0f);
-}
-
-uint HashVector3(float3 v)
-{
-    // 소수점 좌표를 정수로 스케일링 (예: 1000배)
-    int xi = (int) (v.x * 1000.0f);
-    int yi = (int) (v.y * 1000.0f);
-    int zi = (int) (v.z * 1000.0f);
-
-    // 단순 해시 조합
-    uint h = 2166136261u; // FNV-1a offset
-    h = (h ^ xi) * 16777619u;
-    h = (h ^ yi) * 16777619u;
-    h = (h ^ zi) * 16777619u;
-    return h;
-}
-
-PixelOutput main(PixelInput input)
+PixelOutput main(VSOutput input)
 {
     PixelOutput output;
-    
-    float randomValue = Hash(HashVector3(input.normal));
-    uint randomFrame = (uint) (randomValue * frameCount);
+
+    // age를 기반으로 현재 프레임 계산
+    float normalizedTime = fmod(input.Age, animationDuration) / animationDuration;
+    uint currentFrame = 2;
+
+    // 스프라이트 애니메이션을 위한 UV 좌표 계산
     float2 frameSize = float2(1.0f / gridSize.x, 1.0f / gridSize.y);
-    int frameX = randomFrame % gridSize.x;
-    int frameY = randomFrame / gridSize.x;
+    uint frameX = currentFrame % gridSize.x;
+    uint frameY = currentFrame / gridSize.x;
+
     float2 frameOffset = float2(frameX * frameSize.x, frameY * frameSize.y);
-    float2 uv = input.texCoord * 0.5; //frameOffset + (input.texCoord * frameSize);
-    
-    float4 diffuseColor = gDiffuseTexture.Sample(gPointSampler, uv);
-    float mask = diffuseColor.r;
-    float dissolve = diffuseColor.g;
-    float dissolve2 = diffuseColor.b;
-    float alpha = diffuseColor.a;
-    
-    float x = uv.x;
-    float y = uv.y;
-    float clampY = clamp(y, 0.f, 0.5f);
-    float addY = clampY - 1.f;
-    float subY = 1.f - clampY;
-    float lerpY = lerp(addY, subY, x);
-    float oneminus = 1.f - dissolve;
-    float addlerp = lerpY + oneminus;
-    
-    
-    float smoothY = smoothstep(clampY, subY, addlerp);
-    float satu = saturate(alpha - smoothY);
-    
-    
-    
-    float t = input.particleAge / input.particleLifeTime;
-    float powt = pow(t, 2);
-    
-    float3 c = lerp(input.color * mask, input.color * dissolve2, dissolve2);
-    
-    float a = input.alpha * satu * smoothstep(powt, powt + 0.2, dissolve);
-    
-    clip(a - 0.01);
-    
-    output.color = float4(c, a);
-    
-    //float3 finalColor;
-    
-    //finalColor = input.color.rgb * diffuseColor.rgb;
-    
-    //float finalAlpha = input.alpha * diffuseColor.a;
-    //output.color = float4(1,1,1, satu);
-    ////output.color = float4(finalColor, finalAlpha);
-    
+
+    float2 animatedUV = frameOffset + (input.TexCoord * frameSize);
+
+    // 기본 텍스처 색상 가져오기 (애니메이션된 UV 사용)
+    float4 texColor = gMaskTexture.Sample(gLinearSampler, animatedUV);
+
+    float mask = texColor.r;
+    float intensity = texColor.g;
+    float flow = texColor.b;
+    float opacity = texColor.a;
+
+    // 최종 색상 계산
+    float3 finalColor = input.Color.rgb * intensity;
+    float finalAlpha = input.Color.a * mask * opacity;
+
+    clip(finalAlpha - 0.05);
+
+    output.color = float4(finalColor, finalAlpha);
+
     return output;
 }
