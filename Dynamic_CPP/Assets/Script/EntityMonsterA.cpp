@@ -473,6 +473,7 @@ void EntityMonsterA::DeadEvent()
 
 void EntityMonsterA::RotateToTarget()
 {
+	if (isDead) return;
 	SimpleMath::Quaternion rot = m_pOwner->m_transform.GetWorldQuaternion();
 	if (target)
 	{
