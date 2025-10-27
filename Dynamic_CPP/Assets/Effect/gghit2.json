@@ -1,6 +1,9 @@
 {
     "currentTime": 0.0,
-    "duration": 0.20000000298023224,
+    "duration": 1.0,
+    "emitterTimings": [
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
@@ -39,7 +42,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 0.20000000298023224,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -67,7 +70,7 @@
                                 "z": 0.5
                             },
                             "emitterType": 0,
-                            "spawnRate": 0.20000000298023224
+                            "spawnRate": 1.0
                         },
                         "state": {
                             "isInitialized": true,
@@ -96,7 +99,7 @@
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.5,
+                                "x": 0.0,
                                 "y": 1.0,
                                 "z": 1.0
                             },
@@ -175,5 +178,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 3.0
 }

@@ -355,7 +355,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 3.0
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -642,7 +642,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 3.0
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -929,7 +929,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 3.0
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -1420,5 +1420,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }
