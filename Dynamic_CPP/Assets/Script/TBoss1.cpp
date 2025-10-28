@@ -56,6 +56,20 @@ void TBoss1::Start()
 
 	}
 
+	
+	if (m_criticalMark == nullptr)
+	{
+		Prefab* criticalMarkPre = PrefabUtilitys->LoadPrefab("CriticalMark");
+		{
+			if (criticalMarkPre)
+			{
+				auto Obj = PrefabUtilitys->InstantiatePrefab(criticalMarkPre, "criticalMark");
+				m_criticalMark = Obj->GetComponent<CriticalMark>();
+				GetOwner()->AddChild(Obj);
+			}
+		}
+	}
+
 	//prefab load
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
 	Prefab* BP003Prefab = PrefabUtilitys->LoadPrefab("Boss1BP003Obj");
