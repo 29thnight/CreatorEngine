@@ -38,4 +38,5 @@ private:
 	[[Property]]
 	float attackRange = 10.f;
 	
+	GameObject* deadObj = nullptr;
 };

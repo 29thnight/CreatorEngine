@@ -12,6 +12,7 @@
 #include "TweenManager.h"
 #include "Core.Random.h"
 #include "Weapon.h"
+#include "PlayEffectAll.h"
 void EntityResource::Start()
 {
 
@@ -32,6 +33,14 @@ void EntityResource::Start()
 	m_effect = newEffect->AddComponent<EffectComponent>();
 	m_effect->m_effectTemplateName = "resourceView";
 	m_effect->Apply();
+
+
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 }
 
 void EntityResource::Update(float tick)
@@ -60,33 +69,6 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			m_currentHP -= std::max(damage, 0);
 			PlayHitEffect(this->GetOwner(), hitinfo);
 			if (m_currentHP <= 0) {
-				// dead
-
-				//auto& resources = GameObject::Find("GameManager")->GetComponent<GameManager>()->GetResourcePool();
-				/*if (!resources.empty()) {
-					int tempidx = 0;
-					auto item = resources[tempidx];
-					resources.erase(resources.begin() + tempidx);
-					Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
-					spawnPos.y += 3.f;
-					item->GetOwner()->m_transform.SetPosition(spawnPos);
-					item->GetComponent<RigidBodyComponent>().AddForce({ 0.f, 300.f, 300.f }, EForceMode::IMPULSE);
-				}*/
-				/*int tempidx = 0;   //리소스풀쓸때
-				for (auto& resource : resources)
-				{
-					auto item = dynamic_cast<EntityItem*>(resource);
-					if (item && itemCode == item->itemCode)
-					{
-						resources.erase(resources.begin() + tempidx);
-						Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
-						spawnPos.y += 3.f;
-						item->GetOwner()->m_transform.SetPosition(spawnPos);
-						item->GetComponent<RigidBodyComponent>().AddForce({ 0.f, 30.f, 300.f }, EForceMode::IMPULSE);
-						break;
-					}
-					tempidx++;
-				}*/
 				Prefab* itemPrefab = nullptr;
 				if (itemType == EItemType::Mushroom)
 				{
@@ -152,6 +134,15 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 				}
 
+				if(deadObj)
+				{
+					deadObj->SetEnabled(true);
+					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+					deadPos.y += 0.7f;
+					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+					deadEffect->Initialize();
+				}
 				GetOwner()->Destroy();
 				/*auto pung = GameObject::Find("Pung2");
 				if (pung)

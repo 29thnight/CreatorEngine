@@ -3,6 +3,8 @@
 #include "BoxColliderComponent.h"
 #include "pch.h"
 #include "MeshRenderer.h"
+#include "PlayEffectAll.h"
+#include "PrefabUtility.h"
 void EntityMonsterBaseGate::Start()
 {
 	m_maxHP = maxHP;
@@ -31,6 +33,12 @@ void EntityMonsterBaseGate::Start()
 		breakModel->GetComponent<MeshRenderer>()->SetEnabled(false);
 	}
 
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 }
 
 void EntityMonsterBaseGate::Update(float tick)
@@ -48,6 +56,16 @@ void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitin
 	{
 		isDestroy = true;
 		SetAlive(false);
+
+		if (deadObj)
+		{
+			deadObj->SetEnabled(true);
+			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+			deadPos.y += 0.7f;
+			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+			deadEffect->Initialize();
+		}
 
 		if (normalModel)
 		{
