@@ -131,8 +131,10 @@ public:
 
 	//range
 	[[Property]]
-	float BP001RadiusSize = 1.0f; //투사체 사이즈
-	float BP001Speed = 2.0f;
+	float BP001RadiusSize = 3.0f; //투사체 사이즈
+	[[Property]]
+	float BP001Speed = 3.0f;
+	[[Property]]
 	float BP001Delay = 5.0f;
 	[[Property]]
 	float BP002Dist = 5.0f; //데미지 들어갈 거리 

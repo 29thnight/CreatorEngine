@@ -13,6 +13,8 @@ ReflectionScriptField(TBoss1) \
 		meta_property(BP002Damage) \
 		meta_property(BP003Damage) \
 		meta_property(BP001RadiusSize) \
+		meta_property(BP001Speed) \
+		meta_property(BP001Delay) \
 		meta_property(BP002Dist) \
 		meta_property(BP003RadiusSize) \
 		meta_property(MoveSpeed) \

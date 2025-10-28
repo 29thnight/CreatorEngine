@@ -217,7 +217,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [1329787972, 1958920636]
-    ChildWeights: [0.449999988, 0.550000012]
+    ChildWeights: [0.800000012, 0.200000003]
     Position: {x: 1990, y: 1336}
   - ID: 1329787972
     Type: 9
@@ -360,7 +360,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [3951927181, 963003460, 3306620243]
-    ChildWeights: [0.300000012, 0.400000006, 0.300000012]
+    ChildWeights: [0.100000001, 0.5, 0.400000006]
     Position: {x: 780, y: 1856}
   - ID: 3951927181
     Type: 9
@@ -437,7 +437,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [1785449513, 2201317433]
-    ChildWeights: [0.449999988, 0.550000012]
+    ChildWeights: [0.699999988, 0.300000012]
     Position: {x: 1318, y: 2171}
   - ID: 1785449513
     Type: 9

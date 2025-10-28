@@ -131,6 +131,7 @@ void TBoss1::Start()
 
 void TBoss1::Update(float tick)
 {
+	if (isDead)return;
 	std::cout << "[TBoss1::Update] 프레임 시작. 현재 페이즈: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
 	HitImpulseUpdate(tick);
 	//test code  ==> todo : 필요에 따라 최초 타겟과 타겟을 변경하는 내용 ==> 변경기준 카운트? 거리? 랜덤?
@@ -556,7 +557,7 @@ void TBoss1::Update_BP0011(float tick)
 			Mathf::Vector3 dir = targetPos - ownerPos;
 			dir.y = 0;
 			dir.Normalize();
-			Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
+			Mathf::Vector3 pos = ownerPos + (dir * 5.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
 		
 			projectilePos = pos;
 			projectileDir = dir;
@@ -595,7 +596,7 @@ void TBoss1::Update_BP0013(float tick)
 			Mathf::Vector3 dir = targetPos - ownerPos;
 			dir.y = 0;
 			dir.Normalize();
-			Mathf::Vector3 pos = ownerPos + (dir * 2.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
+			Mathf::Vector3 pos = ownerPos + (dir * 5.0f) + (Mathf::Vector3(0, 1, 0) * 0.5);
 
 			projectilePos = pos;
 			projectileDir = dir;
@@ -793,7 +794,7 @@ void TBoss1::Update_BP0032(float tick)
 		for (auto& dir : directions) {
 			
 
-			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
+			Mathf::Vector3 objpos = pos + dir * 8.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
 			GameObject* floor = BP003Objs[index];
 			BP003* script = floor->GetComponent<BP003>();
 			floor->SetEnabled(true);
@@ -889,7 +890,7 @@ void TBoss1::Update_BP0033(float tick)
 
 		for (auto& dir : directions) {
 			//가까운거
-			Mathf::Vector3 objpos = pos + dir * 6.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
+			Mathf::Vector3 objpos = pos + dir * 8.0f; // 6만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
 			GameObject* floor = BP003Objs[index];
 			BP003* script = floor->GetComponent<BP003>();
 			floor->SetEnabled(true);
@@ -904,7 +905,7 @@ void TBoss1::Update_BP0033(float tick)
 			index++;
 
 			//먼거
-			Mathf::Vector3 objpos2 = pos + dir * 12.0f; // 12만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
+			Mathf::Vector3 objpos2 = pos + dir * 16.0f; // 12만큼 떨어진 위치 이 수치는 프로퍼티로 뺄까 일단 내가 계속 임의로 수정해주는걸로
 			GameObject* floor2 = BP003Objs[index];
 			BP003* script2 = floor2->GetComponent<BP003>();
 			floor2->SetEnabled(true);
@@ -1534,7 +1535,7 @@ void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 
 			m_currentHP -= damage;
 
-			//blackBoard->SetValueAsInt("CurrHP", m_currentHP);
+			BB->SetValueAsInt("CurrHP", m_currentHP);
 
 
 			if (m_currentHP <= 0)
@@ -1542,7 +1543,7 @@ void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 				isDead = true;  
 				Dead();         //Dead애니메이션으로 보내기 + 보스 콜라이더 끄기 등등
 				//DeadEvent(); //Die 애니메이션등이있으면 거기로 옮길것  // 이 함수에서 사망이펙트 + 삭제처리 + 게임매니저에 보스클리어 이벤트보내기등
-				Time->SetTimeScale(0.1f, 5.0f); //보스 연출용 예시
+				//Time->SetTimeScale(0.1f, 5.0f); //보스 연출용 예시
 				
 				m_currentHP = 0;
 			}
