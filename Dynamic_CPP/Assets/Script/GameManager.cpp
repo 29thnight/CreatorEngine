@@ -83,6 +83,12 @@ void GameManager::Update(float tick)
 
 	if (m_isGameOver)
 	{
+		int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
+		if (currentScene != (int)SceneType::Boss)
+		{
+			GameInstance::GetInstance()->ResetAllEnhancements();
+		}
+
 		SwitchNextSceneWithFade();
 		return;
 	}

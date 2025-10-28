@@ -456,7 +456,10 @@ void Scene::CullMeshData()
 		{
 			for (auto& mesh : allMeshes)
 			{
-				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+				if (mesh->IsDestroyMark()					|| 
+					false == mesh->IsEnabled()				|| 
+					false == mesh->GetOwner()->IsEnabled()
+				) continue;
 				data->PushShadowRenderData(mesh->GetInstanceID());
 			}
 		});
