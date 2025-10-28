@@ -979,6 +979,7 @@ void Player::UpdateChatchObject()
 			directionToAsis.Normalize();
 
 			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f) && detectDistance > distance)
 			{
 				onIndicate = true;
 
