@@ -41,7 +41,7 @@
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
-	m_deviceResources(deviceResources), m_frameMemoryResource(m_frameScratchBuffer.data(), m_frameScratchBuffer.size(), std::pmr::get_default_resource())
+	m_deviceResources(deviceResources)
 {
     InitializeDeviceState();
     InitializeShadowMapDesc();
@@ -574,7 +574,6 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 	PROFILE_CPU_BEGIN("PrepareRender");
 	PrepareRender();
 	PROFILE_CPU_END();
-	m_frameMemoryResource.release();
 }
 
 void SceneRenderer::SceneRendering()
@@ -1172,6 +1171,215 @@ void SceneRenderer::PrepareRender()
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
 	PROFILE_CPU_BEGIN("CopySceneData");
+	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
+	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
+	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+	std::vector<SpriteRenderer*> spriteRenderers = m_currentScene->GetSpriteRenderers();
+	std::vector<ImageComponent*> imageComponents = UIManagers->Images;
+	std::vector<TextComponent*> textComponents = UIManagers->Texts;
+	std::vector<SpriteSheetComponent*> spriteComponents = UIManagers->SpriteSheets;
+	std::vector<DecalComponent*> decalComponents = m_currentScene->GetDecalComponents();
+	PROFILE_CPU_END();
+
+	PROFILE_CPU_BEGIN("UpdateCommand");
+	if (!textComponents.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, texts = std::move(textComponents)]
+			{
+				for (auto& text : texts)
+				{
+					auto owner = text->GetOwner();
+					if (nullptr == owner) continue;
+					auto scene = owner->GetScene();
+
+					if (scene && scene == m_currentScene)
+					{
+						try
+						{
+							renderScene->UpdateCommand(text);
+						}
+						catch (const std::exception& e)
+						{
+							std::cerr << "Error updating text command: " << e.what() << std::endl;
+						}
+					}
+				}
+			});
+	}
+
+	if (!imageComponents.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, images = std::move(imageComponents)]
+			{
+				for (auto& image : images)
+				{
+					auto owner = image->GetOwner();
+					if (nullptr == owner) continue;
+					auto scene = owner->GetScene();
+					if (scene && scene == m_currentScene)
+					{
+						try
+						{
+							renderScene->UpdateCommand(image);
+						}
+						catch (const std::exception& e)
+						{
+							std::cerr << "Error updating image command: " << e.what() << std::endl;
+						}
+					}
+				}
+			});
+	}
+
+	if (!spriteComponents.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, sprites = std::move(spriteComponents)]
+			{
+				for (auto& sprite : sprites)
+				{
+					auto owner = sprite->GetOwner();
+					if (nullptr == owner) continue;
+					auto scene = owner->GetScene();
+					if (scene && scene == m_currentScene)
+					{
+						try
+						{
+							renderScene->UpdateCommand(sprite);
+						}
+						catch (const std::exception& e)
+						{
+							std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+						}
+					}
+
+				}
+			});
+	}
+
+	if (!terrainComponents.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, terrains = std::move(terrainComponents)]
+			{
+				for (auto& terrain : terrains)
+				{
+					try
+					{
+						renderScene->UpdateCommand(terrain);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating terrain command: " << e.what() << std::endl;
+					}
+				}
+			});
+	}
+
+	if (!allMeshes.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, meshes = std::move(allMeshes)]
+			{
+				for (auto& mesh : meshes)
+				{
+					if (!mesh) continue;
+					try
+					{
+						renderScene->UpdateCommand(mesh);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating mesh command: " << e.what() << '\n';
+					}
+				}
+			});
+	}
+
+	if (!foliageComponents.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, foliages = std::move(foliageComponents)]
+			{
+				for (auto& foliage : foliages)
+				{
+					try
+					{
+						renderScene->UpdateCommand(foliage);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating foliage command: " << e.what() << std::endl;
+					}
+				}
+			});
+	}
+
+	if (!decalComponents.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, decals = std::move(decalComponents)]
+			{
+				for (auto& decal : decals)
+				{
+					try
+					{
+						renderScene->UpdateCommand(decal);
+					}
+					catch (const std::exception& e)
+					{
+						std::cerr << "Error updating decal command: " << e.what() << std::endl;
+					}
+				}
+			});
+	}
+
+	if (!spriteRenderers.empty())
+	{
+		m_threadPool->Enqueue([&, renderScene, sprites = std::move(spriteRenderers)]
+			{
+				for (auto& sprite : sprites)
+				{
+					auto owner = sprite->GetOwner();
+					if (nullptr == owner) continue;
+					auto scene = owner->GetScene();
+					if (scene && scene == m_currentScene)
+					{
+						try
+						{
+							renderScene->UpdateCommand(sprite);
+						}
+						catch (const std::exception& e)
+						{
+							std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+						}
+					}
+
+				}
+			});
+	}
+
+	m_threadPool->NotifyAllAndWait();
+	PROFILE_CPU_END();
+
+	EffectProxyController::GetInstance()->PrepareCommandBehavior();
+
+	for (auto camera : CameraManagement->GetCameras())
+	{
+		if (nullptr == camera) continue;
+
+		if (!RenderPassData::VaildCheck(camera.get())) return;
+		auto data = RenderPassData::GetData(camera.get());
+
+		data->UpdateData(camera.get());
+		data->AddFrame();
+	}
+
+	SwapEvent();
+	ProxyCommandQueue->AddFrame();
+	EffectProxyController::GetInstance()->AddFrame();
+
+	/*auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
+	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
+
+	auto renderScene = m_renderScene;
+	auto m_currentScene = SceneManagers->GetActiveScene();
+	PROFILE_CPU_BEGIN("CopySceneData");
 	const auto& meshSource = m_currentScene->GetMeshRenderers();
 	std::pmr::vector<MeshRenderer*> allMeshes{ &m_frameMemoryResource };
 	allMeshes.assign(meshSource.begin(), meshSource.end());
@@ -1404,7 +1612,7 @@ void SceneRenderer::PrepareRender()
 
 	SwapEvent();
 	ProxyCommandQueue->AddFrame();
-	EffectProxyController::GetInstance()->AddFrame();
+	EffectProxyController::GetInstance()->AddFrame();*/
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

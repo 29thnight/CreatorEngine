@@ -45,6 +45,8 @@ public:
 	virtual void HitImpulseUpdate(float tick);
 	void StopHitImpulse();
 
+	void SetStagger(float time);
+
 	int m_currentHP{ 1 };
 	[[Property]]
 	int m_maxHP{ 100 };
@@ -67,9 +69,6 @@ public:
 	bool isKnockBack = false;
 	float KnockBackElapsedTime = 0.f;
 	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
-
-	Core::Delegate<void> m_onDeathEvent;
-	Core::Delegate<void> m_onDamageEvent;
 	
 	void SetAlive(bool isAlive);
 	bool GetAlive();

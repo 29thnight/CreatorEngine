@@ -47,7 +47,6 @@ public:
 	void ClearThrowOwner();
 public:
 	GameObject* asisTail{ nullptr };
-	RigidBodyComponent* m_rigid = nullptr;
 	Mathf::Vector3 startPos{ 0.f, 0.f, 0.f };
 	Mathf::Vector3 endPos{ 0.f, 0.f, 0.f };
 	float throwDistacneX = 0.f; 
@@ -71,6 +70,7 @@ public:
 
 	bool OnGround;
 	EffectComponent* m_effect = nullptr;
+	RigidBodyComponent* m_rigid = nullptr;
 private:
 	Player* throwOwner{ nullptr }; // 이 아이템을 던진 객체.
 };

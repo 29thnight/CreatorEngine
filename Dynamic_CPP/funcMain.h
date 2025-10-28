@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("BGMController", []() { return new BGMController(); });
 		CreateFactory::GetInstance()->RegisterFactory("PauseMenuButton", []() { return new PauseMenuButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("KoriEmoteSystem", []() { return new KoriEmoteSystem(); });
 		CreateFactory::GetInstance()->RegisterFactory("BossBomb", []() { return new BossBomb(); });

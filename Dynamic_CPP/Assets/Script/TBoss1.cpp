@@ -10,7 +10,9 @@
 #include "BP003.h"
 #include "BP001.h"
 #include "GameManager.h"
-
+#include "Player.h"
+#include "CriticalMark.h"
+#include "Weapon.h"
 void TBoss1::Start()
 {
 	BT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -35,9 +37,21 @@ void TBoss1::Start()
 		}
 
 	}
-
 	if (m_animator) {
 		m_anicontroller = m_animator->m_animationControllers[0].get();
+	}
+
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
+			break;
+		}
+
 	}
 
 	//prefab load
@@ -76,7 +90,7 @@ void TBoss1::Start()
 
 	SetupPatternItemData(playersCount);
 
-
+	m_maxHP = m_MaxHp;
 	m_currentHP = m_maxHP;
 
 	
@@ -260,6 +274,7 @@ void TBoss1::SweepAttackDir(Mathf::Vector3 pos, Mathf::Vector3 dir)
 					hitInfo.hitPos = hit.point;
 					hitInfo.hitNormal = hit.normal;
 					hitInfo.attakerPos = pos;
+					hitInfo.KnockbackForce = { KnockbackDistacneX ,KnockbackDistacneY };
 					//hitInfo.KnockbackForce
 					//hitInfo.bulletType
 					//hitInfo.itemType
@@ -1469,9 +1484,46 @@ void TBoss1::BP0034()
 
 void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 {
-	m_CurrHp -= damage;
+	if (sender)
+	{
+		auto player = dynamic_cast<Player*>(sender);
+		if (player)
+		{
+			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 dir = curPos - senderPos;
+
+			dir.Normalize();
+			if (m_criticalMark)
+			{
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					damage *= player->m_curWeapon->coopCrit;
+					hitInfo.isCritical = true;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+				}
+			}
+			PlayHitEffect(this->GetOwner(), hitInfo);
+
+			m_currentHP -= damage;
+			//blackBoard->SetValueAsInt("CurrHP", m_currentHP);
 
 
-	HitImpulse();
+			if (m_currentHP <= 0)
+			{
+				//isDead = true;  //보스에 아직 변수가없어서 이렇게둠
+				//Dead();         //Dead애니메이션으로 보내기 + 보스 콜라이더 끄기 등등
+				//DeadEvent(); //Die 애니메이션등이있으면 거기로 옮길것  // 이 함수에서 사망이펙트 + 삭제처리 + 게임매니저에 보스클리어 이벤트보내기등
+				
+				
+				//CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
+				//controller->Move({ 0, 0 });
+				
+			}
+			else {
+				HitImpulse();
+			}
+		}
+	}
 }
 

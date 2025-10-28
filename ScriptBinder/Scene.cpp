@@ -699,6 +699,11 @@ void Scene::Start()
 
 void Scene::FixedUpdate(float deltaSecond)
 {
+	//여기서 반드시 블로킹해서 BT 업데이트를 마친다.
+	if (m_AIFuture.valid())
+	{
+		m_AIFuture.get();
+	}
 #ifndef BUILD_FLAG
 	PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();	// render 단계에서 imgui를 통해 transform의 변경이 있으므로 디버그모드에서만 사용.
@@ -780,12 +785,6 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
-	//여기서 반드시 블로킹해서 BT 업데이트를 마친다.
-	if (m_AIFuture.valid())
-	{
-		m_AIFuture.get();
-	}
-
 	PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();
 	PROFILE_CPU_END();
@@ -835,13 +834,12 @@ void Scene::OnDestroy()
 	PROFILE_CPU_BEGIN("DestroyGameObjects");
     DestroyGameObjects();
 	PROFILE_CPU_END();
-
 	//여기서 병렬처리
 	float deltaSecond = Time->GetElapsedSeconds();
 	m_AIFuture = std::async(std::launch::async, [deltaSecond]
-	{
-		AIManagers->InternalAIUpdate(deltaSecond);
-	});
+		{
+			AIManagers->InternalAIUpdate(deltaSecond);
+		});
 }
 
 void Scene::AllDestroyMark()
@@ -1795,11 +1793,14 @@ void Scene::SetInternalPhysicData()
 		}
 	}
 
-	std::erase_if(m_ColliderTypeLinkCallback, 
-		[&linkCompleteSet](const auto& pair)
-		{
-			return linkCompleteSet.contains(pair.first);
-		});
+	if(!m_ColliderTypeLinkCallback.empty())
+	{
+		std::erase_if(m_ColliderTypeLinkCallback,
+			[&linkCompleteSet](const auto& pair)
+			{
+				return linkCompleteSet.contains(pair.first);
+			});
+	}
 }
 
 void Scene::AllUpdateWorldMatrix()

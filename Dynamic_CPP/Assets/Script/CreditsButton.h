@@ -14,4 +14,7 @@ public:
 
 private:
 	using Super = ImageButton;
+
+	bool m_isClicked = false;
+	class GameManager* m_gameManager{};
 };

@@ -9,6 +9,7 @@ class Animator;
 class BehaviorTreeComponent;
 class BlackBoard;
 class RigidBodyComponent;
+class CriticalMark;
 class TBoss1 : public Entity
 {
 public:
@@ -147,6 +148,14 @@ public:
 	[[Property]]
 	float BP003Delay = 1.0f; //생성되고 터지는 딜레이
 
+	//보스공격히트시  플레이어넉백강도, 일단 패턴모두 동일
+	[[Property]]
+	float KnockbackDistacneX = 0.04f;
+	[[Property]]
+	float KnockbackDistacneY = 0.01f;
+
+
+
 
 	[[Property]]
 	int BP0031_MIN_ITEM = 2;
@@ -177,7 +186,7 @@ public:
 
 
 	
-
+	CriticalMark* m_criticalMark = nullptr;
 
 	//보스만 특수하게 
 	GameObject* m_chunsik = nullptr;

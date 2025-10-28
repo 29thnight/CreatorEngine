@@ -53,6 +53,8 @@ void LightController::Initialize()
 
 void LightController::Update()
 {
+	if (!m_pLightBuffer || !m_pLightCountBuffer) return;
+
 	DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
 		m_pLightBuffer,
 		0,

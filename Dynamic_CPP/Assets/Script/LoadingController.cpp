@@ -13,6 +13,12 @@ void LoadingController::Start()
 	if (child)
 	{
 		m_loadingText = child->GetComponent<TextComponent>();
+		int koriChildIndex = child->m_childrenIndices[0];
+		GameObject* koriChild = GameObject::FindIndex(koriChildIndex);
+		if (koriChild)
+		{
+			m_koriIcon = koriChild->GetComponent<ImageComponent>();
+		}
 	}
 
 	GameObject* gmObj = GameObject::Find("GameManager");
@@ -57,6 +63,7 @@ void LoadingController::Update(float tick)
 	else
 	{
 		m_loadingImage->SetEnabled(false);
+		m_koriIcon->SetEnabled(false);
 		m_loadingText->SetMessage("Load Complete");
 	}
 }

@@ -202,86 +202,22 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
 
-	std::vector<FoliageType> foliageTypes;
-	std::vector<FoliageInstance> foliageInstances;
-
-	size_t foliageTypesSize = pComponent->GetFoliageTypes().size();
-	size_t foliageInstancesSize = pComponent->GetFoliageInstances().size();
-	size_t proxyFoliageSize = proxyObject->m_foliageTypes.size();
-	size_t proxyInstancesSize = proxyObject->m_foliageInstances.size();
-
-	if (foliageTypesSize != proxyFoliageSize)
-	{
-		foliageTypes = pComponent->GetFoliageTypes();
-	}
-
-	if (foliageInstancesSize != proxyInstancesSize)
-	{
-		foliageInstances = pComponent->GetFoliageInstances();
-	}
+	std::vector<FoliageType> foliageTypes = pComponent->GetFoliageTypes();
+	std::vector<FoliageInstance> foliageInstances = pComponent->GetFoliageInstances();
 
 	m_updateFunction = [=]()
 	{
-		if (proxyFoliageSize != foliageTypesSize)
-		{
-			proxyObject->m_foliageTypes = foliageTypes;
-		}
-
-		if (proxyInstancesSize != foliageInstancesSize)
-		{
-			proxyObject->m_foliageInstances = foliageInstances;
-		}
+		proxyObject->m_foliageTypes = foliageTypes;
+		proxyObject->m_foliageInstances = foliageInstances;
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 
-		using BucketMap = std::unordered_map<uint32, std::vector<FoliageInstance*>>;
-		constexpr size_t SHARDS = 64;
+		proxyObject->instanceMap.clear();
 
-		auto& instances = proxyObject->m_foliageInstances;
-		instances.clear();
-
-		std::array<BucketMap, SHARDS> shardMaps;
-		std::array<std::mutex, SHARDS> shardLocks;
-
-		// 1) 병렬 수집 (샤딩 + 얕은 락)
-		std::for_each(std::execution::par, instances.begin(), instances.end(),
-		[&](FoliageInstance& inst)
+		for (auto& inst : proxyObject->m_foliageInstances)
 		{
-			if (inst.m_isCulled) return;
-
-			uint32 key = inst.m_foliageTypeID;
-			size_t shard = (std::hash<uint32>{}(key))& (SHARDS - 1);
-
-			// 샤드 단위 잠금
-			std::scoped_lock lk(shardLocks[shard]);
-			shardMaps[shard][key].push_back(&inst);
-		});
-
-		// 2) 키별 총량 계산(미리 capacity 확보용)
-		std::unordered_map<uint32, size_t> totalCounts;
-		for (auto& sm : shardMaps)
-		{
-			for (auto& [k, v] : sm)
-			{
-				totalCounts[k] += v.size();
-			}
-		}
-
-		// 3) 원본 instanceMap에 정확히 reserve
-		for (auto& [k, c] : totalCounts)
-		{
-			auto& dst = proxyObject->instanceMap[k];
-			dst.reserve(dst.size() + c);
-		}
-
-		// 4) 샤드 → 원본으로 머지(단일 스레드, 선형 머지)
-		for (auto& sm : shardMaps)
-		{
-			for (auto& [k, v] : sm)
-			{
-				auto& dst = proxyObject->instanceMap[k];
-				dst.insert(dst.end(), v.begin(), v.end());
-			}
+			if (inst.m_isCulled) continue;
+			proxyObject->instanceMap[inst.m_foliageTypeID].push_back(&inst);
 		}
 	};
 }

@@ -48,4 +48,5 @@ private:
 	int m_curSelectIndex = 0;
 	//케릭터 인덱스
 	int m_characterIndex = 0; //0 남성, 1 여성(추후 케릭터가 추가될 경우를 대비하여 int형으로 선언)
+	class ImageComponent* m_selectionImageComponent = nullptr;
 };

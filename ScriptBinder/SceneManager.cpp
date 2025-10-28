@@ -721,6 +721,7 @@ void SceneManager::BeforeAwakeSceneLoad()
                 }
             }
 
+            UIManagers->SelectUI.reset();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
             m_activeScene.load()->OnDisable();

@@ -29,7 +29,7 @@ public:
 	void LoadScene(const std::string& sceneName);
 	void SwitchScene(const std::string& sceneName);
 	void UnloadScene(const std::string& sceneName);
-	bool IsLoadSceneComplete() const { return m_isLoadSceneComplete; }
+	bool IsLoadSceneComplete() const;
 	int GetAfterLoadSceneIndex() const { return m_beyondSceneIndex; }
 	void SetAfterLoadSceneIndex(int type = 0) { m_beyondSceneIndex = type; }
 
@@ -50,7 +50,7 @@ public:
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	void RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
-
+	CharType GetPlayerCharType(PlayerDir playerDir) const;
 public:
 	// Reward Management
 	void SetRewardAmount(int amount) { m_RewardAmount = amount; } 	// 게임 시작 시 또는 치트용.
