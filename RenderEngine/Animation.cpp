@@ -79,7 +79,7 @@ void Animation::InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress,
 	{
 		bool shouldTrigger = false;
 
-		if (_curAnimatonProgress >= _preAnimationProgress)
+		if (_curAnimatonProgress > _preAnimationProgress)
 		{
 			// 일반 진행
 			if (_preAnimationProgress < event.key && event.key <= _curAnimatonProgress)

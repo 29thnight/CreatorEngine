@@ -98,7 +98,15 @@ public:
     bool m_isBlend = false;
 private:
     bool m_IsEnabled = false;
-    
+
+public:
+    float m_stopTimer = 0.f;
+	float m_stopDuration = 0.f;
+    void StopAnimation(float duration)
+    {
+        m_stopTimer = duration;
+        m_stopDuration = 0.f;
+	}
 };
 
 template<typename T>

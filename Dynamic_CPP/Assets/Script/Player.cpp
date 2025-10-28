@@ -982,7 +982,7 @@ void Player::UpdateChatchObject()
 			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f) && detectDistance > distance)
 			{
 				onIndicate = true;
-
+				
 				if (Indicator)
 				{
 					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
@@ -1846,8 +1846,7 @@ void Player::MeleeAttack()
 					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MeleeStrikeSound"));
 				}
 			}
-
-			
+			entity->SetStagger(0.5f);
 		}
 	}
 }
