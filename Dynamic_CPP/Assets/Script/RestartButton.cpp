@@ -22,6 +22,11 @@ void RestartButton::Update(float tick)
 	if (!m_gameManager || !m_isClicked)
 		return;
 
+	int currentScene = GameInstance::GetInstance()->GetPrevSceneType();
+	if (currentScene != (int)SceneType::Boss)
+	{
+		GameInstance::GetInstance()->ResetAllEnhancements();
+	}
 	m_gameManager->SwitchPrevSceneWithFade();
 }
 

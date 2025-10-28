@@ -41,6 +41,24 @@ void SwitchingSceneTrigger::Start()
     {
         m_loadingText = loadingObj->GetComponent<TextComponent>();
 	}
+
+    m_cutImages.clear();
+    m_cutImages.reserve(32);
+
+    const std::string prefix = "Cut";
+    for (int index = 0;; ++index)
+    {
+        const std::string name = prefix + std::to_string(index);
+        GameObject* obj = GameObject::Find(name);
+        if (!obj)
+            break; // 첫 빈 슬롯에서 종료 (CutN이 없으면 루프 끝)
+
+        if (ImageComponent* comp = obj->GetComponent<ImageComponent>())
+        {
+            m_cutImages.push_back(comp);
+        }
+    }
+
 }
 
 bool SwitchingSceneTrigger::IsAnyAJustPressed()
@@ -106,9 +124,43 @@ void SwitchingSceneTrigger::Update(float tick)
         // float pulse = 0.85f + 0.15f * std::sin(totalTime * 6.283f * 1.0f);
         // m_buttonText->SetAlpha(pulse);
 
-        if (IsAnyAJustPressed()) {
-            m_phase = SwitchPhase::FadingOut;
-            m_timer = 0.f;
+        if (IsAnyAJustPressed()) 
+        {
+            int nextSceneType = m_gameManager->m_nextSceneIndex;
+            if (nextSceneType == (int)SceneType::Tutorial)
+            {
+                m_phase = SwitchPhase::FadingOut;
+                m_timer = 0.f;
+            }
+            else
+            {
+                if (0 == m_cutsceneIndex)
+                {
+                    constexpr int BOSS_CUT_SCENE_INDEX = 3;
+                    if(nextSceneType == (int)SceneType::Boss)
+                    {
+                        m_cutsceneIndex = BOSS_CUT_SCENE_INDEX;
+                        m_maxCutsceneIndex = 8;
+                    }
+                    else
+                    {
+                        m_maxCutsceneIndex = 3;
+                    }
+                }
+
+                if (m_maxCutsceneIndex > m_cutsceneIndex)
+                {
+                    if (m_cutImages[m_cutsceneIndex]);
+                    {
+                        m_cutImages[m_cutsceneIndex++]->SetEnabled(true);
+                    }
+                }
+                else
+                {
+                    m_phase = SwitchPhase::FadingOut;
+                    m_timer = 0.f;
+                }
+            }
             // 즉시 깜빡임 방지로 현재 알파를 고정해도 됨
         }
         break;

@@ -263,6 +263,8 @@ void Player::Start()
 		Indicator = PrefabUtilitys->InstantiatePrefab(IndicatorPrefab, "Indicator");
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(false);
+
+
 	}
 
 	Prefab* bombIndicatorPrefab = PrefabUtilitys->LoadPrefab("BombIndicator");

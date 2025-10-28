@@ -33,9 +33,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.6588882803916931,
-                                "y": 0.5724455714225769,
-                                "z": 0.9954792261123657
+                                "x": 0.2928227484226227,
+                                "y": 0.45371153950691223,
+                                "z": 0.9891696572303772
                             },
                             "initialRotation": {
                                 "x": 0.0,
@@ -111,7 +111,7 @@
                             "useGravity": 1
                         },
                         "movementParams": {
-                            "currentTime": 35.243804931640625,
+                            "currentTime": 1130.1029052734375,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -158,17 +158,17 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 0.05000000074505806,
-                                "y": 0.05000000074505806,
-                                "z": 0.10000000149011612
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612,
+                                "z": 0.5
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.05000000074505806,
-                                "y": 0.05000000074505806,
-                                "z": 0.10000000149011612
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612,
+                                "z": 0.5
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
@@ -202,10 +202,13 @@
                         },
                         "mesh": {
                             "meshIndex": 0,
-                            "type": 1
+                            "type": 3
                         },
                         "model": {
-                            "hasModel": false
+                            "assigned": true,
+                            "hasModel": true,
+                            "meshIndex": 0,
+                            "name": "bullet"
                         },
                         "renderState": {
                             "instanceCount": 5
@@ -222,7 +225,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Glow1",
+                                "name": "circle_soft03",
                                 "slot": 0
                             }
                         ]
@@ -242,5 +245,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 2.0
+    "timeScale": 3.0
 }
