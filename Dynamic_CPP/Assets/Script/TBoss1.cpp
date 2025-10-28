@@ -5,6 +5,7 @@
 #include "PrefabUtility.h"
 #include "RigidBodyComponent.h"
 #include "Animator.h"
+#include "EffectComponent.h"
 #include <utility>
 #include "Core.Random.h"
 #include "BP003.h"
@@ -57,6 +58,11 @@ void TBoss1::Start()
 	}
 
 	//prefab load
+	raiseUpEff = PrefabUtilitys->LoadPrefab("BossRaiseUp");
+	UpEffobj = raiseUpEff->Instantiate();
+	fallDownEff = PrefabUtilitys->LoadPrefab("BossFallDown");
+	DownEffobj = fallDownEff->Instantiate();
+
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
 	Prefab* BP003Prefab = PrefabUtilitys->LoadPrefab("Boss1BP003Obj");
 
@@ -1265,11 +1271,17 @@ void TBoss1::PrepareItemDropsForPattern(EPatternType patternType)
 
 void TBoss1::Burrow()
 {
+	
+	Transform* tr = m_pOwner->GetComponent<Transform>();
+	Mathf::Vector3 pos = tr->GetWorldPosition();
+	DownEffobj->m_transform.SetWorldPosition(pos);
 	//todo : 땅속으로 들어감
 	//땅속으로 들어가는 에니메이션 재생
 	//이후 안보이게 처리
 	//콜라이더 비활성화
 	if (m_moveState == EBossMoveState::Idle) {
+		EffectComponent* eff = DownEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
 		m_animator->SetParameter("BurrowTrigger", true);
 		m_rigid->SetColliderEnabled(false);
 	}
@@ -1284,7 +1296,6 @@ void TBoss1::SetBurrow()
 void TBoss1::Protrude()
 {
 	//todo : 땅속에서 나옴
-	
 	//튀어나오기 전에 이동 가능영역 안에 있는지 확인
 	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //춘식이(중심) 위치
 	//타겟 확인  ==> 타겟이 없거나 잃어버렸다면? 그렇다면 랜덤 위치로
@@ -1320,11 +1331,16 @@ void TBoss1::Protrude()
 	//모델 보이게 처리 하며
 
 	//땅속에서 나오는 에니메이션 재생
-
-	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
+	
+	UpEffobj->m_transform.SetWorldPosition(targetPos);
 	if (m_moveState == EBossMoveState::Burrowed) {
+		//eff
+		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
 	}
+
+	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
 }
 
 void TBoss1::ProtrudeEnd()
@@ -1346,6 +1362,9 @@ void TBoss1::ProtrudeChunsik()
 
 	//땅속에서 나오는 에니메이션 재생
 	if(m_moveState == EBossMoveState::Burrowed) {
+		UpEffobj->m_transform.SetWorldPosition(chunsikPos);
+		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
 	}
 }

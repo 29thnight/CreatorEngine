@@ -458,14 +458,20 @@ void EntityEleteMonster::ChaseTarget(float deltatime)
 
 			for (const auto& feelerDir : feelerDirs)
 			{
-				HitResult res;
-				
-				if (Raycast(m_transform->GetWorldPosition(), feelerDir, m_obstacleAvoidanceDistance, ~0, res))
+				std::vector<HitResult> res;
+
+				if (RaycastAll(m_transform->GetWorldPosition(), feelerDir, m_obstacleAvoidanceDistance, ~0, res))
 				{
-					 if (res.gameObject != m_pOwner && res.gameObject != target)
+					if (res.size() > 0)
 					{
-						obstacleDetected = true;
-						avoidanceForce += -feelerDir;
+						for (auto& hit : res)
+						{
+							if (hit.gameObject != m_pOwner && hit.gameObject != target)
+							{
+								obstacleDetected = true;
+								avoidanceForce += -feelerDir;
+							}
+						}
 					}
 				}
 			}
