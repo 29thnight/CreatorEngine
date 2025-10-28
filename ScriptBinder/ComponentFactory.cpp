@@ -156,22 +156,42 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 						if (!meshRenderer->m_Material->m_pBaseColor || meshRenderer->m_Material->m_baseColorTexName != meshRenderer->m_Material->m_pBaseColor->m_name)
 						{
 							loadTex(meshRenderer->m_Material->m_baseColorTexName, meshRenderer->m_Material->m_pBaseColor, false);
+							if (meshRenderer->m_Material->m_pBaseColor)
+							{
+								meshRenderer->m_Material->m_materialInfo.m_useBaseColor = true;
+							}
 						}
 						if (!meshRenderer->m_Material->m_pNormal || meshRenderer->m_Material->m_normalTexName != meshRenderer->m_Material->m_pNormal->m_name)
 						{
 							loadTex(meshRenderer->m_Material->m_normalTexName, meshRenderer->m_Material->m_pNormal);
+							if (meshRenderer->m_Material->m_pNormal)
+							{
+								meshRenderer->m_Material->m_materialInfo.m_useNormalMap = true;
+							}
 						}
 						if (!meshRenderer->m_Material->m_pOccRoughMetal || meshRenderer->m_Material->m_ORM_TexName != meshRenderer->m_Material->m_pOccRoughMetal->m_name)
 						{
 							loadTex(meshRenderer->m_Material->m_ORM_TexName, meshRenderer->m_Material->m_pOccRoughMetal);
+							if (meshRenderer->m_Material->m_pOccRoughMetal)
+							{
+								meshRenderer->m_Material->m_materialInfo.m_useOccRoughMetal = true;
+							}
 						}
 						if (!meshRenderer->m_Material->m_AOMap || meshRenderer->m_Material->m_AO_TexName != meshRenderer->m_Material->m_AOMap->m_name)
 						{
 							loadTex(meshRenderer->m_Material->m_AO_TexName, meshRenderer->m_Material->m_AOMap);
+							if (meshRenderer->m_Material->m_AOMap)
+							{
+								meshRenderer->m_Material->m_materialInfo.m_useAOMap = true;
+							}
 						}
 						if (!meshRenderer->m_Material->m_pEmissive || meshRenderer->m_Material->m_EmissiveTexName != meshRenderer->m_Material->m_pEmissive->m_name)
 						{
 							loadTex(meshRenderer->m_Material->m_EmissiveTexName, meshRenderer->m_Material->m_pEmissive);
+							if (meshRenderer->m_Material->m_pEmissive)
+							{
+								meshRenderer->m_Material->m_materialInfo.m_useEmissive = true;
+							}
 						}
                     
 						if (materialNode["m_shaderPSOName"])
