@@ -33,16 +33,16 @@ private:
 	//Outline
 	bool isOn = true;
 	bool blurOutline = true;
-	float outlineVelocity = 1.f;
+	float outlineVelocity = 2.f;
 	Mathf::Color4 m_colors[8] = {
-		{ 1.f, 0.f, 0.f, 1.f }, // Red
-		{ 0.f, 1.f, 0.f, 1.f }, // Green
-		{ 0.f, 0.f, 1.f, 1.f }, // Blue
-		{ 1.f, 1.f, 0.f, 1.f }, // Yellow
-		{ 1.f, 0.f, 1.f, 1.f }, // Magenta
-		{ 0.f, 1.f, 1.f, 1.f }, // Cyan
-		{ 0.5f, 0.5f, 0.5f, 1.f }, // Gray
-		{ 0.2f, 0.2f, 0.2f, 1.f } // Dark Gray}
+		{ 1.f, 0.f, 0.f, 2.f }, // Red
+		{ 0.f, 1.f, 0.f, 2.f }, // Green
+		{ 0.f, 0.f, 1.f, 2.f }, // Blue
+		{ 1.f, 1.f, 0.f, 2.f }, // Yellow
+		{ 1.f, 0.f, 1.f, 2.f }, // Magenta
+		{ 0.f, 1.f, 1.f, 2.f }, // Cyan
+		{ 0.5f, 0.5f, 0.5f, 2.f }, // Gray
+		{ 0.2f, 0.2f, 0.2f, 2.f } // Dark Gray}
 	};
 };
 
