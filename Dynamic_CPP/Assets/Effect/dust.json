@@ -146,7 +146,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 115.13843536376953,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -248,7 +248,7 @@
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "SpriteAnimationM",
+                            "pixelShader": "RandomSpriteK",
                             "vertexShader": "BillBoard"
                         },
                         "spriteAnimation": {
@@ -413,7 +413,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 156.91473388671875,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -584,7 +584,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MaskSpriteAnimation",
+                            "pixelShader": "MeshRandomSprite",
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
@@ -700,7 +700,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 112.53821563720703,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -871,7 +871,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MaskSpriteAnimation",
+                            "pixelShader": "MeshRandomSprite",
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
@@ -987,7 +987,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 112.1599349975586,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1158,7 +1158,7 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MaskSpriteAnimation",
+                            "pixelShader": "MeshRandomSprite",
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
@@ -1268,7 +1268,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 112.41221618652344,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.3400000035762787,
