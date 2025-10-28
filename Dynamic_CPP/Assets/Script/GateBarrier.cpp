@@ -1,6 +1,7 @@
 #include "GateBarrier.h"
 #include "pch.h"
 #include "EntityMonsterBaseGate.h"
+#include "EffectComponent.h"
 void GateBarrier::Start()
 {
 	auto children = GetOwner()->m_childrenIndices;
@@ -37,13 +38,14 @@ void GateBarrier::Start()
 			if (childObj)
 			{
 
-				auto childchildren = childObj->m_childrenIndices; //targetObj의 하위
-				GameObject* childchildObj = GameObject::FindIndex(childchildren[0]); //Gate 달린 객체
-				auto gate = childchildObj->GetComponent<EntityMonsterBaseGate>();
+				//auto childchildren = childObj->m_childrenIndices; //targetObj의 하위
+				//GameObject* childchildObj = GameObject::FindIndex(childchildren[0]); //Gate 달린 객체
+				auto gate = childObj->GetComponent<EntityMonsterBaseGate>();
 				if (gate)
 				{
 					m_targets.push_back(gate);
 					gate->invincibility = true;
+					gate->m_barrierEffet->Apply();
 					//gate 들 결계이펙트  켜기 and 무적켜기
 				}
 			}
@@ -73,6 +75,7 @@ void GateBarrier::Update(float tick)
 		{
 			//게이트 결계끄기 and 무적끄기
 			target->invincibility = false;
+			target->m_barrierEffet->StopEffect();
 
 		}
 		m_targets.clear(); //일단 스포너 안지우고 비워서 업데이트만 안돌게 

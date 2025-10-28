@@ -111,13 +111,10 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				deadObj->SetEnabled(true);
 				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
-				deadPos.y += 0.7f;
+				deadPos.y += 1.7f;
 				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 				deadEffect->Initialize();
 			}
-
-
-
 
 			if (normalModel)
 			{
@@ -127,7 +124,7 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			{
 				breakModel->GetComponent<MeshRenderer>()->SetEnabled(true);
 			}
-			GetOwner()->SetLayer("Water");
+			GetOwner()->SetLayer("Rock");
 		}
 		else
 		{
