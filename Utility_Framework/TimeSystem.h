@@ -16,7 +16,9 @@ namespace DirectX11
 	public:
 		// Get elapsed time since the previous Update call.
 		uint64_t GetElapsedTicks() const { return m_elapsedTicks; }
-		double GetElapsedSeconds() const { return TicksToSeconds(m_elapsedTicks); }
+
+		//실제 쓰는 tick 값  * timeScale
+		double GetElapsedSeconds() const { return TicksToSeconds(m_elapsedTicks) * timeScale; }
 		
 		// Get total time since the start of the program.
 		uint64_t GetTotalTicks() const { return m_totalTicks; }
@@ -88,6 +90,7 @@ namespace DirectX11
 			timeDelta *= TicksPerSecond;
 			timeDelta /= m_qpcFrequency.QuadPart;
 
+			UpdateTimeScale(TicksToSeconds(timeDelta));
 			uint32 lastFrameCount = m_frameCount;
 
 			{
@@ -170,6 +173,9 @@ namespace DirectX11
 			postFixedUpdate();
 		}
 
+		void UpdateTimeScale(float _timeDelta);
+		void SetTimeScale(float _timeScale,float _changeTimeScaleTime);
+		void SetTimeScale(float _timeScale);
 	private:
 		// 원본 타이밍 데이터에는 QPC 단위가 사용됩니다.
         LARGE_INTEGER m_qpcFrequency{};
@@ -193,6 +199,12 @@ namespace DirectX11
 		uint64 m_targetElapsedTicks{};
 
 		float m_fixedInterpolatedLerp{};
+
+
+		float orginTimeScale = 1.0f;    //기본 타임스케일값 아마 무조건1 고정
+		float timeScale = 1.0f;         //실 적용중인 타임스케일 값
+		float changeTimeScaleTime = 0.f; //해당시간동안 타임스케일변경
+		
 	};
 }
 

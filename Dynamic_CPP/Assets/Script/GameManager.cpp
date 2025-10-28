@@ -521,3 +521,7 @@ int GameManager::GetReward()
 {
 	return GameInstance::GetInstance()->GetRewardAmount();
 }
+
+void GameManager::BossClear()
+{
+}

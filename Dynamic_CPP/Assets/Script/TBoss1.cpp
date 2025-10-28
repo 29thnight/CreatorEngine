@@ -5,12 +5,17 @@
 #include "PrefabUtility.h"
 #include "RigidBodyComponent.h"
 #include "Animator.h"
+#include "EffectComponent.h"
 #include <utility>
 #include "Core.Random.h"
 #include "BP003.h"
 #include "BP001.h"
 #include "GameManager.h"
-
+#include "Player.h"
+#include "CriticalMark.h"
+#include "Weapon.h"
+#include "PlayEffectAll.h"
+#include "TimeSystem.h"
 void TBoss1::Start()
 {
 	BT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -35,12 +40,29 @@ void TBoss1::Start()
 		}
 
 	}
-
 	if (m_animator) {
 		m_anicontroller = m_animator->m_animationControllers[0].get();
 	}
 
+	std::string markTag = "CriticalMark";
+	for (auto& child : childred)
+	{
+		auto Obj = GameObject::FindIndex(child);
+
+		if (Obj->m_tag == markTag)
+		{
+			m_criticalMark = Obj->GetComponent<CriticalMark>();
+			break;
+		}
+
+	}
+
 	//prefab load
+	raiseUpEff = PrefabUtilitys->LoadPrefab("BossRaiseUp");
+	UpEffobj = raiseUpEff->Instantiate();
+	fallDownEff = PrefabUtilitys->LoadPrefab("BossFallDown");
+	DownEffobj = fallDownEff->Instantiate();
+
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
 	Prefab* BP003Prefab = PrefabUtilitys->LoadPrefab("Boss1BP003Obj");
 
@@ -76,7 +98,7 @@ void TBoss1::Start()
 
 	SetupPatternItemData(playersCount);
 
-
+	m_maxHP = m_MaxHp;
 	m_currentHP = m_maxHP;
 
 	
@@ -97,7 +119,12 @@ void TBoss1::Start()
 		BB->SetValueAsGameObject("2P", Player2->ToString());
 	}
 
-	
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 	HitImpulseStart();
 
 }
@@ -260,6 +287,7 @@ void TBoss1::SweepAttackDir(Mathf::Vector3 pos, Mathf::Vector3 dir)
 					hitInfo.hitPos = hit.point;
 					hitInfo.hitNormal = hit.normal;
 					hitInfo.attakerPos = pos;
+					hitInfo.KnockbackForce = { KnockbackDistacneX ,KnockbackDistacneY };
 					//hitInfo.KnockbackForce
 					//hitInfo.bulletType
 					//hitInfo.itemType
@@ -1243,11 +1271,17 @@ void TBoss1::PrepareItemDropsForPattern(EPatternType patternType)
 
 void TBoss1::Burrow()
 {
+	
+	Transform* tr = m_pOwner->GetComponent<Transform>();
+	Mathf::Vector3 pos = tr->GetWorldPosition();
+	DownEffobj->m_transform.SetWorldPosition(pos);
 	//todo : 땅속으로 들어감
 	//땅속으로 들어가는 에니메이션 재생
 	//이후 안보이게 처리
 	//콜라이더 비활성화
 	if (m_moveState == EBossMoveState::Idle) {
+		EffectComponent* eff = DownEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
 		m_animator->SetParameter("BurrowTrigger", true);
 		m_rigid->SetColliderEnabled(false);
 	}
@@ -1262,7 +1296,6 @@ void TBoss1::SetBurrow()
 void TBoss1::Protrude()
 {
 	//todo : 땅속에서 나옴
-	
 	//튀어나오기 전에 이동 가능영역 안에 있는지 확인
 	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //춘식이(중심) 위치
 	//타겟 확인  ==> 타겟이 없거나 잃어버렸다면? 그렇다면 랜덤 위치로
@@ -1298,11 +1331,16 @@ void TBoss1::Protrude()
 	//모델 보이게 처리 하며
 
 	//땅속에서 나오는 에니메이션 재생
-
-	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
+	
+	UpEffobj->m_transform.SetWorldPosition(targetPos);
 	if (m_moveState == EBossMoveState::Burrowed) {
+		//eff
+		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
 	}
+
+	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
 }
 
 void TBoss1::ProtrudeEnd()
@@ -1324,6 +1362,9 @@ void TBoss1::ProtrudeChunsik()
 
 	//땅속에서 나오는 에니메이션 재생
 	if(m_moveState == EBossMoveState::Burrowed) {
+		UpEffobj->m_transform.SetWorldPosition(chunsikPos);
+		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
 	}
 }
@@ -1469,9 +1510,76 @@ void TBoss1::BP0034()
 
 void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 {
-	m_CurrHp -= damage;
+	if (isDead) return;
+	if (sender)
+	{
+		auto player = dynamic_cast<Player*>(sender);
+		if (player)
+		{
+			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 dir = curPos - senderPos;
+
+			dir.Normalize();
+			if (m_criticalMark)
+			{
+				if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+				{
+					damage *= player->m_curWeapon->coopCrit;
+					hitInfo.isCritical = true;
+					//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+				}
+			}
+			PlayHitEffect(this->GetOwner(), hitInfo);
+
+			m_currentHP -= damage;
+
+			//blackBoard->SetValueAsInt("CurrHP", m_currentHP);
 
 
-	HitImpulse();
+			if (m_currentHP <= 0)
+			{
+				isDead = true;  
+				Dead();         //Dead애니메이션으로 보내기 + 보스 콜라이더 끄기 등등
+				//DeadEvent(); //Die 애니메이션등이있으면 거기로 옮길것  // 이 함수에서 사망이펙트 + 삭제처리 + 게임매니저에 보스클리어 이벤트보내기등
+				Time->SetTimeScale(0.1f, 5.0f); //보스 연출용 예시
+				
+				m_currentHP = 0;
+			}
+			else {
+				HitImpulse();
+			}
+		}
+	}
+}
+
+void TBoss1::Dead()
+{
+	m_animator->SetParameter("Dead", true);
+	GetOwner()->SetLayer("Water");
+}
+
+void TBoss1::DeadEvent()
+{
+	EndDeadAnimation = true;
+	deadObj->SetEnabled(true);
+	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	deadPos.y += 0.7f;
+	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+	deadEffect->Initialize();
+}
+
+void TBoss1::BossClear()
+{
+	GameObject* GMObj = GameObject::Find("GameManager");
+	if (GMObj)
+	{
+		GameManager* GM = GMObj->GetComponent<GameManager>();
+		if (GM)
+		{
+			GM->BossClear(); //예시
+		}
+	}
 }
 

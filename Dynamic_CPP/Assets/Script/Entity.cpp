@@ -1,6 +1,7 @@
 #include "Entity.h"
 #include "MeshRenderer.h"
 #include "Material.h"
+#include "Animator.h"
 
 constexpr size_t floatSize = sizeof(float);
 
@@ -74,4 +75,12 @@ bool Entity::GetAlive()
 void Entity::StopHitImpulse()
 {
 	m_currentHitImpulseDuration = 0.f;
+}
+
+void Entity::SetStagger(float time)
+{
+	auto anim = GetOwner()->GetComponentsInChildren<Animator>();
+	for (auto& a : anim) {
+		a->StopAnimation(time);
+	}
 }

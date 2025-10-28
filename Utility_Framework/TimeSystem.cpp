@@ -1,5 +1,6 @@
 #include "TimeSystem.h"
 
+
 DirectX11::TimeSystem::TimeSystem() :
 	m_elapsedTicks(0),
 	m_totalTicks(0),
@@ -24,4 +25,28 @@ DirectX11::TimeSystem::TimeSystem() :
 
 	// NewCreateSceneInitialize max delta to 1/10 of a second.
 	m_qpcMaxDelta = m_qpcFrequency.QuadPart / 10;
+}
+
+void DirectX11::TimeSystem::UpdateTimeScale(float _timeDelta)
+{
+	if (changeTimeScaleTime > 0.f)
+	{
+		changeTimeScaleTime -= _timeDelta;
+		if (changeTimeScaleTime <= 0.f)
+		{
+			changeTimeScaleTime = 0.f;
+			timeScale = orginTimeScale;
+		}
+	}
+}
+
+void DirectX11::TimeSystem::SetTimeScale(float _timeScale, float _changeTimeScaleTime)
+{
+	timeScale = _timeScale;
+	changeTimeScaleTime = _changeTimeScaleTime;
+}
+
+void DirectX11::TimeSystem::SetTimeScale(float _timeScale)
+{
+	timeScale = _timeScale;
 }

@@ -52,6 +52,7 @@
 #include "EntityMonsterTower.h"
 #include "EntityMonsterBaseGate.h"
 #include "GameInstance.h"
+#include "TBoss1.h"
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -661,13 +662,13 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		// hit
 		//DropCatchItem();
-		EntityEleteMonster* elete = dynamic_cast<EntityEleteMonster*>(sender);
+
 		Damage(damage);
-		if (elete && isStun == false) //엘리트고 아직 죽지않았으면
+		if (nullptr != dynamic_cast<EntityEleteMonster*>(sender) && isStun == false) //엘리트고 아직 죽지않았으면
 		{
 			Transform* transform = GetOwner()->GetComponent<Transform>();
 			Mathf::Vector3 myPos = transform->GetWorldPosition();
-			Mathf::Vector3 dir =  hitinfo.attakerPos - myPos;
+			Mathf::Vector3 dir = hitinfo.attakerPos - myPos;
 			dir.Normalize();
 			dir.y = 0;
 			float targetYaw = std::atan2(dir.z, dir.x) - (XM_PI / 2.0);
@@ -690,7 +691,7 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 				if (true == GameInstance::GetInstance()->IsViveEnabled())
 				{
-					
+
 					if (GM)
 					{
 						auto data = GM->GetControllerVibration();
@@ -707,6 +708,52 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 			}
 		}
+		else if (nullptr != dynamic_cast<TBoss1*>(sender) && isStun == false)   //보스
+		{
+			Transform* transform = GetOwner()->GetComponent<Transform>();
+			Mathf::Vector3 myPos = transform->GetWorldPosition();
+			Mathf::Vector3 dir = hitinfo.attakerPos - myPos;
+			dir.Normalize();
+			dir.y = 0;
+			float targetYaw = std::atan2(dir.z, dir.x) - (XM_PI / 2.0);
+			targetYaw = -targetYaw;
+			DirectX::SimpleMath::Quaternion lookQuat = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0, 0);
+			transform->SetRotation(lookQuat);
+
+			DirectX::SimpleMath::Vector3 baseForward(0, 0, 1); // 모델 기준 Forward
+			DirectX::SimpleMath::Vector3 forward = DirectX::SimpleMath::Vector3::Transform(baseForward, lookQuat);
+			if (m_animator)
+			{
+				m_animator->SetParameter("OnHit", true);
+				//Mathf::Vector3 forward = player->m_transform.GetForward();
+				HitKnockbackPower = hitinfo.KnockbackForce;
+				HItKnockbackTime = hitinfo.KnockbackTime;
+				Mathf::Vector3 horizontal = -forward * HitKnockbackPower.x;
+				Mathf::Vector3 knockbackVeocity = Mathf::Vector3{ horizontal.x ,HitKnockbackPower.y ,horizontal.z };
+				auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+				controller->TriggerForcedMove(knockbackVeocity);
+
+				if (true == GameInstance::GetInstance()->IsViveEnabled())
+				{
+					if (GM)
+					{
+						auto data = GM->GetControllerVibration();
+						if (data)
+						{
+							float power = data->PlayerHitPower;
+							float time = data->PlayerHitTime;
+							if (m_input)
+							{
+								m_input->SetControllerVibration(time, power, power, power, power);
+							}
+						}
+					}
+				}
+			}
+		}
+
+
+
 
 		if (m_DamageSound)
 		{
@@ -932,10 +979,10 @@ void Player::UpdateChatchObject()
 			directionToAsis.Normalize();
 
 			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f) && detectDistance < distance)
+			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f) && detectDistance > distance)
 			{
 				onIndicate = true;
-
+				
 				if (Indicator)
 				{
 					auto curveindicator = Indicator->GetComponent<CurveIndicator>();
@@ -1799,8 +1846,7 @@ void Player::MeleeAttack()
 					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MeleeStrikeSound"));
 				}
 			}
-
-			
+			entity->SetStagger(0.5f);
 		}
 	}
 }
@@ -1857,7 +1903,7 @@ void Player::RangeAttack()
 
 	std::vector<HitResult> hits;
 	OverlapInput RangeInfo;
-	RangeInfo.layerMask = 1 << 8 | 1 << 10 | 1<< 14;
+	RangeInfo.layerMask = 1 << 8 | 1 << 10 | 1<< 14; //자원 몹  적군기지들
 	Transform transform = GetOwner()->m_transform;
 	RangeInfo.position = transform.GetWorldPosition();
 	RangeInfo.rotation = transform.GetWorldQuaternion();

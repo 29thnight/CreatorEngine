@@ -9,6 +9,7 @@ class Animator;
 class BehaviorTreeComponent;
 class BlackBoard;
 class RigidBodyComponent;
+class CriticalMark;
 class TBoss1 : public Entity
 {
 public:
@@ -147,6 +148,14 @@ public:
 	[[Property]]
 	float BP003Delay = 1.0f; //생성되고 터지는 딜레이
 
+	//보스공격히트시  플레이어넉백강도, 일단 패턴모두 동일
+	[[Property]]
+	float KnockbackDistacneX = 0.04f;
+	[[Property]]
+	float KnockbackDistacneY = 0.01f;
+
+
+
 
 	[[Property]]
 	int BP0031_MIN_ITEM = 2;
@@ -175,9 +184,13 @@ public:
 	std::vector<GameObject*> BP001Objs;
 	std::vector<GameObject*> BP003Objs;
 
+	Prefab* fallDownEff = nullptr;
+	GameObject* DownEffobj = nullptr;
+	Prefab* raiseUpEff = nullptr;
+	GameObject* UpEffobj = nullptr;
 
 	
-
+	CriticalMark* m_criticalMark = nullptr;
 
 	//보스만 특수하게 
 	GameObject* m_chunsik = nullptr;
@@ -284,4 +297,20 @@ public:
 	void BP0034();
 
 	void SendDamage(Entity* sender, int damage, HitInfo hitInfo = HitInfo{}) override;
+	bool isDead = false; //죽음 여부 
+	GameObject* deadObj = nullptr; //death 이펙트 들어있는 오브젝트
+	void Dead();
+	[[Method]]
+	void DeadEvent();
+	bool EndDeadAnimation = false;
+
+	void BossClear(); //보스죽음 애니메이션끝나면서 연출 끝나는 타이밍(연출에따라 달라짐) 후에 GameManager에 bossClear 신호 주기
+
+
+
+
+
+
+
+
 };

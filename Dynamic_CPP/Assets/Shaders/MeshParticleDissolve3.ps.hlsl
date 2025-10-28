@@ -36,6 +36,7 @@ cbuffer SpriteAnimationBuffer : register(b4)
 };
 
 Texture2D gNoiseTexture : register(t0);
+Texture2D gDissolveTexture : register(t1);
 
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
@@ -44,22 +45,27 @@ SamplerState gPointSampler : register(s1);
 PixelOutput main(PixelInput input)
 {
     PixelOutput output;
-    
     float normalizedAge = input.particleAge / input.particleLifeTime;
+    
+    float2 uv = input.texCoord;
+    float dissolve = gDissolveTexture.Sample(gLinearSampler, input.texCoord);
+    float d = smoothstep(0, 0.5, dissolve);
+    
     float smoothDissolveDownUp = 1 - smoothstep(0.7, 1.0, normalizedAge);
-    float smooth = smoothstep(normalizedAge, normalizedAge + 0.2, smoothDissolveDownUp);
+    float smooth = smoothstep(normalizedAge - 0.2, normalizedAge, smoothDissolveDownUp);
     
     
     float2 animatedUV = input.texCoord.yx * float2(gridSize.x, gridSize.y);
     animatedUV += gTime * animationDuration;
     animatedUV.x -= normalizedAge * 2;
     float4 diffuseColor = gNoiseTexture.Sample(gLinearSampler, animatedUV);
+    float s = (1 - smoothstep(0.7, 1, uv.y));
     
-    float3 finalColor = input.color.rgb * diffuseColor.rgb;
+    float3 finalColor = input.color.rgb * diffuseColor.rgb * d;
     
-    float finalAlpha = input.alpha * diffuseColor.a * smooth;
+    float finalAlpha = input.alpha * diffuseColor.a * s * d; /** smooth * s * d*/;
 
-    clip(finalAlpha - 0.05);
+    clip(finalAlpha - 0.1);
     output.color = float4(finalColor, finalAlpha);
     
     return output;

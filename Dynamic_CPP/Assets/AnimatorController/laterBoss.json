@@ -1,0 +1,407 @@
+{
+    "Controllers": [
+        {
+            "StateVec": [
+                {
+                    "animationIndex": -1,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": true,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Ani State",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "Dead"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Death",
+                            "transName": "Ani State to Death"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "MeleeCombo"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeComboAtteck",
+                            "transName": "Ani State to MeleeComboAtteck"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "RangedCombo"
+                                }
+                            ],
+                            "curStateName": "Ani State",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangedComboAtteck",
+                            "transName": "Ani State to RangedComboAtteck"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 5,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Idle",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 1,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "StartMeleeAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "MeleeCharge",
+                            "transName": "Idle to MeleeCharge"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 1,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "StartRangedAttack"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeCharge",
+                            "transName": "Idle to RangeCharge"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 1,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "BurrowTrigger"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "Burrow",
+                            "transName": "Idle to Burrow"
+                        },
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 1,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "ShiftTrigger"
+                                }
+                            ],
+                            "curStateName": "Idle",
+                            "exitTime": 0.10000000149011612,
+                            "hasExitTime": 0,
+                            "nextStateName": "PhaseShift",
+                            "transName": "Idle to PhaseShift"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 4,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossWarningAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "MeleeCharge",
+                    "transitions": [
+                        {
+                            "blendTime": 0.009999999776482582,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "CanTransitionToAttack"
+                                }
+                            ],
+                            "curStateName": "MeleeCharge",
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
+                            "nextStateName": "MeleeAtteck",
+                            "transName": "MeleeCharge to MeleeAtteck"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossMeleeAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "MeleeAtteck",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "MeleeAtteck",
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "MeleeAtteck to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 4,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossWarningAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeCharge",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 4,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "CanTransitionToAttack"
+                                }
+                            ],
+                            "curStateName": "RangeCharge",
+                            "exitTime": 1.0,
+                            "hasExitTime": 0,
+                            "nextStateName": "RangeAtteck",
+                            "transName": "RangeCharge to RangeAtteck"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 3,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossRangedAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangeAtteck",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "RangeAtteck",
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "RangeAtteck to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 7,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossBurrowAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Burrow",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [
+                                {
+                                    "bValue": false,
+                                    "cType": 0,
+                                    "fValue": 0.0,
+                                    "iValue": 0,
+                                    "tValue": false,
+                                    "valueName": "ProtrudeTrigger"
+                                }
+                            ],
+                            "curStateName": "Burrow",
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
+                            "nextStateName": "Popup",
+                            "transName": "Burrow to Popup"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 8,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossPopupAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Popup",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "Popup",
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "Popup to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 6,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "PhaseShift",
+                    "transitions": [
+                        {
+                            "blendTime": 0.20000000298023224,
+                            "conditions": [],
+                            "curStateName": "PhaseShift",
+                            "exitTime": 1.0,
+                            "hasExitTime": 1,
+                            "nextStateName": "Idle",
+                            "transName": "PhaseShift to Idle"
+                        }
+                    ],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 0,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossMeleeAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "MeleeComboAtteck",
+                    "transitions": [],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 3,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "BossRangedAni",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "RangedComboAtteck",
+                    "transitions": [],
+                    "useMultipler": 0
+                },
+                {
+                    "animationIndex": 2,
+                    "animationSpeed": 1.0,
+                    "animationSpeedParameterName": "None",
+                    "behaviourName": "",
+                    "m_isAny": false,
+                    "multiplerAnimationSpeed": 1.0,
+                    "state_name": "Death",
+                    "transitions": [],
+                    "useMultipler": 0
+                }
+            ],
+            "controller_name": "NewLayer0",
+            "m_curState": "Idle",
+            "useController": 1,
+            "useMask": 0
+        }
+    ],
+    "Parameters": [
+        {
+            "param_name": "StartMeleeAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "StartRangedAttack",
+            "param_vType": 3
+        },
+        {
+            "param_name": "BurrowTrigger",
+            "param_vType": 3
+        },
+        {
+            "param_name": "ShiftTrigger",
+            "param_vType": 3
+        },
+        {
+            "param_name": "ProtrudeTrigger",
+            "param_vType": 3
+        },
+        {
+            "param_name": "RangedCombo",
+            "param_vType": 3
+        },
+        {
+            "param_name": "MeleeCombo",
+            "param_vType": 3
+        },
+        {
+            "param_name": "Dead",
+            "param_vType": 2
+        },
+        {
+            "param_name": "CanTransitionToAttack",
+            "param_vType": 2
+        }
+    ]
+}

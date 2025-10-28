@@ -458,14 +458,20 @@ void EntityEleteMonster::ChaseTarget(float deltatime)
 
 			for (const auto& feelerDir : feelerDirs)
 			{
-				HitResult res;
-				
-				if (Raycast(m_transform->GetWorldPosition(), feelerDir, m_obstacleAvoidanceDistance, ~0, res))
+				std::vector<HitResult> res;
+
+				if (RaycastAll(m_transform->GetWorldPosition(), feelerDir, m_obstacleAvoidanceDistance, ~0, res))
 				{
-					 if (res.gameObject != m_pOwner && res.gameObject != target)
+					if (res.size() > 0)
 					{
-						obstacleDetected = true;
-						avoidanceForce += -feelerDir;
+						for (auto& hit : res)
+						{
+							if (hit.gameObject != m_pOwner && hit.gameObject != target)
+							{
+								obstacleDetected = true;
+								avoidanceForce += -feelerDir;
+							}
+						}
 					}
 				}
 			}
@@ -1005,16 +1011,7 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 			}
 			PlayHitEffect(this->GetOwner(), hitinfo);
-			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
-			*/
-			/*Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
-			hittimer = m_MaxknockBackTime;
-			hitPos = p;
-			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);*/
-
-
-
-
+	
 			//블랙보드에 데미지 저장
 			//blackBoard->SetValueAsInt("Damage", damage);
 			m_currentHP -= damage;

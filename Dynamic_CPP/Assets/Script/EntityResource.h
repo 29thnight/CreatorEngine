@@ -31,6 +31,8 @@ public:
 	EItemType itemType = EItemType::Mushroom;
 	[[Property]]
 	int maxHP = 1;
+
+
 private:
 	EffectComponent* m_effect = nullptr;
 	CriticalMark* m_criticalMark;
@@ -38,4 +40,5 @@ private:
 	float m_minRewardUpForce = 2.f;
 	[[Property]]
 	float m_maxRewardUpForce = 3.f;
+	GameObject* deadObj = nullptr;
 };

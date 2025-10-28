@@ -113,7 +113,7 @@ public:
 
 	float m_obstacleAvoidanceDistance = 5.0f;
 	float m_avoidanceAngle = 30.0f;
-	float m_avoidanceSteeringForce = 2.0f;
+	float m_avoidanceSteeringForce = 0.7f;
 
 
 
