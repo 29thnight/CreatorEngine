@@ -1005,16 +1005,7 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 			}
 			PlayHitEffect(this->GetOwner(), hitinfo);
-			/* 몬스터 흔들리는 이펙트 MonsterNomal은 에니메이션 대체
-			*/
-			/*Mathf::Vector3 p = XMVector3Rotate(dir * m_knockBackVelocity, XMQuaternionInverse(m_animator->GetOwner()->m_transform.GetWorldQuaternion()));
-			hittimer = m_MaxknockBackTime;
-			hitPos = p;
-			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);*/
-
-
-
-
+	
 			//블랙보드에 데미지 저장
 			//blackBoard->SetValueAsInt("Damage", damage);
 			m_currentHP -= damage;
