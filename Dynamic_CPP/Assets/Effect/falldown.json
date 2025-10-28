@@ -82,6 +82,69 @@
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
                     "useEasing": false
+                },
+                {
+                    "data": {
+                        "colorGradient": [
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 0.0
+                            },
+                            {
+                                "color": {
+                                    "w": 1.0,
+                                    "x": 0.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 0.30000001192092896
+                            },
+                            {
+                                "color": {
+                                    "w": 1.0,
+                                    "x": 0.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 0.699999988079071
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 1.0
+                            }
+                        ],
+                        "colorParams": {
+                            "customFunctionType": 0,
+                            "customParam1": 0.0,
+                            "customParam2": 0.0,
+                            "customParam3": 0.0,
+                            "customParam4": 0.0,
+                            "discreteColorsSize": 0,
+                            "gradientSize": 4,
+                            "transitionMode": 0
+                        },
+                        "discreteColors": [],
+                        "easing": {
+                            "enabled": false
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 1
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MeshColorModuleCS",
+                    "useEasing": false
                 }
             ],
             "name": "NewEmitter",
@@ -141,7 +204,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 15,
             "modules": [
                 {
@@ -223,7 +286,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 1214.3909912109375,
+                            "currentTime": 2.1483089923858643,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 4.369999885559082,
@@ -402,7 +465,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
