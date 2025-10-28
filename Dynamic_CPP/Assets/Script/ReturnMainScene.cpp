@@ -22,6 +22,7 @@ void ReturnMainScene::Update(float tick)
 	if (!m_gameManager || !m_isClicked)
 		return;
 
+	GameInstance::GetInstance()->ResetAllEnhancements();
 	m_gameManager->SwitchNextSceneWithFade();
 }
 

@@ -259,6 +259,7 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	if(m_currentHP <= 0)
 	{
 		isStun = true;
+		Stun();
 		//스턴 이펙트 or 애니메이션 같은거 따로 추가되는지 체크
 		// 스턴
 	}

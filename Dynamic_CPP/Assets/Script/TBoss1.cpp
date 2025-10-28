@@ -57,6 +57,20 @@ void TBoss1::Start()
 
 	}
 
+	
+	if (m_criticalMark == nullptr)
+	{
+		Prefab* criticalMarkPre = PrefabUtilitys->LoadPrefab("CriticalMark");
+		{
+			if (criticalMarkPre)
+			{
+				auto Obj = PrefabUtilitys->InstantiatePrefab(criticalMarkPre, "criticalMark");
+				m_criticalMark = Obj->GetComponent<CriticalMark>();
+				GetOwner()->AddChild(Obj);
+			}
+		}
+	}
+
 	//prefab load
 	raiseUpEff = PrefabUtilitys->LoadPrefab("BossRaiseUp");
 	UpEffobj = raiseUpEff->Instantiate();

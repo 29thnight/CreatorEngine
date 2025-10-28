@@ -1,24 +1,24 @@
 m_name: WeaponMelee
-m_instanceID: 3810190151
+m_instanceID: 1621071869
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponMelee
-    m_instanceID: 2854178634
+    m_instanceID: 2463159263
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
-      position: {x: 0, y: 0, z: 0, w: 1}
+      position: {x: -0.909544647, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      scale: {x: 1.5, y: 1.5, z: 1.5, w: 0}
       m_parentID: 0
-    m_index: 1351
+    m_index: 9
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 1
-    m_prefabFileGuid: c9683366-baf9-5b8f-8a58-4383d1ea6bad
-    m_childrenIndices: [1352]
+    m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
+    m_childrenIndices: [10]
     m_tag: Untagged
     m_layer: Default
     m_components:
@@ -39,7 +39,7 @@ PrefabNode:
         bombThrowDuration: 2.5
         bombRadius: 2.5
         m_name: Weapon
-        m_instanceID: 3746628230
+        m_instanceID: 2465881453
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
@@ -48,26 +48,26 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: Weapon_sword02_re
-        m_instanceID: 344618415
+        m_instanceID: 1155964780
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1351
-        m_index: 1352
-        m_parentIndex: 1351
+          m_parentID: 9
+        m_index: 10
+        m_parentIndex: 9
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: c9683366-baf9-5b8f-8a58-4383d1ea6bad
+        m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 212143425
+            m_instanceID: 959723618
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:

@@ -1,24 +1,24 @@
 m_name: WeaponBomb
-m_instanceID: 2039113632
+m_instanceID: 2517749651
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponBomb
-    m_instanceID: 1573042526
+    m_instanceID: 3329297131
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
-      position: {x: 0, y: 0, z: 0, w: 1}
+      position: {x: 3.29626131, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 1355
+    m_index: 13
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 1
-    m_prefabFileGuid: 2b5d1942-696a-5cf7-af51-2d6225c586bb
-    m_childrenIndices: [1356]
+    m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
+    m_childrenIndices: [14]
     m_tag: Untagged
     m_layer: Default
     m_components:
@@ -39,7 +39,7 @@ PrefabNode:
         bombThrowDuration: 1
         bombRadius: 2.5
         m_name: Weapon
-        m_instanceID: 2055957377
+        m_instanceID: 1028181279
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
@@ -48,26 +48,26 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: Weapon_bomb_re
-        m_instanceID: 2370530971
+        m_instanceID: 3063090041
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 1355
-        m_index: 1356
-        m_parentIndex: 1355
+          m_parentID: 13
+        m_index: 14
+        m_parentIndex: 13
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: 2b5d1942-696a-5cf7-af51-2d6225c586bb
+        m_prefabFileGuid: 35e5f34a-5235-59bf-bc1a-b44ee8fcc84c
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 2806882090
+            m_instanceID: 2353690287
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
