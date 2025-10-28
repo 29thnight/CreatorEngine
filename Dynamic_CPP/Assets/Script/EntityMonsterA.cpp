@@ -16,6 +16,7 @@
 #include "PlayEffectAll.h"
 #include "GameManager.h"
 #include "Weapon.h"
+#include "TimeSystem.h"
 void EntityMonsterA::Start()
 {
 	m_currentHP = maxHP;
@@ -545,6 +546,7 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 			if (m_currentHP <= 0)
 			{
+				//Time->SetTimeScale(0.1f,5.0f);
 				isDead = true;
 				Dead();
 				CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();

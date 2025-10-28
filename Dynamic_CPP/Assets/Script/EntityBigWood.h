@@ -58,4 +58,6 @@ private:
 	float m_minRewardUpForce = 70.f;
 	[[Property]]
 	float m_maxRewardUpForce = 100.f;
+
+	GameObject* deadObj = nullptr;
 };

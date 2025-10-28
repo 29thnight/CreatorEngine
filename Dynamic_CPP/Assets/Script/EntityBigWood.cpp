@@ -9,12 +9,18 @@
 #include "InputManager.h"
 #include "Material.h"
 #include "MeshRenderer.h"
-
+#include "PlayEffectAll.h"
 void EntityBigWood::Start()
 {
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 	HitImpulseStart();
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 }
 
 void EntityBigWood::OnTriggerEnter(const Collision& collision)
@@ -164,6 +170,16 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		}
 
 		SetAlive(false);
+		if (deadObj)
+		{
+			deadObj->SetEnabled(true);
+			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+			deadPos.y += 0.7f;
+			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+			deadEffect->Initialize();
+		}
+
 		GetOwner()->Destroy();
 		/*auto pung = GameObject::Find("Pung2");
 		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();

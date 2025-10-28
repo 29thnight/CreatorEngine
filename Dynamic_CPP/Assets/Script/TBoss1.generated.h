@@ -47,6 +47,7 @@ ReflectionScriptField(TBoss1) \
 		meta_method(BP0032) \
 		meta_method(BP0033) \
 		meta_method(BP0034) \
+		meta_method(DeadEvent) \
 	}); \
 	FieldEnd(TBoss1, PropertyAndMethod) \
 };

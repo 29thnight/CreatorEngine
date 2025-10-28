@@ -85,6 +85,8 @@ public:
 	void InitReward(int amount);
 	void AddReward(int amount);
 	int GetReward();
+
+	void BossClear();
 private:
 	//Entities
 	std::vector<Entity*>	m_entities{};

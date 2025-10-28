@@ -14,6 +14,8 @@
 #include "Player.h"
 #include "CriticalMark.h"
 #include "Weapon.h"
+#include "PlayEffectAll.h"
+#include "TimeSystem.h"
 void TBoss1::Start()
 {
 	BT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -117,7 +119,12 @@ void TBoss1::Start()
 		BB->SetValueAsGameObject("2P", Player2->ToString());
 	}
 
-	
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 	HitImpulseStart();
 
 }
@@ -1503,6 +1510,7 @@ void TBoss1::BP0034()
 
 void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 {
+	if (isDead) return;
 	if (sender)
 	{
 		auto player = dynamic_cast<Player*>(sender);
@@ -1525,23 +1533,52 @@ void TBoss1::SendDamage(Entity* sender, int damage, HitInfo hitInfo)
 			PlayHitEffect(this->GetOwner(), hitInfo);
 
 			m_currentHP -= damage;
+
 			//blackBoard->SetValueAsInt("CurrHP", m_currentHP);
 
 
 			if (m_currentHP <= 0)
 			{
-				//isDead = true;  //보스에 아직 변수가없어서 이렇게둠
-				//Dead();         //Dead애니메이션으로 보내기 + 보스 콜라이더 끄기 등등
+				isDead = true;  
+				Dead();         //Dead애니메이션으로 보내기 + 보스 콜라이더 끄기 등등
 				//DeadEvent(); //Die 애니메이션등이있으면 거기로 옮길것  // 이 함수에서 사망이펙트 + 삭제처리 + 게임매니저에 보스클리어 이벤트보내기등
+				Time->SetTimeScale(0.1f, 5.0f); //보스 연출용 예시
 				
-				
-				//CharacterControllerComponent* controller = m_pOwner->GetComponent<CharacterControllerComponent>();
-				//controller->Move({ 0, 0 });
-				
+				m_currentHP = 0;
 			}
 			else {
 				HitImpulse();
 			}
+		}
+	}
+}
+
+void TBoss1::Dead()
+{
+	m_animator->SetParameter("Dead", true);
+	GetOwner()->SetLayer("Water");
+}
+
+void TBoss1::DeadEvent()
+{
+	EndDeadAnimation = true;
+	deadObj->SetEnabled(true);
+	auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+	Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+	deadPos.y += 0.7f;
+	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+	deadEffect->Initialize();
+}
+
+void TBoss1::BossClear()
+{
+	GameObject* GMObj = GameObject::Find("GameManager");
+	if (GMObj)
+	{
+		GameManager* GM = GMObj->GetComponent<GameManager>();
+		if (GM)
+		{
+			GM->BossClear(); //예시
 		}
 	}
 }
