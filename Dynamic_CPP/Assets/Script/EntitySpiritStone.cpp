@@ -7,6 +7,8 @@
 #include "PrefabUtility.h"
 #include "EffectComponent.h"
 #include "Weapon.h"
+#include "MeshRenderer.h"
+#include "PlayEffectAll.h"
 void EntitySpiritStone::Start()
 {
 	m_currentHP = maxHP;
@@ -26,6 +28,37 @@ void EntitySpiritStone::Start()
 	m_effect = newEffect->AddComponent<EffectComponent>();
 	m_effect->m_effectTemplateName = "resourceView";
 	m_effect->Apply();
+
+
+	auto childIndexs = GetOwner()->m_childrenIndices;
+
+	for (auto& child : childIndexs)
+	{
+		auto childObj = GameObject::FindIndex(child);
+		if (childObj->m_tag == normalTag)
+		{
+			normalModel = childObj;
+		}
+		if (childObj->m_tag == breakTag)
+		{
+			breakModel = childObj;
+		}
+	}
+
+	if (breakModel)
+	{
+		breakModel->GetComponent<MeshRenderer>()->SetEnabled(false);
+	}
+
+
+
+
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
 }
 
 void EntitySpiritStone::Update(float tick)
@@ -37,7 +70,7 @@ void EntitySpiritStone::Update(float tick)
 void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (m_currentHP <= 0) return; // 풀링해서 사용하기 위해 만약 이미 파괴된 상태라면 무시.
-
+	
 	Player* player = dynamic_cast<Player*>(sender);
 	if (player) {
 		// 플레이어가 공격한 경우에만 처리.
@@ -53,10 +86,6 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		}
 		m_currentHP -= std::max(damage, 0);
 		PlayHitEffect(this->GetOwner(), hitinfo);
-
-
-
-
 
 		if(m_currentHP <= 0)
 		{
@@ -75,12 +104,27 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 			}
 
-			/*if (m_onDeathEvent.IsBound())
+			SetAlive(false);
+			m_effect->StopEffect();
+			if (deadObj)
 			{
-				m_onDeathEvent.Invoke();
+				deadObj->SetEnabled(true);
+				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+				deadPos.y += 1.7f;
+				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+				deadEffect->Initialize();
 			}
-			player->AddSpiritStone(m_stoneReward);*/
-			GetOwner()->Destroy();
+
+			if (normalModel)
+			{
+				normalModel->GetComponent<MeshRenderer>()->SetEnabled(false);
+			}
+			if (breakModel)
+			{
+				breakModel->GetComponent<MeshRenderer>()->SetEnabled(true);
+			}
+			GetOwner()->SetLayer("Rock");
 		}
 		else
 		{

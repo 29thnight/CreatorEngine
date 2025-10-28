@@ -28,6 +28,22 @@ void EntityResource::Start()
 		m_criticalMark = GetOwner()->GetComponent<CriticalMark>();
 	}
 
+
+	if (m_criticalMark == nullptr)
+	{
+		Prefab* criticalMarkPre = PrefabUtilitys->LoadPrefab("CriticalMark");
+		{
+			if (criticalMarkPre)
+			{
+				auto Obj = PrefabUtilitys->InstantiatePrefab(criticalMarkPre, "criticalMark");
+				m_criticalMark = Obj->GetComponent<CriticalMark>();
+				GetOwner()->AddChild(Obj);
+			}
+		}
+	}
+
+
+
 	m_currentHP = maxHP;
 	HitImpulseStart();
 	auto newEffect = SceneManagers->GetActiveScene()->CreateGameObject("effect", GameObjectType::Empty, GetOwner()->m_index);

@@ -12,10 +12,10 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
-    "name": "1",
+    "name": "bossatk1",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -178,7 +178,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -341,7 +341,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -477,7 +477,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 100,
             "modules": [
                 {
@@ -559,7 +559,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 44.64400863647461,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -754,7 +754,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -917,7 +917,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 3,
             "modules": [
                 {
@@ -1005,7 +1005,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 17.38458824157715,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {

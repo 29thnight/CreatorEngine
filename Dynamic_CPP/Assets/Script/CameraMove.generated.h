@@ -9,6 +9,7 @@ ReflectionScriptField(CameraMove) \
 		meta_property(offset) \
 		meta_property(detectRange) \
 		meta_property(cameraMoveSpeed) \
+		meta_property(OnCaculCamera) \
 	}); \
 	MethodField \
 	({ \

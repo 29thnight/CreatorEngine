@@ -5,6 +5,7 @@
 #include "EntityBigWood.generated.h"
 
 class EntityAsis;
+class CriticalMark;
 class EntityBigWood : public Entity
 {
 public:
@@ -60,4 +61,5 @@ private:
 	float m_maxRewardUpForce = 100.f;
 
 	GameObject* deadObj = nullptr;
+	CriticalMark* m_criticalMark = nullptr;
 };

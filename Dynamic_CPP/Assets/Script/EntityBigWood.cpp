@@ -10,6 +10,8 @@
 #include "Material.h"
 #include "MeshRenderer.h"
 #include "PlayEffectAll.h"
+#include "CriticalMark.h"
+#include "Weapon.h"
 void EntityBigWood::Start()
 {
 	m_maxHP = maxHP;
@@ -21,6 +23,21 @@ void EntityBigWood::Start()
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
 		deadObj->SetEnabled(false);
 	}
+
+
+	if (m_criticalMark == nullptr)
+	{
+		Prefab* criticalMarkPre = PrefabUtilitys->LoadPrefab("CriticalMark");
+		{
+			if (criticalMarkPre)
+			{
+				auto Obj = PrefabUtilitys->InstantiatePrefab(criticalMarkPre, "criticalMark");
+				m_criticalMark = Obj->GetComponent<CriticalMark>();
+				GetOwner()->AddChild(Obj);
+			}
+		}
+	}
+
 }
 
 void EntityBigWood::OnTriggerEnter(const Collision& collision)
@@ -51,7 +68,20 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 	Entity::SendDamage(sender, damage, hitinfo);
 	// 플레이어가 공격한 경우에만 처리.
-	m_currentHP -= damage;
+	m_currentHP -= damage; 
+	Player* player = dynamic_cast<Player*>(sender);
+	if (player)
+	{
+		if (m_criticalMark)
+		{
+			if (true == m_criticalMark->UpdateMark(static_cast<int>(player->m_playerType)))
+			{
+				damage *= player->m_curWeapon->coopCrit;
+				hitinfo.isCritical = true;
+				//데미지2배및 hitEffect 크리티컬 이펙트로 출력 몬스터,리소스 동일
+			}
+		}
+	}
 	PlayHitEffect(this->GetOwner(), hitinfo);
 	if (m_currentHP <= 0)
 	{

@@ -70,6 +70,21 @@ void EntityMonsterA::Start()
 		}
 
 	}
+
+
+	if (m_criticalMark == nullptr)
+	{
+		Prefab* criticalMarkPre = PrefabUtilitys->LoadPrefab("CriticalMark");
+		{
+			if (criticalMarkPre)
+			{
+				auto Obj = PrefabUtilitys->InstantiatePrefab(criticalMarkPre, "criticalMark");
+				m_criticalMark = Obj->GetComponent<CriticalMark>();
+				GetOwner()->AddChild(Obj);
+			}
+		}
+	}
+
 	CharacterControllerComponent* controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->SetAutomaticRotation(true);
 	if (!m_animator)

@@ -31,7 +31,11 @@ private:
 	float followSpeed{ 1.0f };
 	[[Property]]
 	Mathf::Vector3 offset{ 0.f, 20.f, -11.5f };
-	[[Property]]
+	Mathf::Vector3 minOffset{ 0.f,15.f ,-11.5f };
+	Mathf::Vector3 maxOffset{ 0.f,23.f ,- 16.5f };
+	Mathf::Vector3 preOffset = {0,0,0};
+	float maxDistance = 25.f;
+ 	[[Property]]
 	float detectRange{ 1.f };
 
 
@@ -45,4 +49,8 @@ private:
 	float cameraMoveSpeed = 0.05f;
 
 	Mathf::Vector3 targetPosition{ 0.f, 0.f, 0.f };
+
+	[[Property]]
+	bool OnCaculCamera = false;
+	
 };

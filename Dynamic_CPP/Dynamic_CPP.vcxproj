@@ -433,6 +433,7 @@
 		<ClInclude Include="Assets\Script\KoriEmoteSystem.h" />
 		<ClInclude Include="Assets\Script\PauseMenuButton.h" />
 		<ClInclude Include="Assets\Script\BGMController.h" />
+		<ClInclude Include="Assets\Script\GateBarrier.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\CameraMove.cpp" />
@@ -1203,6 +1204,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\BGMController.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\GateBarrier.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

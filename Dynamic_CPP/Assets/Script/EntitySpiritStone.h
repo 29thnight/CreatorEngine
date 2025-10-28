@@ -34,4 +34,10 @@ private:
 	int maxHP = 80;
 	EffectComponent* m_effect = nullptr;
 	CriticalMark* m_criticalMark;
+	GameObject* deadObj = nullptr;
+	GameObject* normalModel = nullptr;
+	GameObject* breakModel = nullptr;
+	std::string normalTag = "normalModel";
+	std::string breakTag = "breakModel";
+
 };

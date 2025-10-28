@@ -5,6 +5,7 @@
 #include "MeshRenderer.h"
 #include "PlayEffectAll.h"
 #include "PrefabUtility.h"
+#include "EffectComponent.h"
 void EntityMonsterBaseGate::Start()
 {
 	m_maxHP = maxHP;
@@ -25,6 +26,11 @@ void EntityMonsterBaseGate::Start()
 		if (childObj->m_tag == breakTag)
 		{
 			breakModel = childObj;
+		}
+
+		if (childObj->m_tag == "Effect")
+		{
+			m_barrierEffet = childObj->GetComponent<EffectComponent>();
 		}
 	}
 
@@ -49,6 +55,7 @@ void EntityMonsterBaseGate::Update(float tick)
 void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (isDestroy) return;
+	if (invincibility) return;
 	HitImpulse();
 	m_currentHP -= damage;
 
