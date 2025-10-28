@@ -89,18 +89,19 @@ void NormalBullet::OnTriggerEnter(const Collision& collision)
 			{
 				LOG("EnemyHit!");
 				enemy->SendDamage(m_ownerPlayer, m_damage, hitinfo);
-				hasAttacked = true;
+	
 
-				auto GMobj = GameObject::Find("GameManager");
-				if (GMobj)
+			}
+			hasAttacked = true;
+
+			auto GMobj = GameObject::Find("GameManager");
+			if (GMobj)
+			{
+				auto GM = GMobj->GetComponent<GameManager>();
+				if (GM && GM->GetObjectPoolManager() != nullptr)
 				{
-					auto GM = GMobj->GetComponent<GameManager>();
-					if (GM && GM->GetObjectPoolManager() != nullptr)
-					{
-						GM->GetObjectPoolManager()->GetNormalBulletPool()->Push(this->GetOwner());
-						m_effect->StopEffect();
-					}
-					
+					GM->GetObjectPoolManager()->GetNormalBulletPool()->Push(this->GetOwner());
+					m_effect->StopEffect();
 				}
 
 			}

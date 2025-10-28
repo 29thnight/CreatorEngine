@@ -212,7 +212,17 @@ void AnimationJob::Update(float deltaTime)
                     animationcontroller = animator->m_animationControllers[0].get();
                     if (skeleton->m_animations.empty()) return;
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    animationcontroller->m_timeElapsed += deltaT * animation.m_ticksPerSecond;
+                    AnimationState* curState = animationcontroller->m_curState;
+                    float animationspeed = 1;
+                    if (curState)
+                    {
+                        animationspeed = curState->animationSpeed;
+                        if (curState->useMultipler)
+                        {
+                            animationspeed *= curState->multiplerAnimationSpeed;
+                        }
+                    }
+                    animationcontroller->m_timeElapsed += deltaT * animation.m_ticksPerSecond * animationspeed;
                     //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     if (animation.m_isLoop == true)
                     {

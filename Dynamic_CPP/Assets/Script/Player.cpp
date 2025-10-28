@@ -1915,6 +1915,7 @@ void Player::RangeAttack()
 		if (object == GetOwner()) continue;
 		if (auto entity = object->GetComponentDynamicCast<Entity>())  
 		{
+			if (entity->GetAlive() == false) continue; //죽거나 부서진 객체면 넘기기
 			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
 			Mathf::Vector3 enemyPos = object->m_transform.GetWorldPosition();
 			Mathf::Vector3 directionToEnemy = enemyPos - myPos;

@@ -49,6 +49,7 @@ void EntityMonsterBaseGate::Update(float tick)
 void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (isDestroy) return;
+	if (invincibility) return;
 	HitImpulse();
 	m_currentHP -= damage;
 

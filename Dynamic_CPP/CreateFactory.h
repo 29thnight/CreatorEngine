@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "GateBarrier.h"
 #include "BGMController.h"
 #include "PauseMenuButton.h"
 #include "KoriEmoteSystem.h"
