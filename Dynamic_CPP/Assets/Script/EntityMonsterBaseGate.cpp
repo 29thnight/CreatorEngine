@@ -52,6 +52,8 @@ void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitin
 	HitImpulse();
 	m_currentHP -= damage;
 
+	Entity::SendDamage(sender, damage, hitinfo);
+
 	if (m_currentHP <= 0)
 	{
 		isDestroy = true;

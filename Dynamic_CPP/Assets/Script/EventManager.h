@@ -61,6 +61,7 @@ public:
 	void EmitPurchased(const std::string& itemTag, int count = 1, int playerId = -1);
 	void EmitDebuffApplied(int playerId, const std::string& debuffTag);
 	void EmitDebuffRemoved(int playerId, const std::string& debuffTag);
+	void EmitDelivered(const std::string& itemTag, int count = 1, int playerId = -1);
 
 private:
 	// Loading & mapping

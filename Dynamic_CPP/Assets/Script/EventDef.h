@@ -124,6 +124,13 @@ public:
 	{
 		switch (def.type)
 		{
+		case ObjectiveType::Deliver:
+			if (sig.type == EventSignalType::ObjectDestroyed && (def.targetTag.empty() || sig.a == def.targetTag))
+			{
+				// add sig.i to count; default i==1
+				return Bump(st, sig.playerId, def, sig.i > 0 ? sig.i : 1);
+			}
+			break;
 		case ObjectiveType::Destroy:
 			if (sig.type == EventSignalType::ObjectDestroyed && (def.targetTag.empty() || sig.a == def.targetTag))
 				return Bump(st, sig.playerId, def);

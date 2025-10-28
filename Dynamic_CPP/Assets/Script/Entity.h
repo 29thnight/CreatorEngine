@@ -36,7 +36,7 @@ public:
 	virtual void OnDestroy() override  {}
 public:
 	virtual void Interact() {}
-	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) {} //09-25 sehwan HitInfo 추가
+	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}); //09-25 sehwan HitInfo 추가
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce) {}
 	virtual void OnRay() {};
 	virtual void AttakRay() {};

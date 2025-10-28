@@ -49,6 +49,9 @@ public:
 	[[Property]]
 	float4 tint = { 1.f, 1.f, 1.f, 1.f };
 
+	[[Property]]
+	int eventID{ -1 }; // 구매 이벤트 아이디
+
 private:
 	class ItemManager* m_itemManager{ nullptr };
 	class RectTransformComponent* m_rect{ nullptr };

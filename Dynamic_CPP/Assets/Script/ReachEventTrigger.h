@@ -10,11 +10,14 @@ public:
 	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(ReachEventTrigger)
 	virtual void Awake() override;
+	virtual void Update(float tick) override;
 	virtual void OnTriggerEnter(const Collision& collision) override;
 	virtual void OnTriggerStay(const Collision& collision) override;
 	virtual void OnTriggerExit(const Collision& collision) override;
 
 public:
+	[[Property]]
+	int m_eventID{ 0 };
 	[[Property]]
 	int m_triggerIndex{ 0 };
 	[[Property]]
@@ -32,6 +35,8 @@ public:
 	// 모두 통과해야하는지
 	[[Property]]
 	bool m_allPlayerPass{ false };
+	[[Property]]
+	bool m_isAsisWait{ false };
 
 private:
 	bool EmitIfAllowed(const Collision& c);
@@ -44,5 +49,6 @@ private:
 
 	std::unordered_set<int> onTriggeredPlayer{};
 	class EventManager* m_mgr{ nullptr };
+	class EntityAsis* m_asis{ nullptr };
 	bool m_alreadyEmitted{ false };
 };

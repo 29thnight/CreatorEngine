@@ -6,6 +6,7 @@
 #include "PlayerInput.h"
 #include "Texture.h"
 #include "ItemManager.h"
+#include "EventManager.h"
 #include "GameInstance.h"
 #include "pch.h"
 
@@ -204,7 +205,28 @@ void ItemUIPopup::PurshaseButton()
         m_isSelectComplete = true;
         if (m_itemManager)
         {
-            m_itemManager->BuyItem(itemID, rarityID);
+			if (eventID >= 0)
+            {
+                int itemSlot = m_itemManager->GetItemSlot(itemID, rarityID);
+                m_itemManager->BuyItem(itemID, rarityID);
+
+                if (m_itemManager->IsItemSoldOut(itemSlot))
+                {
+                    auto gmObj = m_itemManager->GetOwner();
+                    if (gmObj)
+                    {
+                        auto Manager = gmObj->GetComponent<EventManager>();
+                        if (Manager)
+                        {
+                            Manager->EmitPurchased("Item", 1, m_icon->m_playerID);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                m_itemManager->BuyItem(itemID, rarityID);
+            }
         }
     }
 }

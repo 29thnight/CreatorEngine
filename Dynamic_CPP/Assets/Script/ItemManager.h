@@ -33,8 +33,10 @@ public:
 	//아이템 구매	함수
 	void BuyItem(int slotIndex);
 	void BuyItem(int itemID, int rarityID);
+	int GetItemSlot(int itemID, int rarityID) const;
 	//아이템 빈 슬롯 만들기
 	void ClearItemSlot(int slotIndex);
+	bool IsItemSoldOut(int slotIndex) const;
 
 private:
 	class GameManager* gameManager{ nullptr };

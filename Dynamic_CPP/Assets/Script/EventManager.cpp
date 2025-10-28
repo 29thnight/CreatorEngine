@@ -253,6 +253,16 @@ void EventManager::EmitDebuffRemoved(int playerId, const std::string& debuffTag)
     BroadcastSignal(s);
 }
 
+void EventManager::EmitDelivered(const std::string& itemTag, int count, int playerId)
+{
+    // Deliver를 Destroy 신호로 모델링: tag=itemTag, i=count
+    EventSignal s{ EventSignalType::ObjectDestroyed };
+    s.playerId = playerId;
+    s.a = itemTag;
+    s.i = count; // delta 전달
+    BroadcastSignal(s);
+}
+
 void EventManager::LoadDefinitions()
 {
     m_definitions.clear();

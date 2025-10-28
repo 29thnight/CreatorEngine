@@ -9,7 +9,7 @@
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
 #include "KoriEmoteSystem.h"
-
+#include "ReachEventTrigger.h"
 #include "Animator.h"
 #include "Player.h"
 #include "PrefabUtility.h"
@@ -22,6 +22,7 @@
 #include "EntityBigWood.h"
 #include "EntityMonsterBaseGate.h"
 #include "EntityMonsterTower.h"
+#include "EventManager.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -51,11 +52,11 @@ void EntityAsis::Start()
 	auto gameManager = GameObject::Find("GameManager");
 	if (gameManager)
 	{
-		auto gm = gameManager->GetComponent<GameManager>();
-		if (gm)
+		m_gameManager = gameManager->GetComponent<GameManager>();
+		if (m_gameManager)
 		{
-			gm->PushEntity(this);
-			gm->PushAsis(this);
+			m_gameManager->PushEntity(this);
+			m_gameManager->PushAsis(this);
 		}
 	}
 
@@ -212,7 +213,7 @@ void EntityAsis::Update(float tick)
 	//}
 
 	if (m_currentStaggerDuration <= 0.f) {
-		if (!isBigWoodDetect)
+		if (!m_isWait && !isBigWoodDetect)
 		{
 			if (true == PathMove(tick))
 			{
@@ -290,6 +291,14 @@ bool EntityAsis::AddItem(EntityItem* item)
 	}
 
 	m_EntityItemQueue.enqueue(item);
+	if (m_gameManager)
+	{
+		auto eventManager = m_gameManager->GetOwner()->GetComponent<EventManager>();
+		if (eventManager)
+		{
+			eventManager->EmitDelivered("DResource", 1);
+		}
+	}
 	m_currentEntityItemCount++;
 	item->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 
@@ -414,6 +423,11 @@ bool EntityAsis::PathMove(float tick)
 
 
 	return true;
+}
+
+void EntityAsis::SetMove(bool move)
+{
+	m_isWait = !move;
 }
 
 void EntityAsis::Stun()

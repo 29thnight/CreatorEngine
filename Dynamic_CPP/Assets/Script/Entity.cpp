@@ -2,8 +2,26 @@
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "Animator.h"
+#include "Player.h"
+#include "EventTarget.h"
 
 constexpr size_t floatSize = sizeof(float);
+
+void Entity::SendDamage(Entity* sender, int damage, HitInfo)
+{
+	if (!sender) return;
+
+	auto player = dynamic_cast<Player*>(sender);
+	if (player)
+	{
+		int playerIndex = player->playerIndex;
+		auto eventTarget = GetOwner()->GetComponent<EventTarget>();
+		if (eventTarget)
+		{
+			eventTarget->playerID = playerIndex;
+		}
+	}
+}
 
 void Entity::HitImpulseStart()
 {
