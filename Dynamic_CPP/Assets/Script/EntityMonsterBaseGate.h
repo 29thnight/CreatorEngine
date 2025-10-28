@@ -35,4 +35,6 @@ private:
 	GameObject* breakModel = nullptr;
 	std::string normalTag = "normalModel";
 	std::string breakTag = "breakModel";
+
+	GameObject* deadObj = nullptr;
 };

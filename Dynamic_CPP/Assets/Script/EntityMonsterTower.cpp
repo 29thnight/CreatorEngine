@@ -3,6 +3,7 @@
 #include "TestMonsterB.h"
 #include "MeshRenderer.h"
 #include "PrefabUtility.h"
+#include "PlayEffectAll.h"
 void EntityMonsterTower::Start()
 {
 	m_maxHP = maxHP;
@@ -52,6 +53,14 @@ void EntityMonsterTower::Start()
 			towerMonster->m_transform.SetPosition(monsterSpawnPosObj->m_transform.GetWorldPosition());
 		}
 	}
+
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	if (deadPrefab)
+	{
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj->SetEnabled(false);
+	}
+
 }
 
 void EntityMonsterTower::Update(float tick)
@@ -76,6 +85,18 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
 	{
 		isDestroy = true;
 		SetAlive(false);
+
+
+		if (deadObj)
+		{
+			deadObj->SetEnabled(true);
+			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
+			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
+			deadPos.y += 0.7f;
+			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
+			deadEffect->Initialize();
+		}
+
 		if (normalModel)
 		{
 			auto meshren = normalModel->GetComponentsInchildrenDynamicCast<MeshRenderer>();
