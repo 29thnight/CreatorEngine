@@ -184,6 +184,10 @@ public:
 	std::vector<GameObject*> BP001Objs;
 	std::vector<GameObject*> BP003Objs;
 
+	Prefab* fallDownEff = nullptr;
+	GameObject* DownEffobj = nullptr;
+	Prefab* raiseUpEff = nullptr;
+	GameObject* UpEffobj = nullptr;
 
 	
 	CriticalMark* m_criticalMark = nullptr;

@@ -67,7 +67,13 @@ public:
 	[[Property]]
 	float m_chaseRange = 10.f; //감지 범위
 	[[Property]]
-	float m_rangeOutDuration = 2.0f; //추적 범위 벗어난 시간
+	float m_rangeOutDuration = 0.7f; //추적 범위 벗어난 시간
+
+	//물체 회피
+	float m_obstacleAvoidanceDistance = 5.0f;
+	float m_avoidanceAngle = 30.0f;
+	float m_avoidanceSteeringForce = 0.7f;
+
 
 	//근접 공격 방식
 	float m_attackRange = 2.f;
