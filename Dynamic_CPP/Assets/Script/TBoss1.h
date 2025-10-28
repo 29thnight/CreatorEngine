@@ -293,4 +293,20 @@ public:
 	void BP0034();
 
 	void SendDamage(Entity* sender, int damage, HitInfo hitInfo = HitInfo{}) override;
+	bool isDead = false; //죽음 여부 
+	GameObject* deadObj = nullptr; //death 이펙트 들어있는 오브젝트
+	void Dead();
+	[[Method]]
+	void DeadEvent();
+	bool EndDeadAnimation = false;
+
+	void BossClear(); //보스죽음 애니메이션끝나면서 연출 끝나는 타이밍(연출에따라 달라짐) 후에 GameManager에 bossClear 신호 주기
+
+
+
+
+
+
+
+
 };
