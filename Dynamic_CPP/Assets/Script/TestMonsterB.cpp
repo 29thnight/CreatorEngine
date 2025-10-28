@@ -266,8 +266,8 @@ void TestMonsterB::Update(float tick)
 		if (count > 0) {
 			for (auto& hit : hitResults) {
 				//std::cout << "EntityMonsterA AttackBoxOn hit : " << hit.gameObject->GetHashedName().ToString() << std::endl;
-				if (hit.gameObject->GetHashedName() == player1->GetHashedName()
-					|| hit.gameObject->GetHashedName() == player2->GetHashedName()) //player
+				if (hit.gameObject->GetHashedName() == m_player1->GetHashedName()
+					|| hit.gameObject->GetHashedName() == m_player2->GetHashedName()) //player
 				{
 					//std::cout << "EntityMonsterA AttackBoxOn SendDamage : " << hit.gameObject->GetHashedName().ToString() << std::endl;
 					auto entity = hit.gameObject->GetComponent<Entity>();
