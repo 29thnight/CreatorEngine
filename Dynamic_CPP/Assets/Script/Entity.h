@@ -45,7 +45,7 @@ public:
 	virtual void HitImpulseUpdate(float tick);
 	void StopHitImpulse();
 
-	void SetStagger(float time);
+	virtual void SetStagger(float time) {};
 
 	int m_currentHP{ 1 };
 	[[Property]]

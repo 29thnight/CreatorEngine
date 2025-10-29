@@ -361,6 +361,14 @@ void EntityMonsterA::Update(float tick)
 	// test code end
 }
 
+void EntityMonsterA::SetStagger(float time)
+{
+	auto anim = GetOwner()->GetComponentsInChildren<Animator>();
+	for (auto& a : anim) {
+		a->StopAnimation(time);
+	}
+}
+
 
 
 void EntityMonsterA::AttackBoxOn()

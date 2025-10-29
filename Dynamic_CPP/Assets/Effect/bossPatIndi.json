@@ -1,13 +1,13 @@
 {
     "currentTime": 0.0,
-    "duration": -1.0,
+    "duration": 1.0,
     "emitterTimings": [
         0.0,
         0.0
     ],
     "isPaused": false,
     "isPlaying": false,
-    "loop": true,
+    "loop": false,
     "name": "bossPatIndi",
     "particleSystems": [
         {
@@ -23,9 +23,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 0.125,
+                                "x": 1.0,
                                 "y": 1.0,
-                                "z": 0.625
+                                "z": 1.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -57,7 +57,7 @@
                             "emitterPosition": {
                                 "x": 0.0,
                                 "y": 0.10000000149011612,
-                                "z": 2.5
+                                "z": 0.0
                             },
                             "emitterRadius": 1.0,
                             "emitterRotation": {
@@ -81,6 +81,60 @@
                     "stage": 2,
                     "type": "MeshSpawnModuleCS",
                     "useEasing": false
+                },
+                {
+                    "data": {
+                        "colorGradient": [
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.7372549176216125,
+                                    "y": 0.26274511218070984,
+                                    "z": 0.26274511218070984
+                                },
+                                "time": 0.0
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.7372549176216125,
+                                    "y": 0.26274511218070984,
+                                    "z": 0.26274511218070984
+                                },
+                                "time": 0.06199999898672104
+                            },
+                            {
+                                "color": {
+                                    "w": 1.0,
+                                    "x": 0.7372549176216125,
+                                    "y": 0.26274511218070984,
+                                    "z": 0.26274511218070984
+                                },
+                                "time": 0.06599999964237213
+                            }
+                        ],
+                        "colorParams": {
+                            "customFunctionType": 0,
+                            "customParam1": 0.0,
+                            "customParam2": 0.0,
+                            "customParam3": 0.0,
+                            "customParam4": 0.0,
+                            "discreteColorsSize": 0,
+                            "gradientSize": 3,
+                            "transitionMode": 0
+                        },
+                        "discreteColors": [],
+                        "easing": {
+                            "enabled": false
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 1
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MeshColorModuleCS",
+                    "useEasing": false
                 }
             ],
             "name": "NewEmitter",
@@ -88,7 +142,7 @@
             "position": {
                 "x": 0.0,
                 "y": 0.10000000149011612,
-                "z": 2.5
+                "z": 0.0
             },
             "renderModules": [
                 {
@@ -108,7 +162,7 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "plane"
+                            "name": "BarIndicator"
                         },
                         "renderState": {
                             "instanceCount": 1
@@ -152,9 +206,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 0.125,
+                                "x": 1.0,
                                 "y": 1.0,
-                                "z": 0.625
+                                "z": 1.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -186,7 +240,7 @@
                             "emitterPosition": {
                                 "x": 0.0,
                                 "y": 0.10000000149011612,
-                                "z": 2.5
+                                "z": 0.0
                             },
                             "emitterRadius": 1.0,
                             "emitterRotation": {
@@ -216,7 +270,7 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 1.0,
+                                    "w": 0.0,
                                     "x": 0.7372549176216125,
                                     "y": 0.26274511218070984,
                                     "z": 0.26274511218070984
@@ -225,10 +279,19 @@
                             },
                             {
                                 "color": {
+                                    "w": 0.0,
+                                    "x": 0.7372549176216125,
+                                    "y": 0.26274511218070984,
+                                    "z": 0.26274511218070984
+                                },
+                                "time": 0.061000000685453415
+                            },
+                            {
+                                "color": {
                                     "w": 1.0,
-                                    "x": 0.6383363008499146,
-                                    "y": 0.12755180895328522,
-                                    "z": 0.12755180895328522
+                                    "x": 0.6392157077789307,
+                                    "y": 0.12941177189350128,
+                                    "z": 0.12941177189350128
                                 },
                                 "time": 0.5
                             }
@@ -240,7 +303,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 2,
+                            "gradientSize": 3,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -262,7 +325,7 @@
             "position": {
                 "x": 0.0,
                 "y": 0.10000000149011612,
-                "z": 2.5
+                "z": 0.0
             },
             "renderModules": [
                 {
@@ -282,7 +345,7 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "plane"
+                            "name": "BarIndicator"
                         },
                         "renderState": {
                             "instanceCount": 1

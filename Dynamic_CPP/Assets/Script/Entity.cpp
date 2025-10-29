@@ -95,10 +95,10 @@ void Entity::StopHitImpulse()
 	m_currentHitImpulseDuration = 0.f;
 }
 
-void Entity::SetStagger(float time)
-{
-	auto anim = GetOwner()->GetComponentsInChildren<Animator>();
-	for (auto& a : anim) {
-		a->StopAnimation(time);
-	}
-}
+//void Entity::SetStagger(float time)
+//{
+//	auto anim = GetOwner()->GetComponentsInChildren<Animator>();
+//	for (auto& a : anim) {
+//		a->StopAnimation(time);
+//	}
+//}

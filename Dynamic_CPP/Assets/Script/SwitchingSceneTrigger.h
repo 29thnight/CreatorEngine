@@ -22,6 +22,8 @@ private:
 	// 버튼 에지 검출용
 	bool m_prevA0 = false;
 	bool m_prevA1 = false;
+	[[Property]]
+	bool m_isTestMode{ false };
 
 	bool m_isFadeInComplete{ false };
 	bool m_isFadeOutComplete{ false };
