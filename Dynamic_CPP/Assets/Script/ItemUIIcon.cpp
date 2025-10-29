@@ -5,6 +5,7 @@
 #include "ImageComponent.h"
 #include "ItemComponent.h"
 #include "GameInstance.h"
+#include "ItemManager.h"
 #include "Player.h"
 #include "pch.h"
 
@@ -12,15 +13,13 @@ void ItemUIIcon::Start()
 {
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
 	m_image = m_pOwner->GetComponent<ImageComponent>();
+	m_rect->SetSizeDelta({ 75.f, 75.f });
 
-    if(!GetOwner()->m_childrenIndices.empty())
+
+	auto gmObj = GameObject::Find("GameManager");
+    if (gmObj)
     {
-        int index = GetOwner()->m_childrenIndices[0];
-        auto bgObj = GameObject::FindIndex(index);
-        if (bgObj)
-        {
-            m_bgImage = bgObj->GetComponent<ImageComponent>();
-        }
+		m_itemManager = gmObj->GetComponent<ItemManager>();
     }
 
     // 필요 시 초기화
@@ -29,7 +28,6 @@ void ItemUIIcon::Start()
 
 void ItemUIIcon::Update(float tick)
 {
-
     constexpr int layerOrderFoward = 10;
 
     // --- 0) 카메라/스크린 좌표 계산 (원래 코드) ---
@@ -208,32 +206,23 @@ void ItemUIIcon::SetItemID(int id)
     itemID = id;
     if (m_image)
     {
-        //->  TODO : itemID가 결정나면 거기에 맞춰서 아이콘을 정렬하던지, 미리 지정해서 적용하도록 처리가 필요
-
     }
 
+}
+
+void ItemUIIcon::SetItemEnhancement(int id)
+{
+	itemTypeID = id;
+    if (m_image && 0 < itemTypeID)
+    {
+        constexpr int CONVERT_TYPE_OFFSET = 1;
+        m_image->SetTexture(itemTypeID - CONVERT_TYPE_OFFSET); // HP 아이콘
+    }
 }
 
 void ItemUIIcon::SetRarityID(int id)
 {
     rarityID = id;
-    if (m_bgImage)
-    {
-        switch (rarityID)
-        {
-        case 2:
-            m_bgImage->color = GameInstance::GetInstance()->EpicItemColor;
-            break;
-        case 1:
-            m_bgImage->color = GameInstance::GetInstance()->RareItemColor;
-            break;
-        case 0:
-        default:
-            m_bgImage->color = GameInstance::GetInstance()->CommonItemColor;
-            break;
-        }
-
-    }
 }
 
 void ItemUIIcon::ApplyOrderDelta(int delta)

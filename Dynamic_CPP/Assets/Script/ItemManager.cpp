@@ -148,6 +148,7 @@ void ItemManager::RefreshItemSlots()
 			if (itemIcons[i])
 			{
 				itemIcons[i]->SetItemID(itemInfos[i].id);
+				itemIcons[i]->SetItemEnhancement(itemInfos[i].enhancementType);
 				itemIcons[i]->SetRarityID(itemInfos[i].rarity);
 				itemIcons[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
 				itemIcons[i]->ResetPurchased();

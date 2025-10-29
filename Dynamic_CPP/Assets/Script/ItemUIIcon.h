@@ -29,6 +29,7 @@ public:
 
 	void SetTarget(class GameObject* target);
 	void SetItemID(int id);
+	void SetItemEnhancement(int id);
 	void SetRarityID(int id);
 	void ApplyOrderDelta(int delta);
 	int GetItemID() const { return itemID; }
@@ -41,6 +42,7 @@ public:
 	int				m_playerID{ -1 };
 
 private:
+	class ItemManager*				m_itemManager = nullptr;
 	class RectTransformComponent*	m_rect = nullptr;
 	class ImageComponent*			m_image = nullptr;
 	class ImageComponent*			m_bgImage = nullptr;
@@ -53,6 +55,8 @@ private:
 	bool			m_isSetPopup = false; // º¸ºù ¸ØÃß°í ÆË¾÷À¸·Î ÀüÈ¯
 	[[Property]]
 	int				itemID{};
+	[[Property]]
+	int				itemTypeID{};
 	[[Property]]
 	int				rarityID{};
 	[[Property]]

@@ -26,7 +26,7 @@ void ItemUIPopup::Start()
     //타이틀의 자식 -> 설명
     //설명의 자식 -> 버튼
     //버튼의 자식 -> 구매
-    // 0: Title, 1: Description, 2: priceIcon, 3: PurchaseButton, 4: priceText, 5: PurchaseText
+    // 0: Title, 1: Description, 2: priceIcon, 3: PurchaseButton, 4: priceText
     constexpr int childMax = 6;
 
     GameObject* cur = GetOwner();
@@ -55,9 +55,6 @@ void ItemUIPopup::Start()
         case 4:
             m_priceText = cur->GetComponent<TextComponent>();
             break;
-        case 5:
-            m_purchaseText = cur->GetComponent<TextComponent>();
-            break;
         }
     }
 }
@@ -72,7 +69,7 @@ void ItemUIPopup::Update(float tick)
     //안전한 실행을 위한 과한 nullptr 검사
 	if (!m_rect     || !m_iconObj   || !m_icon          || !m_image     || 
         !m_iconRect || !m_button    || !m_purchase      || !m_descComp  ||
-        !m_nameComp || !m_input     || !m_purchaseText  || !m_priceText ) 
+        !m_nameComp || !m_input     || !m_priceText ) 
     {
         return;
     }
@@ -119,6 +116,7 @@ void ItemUIPopup::Update(float tick)
 
 	// 아이콘 위치 동기화
 	auto iconPos = m_iconRect->GetAnchoredPosition();
+    iconPos.y += 10.f;
     m_rect->SetAnchoredPosition(iconPos);
 
     // 아이콘이 팝업 상태인지 확인
@@ -257,7 +255,4 @@ void ItemUIPopup::CalcLayerOrder(int add)
     //가격텍스트
     int priceLayer = m_priceText->GetLayerOrder();
     m_priceText->SetOrder(priceLayer + add);
-    //구매텍스트
-    int purchaseTextLayer = m_purchaseText->GetLayerOrder();
-    m_purchaseText->SetOrder(purchaseTextLayer + add);
 }
