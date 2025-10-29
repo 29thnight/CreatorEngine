@@ -39,7 +39,7 @@ PixelOutput main(PixelInput input)
     float normalizedAge = 1 - input.particleAge / input.particleLifeTime;
     float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, input.texCoord);
     float4 dissolveColor = gDissolveTexture.Sample(gLinearSampler, input.texCoord);
-    float smoothDissolve = smoothstep(normalizedAge - 0.1, normalizedAge, dissolveColor.g);
+    float smoothDissolve = smoothstep(normalizedAge - 0.03, normalizedAge, dissolveColor.g);
     
     if (diffuseColor.a < 0.01)
         discard;

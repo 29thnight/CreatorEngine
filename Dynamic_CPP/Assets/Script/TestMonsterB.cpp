@@ -357,6 +357,14 @@ void TestMonsterB::Update(float tick)
 	HitImpulseUpdate(tick);
 }
 
+void TestMonsterB::SetStagger(float time)
+{
+	auto anim = GetOwner()->GetComponentsInChildren<Animator>();
+	for (auto& a : anim) {
+		a->StopAnimation(time);
+	}
+}
+
 void TestMonsterB::Dead()
 {
 	m_animator->SetParameter("Dead", true);

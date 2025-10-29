@@ -15,6 +15,9 @@ public:
 	void Finalize();
 
 	void BuildGame();
+	//For Test
+	bool PackageGameAssets();
+	bool UnpackageGameAssets();
 
 private:
 	std::wstring m_buildSlnPath{};
