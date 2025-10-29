@@ -927,15 +927,15 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 {
     if (type->typeID == type_guid(GameObject))
     {
-		Prefab* m_prefab = nullptr;
-        if (itNode["m_prefabFileGuid"] && !itNode["m_prefabFileGuid"].IsNull())
-        {
-            auto prefabGuid = itNode["m_prefabFileGuid"].as<std::string>();
-            if (prefabGuid != nullFileGuid)
-            {
-                m_prefab = PrefabUtilitys->LoadPrefabGuid(prefabGuid);
-            }
-        }
+		//Prefab* m_prefab = nullptr;
+  //      if (itNode["m_prefabFileGuid"] && !itNode["m_prefabFileGuid"].IsNull())
+  //      {
+  //          auto prefabGuid = itNode["m_prefabFileGuid"].as<std::string>();
+  //          if (prefabGuid != nullFileGuid)
+  //          {
+  //              m_prefab = PrefabUtilitys->LoadPrefabGuid(prefabGuid);
+  //          }
+  //      }
 
         auto obj = m_activeScene.load()->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
@@ -957,11 +957,11 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
 
-			if (m_prefab)
-            {
-                obj->m_prefab = m_prefab;
-				PrefabUtilitys->RegisterInstance(obj, m_prefab);
-            }
+			//if (m_prefab)
+   //         {
+   //             obj->m_prefab = m_prefab;
+			//	PrefabUtilitys->RegisterInstance(obj, m_prefab);
+   //         }
 
         }
 
@@ -987,15 +987,15 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 {
     if (type->typeID == type_guid(GameObject))
     {
-        Prefab* m_prefab = nullptr;
-        if (itNode["m_prefabFileGuid"] && !itNode["m_prefabFileGuid"].IsNull())
-        {
-            auto prefabGuid = itNode["m_prefabFileGuid"].as<std::string>();
-            if (prefabGuid != nullFileGuid)
-            {
-                m_prefab = PrefabUtilitys->LoadPrefabGuid(prefabGuid);
-            }
-        }
+        //Prefab* m_prefab = nullptr;
+        //if (itNode["m_prefabFileGuid"] && !itNode["m_prefabFileGuid"].IsNull())
+        //{
+        //    auto prefabGuid = itNode["m_prefabFileGuid"].as<std::string>();
+        //    if (prefabGuid != nullFileGuid)
+        //    {
+        //        m_prefab = PrefabUtilitys->LoadPrefabGuid(prefabGuid);
+        //    }
+        //}
 
         auto obj = targetScene->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
@@ -1017,11 +1017,11 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
                 TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
             }
 
-            if (m_prefab)
-            {
-                obj->m_prefab = m_prefab;
-                PrefabUtilitys->RegisterInstance(obj, m_prefab);
-            }
+            //if (m_prefab)
+            //{
+            //    obj->m_prefab = m_prefab;
+            //    PrefabUtilitys->RegisterInstance(obj, m_prefab);
+            //}
         }
 
         if (itNode["m_components"])
