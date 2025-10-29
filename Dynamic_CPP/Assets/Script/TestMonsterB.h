@@ -30,6 +30,8 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	virtual void SetStagger(float time) override;
+
 	BehaviorTreeComponent* enemyBT = nullptr;
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;
