@@ -34,6 +34,7 @@
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Barrier.h" />
+    <ClInclude Include="PakHelper.h" />
     <ClInclude Include="plf_colony.h" />
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.CountingSemaphore.h" />

@@ -3,6 +3,8 @@
 #include "PrefabUtility.h"
 #include "EventTarget.h"
 #include "Player.h"
+#include "EntityAsis.h"
+
 void MobSpawner::Start()
 {
 	SpawnArea = GameObject::FindIndex(GetOwner()->m_parentIndex)->m_transform.GetWorldPosition();
@@ -28,6 +30,26 @@ void MobSpawner::OnTriggerEnter(const Collision& collision)
 			}
 		}
 	}
+	EntityAsis* asis = collision.otherObj->GetComponent<EntityAsis>();
+	if (asis != nullptr)
+	{
+		if (isBound == false)
+		{
+			isActive = true;
+			Spawn();
+
+		}
+		else
+		{
+			if (triggerOnce == true)
+			{
+				isActive = true;
+				triggerOnce = false;
+				Spawn();
+
+			}
+		}
+	}
 }
 
 void MobSpawner::OnCollisionEnter(const Collision& collision)
@@ -49,6 +71,26 @@ void MobSpawner::OnCollisionEnter(const Collision& collision)
 				triggerOnce = false;
 				Spawn();
 				
+			}
+		}
+	}
+	EntityAsis* asis = collision.otherObj->GetComponent<EntityAsis>();
+	if (asis != nullptr)
+	{
+		if (isBound == false)
+		{
+			isActive = true;
+			Spawn();
+
+		}
+		else
+		{
+			if (triggerOnce == true)
+			{
+				isActive = true;
+				triggerOnce = false;
+				Spawn();
+
 			}
 		}
 	}
@@ -116,12 +158,11 @@ void MobSpawner::Spawn()
 				obj->m_transform.SetPosition(SpawnArea + temp);
 				if(0 != m_eventId && !m_runtimeTag.empty())
 				{
-					auto eventTargetBase = obj->AddScriptComponent("EventTarget");
+					auto eventTargetBase = obj->GetComponent<EventTarget>();
 					// Configure EventTarget : TESTING
-					auto eventTarget = dynamic_cast<EventTarget*>(eventTargetBase);
-					if (eventTarget)
+					if (eventTargetBase)
 					{
-						eventTarget->Configure(m_eventId, "targetTag", m_runtimeTag);
+						eventTargetBase->Configure(m_eventId, "targetTag", m_runtimeTag);
 					}
 				}
 			}

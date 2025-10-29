@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "SwitchingSceneTrigger.generated.h"
 
 enum class SwitchPhase { Hidden, FadingIn, WaitingInput, FadingOut, Switching };
 class GameManager;
@@ -8,6 +9,8 @@ class TextComponent;
 class SwitchingSceneTrigger : public ModuleBehavior
 {
 public:
+   ReflectSwitchingSceneTrigger
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(SwitchingSceneTrigger)
 	virtual void Start() override;
 	virtual void Update(float tick) override;
@@ -36,10 +39,10 @@ private:
 	//[페이드 인 전용]
 	//지금은 spriteFont로 해서 TextComponent를 받지만, 아이콘으로 변경될 경우
 	//ImageComponent로 변경 필요
-	GameManager* m_gameManager{ nullptr };
-	TextComponent* m_buttonText{ nullptr };
-	TextComponent* m_switchingText{ nullptr };
-	TextComponent* m_loadingText{ nullptr };
-	std::vector<ImageComponent*> m_cutImages{};
+	GameManager*					m_gameManager{ nullptr };
+	TextComponent*					m_buttonText{ nullptr };
+	TextComponent*					m_switchingText{ nullptr };
+	TextComponent*					m_loadingText{ nullptr };
+	std::vector<ImageComponent*>	m_cutImages{};
 
 };

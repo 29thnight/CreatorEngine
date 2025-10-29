@@ -1,0 +1,32 @@
+m_name: MenuKeyObserver
+m_instanceID: 3860418927
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: MenuKeyObserver
+    m_instanceID: 2857034986
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 24
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - ModuleBehavior: 1399118904
+        m_name: MenuKeyObserver
+        m_instanceID: 1134277461
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 4d8d8322-15ca-5a28-8528-4cf379bdd05e
+    m_gameObjectType: 0
+    m_isStatic: false

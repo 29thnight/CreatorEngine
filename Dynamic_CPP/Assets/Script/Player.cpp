@@ -1117,6 +1117,15 @@ void Player::Charging()
 
 		if (chargeEffect)
 		{
+			// 차지 ing
+			switch (m_curWeapon->itemType) {
+			case ItemType::Melee:
+				chargeEffect->m_effectTemplateName = "chargeAing";
+				break;
+			case ItemType::Range:
+				chargeEffect->m_effectTemplateName = "chargeBing";
+				break;
+			}
 			chargeEffect->Apply();
 		}
 		if (m_SpecialActionSound)
@@ -1137,17 +1146,31 @@ void Player::ChargeAttack()
 		OnMoveBomb = false;
 
 	}
-	else //근거리 and 원거리 
+	else if(m_curWeapon->itemType == ItemType::Melee || m_curWeapon->itemType == ItemType::Range)//근거리 and 원거리 
 	{
 		if (chargeEffect)
 		{
-			chargeEffect->StopEffect();
+			//
+
+			
 		}
 		if (m_chargingTime >= m_curWeapon->chgTime)  //무기별 차징시간 넘었으면
 		{
 			//차지공격나감
 			isChargeAttack = true;
 			m_curWeapon->isCompleteCharge = false;
+
+			// 차징 end후 차징완료 이펙트 출력
+
+			switch (m_curWeapon->itemType) {
+			case ItemType::Melee:
+				chargeEffect->m_effectTemplateName = "chargeA";
+				break;
+			case ItemType::Range:
+				chargeEffect->m_effectTemplateName = "chargeB";
+				break;
+			}
+			chargeEffect->Apply();
 
 			if (true == GameInstance::GetInstance()->IsViveEnabled())
 			{
@@ -1158,7 +1181,7 @@ void Player::ChargeAttack()
 						auto event = obj->GetComponent<EventManager>();
 						if (event)
 						{
-							event->EmitAbilityUsed("Charge");
+							event->EmitAbilityUsed("Charge","",playerIndex);
 						}
 					}
 					auto data = GM->GetControllerVibration();
@@ -1181,6 +1204,9 @@ void Player::ChargeAttack()
 			{
 				m_animator->SetParameter("RangeChargeAttack", true); 
 			}
+		}
+		else {
+			chargeEffect->StopEffect();
 		}
 	}
 

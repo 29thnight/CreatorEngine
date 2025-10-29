@@ -53,7 +53,7 @@ void EntitySpiritStone::Start()
 
 
 
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("DestroyEffect");
 	if (deadPrefab)
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
@@ -111,7 +111,7 @@ void EntitySpiritStone::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				deadObj->SetEnabled(true);
 				auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 				Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
-				deadPos.y += 1.7f;
+				deadPos.y += 1.5f;
 				deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 				deadEffect->Initialize();
 			}

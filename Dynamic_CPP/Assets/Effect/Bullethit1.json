@@ -13,7 +13,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
-    "name": "bullethit1",
+    "name": "Bullethit1",
     "particleSystems": [
         {
             "isRunning": false,
@@ -85,7 +85,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 66.8420181274414,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -202,19 +202,28 @@
                                 "color": {
                                     "w": 1.0,
                                     "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
+                                    "y": 1.0,
+                                    "z": 1.0
                                 },
                                 "time": 0.36000001430511475
                             },
                             {
                                 "color": {
                                     "w": 1.0,
-                                    "x": 0.501960813999176,
-                                    "y": 0.0,
-                                    "z": 0.0
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
                                 },
-                                "time": 0.9430000185966492
+                                "time": 0.7020000219345093
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
+                                "time": 0.9330000281333923
                             }
                         ],
                         "colorParams": {
@@ -224,7 +233,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 3,
+                            "gradientSize": 4,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -264,12 +273,12 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 2,
-                            "depthPreset": 2,
+                            "blendPreset": 1,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "Doubleglow",
+                            "pixelShader": "GGlow",
                             "vertexShader": "BillBoard"
                         },
                         "textures": [
@@ -433,9 +442,9 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 0.6823529601097107,
-                                    "x": 0.5333333611488342,
-                                    "y": 0.800000011920929,
+                                    "w": 3.9215686321258545,
+                                    "x": 0.0,
+                                    "y": 0.572549045085907,
                                     "z": 1.0
                                 },
                                 "time": 0.0
@@ -443,8 +452,8 @@
                             {
                                 "color": {
                                     "w": 0.0,
-                                    "x": 0.5333333611488342,
-                                    "y": 0.800000011920929,
+                                    "x": 0.0,
+                                    "y": 0.5714287757873535,
                                     "z": 1.0
                                 },
                                 "time": 0.9850000143051147
@@ -498,7 +507,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -667,18 +676,18 @@
                             {
                                 "color": {
                                     "w": 1.0,
-                                    "x": 0.4941176474094391,
-                                    "y": 0.6313725709915161,
-                                    "z": 0.9450980424880981
+                                    "x": 0.0,
+                                    "y": 0.9458484649658203,
+                                    "z": 1.0
                                 },
                                 "time": 0.0
                             },
                             {
                                 "color": {
                                     "w": 0.0,
-                                    "x": 0.4941176474094391,
-                                    "y": 0.6313725709915161,
-                                    "z": 0.9450980424880981
+                                    "x": 0.0,
+                                    "y": 0.9450980424880981,
+                                    "z": 1.0
                                 },
                                 "time": 0.9850000143051147
                             }
@@ -731,7 +740,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -900,38 +909,20 @@
                             {
                                 "color": {
                                     "w": 1.0,
-                                    "x": 0.4941176474094391,
-                                    "y": 0.6313725709915161,
-                                    "z": 0.9450980424880981
+                                    "x": 0.0,
+                                    "y": 0.9450980424880981,
+                                    "z": 1.0
                                 },
                                 "time": 0.0
                             },
                             {
                                 "color": {
                                     "w": 0.0,
-                                    "x": 0.4941176474094391,
-                                    "y": 0.6313725709915161,
-                                    "z": 0.9450980424880981
+                                    "x": 0.0,
+                                    "y": 0.9450980424880981,
+                                    "z": 1.0
                                 },
                                 "time": 0.9850000143051147
-                            },
-                            {
-                                "color": {
-                                    "w": 0.699999988079071,
-                                    "x": 1.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 0.699999988079071
-                            },
-                            {
-                                "color": {
-                                    "w": 0.0,
-                                    "x": 0.5,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "time": 1.0
                             }
                         ],
                         "colorParams": {
@@ -941,7 +932,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 4,
+                            "gradientSize": 2,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -982,7 +973,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1215,7 +1206,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1403,7 +1394,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1636,7 +1627,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1716,5 +1707,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }

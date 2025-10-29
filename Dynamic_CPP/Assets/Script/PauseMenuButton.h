@@ -28,26 +28,12 @@ public:
 	virtual void OnDisable() override;
 	virtual void OnDestroy() override  {}
 
-	// 초기/보간/전환
-	void ComputeOffscreenPositions();
-	void ApplyTargets(float tick);
-	void SetActive(PauseWindowType next);
-	void Next(); // RT/→
-	void Prev(); // LT/←
-
 private:
 	class GameObject*		m_pauseMenuCanvasObject{};
 	class ImageComponent*	m_boxImageComponent{};
 	bool					m_isMenuOpened{ false };
 
 private:
-	class GameObject*		m_settingPanelObject{};
-	class GameObject*		m_howToPlayPanelObject{};
-
-	class RectTransformComponent* m_selfRect{ nullptr };
-	class RectTransformComponent* m_settingsRect{ nullptr };
-	class RectTransformComponent* m_howToRect{ nullptr };
-
 	PauseWindowType m_active{ PauseWindowType::Self };
 	bool m_isTransitioning{ false };
 

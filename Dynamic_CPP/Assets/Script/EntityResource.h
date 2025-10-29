@@ -33,6 +33,7 @@ public:
 	int maxHP = 1;
 
 
+
 private:
 	EffectComponent* m_effect = nullptr;
 	CriticalMark* m_criticalMark;

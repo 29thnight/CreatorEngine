@@ -22,6 +22,7 @@ void ReachEventTrigger::Update(float tick)
 			if (m_eventID < currentEventID)
 			{
 				m_asis->SetMove(true);
+				GetOwner()->Destroy();
 			}
 		}
 	}

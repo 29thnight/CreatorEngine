@@ -1,13 +1,14 @@
 ID,QuestName,Scene,Category,PlayerScope,PriorQuestID,NextQuestID,AdvancePolicy,Description,Objectives
-3100,Start,Tutorial,UI,Shared,0,3101,AutoAdvance,null,ReachTrigger actor=Asis index=1
-3101,DestroyBush,Tutorial,Quest,AllPlayersIndividually,3100,3102,AutoAdvance,자원 3개를 파괴하세요,Destroy tag=$targetTag required=3
-3102,DeliveryRsToKori,Tutorial,Quest,Shared,3101,3103,AutoAdvance,코리에게 자원 블록을 전달하세요,Deliver tag=DResource required=6
-3103,ProtectKori,Tutorial,Quest,Shared,3102,3104,AutoAdvance,몬스터로부터 코리를 지키세요,KillCount tag=$targetTag required=n
-3104,FollowKori,Tutorial,Quest,Shared,3103,3105,AutoAdvance,코리를 따라가며 자원을 파괴하세요,ReachTrigger actor=Player index=1
-3105,DeliveryRsToKori,Tutorial,Quest,Shared,3104,3106,AutoAdvance,코리에게 자원 블록을 전달하세요,Deliver tag=DResource required=2
-3106,UseCharging,Tutorial,Quest,AllPlayersIndividually,3105,3107,AutoAdvance,차징 공격을 시도해 보세요,UseAbilityToDestroy ability=Charge
-3107,MoveToTrigger1,Tutorial,Quest,Shared,3106,3108,AutoAdvance,코리와 함께 이동하세요,ReachTrigger actor=Asis index=1
-3108,BreakObstacle,Tutorial,Quest,Shared,3107,3109,AutoAdvance,코리가 나아갈 수 있도록 장애물을 파괴하세요,Destroy tag=$targetTag required=1
-3109,MoveToTrigger2,Tutorial,Quest,Shared,3108,3110,AutoAdvance,코리와 함께 이동하세요,ReachTrigger actor=Asis index=1
-3110,BuySomething,Tutorial,Quest,AllPlayersIndividually,3109,4101,AutoAdvance,상점에서 아이템을 구매하여 성장하세요,Purchase tag=Item count=1
-4101,TutoEnd,Tutorial,UI,None,3110,0,Manual,튜토리얼 종료,null
+3100,Start,Tutorial,UI,Shared,0,3101,AutoAdvance,코리를 따라가세요,ReachTrigger actor=Asis index=1
+3101,DestroyBush,Tutorial,Quest,AllPlayersIndividually,3100,3102,AutoAdvance,자원을 파괴하세요,Destroy tag=$targetTag required=1
+3102,DeliveryRsToKori,Tutorial,Quest,Shared,3101,3103,AutoAdvance,코리에게 자원 블록을 전달하세요,Deliver tag=DResource required=2
+3103,SecondStop,Tutorial,Quest,Shared,3102,3104,AutoAdvance,코리를 따라가세요,ReachTrigger actor=Asis index=1
+3104,ProtectKori,Tutorial,Quest,Shared,3103,3105,AutoAdvance,몬스터로부터 코리를 지키세요,KillCount tag=Enemy required=3
+3105,FollowKori,Tutorial,Quest,Shared,3104,3106,AutoAdvance,코리를 따라가며 자원을 파괴하세요,ReachTrigger actor=Asis index=1
+3106,DeliveryRsToKori,Tutorial,Quest,Shared,3105,3107,AutoAdvance,코리에게 자원 블록을 전달하세요,Deliver tag=DResource required=2
+3107,UseCharging,Tutorial,Quest,AllPlayersIndividually,3106,3108,AutoAdvance,차징 공격을 시도해 보세요,UseAbilityToDestroy ability=Charge 
+3108,MoveToTrigger1,Tutorial,Quest,Shared,3107,3109,AutoAdvance,코리와 함께 이동하세요,ReachTrigger actor=Asis index=1
+3109,BreakObstacle,Tutorial,Quest,Shared,3108,3110,AutoAdvance,코리가 나아갈 수 있도록 장애물을 파괴하세요,Destroy tag=$targetTag required=1
+3110,MoveToTrigger2,Tutorial,Quest,Shared,3109,3111,AutoAdvance,코리와 함께 이동하세요,ReachTrigger actor=Asis index=1
+3111,BuySomething,Tutorial,Quest,AllPlayersIndividually,3110,4102,AutoAdvance,상점에서 아이템을 구매하여 성장하세요,Purchase tag=Item count=1
+4101,TutoEnd,Tutorial,UI,None,3111,0,Manual,튜토리얼 종료,null

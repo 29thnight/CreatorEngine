@@ -1,33 +1,31 @@
 m_name: SceneTransitionCanvas
+m_instanceID: 2725457681
 m_isEnabled: true
-m_instanceID: 2956012071
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: SceneTransitionCanvas
+    m_instanceID: 2570675970
     m_isEnabled: true
-    m_instanceID: 1701377057
+    m_attachedSoketID: 0
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 1}
-      m_parentID: 4294967295
-    m_index: 3
-    m_parentIndex: -1
+      m_parentID: 0
+    m_index: 1446
+    m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [4]
-    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
-    m_attachedSoketID: 0
     m_collisionType: 0
-    m_isStatic: false
-    m_gameObjectType: 6
+    m_prefabFileGuid: c481d03e-d30a-5047-954b-5a585c26b4b9
+    m_childrenIndices: [1447]
     m_tag: Untagged
     m_layer: Default
     m_components:
       - RectTransformComponent: 3002078429
         m_name: RectTransformComponent
+        m_instanceID: 956698113
         m_isEnabled: true
-        m_instanceID: 3914273876
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_anchorMin: {x: 0.5, y: 0.5}
         m_anchorMax: {x: 0.5, y: 0.5}
@@ -37,37 +35,37 @@ PrefabNode:
         m_worldRect: {x: -960, y: -540, width: 1920, height: 1080}
       - Canvas: 2773063417
         m_name: Component
+        m_instanceID: 299377960
         m_isEnabled: true
-        m_instanceID: 3965146250
         m_FileID: 00000000-0000-0000-0000-000000000000
-        CanvasOrder: 0
+        CanvasOrder: 6
         CanvasName: SceneTransitionCanvas
+    m_gameObjectType: 6
+    m_isStatic: false
     children:
       - GameObject: 2166264123
         m_name: SceneTransition
-        m_isEnabled: true
         m_instanceID: 4086216612
+        m_isEnabled: true
+        m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 3
-        m_index: 4
-        m_parentIndex: 3
+          m_parentID: 1446
+        m_index: 1447
+        m_parentIndex: 1446
         m_rootIndex: 0
-        m_childrenIndices: ~
-        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
-        m_attachedSoketID: 0
         m_collisionType: 0
-        m_isStatic: false
-        m_gameObjectType: 5
+        m_prefabFileGuid: c481d03e-d30a-5047-954b-5a585c26b4b9
+        m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
+            m_instanceID: 3688726631
             m_isEnabled: true
-            m_instanceID: 1437099703
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
             m_anchorMax: {x: 0.5, y: 0.5}
@@ -77,28 +75,30 @@ PrefabNode:
             m_worldRect: {x: 0, y: 0, width: 1920, height: 1080}
           - ImageComponent: 1187169862
             m_name: ImageComponent
+            m_instanceID: 3262191733
             m_isEnabled: true
-            m_instanceID: 161411315
             m_FileID: 00000000-0000-0000-0000-000000000000
-            uiEffects: 0
             _layerorder: 0
+            uiEffects: 0
             m_ownerCanvasName: SceneTransitionCanvas
             navigations: ~
             m_customPixelShaderPath: ""
-            curindex: 0
+            texturePaths: [TestBg.png]
             color: {r: 0, g: 0, b: 0, a: 1}
+            curindex: 0
             rotate: 0
             origin: {x: 960, y: 540}
             unionScale: 1
-            clipDirection: 0
             clipPercent: 1
-            texturePaths: [TestBg.png]
+            clipDirection: 0
           - ModuleBehavior: 1399118904
             m_defaultFadeIn: 0.5
             m_defaultFadeOut: 0.5
             m_ignoreTimeScale: false
             m_name: SceneTransitionUI
+            m_instanceID: 723269198
             m_isEnabled: true
-            m_instanceID: 4251732304
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 7752ec76-401c-59f2-8f67-bb223f175de1
+        m_gameObjectType: 5
+        m_isStatic: false

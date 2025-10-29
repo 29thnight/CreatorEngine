@@ -6,6 +6,18 @@
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
 
+void ReculsiveDrawObject(void* instance, const Meta::Type& type)
+{
+	if (type.parent)
+	{
+		ReculsiveDrawObject(instance, *type.parent);
+	}
+
+	Meta::DrawProperties(instance, type);
+	Meta::DrawMethods(instance, type);
+
+}
+
 void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior)
 {
 	if (moduleBehavior)
@@ -34,8 +46,7 @@ void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior)
 		const Meta::Type* type = Meta::Find(moduleBehavior->m_name.ToString());
 		if (type)
 		{
-			Meta::DrawProperties(moduleBehavior, *type);
-			Meta::DrawMethods(moduleBehavior, *type);
+			ReculsiveDrawObject(moduleBehavior, *type);
 		}
 		else
 		{

@@ -23,7 +23,7 @@ void GameManager::Awake()
 	LOG("GameManager Awake");
 	//앞으론 언리얼 처럼 게임인스턴스를 활용해서 전역 설정값 관리
 	GameInstance::GetInstance()->Initialize();
-
+	GameInit();
 	auto resourcePool = GameObject::Find("ResourcePool");
 	auto weaponPiecePool = GameObject::Find("WeaponPiecePool");
 
@@ -83,12 +83,7 @@ void GameManager::Update(float tick)
 
 	if (m_isGameOver)
 	{
-		int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
-		if (currentScene != (int)SceneType::Boss)
-		{
-			GameInstance::GetInstance()->ResetAllEnhancements();
-		}
-
+		GameInit();
 		SwitchNextSceneWithFade();
 		return;
 	}
@@ -154,6 +149,16 @@ void GameManager::OnDisable()
 		{
 			meshrenderer->m_bitflag = 0;
 		}
+	}
+}
+
+void GameManager::GameInit()
+{
+	int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
+	if (currentScene != (int)SceneType::Boss)
+	{
+		GameInstance::GetInstance()->ResetAllEnhancements();
+		GameInstance::GetInstance()->ClearRewardAmount();
 	}
 }
 
