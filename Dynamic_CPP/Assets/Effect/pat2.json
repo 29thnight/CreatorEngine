@@ -11,7 +11,7 @@
     "name": "pat2",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -170,7 +170,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "MagicCircle",
+                                "name": "boss_eff_w",
                                 "slot": 0
                             }
                         ]
@@ -185,7 +185,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -217,7 +217,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 0.8999999761581421,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -262,8 +262,8 @@
                             {
                                 "color": {
                                     "w": 1.0,
-                                    "x": 0.9963834285736084,
-                                    "y": 1.0,
+                                    "x": 0.9960784316062927,
+                                    "y": 0.0,
                                     "z": 0.0
                                 },
                                 "time": 0.0
@@ -344,12 +344,12 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "MagicCircle",
+                                "name": "boss_eff_w",
                                 "slot": 0
                             },
                             {
                                 "hasTexture": true,
-                                "name": "MagicCircleDissolve",
+                                "name": "boss_eff",
                                 "slot": 1
                             }
                         ]
