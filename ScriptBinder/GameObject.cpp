@@ -175,7 +175,6 @@ ModuleBehavior* GameObject::AddScriptComponent(std::string_view scriptName)
 	m_componentIds[component->m_scriptTypeID] = index;
 
     ScriptManager->CollectScriptComponent(this, index, scriptName.data());
-	ScriptManager->BindScriptEvents(component.get(), scriptName.data());
 
     return component.get();
 }

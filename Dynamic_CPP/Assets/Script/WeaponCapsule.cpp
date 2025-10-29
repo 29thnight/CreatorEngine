@@ -82,11 +82,11 @@ void WeaponCapsule::TryAddWeapon()
 	Prefab* weaponPrefab;
 	if (weaponCode == 1)
 	{
-		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
+		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
 	}
 	else if (weaponCode == 2)
 	{
-		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponWand");
+		weaponPrefab = PrefabUtilitys->LoadPrefab("WeaponMelee");
 	}
 	else if (weaponCode == 3)
 	{

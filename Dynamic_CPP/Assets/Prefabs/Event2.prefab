@@ -1,0 +1,65 @@
+m_name: Event2
+m_instanceID: 1411281612
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: Event2
+    m_instanceID: 2368720618
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 40, y: 0, z: 15, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 730
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_instanceID: 3901992624
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: true
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_instanceID: 2488350999
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 2, y: 3, z: 3}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        m_eventID: 3104
+        m_triggerIndex: 1
+        m_emitOnEnter: true
+        m_emitOnStay: false
+        m_emitOnExit: false
+        m_once: false
+        m_playerId: -1
+        m_allPlayerPass: false
+        m_isAsisWait: true
+        m_name: ReachEventTrigger
+        m_instanceID: 192311470
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 1eebc4f4-eaf1-5129-b379-9410167dd347
+    m_gameObjectType: 0
+    m_isStatic: false

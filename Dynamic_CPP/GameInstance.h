@@ -8,7 +8,7 @@
 static constexpr int MAX_INPUT_DEVICE = 2;
 enum class CharType { None = 0, Man = 1, Woman = 2 };
 enum class PlayerDir { None = 0, Left = 1, Right = 2 };
-enum class SceneType { Bootstrap, SelectChar, Loading, Stage, Tutorial, Boss, Credits, GameOver };
+enum class SceneType { Bootstrap, SelectChar, Loading, Stage, Tutorial, Boss, Credits, GameOver, Clear };
 
 class EventManager;
 class PlayGameData;
