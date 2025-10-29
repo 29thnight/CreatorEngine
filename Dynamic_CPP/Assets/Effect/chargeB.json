@@ -13,7 +13,7 @@
     "particleSystems": [
         {
             "isRunning": false,
-            "maxParticles": 15,
+            "maxParticles": 30,
             "modules": [
                 {
                     "data": {
@@ -72,11 +72,11 @@
                                 "z": 0.5
                             },
                             "emitterType": 1,
-                            "spawnRate": 15.0
+                            "spawnRate": 30.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 15
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -113,7 +113,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 2.3210866451263428,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -132,7 +132,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 15
+                            "particleCapacity": 30
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -177,7 +177,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 15
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -213,7 +213,7 @@
                             "name": "round"
                         },
                         "renderState": {
-                            "instanceCount": 15
+                            "instanceCount": 30
                         },
                         "renderStates": {
                             "blendPreset": 2,
@@ -593,5 +593,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }
