@@ -1570,7 +1570,10 @@ void TBoss1::BP0011()
 	m_activePattern = EPatternType::BP0011;
 	m_patternPhase = EPatternPhase::Warning;
 	BPTimer = 0.f;
-	pattenIndex = 0;
+	pattenIndex++;
+	if (pattenIndex < 0 || pattenIndex >= BP001Objs.size()) {
+		pattenIndex = 0;
+	}
 	projectileIndex = 0;
 	if (m_animator) m_animator->SetParameter("StartRangedAttack", true);
 
