@@ -17,7 +17,7 @@ void EntityBigWood::Start()
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 	HitImpulseStart();
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("DestroyEffect");
 	if (deadPrefab)
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
@@ -205,7 +205,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			deadObj->SetEnabled(true);
 			auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 			Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
-			deadPos.y += 0.7f;
+			deadPos.y += 0.0f;
 			deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 			deadEffect->Initialize();
 		}

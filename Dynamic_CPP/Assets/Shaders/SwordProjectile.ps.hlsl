@@ -76,7 +76,7 @@ PixelOutput main(PixelInput input)
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
     float brightnessMask = smoothstep(0.03, 0.12, colorBrightness);
-    finalAlpha = finalAlpha * brightnessMask; // 기존 알파와 곱하기
+    finalAlpha = finalAlpha * brightnessMask * smoothstep(0.03, 0.12, emissionColor.r); // 기존 알파와 곱하기
     
     clip(finalAlpha - 0.05); // 최종 알파로 클립
     
