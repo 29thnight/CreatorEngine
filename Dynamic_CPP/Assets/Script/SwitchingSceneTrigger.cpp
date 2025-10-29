@@ -46,7 +46,7 @@ void SwitchingSceneTrigger::Start()
     m_cutImages.reserve(32);
 
     const std::string prefix = "Cut";
-    for (int index = 0;; ++index)
+    for (int index = 1;; ++index)
     {
         const std::string name = prefix + std::to_string(index);
         GameObject* obj = GameObject::Find(name);
@@ -137,7 +137,7 @@ void SwitchingSceneTrigger::Update(float tick)
                 if (0 == m_cutsceneIndex)
                 {
                     constexpr int BOSS_CUT_SCENE_INDEX = 3;
-                    if(nextSceneType == (int)SceneType::Boss)
+                    if(nextSceneType == (int)SceneType::Boss || m_isTestMode)
                     {
                         m_cutsceneIndex = BOSS_CUT_SCENE_INDEX;
                         m_maxCutsceneIndex = 8;
