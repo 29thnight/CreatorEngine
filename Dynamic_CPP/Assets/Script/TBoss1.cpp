@@ -4,6 +4,7 @@
 #include "BehaviorTreeComponent.h"
 #include "PrefabUtility.h"
 #include "RigidBodyComponent.h"
+#include "BoxColliderComponent.h"
 #include "Animator.h"
 #include "EffectComponent.h"
 #include <utility>
@@ -82,10 +83,20 @@ void TBoss1::Start()
 	meleeIndicator = PrefabUtilitys->LoadPrefab("BossMeleeIndicator");
 	Indicatorobj = meleeIndicator->Instantiate();
 
+	Prefab* debugPrefeb = PrefabUtilitys->LoadPrefab("DebugObj");
+	debugMelee = debugPrefeb->Instantiate();
+	RigidBodyComponent* debugRB = debugMelee->AddComponent<RigidBodyComponent>();
+	BoxColliderComponent* debugBox = debugMelee->AddComponent<BoxColliderComponent>();
+	debugRB->SetBodyType(EBodyType::KINEMATIC);
+	debugRB->SetIsTrigger(true);
+	Mathf::Vector3 exten = { BP002Widw * 0.5f, 2.0f, BP002Dist * 0.5f };
+	debugBox->SetExtents(exten);
+
+
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
 	Prefab* BP003Prefab = PrefabUtilitys->LoadPrefab("Boss1BP003Obj");
 
-	debugMelee
+	
 
 	////1번 패턴 투사체 최대 10개
 	for (size_t i = 0; i < 10; i++) {
@@ -336,6 +347,9 @@ void TBoss1::SweepAttack()
 	input.startRotation = boxOrientation;
 	input.layerMask = 1 << 5; // 플레이어 레이어만 검사
 	int hitCount = PhysicsManagers->BoxSweep(input, boxHalfExtents, hitObjects);
+	auto debugtr = debugMelee->GetComponent<Transform>();
+	debugtr->SetPosition(boxCenter);
+	debugtr->SetRotation(boxOrientation);
 	AtkEffobj->GetComponent<Transform>()->SetPosition(boxCenter);
 	AtkEffobj->GetComponentsInChildren<EffectComponent>()[0]->Apply();
 	isAttacked = true;
