@@ -37,7 +37,9 @@ void BossBurrowAni::Update(float deltaTime)
     TBoss1* boss = m_boss->GetComponent<TBoss1>();
     if (boss) {
         if (progress > 0.99) {
-            boss->SetBurrow();
+            if (boss->m_moveState == TBoss1::EBossMoveState::Burrowing) {
+                boss->SetBurrow();
+            }
         }
     }
 }

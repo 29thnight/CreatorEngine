@@ -27,6 +27,7 @@ void BossPopupAni::Enter()
         TBoss1* boss = m_boss->GetComponent<TBoss1>();
         if (!boss) return;
         boss->m_moveState = TBoss1::EBossMoveState::Protruding;
+        boss->ProtrudeDamege();
 
     }
 }
