@@ -1,17 +1,17 @@
 m_name: Boss1BP001Obj_Prefab
-m_instanceID: 2014325147
+m_instanceID: 1000091787
 m_isEnabled: true
 m_fileGuid: 8d83bbee-3374-581b-a669-ac46b9f55c8e
 PrefabNode:
   - GameObject: 2166264123
     m_name: Boss1BP001Obj
-    m_instanceID: 2137531340
+    m_instanceID: 1389985529
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
       position: {x: 0, y: 0, z: -8, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      scale: {x: 2.5, y: 2.5, z: 2.5, w: 0}
       m_parentID: 0
     m_index: 1
     m_parentIndex: 0
@@ -24,7 +24,7 @@ PrefabNode:
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
-        m_instanceID: 1267607522
+        m_instanceID: 3655458257
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
@@ -40,21 +40,21 @@ PrefabNode:
         m_collisionEnabled: true
       - SphereColliderComponent: 1490099576
         m_name: SphereColliderComponent
-        m_instanceID: 3976200216
+        m_instanceID: 3187430968
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
-        radius: 1
+        radius: 0.600000024
         m_posOffset: {x: 0, y: 0, z: 0}
         m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
       - ModuleBehavior: 1399118904
         m_name: BP001
-        m_instanceID: 3526641041
+        m_instanceID: 1948306555
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 34a7067d-830f-57f1-872b-7c048523319a
       - EffectComponent: 3131036541
         m_name: EffectComponent
-        m_instanceID: 659066038
+        m_instanceID: 1574234674
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_effectTemplateName: bvx
@@ -64,7 +64,7 @@ PrefabNode:
         m_isPaused: false
         m_loop: true
         m_useAbsolutePosition: false
-        m_currentTime: 28.9990349
+        m_currentTime: 203.675766
         m_effectInstanceName: yyyyy_obj1864216219
     m_gameObjectType: 0
     m_isStatic: false
