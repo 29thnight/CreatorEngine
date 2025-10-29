@@ -13,14 +13,14 @@
     "particleSystems": [
         {
             "isRunning": true,
-            "maxParticles": 15,
+            "maxParticles": 30,
             "modules": [
                 {
                     "data": {
                         "meshParticleTemplate": {
                             "RotationSpeed": {
                                 "x": 0.0,
-                                "y": 99.80000305175781,
+                                "y": 0.0,
                                 "z": 0.0
                             },
                             "Scale": {
@@ -72,11 +72,11 @@
                                 "z": 0.5
                             },
                             "emitterType": 1,
-                            "spawnRate": 7.5
+                            "spawnRate": 15.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 15
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -98,11 +98,11 @@
                             {
                                 "direction": [
                                     1.0,
-                                    0.30000001192092896,
+                                    0.0,
                                     1.0
                                 ],
-                                "duration": 0.9409999847412109,
-                                "force": 1.3359999656677246,
+                                "duration": 1.0,
+                                "force": 2.2750000953674316,
                                 "range": 2.0,
                                 "triggerTime": 0.0,
                                 "type": 2
@@ -113,7 +113,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 16.58536720275879,
+                            "currentTime": 263.50897216796875,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -132,7 +132,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 15
+                            "particleCapacity": 30
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -177,7 +177,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 15
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -213,7 +213,7 @@
                             "name": "round"
                         },
                         "renderState": {
-                            "instanceCount": 15
+                            "instanceCount": 30
                         },
                         "renderStates": {
                             "blendPreset": 2,
@@ -593,5 +593,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }
