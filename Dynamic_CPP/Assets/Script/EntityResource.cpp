@@ -13,6 +13,7 @@
 #include "Core.Random.h"
 #include "Weapon.h"
 #include "PlayEffectAll.h"
+#include "EventTarget.h"
 void EntityResource::Start()
 {
 
@@ -72,6 +73,7 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		auto player = dynamic_cast<Player*>(sender);
 		if (player)
 		{
+			Entity::SendDamage(sender, damage, hitinfo);
 			// hit
 			if (m_criticalMark)
 			{

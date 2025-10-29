@@ -12,7 +12,7 @@
 #include "EntityItem.h"
 #include "RaycastHelper.h"
 #include "Skeleton.h"
-
+#include "EventManager.h"
 #include "EffectComponent.h"
 #include "TestEnemy.h"
 #include "BoxColliderComponent.h"
@@ -1149,11 +1149,18 @@ void Player::ChargeAttack()
 			isChargeAttack = true;
 			m_curWeapon->isCompleteCharge = false;
 
-
 			if (true == GameInstance::GetInstance()->IsViveEnabled())
 			{
 				if (GM)
 				{
+					if (auto obj = GM->GetOwner())
+					{
+						auto event = obj->GetComponent<EventManager>();
+						if (event)
+						{
+							event->EmitAbilityUsed("Charge");
+						}
+					}
 					auto data = GM->GetControllerVibration();
 					if (data)
 					{

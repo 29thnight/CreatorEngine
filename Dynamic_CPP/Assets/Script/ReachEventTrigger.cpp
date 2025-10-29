@@ -1,6 +1,7 @@
 #include "ReachEventTrigger.h"
 #include "EventManager.h"
 #include "GameInstance.h"
+#include "EntityAsis.h"
 #include "Player.h"
 #include "pch.h"
 
@@ -8,6 +9,22 @@ void ReachEventTrigger::Awake()
 {
 	EnsureManager();
 	m_alreadyEmitted = false;
+}
+
+void ReachEventTrigger::Update(float tick)
+{
+	if (m_isAsisWait && m_asis && m_mgr)
+	{
+		const auto activeIds = m_mgr->GetActiveEventIds();
+		if (!activeIds.empty())
+		{
+			int currentEventID = activeIds.front();
+			if (m_eventID < currentEventID)
+			{
+				m_asis->SetMove(true);
+			}
+		}
+	}
 }
 
 void ReachEventTrigger::OnTriggerEnter(const Collision& collision)
@@ -50,6 +67,15 @@ bool ReachEventTrigger::EmitIfAllowed(const Collision& c)
 				}
 			}
 		}
+		else if (c.otherObj->HasComponent<EntityAsis>())
+		{
+			m_asis = c.otherObj->GetComponentDynamicCast<EntityAsis>();
+			if (m_asis && m_isAsisWait)
+			{
+				m_asis->SetMove(false);
+			}
+		}
+
 
 		m_mgr->EmitReachedTrigger(actorTag, m_triggerIndex, currPlayerID);
 	}

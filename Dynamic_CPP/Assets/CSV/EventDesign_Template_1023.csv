@@ -1,9 +1,0 @@
-ID,QuestName,Scene,Category,PlayerScope,PriorQuestID,NextQuestID,AdvancePolicy,Description,Objectives,
-3101,DestroyBush,,Quest,AllPlayersIndividually,0,3102,AutoAdvance,"""수풀 3개를 파괴하세요""",Destroy tag=$targetTag required=3,
-3102,DeliveryRsToKori,,Quest,AllPlayersIndividually,3101,3103,AutoAdvance,"""코리에게 자원 블록을 전달하세요""",Deliver tag=$targetTag required=3,
-3103,ProtectKori,,Quest,Shared,3102,3104,AutoAdvance,"""몬스터로부터 코리를 지키세요""",KillCount tag=$targetTag required=n,<<<< 몬스터 배치 후 기입 예정
-3104,FollowKori,,Quest,Shared,3103,3105,AutoAdvance,"""코리를 따라가며 자원을 파괴하세요""",ReachTrigger actor=Player index=1,
-3105,UseCharging,,Quest,Shared,3104,3106,WaitForNextTrigger,"""차징으로 오브젝트를 파괴하세요""",,<<<< 차징으로 파괴헀을 때를 체크 어떻게 하는지?
-3106,BreakObstacle,,Quest,Shared,3105,3107,WaitForNextTrigger,"""코리가 나아갈 수 있도록 장애물을 파괴하세요""",Destroy tag=$targetTag required=1,
-3107,BuySomething,,Quest,AllPlayersIndividually,3106,0,AutoAdvance,"""상점에서 아이템을 구매하여 성장하세요""",Interact actor=Player tag=$targetTag,
-4101,TutoEnd,,UI,None,3107,0,Manual,"""튜토리얼 종료""",null,

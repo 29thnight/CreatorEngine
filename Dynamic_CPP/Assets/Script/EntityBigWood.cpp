@@ -66,6 +66,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 	if (m_currentHP <= 0) return; // 풀링해서 사용하기 위해 만약 이미 파괴된 상태라면 무시.
 
+	Entity::SendDamage(sender, damage, hitinfo);
 	// 플레이어가 공격한 경우에만 처리.
 	m_currentHP -= damage; 
 	Player* player = dynamic_cast<Player*>(sender);
@@ -86,7 +87,6 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	{
 		// 파괴 처리.
 		m_currentHP = 0;
-
 		// 재화 오브젝트 생성 후 렌덤위치로.
 
 		/*if (m_onDeathEvent.IsBound())

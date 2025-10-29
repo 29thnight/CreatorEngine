@@ -117,7 +117,7 @@ public:
 
     CSVCell operator[](const int _index) const
     {
-        if (_index >= m_row.size())
+        if (_index >= m_row.size() - 1)
             throw std::out_of_range("Index out of range");
         return CSVCell(m_row[_index]);
     }

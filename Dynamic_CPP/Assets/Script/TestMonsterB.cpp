@@ -492,6 +492,8 @@ void TestMonsterB::AttackBoxOff()
 
 void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	Entity::SendDamage(sender, damage, hitinfo);
+
 	if (sender)
 	{
 		auto player = dynamic_cast<Player*>(sender);

@@ -5,6 +5,7 @@ ReflectionScriptField(ReachEventTrigger) \
 { \
 	PropertyField \
 	({ \
+		meta_property(m_eventID) \
 		meta_property(m_triggerIndex) \
 		meta_property(m_emitOnEnter) \
 		meta_property(m_emitOnStay) \
@@ -12,6 +13,7 @@ ReflectionScriptField(ReachEventTrigger) \
 		meta_property(m_once) \
 		meta_property(m_playerId) \
 		meta_property(m_allPlayerPass) \
+		meta_property(m_isAsisWait) \
 	}); \
 	FieldEnd(ReachEventTrigger, PropertyOnly) \
 };

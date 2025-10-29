@@ -990,6 +990,8 @@ void EntityEleteMonster::RotateToTarget()
 
 void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	Entity::SendDamage(sender, damage, hitinfo);
+
 	if (sender)
 	{
 		auto player = dynamic_cast<Player*>(sender);

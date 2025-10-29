@@ -12,6 +12,7 @@ ReflectionScriptField(ItemUIPopup) \
 		meta_property(clockwise) \
 		meta_property(featherAngle) \
 		meta_property(tint) \
+		meta_property(eventID) \
 		meta_property(itemID) \
 		meta_property(rarityID) \
 		meta_property(m_baseSize) \

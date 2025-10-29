@@ -68,7 +68,7 @@ void EntityMonsterTower::Update(float tick)
 	HitImpulseUpdate(tick);
 }
 
-void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
+void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
 
 	if (isDestroy) return;
@@ -80,6 +80,7 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo)
 		towerMonster->GetComponentDynamicCast<TestMonsterB>()->SendDamage(this, 0);
 	}
 
+	Entity::SendDamage(sender, damage, hitinfo);
 
 	if (m_currentHP <= 0)
 	{

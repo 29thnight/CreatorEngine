@@ -210,6 +210,19 @@ void ItemManager::BuyItem(int itemID, int rarityID)
 	}
 }
 
+int ItemManager::GetItemSlot(int itemID, int rarityID) const
+{
+	for (int slot = 0; slot < itemInfos.size(); ++slot)
+	{
+		if (itemInfos[slot].id == itemID &&
+			itemInfos[slot].rarity == rarityID)
+		{
+			return slot;
+		}
+	}
+	return -1;
+}
+
 void ItemManager::ClearItemSlot(int slotIndex)
 {
 	if (slotIndex < 0 || slotIndex >= static_cast<int>(itemSlots.size()))
@@ -232,5 +245,14 @@ void ItemManager::ClearItemSlot(int slotIndex)
 	{
 		itemIcons[slotIndex]->OnPurchased();
 	}
+}
+
+bool ItemManager::IsItemSoldOut(int slotIndex) const
+{
+	if (slotIndex < 0 || slotIndex >= static_cast<int>(itemSlots.size()))
+		return false;
+	if (!itemSlots[slotIndex])
+		return false;
+	return itemSlots[slotIndex]->m_isItemSoldOut;
 }
 

@@ -15,4 +15,5 @@ public:
 protected:
 	class ImageComponent* m_imageComponent{ nullptr };
 	class UIButton* m_uiButton{ nullptr };
+	bool m_isTintChange{ false };
 };

@@ -33,6 +33,7 @@ public:
 	bool AddItem(EntityItem* item);
 	void Purification(float tick);
 	bool PathMove(float tick);
+	void SetMove(bool move);
 	void Stun();
 	// 현재 들고있는 아이템을 떨구는 함수 (index로 가능)
 	bool DropItem();
@@ -49,6 +50,7 @@ public:
 		return static_cast<float>(m_currentPollutionGauge) / static_cast<float>(maxPollutionGauge);
 	}
 private:
+	class GameManager* m_gameManager = nullptr;
 	KoriEmoteSystem* m_emoteSystem = nullptr;
 	Animator* m_animator = nullptr;
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
@@ -144,6 +146,7 @@ private:
 	float m_predictNextTime = 2.0f; // 예측 시간
 	[[Property]]
 	float m_rotateSpeed = 5.f;
+	bool m_isWait{ false };
 
 #ifdef _DEBUG
 	GameObject* DebugPoint{ nullptr };

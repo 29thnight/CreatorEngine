@@ -18,7 +18,6 @@ tags:
   - Asis
   - Host
   - Target
-  - Effect
 layers:
   - Default
   - TransparentFX

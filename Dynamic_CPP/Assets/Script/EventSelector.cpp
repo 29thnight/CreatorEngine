@@ -115,6 +115,15 @@ void EventSelector::Update(float tick)
                 if (!def->uiText.empty())
                 {
                     activeText = def->uiText;
+                    std::string nullStringChk = activeText;
+                    std::transform(nullStringChk.begin(), nullStringChk.end(), nullStringChk.begin(),
+                        [](unsigned char c) { return (char)std::tolower(c); });
+
+                    auto str = Utf8ToAnsi(nullStringChk);
+                    if (str == "null")
+                    {
+                        m_state = UiState::Hidden;
+                    }
                 }
                 else if (!def->name.empty())
                 {
@@ -123,11 +132,13 @@ void EventSelector::Update(float tick)
                 else
                 {
                     activeText = std::string("Event ") + std::to_string(*activeId);
+					m_state = UiState::Hidden;
                 }
             }
             else
             {
                 activeText = std::string("Event ") + std::to_string(*activeId);
+                m_state = UiState::Hidden;
             }
         }
     }
