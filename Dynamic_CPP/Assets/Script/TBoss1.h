@@ -55,6 +55,7 @@ public:
 
 	enum class EPatternPhase {
 		Inactive, // 비활성
+		Starting,  // 시작 모션
 		Warning,  // 공격 전조, 경고 시간
 		Spawning, // 공격 위치/방향 계산 확정
 		Move,          // 이동 단계 --> 패턴 중간에 이동 해야 하는 경우
@@ -69,6 +70,7 @@ public:
 		Idle, //대기 이동 가능
 		Burrowing, //땅속으로 들어가는중
 		Burrowed, //땅속에서 이동중
+		Warning, //튀어나오기 전 경고
 		Protruding //땅속에서 나오는중
 	};
 
@@ -128,6 +130,8 @@ public:
 	int BP002Damage = 5;
 	[[Property]]
 	int BP003Damage = 5;
+	[[Property]]
+	int ProtrudeDamage = 5;
 
 	//range
 	[[Property]]
@@ -138,9 +142,12 @@ public:
 	float BP001Delay = 5.0f;
 	[[Property]]
 	float BP002Dist = 5.0f; //데미지 들어갈 거리 
+	[[Property]]
 	float BP002Widw = 1.0f; //데미지 들어갈 폭    -> 모션 보이는 것보다 크거나 작을수 있음
 	[[Property]]
 	float BP003RadiusSize = 5.0f; //폭파시 체크 범위 
+	[[Property]]
+	float ProtrudeRadiusSize = 3.0f;
 
 	//move
 	[[Property]]
@@ -195,6 +202,10 @@ public:
 	GameObject* AtkEffobj = nullptr;
 	Prefab* meleeIndicator = nullptr;
 	GameObject* Indicatorobj = nullptr;
+	Prefab* protrudeIndecator = nullptr;
+	GameObject* protrudeIndicatorobj = nullptr;
+	
+
 
 	GameObject* debugMelee = nullptr;
 	
@@ -203,6 +214,7 @@ public:
 	//보스만 특수하게 
 	GameObject* m_chunsik = nullptr;
 	float m_chunsikRadius = 10.f;
+	Mathf::Vector3 ProtrudePos = Mathf::Vector3::Zero;
 
 	void RotateToTarget();
 	void ShootIndexProjectile(int index, Mathf::Vector3 pos,Mathf::Vector3 dir);
@@ -221,6 +233,9 @@ public:
 	std::vector<std::pair<int, Mathf::Vector3>> BP0034Points;
 	float BP0013delay = 1.0f;
 	float BP0034delay = 1.0f;
+
+	bool lockAttack = false;
+
 
 	void UpdatePatternPhase(float tick);
 	void UpdatePatternAction(float tick);
@@ -243,6 +258,11 @@ public:
 	bool isAttacked = false;
 	bool isBurrow = false;
 	float burrowTimer = 0.f;
+	[[Property]]
+	float burrowDelay = 2.0f;
+	[[Property]]
+	float burrowSetIndicator = 1.0f;
+
 	float hazardTimer = 0.f;
 	float hazardInterval = 8.f; //바닥 패턴 주기
 	int actionCount = 0; // 행동 횟수 일정 이상시 강제 대기 상태 
@@ -273,7 +293,17 @@ public:
 	void ProtrudeEnd(); //타겟 위치로 튀어나옴
 	[[Method]]
 	void ProtrudeChunsik(); //춘식이 위치로 튀어나옴
-	
+	[[Method]]
+	void ProtrudeDamege(); //튀어나오면서 데미지
+
+	void calculateProtrudePoint(GameObject* target);
+
+	[[Method]]
+	void CalculToChunsik();
+	[[Method]]
+	void CalculToTarget();
+
+
 	[[Method]]
 	void ShootProjectile(); //애니메이션 이벤트에서 호출
 	[[Method]]
@@ -281,6 +311,7 @@ public:
 	[[Method]]
 	void ShowMeleeIndicator();
 	
+	bool isIndicator = false;
 
 	[[Method]]
 	void BP0011();
@@ -314,12 +345,6 @@ public:
 	bool EndDeadAnimation = false;
 
 	void BossClear(); //보스죽음 애니메이션끝나면서 연출 끝나는 타이밍(연출에따라 달라짐) 후에 GameManager에 bossClear 신호 주기
-
-
-	
-
-
-
 
 
 };

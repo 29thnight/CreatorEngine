@@ -12,11 +12,14 @@ ReflectionScriptField(TBoss1) \
 		meta_property(BP001Damage) \
 		meta_property(BP002Damage) \
 		meta_property(BP003Damage) \
+		meta_property(ProtrudeDamage) \
 		meta_property(BP001RadiusSize) \
 		meta_property(BP001Speed) \
 		meta_property(BP001Delay) \
 		meta_property(BP002Dist) \
+		meta_property(BP002Widw) \
 		meta_property(BP003RadiusSize) \
+		meta_property(ProtrudeRadiusSize) \
 		meta_property(MoveSpeed) \
 		meta_property(BP003Delay) \
 		meta_property(KnockbackDistacneX) \
@@ -29,6 +32,8 @@ ReflectionScriptField(TBoss1) \
 		meta_property(BP0033_MAX_ITEM) \
 		meta_property(BP0034_MIN_ITEM) \
 		meta_property(BP0034_MAX_ITEM) \
+		meta_property(burrowDelay) \
+		meta_property(burrowSetIndicator) \
 	}); \
 	MethodField \
 	({ \
@@ -37,6 +42,9 @@ ReflectionScriptField(TBoss1) \
 		meta_method(Protrude) \
 		meta_method(ProtrudeEnd) \
 		meta_method(ProtrudeChunsik) \
+		meta_method(ProtrudeDamege) \
+		meta_method(CalculToChunsik) \
+		meta_method(CalculToTarget) \
 		meta_method(ShootProjectile) \
 		meta_method(SweepAttack) \
 		meta_method(ShowMeleeIndicator) \

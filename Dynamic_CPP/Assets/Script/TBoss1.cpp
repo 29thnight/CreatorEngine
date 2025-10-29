@@ -5,6 +5,7 @@
 #include "PrefabUtility.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
+#include "SphereColliderComponent.h"
 #include "Animator.h"
 #include "EffectComponent.h"
 #include <utility>
@@ -79,18 +80,25 @@ void TBoss1::Start()
 	DownEffobj = fallDownEff->Instantiate();
 	meleeAtkEff = PrefabUtilitys->LoadPrefab("Bossatk1");
 	AtkEffobj = meleeAtkEff->Instantiate();
+	AtkEffobj->GetComponent<Transform>()->SetScale({ BP002Widw,1,BP002Widw });
 
 	meleeIndicator = PrefabUtilitys->LoadPrefab("BossMeleeIndicator");
 	Indicatorobj = meleeIndicator->Instantiate();
+	Indicatorobj->GetComponent<Transform>()->SetScale({ BP002Widw,1,BP002Widw });
 
+	protrudeIndecator = PrefabUtilitys->LoadPrefab("Protrude_Indecator");
+	protrudeIndicatorobj = protrudeIndecator->Instantiate();
+	protrudeIndicatorobj->GetComponent<Transform>()->SetScale({ ProtrudeRadiusSize,1,ProtrudeRadiusSize });
+
+	//meleeatteck debug
 	Prefab* debugPrefeb = PrefabUtilitys->LoadPrefab("DebugObj");
 	debugMelee = debugPrefeb->Instantiate();
 	RigidBodyComponent* debugRB = debugMelee->AddComponent<RigidBodyComponent>();
-	BoxColliderComponent* debugBox = debugMelee->AddComponent<BoxColliderComponent>();
+	SphereColliderComponent* debugBox = debugMelee->AddComponent<SphereColliderComponent>();
 	debugRB->SetBodyType(EBodyType::KINEMATIC);
 	debugRB->SetIsTrigger(true);
-	Mathf::Vector3 exten = { BP002Widw * 0.5f, 2.0f, BP002Dist * 0.5f };
-	debugBox->SetExtents(exten);
+	debugBox->SetRadius(BP002Widw);
+	//
 
 
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
@@ -336,23 +344,26 @@ void TBoss1::SweepAttack()
 	Mathf::Vector3 pos = m_pOwner->m_transform.GetWorldPosition();
 	Mathf::Vector3 dir = m_pOwner->m_transform.GetForward();
 
-	Mathf::Vector3 boxHalfExtents(BP002Widw * 0.5f, 2.0f, BP002Dist * 0.5f); // 높이 2.0f는 임의로 설정
-	Mathf::Vector3 boxCenter = pos + dir * (BP002Dist * 0.5f); // 박스 중심 위치
-	Mathf::Quaternion boxOrientation = Mathf::Quaternion::CreateFromRotationMatrix(Mathf::Matrix::CreateLookAt(Mathf::Vector3::Zero, dir, Mathf::Vector3::Up));
+	//box sweep -> box overlap --> sphear ovelap
+	Mathf::Vector3 Centerpos = pos + dir * BP002Dist; // 박스 중심 위치
+	Mathf::Vector3 up = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+	Mathf::Quaternion angle = Mathf::Quaternion::LookRotation(-dir, up);
+
 	std::vector<HitResult> hitObjects;
-	SweepInput input;
-	input.direction = dir;
-	input.distance = BP002Dist;
-	input.startPosition = pos;
-	input.startRotation = boxOrientation;
+
+	OverlapInput input;
+	input.position = Centerpos;
+	input.rotation = angle;
 	input.layerMask = 1 << 5; // 플레이어 레이어만 검사
-	int hitCount = PhysicsManagers->BoxSweep(input, boxHalfExtents, hitObjects);
 	auto debugtr = debugMelee->GetComponent<Transform>();
-	debugtr->SetPosition(boxCenter);
-	debugtr->SetRotation(boxOrientation);
-	AtkEffobj->GetComponent<Transform>()->SetPosition(boxCenter);
+	int hitCount = PhysicsManagers->SphereOverlap(input, BP002Widw, hitObjects);
+	debugtr->SetPosition(Centerpos);
+	debugtr->SetRotation(angle);
+	AtkEffobj->GetComponent<Transform>()->SetPosition(Centerpos);
 	AtkEffobj->GetComponentsInChildren<EffectComponent>()[0]->Apply();
 	isAttacked = true;
+	isIndicator = false;
+	lockAttack = false;
 	if (hitCount > 0)
 	{
 		for (const auto& hit : hitObjects)
@@ -385,13 +396,17 @@ void TBoss1::ShowMeleeIndicator()
 	Mathf::Vector3 dir = m_pOwner->m_transform.GetForward();
 	Mathf::Vector3 up = Mathf::Vector3(0.0f, 1.0f, 0.0f);
 	Mathf::Quaternion angle = Mathf::Quaternion::LookRotation(-dir, up);
+	Mathf::Vector3 setpos = pos + dir * BP002Dist;
 
 	Transform* tr = Indicatorobj->GetComponent<Transform>();
-	tr->SetPosition(pos);
+	tr->SetPosition(setpos);
 	tr->SetRotation(angle);
 
 	EffectComponent* eff = Indicatorobj->GetComponent< EffectComponent>();
-	eff->Apply();
+	if (!isIndicator) {
+		eff->Apply();
+		isIndicator = true;
+	}
 }
 
 
@@ -404,7 +419,25 @@ void TBoss1::MoveToChunsik(float tick)
 		}
 		else {
 			burrowTimer += tick;
-			if (burrowTimer >= 2.f) {
+			float indisettime = burrowDelay - burrowSetIndicator;
+			if (indisettime < 0) {
+				indisettime = 0;
+			}
+			if (burrowTimer >= indisettime) {
+				if (m_moveState == EBossMoveState::Burrowed) {
+					calculateProtrudePoint(m_chunsik);
+
+					//보스 위치 변경
+					m_pOwner->GetComponent<Transform>()->SetWorldPosition(ProtrudePos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
+					//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
+					protrudeIndicatorobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
+					float timescale = 1 / indisettime;
+					protrudeIndicatorobj->GetComponent<EffectComponent>()->SetTimeScale(timescale);
+					protrudeIndicatorobj->GetComponent<EffectComponent>()->Apply();
+					m_moveState = EBossMoveState::Warning;
+				}
+			}
+			if (burrowTimer >= burrowDelay) {
 				ProtrudeChunsik();
 				burrowTimer = 0.f;
 			}
@@ -422,7 +455,25 @@ void TBoss1::BurrowMove(float tick)
 		}
 		else {
 			burrowTimer += tick;
-			if (burrowTimer >= 2.f) {
+			float indisettime = burrowDelay - burrowSetIndicator;
+			if (indisettime < 0) {
+				indisettime = 0;
+			}
+			if (burrowTimer >= indisettime) {
+				if (m_moveState == EBossMoveState::Burrowed) {
+					calculateProtrudePoint(m_target);
+
+					//보스 위치 변경
+					m_pOwner->GetComponent<Transform>()->SetWorldPosition(ProtrudePos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
+					//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
+					protrudeIndicatorobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
+					float timescale = 1 / indisettime;
+					protrudeIndicatorobj->GetComponent<EffectComponent>()->SetTimeScale(timescale);
+					protrudeIndicatorobj->GetComponent<EffectComponent>()->Apply();
+					m_moveState = EBossMoveState::Warning;
+				}
+			}
+			if (burrowTimer >= burrowDelay) {
 				Protrude();
 				burrowTimer = 0.f;
 			}
@@ -436,7 +487,12 @@ void TBoss1::OnWarningFinished()
 	std::cout << "[TBoss1::OnWarningFinished] 진입. 현재 페이즈: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
 	if (m_animator) m_animator->SetParameter("CanTransitionToAttack", true);
 	if (m_activePattern == EPatternType::BP0022) {
-		m_patternPhase = EPatternPhase::Move;
+		if (m_patternPhase == EPatternPhase::Starting) {
+			m_patternPhase = EPatternPhase::Move;
+		}
+		else {
+			m_patternPhase = EPatternPhase::Spawning;
+		}
 	}
 	else {
 		m_patternPhase = EPatternPhase::Spawning;
@@ -469,7 +525,7 @@ void TBoss1::OnAttackActionFinished()
 		pattenIndex++;
 		if (pattenIndex < 5) // 5회 공격 콤보
 		{
-			m_patternPhase = EPatternPhase::Move; // 다음은 이동 단계
+			m_patternPhase = EPatternPhase::ComboInterval; // 다음은 이동 단계
 			BPTimer = 0.f; // 이동 시간 측정용 타이머 (필요시)
 			isMoved = false;
 		}
@@ -665,17 +721,24 @@ void TBoss1::Update_BP0021(float tick)
 	{
 	case EPatternPhase::Warning:
 		// Fixed attack, do not track
-		RotateToTarget(); // Track target during warning
+		BPTimer += tick;
+		if (BPTimer > 1.0f) {
+			lockAttack = true;
+		}
+		if (!lockAttack) {
+			RotateToTarget(); // Track target during warning
+		}
 		if (m_anicontroller && m_anicontroller->m_curState) {
 			std::string currentStateName = m_anicontroller->m_curState->m_name;
 			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
 				m_animator->SetParameter("StartMeleeAttack", true);
 			}
 		}
+		ShowMeleeIndicator();
 		break;
 	case EPatternPhase::Spawning:
-		RotateToTarget(); // Lock final direction
-		ShowMeleeIndicator();
+		//RotateToTarget(); // Lock final direction
+		//ShowMeleeIndicator();
 		m_patternPhase = EPatternPhase::Action;
 		break;
 	}
@@ -685,14 +748,7 @@ void TBoss1::Update_BP0022(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Warning:
-		RotateToTarget(); // Track target during warning
-		if (m_anicontroller && m_anicontroller->m_curState) {
-			std::string currentStateName = m_anicontroller->m_curState->m_name;
-			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
-				m_animator->SetParameter("WarningTrigger", true);
-			}
-		}
+	case EPatternPhase::Starting:
 		break;
 	case EPatternPhase::Move:
 		// This phase is for movement. Assume BurrowMove is animation-driven.
@@ -700,18 +756,35 @@ void TBoss1::Update_BP0022(float tick)
 		// For now, we just wait for OnMoveFinished() to set the next phase.
 		BurrowMove(tick);
 		if (isMoved) {
+			RotateToTarget(); // Lock final direction
 			if (m_anicontroller && m_anicontroller->m_curState) {
 				std::string currentStateName = m_anicontroller->m_curState->m_name;
 				if (currentStateName == "Idle") {
-					m_patternPhase = EPatternPhase::Spawning;
-					if (m_animator) m_animator->SetParameter("MeleeCombo", true);
+					m_patternPhase = EPatternPhase::Warning;
+					//if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
 				}
 			}
 		}
 		break;
-	case EPatternPhase::Spawning:
-		RotateToTarget(); // Lock final direction
+	case EPatternPhase::Warning:
+		BPTimer += tick;
+		if (BPTimer > 1.0f) {
+			lockAttack = true;
+		}
+		if (!lockAttack) {
+			RotateToTarget(); // Track target during warning
+		}
+		if (m_anicontroller && m_anicontroller->m_curState) {
+			std::string currentStateName = m_anicontroller->m_curState->m_name;
+			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
+				if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+			}
+		}
 		ShowMeleeIndicator();
+		break;
+	case EPatternPhase::Spawning:
+		//RotateToTarget(); // Lock final direction
+		//ShowMeleeIndicator();
 		m_patternPhase = EPatternPhase::Action;
 		break;
 	/*case EPatternPhase::Action:
@@ -1289,7 +1362,8 @@ void TBoss1::StartNextComboAttack()
 		if (m_animator) m_animator->SetParameter("RangedCombo", true);
 		break;
 	case EPatternType::BP0022: // Melee Combo example
-		if(m_animator) m_animator->SetParameter("MeleeCombo", true);
+		m_patternPhase = EPatternPhase::Move;
+		//if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
 		break;
 	}
 }
@@ -1351,13 +1425,85 @@ void TBoss1::SetBurrow()
 void TBoss1::Protrude()
 {
 	//todo : 땅속에서 나옴
+	UpEffobj->m_transform.SetWorldPosition(ProtrudePos);
+	if (m_moveState == EBossMoveState::Warning) {
+		//eff
+		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
+		m_animator->SetParameter("ProtrudeTrigger", true);
+	}
+
+	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
+}
+
+void TBoss1::ProtrudeEnd()
+{	
+	
+	m_rigid->SetColliderEnabled(true);
+	isBurrow = false;
+	isMoved = true;
+	m_moveState = EBossMoveState::Idle;
+}
+
+void TBoss1::ProtrudeChunsik()
+{
+	//모델 보이게 처리 하며
+	UpEffobj->m_transform.SetWorldPosition(ProtrudePos);
+	//땅속에서 나오는 에니메이션 재생
+	if(m_moveState == EBossMoveState::Warning) {
+		UpEffobj->m_transform.SetWorldPosition(ProtrudePos);
+		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
+		eff->Apply();
+		m_animator->SetParameter("ProtrudeTrigger", true);
+	}
+}
+
+void TBoss1::ProtrudeDamege()
+{
+	Transform* tr = m_pOwner->GetComponent<Transform>();
+	Mathf::Vector3 pos = tr->GetWorldPosition();
+	
+	OverlapInput in;
+	in.position = pos;
+	in.rotation = Mathf::Quaternion::Identity;
+	in.layerMask = 1 << 5; // 플레이어 레이어만 검사
+	std::vector<HitResult> res;
+
+	int count = PhysicsManagers->SphereOverlap(in, ProtrudeRadiusSize, res);
+	if (count > 0)
+	{
+		for (const auto& hit : res)
+		{
+			GameObject* hitObject = hit.gameObject;
+			if (hitObject == this->GetOwner()) {
+				continue;
+			}
+			// 플레이어에게 데미지 적용
+			Entity* entity = hitObject->GetComponentDynamicCast<Entity>();
+			if (entity)
+			{
+				HitInfo hitInfo;
+				hitInfo.hitPos = hit.point;
+				hitInfo.hitNormal = hit.normal;
+				hitInfo.attakerPos = pos;
+				//hitInfo.KnockbackForce
+				//hitInfo.bulletType
+				//hitInfo.itemType
+				entity->SendDamage(this, BP002Damage, hitInfo);
+			}
+		}
+	}
+}
+
+void TBoss1::calculateProtrudePoint(GameObject* target)
+{
 	//튀어나오기 전에 이동 가능영역 안에 있는지 확인
 	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //춘식이(중심) 위치
 	//타겟 확인  ==> 타겟이 없거나 잃어버렸다면? 그렇다면 랜덤 위치로
 	Mathf::Vector3 targetPos;
-	if(m_target)
+	if (target)
 	{
-		targetPos = m_target->GetComponent<Transform>()->GetWorldPosition();
+		targetPos = target->GetComponent<Transform>()->GetWorldPosition();
 		targetPos.y = chunsikPos.y; //높이 맞춤
 	}
 	else {
@@ -1379,48 +1525,40 @@ void TBoss1::Protrude()
 		targetPos = chunsikPos + dir * (m_chunsikRadius - 1.f); // 약간 안쪽으로
 	}
 
-	//보스 위치 변경
-	m_pOwner->GetComponent<Transform>()->SetWorldPosition(targetPos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
-	//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
-	
-	//모델 보이게 처리 하며
-
-	//땅속에서 나오는 에니메이션 재생
-	
-	UpEffobj->m_transform.SetWorldPosition(targetPos);
-	if (m_moveState == EBossMoveState::Burrowed) {
-		//eff
-		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
-		eff->Apply();
-		m_animator->SetParameter("ProtrudeTrigger", true);
-	}
-
-	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
+	ProtrudePos = targetPos;
 }
 
-void TBoss1::ProtrudeEnd()
-{	
-	m_rigid->SetColliderEnabled(true);
-	isBurrow = false;
-	isMoved = true;
-	m_moveState = EBossMoveState::Idle;
-}
-
-void TBoss1::ProtrudeChunsik()
+void TBoss1::CalculToChunsik()
 {
-	Mathf::Vector3 chunsikPos = m_chunsik->GetComponent<Transform>()->GetWorldPosition(); //춘식이(중심) 위치
-	m_pOwner->GetComponent<Transform>()->SetWorldPosition(chunsikPos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
+	if (m_moveState == EBossMoveState::Burrowed) {
+		calculateProtrudePoint(m_chunsik);
 
-	//패턴시 보스를 중심이동 시키는 내용 --> 이때도 인디케이터와 데미지 판정이 필요 한가?
+		//보스 위치 변경
+		m_pOwner->GetComponent<Transform>()->SetWorldPosition(ProtrudePos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
+		//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
+		protrudeIndicatorobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
+		float indisettime = burrowDelay - burrowSetIndicator;
+		float timescale = 1 / indisettime;
+		protrudeIndicatorobj->GetComponent<EffectComponent>()->SetTimeScale(timescale);
+		protrudeIndicatorobj->GetComponent<EffectComponent>()->Apply();
+		m_moveState = EBossMoveState::Warning;
+	}
+}
 
-	//모델 보이게 처리 하며
+void TBoss1::CalculToTarget()
+{
+	if (m_moveState == EBossMoveState::Burrowed) {
+		calculateProtrudePoint(m_target);
 
-	//땅속에서 나오는 에니메이션 재생
-	if(m_moveState == EBossMoveState::Burrowed) {
-		UpEffobj->m_transform.SetWorldPosition(chunsikPos);
-		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
-		eff->Apply();
-		m_animator->SetParameter("ProtrudeTrigger", true);
+		//보스 위치 변경
+		m_pOwner->GetComponent<Transform>()->SetWorldPosition(ProtrudePos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
+		//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
+		protrudeIndicatorobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
+		float indisettime = burrowDelay - burrowSetIndicator;
+		float timescale = 1 / indisettime;
+		protrudeIndicatorobj->GetComponent<EffectComponent>()->SetTimeScale(timescale);
+		protrudeIndicatorobj->GetComponent<EffectComponent>()->Apply();
+		m_moveState = EBossMoveState::Warning;
 	}
 }
 
@@ -1478,7 +1616,7 @@ void TBoss1::BP0022()
 {
 	if (m_activePattern != EPatternType::None) return;
 	m_activePattern = EPatternType::BP0022;
-	m_patternPhase = EPatternPhase::Warning;
+	m_patternPhase = EPatternPhase::Starting;
 	pattenIndex = 0;
 	BPTimer = 0.f;
 	isMoved = false;
