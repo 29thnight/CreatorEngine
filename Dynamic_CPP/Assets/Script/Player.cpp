@@ -1158,7 +1158,7 @@ void Player::ChargeAttack()
 						auto event = obj->GetComponent<EventManager>();
 						if (event)
 						{
-							event->EmitAbilityUsed("Charge");
+							event->EmitAbilityUsed("Charge","",playerIndex);
 						}
 					}
 					auto data = GM->GetControllerVibration();
