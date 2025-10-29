@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "PortalTrigger.h"
+#include "ClearPortal.h"
 #include "ExitPauseButton.h"
 #include "GateBarrier.h"
 #include "BGMController.h"

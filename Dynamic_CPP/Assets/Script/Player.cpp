@@ -1459,7 +1459,13 @@ void Player::Cheat()
 			AddWeapon(weapon);
 		}
 	}
-	
+	if (InputManagement->IsKeyDown('4'))
+	{
+		if (GM)
+		{
+			GM->AddReward(50);
+		}
+	}
 }
 
 void Player::DetectResource()
