@@ -10,7 +10,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
-    "name": "1",
+    "name": "Bullethit3",
     "particleSystems": [
         {
             "isRunning": true,
@@ -101,7 +101,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 126.64984130859375,
+                            "currentTime": 7.472269535064697,
                             "velocityMode": 0
                         },
                         "orbitalData": {

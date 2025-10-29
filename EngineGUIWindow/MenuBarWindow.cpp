@@ -372,6 +372,14 @@ void MenuBarWindow::RenderMenuBar()
                         GameBuilderSystem::GetInstance()->BuildGame();
                     }
                 }
+                if (ImGui::MenuItem("Test Pack"))
+                {
+                    GameBuilderSystem::GetInstance()->PackageGameAssets();
+                }
+                if (ImGui::MenuItem("Test Unpack"))
+                {
+                    GameBuilderSystem::GetInstance()->UnpackageGameAssets();
+                }
                 if (ImGui::MenuItem("Exit"))
                 {
                     // Exit action

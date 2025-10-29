@@ -24,6 +24,37 @@ namespace
 #endif
     }
 
+    bool EnsureDirectoryExists(const fs::path& directory)
+    {
+        if (directory.empty())
+        {
+            Debug->LogError("Directory path is empty.");
+            return false;
+        }
+
+        std::error_code ec{};
+        if (fs::exists(directory, ec))
+        {
+            if (ec)
+            {
+                Debug->LogError("Failed to query directory '" + PathToUtf8(directory) + "': " + ec.message());
+                return false;
+            }
+
+            return true;
+        }
+
+        ec.clear();
+        fs::create_directories(directory, ec);
+        if (ec)
+        {
+            Debug->LogError("Failed to create directory '" + PathToUtf8(directory) + "': " + ec.message());
+            return false;
+        }
+
+        return true;
+    }
+
     std::wstring SanitizePakStem(const std::wstring& desiredName)
     {
         constexpr std::wstring_view invalidChars = L"<>:\"/\\|?*";
@@ -180,6 +211,106 @@ namespace
 
         return false;
     }
+
+    bool UnpackageGameAssets()
+    {
+        std::wstring pakStem = SanitizePakStem(EngineSettingInstance->GetBuildGameName());
+        if (pakStem.empty())
+        {
+            pakStem = L"GameAssets";
+        }
+
+        fs::path pakBaseDir = PathFinder::RelativeToExecutable("");
+        if (pakBaseDir.empty())
+        {
+            pakBaseDir = PathFinder::Relative().parent_path();
+        }
+
+        fs::path pakPath = pakBaseDir / (pakStem + L".pak");
+
+        std::error_code ec{};
+        if (pakPath.empty() || !fs::exists(pakPath, ec) || ec)
+        {
+            Debug->LogError("Pak file not found: " + PathToUtf8(pakPath));
+            return false;
+        }
+
+        fs::path extractRoot = PathFinder::DumpPath();
+        if (extractRoot.empty())
+        {
+            extractRoot = pakBaseDir / "UnpackedAssets";
+        }
+        else
+        {
+            extractRoot /= "UnpackedAssets";
+        }
+        if (!EnsureDirectoryExists(extractRoot))
+        {
+            Debug->LogError("Unable to prepare extraction root: " + PathToUtf8(extractRoot));
+            return false;
+        }
+
+        try
+        {
+            Pak::OpenOptions options{};
+            Pak::Archive archive(pakPath, options);
+
+            auto entries = archive.list();
+            if (entries.empty())
+            {
+                Debug->LogWarning("Pak archive contains no entries: " + PathToUtf8(pakPath));
+                return false;
+            }
+
+            bool allSucceeded = true;
+            std::size_t extractedCount = 0;
+
+            for (const auto& entry : entries)
+            {
+                std::u8string u8Path(entry.path.begin(), entry.path.end());
+                fs::path relativePath = fs::u8path(u8Path);
+                fs::path outPath = extractRoot / relativePath;
+                fs::path parent = outPath.parent_path();
+
+                if (!parent.empty() && !EnsureDirectoryExists(parent))
+                {
+                    allSucceeded = false;
+                    continue;
+                }
+
+                try
+                {
+                    archive.extractToFile(entry.path, outPath.wstring());
+                    ++extractedCount;
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError("Failed to extract '" + entry.path + "': " + e.what());
+                    allSucceeded = false;
+                }
+                catch (...)
+                {
+                    Debug->LogError("Failed to extract '" + entry.path + "': unknown error.");
+                    allSucceeded = false;
+                }
+            }
+
+            Debug->Log("Unpacked " + std::to_string(extractedCount) +
+                " assets from pak to '" + PathToUtf8(extractRoot) + "'.");
+
+            return allSucceeded;
+        }
+        catch (const std::exception& e)
+        {
+            Debug->LogError(std::string("Failed to open pak archive: ") + e.what());
+        }
+        catch (...)
+        {
+            Debug->LogError("Failed to open pak archive: unknown error.");
+        }
+
+        return false;
+    }
 }
 
 void GameBuilderSystem::Initialize()
@@ -242,6 +373,11 @@ void GameBuilderSystem::BuildGame()
 bool GameBuilderSystem::PackageGameAssets()
 {
 	return ::PackageGameAssets();
+}
+
+bool GameBuilderSystem::UnpackageGameAssets()
+{
+	return ::UnpackageGameAssets();
 }
 
 #endif // !DYNAMICCPP_EXPORTS

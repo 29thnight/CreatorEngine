@@ -1,5 +1,5 @@
 m_name: MenuSettingCanvas
-m_instanceID: 141224084
+m_instanceID: 3932343387
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
@@ -95,7 +95,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: PauseMenuButton
-            m_instanceID: 758477427
+            m_instanceID: 1011345791
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 74acdcc6-6299-5cba-97b1-0cea5317fe68
@@ -158,7 +158,7 @@ PrefabNode:
                 m_isTintChange: true
                 m_isEntering: false
                 m_name: RestartButton
-                m_instanceID: 1428902972
+                m_instanceID: 2611577215
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 67391d80-4595-5d28-a6e1-6e08439a9c12
@@ -230,7 +230,7 @@ PrefabNode:
                 m_isTintChange: true
                 m_isEntering: false
                 m_name: ReturnMainScene
-                m_instanceID: 3709106302
+                m_instanceID: 2792732054
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: cc18df0a-857f-53d7-a50f-90a955a2a6b5
@@ -354,7 +354,7 @@ PrefabNode:
                 m_isTintChange: true
                 m_isEntering: false
                 m_name: SettingButton
-                m_instanceID: 3686023611
+                m_instanceID: 2691658788
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: b6a50c64-b6e7-5ac1-9825-df49f42ced81
