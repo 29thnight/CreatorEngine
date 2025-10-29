@@ -228,5 +228,4 @@ void ItemUIIcon::SetRarityID(int id)
 void ItemUIIcon::ApplyOrderDelta(int delta)
 {
     if (m_image) { int cur = m_image->GetLayerOrder();   m_image->SetOrder(cur + delta); }
-    if (m_bgImage) { int cur = m_bgImage->GetLayerOrder(); m_bgImage->SetOrder(cur + delta); }
 }

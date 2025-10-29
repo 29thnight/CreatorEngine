@@ -45,7 +45,6 @@ private:
 	class ItemManager*				m_itemManager = nullptr;
 	class RectTransformComponent*	m_rect = nullptr;
 	class ImageComponent*			m_image = nullptr;
-	class ImageComponent*			m_bgImage = nullptr;
 	class GameObject*				m_target = nullptr;
 	class ItemComponent*			m_itemComp = nullptr;
 	enum class PopupPhase { None, ToPopup, ToScreen }; // 왕복 트윈 상태

@@ -1,5 +1,5 @@
 m_name: ItemPopupCanvas
-m_instanceID: 760810372
+m_instanceID: 4258025067
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
@@ -38,7 +38,7 @@ PrefabNode:
         m_instanceID: 945989853
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
-        CanvasOrder: 0
+        CanvasOrder: 3
         CanvasName: ItemPopupCanvas
     m_gameObjectType: 6
     m_isStatic: false
@@ -107,7 +107,7 @@ PrefabNode:
             m_bobPhase: 0
             m_bobDamping: 0
             m_name: ItemUIIcon
-            m_instanceID: 3486095427
+            m_instanceID: 310764706
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
@@ -177,7 +177,7 @@ PrefabNode:
             m_bobPhase: 0
             m_bobDamping: 0
             m_name: ItemUIIcon
-            m_instanceID: 2848785532
+            m_instanceID: 3109115414
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
@@ -247,7 +247,7 @@ PrefabNode:
             m_bobPhase: 0
             m_bobDamping: 0
             m_name: ItemUIIcon
-            m_instanceID: 1258829842
+            m_instanceID: 1023760508
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 208aea6d-896b-57f3-b3f4-024cc3c4204f
@@ -318,7 +318,7 @@ PrefabNode:
             m_duration: 0.300000012
             m_requiredSelectHold: 0.5
             m_name: ItemUIPopup
-            m_instanceID: 1111539473
+            m_instanceID: 2214823281
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
@@ -359,10 +359,10 @@ PrefabNode:
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 0, y: -85}
+                m_anchoredPosition: {x: -5, y: -85}
                 m_sizeDelta: {x: 191, y: 60}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 4404.5, y: 425, width: 191, height: 60}
+                m_worldRect: {x: 4399.5, y: 425, width: 191, height: 60}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_instanceID: 1872656497
@@ -375,7 +375,7 @@ PrefabNode:
                 m_customPixelShaderPath: ""
                 fontPath: gmaket_bold_26pt.spritefont
                 message: ItemName
-                relpos: {x: 0, y: 0}
+                relpos: {x: -0.5, y: 0}
                 color: {r: 1, g: 1, b: 1, a: 1}
                 manualRect: {x: 0, y: 0, width: 0, height: 0}
                 fontSize: 1
@@ -411,7 +411,7 @@ PrefabNode:
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 0, y: 145}
+                    m_anchoredPosition: {x: 5, y: 145}
                     m_sizeDelta: {x: 174, y: 55}
                     m_pivot: {x: 0.5, y: 0.5}
                     m_worldRect: {x: 4413, y: 572.5, width: 174, height: 55}
@@ -663,7 +663,7 @@ PrefabNode:
             m_duration: 0.300000012
             m_requiredSelectHold: 0.5
             m_name: ItemUIPopup
-            m_instanceID: 429499538
+            m_instanceID: 3453174120
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
@@ -696,10 +696,10 @@ PrefabNode:
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 0, y: -85}
+                m_anchoredPosition: {x: -5, y: -85}
                 m_sizeDelta: {x: 191, y: 60}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 4404.5, y: 425, width: 191, height: 60}
+                m_worldRect: {x: 4399.5, y: 425, width: 191, height: 60}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_instanceID: 3071806069
@@ -748,7 +748,7 @@ PrefabNode:
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 0, y: 145}
+                    m_anchoredPosition: {x: 5, y: 145}
                     m_sizeDelta: {x: 174, y: 55}
                     m_pivot: {x: 0.5, y: 0.5}
                     m_worldRect: {x: 4413, y: 572.5, width: 174, height: 55}
@@ -1000,7 +1000,7 @@ PrefabNode:
             m_duration: 0.300000012
             m_requiredSelectHold: 0.5
             m_name: ItemUIPopup
-            m_instanceID: 1083619188
+            m_instanceID: 135942302
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 912c800e-9803-5aca-90ec-00fe937349d7
@@ -1033,10 +1033,10 @@ PrefabNode:
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
                 m_anchorMax: {x: 0.5, y: 0.5}
-                m_anchoredPosition: {x: 0, y: -85}
+                m_anchoredPosition: {x: -5, y: -85}
                 m_sizeDelta: {x: 191, y: 60}
                 m_pivot: {x: 0.5, y: 0.5}
-                m_worldRect: {x: 4404.5, y: 425, width: 191, height: 60}
+                m_worldRect: {x: 4399.5, y: 425, width: 191, height: 60}
               - TextComponent: 967791323
                 m_name: TextComponent
                 m_instanceID: 2227969938
@@ -1085,7 +1085,7 @@ PrefabNode:
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
                     m_anchorMax: {x: 0.5, y: 0.5}
-                    m_anchoredPosition: {x: 0, y: 145}
+                    m_anchoredPosition: {x: 5, y: 145}
                     m_sizeDelta: {x: 174, y: 55}
                     m_pivot: {x: 0.5, y: 0.5}
                     m_worldRect: {x: 4413, y: 572.5, width: 174, height: 55}
