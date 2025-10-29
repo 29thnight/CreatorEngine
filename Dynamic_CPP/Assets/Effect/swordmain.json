@@ -14,7 +14,7 @@
     "name": "swordmain",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -37,9 +37,9 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.06440294533967972,
-                                "y": 0.03758964315056801,
-                                "z": 0.3173598647117615
+                                "x": 0.3019607961177826,
+                                "y": 0.08235294371843338,
+                                "z": 0.4588235318660736
                             },
                             "initialRotation": {
                                 "x": 0.0,
@@ -102,7 +102,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 281.30828857421875,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -212,7 +212,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 20,
             "modules": [
                 {
@@ -371,7 +371,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 281.30828857421875,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -546,7 +546,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 20,
             "modules": [
                 {
@@ -705,7 +705,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 281.30828857421875,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -880,7 +880,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 20,
             "modules": [
                 {
@@ -1039,7 +1039,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 281.30828857421875,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -1214,7 +1214,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 10,
             "modules": [
                 {
@@ -1296,7 +1296,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 191.9793701171875,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -1487,5 +1487,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 3.0
 }

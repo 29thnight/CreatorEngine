@@ -16,7 +16,7 @@
                 {
                     "data": {
                         "autoGeneration": {
-                            "autoAddInterval": 0.05000000074505806,
+                            "autoAddInterval": 0.029100000858306885,
                             "autoGenerateFromPosition": true
                         },
                         "easing": {
@@ -26,8 +26,8 @@
                         },
                         "endColor": {
                             "w": 0.0,
-                            "x": 0.0,
-                            "y": 0.20000000298023224,
+                            "x": 1.0,
+                            "y": 1.0,
                             "z": 1.0
                         },
                         "orientation": {
@@ -53,17 +53,17 @@
                             "tubeSegments": 8
                         },
                         "startColor": {
-                            "w": 1.0,
-                            "x": 0.0,
-                            "y": 0.5,
+                            "w": 3.9215686321258545,
+                            "x": 0.33212947845458984,
+                            "y": 0.0,
                             "z": 1.0
                         },
                         "trailParams": {
                             "endWidth": 0.10000000149011612,
                             "maxTrailPoints": 500,
-                            "minDistance": 0.09849999845027924,
-                            "startWidth": 1.0,
-                            "trailLifetime": 2.0199999809265137,
+                            "minDistance": 0.0010000000474974513,
+                            "startWidth": 2.614000082015991,
+                            "trailLifetime": 0.9700000286102295,
                             "useLengthBasedUV": true
                         }
                     },
@@ -88,24 +88,24 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "time": 239.97576904296875
+                            "time": 1149.173583984375
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "TrailPixel",
+                            "pixelShader": "Dash",
                             "vertexShader": "TrailVertex"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Flash21",
+                                "name": "Trail71",
                                 "slot": 0
                             }
                         ],
