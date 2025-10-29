@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("ExitPauseButton", []() { return new ExitPauseButton(); });
 		CreateFactory::GetInstance()->RegisterFactory("GateBarrier", []() { return new GateBarrier(); });
 		CreateFactory::GetInstance()->RegisterFactory("BGMController", []() { return new BGMController(); });
 		CreateFactory::GetInstance()->RegisterFactory("PauseMenuButton", []() { return new PauseMenuButton(); });

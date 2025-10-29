@@ -15,6 +15,7 @@ inline constexpr std::string_view ToKey(SceneType t) {
 	case SceneType::Boss:       return "Boss";
 	case SceneType::Credits:    return "Credits";
 	case SceneType::GameOver:   return "GameOver";
+	case SceneType::Clear:      return "Clear";
 	}
 	return "Unknown";
 }
@@ -28,6 +29,7 @@ inline std::optional<SceneType> FromKey(std::string_view k) {
 	if (k == "Boss")       return SceneType::Boss;
 	if (k == "Credits")    return SceneType::Credits;
 	if (k == "GameOver")   return SceneType::GameOver;
+	if (k == "Clear")      return SceneType::Clear;
 	return std::nullopt;
 }
 
