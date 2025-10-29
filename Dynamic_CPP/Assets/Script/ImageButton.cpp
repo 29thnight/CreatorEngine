@@ -23,13 +23,27 @@ void ImageButton::Update(float tick)
 
 	if (m_imageComponent)
 	{
-		if(m_imageComponent->IsNavigationThis())
+		if(!m_isTintChange)
 		{
-			m_imageComponent->SetEnabled(true);
+			if (m_imageComponent->IsNavigationThis())
+			{
+				m_imageComponent->SetEnabled(true);
+			}
+			else
+			{
+				m_imageComponent->SetEnabled(false);
+			}
 		}
 		else
 		{
-			m_imageComponent->SetEnabled(false);
+			if (m_imageComponent->IsNavigationThis())
+			{
+				m_imageComponent->color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
+			}
+			else
+			{
+				m_imageComponent->color = Mathf::Color4(0.8f, 0.8f, 0.8f, 1.f);
+			}
 		}
 	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "SwitchingSceneTrigger.generated.h"
 
 enum class SwitchPhase { Hidden, FadingIn, WaitingInput, FadingOut, Switching };
 class GameManager;
@@ -8,6 +9,8 @@ class TextComponent;
 class SwitchingSceneTrigger : public ModuleBehavior
 {
 public:
+   ReflectSwitchingSceneTrigger
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(SwitchingSceneTrigger)
 	virtual void Start() override;
 	virtual void Update(float tick) override;

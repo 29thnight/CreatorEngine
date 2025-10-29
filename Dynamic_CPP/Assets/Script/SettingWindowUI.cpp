@@ -12,6 +12,10 @@ void SettingWindowUI::Start()
 	m_howToPlayObj = GameObject::Find("HowToPlayPanel");
 	m_settingButtonObj = GameObject::Find("SettingsButton");
 	m_mainCanvasObj = GameObject::Find("MainSceneCanvas");
+    if (!m_mainCanvasObj)
+    {
+		m_mainCanvasObj = GameObject::Find("MenuSettingCanvas");
+    }
 
     if (m_optionsObj)
         m_optionsRect = m_optionsObj->GetComponent<RectTransformComponent>();
