@@ -10,6 +10,7 @@
 #include "ObjectPoolManager.h"
 #include "EffectComponent.h"
 #include "PrefabUtility.h"
+#include "PlayEffectAll.h"
 void SpecialBullet::Start()
 {
 	__super::Start();
@@ -76,10 +77,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 	//피격된 지점 중심으로 범위 공격 
 	if (hasAttacked == false)
 	{
-		//if (collision.otherObj->m_tag == "Enemy")
-		{
-			//Entity* enemy = collision.otherObj->GetComponentDynamicCast<Entity>();
-			//if (enemy)
+		{ 
 			{
 
 				hasAttacked = true;
@@ -88,6 +86,8 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 
 				std::vector<HitResult> hits;
 				OverlapInput bulletInfo;
+				
+
 				
 				bulletInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10  | 1<< 15;
 				bulletInfo.position = transform.GetWorldPosition();
@@ -99,6 +99,16 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				float myRadius = explosionRadius;
 				Mathf::Vector3 mypos = bulletInfo.position;
 				
+
+				//폭발이펙트
+				Prefab* explosionPre = PrefabUtilitys->LoadPrefab("BulletExplosion");
+				if (explosionPre)
+				{
+					GameObject* explosionObj = PrefabUtilitys->InstantiatePrefab(explosionPre, "explosion");
+					explosionObj->GetComponent<Transform>()->SetPosition(mypos);
+					auto effect =explosionObj->GetComponent<PlayEffectAll>();
+					effect->Initialize();
+				}
 				//test
 				Prefab* test = PrefabUtilitys->LoadPrefab("TestSphere");
 				if (test)

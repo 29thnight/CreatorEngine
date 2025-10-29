@@ -52,7 +52,7 @@ void EntityResource::Start()
 	m_effect->Apply();
 
 
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("DestroyEffect");
 	if (deadPrefab)
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");

@@ -17,7 +17,7 @@ void EntityBigWood::Start()
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 	HitImpulseStart();
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("DestroyEffect");
 	if (deadPrefab)
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
