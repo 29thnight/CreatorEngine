@@ -177,8 +177,10 @@ void DataSystem::Initialize()
 	m_watcher			= new efsw::FileWatcher();
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
 	m_assetMetaWatcher	= std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
+#ifndef BUILD_FLAG
 	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
 	m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
+#endif
 	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
 	m_watcher->watch();
 }

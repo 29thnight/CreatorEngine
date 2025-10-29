@@ -327,6 +327,9 @@
     <ClInclude Include="plf_colony.h">
       <Filter>Core.Container\Plf_Colony</Filter>
     </ClInclude>
+    <ClInclude Include="PakHelper.h">
+      <Filter>EngineBootstrap</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

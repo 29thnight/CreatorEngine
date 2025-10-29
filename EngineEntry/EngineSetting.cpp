@@ -1,9 +1,13 @@
 #include "EngineSetting.h"
 #include "ReflectionYml.h"
+#include "PakHelper.h"
+
 
 bool EngineSetting::Initialize()
 {
 	bool isSuccess = LoadSettings();
+
+#ifndef BUILD_FLAG
 	char* vcInstallDir = nullptr;
 	size_t len = 0;
 
@@ -40,6 +44,10 @@ bool EngineSetting::Initialize()
 	}
 
 	isSuccess = EngineSetting::LoadSettings();
+#else
+	isSuccess = EngineSetting::LoadSettings();
+	UnpackageGameAssets();
+#endif
 
 	return isSuccess;
 }

@@ -1,11 +1,11 @@
 m_name: SettingCanvas
-m_instanceID: 1882483799
+m_instanceID: 2874949550
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: SettingCanvas
-    m_instanceID: 3908778434
+    m_instanceID: 895635733
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -13,18 +13,18 @@ PrefabNode:
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-    m_index: 12
+    m_index: 1480
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 0
     m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
-    m_childrenIndices: [13, 21]
+    m_childrenIndices: [1481, 1489]
     m_tag: Untagged
     m_layer: Default
     m_components:
       - RectTransformComponent: 3002078429
         m_name: RectTransformComponent
-        m_instanceID: 388807190
+        m_instanceID: 530975370
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_anchorMin: {x: 0.5, y: 0.5}
@@ -35,10 +35,10 @@ PrefabNode:
         m_worldRect: {x: -960, y: -540, width: 1920, height: 1080}
       - Canvas: 2773063417
         m_name: Component
-        m_instanceID: 1834017933
+        m_instanceID: 1530595337
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
-        CanvasOrder: 1
+        CanvasOrder: 5
         CanvasName: SettingCanvas
     m_gameObjectType: 6
     m_isStatic: false
@@ -52,19 +52,19 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 12
-        m_index: 13
-        m_parentIndex: 12
+          m_parentID: 1480
+        m_index: 1481
+        m_parentIndex: 1480
         m_rootIndex: 0
         m_collisionType: 0
         m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
-        m_childrenIndices: [14, 16, 19, 20]
+        m_childrenIndices: [1482, 1484, 1487, 1488]
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
-            m_instanceID: 1800418843
+            m_instanceID: 904503867
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
@@ -75,7 +75,7 @@ PrefabNode:
             m_worldRect: {x: 366, y: 132, width: 1188, height: 816}
           - ImageComponent: 1187169862
             m_name: ImageComponent
-            m_instanceID: 1572253293
+            m_instanceID: 267266947
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 1
@@ -96,7 +96,7 @@ PrefabNode:
           - ModuleBehavior: 1399118904
             m_slideSpeed: 64
             m_name: SettingWindowUI
-            m_instanceID: 1968748588
+            m_instanceID: 985402380
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 4d160e78-d45a-5271-8110-63ad20be36f4
@@ -112,19 +112,19 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 13
-            m_index: 14
-            m_parentIndex: 13
+              m_parentID: 1481
+            m_index: 1482
+            m_parentIndex: 1481
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
-            m_childrenIndices: [15]
+            m_childrenIndices: [1483]
             m_tag: Untagged
             m_layer: Default
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 246904701
+                m_instanceID: 2875398152
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -135,7 +135,7 @@ PrefabNode:
                 m_worldRect: {x: 831, y: 450, width: 320, height: 12}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 2410898142
+                m_instanceID: 1405500872
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 2
@@ -157,7 +157,7 @@ PrefabNode:
                 clipDirection: 0
               - ModuleBehavior: 1399118904
                 m_name: SoundBarUI
-                m_instanceID: 1012024384
+                m_instanceID: 736991720
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 2ddb06a8-fc80-5eee-82d5-410f2a217d6f
@@ -165,7 +165,7 @@ PrefabNode:
             m_isStatic: false
             children:
               - GameObject: 2166264123
-                m_name: pop_set_soundbtt
+                m_name: pop_set_soundbtt (1)
                 m_instanceID: 2512604571
                 m_isEnabled: true
                 m_attachedSoketID: 0
@@ -173,9 +173,9 @@ PrefabNode:
                   position: {x: 0, y: 0, z: 0, w: 1}
                   rotation: {x: 0, y: 0, z: 0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 1}
-                  m_parentID: 14
-                m_index: 15
-                m_parentIndex: 14
+                  m_parentID: 1482
+                m_index: 1483
+                m_parentIndex: 1482
                 m_rootIndex: 0
                 m_collisionType: 0
                 m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -185,7 +185,7 @@ PrefabNode:
                 m_components:
                   - RectTransformComponent: 3002078429
                     m_name: RectTransformComponent
-                    m_instanceID: 1305189441
+                    m_instanceID: 1274847926
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
@@ -196,7 +196,7 @@ PrefabNode:
                     m_worldRect: {x: 812, y: 427, width: 62, height: 62}
                   - ImageComponent: 1187169862
                     m_name: ImageComponent
-                    m_instanceID: 1946033806
+                    m_instanceID: 1061694032
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     _layerorder: 3
@@ -223,19 +223,19 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 13
-            m_index: 16
-            m_parentIndex: 13
+              m_parentID: 1481
+            m_index: 1484
+            m_parentIndex: 1481
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
-            m_childrenIndices: [17, 18]
+            m_childrenIndices: [1485, 1486]
             m_tag: Untagged
             m_layer: Default
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 1175728084
+                m_instanceID: 4136015716
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -246,10 +246,10 @@ PrefabNode:
                 m_worldRect: {x: 822, y: 580, width: 276, height: 60}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 3029756368
+                m_instanceID: 748277398
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
-                _layerorder: 1
+                _layerorder: 2
                 uiEffects: 0
                 m_ownerCanvasName: SettingCanvas
                 navigations:
@@ -266,7 +266,7 @@ PrefabNode:
                 clipDirection: 0
               - ModuleBehavior: 1399118904
                 m_name: ViveSwitchUI
-                m_instanceID: 4158444049
+                m_instanceID: 361631921
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: dd93fa32-9706-50c9-b318-5afb3ee7f4c0
@@ -282,9 +282,9 @@ PrefabNode:
                   position: {x: 0, y: 0, z: 0, w: 1}
                   rotation: {x: 0, y: 0, z: 0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 1}
-                  m_parentID: 16
-                m_index: 17
-                m_parentIndex: 16
+                  m_parentID: 1484
+                m_index: 1485
+                m_parentIndex: 1484
                 m_rootIndex: 0
                 m_collisionType: 0
                 m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -294,7 +294,7 @@ PrefabNode:
                 m_components:
                   - RectTransformComponent: 3002078429
                     m_name: RectTransformComponent
-                    m_instanceID: 3058270032
+                    m_instanceID: 2248303591
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
@@ -305,10 +305,10 @@ PrefabNode:
                     m_worldRect: {x: 824, y: 582.5, width: 142, height: 55}
                   - ImageComponent: 1187169862
                     m_name: ImageComponent
-                    m_instanceID: 1951350264
+                    m_instanceID: 3267618537
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 2
+                    _layerorder: 3
                     uiEffects: 0
                     m_ownerCanvasName: SettingCanvas
                     navigations: ~
@@ -332,9 +332,9 @@ PrefabNode:
                   position: {x: 0, y: 0, z: 0, w: 1}
                   rotation: {x: 0, y: 0, z: 0, w: 1}
                   scale: {x: 1, y: 1, z: 1, w: 1}
-                  m_parentID: 16
-                m_index: 18
-                m_parentIndex: 16
+                  m_parentID: 1484
+                m_index: 1486
+                m_parentIndex: 1484
                 m_rootIndex: 0
                 m_collisionType: 0
                 m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -344,7 +344,7 @@ PrefabNode:
                 m_components:
                   - RectTransformComponent: 3002078429
                     m_name: RectTransformComponent
-                    m_instanceID: 4109911668
+                    m_instanceID: 271465733
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
                     m_anchorMin: {x: 0.5, y: 0.5}
@@ -355,10 +355,10 @@ PrefabNode:
                     m_worldRect: {x: 822, y: 580, width: 276, height: 60}
                   - ImageComponent: 1187169862
                     m_name: ImageComponent
-                    m_instanceID: 707708463
+                    m_instanceID: 3556797853
                     m_isEnabled: true
                     m_FileID: 00000000-0000-0000-0000-000000000000
-                    _layerorder: 3
+                    _layerorder: 4
                     uiEffects: 0
                     m_ownerCanvasName: SettingCanvas
                     navigations: ~
@@ -374,7 +374,7 @@ PrefabNode:
                 m_gameObjectType: 5
                 m_isStatic: false
           - GameObject: 2166264123
-            m_name: arrow_R
+            m_name: arrow_R (1)
             m_instanceID: 1467290966
             m_isEnabled: true
             m_attachedSoketID: 0
@@ -382,9 +382,9 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 13
-            m_index: 19
-            m_parentIndex: 13
+              m_parentID: 1481
+            m_index: 1487
+            m_parentIndex: 1481
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -394,7 +394,7 @@ PrefabNode:
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 3018876190
+                m_instanceID: 724715256
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -405,7 +405,7 @@ PrefabNode:
                 m_worldRect: {x: 1472, y: 149, width: 46, height: 76}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 962580650
+                m_instanceID: 673348203
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 2
@@ -424,7 +424,7 @@ PrefabNode:
             m_gameObjectType: 5
             m_isStatic: false
           - GameObject: 2166264123
-            m_name: btt_B (1)
+            m_name: btt_B (4)
             m_instanceID: 168413863
             m_isEnabled: true
             m_attachedSoketID: 0
@@ -432,9 +432,9 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 13
-            m_index: 20
-            m_parentIndex: 13
+              m_parentID: 1481
+            m_index: 1488
+            m_parentIndex: 1481
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -444,7 +444,7 @@ PrefabNode:
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 3444193855
+                m_instanceID: 1556200249
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -455,7 +455,7 @@ PrefabNode:
                 m_worldRect: {x: 849.5, y: 812.5, width: 221, height: 63}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 1273764978
+                m_instanceID: 2620128403
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 2
@@ -482,19 +482,19 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 12
-        m_index: 21
-        m_parentIndex: 12
+          m_parentID: 1480
+        m_index: 1489
+        m_parentIndex: 1480
         m_rootIndex: 0
         m_collisionType: 0
         m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
-        m_childrenIndices: [22, 23]
+        m_childrenIndices: [1490, 1491]
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
-            m_instanceID: 87612748
+            m_instanceID: 2216161939
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
@@ -505,7 +505,7 @@ PrefabNode:
             m_worldRect: {x: 1996, y: 132, width: 1188, height: 816}
           - ImageComponent: 1187169862
             m_name: ImageComponent
-            m_instanceID: 3995458411
+            m_instanceID: 1869670250
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 1
@@ -525,7 +525,7 @@ PrefabNode:
         m_isStatic: false
         children:
           - GameObject: 2166264123
-            m_name: arrow_L
+            m_name: arrow_L (1)
             m_instanceID: 2655288430
             m_isEnabled: true
             m_attachedSoketID: 0
@@ -533,9 +533,9 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 21
-            m_index: 22
-            m_parentIndex: 21
+              m_parentID: 1489
+            m_index: 1490
+            m_parentIndex: 1489
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -545,7 +545,7 @@ PrefabNode:
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 2470858271
+                m_instanceID: 2610013608
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -556,7 +556,7 @@ PrefabNode:
                 m_worldRect: {x: 2026, y: 149, width: 46, height: 76}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 3470159372
+                m_instanceID: 739067580
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 2
@@ -575,7 +575,7 @@ PrefabNode:
             m_gameObjectType: 5
             m_isStatic: false
           - GameObject: 2166264123
-            m_name: btt_B (2)
+            m_name: btt_B (5)
             m_instanceID: 3857367619
             m_isEnabled: true
             m_attachedSoketID: 0
@@ -583,9 +583,9 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 21
-            m_index: 23
-            m_parentIndex: 21
+              m_parentID: 1489
+            m_index: 1491
+            m_parentIndex: 1489
             m_rootIndex: 0
             m_collisionType: 0
             m_prefabFileGuid: a78ac44e-b33e-51ba-880c-54faa7e2c0b2
@@ -595,7 +595,7 @@ PrefabNode:
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 3875382657
+                m_instanceID: 3500008481
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -606,7 +606,7 @@ PrefabNode:
                 m_worldRect: {x: 2479.5, y: 812.5, width: 221, height: 63}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 4132445702
+                m_instanceID: 3510600702
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 2

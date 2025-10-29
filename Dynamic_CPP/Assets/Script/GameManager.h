@@ -23,6 +23,7 @@ public:
 	virtual void OnDisable() override;
 
 public:
+	void GameInit();
 	//Scene Management
 	void LoadScene(int sceneType);
 	void SwitchScene(int sceneType);

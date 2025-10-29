@@ -98,25 +98,66 @@ public:
 
         auto base = file::path(ExecuteablePath);
 		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
-		DumpPath				= file::path(base).append("Dump\\").lexically_normal();
-		BaseProjectPath			= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
-        DataPath				= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal();
-		ModelSourcePath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Models\\").lexically_normal();
-		TextureSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Textures\\").lexically_normal();
-		MaterialSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Materials\\").lexically_normal();
-		UISourcePath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\UI\\").lexically_normal();
-		PrefabSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Prefabs\\").lexically_normal();
-		ShaderSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Shaders\\").lexically_normal();
-		DynamicSolutionDir		= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
-		ProjectSettingsPath		= file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
-		PrecompiledShaderPath	= file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
-        IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();
-		TerrainSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
-		NodeEditorPath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
-		volumeProfilePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\VolumeProfile\\").lexically_normal();
-		InputMapPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
-		GameBuildSlnPath		= file::path(base).append("..\\..\\GameBuild.sln").lexically_normal();
-		animatorPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\AnimatorController\\").lexically_normal();
+		DumpPath = file::path(base).append("Dump\\").lexically_normal();
+		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+
+#ifdef BUILD_FLAG
+		std::array<WCHAR, MAX_PATH> tempPathBuffer{};
+		const DWORD tempPathLength = GetTempPathW(static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
+
+		file::path assetsRoot;
+		if (tempPathLength > 0 && tempPathLength < tempPathBuffer.size())
+		{
+			assetsRoot = file::path(tempPathBuffer.data()) / L"UnpackedAssets" / L"Assets";
+		}
+		else
+		{
+			assetsRoot = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\");
+		}
+
+		assetsRoot = assetsRoot.lexically_normal();
+#else
+		file::path assetsRoot = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal();
+#endif
+
+		DataPath = assetsRoot;
+		ModelSourcePath = assetsRoot / "Models";
+		TextureSourcePath = assetsRoot / "Textures";
+		MaterialSourcePath = assetsRoot / "Materials";
+		UISourcePath = assetsRoot / "UI";
+		PrefabSourcePath = assetsRoot / "Prefabs";
+		ShaderSourcePath = assetsRoot / "Shaders";
+#ifdef BUILD_FLAG
+		DynamicSolutionDir = file::path(tempPathBuffer.data()) / L"UnpackedAssets";
+		ProjectSettingsPath = file::path(tempPathBuffer.data()) / L"UnpackedAssets" / L"ProjectSetting";
+		DynamicSolutionDir = DynamicSolutionDir.lexically_normal();
+		ProjectSettingsPath = ProjectSettingsPath.lexically_normal();
+#else
+		DynamicSolutionDir = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+		ProjectSettingsPath = file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
+#endif
+
+		PrecompiledShaderPath = file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
+		IconPath = file::path(base).append("..\\Icons\\").lexically_normal();
+		TerrainSourcePath = assetsRoot / "Terrain";
+		NodeEditorPath = assetsRoot / "NodeEditor";
+		volumeProfilePath = assetsRoot / "VolumeProfile";
+		InputMapPath = assetsRoot / "InputMap";
+		GameBuildSlnPath = file::path(base).append("..\\..\\GameBuild.sln").lexically_normal();
+		animatorPath = assetsRoot / "AnimatorController";
+
+		DataPath = DataPath.lexically_normal();
+		ModelSourcePath = ModelSourcePath.lexically_normal();
+		TextureSourcePath = TextureSourcePath.lexically_normal();
+		MaterialSourcePath = MaterialSourcePath.lexically_normal();
+		UISourcePath = UISourcePath.lexically_normal();
+		PrefabSourcePath = PrefabSourcePath.lexically_normal();
+		ShaderSourcePath = ShaderSourcePath.lexically_normal();
+		TerrainSourcePath = TerrainSourcePath.lexically_normal();
+		NodeEditorPath = NodeEditorPath.lexically_normal();
+		volumeProfilePath = volumeProfilePath.lexically_normal();
+		InputMapPath = InputMapPath.lexically_normal();
+		animatorPath = animatorPath.lexically_normal();
 		//dir not exist -> create dir
 
 		std::vector<file::path> paths = {
@@ -139,6 +180,7 @@ public:
 			animatorPath,
 		};
 
+#ifndef BUILD_FLAG
 		for (const auto& path : paths)
 		{
 			if (!file::exists(path))
@@ -146,6 +188,7 @@ public:
 				file::create_directories(path);
 			}
 		}
+#endif
     }
 };
 

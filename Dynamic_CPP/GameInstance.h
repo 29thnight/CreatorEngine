@@ -56,6 +56,7 @@ public:
 	void SetRewardAmount(int amount) { m_RewardAmount = amount; } 	// 게임 시작 시 또는 치트용.
 	void AddRewardAmount(int amount);
 	int GetRewardAmount() const { return m_RewardAmount; }
+	void ClearRewardAmount() { m_RewardAmount = 0; }
 
 public:
 	// Event Manager Management

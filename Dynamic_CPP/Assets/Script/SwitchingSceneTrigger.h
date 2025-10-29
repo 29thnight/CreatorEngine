@@ -39,10 +39,10 @@ private:
 	//[페이드 인 전용]
 	//지금은 spriteFont로 해서 TextComponent를 받지만, 아이콘으로 변경될 경우
 	//ImageComponent로 변경 필요
-	GameManager* m_gameManager{ nullptr };
-	TextComponent* m_buttonText{ nullptr };
-	TextComponent* m_switchingText{ nullptr };
-	TextComponent* m_loadingText{ nullptr };
-	std::vector<ImageComponent*> m_cutImages{};
+	GameManager*					m_gameManager{ nullptr };
+	TextComponent*					m_buttonText{ nullptr };
+	TextComponent*					m_switchingText{ nullptr };
+	TextComponent*					m_loadingText{ nullptr };
+	std::vector<ImageComponent*>	m_cutImages{};
 
 };

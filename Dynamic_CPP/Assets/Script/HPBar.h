@@ -56,9 +56,17 @@ private:
 	std::weak_ptr<GameObject> m_target;
 	class RectTransformComponent* m_rect = nullptr;
 	class ImageComponent* m_image = nullptr;
+	class ImageComponent* m_warningImage = nullptr;
 	class Camera* m_camera = nullptr;
 
 	int m_currentHP{};
 	int m_maxHP{};
 	int m_type{};
+	float m_warningPersent{ 0.2f };
+
+private:
+	float m_blinkHz{ 2.0f };  // 1초에 2번 깜빡임
+	float m_blinkPhase{ 0.0f };  // 누적 시간(라디안 아님)
+	float m_minWarnAlpha{ 0.15f }; // 경고시 최소 알파
+	float m_maxWarnAlpha{ 1.0f };  // 경고시 최대 알파
 };
