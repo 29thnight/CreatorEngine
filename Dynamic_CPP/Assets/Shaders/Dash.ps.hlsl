@@ -35,16 +35,17 @@ float4 main(PixelInput input) : SV_TARGET
     
     // 가장자리 강조
     finalColor.rgb *= (1.0f + fresnel * 0.3f);
-    
+
     // V 좌표 기반 페이드 (트레일 가장자리)
     float vFade = smoothstep(0.0f, 0.1f, input.texcoord.y) *
-                  smoothstep(1.0f, 0.9f, input.texcoord.y);
-    finalColor.a *= vFade;
-    
+              smoothstep(1.0f, 0.9f, input.texcoord.y);
+
+    float parabolaTaper = pow(input.texcoord.x, 2.0f);
+
     // 거리 기반 페이드 (viewDir 길이 사용)
     float distance = length(input.viewDir);
     float distanceFade = 1.0f - saturate((distance - 50.0f) / 100.0f);
-    finalColor.a *= distanceFade;
+    finalColor.a *= distanceFade * parabolaTaper;
     
     // 알파 테스트
     clip(finalColor.a - 0.01f);
