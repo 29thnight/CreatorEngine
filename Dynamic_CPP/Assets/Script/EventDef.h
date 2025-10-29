@@ -135,6 +135,7 @@ public:
 			if (sig.type == EventSignalType::ObjectDestroyed && (def.targetTag.empty() || sig.a == def.targetTag))
 				return Bump(st, sig.playerId, def);
 			break;
+		case ObjectiveType::KillCount:
 		case ObjectiveType::EliminateAll:
 			// Typically driven elsewhere: broadcast remaining count via sig.i
 			if (sig.type == EventSignalType::EnemyKilled && (def.targetTag.empty() || sig.b == def.targetTag))
