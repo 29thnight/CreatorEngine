@@ -186,11 +186,17 @@ public:
 	std::vector<GameObject*> BP001Objs;
 	std::vector<GameObject*> BP003Objs;
 
+	//effect
 	Prefab* fallDownEff = nullptr;
 	GameObject* DownEffobj = nullptr;
 	Prefab* raiseUpEff = nullptr;
 	GameObject* UpEffobj = nullptr;
+	Prefab* meleeAtkEff = nullptr;
+	GameObject* AtkEffobj = nullptr;
+	Prefab* meleeIndicator = nullptr;
+	GameObject* Indicatorobj = nullptr;
 
+	GameObject* debugMelee = nullptr;
 	
 	CriticalMark* m_criticalMark = nullptr;
 
@@ -272,7 +278,8 @@ public:
 	void ShootProjectile(); //애니메이션 이벤트에서 호출
 	[[Method]]
 	void SweepAttack(); //애니메이션 이벤트에서 호출
-
+	[[Method]]
+	void ShowMeleeIndicator();
 	
 
 	[[Method]]
@@ -309,7 +316,7 @@ public:
 	void BossClear(); //보스죽음 애니메이션끝나면서 연출 끝나는 타이밍(연출에따라 달라짐) 후에 GameManager에 bossClear 신호 주기
 
 
-
+	
 
 
 

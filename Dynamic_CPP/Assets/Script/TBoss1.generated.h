@@ -39,6 +39,7 @@ ReflectionScriptField(TBoss1) \
 		meta_method(ProtrudeChunsik) \
 		meta_method(ShootProjectile) \
 		meta_method(SweepAttack) \
+		meta_method(ShowMeleeIndicator) \
 		meta_method(BP0011) \
 		meta_method(BP0012) \
 		meta_method(BP0013) \

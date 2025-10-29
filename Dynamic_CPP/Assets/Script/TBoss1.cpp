@@ -76,9 +76,16 @@ void TBoss1::Start()
 	UpEffobj = raiseUpEff->Instantiate();
 	fallDownEff = PrefabUtilitys->LoadPrefab("BossFallDown");
 	DownEffobj = fallDownEff->Instantiate();
+	meleeAtkEff = PrefabUtilitys->LoadPrefab("Bossatk1");
+	AtkEffobj = meleeAtkEff->Instantiate();
+
+	meleeIndicator = PrefabUtilitys->LoadPrefab("BossMeleeIndicator");
+	Indicatorobj = meleeIndicator->Instantiate();
 
 	Prefab* BP001Prefab = PrefabUtilitys->LoadPrefab("Boss1BP001Obj");
 	Prefab* BP003Prefab = PrefabUtilitys->LoadPrefab("Boss1BP003Obj");
+
+	debugMelee
 
 	////1번 패턴 투사체 최대 10개
 	for (size_t i = 0; i < 10; i++) {
@@ -329,6 +336,8 @@ void TBoss1::SweepAttack()
 	input.startRotation = boxOrientation;
 	input.layerMask = 1 << 5; // 플레이어 레이어만 검사
 	int hitCount = PhysicsManagers->BoxSweep(input, boxHalfExtents, hitObjects);
+	AtkEffobj->GetComponent<Transform>()->SetPosition(boxCenter);
+	AtkEffobj->GetComponentsInChildren<EffectComponent>()[0]->Apply();
 	isAttacked = true;
 	if (hitCount > 0)
 	{
@@ -354,6 +363,21 @@ void TBoss1::SweepAttack()
 			
 		}
 	}
+}
+
+void TBoss1::ShowMeleeIndicator()
+{
+	Mathf::Vector3 pos = m_pOwner->m_transform.GetWorldPosition();
+	Mathf::Vector3 dir = m_pOwner->m_transform.GetForward();
+	Mathf::Vector3 up = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+	Mathf::Quaternion angle = Mathf::Quaternion::LookRotation(-dir, up);
+
+	Transform* tr = Indicatorobj->GetComponent<Transform>();
+	tr->SetPosition(pos);
+	tr->SetRotation(angle);
+
+	EffectComponent* eff = Indicatorobj->GetComponent< EffectComponent>();
+	eff->Apply();
 }
 
 
@@ -637,6 +661,7 @@ void TBoss1::Update_BP0021(float tick)
 		break;
 	case EPatternPhase::Spawning:
 		RotateToTarget(); // Lock final direction
+		ShowMeleeIndicator();
 		m_patternPhase = EPatternPhase::Action;
 		break;
 	}
@@ -672,6 +697,7 @@ void TBoss1::Update_BP0022(float tick)
 		break;
 	case EPatternPhase::Spawning:
 		RotateToTarget(); // Lock final direction
+		ShowMeleeIndicator();
 		m_patternPhase = EPatternPhase::Action;
 		break;
 	/*case EPatternPhase::Action:
