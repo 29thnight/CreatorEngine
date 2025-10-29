@@ -34,7 +34,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 10.0,
-                            "lifeTime": 0.5,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 0.699999988079071,
@@ -86,8 +86,8 @@
                             {
                                 "color": {
                                     "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
+                                    "x": 0.0,
+                                    "y": 0.880866289138794,
                                     "z": 1.0
                                 },
                                 "time": 0.05700000002980232
@@ -150,7 +150,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -238,13 +238,13 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.5103182792663574,
-                                "y": 0.4270361363887787,
-                                "z": 0.9819168448448181
+                                "x": 0.0,
+                                "y": 0.9241878986358643,
+                                "z": 1.0
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 1.5,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -338,7 +338,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -414,7 +414,7 @@
         },
         {
             "isRunning": false,
-            "maxParticles": 1,
+            "maxParticles": 3,
             "modules": [
                 {
                     "data": {
@@ -427,16 +427,16 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 0.0,
-                                "y": 0.41568660736083984,
+                                "y": 0.9686274528503418,
                                 "z": 1.0
                             },
                             "initialRotation": 0.0,
-                            "initialRotationRange": 0.0,
-                            "lifeTime": 1.5,
-                            "rotateSpeed": 1.0,
+                            "initialRotationRange": 10.0,
+                            "lifeTime": 1.0,
+                            "rotateSpeed": 10.0,
                             "size": {
-                                "x": 1.399999976158142,
-                                "y": 1.399999976158142
+                                "x": 1.0,
+                                "y": 1.0
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -458,11 +458,11 @@
                                 "z": 1.0
                             },
                             "emitterType": 0,
-                            "spawnRate": 1.0
+                            "spawnRate": 3.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 3
                         }
                     },
                     "stage": 2,
@@ -482,7 +482,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 735.7537231445313,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -505,7 +505,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 1
+                            "particleCapacity": 3
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -547,8 +547,8 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 2,
-                            "depthPreset": 2,
+                            "blendPreset": 1,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -635,15 +635,15 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 0.3921568691730499,
-                                "x": 1.0,
-                                "y": 1.0,
+                                "w": 1.0,
+                                "x": 0.0,
+                                "y": 0.8588235378265381,
                                 "z": 1.0
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 7.5,
-                            "rotateSpeed": 1.5,
+                            "lifeTime": 1.0,
+                            "rotateSpeed": 10.0,
                             "size": {
                                 "x": 1.1200000047683716,
                                 "y": 1.1200000047683716
@@ -692,7 +692,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 787.1670532226563,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -758,7 +758,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -845,9 +845,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 0.699999988079071,
-                                "y": 0.699999988079071,
-                                "z": 0.699999988079071
+                                "x": 0.6499999761581421,
+                                "y": 0.6499999761581421,
+                                "z": 0.6499999761581421
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -856,16 +856,16 @@
                             },
                             "color": {
                                 "w": 1.0,
-                                "x": 0.10980392247438431,
-                                "y": 0.3921568691730499,
-                                "z": 0.7490196228027344
+                                "x": 0.003921568859368563,
+                                "y": 0.4431372582912445,
+                                "z": 1.0
                             },
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 5.0,
+                            "lifeTime": 1.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -937,7 +937,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -1125,7 +1125,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {

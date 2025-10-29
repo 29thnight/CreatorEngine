@@ -7,9 +7,9 @@
         0.0,
         0.0,
         0.0,
-        0.0,
-        0.0,
-        0.0
+        0.10000000149011612,
+        0.10000000149011612,
+        0.10000000149011612
     ],
     "isPaused": false,
     "isPlaying": false,
@@ -18,7 +18,7 @@
     "particleSystems": [
         {
             "isRunning": false,
-            "maxParticles": 5,
+            "maxParticles": 10,
             "modules": [
                 {
                     "data": {
@@ -35,9 +35,9 @@
                                 "z": 1.0
                             },
                             "initialRotation": 0.0,
-                            "initialRotationRange": 2.0,
-                            "lifeTime": 1.5,
-                            "rotateSpeed": 0.0,
+                            "initialRotationRange": 10.0,
+                            "lifeTime": 4.0,
+                            "rotateSpeed": 1.0,
                             "size": {
                                 "x": 1.0,
                                 "y": 1.0
@@ -47,7 +47,7 @@
                                 "y": 3.0,
                                 "z": 0.0
                             },
-                            "velocityRange": 0.0
+                            "velocityRange": 1.0
                         },
                         "spawnParams": {
                             "emitterPosition": {
@@ -66,7 +66,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 10
                         }
                     },
                     "stage": 2,
@@ -98,7 +98,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 10
                         }
                     },
                     "stage": 2,
@@ -118,7 +118,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 2.7753727436065674,
+                            "currentTime": 270.9527893066406,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -141,7 +141,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 10
                         },
                         "velocityCurve": [],
                         "windData": {
@@ -165,20 +165,20 @@
                             {
                                 "color": {
                                     "w": 0.0,
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
+                                    "x": 0.8745098114013672,
+                                    "y": 0.43921568989753723,
+                                    "z": 0.0235294122248888
                                 },
                                 "time": 0.0
                             },
                             {
                                 "color": {
-                                    "w": 0.8999999761581421,
-                                    "x": 0.8734177350997925,
-                                    "y": 0.4389709234237671,
-                                    "z": 0.024480942636728287
+                                    "w": 1.0,
+                                    "x": 0.8745098114013672,
+                                    "y": 0.43921568989753723,
+                                    "z": 0.0235294122248888
                                 },
-                                "time": 0.11500000208616257
+                                "time": 0.3449999988079071
                             },
                             {
                                 "color": {
@@ -187,7 +187,7 @@
                                     "y": 0.0,
                                     "z": 0.0
                                 },
-                                "time": 1.0
+                                "time": 0.6079999804496765
                             }
                         ],
                         "colorParams": {
@@ -206,7 +206,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 10
                         }
                     },
                     "stage": 2,
@@ -314,7 +314,7 @@
         },
         {
             "isRunning": false,
-            "maxParticles": 10,
+            "maxParticles": 30,
             "modules": [
                 {
                     "data": {
@@ -351,18 +351,18 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "emitterRadius": 0.5,
+                            "emitterRadius": 1.0,
                             "emitterSize": {
                                 "x": 1.0,
                                 "y": 1.0,
                                 "z": 1.0
                             },
                             "emitterType": 0,
-                            "spawnRate": 50.0
+                            "spawnRate": 200.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -375,14 +375,27 @@
                             "enabled": false
                         },
                         "explosiveData": {
-                            "initialSpeed": 13.166999816894531,
+                            "initialSpeed": 18.224000930786133,
                             "randomFactor": 1.0,
-                            "speedDecay": 0.4819999933242798,
+                            "speedDecay": 0.8289999961853027,
                             "sphereRadius": 2.0
                         },
-                        "impulses": [],
+                        "impulses": [
+                            {
+                                "direction": {
+                                    "x": 0.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                },
+                                "duration": 1.0,
+                                "force": 20.0,
+                                "range": 20.0,
+                                "triggerTime": 0.0,
+                                "type": 2
+                            }
+                        ],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 270.9527893066406,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -405,7 +418,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 30
                         },
                         "velocityCurve": [
                             {
@@ -443,16 +456,16 @@
                                     "y": 1.0,
                                     "z": 1.0
                                 },
-                                "time": 0.2759999930858612
+                                "time": 0.10700000077486038
                             },
                             {
                                 "color": {
-                                    "w": 1.0,
+                                    "w": 1.9607843160629272,
                                     "x": 1.0,
                                     "y": 1.0,
                                     "z": 1.0
                                 },
-                                "time": 0.33799999952316284
+                                "time": 0.164000004529953
                             },
                             {
                                 "color": {
@@ -480,7 +493,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -497,8 +510,8 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 0.5,
-                                "y": 0.5
+                                "x": 0.25,
+                                "y": 0.25
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 0.30000001192092896,
@@ -512,7 +525,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 30
                         }
                     },
                     "stage": 2,
@@ -543,7 +556,7 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
@@ -731,7 +744,7 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 2,
+                            "blendPreset": 1,
                             "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
@@ -909,21 +922,12 @@
                             },
                             {
                                 "color": {
-                                    "w": 1.0,
+                                    "w": 7.843137264251709,
                                     "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 1.0
-                                },
-                                "time": 0.5
-                            },
-                            {
-                                "color": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 0.5696202516555786,
+                                    "y": 0.5686274766921997,
                                     "z": 0.0
                                 },
-                                "time": 0.9309999942779541
+                                "time": 0.6899999976158142
                             },
                             {
                                 "color": {
@@ -942,7 +946,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 2,
-                            "gradientSize": 4,
+                            "gradientSize": 3,
                             "transitionMode": 0
                         },
                         "discreteColors": [
@@ -995,7 +999,7 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
@@ -1132,7 +1136,7 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 0.19607843458652496,
+                                    "w": 1.0,
                                     "x": 1.0,
                                     "y": 0.5137255191802979,
                                     "z": 0.0
@@ -1141,19 +1145,10 @@
                             },
                             {
                                 "color": {
-                                    "w": 0.19607843458652496,
+                                    "w": 1.0,
                                     "x": 0.6941176652908325,
                                     "y": 0.43921568989753723,
                                     "z": 0.019607843831181526
-                                },
-                                "time": 0.4959999918937683
-                            },
-                            {
-                                "color": {
-                                    "w": 0.19607843458652496,
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
                                 },
                                 "time": 1.0
                             }
@@ -1165,7 +1160,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 3,
+                            "gradientSize": 2,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -1237,7 +1232,7 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
@@ -1335,9 +1330,9 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 1.0,
+                                "w": 1.9607843160629272,
                                 "x": 1.0,
-                                "y": 0.9314078688621521,
+                                "y": 0.6078431606292725,
                                 "z": 0.0
                             },
                             "initialRotation": {
@@ -1435,7 +1430,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 274.9154968261719,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1504,7 +1499,7 @@
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
@@ -1530,7 +1525,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1652,7 +1647,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 495.63739013671875,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1694,7 +1689,7 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 3.9215686321258545,
+                                    "w": 19.60784339904785,
                                     "x": 1.0,
                                     "y": 1.0,
                                     "z": 1.0
@@ -1703,7 +1698,7 @@
                             },
                             {
                                 "color": {
-                                    "w": 3.9215686321258545,
+                                    "w": 19.60784339904785,
                                     "x": 1.0,
                                     "y": 1.0,
                                     "z": 0.0
@@ -1712,7 +1707,7 @@
                             },
                             {
                                 "color": {
-                                    "w": 3.9215686321258545,
+                                    "w": 19.60784339904785,
                                     "x": 1.0,
                                     "y": 0.0,
                                     "z": 0.0
@@ -1721,8 +1716,8 @@
                             },
                             {
                                 "color": {
-                                    "w": 0.0,
-                                    "x": 0.5,
+                                    "w": 19.60784339904785,
+                                    "x": 0.501960813999176,
                                     "y": 0.0,
                                     "z": 0.0
                                 },
@@ -1791,7 +1786,7 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "EffectSpehere"
+                            "name": "RingMesh01"
                         },
                         "renderState": {
                             "instanceCount": 1
@@ -1806,16 +1801,16 @@
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
-                            "animationDuration": 1.0,
+                            "animationDuration": 0.5,
                             "enabled": true,
                             "frameCount": 0,
-                            "gridColumns": 5,
-                            "gridRows": 1
+                            "gridColumns": 3,
+                            "gridRows": 3
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Noise62",
+                                "name": "Noise53",
                                 "slot": 0
                             }
                         ]
