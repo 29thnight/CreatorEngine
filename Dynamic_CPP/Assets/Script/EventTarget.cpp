@@ -6,6 +6,12 @@
 
 void EventTarget::Configure(int eventId, const std::string& varName, const std::string& value)
 {
+	if (!m_mgr)
+	{
+		auto mgr = GameInstance::GetInstance()->GetActiveEventManager();
+		if (mgr) SetManager(mgr);
+	}
+
 	m_eventId = eventId; m_targetTag = varName; m_runtimeTag = value;
 	if (m_mgr) 
 	{
