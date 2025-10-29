@@ -1,0 +1,483 @@
+m_name: ItemSlotPrefab2
+m_instanceID: 45641094
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: ItemSlotPrefab2
+    m_instanceID: 3887393218
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 100.662872, y: 0, z: 8.22407818, w: 1}
+      rotation: {x: -0, y: -0.430511206, z: -0, w: 0.902585268}
+      scale: {x: 1.00000024, y: 1, z: 1.00000024, w: 0}
+      m_parentID: 0
+    m_index: 775
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 38187771-8cb1-5890-bd3e-c22b2b65a415
+    m_childrenIndices: [740, 742, 743]
+    m_tag: Untagged
+    m_layer: Default
+    m_components: ~
+    m_gameObjectType: 0
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: ItemSlot0
+        m_instanceID: 2890098808
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 16.3337631, y: 0, z: -1.74188995, w: 1}
+          rotation: {x: -0, y: -1.67638078e-07, z: -0, w: 1}
+          scale: {x: 0.399999976, y: 0.400000006, z: 0.399999976, w: 0}
+          m_parentID: 775
+        m_index: 740
+        m_parentIndex: 775
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 61671173-88ee-5d0e-9315-d3ebd82777a1
+        m_childrenIndices: [776]
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_instanceID: 516472745
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: foothold
+              m_baseColorTexName: Ground_L_bone_BaseColor.png
+              m_normalTexName: Ground_L_bone_Normal.png
+              m_ORM_TexName: Ground_L_bone_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_IOR: 1.5
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 43b42f90-d8a1-5900-bf75-7d4880900db7
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Cylinder
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+          - RigidBodyComponent: 2204703439
+            m_name: RigidBodyComponent
+            m_instanceID: 739761870
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_bodyType: 0
+            LinearDamping: 0.00999999978
+            m_mass: 70
+            maxLinearVelocity: 1.00000003e+16
+            maxAngularVelocity: 100
+            maxContactImpulse: 1.00000003e+32
+            maxDepenetrationVelocity: 1.00000003e+32
+            m_useGravity: false
+            m_setTrigger: true
+            m_setKinematic: false
+            m_collisionEnabled: true
+          - BoxColliderComponent: 4263226401
+            m_name: BoxColliderComponent
+            m_instanceID: 1710694218
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_boxExtent: {x: 1, y: 1, z: 1}
+            m_posOffset: {x: 0, y: 0, z: 0}
+            m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+          - ModuleBehavior: 1399118904
+            m_playerID: -1
+            m_itemID: 0
+            m_itemRarity: 0
+            m_name: ItemComponent
+            m_instanceID: 3263715603
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 266318df-695a-5a28-91a3-74f223afc1d6
+        m_gameObjectType: 3
+        m_isStatic: false
+        children:
+          - GameObject: 2166264123
+            m_name: Box_01
+            m_instanceID: 1966380534
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: -0.134414673, y: 0.899016023, z: -0.22253418, w: 1}
+              rotation: {x: -0, y: 2.27065485e-07, z: -0, w: 1}
+              scale: {x: 2.09999847, y: 2.09999895, z: 2.09999847, w: 0}
+              m_parentID: 740
+            m_index: 776
+            m_parentIndex: 740
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - MeshRenderer: 659998325
+                m_name: MeshRenderer
+                m_instanceID: 1119258328
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_Material:
+                  m_name: Material
+                  m_baseColorTexName: Obj_Inter_flower_low_DefaultMaterial_BaseColor.png
+                  m_normalTexName: Obj_Inter_flower_low_DefaultMaterial_Normal.png
+                  m_ORM_TexName: Obj_Inter_flower_low_DefaultMaterial_OcclusionRoughnessMetallic.png
+                  m_AO_TexName: ""
+                  m_EmissiveTexName: ""
+                  m_materialInfo:
+                    m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                    m_metallic: 1
+                    m_roughness: 1
+                    m_IOR: 1.5
+                  m_flowInfo:
+                    m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                    m_uvScroll: {x: 0, y: 0}
+                  m_fileGuid: a028fe9c-5d0b-51e8-b6b9-26ebdc8a63de
+                  m_renderingMode: 0
+                  m_shaderPSOName: ""
+                m_Mesh:
+                  m_name: SM_wood_box_01
+                  m_materialIndex: 0
+                  m_LODThresholds: ~
+                m_LightMapping:
+                  lightmapIndex: -1
+                  ligthmapResolution: 0
+                  lightmapScale: 1
+                  lightmapOffset: {x: 0, y: 0}
+                  lightmapTiling: {x: 0, y: 0}
+                m_bitflag: 0
+                m_isSkinnedMesh: false
+                m_shadowRecive: true
+                m_shadowCast: true
+                m_isEnableLOD: false
+            m_gameObjectType: 3
+            m_isStatic: false
+      - GameObject: 2166264123
+        m_name: ItemSlot1
+        m_instanceID: 916044127
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 11.3200607, y: 0, z: 0.673164368, w: 1}
+          rotation: {x: -0, y: -1.86264515e-08, z: -0, w: 1}
+          scale: {x: 0.400000006, y: 0.400000006, z: 0.400000006, w: 0}
+          m_parentID: 775
+        m_index: 742
+        m_parentIndex: 775
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 61671173-88ee-5d0e-9315-d3ebd82777a1
+        m_childrenIndices: [777]
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_instanceID: 1747094009
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: foothold
+              m_baseColorTexName: Ground_L_bone_BaseColor.png
+              m_normalTexName: Ground_L_bone_Normal.png
+              m_ORM_TexName: Ground_L_bone_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_IOR: 1.5
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 43b42f90-d8a1-5900-bf75-7d4880900db7
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Cylinder
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+          - RigidBodyComponent: 2204703439
+            m_name: RigidBodyComponent
+            m_instanceID: 789637855
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_bodyType: 0
+            LinearDamping: 0.00999999978
+            m_mass: 70
+            maxLinearVelocity: 1.00000003e+16
+            maxAngularVelocity: 100
+            maxContactImpulse: 1.00000003e+32
+            maxDepenetrationVelocity: 1.00000003e+32
+            m_useGravity: false
+            m_setTrigger: true
+            m_setKinematic: false
+            m_collisionEnabled: true
+          - BoxColliderComponent: 4263226401
+            m_name: BoxColliderComponent
+            m_instanceID: 2274375640
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_boxExtent: {x: 1, y: 1, z: 1}
+            m_posOffset: {x: 0, y: 0, z: 0}
+            m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+          - ModuleBehavior: 1399118904
+            m_playerID: -1
+            m_itemID: 0
+            m_itemRarity: 0
+            m_name: ItemComponent
+            m_instanceID: 2963230566
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 266318df-695a-5a28-91a3-74f223afc1d6
+        m_gameObjectType: 3
+        m_isStatic: false
+        children:
+          - GameObject: 2166264123
+            m_name: Box_01 (1)
+            m_instanceID: 2883689251
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 2.0999999, y: 2.0999999, z: 2.0999999, w: 1}
+              m_parentID: 742
+            m_index: 777
+            m_parentIndex: 742
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - MeshRenderer: 659998325
+                m_name: MeshRenderer
+                m_instanceID: 1919823702
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_Material:
+                  m_name: Material
+                  m_baseColorTexName: Obj_Inter_flower_low_DefaultMaterial_BaseColor.png
+                  m_normalTexName: Obj_Inter_flower_low_DefaultMaterial_Normal.png
+                  m_ORM_TexName: Obj_Inter_flower_low_DefaultMaterial_OcclusionRoughnessMetallic.png
+                  m_AO_TexName: ""
+                  m_EmissiveTexName: ""
+                  m_materialInfo:
+                    m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                    m_metallic: 1
+                    m_roughness: 1
+                    m_IOR: 1.5
+                  m_flowInfo:
+                    m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                    m_uvScroll: {x: 0, y: 0}
+                  m_fileGuid: a028fe9c-5d0b-51e8-b6b9-26ebdc8a63de
+                  m_renderingMode: 0
+                  m_shaderPSOName: ""
+                m_Mesh:
+                  m_name: SM_wood_box_01
+                  m_materialIndex: 0
+                  m_LODThresholds: ~
+                m_LightMapping:
+                  lightmapIndex: -1
+                  ligthmapResolution: 0
+                  lightmapScale: 1
+                  lightmapOffset: {x: 0, y: 0}
+                  lightmapTiling: {x: 0, y: 0}
+                m_bitflag: 0
+                m_isSkinnedMesh: false
+                m_shadowRecive: true
+                m_shadowCast: true
+                m_isEnableLOD: false
+            m_gameObjectType: 3
+            m_isStatic: false
+      - GameObject: 2166264123
+        m_name: ItemSlot2
+        m_instanceID: 49211945
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 9.43601227, y: 0, z: 5.3637085, w: 1}
+          rotation: {x: -0, y: -9.31322646e-08, z: -0, w: 1}
+          scale: {x: 0.399999976, y: 0.400000006, z: 0.399999976, w: 0}
+          m_parentID: 775
+        m_index: 743
+        m_parentIndex: 775
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 61671173-88ee-5d0e-9315-d3ebd82777a1
+        m_childrenIndices: [778]
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - MeshRenderer: 659998325
+            m_name: MeshRenderer
+            m_instanceID: 1191858846
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_Material:
+              m_name: foothold
+              m_baseColorTexName: Ground_L_bone_BaseColor.png
+              m_normalTexName: Ground_L_bone_Normal.png
+              m_ORM_TexName: Ground_L_bone_OcclusionRoughnessMetallic.png
+              m_AO_TexName: ""
+              m_EmissiveTexName: ""
+              m_materialInfo:
+                m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                m_metallic: 1
+                m_roughness: 1
+                m_IOR: 1.5
+              m_flowInfo:
+                m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                m_uvScroll: {x: 0, y: 0}
+              m_fileGuid: 43b42f90-d8a1-5900-bf75-7d4880900db7
+              m_renderingMode: 0
+              m_shaderPSOName: ""
+            m_Mesh:
+              m_name: Cylinder
+              m_materialIndex: 0
+              m_LODThresholds: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: {x: 0, y: 0}
+              lightmapTiling: {x: 0, y: 0}
+            m_bitflag: 0
+            m_isSkinnedMesh: false
+            m_shadowRecive: true
+            m_shadowCast: true
+            m_isEnableLOD: false
+          - RigidBodyComponent: 2204703439
+            m_name: RigidBodyComponent
+            m_instanceID: 1724617297
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_bodyType: 0
+            LinearDamping: 0.00999999978
+            m_mass: 70
+            maxLinearVelocity: 1.00000003e+16
+            maxAngularVelocity: 100
+            maxContactImpulse: 1.00000003e+32
+            maxDepenetrationVelocity: 1.00000003e+32
+            m_useGravity: false
+            m_setTrigger: true
+            m_setKinematic: false
+            m_collisionEnabled: true
+          - BoxColliderComponent: 4263226401
+            m_name: BoxColliderComponent
+            m_instanceID: 3297937848
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_boxExtent: {x: 1, y: 1, z: 1}
+            m_posOffset: {x: 0, y: 0, z: 0}
+            m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+          - ModuleBehavior: 1399118904
+            m_playerID: -1
+            m_itemID: 0
+            m_itemRarity: 0
+            m_name: ItemComponent
+            m_instanceID: 1672760370
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 266318df-695a-5a28-91a3-74f223afc1d6
+        m_gameObjectType: 3
+        m_isStatic: false
+        children:
+          - GameObject: 2166264123
+            m_name: Box_01 (2)
+            m_instanceID: 2925422921
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 2.0999999, y: 2.0999999, z: 2.0999999, w: 1}
+              m_parentID: 743
+            m_index: 778
+            m_parentIndex: 743
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - MeshRenderer: 659998325
+                m_name: MeshRenderer
+                m_instanceID: 136889777
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_Material:
+                  m_name: Material
+                  m_baseColorTexName: Obj_Inter_flower_low_DefaultMaterial_BaseColor.png
+                  m_normalTexName: Obj_Inter_flower_low_DefaultMaterial_Normal.png
+                  m_ORM_TexName: Obj_Inter_flower_low_DefaultMaterial_OcclusionRoughnessMetallic.png
+                  m_AO_TexName: ""
+                  m_EmissiveTexName: ""
+                  m_materialInfo:
+                    m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                    m_metallic: 1
+                    m_roughness: 1
+                    m_IOR: 1.5
+                  m_flowInfo:
+                    m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                    m_uvScroll: {x: 0, y: 0}
+                  m_fileGuid: a028fe9c-5d0b-51e8-b6b9-26ebdc8a63de
+                  m_renderingMode: 0
+                  m_shaderPSOName: ""
+                m_Mesh:
+                  m_name: SM_wood_box_01
+                  m_materialIndex: 0
+                  m_LODThresholds: ~
+                m_LightMapping:
+                  lightmapIndex: -1
+                  ligthmapResolution: 0
+                  lightmapScale: 1
+                  lightmapOffset: {x: 0, y: 0}
+                  lightmapTiling: {x: 0, y: 0}
+                m_bitflag: 0
+                m_isSkinnedMesh: false
+                m_shadowRecive: true
+                m_shadowCast: true
+                m_isEnableLOD: false
+            m_gameObjectType: 3
+            m_isStatic: false

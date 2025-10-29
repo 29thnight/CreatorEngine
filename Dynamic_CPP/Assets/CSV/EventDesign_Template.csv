@@ -10,5 +10,5 @@ ID,QuestName,Scene,Category,PlayerScope,PriorQuestID,NextQuestID,AdvancePolicy,D
 3108,MoveToTrigger1,Tutorial,Quest,Shared,3107,3109,AutoAdvance,코리와 함께 이동하세요,ReachTrigger actor=Asis index=1
 3109,BreakObstacle,Tutorial,Quest,Shared,3108,3110,AutoAdvance,코리가 나아갈 수 있도록 장애물을 파괴하세요,Destroy tag=$targetTag required=1
 3110,MoveToTrigger2,Tutorial,Quest,Shared,3109,3111,AutoAdvance,코리와 함께 이동하세요,ReachTrigger actor=Asis index=1
-3111,BuySomething,Tutorial,Quest,AllPlayersIndividually,3110,4102,AutoAdvance,상점에서 아이템을 구매하여 성장하세요,Purchase tag=Item count=1
+3111,BuySomething,Tutorial,Quest,Shared,3110,4101,AutoAdvance,상점에서 아이템을 구매하여 성장하세요,Purchase tag=Item count=2
 4101,TutoEnd,Tutorial,UI,None,3111,0,Manual,튜토리얼 종료,null
