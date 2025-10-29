@@ -57,6 +57,7 @@ void EntityResource::Start()
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
 		deadObj->SetEnabled(false);
+		deadObj->m_transform.SetScale({ 0.5,0.5,0.5 });
 	}
 }
 
@@ -157,7 +158,7 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 					deadObj->SetEnabled(true);
 					auto deadEffect = deadObj->GetComponent<PlayEffectAll>();
 					Mathf::Vector3 deadPos = GetOwner()->m_transform.GetWorldPosition();
-					deadPos.y += 0.7f;
+					deadPos.y += 0.0f;
 					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 					deadEffect->Initialize();
 				}
