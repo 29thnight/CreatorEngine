@@ -15,7 +15,7 @@
     "name": "dust",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 4,
             "modules": [
                 {
@@ -138,8 +138,8 @@
                                     0.0,
                                     1.0
                                 ],
-                                "duration": 1.0,
-                                "force": 0.5149999856948853,
+                                "duration": 0.009999999776482582,
+                                "force": 0.9340000152587891,
                                 "range": 2.0,
                                 "triggerTime": 0.0,
                                 "type": 2
@@ -150,7 +150,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 101.73017883300781,
+                            "currentTime": 0.0,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -252,7 +252,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -292,9 +292,9 @@
                             },
                             "emitterRadius": 1.0,
                             "emitterSize": {
-                                "x": 3.0,
-                                "y": 2.0,
-                                "z": 3.0
+                                "x": 1.0,
+                                "y": 0.0,
+                                "z": 1.0
                             },
                             "emitterType": 2,
                             "spawnRate": 10.0
@@ -382,14 +382,27 @@
                             "speedDecay": 2.0,
                             "sphereRadius": 1.0
                         },
-                        "impulses": [],
+                        "impulses": [
+                            {
+                                "direction": {
+                                    "x": 0.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                },
+                                "duration": 0.009999999776482582,
+                                "force": 0.38999998569488525,
+                                "range": 20.0,
+                                "triggerTime": 0.20000000298023224,
+                                "type": 1
+                            }
+                        ],
                         "movementParams": {
-                            "currentTime": 59.876129150390625,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
                             "useGravity": false,
-                            "velocityMode": 0
+                            "velocityMode": 2
                         },
                         "orbitalData": {
                             "axis": {
@@ -563,7 +576,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -651,7 +664,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 59.876129150390625,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -850,7 +863,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -938,7 +951,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 59.876129150390625,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1137,7 +1150,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1225,7 +1238,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 59.876129150390625,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1442,12 +1455,12 @@
                                 "z": 0.29411765933036804
                             },
                             "initialRotation": 0.0,
-                            "initialRotationRange": 0.0,
-                            "lifeTime": 3.0,
-                            "rotateSpeed": 0.0,
+                            "initialRotationRange": 10.0,
+                            "lifeTime": 1.0,
+                            "rotateSpeed": 1.0,
                             "size": {
-                                "x": 0.10000000149011612,
-                                "y": 0.10000000149011612
+                                "x": 0.20000000298023224,
+                                "y": 0.20000000298023224
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -1498,18 +1511,18 @@
                                     "y": 1.0,
                                     "z": 0.0
                                 },
-                                "duration": 0.652999997138977,
-                                "force": 20.0,
-                                "range": 6.86899995803833,
-                                "triggerTime": 0.09600000083446503,
+                                "duration": 1.0,
+                                "force": 40.0,
+                                "range": 20.0,
+                                "triggerTime": 0.0,
                                 "type": 1
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 59.876129150390625,
+                            "currentTime": 19.670204162597656,
                             "easingEnabled": false,
                             "easingType": 0,
-                            "gravityStrength": 0.3400000035762787,
+                            "gravityStrength": 0.25,
                             "useGravity": true,
                             "velocityMode": 2
                         },
