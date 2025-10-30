@@ -20,6 +20,7 @@ public:
 	virtual void Awake() override;
 	virtual void Start() override;
 	virtual void Update(float tick) override;
+	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override;
 
 public:
@@ -86,7 +87,8 @@ public:
 	void InitReward(int amount);
 	void AddReward(int amount);
 	int GetReward();
-
+	void SavePlayerData();
+	void LoadPlayerData();
 	void BossClear();
 private:
 	//Entities
@@ -100,6 +102,7 @@ private:
 	ObjectPoolManager*		objectPoolManager{};
 	ControllerVibration*	ControllerVibrationData{};
 
+	bool isDataLoaded = false; //플레이어 데이터 1회로드
 private:
 	void CheatMiningResource();
 

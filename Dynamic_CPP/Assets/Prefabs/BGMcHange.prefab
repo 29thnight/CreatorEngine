@@ -1,0 +1,58 @@
+m_name: BGMcHange
+m_instanceID: 1504840674
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: BGMcHange
+    m_instanceID: 630980331
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 3
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - ModuleBehavior: 1399118904
+        nextBGMTag: None
+        nextAmbienceTag: None
+        m_name: BGMChangeTrigger
+        m_instanceID: 1471135049
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: 2d62f541-a1f9-5711-8aa1-d425ff7dd927
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_instanceID: 3001696734
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 0
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: true
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_instanceID: 781646332
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 4, y: 3.9000001, z: 4}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+    m_gameObjectType: 0
+    m_isStatic: false

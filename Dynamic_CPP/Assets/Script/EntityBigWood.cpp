@@ -12,6 +12,7 @@
 #include "PlayEffectAll.h"
 #include "CriticalMark.h"
 #include "Weapon.h"
+#include "GameManager.h"
 void EntityBigWood::Start()
 {
 	m_maxHP = maxHP;
@@ -210,11 +211,19 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			deadEffect->Initialize();
 		}
 
+		GameObject* GMObj = GameObject::Find("GameManager");
+		if (GMObj)
+		{
+			GameManager* GM = GMObj->GetComponent<GameManager>();
+			if (GM)
+			{
+				GM->AddReward(reward);
+			}
+		}
+
+
 		GetOwner()->Destroy();
-		/*auto pung = GameObject::Find("Pung2");
-		Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-		pung->m_transform.SetPosition(pos);
-		pung->GetComponent<EffectComponent>()->Apply();*/
+		
 	}
 	else
 	{

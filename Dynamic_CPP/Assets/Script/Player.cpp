@@ -378,28 +378,6 @@ void Player::Start()
 void Player::Update(float tick)
 {
 
-	//Test sehwan
-
-	/*if (InputManagement->IsKeyDown('G'))
-	{
-		auto data =GameInstance::GetInstance()->GetPlayData();
-		data->SavePlayerData(this);
-	}
-
-	if (InputManagement->IsKeyDown('H'))
-	{
-		auto data = GameInstance::GetInstance()->GetPlayData();
-		data->LoadPlayerData(playerIndex);
-	}*/
-
-	//if (InputManagement->IsKeyDown('L'))
-	//{
-	//	auto sound = GameInstance::GetInstance()->GetSoundName();
-	//	//sound->LoadSoundNameFromCSV();
-	//}
-
-
-
 	Cheat(); 
 	DetectResource();
 	HitImpulseUpdate(tick);
@@ -572,6 +550,8 @@ void Player::Update(float tick)
 void Player::LateUpdate(float tick)
 {
 	if (!m_isCallStart) return;
+
+
 	if (GM&& GM->TestCameraControll == false)
 	{
 		if (isStun)
@@ -1190,14 +1170,6 @@ void Player::ChargeAttack()
 			{
 				if (GM)
 				{
-					if (auto obj = GM->GetOwner())
-					{
-						auto event = obj->GetComponent<EventManager>();
-						if (event)
-						{
-							event->EmitAbilityUsed("Charge","",playerIndex);
-						}
-					}
 					auto data = GM->GetControllerVibration();
 					if (data)
 					{
@@ -1210,6 +1182,20 @@ void Player::ChargeAttack()
 					}
 				}
 			}
+
+
+			if (GM)
+			{
+				if (auto obj = GM->GetOwner())
+				{
+					auto event = obj->GetComponent<EventManager>();
+					if (event)
+					{
+						event->EmitAbilityUsed("Charge", "", playerIndex);
+					}
+				}
+			}
+
 			if (m_curWeapon->itemType == ItemType::Melee)
 			{
 				m_animator->SetParameter("MeleeChargeAttack", true);

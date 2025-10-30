@@ -13,7 +13,7 @@ void MobSpawner::Start()
 void MobSpawner::OnTriggerEnter(const Collision& collision)
 {
 	Player* p = collision.otherObj->GetComponent<Player>();
-	if (p != nullptr)
+	if (p != nullptr && OnlyAsis == false)
 	{
 		if (isBound == false)
 		{
@@ -55,7 +55,7 @@ void MobSpawner::OnTriggerEnter(const Collision& collision)
 void MobSpawner::OnCollisionEnter(const Collision& collision)
 {
 	Player* p = collision.otherObj->GetComponent<Player>();
-	if (p != nullptr)
+	if (p != nullptr && OnlyAsis == false)
 	{
 		if (isBound == false)
 		{

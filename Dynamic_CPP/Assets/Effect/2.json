@@ -1,106 +1,80 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "emitterTimings": [
+        0.0,
         0.0
     ],
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "2",
     "particleSystems": [
         {
-            "isRunning": true,
-            "maxParticles": 3,
+            "isRunning": false,
+            "maxParticles": 14,
             "modules": [
                 {
                     "data": {
-                        "particleTemplate": {
-                            "acceleration": {
-                                "x": 0.0,
-                                "y": -9.800000190734863,
-                                "z": 0.0
-                            },
-                            "color": {
-                                "w": 1.0,
-                                "x": 0.0,
-                                "y": 0.2025318145751953,
-                                "z": 1.0
-                            },
-                            "initialRotation": 8.649999618530273,
-                            "initialRotationRange": 5.0,
-                            "lifeTime": 1.0,
-                            "rotateSpeed": 0.0,
-                            "size": {
-                                "x": 1.0,
-                                "y": 1.0
-                            },
-                            "velocity": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "velocityRange": 0.0
+                        "autoGeneration": {
+                            "autoAddInterval": 0.05000000074505806,
+                            "autoGenerateFromPosition": true
                         },
-                        "spawnParams": {
-                            "emitterPosition": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "emitterRadius": 1.0,
-                            "emitterSize": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "emitterType": 0,
-                            "spawnRate": 3.0
-                        },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 3
-                        }
-                    },
-                    "stage": 2,
-                    "type": "SpawnModuleCS",
-                    "useEasing": false
-                },
-                {
-                    "data": {
                         "easing": {
-                            "animationType": 0,
-                            "duration": 1.0,
-                            "enabled": false,
-                            "type": 0
+                            "easingDuration": 0.0,
+                            "easingType": 0,
+                            "useEasing": false
                         },
-                        "sizeParams": {
-                            "endSize": {
-                                "x": 2.0,
-                                "y": 2.0
-                            },
-                            "oscillationSpeed": 5.0,
-                            "randomScaleMax": 2.0,
-                            "randomScaleMin": 0.5,
-                            "startSize": {
+                        "endColor": {
+                            "w": 0.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "orientation": {
+                            "customUpVector": {
                                 "x": 0.0,
-                                "y": 0.0
+                                "y": 1.0,
+                                "z": 0.0
                             },
-                            "useOscillation": 0,
-                            "useRandomScale": 0
+                            "type": 1
                         },
-                        "state": {
-                            "isInitialized": true,
-                            "particleCapacity": 3
+                        "position": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "positionOffset": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "renderSettings": {
+                            "renderMode": 0,
+                            "tubeSegments": 16
+                        },
+                        "startColor": {
+                            "w": 3.9215686321258545,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "trailParams": {
+                            "endWidth": 0.0010000000474974513,
+                            "maxTrailPoints": 500,
+                            "minDistance": 0.0010000000474974513,
+                            "startWidth": 1.5390000343322754,
+                            "trailLifetime": 1.0,
+                            "useLengthBasedUV": true
                         }
                     },
-                    "stage": 2,
-                    "type": "SizeModuleCS",
+                    "stage": 4,
+                    "type": "TrailGenerateModule",
                     "useEasing": false
                 }
             ],
-            "name": "star2",
-            "particleDataType": 1,
+            "name": "NewEmitter",
+            "particleDataType": 2,
             "position": {
                 "x": 0.0,
                 "y": 0.0,
@@ -109,86 +83,151 @@
             "renderModules": [
                 {
                     "data": {
-                        "billboard": {
-                            "maxCount": 0,
-                            "type": 1
+                        "constantBuffer": {
+                            "cameraPosition": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "time": 119.36621856689453
                         },
-                        "indices": [
-                            0,
-                            1,
-                            2,
-                            0,
-                            2,
-                            3
-                        ],
+                        "renderState": {
+                            "instanceCount": 14
+                        },
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "BillBoard",
-                            "vertexShader": "BillBoard"
+                            "pixelShader": "Dash",
+                            "vertexShader": "TrailVertex"
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "bl_02",
+                                "name": "t_trail08",
                                 "slot": 0
                             }
                         ],
-                        "vertices": [
-                            {
-                                "position": {
-                                    "w": 1.0,
-                                    "x": -1.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                },
-                                "texcoord": {
-                                    "x": 0.0,
-                                    "y": 0.0
-                                }
-                            },
-                            {
-                                "position": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": 1.0,
-                                    "z": 0.0
-                                },
-                                "texcoord": {
-                                    "x": 1.0,
-                                    "y": 0.0
-                                }
-                            },
-                            {
-                                "position": {
-                                    "w": 1.0,
-                                    "x": 1.0,
-                                    "y": -1.0,
-                                    "z": 0.0
-                                },
-                                "texcoord": {
-                                    "x": 1.0,
-                                    "y": 1.0
-                                }
-                            },
-                            {
-                                "position": {
-                                    "w": 1.0,
-                                    "x": -1.0,
-                                    "y": -1.0,
-                                    "z": 0.0
-                                },
-                                "texcoord": {
-                                    "x": 0.0,
-                                    "y": 1.0
-                                }
-                            }
-                        ]
+                        "trailModule": {
+                            "connected": false
+                        }
                     },
-                    "type": "BillboardModuleGPU"
+                    "type": "TrailRenderModule"
+                }
+            ],
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            }
+        },
+        {
+            "isRunning": false,
+            "maxParticles": 14,
+            "modules": [
+                {
+                    "data": {
+                        "autoGeneration": {
+                            "autoAddInterval": 0.05000000074505806,
+                            "autoGenerateFromPosition": true
+                        },
+                        "easing": {
+                            "easingDuration": 0.0,
+                            "easingType": 0,
+                            "useEasing": false
+                        },
+                        "endColor": {
+                            "w": 0.0,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "orientation": {
+                            "customUpVector": {
+                                "x": 0.0,
+                                "y": 1.0,
+                                "z": 0.0
+                            },
+                            "type": 0
+                        },
+                        "position": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "positionOffset": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "renderSettings": {
+                            "renderMode": 0,
+                            "tubeSegments": 16
+                        },
+                        "startColor": {
+                            "w": 3.9215686321258545,
+                            "x": 1.0,
+                            "y": 1.0,
+                            "z": 1.0
+                        },
+                        "trailParams": {
+                            "endWidth": 0.0010000000474974513,
+                            "maxTrailPoints": 500,
+                            "minDistance": 0.0010000000474974513,
+                            "startWidth": 1.5049999952316284,
+                            "trailLifetime": 1.0,
+                            "useLengthBasedUV": true
+                        }
+                    },
+                    "stage": 4,
+                    "type": "TrailGenerateModule",
+                    "useEasing": false
+                }
+            ],
+            "name": "NewEmitter",
+            "particleDataType": 2,
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "renderModules": [
+                {
+                    "data": {
+                        "constantBuffer": {
+                            "cameraPosition": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "time": 119.36621856689453
+                        },
+                        "renderState": {
+                            "instanceCount": 14
+                        },
+                        "renderStates": {
+                            "blendPreset": 2,
+                            "depthPreset": 2,
+                            "rasterizerPreset": 1
+                        },
+                        "shaders": {
+                            "pixelShader": "Dash",
+                            "vertexShader": "TrailVertex"
+                        },
+                        "textures": [
+                            {
+                                "hasTexture": true,
+                                "name": "t_trail08",
+                                "slot": 0
+                            }
+                        ],
+                        "trailModule": {
+                            "connected": false
+                        }
+                    },
+                    "type": "TrailRenderModule"
                 }
             ],
             "rotation": {
@@ -203,5 +242,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 2.0
 }

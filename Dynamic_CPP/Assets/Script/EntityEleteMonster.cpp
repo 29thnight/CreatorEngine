@@ -990,6 +990,7 @@ void EntityEleteMonster::RotateToTarget()
 
 void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (isDead) return;
 	Entity::SendDamage(sender, damage, hitinfo);
 
 	if (sender)

@@ -60,6 +60,8 @@ private:
 	[[Property]]
 	float m_maxRewardUpForce = 100.f;
 
+	[[Property]]
+	int reward = 0;
 	GameObject* deadObj = nullptr;
 	CriticalMark* m_criticalMark = nullptr;
 };

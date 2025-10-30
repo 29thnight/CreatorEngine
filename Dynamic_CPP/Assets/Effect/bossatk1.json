@@ -15,7 +15,7 @@
     "name": "bossatk1",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -27,9 +27,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612,
+                                "z": 0.10000000149011612
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -96,7 +96,7 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 1.0,
+                                "x": 0.10000000149011612,
                                 "y": 1.0,
                                 "z": 10.0
                             },
@@ -104,9 +104,9 @@
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
+                                "x": 0.10000000149011612,
                                 "y": 1.0,
-                                "z": 1.0
+                                "z": 0.10000000149011612
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
@@ -178,7 +178,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -190,9 +190,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.10000000149011612,
+                                "y": 0.10000000149011612,
+                                "z": 0.10000000149011612
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -259,7 +259,7 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 1.0,
+                                "x": 0.10000000149011612,
                                 "y": 1.0,
                                 "z": 10.0
                             },
@@ -267,9 +267,9 @@
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 1.0,
+                                "x": 0.10000000149011612,
                                 "y": 1.0,
-                                "z": 1.0
+                                "z": 0.10000000149011612
                             },
                             "useOscillation": 0,
                             "useRandomScale": 0
@@ -341,7 +341,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -353,9 +353,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 4.0,
-                                "y": 1.0,
-                                "z": 4.0
+                                "x": 0.5,
+                                "y": 0.5,
+                                "z": 0.5
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -477,7 +477,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 100,
             "modules": [
                 {
@@ -497,10 +497,10 @@
                             "initialRotation": 0.0,
                             "initialRotationRange": 10.0,
                             "lifeTime": 3.0,
-                            "rotateSpeed": 0.0,
+                            "rotateSpeed": 1.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.20000000298023224,
+                                "y": 0.20000000298023224
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -553,13 +553,13 @@
                                 },
                                 "duration": 1.0,
                                 "force": 20.0,
-                                "range": 20.0,
+                                "range": 10.085000038146973,
                                 "triggerTime": 0.0,
                                 "type": 2
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 169.67132568359375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -754,7 +754,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -766,9 +766,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -835,9 +835,9 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 2.0,
+                                "x": 0.25,
                                 "y": 1.0,
-                                "z": 2.0
+                                "z": 0.25
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
@@ -917,7 +917,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 3,
             "modules": [
                 {
@@ -929,9 +929,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -1005,7 +1005,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 105.0202865600586,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1052,9 +1052,9 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 3.0,
+                                "x": 0.5,
                                 "y": 1.0,
-                                "z": 3.0
+                                "z": 0.5
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,

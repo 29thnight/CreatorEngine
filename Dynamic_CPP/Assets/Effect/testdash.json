@@ -26,7 +26,7 @@
                             "useEasing": false
                         },
                         "endColor": {
-                            "w": 0.0,
+                            "w": 0.5882353186607361,
                             "x": 1.0,
                             "y": 1.0,
                             "z": 1.0
@@ -54,7 +54,7 @@
                             "tubeSegments": 16
                         },
                         "startColor": {
-                            "w": 1.0,
+                            "w": 3.9215686321258545,
                             "x": 1.0,
                             "y": 1.0,
                             "z": 1.0
@@ -95,7 +95,7 @@
                             "instanceCount": 14
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
@@ -139,7 +139,7 @@
                             "useEasing": false
                         },
                         "endColor": {
-                            "w": 0.0,
+                            "w": 0.5882353186607361,
                             "x": 1.0,
                             "y": 1.0,
                             "z": 1.0
@@ -167,7 +167,7 @@
                             "tubeSegments": 16
                         },
                         "startColor": {
-                            "w": 1.0,
+                            "w": 3.9215686321258545,
                             "x": 1.0,
                             "y": 1.0,
                             "z": 1.0
@@ -208,7 +208,7 @@
                             "instanceCount": 14
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
