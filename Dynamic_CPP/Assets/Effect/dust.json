@@ -39,8 +39,8 @@
                             "color": {
                                 "w": 1.0,
                                 "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "y": 0.9190657734870911,
+                                "z": 0.8050541877746582
                             },
                             "initialRotation": {
                                 "x": 0.0,
@@ -150,7 +150,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 161.403564453125,
+                            "currentTime": 101.73017883300781,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -219,8 +219,8 @@
                             "instanceCount": 4
                         },
                         "renderStates": {
-                            "blendPreset": 2,
-                            "depthPreset": 2,
+                            "blendPreset": 1,
+                            "depthPreset": 4,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -252,7 +252,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 5,
             "modules": [
                 {
@@ -384,7 +384,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 59.876129150390625,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -563,7 +563,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -651,7 +651,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 59.876129150390625,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -850,7 +850,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -938,7 +938,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 59.876129150390625,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1137,7 +1137,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1225,7 +1225,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 59.876129150390625,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1424,7 +1424,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 5,
             "modules": [
                 {
@@ -1506,7 +1506,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 59.876129150390625,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.3400000035762787,
