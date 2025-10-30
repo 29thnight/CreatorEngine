@@ -19,20 +19,6 @@ void EventManager::Awake()
 
     LoadDefinitions();
 
-	auto tag = GetOwner()->GetComponent<SceneTag>();
-    if (tag)
-    {
-        int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
-        if (currentScene == (int)SceneType::Bootstrap)
-        {
-            int tagScene = GameInstance::GetInstance()->FindSceneTypeByName(tag->m_sceneTag);
-            if (tagScene != -1)
-            {
-                GameInstance::GetInstance()->SetCurrentSceneType(tagScene);
-            }
-        }
-    }
-
 	int sceneType = GameInstance::GetInstance()->GetCurrentSceneType();
     // Optionally auto-start the first event that has priorId==0
     for (auto& def : m_definitions)
