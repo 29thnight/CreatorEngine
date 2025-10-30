@@ -33,6 +33,19 @@ inline std::optional<SceneType> FromKey(std::string_view k) {
 	return std::nullopt;
 }
 
+inline std::optional<SceneType> FromLowerKey(std::string_view k) {
+	if (k == "bootstrap")  return SceneType::Bootstrap;
+	if (k == "selecthhar") return SceneType::SelectChar;
+	if (k == "loading")    return SceneType::Loading;
+	if (k == "stage")      return SceneType::Stage;
+	if (k == "tutorial")   return SceneType::Tutorial;
+	if (k == "boss")       return SceneType::Boss;
+	if (k == "credits")    return SceneType::Credits;
+	if (k == "gameOver")   return SceneType::GameOver;
+	if (k == "clear")      return SceneType::Clear;
+	return std::nullopt;
+}
+
 static inline std::string FormatDescFmtStyle(const std::string& fmt, int rawPercent)
 {
 	try
@@ -350,6 +363,26 @@ void GameInstance::UnloadScene(const std::string& sceneName)
 bool GameInstance::IsLoadSceneComplete() const
 {
 	return m_isLoadSceneComplete;
+}
+
+int GameInstance::FormKeyToSceneType(std::string_view key)
+{
+	if (auto t = FromLowerKey(key)) {
+		return static_cast<int>(*t);
+	}
+	return -1;
+}
+
+int GameInstance::FindSceneTypeByName(const std::string& sceneName) const
+{
+	for (const auto& [type, name] : m_settingedSceneNames) 
+	{
+		if (name == sceneName) 
+		{
+			return static_cast<int>(type);
+		}
+	}
+	return -1;
 }
 
 void GameInstance::PauseGame()

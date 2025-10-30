@@ -63,7 +63,9 @@ public:
         float                                   deltaTime{};
 		float                                   frameDuration{ 0.1f };
         SpriteEffects                           filpEffect{ SpriteEffects_None };
-		bool                                    isPreview{ false };
+        bool                                    isPreview{ false };
+        float                                   clipPercent{ 1.f };
+        ClipDirection                           clipDirection{ ClipDirection::None };
 	};
 
     explicit UIRenderProxy(ImageComponent* image) noexcept;

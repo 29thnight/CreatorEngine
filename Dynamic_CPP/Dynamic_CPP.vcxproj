@@ -437,6 +437,8 @@
 		<ClInclude Include="Assets\Script\ExitPauseButton.h" />
 		<ClInclude Include="Assets\Script\ClearPortal.h" />
 		<ClInclude Include="Assets\Script\PortalTrigger.h" />
+		<ClInclude Include="Assets\Script\BossHPBar.h" />
+		<ClInclude Include="Assets\Script\SceneTag.h" />
 		<ClInclude Include="Assets\Script\BGMChangeTrigger.h" />
 		<ClInclude Include="Assets\Script\BGMAmbienceController.h" />
 	</ItemGroup>
@@ -1225,6 +1227,14 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PortalTrigger.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossHPBar.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SceneTag.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

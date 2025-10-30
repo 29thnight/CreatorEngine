@@ -7,6 +7,8 @@ ReflectionFieldInheritance(SpriteSheetComponent, UIComponent) \
 	({ \
 		meta_property(m_spriteSheetPath) \
 		meta_property(m_frameDuration) \
+		meta_property(clipPercent) \
+		meta_property(clipDirection) \
 		meta_property(m_isLoop) \
 		meta_property(m_isPreview) \
 	}); \

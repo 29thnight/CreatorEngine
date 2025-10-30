@@ -4,6 +4,7 @@
 #include "GameInstance.h"
 #include "ITriggerCondition.h"
 #include "StringHelper.h"
+#include "SceneTag.h"
 #include "pch.h"
 
 static bool HasColumn(const CSVReader::Row& row, const char* name)
@@ -18,10 +19,12 @@ void EventManager::Awake()
 
     LoadDefinitions();
 
+	int sceneType = GameInstance::GetInstance()->GetCurrentSceneType();
     // Optionally auto-start the first event that has priorId==0
     for (auto& def : m_definitions)
     {
-        if (def.priorId == 0)
+		int defScene = GameInstance::GetInstance()->FormKeyToSceneType(def.scene);
+        if (def.priorId == 0 && sceneType == defScene)
         {
             StartEvent(def.id);
             break;
@@ -279,7 +282,12 @@ void EventManager::LoadDefinitions()
             EventDefinition def;
             def.id = row["ID"].as<int>();
             def.name = HasColumn(row, "QuestName") ? row["QuestName"].as<std::string>() : std::string{};
-            def.scene = HasColumn(row, "Scene") ? row["Scene"].as<std::string>() : std::string{};
+			auto s = HasColumn(row, "Scene") ? row["Scene"].as<std::string>() : std::string{};
+            std::transform(s.begin(), s.end(), s.begin(),
+                [](unsigned char c) { return (char)std::tolower(c); });
+            auto str = Utf8ToAnsi(s);
+			def.scene = str;
+
             def.category = ParseCategory(HasColumn(row, "Category") ? row["Category"].as<std::string>() : "Quest");
             def.playerScope = ParsePlayerScope(HasColumn(row, "PlayerScope") ? row["PlayerScope"].as<std::string>() : "Shared");
             if (HasColumn(row, "AdvancePolicy")) 
@@ -424,14 +432,19 @@ void EventManager::EnsureRuntime(int id)
 {
     if (m_runtime.find(id) != m_runtime.end()) return;
 
+    int sceneType = GameInstance::GetInstance()->GetCurrentSceneType();
+
     auto* def = GetEventDefinition(id);
     if (!def) return;
+
+    int defScene = GameInstance::GetInstance()->FormKeyToSceneType(def->scene);
+
+    if (sceneType != defScene) return;
 
     EventRuntime rt{};
     rt.def = *def;
     rt.status = EventStatus::NotStarted;
     rt.objectives.resize(def->objectives.size());
-
 
     m_runtime.emplace(id, std::move(rt));
 }

@@ -633,6 +633,12 @@
 		<ClInclude Include="Assets\Script\PortalTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\BossHPBar.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SceneTag.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\BGMChangeTrigger.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -1170,6 +1176,12 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PortalTrigger.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\BossHPBar.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SceneTag.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\BGMChangeTrigger.cpp">

@@ -32,6 +32,7 @@ public:
 	bool IsLoadSceneComplete() const;
 	int GetAfterLoadSceneIndex() const { return m_beyondSceneIndex; }
 	void SetAfterLoadSceneIndex(int type = 0) { m_beyondSceneIndex = type; }
+	int FormKeyToSceneType(std::string_view key);
 
 public:
 	//Scene Management(NEW)
@@ -41,6 +42,7 @@ public:
 	void SwitchToPrevScene() { SwitchSettingedScene(static_cast<int>(m_prevSceneType)); }
 	int GetCurrentSceneType() const { return static_cast<int>(m_currentSceneType); }
 	int GetPrevSceneType() const { return static_cast<int>(m_prevSceneType); }
+	int FindSceneTypeByName(const std::string& sceneName) const;
 	void SetCurrentSceneType(int sceneType) { m_currentSceneType = static_cast<SceneType>(sceneType); }
 	void PauseGame();
 	void ResumeGame();
