@@ -40,7 +40,7 @@ private:
     //EffectComponent*      m_effectComponent{ nullptr };
 
     [[Property]]
-    std::string m_defaultMessage{ "No Active Event" };
+    std::string m_defaultMessage{ "null" };
     UiState m_state{ UiState::Hidden };
     [[Property]]
     float m_slideInDuration{ 0.35f };

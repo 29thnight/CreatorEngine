@@ -143,6 +143,8 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
     data.position           = sprite->pos;
     data.scale              = sprite->scale;
     data.filpEffect = (SpriteEffects)sprite->uiEffects;
+    data.clipDirection = sprite->clipDirection;
+    data.clipPercent = sprite->clipPercent;
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
@@ -297,6 +299,8 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         deltaTime,
 						info.frameDuration,
                         m_sequenceState,
+                        info.clipDirection,
+						info.clipPercent,
                         DirectX::Colors::White,
                         0.f,
                         1.f,

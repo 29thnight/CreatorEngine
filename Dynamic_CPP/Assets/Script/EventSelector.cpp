@@ -17,9 +17,7 @@ void EventSelector::Start()
 {
 	m_textComponent = GetOwner()->GetComponent<TextComponent>();
 	m_textRectTransform = GetOwner()->GetComponent<RectTransformComponent>();
-    //TODO : 찾아라 드래곤볼 해야함.
-    //m_imageComponent = GetOwner()->GetComponent<ImageComponent>();
-    //m_rectTransform = GetOwner()->GetComponent<RectTransformComponent>();
+
     GameObject* parentObj = GameObject::FindIndex(GetOwner()->m_parentIndex);
     GameObject* grandParentObj{};
     if (parentObj)
@@ -123,23 +121,32 @@ void EventSelector::Update(float tick)
                     if (str == "null")
                     {
                         m_state = UiState::Hidden;
+                        m_chkboxIconComponent->SetEnabled(false);
                     }
                 }
                 else if (!def->name.empty())
                 {
                     activeText = def->name;
+                    m_chkboxIconComponent->SetEnabled(true);
                 }
                 else
                 {
                     activeText = std::string("Event ") + std::to_string(*activeId);
 					m_state = UiState::Hidden;
+                    m_chkboxIconComponent->SetEnabled(false);
                 }
             }
             else
             {
                 activeText = std::string("Event ") + std::to_string(*activeId);
                 m_state = UiState::Hidden;
+                m_chkboxIconComponent->SetEnabled(false);
             }
+        }
+        else
+        {
+            m_state = UiState::Hidden;
+            m_chkboxIconComponent->SetEnabled(false);
         }
     }
 
@@ -335,8 +342,9 @@ void EventSelector::UpdateState(float tick)
             m_pendingEventId.reset();
             m_pendingMessage.clear();
             BeginEnter(nextId, std::move(nextMessage));
-            if (m_chkIconComponent)
+            if (m_chkIconComponent && m_chkboxIconComponent)
             {
+				m_chkboxIconComponent->SetEnabled(false);
                 m_chkIconComponent->SetEnabled(false);
             }
         }
@@ -367,6 +375,11 @@ void EventSelector::UpdateState(float tick)
 						m_rectTransform->SetSizeDelta({ doubleX + 20.f, m_bgSize.y });
                     }
                 }
+            }
+
+            if (m_chkboxIconComponent)
+            {
+                m_chkboxIconComponent->SetEnabled(true);
             }
         }
         break;

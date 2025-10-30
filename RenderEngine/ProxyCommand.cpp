@@ -281,6 +281,8 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	float deltaTime		= pComponent->m_deltaTime;
 	bool isEnable		= owner->IsEnabled();
 	bool isPreview		= pComponent->m_isPreview;
+	auto clipDirection = pComponent->clipDirection;
+	float clipPercent = pComponent->clipPercent;
 
 	if (!shaderPath.empty())
 	{
@@ -291,7 +293,9 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 		}
 	}
 
-	m_updateFunction = [weakProxyObject, canvasOrder, isPreview, isEnable, origin, position, scale, layerOrder, frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
+	m_updateFunction = [weakProxyObject, canvasOrder, isPreview, 
+		isEnable, origin, position, scale, layerOrder, clipDirection, clipPercent,
+		frameDuration, isLoop, deltaTime, buffer = std::move(cpuBuffer)]() mutable
 	{
 		if (auto proxyObject = weakProxyObject.lock())
 		{
@@ -304,6 +308,8 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 			data.layerOrder = layerOrder;
 			data.frameDuration = frameDuration;
 			data.isPreview = isPreview;
+			data.clipDirection = clipDirection;
+			data.clipPercent = clipPercent;
 			if (!isEnable)
 			{
 				proxyObject->m_sequenceState.frameIndex = 0;

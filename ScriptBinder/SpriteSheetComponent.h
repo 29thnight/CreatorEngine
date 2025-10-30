@@ -4,6 +4,7 @@
 #include "IRenderable.h"
 #include "IRegistableEvent.h"
 #include "UIComponent.h"
+#include "Navigation.h"
 #include "ImageComponent.generated.h"
 #include "SpriteSheetComponent.generated.h"
 
@@ -30,6 +31,10 @@ public:
 	[[Property]]
 	float                    m_frameDuration{ 0.1f };
 	float                    m_deltaTime{};
+	[[Property]]
+	float                    clipPercent{ 1.f };
+	[[Property]]
+	ClipDirection            clipDirection{ ClipDirection::None };
 	[[Property]]
 	bool                     m_isLoop{ true };
 	[[Property]]
