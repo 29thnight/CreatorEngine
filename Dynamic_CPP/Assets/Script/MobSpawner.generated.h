@@ -13,6 +13,7 @@ ReflectionScriptField(MobSpawner) \
 		meta_property(isBound) \
 		meta_property(spawnTimer) \
 		meta_property(isActive) \
+		meta_property(OnlyAsis) \
 	}); \
 	MethodField \
 	({ \
