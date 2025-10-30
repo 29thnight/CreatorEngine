@@ -1,6 +1,6 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "emitterTimings": [
         0.0,
         0.0,
@@ -11,7 +11,7 @@
     ],
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "bossatk1",
     "particleSystems": [
         {
@@ -353,9 +353,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 4.0,
+                                "x": 1.0,
                                 "y": 1.0,
-                                "z": 4.0
+                                "z": 1.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -499,8 +499,8 @@
                             "lifeTime": 3.0,
                             "rotateSpeed": 0.0,
                             "size": {
-                                "x": 1.0,
-                                "y": 1.0
+                                "x": 0.4000000059604645,
+                                "y": 0.4000000059604645
                             },
                             "velocity": {
                                 "x": 0.0,
@@ -559,7 +559,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 36.802024841308594,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -754,7 +754,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -835,9 +835,9 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 2.0,
+                                "x": 0.5,
                                 "y": 1.0,
-                                "z": 2.0
+                                "z": 0.5
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
@@ -917,7 +917,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 3,
             "modules": [
                 {
@@ -1005,7 +1005,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 35.76886749267578,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1052,9 +1052,9 @@
                         },
                         "sizeParams": {
                             "endSize": {
-                                "x": 3.0,
+                                "x": 1.0,
                                 "y": 1.0,
-                                "z": 3.0
+                                "z": 1.0
                             },
                             "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
@@ -1139,5 +1139,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 2.0
+    "timeScale": 1.0
 }
