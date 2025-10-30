@@ -1,6 +1,13 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0,
+        0.5,
+        0.5,
+        0.25,
+        0.5
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
@@ -76,12 +83,14 @@
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 2.0,
                                 "y": 2.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -98,30 +107,12 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 1.0,
+                                    "w": 3.9215686321258545,
                                     "x": 0.45490196347236633,
                                     "y": 0.1921568661928177,
                                     "z": 1.0
                                 },
                                 "time": 0.0
-                            },
-                            {
-                                "color": {
-                                    "w": 0.9019607901573181,
-                                    "x": 0.45490196347236633,
-                                    "y": 0.1921568661928177,
-                                    "z": 1.0
-                                },
-                                "time": 0.30000001192092896
-                            },
-                            {
-                                "color": {
-                                    "w": 0.7019608020782471,
-                                    "x": 0.45490196347236633,
-                                    "y": 0.1921568661928177,
-                                    "z": 1.0
-                                },
-                                "time": 0.699999988079071
                             },
                             {
                                 "color": {
@@ -140,7 +131,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 4,
+                            "gradientSize": 2,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -181,7 +172,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -268,14 +259,14 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 1.0,
-                                "x": 0.4755873680114746,
+                                "w": 3.9215686321258545,
+                                "x": 0.4745098054409027,
                                 "y": 0.0,
                                 "z": 1.0
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 5.0,
-                            "lifeTime": 1.5,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -325,12 +316,14 @@
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -367,7 +360,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -454,15 +447,15 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 1.0,
+                                "w": 3.9215686321258545,
                                 "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 2.5,
-                            "rotateSpeed": -1.0,
+                            "lifeTime": 1.0,
+                            "rotateSpeed": -5.0,
                             "size": {
                                 "x": 1.0,
                                 "y": 1.0
@@ -500,6 +493,9 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
                         "explosiveData": {
                             "initialSpeed": 50.0,
                             "randomFactor": 0.4000000059604645,
@@ -508,7 +504,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 156.4491424560547,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -562,12 +558,14 @@
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
-                                "x": 0.10000000149011612,
-                                "y": 0.10000000149011612
+                                "x": 0.0,
+                                "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -604,7 +602,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -749,21 +747,12 @@
                             },
                             {
                                 "color": {
-                                    "w": 0.0,
-                                    "x": 0.16862745583057404,
-                                    "y": 0.05882352963089943,
-                                    "z": 0.33725491166114807
-                                },
-                                "time": 0.4869999885559082
-                            },
-                            {
-                                "color": {
-                                    "w": 0.19607843458652496,
+                                    "w": 1.9607843160629272,
                                     "x": 0.14901961386203766,
                                     "y": 0.03921568766236305,
                                     "z": 0.2705882489681244
                                 },
-                                "time": 1.0
+                                "time": 0.5
                             }
                         ],
                         "colorParams": {
@@ -773,7 +762,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 3,
+                            "gradientSize": 2,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -802,12 +791,14 @@
                                 "x": 1.0,
                                 "y": 1.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -843,8 +834,8 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 1,
-                            "depthPreset": 2,
+                            "blendPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -937,14 +928,14 @@
                                 "z": 0.0
                             },
                             "color": {
-                                "w": 1.0,
+                                "w": 3.9215686321258545,
                                 "x": 1.0,
                                 "y": 1.0,
                                 "z": 1.0
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 5.0,
-                            "lifeTime": 1.5,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -994,12 +985,14 @@
                                 "x": 3.0,
                                 "y": 3.0
                             },
+                            "oscillationSpeed": 5.0,
                             "randomScaleMax": 2.0,
                             "randomScaleMin": 0.5,
                             "startSize": {
                                 "x": 0.0,
                                 "y": 0.0
                             },
+                            "useOscillation": 0,
                             "useRandomScale": 0
                         },
                         "state": {
@@ -1035,8 +1028,8 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 1,
-                            "depthPreset": 2,
+                            "blendPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
