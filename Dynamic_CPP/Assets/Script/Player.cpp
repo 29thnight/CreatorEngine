@@ -869,7 +869,7 @@ void Player::CharacterMove(Mathf::Vector2 dir)
 void Player::PlaySoundStep()
 {
 	if (m_MoveSound == nullptr) return;
-	m_MoveSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("StepSound");
+	m_MoveSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerFootstep");
 	m_MoveSound->PlayOneShot();
 
 	m_runIndex = (m_runIndex + 1) % m_runEffects.size();
@@ -949,6 +949,11 @@ void Player::ThrowEvent()
 	{
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(onIndicate);
+	}
+	if (m_ActionSound)
+	{
+		m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerThrowBlock");
+		m_ActionSound->PlayOneShot();
 	}
 }
 
@@ -1037,7 +1042,7 @@ void Player::PlaySoundDash()
 {
 	if (m_MoveSound == nullptr) return;
 
-	m_MoveSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("DashSound");
+	m_MoveSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerDash");
 	m_MoveSound->PlayOneShot();
 }
 

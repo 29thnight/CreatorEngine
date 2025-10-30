@@ -11,20 +11,23 @@ void BGMController::Start()
 	std::string curSoundName;
 	switch (curScene)
 	{
+	case SceneType::Bootstrap:
+		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
+		break;
 	case SceneType::SelectChar:
-		curSoundName = sounds->GetSoudNameRandom("SelectCharBGM");
+		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
 		break;
 	case SceneType::Loading:
-		curSoundName = sounds->GetSoudNameRandom("LoadingBGM");
+		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
 		break;
 	case SceneType::Stage:
-		curSoundName = sounds->GetSoudNameRandom("StageBGM");
+		curSoundName = sounds->GetSoudNameRandom("AmbStage11");
 		break;
 	case SceneType::Tutorial:
-		curSoundName = sounds->GetSoudNameRandom("TutorialBGM");
+		curSoundName = sounds->GetSoudNameRandom("AmbStage11");
 		break;
 	case SceneType::Boss:
-		curSoundName = sounds->GetSoudNameRandom("BossBGM");
+		curSoundName = sounds->GetSoudNameRandom("BgmBoss");
 		break;
 	case SceneType::Credits:
 		curSoundName = sounds->GetSoudNameRandom("CreditsBGM");
