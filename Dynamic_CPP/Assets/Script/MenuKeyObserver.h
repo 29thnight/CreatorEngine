@@ -15,4 +15,5 @@ private:
 	float m_elapsedTime{ 0.f };
 	//class GameManager* m_gameManager{ nullptr };
 	class GameObject* m_menuCanvasObject{ nullptr };
+	class ImageComponent* m_menuImageComponent{ nullptr };
 };

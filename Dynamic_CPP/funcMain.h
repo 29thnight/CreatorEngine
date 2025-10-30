@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("UIHPObserver", []() { return new UIHPObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("SceneTag", []() { return new SceneTag(); });
 		CreateFactory::GetInstance()->RegisterFactory("BossHPBar", []() { return new BossHPBar(); });
 		CreateFactory::GetInstance()->RegisterFactory("PortalTrigger", []() { return new PortalTrigger(); });

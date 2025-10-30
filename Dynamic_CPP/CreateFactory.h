@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "UIHPObserver.h"
 #include "SceneTag.h"
 #include "BossHPBar.h"
 #include "PortalTrigger.h"

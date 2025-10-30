@@ -1,13 +1,6 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
-    "emitterTimings": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
@@ -146,7 +139,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 115.13843536376953,
+                            "currentTime": 184.40081787109375,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -244,11 +237,11 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
-                            "pixelShader": "RandomSpriteK",
+                            "pixelShader": "SpriteAnimationM",
                             "vertexShader": "BillBoard"
                         },
                         "spriteAnimation": {
@@ -355,7 +348,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 0.0
+                                "z": 3.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -413,7 +406,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 156.91473388671875,
+                            "currentTime": 20.703163146972656,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -580,11 +573,11 @@
                         },
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MeshRandomSprite",
+                            "pixelShader": "MaskSpriteAnimation",
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
@@ -642,7 +635,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 0.0
+                                "z": 3.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -700,7 +693,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 112.53821563720703,
+                            "currentTime": 20.755115509033203,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -867,11 +860,11 @@
                         },
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MeshRandomSprite",
+                            "pixelShader": "MaskSpriteAnimation",
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
@@ -929,7 +922,7 @@
                             "initialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 0.0
+                                "z": 3.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -987,7 +980,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 112.1599349975586,
+                            "currentTime": 21.76004409790039,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1154,11 +1147,11 @@
                         },
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MeshRandomSprite",
+                            "pixelShader": "MaskSpriteAnimation",
                             "vertexShader": "MeshParticle"
                         },
                         "spriteAnimation": {
@@ -1268,7 +1261,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 112.41221618652344,
+                            "currentTime": 20.46453094482422,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.3400000035762787,
@@ -1334,7 +1327,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1420,5 +1413,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 2.0
+    "timeScale": 1.0
 }

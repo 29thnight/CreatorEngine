@@ -53,6 +53,8 @@
 #include "EntityMonsterBaseGate.h"
 #include "GameInstance.h"
 #include "TBoss1.h"
+#include "UIHPObserver.h"
+
 void Player::Awake()
 {
 	auto gmobj = GameObject::Find("GameManager");
@@ -170,6 +172,12 @@ void Player::Start()
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
 				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
 			}
+
+			auto hpObserver = m_uiController->GetComponent<UIHPObserver>();
+			if (hpObserver)
+			{
+				hpObserver->m_entity = this;
+			}
 		}
 
 		m_HPbar = GameObject::Find("P1_HPBar");
@@ -202,6 +210,12 @@ void Player::Start()
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
 				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+			}
+
+			auto hpObserver = m_uiController->GetComponent<UIHPObserver>();
+			if (hpObserver)
+			{
+				hpObserver->m_entity = this;
 			}
 		}
 

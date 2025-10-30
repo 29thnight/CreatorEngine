@@ -19,6 +19,7 @@ tags:
   - Host
   - Target
   - Effect
+  - Boss
 layers:
   - Default
   - TransparentFX

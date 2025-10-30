@@ -2,6 +2,7 @@
 #include "InputManager.h"
 #include "GameManager.h"
 #include "GameInstance.h"
+#include "ImageComponent.h"
 #include "pch.h"
 
 void MenuKeyObserver::Start()
@@ -18,6 +19,16 @@ void MenuKeyObserver::Start()
 	{
 		m_menuCanvasObject->SetEnabled(false);
 	}
+
+	auto BossObj = GameObject::Find("Boss_edit");
+	if (BossObj)
+	{
+		m_menuImageComponent = GetComponent<ImageComponent>();
+		if (m_menuImageComponent)
+		{
+			m_menuImageComponent->SetTexture(1); //각각 반대되는 케릭터의 텍스처로 설정
+		}
+	}
 }
 
 void MenuKeyObserver::Update(float tick)
@@ -31,20 +42,6 @@ void MenuKeyObserver::Update(float tick)
 
 		GameInstance::GetInstance()->PauseGame();
 		m_menuCanvasObject->SetEnabled(true);
-
-		//GameInstance::GetInstance()->m_isIngameMenuOpen = !GameInstance::GetInstance()->m_isIngameMenuOpen;
-		//if (!m_menuCanvasObject) return;
-
-		//if(!GameInstance::GetInstance()->m_isIngameMenuOpen)
-		//{
-		//	GameInstance::GetInstance()->PauseGame();
-		//	m_menuCanvasObject->SetEnabled(true);
-		//}
-		//else
-		//{
-		//	GameInstance::GetInstance()->ResumeGame();
-		//	m_menuCanvasObject->SetEnabled(false);
-		//}
 		m_elapsedTime = 0.f;
 	}
 }

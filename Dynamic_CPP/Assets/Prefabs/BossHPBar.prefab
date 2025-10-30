@@ -1,0 +1,112 @@
+m_name: BossHPBar
+m_instanceID: 27261895
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: BossHPBar
+    m_instanceID: 4067269559
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_parentID: 152
+    m_index: 323
+    m_parentIndex: 152
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [324]
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RectTransformComponent: 3002078429
+        m_name: RectTransformComponent
+        m_instanceID: 843012073
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_anchorMin: {x: 0.5, y: 0.5}
+        m_anchorMax: {x: 0.5, y: 0.5}
+        m_anchoredPosition: {x: 960, y: 121}
+        m_sizeDelta: {x: 850, y: 36}
+        m_pivot: {x: 0.5, y: 0.5}
+        m_worldRect: {x: 535, y: 103, width: 850, height: 36}
+      - ImageComponent: 1187169862
+        m_name: ImageComponent
+        m_instanceID: 2937144699
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        _layerorder: 0
+        uiEffects: 0
+        m_ownerCanvasName: Canvas
+        navigations: ~
+        m_customPixelShaderPath: ""
+        texturePaths: [boss_bar.png]
+        color: {r: 1, g: 1, b: 1, a: 1}
+        curindex: 0
+        rotate: 0
+        origin: {x: 425, y: 18}
+        unionScale: 1
+        clipPercent: 1
+        clipDirection: 0
+      - ModuleBehavior: 1399118904
+        m_name: BossHPBar
+        m_instanceID: 2757032074
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: cd25e130-c97d-5381-9027-d4c9b6c7a5d1
+    m_gameObjectType: 5
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: boss_bar_G
+        m_instanceID: 3839737361
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 323
+        m_index: 324
+        m_parentIndex: 323
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 1683678672
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 0, y: 0}
+            m_sizeDelta: {x: 850, y: 36}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 535, y: 103, width: 850, height: 36}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 3607832805
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: Canvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            texturePaths: [boss_bar_G.png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 425, y: 18}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 1
+        m_gameObjectType: 5
+        m_isStatic: false
