@@ -67,8 +67,10 @@ PixelOutput main(PixelInput input)
     
     
     float smoothDissolve = smoothstep(normalizedAge - 0.03, normalizedAge, diffuseColor.g);
+    //float emissive = smoothstep(normalizedAge + 0.03, normalizedAge, diffuseColor.g);
+    //float3 eColor = emissive * hueColor;
     
-    float3 finalColor = input.color.rgb * diffuseColor.rgb;
+    float3 finalColor = input.color.rgb * diffuseColor.rgb;// + eColor;
     
     float finalAlpha = input.alpha * originDif.r * s; // * smoothDissolve;
     
