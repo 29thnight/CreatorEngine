@@ -192,6 +192,8 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("BGMAmbienceController", []() { return new BGMAmbienceController(); });
+		CreateFactory::GetInstance()->RegisterFactory("BGMChangeTrigger", []() { return new BGMChangeTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("PortalTrigger", []() { return new PortalTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("ClearPortal", []() { return new ClearPortal(); });
 		CreateFactory::GetInstance()->RegisterFactory("ExitPauseButton", []() { return new ExitPauseButton(); });

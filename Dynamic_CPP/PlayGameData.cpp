@@ -118,6 +118,8 @@ void PlayGameData::LoadPlayerData(int _playerIndex)
 		}
 
 	}
+
+	Initialize();
 }
 
 void PlayGameData::SaveAsisData(EntityAsis* asis)

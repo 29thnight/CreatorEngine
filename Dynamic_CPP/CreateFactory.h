@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "BGMAmbienceController.h"
+#include "BGMChangeTrigger.h"
 #include "PortalTrigger.h"
 #include "ClearPortal.h"
 #include "ExitPauseButton.h"
