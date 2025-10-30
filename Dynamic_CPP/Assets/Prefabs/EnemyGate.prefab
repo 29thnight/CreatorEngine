@@ -1,11 +1,11 @@
 m_name: EnemyGate
-m_instanceID: 1700747289
+m_instanceID: 296951538
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: EnemyGate
-    m_instanceID: 2801552940
+    m_instanceID: 2524143747
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -24,7 +24,7 @@ PrefabNode:
     m_components:
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
-        m_instanceID: 1311949019
+        m_instanceID: 1224294204
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 2
@@ -40,7 +40,7 @@ PrefabNode:
         m_collisionEnabled: true
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
-        m_instanceID: 4187402625
+        m_instanceID: 3213475797
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 2.79999995, y: 5.30000019, z: 0.800000012}
@@ -49,7 +49,7 @@ PrefabNode:
       - ModuleBehavior: 1399118904
         maxHP: 200
         m_name: EntityMonsterBaseGate
-        m_instanceID: 2012456251
+        m_instanceID: 1202762669
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 57e346f4-474f-5eaa-a7e9-906fca4c026c
@@ -58,7 +58,7 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: Gate
-        m_instanceID: 3785474299
+        m_instanceID: 2627582346
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
@@ -77,7 +77,7 @@ PrefabNode:
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 875896516
+            m_instanceID: 1569782147
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
@@ -117,7 +117,7 @@ PrefabNode:
         m_isStatic: false
       - GameObject: 2166264123
         m_name: gate_B
-        m_instanceID: 2373162349
+        m_instanceID: 210453983
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
@@ -136,7 +136,7 @@ PrefabNode:
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 1980561882
+            m_instanceID: 3334589696
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
@@ -176,11 +176,11 @@ PrefabNode:
         m_isStatic: false
       - GameObject: 2166264123
         m_name: BarrierEffect
-        m_instanceID: 3020380614
+        m_instanceID: 364644852
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
-          position: {x: 0, y: 2.44279408, z: -0.194675595, w: 1}
+          position: {x: 0, y: 2.44279408, z: -0.590805531, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 3
@@ -195,7 +195,7 @@ PrefabNode:
         m_components:
           - EffectComponent: 3131036541
             m_name: EffectComponent
-            m_instanceID: 2704215939
+            m_instanceID: 3385512633
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_effectTemplateName: barrier
@@ -205,7 +205,7 @@ PrefabNode:
             m_isPaused: false
             m_loop: true
             m_useAbsolutePosition: false
-            m_currentTime: 3.37422991
-            m_effectInstanceName: barrier_obj3020380614
+            m_currentTime: 19.573
+            m_effectInstanceName: barrier_obj364644852
         m_gameObjectType: 0
         m_isStatic: false

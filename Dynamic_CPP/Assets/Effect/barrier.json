@@ -1,6 +1,6 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "emitterTimings": [
         0.0,
         0.0,
@@ -8,7 +8,7 @@
     ],
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
+    "loop": true,
     "name": "barrier",
     "particleSystems": [
         {
@@ -185,11 +185,6 @@
                                 "hasTexture": true,
                                 "name": "Smoke21",
                                 "slot": 1
-                            },
-                            {
-                                "hasTexture": true,
-                                "name": "HUE",
-                                "slot": 2
                             }
                         ]
                     },
@@ -410,11 +405,6 @@
                                 "hasTexture": true,
                                 "name": "Smoke21",
                                 "slot": 1
-                            },
-                            {
-                                "hasTexture": true,
-                                "name": "HUE",
-                                "slot": 2
                             }
                         ]
                     },
@@ -601,11 +591,6 @@
                                 "hasTexture": true,
                                 "name": "Tex_fx_HCFX_Dust_01",
                                 "slot": 1
-                            },
-                            {
-                                "hasTexture": true,
-                                "name": "HUE",
-                                "slot": 2
                             }
                         ]
                     },
