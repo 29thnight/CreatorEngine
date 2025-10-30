@@ -22,6 +22,7 @@
 #include <ppl.h>
 #include "InputActionManager.h"
 #include "EngineBootstrap.h"
+#include "PakHelper.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -48,6 +49,7 @@ void GameBuilder::App::Finalize()
 {
 	m_main->Finalize();
 	m_deviceResources->ReportLiveDeviceObjects();
+	CleanupUnpackedGameAssets();
 }
 
 void GameBuilder::App::SetWindow(CoreWindow& coreWindow)

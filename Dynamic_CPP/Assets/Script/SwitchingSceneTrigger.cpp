@@ -80,6 +80,55 @@ void SwitchingSceneTrigger::SetAlphaAll(float a)
     if (m_switchingText) m_switchingText->SetAlpha(a);
 }
 
+void SwitchingSceneTrigger::SetupCutRangeForNextScene()
+{
+    // 한 번만 세팅
+    if (m_cutRangeReady) return;
+
+    int nextSceneType = m_gameManager ? m_gameManager->m_nextSceneIndex : -1;
+
+    int start = 0;
+    int end = 0;
+
+    // 보스 or 테스트 모드 → 3~7 (end=8)
+    if (nextSceneType == (int)SceneType::Boss || m_isTestBossStage)
+    {
+        start = 3;
+        end = 8;
+    }
+    else // 일반 스테이지 → 0~2 (end=3)
+    {
+        start = 0;
+        end = 3;
+    }
+
+    // 이미지 개수에 맞춰 클램프
+    const int N = static_cast<int>(m_cutImages.size());
+    start = std::clamp(start, 0, N);
+    end = std::clamp(end, start, N); // end >= start && end <= N
+
+    m_cutStart = start;
+    m_cutEndExclusive = end;
+    m_cutCursor = m_cutStart;
+    m_cutRangeReady = true;
+
+    // WaitingInput에 들어오자마자 첫 컷을 자동으로 보여주고 싶으면:
+    if (m_cutCursor < m_cutEndExclusive)
+    {
+        ShowCut(m_cutCursor);
+        ++m_cutCursor;
+    }
+
+    // 자동 진행 타이머 초기화
+    m_autoTimer = 0.f;
+}
+
+void SwitchingSceneTrigger::ShowCut(int idx)
+{
+    if (idx >= 0 && idx < static_cast<int>(m_cutImages.size()) && m_cutImages[idx])
+        m_cutImages[idx]->SetEnabled(true);
+}
+
 void SwitchingSceneTrigger::Update(float tick)
 {
     if (!m_buttonText || !m_switchingText) return;
@@ -115,53 +164,76 @@ void SwitchingSceneTrigger::Update(float tick)
         if (t >= 1.f) {
             m_phase = SwitchPhase::WaitingInput;
             m_timer = 0.f;
+            SetupCutRangeForNextScene();
         }
         break;
     }
 
-    case SwitchPhase::WaitingInput: {
-        // 연출: 버튼 텍스트에만 살짝 펄스 주고 싶다면(선택)
-        // float pulse = 0.85f + 0.15f * std::sin(totalTime * 6.283f * 1.0f);
-        // m_buttonText->SetAlpha(pulse);
-
-        if (IsAnyAJustPressed()) 
+    case SwitchPhase::WaitingInput:
+    {
+        // 수동 입력: 즉시 다음 컷
+        if (IsAnyAJustPressed())
         {
-            int nextSceneType = m_gameManager->m_nextSceneIndex;
-            if (nextSceneType == (int)SceneType::Tutorial)
+            int nextSceneType = m_gameManager ? m_gameManager->m_nextSceneIndex : -1;
+            const bool hasCutscene =
+                (nextSceneType == (int)SceneType::Boss) ||
+                (nextSceneType == (int)SceneType::Stage) ||
+                m_isTestMode;
+
+            if (!hasCutscene)
             {
+                // 컷신 없음: 자동으로 바로 페이드아웃
                 m_phase = SwitchPhase::FadingOut;
                 m_timer = 0.f;
+                break;
+            }
+
+            if (m_cutCursor < m_cutEndExclusive)
+            {
+                ShowCut(m_cutCursor);
+                ++m_cutCursor;
+                m_autoTimer = 0.f; // 수동 시 타이머 리셋
             }
             else
             {
-                if (0 == m_cutsceneIndex)
-                {
-                    constexpr int BOSS_CUT_SCENE_INDEX = 3;
-                    if(nextSceneType == (int)SceneType::Boss || m_isTestMode)
-                    {
-                        m_cutsceneIndex = BOSS_CUT_SCENE_INDEX;
-                        m_maxCutsceneIndex = 8;
-                    }
-                    else
-                    {
-                        m_maxCutsceneIndex = 3;
-                    }
-                }
+                // 이미 마지막 컷까지 끝난 상태 → 페이드아웃
+                m_phase = SwitchPhase::FadingOut;
+                m_timer = 0.f;
+                break;
+            }
+        }
+        else // 자동 재생
+        {
+            int nextSceneType = m_gameManager ? m_gameManager->m_nextSceneIndex : -1;
+            const bool hasCutscene =
+                (nextSceneType == (int)SceneType::Boss) ||
+                (nextSceneType == (int)SceneType::Stage) ||
+                m_isTestMode;
 
-                if (m_maxCutsceneIndex > m_cutsceneIndex)
+            if (hasCutscene)
+            {
+                if (m_cutCursor < m_cutEndExclusive)
                 {
-                    if (m_cutImages[m_cutsceneIndex]);
+                    m_autoTimer += tick;
+                    if (m_autoTimer >= m_autoPlayDelay)
                     {
-                        m_cutImages[m_cutsceneIndex++]->SetEnabled(true);
+                        m_autoTimer = 0.f;
+                        ShowCut(m_cutCursor);
+                        ++m_cutCursor;
                     }
                 }
                 else
                 {
-                    m_phase = SwitchPhase::FadingOut;
-                    m_timer = 0.f;
+                    // 마지막 컷 도달
+                    if (!m_waitAtLastCut)
+                    {
+                        // 자동으로 바로 넘어가고 싶다면:
+                        m_phase = SwitchPhase::FadingOut;
+                        m_timer = 0.f;
+                    }
+                    // else: 입력을 기다림 (아무 것도 하지 않음)
                 }
             }
-            // 즉시 깜빡임 방지로 현재 알파를 고정해도 됨
         }
         break;
     }
