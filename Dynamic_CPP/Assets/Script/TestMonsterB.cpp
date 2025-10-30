@@ -500,6 +500,7 @@ void TestMonsterB::AttackBoxOff()
 
 void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (isDead) return;
 	Entity::SendDamage(sender, damage, hitinfo);
 
 	if (sender)

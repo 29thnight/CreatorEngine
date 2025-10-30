@@ -68,6 +68,7 @@ void EntityResource::Update(float tick)
 }
 void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (m_currentHP <= 0) return;
 	//LOG("EntityResource Attack");
 	if (sender)
 	{

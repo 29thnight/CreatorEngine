@@ -526,6 +526,7 @@ void EntityMonsterA::RotateToTarget()
 
 void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (isDead) return;
 	Entity::SendDamage(sender, damage, hitinfo);
 
 	if (sender)
