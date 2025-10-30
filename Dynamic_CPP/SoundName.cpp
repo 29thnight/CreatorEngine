@@ -103,13 +103,20 @@ void SoundNames::LoadSoundNameFromCSV()
 			soundTag.pop_back();
 		std::vector<std::string> sounds;
 		
-		for (int i = 1; i < row.GetSize(); ++i)
+		try
 		{
-			std::string cell = row[i].as<std::string>();
-			if (!cell.empty() && cell.back() == '\0')
-				cell.pop_back();
-			if (cell.empty()) continue;
-			sounds.push_back(cell);
+			for (int i = 1; i < row.GetSize(); ++i)
+			{
+				std::string cell = row[i].as<std::string>();
+				if (!cell.empty() && cell.back() == '\0')
+					cell.pop_back();
+				if (cell.empty()) continue;
+				sounds.push_back(cell);
+			}
+		}
+		catch(...)
+		{
+
 		}
 
 

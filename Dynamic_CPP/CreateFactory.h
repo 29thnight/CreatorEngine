@@ -5,6 +5,8 @@
 // Automation include ScriptClass header
 #include "SceneTag.h"
 #include "BossHPBar.h"
+#include "BGMAmbienceController.h"
+#include "BGMChangeTrigger.h"
 #include "PortalTrigger.h"
 #include "ClearPortal.h"
 #include "ExitPauseButton.h"

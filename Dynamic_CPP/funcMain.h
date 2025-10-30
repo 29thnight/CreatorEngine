@@ -194,6 +194,8 @@ extern "C"
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("SceneTag", []() { return new SceneTag(); });
 		CreateFactory::GetInstance()->RegisterFactory("BossHPBar", []() { return new BossHPBar(); });
+		CreateFactory::GetInstance()->RegisterFactory("BGMAmbienceController", []() { return new BGMAmbienceController(); });
+		CreateFactory::GetInstance()->RegisterFactory("BGMChangeTrigger", []() { return new BGMChangeTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("PortalTrigger", []() { return new PortalTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("ClearPortal", []() { return new ClearPortal(); });
 		CreateFactory::GetInstance()->RegisterFactory("ExitPauseButton", []() { return new ExitPauseButton(); });

@@ -17,6 +17,7 @@ ReflectionScriptField(EntityBigWood) \
 		meta_property(m_rewardUpAngle) \
 		meta_property(m_minRewardUpForce) \
 		meta_property(m_maxRewardUpForce) \
+		meta_property(reward) \
 	}); \
 	FieldEnd(EntityBigWood, PropertyOnly) \
 };

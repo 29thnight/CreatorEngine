@@ -139,6 +139,17 @@ void GameManager::Update(float tick)
 	}
 }
 
+void GameManager::LateUpdate(float tick)
+{
+	if (isDataLoaded == false)
+	{
+		isDataLoaded = true;
+		LoadPlayerData();
+	}
+}
+
+
+
 void GameManager::OnDisable()
 {
 	LOG("GameManager OnDisable");
@@ -525,6 +536,39 @@ void GameManager::AddReward(int amount)
 int GameManager::GetReward()
 {
 	return GameInstance::GetInstance()->GetRewardAmount();
+}
+
+void GameManager::SavePlayerData()
+{
+	if (m_players.size() < 2) return;
+	auto data = GameInstance::GetInstance()->GetPlayData();
+
+	for(int i=0; i < 2; ++i)
+	{
+		Player* player = dynamic_cast<Player*>(m_players[i]);
+
+		if (player)
+		{
+			data->SavePlayerData(player);
+		}
+	}
+	
+}
+
+void GameManager::LoadPlayerData()
+{
+	if (m_players.size() < 2) return;
+	auto data = GameInstance::GetInstance()->GetPlayData();
+
+	for (int i = 0; i < 2; ++i)
+	{
+		Player* player = dynamic_cast<Player*>(m_players[i]);
+
+		if (player)
+		{
+			data->LoadPlayerData(player->playerIndex);
+		}
+	}
 }
 
 void GameManager::BossClear()

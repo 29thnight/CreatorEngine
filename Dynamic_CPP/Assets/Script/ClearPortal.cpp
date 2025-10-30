@@ -71,6 +71,7 @@ void ClearPortal::SwitchScene()
 		m_gameManager->m_nextSceneIndex = (int)SceneType::Stage;
 		break;
 	case SceneType::Stage:
+		m_gameManager->SavePlayerData();
 		m_gameManager->m_nextSceneIndex = (int)SceneType::Boss;
 		break;
 	default:

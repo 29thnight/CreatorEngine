@@ -47,6 +47,8 @@ public:
 
 	Mathf::Vector3 SpawnArea{};
 	bool triggerOnce = true;
+	[[Property]]
+	bool OnlyAsis = false; //아시스에만 반응하는거면
 private:
 	double radical_inverse_base2(unsigned int n);
 	Mathf::Vector3 UniformRandomUpdirection(float angle, int curindex, int maxCount);
