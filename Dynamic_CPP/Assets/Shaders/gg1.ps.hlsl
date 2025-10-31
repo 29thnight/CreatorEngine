@@ -48,13 +48,11 @@ PixelOutput main(PixelInput input)
     PixelOutput output;
     
     float normalizedAge = input.particleAge / input.particleLifeTime;
-    
+
     // UV 애니메이션 계산
     float2 dissolveUV = input.texCoord * float2(3.0, 6.0);
     float2 tempUV = input.texCoord;
 
-    // 0이 왼쪽 1이 오른쪽
-    
     if (frameCount == 1)
     {
         dissolveUV.x += gTime * 3;
@@ -65,9 +63,9 @@ PixelOutput main(PixelInput input)
         dissolveUV.x -= gTime * 3;
         tempUV.x -= gTime;
     }
-
+  
     float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
-
+    
     // 텍스처 샘플링
     float4 smokeColor = gSmokeTexture.Sample(gLinearSampler, tempUV);
     float4 emissionColor = gEmissionTexture.Sample(gLinearSampler, input.texCoord);
@@ -97,7 +95,7 @@ PixelOutput main(PixelInput input)
     {
         xDissolve = 1 - input.texCoord.x;
     }
-
+    
     float dissolveSpeed = 1.5;
     float xDissolveThreshold = lerp(0.0, 1.0, saturate(normalizedAge * dissolveSpeed));
     
@@ -107,13 +105,13 @@ PixelOutput main(PixelInput input)
     float dissolveAlpha = smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve);
 
     float3 baseColor = adjustedSmoke * smokeColor.rgb;
-    float3 finalColor = pow(baseColor + ((emissionColor.rgb * adjustedSmoke) * emissionStrength * remappedEmission), 2);
+    float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);
     
     float finalAlpha = input.alpha * smokeColor.a * dissolveAlpha * dissolveValue;
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
-    float brightnessMask = smoothstep(0.03, 0.12, colorBrightness);
-    finalAlpha = finalAlpha * brightnessMask * smoothstep(0.03, 0.12, emissionColor.r); // 기존 알파와 곱하기
+    float brightnessMask = smoothstep(0.1, 1, colorBrightness);
+    finalAlpha = finalAlpha * brightnessMask * smoothstep(0.1, 1, emissionColor.r); // 기존 알파와 곱하기
     
     clip(finalAlpha - 0.05); // 최종 알파로 클립
     
