@@ -110,6 +110,7 @@ private:
 	float daegiTime = 4.0f;     //일단 연출없어서 4초대기후 다음씬
 	bool isClearSwitching = false;	
 private:
+	void CheatSceneEvent();
 	void CheatMiningResource();
 
 	struct PlayerBaseSnapshot {

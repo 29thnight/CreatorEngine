@@ -77,6 +77,10 @@ void GameManager::Update(float tick)
 	static float rewardTimer = 0.f;
 	rewardTimer += tick;
 
+	//ÀÓÀÇ ¾ÀÀüÈ¯
+	CheatSceneEvent();
+	
+
 
 	CheckClear(tick);
 	
@@ -503,6 +507,40 @@ void GameManager::PushControllerVibration(ControllerVibration* _ControllerVibrat
 ControllerVibration* GameManager::GetControllerVibration()
 {
 	return ControllerVibrationData;
+}
+
+void GameManager::CheatSceneEvent()
+{
+
+	if (m_isSwitching) {
+		SwitchNextScene();
+	}
+	else
+	{
+		if (InputManagement->IsKeyDown(KeyBoard::F1)) {
+			m_nextSceneIndex = (int)SceneType::Tutorial;
+			m_isLoadingReq = true;
+			LoadNextScene();
+			m_isSwitching = true;
+		}
+
+		if (InputManagement->IsKeyDown(KeyBoard::F2)) {
+			m_nextSceneIndex = (int)SceneType::Stage;
+			m_isLoadingReq = true;
+			LoadNextScene();
+			m_isSwitching = true;
+		}
+
+		if (InputManagement->IsKeyDown(KeyBoard::F3)) {
+			m_nextSceneIndex = (int)SceneType::Boss;
+			m_isLoadingReq = true;
+			LoadNextScene();
+			m_isSwitching = true;
+		}
+	}
+		
+	
+	
 }
 
 void GameManager::CheatMiningResource()
