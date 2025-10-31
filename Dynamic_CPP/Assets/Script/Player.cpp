@@ -1935,6 +1935,63 @@ void Player::MeleeAttack()
 	}
 }
 
+void Player::MeleeAttackOnce(float degAngleRange, float degIntervalAngle)
+{
+	Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+	rayOrigin.y += 0.5f;
+
+	float distacne = 2.0f;
+	if (m_curWeapon)
+	{
+		distacne = m_curWeapon->itemAckRange;
+	}
+	if (isChargeAttack)
+		distacne = m_curWeapon->chgRange;
+	float damage = calculDamge(isChargeAttack);
+
+	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10 | 1 << 14;
+
+	float startAngle = -degAngleRange / 2.0f;
+	int rayCount = static_cast<int>(degAngleRange / degIntervalAngle) + 1;
+
+	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	std::vector<HitResult> hits;
+	hits.reserve(100);
+	for (int i = 0; i < rayCount; i++) {
+		std::vector<HitResult> tempHits;
+		float angle = XMConvertToRadians(startAngle + i * degIntervalAngle);
+		Vector3 dir = Vector3::Transform(forward, Matrix::CreateRotationY(-angle));
+		dir.Normalize();
+		int leftSize = RaycastAll(rayOrigin, dir, distacne, layerMask, tempHits);
+		hits.insert(hits.end(), tempHits.begin(), tempHits.end());
+	}
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == nullptr || object == GetOwner()) continue;
+		auto entity = object->GetComponentDynamicCast<Entity>();
+		if (entity) {
+			auto [iter, inserted] = AttackTarget.insert(entity);
+			HitInfo hitinfo;
+			hitinfo.itemType = m_curWeapon->itemType;
+			hitinfo.hitPos = hit.point;
+			hitinfo.attakerPos = rayOrigin;
+			hitinfo.hitNormal = hit.normal;
+			hitinfo.KnockbackForce = { m_curWeapon->itemKnockback ,0,m_curWeapon->itemKnockback };
+			if (inserted) (*iter)->SendDamage(this, damage, hitinfo);
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MeleeStrikeSound"));
+				}
+			}
+			entity->SetStagger(0.5f);
+		}
+	}
+}
+
 void Player::MeleeChargeAttack()
 {
 	if (!GM || GM->GetObjectPoolManager() == nullptr) return;
