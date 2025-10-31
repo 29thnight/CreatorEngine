@@ -658,6 +658,11 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		//auto enemy = dynamic_cast<EntityEnemy*>(sender);
 		// hit
 		//DropCatchItem();
+		if (m_DamageSound)
+		{
+			m_DamageSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerHit");
+			m_DamageSound->PlayOneShot();
+		}
 
 		Damage(damage);
 		if (nullptr != dynamic_cast<EntityEleteMonster*>(sender) && isStun == false) //엘리트고 아직 죽지않았으면
@@ -748,14 +753,6 @@ void Player::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			}
 		}
 
-
-
-
-		if (m_DamageSound)
-		{
-			m_DamageSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerHit");
-			m_DamageSound->PlayOneShot();
-		}
 		SetInvincibility(HitGracePeriodTime);
 	}
 }
@@ -810,6 +807,12 @@ void Player::Damage(int damage)
 		m_currentHP = 0;
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
+
+		if (m_DamageSound)
+		{
+			m_DamageSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerStun");
+			m_DamageSound->PlayOneShot();
+		}
 	}
 	if (m_HPbar)
 	{
@@ -908,6 +911,34 @@ void Player::Catch()
 			catchedObject = item;
 			catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 			catchedObject->SetThrowOwner(this);
+
+
+			switch (item->itemType)
+			{
+			case EItemType::Mineral:
+				if (m_ActionSound)
+				{
+					m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerGrabMetal");
+					m_ActionSound->PlayOneShot();
+				}
+				break;
+			case EItemType::Mushroom:
+				if (m_ActionSound)
+				{
+					m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerGrabMush");
+					m_ActionSound->PlayOneShot();
+				}
+				break;
+			case EItemType::Fruit:
+				if (m_ActionSound)
+				{
+					m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerGrabFruit");
+					m_ActionSound->PlayOneShot();
+				}
+				break;
+			default:
+				break;
+			}
 		}
 
 
@@ -1129,7 +1160,7 @@ void Player::Charging()
 		}
 		if (m_SpecialActionSound)
 		{
-				m_SpecialActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ChargingSound");
+				m_SpecialActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponChargeKeyhold");
 				m_SpecialActionSound->PlayOneShot();
 		}
 	}
@@ -1287,7 +1318,7 @@ void Player::PlaySlashEvent()
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Slash1");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponMelee1");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1328,7 +1359,7 @@ void Player::PlaySlashEvent2()
 		Slashscript->Initialize();
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Slash2");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponMelee2");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1356,7 +1387,7 @@ void Player::PlaySlashEvent3()
 		Slashscript->Initialize();
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Slash3");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponMelee3");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1398,6 +1429,11 @@ void Player::Resurrection()
 	{
 		OnresurrectionEffect = true;
 		resurrectionEffect->Apply();
+		if (m_SpecialActionSound)
+		{
+			m_SpecialActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerResurrection");
+			m_SpecialActionSound->PlayOneShot();
+		}
 	}
 }
 
@@ -1533,7 +1569,7 @@ void Player::SwapWeaponInternal(int dir)
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponSwapSounds");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerSlotchange");
 			m_ActionSound->PlayOneShot();
 		}
 
@@ -2238,6 +2274,25 @@ void Player::OnTriggerEnter(const Collision& collision)
 	{
 		Heal(healItem->GetHealAmount());
 		healItem->Use();
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerGrabFlower"));
+			}
+		}
+
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerHeal"));
+			}
+		}
+
+
 	}
 	
 

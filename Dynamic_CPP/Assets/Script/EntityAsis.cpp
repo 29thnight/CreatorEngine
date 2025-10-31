@@ -23,6 +23,7 @@
 #include "EntityMonsterBaseGate.h"
 #include "EntityMonsterTower.h"
 #include "EventManager.h"
+#include "SoundComponent.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -68,16 +69,9 @@ void EntityAsis::Start()
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
-	//m_asismove = GetOwner()->GetComponent<AsisMove>();
 
-	/*auto fakeObjects = GameObject::Find("fake");
-	if (fakeObjects) {
-		for (auto& index : fakeObjects->m_childrenIndices) {
-			auto object = GameObject::FindIndex(index);
-			m_fakeItemQueue.push_back(object);
-		}
-	}*/
-
+	std::string ActionSoundName = "PlayerActionSound";
+	std::string SpecialActionSound = "PlayerSpecialActionSound";
 
 	auto childred = GetOwner()->m_childrenIndices;
 	for (auto& child : childred)
@@ -89,15 +83,30 @@ void EntityAsis::Start()
 			m_animator = animator;
 			break;
 		}
-
 	}
 	if (!m_animator)
 	{
 		m_animator = GetOwner()->GetComponent<Animator>();
 	}
 
+	for (auto& child : childred)
+	{
+		GameObject* childObj = GameObject::FindIndex(child);
+		if (childObj)
+		{
+			
+			if (childObj->m_tag == ActionSoundName)
+			{
+				m_ActionSound = childObj->GetComponent<SoundComponent>();
+			}
+			
+			else if (childObj->m_tag == SpecialActionSound)
+			{
+				m_EmoteSound = childObj->GetComponent<SoundComponent>();
 
-
+			}
+		}
+	}
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 
@@ -244,6 +253,12 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		return;
 	}
 
+
+	if (m_ActionSound)
+	{
+		m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriHit");
+		m_ActionSound->PlayOneShot();
+	}
 	m_currentHP -= damage;
 	m_currentStaggerDuration = staggerDuration; // 경직
 	m_currentGracePeriod = graceperiod;			// 무적
@@ -252,6 +267,13 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	if(m_emoteSystem)
 	{
 		m_emoteSystem->PlaySick();
+
+
+		if (m_EmoteSound)
+		{
+			m_EmoteSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriReactionHurt");
+			m_EmoteSound->PlayOneShot();
+		}
 	}
 	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
 	bool isDroped = DropItem();
@@ -302,6 +324,14 @@ bool EntityAsis::AddItem(EntityItem* item)
 	m_currentEntityItemCount++;
 	item->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 
+	if (m_ActionSound)
+	{
+		m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriGetBlock");
+		m_ActionSound->PlayOneShot();
+	}
+
+
+
 	LOG("EntityAsis: Adding item at index " << m_currentEntityItemCount);
 	return true;
 }
@@ -344,6 +374,17 @@ void EntityAsis::Purification(float tick)
 			if (m_emoteSystem)
 			{
 				m_emoteSystem->PlaySmile();
+				if (m_EmoteSound)
+				{
+					m_EmoteSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriReactionSweet");
+					m_EmoteSound->PlayOneShot();
+				}
+			}
+
+			if (m_ActionSound)
+			{
+				m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriGiveWeapon");
+				m_ActionSound->PlayOneShot();
 			}
 
 			// 이부분은 아이템에 등록된 정화무기가 될것.
@@ -433,9 +474,24 @@ void EntityAsis::SetMove(bool move)
 void EntityAsis::Stun()
 {
 	// 스턴 이모트 재생
+
+
+	if (m_ActionSound)
+	{
+		m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriStun");
+		m_ActionSound->PlayOneShot();
+	}
+
 	if (m_emoteSystem)
 	{
 		m_emoteSystem->PlayStunned();
+		if (m_EmoteSound)
+		{
+			m_EmoteSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriStun");
+			m_EmoteSound->PlayOneShot();
+		}
+
+
 	}
 }
 
@@ -542,9 +598,20 @@ void EntityAsis::Resurrection()
 	Heal(ResurrectionHP);
 	isStun = false;
 	ResurrectionElapsedTime = 0;
+	if (m_ActionSound)
+	{
+		m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriResurrection");
+		m_ActionSound->PlayOneShot();
+	}
 	if (m_emoteSystem)
 	{
 		m_emoteSystem->PlayHappy();
+
+		if (m_EmoteSound)
+		{
+			m_EmoteSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriReactionHappy");
+			m_EmoteSound->PlayOneShot();
+		}
 	}
 }
 
