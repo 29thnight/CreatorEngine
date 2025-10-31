@@ -24,6 +24,9 @@
 #include "EntityMonsterTower.h"
 #include "EventManager.h"
 #include "SoundComponent.h"
+#include "TweenManager.h"
+#include "CameraMove.h"
+#include "EffectComponent.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -185,6 +188,7 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
+#ifdef _DEBUG
 	if (asisTail) {
 		Debug->Log(asisTail->m_name.data());
 	}
@@ -192,6 +196,12 @@ void EntityAsis::Update(float tick)
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
 		SendDamage(nullptr, 10);
 	}
+
+	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::B)) {
+		SetDead();
+	}
+#endif // _DEBUG
+
 	if(isStun)
 	{
 		if (CheckResurrectionByPlayer() == true)
@@ -649,4 +659,179 @@ void EntityAsis::AddPollutionGauge(int amount)
 bool EntityAsis::IsStun()
 {
 	return isStun;
+}
+
+void EntityAsis::SetDead()
+{
+	points.clear();
+	GameObject::Find("Main Camera")->GetComponent<CameraMove>()->StopCameraMoveFlag();
+	testPlayerAllDead = true;
+	currentPointIndex = 0;
+	moveSpeed *= 3.f;
+
+	// 아시스의 퇴각 경로 설정
+	Mathf::Vector3 asisPos = GetOwner()->m_transform.GetWorldPosition();
+	points.push_back(asisPos);
+	auto& players = m_gameManager->GetPlayers();
+	GameObject* p1 = players[0]->GetOwner();
+	GameObject* p2 = players[1]->GetOwner();
+	Mathf::Vector3 player1Pos = players[0]->GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 player2Pos = players[1]->GetOwner()->m_transform.GetWorldPosition();
+	float player1Dist = Mathf::Distance(player1Pos, asisPos);
+	float player2Dist = Mathf::Distance(player2Pos, asisPos);
+
+
+	// 아시스 퇴각 시 플레이어 캐리 위치 오프셋
+	auto t = std::make_shared<Tweener<float>>(
+		[=]() { return 0.f; },
+		[=](float val) {
+			GameObject* asis = this->GetOwner();
+			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
+			p1->m_transform.SetPosition(pos + carryPlayerOffset[0]);
+		},
+		1.f,
+		20.f,
+		[&](float t) {
+			return Easing::Linear(t);
+		}
+	);
+	auto t2 = std::make_shared<Tweener<float>>(
+		[=]() { return 0.f; },
+		[=](float val) {
+			GameObject* asis = this->GetOwner();
+			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
+			p2->m_transform.SetPosition(pos + carryPlayerOffset[1]);
+		},
+		1.f,
+		20.f,
+		[&](float t) {
+			return Easing::Linear(t);
+		}
+	);
+
+	// 플레이어 캐리 트윈
+	auto tween = std::make_shared<Tweener<float>>(
+		[=]() { return 0.f; },
+		[=](float val) {
+			GameObject* asis = this->GetOwner();
+			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
+			pos.x = Mathf::Lerp(player1Pos.x, pos.x + carryPlayerOffset[0].x, val);
+			pos.z = Mathf::Lerp(player1Pos.z, pos.z + carryPlayerOffset[0].y, val);
+			pos.y = Mathf::Lerp(player1Pos.y, pos.y + carryPlayerOffset[0].z, val) + std::sinf(val * Mathf::pi);
+			p1->m_transform.SetPosition(pos);
+
+			auto e = p1->GetComponent<Player>()->dashEffect;
+			e->m_effectTemplateName = "shield";
+			e->Apply();
+		},
+		1.f,
+		1.f,
+		[&](float t) { 
+			return Easing::Linear(t);
+		}
+	);
+	auto tween2 = std::make_shared<Tweener<float>>(
+		[=]() { return 0.f; },
+		[=](float val) {
+			GameObject* asis = this->GetOwner();
+			Mathf::Vector3 pos = asis->m_transform.GetWorldPosition();
+			pos.x = Mathf::Lerp(player2Pos.x, pos.x + carryPlayerOffset[1].x, val);
+			pos.z = Mathf::Lerp(player2Pos.z, pos.z + carryPlayerOffset[1].y, val);
+			pos.y = Mathf::Lerp(player2Pos.y, pos.y + carryPlayerOffset[1].z, val) + std::sinf(val * Mathf::pi);
+			p2->m_transform.SetPosition(pos);
+
+			auto e = p2->GetComponent<Player>()->dashEffect;
+			e->m_effectTemplateName = "shield";
+			e->Apply();
+		},
+		1.f,
+		1.f,
+		[&](float t) {
+			return Easing::Linear(t);
+		}
+	);
+	tween->Pause();
+	tween2->Pause();
+
+	// 퇴각 시 플레이어 캐리 시점 감지 트윈
+	auto detect = std::make_shared<Tweener<float>>(
+		[=]() { return 0.f; },
+		[=](float val) {
+			EntityAsis* asis = this;
+			int curIndex = asis->currentPointIndex;
+
+			if (curIndex == 1) {
+				// first
+				tween->Resume();
+			}
+			else if (curIndex == 2)
+			{
+				// second
+				tween2->Resume();
+			}
+		},
+		1.f,
+		20.f,
+		[&](float t) {
+			return Easing::Linear(t);
+		}
+	);
+	auto detect2 = std::make_shared<Tweener<float>>(
+		[=]() { return 0.f; },
+		[=](float val) {
+			EntityAsis* asis = this;
+			int curIndex = asis->currentPointIndex;
+
+			if (curIndex == 1) {
+				// second
+				tween2->Resume();
+			}
+			else if (curIndex == 2)
+			{
+				// first
+				tween->Resume();
+			}
+		},
+		1.f,
+		20.f,
+		[&](float t) {
+			return Easing::Linear(t);
+		}
+	);
+
+	auto tw = GameObject::Find("GameManager")->GetComponent<TweenManager>();
+
+	if (player1Dist < player2Dist) {
+		points.push_back(player1Pos);
+		points.push_back(player2Pos);
+
+		tween->SetOnComplete([=]() {
+			tw->AddTween(t);
+			});
+
+		tween2->SetOnComplete([=]() {
+			tw->AddTween(t2);
+			});
+
+		tw->AddTween(detect);
+		tw->AddTween(tween);
+		tw->AddTween(tween2);
+	}
+	else {
+		points.push_back(player2Pos);
+		points.push_back(player1Pos);
+
+		tween2->SetOnComplete([=]() {
+			tw->AddTween(t2);
+			});
+		tween->SetOnComplete([=]() {
+			tw->AddTween(t);
+			});
+
+		tw->AddTween(detect2);
+		tw->AddTween(tween2);
+		tw->AddTween(tween);
+	}
+
+	points.push_back(asisPos + Mathf::Vector3(-asisPos.x, 0.f, 0.f));
 }
