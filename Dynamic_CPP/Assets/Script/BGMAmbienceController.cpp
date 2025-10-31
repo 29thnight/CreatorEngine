@@ -13,13 +13,13 @@ void BGMAmbienceController::Start()
 	switch (curScene)
 	{
 	case SceneType::Stage:
-		curSoundName = sounds->GetSoudNameRandom("StageBGMAmbienc");
+		curSoundName = sounds->GetSoudNameRandom("AmbStage11");
 		break;
 	case SceneType::Tutorial:
-		curSoundName = sounds->GetSoudNameRandom("TutorialBGMAmbienc");
+		curSoundName = sounds->GetSoudNameRandom("AmbStage11");
 		break;
 	case SceneType::Boss:
-		curSoundName = sounds->GetSoudNameRandom("BossBGMAmbienc");
+		curSoundName = sounds->GetSoudNameRandom("AmbBoss");
 		break;
 	default:
 		curSoundName = sounds->GetSoudNameRandom("TestAmbienc");
