@@ -30,9 +30,10 @@ public:
 	[[Property]]
 	EItemType itemType = EItemType::Mushroom;
 	[[Property]]
-	int maxHP = 1;
+	int maxHP = 40;
 
-
+	void PlayHitSound();
+	void PlayDestorySound();
 
 private:
 	EffectComponent* m_effect = nullptr;

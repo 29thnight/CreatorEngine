@@ -15,6 +15,8 @@
 #include "PlayEffectAll.h"
 #include "Weapon.h"
 #include "EntityMonsterTower.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void TestMonsterB::Start()
 {
 	m_currentHP = maxHP;
@@ -140,6 +142,12 @@ void TestMonsterB::Start()
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
 	HitImpulseStart();
+
+	auto GMobj = GameObject::Find("GameManager");
+	if (GMobj)
+	{
+		GM = GMobj->GetComponent<GameManager>();
+	}
 }
 
 void TestMonsterB::Update(float tick)
@@ -373,6 +381,15 @@ void TestMonsterB::Dead()
 	if (asisScrip) {
 		asisScrip->AddPollutionGauge(m_enemyReward);
 	}
+
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon002Die"));
+		}
+	}
 }
 
 void TestMonsterB::ChaseTarget(float deltatime)
@@ -529,9 +546,17 @@ void TestMonsterB::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			hittimer = m_MaxknockBackTime;
 			hitPos = p;
 			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
+
 			PlayHitEffect(this->GetOwner(), hitinfo);
 
-
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon002Hit"));
+				}
+			}
 
 			//블랙보드에 데미지 저장
 			//blackBoard->SetValueAsInt("Damage", damage);
@@ -594,7 +619,14 @@ void TestMonsterB::ShootingAttack()
 
 		//Mathf::Quaternion startrot = Mathf::Quaternion::Identity;
 		//projectilePrefab->m_transform.SetRotation(startrot); //투척 이후 회전 효과 필요시 
-
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon002Attack"));
+			}
+		}
 		//투척 직적 타겟 위치와 최대 사거리에 따른 낙하 지점 고정
 		Mathf::Vector3 endpos;
 		Mathf::Vector3 targetpos = target->m_transform.GetWorldPosition();

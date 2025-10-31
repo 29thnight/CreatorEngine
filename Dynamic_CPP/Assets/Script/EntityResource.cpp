@@ -14,6 +14,7 @@
 #include "Weapon.h"
 #include "PlayEffectAll.h"
 #include "EventTarget.h"
+#include "SFXPoolManager.h"
 void EntityResource::Start()
 {
 
@@ -163,6 +164,9 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 					deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 					deadEffect->Initialize();
 				}
+
+
+				PlayDestorySound();
 				GetOwner()->Destroy();
 				/*auto pung = GameObject::Find("Pung2");
 				if (pung)
@@ -174,13 +178,91 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			}
 			else {
 				HitImpulse();
-
+				PlayHitSound();
 			}
 		}
 	}
 	else
 	{
 		LOG("EntityResource Attack sender is nullptr");
+	}
+}
+
+void EntityResource::PlayHitSound()
+{
+	auto GMobj = GameObject::Find("GameManager");
+	std::string soundName{};
+
+	switch (itemType)
+	{
+	case EItemType::Basic:
+		break;
+	case EItemType::Mushroom:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceMushroomHit");
+		break;
+	case EItemType::Mineral:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceGemHit");
+		break;
+	case EItemType::Fruit:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceFruitHit");
+		break;
+	case EItemType::Flower:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceFlowerHit");
+		break;
+	default:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceGemHit");
+		break;
+	}
+	if (GMobj)
+	{
+		GameManager* GM = GMobj->GetComponent<GameManager>();
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(soundName);
+			}
+		}
+	}
+}
+
+void EntityResource::PlayDestorySound()
+{
+	auto GMobj = GameObject::Find("GameManager");
+
+	std::string soundName{};
+	switch (itemType)
+	{
+	case EItemType::Basic:
+		break;
+	case EItemType::Mushroom:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceMushroomDestroy");
+		break;
+	case EItemType::Mineral:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceGemDestroy");
+		break;
+	case EItemType::Fruit:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceFruitDestroy");
+		break;
+	case EItemType::Flower:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceFlowerDestroy");
+		break;
+	default:
+		soundName = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceGemDestroy");
+		break;
+	}
+	if (GMobj)
+	{
+		GameManager* GM = GMobj->GetComponent<GameManager>();
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(soundName);
+			}
+		}
 	}
 }
 

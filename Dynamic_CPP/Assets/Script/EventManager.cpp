@@ -6,7 +6,8 @@
 #include "StringHelper.h"
 #include "SceneTag.h"
 #include "pch.h"
-
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 static bool HasColumn(const CSVReader::Row& row, const char* name)
 {
     try { (void)row[name]; return true; }
@@ -93,6 +94,16 @@ void EventManager::CompleteEvent(int id)
     auto& rt = m_runtime[id];
     rt.status = EventStatus::Completed;
 
+    GameManager* GM = nullptr;
+    GM = GetOwner()->GetComponent<GameManager>();
+    if (GM)
+    {
+        auto pool = GM->GetSFXPool();
+        if (pool)
+        {
+            pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MissionComplete"));
+        }
+    }
     // Auto advance if configured
     if (rt.def.advance == AdvancePolicy::AutoAdvance && rt.def.nextId != 0)
         StartEvent(rt.def.nextId);

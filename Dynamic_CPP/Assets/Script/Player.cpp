@@ -1609,7 +1609,7 @@ void Player::SwapBasicWeapon()
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("weaponSwapSounds");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerSlotchange");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -1681,13 +1681,7 @@ void Player::DeleteCurWeapon()
 	m_curWeapon->GetOwner()->Destroy();
 	if (it != m_weaponInventory.end())
 	{
-		if (m_curWeapon->itemType != ItemType::Bomb) //basic인건 위에서 검사하니까 붐이아닌지만 체크
-		{
-			m_SpecialActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponBreakSound");
-			m_SpecialActionSound->PlayOneShot();
-		}
-
-
+	
 		SwapBasicWeapon();
 		handSocket->DetachObject((*it)->GetOwner());
 		m_weaponInventory.erase(it);
@@ -1922,6 +1916,65 @@ void Player::MeleeAttack()
 			hitinfo.hitNormal = hit.normal;
 			hitinfo.KnockbackForce = { m_curWeapon->itemKnockback ,0,m_curWeapon->itemKnockback };
 			if (inserted) (*iter)->SendDamage(this, damage, hitinfo);
+			entity->SetStagger(0.5f);
+		}
+	}
+}
+
+void Player::Melee1()
+{
+	MeleeAttackOnce(180.f, 15.f);
+}
+
+void Player::Melee3()
+{
+	MeleeAttackOnce(360.f, 15.f);
+}
+
+void Player::MeleeAttackOnce(float degAngleRange, float degIntervalAngle)
+{
+	Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+	rayOrigin.y += 0.5f;
+
+	float distacne = 2.0f;
+	if (m_curWeapon)
+	{
+		distacne = m_curWeapon->itemAckRange;
+	}
+	if (isChargeAttack)
+		distacne = m_curWeapon->chgRange;
+	float damage = calculDamge(isChargeAttack);
+
+	unsigned int layerMask = 1 << 0 | 1 << 8 | 1 << 10 | 1 << 14;
+
+	float startAngle = -degAngleRange / 2.0f;
+	int rayCount = static_cast<int>(degAngleRange / degIntervalAngle) + 1;
+
+	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	std::vector<HitResult> hits;
+	hits.reserve(100);
+	for (int i = 0; i < rayCount; i++) {
+		std::vector<HitResult> tempHits;
+		float angle = XMConvertToRadians(startAngle + i * degIntervalAngle);
+		Vector3 dir = Vector3::Transform(forward, Matrix::CreateRotationY(-angle));
+		dir.Normalize();
+		int leftSize = RaycastAll(rayOrigin, dir, distacne, layerMask, tempHits);
+		hits.insert(hits.end(), tempHits.begin(), tempHits.end());
+	}
+	for (auto& hit : hits)
+	{
+		auto object = hit.gameObject;
+		if (object == nullptr || object == GetOwner()) continue;
+		auto entity = object->GetComponentDynamicCast<Entity>();
+		if (entity) {
+			auto [iter, inserted] = AttackTarget.insert(entity);
+			HitInfo hitinfo;
+			hitinfo.itemType = m_curWeapon->itemType;
+			hitinfo.hitPos = hit.point;
+			hitinfo.attakerPos = rayOrigin;
+			hitinfo.hitNormal = hit.normal;
+			hitinfo.KnockbackForce = { m_curWeapon->itemKnockback ,0,m_curWeapon->itemKnockback };
+			if (inserted) (*iter)->SendDamage(this, damage, hitinfo);
 			if (GM)
 			{
 				auto pool = GM->GetSFXPool();
@@ -1966,7 +2019,7 @@ void Player::MeleeChargeAttack()
 		}
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("MeleeChargeSound");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponMeleeCharge");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2137,7 +2190,7 @@ void Player::ShootNormalBullet()
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("NormalBulletSound");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponNormalBullet");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2173,7 +2226,7 @@ void Player::ShootSpecialBullet()
 		}
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("SpecialBulletSound");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponSpecialBullet");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2228,7 +2281,7 @@ void Player::ShootChargeBullet()
 
 		if (m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("RangeChargeSound");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponBulletCharge");
 			m_ActionSound->PlayOneShot();
 		}
 	}
@@ -2258,7 +2311,7 @@ void Player::ThrowBomb()
 		
 		if(m_ActionSound)
 		{
-			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ThrowBomb");
+			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponBombThrow");
 			m_ActionSound->PlayOneShot();
 		}
 	}

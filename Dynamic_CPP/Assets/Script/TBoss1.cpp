@@ -18,6 +18,7 @@
 #include "Weapon.h"
 #include "PlayEffectAll.h"
 #include "TimeSystem.h"
+#include "SFXPoolManager.h"
 void TBoss1::Start()
 {
 	BT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -166,7 +167,11 @@ void TBoss1::Start()
 		deadObj->SetEnabled(false);
 	}
 	HitImpulseStart();
-
+	auto GMobj = GameObject::Find("GameManager");
+	if (GMobj)
+	{
+		GM = GMobj->GetComponent<GameManager>();
+	}
 }
 
 void TBoss1::Update(float tick)
@@ -293,6 +298,15 @@ void TBoss1::ShootProjectile()
 	obj->SetEnabled(true);
 	script->Initialize(this, projectilePos, projectileDir, BP001Damage, BP001RadiusSize, BP001Delay, BP001Speed);
 	script->isAttackStart = true;
+
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossFireAttackShoot"));
+		}
+	}
 }
 
 
@@ -364,6 +378,14 @@ void TBoss1::SweepAttack()
 	isAttacked = true;
 	isIndicator = false;
 	lockAttack = false;
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBodyAttack"));
+		}
+	}
 	if (hitCount > 0)
 	{
 		for (const auto& hit : hitObjects)
@@ -384,6 +406,7 @@ void TBoss1::SweepAttack()
 				//hitInfo.bulletType
 				//hitInfo.itemType
 				entity->SendDamage(this, BP002Damage, hitInfo);
+
 			}
 			
 		}
@@ -851,6 +874,17 @@ void TBoss1::Update_BP0031(float tick)
 		}
 
 
+
+
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+			}
+		}
+
 		pattenIndex = index;
 		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
@@ -936,6 +970,14 @@ void TBoss1::Update_BP0032(float tick)
 			index++;
 		}
 
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+			}
+		}
 		pattenIndex = index;
 		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
@@ -1046,6 +1088,14 @@ void TBoss1::Update_BP0033(float tick)
 
 			index++;
 		}
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+			}
+		}
 		pattenIndex = index;
 		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
@@ -1130,6 +1180,14 @@ void TBoss1::Update_BP0034(float tick)
 			}
 		}
 		
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+			}
+		}
 		break;
 	}
 	case EPatternPhase::WaitForObjects:
@@ -1413,6 +1471,16 @@ void TBoss1::Burrow()
 		eff->Apply();
 		m_animator->SetParameter("BurrowTrigger", true);
 		m_rigid->SetColliderEnabled(false);
+
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundDown"));
+			}
+		}
+
 	}
 }
 
@@ -1431,6 +1499,15 @@ void TBoss1::Protrude()
 		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
 		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
+
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundUP"));
+			}
+		}
 	}
 
 	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
@@ -1753,6 +1830,16 @@ void TBoss1::Dead()
 {
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
+
+
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossDie"));
+		}
+	}
 }
 
 void TBoss1::DeadEvent()

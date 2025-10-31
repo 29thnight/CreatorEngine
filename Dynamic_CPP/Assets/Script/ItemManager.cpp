@@ -6,7 +6,7 @@
 #include "ItemUIIcon.h"
 #include "ItemUIPopup.h"
 #include "pch.h"
-
+#include "SFXPoolManager.h"
 void ItemManager::Start()
 {
 	itemSlots.fill(nullptr);
@@ -186,6 +186,18 @@ void ItemManager::BuyItem(int slotIndex)
 		//아이템 획득 처리
 		GameInstance::GetInstance()->ApplyItemEnhancement(info);
 		gameManager->ApplyGlobalEnhancementsToAllPlayers();
+
+		if (gameManager)
+		{
+			auto pool = gameManager->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("StorePurchaseItem"));
+			}
+		}
+
+
+
 		//아이템 슬롯 비우기
 		ClearItemSlot(slotIndex);
 	}

@@ -3,6 +3,8 @@
 #include "PlayEffectAll.h"
 #include "PrefabUtility.h"
 #include "SphereColliderComponent.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void MonsterProjectile::Start()
 {
 }
@@ -24,8 +26,6 @@ void MonsterProjectile::Update(float tick)
 
     Mathf::Vector3 currentPos = CalculateBezierPoint(t, m_startPos, m_controlPos, m_endPos);
     m_pOwner->m_transform.SetPosition(currentPos);
-
-    std::cout << "MonsterProjectile elapsedTime : " << t << "currentPos [ x: " << currentPos.x << " y: " << currentPos.y << " z: " << currentPos.z << std::endl;
 
     if (t >= 1.f)
     {
@@ -51,6 +51,24 @@ void MonsterProjectile::Update(float tick)
             testObj->GetComponent<SphereColliderComponent>()->SetRadius(m_radius);
         }
         
+
+        auto GMobj = GameObject::Find("GameManager");
+        if (GMobj)
+        {
+            GameManager* GM = GMobj->GetComponent<GameManager>();
+            if (GM)
+            {
+                auto pool = GM->GetSFXPool();
+                if (pool)
+                {
+                    pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon002AttackExplosion"));
+                }
+            }
+        }
+
+
+
+
         Prefab* PungPrefab = PrefabUtilitys->LoadPrefab("MonProjectileEffect");
         if (PungPrefab)
         {

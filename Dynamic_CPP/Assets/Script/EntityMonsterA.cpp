@@ -12,11 +12,11 @@
 #include "HPBar.h"
 #include "CriticalMark.h"
 #include "EntityAsis.h"
-
 #include "PlayEffectAll.h"
 #include "GameManager.h"
 #include "Weapon.h"
 #include "TimeSystem.h"
+#include "SFXPoolManager.h"
 void EntityMonsterA::Start()
 {
 	m_currentHP = maxHP;
@@ -111,7 +111,6 @@ void EntityMonsterA::Start()
 
 
 	GameObject* GMObj = GameObject::Find("GameManager");
-	GameManager* GM = nullptr;
 	if (GMObj)
 	{
 		 GM = GMObj->GetComponent<GameManager>();
@@ -352,13 +351,6 @@ void EntityMonsterA::Update(float tick)
 	}
 
 	HitImpulseUpdate(tick);
-
-	// test code start
-	if (InputManagement->IsKeyDown('M'))
-	{
-		GetOwner()->Destroy();
-	}
-	// test code end
 }
 
 void EntityMonsterA::SetStagger(float time)
@@ -375,6 +367,14 @@ void EntityMonsterA::AttackBoxOn()
 {
 	//std::cout << "EntityMonsterA AttackBoxOn" << std::endl;
 	isBoxAttack = true;
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon001Attack"));
+		}
+	}
 }
 
 void EntityMonsterA::AttackBoxOff()
@@ -476,6 +476,14 @@ void EntityMonsterA::Dead()
 {
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon001Die"));
+		}
+	}
 	//todo : Dead entity remove or disable
 	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();
 	if (asisScrip) {
@@ -556,17 +564,22 @@ void EntityMonsterA::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			hitPos = p;
 			m_animator->GetOwner()->m_transform.SetScale(hitBaseScale * m_knockBackScaleVelocity);
 			
-
-
-
 			//블랙보드에 데미지 저장
 			//blackBoard->SetValueAsInt("Damage", damage);
 			m_currentHP -= damage;
 			blackBoard->SetValueAsInt("CurrHP", m_currentHP);
+
+
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon001Hit"));
+				}
+			}
 			//std::cout << "EntityMonsterA SendDamage CurrHP : " << m_currentHP << std::endl;
 
-
-			
 			PlayHitEffect(this->GetOwner(), hitinfo);
 
 

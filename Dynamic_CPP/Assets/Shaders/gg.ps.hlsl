@@ -28,6 +28,13 @@ cbuffer TimeBuffer : register(b3)
     float3 gPadding;
 };
 
+cbuffer SpriteAnimationBuffer : register(b4)
+{
+    uint frameCount; // 총 프레임 수
+    float animationDuration;
+    uint2 gridSize; // 스프라이트 시트 격자 크기 (columns, rows)
+};
+
 Texture2D gDiffuseTexture : register(t0);
 Texture2D gEmissionTexture : register(t1);
 Texture2D gDissolveTexture : register(t2);
@@ -44,15 +51,26 @@ PixelOutput main(PixelInput input)
     
     // UV 애니메이션 계산
     float2 dissolveUV = input.texCoord * float2(3.0, 6.0);
-    dissolveUV.x += gTime;
+    float2 tempUV = input.texCoord;
+
+    // 0이 왼쪽 1이 오른쪽
     
+    if (frameCount == 1)
+    {
+        dissolveUV.x += gTime * 3;
+        tempUV.x += gTime;
+    }
+    else
+    {
+        dissolveUV.x -= gTime * 3;
+        tempUV.x -= gTime;
+    }
+
     float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
 
-    float2 tempUV = input.texCoord;
-    
     // 텍스처 샘플링
     float4 smokeColor = gSmokeTexture.Sample(gLinearSampler, tempUV);
-    float4 emissionColor = gEmissionTexture.Sample(gLinearSampler, tempUV);
+    float4 emissionColor = gEmissionTexture.Sample(gLinearSampler, input.texCoord);
     
     float dissolveValue = dissolveData.r;
     
@@ -69,12 +87,29 @@ PixelOutput main(PixelInput input)
 
     float f1 = 1 - smoothstep(0, 0.4, normalizedAge) + smoothstep(0.4, 1, normalizedAge);
 
-    float dissolveAlpha = smoothstep(f1 - 0.1, f1 + 0.1, dissolveValue);
-
-    float3 baseColor = adjustedSmoke;
-    float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);
+    float xDissolve;
     
-    float finalAlpha = input.alpha * smokeColor.a * dissolveAlpha;
+    if (frameCount == 1)
+    {
+        xDissolve = input.texCoord.x;
+    }
+    else
+    {
+        xDissolve = 1 - input.texCoord.x;
+    }
+
+    float dissolveSpeed = 1.5;
+    float xDissolveThreshold = lerp(0.0, 1.0, saturate(normalizedAge * dissolveSpeed));
+    
+    float combinedDissolve = dissolveValue + (1.0 - xDissolve);
+    float finalDissolveThreshold = f1 + xDissolveThreshold;
+    
+    float dissolveAlpha = smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve);
+
+    float3 baseColor = adjustedSmoke * smokeColor.rgb;
+    float3 finalColor = pow(baseColor + ((emissionColor.rgb * adjustedSmoke) * emissionStrength * remappedEmission), 2);
+    
+    float finalAlpha = input.alpha * smokeColor.a * dissolveAlpha * dissolveValue;
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
     float brightnessMask = smoothstep(0.03, 0.12, colorBrightness);

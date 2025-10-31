@@ -16,6 +16,7 @@
 #include "CriticalMark.h"
 #include "PlayEffectAll.h"
 #include "Weapon.h"
+#include "SFXPoolManager.h"
 struct Feeler {
 	float length;
 	DirectX::SimpleMath::Vector3 localDirection;
@@ -150,7 +151,11 @@ void EntityEleteMonster::Start()
 	blackBoard->SetValueAsFloat("RetreatRange", m_retreatRange);
 	blackBoard->SetValueAsFloat("TeleportDistance", m_teleportDistance);
 	blackBoard->SetValueAsFloat("TeleportCooldown", m_teleportCoolTime);
-
+	auto GMobj = GameObject::Find("GameManager");
+	if (GMobj)
+	{
+		GM = GMobj->GetComponent<GameManager>();
+	}
 	HitImpulseStart();
 }
 
@@ -403,6 +408,16 @@ void EntityEleteMonster::ShootingAttack()
 		m_projectileIndex++;
 		if (m_projectileIndex >= m_projectiles.size()) {
 			m_projectileIndex = 0;
+		}
+
+
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon003Attack"));
+			}
 		}
 	}
 }
@@ -704,6 +719,16 @@ void EntityEleteMonster::StartTeleport()
 		m_isTeleport = true;
 		m_teleportTimer = m_teleportDelay;
 
+
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon003Teleport"));
+			}
+		}
+
 		// TODO:이펙트 시작 telport 사라지는 이펙트
 		Prefab* tpStart = PrefabUtilitys->LoadPrefab("TPstartEffect");
 		if (tpStart) {
@@ -741,6 +766,8 @@ void EntityEleteMonster::StartTeleport()
 				effect->Initialize();
 			}
 		}
+
+
 	}
 	else
 	{
@@ -748,6 +775,7 @@ void EntityEleteMonster::StartTeleport()
 		std::cout << "Teleport failde not find location " << std::endl;
 		blackBoard->SetValueAsFloat("TeleportCooldown", 1.0f);
 	}
+
 
 	//일정 시간 뒤에 텔레포트 실행
 }
@@ -953,6 +981,14 @@ void EntityEleteMonster::Dead()
 	if (asisScrip) {
 		asisScrip->AddPollutionGauge(m_enemyReward);
 	}
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon003Die"));
+		}
+	}
 }
 
 void EntityEleteMonster::DeadEvent()
@@ -1014,6 +1050,14 @@ void EntityEleteMonster::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				}
 			}
 			PlayHitEffect(this->GetOwner(), hitinfo);
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon003Hit"));
+				}
+			}
 	
 			//블랙보드에 데미지 저장
 			//blackBoard->SetValueAsInt("Damage", damage);
