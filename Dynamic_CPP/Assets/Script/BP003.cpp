@@ -86,6 +86,8 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 	m_delay = delay;
 	m_timer = 0.0f;
 
+	m_pOwner->GetComponent<Transform>()->SetScale({ m_radius ,1 ,m_radius });
+
 	//일단 초기화때 넣자
 	m_useOrbiting = useOrbiting;
 	m_clockWise = clockwise;

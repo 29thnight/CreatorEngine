@@ -187,6 +187,11 @@ public:
 	float bombMoveSpeed = 0.005f;  //ÆøÅºµµÂøÁöÁ¡ Á¶Àý ½ºÇÇµå
  	void MeleeAttack();
 	[[Method]]
+	void Melee1();
+	[[Method]]
+	void Melee3();
+	void MeleeAttackOnce(float degAngleRange, float degIntervalAngle);
+	[[Method]]
 	void MeleeChargeAttack();
 	void RangeAttack();
 

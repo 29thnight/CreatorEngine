@@ -1851,6 +1851,7 @@ void TBoss1::DeadEvent()
 	deadPos.y += 0.7f;
 	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 	deadEffect->Initialize();
+	BossClear();
 }
 
 void TBoss1::BossClear()
