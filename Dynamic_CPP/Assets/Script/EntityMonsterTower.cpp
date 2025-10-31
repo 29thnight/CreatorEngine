@@ -47,7 +47,7 @@ void EntityMonsterTower::Start()
 		towerMonster = PrefabUtilitys->InstantiatePrefab(monsterPrefab, "towerPrefab");
 		auto monsterScript = towerMonster->GetComponentDynamicCast<TestMonsterB>();
 		monsterScript->m_attackRange = attackRange;
-		monsterScript->m_chaseRange = attackRange;
+		monsterScript->m_chaseRange = 1.0f;
 		if (monsterSpawnPosObj)
 		{
 			towerMonster->m_transform.SetPosition(monsterSpawnPosObj->m_transform.GetWorldPosition());

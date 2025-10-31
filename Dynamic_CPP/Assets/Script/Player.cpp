@@ -484,6 +484,7 @@ void Player::Update(float tick)
 	}
 	if (m_curWeapon->IsBroken() && sucessAttack == true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
 	{
+		isChargeAttack = false; //임시땜빵&&&&&
 		DeleteCurWeapon();
 	}
 	if (sucessAttack == true) //매프레임 갱신?
@@ -943,18 +944,6 @@ void Player::Catch()
 			}
 		}
 
-
-		/*switch (item->itemType)
-		{
-		case EItemType::Flower:
-			Sound->playOneShot();
-		case EItemType::Fruit:
-			Sound->playOneShot();
-		case EItemType::Mineral:
-			Sound->playOneShot();
-		case EItemType::Mushroom:
-			Sound->playOneShot();
-		}*/
 		WeaponCapsule* weaponCapsule = m_nearObject->GetComponentDynamicCast<WeaponCapsule>();
 		if (weaponCapsule)
 		{
@@ -1083,8 +1072,10 @@ void Player::StartAttack()
 {
 	//여기서 공격처리하고 차징시작 
 	if (false == CheckState(PlayerStateFlag::CanAttack)) return;
+	if (isChargeAttack == true) return; //차지어택일경우 sucessAttack 확인후  거기서 다시초기화해줌
 	if (isAttacking == false || canMeleeCancel == true)
 	{
+		canMeleeCancel = false;
 		isChargeAttack = false;
 		if (m_curWeapon)
 		{

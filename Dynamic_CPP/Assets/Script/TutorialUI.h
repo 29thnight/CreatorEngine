@@ -1,17 +1,15 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Entity.h"
-#include "ItemType.h"
-#include "EntityResource.generated.h"
-class CriticalMark;
-class EffectComponent;
-class TutorialUI;
-class EntityResource : public Entity
+#include "ModuleBehavior.h"
+#include "GameObject.h"
+#include "TutorialUI.generated.h"
+
+class TutorialUI : public ModuleBehavior
 {
 public:
-   ReflectEntityResource
+   ReflectTutorialUI
 	[[ScriptReflectionField]]
-	MODULE_BEHAVIOR_BODY(EntityResource)
+	MODULE_BEHAVIOR_BODY(TutorialUI)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -22,27 +20,22 @@ public:
 	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
 	virtual void Update(float tick) override;
-	virtual void LateUpdate(float tick) override {}
+	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void SendDamage(Entity* sender, int damage, HitInfo = HitInfo{}) override;
-
+	//0 집기 1던지기 2초원으로 3 공격
+	void SetTarget(std::shared_ptr<GameObject> target) { m_target = target; }
+	void Init();
 	[[Property]]
-	EItemType itemType = EItemType::Mushroom;
-	[[Property]]
-	int maxHP = 40;
+	Mathf::Vector2 screenOffset = { 0.f, -50.f };
 
-	void PlayHitSound();
-	void PlayDestorySound();
-
-	TutorialUI* m_tutorialUi = nullptr;
+	void SetType(int type); //0 집기 1던지기 2초원으로 3 공격
 private:
-	EffectComponent* m_effect = nullptr;
-	CriticalMark* m_criticalMark;
-	[[Property]]
-	float m_minRewardUpForce = 2.f;
-	[[Property]]
-	float m_maxRewardUpForce = 3.f;
-	GameObject* deadObj = nullptr;
+	std::weak_ptr<GameObject> m_target;
+	class RectTransformComponent* m_rect = nullptr;
+	class ImageComponent* m_image = nullptr;
+	class Camera* m_camera = nullptr;
+
+	int m_type{};
 };

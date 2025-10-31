@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TutorialUI.h"
 #include "Skip.h"
 #include "ClearLerpUI.h"
 #include "UIHPObserver.h"

@@ -15,6 +15,7 @@
 #include "PlayEffectAll.h"
 #include "EventTarget.h"
 #include "SFXPoolManager.h"
+#include "TutorialUI.h"
 void EntityResource::Start()
 {
 
@@ -59,6 +60,24 @@ void EntityResource::Start()
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
 		deadObj->SetEnabled(false);
 		deadObj->m_transform.SetScale({ 0.5,0.5,0.5 });
+	}
+
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
+	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	{
+		auto canvObj = GameObject::Find("Canvas");
+		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
+		if (tutorUIPre)
+		{
+			GameObject* tutorUIObj = PrefabUtilitys->InstantiatePrefab(tutorUIPre, "resourceUI");
+			m_tutorialUi = tutorUIObj->GetComponent<TutorialUI>();
+			canvObj->AddChild(tutorUIObj);
+			m_tutorialUi->Init();
+			m_tutorialUi->SetType(3);
+			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
+
+		}
 	}
 }
 
