@@ -86,6 +86,8 @@ void TBoss1::Start()
 	meleeIndicator = PrefabUtilitys->LoadPrefab("BossMeleeIndicator");
 	Indicatorobj = meleeIndicator->Instantiate();
 	Indicatorobj->GetComponent<Transform>()->SetScale({ BP002Widw,1,BP002Widw });
+	
+
 
 	protrudeIndecator = PrefabUtilitys->LoadPrefab("Protrude_Indecator");
 	protrudeIndicatorobj = protrudeIndecator->Instantiate();
@@ -426,6 +428,8 @@ void TBoss1::ShowMeleeIndicator()
 	tr->SetRotation(angle);
 
 	EffectComponent* eff = Indicatorobj->GetComponent< EffectComponent>();
+	float tiemescale = 1 / m_meleeIncatorDuration;
+	eff->SetTimeScale(tiemescale);
 	if (!isIndicator) {
 		eff->Apply();
 		isIndicator = true;
