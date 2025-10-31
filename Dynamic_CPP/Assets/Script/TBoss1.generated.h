@@ -34,6 +34,7 @@ ReflectionScriptField(TBoss1) \
 		meta_property(BP0034_MAX_ITEM) \
 		meta_property(burrowDelay) \
 		meta_property(burrowSetIndicator) \
+		meta_property(m_meleeIncatorDuration) \
 	}); \
 	MethodField \
 	({ \

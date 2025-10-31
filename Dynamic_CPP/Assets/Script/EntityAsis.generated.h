@@ -32,5 +32,9 @@ ReflectionScriptField(EntityAsis) \
 		meta_property(m_predictNextTime) \
 		meta_property(m_rotateSpeed) \
 	}); \
-	FieldEnd(EntityAsis, PropertyOnly) \
+	MethodField \
+	({ \
+		meta_method(SetDead) \
+	}); \
+	FieldEnd(EntityAsis, PropertyAndMethod) \
 };

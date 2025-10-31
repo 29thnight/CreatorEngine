@@ -7,6 +7,7 @@
 class EntityItem;
 class WeaponCapsule;
 class KoriEmoteSystem;
+class GameManager;
 class SoundComponent;
 class EntityAsis : public Entity
 {
@@ -159,4 +160,13 @@ private:
 #ifdef _DEBUG
 	GameObject* DebugPoint{ nullptr };
 #endif // _DEBUG
+
+private:
+	bool testPlayerAllDead{ false };
+	Mathf::Vector3 carryPlayerOffset[2] = { 
+		Mathf::Vector3(0.f, 2.f, 0.5f),
+		Mathf::Vector3(0.f, 2.f, -0.5f) };
+public:
+	[[Method]]
+	void SetDead();
 };

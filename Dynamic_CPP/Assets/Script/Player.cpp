@@ -559,6 +559,10 @@ void Player::LateUpdate(float tick)
 	{
 		if (isStun)
 		{
+			if (GM->m_isGameOver) {
+				return;
+			}
+
 
 			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
 			auto cam = camComponent->GetCamera();

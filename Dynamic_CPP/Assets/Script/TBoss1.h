@@ -314,6 +314,9 @@ public:
 	void ShowMeleeIndicator();
 	
 	bool isIndicator = false;
+	[[Property]]
+	float m_meleeIncatorDuration = 1.0f;
+
 
 	[[Method]]
 	void BP0011();
