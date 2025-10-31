@@ -1172,6 +1172,9 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		ConvertVectorDxToPx(rigidBodyData.position, pxTransform.p);
 		ConvertQuaternionDxToPx(rigidBodyData.rotation, pxTransform.q);		
 
+		if (rigidBodyData.isGeometryDirty) {
+			staticBody->SetConvertScale(rigidBodyData.scale, m_physics, m_collisionMatrix);
+		}
 		//CopyMatrixDxToPx(dxMatrix, pxTransform);
 
 		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
