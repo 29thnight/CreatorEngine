@@ -11,7 +11,7 @@
     "name": "pat2",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -23,9 +23,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
+                                "x": 0.25,
                                 "y": 1.0,
-                                "z": 1.0
+                                "z": 0.25
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -185,7 +185,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -197,9 +197,9 @@
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
+                                "x": 0.25,
                                 "y": 1.0,
-                                "z": 1.0
+                                "z": 0.25
                             },
                             "acceleration": {
                                 "x": 0.0,
