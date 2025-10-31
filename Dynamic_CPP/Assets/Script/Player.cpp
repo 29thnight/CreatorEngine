@@ -1935,6 +1935,16 @@ void Player::MeleeAttack()
 	}
 }
 
+void Player::Melee1()
+{
+	MeleeAttackOnce(180.f, 15.f);
+}
+
+void Player::Melee3()
+{
+	MeleeAttackOnce(360.f, 15.f);
+}
+
 void Player::MeleeAttackOnce(float degAngleRange, float degIntervalAngle)
 {
 	Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
