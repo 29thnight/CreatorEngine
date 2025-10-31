@@ -9,6 +9,7 @@ class BlackBoard;
 class Animator;
 class EffectComponent;
 class CriticalMark;
+class GameManager;
 //¿ø°Å¸®¸÷
 class TestMonsterB : public Entity
 {
@@ -133,4 +134,5 @@ private:
 	bool EndDeadAnimation = false;
 	float deadElapsedTime = 0.f;
 	float deadDestroyTime = 1.0f;
+	GameManager* GM = nullptr;
 };

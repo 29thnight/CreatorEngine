@@ -8,6 +8,8 @@
 #include "PrefabUtility.h"
 #include "SphereColliderComponent.h"
 #include "EntityEleteMonster.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void MonEleteProjetile::Start()
 {
 	if (nullptr == m_effect)
@@ -137,6 +139,21 @@ void MonEleteProjetile::Action(GameObject* target)
 	hitInfo.KnockbackForce = { KnockbackDistacneX ,KnockbackDistacneY};
 	hitInfo.KnockbackTime = KnockbackTime;
 	targetEntity->SendDamage(ownerEntity, m_Damege, hitInfo);
+
+
+	auto GMobj = GameObject::Find("GameManager");
+	if (GMobj)
+	{
+		GameManager* GM = GMobj->GetComponent<GameManager>();
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("Mon003AttackExplosion"));
+			}
+		}
+	}
 
 
 	Prefab* hitPrefab = PrefabUtilitys->LoadPrefab("EliteAtkHitEffect");

@@ -3,10 +3,17 @@
 #include "GameInstance.h"
 #include "UIButton.h"
 #include "pch.h"
-
+#include "SFXPoolManager.h"
+#include "GameManager.h"
 void ImageButton::Start()
 {
 	m_imageComponent = GetComponent<ImageComponent>();
+
+	auto GMobj = GameObject::Find("GameManager");
+	if (GMobj)
+	{
+		GM = GMobj->GetComponent<GameManager>();
+	}
 	//GameInstance::GetInstance()->LoadScene("LoadingScene");
 }
 
@@ -17,7 +24,17 @@ void ImageButton::Update(float tick)
 		m_uiButton = GetComponent<UIButton>();
 		if (m_uiButton)
 		{
-			m_uiButton->SetClickFunction([&]() { ClickFunction(); });
+			m_uiButton->SetClickFunction([&]()
+				{
+				if (GM)
+				{
+					auto pool = GM->GetSFXPool();
+					if (pool)
+					{
+						pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ButtonClick"));
+					}
+				}
+				ClickFunction(); });
 		}
 	}
 
@@ -27,6 +44,14 @@ void ImageButton::Update(float tick)
 		{
 			if (m_imageComponent->IsNavigationThis())
 			{
+				if (GM)
+				{
+					auto pool = GM->GetSFXPool();
+					if (pool)
+					{
+						pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ButtonSelect"));
+					}
+				}
 				m_imageComponent->SetEnabled(true);
 			}
 			else
@@ -38,6 +63,14 @@ void ImageButton::Update(float tick)
 		{
 			if (m_imageComponent->IsNavigationThis())
 			{
+				if (GM)
+				{
+					auto pool = GM->GetSFXPool();
+					if (pool)
+					{
+						pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ButtonSelect"));
+					}
+				}
 				m_imageComponent->color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
 			}
 			else

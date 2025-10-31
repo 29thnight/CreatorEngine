@@ -10,6 +10,7 @@ class BehaviorTreeComponent;
 class BlackBoard;
 class RigidBodyComponent;
 class CriticalMark;
+class GameManager;
 class TBoss1 : public Entity
 {
 public:
@@ -118,6 +119,7 @@ public:
 	GameObject* Player2 = nullptr; 
 
 	GameObject* m_target = nullptr;
+	GameManager* GM = nullptr;
 	//hp
 	[[Property]]
 	int m_MaxHp = 1000;

@@ -3,6 +3,8 @@
 #include "Entity.h"
 #include "PrefabUtility.h"
 #include "EffectComponent.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void BP001::Start()
 {
 }
@@ -77,6 +79,20 @@ void BP001::Explosion()
 	itemObj->GetComponent<EffectComponent>()->Apply();
 	GetOwner()->GetComponent<EffectComponent>()->StopEffect();
 	PhysicsManagers->SphereOverlap(input, m_radius, res);
+
+	auto GMobj = GameObject::Find("GameManager");
+	if (GMobj)
+	{
+		GameManager* GM = GMobj->GetComponent<GameManager>();
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossFireAttackExplosion"));
+			}
+		}
+	}
 
 	//쿼리 감지시 데미지 처리
 	for (auto& hit : res) {

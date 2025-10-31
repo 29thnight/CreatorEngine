@@ -9,6 +9,7 @@ class Animator;
 class EffectComponent;
 class CharacterControllerComponent;
 class CriticalMark;
+class GameManager;
 class EntityMonsterA : public Entity
 {
 public:
@@ -110,4 +111,6 @@ public:
 	float m_knockBackVelocity = 1.f;
 	float m_knockBackScaleVelocity = 1.f;
 	float m_MaxknockBackTime = 0.2f;
+
+	GameManager* GM = nullptr;
 };

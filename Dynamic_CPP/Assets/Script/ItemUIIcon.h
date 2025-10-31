@@ -48,7 +48,7 @@ private:
 	class GameObject*				m_target = nullptr;
 	class ItemComponent*			m_itemComp = nullptr;
 	enum class PopupPhase { None, ToPopup, ToScreen }; // 왕복 트윈 상태
-
+	class GameManager* GM = nullptr;
 private:
 	[[Property]]
 	bool			m_isSetPopup = false; // 보빙 멈추고 팝업으로 전환

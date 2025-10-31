@@ -100,7 +100,7 @@ void Bomb::Update(float tick)
 					auto pool = GM->GetSFXPool();
 					if (pool)
 					{
-						pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BombExplosionSound"));
+						pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("WeaponBombExplosion"));
 						elapsedTime = 0;
 					}
 				}

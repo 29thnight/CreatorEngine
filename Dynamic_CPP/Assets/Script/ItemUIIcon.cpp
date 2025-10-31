@@ -8,7 +8,8 @@
 #include "ItemManager.h"
 #include "Player.h"
 #include "pch.h"
-
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void ItemUIIcon::Start()
 {
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
@@ -20,6 +21,7 @@ void ItemUIIcon::Start()
     if (gmObj)
     {
 		m_itemManager = gmObj->GetComponent<ItemManager>();
+        GM = gmObj->GetComponent<GameManager>();
     }
 
     // ÇÊ¿ä ½Ã ÃÊ±âÈ­
@@ -77,6 +79,15 @@ void ItemUIIcon::Update(float tick)
         m_popupElapsed = 0.f;
         m_isPopupComplete = false;   // ÆË¾÷ ¿Ï·á ÇÃ·¡±× ÃÊ±âÈ­
         m_bobbing = false;   // ÆË¾÷ µ¿¾È º¸ºù Ç¥½Ã ²¨µÒ
+
+        if (GM)
+        {
+            auto pool = GM->GetSFXPool();
+            if (pool)
+            {
+                pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("StoreSelectItem"));
+            }
+        }
 
         if (!m_popupRaised) { ApplyOrderDelta(+layerOrderFoward); m_popupRaised = true; }
     }

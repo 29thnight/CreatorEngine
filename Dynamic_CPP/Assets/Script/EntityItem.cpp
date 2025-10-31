@@ -15,6 +15,7 @@
 #include "SceneManager.h"
 #include "EffectComponent.h"
 #include "EntityMonsterBaseGate.h"
+#include "SFXPoolManager.h"
 using namespace Mathf;
 void EntityItem::Start()
 {
@@ -67,6 +68,7 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 
 	if (collision.otherObj->m_tag == "Ground")
 	{
+		OnGround();
 		m_state = EItemState::NONE;
 		LOG(collision.otherObj->m_name.ToString() << "OnTriggerEnter Item");
 		if (m_rigid)
@@ -132,6 +134,7 @@ void EntityItem::Update(float tick)
 					m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 					m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 				}
+				OnGround();
 				m_state = EItemState::NONE;
 
 			};
@@ -209,6 +212,7 @@ void EntityItem::Update(float tick)
 				m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			}
 			speed = 2.f;
+			OnGround();
 			m_state = EItemState::NONE;
 		}
 	}
@@ -225,6 +229,7 @@ void EntityItem::Update(float tick)
 				m_rigid->UseGravity(false);
 			}
 			
+			OnGround();
 			m_state = EItemState::NONE;
 		}
 	}
@@ -298,5 +303,28 @@ Player* EntityItem::GetThrowOwner()
 void EntityItem::ClearThrowOwner()
 {
 	throwOwner = nullptr;
+}
+
+void EntityItem::OnGround()
+{
+	if (m_state != EItemState::NONE)
+	{
+		m_state = EItemState::NONE;
+		
+		auto GMobj = GameObject::Find("GameManager");
+		if (GMobj)
+		{
+			GameManager* GM = GMobj->GetComponent<GameManager>();
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ResourceDrop"));
+				}
+			}
+		}
+		
+	}
 }
 

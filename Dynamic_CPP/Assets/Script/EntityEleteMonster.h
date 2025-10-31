@@ -11,6 +11,7 @@ class Animator;
 class EffectComponent;
 struct Feeler;
 class CriticalMark;
+class GameManager;
 class EntityEleteMonster : public Entity
 {
 public:
@@ -184,6 +185,8 @@ public:
 	float KnockbackDistacneY = 0.01f;
 	[[Property]]
 	float KnockbackTime = 0;
+
+	GameManager* GM = nullptr;
 	////³Ø¹éÃ³¸® -> ³Ë¹é X
 	//float hittimer = 0.f;
 	//Mathf::Vector3 hitPos;
@@ -192,4 +195,5 @@ public:
 	//float m_knockBackVelocity = 1.f;
 	//float m_knockBackScaleVelocity = 1.f;
 	//float m_MaxknockBackTime = 0.2f;
+
 };

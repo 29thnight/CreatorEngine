@@ -45,6 +45,7 @@ public:
 	void SetThrowOwner(Player* player);
 	Player* GetThrowOwner();
 	void ClearThrowOwner();
+	void OnGround();
 public:
 	GameObject* asisTail{ nullptr };
 	Mathf::Vector3 startPos{ 0.f, 0.f, 0.f };
@@ -67,8 +68,6 @@ public:
 
 	[[Property]]
 	int itemReward = 5;
-
-	bool OnGround;
 	EffectComponent* m_effect = nullptr;
 	RigidBodyComponent* m_rigid = nullptr;
 private:

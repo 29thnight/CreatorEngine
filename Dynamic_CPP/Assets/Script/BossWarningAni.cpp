@@ -3,7 +3,9 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "TBoss1.h"
-
+#include "GameInstance.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void BossWarningAni::Enter()
 {
     AnimationController* controller = m_ownerController;
@@ -24,6 +26,20 @@ void BossWarningAni::Enter()
 
     // 타이머를 초기화합니다.
     m_stateTimer = 0.0f;
+
+    auto GMobj = GameObject::Find("GameManager");
+    if (GMobj)
+    {
+        GameManager* GM = GMobj->GetComponent<GameManager>();
+        if (GM)
+        {
+            auto pool = GM->GetSFXPool();
+            if (pool)
+            {
+                pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossPremotion"));
+            }
+        }
+    }
 }
 
 void BossWarningAni::Update(float deltaTime)
