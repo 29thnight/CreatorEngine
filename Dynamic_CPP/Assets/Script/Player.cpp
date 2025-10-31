@@ -157,7 +157,7 @@ void Player::Start()
 		resurrectionEffect = ResurrpreObj->GetComponentDynamicCast<EffectComponent>();
 	}
 
-
+	constexpr int CONVERT_TYPE = 1;
 	if(0 == playerIndex)
 	{
 		m_uiController = GameObject::Find("P1_UIController");
@@ -171,6 +171,7 @@ void Player::Start()
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
 				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+				weaponSlotController->m_charType = CharType((int)m_playerType + CONVERT_TYPE);
 			}
 
 			auto hpObserver = m_uiController->GetComponent<UIHPObserver>();
@@ -191,7 +192,7 @@ void Player::Start()
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
-				hpbar->SetType(0);
+				hpbar->SetType((int)m_playerType);
 				hpbar->SetTarget(player->shared_from_this());
 				hpbar->Init();
 			}
@@ -210,6 +211,7 @@ void Player::Start()
 				weaponSlotController->m_SetActiveHandle = m_SetActiveEvent.AddRaw(weaponSlotController, &WeaponSlotController::SetActive);
 				weaponSlotController->m_UpdateChargingPersentHandle = m_ChargingWeaponEvent.AddRaw(weaponSlotController, &WeaponSlotController::UpdateChargingPersent);
 				weaponSlotController->m_EndChargingPersentHandle = m_EndChargingEvent.AddRaw(weaponSlotController, &WeaponSlotController::EndChargingPersent);
+				weaponSlotController->m_charType = CharType((int)m_playerType + CONVERT_TYPE);
 			}
 
 			auto hpObserver = m_uiController->GetComponent<UIHPObserver>();
@@ -230,7 +232,7 @@ void Player::Start()
 				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
-				hpbar->SetType(1);
+				hpbar->SetType((int)m_playerType);
 				hpbar->SetTarget(player->shared_from_this());
 				hpbar->Init();
 			}

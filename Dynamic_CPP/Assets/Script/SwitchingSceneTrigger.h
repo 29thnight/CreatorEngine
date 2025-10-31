@@ -27,6 +27,8 @@ private:
 	bool m_prevA1 = false;
 	[[Property]]
 	bool m_isTestMode{ false };
+	[[Property]]
+	bool m_isTestBossStage{ false };
 
 	bool m_isFadeInComplete{ false };
 	bool m_isFadeOutComplete{ false };
@@ -45,4 +47,17 @@ private:
 	TextComponent*					m_loadingText{ nullptr };
 	std::vector<ImageComponent*>	m_cutImages{};
 
+	int   m_cutStart = 0;   // 포함
+	int   m_cutEndExclusive = 0;   // 미포함
+	int   m_cutCursor = 0;   // 현재 재생 위치
+	bool  m_cutRangeReady = false;
+	// 자동 진행
+	[[Property]]
+	float   m_autoPlayDelay = 3.2f;   // 컷신 자동 진행 간격(초) - 원하는 값으로
+	float   m_autoTimer = 0.0f;   // 누적 타이머
+	[[Property]]
+	bool    m_waitAtLastCut = true;   // 마지막 컷에서는 입력 대기
+
+	void  SetupCutRangeForNextScene();
+	void ShowCut(int idx);
 };

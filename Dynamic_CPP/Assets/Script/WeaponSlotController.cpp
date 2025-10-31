@@ -1,7 +1,6 @@
 #include "WeaponSlotController.h"
 #include "WeaponSlot.h"
 #include "ImageComponent.h"
-#include "GameInstance.h"
 #include "pch.h"
 
 void WeaponSlotController::Awake()
@@ -25,21 +24,30 @@ void WeaponSlotController::Awake()
 void WeaponSlotController::Start()
 {
 	m_selectionImageComponent = GetComponent<ImageComponent>();
-	//TODO : 플레이어 오브젝트의 종류를(여성케릭인지 남성케릭인지) 인식해야함.
-	if (!m_selectionImageComponent) return;
-
-	constexpr int CONVERT_TYPE = 1;
-	auto type = GameInstance::GetInstance()->GetPlayerCharType(PlayerDir(m_playerIndex + CONVERT_TYPE));
-
-	if (type != CharType::None && m_playerIndex != (int)type - CONVERT_TYPE)
-	{
-		m_selectionImageComponent->SetTexture(1); //각각 반대되는 케릭터의 텍스처로 설정
-		m_selectionImageComponent->uiEffects = UIEffects::UIEffects_FlipHorizontally;
-	}
+	//지금 케릭터 좌측 UI는 여성, 우측은 남성으로 초기 설정되어 있음.
+	//이때 플레이어 인덱스는 0이 좌측, 1이 우측이므로 charType과 반대로 설정
 }
 
 void WeaponSlotController::Update(float tick)
 {
+	if (!m_selectionImageComponent) return;
+
+	if (0 == m_playerIndex)
+	{
+		if (m_charType == CharType::Man)
+		{
+			m_selectionImageComponent->SetTexture(1); //남성 케릭터 텍스처로 설정
+			m_selectionImageComponent->uiEffects = UIEffects::UIEffects_FlipHorizontally;
+		}
+	}
+	else if (1 == m_playerIndex)
+	{
+		if (m_charType == CharType::Woman)
+		{
+			m_selectionImageComponent->SetTexture(1); //여성 케릭터 텍스처로 설정
+			m_selectionImageComponent->uiEffects = UIEffects::UIEffects_FlipHorizontally;
+		}
+	}
 }
 
 void WeaponSlotController::AddWeapon(Weapon* weapon, int slotIndex)

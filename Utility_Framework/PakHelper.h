@@ -262,6 +262,57 @@ namespace
         return false;
     }
 
+    bool CleanupUnpackedGameAssets()
+    {
+        fs::path pakBaseDir = PathFinder::RelativeToExecutable("");
+        if (pakBaseDir.empty())
+        {
+            pakBaseDir = PathFinder::Relative().parent_path();
+        }
+
+        fs::path extractRootBase;
+
+        std::array<wchar_t, MAX_PATH> tempPathBuffer{};
+        const DWORD tempPathLen = GetTempPathW(static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
+
+        if (tempPathLen > 0 && tempPathLen < tempPathBuffer.size())
+        {
+            extractRootBase = fs::path(tempPathBuffer.data());
+        }
+        else
+        {
+            extractRootBase = PathFinder::DumpPath();
+        }
+
+        if (extractRootBase.empty())
+        {
+            extractRootBase = pakBaseDir;
+        }
+
+        fs::path extractRoot = extractRootBase / "UnpackedAssets";
+        std::error_code ec{};
+
+        if (!fs::exists(extractRoot, ec))
+        {
+            if (ec)
+            {
+                Debug->LogWarning("Failed to query unpacked assets directory '" + PathToUtf8(extractRoot) + "': " + ec.message());
+            }
+
+            return true;
+        }
+
+        const auto removedCount = fs::remove_all(extractRoot, ec);
+        if (ec)
+        {
+            Debug->LogError("Failed to delete unpacked assets directory '" + PathToUtf8(extractRoot) + "': " + ec.message());
+            return false;
+        }
+
+        Debug->Log("Removed unpacked assets directory '" + PathToUtf8(extractRoot) + "' (" + std::to_string(removedCount) + " entries).");
+        return true;
+    }
+
     bool UnpackageGameAssets()
     {
         std::wstring pakStem = SanitizePakStem(EngineSettingInstance->GetBuildGameName());

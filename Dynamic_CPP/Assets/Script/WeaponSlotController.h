@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "GameInstance.h"
 #include "WeaponSlotController.generated.h"
 
 constexpr unsigned int WEAPON_SLOT_MAX = 4; //무기 슬롯 최대 개수(0 Basic, 1 ~ 3 stack 운용)
@@ -38,6 +39,7 @@ public:
 	Core::DelegateHandle m_SetActiveHandle{};
 	Core::DelegateHandle m_UpdateChargingPersentHandle{};
 	Core::DelegateHandle m_EndChargingPersentHandle{};
+	CharType m_charType = CharType::None;
 
 private:
 	[[Property]]
@@ -49,4 +51,5 @@ private:
 	//케릭터 인덱스
 	int m_characterIndex = 0; //0 남성, 1 여성(추후 케릭터가 추가될 경우를 대비하여 int형으로 선언)
 	class ImageComponent* m_selectionImageComponent = nullptr;
+
 };
