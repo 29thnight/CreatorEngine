@@ -10,6 +10,7 @@ class ActionMap;
 class Weapon;
 class SFXPoolManager;
 class ControllerVibration;
+class TweenManager;
 class GameManager : public ModuleBehavior
 {
 public:
@@ -133,5 +134,8 @@ public:
 	float						m_fadeInDuration = 0.3f; // 필요시 인스펙터/ini로
 	bool						TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
 	bool						m_isGameOver = false;
+
+private:
+	float						m_gameOverDelay = 0.f;
 };
 

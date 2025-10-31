@@ -45,7 +45,7 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    float normalizedAge = fmod(input.particleAge / input.particleLifeTime, animationDuration) / animationDuration;
+    float normalizedAge = (input.particleAge / input.particleLifeTime) / animationDuration;
     uint currentFrame = (uint) (normalizedAge * frameCount) % frameCount;
     
     // 스프라이트 애니메이션을 위한 UV 좌표 계산

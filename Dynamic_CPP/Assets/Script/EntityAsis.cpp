@@ -202,6 +202,11 @@ void EntityAsis::Update(float tick)
 	}
 #endif // _DEBUG
 
+	if (testPlayerAllDead) {
+		PathMove(tick);
+		return;
+	}
+
 	if(isStun)
 	{
 		if (CheckResurrectionByPlayer() == true)

@@ -17,6 +17,7 @@
 #include "SFXPoolManager.h"
 #include "GameInstance.h"
 #include "SceneTransitionUI.h"
+#include "TweenManager.h"
 
 void GameManager::Awake()
 {
@@ -136,8 +137,28 @@ void GameManager::Update(float tick)
 			}
 			m_nextSceneIndex = (int)SceneType::GameOver;
 			m_isLoadingReq = false;
-			LoadNextScene();
 			m_isGameOver = true;
+
+			m_asis[0]->GetOwner()->GetComponent<EntityAsis>()->SetDead();
+
+			auto tween = std::make_shared<Tweener<float>>(
+				[=]() { return 0.f; },
+				[=](float val) {
+				},
+				1.f,
+				15.f,
+				[&](float t) {
+					return Easing::Linear(t);
+				}
+			);
+			tween->SetOnComplete([&]() {
+				LoadNextScene();
+			});
+			TweenManager* tw = GetComponent<TweenManager>();
+			if (tw) {
+				tw->AddTween(tween);
+			}
+			tween.reset();
 		}
 	}
 }
