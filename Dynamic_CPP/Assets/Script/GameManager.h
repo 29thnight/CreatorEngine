@@ -90,6 +90,8 @@ public:
 	void SavePlayerData();
 	void LoadPlayerData();
 	void BossClear();
+	void CheckClear(float tick);
+	void ChangeClearScene(); //보스클리어 다음씬으로
 private:
 	//Entities
 	std::vector<Entity*>	m_entities{};
@@ -103,6 +105,9 @@ private:
 	ControllerVibration*	ControllerVibrationData{};
 
 	bool isDataLoaded = false; //플레이어 데이터 1회로드
+	bool isBossClear = false;  //보스꺰 정해진연출 실행 or 정해진시간지나면 다음씬으로
+	float daegiTime = 4.0f;     //일단 연출없어서 4초대기후 다음씬
+	bool isClearSwitching = false;	
 private:
 	void CheatMiningResource();
 

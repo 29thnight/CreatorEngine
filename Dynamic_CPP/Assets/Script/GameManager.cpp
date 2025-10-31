@@ -76,6 +76,9 @@ void GameManager::Update(float tick)
 	static float rewardTimer = 0.f;
 	rewardTimer += tick;
 
+
+	CheckClear(tick);
+	
 	if (InputManagement->IsKeyPressed(KeyBoard::Escape))
 	{
 		SceneManagers->SetDecommissioning();
@@ -573,4 +576,45 @@ void GameManager::LoadPlayerData()
 
 void GameManager::BossClear()
 {
+	isBossClear = true;
 }
+
+void GameManager::CheckClear(float tick)
+{
+	if (isBossClear)
+	{
+		daegiTime -= tick;
+		if (daegiTime <= 0.f)
+		{
+			ChangeClearScene();
+			daegiTime = 4.0f;
+			isBossClear = false;
+		}
+	}
+
+	if (isClearSwitching)
+	{
+		SwitchNextSceneWithFade();
+	}
+
+}
+
+void GameManager::ChangeClearScene()
+{
+	if (isClearSwitching) return;
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
+	switch (static_cast<SceneType>(curScene))
+	{
+	case SceneType::Boss:
+		m_nextSceneIndex = (int)SceneType::Clear;
+		break;
+	default:
+		m_nextSceneIndex = (int)SceneType::Clear;
+		break;
+	}
+	LoadNextScene();
+
+	isClearSwitching = true;
+}
+

@@ -5,9 +5,9 @@
 
 bool EngineSetting::Initialize()
 {
-	bool isSuccess = LoadSettings();
 
 #ifndef BUILD_FLAG
+	bool isSuccess = LoadSettings();
 	char* vcInstallDir = nullptr;
 	size_t len = 0;
 
@@ -45,8 +45,8 @@ bool EngineSetting::Initialize()
 
 	isSuccess = EngineSetting::LoadSettings();
 #else
-	isSuccess = EngineSetting::LoadSettings();
 	UnpackageGameAssets();
+	bool isSuccess = EngineSetting::LoadSettings();
 #endif
 
 	return isSuccess;

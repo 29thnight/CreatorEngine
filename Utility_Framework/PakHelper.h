@@ -111,7 +111,7 @@ namespace
 
         const fs::path projectSettingsRoot = PathFinder::ProjectSettingPath("");
 
-        std::wstring pakStem = SanitizePakStem(EngineSettingInstance->GetBuildGameName());
+        std::wstring pakStem = SanitizePakStem(L"TRAIN_ASIS");
         if (pakStem.empty())
         {
             pakStem = L"GameAssets";
@@ -262,6 +262,104 @@ namespace
         return false;
     }
 
+    static void SetAttrsNormal(const fs::path& p)
+    {
+        const std::wstring w = p.c_str();
+        DWORD attrs = GetFileAttributesW(w.c_str());
+        if (attrs != INVALID_FILE_ATTRIBUTES)
+        {
+            // 숨김/시스템/읽기전용 제거
+            attrs &= ~(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN);
+            SetFileAttributesW(w.c_str(), attrs);
+        }
+    }
+
+    static bool DeleteFileWithRetry(const std::wstring& wpath, int tries = 8, DWORD waitMs = 50)
+    {
+        for (int i = 0; i < tries; ++i)
+        {
+            if (DeleteFileW(wpath.c_str()))
+                return true;
+
+            DWORD err = GetLastError();
+            if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED || err == ERROR_LOCK_VIOLATION)
+                std::this_thread::sleep_for(std::chrono::milliseconds(waitMs));
+            else
+                break;
+        }
+        return false;
+    }
+
+    static bool RemoveDirWithRetry(const std::wstring& wpath, int tries = 8, DWORD waitMs = 50)
+    {
+        for (int i = 0; i < tries; ++i)
+        {
+            if (RemoveDirectoryW(wpath.c_str()))
+                return true;
+
+            DWORD err = GetLastError();
+            if (err == ERROR_SHARING_VIOLATION || err == ERROR_ACCESS_DENIED || err == ERROR_DIR_NOT_EMPTY)
+                std::this_thread::sleep_for(std::chrono::milliseconds(waitMs));
+            else
+                break;
+        }
+        return false;
+    }
+
+    static void ScheduleDeleteOnReboot(const std::wstring& wpath)
+    {
+        // 실패해도 어쩔 수 없음: best-effort
+        MoveFileExW(wpath.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+    }
+
+    static bool ForceDeleteTree(const fs::path& root)
+    {
+        if (!fs::exists(root)) return true;
+
+        // 재귀로 하위부터 삭제
+        for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
+            it != fs::end(it); ++it)
+        {
+            const auto& p = it->path();
+            std::wstring w = p.c_str();
+
+            // 디렉터리는 나중에 삭제되도록 건너뜀
+            if (it->is_regular_file() || it->is_symlink())
+            {
+                SetAttrsNormal(p);
+                if (!DeleteFileWithRetry(w))
+                {
+                    // 마지막 수단: 재부팅 시 삭제
+                    ScheduleDeleteOnReboot(w);
+                }
+            }
+        }
+        // 이제 디렉터리들을 바닥에서 위로 삭제
+        // recursive_directory_iterator는 위에서 아래로 가므로, 여기선 reverse_iterator로 정리
+        std::vector<fs::path> dirs;
+        for (auto it = fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied);
+            it != fs::end(it); ++it)
+        {
+            if (it->is_directory()) dirs.push_back(it->path());
+        }
+        std::sort(dirs.begin(), dirs.end(),
+            [](const fs::path& a, const fs::path& b) { return a.native().size() > b.native().size(); });
+
+        for (const auto& d : dirs)
+        {
+            SetAttrsNormal(d);
+            if (!RemoveDirWithRetry(d.c_str()))
+                ScheduleDeleteOnReboot(d.c_str());
+        }
+
+        // 최상위 폴더
+        SetAttrsNormal(root);
+        if (!RemoveDirWithRetry(root.c_str()))
+            ScheduleDeleteOnReboot(root.c_str());
+
+        return !fs::exists(root);
+    }
+
     bool CleanupUnpackedGameAssets()
     {
         fs::path pakBaseDir = PathFinder::RelativeToExecutable("");
@@ -291,31 +389,26 @@ namespace
 
         fs::path extractRoot = extractRootBase / "UnpackedAssets";
         std::error_code ec{};
-
         if (!fs::exists(extractRoot, ec))
         {
-            if (ec)
-            {
-                Debug->LogWarning("Failed to query unpacked assets directory '" + PathToUtf8(extractRoot) + "': " + ec.message());
-            }
-
+            if (ec) Debug->LogWarning("Failed to query '" + PathToUtf8(extractRoot) + "': " + ec.message());
             return true;
         }
 
-        const auto removedCount = fs::remove_all(extractRoot, ec);
-        if (ec)
+        if (!ForceDeleteTree(extractRoot))
         {
-            Debug->LogError("Failed to delete unpacked assets directory '" + PathToUtf8(extractRoot) + "': " + ec.message());
+            Debug->LogError("Failed to delete unpacked assets directory '" + PathToUtf8(extractRoot) + "'. "
+                "Some entries may be scheduled for deletion on reboot.");
             return false;
         }
 
-        Debug->Log("Removed unpacked assets directory '" + PathToUtf8(extractRoot) + "' (" + std::to_string(removedCount) + " entries).");
+        Debug->Log("Removed unpacked assets directory '" + PathToUtf8(extractRoot) + "'.");
         return true;
     }
 
     bool UnpackageGameAssets()
     {
-        std::wstring pakStem = SanitizePakStem(EngineSettingInstance->GetBuildGameName());
+        std::wstring pakStem = SanitizePakStem(L"TRAIN_ASIS");
         if (pakStem.empty())
         {
             pakStem = L"GameAssets";

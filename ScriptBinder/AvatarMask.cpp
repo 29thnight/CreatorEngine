@@ -64,6 +64,7 @@ bool AvatarMask::IsBoneEnabled(const std::string& name)
 
 BoneMask* AvatarMask::MakeBoneMask(Bone* Bone)
 {
+    if (!Bone) return nullptr;
 
     BoneMask* newMask = new BoneMask();
     newMask->boneName = Bone->m_name;
