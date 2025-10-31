@@ -12,7 +12,7 @@
     "name": "portal",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 40,
             "modules": [
                 {
@@ -198,7 +198,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 10,
             "modules": [
                 {
@@ -418,21 +418,21 @@
             }
         },
         {
-            "isRunning": true,
-            "maxParticles": 10,
+            "isRunning": false,
+            "maxParticles": 6,
             "modules": [
                 {
                     "data": {
                         "meshParticleTemplate": {
                             "RotationSpeed": {
-                                "x": 10.5,
-                                "y": 0.0,
+                                "x": 0.0,
+                                "y": -6.28000020980835,
                                 "z": 0.0
                             },
                             "Scale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 2.0,
+                                "y": 2.0,
+                                "z": 2.0
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -446,11 +446,11 @@
                                 "z": 1.0
                             },
                             "initialRotation": {
-                                "x": 3.140000104904175,
+                                "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "lifeTime": 1.0,
+                            "lifeTime": 2.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -468,7 +468,7 @@
                             },
                             "emitterRadius": 1.0,
                             "emitterRotation": {
-                                "x": 0.0,
+                                "x": 1.5700000524520874,
                                 "y": 0.0,
                                 "z": 0.0
                             },
@@ -478,11 +478,11 @@
                                 "z": 0.5
                             },
                             "emitterType": 0,
-                            "spawnRate": 5.0
+                            "spawnRate": 4.0
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 6
                         }
                     },
                     "stage": 2,
@@ -491,24 +491,96 @@
                 },
                 {
                     "data": {
+                        "easing": {
+                            "enabled": false
+                        },
+                        "explosiveData": {
+                            "initialSpeed": 50.0,
+                            "randomFactor": 0.4000000059604645,
+                            "speedDecay": 2.0,
+                            "sphereRadius": 1.0
+                        },
+                        "impulses": [],
+                        "meshParams": {
+                            "gravityStrength": 0.0,
+                            "useGravity": 0
+                        },
+                        "movementParams": {
+                            "currentTime": 242.92373657226563,
+                            "velocityMode": 0
+                        },
+                        "orbitalData": {
+                            "axis": [
+                                0.0,
+                                1.0,
+                                0.0
+                            ],
+                            "center": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "radius": 5.0,
+                            "speed": 1.0
+                        },
+                        "state": {
+                            "isInitialized": true,
+                            "particleCapacity": 6
+                        },
+                        "velocityCurve": [],
+                        "windData": {
+                            "baseStrength": 1.0,
+                            "direction": [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            "frequency": 1.0,
+                            "turbulence": 0.5
+                        }
+                    },
+                    "stage": 2,
+                    "type": "MeshMovementModuleCS",
+                    "useEasing": false
+                },
+                {
+                    "data": {
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 0.615686297416687,
-                                    "x": 0.5882353186607361,
-                                    "y": 0.7607843279838562,
+                                    "w": 1.0,
+                                    "x": 1.0,
+                                    "y": 1.0,
                                     "z": 1.0
                                 },
                                 "time": 0.0
                             },
                             {
                                 "color": {
-                                    "w": 0.7607843279838562,
-                                    "x": 0.2666666805744171,
-                                    "y": 1.0,
-                                    "z": 0.47058823704719543
+                                    "w": 0.5803921818733215,
+                                    "x": 0.0,
+                                    "y": 0.15766717493534088,
+                                    "z": 0.7784810066223145
                                 },
-                                "time": 0.45899999141693115
+                                "time": 0.9819999933242798
+                            },
+                            {
+                                "color": {
+                                    "w": 0.699999988079071,
+                                    "x": 1.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 0.699999988079071
+                            },
+                            {
+                                "color": {
+                                    "w": 0.0,
+                                    "x": 0.5,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "time": 1.0
                             }
                         ],
                         "colorParams": {
@@ -518,7 +590,7 @@
                             "customParam3": 0.0,
                             "customParam4": 0.0,
                             "discreteColorsSize": 0,
-                            "gradientSize": 2,
+                            "gradientSize": 4,
                             "transitionMode": 0
                         },
                         "discreteColors": [],
@@ -527,7 +599,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 10
+                            "particleCapacity": 6
                         }
                     },
                     "stage": 2,
@@ -560,10 +632,10 @@
                             "assigned": true,
                             "hasModel": true,
                             "meshIndex": 0,
-                            "name": "IceSpikes2"
+                            "name": "OneSizePlane"
                         },
                         "renderState": {
-                            "instanceCount": 10
+                            "instanceCount": 6
                         },
                         "renderStates": {
                             "blendPreset": 1,
@@ -571,26 +643,14 @@
                             "rasterizerPreset": 2
                         },
                         "shaders": {
-                            "pixelShader": "MeshParticleNTHDistortion",
+                            "pixelShader": "MeshParticle",
                             "vertexShader": "MeshParticle"
-                        },
-                        "spriteAnimation": {
-                            "animationDuration": 0.5,
-                            "enabled": true,
-                            "frameCount": 4,
-                            "gridColumns": 2,
-                            "gridRows": 2
                         },
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "Tex_fx_HCFX_Dust_01",
+                                "name": "wenli_RM_01",
                                 "slot": 0
-                            },
-                            {
-                                "hasTexture": true,
-                                "name": "Tex_fx_HCFX_Dust_01",
-                                "slot": 1
                             }
                         ]
                     },
@@ -598,7 +658,7 @@
                 }
             ],
             "rotation": {
-                "x": 0.0,
+                "x": 1.5700000524520874,
                 "y": 0.0,
                 "z": 0.0
             }
