@@ -7,6 +7,7 @@
 class EntityItem;
 class WeaponCapsule;
 class KoriEmoteSystem;
+class SoundComponent;
 class EntityAsis : public Entity
 {
 public:
@@ -147,6 +148,13 @@ private:
 	[[Property]]
 	float m_rotateSpeed = 5.f;
 	bool m_isWait{ false };
+
+
+	SoundComponent* m_ActionSound = nullptr; //칼 휘두름, 탄 발사, 잡기,던지기,부활, 무기교체 등 행동사운드
+	SoundComponent* m_EmoteSound = nullptr;  //이모트 사운드
+	//SoundComponent* m_DamageSound = nullptr; //피격 스턴,사운드
+	//SoundComponent* m_MoveSound = nullptr;   
+
 
 #ifdef _DEBUG
 	GameObject* DebugPoint{ nullptr };
