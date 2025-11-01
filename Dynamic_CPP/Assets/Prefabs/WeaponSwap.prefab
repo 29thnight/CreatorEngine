@@ -1,0 +1,62 @@
+m_name: WeaponSwap
+m_instanceID: 2000088866
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: WeaponSwap
+    m_instanceID: 846967282
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 4
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [3]
+    m_tag: Untagged
+    m_layer: Default
+    m_components: ~
+    m_gameObjectType: 0
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: Effect
+        m_instanceID: 2680814780
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 4
+        m_index: 3
+        m_parentIndex: 4
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - EffectComponent: 3131036541
+            m_name: EffectComponent
+            m_instanceID: 3547664950
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_effectTemplateName: weaponswap
+            m_timeScale: 2
+            m_duration: 1
+            m_isPlaying: false
+            m_isPaused: false
+            m_loop: false
+            m_useAbsolutePosition: false
+            m_currentTime: 1.00411808
+            m_effectInstanceName: weaponswap_obj2680814780
+        m_gameObjectType: 0
+        m_isStatic: false
