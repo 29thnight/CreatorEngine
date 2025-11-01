@@ -1,0 +1,62 @@
+m_name: TutorialUI
+m_instanceID: 2751644250
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: TutorialUI
+    m_instanceID: 581179728
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_parentID: 0
+    m_index: 3
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: a9c708ac-37ea-55fd-9be4-da499f687c9c
+    m_childrenIndices: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RectTransformComponent: 3002078429
+        m_name: RectTransformComponent
+        m_instanceID: 4140216034
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_anchorMin: {x: 0.5, y: 0.5}
+        m_anchorMax: {x: 0.5, y: 0.5}
+        m_anchoredPosition: {x: 960, y: 540}
+        m_sizeDelta: {x: 129, y: 41}
+        m_pivot: {x: 0.5, y: 0.5}
+        m_worldRect: {x: 895.5, y: 519.5, width: 129, height: 41}
+      - ImageComponent: 1187169862
+        m_name: ImageComponent
+        m_instanceID: 3425567016
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        _layerorder: 0
+        uiEffects: 0
+        m_ownerCanvasName: Canvas
+        navigations: ~
+        m_customPixelShaderPath: ""
+        texturePaths: [A_1.png, A_2.png, A_3.png, X.png]
+        color: {r: 1, g: 1, b: 1, a: 1}
+        curindex: 0
+        rotate: 0
+        origin: {x: 64.5, y: 20.5}
+        unionScale: 1
+        clipPercent: 1
+        clipDirection: 0
+      - ModuleBehavior: 1399118904
+        screenOffset: {x: 0, y: -50}
+        m_name: TutorialUI
+        m_instanceID: 3169902023
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: f599c7c4-ad15-515f-88f4-c47b995f8c0f
+    m_gameObjectType: 5
+    m_isStatic: false

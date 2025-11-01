@@ -86,6 +86,8 @@ void TBoss1::Start()
 	meleeIndicator = PrefabUtilitys->LoadPrefab("BossMeleeIndicator");
 	Indicatorobj = meleeIndicator->Instantiate();
 	Indicatorobj->GetComponent<Transform>()->SetScale({ BP002Widw,1,BP002Widw });
+	
+
 
 	protrudeIndecator = PrefabUtilitys->LoadPrefab("Protrude_Indecator");
 	protrudeIndicatorobj = protrudeIndecator->Instantiate();
@@ -426,6 +428,8 @@ void TBoss1::ShowMeleeIndicator()
 	tr->SetRotation(angle);
 
 	EffectComponent* eff = Indicatorobj->GetComponent< EffectComponent>();
+	float tiemescale = 1 / m_meleeIncatorDuration;
+	eff->SetTimeScale(tiemescale);
 	if (!isIndicator) {
 		eff->Apply();
 		isIndicator = true;
@@ -875,16 +879,6 @@ void TBoss1::Update_BP0031(float tick)
 
 
 
-
-		if (GM)
-		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
-			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
-			}
-		}
-
 		pattenIndex = index;
 		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
@@ -970,14 +964,6 @@ void TBoss1::Update_BP0032(float tick)
 			index++;
 		}
 
-		if (GM)
-		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
-			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
-			}
-		}
 		pattenIndex = index;
 		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
@@ -1088,14 +1074,6 @@ void TBoss1::Update_BP0033(float tick)
 
 			index++;
 		}
-		if (GM)
-		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
-			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
-			}
-		}
 		pattenIndex = index;
 		m_patternPhase = EPatternPhase::WaitForObjects;
 		break; // while 루프 탈출
@@ -1180,14 +1158,6 @@ void TBoss1::Update_BP0034(float tick)
 			}
 		}
 		
-		if (GM)
-		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
-			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
-			}
-		}
 		break;
 	}
 	case EPatternPhase::WaitForObjects:

@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "ClearPortal.h"
 #include "EntityAsis.h"
+#include "EffectComponent.h"
 void PortalTrigger::Start()
 {
 
@@ -26,8 +27,11 @@ void PortalTrigger::OnTriggerEnter(const Collision& collision)
 	{
 		if (portal)
 		{
-			if(portal->isPortalReady == false)
+			if (portal->isPortalReady == false)
+			{
 				portal->isPortalReady = true;
+				portal->m_portalEffect->Apply();
+			}
 		}
 	}
 }

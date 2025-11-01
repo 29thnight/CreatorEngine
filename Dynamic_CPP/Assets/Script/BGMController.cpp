@@ -21,10 +21,10 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
 		break;
 	case SceneType::Stage:
-		curSoundName = sounds->GetSoudNameRandom("AmbStage11");
+		curSoundName = sounds->GetSoudNameRandom("BgmStage11");
 		break;
 	case SceneType::Tutorial:
-		curSoundName = sounds->GetSoudNameRandom("AmbStage11");
+		curSoundName = sounds->GetSoudNameRandom("BgmStage11");
 		break;
 	case SceneType::Boss:
 		curSoundName = sounds->GetSoudNameRandom("BgmBoss");

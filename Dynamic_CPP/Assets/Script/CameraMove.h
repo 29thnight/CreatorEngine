@@ -53,4 +53,21 @@ private:
 	[[Property]]
 	bool OnCaculCamera = false;
 	
+
+private:
+	//camera shake
+	float shakeDuration = 0.f;
+	float shakeMagnitude = 0.7f;
+	float dampingSpeed = 1.0f;
+	Mathf::Vector3 initialPosition{ 0.f, 0.f, 0.f };
+
+	[[Method]]
+	void ShakeCamera(float duration);
+	[[Method]]
+	void ShakeCamera1s();
+
+public:
+	void StopCameraMoveFlag() { cameraMoveStopFlag = true; }
+private:
+	bool cameraMoveStopFlag = false;
 };

@@ -17,6 +17,7 @@
 #include "SFXPoolManager.h"
 #include "GameInstance.h"
 #include "SceneTransitionUI.h"
+#include "TweenManager.h"
 
 void GameManager::Awake()
 {
@@ -75,6 +76,10 @@ void GameManager::Update(float tick)
 	//테스트용 보상 코드
 	static float rewardTimer = 0.f;
 	rewardTimer += tick;
+
+	//임의 씬전환
+	CheatSceneEvent();
+	
 
 
 	CheckClear(tick);
@@ -136,8 +141,28 @@ void GameManager::Update(float tick)
 			}
 			m_nextSceneIndex = (int)SceneType::GameOver;
 			m_isLoadingReq = false;
-			LoadNextScene();
 			m_isGameOver = true;
+
+			m_asis[0]->GetOwner()->GetComponent<EntityAsis>()->SetDead();
+
+			auto tween = std::make_shared<Tweener<float>>(
+				[=]() { return 0.f; },
+				[=](float val) {
+				},
+				1.f,
+				15.f,
+				[&](float t) {
+					return Easing::Linear(t);
+				}
+			);
+			tween->SetOnComplete([&]() {
+				LoadNextScene();
+			});
+			TweenManager* tw = GetComponent<TweenManager>();
+			if (tw) {
+				tw->AddTween(tween);
+			}
+			tween.reset();
 		}
 	}
 }
@@ -495,6 +520,40 @@ void GameManager::PushControllerVibration(ControllerVibration* _ControllerVibrat
 ControllerVibration* GameManager::GetControllerVibration()
 {
 	return ControllerVibrationData;
+}
+
+void GameManager::CheatSceneEvent()
+{
+
+	if (m_isSwitching) {
+		SwitchNextScene();
+	}
+	else
+	{
+		if (InputManagement->IsKeyDown(KeyBoard::F1)) {
+			m_nextSceneIndex = (int)SceneType::Tutorial;
+			m_isLoadingReq = true;
+			LoadNextScene();
+			m_isSwitching = true;
+		}
+
+		if (InputManagement->IsKeyDown(KeyBoard::F2)) {
+			m_nextSceneIndex = (int)SceneType::Stage;
+			m_isLoadingReq = true;
+			LoadNextScene();
+			m_isSwitching = true;
+		}
+
+		if (InputManagement->IsKeyDown(KeyBoard::F3)) {
+			m_nextSceneIndex = (int)SceneType::Boss;
+			m_isLoadingReq = true;
+			LoadNextScene();
+			m_isSwitching = true;
+		}
+	}
+		
+	
+	
 }
 
 void GameManager::CheatMiningResource()

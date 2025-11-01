@@ -7,7 +7,8 @@
 #include "Core.Random.h"
 #include "EffectComponent.h"
 #include "TweenManager.h"
-
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void BP003::Start()
 {
 	meshRenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
@@ -103,7 +104,17 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 	
 	auto effcomp = GetOwner()->GetComponent<EffectComponent>();
 	effcomp->Apply();
+	GameObject* GMObj = GameObject::Find("GameManager");
+	GameManager* GM = GMObj->GetComponent<GameManager>();
 
+	if (GM)
+	{
+		auto pool = GM->GetSFXPool();
+		if (pool)
+		{
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+		}
+	}
 	isInitialize = true;
 }
 
