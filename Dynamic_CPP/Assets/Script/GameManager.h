@@ -42,6 +42,8 @@ public:
 	[[Method]]
 	void LoadPrevScene();
 	[[Method]]
+	void LoadPrevSceneManual();
+	[[Method]]
 	void SwitchPrevScene();
 	[[Method]]
 	void SwitchNextSceneWithFade();

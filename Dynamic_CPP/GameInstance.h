@@ -53,6 +53,7 @@ public:
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	void RemovePlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
 	CharType GetPlayerCharType(PlayerDir playerDir) const;
+	PlayerDir GetPlayerDir(CharType charType) const;
 public:
 	// Reward Management
 	void SetRewardAmount(int amount) { m_RewardAmount = amount; } 	// 게임 시작 시 또는 치트용.

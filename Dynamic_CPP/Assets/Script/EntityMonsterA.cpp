@@ -26,7 +26,7 @@ void EntityMonsterA::Start()
 	if (HPBarPrefab && canvObj)
 	{
 		GameObject* hpObj = PrefabUtilitys->InstantiatePrefab(HPBarPrefab, "MonAHp");
-		HPBar* hp = hpObj->GetComponent<HPBar>();
+		hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
 		m_currentHP = m_maxHP;
@@ -474,6 +474,7 @@ void EntityMonsterA::ChaseTarget(float deltatime)
 
 void EntityMonsterA::Dead()
 {
+	hp->GetOwner()->Destroy();
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	if (GM)

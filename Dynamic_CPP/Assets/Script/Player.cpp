@@ -158,6 +158,8 @@ void Player::Start()
 	}
 
 	constexpr int CONVERT_TYPE = 1;
+	playerIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
+
 	if(0 == playerIndex)
 	{
 		m_uiController = GameObject::Find("P1_UIController");
@@ -610,13 +612,19 @@ void Player::LateUpdate(float tick)
 			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
 			auto cam = camComponent->GetCamera();
 			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+			XMVECTOR determinant{};
+			auto invCamViewProj = XMMatrixInverse(&determinant, camViewProj);
+			if (XMVectorGetX(XMVectorAbs(determinant)) < 0.00001f)
+			{
+				std::cout << "Cannot invert matrix, determinant is too close to zero." << std::endl;
+			}
 
 			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
 			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 			float w = XMVectorGetW(clipSpacePos);
 			if (w < 0.001f) {
 				// 원래 위치 반환.
+				std::cout << "W component too small, cannot project point." << std::endl;
 				GetOwner()->m_transform.SetPosition(worldpos);
 				return;
 			}
@@ -626,10 +634,12 @@ void Player::LateUpdate(float tick)
 			float y = XMVectorGetY(ndcPos);
 			x = abs(x);
 			y = abs(y);
+			std::cout << "NDC Position: (" << x << ", " << y << ")" << std::endl;
 
-			float clamp_limit = 0.9f;
+			float clamp_limit = 0.7f;
 			if (x < clamp_limit && y < clamp_limit)
 			{
+				std::cout << "Within bounds, no clamping needed." << std::endl;
 				return;
 			}
 

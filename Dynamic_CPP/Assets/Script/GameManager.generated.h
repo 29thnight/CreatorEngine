@@ -14,6 +14,7 @@ ReflectionScriptField(GameManager) \
 		meta_method(LoadNextScene) \
 		meta_method(SwitchNextScene) \
 		meta_method(LoadPrevScene) \
+		meta_method(LoadPrevSceneManual) \
 		meta_method(SwitchPrevScene) \
 		meta_method(SwitchNextSceneWithFade) \
 		meta_method(SwitchPrevSceneWithFade) \

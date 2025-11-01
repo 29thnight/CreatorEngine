@@ -10,6 +10,7 @@ class Animator;
 class EffectComponent;
 class CriticalMark;
 class GameManager;
+class HPBar;
 //¿ø°Å¸®¸÷
 class TestMonsterB : public Entity
 {
@@ -135,4 +136,5 @@ private:
 	float deadElapsedTime = 0.f;
 	float deadDestroyTime = 1.0f;
 	GameManager* GM = nullptr;
+	HPBar* hp = nullptr;
 };

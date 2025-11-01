@@ -418,7 +418,10 @@ void GameInstance::SwitchSettingedScene(int sceneType)
 	auto it = m_settingedSceneNames.find(static_cast<SceneType>(sceneType));
 	if (it != m_settingedSceneNames.end()) 
 	{
-		m_prevSceneType = m_currentSceneType;
+		if (m_currentSceneType != SceneType::Loading)
+		{
+			m_prevSceneType = m_currentSceneType;
+		}
 		SwitchScene(it->second);
 		m_currentSceneType = static_cast<SceneType>(sceneType);
 	} 
@@ -470,4 +473,16 @@ CharType GameInstance::GetPlayerCharType(PlayerDir playerDir) const
 		}
 	}
 	return CharType::None;
+}
+
+PlayerDir GameInstance::GetPlayerDir(CharType charType) const
+{
+	for (const auto& [ct, dir] : m_playerInputDevices)
+	{
+		if (ct == charType)
+		{
+			return dir;
+		}
+	}
+	return PlayerDir::None;
 }

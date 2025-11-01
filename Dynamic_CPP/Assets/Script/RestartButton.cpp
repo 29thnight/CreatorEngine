@@ -22,11 +22,23 @@ void RestartButton::Update(float tick)
 	if (!m_gameManager || !m_isClicked)
 		return;
 
-	int currentScene = GameInstance::GetInstance()->GetPrevSceneType();
-	if (currentScene != (int)SceneType::Boss)
+	if (m_isEntering)
 	{
-		GameInstance::GetInstance()->ResetAllEnhancements();
+		int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
+		if (currentScene != (int)SceneType::Boss)
+		{
+			GameInstance::GetInstance()->ResetAllEnhancements();
+		}
 	}
+	else
+	{
+		int currentScene = GameInstance::GetInstance()->GetPrevSceneType();
+		if (currentScene != (int)SceneType::Boss)
+		{
+			GameInstance::GetInstance()->ResetAllEnhancements();
+		}
+	}
+
 	m_gameManager->SwitchPrevSceneWithFade();
 }
 
@@ -37,7 +49,15 @@ void RestartButton::ClickFunction()
 
 	GameInstance::GetInstance()->ResumeGame();
 	m_gameManager->m_isLoadingReq = true;
-	m_gameManager->LoadPrevScene();
+	if (m_isEntering) // 메뉴일때는 켜고, 게임오버 씬일때는 끄기
+	{
+		m_gameManager->m_prevSceneIndex = GameInstance::GetInstance()->GetCurrentSceneType();
+		m_gameManager->LoadPrevSceneManual();
+	}
+	else
+	{
+		m_gameManager->LoadPrevScene();
+	}
 	m_imageComponent->SetNavLock(true);
 	m_isClicked = true;
 }

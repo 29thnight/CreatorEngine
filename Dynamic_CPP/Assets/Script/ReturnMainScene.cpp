@@ -23,6 +23,7 @@ void ReturnMainScene::Update(float tick)
 		return;
 
 	GameInstance::GetInstance()->ResetAllEnhancements();
+	
 	m_gameManager->SwitchNextSceneWithFade();
 }
 
@@ -31,6 +32,7 @@ void ReturnMainScene::ClickFunction()
 	if (!m_gameManager || m_isClicked)
 		return;
 
+	GameInstance::GetInstance()->ResumeGame();
 	m_gameManager->m_nextSceneIndex = (int)SceneType::Bootstrap;
 	m_gameManager->LoadNextScene();
 	m_imageComponent->SetNavLock(true);

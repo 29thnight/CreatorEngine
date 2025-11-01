@@ -262,6 +262,19 @@ void GameManager::LoadPrevScene()
 	}
 }
 
+void GameManager::LoadPrevSceneManual()
+{
+	if (m_isLoadingReq)
+	{
+		GameInstance::GetInstance()->SetAfterLoadSceneIndex(m_prevSceneIndex);
+		LoadScene((int)SceneType::Loading);
+	}
+	else
+	{
+		LoadScene(m_prevSceneIndex);
+	}
+}
+
 void GameManager::SwitchPrevScene()
 {
 	if (!GameInstance::GetInstance()->IsLoadSceneComplete())

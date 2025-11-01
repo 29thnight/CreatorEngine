@@ -17,9 +17,9 @@ public:
 
 public:
 	[[Property]]
-	int m_eventID{ 0 };
+	int m_eventID{};
 	[[Property]]
-	int m_triggerIndex{ 0 };
+	int m_triggerIndex{};
 	[[Property]]
 	bool m_emitOnEnter{ true };
 	[[Property]]

@@ -129,7 +129,9 @@ Mathf::xMatrix Camera::CalculateInverseProjection()
 
 DirectX11::Sizef Camera::GetScreenSize() const
 {
-	return DirectX11::DeviceStates->g_ClientRect;
+	DirectX11::Sizef size;
+	size = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
+	return size;
 }
 
 DirectX::BoundingFrustum Camera::GetFrustum()

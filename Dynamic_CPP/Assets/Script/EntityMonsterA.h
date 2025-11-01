@@ -10,6 +10,7 @@ class EffectComponent;
 class CharacterControllerComponent;
 class CriticalMark;
 class GameManager;
+class HPBar;
 class EntityMonsterA : public Entity
 {
 public:
@@ -113,4 +114,5 @@ public:
 	float m_MaxknockBackTime = 0.2f;
 
 	GameManager* GM = nullptr;
+	HPBar* hp = nullptr;
 };

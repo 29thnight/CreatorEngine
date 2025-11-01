@@ -112,15 +112,15 @@ void SwitchingSceneTrigger::SetupCutRangeForNextScene()
     m_cutCursor = m_cutStart;
     m_cutRangeReady = true;
 
-    // WaitingInput에 들어오자마자 첫 컷을 자동으로 보여주고 싶으면:
-    if (m_cutCursor < m_cutEndExclusive)
-    {
-        ShowCut(m_cutCursor);
-        ++m_cutCursor;
-    }
-
     // 자동 진행 타이머 초기화
     m_autoTimer = 0.f;
+}
+
+inline bool HasCutsceneForNextSceneStrict(const GameManager* gm)
+{
+    if (!gm) return false;
+    int t = gm->m_nextSceneIndex; int prev = gm->m_prevSceneIndex;
+    return prev == (int)SceneType::SelectChar || t == (int)SceneType::Boss;
 }
 
 void SwitchingSceneTrigger::ShowCut(int idx)
@@ -157,14 +157,19 @@ void SwitchingSceneTrigger::Update(float tick)
 
     case SwitchPhase::FadingIn: {
         m_timer += tick;
-        const float t = std::clamp(m_timer / std::max(0.0001f, m_fadeInDuration), 0.f, 1.f);
-        const float a = SmoothStep(t);
-        SetAlphaAll(a);
+        float t = std::clamp(m_timer / std::max(0.0001f, m_fadeInDuration), 0.f, 1.f);
+        SetAlphaAll(SmoothStep(t));
 
         if (t >= 1.f) {
-            m_phase = SwitchPhase::WaitingInput;
             m_timer = 0.f;
-            SetupCutRangeForNextScene();
+
+            if (!HasCutsceneForNextSceneStrict(m_gameManager)) {
+                m_phase = SwitchPhase::WaitingInput;
+            }
+            else {
+                m_phase = SwitchPhase::WaitingInput;
+                SetupCutRangeForNextScene(); // 여기는 OK
+            }
         }
         break;
     }
@@ -175,10 +180,7 @@ void SwitchingSceneTrigger::Update(float tick)
         if (IsAnyAJustPressed())
         {
             int nextSceneType = m_gameManager ? m_gameManager->m_nextSceneIndex : -1;
-            const bool hasCutscene =
-                (nextSceneType == (int)SceneType::Boss) ||
-                (nextSceneType == (int)SceneType::Stage) ||
-                m_isTestMode;
+            const bool hasCutscene = HasCutsceneForNextSceneStrict(m_gameManager);
 
             if (!hasCutscene)
             {
@@ -205,10 +207,7 @@ void SwitchingSceneTrigger::Update(float tick)
         else // 자동 재생
         {
             int nextSceneType = m_gameManager ? m_gameManager->m_nextSceneIndex : -1;
-            const bool hasCutscene =
-                (nextSceneType == (int)SceneType::Boss) ||
-                (nextSceneType == (int)SceneType::Stage) ||
-                m_isTestMode;
+            const bool hasCutscene = HasCutsceneForNextSceneStrict(m_gameManager);
 
             if (hasCutscene)
             {

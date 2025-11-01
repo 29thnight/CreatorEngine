@@ -44,6 +44,11 @@ void ImageButton::Update(float tick)
 		{
 			if (m_imageComponent->IsNavigationThis())
 			{
+				if(m_imageComponent->IsEnabled()) 
+				{
+					return;
+				}
+
 				if (GM)
 				{
 					auto pool = GM->GetSFXPool();
@@ -63,6 +68,11 @@ void ImageButton::Update(float tick)
 		{
 			if (m_imageComponent->IsNavigationThis())
 			{
+				if (m_imageComponent->color == Mathf::Color4(1.f, 1.f, 1.f, 1.f))
+				{
+					return;
+				}
+
 				if (GM)
 				{
 					auto pool = GM->GetSFXPool();

@@ -12,6 +12,7 @@ class EffectComponent;
 struct Feeler;
 class CriticalMark;
 class GameManager;
+class HPBar;
 class EntityEleteMonster : public Entity
 {
 public:
@@ -187,6 +188,7 @@ public:
 	float KnockbackTime = 0;
 
 	GameManager* GM = nullptr;
+	HPBar* hp = nullptr;
 	////³Ø¹éÃ³¸® -> ³Ë¹é X
 	//float hittimer = 0.f;
 	//Mathf::Vector3 hitPos;

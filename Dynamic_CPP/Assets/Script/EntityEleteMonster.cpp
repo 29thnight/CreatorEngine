@@ -31,7 +31,7 @@ void EntityEleteMonster::Start()
 	if (HPBarPrefab && canvObj)
 	{
 		GameObject* hpObj = PrefabUtilitys->InstantiatePrefab(HPBarPrefab, "MonAHp");
-		HPBar* hp = hpObj->GetComponent<HPBar>();
+		hp = hpObj->GetComponent<HPBar>();
 		canvObj->AddChild(hpObj);
 		hp->targetIndex = GetOwner()->m_index;
 		m_currentHP = m_maxHP;
@@ -975,6 +975,7 @@ void EntityEleteMonster::Teleport()
 
 void EntityEleteMonster::Dead()
 {
+	hp->GetOwner()->Destroy();
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();
