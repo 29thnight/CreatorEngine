@@ -85,6 +85,7 @@ namespace CreatorEngine
         }
 
         private Transform? m_CachedTransform;
+        private RectTransform? m_CachedRectTransform;
 
         public Transform Transform
         {
@@ -105,6 +106,19 @@ namespace CreatorEngine
                 }
 
                 return m_CachedTransform;
+            }
+        }
+
+        public RectTransform? RectTransform
+        {
+            get
+            {
+                if (m_CachedRectTransform == null || m_CachedRectTransform.m_NativePtr == IntPtr.Zero)
+                {
+                    m_CachedRectTransform = RectTransform.Get(this);
+                }
+
+                return m_CachedRectTransform;
             }
         }
 

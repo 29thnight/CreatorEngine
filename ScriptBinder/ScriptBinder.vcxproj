@@ -314,6 +314,7 @@
     <ClInclude Include="Object_Binding.h" />
     <ClInclude Include="Component_Binding.h" />
     <ClInclude Include="RectTransformComponent.h" />
+    <ClInclude Include="RectTransform_Binding.h" />
     <ClInclude Include="CurvePoint.h" />
     <ClInclude Include="ScriptStringModule.h" />
     <ClInclude Include="SoundComponent.h" />
