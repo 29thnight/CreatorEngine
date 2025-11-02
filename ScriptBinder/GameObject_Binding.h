@@ -76,6 +76,15 @@ namespace
             return 0;
         }
 
+        static intptr_t ICall_GameObject_GetTransform(MonoObject* _this, intptr_t nativePtr) noexcept
+        {
+            if (auto* self = FromIntPtr<GameObject>(_this, nativePtr))
+            {
+                return reinterpret_cast<intptr_t>(&self->m_transform);
+            }
+            return 0;
+        }
+
         static MonoString* ICall_GameObject_GetTag(MonoObject* _this, intptr_t nativePtr)
         {
             if (auto* self = FromIntPtr<GameObject>(_this, nativePtr))
@@ -136,6 +145,7 @@ inline void Register_GameObject_ICalls()
     mono_add_internal_call("CreatorEngine.GameObject::ICall_Find", (const void*)ICall_GameObject_Find);
     mono_add_internal_call("CreatorEngine.GameObject::ICall_FindIndex", (const void*)ICall_GameObject_FindIndex);
     mono_add_internal_call("CreatorEngine.GameObject::ICall_GetComponent", (const void*)ICall_GameObject_GetComponent);
+    mono_add_internal_call("CreatorEngine.GameObject::ICall_GetTransform", (const void*)ICall_GameObject_GetTransform);
     mono_add_internal_call("CreatorEngine.GameObject::ICall_GetTag", (const void*)ICall_GameObject_GetTag);
     mono_add_internal_call("CreatorEngine.GameObject::ICall_SetTag", (const void*)ICall_GameObject_SetTag);
     mono_add_internal_call("CreatorEngine.GameObject::ICall_GetLayer", (const void*)ICall_GameObject_GetLayer);
