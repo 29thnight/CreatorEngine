@@ -15,6 +15,9 @@ namespace CreatorEngine
         private static extern IntPtr ICall_GetComponent(IntPtr self, uint typeGuid);
 
         [MethodImpl(MethodImplOptions.InternalCall)]
+        private static extern IntPtr ICall_GetTransform(IntPtr self);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
         private static extern string ICall_GetTag(IntPtr self);
 
         [MethodImpl(MethodImplOptions.InternalCall)]
@@ -79,6 +82,30 @@ namespace CreatorEngine
             var component = new Component();
             component.m_NativePtr = componentPtr;
             return component;
+        }
+
+        private Transform? m_CachedTransform;
+
+        public Transform Transform
+        {
+            get
+            {
+                if (m_CachedTransform == null)
+                {
+                    IntPtr transformPtr = ICall_GetTransform(m_NativePtr);
+                    if (transformPtr == IntPtr.Zero)
+                    {
+                        throw new InvalidOperationException("Native transform pointer is null.");
+                    }
+
+                    m_CachedTransform = new Transform
+                    {
+                        m_NativePtr = transformPtr
+                    };
+                }
+
+                return m_CachedTransform;
+            }
         }
 
         public string Tag
