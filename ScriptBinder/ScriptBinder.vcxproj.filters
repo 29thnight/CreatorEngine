@@ -691,6 +691,9 @@
     <ClInclude Include="Transform_Binding.h">
       <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
     </ClInclude>
+    <ClInclude Include="RectTransform_Binding.h">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObject.inl">

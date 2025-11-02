@@ -4,6 +4,7 @@
 #include "Component_Binding.h"
 #include "GameObject_Binding.h"
 #include "Transform_Binding.h"
+#include "RectTransform_Binding.h"
 #include <cassert>
 #include <sstream>
 #include <iostream>
@@ -161,6 +162,7 @@ void MonoManager::RegisterInternalCalls()
     Register_GameObject_ICalls();
     // Register_Component_ICalls();
     Register_Transform_ICalls();
+    Register_RectTransform_ICalls();
     // ...
 }
 
