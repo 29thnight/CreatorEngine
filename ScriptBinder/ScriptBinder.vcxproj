@@ -305,6 +305,7 @@
     <ClInclude Include="FoliageType.h" />
     <ClInclude Include="FoliageComponent.h" />
     <ClInclude Include="FormIntPtr.h" />
+    <ClInclude Include="GameObject_Binding.h" />
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
     <ClInclude Include="MonoManager.h" />

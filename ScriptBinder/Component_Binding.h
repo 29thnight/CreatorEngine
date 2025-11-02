@@ -1,4 +1,5 @@
 #pragma once
+#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
 #include "FormIntPtr.h"
 #include "Component.h"

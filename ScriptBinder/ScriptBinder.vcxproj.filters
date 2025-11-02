@@ -174,9 +174,6 @@
     <Filter Include="Classes\Components\Transform\2D">
       <UniqueIdentifier>{e6e1a773-6424-4361-9436-843af99d9eac}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\DecalComponent">
-      <UniqueIdentifier>{8240d859-d50f-4e50-a493-e2e07d3c4063}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\InputManager\EngineReflect">
       <UniqueIdentifier>{ca4d0a2a-f8f3-464b-845e-7e806c05ddf1}</UniqueIdentifier>
     </Filter>
@@ -197,6 +194,9 @@
     </Filter>
     <Filter Include="Managers\HotLoadSystem\MonoLibSystem\FormIntPtr">
       <UniqueIdentifier>{f59f7b30-929f-4cba-9836-2bb3074eb2ac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\DecalComponent">
+      <UniqueIdentifier>{8240d859-d50f-4e50-a493-e2e07d3c4063}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -684,6 +684,9 @@
     </ClInclude>
     <ClInclude Include="FormIntPtr.h">
       <Filter>Managers\HotLoadSystem\MonoLibSystem\FormIntPtr</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObject_Binding.h">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
