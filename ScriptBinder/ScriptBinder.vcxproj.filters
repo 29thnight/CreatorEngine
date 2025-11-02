@@ -673,6 +673,9 @@
     <ClInclude Include="Object_Binding.h">
       <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
     </ClInclude>
+    <ClInclude Include="Component_Binding.h">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
+    </ClInclude>
     <ClInclude Include="MonoManager.h">
       <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
     </ClInclude>

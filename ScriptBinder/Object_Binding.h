@@ -1,5 +1,4 @@
 #pragma once
-#define UNUSE_MONO_LIB // ¸ğ³ë °ü·Ã ±â´É Æ®¸®°Å
 #ifndef UNUSE_MONO_LIB
 
 // Object_Bindings.cpp
@@ -7,7 +6,7 @@
 #include <mono/metadata/assembly.h>
 #include <mono/metadata/mono-config.h>
 #include <mono/metadata/object.h>
-#include "Object.h"          // ³×°¡ ÁØ Object ¼±¾ğ
+#include "Object.h"          // ë„¤ê°€ ì¤€ Object ì„ ì–¸
 #include "TypeTrait.h"
 
 namespace
@@ -33,7 +32,7 @@ namespace
         return reinterpret_cast<Object*>(nativePtr);
     }
 
-    // -------- ICalls (extern "C" ±ÇÀå) --------
+    // -------- ICalls (extern "C" ê¶Œì¥) --------
     extern "C"
     {
         // ulong GetInstanceID(IntPtr self)
@@ -120,10 +119,10 @@ namespace
     }
 } // anonymous namespace
 
-// --- µî·Ï ÇÔ¼ö (µµ¸ŞÀÎ ÃÊ±âÈ­ ½Ã ÇÑ ¹ø È£Ãâ) ---
+// --- ë“±ë¡ í•¨ìˆ˜ (ë„ë©”ì¸ ì´ˆê¸°í™” ì‹œ í•œ ë²ˆ í˜¸ì¶œ) ---
 void Register_Object_ICalls()
 {
-    // C# Á¤±Ô¸í: "³×ÀÓ½ºÆäÀÌ½º.Å¸ÀÔ::¸Ş¼­µå¸í"
+    // C# ì •ê·œëª…: "ë„¤ì„ìŠ¤í˜ì´ìŠ¤.íƒ€ì…::ë©”ì„œë“œëª…"
     mono_add_internal_call("CreatorEngine.Object::ICall_GetInstanceID", (const void*)ICall_Object_GetInstanceID);
     mono_add_internal_call("CreatorEngine.Object::ICall_GetTypeID", (const void*)ICall_Object_GetTypeID);
     mono_add_internal_call("CreatorEngine.Object::ICall_ToString", (const void*)ICall_Object_ToString);

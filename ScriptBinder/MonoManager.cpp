@@ -1,32 +1,32 @@
 #include "MonoManager.h"
 #ifndef UNUSE_MONO_LIB
+#include "Object_Binding.h"
+#include "Component_Binding.h"
 #include <cassert>
 #include <sstream>
 #include <iostream>
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/threads.h>
 
-// ³×°¡ ±âÁ¸¿¡ ÀÛ¼ºÇÑ Object ¹ÙÀÎµù µî·Ï ÇÔ¼ö
-void Register_Object_ICalls();
 
 bool MonoManager::Initialize(const char* domainName,
     const char* monoLibDir,
     const char* monoEtcDir,
     bool enableDebug)
 {
-    // Mono ¿£Áø °æ·Î ¼³Á¤
+    // Mono ì—”ì§„ ê²½ë¡œ ì„¤ì •
     mono_set_dirs(monoLibDir, monoEtcDir);
     mono_config_parse(nullptr);
 
     if (enableDebug)
     {
-        // mdb/pdb ½Éº¼ ·Îµù È°¼ºÈ­
+        // mdb/pdb ì‹¬ë³¼ ë¡œë”© í™œì„±í™”
         mono_debug_init(MONO_DEBUG_FORMAT_MONO);
-        mono_jit_set_aot_mode(MONO_AOT_MODE_INTERP); // ÇÊ¿ä½Ã ÀÎÅÍÇÁ¸®ÅÍ º´Çà
+        mono_jit_set_aot_mode(MONO_AOT_MODE_INTERP); // í•„ìš”ì‹œ ì¸í„°í”„ë¦¬í„° ë³‘í–‰
         mono_debug_domain_create(mono_get_root_domain());
     }
 
-    // ·çÆ® µµ¸ŞÀÎ »ı¼º
+    // ë£¨íŠ¸ ë„ë©”ì¸ ìƒì„±
     m_rootDomain = mono_jit_init_version(domainName, "v4.0.30319");
     if (!m_rootDomain)
     {
@@ -34,11 +34,11 @@ bool MonoManager::Initialize(const char* domainName,
         return false;
     }
 
-    // ¾Û µµ¸ŞÀÎ »ı¼º (½ºÅ©¸³Æ®¿ë µµ¸ŞÀÎ ºĞ¸®)
+    // ì•± ë„ë©”ì¸ ìƒì„± (ìŠ¤í¬ë¦½íŠ¸ìš© ë„ë©”ì¸ ë¶„ë¦¬)
     if (!CreateAppDomain(domainName))
         return false;
 
-    // ³»ºÎ È£Ãâ µî·Ï (ÇÊ¿äÇÑ ¹ÙÀÎµù ¸ğµÎ ¿©±â¿¡¼­)
+    // ë‚´ë¶€ í˜¸ì¶œ ë“±ë¡ (í•„ìš”í•œ ë°”ì¸ë”© ëª¨ë‘ ì—¬ê¸°ì—ì„œ)
     RegisterInternalCalls();
     return true;
 }
@@ -75,7 +75,7 @@ void MonoManager::DestroyAppDomain()
 {
     if (m_appDomain)
     {
-        // appdomain unload´Â ·çÆ® µµ¸ŞÀÎ ÄÁÅØ½ºÆ®¿¡¼­ ½ÇÇàÇØ¾ß ÇÔ
+        // appdomain unloadëŠ” ë£¨íŠ¸ ë„ë©”ì¸ ì»¨í…ìŠ¤íŠ¸ì—ì„œ ì‹¤í–‰í•´ì•¼ í•¨
         mono_domain_set(m_rootDomain, /* force */ false);
         mono_domain_unload(m_appDomain);
         m_appDomain = nullptr;
@@ -115,35 +115,35 @@ MonoManager::LoadAssembly(const std::string& name, const std::string& path)
 
 void MonoManager::UnloadAllAssemblies()
 {
-    // Mono API·Î °³º° ¾î¼Àºí¸® unload´Â ¾È µÊ. AppDomainÀ» ÅëÂ°·Î ¾ğ·ÎµåÇØ¾ß ÇÔ.
+    // Mono APIë¡œ ê°œë³„ ì–´ì…ˆë¸”ë¦¬ unloadëŠ” ì•ˆ ë¨. AppDomainì„ í†µì§¸ë¡œ ì–¸ë¡œë“œí•´ì•¼ í•¨.
     m_assemblies.clear();
 }
 
 bool MonoManager::ReloadAll(const std::vector<std::pair<std::string, std::string>>& assemblies)
 {
-    // 1) ±âÁ¸ AppDomain ÆÄ±«
+    // 1) ê¸°ì¡´ AppDomain íŒŒê´´
     UnloadAllAssemblies();
     DestroyAppDomain();
 
-    // 2) »õ AppDomain »ı¼º
+    // 2) ìƒˆ AppDomain ìƒì„±
     if (!CreateAppDomain("ScriptDomain"))
         return false;
 
-    // 3) Àç·Îµù
+    // 3) ì¬ë¡œë”©
     for (auto& p : assemblies)
     {
         auto opt = LoadAssembly(p.first, p.second);
         if (!opt) return false;
     }
 
-    // 4) ³»ºÎ È£Ãâ Àçµî·Ï(µµ¸ŞÀÎ¸¶´Ù ÇÊ¿ä)
+    Register_Component_ICalls();
     RegisterInternalCalls();
     return true;
 }
 
 MonoThread* MonoManager::AttachCurrentThread()
 {
-    // ÀÌ¹Ì ºÙ¾î ÀÖÀ¸¸é nullptr ¹İÈ¯ °¡´É. Attach º¸Àå À§ÇØ °á°ú Ã¼Å©´Â »ı·«
+    // ì´ë¯¸ ë¶™ì–´ ìˆìœ¼ë©´ nullptr ë°˜í™˜ ê°€ëŠ¥. Attach ë³´ì¥ ìœ„í•´ ê²°ê³¼ ì²´í¬ëŠ” ìƒëµ
     return mono_thread_attach(m_appDomain);
 }
 
@@ -154,7 +154,7 @@ void MonoManager::DetachCurrentThread()
 
 void MonoManager::RegisterInternalCalls()
 {
-    // ¿©±â¿¡ ¿£ÁøÀÇ ¸ğµç ¹ÙÀÎµù µî·Ï ÇÔ¼ö È£Ãâ
+    // ì—¬ê¸°ì— ì—”ì§„ì˜ ëª¨ë“  ë°”ì¸ë”© ë“±ë¡ í•¨ìˆ˜ í˜¸ì¶œ
     Register_Object_ICalls();
     // Register_Component_ICalls();
     // Register_Transform_ICalls();
@@ -165,8 +165,8 @@ MonoClass* MonoManager::GetClass(const char* nameSpace, const char* klassName, M
 {
     if (!image)
     {
-        // ±âº»: Ã¹ ¹øÂ°(¶Ç´Â Æ¯Á¤) ½ºÅ©¸³Æ® ¾î¼Àºí¸® ÀÌ¹ÌÁö »ç¿ëÇÏ°í ½ÍÀ¸¸é ÀÌ¸§À» ÅëÀÏÇØ¼­ ²¨³» ¾²ÀÚ.
-        // ¿©±â¼± ´ë·« Ã¹ ¹øÂ° ¿£Æ®¸®¸¦ »ç¿ë
+        // ê¸°ë³¸: ì²« ë²ˆì§¸(ë˜ëŠ” íŠ¹ì •) ìŠ¤í¬ë¦½íŠ¸ ì–´ì…ˆë¸”ë¦¬ ì´ë¯¸ì§€ ì‚¬ìš©í•˜ê³  ì‹¶ìœ¼ë©´ ì´ë¦„ì„ í†µì¼í•´ì„œ êº¼ë‚´ ì“°ì.
+        // ì—¬ê¸°ì„  ëŒ€ëµ ì²« ë²ˆì§¸ ì—”íŠ¸ë¦¬ë¥¼ ì‚¬ìš©
         if (m_assemblies.empty()) return nullptr;
         image = m_assemblies.begin()->second.image;
     }
@@ -201,7 +201,7 @@ MonoObject* MonoManager::CreateInstance(MonoClass* klass)
     if (!klass) return nullptr;
     MonoObject* obj = mono_object_new(m_appDomain, klass);
     if (!obj) return nullptr;
-    mono_runtime_object_init(obj); // .ctor() È£Ãâ
+    mono_runtime_object_init(obj); // .ctor() í˜¸ì¶œ
     return obj;
 }
 
@@ -262,8 +262,8 @@ void MonoManager::GCCollect()
 
 void MonoManager::GCWaitForPendingFinalizers()
 {
-    // corlib(mscorlib) ÀÌ¹ÌÁö¿¡¼­ System.GC Å¬·¡½º¸¦ Á÷Á¢ ¾ò¾î È£Ãâ
-    MonoImage* corlib = mono_get_corlib(); // corlib ÀÌ¹ÌÁö ÇÚµé
+    // corlib(mscorlib) ì´ë¯¸ì§€ì—ì„œ System.GC í´ë˜ìŠ¤ë¥¼ ì§ì ‘ ì–»ì–´ í˜¸ì¶œ
+    MonoImage* corlib = mono_get_corlib(); // corlib ì´ë¯¸ì§€ í•¸ë“¤
     if (!corlib) {
         std::cerr << "[Mono] corlib image not found\n";
         return;

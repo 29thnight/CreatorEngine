@@ -1,5 +1,4 @@
 #pragma once
-#define UNUSE_MONO_LIB // ¸ğ³ë °ü·Ã ±â´É Æ®¸®°Å
 #ifndef UNUSE_MONO_LIB
 #include <DLLAcrossSingleton.h>
 #include <string>
@@ -25,53 +24,53 @@ public:
     };
 
 public:
-    // ÇÊ¼ö ¼ö¸íÁÖ±â
+    // í•„ìˆ˜ ìˆ˜ëª…ì£¼ê¸°
     bool Initialize(const char* domainName,
         const char* monoLibDir,      // ex) "<mono>/lib"
         const char* monoEtcDir,      // ex) "<mono>/etc"
-        bool enableDebug = false);   // mdb/pdb ½Éº¼ Áö¿ø
+        bool enableDebug = false);   // mdb/pdb ì‹¬ë³¼ ì§€ì›
 
     void Shutdown();
 
-    // ¾î¼Àºí¸® ·Îµå/Àç·Îµù
+    // ì–´ì…ˆë¸”ë¦¬ ë¡œë“œ/ì¬ë¡œë”©
     std::optional<AssemblyPack> LoadAssembly(const std::string& name, const std::string& path);
     void UnloadAllAssemblies();
     bool ReloadAll(const std::vector<std::pair<std::string, std::string>>& assemblies);
 
-    // ±âº» µµ¸ŞÀÎ/µµ¸ŞÀÎ Á¤º¸
+    // ê¸°ë³¸ ë„ë©”ì¸/ë„ë©”ì¸ ì •ë³´
     MonoDomain* GetRootDomain() const { return m_rootDomain; }
     MonoDomain* GetAppDomain()  const { return m_appDomain; }
 
-    // ½º·¹µå °ü¸®
+    // ìŠ¤ë ˆë“œ ê´€ë¦¬
     MonoThread* AttachCurrentThread();
     void        DetachCurrentThread();
 
-    // ³»ºÎ È£Ãâ µî·Ï(¿©±â¼­ ÇÑ ¹ø¿¡)
+    // ë‚´ë¶€ í˜¸ì¶œ ë“±ë¡(ì—¬ê¸°ì„œ í•œ ë²ˆì—)
     void RegisterInternalCalls();
 
-    // Å¬·¡½º/¸Ş¼­µå µµ¿ì¹Ì
+    // í´ë˜ìŠ¤/ë©”ì„œë“œ ë„ìš°ë¯¸
     MonoClass* GetClass(const char* nameSpace, const char* klassName, MonoImage* image = nullptr) const;
     MonoMethod* GetMethod(MonoClass* klass, const char* methodName, int paramCount) const;
 
-    // Á¤Àû ¸Ş¼­µå È£Ãâ
+    // ì •ì  ë©”ì„œë“œ í˜¸ì¶œ
     MonoObject* InvokeStatic(MonoClass* klass, const char* methodName, void** args, int paramCount, MonoObject** outException = nullptr);
 
-    // ÀÎ½ºÅÏ½º »ı¼º/¸Ş¼­µå È£Ãâ
+    // ì¸ìŠ¤í„´ìŠ¤ ìƒì„±/ë©”ì„œë“œ í˜¸ì¶œ
     MonoObject* CreateInstance(MonoClass* klass);
     MonoObject* Invoke(MonoObject* instance, const char* methodName, void** args, int paramCount, MonoObject** outException = nullptr);
 
-    // ¹®ÀÚ¿­ º¯È¯
+    // ë¬¸ìì—´ ë³€í™˜
     MonoString* ToMonoString(const std::string& s) const;
     std::string FromMonoString(MonoString* ms) const;
 
-    // ¿¹¿Ü Æ÷¸Ë Ãâ·Â
+    // ì˜ˆì™¸ í¬ë§· ì¶œë ¥
     static std::string FormatException(MonoObject* exception);
 
-    // GC/À¯Æ¿
+    // GC/ìœ í‹¸
     void GCCollect();
     void GCWaitForPendingFinalizers();
 
-    // ÀÌ¹ÌÁö/¾î¼Àºí¸® Á¢±Ù
+    // ì´ë¯¸ì§€/ì–´ì…ˆë¸”ë¦¬ ì ‘ê·¼
     MonoImage* GetImage(const std::string& assemblyName) const;
 
 private:
