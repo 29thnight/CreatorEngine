@@ -489,6 +489,59 @@ public:
                 SpriteEffects_None, layerDepth);
         }
 
+        void XM_CALLCONV DrawSequential(
+            DirectX::SpriteBatch* batch,
+            DirectX::XMFLOAT2 const& position,
+            float dt,
+            float frameDuration,
+            SequenceState& state,
+            ClipDirection clipDir,
+            float clipPercent,
+            DirectX::FXMVECTOR color,
+            float rotation,
+            DirectX::XMFLOAT2 const& scale,
+            DirectX::SpriteEffects effects = DirectX::SpriteEffects_None,
+            float layerDepth = 0.f) const
+        {
+            using namespace DirectX;
+            if (!batch || mSprites.empty() || frameDuration <= 0.f || mMaxSrcW <= 0 || mMaxSrcH <= 0)
+                return;
+
+            state.timeAccum += dt;
+            while (state.timeAccum >= frameDuration)
+            {
+                state.timeAccum -= frameDuration;
+                if (state.frameIndex + 1 < mSprites.size()) ++state.frameIndex;
+                else { state.frameIndex = state.loop ? 0 : (mSprites.size() - 1); }
+            }
+
+            const SpriteFrame* frame = GetFrameByIndex(state.frameIndex);
+            if (!frame) return;
+
+            if (clipDir == ClipDirection::None || clipPercent >= 1.f)
+            {
+                Draw(batch, *frame, position, color, rotation, scale, effects, layerDepth);
+                return;
+            }
+
+            const RECT maxDst = MakeMaxDestAlignedByFrameOrigin(mMaxSrcW, mMaxSrcH, *frame, position, scale);
+            const RECT curDst = MakeDestFromPosScale2(*frame, position, scale);
+            const RECT clipDst = MakeClipRectFromPercent(maxDst, clipDir, clipPercent);
+
+            RECT inter{};
+            if (!IntersectRectSafe(inter, curDst, clipDst))
+                return;
+
+            RECT clippedSrc{};
+            if (!MapIntersectionToSource(*frame, curDst, inter, clippedSrc))
+                return;
+
+            static const XMFLOAT2 zeroOrigin{ 0.f, 0.f };
+            batch->Draw(mTexture.Get(), inter, &clippedSrc, color, /*rotation*/0.f, zeroOrigin,
+                SpriteEffects_None, layerDepth);
+        }
+
+
 private:
     // frame, position, scale(float) -> 목적 사각형
     static RECT MakeDestFromPosScale(const SpriteFrame& frame, DirectX::XMFLOAT2 pos, float scale)
@@ -550,6 +603,26 @@ private:
         const float T = std::floor(pos.y - oy_max * scale);
         const float R = L + std::round(maxW * scale);
         const float B = T + std::round(maxH * scale);
+
+        RECT r{ LONG(L), LONG(T), LONG(R), LONG(B) };
+        return r;
+    }
+
+    static RECT MakeMaxDestAlignedByFrameOrigin(LONG maxW, LONG maxH,
+        const SpriteFrame& frame,
+        DirectX::XMFLOAT2 pos,
+        DirectX::XMFLOAT2 scale)
+    {
+        const float ox_ratio = (SrcWidth(frame) > 0) ? (frame.origin.x / float(SrcWidth(frame))) : 0.f;
+        const float oy_ratio = (SrcHeight(frame) > 0) ? (frame.origin.y / float(SrcHeight(frame))) : 0.f;
+
+        const float ox_max = ox_ratio * float(maxW);
+        const float oy_max = oy_ratio * float(maxH);
+
+        const float L = std::floor(pos.x - ox_max * scale.x);
+        const float T = std::floor(pos.y - oy_max * scale.y);
+        const float R = L + std::round(maxW * scale.x);
+        const float B = T + std::round(maxH * scale.y);
 
         RECT r{ LONG(L), LONG(T), LONG(R), LONG(B) };
         return r;

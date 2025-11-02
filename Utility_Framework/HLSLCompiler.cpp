@@ -2,8 +2,10 @@
 #include "HLSLCompiler.h"
 #include "FileIO.h"
 
-std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
-std::mutex HLSLCompiler::m_compileMutex;
+//std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
+//std::mutex HLSLCompiler::m_compileMutex;
+
+concurrency::concurrent_unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
 
 ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 {
@@ -11,7 +13,6 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 	std::string fileExtension = filePath.extension().string();
 
     {
-		std::unique_lock<std::mutex> lock(m_compileMutex);
         if (m_shaderCache.find(filePath.string()) != m_shaderCache.end())
         {
             return m_shaderCache[filePath.string()];
@@ -71,7 +72,6 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 		if (SUCCEEDED(hResult))
 		{
             {
-				std::unique_lock<std::mutex> lock(m_compileMutex);
                 m_shaderCache[filePath.string()] = shaderBlob;
             }
             std::string csoPath = PathFinder::RelativeToPrecompiledShader().string() + filePath.stem().string() + ".cso";
@@ -114,7 +114,6 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 		}
 
         {
-            std::unique_lock<std::mutex> lock(m_compileMutex);
             m_shaderCache[filePath.string()] = shaderBlob;
         }
 

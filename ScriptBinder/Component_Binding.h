@@ -1,11 +1,7 @@
 #pragma once
+#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
-
-#include <mono/jit/jit.h>
-#include <mono/metadata/assembly.h>
-#include <mono/metadata/mono-config.h>
-#include <mono/metadata/object.h>
-
+#include "FormIntPtr.h"
 #include "Component.h"
 #include "GameObject.h"
 #include "TypeTrait.h"
@@ -14,16 +10,11 @@
 
 namespace
 {
-    inline Component* FromIntPtr(MonoObject* /*instance*/, intptr_t nativePtr) noexcept
-    {
-        return reinterpret_cast<Component*>(nativePtr);
-    }
-
     extern "C"
     {
         static intptr_t ICall_Component_GetOwner(MonoObject* _this, intptr_t nativePtr) noexcept
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Component>(_this, nativePtr))
             {
                 if (auto* owner = self->GetOwner())
                 {
@@ -35,7 +26,7 @@ namespace
 
         static intptr_t ICall_Component_GetComponent(MonoObject* _this, intptr_t nativePtr, uint64_t typeGuid) noexcept
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Component>(_this, nativePtr))
             {
                 try
                 {

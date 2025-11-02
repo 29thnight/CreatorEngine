@@ -113,8 +113,6 @@ void EntityAsis::Start()
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 
-
-
 	auto paths = GameObject::Find("Paths");
 	if (paths) {
 		for (auto& index : paths->m_childrenIndices) {
@@ -279,27 +277,27 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 	m_currentGracePeriod = graceperiod;			// 무적
 	m_currentTailPurificationDuration = 0.f;	// 진행중인 정화 취소
 	HitImpulse();
+	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
+	bool isDroped = DropItem();
+	//Hit 보다 Stun 이 우선시 된다.
+	LOG("EntityAsis: Current HP: " << m_currentHP);
+	if (m_currentHP <= 0)
+	{
+		//스턴 이펙트 or 애니메이션 같은거 따로 추가되는지 체크
+		// 스턴
+		isStun = true;
+		Stun();
+		return;
+	}
+
 	if(m_emoteSystem)
 	{
 		m_emoteSystem->PlaySick();
-
-
 		if (m_EmoteSound)
 		{
 			m_EmoteSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriReactionHurt");
 			m_EmoteSound->PlayOneShot();
 		}
-	}
-	// 피격 시 정화중인 아이템 떨구는 기능. 드랍되었다면 isDroped로 사운드처리. (ex. 뱉는 사운드, 정화실패 사운드 등)
-	bool isDroped = DropItem();
-
-	LOG("EntityAsis: Current HP: " << m_currentHP);
-	if(m_currentHP <= 0)
-	{
-		isStun = true;
-		Stun();
-		//스턴 이펙트 or 애니메이션 같은거 따로 추가되는지 체크
-		// 스턴
 	}
 }
 
@@ -505,8 +503,6 @@ void EntityAsis::Stun()
 			m_EmoteSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriStun");
 			m_EmoteSound->PlayOneShot();
 		}
-
-
 	}
 }
 

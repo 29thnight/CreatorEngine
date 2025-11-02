@@ -292,21 +292,38 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                 if (m_texture && m_spriteSheet)
                 {
                     DirectX::XMFLOAT2 pos{ info.position.x, info.position.y };
-                    auto size = m_texture->GetImageSize();
-					float deltaTime = info.isPreview ? Time->GetElapsedSeconds() : info.deltaTime;
-                    m_spriteSheet->DrawSequential(spriteBatch.get(),
-                        pos,
-                        deltaTime,
-						info.frameDuration,
-                        m_sequenceState,
-                        info.clipDirection,
-						info.clipPercent,
-                        DirectX::Colors::White,
-                        0.f,
-                        1.f,
-                        info.filpEffect,
-						static_cast<float>(info.layerOrder) / MaxOreder
-                    );
+                    DirectX::XMFLOAT2 spriteScale{ info.scale.x, info.scale.y };
+                    float deltaTime = info.isPreview ? Time->GetElapsedSeconds() : info.deltaTime;
+                    if (info.clipDirection == ClipDirection::None || info.clipPercent >= 1.f)
+                    {
+                        m_spriteSheet->DrawSequential(
+                            spriteBatch.get(),
+                            pos,
+                            deltaTime,
+                            info.frameDuration,
+                            m_sequenceState,
+                            DirectX::Colors::White,
+                            0.f,
+                            spriteScale,
+                            info.filpEffect,
+                            static_cast<float>(info.layerOrder) / MaxOreder);
+                    }
+                    else
+                    {
+                        m_spriteSheet->DrawSequential(
+                            spriteBatch.get(),
+                            pos,
+                            deltaTime,
+                            info.frameDuration,
+                            m_sequenceState,
+                            info.clipDirection,
+                            info.clipPercent,
+                            DirectX::Colors::White,
+                            0.f,
+                            spriteScale,
+                            info.filpEffect,
+                            static_cast<float>(info.layerOrder) / MaxOreder);
+                    }
                 }
 			}
         },

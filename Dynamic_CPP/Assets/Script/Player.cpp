@@ -611,25 +611,20 @@ void Player::LateUpdate(float tick)
 					}
 				}
 			}
+			GetOwner()->m_transform.UpdateWorldMatrix(); //이거 해야함 ㅠㅠ
 		}
 		else
 		{
 			CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
 			auto cam = camComponent->GetCamera();
 			auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-			XMVECTOR determinant{};
-			auto invCamViewProj = XMMatrixInverse(&determinant, camViewProj);
-			if (XMVectorGetX(XMVectorAbs(determinant)) < 0.00001f)
-			{
-				std::cout << "Cannot invert matrix, determinant is too close to zero." << std::endl;
-			}
+			auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
 			XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
 			XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
 			float w = XMVectorGetW(clipSpacePos);
 			if (w < 0.001f) {
 				// 원래 위치 반환.
-				std::cout << "W component too small, cannot project point." << std::endl;
 				GetOwner()->m_transform.SetPosition(worldpos);
 				return;
 			}
@@ -639,12 +634,10 @@ void Player::LateUpdate(float tick)
 			float y = XMVectorGetY(ndcPos);
 			x = abs(x);
 			y = abs(y);
-			std::cout << "NDC Position: (" << x << ", " << y << ")" << std::endl;
 
 			float clamp_limit = 0.7f;
 			if (x < clamp_limit && y < clamp_limit)
 			{
-				std::cout << "Within bounds, no clamping needed." << std::endl;
 				return;
 			}
 
@@ -653,10 +646,12 @@ void Player::LateUpdate(float tick)
 				XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
 				XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
 			);
+
 			XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
 			XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
 			GetOwner()->m_transform.SetPosition(newWorldPos);
+			GetOwner()->m_transform.UpdateWorldMatrix(); //이거 해야함 ㅠㅠ
 		}
 	}
 	

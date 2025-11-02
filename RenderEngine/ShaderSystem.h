@@ -68,7 +68,12 @@ private:
 	Material* m_selectShaderTarget = nullptr;
 	ImageComponent* m_selectImageTarget = nullptr;
 	ThreadPool<std::function<void()>>* m_shaderReloadThreadPool = nullptr;
-	std::mutex m_shaderReloadMutex;
+	std::mutex m_vertexShaderMutex;
+	std::mutex m_hullShaderMutex;
+	std::mutex m_domainShaderMutex;
+	std::mutex m_geometryShaderMutex;
+	std::mutex m_pixelShaderMutex;
+	std::mutex m_computeShaderMutex;
 };
 
 static auto ShaderSystem = ShaderResourceSystem::GetInstance();

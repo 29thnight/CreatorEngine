@@ -1,11 +1,9 @@
 #pragma once
+#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
 
 // Object_Bindings.cpp
-#include <mono/jit/jit.h>
-#include <mono/metadata/assembly.h>
-#include <mono/metadata/mono-config.h>
-#include <mono/metadata/object.h>
+#include "FormIntPtr.h"     // FromIntPtr<T> 템플릿
 #include "Object.h"          // 네가 준 Object 선언
 #include "TypeTrait.h"
 
@@ -26,19 +24,13 @@ namespace
         return mono_string_new(mono_domain_get(), s.c_str());
     }
 
-    // --- Safe cast ---
-    inline Object* FromIntPtr(MonoObject* /*dummyInstance*/, intptr_t nativePtr)
-    {
-        return reinterpret_cast<Object*>(nativePtr);
-    }
-
     // -------- ICalls (extern "C" 권장) --------
     extern "C"
     {
         // ulong GetInstanceID(IntPtr self)
         static uint64_t ICall_Object_GetInstanceID(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 return static_cast<uint64_t>(self->GetInstanceID());
             return 0ull;
         }
@@ -46,7 +38,7 @@ namespace
         // ulong GetTypeID(IntPtr self)
         static uint64_t ICall_Object_GetTypeID(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 return static_cast<uint64_t>(self->GetTypeID());
             return 0ull;
         }
@@ -54,7 +46,7 @@ namespace
         // string ToString(IntPtr self)
         static MonoString* ICall_Object_ToString(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 return UTF8ToMono(self->ToString());
             return UTF8ToMono(std::string{});
         }
@@ -62,7 +54,7 @@ namespace
         // string GetName(IntPtr self)
         static MonoString* ICall_Object_GetName(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 return UTF8ToMono(self->GetHashedName().ToString());
             return UTF8ToMono(std::string{});
         }
@@ -70,7 +62,7 @@ namespace
         // void SetName(IntPtr self, string name)
         static void ICall_Object_SetName(MonoObject* _this, intptr_t nativePtr, MonoString* mname)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
             {
                 const std::string name = MonoToUTF8(mname);
                 self->m_name = HashingString{ name.c_str() };
@@ -80,7 +72,7 @@ namespace
         // bool GetEnabled(IntPtr self)
         static mono_bool ICall_Object_GetEnabled(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 return self->IsEnabled() ? 1 : 0;
             return 0;
         }
@@ -88,21 +80,21 @@ namespace
         // void SetEnabled(IntPtr self, bool v)
         static void ICall_Object_SetEnabled(MonoObject* _this, intptr_t nativePtr, mono_bool v)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 self->SetEnabled(v != 0);
         }
 
         // void Destroy(IntPtr self)
         static void ICall_Object_Destroy(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 Object::Destroy(self);
         }
 
         // void SetDontDestroyOnLoad(IntPtr self)
         static void ICall_Object_SetDontDestroyOnLoad(MonoObject* _this, intptr_t nativePtr)
         {
-            if (auto* self = FromIntPtr(_this, nativePtr))
+            if (auto* self = FromIntPtr<Object>(_this, nativePtr))
                 Object::SetDontDestroyOnLoad(self);
         }
 

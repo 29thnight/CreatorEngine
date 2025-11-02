@@ -119,7 +119,7 @@ void SwitchingSceneTrigger::SetupCutRangeForNextScene()
 inline bool HasCutsceneForNextSceneStrict(const GameManager* gm)
 {
     if (!gm) return false;
-    int t = gm->m_nextSceneIndex; int prev = gm->m_prevSceneIndex;
+    int t = gm->m_nextSceneIndex; int prev = GameInstance::GetInstance()->GetPrevSceneType();
     return prev == (int)SceneType::SelectChar || t == (int)SceneType::Boss;
 }
 

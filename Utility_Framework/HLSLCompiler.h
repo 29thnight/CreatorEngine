@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
+#include <concurrent_unordered_map.h>
 
 class IncludeHandler : public ID3DInclude
 {
@@ -77,7 +78,7 @@ private:
     static bool CheckResult(HRESULT hResult, ID3DBlob* shader, ID3DBlob* errorBlob);
     static bool CheckExtension(std::string_view shaderExtension);
 
-	static std::unordered_map<std::string, ComPtr<ID3DBlob>> m_shaderCache;
-	static std::mutex m_compileMutex;
+	static concurrency::concurrent_unordered_map<std::string, ComPtr<ID3DBlob>> m_shaderCache;
+	//static std::mutex m_compileMutex;
 };
 #endif // !DYNAMICCPP_EXPORTS

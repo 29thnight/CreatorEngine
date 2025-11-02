@@ -195,6 +195,9 @@
     <Filter Include="Managers\HotLoadSystem\MonoLibSystem\Test">
       <UniqueIdentifier>{a8caaf63-9b01-447d-aac7-6b1bc39f4fb8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\HotLoadSystem\MonoLibSystem\FormIntPtr">
+      <UniqueIdentifier>{f59f7b30-929f-4cba-9836-2bb3074eb2ac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -678,6 +681,9 @@
     </ClInclude>
     <ClInclude Include="MonoManager.h">
       <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="FormIntPtr.h">
+      <Filter>Managers\HotLoadSystem\MonoLibSystem\FormIntPtr</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

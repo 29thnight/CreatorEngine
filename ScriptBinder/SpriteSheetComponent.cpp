@@ -34,11 +34,16 @@ void SpriteSheetComponent::Update(float tick)
 		const auto& worldRect = rect->GetWorldRect();
 		pos = { worldRect.x + worldRect.width * 0.5f,
 				worldRect.y + worldRect.height * 0.5f,
-				0.0f };
-		scale = { worldRect.width / uiinfo.size.x,
-				  worldRect.height / uiinfo.size.y };
-
-		rect->SetSizeDelta(uiinfo.size);
+			0.0f };
+		if (uiinfo.size.x != 0.f && uiinfo.size.y != 0.f)
+		{
+			scale = { worldRect.width / uiinfo.size.x,
+						worldRect.height / uiinfo.size.y };
+		}
+		else
+		{
+			scale = { 1.f, 1.f };
+		}
 	}
 }
 

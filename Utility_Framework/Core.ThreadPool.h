@@ -17,7 +17,7 @@ class ThreadPool
 private:
     using ConcurrentQueue = concurrency::concurrent_queue<TaskType>;
 public:
-    ThreadPool(int numThreads = 0, DWORD_PTR affinityMask = 0, int priority = THREAD_PRIORITY_NORMAL)
+    ThreadPool(int numThreads = 0, DWORD_PTR affinityMask = 0, int priority = THREAD_PRIORITY_HIGHEST)
         : m_affinityMask(affinityMask), m_threadPriority(priority)
     {
         m_numThreads = (numThreads > 0) ? numThreads : static_cast<int>(::GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
