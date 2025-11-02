@@ -2,6 +2,7 @@
 #ifndef UNUSE_MONO_LIB
 #include "Object_Binding.h"
 #include "Component_Binding.h"
+#include "GameObject_Binding.h"
 #include <cassert>
 #include <sstream>
 #include <iostream>
@@ -156,6 +157,7 @@ void MonoManager::RegisterInternalCalls()
 {
     // 여기에 엔진의 모든 바인딩 등록 함수 호출
     Register_Object_ICalls();
+    Register_GameObject_ICalls();
     // Register_Component_ICalls();
     // Register_Transform_ICalls();
     // ...

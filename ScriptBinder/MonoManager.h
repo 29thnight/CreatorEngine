@@ -1,5 +1,4 @@
 #pragma once
-#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
 #include <DLLAcrossSingleton.h>
 #include <string>
