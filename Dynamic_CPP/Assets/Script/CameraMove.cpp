@@ -16,22 +16,22 @@ void CameraMove::Start()
 
 void CameraMove::Update(float tick)
 {
-	//camera shake
-	if (shakeDuration > 0)
-	{
-		//initialPosition.x = sinf(Mathf::pi * (1.f - shakeDuration));
-		/*Random<float> random(-1.f, 1.f);
-		initialPosition += Mathf::Vector3{
-			random.Generate() * shakeMagnitude * tick,
-			random.Generate() * shakeMagnitude * tick,
-			random.Generate() * shakeMagnitude * tick
-		};*/
-		shakeDuration -= tick * dampingSpeed;
-	}
-	else {
-		shakeDuration = 0.f;
-		//initialPosition = Mathf::Vector3::Zero;
-	}
+	////camera shake
+	//if (shakeDuration > 0)
+	//{
+	//	//initialPosition.x = sin(Mathf::pi * std::powf(shakeDuration, 3)) * 5.f;
+	//	/*Random<float> random(-1.f, 1.f);
+	//	initialPosition = Mathf::Vector3{
+	//		random.Generate() * shakeMagnitude * tick,
+	//		random.Generate() * shakeMagnitude * tick,
+	//		random.Generate() * shakeMagnitude * tick
+	//	};*/
+	//	shakeDuration -= tick * dampingSpeed;
+	//}
+	//else {
+	//	shakeDuration = 0.f;
+	//	initialPosition = Mathf::Vector3::Zero;
+	//}
 }
 
 void CameraMove::LateUpdate(float tick)
@@ -70,8 +70,22 @@ void CameraMove::LateUpdate(float tick)
 			dir.y = 0.f;
 			dir.Normalize();
 
-			Mathf::Vector3 shakePos = Mathf::Vector3::Zero;
-			shakePos.x = sinf(Mathf::pi * (1.f - shakeDuration) * 20.f) * shakeMagnitude;
+
+			if (shakeDuration > 0)
+			{
+				//initialPosition.x = sin(Mathf::pi * std::powf(shakeDuration, 3)) * 5.f;
+				Random<float> random(-1.f, 1.f);
+				initialPosition = Mathf::Vector3{
+					random.Generate() * shakeMagnitude * tick,
+					random.Generate() * shakeMagnitude * tick,
+					random.Generate() * shakeMagnitude * tick
+				};
+				shakeDuration -= tick * dampingSpeed;
+			}
+			else {
+				shakeDuration = 0.f;
+				initialPosition = Mathf::Vector3::Zero;
+			}
 
 			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
 			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + shakePos);
@@ -198,13 +212,14 @@ void CameraMove::CameraMoveFun(Mathf::Vector2 dir)
 	}
 }
 
-void CameraMove::ShakeCamera(float duration)
+void CameraMove::ShakeCamera(float duration,float magnitude)
 {
 	shakeDuration = duration;
+	shakeMagnitude = magnitude;
 	initialPosition = Mathf::Vector3::Zero;
 }
 
 void CameraMove::ShakeCamera1s()
 {
-	ShakeCamera(1.f);
+	ShakeCamera(shakeDuration, shakeMagnitude);
 }
