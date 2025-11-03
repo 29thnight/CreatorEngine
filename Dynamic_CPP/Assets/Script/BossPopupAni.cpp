@@ -3,7 +3,9 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "TBoss1.h"
-
+#include "GameInstance.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void BossPopupAni::Enter()
 {
     AnimationController* controller = m_ownerController;
@@ -28,7 +30,14 @@ void BossPopupAni::Enter()
         if (!boss) return;
         boss->m_moveState = TBoss1::EBossMoveState::Protruding;
         boss->ProtrudeDamege();
-
+        if (boss->GM)
+        {
+            auto pool = boss->GM->GetSFXPool();
+            if (pool)
+            {
+                pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundUP"));
+            }
+        }
     }
 }
 

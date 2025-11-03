@@ -1529,14 +1529,14 @@ void TBoss1::Protrude()
 		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
 
-		if (GM)
+		/*if (GM)
 		{
 			auto pool = GM->GetSFXPool();
 			if (pool)
 			{
 				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundUP"));
 			}
-		}
+		}*/
 	}
 	m_decalobj->SetEnabled(true);
 
@@ -1564,14 +1564,14 @@ void TBoss1::ProtrudeChunsik()
 		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
 		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
-		if (GM)
+		/*if (GM)
 		{
 			auto pool = GM->GetSFXPool();
 			if (pool)
 			{
 				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundUP"));
 			}
-		}
+		}*/
 	}
 	m_decalobj->SetEnabled(true);
 }
