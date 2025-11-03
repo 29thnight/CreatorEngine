@@ -47,29 +47,38 @@ void CameraMove::LateUpdate(float tick)
 			}
 
 			Transform* transform = GetOwner()->GetComponent<Transform>();
-			Mathf::Vector3 targetPos = target->GetComponent<Transform>()->GetWorldPosition();
-			targetPos.y = 0.f;
 			Mathf::Vector3 currentPos = transform->GetWorldPosition();
-			currentPos = currentPos - offset;
-			currentPos.y = 0.f;
-			float distance = Mathf::Vector3::Distance(targetPos, currentPos);
-
-
 			float followTimer = 0.f;
+			if (!isBossCamera) {
+				Mathf::Vector3 targetPos = target->GetComponent<Transform>()->GetWorldPosition();
+				targetPos.y = 0.f;
+				currentPos = currentPos - offset;
+				currentPos.y = 0.f;
+				float distance = Mathf::Vector3::Distance(targetPos, currentPos);
 
-			if (distance > detectRange)
-			{
-				targetPosition = targetPos;
-				followTimer = tick / followSpeed / 3.f;
+
+				
+
+				if (distance > detectRange)
+				{
+					targetPosition = targetPos;
+					followTimer = tick / followSpeed / 3.f;
+				}
+				else {
+					followTimer = 0.f;
+				}
+
+				Mathf::Vector3 dir = targetPosition - currentPos;
+				dir.y = 0.f;
+				dir.Normalize();
+
 			}
 			else {
-				followTimer = 0.f;
+				//보스전 카메라 고정
+				targetPosition = transform->GetWorldPosition();
+				offset = Mathf::Vector3::Zero;
 			}
-
-			Mathf::Vector3 dir = targetPosition - currentPos;
-			dir.y = 0.f;
-			dir.Normalize();
-
+			
 
 			if (shakeDuration > 0)
 			{

@@ -57,6 +57,8 @@ private:
 	float shakeDuration = 0.f;
 	[[Property]]
 	float shakeMagnitude = 0.7f;
+	[[Property]]
+	bool isBossCamera = false;
 
 private:
 	//camera shake
@@ -64,11 +66,11 @@ private:
 	Mathf::Vector3 initialPosition{ 0.f, 0.f, 0.f };
 
 	[[Method]]
-	void ShakeCamera(float duration, float magnitude);
-	[[Method]]
 	void ShakeCamera1s();
-
 public:
+	[[Method]]
+	void ShakeCamera(float duration, float magnitude);
+
 	void StopCameraMoveFlag() { cameraMoveStopFlag = true; }
 private:
 	bool cameraMoveStopFlag = false;

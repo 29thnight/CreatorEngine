@@ -18,6 +18,7 @@
 #include "GameInstance.h"
 #include "SceneTransitionUI.h"
 #include "TweenManager.h"
+#include "CameraMove.h"
 
 void GameManager::Awake()
 {
@@ -701,6 +702,11 @@ void GameManager::VibDestroyGate()
 		player->VibDestroyGate();
 
 	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(0.5f, 1.0f);
+	}
 }
 
 void GameManager::VibKillBoss()
@@ -711,6 +717,11 @@ void GameManager::VibKillBoss()
 
 		player->VibKillBoss();
 
+	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(1.0f, 10.0f);
 	}
 }
 
@@ -723,6 +734,11 @@ void GameManager::VibPlayerStun()
 		player->VibPlayerStun();
 
 	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(0.5f, 1.0f);
+	}
 }
 
 void GameManager::VibKoriStun()
@@ -733,6 +749,11 @@ void GameManager::VibKoriStun()
 
 		player->VibKoriStun();
 
+	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(0.5f, 1.0f);
 	}
 }
 

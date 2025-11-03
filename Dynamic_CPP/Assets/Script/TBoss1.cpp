@@ -19,6 +19,7 @@
 #include "PlayEffectAll.h"
 #include "TimeSystem.h"
 #include "SFXPoolManager.h"
+
 void TBoss1::Start()
 {
 	BT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -1877,7 +1878,6 @@ void TBoss1::Dead()
 {
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
-
 
 	if (GM)
 	{
