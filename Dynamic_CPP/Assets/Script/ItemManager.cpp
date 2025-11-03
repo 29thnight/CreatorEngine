@@ -69,6 +69,7 @@ void ItemManager::Start()
 			{
 				itemIcons[i]->SetItemID(itemInfos[i].id);
 				itemIcons[i]->SetRarityID(itemInfos[i].rarity);
+				itemIcons[i]->SetItemEnhancement(itemInfos[i].enhancementType);	
 				itemIcons[i]->SetTarget(itemSlots[i] ? itemSlots[i]->GetOwner() : nullptr);
 			}
 		}
