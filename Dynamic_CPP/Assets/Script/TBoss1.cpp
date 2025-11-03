@@ -1335,15 +1335,26 @@ void TBoss1::SelectTarget()
 	//todo : 타겟 선택 (1P/2P) 함수로 빼는 이유는 패턴에 따라 타겟을 언제 선택할지 다를수 있기 때문
 	//싱글플레이어 모드 가능성 있으므로 1P/2P가 모두 있는지 확인
 	
+	Player* p1Script = nullptr;
+	Player* p2Script = nullptr;
+
 	if (!Player1 && !Player2) {
 		//에러 플레이어를 찾을 수 없음
 		return;
 	}
+
 	if (Player1 && !Player2) {
 		//1P만 존재
 		m_target = Player1; //무조건 1P
+		p1Script = Player1->GetComponent<Player>();
 		return;
 	}
+	else {
+		p1Script = Player1->GetComponent<Player>();
+		p2Script = Player2->GetComponent<Player>();
+	}
+
+
 	//2P만 존재 하는 경우가 있을까? --> 이건 나중에 생각하자
 	//아니라면 둘이 선택되었던 횟수 비교
 	if (p1Count != p2Count)
@@ -1358,6 +1369,40 @@ void TBoss1::SelectTarget()
 		}
 		return;
 	}
+
+	//코인토스 이전에 스턴 상태인지 확인
+	//우선 둘 다 스턴 상태인지 확인 
+	//우선 스크립트 부터 확인
+	bool p1Stun = true; // 스턴 상태면 공격 대상에서 제외
+	bool p2Stun = true;
+	if (!p1Script && !p2Script) {
+		//둘다 플레이어 스크립트를 찾을 수 없음 에러
+		return;
+	}else{
+		if (p1Script) {
+			p1Stun = p1Script->isStun;
+		}
+		if (p2Script) {
+			p2Stun = p2Script->isStun;
+		}
+	}
+	
+	if (p1Stun && !p2Stun) {
+		//1P 스턴 2P만 공격 가능
+		m_target = Player2;
+		p2Count++;
+		return;
+	}
+	else if (!p1Stun && p2Stun) {
+		//2P 스턴 1P만 공격 가능
+		m_target = Player1;
+		p1Count++;
+		return;
+	}
+	
+	//둘다 스턴 혹은 아니라면 코인토스 진행
+
+
 	//횟수가 같다면?
 	//코인 토스 처럼 2/1 확률로 1P/2P 선택
 	int randValue = rand() % 2; // 0, 1 중 하나를 랜덤으로 선택
@@ -1376,7 +1421,6 @@ void TBoss1::SelectTarget()
 		p1Count = 0;
 		p2Count = 0;
 	}
-	
 }
 
 void TBoss1::StartNextComboAttack()

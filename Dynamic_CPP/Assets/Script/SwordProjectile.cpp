@@ -47,7 +47,12 @@ void SwordProjectile::OnTriggerEnter(const Collision& collision)
 	if (enemy)
 	{
 		auto [iter, inserted] = targets.insert(enemy);
-		if (inserted) (*iter)->SendDamage(m_ownerPlayer, m_damage, hitinfo);
+		if (inserted)
+		{
+			(*iter)->SendDamage(m_ownerPlayer, m_damage, hitinfo);
+			m_ownerPlayer->VibChargeHit();
+		}
+
 	}
 }
 

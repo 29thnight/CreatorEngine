@@ -37,5 +37,44 @@ public:
 	float PlayerChargeEndPower = 0.25f;
 	[[Property]]
 	float PlayerChargeEndTime = 0.1f;
-	
+
+
+	//주인만
+	[[Property]]
+	float  PlayerChargeHitPower = 0.5f;
+	[[Property]]
+	float  PlayerChargeHitTime = 0.2f;
+
+	//주인만
+	[[Property]]
+	float  BombExplosionPower = 0.5f;
+	[[Property]]
+	float  BombExplosionTime = 0.2f;
+
+	//막타친 주인만
+	[[Property]]
+	float  EleteKillPower = 0.25f;
+	[[Property]]
+	float  EleteKillTime = 0.1f;
+
+	//둘다
+	[[Property]]
+	float  GateDestroyPower = 0.5f;
+	[[Property]]
+	float  GateDestroyTime = 0.2f;
+
+	[[Property]]
+	float  BossKillPower = 0.75f;
+	[[Property]]
+	float  BossKillTime = 0.3f;
+
+	[[Property]]
+	float PlayerAllStunPower = 0.75f;
+	[[Property]]
+	float PlayerAllStunTime = 0.3f;
+
+	[[Property]]
+	float KoriStunPower = 0.5f;
+	[[Property]]
+	float KoriStunTime = 0.2f;
 };

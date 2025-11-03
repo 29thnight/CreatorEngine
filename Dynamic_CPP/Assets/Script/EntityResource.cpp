@@ -54,10 +54,10 @@ void EntityResource::Start()
 	m_effect->Apply();
 
 
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("DestroyEffect");
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
 	if (deadPrefab)
 	{
-		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeadEffect");
+		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeathEffect");
 		deadObj->SetEnabled(false);
 		deadObj->m_transform.SetScale({ 0.5,0.5,0.5 });
 	}

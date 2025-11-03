@@ -157,6 +157,14 @@ void Player::Start()
 		resurrectionEffect = ResurrpreObj->GetComponentDynamicCast<EffectComponent>();
 	}
 
+	Prefab* swapprefab = PrefabUtilitys->LoadPrefab("WeaponSwap");
+	if (swapprefab)
+	{
+		GameObject* swapObj = PrefabUtilitys->InstantiatePrefab(swapprefab, "WeaponSwapEffect");
+		swapEffect = swapObj->GetComponentDynamicCast<EffectComponent>();
+	}
+	
+
 	constexpr int CONVERT_TYPE = 1;
 	playerIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
 
@@ -334,6 +342,10 @@ void Player::Start()
 	playerState["Dash"] = dashBit;
 	ChangeState("Idle");
 
+	BitFlag EndAttackBit; //공격 후딜중 -- 대시 걷기로만 전환가능
+	EndAttackBit.Set(PlayerStateFlag::CanMove);
+	EndAttackBit.Set(PlayerStateFlag::CanDash);
+	playerState["EndAttack"] = EndAttackBit;
 	Debug->Log("Player Start");
 	m_animator->SetUseLayer(1, false);
 	m_maxHP = maxHP;
@@ -385,32 +397,8 @@ void Player::Update(float tick)
 	Cheat(); 
 	DetectResource();
 	HitImpulseUpdate(tick);
+	UpdateEffectPos();
 	m_controller->SetBaseSpeed(moveSpeed);
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	if(dashObj)
-	{
-		Mathf::Vector3 dashPos = pos;
-		dashPos.y += 0.5f;
-		dashObj->m_transform.SetPosition(dashPos);
-	}
-	if (healEffect)
-	{
-		Mathf::Vector3 healPos = pos;
-		healPos.y += 1.0f;
-		healEffect->GetOwner()->m_transform.SetPosition(healPos);
-	}
-	if (chargeEffect)
-	{
-		Mathf::Vector3 chargePos = pos;
-		chargePos.y += 0.7f;
-		chargeEffect->GetOwner()->m_transform.SetPosition(chargePos);
-	}
-	if (resurrectionEffect)
-	{
-		Mathf::Vector3 resurrPos = pos;
-		resurrPos.y += 1.4f;
-		resurrectionEffect->GetOwner()->m_transform.SetPosition(resurrPos);
-	}
 	if (catchedObject)
 	{
 		UpdateChatchObject();
@@ -1470,6 +1458,153 @@ void Player::SendKnockBack(Entity* sender,Mathf::Vector2 _KnockbackForce)
 	controller->TriggerForcedMove(knockbackVeocity);
 }
 
+void Player::EndAttackFrame()
+{
+	ChangeState("EndAttack");
+}
+
+void Player::UpdateEffectPos()
+{
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	if (dashObj)
+	{
+		Mathf::Vector3 dashPos = pos;
+		dashPos.y += 0.5f;
+		dashObj->m_transform.SetPosition(dashPos);
+	}
+	if (healEffect)
+	{
+		Mathf::Vector3 healPos = pos;
+		healPos.y += 1.0f;
+		healEffect->GetOwner()->m_transform.SetPosition(healPos);
+	}
+	if (chargeEffect)
+	{
+		Mathf::Vector3 chargePos = pos;
+		chargePos.y += 0.7f;
+		chargeEffect->GetOwner()->m_transform.SetPosition(chargePos);
+	}
+	if (resurrectionEffect)
+	{
+		Mathf::Vector3 resurrPos = pos;
+		resurrPos.y += 1.4f;
+		resurrectionEffect->GetOwner()->m_transform.SetPosition(resurrPos);
+	}
+
+	if (swapEffect)
+	{
+		Mathf::Matrix left = handSocket->transform.GetLocalMatrix();
+		Mathf::Vector3 leftPos = left.Translation();
+		Mathf::Vector3 swapPos = leftPos;
+		swapEffect->GetOwner()->m_transform.SetPosition(swapPos);
+	}
+}
+
+void Player::VibChargeHit()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->PlayerChargeHitPower;
+			float time = data->PlayerChargeHitTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
+void Player::VibBombExpolsion()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->BombExplosionPower;
+			float time = data->BombExplosionTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
+void Player::VibKillElete()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->EleteKillPower;
+			float time = data->EleteKillTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
+void Player::VibDestroyGate()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->GateDestroyPower;
+			float time = data->GateDestroyTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
+void Player::VibKillBoss()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->BossKillPower;
+			float time = data->BossKillTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
+void Player::VibPlayerStun()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->PlayerAllStunPower;
+			float time = data->PlayerAllStunTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
+void Player::VibKoriStun()
+{
+	if (m_input && GM && true == GameInstance::GetInstance()->IsViveEnabled())
+	{
+		auto data = GM->GetControllerVibration();
+		if (data)
+		{
+			float power = data->KoriStunPower;
+			float time = data->KoriStunTime;
+			m_input->SetControllerVibration(time, power);
+		}
+
+	}
+}
+
 void Player::Cheat()
 {
 	if (InputManagement->IsKeyDown('1'))
@@ -1504,11 +1639,16 @@ void Player::Cheat()
 	}
 	if (InputManagement->IsKeyDown('4'))
 	{
+		Heal(35);
+	}
+	if (InputManagement->IsKeyDown('5'))
+	{
 		if (GM)
 		{
 			GM->AddReward(50);
 		}
 	}
+
 }
 
 void Player::DetectResource()
@@ -1574,7 +1714,10 @@ void Player::SwapWeaponInternal(int dir)
 			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerSlotchange");
 			m_ActionSound->PlayOneShot();
 		}
-
+		if (swapEffect)
+		{
+			swapEffect->Apply();
+		}
 		if (adjustedDirection < 0)
 		{
 			LOG("Swap Left" + std::to_string(m_weaponIndex));
@@ -1611,6 +1754,10 @@ void Player::SwapBasicWeapon()
 		{
 			m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerSlotchange");
 			m_ActionSound->PlayOneShot();
+		}
+		if (swapEffect)
+		{
+			swapEffect->Apply();
 		}
 	}
 	CancelChargeAttack();

@@ -331,16 +331,63 @@ Mathf::Vector2 InputManager::GetControllerThumbR(DWORD index) const
     return stick;
 }
 
+void InputManager::SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre,float time)
+{
+    GameInputRumbleParams vibration = {};
+    
+
+    if (m_controllerVibrationTime[Index] > 0.f) //현재진행중인 바이브레이션이있으면 더 강한진동일떄만 적용
+    {
+
+        if (leftMotorSpeed >= vibrations[Index].z)
+        {
+            vibration.lowFrequency = lowFre;      // 저주파 모터 진동 강도
+            vibration.highFrequency = highFre;    // 고주파 모터 진동 강도
+            vibration.leftTrigger = leftMotorSpeed;   // 왼쪽 트리거 진동 강도
+            vibration.rightTrigger = rightMotorSpeed;
+            vibrations[Index].x = lowFre;
+            vibrations[Index].y = highFre;
+            vibrations[Index].z = leftMotorSpeed;
+            vibrations[Index].w = rightMotorSpeed;
+            if (device[Index] == nullptr) return;
+            device[Index]->SetRumbleState(&vibration);
+            m_controllerVibrationTime[Index] = time;
+        }
+    }
+    else //없으면 그냥적용
+    {
+        vibration.lowFrequency = lowFre;      // 저주파 모터 진동 강도
+        vibration.highFrequency = highFre;    // 고주파 모터 진동 강도
+        vibration.leftTrigger = leftMotorSpeed;   // 왼쪽 트리거 진동 강도
+        vibration.rightTrigger = rightMotorSpeed;
+
+        vibrations->x = lowFre;
+        vibrations->y = highFre;
+        vibrations->z = leftMotorSpeed;
+        vibrations->w = rightMotorSpeed;
+        if (device[Index] == nullptr) return;
+        device[Index]->SetRumbleState(&vibration);
+        m_controllerVibrationTime[Index] = time;
+    }
+    
+    
+}
+
 void InputManager::SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre)
 {
     GameInputRumbleParams vibration = {};
+
     vibration.lowFrequency = lowFre;      // 저주파 모터 진동 강도
     vibration.highFrequency = highFre;    // 고주파 모터 진동 강도
     vibration.leftTrigger = leftMotorSpeed;   // 왼쪽 트리거 진동 강도
     vibration.rightTrigger = rightMotorSpeed;
+
+    vibrations->x = lowFre;
+    vibrations->y = highFre;
+    vibrations->z = leftMotorSpeed;
+    vibrations->w = rightMotorSpeed;
     if (device[Index] == nullptr) return;
     device[Index]->SetRumbleState(&vibration);
-    
 }
 
 void InputManager::UpdateControllerVibration(float tick)
@@ -356,6 +403,7 @@ void InputManager::UpdateControllerVibration(float tick)
     		}
     		else
     		{
+                m_controllerVibrationTime[i] = 0.f;
                 GameInputRumbleParams vibration = {};
                 device[i]->SetRumbleState(&vibration);
     		}

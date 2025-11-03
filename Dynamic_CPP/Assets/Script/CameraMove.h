@@ -53,16 +53,18 @@ private:
 	[[Property]]
 	bool OnCaculCamera = false;
 	
+	[[Property]]
+	float shakeDuration = 0.f;
+	[[Property]]
+	float shakeMagnitude = 0.7f;
 
 private:
 	//camera shake
-	float shakeDuration = 0.f;
-	float shakeMagnitude = 0.7f;
 	float dampingSpeed = 1.0f;
 	Mathf::Vector3 initialPosition{ 0.f, 0.f, 0.f };
 
 	[[Method]]
-	void ShakeCamera(float duration);
+	void ShakeCamera(float duration, float magnitude);
 	[[Method]]
 	void ShakeCamera1s();
 
