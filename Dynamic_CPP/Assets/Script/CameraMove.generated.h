@@ -10,6 +10,7 @@ ReflectionScriptField(CameraMove) \
 		meta_property(detectRange) \
 		meta_property(cameraMoveSpeed) \
 		meta_property(OnCaculCamera) \
+		meta_property(shakeMagnitude) \
 	}); \
 	MethodField \
 	({ \

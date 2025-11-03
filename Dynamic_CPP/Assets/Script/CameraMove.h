@@ -57,6 +57,7 @@ private:
 private:
 	//camera shake
 	float shakeDuration = 0.f;
+	[[Property]]
 	float shakeMagnitude = 0.7f;
 	float dampingSpeed = 1.0f;
 	Mathf::Vector3 initialPosition{ 0.f, 0.f, 0.f };

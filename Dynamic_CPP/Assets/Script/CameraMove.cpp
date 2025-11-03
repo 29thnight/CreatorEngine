@@ -19,7 +19,7 @@ void CameraMove::Update(float tick)
 	//camera shake
 	if (shakeDuration > 0)
 	{
-		initialPosition.x = sin(Mathf::pi * std::powf(shakeDuration, 3)) * 5.f;
+		//initialPosition.x = sinf(Mathf::pi * (1.f - shakeDuration));
 		/*Random<float> random(-1.f, 1.f);
 		initialPosition += Mathf::Vector3{
 			random.Generate() * shakeMagnitude * tick,
@@ -30,7 +30,7 @@ void CameraMove::Update(float tick)
 	}
 	else {
 		shakeDuration = 0.f;
-		initialPosition = Mathf::Vector3::Zero;
+		//initialPosition = Mathf::Vector3::Zero;
 	}
 }
 
@@ -70,9 +70,11 @@ void CameraMove::LateUpdate(float tick)
 			dir.y = 0.f;
 			dir.Normalize();
 
+			Mathf::Vector3 shakePos = Mathf::Vector3::Zero;
+			shakePos.x = sinf(Mathf::pi * (1.f - shakeDuration) * 20.f) * shakeMagnitude;
 
 			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
-			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + initialPosition);
+			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + shakePos);
 
 
 			//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);
