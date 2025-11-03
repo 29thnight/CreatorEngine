@@ -80,7 +80,7 @@ private:
 	float	staggerDuration{ 1.f };				// 피격 경직 시간
 
 	[[Property]]
-	float	resurrectionMultiple{ 1.f };		// 부활 시간 배율
+	float	resurrectionMultiple{ 1.f };		// 부활 시간 배율 소문자 resurrection값 안씀 대문자값쓰는중
 	[[Property]]
 	float	resurrectionTime{ 1.f };			// 부활 시간
 	[[Property]]

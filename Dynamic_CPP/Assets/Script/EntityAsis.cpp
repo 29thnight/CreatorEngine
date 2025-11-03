@@ -198,6 +198,21 @@ void EntityAsis::Update(float tick)
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::B)) {
 		SetDead();
 	}
+
+	if (InputManagement->IsKeyDown('7'))
+	{
+		SendDamage(nullptr, 10);
+	}
+	if (InputManagement->IsKeyDown('8'))
+	{
+		Resurrection();
+	}
+	if (InputManagement->IsKeyDown('9'))
+	{
+		Stun();
+	}
+
+
 #endif // _DEBUG
 
 	if (testPlayerAllDead) {
@@ -288,6 +303,14 @@ void EntityAsis::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 		isStun = true;
 		Stun();
 		return;
+	}
+
+	if (!isStun)
+	{
+		if (m_animator)
+		{
+			m_animator->SetParameter("OnHit", true);
+		}
 	}
 
 	if(m_emoteSystem)
@@ -487,7 +510,10 @@ void EntityAsis::Stun()
 {
 	// 스턴 이모트 재생
 
-
+	if (m_animator)
+	{
+		m_animator->SetParameter("OnStun", true);
+	}
 	if (m_ActionSound)
 	{
 		m_ActionSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("KoriStun");
@@ -563,7 +589,23 @@ int EntityAsis::CheckBigWood()
 
 WeaponCapsule* EntityAsis::MakeWeaponCapsule(int _itemCode)
 {
-	Prefab* weaponCapsuleprefab = PrefabUtilitys->LoadPrefab("WeaponCapsule");
+	std::string prefabName{};
+	switch (_itemCode)
+	{
+	case 1:
+		prefabName = "WeaponCapsuleWand";
+		break;
+	case 2:
+		prefabName = "WeaponCapsuleMelee";
+		break;
+	case 3:
+		prefabName = "WeaponCapsuleBomb";
+		break;
+	default:
+		prefabName = "WeaponCapsuleMelee";
+		break;
+	}
+	Prefab* weaponCapsuleprefab = PrefabUtilitys->LoadPrefab(prefabName);
 	if (weaponCapsuleprefab)
 	{
 		GameObject* weaponCapsuleObj = PrefabUtilitys->InstantiatePrefab(weaponCapsuleprefab, "weaponCapsule");
@@ -616,6 +658,10 @@ bool EntityAsis::CheckResurrectionByPlayer()
 
 void EntityAsis::Resurrection()
 {
+	if (m_animator)
+	{
+		m_animator->SetParameter("OnResurrection", true);
+	}
 	Heal(ResurrectionHP);
 	isStun = false;
 	ResurrectionElapsedTime = 0;

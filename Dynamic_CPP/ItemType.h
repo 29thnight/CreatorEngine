@@ -3,8 +3,8 @@
 enum class EItemType
 {
 	Basic,
-	Mushroom,  //meely
-	Mineral,   // range
+	Mushroom,  //range
+	Mineral,   //meely
 	Fruit,    //bomb
 	Flower,   //heal 웨폰아니고 다른곳으로 
 };

@@ -54,7 +54,13 @@ void EntityResource::Start()
 	m_effect->Apply();
 
 
-	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab("EnemyDeathEffect");
+
+	std::string prefabName = "DestroyEffect";
+	if (itemType == EItemType::Flower || itemType == EItemType::Fruit)
+	{
+		prefabName = "EnemyDeathEffect";
+	}
+	Prefab* deadPrefab = PrefabUtilitys->LoadPrefab(prefabName);
 	if (deadPrefab)
 	{
 		deadObj = PrefabUtilitys->InstantiatePrefab(deadPrefab, "DeathEffect");

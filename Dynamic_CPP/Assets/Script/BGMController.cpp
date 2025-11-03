@@ -8,17 +8,17 @@ void BGMController::Start()
 	auto instance = GameInstance::GetInstance();
 	auto sounds = instance->GetSoundName();
 	auto curScene = (SceneType)instance->GetCurrentSceneType();
-	std::string curSoundName;
+	std::string curSoundName{};
 	switch (curScene)
 	{
 	case SceneType::Bootstrap:
 		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
 		break;
 	case SceneType::SelectChar:
-		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
+		curSoundName = sounds->GetSoudNameRandom("BgmCharacterSelect");
 		break;
 	case SceneType::Loading:
-		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
+		//curSoundName = sounds->GetSoudNameRandom("BgmTitle");
 		break;
 	case SceneType::Stage:
 		curSoundName = sounds->GetSoudNameRandom("BgmStage11");
@@ -36,7 +36,7 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("GameOverBGM");
 		break;
 	default:
-		curSoundName = sounds->GetSoudNameRandom("Test");
+		//curSoundName = sounds->GetSoudNameRandom("Test");
 		break;
 	}
 
