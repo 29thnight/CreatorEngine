@@ -3,8 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
-#include "TutorialScript.h"
-#include "CreditScroll.h"
+#include "BackGroundEffect.h"
 #include "TutorialUI.h"
 #include "Skip.h"
 #include "ClearLerpUI.h"

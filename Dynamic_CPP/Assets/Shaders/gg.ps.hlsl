@@ -98,18 +98,18 @@ PixelOutput main(PixelInput input)
         xDissolve = 1 - input.texCoord.x;
     }
 
-    float dissolveSpeed = 1.5;
+    float dissolveSpeed = 3;
     float xDissolveThreshold = lerp(0.0, 1.0, saturate(normalizedAge * dissolveSpeed));
     
     float combinedDissolve = dissolveValue + (1.0 - xDissolve);
     float finalDissolveThreshold = f1 + xDissolveThreshold;
     
-    float dissolveAlpha = smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve);
+    float dissolveAlpha = lerp(0.2, 1.0, smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve));
 
     float3 baseColor = adjustedSmoke * smokeColor.rgb;
     float3 finalColor = pow(baseColor + ((emissionColor.rgb * adjustedSmoke) * emissionStrength * remappedEmission), 2);
     
-    float finalAlpha = input.alpha * smokeColor.a * dissolveAlpha * dissolveValue;
+    float finalAlpha = input.alpha * smokeColor.a * dissolveAlpha;
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
     float brightnessMask = smoothstep(0.03, 0.12, colorBrightness);
