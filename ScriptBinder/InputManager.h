@@ -73,9 +73,12 @@ public:
 	Mathf::Vector2 GetControllerThumbL(DWORD index) const;
 	Mathf::Vector2 GetControllerThumbR(DWORD index) const;
 
+	void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre, float time);
 	void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre);
 	void UpdateControllerVibration(float tick);
 	void SetControllerVibrationTime(DWORD Index, float time);
+	
+	Mathf::Vector4 vibrations[MAX_CONTROLLER]{};
 
 public:
 	ComPtr<IGameInput>				gameInput{};

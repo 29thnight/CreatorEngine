@@ -57,12 +57,10 @@ void PlayerInputComponent::SetActionMap(ActionMap* _actionMap)
 
 void PlayerInputComponent::SetControllerVibration(float tick, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre)
 {
-	InputManagement->SetControllerVibrationTime(controllerIndex,tick);
-	InputManagement->SetControllerVibration(controllerIndex, leftMotorSpeed,rightMotorSpeed,lowFre,highFre);
+	InputManagement->SetControllerVibration(controllerIndex, leftMotorSpeed,rightMotorSpeed,lowFre,highFre ,tick);
 }
 
 void PlayerInputComponent::SetControllerVibration(float tick, float power)
 {
-	InputManagement->SetControllerVibrationTime(controllerIndex, tick);
-	InputManagement->SetControllerVibration(controllerIndex, power, power, power, power);
+	InputManagement->SetControllerVibration(controllerIndex, power, power, power, power,tick);
 }
