@@ -7,6 +7,7 @@
 #include "CharacterControllerComponent.h"
 #include "EffectComponent.h"
 #include "Socket.h"
+#include "GameObject.h"
 void PlayerStun::Enter()
 {
 	if (m_player == nullptr)

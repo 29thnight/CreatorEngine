@@ -504,6 +504,17 @@ void EntityAsis::Stun()
 			m_EmoteSound->PlayOneShot();
 		}
 	}
+
+
+	auto GMObj = GameObject::Find("GameManager");
+	if (GMObj)
+	{
+		GameManager* GM = GMObj->GetComponent<GameManager>();
+		if (GM)
+		{
+			GM->VibKoriStun();
+		}
+	}
 }
 
 bool EntityAsis::DropItem()

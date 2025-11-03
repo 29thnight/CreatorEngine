@@ -218,6 +218,7 @@ void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 			if (GM)
 			{
 				GM->AddReward(reward);
+				GM->VibDestroyGate();
 			}
 		}
 

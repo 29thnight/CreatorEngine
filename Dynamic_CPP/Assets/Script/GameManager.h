@@ -95,6 +95,12 @@ public:
 	void BossClear();
 	void CheckClear(float tick);
 	void ChangeClearScene(); //보스클리어 다음씬으로
+
+
+	void VibDestroyGate();
+	void VibKillBoss();
+	void VibPlayerStun();
+	void VibKoriStun();
 private:
 	//Entities
 	std::vector<Entity*>	m_entities{};

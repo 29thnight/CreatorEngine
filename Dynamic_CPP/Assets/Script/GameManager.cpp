@@ -139,6 +139,7 @@ void GameManager::Update(float tick)
 			{
 				GameInstance::GetInstance()->SetCurrentSceneType((int)SceneType::Stage);
 			}
+			VibPlayerStun();
 			m_nextSceneIndex = (int)SceneType::GameOver;
 			m_isLoadingReq = false;
 			m_isGameOver = true;
@@ -688,5 +689,49 @@ void GameManager::ChangeClearScene()
 	LoadNextScene();
 
 	isClearSwitching = true;
+}
+
+void GameManager::VibDestroyGate()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibDestroyGate();
+
+	}
+}
+
+void GameManager::VibKillBoss()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibKillBoss();
+
+	}
+}
+
+void GameManager::VibPlayerStun()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibPlayerStun();
+
+	}
+}
+
+void GameManager::VibKoriStun()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibKoriStun();
+
+	}
 }
 
