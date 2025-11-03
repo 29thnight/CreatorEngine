@@ -645,7 +645,7 @@ void Player::LateUpdate(float tick)
 			x = abs(x);
 			y = abs(y);
 
-			float clamp_limit = 0.7f;
+			float clamp_limit = 0.9f;
 			if (x < clamp_limit && y < clamp_limit)
 			{
 				return;
