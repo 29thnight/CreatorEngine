@@ -821,6 +821,10 @@ void Player::Damage(int damage)
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 
+		if (IndicatorStun)
+		{
+			IndicatorStun->SetEnabled(true);
+		}
 		if (m_DamageSound)
 		{
 			m_DamageSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerStun");
