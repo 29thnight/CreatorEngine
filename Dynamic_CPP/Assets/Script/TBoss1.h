@@ -207,7 +207,7 @@ public:
 	Prefab* protrudeIndecator = nullptr;
 	GameObject* protrudeIndicatorobj = nullptr;
 	
-
+	GameObject* m_decalobj = nullptr;
 
 	GameObject* debugMelee = nullptr;
 	

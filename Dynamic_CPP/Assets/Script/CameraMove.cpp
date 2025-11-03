@@ -88,7 +88,7 @@ void CameraMove::LateUpdate(float tick)
 			}
 
 			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
-			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + shakePos);
+			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + initialPosition);
 
 
 			//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);
