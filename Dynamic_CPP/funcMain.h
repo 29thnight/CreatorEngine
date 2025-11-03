@@ -194,6 +194,7 @@ extern "C"
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("TutorialScript", []() { return new TutorialScript(); });
 		CreateFactory::GetInstance()->RegisterFactory("CreditScroll", []() { return new CreditScroll(); });
+		CreateFactory::GetInstance()->RegisterFactory("BackGroundEffect", []() { return new BackGroundEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("TutorialUI", []() { return new TutorialUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("Skip", []() { return new Skip(); });
 		CreateFactory::GetInstance()->RegisterFactory("ClearLerpUI", []() { return new ClearLerpUI(); });

@@ -8,7 +8,7 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "background1",
+    "name": "background2",
     "particleSystems": [
         {
             "isRunning": true,
@@ -80,7 +80,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 7.204294681549072,
+                            "currentTime": 12.597009658813477,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.12999999523162842,
@@ -188,7 +188,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "leaf01_g",
+                                "name": "leaf03_g",
                                 "slot": 0
                             }
                         ],
@@ -322,7 +322,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 7.204294681549072,
+                            "currentTime": 12.597009658813477,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.12999999523162842,
@@ -430,7 +430,7 @@
                         "textures": [
                             {
                                 "hasTexture": true,
-                                "name": "leaf02_g",
+                                "name": "leaf04_g",
                                 "slot": 0
                             }
                         ],
