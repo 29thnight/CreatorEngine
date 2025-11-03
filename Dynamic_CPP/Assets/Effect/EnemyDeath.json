@@ -1,6 +1,10 @@
 {
     "currentTime": 0.0,
     "duration": 1.0,
+    "emitterTimings": [
+        0.0,
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": false,
@@ -162,7 +166,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 12.390120506286621,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -228,7 +232,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -378,7 +382,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 12.390120506286621,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -526,7 +530,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 2,
+                            "depthPreset": 4,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
