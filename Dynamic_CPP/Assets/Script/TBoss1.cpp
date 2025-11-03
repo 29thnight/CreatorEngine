@@ -1886,6 +1886,8 @@ void TBoss1::Dead()
 		{
 			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossDie"));
 		}
+		GM->VibKillBoss();
+	
 	}
 }
 
