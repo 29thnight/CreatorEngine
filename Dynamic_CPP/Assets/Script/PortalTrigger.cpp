@@ -3,6 +3,7 @@
 #include "ClearPortal.h"
 #include "EntityAsis.h"
 #include "EffectComponent.h"
+#include "TutorialUI.h"
 void PortalTrigger::Start()
 {
 
@@ -31,6 +32,10 @@ void PortalTrigger::OnTriggerEnter(const Collision& collision)
 			{
 				portal->isPortalReady = true;
 				portal->m_portalEffect->Apply();
+				if (portal->m_tutorialUi)
+				{
+					portal->m_tutorialUi->GetOwner()->SetEnabled(true);
+				}
 			}
 		}
 	}

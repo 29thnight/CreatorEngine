@@ -638,7 +638,6 @@ void GameManager::LoadPlayerData()
 {
 	if (m_players.size() < 2) return;
 	auto data = GameInstance::GetInstance()->GetPlayData();
-
 	for (int i = 0; i < 2; ++i)
 	{
 		Player* player = dynamic_cast<Player*>(m_players[i]);
@@ -648,6 +647,7 @@ void GameManager::LoadPlayerData()
 			data->LoadPlayerData(player->playerIndex);
 		}
 	}
+	data->Initialize();
 }
 
 void GameManager::BossClear()

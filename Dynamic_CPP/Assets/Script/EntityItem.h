@@ -19,6 +19,7 @@ enum EItemState
 };
 
 
+class TutorialUI;
 class EntityItem : public Entity
 {
 public:
@@ -72,4 +73,5 @@ public:
 	RigidBodyComponent* m_rigid = nullptr;
 private:
 	Player* throwOwner{ nullptr }; // 이 아이템을 던진 객체.
+	TutorialUI* m_tutorialUi = nullptr;
 };

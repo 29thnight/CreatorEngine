@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("TutorialScript", []() { return new TutorialScript(); });
 		CreateFactory::GetInstance()->RegisterFactory("CreditScroll", []() { return new CreditScroll(); });
 		CreateFactory::GetInstance()->RegisterFactory("TutorialUI", []() { return new TutorialUI(); });
 		CreateFactory::GetInstance()->RegisterFactory("Skip", []() { return new Skip(); });

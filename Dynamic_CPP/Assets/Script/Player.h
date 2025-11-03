@@ -167,6 +167,8 @@ public:
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isChargeAttack = false;
+	float chargeBugTime = 3.0f; //간혈적으로 차지어택이 버그로뜸
+	float chargeElapsedTime = 0.f;
 	bool isAttacking = false;
 	float nearDistance = FLT_MAX;
 	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들

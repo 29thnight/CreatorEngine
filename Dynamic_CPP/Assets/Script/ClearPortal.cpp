@@ -5,6 +5,8 @@
 #include "InputManager.h"
 #include "EffectComponent.h"
 #include "SceneManager.h"
+#include "PrefabUtility.h"
+#include "TutorialUI.h"
 void ClearPortal::Start()
 {
 	auto GMObj = GameObject::Find("GameManager");
@@ -21,7 +23,24 @@ void ClearPortal::Start()
 		portalObj->GetComponent<Transform>()->AddPosition({ 0,2.5,0 });
 		m_portalEffect->m_effectTemplateName = "portaloff";
 	}
-	
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
+	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	{
+		auto canvObj = GameObject::Find("Canvas");
+		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
+		if (tutorUIPre)
+		{
+			GameObject* tutorUIObj = PrefabUtilitys->InstantiatePrefab(tutorUIPre, "portalUI");
+			m_tutorialUi = tutorUIObj->GetComponent<TutorialUI>();
+			canvObj->AddChild(tutorUIObj);
+			m_tutorialUi->Init();
+			m_tutorialUi->SetType(2);
+			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
+			m_tutorialUi->screenOffset = { 0, -80.f };
+			m_tutorialUi->GetOwner()->SetEnabled(false);
+		}
+	}
 }
 
 void ClearPortal::OnTriggerEnter(const Collision& collision)

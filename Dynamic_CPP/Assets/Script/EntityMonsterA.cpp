@@ -17,6 +17,7 @@
 #include "Weapon.h"
 #include "TimeSystem.h"
 #include "SFXPoolManager.h"
+#include "TutorialUI.h"
 void EntityMonsterA::Start()
 {
 	m_currentHP = maxHP;
@@ -152,6 +153,27 @@ void EntityMonsterA::Start()
 	if (hasP2) {
 		m_player2 = blackBoard->GetValueAsGameObject("Player2");
 	}
+
+
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
+	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	{
+		auto canvObj = GameObject::Find("Canvas");
+		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
+		if (tutorUIPre)
+		{
+			GameObject* tutorUIObj = PrefabUtilitys->InstantiatePrefab(tutorUIPre, "monsterUI");
+			m_tutorialUi = tutorUIObj->GetComponent<TutorialUI>();
+			canvObj->AddChild(tutorUIObj);
+			m_tutorialUi->Init();
+			m_tutorialUi->SetType(3);
+			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
+			m_tutorialUi->screenOffset = { 0, -70.f };
+
+		}
+	}
+
 	HitImpulseStart();
 }
 
@@ -349,6 +371,7 @@ void EntityMonsterA::Update(float tick)
 		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer / m_MaxknockBackTime));
 		m_animator->GetOwner()->m_transform.SetScale(Mathf::Vector3::Lerp(hitBaseScale, hitBaseScale * m_knockBackScaleVelocity, hittimer / m_MaxknockBackTime));
 	}
+
 
 	HitImpulseUpdate(tick);
 }

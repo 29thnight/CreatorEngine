@@ -11,6 +11,7 @@ class CharacterControllerComponent;
 class CriticalMark;
 class GameManager;
 class HPBar;
+class TutorialUI;
 class EntityMonsterA : public Entity
 {
 public:
@@ -115,4 +116,5 @@ public:
 
 	GameManager* GM = nullptr;
 	HPBar* hp = nullptr;
+	TutorialUI* m_tutorialUi = nullptr;
 };

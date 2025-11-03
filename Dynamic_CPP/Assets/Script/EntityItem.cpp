@@ -16,6 +16,8 @@
 #include "EffectComponent.h"
 #include "EntityMonsterBaseGate.h"
 #include "SFXPoolManager.h"
+#include "TutorialUI.h"
+#include "PrefabUtility.h"
 using namespace Mathf;
 void EntityItem::Start()
 {
@@ -54,6 +56,25 @@ void EntityItem::Start()
 	}*/
 	if(m_effect)
 		m_effect->Apply();
+
+
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
+	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	{
+		auto canvObj = GameObject::Find("Canvas");
+		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
+		if (tutorUIPre)
+		{
+			GameObject* tutorUIObj = PrefabUtilitys->InstantiatePrefab(tutorUIPre, "itemUI");
+			m_tutorialUi = tutorUIObj->GetComponent<TutorialUI>();
+			canvObj->AddChild(tutorUIObj);
+			m_tutorialUi->Init();
+			m_tutorialUi->SetType(0);
+			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
+			m_tutorialUi->screenOffset = { 0, -40.f };
+		}
+	}
 }
 
 void EntityItem::OnTriggerEnter(const Collision& collision)
@@ -255,6 +276,10 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
 	endPos.y += 0.2f;
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->GetOwner()->SetEnabled(false);
+	}
 }
 void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2 distance,bool indicate)
 {
@@ -276,6 +301,10 @@ void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
 	endPos.y = endPos.y + 0.2f - 1.0f;
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->GetOwner()->SetEnabled(false);
+	}
 }
 
 void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float height)
@@ -288,11 +317,19 @@ void EntityItem::Throw(Mathf::Vector3 _startPos, Mathf::Vector3 velocity, float 
 	throwDistacneY = height;
 	endPos = startPos + velocity;
 	endPos.y = endPos.y + 0.2f - 1.0f;
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->GetOwner()->SetEnabled(false);
+	}
 }
 
 void EntityItem::SetThrowOwner(Player* player)
 {
 	throwOwner = player;
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->SetType(1);
+	}
 }
 
 Player* EntityItem::GetThrowOwner()
@@ -325,6 +362,12 @@ void EntityItem::OnGround()
 			}
 		}
 		
+	}
+
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->GetOwner()->SetEnabled(true);
+		m_tutorialUi->SetType(0);
 	}
 }
 

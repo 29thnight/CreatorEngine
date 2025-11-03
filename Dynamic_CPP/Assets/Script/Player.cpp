@@ -547,6 +547,19 @@ void Player::Update(float tick)
 		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
 	}
 
+
+
+	//간혈적 버그 
+	if (isChargeAttack == true)
+	{
+		chargeElapsedTime += tick;
+		if (chargeElapsedTime >= chargeBugTime)
+		{
+			isChargeAttack = false;
+			chargeElapsedTime = 0.f;
+		}
+
+	}
 }
 
 void Player::LateUpdate(float tick)
@@ -1248,10 +1261,12 @@ void Player::ChargeAttack()
 			if (m_curWeapon->itemType == ItemType::Melee)
 			{
 				m_animator->SetParameter("MeleeChargeAttack", true);
+				chargeElapsedTime = 0.f;
 			}
 			else if (m_curWeapon->itemType == ItemType::Range)
 			{
 				m_animator->SetParameter("RangeChargeAttack", true); 
+				chargeElapsedTime = 0.f;
 			}
 		}
 		else {

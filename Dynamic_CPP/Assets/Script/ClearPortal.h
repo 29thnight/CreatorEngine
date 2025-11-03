@@ -4,6 +4,7 @@
 
 class GameManager;
 class EffectComponent;
+class TutorialUI;
 class ClearPortal : public ModuleBehavior
 {
 public:
@@ -32,9 +33,9 @@ public:
 	bool isPortalReady = false; //아시스가 특정지정 도착시 포탈 준비   // 준비되야 활성화가능
 	bool InPortal2 = false;
 	bool preInPortal2 = false;
+	TutorialUI* m_tutorialUi = nullptr;
 private:
 	int  playerCount = 0;
 	bool isSwitching{ false };
 	GameManager* m_gameManager;
-
 };
