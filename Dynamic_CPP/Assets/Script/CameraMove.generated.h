@@ -12,14 +12,15 @@ ReflectionScriptField(CameraMove) \
 		meta_property(OnCaculCamera) \
 		meta_property(shakeDuration) \
 		meta_property(shakeMagnitude) \
+		meta_property(isBossCamera) \
 	}); \
 	MethodField \
 	({ \
 		meta_method(OnCameraControll) \
 		meta_method(OffCameraCOntroll) \
 		meta_method(CameraMoveFun, "dir") \
-		meta_method(ShakeCamera, "duration", "magnitude") \
 		meta_method(ShakeCamera1s) \
+		meta_method(ShakeCamera, "duration", "magnitude") \
 	}); \
 	FieldEnd(CameraMove, PropertyAndMethod) \
 };

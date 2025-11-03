@@ -6,6 +6,7 @@
 #include "PlayEffectAll.h"
 #include "PrefabUtility.h"
 #include "EffectComponent.h"
+#include "GameManager.h"
 void EntityMonsterBaseGate::Start()
 {
 	m_maxHP = maxHP;
@@ -87,7 +88,15 @@ void EntityMonsterBaseGate::SendDamage(Entity* sender, int damage, HitInfo hitin
 		}
 
 		GetOwner()->SetLayer("Water");
-
+		auto GMObj = GameObject::Find("GameManager");
+		if (GMObj)
+		{
+			GameManager* GM = GMObj->GetComponent<GameManager>();
+			if (GM)
+			{
+				GM->VibDestroyGate();
+			}
+		}
 	}
 }
 

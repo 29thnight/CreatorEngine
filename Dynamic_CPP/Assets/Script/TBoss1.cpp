@@ -19,6 +19,7 @@
 #include "PlayEffectAll.h"
 #include "TimeSystem.h"
 #include "SFXPoolManager.h"
+
 void TBoss1::Start()
 {
 	BT = m_pOwner->GetComponent<BehaviorTreeComponent>();
@@ -60,6 +61,7 @@ void TBoss1::Start()
 
 	}
 
+	m_decalobj = GameObject::Find("Boss_decal");
 	
 	if (m_criticalMark == nullptr)
 	{
@@ -195,6 +197,25 @@ void TBoss1::Update(float tick)
 		RotateToTarget();
 	}
 
+	if (m_moveState == EBossMoveState::Burrowing)
+	{
+		Transform* decaltr = m_decalobj->GetComponent<Transform>();
+		Mathf::Vector3 scale = decaltr->GetWorldScale();
+		if (scale.x >= 0.1f)
+		{
+			decaltr->SetScale(scale - Mathf::Vector3(1.0f, 0.f, 1.0f) * tick);
+		}
+	}
+	else if (m_moveState == EBossMoveState::Protruding)
+	{
+		Transform* decaltr = m_decalobj->GetComponent<Transform>();
+		Mathf::Vector3 scale = decaltr->GetWorldScale();
+		if (scale.x <= 10.0f)
+		{
+			decaltr->SetScale(scale + Mathf::Vector3(1.0f, 0.f, 1.0f) * tick);
+		}
+	}
+	
 	// 1. Handle generic, time-based phase transitions
 	UpdatePatternPhase(tick);
 
@@ -1502,6 +1523,7 @@ void TBoss1::SetBurrow()
 {
 	isBurrow = true;
 	m_moveState = EBossMoveState::Burrowed;
+	m_decalobj->SetEnabled(false);
 }
 
 void TBoss1::Protrude()
@@ -1523,6 +1545,7 @@ void TBoss1::Protrude()
 			}
 		}
 	}
+	m_decalobj->SetEnabled(true);
 
 	//올라오면서 플레이어 데미지 판정 + 플레이어 넉백
 }
@@ -1534,6 +1557,8 @@ void TBoss1::ProtrudeEnd()
 	isBurrow = false;
 	isMoved = true;
 	m_moveState = EBossMoveState::Idle;
+	Transform* decaltr = m_decalobj->GetComponent<Transform>();
+	decaltr->SetScale(Mathf::Vector3(10.f, 1, 10.f));
 }
 
 void TBoss1::ProtrudeChunsik()
@@ -1546,7 +1571,16 @@ void TBoss1::ProtrudeChunsik()
 		EffectComponent* eff = UpEffobj->GetComponent<EffectComponent>();
 		eff->Apply();
 		m_animator->SetParameter("ProtrudeTrigger", true);
+		if (GM)
+		{
+			auto pool = GM->GetSFXPool();
+			if (pool)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundUP"));
+			}
+		}
 	}
+	m_decalobj->SetEnabled(true);
 }
 
 void TBoss1::ProtrudeDamege()
@@ -1845,7 +1879,6 @@ void TBoss1::Dead()
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 
-
 	if (GM)
 	{
 		auto pool = GM->GetSFXPool();
@@ -1853,6 +1886,8 @@ void TBoss1::Dead()
 		{
 			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossDie"));
 		}
+		GM->VibKillBoss();
+	
 	}
 }
 

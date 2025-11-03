@@ -77,6 +77,7 @@ void Bomb::Update(float tick)
 				testObj->GetComponent<SphereColliderComponent>()->SetRadius(radius);
 			}
 
+			m_ownerPlayer->VibBombExpolsion();
 
 			for (auto& hit : hits)
 			{

@@ -1,0 +1,43 @@
+m_name: indicator_pc1
+m_instanceID: 3756296936
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: indicator_pc1
+    m_instanceID: 1967980530
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0.100000001, z: 4.54747351e-13, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 2, y: 1, z: 2, w: 0}
+      m_parentID: 67
+    m_index: 126
+    m_parentIndex: 67
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 0d3b5f0d-0c5f-56b4-b8c3-79e2a95f200e
+    m_childrenIndices: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - DecalComponent: 3765195741
+        m_name: DecalComponent
+        m_instanceID: 1592087219
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_diffusefileName: C:\Users\user\Desktop\LastProject\Dynamic_CPP\Assets\Textures\indicator_pc1.png
+        m_normalFileName: ""
+        m_ormFileName: ""
+        m_decalTexture: ~
+        m_normalTexture: ~
+        m_occluroughmetalTexture: ~
+        sliceX: 1
+        sliceY: 1
+        sliceNumber: 0
+        slicePerSeconds: 1
+        useAnimation: false
+        isLoop: true
+    m_gameObjectType: 3
+    m_isStatic: false

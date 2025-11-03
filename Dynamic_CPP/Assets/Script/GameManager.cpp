@@ -18,6 +18,7 @@
 #include "GameInstance.h"
 #include "SceneTransitionUI.h"
 #include "TweenManager.h"
+#include "CameraMove.h"
 
 void GameManager::Awake()
 {
@@ -139,6 +140,7 @@ void GameManager::Update(float tick)
 			{
 				GameInstance::GetInstance()->SetCurrentSceneType((int)SceneType::Stage);
 			}
+			VibPlayerStun();
 			m_nextSceneIndex = (int)SceneType::GameOver;
 			m_isLoadingReq = false;
 			m_isGameOver = true;
@@ -690,5 +692,69 @@ void GameManager::ChangeClearScene()
 	LoadNextScene();
 
 	isClearSwitching = true;
+}
+
+void GameManager::VibDestroyGate()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibDestroyGate();
+
+	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(0.5f, 1.0f);
+	}
+}
+
+void GameManager::VibKillBoss()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibKillBoss();
+
+	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(1.0f, 10.0f);
+	}
+}
+
+void GameManager::VibPlayerStun()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibPlayerStun();
+
+	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(0.5f, 1.0f);
+	}
+}
+
+void GameManager::VibKoriStun()
+{
+	for (auto entity : m_players)
+	{
+		Player* player = dynamic_cast<Player*>(entity);
+
+		player->VibKoriStun();
+
+	}
+	GameObject* cameraObj = GameObject::Find("Main Camera");
+	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
+	if (cameraMove) {
+		cameraMove->ShakeCamera(0.5f, 1.0f);
+	}
 }
 

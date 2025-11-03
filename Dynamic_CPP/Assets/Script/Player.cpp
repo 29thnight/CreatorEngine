@@ -163,7 +163,16 @@ void Player::Start()
 		GameObject* swapObj = PrefabUtilitys->InstantiatePrefab(swapprefab, "WeaponSwapEffect");
 		swapEffect = swapObj->GetComponentDynamicCast<EffectComponent>();
 	}
-	
+	Prefab* IndicatorStunPre = PrefabUtilitys->LoadPrefab("indicatorStun");
+	if (IndicatorStunPre)
+	{
+		//IndicatorStun
+		IndicatorStun = PrefabUtilitys->InstantiatePrefab(IndicatorStunPre, "indicatorStun");
+		GetOwner()->AddChild(IndicatorStun);
+		IndicatorStun->SetEnabled(false);
+	}
+
+
 
 	constexpr int CONVERT_TYPE = 1;
 	playerIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
@@ -787,6 +796,10 @@ void Player::SetCurHP(int hp)
 	if (m_currentHP <= 0)
 	{
 		isStun = true;
+		if (IndicatorStun)
+		{
+			IndicatorStun->SetEnabled(true);
+		}
 		m_animator->SetParameter("OnStun", true);
 	}
 	if (m_HPbar)
@@ -808,6 +821,10 @@ void Player::Damage(int damage)
 		isStun = true;
 		m_animator->SetParameter("OnStun", true);
 
+		if (IndicatorStun)
+		{
+			IndicatorStun->SetEnabled(true);
+		}
 		if (m_DamageSound)
 		{
 			m_DamageSound->clipKey = GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerStun");
@@ -1069,6 +1086,11 @@ void Player::StartAttack()
 {
 	//여기서 공격처리하고 차징시작 
 	if (false == CheckState(PlayerStateFlag::CanAttack)) return;
+
+	if (swapEffect)
+	{
+		swapEffect->StopEffect();
+	}
 	if (isChargeAttack == true) return; //차지어택일경우 sucessAttack 확인후  거기서 다시초기화해줌
 	if (isAttacking == false || canMeleeCancel == true)
 	{
@@ -1116,6 +1138,7 @@ void Player::StartAttack()
 				bombThrowPositionoffset = { 0,0,0 };
 				if (m_animator)
 					m_animator->SetParameter("OnTargetBomb", true);
+				ChangeState("Attack");
 				//현재무기 감추거나 attach떼고 손에붙여서 날아가게?
 			}
 			startAttack = true; 
@@ -1425,6 +1448,10 @@ void Player::Resurrection()
 			m_SpecialActionSound->PlayOneShot();
 		}
 	}
+	if (IndicatorStun)
+	{
+		IndicatorStun->SetEnabled(false);
+	}
 }
 
 void Player::SetInvincibility(float _GracePeriodTime)
@@ -1460,6 +1487,12 @@ void Player::SendKnockBack(Entity* sender,Mathf::Vector2 _KnockbackForce)
 
 void Player::EndAttackFrame()
 {
+	if (m_curWeapon->itemType == ItemType::Basic) 
+		return;
+	if (m_curWeapon->itemType == ItemType::Melee && !isChargeAttack)
+		return;
+
+
 	ChangeState("EndAttack");
 }
 
