@@ -150,7 +150,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 31.98790740966797,
                             "velocityMode": 2
                         },
                         "orbitalData": {
@@ -397,7 +397,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 31.98790740966797,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -605,8 +605,8 @@
                             },
                             "initialRotation": {
                                 "x": 0.0,
-                                "y": 0.0,
-                                "z": 3.0
+                                "y": 3.0,
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -664,7 +664,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 31.98790740966797,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -892,8 +892,8 @@
                             },
                             "initialRotation": {
                                 "x": 0.0,
-                                "y": 0.0,
-                                "z": 3.0
+                                "y": 3.0,
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -951,7 +951,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 31.98790740966797,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1179,8 +1179,8 @@
                             },
                             "initialRotation": {
                                 "x": 0.0,
-                                "y": 0.0,
-                                "z": 3.0
+                                "y": 3.0,
+                                "z": 0.0
                             },
                             "lifeTime": 1.0,
                             "renderMode": 0,
@@ -1238,7 +1238,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 0.0,
+                            "currentTime": 31.98790740966797,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1437,7 +1437,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -1519,7 +1519,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 19.670204162597656,
+                            "currentTime": 31.98790740966797,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.25,
@@ -1561,7 +1561,7 @@
                     "useEasing": false
                 }
             ],
-            "name": "NewEmitter",
+            "name": "stone",
             "particleDataType": 1,
             "position": {
                 "x": 0.0,
