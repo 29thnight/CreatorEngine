@@ -32,6 +32,7 @@ ColorGradingPass::ColorGradingPass()
 	m_pso = std::make_unique<PipelineStateObject>();
 
 	m_pColorGradingLUTShader = &ShaderSystem->ComputeShaders["GenerateColorGradingLUT"];
+	m_pCopyShader = &ShaderSystem->ComputeShaders["CopyTexture"];
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
 	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ColorGrading"];
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
@@ -84,6 +85,27 @@ ColorGradingPass::ColorGradingPass()
 	);
 	m_pDefaultLUTTexture->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
 	m_pDefaultLUTTexture->CreateUAV(DXGI_FORMAT_R8G8B8A8_UNORM);
+	
+	m_pPrevLUTTexture = Texture::Create(
+		64,
+		64,
+		"PrevColorGradingLUTTexture",
+		DXGI_FORMAT_R8G8B8A8_UNORM,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
+	);
+	m_pPrevLUTTexture->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
+	m_pPrevLUTTexture->CreateUAV(DXGI_FORMAT_R8G8B8A8_UNORM);
+
+	m_pColorGradingTexture = Texture::Create(
+		64,
+		64,
+		"PrevColorGradingLUTTexture",
+		DXGI_FORMAT_R8G8B8A8_UNORM,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
+	);
+	m_pColorGradingTexture->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
+	m_pColorGradingTexture->CreateUAV(DXGI_FORMAT_R8G8B8A8_UNORM);
+
 	DirectX11::CSSetShader(m_pColorGradingLUTShader->GetShader(), nullptr, 0);
 	ColorGradingEdit editData;
 	editData.exposure = 1;
@@ -138,7 +160,7 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 	camera.UpdateBuffer();
 	CBData cbData;
 	cbData.lerpValue = lerp;
-	cbData.time = timer * 0.2f;
+	cbData.time = timer;
 	cbData.useLUTEdit = useLUTEdit;
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
@@ -159,6 +181,7 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 
 	DirectX11::PSSetShaderResources(0, 1, &m_pCopiedTexture->m_pSRV);
 	DirectX11::PSSetShaderResources(1, 1, m_pColorGradingTexture ? &m_pColorGradingTexture->m_pSRV : &m_pDefaultLUTTexture->m_pSRV);
+	DirectX11::PSSetShaderResources(2, 1, &m_pPrevLUTTexture->m_pSRV);
 
 	DirectX11::Draw(4, 0);
 
@@ -265,13 +288,61 @@ void ColorGradingPass::ApplySettings(const ColorGradingPassSetting& setting)
 void ColorGradingPass::SetColorGradingTexture(std::string_view filename)
 {
 	m_textureFilePath = filename;
-	if (m_pColorGradingTexture)
-	{
-		m_pColorGradingTexture.release();
+	
+	timer = 0.f;
+
+	if (filename.empty() || filename == "None" || filename == "none") {
+		ComPtr<ID3D11Resource> srcResource;
+		ComPtr<ID3D11Resource> dstResource;
+
+		// SRV에서 원본 리소스 가져오기
+		m_pDefaultLUTTexture->m_pSRV->GetResource(&srcResource);
+		m_pColorGradingTexture->m_pSRV->GetResource(&dstResource);
+		DirectX11::CopyResource(dstResource.Get(), srcResource.Get());
+		m_pPrevLUTTexture->m_pSRV->GetResource(&dstResource);
+		DirectX11::CopyResource(dstResource.Get(), srcResource.Get());
 	}
-	if (!m_textureFilePath.ToString().empty())
-	{
-		m_pColorGradingTexture = Texture::LoadManagedFromPath(m_textureFilePath.ToString());
+	else {
+		if (m_pColorGradingTexture)
+		{
+			ComPtr<ID3D11Resource> srcResource;
+			ComPtr<ID3D11Resource> dstResource;
+			m_pColorGradingTexture->m_pSRV->GetResource(&srcResource);
+			m_pPrevLUTTexture->m_pSRV->GetResource(&dstResource);
+			DirectX11::CopyResource(dstResource.Get(), srcResource.Get());
+
+			//m_pColorGradingTexture.release();
+		}
+		else {
+			ComPtr<ID3D11Resource> srcResource;
+			ComPtr<ID3D11Resource> dstResource;
+
+			m_pDefaultLUTTexture->m_pSRV->GetResource(&srcResource);
+			m_pPrevLUTTexture->m_pSRV->GetResource(&dstResource);
+			DirectX11::CopyResource(dstResource.Get(), srcResource.Get());
+		}
+		if (!m_textureFilePath.ToString().empty())
+		{
+			auto tempTexture = Texture::LoadManagedFromPath(m_textureFilePath.ToString());
+
+			if (tempTexture) {
+
+				DirectX11::CSSetShader(m_pCopyShader->GetShader(), nullptr, 0);
+				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &m_pColorGradingTexture->m_pUAV, nullptr);
+				DirectX11::Dispatch(4, 4, 1);
+
+
+				ID3D11UnorderedAccessView* nulluav = nullptr;
+				ID3D11ShaderResourceView* nullsrv = nullptr;
+
+				DirectX11::CSSetShaderResources(0, 1, &nullsrv);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &nulluav, nullptr);
+
+				tempTexture.release();
+				//m_pColorGradingTexture = Texture::LoadManagedFromPath(m_textureFilePath.ToString());
+			}
+		}
 	}
 }
 

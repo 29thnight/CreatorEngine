@@ -261,6 +261,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	{
 		m_pBitMaskPass = std::make_unique<BitMaskPass>();
 		m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
+		m_pBitMaskPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bitMask);
 	});
 
 	//DecalPass

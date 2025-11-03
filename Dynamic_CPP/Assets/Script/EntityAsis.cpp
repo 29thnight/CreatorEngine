@@ -235,7 +235,7 @@ void EntityAsis::Update(float tick)
 	//}
 
 	if (m_currentStaggerDuration <= 0.f) {
-		if (!m_isWait && !isBigWoodDetect)
+		if (!m_isWait && !isBigWoodDetect && !isStun)
 		{
 			if (true == PathMove(tick))
 			{
@@ -416,7 +416,6 @@ void EntityAsis::Purification(float tick)
 
 bool EntityAsis::PathMove(float tick)
 {
-	if (isStun == true) return false;
 	int pathSize = points.size();
 	if (pathSize == 0) return false;
 	int nextPointIndex = (currentPointIndex + 1) % pathSize;

@@ -9,6 +9,7 @@
 #include "AAPassSetting.h"
 #include "SSAOPassSetting.h"
 #include "VolumetricFogPassSetting.h"
+#include "BitMaskPassSetting.h"
 #include "RenderPassSettings.generated.h"
 
 struct RenderPassSettings
@@ -37,6 +38,8 @@ struct RenderPassSettings
     ToneMapPassSetting      toneMap{};
     [[Property]]
 	VolumetricFogPassSetting volumetricFog{};
+    [[Property]]
+    BitMaskPassSetting      bitMask{};
     [[Property]]
     std::string             skyboxTextureName{ "rosendal_park_sunset_puresky_4k.hdr" };
     [[Property]]

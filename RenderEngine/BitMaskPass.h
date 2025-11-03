@@ -2,6 +2,7 @@
 #include "IRenderPass.h"
 #include "Texture.h"
 
+struct BitMaskPassSetting;
 class BitMaskPass final : public IRenderPass
 {
 public:
@@ -13,6 +14,8 @@ public:
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize(uint32_t width, uint32_t height) override;
+
+	virtual void ApplySettings(const BitMaskPassSetting& settings);
 
 private:
 	Texture* m_pBitmaskTexture{ nullptr };

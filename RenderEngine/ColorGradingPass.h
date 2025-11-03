@@ -16,10 +16,11 @@ public:
     void ApplySettings(const ColorGradingPassSetting& setting);
 	void SetColorGradingTexture(std::string_view filename);
 
-	Managed::UniquePtr<Texture> m_pColorGradingTexture{};
+	Texture* m_pColorGradingTexture{};
 private:
 	Texture* m_pCopiedTexture{};
 	Texture* m_pDefaultLUTTexture{};
+	Texture* m_pPrevLUTTexture{};
 	ComPtr<ID3D11Buffer> m_Buffer{};
 	ComPtr<ID3D11Buffer> m_EditBuffer{};
 	float lerp = 0.f;
@@ -43,6 +44,7 @@ private:
 	float4 highlights{ 1,1,1,1 }; // .rgb: Color, .a: Brightness Scale
 
 	ComputeShader* m_pColorGradingLUTShader = nullptr;
+	ComputeShader* m_pCopyShader = nullptr;
 	Texture* m_pColorGradingLUTTexture = nullptr;
 	std::string m_tempLUTName{ "ColorGradingLUT" };
 };

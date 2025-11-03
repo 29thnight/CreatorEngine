@@ -949,6 +949,9 @@
     <ClInclude Include="ICustomEditor.h">
       <Filter>EditorAddon</Filter>
     </ClInclude>
+    <ClInclude Include="BitMaskPassSetting.h">
+      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -1361,6 +1364,12 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleNTHDistortion.ps.hlsl">
       <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleWater.ps.hlsl">
+      <Filter>Shaders\Effect\Special\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\CopyTexture.cs.hlsl">
+      <Filter>Shaders\Common</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

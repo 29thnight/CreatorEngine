@@ -16,6 +16,10 @@
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
 #include "BloomSetting.h"
+#include "MeshCollider.h"
+#include "RagdollComponent.h"
+#include "FoliageComponent.h"
+#include "BitMaskPassSetting.h"
 #include "RigidBodyComponent.h"
 #include "ColorGradingPassSetting.h"
 #include "DeferredPassSetting.h"
@@ -55,13 +59,10 @@
 #include "ConditionParameter.h"
 #include "LightComponent.h"
 #include "CurvePoint.h"
+#include "Scene.h"
+#include "SoundComponent.h"
 #include "EffectComponent.h"
 #include "FoliageInstance.h"
-#include "SoundComponent.h"
-#include "Scene.h"
-#include "MeshCollider.h"
-#include "RagdollComponent.h"
-#include "FoliageComponent.h"
 #include "GameObject.h"
 #include "InputAction.h"
 #include "LightMapping.h"
@@ -93,6 +94,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(BTBuildGraph);
     AUTO_REGISTER_CLASS(BTBuildNode);
     AUTO_REGISTER_CLASS(BehaviorTreeComponent);
+    AUTO_REGISTER_CLASS(BitMaskPassSetting);
     AUTO_REGISTER_CLASS(BlackBoardValue);
     AUTO_REGISTER_CLASS(BloomPassSetting);
     AUTO_REGISTER_CLASS(BoneMask);

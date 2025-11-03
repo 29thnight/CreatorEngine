@@ -66,7 +66,7 @@ float3 ApplyTonalGrading(float3 color)
 Texture2D<float4> ColorTexture : register(t0);
 
 Texture2D<float4> LUT : register(t1);
-//Texture2D<float4> NewLUT : register(t2);
+Texture2D<float4> PrevLUT : register(t2);
 
 
 float4 main(PixelShaderInput IN) : SV_TARGET
@@ -123,10 +123,34 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         float4 c1 = lerp(c10, c11, greenFrac);
 
         float4 lutColor = lerp(c0, c1, blueFrac);
+        
+        if (time > 0.f && time < 1.f)
+        {
+            float4 c000 = PrevLUT.Load(int3(basePos00 + int2(red0, green0), 0));
+            float4 c100 = PrevLUT.Load(int3(basePos00 + int2(red1, green0), 0));
+            float4 c010 = PrevLUT.Load(int3(basePos00 + int2(red0, green1), 0));
+            float4 c110 = PrevLUT.Load(int3(basePos00 + int2(red1, green1), 0));
+            float4 c001 = PrevLUT.Load(int3(basePos01 + int2(red0, green0), 0));
+            float4 c101 = PrevLUT.Load(int3(basePos01 + int2(red1, green0), 0));
+            float4 c011 = PrevLUT.Load(int3(basePos01 + int2(red0, green1), 0));
+            float4 c111 = PrevLUT.Load(int3(basePos01 + int2(red1, green1), 0));
+
+// Trilinear interpolation
+            float4 c00 = lerp(c000, c100, redFrac);
+            float4 c01 = lerp(c010, c110, redFrac);
+            float4 c0 = lerp(c00, c01, greenFrac);
+
+            float4 c10 = lerp(c001, c101, redFrac);
+            float4 c11 = lerp(c011, c111, redFrac);
+            float4 c1 = lerp(c10, c11, greenFrac);
+
+            float4 prevlutColor = lerp(c0, c1, blueFrac);
+            lutColor = lerp(prevlutColor, lutColor, saturate(time));
+        }
 
 // Blend LUT result with base color
     //float4 finalColor = lerp(baseColor, lutColor, lerpValue);
-        float4 finalColor = lerp(baseColor, lutColor, min(time, 1.0f));
+        float4 finalColor = lerp(baseColor, lutColor, saturate(time));
         finalColor = lerp(baseColor, finalColor, lerpValue);
         finalColor.a = 1.0f;
         return finalColor;

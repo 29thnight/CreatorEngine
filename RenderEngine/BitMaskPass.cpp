@@ -1,6 +1,7 @@
 #include "BitMaskPass.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
+#include "BitMaskPassSetting.h"
 
 cbuffer EdgefilterBuffer
 {
@@ -150,14 +151,75 @@ void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 void BitMaskPass::ControlPanel()
 {
     ImGui::PushID(this);
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().bitMask;
 	ImGui::Text("BitMask Pass");
-    ImGui::Checkbox("Enable Outline", &isOn);
-    ImGui::Checkbox("Enable Outline blur", &blurOutline);
-    ImGui::DragFloat("Outline Velocity", &outlineVelocity);
+    if (ImGui::Checkbox("Enable Outline", &isOn)) {
+        setting.isOn = isOn;
+    }
+    if (ImGui::Checkbox("Enable Outline blur", &blurOutline)) {
+        setting.blurOutline = blurOutline;
+    }
+    if (ImGui::DragFloat("Outline Velocity", &outlineVelocity)) {
+        setting.outlineVelocity = outlineVelocity;
+    }
     for (int i = 0; i < 8; i++) {
         ImGui::PushID(i);
-        ImGui::ColorEdit4(("Color" + std::to_string(i)).c_str(), &m_colors[i].x);
-        ImGui::DragFloat("ColorVelocity", &m_colors[i].w, 1.f);
+        if (ImGui::ColorEdit4(("Color" + std::to_string(i)).c_str(), &m_colors[i].x)) {
+            switch (i) {
+            case 0:
+                setting.m_color1 = m_colors[i];
+                break;
+            case 1:
+                setting.m_color2 = m_colors[i];
+                break;
+            case 2:
+                setting.m_color3 = m_colors[i];
+                break;
+            case 3:
+                setting.m_color4 = m_colors[i];
+                break;
+            case 4:
+                setting.m_color5 = m_colors[i];
+                break;
+            case 5:
+                setting.m_color6 = m_colors[i];
+                break;
+            case 6:
+                setting.m_color7 = m_colors[i];
+                break;
+            case 7:
+                setting.m_color8 = m_colors[i];
+                break;
+            }
+        }
+        if (ImGui::DragFloat("ColorVelocity", &m_colors[i].w, 1.f)) {
+            switch (i) {
+            case 0:
+                setting.m_color1.w = m_colors[i].w;
+                break;
+            case 1:
+                setting.m_color2.w = m_colors[i].w;
+                break;
+            case 2:
+                setting.m_color3.w = m_colors[i].w;
+                break;
+            case 3:
+                setting.m_color4.w = m_colors[i].w;
+                break;
+            case 4:
+                setting.m_color5.w = m_colors[i].w;
+                break;
+            case 5:
+                setting.m_color6.w = m_colors[i].w;
+                break;
+            case 6:
+                setting.m_color7.w = m_colors[i].w;
+                break;
+            case 7:
+                setting.m_color8.w = m_colors[i].w;
+                break;
+            }
+        }
         ImGui::PopID();
     }
     ImGui::PopID();
@@ -165,4 +227,19 @@ void BitMaskPass::ControlPanel()
 
 void BitMaskPass::Resize(uint32_t width, uint32_t height)
 {
+}
+
+void BitMaskPass::ApplySettings(const BitMaskPassSetting& settings)
+{
+    isOn = settings.isOn;
+    blurOutline = settings.blurOutline;
+    outlineVelocity = settings.outlineVelocity;
+    m_colors[0] = settings.m_color1;
+    m_colors[1] = settings.m_color2;
+    m_colors[2] = settings.m_color3;
+    m_colors[3] = settings.m_color4;
+    m_colors[4] = settings.m_color5;
+    m_colors[5] = settings.m_color6;
+    m_colors[6] = settings.m_color7;
+    m_colors[7] = settings.m_color8;
 }
