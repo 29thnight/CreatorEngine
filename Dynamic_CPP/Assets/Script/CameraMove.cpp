@@ -39,7 +39,7 @@ void CameraMove::LateUpdate(float tick)
 	if (cameraMoveStopFlag) return;
 	if (GM)
 	{
-		if (GM->TestCameraControll == false && OnCaculCamera ==false)
+		if (GM->TestCameraControll == false && OnCaculCamera == false)
 		{
 			if (target == nullptr)
 			{
@@ -88,14 +88,14 @@ void CameraMove::LateUpdate(float tick)
 			}
 
 			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
-			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + shakePos);
+			//transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + shakePos);
 
 
 			//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);
 			//lerpPos.y = 0.f;
 			//transform->SetPosition(lerpPos + offset);
 		}
-		else if(GM->TestCameraControll == false && OnCaculCamera == true)
+		else if (GM->TestCameraControll == false && OnCaculCamera == true)
 		{
 			//플레이어 2명 아시스 위치에따라 카메라 위치계산
 
@@ -143,17 +143,17 @@ void CameraMove::LateUpdate(float tick)
 
 
 				Mathf::Vector3 realOffset = offset;
-				float farDistance = 0; 
+				float farDistance = 0;
 				//currentPos  에 3개다 거리계산해서 젤먼애 구해서 걔기준 일정비례 offset lerp
 
 				float asisDistance = Mathf::Vector3::Distance(asisPos, centerPos);
 				float P1Distance = Mathf::Vector3::Distance(P1Pos, centerPos);
 				float P2Distance = Mathf::Vector3::Distance(P2Pos, centerPos);
-	
+
 				farDistance = std::max(asisDistance, std::max(P1Distance, P2Distance));
 				float t = farDistance / maxDistance;
 				t = std::clamp(t, 0.0f, 1.0f);
-		
+
 				realOffset = Mathf::Vector3::Lerp(minOffset, maxOffset, t);
 				preOffset = realOffset;
 				//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
@@ -166,7 +166,7 @@ void CameraMove::LateUpdate(float tick)
 			}
 
 		}
-		else if(GM->TestCameraControll == true)
+		else if (GM->TestCameraControll == true)
 		{
 
 		}
@@ -212,7 +212,7 @@ void CameraMove::CameraMoveFun(Mathf::Vector2 dir)
 	}
 }
 
-void CameraMove::ShakeCamera(float duration,float magnitude)
+void CameraMove::ShakeCamera(float duration, float magnitude)
 {
 	shakeDuration = duration;
 	shakeMagnitude = magnitude;

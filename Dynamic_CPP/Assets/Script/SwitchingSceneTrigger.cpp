@@ -59,6 +59,32 @@ void SwitchingSceneTrigger::Start()
         }
     }
 
+	GameObject* illustrationObj = GameObject::Find("LoadingIll");
+    if (illustrationObj)
+    {
+        if (ImageComponent* imgComp = illustrationObj->GetComponent<ImageComponent>())
+        {
+            if(m_gameManager)
+            {
+                int t = m_gameManager->m_nextSceneIndex;
+                int prev = GameInstance::GetInstance()->GetPrevSceneType();
+                if (prev == (int)SceneType::SelectChar)
+                {
+                    imgComp->SetEnabled(true);
+                }
+                else if (t == (int)SceneType::Boss)
+                {
+                    imgComp->SetTexture(1); // 보스 일러스트
+                    imgComp->SetEnabled(true);
+                }
+                else
+                {
+                    imgComp->SetEnabled(false);
+                }
+            }
+        }
+	}
+
 }
 
 bool SwitchingSceneTrigger::IsAnyAJustPressed()
@@ -116,11 +142,11 @@ void SwitchingSceneTrigger::SetupCutRangeForNextScene()
     m_autoTimer = 0.f;
 }
 
-inline bool HasCutsceneForNextSceneStrict(const GameManager* gm)
+bool SwitchingSceneTrigger::HasCutsceneForNextSceneStrict(const GameManager* gm)
 {
     if (!gm) return false;
     int t = gm->m_nextSceneIndex; int prev = GameInstance::GetInstance()->GetPrevSceneType();
-    return prev == (int)SceneType::SelectChar || t == (int)SceneType::Boss;
+    return prev == (int)SceneType::SelectChar || t == (int)SceneType::Boss || m_isTestMode;
 }
 
 void SwitchingSceneTrigger::ShowCut(int idx)

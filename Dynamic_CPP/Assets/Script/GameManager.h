@@ -111,6 +111,7 @@ private:
 	bool isBossClear = false;  //보스꺰 정해진연출 실행 or 정해진시간지나면 다음씬으로
 	float daegiTime = 4.0f;     //일단 연출없어서 4초대기후 다음씬
 	bool isClearSwitching = false;	
+	bool isCheatSceneEventDone = false;
 private:
 	void CheatSceneEvent();
 	void CheatMiningResource();

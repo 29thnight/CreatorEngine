@@ -16,7 +16,7 @@ void ClearLerpUI::Start()
 
     if (m_gm)
     {
-		m_gm->SetLoadingReq(true);
+		m_gm->SetLoadingReq(false);
         m_gm->m_nextSceneIndex = (int)SceneType::Credits;
         m_gm->LoadNextScene();
     }

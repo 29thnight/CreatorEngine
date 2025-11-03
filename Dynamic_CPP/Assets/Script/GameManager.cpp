@@ -524,8 +524,9 @@ ControllerVibration* GameManager::GetControllerVibration()
 
 void GameManager::CheatSceneEvent()
 {
+	if (m_isSwitching) return;
 
-	if (m_isSwitching) 
+	if (isCheatSceneEventDone)
 	{
 		SwitchNextSceneWithFade();
 	}
@@ -535,21 +536,21 @@ void GameManager::CheatSceneEvent()
 			m_nextSceneIndex = (int)SceneType::Tutorial;
 			m_isLoadingReq = true;
 			LoadNextScene();
-			m_isSwitching = true;
+			isCheatSceneEventDone = true;
 		}
 
 		if (InputManagement->IsKeyDown(KeyBoard::F2)) {
 			m_nextSceneIndex = (int)SceneType::Stage;
 			m_isLoadingReq = true;
 			LoadNextScene();
-			m_isSwitching = true;
+			isCheatSceneEventDone = true;
 		}
 
 		if (InputManagement->IsKeyDown(KeyBoard::F3)) {
 			m_nextSceneIndex = (int)SceneType::Boss;
 			m_isLoadingReq = true;
 			LoadNextScene();
-			m_isSwitching = true;
+			isCheatSceneEventDone = true;
 		}
 	}
 		

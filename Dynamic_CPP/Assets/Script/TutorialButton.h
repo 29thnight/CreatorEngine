@@ -17,7 +17,7 @@ public:
 
 private:
 	using Super = ImageButton;
-
+	class GameManager* m_gameManager{ nullptr };
 	[[Property]]
 	bool m_isEntering{ false };
 };

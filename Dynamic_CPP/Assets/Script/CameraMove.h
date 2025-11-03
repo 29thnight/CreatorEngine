@@ -21,8 +21,8 @@ public:
 	virtual void OnCollisionExit(const Collision& collision) override {}
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override;
-	virtual void OnDisable() override  {}
-	virtual void OnDestroy() override  {}
+	virtual void OnDisable() override {}
+	virtual void OnDestroy() override {}
 
 private:
 	GameObject* target = nullptr;
@@ -32,12 +32,11 @@ private:
 	[[Property]]
 	Mathf::Vector3 offset{ 0.f, 20.f, -11.5f };
 	Mathf::Vector3 minOffset{ 0.f,15.f ,-11.5f };
-	Mathf::Vector3 maxOffset{ 0.f,23.f ,- 16.5f };
-	Mathf::Vector3 preOffset = {0,0,0};
+	Mathf::Vector3 maxOffset{ 0.f,23.f ,-16.5f };
+	Mathf::Vector3 preOffset = { 0,0,0 };
 	float maxDistance = 25.f;
- 	[[Property]]
+	[[Property]]
 	float detectRange{ 1.f };
-
 
 	[[Method]]
 	void OnCameraControll();
@@ -52,7 +51,7 @@ private:
 
 	[[Property]]
 	bool OnCaculCamera = false;
-	
+
 	[[Property]]
 	float shakeDuration = 0.f;
 	[[Property]]

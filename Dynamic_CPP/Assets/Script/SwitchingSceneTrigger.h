@@ -59,5 +59,6 @@ private:
 	bool    m_waitAtLastCut = true;   // 마지막 컷에서는 입력 대기
 
 	void  SetupCutRangeForNextScene();
+	bool HasCutsceneForNextSceneStrict(const GameManager* gm);
 	void ShowCut(int idx);
 };

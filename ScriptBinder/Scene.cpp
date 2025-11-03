@@ -449,6 +449,7 @@ void Scene::CullMeshData()
 
 	for (auto camera : CameraManagement->GetCameras())
 	{
+		if (!camera) return;
 		if (!RenderPassData::VaildCheck(camera.get())) return;
 		auto data = RenderPassData::GetData(camera.get());
 
