@@ -107,6 +107,8 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "CameraMove.h"
+#include "CreditScroll.h"
+#include "TutorialScript.h"
 class CreateFactory : public Singleton<CreateFactory>
 {
 private:
