@@ -199,18 +199,6 @@ void EntityAsis::Update(float tick)
 		SetDead();
 	}
 
-	if (InputManagement->IsKeyDown('7'))
-	{
-		SendDamage(nullptr, 10);
-	}
-	if (InputManagement->IsKeyDown('8'))
-	{
-		Resurrection();
-	}
-	if (InputManagement->IsKeyDown('9'))
-	{
-		Stun();
-	}
 
 
 #endif // _DEBUG
