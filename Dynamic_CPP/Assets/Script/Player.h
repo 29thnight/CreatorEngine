@@ -317,6 +317,7 @@ public:
 	GameObject* stunObj = nullptr;
 	EffectComponent* stunEffect = nullptr;
 	EffectComponent* healEffect = nullptr;
+	EffectComponent* swapEffect = nullptr;
 	std::vector<EffectComponent*>	m_runEffects;
 	int								m_runIndex = 0;
 	
@@ -335,6 +336,18 @@ public:
 	float Attack2StepDistance = 0.01f;
 	[[Property]]
 	float Attack2StepTime = 0.01f;
+
+	[[Method]]
+	void EndAttackFrame(); //해당함수 실행뒤부터 모션캔슬후 이동,대시 가능
+	void UpdateEffectPos();
+
+	void VibChargeHit();
+	void VibBombExpolsion();
+	void VibKillElete();
+	void VibDestroyGate();
+	void VibKillBoss();
+	void VibPlayerStun();
+	void VibKoriStun();
 private:
 	//치트들 담긴함수 
 	void Cheat();

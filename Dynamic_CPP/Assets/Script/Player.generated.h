@@ -80,6 +80,7 @@ ReflectionScriptField(Player) \
 		meta_method(PlaySlashEvent) \
 		meta_method(PlaySlashEvent2) \
 		meta_method(PlaySlashEvent3) \
+		meta_method(EndAttackFrame) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };
