@@ -12,13 +12,19 @@ void SceneTransitionUI::Awake()
     // 네 엔진의 컬러/알파 API에 맞게 조정
     m_currAlpha = m_image->color.w;
     ApplyAlpha(m_currAlpha);
+    constexpr int MAX_CANVAS_ORDER = 500;
+    auto canvas = m_image->GetOwnerCanvas();
+    if (canvas)
+    {
+        canvas->SetCanvasOrder(MAX_CANVAS_ORDER); // 최상위로
+    }
 
 }
 
 void SceneTransitionUI::Update(float tick)
 {
-	constexpr int MAX_CANVAS_ORDER = std::numeric_limits<int>::max();
-	constexpr int MIN_CANVAS_ORDER = std::numeric_limits<int>::min();
+	constexpr int MAX_CANVAS_ORDER = 500;
+	constexpr int MIN_CANVAS_ORDER = 0;
 
     if (!m_image) return;
     if (m_state == State::Idle)
@@ -74,6 +80,7 @@ void SceneTransitionUI::Update(float tick)
                 // 콜백 재사용 방지
                 m_onFadeInComplete = nullptr;
                 m_onAllComplete = nullptr;
+				m_elapsed = 0.f;
             }
         }
         break;

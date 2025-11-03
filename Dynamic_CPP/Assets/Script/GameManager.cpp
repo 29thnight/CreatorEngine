@@ -61,7 +61,7 @@ void GameManager::Start()
 		m_sceneTransitionUI = transitionUIObj->GetComponent<SceneTransitionUI>();
 		if (m_sceneTransitionUI)
 		{
-			m_sceneTransitionUI->FadeOut(0.3f);
+			m_sceneTransitionUI->FadeOut(m_fadeInDuration);
 		}
 	}
 	else {
@@ -339,7 +339,7 @@ void GameManager::SwitchNextSceneWithFade()
 		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
 		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
 		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:
-		m_isSwitching = false;
+		//m_isSwitching = false;
 	});
 }
 
@@ -365,7 +365,7 @@ void GameManager::SwitchPrevSceneWithFade()
 		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
 		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
 		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:
-		m_isSwitching = false;
+		//m_isSwitching = false;
 	});
 }
 
@@ -525,8 +525,9 @@ ControllerVibration* GameManager::GetControllerVibration()
 void GameManager::CheatSceneEvent()
 {
 
-	if (m_isSwitching) {
-		SwitchNextScene();
+	if (m_isSwitching) 
+	{
+		SwitchNextSceneWithFade();
 	}
 	else
 	{
