@@ -175,8 +175,11 @@ void Player::Start()
 
 
 	constexpr int CONVERT_TYPE = 1;
-	playerIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
-
+	int curIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
+	if (curIndex != -1)
+	{
+		playerIndex = curIndex;
+	}
 	if(0 == playerIndex)
 	{
 		m_uiController = GameObject::Find("P1_UIController");

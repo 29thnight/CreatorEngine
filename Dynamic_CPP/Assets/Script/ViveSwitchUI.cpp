@@ -4,7 +4,9 @@
 #include "InputManager.h"
 #include "GameInstance.h"
 #include "pch.h"
-
+#include "SoundName.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void ViveSwitchUI::Start()
 {
     m_barRect = GetComponent<RectTransformComponent>();
@@ -26,6 +28,12 @@ void ViveSwitchUI::Start()
 
     // 초기 상태(원하면 false로 시작)
     SetViveEnabled(true);
+
+    GameObject* GMObj = GameObject::Find("GameManager");
+    if (GMObj)
+    {
+        GM = GMObj->GetComponent<GameManager>();
+    }
 }
 
 void ViveSwitchUI::Update(float tick)
@@ -63,12 +71,28 @@ void ViveSwitchUI::Update(float tick)
             if (x <= -m_toggleThreshold && !IsViveEnabled())
             {
                 SetViveEnabled(true);
+                if (GM)
+                {
+                    auto pool = GM->GetSFXPool();
+                    if (pool)
+                    {
+                        pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("OptionControl"));
+                    }
+                }
                 m_cdTimer = m_cooldownSec;
             }
             else if (x >= m_toggleThreshold && IsViveEnabled())
             {
                 SetViveEnabled(false);
                 m_cdTimer = m_cooldownSec;
+                if (GM)
+                {
+                    auto pool = GM->GetSFXPool();
+                    if (pool)
+                    {
+                        pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("OptionControl"));
+                    }
+                }
             }
         }
 

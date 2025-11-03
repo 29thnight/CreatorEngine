@@ -42,5 +42,6 @@ private:
 	float m_cooldownSec = 0.20f; // 연타 방지 쿨다운
 	float m_cdTimer = 0.f;
 
+	class GameManager* GM = nullptr;
 	ControllerHaptics m_haptics{};
 };

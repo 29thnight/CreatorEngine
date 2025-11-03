@@ -1507,14 +1507,7 @@ void TBoss1::Burrow()
 		m_animator->SetParameter("BurrowTrigger", true);
 		m_rigid->SetColliderEnabled(false);
 
-		if (GM)
-		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
-			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossGroundDown"));
-			}
-		}
+
 
 	}
 }

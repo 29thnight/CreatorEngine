@@ -77,7 +77,13 @@ void EntityMonsterTower::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 
 	if (towerMonster)
 	{
-		towerMonster->GetComponentDynamicCast<TestMonsterB>()->SendDamage(this, 0);
+		auto monster = towerMonster->GetComponentDynamicCast<TestMonsterB>();
+		if (monster)
+		{
+			monster->SendDamage(this, 0);
+
+		}
+
 	}
 
 	Entity::SendDamage(sender, damage, hitinfo);

@@ -20,7 +20,8 @@ void ClearPortal::Start()
 	if (portalObj)
 	{
 		m_portalEffect = portalObj->AddComponent<EffectComponent>();
-		portalObj->GetComponent<Transform>()->AddPosition({ 0,2.5,0 });
+		portalObj->GetComponent<Transform>()->AddPosition({ 0,0.5,0 });
+		portalObj->GetComponent<Transform>()->SetScale({2.0f,2.0f,2.0f});
 		m_portalEffect->m_effectTemplateName = "portaloff";
 	}
 	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
