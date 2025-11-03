@@ -49,9 +49,9 @@ private:
 
     // 기본 설정 (인스펙터 노출용)
     [[Property]] 
-    float m_defaultFadeIn = 0.3f;
+    float m_defaultFadeIn = 0.8f;
     [[Property]] 
-    float m_defaultFadeOut = 0.3f;
+    float m_defaultFadeOut = 0.8f;
     [[Property]] 
     bool  m_ignoreTimeScale = false; // 네가 비스케일 틱을 갖고있다면 연결
 

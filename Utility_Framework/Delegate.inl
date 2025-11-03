@@ -86,7 +86,7 @@ namespace Core
 
 				info.callback(args...); 
 			}
-			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
+			catch (const std::exception& e) { std::cout << "Delegate Exception: " << e.what() << std::endl; continue; }
 		}
 	}
 
@@ -101,7 +101,7 @@ namespace Core
 
 				info.callback(args...); 
 			}
-			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
+			catch (const std::exception& e) { std::cout << "Delegate Exception: " << e.what() << std::endl; continue; }
 		}
 	}
 
@@ -124,7 +124,7 @@ namespace Core
 
 				it->callback(args...); 
 			}
-			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; }
+			catch (const std::exception& e) { std::cout << "Delegate Exception: " << e.what() << std::endl; }
 		}
 	}
 

@@ -8,6 +8,7 @@ ReflectionScriptField(GameManager) \
 		meta_property(m_prevSceneIndex) \
 		meta_property(m_nextSceneIndex) \
 		meta_property(m_isTestReward) \
+		meta_property(m_fadeInDuration) \
 	}); \
 	MethodField \
 	({ \

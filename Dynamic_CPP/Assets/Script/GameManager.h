@@ -140,7 +140,8 @@ private:
 public:
 	class SceneTransitionUI*	m_sceneTransitionUI{ nullptr };
 	float						displayPollutionGaugeRatio{}; //테스트 용
-	float						m_fadeInDuration = 0.3f; // 필요시 인스펙터/ini로
+	[[Property]]
+	float						m_fadeInDuration = 0.8f; // 필요시 인스펙터/ini로
 	bool						TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
 	bool						m_isGameOver = false;
 
