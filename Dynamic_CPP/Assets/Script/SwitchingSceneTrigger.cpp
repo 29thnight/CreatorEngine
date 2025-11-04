@@ -66,7 +66,7 @@ void SwitchingSceneTrigger::Start()
         {
             if(m_gameManager)
             {
-                int t = m_gameManager->m_nextSceneIndex;
+                int t = GameInstance::GetInstance()->GetAfterLoadSceneIndex();
                 int prev = GameInstance::GetInstance()->GetPrevSceneType();
                 if (prev == (int)SceneType::SelectChar)
                 {

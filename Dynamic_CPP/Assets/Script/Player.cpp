@@ -1733,24 +1733,32 @@ void Player::SwapWeaponInternal(int dir)
 	int adjustedDirection = dir;
 	if (playerIndex == 1)
 	{
-		adjustedDirection *= -1;
+		adjustedDirection *= -1; // 플레이어2는 방향 반대로
 	}
 
 	const int maxInventoryIndex = static_cast<int>(m_weaponInventory.size()) - 1;
 	const int maxAllowedIndex = std::max(0, std::min(3, maxInventoryIndex));
-	int preIndex = m_weaponIndex;
-	m_weaponIndex = std::clamp(m_weaponIndex + adjustedDirection, 0, maxAllowedIndex);
-	bool isChange = false;
-	if (preIndex != m_weaponIndex)
-		isChange = true;
-	if (isChange == false) return;
+	const int slotCount = maxAllowedIndex + 1;            // 사용 가능한 슬롯 개수 [0..maxAllowedIndex]
+	if (slotCount <= 1) return;                           // 슬롯이 하나면 바꿀 필요 없음
+
+	const int prevIndex = m_weaponIndex;
+
+	// 순환(랩) 인덱스 계산: 음수/양수 이동 모두 안전
+	int nextIndex = m_weaponIndex + adjustedDirection;
+	nextIndex = ((nextIndex % slotCount) + slotCount) % slotCount;
+
+	if (prevIndex == nextIndex) return;                   // 변화 없음
+	m_weaponIndex = nextIndex;
+
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
+
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponIndex);
 		m_UpdateDurabilityEvent.UnsafeBroadcast(m_curWeapon, m_weaponIndex);
+
 		canChangeSlot = false;
 		countRangeAttack = 0;
 		OnMoveBomb = false;
@@ -1769,14 +1777,11 @@ void Player::SwapWeaponInternal(int dir)
 		{
 			swapEffect->Apply();
 		}
+
 		if (adjustedDirection < 0)
-		{
 			LOG("Swap Left" + std::to_string(m_weaponIndex));
-		}
 		else
-		{
 			LOG("Swap Right" + std::to_string(m_weaponIndex));
-		}
 	}
 }
 

@@ -3,6 +3,7 @@
 #include "ModuleBehavior.h"
 #include "TutorialScript.generated.h"
 
+class Entity;
 class TutorialScript : public ModuleBehavior
 {
 public:

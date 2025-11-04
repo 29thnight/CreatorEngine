@@ -51,7 +51,7 @@ void DirectX11::GameMain::Initialize()
     m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
     ScriptManager->Initialize();
-    Sound->initialize((int)ChannelType::MaxChannel);
+    Sound->initialize(128);
     DataSystems->Initialize();
     SceneManagers->CreateScene();
 

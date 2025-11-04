@@ -22,4 +22,6 @@ public:
 	virtual void OnDestroy() override  {}
 
 	SoundComponent* m_sound;
+	class GameObject* m_pBootstrapObject{ nullptr };
+	bool m_isBootstrapCompleted{ false };
 };

@@ -23,4 +23,6 @@ public:
 private:
 	class SoundComponent* m_pSoundObject{ nullptr };
 	class GameObject* m_pBootstrapObject{ nullptr };
+
+	bool m_isBootstrapCompleted{ false };
 };
