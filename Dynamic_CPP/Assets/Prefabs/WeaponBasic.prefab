@@ -1,11 +1,11 @@
-m_name: WeaponBasic
-m_instanceID: 1934588259
+m_name: WeaponBasic_Prefab
+m_instanceID: 3906176481
 m_isEnabled: true
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_fileGuid: 15eeb28f-e3dd-5351-80ee-37a3d53f3200
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponBasic
-    m_instanceID: 1412923911
+    m_instanceID: 647676405
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -13,12 +13,12 @@ PrefabNode:
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
-    m_index: 131
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 1
-    m_prefabFileGuid: d4191843-1cd4-5054-9fb9-920d7bef8db1
-    m_childrenIndices: [132]
+    m_prefabFileGuid: 15eeb28f-e3dd-5351-80ee-37a3d53f3200
+    m_childrenIndices: [2]
     m_tag: Untagged
     m_layer: Default
     m_components:
@@ -39,7 +39,7 @@ PrefabNode:
         bombThrowDuration: 2.5
         bombRadius: 2.5
         m_name: Weapon
-        m_instanceID: 2255408540
+        m_instanceID: 3327648478
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
@@ -48,26 +48,26 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: Weapon_sword01_re
-        m_instanceID: 1796468493
+        m_instanceID: 3600138589
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 131
-        m_index: 132
-        m_parentIndex: 131
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: d4191843-1cd4-5054-9fb9-920d7bef8db1
+        m_prefabFileGuid: 15eeb28f-e3dd-5351-80ee-37a3d53f3200
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 2520859205
+            m_instanceID: 1648630343
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
@@ -87,7 +87,7 @@ PrefabNode:
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: a73cdce2-4b3d-5790-ac39-a1fa2c88faf5
               m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_shaderPSOName: FlashWeaponShader
             m_Mesh:
               m_name: Cylinder.015
               m_materialIndex: 0

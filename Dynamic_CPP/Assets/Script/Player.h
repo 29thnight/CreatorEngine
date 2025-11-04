@@ -70,6 +70,11 @@ public:
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
 	void FindNearObject(GameObject* _gameObject);
 
+	float swapFlashTimer = 0.f;
+	void SwapWeaponFlash();
+	void UpdateSwapWeaponFlash(float tick);
+	void InstantiateWeaponMaterial(GameObject* g);
+
 	//플레이어 기본
 	[[Property]]
 	int playerIndex = 0;

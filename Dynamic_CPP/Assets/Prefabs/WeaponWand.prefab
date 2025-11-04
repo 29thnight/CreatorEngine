@@ -1,11 +1,11 @@
-m_name: WeaponWand
-m_instanceID: 640645211
+m_name: WeaponWand_Prefab
+m_instanceID: 2017158481
 m_isEnabled: true
-m_fileGuid: 00000000-0000-0000-0000-000000000000
+m_fileGuid: a95f7af2-7f40-583e-b618-4a377a2d8e5c
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponWand
-    m_instanceID: 3605566317
+    m_instanceID: 213907423
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -13,12 +13,12 @@ PrefabNode:
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1.5, y: 1.5, z: 1.5, w: 0}
       m_parentID: 0
-    m_index: 135
+    m_index: 1
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 1
-    m_prefabFileGuid: daa1d7b2-8722-5501-917a-6e205a13a46f
-    m_childrenIndices: [136]
+    m_prefabFileGuid: a95f7af2-7f40-583e-b618-4a377a2d8e5c
+    m_childrenIndices: [2]
     m_tag: Untagged
     m_layer: Default
     m_components:
@@ -39,7 +39,7 @@ PrefabNode:
         bombThrowDuration: 2.5
         bombRadius: 2.5
         m_name: Weapon
-        m_instanceID: 4250641001
+        m_instanceID: 364141617
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
@@ -47,27 +47,27 @@ PrefabNode:
     m_isStatic: false
     children:
       - GameObject: 2166264123
-        m_name: Weapon_wand_re (3)
-        m_instanceID: 3155314949
+        m_name: Weapon_wand_re
+        m_instanceID: 3029141977
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 135
-        m_index: 136
-        m_parentIndex: 135
+          m_parentID: 1
+        m_index: 2
+        m_parentIndex: 1
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: daa1d7b2-8722-5501-917a-6e205a13a46f
+        m_prefabFileGuid: a95f7af2-7f40-583e-b618-4a377a2d8e5c
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 2091668381
+            m_instanceID: 2584824389
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
@@ -87,7 +87,7 @@ PrefabNode:
                 m_uvScroll: {x: 0, y: 0}
               m_fileGuid: ad53a844-789f-5001-9118-ed2ca902e932
               m_renderingMode: 0
-              m_shaderPSOName: ""
+              m_shaderPSOName: FlashWeaponShader
             m_Mesh:
               m_name: Cylinder.013
               m_materialIndex: 0

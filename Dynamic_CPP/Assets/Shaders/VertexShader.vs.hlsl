@@ -80,7 +80,7 @@ VertexShaderOutput main(AppData IN)
     OUT.wPosition = mul(model, float4(IN.position, 1.0f));
     matrix vp = mul(projection, view);
     OUT.position = mul(vp, OUT.wPosition);
-    OUT.pos = OUT.position;
+    OUT.pos = float4(IN.position, 1.f);
     OUT.texCoord = IN.texCoord;
     OUT.texCoord1 = IN.texCoord1;
 

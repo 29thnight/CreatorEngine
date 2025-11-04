@@ -291,6 +291,8 @@ void Player::Start()
 		GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(basicWeapon, "BasicWeapon");
 		weapon = weaponObj->GetComponent<Weapon>();
 		AddWeapon(weapon);
+
+		InstantiateWeaponMaterial(weaponObj);
 	}
 
 
@@ -428,6 +430,7 @@ void Player::Update(float tick)
 	DetectResource();
 	HitImpulseUpdate(tick);
 	UpdateEffectPos();
+	UpdateSwapWeaponFlash(tick);
 	m_controller->SetBaseSpeed(moveSpeed);
 	if (catchedObject)
 	{
@@ -1808,6 +1811,7 @@ void Player::SwapWeaponInternal(int dir)
 		else
 			LOG("Swap Right" + std::to_string(m_weaponIndex));
 	}
+	SwapWeaponFlash();
 }
 
 void Player::SwapWeaponLeft()
@@ -1845,6 +1849,7 @@ void Player::SwapBasicWeapon()
 	countRangeAttack = 0;
 	m_comboCount = 0;
 	canRapidfire = false;
+	SwapWeaponFlash();
 }
 
 void Player::AddMeleeWeapon()
@@ -1876,6 +1881,8 @@ bool Player::AddWeapon(Weapon* weapon)
 		//TODO : 리턴하고 던져진무기 땅에떨구기 지금은 Destory인대 바꿔야함&&&&&
 	}
 
+	InstantiateWeaponMaterial(weapon->GetOwner());
+
 	weapon->SetEnabled(false);
 	int prevSize = m_weaponInventory.size();
 	weapon->Initialize();
@@ -1895,6 +1902,7 @@ bool Player::AddWeapon(Weapon* weapon)
 		m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, m_weaponIndex);
 		m_SetActiveEvent.UnsafeBroadcast(m_weaponInventory.size() - 1);
 		m_weaponIndex = m_weaponInventory.size() - 1;
+		SwapWeaponFlash();
 	}
 	return true;
 }
@@ -1961,6 +1969,34 @@ void Player::FindNearObject(GameObject* _gameObject)
 		}
 	}
 
+}
+
+void Player::SwapWeaponFlash()
+{
+	swapFlashTimer = 0.f;
+}
+
+void Player::UpdateSwapWeaponFlash(float tick)
+{
+	if (m_curWeapon == nullptr) return;
+
+	swapFlashTimer += tick;
+	if (swapFlashTimer > 1.f) {
+		return;
+	}
+
+	auto mesh = m_curWeapon->GetOwner()->GetComponentsInChildren<MeshRenderer>();
+	for (auto& m : mesh) {
+		m->m_Material->TrySetValue("FlashBuffer", "flashTime", &swapFlashTimer, sizeof(float));
+	}
+}
+
+void Player::InstantiateWeaponMaterial(GameObject* g)
+{
+	auto mesh = g->GetComponentsInChildren<MeshRenderer>();
+	for (auto& m : mesh) {
+		m->m_Material = m->m_Material->Instantiate(m->m_Material, "cloneWeapon");
+	}
 }
 
 void Player::Cancancel()

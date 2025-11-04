@@ -97,7 +97,10 @@ void CameraMove::LateUpdate(float tick)
 			}
 
 			//transform->SetPosition(currentPos + dir * tick * followSpeed + offset);
-			transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + initialPosition);
+			if (!isBossCamera)
+				transform->SetPosition(Mathf::Vector3::Lerp(currentPos, targetPosition, followTimer) + offset + initialPosition);
+			else
+				transform->SetPosition(targetPosition + offset + initialPosition);
 
 
 			//Mathf::Vector3 lerpPos = Mathf::Lerp(targetPos, currentPos, tick * followSpeed);
