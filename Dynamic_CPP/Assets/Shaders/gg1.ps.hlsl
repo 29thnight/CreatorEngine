@@ -102,7 +102,7 @@ PixelOutput main(PixelInput input)
     float combinedDissolve = dissolveValue + (1.0 - xDissolve);
     float finalDissolveThreshold = f1 + xDissolveThreshold;
     
-    float dissolveAlpha = lerp(0.2, 1.0, smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve));
+    float dissolveAlpha = lerp(0.0, 1.0, smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve));
 
     float3 baseColor = adjustedSmoke * smokeColor.rgb;
     float3 finalColor = pow(baseColor + (emissionColor.rgb * emissionStrength * remappedEmission), 2);

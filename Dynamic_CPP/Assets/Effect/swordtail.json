@@ -10,7 +10,7 @@
     "name": "swordtail",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -26,8 +26,8 @@
                         },
                         "endColor": {
                             "w": 0.0,
-                            "x": 0.0,
-                            "y": 0.20000000298023224,
+                            "x": 0.7653427124023438,
+                            "y": 0.0,
                             "z": 1.0
                         },
                         "orientation": {
@@ -53,9 +53,9 @@
                             "tubeSegments": 8
                         },
                         "startColor": {
-                            "w": 1.0,
-                            "x": 0.0,
-                            "y": 0.5,
+                            "w": 0.5882353186607361,
+                            "x": 0.6117647290229797,
+                            "y": 0.0,
                             "z": 1.0
                         },
                         "trailParams": {
@@ -88,13 +88,13 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "time": 239.97576904296875
+                            "time": 504.82574462890625
                         },
                         "renderState": {
                             "instanceCount": 1
                         },
                         "renderStates": {
-                            "blendPreset": 1,
+                            "blendPreset": 2,
                             "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
@@ -110,7 +110,7 @@
                             }
                         ],
                         "trailModule": {
-                            "connected": false
+                            "connected": true
                         }
                     },
                     "type": "TrailRenderModule"

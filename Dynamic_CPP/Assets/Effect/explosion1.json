@@ -118,7 +118,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 270.9527893066406,
+                            "currentTime": 12.215767860412598,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -313,7 +313,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 30,
             "modules": [
                 {
@@ -395,7 +395,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 270.9527893066406,
+                            "currentTime": 25.953088760375977,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -557,7 +557,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1000,7 +1000,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -1430,7 +1430,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 274.9154968261719,
+                            "currentTime": 12.215767860412598,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1525,7 +1525,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1647,7 +1647,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 495.63739013671875,
+                            "currentTime": 12.215767860412598,
                             "velocityMode": 0
                         },
                         "orbitalData": {

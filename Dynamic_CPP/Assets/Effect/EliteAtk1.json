@@ -3,9 +3,9 @@
     "duration": 1.0,
     "emitterTimings": [
         0.0,
-        0.25,
-        0.25,
-        0.125,
+        0.10000000149011612,
+        0.10000000149011612,
+        0.05000000074505806,
         0.25
     ],
     "isPaused": false,
@@ -435,7 +435,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
@@ -504,7 +504,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 17.395687103271484,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -1109,5 +1109,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 3.0
 }

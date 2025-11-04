@@ -104,7 +104,7 @@ PixelOutput main(PixelInput input)
     float combinedDissolve = dissolveValue + (1.0 - xDissolve);
     float finalDissolveThreshold = f1 + xDissolveThreshold;
     
-    float dissolveAlpha = lerp(0.2, 1.0, smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve));
+    float dissolveAlpha = lerp(0.0, 1.0, smoothstep(finalDissolveThreshold - 0.1, finalDissolveThreshold + 0.1, combinedDissolve));
 
     float3 baseColor = adjustedSmoke * smokeColor.rgb;
     float3 finalColor = pow(baseColor + ((emissionColor.rgb * adjustedSmoke) * emissionStrength * remappedEmission), 2);
@@ -113,9 +113,9 @@ PixelOutput main(PixelInput input)
     
     float colorBrightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
     float brightnessMask = smoothstep(0.03, 0.12, colorBrightness);
-    finalAlpha = finalAlpha * brightnessMask * smoothstep(0.03, 0.12, emissionColor.r); // 기존 알파와 곱하기
+    finalAlpha = finalAlpha * brightnessMask * smoothstep(0.03, 0.12, emissionColor.r);
     
-    clip(finalAlpha - 0.05); // 최종 알파로 클립
+    clip(finalAlpha - 0.05);
     
     output.color = float4(finalColor, finalAlpha);
     
