@@ -26,7 +26,7 @@ void ClearPortal::Start()
 	}
 	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
 
-	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	//if (static_cast<SceneType>(curScene) == SceneType::Tutorial) //듀토상관없이 달기
 	{
 		auto canvObj = GameObject::Find("Canvas");
 		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");

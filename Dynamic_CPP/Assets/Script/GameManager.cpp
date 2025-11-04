@@ -602,6 +602,16 @@ void GameManager::EnsureBaseSnapshot(Player* player)
 	snap.initialized = true;
 }
 
+bool GameManager::GetReadyItemTutorial()
+{
+	return ReadyItemTutorial;
+}
+
+void GameManager::SetReadyItemTutorial(bool able)
+{
+	ReadyItemTutorial = able;
+}
+
 void GameManager::InitReward(int amount)
 {
 	GameInstance::GetInstance()->SetRewardAmount(amount);

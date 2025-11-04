@@ -10,6 +10,13 @@
 void TutorialScript::Start()
 {
 
+
+	auto GMObj = GameObject::Find("GameManager");
+	if (GMObj)
+	{
+		GM = GMObj->GetComponent<GameManager>();
+	}
+
 	auto children = GetOwner()->m_childrenIndices;
 	for (auto& child : children)
 	{
@@ -39,6 +46,13 @@ void TutorialScript::Start()
 		}
 	}
 
+
+
+	if (EventID == 3111)
+	{
+		GM->SetReadyItemTutorial(false);
+	}
+
 }
 
 void TutorialScript::OnTriggerEnter(const Collision& collision)
@@ -49,6 +63,10 @@ void TutorialScript::OnTriggerEnter(const Collision& collision)
 		if (EventID == 3107)
 		{
 			SpawnItem();
+		}
+		else if (EventID == 3111)
+		{
+			GM->SetReadyItemTutorial(true);
 		}
 		else
 		{
@@ -70,7 +88,6 @@ void TutorialScript::Update(float tick)
 
 void TutorialScript::SpawnItem()
 {
-	auto GMObj = GameObject::Find("GameManager");
 	float PI = 3.141592;
 	Mathf::Vector3 OwnerPos = GetOwner()->m_transform.GetWorldPosition();
 	float radius = 6.0f; // 원의 반지름
@@ -124,9 +141,6 @@ void TutorialScript::SpawnItem()
 				[](float t) { return Easing::Linear(t); }
 			);
 
-			if (GMObj)
-			{
-				GameManager* GM = GMObj->GetComponent<GameManager>();
 				if (GM)
 				{
 					auto tweenManager = GM->GetComponent<TweenManager>();
@@ -138,7 +152,7 @@ void TutorialScript::SpawnItem()
 			}
 		}
 		
-	}
+	
 
 	
 }

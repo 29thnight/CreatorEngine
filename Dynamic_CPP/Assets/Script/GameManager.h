@@ -146,7 +146,13 @@ public:
 	bool						TestCameraControll = false; //10월 시연용 카메라 따라가기 On, Off면 아시스따라가기 and 캐릭터 가두기 
 	bool						m_isGameOver = false;
 
+
+	bool GetReadyItemTutorial();
+	void SetReadyItemTutorial(bool able);
 private:
 	float						m_gameOverDelay = 0.f;
+
+
+	bool                        ReadyItemTutorial = true; //듀토리얼씬 아이템 구매 제어용
 };
 

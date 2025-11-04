@@ -3,6 +3,8 @@
 #include "ModuleBehavior.h"
 #include "TutorialScript.generated.h"
 
+class GameManager;
+class Entity;
 class TutorialScript : public ModuleBehavior
 {
 public:
@@ -29,4 +31,5 @@ public:
 private:
 	GameObject* m_targetObj = nullptr;
 	std::vector<Entity*> m_targets;
+	GameManager* GM = nullptr;
 };
