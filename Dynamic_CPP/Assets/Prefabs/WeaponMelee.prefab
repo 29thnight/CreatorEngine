@@ -1,11 +1,11 @@
 m_name: WeaponMelee
-m_instanceID: 1621071869
+m_instanceID: 4156551726
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: WeaponMelee
-    m_instanceID: 2463159263
+    m_instanceID: 1394201401
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -13,18 +13,18 @@ PrefabNode:
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1.5, y: 1.5, z: 1.5, w: 0}
       m_parentID: 0
-    m_index: 9
+    m_index: 129
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 1
     m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
-    m_childrenIndices: [10]
+    m_childrenIndices: [130]
     m_tag: Untagged
     m_layer: Default
     m_components:
       - ModuleBehavior: 1399118904
         itemType: 2
-        itemAckDmg: 40
+        itemAckDmg: 45
         itemAckRange: 3.5
         itemKnockback: 0.5
         coopCrit: 1.5
@@ -34,12 +34,12 @@ PrefabNode:
         chgKnockback: 1
         ChargeAttackBulletCount: 5
         ChargeAttackBulletAngle: 15
-        durMax: 12
+        durMax: 10
         durUseAtk: 1
         bombThrowDuration: 2.5
         bombRadius: 2.5
         m_name: Weapon
-        m_instanceID: 2465881453
+        m_instanceID: 2077743985
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
@@ -48,16 +48,16 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: Weapon_sword02_re
-        m_instanceID: 1155964780
+        m_instanceID: 3520851700
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 9
-        m_index: 10
-        m_parentIndex: 9
+          m_parentID: 129
+        m_index: 130
+        m_parentIndex: 129
         m_rootIndex: 0
         m_collisionType: 0
         m_prefabFileGuid: 5a567386-d956-5b5d-a1c9-7631a68dd4c0
@@ -67,7 +67,7 @@ PrefabNode:
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 959723618
+            m_instanceID: 3342153177
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:

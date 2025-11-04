@@ -8,7 +8,7 @@ void ObjectPoolManager::Start()
 	{
 		gm->PushObjectPoolManager(this);
 		normalBulletPool.InitializePool("BulletNormal", 30);
-		specialBulletPool.InitializePool("BulletSpecial", 10);
+		specialBulletPool.InitializePool("BulletSpecial", 30);
 		bombPool.InitializePool("Bomb", 15);
 		swordProjectilePool.InitializePool("SwordProjectile", 5);
 	}

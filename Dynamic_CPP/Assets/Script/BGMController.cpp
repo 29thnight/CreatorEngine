@@ -9,6 +9,7 @@ void BGMController::Start()
 	auto sounds = instance->GetSoundName();
 	auto curScene = (SceneType)instance->GetCurrentSceneType();
 	std::string curSoundName{};
+	m_sound = GetOwner()->GetComponent<SoundComponent>();
 	switch (curScene)
 	{
 	case SceneType::Bootstrap:
@@ -34,7 +35,18 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("CreditsBGM");
 		break;
 	case SceneType::GameOver:
-		curSoundName = sounds->GetSoudNameRandom("GameOverBGM");
+		curSoundName = sounds->GetSoudNameRandom("GameOver");
+		if (m_sound)
+		{
+			m_sound->loop = false;
+		}
+		break;
+	case SceneType::Clear:
+		curSoundName = sounds->GetSoudNameRandom("StageClear");
+		if (m_sound)
+		{
+			m_sound->loop = false;
+		}
 		break;
 	default:
 		//curSoundName = sounds->GetSoudNameRandom("Test");
@@ -44,7 +56,10 @@ void BGMController::Start()
 
 
 	m_sound = GetOwner()->GetComponent<SoundComponent>();
-	m_sound->clipKey = curSoundName;
+	if (m_sound)
+	{
+		m_sound->clipKey = curSoundName;
+	}
 	if (curScene != SceneType::Bootstrap)
 	{
 		m_sound->Play();

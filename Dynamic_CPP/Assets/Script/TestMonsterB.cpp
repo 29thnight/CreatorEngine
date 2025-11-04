@@ -397,7 +397,8 @@ void TestMonsterB::SetStagger(float time)
 
 void TestMonsterB::Dead()
 {
-	hp->GetOwner()->Destroy();
+	if (hp)
+		hp->GetOwner()->Destroy();
 	if (m_tutorialUi)
 	{
 		m_tutorialUi->GetOwner()->Destroy();
