@@ -14,7 +14,7 @@ void ItemUIIcon::Start()
 {
 	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
 	m_image = m_pOwner->GetComponent<ImageComponent>();
-	m_rect->SetSizeDelta({ 75.f, 75.f });
+	m_rect->SetSizeDelta({ 80.f, 80.f });
 
 
 	auto gmObj = GameObject::Find("GameManager");

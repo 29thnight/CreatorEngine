@@ -7,6 +7,7 @@
 #include "SceneManager.h"
 #include "PrefabUtility.h"
 #include "TutorialUI.h"
+#include "ImageComponent.h"
 void ClearPortal::Start()
 {
 	auto GMObj = GameObject::Find("GameManager");
@@ -26,7 +27,7 @@ void ClearPortal::Start()
 	}
 	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
 
-	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	if (static_cast<SceneType>(curScene) == SceneType::Tutorial) //튜토일떄
 	{
 		auto canvObj = GameObject::Find("Canvas");
 		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
@@ -40,6 +41,23 @@ void ClearPortal::Start()
 			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
 			m_tutorialUi->screenOffset = { 0, -80.f };
 			m_tutorialUi->GetOwner()->SetEnabled(false);
+		}
+	}
+	else if (static_cast<SceneType>(curScene) == SceneType::Stage) //스테이지
+	{
+		auto canvObj = GameObject::Find("Canvas");
+		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
+		if (tutorUIPre)
+		{
+			GameObject* tutorUIObj = PrefabUtilitys->InstantiatePrefab(tutorUIPre, "portalUI");
+			m_tutorialUi = tutorUIObj->GetComponent<TutorialUI>();
+			canvObj->AddChild(tutorUIObj);
+			m_tutorialUi->Init();
+			m_tutorialUi->SetType(4);
+			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
+			m_tutorialUi->screenOffset = { 0, -110.f };
+			m_tutorialUi->GetOwner()->SetEnabled(false);
+			m_tutorialUi->GetOwner()->GetComponent<ImageComponent>()->ResetSize();
 		}
 	}
 }

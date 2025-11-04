@@ -141,6 +141,7 @@ void TBoss1::Start()
 		}
 	}
 
+	
 	SetupPatternItemData(playersCount);
 
 	m_maxHP = m_MaxHp;

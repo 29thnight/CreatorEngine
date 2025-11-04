@@ -17,6 +17,7 @@
 #include "EntityMonsterTower.h"
 #include "GameManager.h"
 #include "SFXPoolManager.h"
+#include "TutorialUI.h"
 void TestMonsterB::Start()
 {
 	m_currentHP = maxHP;
@@ -148,6 +149,27 @@ void TestMonsterB::Start()
 	{
 		GM = GMobj->GetComponent<GameManager>();
 	}
+
+
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
+	if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+	{
+		auto canvObj = GameObject::Find("Canvas");
+		Prefab* tutorUIPre = PrefabUtilitys->LoadPrefab("TutorialUI");
+		if (tutorUIPre)
+		{
+			GameObject* tutorUIObj = PrefabUtilitys->InstantiatePrefab(tutorUIPre, "monsterUI");
+			m_tutorialUi = tutorUIObj->GetComponent<TutorialUI>();
+			canvObj->AddChild(tutorUIObj);
+			m_tutorialUi->Init();
+			m_tutorialUi->SetType(3);
+			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
+			m_tutorialUi->screenOffset = { 0, -70.f };
+
+		}
+	}
+
 }
 
 void TestMonsterB::Update(float tick)
@@ -375,7 +397,12 @@ void TestMonsterB::SetStagger(float time)
 
 void TestMonsterB::Dead()
 {
-	hp->GetOwner()->Destroy();
+	if (hp)
+		hp->GetOwner()->Destroy();
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->GetOwner()->Destroy();
+	}
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();

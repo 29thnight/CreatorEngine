@@ -80,8 +80,6 @@ void GameManager::Update(float tick)
 
 	//임의 씬전환
 	CheatSceneEvent();
-	
-
 
 	CheckClear(tick);
 	
@@ -93,6 +91,7 @@ void GameManager::Update(float tick)
 	if (m_isGameOver)
 	{
 		GameInit();
+		m_fadeInDuration = 5.f;
 		SwitchNextSceneWithFade();
 		return;
 	}
@@ -104,15 +103,6 @@ void GameManager::Update(float tick)
 		if (m_isTestReward)
 		{
 			AddReward(99);
-			//int reward = GetReward();
-			//if (reward < 99)
-			//{
-			//	AddReward(1);
-			//}
-			//else
-			//{
-			//	InitReward(0);
-			//}
 			displayPollutionGaugeRatio += tick;
 		}
 		else
@@ -126,7 +116,8 @@ void GameManager::Update(float tick)
 	{
 		for (auto& player : m_players)
 		{
-			if (0 >= player->m_currentHP)
+			auto p = dynamic_cast<Player*>(player);
+			if (p && p->isStun)
 			{
 				++deadCount;
 			}
@@ -337,11 +328,6 @@ void GameManager::SwitchNextSceneWithFade()
 		else {
 			SwitchScene(m_nextSceneIndex);
 		}
-
-		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
-		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
-		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:
-		//m_isSwitching = false;
 	});
 }
 
@@ -364,10 +350,6 @@ void GameManager::SwitchPrevSceneWithFade()
 		{
 			SwitchScene(m_prevSceneIndex);
 		}
-		// 새 씬에서 어둡게 시작했다면, 적절한 시점(로딩 완료 등)에 FadeOut 호출.
-		// m_fader->FadeOut(0.5f, [this](){ m_isSwitching = false; });
-		// 만약 FadeOut 시점이 여기 아니면, 전환 직후 바로 플래그 해제:
-		//m_isSwitching = false;
 	});
 }
 
@@ -602,6 +584,16 @@ void GameManager::EnsureBaseSnapshot(Player* player)
 	snap.initialized = true;
 }
 
+bool GameManager::GetReadyItemTutorial()
+{
+	return ReadyItemTutorial;
+}
+
+void GameManager::SetReadyItemTutorial(bool able)
+{
+	ReadyItemTutorial = able;
+}
+
 void GameManager::InitReward(int amount)
 {
 	GameInstance::GetInstance()->SetRewardAmount(amount);
@@ -706,7 +698,7 @@ void GameManager::VibDestroyGate()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(0.5f, 1.0f);
+		cameraMove->ShakeCamera(0.2f, 0.7f);
 	}
 }
 
@@ -722,7 +714,7 @@ void GameManager::VibKillBoss()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(1.0f, 10.0f);
+		cameraMove->ShakeCamera(0.3f, 10.0f);
 	}
 }
 
@@ -738,7 +730,7 @@ void GameManager::VibPlayerStun()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(0.5f, 1.0f);
+		cameraMove->ShakeCamera(0.3f, 10.0f);
 	}
 }
 
@@ -754,7 +746,7 @@ void GameManager::VibKoriStun()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(0.5f, 1.0f);
+		cameraMove->ShakeCamera(0.2f, 0.7f);
 	}
 }
 

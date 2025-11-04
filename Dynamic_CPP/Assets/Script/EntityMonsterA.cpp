@@ -497,7 +497,12 @@ void EntityMonsterA::ChaseTarget(float deltatime)
 
 void EntityMonsterA::Dead()
 {
-	hp->GetOwner()->Destroy();
+	if(hp)
+		hp->GetOwner()->Destroy();
+	if (m_tutorialUi)
+	{
+		m_tutorialUi->GetOwner()->Destroy();
+	}
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	if (GM)

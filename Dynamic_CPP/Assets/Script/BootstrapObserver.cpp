@@ -17,9 +17,10 @@ void BootstrapObserver::Update(float tick)
 {
 	if (m_pBootstrapObject && !m_pBootstrapObject->IsEnabled())
 	{
-		if (m_pSoundObject && !m_pSoundObject->IsPlaying())
+		if (m_pSoundObject && !m_pSoundObject->IsPlaying() && !m_isBootstrapCompleted)
 		{
 			m_pSoundObject->Play();
+			m_isBootstrapCompleted = true;
 		}
 	}
 }
