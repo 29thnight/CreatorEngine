@@ -706,7 +706,7 @@ void GameManager::VibDestroyGate()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(0.5f, 1.0f);
+		cameraMove->ShakeCamera(0.2f, 0.7f);
 	}
 }
 
@@ -722,7 +722,7 @@ void GameManager::VibKillBoss()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(1.0f, 10.0f);
+		cameraMove->ShakeCamera(0.3f, 10.0f);
 	}
 }
 
@@ -738,7 +738,7 @@ void GameManager::VibPlayerStun()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(0.5f, 1.0f);
+		cameraMove->ShakeCamera(0.3f, 10.0f);
 	}
 }
 
@@ -754,7 +754,7 @@ void GameManager::VibKoriStun()
 	GameObject* cameraObj = GameObject::Find("Main Camera");
 	CameraMove* cameraMove = cameraObj->GetComponent<CameraMove>();
 	if (cameraMove) {
-		cameraMove->ShakeCamera(0.5f, 1.0f);
+		cameraMove->ShakeCamera(0.2f, 0.7f);
 	}
 }
 
