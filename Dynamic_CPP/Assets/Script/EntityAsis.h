@@ -19,7 +19,7 @@ public:
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 	virtual void OnTriggerEnter(const Collision& collision) override;
-	virtual void OnTriggerStay(const Collision& collision) override {}
+	virtual void OnTriggerStay(const Collision& collision) override;
 	virtual void OnTriggerExit(const Collision& collision) override {}
 	virtual void OnCollisionEnter(const Collision& collision) override;
 	virtual void OnCollisionStay(const Collision& collision) override {}
