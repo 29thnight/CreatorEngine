@@ -1514,6 +1514,13 @@ void Player::EndAttackFrame()
 	ChangeState("EndAttack");
 }
 
+void Player::EndAttackFrameNoCharge()
+{
+	if (isChargeAttack) return;
+
+	ChangeState("EndAttack");
+}
+
 void Player::UpdateEffectPos()
 {
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
@@ -2441,11 +2448,11 @@ void Player::ShootChargeBullet()
 {
 	if (!GM || GM->GetObjectPoolManager() == nullptr) return;
 	auto poolmanager = GM->GetObjectPoolManager();
-	auto normalBullets = poolmanager->GetNormalBulletPool();
+	auto normalBullets = poolmanager->GetSpecialBulletPool();
 	Mathf::Vector3  pos = player->m_transform.GetWorldPosition();
 	Mathf::Vector3 shootPos = pos;
 	std::vector<GameObject*> chargePool;
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < m_curWeapon->ChargeAttackBulletCount; i++)
 	{
 		GameObject* bulletObj = normalBullets->Pop();
 		chargePool.push_back(bulletObj);
@@ -2473,7 +2480,7 @@ void Player::ShootChargeBullet()
 			for (int i = -halfCount; i <= halfCount; i++)
 			{
 				if (chargePool.empty()) return;
-				NormalBullet* bullet = chargePool.back()->GetComponent<NormalBullet>();
+				SpecialBullet* bullet = chargePool.back()->GetComponent<SpecialBullet>();
 				chargePool.pop_back();
 				int Shootangle = m_curWeapon->ChargeAttackBulletAngle * i;
 				Mathf::Vector3 ShootDir = XMVector3TransformNormal(OrgionShootDir,

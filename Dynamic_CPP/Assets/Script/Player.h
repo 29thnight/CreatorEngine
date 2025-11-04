@@ -167,7 +167,7 @@ public:
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isChargeAttack = false;
-	float chargeBugTime = 3.0f; //간혈적으로 차지어택이 버그로뜸
+	float chargeBugTime = 2.2f; //간혈적으로 차지어택이 버그로뜸
 	float chargeElapsedTime = 0.f;
 	bool isAttacking = false;
 	float nearDistance = FLT_MAX;
@@ -341,6 +341,8 @@ public:
 
 	[[Method]]
 	void EndAttackFrame(); //해당함수 실행뒤부터 모션캔슬후 이동,대시 가능
+	[[Method]]
+	void EndAttackFrameNoCharge();
 	void UpdateEffectPos();
 
 	void VibChargeHit();
