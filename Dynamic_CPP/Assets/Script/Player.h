@@ -344,14 +344,21 @@ public:
 	[[Method]]
 	void EndAttackFrameNoCharge();
 	void UpdateEffectPos();
-
+	[[Method]]
 	void VibChargeHit();
+	[[Method]]
 	void VibBombExpolsion();
+	[[Method]]
 	void VibKillElete();
+	[[Method]]
 	void VibDestroyGate();
+	[[Method]]
 	void VibKillBoss();
+	[[Method]]
 	void VibPlayerStun();
+	[[Method]]
 	void VibKoriStun();
+
 private:
 	//치트들 담긴함수 
 	void Cheat();
