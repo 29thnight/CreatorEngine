@@ -48,6 +48,7 @@ void EntityMonsterTower::Start()
 		auto monsterScript = towerMonster->GetComponentDynamicCast<TestMonsterB>();
 		monsterScript->m_attackRange = attackRange;
 		monsterScript->m_chaseRange = 1.0f;
+		monsterScript->m_moveSpeed = 0.f;
 		if (monsterSpawnPosObj)
 		{
 			towerMonster->m_transform.SetPosition(monsterSpawnPosObj->m_transform.GetWorldPosition());
