@@ -35,4 +35,5 @@ public:
 
 private:
 	class ItemUIIcon* m_controlIcon{};
+	class GameManager* GM = nullptr;
 };

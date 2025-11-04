@@ -11,6 +11,7 @@ class EffectComponent;
 class CriticalMark;
 class GameManager;
 class HPBar;
+class TutorialUI;
 //¿ø°Å¸®¸÷
 class TestMonsterB : public Entity
 {
@@ -137,4 +138,5 @@ private:
 	float deadDestroyTime = 1.0f;
 	GameManager* GM = nullptr;
 	HPBar* hp = nullptr;
+	TutorialUI* m_tutorialUi = nullptr;
 };

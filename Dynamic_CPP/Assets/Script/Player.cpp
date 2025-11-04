@@ -2530,26 +2530,28 @@ void Player::OnTriggerEnter(const Collision& collision)
 	auto healItem = collision.otherObj->GetComponent<EntityItemHeal>();
 	if (healItem && healItem->CanHeal() ==true)
 	{
-		Heal(healItem->GetHealAmount());
-		healItem->Use();
-		if (GM)
+		if (!isStun)
 		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
+			Heal(healItem->GetHealAmount());
+			healItem->Use();
+			if (GM)
 			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerGrabFlower"));
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerGrabFlower"));
+				}
+			}
+
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerHeal"));
+				}
 			}
 		}
-
-		if (GM)
-		{
-			auto pool = GM->GetSFXPool();
-			if (pool)
-			{
-				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("PlayerHeal"));
-			}
-		}
-
 
 	}
 	

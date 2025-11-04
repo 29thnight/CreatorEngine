@@ -2,9 +2,14 @@
 #include "Player.h"
 #include "ItemUIIcon.h"
 #include "pch.h"
-
+#include "GameManager.h"
 void ItemComponent::Start()
 {
+    auto GMObj = GameObject::Find("GameManager");
+    if (GMObj)
+    {
+        GM = GMObj->GetComponent<GameManager>();
+    }
 }
 
 void ItemComponent::OnTriggerEnter(const Collision& collision)
@@ -32,6 +37,9 @@ void ItemComponent::OnTriggerExit(const Collision& collision)
 
 void ItemComponent::Update(float tick)
 {
+
+    if (GM && GM->GetReadyItemTutorial() == false) return;
+
     if (!m_controlIcon) return;
 
     if (m_isItemSoldOut)
