@@ -90,6 +90,11 @@ bool Entity::GetAlive()
 	return IsAlive;
 }
 
+void Entity::SetTuToMooJuk(bool _able)
+{
+	tutorialMooJuk = _able;
+}
+
 void Entity::StopHitImpulse()
 {
 	m_currentHitImpulseDuration = 0.f;

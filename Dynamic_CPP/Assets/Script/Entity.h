@@ -72,6 +72,11 @@ public:
 	
 	void SetAlive(bool isAlive);
 	bool GetAlive();
+
+	void SetTuToMooJuk(bool _able);
+protected:
+	bool tutorialMooJuk = false;
 private:
 	bool IsAlive = true;  //Detrsoty는 안됬지만 로직상 Dead상태등 //ex 문부서짐, 통나무 파괴됨 등
+	
 };

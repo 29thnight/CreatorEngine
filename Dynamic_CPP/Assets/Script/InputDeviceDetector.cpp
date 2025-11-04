@@ -6,7 +6,7 @@
 #include "ImageComponent.h"
 #include "SelectTimer.h"
 #include "pch.h"
-
+#include "SFXPoolManager.h"
 static int SignAxis(float x, float dead)
 {
     if (x > dead) return +1;
@@ -158,8 +158,15 @@ void InputDeviceDetector::CharSelect()
                 m_controllerImage->SetTexture(CON_SELECT_MAN);
             }
             m_isApply = true;
+            if (m_gameManager)
+            {
+                auto pool = m_gameManager->GetSFXPool();
+                if (pool)
+                {
+                    pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ButtonClick"));
+                }
+            }
         }
-
     }
     else if (m_isSelectComplete && m_selectHold >= m_requiredSelectHold)
     {
@@ -181,6 +188,14 @@ void InputDeviceDetector::CharSelect()
         m_selectHold = 0.f;
         m_isSelectComplete = false;
         m_isApply = true;
+        if (m_gameManager)
+        {
+            auto pool = m_gameManager->GetSFXPool();
+            if (pool)
+            {
+                pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ButtonClick"));
+            }
+        }
     }
 }
 
