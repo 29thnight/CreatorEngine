@@ -786,6 +786,11 @@ void PhysicsManager::SetPhysicData()
 
 			//std::cout << " PhysicsManager::SetPhysicData CCT : " << bm.GetElapsedTime() << std::endl;
 		}
+		else if (colliderInfo.id == m_heightFieldTypeId)
+		{
+			HeightFieldColliderInfo data = colliderInfo.gameObject->GetComponent<TerrainColliderComponent>()->GetHeightFieldColliderInfo();
+			continue;
+		}
 		else
 		{
 

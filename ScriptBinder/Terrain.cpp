@@ -727,6 +727,23 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		//proxy->m_terrainMesh = m_pMesh;
 		proxy->m_terrainMaterial = m_pMaterial;
 	}
+
+	file::path Path = filePath + L".meta";
+	if (file::exists(Path))
+	{
+		auto node = MetaYml::LoadFile(Path.string());
+
+		if (node["guid"] && !node["guid"].IsNull())
+		{
+			FileGuid fileGuid = node["guid"].as<std::string>();
+			if (fileGuid != nullFileGuid)
+			{
+				m_trrainAssetGuid = fileGuid;
+			}
+		}
+	}
+
+
 }
 
 void TerrainComponent::SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH)

@@ -20,8 +20,8 @@ class TerrainComponent : public Component, public RegistableEvent<TerrainCompone
 {
 public:
     ReflectTerrainComponent
-        [[Serializable(Inheritance:Component)]]
-        TerrainComponent();
+    [[Serializable(Inheritance:Component)]]
+    TerrainComponent();
     virtual ~TerrainComponent() = default;
 
     [[Property]]
