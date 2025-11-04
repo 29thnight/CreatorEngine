@@ -54,6 +54,7 @@
 #include "GameInstance.h"
 #include "TBoss1.h"
 #include "UIHPObserver.h"
+#include "PlayerObserver.h"
 
 void Player::Awake()
 {
@@ -172,13 +173,14 @@ void Player::Start()
 		IndicatorStun->SetEnabled(false);
 	}
 
-
+	m_input = GetOwner()->GetComponent<PlayerInputComponent>();
 
 	constexpr int CONVERT_TYPE = 1;
 	int curIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
 	if (curIndex != -1)
 	{
 		playerIndex = curIndex;
+		m_input->controllerIndex = playerIndex;
 	}
 	if(0 == playerIndex)
 	{
@@ -219,6 +221,16 @@ void Player::Start()
 				hpbar->Init();
 			}
 		}
+
+		Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
+		if (observerPrefab)
+		{
+			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P1Observer");
+			auto observer = observerObj->GetComponent<PlayerObserver>();
+			observer->SetPlayerIndex(0);
+			observer->SetTarget(player->shared_from_this());
+			observer->Init();
+		}
 	}
 	else
 	{
@@ -258,6 +270,16 @@ void Player::Start()
 				hpbar->SetTarget(player->shared_from_this());
 				hpbar->Init();
 			}
+		}
+
+		Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
+		if (observerPrefab)
+		{
+			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P2Observer");
+			auto observer = observerObj->GetComponent<PlayerObserver>();
+			observer->SetPlayerIndex(1);
+			observer->SetTarget(player->shared_from_this());
+			observer->Init();
 		}
 	}
 
@@ -397,10 +419,6 @@ void Player::Start()
 	{
 		Lslash3 = PrefabUtilitys->InstantiatePrefab(LSlashPrefab3, "LSlash3");
 	}
-
-
-
-	m_input = GetOwner()->GetComponent<PlayerInputComponent>();
 }
 
 void Player::Update(float tick)

@@ -672,6 +672,9 @@
 		<ClInclude Include="Assets\Script\TestShader.h">
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerObserver.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1242,6 +1245,9 @@
 			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TutorialScript.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerObserver.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

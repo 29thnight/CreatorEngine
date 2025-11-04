@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "PlayerObserver.h"
 #include "BackGroundEffect.h"
 #include "TutorialUI.h"
 #include "Skip.h"

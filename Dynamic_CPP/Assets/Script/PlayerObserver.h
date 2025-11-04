@@ -1,11 +1,14 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "PlayerObserver.generated.h"
 
-class UIHPObserver : public ModuleBehavior
+class PlayerObserver : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(UIHPObserver)
+   ReflectPlayerObserver
+	[[ScriptReflectionField]]
+	MODULE_BEHAVIOR_BODY(PlayerObserver)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,21 +23,22 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-public:
-	class Entity* m_entity = nullptr;
+	void SetTarget(std::shared_ptr<GameObject> target) { m_target = target; }
+	void SetPlayerIndex(int index) { m_playerIndex = index; }
+	void Init();
+
+	[[Property]]
+	Mathf::Vector2 screenOffset = { 0.f, -70.f };
+	[[Property]]
+	float WaitBeforeFade{ 2.0f }; // 2초 대기
 
 private:
+	std::weak_ptr<GameObject> m_target;
+	class RectTransformComponent* m_rect = nullptr;
 	class ImageComponent* m_image = nullptr;
-	class GameManager* GM = nullptr;
+	class Camera* m_camera = nullptr;
 
-	int m_currentHP{};
-	int m_maxHP{};
-	float m_warningPersent{ 0.2f };
-
-	Mathf::Color4 m_warningColor{ 0.992f, 0.541f, 0.541f, 1.0f };
-
-private:
-	float m_blinkTimer = 0.0f; // 누적 시간
-	float m_blinkPeriod = 0.5f; // 한 주기(초) - 빠르기 조절용
-	float m_onRatio = 0.5f; // 주기 중 경고색 유지 비율 (0~1)
+	float m_lerpSpeed = 2.0f;
+	float m_elapsedTime = 0.0f;
+	int m_playerIndex = 0;
 };

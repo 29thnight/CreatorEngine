@@ -45,6 +45,7 @@ private:
 	TextComponent*					m_buttonText{ nullptr };
 	TextComponent*					m_switchingText{ nullptr };
 	TextComponent*					m_loadingText{ nullptr };
+	ImageComponent*					imgComp{};
 	std::vector<ImageComponent*>	m_cutImages{};
 
 	int   m_cutStart = 0;   // Æ÷ÇÔ

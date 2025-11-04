@@ -1,10 +1,17 @@
 #include "UIHPObserver.h"
 #include "Entity.h"
 #include "ImageComponent.h"
+#include "GameManager.h"
 #include "pch.h"
 void UIHPObserver::Start()
 {
 	m_image = GetComponent<ImageComponent>();
+
+    auto gmobj = GameObject::Find("GameManager");
+    if (gmobj)
+    {
+        GM = gmobj->GetComponent<GameManager>();
+	}
 }
 
 void UIHPObserver::Update(float tick)
@@ -19,9 +26,16 @@ void UIHPObserver::Update(float tick)
         m_blinkTimer = 0.f;
         return;
     }
-
+	// 게임 오버 시 회색 처리
+    if (GM && GM->m_isGameOver)
+    {
+        m_image->color = { 0.43f, 0.43f, 0.43f, 1.f };
+        m_blinkTimer = 0.f;
+		return;
+    }
+	// HP 비율 계산
     const float hpPercent = static_cast<float>(m_currentHP) / static_cast<float>(m_maxHP);
-
+	// 경고 상태 체크
     if (hpPercent <= m_warningPersent)
     {
         // 토글(스퀘어) 깜빡임

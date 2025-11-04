@@ -62,7 +62,7 @@ void SwitchingSceneTrigger::Start()
 	GameObject* illustrationObj = GameObject::Find("LoadingIll");
     if (illustrationObj)
     {
-        if (ImageComponent* imgComp = illustrationObj->GetComponent<ImageComponent>())
+        if (imgComp = illustrationObj->GetComponent<ImageComponent>())
         {
             if(m_gameManager)
             {
@@ -104,6 +104,7 @@ void SwitchingSceneTrigger::SetAlphaAll(float a)
 {
     if (m_buttonText)    m_buttonText->SetAlpha(a);
     if (m_switchingText) m_switchingText->SetAlpha(a);
+	if (imgComp) 	  imgComp->color.w = 1.f - a;
 }
 
 void SwitchingSceneTrigger::SetupCutRangeForNextScene()
@@ -195,6 +196,7 @@ void SwitchingSceneTrigger::Update(float tick)
             else {
                 m_phase = SwitchPhase::WaitingInput;
                 SetupCutRangeForNextScene(); // 여기는 OK
+				imgComp->SetEnabled(false); // 일러스트 숨기기
             }
         }
         break;
