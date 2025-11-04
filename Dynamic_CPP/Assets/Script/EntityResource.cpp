@@ -94,6 +94,7 @@ void EntityResource::Update(float tick)
 }
 void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (tutorialMooJuk == true) return;  //듀토리얼용 제어
 	if (m_currentHP <= 0) return;
 	//LOG("EntityResource Attack");
 	if (sender)

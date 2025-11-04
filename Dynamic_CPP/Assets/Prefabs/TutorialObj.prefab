@@ -1,0 +1,1421 @@
+m_name: TutorialObj
+m_instanceID: 1932669072
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: TutorialObj
+    m_instanceID: 1875614977
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 25.0536289, y: 0, z: 15.7316113, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+    m_index: 803
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [804]
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RigidBodyComponent: 2204703439
+        m_name: RigidBodyComponent
+        m_instanceID: 3937732341
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_bodyType: 1
+        LinearDamping: 0.00999999978
+        m_mass: 70
+        maxLinearVelocity: 1.00000003e+16
+        maxAngularVelocity: 100
+        maxContactImpulse: 1.00000003e+32
+        maxDepenetrationVelocity: 1.00000003e+32
+        m_useGravity: false
+        m_setTrigger: true
+        m_setKinematic: false
+        m_collisionEnabled: true
+      - BoxColliderComponent: 4263226401
+        m_name: BoxColliderComponent
+        m_instanceID: 3552473473
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_boxExtent: {x: 2.20000005, y: 2, z: 2}
+        m_posOffset: {x: 0, y: 0, z: 0}
+        m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+      - ModuleBehavior: 1399118904
+        EventID: 0
+        m_name: TutorialScript
+        m_instanceID: 3988254425
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptGuid: b3509dfd-95be-567c-8b8c-c966118a29f9
+    m_gameObjectType: 0
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: Target
+        m_instanceID: 3546278704
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 803
+        m_index: 804
+        m_parentIndex: 803
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: [56, 61, 66, 53, 185, 807, 810]
+        m_tag: Target
+        m_layer: Default
+        m_components: ~
+        m_gameObjectType: 0
+        m_isStatic: false
+        children:
+          - GameObject: 2166264123
+            m_name: ResourceFlower
+            m_instanceID: 3315211073
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: -2.55228424, y: -5.43933254e-07, z: 4.67957306, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 804
+            m_index: 56
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+            m_childrenIndices: [57, 58]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 2422185456
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 4244164769
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 1, y: 2, z: 1}
+                m_posOffset: {x: 0, y: 0, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 4
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 917848061
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+              - ModuleBehavior: 1399118904
+                m_eventId: 3101
+                m_runtimeTag: Resource
+                m_name: EventTarget
+                m_instanceID: 424574958
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 622ce0c7-7cca-5bcc-9e64-84f508507195
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: CriticalMark (4)
+                m_instanceID: 593459784
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 1.91392028, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 56
+                m_index: 57
+                m_parentIndex: 56
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 3095367796
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: item_flower_re
+                m_instanceID: 2638599411
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 56
+                m_index: 58
+                m_parentIndex: 56
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                m_childrenIndices: [59, 60]
+                m_tag: Untagged
+                m_layer: Default
+                m_components: ~
+                m_gameObjectType: 3
+                m_isStatic: false
+                children:
+                  - GameObject: 2166264123
+                    m_name: Cylinder.002-0
+                    m_instanceID: 3701432707
+                    m_isEnabled: true
+                    m_attachedSoketID: 0
+                    m_transform:
+                      position: {x: 0, y: 0, z: 0, w: 1}
+                      rotation: {x: -0, y: 0, z: -0, w: 1}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 58
+                    m_index: 59
+                    m_parentIndex: 58
+                    m_rootIndex: 0
+                    m_collisionType: 0
+                    m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                    m_childrenIndices: ~
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components:
+                      - MeshRenderer: 659998325
+                        m_name: MeshRenderer
+                        m_instanceID: 2416669413
+                        m_isEnabled: true
+                        m_FileID: 00000000-0000-0000-0000-000000000000
+                        m_Material:
+                          m_name: item_flower_bush
+                          m_baseColorTexName: item_flower_bush.png
+                          m_normalTexName: ""
+                          m_ORM_TexName: ""
+                          m_AO_TexName: ""
+                          m_EmissiveTexName: ""
+                          m_materialInfo:
+                            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                            m_metallic: 0
+                            m_roughness: 0.699999988
+                            m_IOR: 1.5
+                          m_flowInfo:
+                            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                            m_uvScroll: {x: 0, y: 0}
+                          m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                          m_renderingMode: 0
+                          m_shaderPSOName: ""
+                        m_Mesh:
+                          m_name: Cylinder.002-0
+                          m_materialIndex: 0
+                          m_LODThresholds: ~
+                        m_LightMapping:
+                          lightmapIndex: -1
+                          ligthmapResolution: 0
+                          lightmapScale: 1
+                          lightmapOffset: {x: 0, y: 0}
+                          lightmapTiling: {x: 0, y: 0}
+                        m_bitflag: 0
+                        m_isSkinnedMesh: false
+                        m_shadowRecive: true
+                        m_shadowCast: true
+                        m_isEnableLOD: false
+                    m_gameObjectType: 3
+                    m_isStatic: false
+                  - GameObject: 2166264123
+                    m_name: Cylinder.002-1
+                    m_instanceID: 2958940085
+                    m_isEnabled: true
+                    m_attachedSoketID: 0
+                    m_transform:
+                      position: {x: 0, y: 0, z: 0, w: 1}
+                      rotation: {x: -0, y: 0, z: -0, w: 1}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 58
+                    m_index: 60
+                    m_parentIndex: 58
+                    m_rootIndex: 0
+                    m_collisionType: 0
+                    m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                    m_childrenIndices: ~
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components:
+                      - MeshRenderer: 659998325
+                        m_name: MeshRenderer
+                        m_instanceID: 2028465531
+                        m_isEnabled: true
+                        m_FileID: 00000000-0000-0000-0000-000000000000
+                        m_Material:
+                          m_name: item_flower
+                          m_baseColorTexName: item_flower_DefaultMaterial_BaseColor.png
+                          m_normalTexName: item_flower_DefaultMaterial_Normal.png
+                          m_ORM_TexName: item_flower_DefaultMaterial_OcclusionRoughnessMetallic.png
+                          m_AO_TexName: ""
+                          m_EmissiveTexName: ""
+                          m_materialInfo:
+                            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                            m_metallic: 1
+                            m_roughness: 1
+                            m_IOR: 1.5
+                          m_flowInfo:
+                            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                            m_uvScroll: {x: 0, y: 0}
+                          m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                          m_renderingMode: 0
+                          m_shaderPSOName: ""
+                        m_Mesh:
+                          m_name: Cylinder.002-1
+                          m_materialIndex: 1
+                          m_LODThresholds: ~
+                        m_LightMapping:
+                          lightmapIndex: -1
+                          ligthmapResolution: 0
+                          lightmapScale: 1
+                          lightmapOffset: {x: 0, y: 0}
+                          lightmapTiling: {x: 0, y: 0}
+                        m_bitflag: 0
+                        m_isSkinnedMesh: false
+                        m_shadowRecive: true
+                        m_shadowCast: true
+                        m_isEnableLOD: false
+                    m_gameObjectType: 3
+                    m_isStatic: false
+          - GameObject: 2166264123
+            m_name: ResourceFlower (1)
+            m_instanceID: 842816998
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 4.78234863, y: 2.12712649e-07, z: 5.27853203, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 804
+            m_index: 61
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+            m_childrenIndices: [62, 63]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 1529058846
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 2595507313
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 1, y: 2, z: 1}
+                m_posOffset: {x: 0, y: 0, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 4
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 1936408388
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+              - ModuleBehavior: 1399118904
+                m_eventId: 3101
+                m_runtimeTag: Resource
+                m_name: EventTarget
+                m_instanceID: 571751873
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 622ce0c7-7cca-5bcc-9e64-84f508507195
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: CriticalMark (8)
+                m_instanceID: 3110328010
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 1.91392028, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 61
+                m_index: 62
+                m_parentIndex: 61
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 3142008772
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: item_flower_re (1)
+                m_instanceID: 2490128354
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 61
+                m_index: 63
+                m_parentIndex: 61
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                m_childrenIndices: [64, 65]
+                m_tag: Untagged
+                m_layer: Default
+                m_components: ~
+                m_gameObjectType: 3
+                m_isStatic: false
+                children:
+                  - GameObject: 2166264123
+                    m_name: Cylinder.002-0 (1)
+                    m_instanceID: 4161623740
+                    m_isEnabled: true
+                    m_attachedSoketID: 0
+                    m_transform:
+                      position: {x: 0, y: 0, z: 0, w: 1}
+                      rotation: {x: -0, y: 0, z: -0, w: 1}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 63
+                    m_index: 64
+                    m_parentIndex: 63
+                    m_rootIndex: 0
+                    m_collisionType: 0
+                    m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                    m_childrenIndices: ~
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components:
+                      - MeshRenderer: 659998325
+                        m_name: MeshRenderer
+                        m_instanceID: 2211864587
+                        m_isEnabled: true
+                        m_FileID: 00000000-0000-0000-0000-000000000000
+                        m_Material:
+                          m_name: item_flower_bush
+                          m_baseColorTexName: item_flower_bush.png
+                          m_normalTexName: ""
+                          m_ORM_TexName: ""
+                          m_AO_TexName: ""
+                          m_EmissiveTexName: ""
+                          m_materialInfo:
+                            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                            m_metallic: 0
+                            m_roughness: 0.699999988
+                            m_IOR: 1.5
+                          m_flowInfo:
+                            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                            m_uvScroll: {x: 0, y: 0}
+                          m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                          m_renderingMode: 0
+                          m_shaderPSOName: ""
+                        m_Mesh:
+                          m_name: Cylinder.002-0
+                          m_materialIndex: 0
+                          m_LODThresholds: ~
+                        m_LightMapping:
+                          lightmapIndex: -1
+                          ligthmapResolution: 0
+                          lightmapScale: 1
+                          lightmapOffset: {x: 0, y: 0}
+                          lightmapTiling: {x: 0, y: 0}
+                        m_bitflag: 0
+                        m_isSkinnedMesh: false
+                        m_shadowRecive: true
+                        m_shadowCast: true
+                        m_isEnableLOD: false
+                    m_gameObjectType: 3
+                    m_isStatic: false
+                  - GameObject: 2166264123
+                    m_name: Cylinder.002-1 (1)
+                    m_instanceID: 90955656
+                    m_isEnabled: true
+                    m_attachedSoketID: 0
+                    m_transform:
+                      position: {x: 0, y: 0, z: 0, w: 1}
+                      rotation: {x: -0, y: 0, z: -0, w: 1}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 63
+                    m_index: 65
+                    m_parentIndex: 63
+                    m_rootIndex: 0
+                    m_collisionType: 0
+                    m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                    m_childrenIndices: ~
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components:
+                      - MeshRenderer: 659998325
+                        m_name: MeshRenderer
+                        m_instanceID: 2624170166
+                        m_isEnabled: true
+                        m_FileID: 00000000-0000-0000-0000-000000000000
+                        m_Material:
+                          m_name: item_flower
+                          m_baseColorTexName: item_flower_DefaultMaterial_BaseColor.png
+                          m_normalTexName: item_flower_DefaultMaterial_Normal.png
+                          m_ORM_TexName: item_flower_DefaultMaterial_OcclusionRoughnessMetallic.png
+                          m_AO_TexName: ""
+                          m_EmissiveTexName: ""
+                          m_materialInfo:
+                            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                            m_metallic: 1
+                            m_roughness: 1
+                            m_IOR: 1.5
+                          m_flowInfo:
+                            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                            m_uvScroll: {x: 0, y: 0}
+                          m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                          m_renderingMode: 0
+                          m_shaderPSOName: ""
+                        m_Mesh:
+                          m_name: Cylinder.002-1
+                          m_materialIndex: 1
+                          m_LODThresholds: ~
+                        m_LightMapping:
+                          lightmapIndex: -1
+                          ligthmapResolution: 0
+                          lightmapScale: 1
+                          lightmapOffset: {x: 0, y: 0}
+                          lightmapTiling: {x: 0, y: 0}
+                        m_bitflag: 0
+                        m_isSkinnedMesh: false
+                        m_shadowRecive: true
+                        m_shadowCast: true
+                        m_isEnableLOD: false
+                    m_gameObjectType: 3
+                    m_isStatic: false
+          - GameObject: 2166264123
+            m_name: ResourceFlower (2)
+            m_instanceID: 242732450
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: -9.53674316e-07, z: -6.24605656, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 804
+            m_index: 66
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+            m_childrenIndices: [67, 68]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 4015567347
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 1512510635
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 1, y: 2, z: 1}
+                m_posOffset: {x: 0, y: 0, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 4
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 1741127375
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+              - ModuleBehavior: 1399118904
+                m_eventId: 3101
+                m_runtimeTag: Resource
+                m_name: EventTarget
+                m_instanceID: 3900805123
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 622ce0c7-7cca-5bcc-9e64-84f508507195
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: CriticalMark (9)
+                m_instanceID: 2051082102
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 1.91392028, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 66
+                m_index: 67
+                m_parentIndex: 66
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 3594942155
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: item_flower_re (2)
+                m_instanceID: 4082714720
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: 0, y: 0, z: 0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 1}
+                  m_parentID: 66
+                m_index: 68
+                m_parentIndex: 66
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                m_childrenIndices: [69, 70]
+                m_tag: Untagged
+                m_layer: Default
+                m_components: ~
+                m_gameObjectType: 3
+                m_isStatic: false
+                children:
+                  - GameObject: 2166264123
+                    m_name: Cylinder.002-0 (2)
+                    m_instanceID: 1003572827
+                    m_isEnabled: true
+                    m_attachedSoketID: 0
+                    m_transform:
+                      position: {x: 0, y: 0, z: 0, w: 1}
+                      rotation: {x: -0, y: 0, z: -0, w: 1}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 68
+                    m_index: 69
+                    m_parentIndex: 68
+                    m_rootIndex: 0
+                    m_collisionType: 0
+                    m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                    m_childrenIndices: ~
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components:
+                      - MeshRenderer: 659998325
+                        m_name: MeshRenderer
+                        m_instanceID: 4022559975
+                        m_isEnabled: true
+                        m_FileID: 00000000-0000-0000-0000-000000000000
+                        m_Material:
+                          m_name: item_flower_bush
+                          m_baseColorTexName: item_flower_bush.png
+                          m_normalTexName: ""
+                          m_ORM_TexName: ""
+                          m_AO_TexName: ""
+                          m_EmissiveTexName: ""
+                          m_materialInfo:
+                            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                            m_metallic: 0
+                            m_roughness: 0.699999988
+                            m_IOR: 1.5
+                          m_flowInfo:
+                            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                            m_uvScroll: {x: 0, y: 0}
+                          m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                          m_renderingMode: 0
+                          m_shaderPSOName: ""
+                        m_Mesh:
+                          m_name: Cylinder.002-0
+                          m_materialIndex: 0
+                          m_LODThresholds: ~
+                        m_LightMapping:
+                          lightmapIndex: -1
+                          ligthmapResolution: 0
+                          lightmapScale: 1
+                          lightmapOffset: {x: 0, y: 0}
+                          lightmapTiling: {x: 0, y: 0}
+                        m_bitflag: 0
+                        m_isSkinnedMesh: false
+                        m_shadowRecive: true
+                        m_shadowCast: true
+                        m_isEnableLOD: false
+                    m_gameObjectType: 3
+                    m_isStatic: false
+                  - GameObject: 2166264123
+                    m_name: Cylinder.002-1 (2)
+                    m_instanceID: 816950313
+                    m_isEnabled: true
+                    m_attachedSoketID: 0
+                    m_transform:
+                      position: {x: 0, y: 0, z: 0, w: 1}
+                      rotation: {x: -0, y: 0, z: -0, w: 1}
+                      scale: {x: 1, y: 1, z: 1, w: 0}
+                      m_parentID: 68
+                    m_index: 70
+                    m_parentIndex: 68
+                    m_rootIndex: 0
+                    m_collisionType: 0
+                    m_prefabFileGuid: e3b8a476-8597-5774-8657-1ea5e2cbcd6d
+                    m_childrenIndices: ~
+                    m_tag: Untagged
+                    m_layer: Default
+                    m_components:
+                      - MeshRenderer: 659998325
+                        m_name: MeshRenderer
+                        m_instanceID: 456238084
+                        m_isEnabled: true
+                        m_FileID: 00000000-0000-0000-0000-000000000000
+                        m_Material:
+                          m_name: item_flower
+                          m_baseColorTexName: item_flower_DefaultMaterial_BaseColor.png
+                          m_normalTexName: item_flower_DefaultMaterial_Normal.png
+                          m_ORM_TexName: item_flower_DefaultMaterial_OcclusionRoughnessMetallic.png
+                          m_AO_TexName: ""
+                          m_EmissiveTexName: ""
+                          m_materialInfo:
+                            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                            m_metallic: 1
+                            m_roughness: 1
+                            m_IOR: 1.5
+                          m_flowInfo:
+                            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                            m_uvScroll: {x: 0, y: 0}
+                          m_fileGuid: c1168209-8bda-5179-b344-3da35b954dfc
+                          m_renderingMode: 0
+                          m_shaderPSOName: ""
+                        m_Mesh:
+                          m_name: Cylinder.002-1
+                          m_materialIndex: 1
+                          m_LODThresholds: ~
+                        m_LightMapping:
+                          lightmapIndex: -1
+                          ligthmapResolution: 0
+                          lightmapScale: 1
+                          lightmapOffset: {x: 0, y: 0}
+                          lightmapTiling: {x: 0, y: 0}
+                        m_bitflag: 0
+                        m_isSkinnedMesh: false
+                        m_shadowRecive: true
+                        m_shadowCast: true
+                        m_isEnableLOD: false
+                    m_gameObjectType: 3
+                    m_isStatic: false
+          - GameObject: 2166264123
+            m_name: ResourceMineral (3)
+            m_instanceID: 2874132219
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 1.30392265, y: 0, z: 6.86943054, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 804
+            m_index: 53
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: 2b52624d-2c69-5d37-aca4-da3386482f18
+            m_childrenIndices: [54, 55]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 3049776928
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 2913844023
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 0.5, y: 2, z: 0.5}
+                m_posOffset: {x: 0, y: 0, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 2
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 4210660794
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+              - ModuleBehavior: 1399118904
+                m_eventId: 3101
+                m_runtimeTag: Resource
+                m_name: EventTarget
+                m_instanceID: 3639553419
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 622ce0c7-7cca-5bcc-9e64-84f508507195
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: obj_Inter_stone (3)
+                m_instanceID: 4276158314
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 53
+                m_index: 54
+                m_parentIndex: 53
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: 2b52624d-2c69-5d37-aca4-da3386482f18
+                m_childrenIndices: ~
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - MeshRenderer: 659998325
+                    m_name: MeshRenderer
+                    m_instanceID: 2765501255
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_Material:
+                      m_name: obj_Inter_stone
+                      m_baseColorTexName: Map_Inter_stone_DefaultMaterial_BaseColor.png
+                      m_normalTexName: Map_Inter_stone_DefaultMaterial_Normal.png
+                      m_ORM_TexName: Map_Inter_stone_DefaultMaterial_OcclusionRoughnessMetallic.png
+                      m_AO_TexName: ""
+                      m_EmissiveTexName: ""
+                      m_materialInfo:
+                        m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                        m_metallic: 1
+                        m_roughness: 1
+                        m_IOR: 1.5
+                      m_flowInfo:
+                        m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                        m_uvScroll: {x: 0, y: 0}
+                      m_fileGuid: 2a243319-656e-556a-bfec-2d0fa8c9e5df
+                      m_renderingMode: 0
+                      m_shaderPSOName: ""
+                    m_Mesh:
+                      m_name: Plane.010
+                      m_materialIndex: 0
+                      m_LODThresholds: ~
+                    m_LightMapping:
+                      lightmapIndex: -1
+                      ligthmapResolution: 0
+                      lightmapScale: 1
+                      lightmapOffset: {x: 0, y: 0}
+                      lightmapTiling: {x: 0, y: 0}
+                    m_bitflag: 0
+                    m_isSkinnedMesh: false
+                    m_shadowRecive: true
+                    m_shadowCast: true
+                    m_isEnableLOD: false
+                  - ModuleBehavior: 1399118904
+                    m_eventId: 3101
+                    m_runtimeTag: Resource
+                    m_name: EventTarget
+                    m_instanceID: 2579261582
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: 622ce0c7-7cca-5bcc-9e64-84f508507195
+                m_gameObjectType: 3
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: CriticalMark (3)
+                m_instanceID: 4271389022
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 1.82164216, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 53
+                m_index: 55
+                m_parentIndex: 53
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: 2b52624d-2c69-5d37-aca4-da3386482f18
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 3957679909
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false
+          - GameObject: 2166264123
+            m_name: ResourceMineral (7)
+            m_instanceID: 2568488618
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 8.12145805, y: -7.59105546e-07, z: -5.34245682, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 0}
+              m_parentID: 804
+            m_index: 185
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: 2b52624d-2c69-5d37-aca4-da3386482f18
+            m_childrenIndices: [186, 187]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 1162444355
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 4061119236
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 0.5, y: 2, z: 0.5}
+                m_posOffset: {x: 0, y: 0, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 2
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 2793076416
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+              - ModuleBehavior: 1399118904
+                m_eventId: 3101
+                m_runtimeTag: Resource
+                m_name: EventTarget
+                m_instanceID: 2739145361
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 622ce0c7-7cca-5bcc-9e64-84f508507195
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: obj_Inter_stone (7)
+                m_instanceID: 816276922
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 3.06037009e-08, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 185
+                m_index: 186
+                m_parentIndex: 185
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: 2b52624d-2c69-5d37-aca4-da3386482f18
+                m_childrenIndices: ~
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - MeshRenderer: 659998325
+                    m_name: MeshRenderer
+                    m_instanceID: 293693685
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_Material:
+                      m_name: obj_Inter_stone
+                      m_baseColorTexName: Map_Inter_stone_DefaultMaterial_BaseColor.png
+                      m_normalTexName: Map_Inter_stone_DefaultMaterial_Normal.png
+                      m_ORM_TexName: Map_Inter_stone_DefaultMaterial_OcclusionRoughnessMetallic.png
+                      m_AO_TexName: ""
+                      m_EmissiveTexName: ""
+                      m_materialInfo:
+                        m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                        m_metallic: 1
+                        m_roughness: 1
+                        m_IOR: 1.5
+                      m_flowInfo:
+                        m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                        m_uvScroll: {x: 0, y: 0}
+                      m_fileGuid: 2a243319-656e-556a-bfec-2d0fa8c9e5df
+                      m_renderingMode: 0
+                      m_shaderPSOName: ""
+                    m_Mesh:
+                      m_name: Plane.010
+                      m_materialIndex: 0
+                      m_LODThresholds: ~
+                    m_LightMapping:
+                      lightmapIndex: -1
+                      ligthmapResolution: 0
+                      lightmapScale: 1
+                      lightmapOffset: {x: 0, y: 0}
+                      lightmapTiling: {x: 0, y: 0}
+                    m_bitflag: 0
+                    m_isSkinnedMesh: false
+                    m_shadowRecive: true
+                    m_shadowCast: true
+                    m_isEnableLOD: false
+                m_gameObjectType: 3
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: CriticalMark (23)
+                m_instanceID: 3669188280
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 1.82164216, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 185
+                m_index: 187
+                m_parentIndex: 185
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: 2b52624d-2c69-5d37-aca4-da3386482f18
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - EffectComponent: 3131036541
+                    m_name: EffectComponent
+                    m_instanceID: 4141827211
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_effectTemplateName: "Null"
+                    m_timeScale: 1
+                    m_duration: -1
+                    m_isPlaying: true
+                    m_isPaused: false
+                    m_loop: true
+                    m_useAbsolutePosition: false
+                    m_currentTime: 1042.40942
+                    m_effectInstanceName: Null_obj3669188280
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 3038000860
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false
+          - GameObject: 2166264123
+            m_name: ResourceMushroom (16)
+            m_instanceID: 3609763525
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 11.2795734, y: 0, z: 5.3552494, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 0.699999988, y: 0.699999988, z: 0.699999988, w: 0}
+              m_parentID: 804
+            m_index: 807
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: efdcb168-46b9-5ebc-98e7-39ca01baa52d
+            m_childrenIndices: [808, 809]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 2609279546
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 654169012
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 1.20000005, y: 1.5, z: 1.20000005}
+                m_posOffset: {x: 0, y: 1.5, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 1
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 3539307616
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: Obj_Inter_mushroom2 (16)
+                m_instanceID: 52194496
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 807
+                m_index: 808
+                m_parentIndex: 807
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: efdcb168-46b9-5ebc-98e7-39ca01baa52d
+                m_childrenIndices: ~
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - MeshRenderer: 659998325
+                    m_name: MeshRenderer
+                    m_instanceID: 657661452
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_Material:
+                      m_name: Mushroom
+                      m_baseColorTexName: Obj_Inter_mushroom_L_DefaultMaterial_BaseColor.png
+                      m_normalTexName: Obj_Inter_mushroom_L_DefaultMaterial_Normal.png
+                      m_ORM_TexName: Obj_Inter_mushroom_L_DefaultMaterial_OcclusionRoughnessMetallic.png
+                      m_AO_TexName: ""
+                      m_EmissiveTexName: ""
+                      m_materialInfo:
+                        m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                        m_metallic: 1
+                        m_roughness: 1
+                        m_IOR: 1.5
+                      m_flowInfo:
+                        m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                        m_uvScroll: {x: 0, y: 0}
+                      m_fileGuid: 52a63799-a19b-58e6-bacd-b9b7cb7ca849
+                      m_renderingMode: 0
+                      m_shaderPSOName: FlashShader
+                    m_Mesh:
+                      m_name: Cube.005
+                      m_materialIndex: 0
+                      m_LODThresholds: ~
+                    m_LightMapping:
+                      lightmapIndex: -1
+                      ligthmapResolution: 0
+                      lightmapScale: 1
+                      lightmapOffset: {x: 0, y: 0}
+                      lightmapTiling: {x: 0, y: 0}
+                    m_bitflag: 0
+                    m_isSkinnedMesh: false
+                    m_shadowRecive: true
+                    m_shadowCast: true
+                    m_isEnableLOD: false
+                m_gameObjectType: 3
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: CriticalMark (61)
+                m_instanceID: 2026484115
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 3.28742409, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 807
+                m_index: 809
+                m_parentIndex: 807
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: efdcb168-46b9-5ebc-98e7-39ca01baa52d
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - EffectComponent: 3131036541
+                    m_name: EffectComponent
+                    m_instanceID: 2755419264
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_effectTemplateName: "Null"
+                    m_timeScale: 1
+                    m_duration: -1
+                    m_isPlaying: false
+                    m_isPaused: false
+                    m_loop: true
+                    m_useAbsolutePosition: false
+                    m_currentTime: 0
+                    m_effectInstanceName: ""
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 4232271660
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false
+          - GameObject: 2166264123
+            m_name: ResourceMushroom (17)
+            m_instanceID: 509307670
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 7.91328621, y: 0, z: -7.27049351, w: 1}
+              rotation: {x: -0, y: 0, z: -0, w: 1}
+              scale: {x: 0.699999988, y: 0.699999988, z: 0.699999988, w: 0}
+              m_parentID: 804
+            m_index: 810
+            m_parentIndex: 804
+            m_rootIndex: 0
+            m_collisionType: 8
+            m_prefabFileGuid: efdcb168-46b9-5ebc-98e7-39ca01baa52d
+            m_childrenIndices: [811, 812]
+            m_tag: Untagged
+            m_layer: EntityResource
+            m_components:
+              - RigidBodyComponent: 2204703439
+                m_name: RigidBodyComponent
+                m_instanceID: 3444422023
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_bodyType: 2
+                LinearDamping: 0.00999999978
+                m_mass: 70
+                maxLinearVelocity: 1.00000003e+16
+                maxAngularVelocity: 100
+                maxContactImpulse: 1.00000003e+32
+                maxDepenetrationVelocity: 1.00000003e+32
+                m_useGravity: false
+                m_setTrigger: false
+                m_setKinematic: true
+                m_collisionEnabled: true
+              - BoxColliderComponent: 4263226401
+                m_name: BoxColliderComponent
+                m_instanceID: 4159849709
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_boxExtent: {x: 1.20000005, y: 1.5, z: 1.20000005}
+                m_posOffset: {x: 0, y: 1.5, z: 0}
+                m_rotOffset: {x: 0, y: 0, z: 0, w: 1}
+              - ModuleBehavior: 1399118904
+                itemType: 1
+                maxHP: 40
+                m_minRewardUpForce: 2
+                m_maxRewardUpForce: 3
+                m_name: EntityResource
+                m_instanceID: 3282032
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_scriptGuid: 73c9555e-9031-5f34-bfa4-4ecb8e10e9fa
+            m_gameObjectType: 0
+            m_isStatic: false
+            children:
+              - GameObject: 2166264123
+                m_name: Obj_Inter_mushroom2 (17)
+                m_instanceID: 1153129251
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 0, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 810
+                m_index: 811
+                m_parentIndex: 810
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: efdcb168-46b9-5ebc-98e7-39ca01baa52d
+                m_childrenIndices: ~
+                m_tag: Untagged
+                m_layer: Default
+                m_components:
+                  - MeshRenderer: 659998325
+                    m_name: MeshRenderer
+                    m_instanceID: 3885319594
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_Material:
+                      m_name: Mushroom
+                      m_baseColorTexName: Obj_Inter_mushroom_L_DefaultMaterial_BaseColor.png
+                      m_normalTexName: Obj_Inter_mushroom_L_DefaultMaterial_Normal.png
+                      m_ORM_TexName: Obj_Inter_mushroom_L_DefaultMaterial_OcclusionRoughnessMetallic.png
+                      m_AO_TexName: ""
+                      m_EmissiveTexName: ""
+                      m_materialInfo:
+                        m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+                        m_metallic: 1
+                        m_roughness: 1
+                        m_IOR: 1.5
+                      m_flowInfo:
+                        m_windVector: {x: 0, y: 0, z: 0, w: 0}
+                        m_uvScroll: {x: 0, y: 0}
+                      m_fileGuid: 52a63799-a19b-58e6-bacd-b9b7cb7ca849
+                      m_renderingMode: 0
+                      m_shaderPSOName: FlashShader
+                    m_Mesh:
+                      m_name: Cube.005
+                      m_materialIndex: 0
+                      m_LODThresholds: ~
+                    m_LightMapping:
+                      lightmapIndex: -1
+                      ligthmapResolution: 0
+                      lightmapScale: 1
+                      lightmapOffset: {x: 0, y: 0}
+                      lightmapTiling: {x: 0, y: 0}
+                    m_bitflag: 0
+                    m_isSkinnedMesh: false
+                    m_shadowRecive: true
+                    m_shadowCast: true
+                    m_isEnableLOD: false
+                m_gameObjectType: 3
+                m_isStatic: false
+              - GameObject: 2166264123
+                m_name: CriticalMark (62)
+                m_instanceID: 4084512326
+                m_isEnabled: true
+                m_attachedSoketID: 0
+                m_transform:
+                  position: {x: 0, y: 3.28742409, z: 0, w: 1}
+                  rotation: {x: -0, y: 0, z: -0, w: 1}
+                  scale: {x: 1, y: 1, z: 1, w: 0}
+                  m_parentID: 810
+                m_index: 812
+                m_parentIndex: 810
+                m_rootIndex: 0
+                m_collisionType: 0
+                m_prefabFileGuid: efdcb168-46b9-5ebc-98e7-39ca01baa52d
+                m_childrenIndices: ~
+                m_tag: CriticalMark
+                m_layer: Default
+                m_components:
+                  - EffectComponent: 3131036541
+                    m_name: EffectComponent
+                    m_instanceID: 1614192466
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_effectTemplateName: "Null"
+                    m_timeScale: 1
+                    m_duration: -1
+                    m_isPlaying: false
+                    m_isPaused: false
+                    m_loop: true
+                    m_useAbsolutePosition: false
+                    m_currentTime: 0
+                    m_effectInstanceName: ""
+                  - ModuleBehavior: 1399118904
+                    markDuration: 5
+                    markCoolDown: 5
+                    m_name: CriticalMark
+                    m_instanceID: 562742422
+                    m_isEnabled: true
+                    m_FileID: 00000000-0000-0000-0000-000000000000
+                    m_scriptGuid: f3d160e2-79b7-5243-9e7d-74d9b91c7245
+                m_gameObjectType: 0
+                m_isStatic: false

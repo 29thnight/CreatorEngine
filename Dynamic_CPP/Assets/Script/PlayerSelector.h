@@ -4,6 +4,7 @@
 #include "ModuleBehavior.h"
 #include "ICustomEditor.h"
 
+class GameManager;
 class PlayerSelector : public ModuleBehavior, public ICustomEditor
 {
 public:
@@ -33,4 +34,5 @@ private:
 	std::array<SelectorSlot, 2>				m_slot{ SelectorSlot::Neutral, SelectorSlot::Neutral };
 	std::array<int, 2>						m_axis{ 0, 0 }; // -1/0/+1
 	std::vector<IPlayerSelectorObserver*>	m_observers;
+	GameManager* GM = nullptr;
 };

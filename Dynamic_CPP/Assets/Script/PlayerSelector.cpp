@@ -1,9 +1,16 @@
 #include "PlayerSelector.h"
 #include <imgui.h>
 #include "pch.h"
-
+#include "GameManager.h"
+#include "SFXPoolManager.h"
+#include "SoundName.h"
 void PlayerSelector::Start()
 {
+    auto GMobj = GameObject::Find("GameManager");
+    if (GMobj)
+    {
+        GM = GMobj->GetComponent<GameManager>();
+    }
 }
 
 void PlayerSelector::Update(float tick)
@@ -36,6 +43,15 @@ void PlayerSelector::MoveStep(int playerIndex, int step)
         m_axis[playerIndex] = step;
         SelectorState s{ playerIndex, m_slot[playerIndex], step };
         Notify(s);
+        if (GM)
+        {
+            auto pool = GM->GetSFXPool();
+            if (pool)
+            {
+                pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("ButtonSelect"));
+            }
+        }
+
     }
 }
 

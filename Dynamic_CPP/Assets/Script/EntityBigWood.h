@@ -64,4 +64,6 @@ private:
 	int reward = 0;
 	GameObject* deadObj = nullptr;
 	CriticalMark* m_criticalMark = nullptr;
+
+
 };

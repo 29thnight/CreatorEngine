@@ -65,6 +65,7 @@ void EntityBigWood::Update(float tick)
 
 void EntityBigWood::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 {
+	if (tutorialMooJuk == true) return;  //듀토리얼용 제어
 	if (m_currentHP <= 0) return; // 풀링해서 사용하기 위해 만약 이미 파괴된 상태라면 무시.
 
 	Entity::SendDamage(sender, damage, hitinfo);
