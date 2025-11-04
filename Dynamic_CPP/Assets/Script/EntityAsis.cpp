@@ -163,6 +163,28 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 	}
 }
 
+void EntityAsis::OnTriggerStay(const Collision& collision)
+{
+	auto item = collision.otherObj->GetComponent<EntityItem>();
+	if (item) {
+		if (item->m_state != EItemState::THROWN) return;
+		if (item->canEat == false) return;
+		LOG("OnCollision Item: " << collision.otherObj->m_name.data());
+		auto owner = item->GetThrowOwner();
+		if (owner) {
+			bool result = AddItem(item);
+			item->canEat = false;
+			item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
+			if (!result) {
+				// È¹µæÀ» ½ÇÆÐÇßÀ» ¶§.
+			}
+			else {
+				// È¹µæÇßÀ» ¶§ Ã³¸®.
+			}
+		}
+	}
+}
+
 void EntityAsis::OnCollisionEnter(const Collision& collision)
 {
 	auto item = collision.otherObj->GetComponent<EntityItem>();
