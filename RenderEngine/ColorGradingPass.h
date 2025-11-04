@@ -47,5 +47,7 @@ private:
 	ComputeShader* m_pCopyShader = nullptr;
 	Texture* m_pColorGradingLUTTexture = nullptr;
 	std::string m_tempLUTName{ "ColorGradingLUT" };
+
+	bool flagTextureSwap = false;
 };
 
