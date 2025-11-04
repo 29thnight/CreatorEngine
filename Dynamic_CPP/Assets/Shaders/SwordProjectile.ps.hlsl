@@ -44,7 +44,7 @@ PixelOutput main(PixelInput input)
     
     // UV 애니메이션 계산
     float2 dissolveUV = input.texCoord * float2(1.0, 12.0);
-    dissolveUV.y += gTime;
+    dissolveUV.y += gTime * 2;
     
     float4 dissolveData = gDissolveTexture.Sample(gLinearSampler, dissolveUV);
 

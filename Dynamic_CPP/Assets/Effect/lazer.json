@@ -32,7 +32,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 0.0,
-                            "lifeTime": 5.0,
+                            "lifeTime": 1.0,
                             "rotateSpeed": 0.0,
                             "size": {
                                 "x": 1.0,
@@ -49,7 +49,7 @@
                             "emitterPosition": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 1.0
+                                "z": 0.0
                             },
                             "emitterRadius": 1.0,
                             "emitterSize": {
@@ -106,7 +106,7 @@
                         "colorGradient": [
                             {
                                 "color": {
-                                    "w": 0.5882353186607361,
+                                    "w": 0.19607843458652496,
                                     "x": 1.0,
                                     "y": 0.0,
                                     "z": 0.0
@@ -115,7 +115,7 @@
                             },
                             {
                                 "color": {
-                                    "w": 0.0,
+                                    "w": 0.19607843458652496,
                                     "x": 0.501960813999176,
                                     "y": 0.0,
                                     "z": 1.0
@@ -152,7 +152,7 @@
             "position": {
                 "x": 0.0,
                 "y": 0.0,
-                "z": 1.0
+                "z": 0.0
             },
             "renderModules": [
                 {
@@ -170,8 +170,8 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 2,
-                            "depthPreset": 4,
+                            "blendPreset": 1,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -266,7 +266,7 @@
                             "Scale": {
                                 "x": 0.25,
                                 "y": 0.5,
-                                "z": 1.0
+                                "z": 0.5
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -356,7 +356,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -395,7 +395,7 @@
                             "Scale": {
                                 "x": 0.25,
                                 "y": 0.5,
-                                "z": 1.0
+                                "z": 0.5
                             },
                             "acceleration": {
                                 "x": 0.0,
@@ -485,7 +485,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -546,7 +546,7 @@
                             "emitterPosition": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": -0.5
+                                "z": 0.0
                             },
                             "emitterRadius": 1.0,
                             "emitterSize": {
@@ -624,7 +624,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 59.761253356933594,
+                            "currentTime": 280.419921875,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.0,
@@ -640,7 +640,7 @@
                             "center": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": -0.5
+                                "z": 0.0
                             },
                             "radius": 5.0,
                             "speed": 1.0
@@ -671,7 +671,7 @@
             "position": {
                 "x": 0.0,
                 "y": 0.0,
-                "z": -0.5
+                "z": 0.0
             },
             "renderModules": [
                 {
@@ -689,7 +689,7 @@
                             3
                         ],
                         "renderStates": {
-                            "blendPreset": 2,
+                            "blendPreset": 1,
                             "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
@@ -776,5 +776,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 2.0
+    "timeScale": 1.0
 }
