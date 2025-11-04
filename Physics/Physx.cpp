@@ -255,7 +255,7 @@ bool PhysicX::Initialize()
 	//======================================================================
 	//debug용 plane 생성 --> triangle mesh로 객체 생성
 	
-	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
+	/*physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
 	auto material = m_defaultMaterial;
 	material->setRestitution(0.0f);
 	material->setDynamicFriction(1.0f);
@@ -273,7 +273,7 @@ bool PhysicX::Initialize()
 	plane->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
 	plane->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 	m_scene->addActor(*plane);
-	planeShape->release();
+	planeShape->release();*/
 
 	//======================================================================
 
@@ -829,15 +829,18 @@ void PhysicX::CreateStaticBody(const TriangleMeshColliderInfo & info, const ECol
 
 void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColliderType & colliderType)
 {
+	//info.heightMep;
+	float worldHeightRange = 500.0f - (-100.0f);
+	float calculatedHeightScale = worldHeightRange / 32767.0f;
 	HeightFieldResource* heightField = new HeightFieldResource(m_physics, info.heightMep, info.numCols,info.numRows);
 	physx::PxHeightField* pxHeightField = heightField->GetHeightField();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField,physx::PxMeshGeometryFlag::eDOUBLE_SIDED), *material, true);
+	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField,physx::PxMeshGeometryFlag::eDOUBLE_SIDED, calculatedHeightScale), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 	
-	DirectX::SimpleMath::Vector3 offsetPosition( info.rowScale * info.numRows * 0.5f,0.0f,- info.colScale * info.numCols * 0.5f);
+	DirectX::SimpleMath::Vector3 offsetPosition( info.rowScale * info.numRows * 0.5f,-100.0f,- info.colScale * info.numCols * 0.5f);
 	const float pi = 3.1415926535f;
 	shape->release();
 	DirectX::SimpleMath::Quaternion offsetRotation = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::UnitZ, pi);

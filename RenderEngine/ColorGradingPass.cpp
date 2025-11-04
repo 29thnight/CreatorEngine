@@ -152,6 +152,11 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
+	if (flagTextureSwap) {
+		SetColorGradingTexture(m_textureFilePath.ToString());
+		flagTextureSwap = false;
+	}
+
 	m_pso->Apply();
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
@@ -263,8 +268,8 @@ void ColorGradingPass::ControlPanel()
 			file::path filepath = PathFinder::Relative("ColorGrading\\") / filename.filename();
 			m_textureFilePath = filepath.string();
 			if (!filename.filename().empty()) {
-				SetColorGradingTexture(filepath.string());
 				setting.textureFilePath = m_textureFilePath.ToString();
+				flagTextureSwap = true;
 			}
 			else {
 				Debug->Log("Empty Color Grading File Name");
@@ -282,7 +287,8 @@ void ColorGradingPass::ApplySettings(const ColorGradingPassSetting& setting)
     isOn = setting.isOn;
     lerp = setting.lerp;
 	m_textureFilePath = setting.textureFilePath;
-	SetColorGradingTexture(m_textureFilePath.ToString());
+	flagTextureSwap = true;
+	//SetColorGradingTexture(m_textureFilePath.ToString());
 }
 
 void ColorGradingPass::SetColorGradingTexture(std::string_view filename)

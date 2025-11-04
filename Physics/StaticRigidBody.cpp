@@ -47,6 +47,10 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 	ConvertVectorDxToPx(pos, transformPx.p);
 	ConvertQuaternionDxToPx(rot, transformPx.q); // 회전 변환
 
+	if (shape->getGeometry().getType() == physx::PxGeometryType::eHEIGHTFIELD) {
+		transformPx.p.y += -100.0f;
+	}
+
 	//CopyMatrixDxToPx(transform, transformPx);
 
 	m_rigidStatic = physics->createRigidStatic(transformPx);
