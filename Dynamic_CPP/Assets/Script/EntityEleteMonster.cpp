@@ -975,7 +975,8 @@ void EntityEleteMonster::Teleport()
 
 void EntityEleteMonster::Dead()
 {
-	hp->GetOwner()->Destroy();
+	if (hp)
+		hp->GetOwner()->Destroy();
 	m_animator->SetParameter("Dead", true);
 	GetOwner()->SetLayer("Water");
 	EntityAsis* asisScrip = m_asis->GetComponentDynamicCast<EntityAsis>();

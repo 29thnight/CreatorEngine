@@ -82,6 +82,13 @@ ReflectionScriptField(Player) \
 		meta_method(PlaySlashEvent3) \
 		meta_method(EndAttackFrame) \
 		meta_method(EndAttackFrameNoCharge) \
+		meta_method(VibChargeHit) \
+		meta_method(VibBombExpolsion) \
+		meta_method(VibKillElete) \
+		meta_method(VibDestroyGate) \
+		meta_method(VibKillBoss) \
+		meta_method(VibPlayerStun) \
+		meta_method(VibKoriStun) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };

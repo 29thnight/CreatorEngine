@@ -30,7 +30,7 @@ public:
 	[[Property]]
 	Mathf::Vector2 screenOffset = { 0.f, -50.f };
 
-	void SetType(int type); //0 집기 1던지기 2초원으로 3 공격
+	void SetType(int type); //0 집기 1던지기 2초원으로 3 공격 4보스로
 private:
 	std::weak_ptr<GameObject> m_target;
 	class RectTransformComponent* m_rect = nullptr;

@@ -41,6 +41,13 @@ void BGMController::Start()
 			m_sound->loop = false;
 		}
 		break;
+	case SceneType::Clear:
+		curSoundName = sounds->GetSoudNameRandom("StageClear");
+		if (m_sound)
+		{
+			m_sound->loop = false;
+		}
+		break;
 	default:
 		//curSoundName = sounds->GetSoudNameRandom("Test");
 		break;
