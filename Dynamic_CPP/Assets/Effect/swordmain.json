@@ -71,7 +71,7 @@
                             "emitterSize": {
                                 "x": 0.0,
                                 "y": 0.0,
-                                "z": 1.0
+                                "z": 0.5
                             },
                             "emitterType": 2,
                             "spawnRate": 10.0
@@ -102,7 +102,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 74.13143920898438,
+                            "currentTime": 93.01250457763672,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -212,7 +212,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 20,
             "modules": [
                 {
@@ -371,7 +371,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 74.13143920898438,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -546,7 +546,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 20,
             "modules": [
                 {
@@ -705,7 +705,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 74.13143920898438,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -880,7 +880,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 20,
             "modules": [
                 {
@@ -1039,7 +1039,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 74.13143920898438,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -1214,7 +1214,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 10,
             "modules": [
                 {
@@ -1296,7 +1296,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 74.13143920898438,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
