@@ -89,7 +89,7 @@ void SpecialBullet::OnTriggerEnter(const Collision& collision)
 				
 
 				
-				bulletInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10  | 1<< 15;
+				bulletInfo.layerMask = 1 << 0 | 1 << 8 | 1 << 10  | 1<< 14;
 				bulletInfo.position = transform.GetWorldPosition();
 				bulletInfo.rotation = transform.GetWorldQuaternion();
 				PhysicsManagers->SphereOverlap(bulletInfo, explosionRadius, hits);

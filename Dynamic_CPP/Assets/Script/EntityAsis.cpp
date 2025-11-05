@@ -110,6 +110,18 @@ void EntityAsis::Start()
 			}
 		}
 	}
+
+	Prefab* IndicatorStunPre = PrefabUtilitys->LoadPrefab("indicatorStun");
+	if (IndicatorStunPre)
+	{
+		//IndicatorStun
+		IndicatorStun = PrefabUtilitys->InstantiatePrefab(IndicatorStunPre, "indicatorStun");
+		GetOwner()->AddChild(IndicatorStun);
+		IndicatorStun->GetComponent<Transform>()->SetScale({11,0.4,11});
+		IndicatorStun->SetEnabled(false);
+
+	}
+
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 
@@ -539,7 +551,10 @@ void EntityAsis::Stun()
 			m_EmoteSound->PlayOneShot();
 		}
 	}
-
+	if (IndicatorStun)
+	{
+		IndicatorStun->SetEnabled(true);
+	}
 
 	auto GMObj = GameObject::Find("GameManager");
 	if (GMObj)
@@ -671,6 +686,10 @@ void EntityAsis::Resurrection()
 	if (m_animator)
 	{
 		m_animator->SetParameter("OnResurrection", true);
+	}
+	if (IndicatorStun)
+	{
+		IndicatorStun->SetEnabled(false);
 	}
 	Heal(ResurrectionHP);
 	isStun = false;

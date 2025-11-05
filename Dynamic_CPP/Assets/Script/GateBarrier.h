@@ -25,4 +25,7 @@ private:
 	GameObject* m_targetObj = nullptr;
 	std::vector<std::weak_ptr<Entity>> m_hosts;
 	std::vector<EntityMonsterBaseGate*> m_targets;
+
+	bool OnEffect = false;
+	void TurnOnEffect();
 };
