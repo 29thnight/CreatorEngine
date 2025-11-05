@@ -640,6 +640,7 @@ void GameManager::LoadPlayerData()
 		}
 	}
 	data->Initialize();
+	ApplyGlobalEnhancementsToAllPlayers(); //TODO::&&&&& 이게 맞는지 확인
 }
 
 void GameManager::BossClear()
