@@ -2209,6 +2209,7 @@ void Player::MeleeAttack()
 
 void Player::Melee1()
 {
+	if (isChargeAttack == true) return;
 	MeleeAttackOnce(180.f, 15.f);
 }
 

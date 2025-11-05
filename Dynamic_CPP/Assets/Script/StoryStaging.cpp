@@ -10,7 +10,9 @@ void StoryStaging::Start()
 
 	int index = 0;
 	for (auto& c : childs) {
-		stagingPositions[index] = GameObject::FindIndex(c)->m_transform.GetWorldPosition();
+		auto g = GameObject::FindIndex(c);
+		stagingPositions[index] = g->m_transform.GetWorldPosition();
+		stagingForward[index] = g->m_transform.GetWorldQuaternion();
 		index++;
 	}
 	auto diaConductorObj = GameObject::Find("MovieModeController");
@@ -62,7 +64,7 @@ void StoryStaging::StartAction()
 		p->StagingStart();
 
 		Mathf::Vector3 playerPos = player->m_transform.GetWorldPosition();
-		Mathf::Vector3 direction = stagingPositions[0] - playerPos;
+		Mathf::Vector3 direction = stagingForward[index];
 		Vector3 right = Vector3::Up.Cross(direction);
 		if (right.LengthSquared() < 0.0001f)
 			right = -Vector3::Right; // fallback for colinear

@@ -20,6 +20,7 @@ ReflectionScriptField(TestMonsterB) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(InDeadAni) \
 		meta_method(ShootingAttack) \
 		meta_method(DeadEvent) \
 	}); \
