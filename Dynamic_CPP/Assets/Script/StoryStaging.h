@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "StoryStaging.generated.h"
 
 class StoryStaging : public ModuleBehavior
 {
 public:
+   ReflectStoryStaging
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(StoryStaging)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -20,8 +23,13 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	[[Property]]
+	int stagingID = 0;
+
 private:
 	std::vector<GameObject*> players;
 	void StartAction();
 	Mathf::Vector3 stagingPositions[2];
+	class LetterboxController* m_letterboxController = nullptr;
+	bool m_actionEnd = false;
 };

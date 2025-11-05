@@ -16,6 +16,8 @@ ReflectionScriptField(LetterboxController) \
 		meta_method(EnterCinemaMode) \
 		meta_method(ExitCinemaMode) \
 		meta_method(TestCinemaMode) \
+		meta_method(Stap1) \
+		meta_method(Stap2) \
 	}); \
 	FieldEnd(LetterboxController, PropertyAndMethod) \
 };
