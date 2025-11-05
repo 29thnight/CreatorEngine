@@ -16,6 +16,7 @@ ReflectionScriptField(EntityMonsterA) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(InDeadAni) \
 		meta_method(DeadEvent) \
 		meta_method(AttackBoxOn) \
 		meta_method(AttackBoxOff) \
