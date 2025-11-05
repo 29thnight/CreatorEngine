@@ -7,6 +7,7 @@ ReflectionScriptField(PlayerObserver) \
 	({ \
 		meta_property(screenOffset) \
 		meta_property(WaitBeforeFade) \
+		meta_property(m_isCinema) \
 	}); \
 	FieldEnd(PlayerObserver, PropertyOnly) \
 };

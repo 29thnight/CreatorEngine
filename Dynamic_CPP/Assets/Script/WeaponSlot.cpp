@@ -36,6 +36,18 @@ void WeaponSlot::Start()
 	
 }
 
+void WeaponSlot::Update(float tick)
+{
+	//if (GetOwner()->IsEnabled())
+	//{
+	//	SetActive(true);
+	//}
+}
+
+void WeaponSlot::OnEnable()
+{
+}
+
 void WeaponSlot::ApplyWeapon(Weapon* weapon)
 {
 	if (!weapon)

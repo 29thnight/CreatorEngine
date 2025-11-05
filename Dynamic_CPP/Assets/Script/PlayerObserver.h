@@ -31,6 +31,8 @@ public:
 	Mathf::Vector2 screenOffset = { 0.f, -70.f };
 	[[Property]]
 	float WaitBeforeFade{ 2.0f }; // 2√  ¥Î±‚
+	[[Property]]
+	bool m_isCinema{};
 
 private:
 	std::weak_ptr<GameObject> m_target;
@@ -40,5 +42,5 @@ private:
 
 	float m_lerpSpeed = 2.0f;
 	float m_elapsedTime = 0.0f;
-	int m_playerIndex = 0;
+	int m_playerIndex = -1;
 };

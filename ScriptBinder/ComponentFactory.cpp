@@ -277,6 +277,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 					for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
 					{
+						if (animationBools.empty()) break;
+
 						animator->m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
 
 						for (auto& event : animationKeyFrameMap[i])

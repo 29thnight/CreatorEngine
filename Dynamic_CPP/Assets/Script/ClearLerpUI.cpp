@@ -47,7 +47,7 @@ void ClearLerpUI::Update(float tick)
             if (m_fadeDuration <= 0.0f)
             {
                 // duration=0이면 즉시 도달
-                m_image->color = Mathf::Vector4{ m_fadeTo.x, m_fadeTo.y, m_fadeTo.z, 1.f };
+                m_image->color = Mathf::Vector4{ m_fadeTo.x, m_fadeTo.y, m_fadeTo.z, m_fadeTo.z };
                 m_fadeRunning = false;
                 m_fadeJustDone = true;
                 OnFadeComplete();
@@ -59,7 +59,7 @@ void ClearLerpUI::Update(float tick)
                 // 필요 시 ease-in/out 교체 가능 (t*t 등)
 
                 auto c = Mathf::Lerp(m_fadeFrom, m_fadeTo, t);
-                m_image->color = Mathf::Vector4{ c.x, c.y, c.z , 1.f };
+                m_image->color = Mathf::Vector4{ c.x, c.y, c.z , c.z };
 
                 if (m_fadeElapsed >= m_fadeDuration)
                 {

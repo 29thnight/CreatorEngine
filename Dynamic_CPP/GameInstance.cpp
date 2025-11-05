@@ -486,3 +486,9 @@ PlayerDir GameInstance::GetPlayerDir(CharType charType) const
 	}
 	return PlayerDir::None;
 }
+
+bool GameInstance::IsCurrentCinemaMode() const
+{
+	// 시네마 모드로 들어갈 씬을 확인해야함
+	return m_isCinemaMode;
+}

@@ -51,6 +51,8 @@ void GameManager::Awake()
 	else {
 		LOG("not assigned weaponPiecePool");
 	}
+
+	GameInstance::GetInstance()->SetSinemaMode(m_isCinemaMode);
 }
 
 void GameManager::Start()
