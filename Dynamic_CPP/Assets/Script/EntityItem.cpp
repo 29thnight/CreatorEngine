@@ -228,7 +228,7 @@ void EntityItem::Update(float tick)
 
 			if (m_rigid)
 			{
-				m_rigid->SetIsTrigger(false);
+				//m_rigid->SetIsTrigger(false);
 				m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 				m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			}
