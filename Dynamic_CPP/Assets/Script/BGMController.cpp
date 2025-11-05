@@ -32,7 +32,7 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("BgmBoss");
 		break;
 	case SceneType::Credits:
-		curSoundName = sounds->GetSoudNameRandom("CreditsBGM");
+		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
 		break;
 	case SceneType::GameOver:
 		curSoundName = sounds->GetSoudNameRandom("GameOver");

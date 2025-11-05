@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TowerTrigger.h"
 #include "DialogueConductor.h"
 #include "PlayerDialogueUI.h"
 #include "LetterboxController.h"

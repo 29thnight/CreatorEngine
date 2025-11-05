@@ -180,7 +180,7 @@ public:
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isChargeAttack = false;
-	float chargeBugTime = 2.2f; //간혈적으로 차지어택이 버그로뜸
+	float chargeBugTime = 1.8f; //간혈적으로 차지어택이 버그로뜸
 	float chargeElapsedTime = 0.f;
 	bool isAttacking = false;
 	float nearDistance = FLT_MAX;
