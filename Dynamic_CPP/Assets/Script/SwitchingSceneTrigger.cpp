@@ -261,6 +261,11 @@ void SwitchingSceneTrigger::Update(float tick)
                     // else: 입력을 기다림 (아무 것도 하지 않음)
                 }
             }
+            else
+            {
+                m_phase = SwitchPhase::FadingOut;
+                m_timer = 0.f;
+            }
         }
         break;
     }

@@ -333,7 +333,10 @@ namespace Meta
             if (method.name == methodName)
             {
                 std::any result = method.invoker(instance, args);
-                if (outResult) *outResult = std::move(result);
+                if (outResult && result.has_value())
+                {
+                    *outResult = std::move(result);
+                }
                 return true;
             }
         }

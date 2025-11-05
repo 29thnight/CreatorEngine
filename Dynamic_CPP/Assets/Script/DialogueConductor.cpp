@@ -2,12 +2,12 @@
 #include "PlayerDialogueUI.h"
 #include "InputManager.h"
 #include "LetterboxController.h"
+#include "Player.h"
 #include "LogSystem.h"
 #include "pch.h"
 
 void DialogueConductor::MaybeStartOrTickAutoExit(float tick)
 {
-
     const bool finished = (m_cursor >= static_cast<int>(m_sequence.size()));
     if (!finished) return;
 
@@ -160,6 +160,36 @@ void DialogueConductor::StepShow()
 
 void DialogueConductor::Update(float tick)
 {
+	static float elapsed = 0.f;
+	constexpr float debugLogInterval = 2.f; // 5초마다 로그
+	if (m_cursor >= static_cast<int>(m_sequence.size()))
+    {
+        elapsed += tick;
+        if (elapsed >= debugLogInterval)
+        {
+            auto p1 = GameObject::Find("1P");
+            if (p1)
+            {
+                auto player1 = p1->GetComponent<Player>();
+                if (player1)
+                {
+                    player1->StagingEnd();
+                }
+            }
+            auto p2 = GameObject::Find("2P");
+            if (p2)
+            {
+                auto player2 = p2->GetComponent<Player>();
+                if (player2)
+                {
+                    player2->StagingEnd();
+                }
+            }
+            elapsed = 0.f;
+		}
+    }
+    
+
     if (IsAnyAJustPressed())
     {
         if (m_cursor < static_cast<int>(m_sequence.size()))

@@ -4,6 +4,7 @@
 #include "ImageComponent.h"
 #include "RectTransformComponent.h"
 #include "InputManager.h"
+#include "GameInstance.h"
 
 void SoundBarUI::Start()
 {
@@ -25,7 +26,8 @@ void SoundBarUI::Start()
     RecalculateBarRange();
 
     // 초기값: 100% 위치에 버튼 놓기 (원하면 0으로 바꿔도 됨)
-    SetVolumePercent(100);
+	int initialPercent = static_cast<int>(std::round(GameInstance::GetInstance()->m_masterVolume * 100.f));
+    SetVolumePercent(initialPercent);
 }
 
 void SoundBarUI::Update(float tick)
@@ -73,7 +75,9 @@ void SoundBarUI::Update(float tick)
             btnPos.x = CalcButtonXFromPercent(m_percent);
 			m_soundBarButtonRect->SetAnchoredPosition(btnPos);
 
-			Sound->setMasterVolume(static_cast<float>(m_percent) / 100.f);
+			GameInstance::GetInstance()->m_masterVolume = static_cast<float>(m_percent) / 100.f;
+
+			Sound->setMasterVolume(GameInstance::GetInstance()->m_masterVolume);
         }
         else
         {

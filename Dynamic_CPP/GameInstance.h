@@ -102,6 +102,7 @@ public:
 	void SetBootstrapCompleted(bool completed) { m_isBootstrapCompleted = completed; }
 
 	bool m_isIngameMenuOpen{ false };
+	float m_masterVolume{ 1.f };
 
 public:
 	//Item BG Color

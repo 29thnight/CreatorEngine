@@ -170,25 +170,6 @@ void LetterboxController::ExitCinemaMode()
         P2_HPBar->SetEnabled(true);
 	}
 
-	auto p1 = GameObject::Find("1P");
-    if (p1)
-    {
-        auto player1 = p1->GetComponent<Player>();
-        if (player1)
-        {
-            player1->StagingEnd();
-        }
-    }
-    auto p2 = GameObject::Find("2P");
-    if (p2)
-    {
-        auto player2 = p2->GetComponent<Player>();
-        if (player2)
-        {
-            player2->StagingEnd();
-        }
-	}
-
 	SetBubbleVisible(false);
 }
 
