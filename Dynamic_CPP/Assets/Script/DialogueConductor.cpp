@@ -19,10 +19,6 @@ void DialogueConductor::MaybeStartOrTickAutoExit(float tick)
         {
             m_exiting = false;
             m_exitTimer = 0.f;
-            if (m_letterbox && autoExitAfterFinish)
-            {
-                m_letterbox->ExitCinemaMode();
-            }
         }
         return;
     }
@@ -160,8 +156,10 @@ void DialogueConductor::StepShow()
 
 void DialogueConductor::Update(float tick)
 {
+    if (m_sequence.empty()) return;
+
 	static float elapsed = 0.f;
-	constexpr float debugLogInterval = 2.f; // 5초마다 로그
+	constexpr float debugLogInterval = 2.f; // 2초 대기
 	if (m_cursor >= static_cast<int>(m_sequence.size()))
     {
         elapsed += tick;
@@ -186,7 +184,14 @@ void DialogueConductor::Update(float tick)
                 }
             }
             elapsed = 0.f;
+
+            ClearSequence();
+            if (m_letterbox)
+            {
+                m_letterbox->ExitCinemaMode();
+            }
 		}
+
     }
     
 

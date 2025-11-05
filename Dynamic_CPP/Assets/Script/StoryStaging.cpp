@@ -53,6 +53,35 @@ void StoryStaging::OnTriggerExit(const Collision& collision)
 	}
 }
 
+void StoryStaging::Update(float tick)
+{
+	if (m_actionEnd) return;
+
+	if (2 <= currentStagingIndex)
+	{
+		if (!m_letterboxController)
+		{
+			auto diaConductorObj = GameObject::Find("MovieModeController");
+			if (diaConductorObj)
+			{
+				m_letterboxController = diaConductorObj->GetComponent<LetterboxController>();
+			}
+		}
+
+		switch (stagingID)
+		{
+		case 0:
+			m_letterboxController->Stap1();
+			break;
+		case 1:
+			m_letterboxController->Stap2();
+			break;
+		};
+
+		m_actionEnd = true;
+	}
+}
+
 void StoryStaging::StartAction()
 {
 	TweenManager* tw = GameObject::Find("GameManager")->GetComponent<TweenManager>();
@@ -109,28 +138,9 @@ void StoryStaging::StartAction()
 			}
 		);
 
-		posTween->SetOnComplete([=]() {
+		posTween->SetOnComplete([=, this]() {
 			p->Staging();
-			if(!m_letterboxController)
-			{
-				auto diaConductorObj = GameObject::Find("MovieModeController");
-				if (diaConductorObj)
-				{
-					m_letterboxController = diaConductorObj->GetComponent<LetterboxController>();
-				}
-			}
-
-			switch (stagingID)
-			{
-			case 0:
-				m_letterboxController->Stap1();
-				break;
-			case 1:
-				m_letterboxController->Stap2();
-				break;
-			};
-
-			m_actionEnd = true;
+			currentStagingIndex++;
 		});
 
 		tw->AddTween(tween);
