@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include "MonoBehaviorRecord.h"
+#include "MonoManager.h"
 
 #include <atomic>
 #include <mutex>
@@ -48,6 +49,10 @@ public:
         if (m_monoInstance != nullptr)
         {
             m_handle = RegisterManagedInstance(m_monoInstance);
+            if (auto* monoManager = MonoManager::GetInstance(); monoManager != nullptr)
+            {
+                monoManager->BindScriptEvents(this);
+            }
         }
     }
 
@@ -98,6 +103,11 @@ private:
     {
         if (m_handle != 0)
         {
+            if (auto* monoManager = MonoManager::GetInstance(); monoManager != nullptr)
+            {
+                monoManager->UnbindScriptEvents(this);
+            }
+
             UnregisterManagedInstance(m_handle);
             m_handle = 0;
         }

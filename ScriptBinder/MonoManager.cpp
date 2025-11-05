@@ -5,9 +5,19 @@
 #include "GameObject_Binding.h"
 #include "Transform_Binding.h"
 #include "RectTransform_Binding.h"
+#include "CSharpScriptComponent.h"
+#include "GameObject.h"
+#include "Scene.h"
+#include "DataSystem.h"
 #include <cassert>
 #include <sstream>
 #include <iostream>
+#include <array>
+#include <string_view>
+#include <optional>
+#include <filesystem>
+#include <utility>
+#include <yaml-cpp/yaml.h>
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/threads.h>
 
@@ -298,5 +308,318 @@ MonoImage* MonoManager::GetImage(const std::string& assemblyName) const
     auto it = m_assemblies.find(assemblyName);
     if (it == m_assemblies.end()) return nullptr;
     return it->second.image;
+}
+
+namespace
+{
+    using EventMapping = std::pair<std::string_view, MonoBehaviorEvent>;
+    constexpr std::array<EventMapping, 8> kSupportedEvents{
+        EventMapping{ "Awake", MonoBehaviorEvent::Awake },
+        EventMapping{ "OnEnable", MonoBehaviorEvent::OnEnable },
+        EventMapping{ "Start", MonoBehaviorEvent::Start },
+        EventMapping{ "FixedUpdate", MonoBehaviorEvent::FixedUpdate },
+        EventMapping{ "Update", MonoBehaviorEvent::Update },
+        EventMapping{ "LateUpdate", MonoBehaviorEvent::LateUpdate },
+        EventMapping{ "OnDisable", MonoBehaviorEvent::OnDisable },
+        EventMapping{ "OnDestroy", MonoBehaviorEvent::OnDestroy },
+    };
+}
+
+std::optional<MonoBehaviorEvent> MonoManager::ToBehaviorEvent(std::string_view name)
+{
+    for (const auto& [eventName, eventType] : kSupportedEvents)
+    {
+        if (eventName == name)
+        {
+            return eventType;
+        }
+    }
+    return std::nullopt;
+}
+
+int MonoManager::ExpectedParameterCount(MonoBehaviorEvent eventType)
+{
+    switch (eventType)
+    {
+    case MonoBehaviorEvent::FixedUpdate:
+    case MonoBehaviorEvent::Update:
+    case MonoBehaviorEvent::LateUpdate:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+void MonoManager::InvokeMonoBehavior(MonoBehaviorHandle handle, MonoMethod* method, void** args, std::string_view eventName) const
+{
+    if (!method)
+    {
+        return;
+    }
+
+    MonoObject* instance = CSharpScriptComponent::ResolveMonoInstance(handle);
+    if (!instance)
+    {
+        return;
+    }
+
+    MonoObject* exception = nullptr;
+    mono_runtime_invoke(method, instance, args, &exception);
+    if (exception)
+    {
+        std::cerr << "[Mono.Exception] " << eventName << ": " << FormatException(exception) << '\n';
+    }
+}
+
+Core::DelegateHandle MonoManager::RegisterEventHandler(Scene* scene,
+    MonoBehaviorHandle handle,
+    MonoMethod* method,
+    MonoBehaviorEvent eventType,
+    std::string_view eventName) const
+{
+    if (!scene || !method)
+    {
+        return {};
+    }
+
+    switch (eventType)
+    {
+    case MonoBehaviorEvent::Awake:
+        return scene->AwakeEvent.AddLambda([this, handle, method, label = std::string(eventName)]()
+        {
+            InvokeMonoBehavior(handle, method, nullptr, label);
+        });
+    case MonoBehaviorEvent::OnEnable:
+        return scene->OnEnableEvent.AddLambda([this, handle, method, label = std::string(eventName)]()
+        {
+            InvokeMonoBehavior(handle, method, nullptr, label);
+        });
+    case MonoBehaviorEvent::Start:
+        return scene->StartEvent.AddLambda([this, handle, method, label = std::string(eventName)]()
+        {
+            InvokeMonoBehavior(handle, method, nullptr, label);
+        });
+    case MonoBehaviorEvent::FixedUpdate:
+        return scene->FixedUpdateEvent.AddLambda([this, handle, method, label = std::string(eventName)](float fixedTick)
+        {
+            void* args[]{ &fixedTick };
+            InvokeMonoBehavior(handle, method, args, label);
+        });
+    case MonoBehaviorEvent::Update:
+        return scene->UpdateEvent.AddLambda([this, handle, method, label = std::string(eventName)](float delta)
+        {
+            void* args[]{ &delta };
+            InvokeMonoBehavior(handle, method, args, label);
+        });
+    case MonoBehaviorEvent::LateUpdate:
+        return scene->LateUpdateEvent.AddLambda([this, handle, method, label = std::string(eventName)](float delta)
+        {
+            void* args[]{ &delta };
+            InvokeMonoBehavior(handle, method, args, label);
+        });
+    case MonoBehaviorEvent::OnDisable:
+        return scene->OnDisableEvent.AddLambda([this, handle, method, label = std::string(eventName)]()
+        {
+            InvokeMonoBehavior(handle, method, nullptr, label);
+        });
+    case MonoBehaviorEvent::OnDestroy:
+        return scene->OnDestroyEvent.AddLambda([this, handle, method, label = std::string(eventName)]()
+        {
+            InvokeMonoBehavior(handle, method, nullptr, label);
+        });
+    }
+
+    return {};
+}
+
+std::optional<std::vector<std::string>> MonoManager::LoadEventList(const CSharpScriptComponent* component) const
+{
+    if (!component)
+    {
+        return std::nullopt;
+    }
+
+    DataSystem* dataSystem = DataSystem::GetInstance();
+    if (!dataSystem)
+    {
+        return std::nullopt;
+    }
+
+    const auto scriptPath = dataSystem->GetFilePath(component->GetScriptGuid());
+    if (scriptPath.empty())
+    {
+        return std::nullopt;
+    }
+
+    auto metaPath = scriptPath;
+    metaPath += ".meta";
+    if (!std::filesystem::exists(metaPath))
+    {
+        return std::nullopt;
+    }
+
+    YAML::Node scriptNode = YAML::LoadFile(metaPath.string());
+    const YAML::Node eventsNode = scriptNode["eventRegisterSetting"];
+    if (!eventsNode || !eventsNode.IsSequence())
+    {
+        return std::nullopt;
+    }
+
+    std::vector<std::string> events;
+    events.reserve(eventsNode.size());
+    for (const auto& node : eventsNode)
+    {
+        if (!node.IsScalar())
+        {
+            continue;
+        }
+        events.emplace_back(node.as<std::string>());
+    }
+
+    if (events.empty())
+    {
+        return std::nullopt;
+    }
+
+    return events;
+}
+
+void MonoManager::BindScriptEvents(CSharpScriptComponent* component)
+{
+    if (!component || !component->HasManagedInstance())
+    {
+        return;
+    }
+
+    UnbindScriptEvents(component);
+
+    GameObject* owner = component->GetOwner();
+    if (!owner)
+    {
+        return;
+    }
+
+    Scene* scene = owner->GetScene();
+    if (!scene)
+    {
+        return;
+    }
+
+    auto eventsOpt = LoadEventList(component);
+    if (!eventsOpt)
+    {
+        return;
+    }
+
+    MonoObject* instance = component->GetMonoInstance();
+    if (!instance)
+    {
+        return;
+    }
+
+    MonoClass* klass = mono_object_get_class(instance);
+    if (!klass)
+    {
+        return;
+    }
+
+    MonoBehaviorRecord record{};
+    record.id = component->GetBehaviorHandle();
+    record.instance = instance;
+
+    for (const auto& eventName : *eventsOpt)
+    {
+        auto eventType = ToBehaviorEvent(eventName);
+        if (!eventType)
+        {
+            continue;
+        }
+
+        MonoMethod* method = mono_class_get_method_from_name(klass, eventName.c_str(), ExpectedParameterCount(*eventType));
+        if (!method)
+        {
+            continue;
+        }
+
+        Core::DelegateHandle handle = RegisterEventHandler(scene, record.id, method, *eventType, eventName);
+        if (!handle.IsValid())
+        {
+            continue;
+        }
+
+        record.events.push_back({ method, handle, *eventType });
+    }
+
+    if (record.events.empty())
+    {
+        return;
+    }
+
+    std::scoped_lock lock{ m_behaviorMutex };
+    m_behaviorRecords[component] = std::move(record);
+}
+
+void MonoManager::UnbindScriptEvents(CSharpScriptComponent* component)
+{
+    if (!component)
+    {
+        return;
+    }
+
+    MonoBehaviorRecord record{};
+    {
+        std::scoped_lock lock{ m_behaviorMutex };
+        auto it = m_behaviorRecords.find(component);
+        if (it == m_behaviorRecords.end())
+        {
+            return;
+        }
+
+        record = std::move(it->second);
+        m_behaviorRecords.erase(it);
+    }
+
+    GameObject* owner = component->GetOwner();
+    Scene* scene = owner ? owner->GetScene() : nullptr;
+    if (!scene)
+    {
+        return;
+    }
+
+    for (auto& pair : record.events)
+    {
+        if (!pair.handle.IsValid())
+        {
+            continue;
+        }
+
+        switch (pair.event)
+        {
+        case MonoBehaviorEvent::Awake:
+            scene->AwakeEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::OnEnable:
+            scene->OnEnableEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::Start:
+            scene->StartEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::FixedUpdate:
+            scene->FixedUpdateEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::Update:
+            scene->UpdateEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::LateUpdate:
+            scene->LateUpdateEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::OnDisable:
+            scene->OnDisableEvent -= pair.handle;
+            break;
+        case MonoBehaviorEvent::OnDestroy:
+            scene->OnDestroyEvent -= pair.handle;
+            break;
+        }
+    }
 }
 #endif // UNUSE_MONO_LIB

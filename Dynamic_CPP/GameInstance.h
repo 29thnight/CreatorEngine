@@ -102,8 +102,8 @@ public:
 	void SetBootstrapCompleted(bool completed) { m_isBootstrapCompleted = completed; }
 
 	bool m_isIngameMenuOpen{ false };
-	float m_masterVolume{ 1.f };
-
+	float GetSoundPercent() { return SoundPercent; }
+	void  SetSoundPercent(float _percent) { SoundPercent = _percent; }
 public:
 	//Item BG Color
 	Mathf::Color4									CommonItemColor{ 1.f, 1.f, 1.f, 1.f };
@@ -115,7 +115,7 @@ private:
 	int												m_RewardAmount{};
 	bool											m_isLoadSceneComplete{ false };
 	bool											m_isInitialize{ false };
-
+	float                                           SoundPercent = 100.f;
 private:
 	// 로딩 이후 전환 씬 인덱스 관리용
 	int												m_beyondSceneIndex{ 0 };
