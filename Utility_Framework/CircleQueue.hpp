@@ -23,7 +23,7 @@ public:
     // 이는 큐가 가득 찼는지 (head == tail && count == capacity - 1)와
     // 큐가 비었는지 (head == tail && count == 0)를 구분하기 위함입니다.
     explicit CircularQueue(int size) :
-        capacity(size + 1), // 큐가 가득 찼을 때 한 칸을 비워두기 위해 +1
+        capacity(size), // 큐가 가득 찼을 때 한 칸을 비워두기 위해 +1
         arr(size),
         head(0),
         tail(0),
@@ -40,7 +40,7 @@ public:
             throw std::overflow_error("Queue is full. Cannot enqueue item.");
         }
         arr[tail] = item;
-        tail = (tail + 1) % capacity;
+        tail = (tail + 1) % (capacity - 1);
         count++;
     }
 
@@ -56,7 +56,7 @@ public:
         else {
             arr[head] = T();
         }
-        head = (head + 1) % capacity;
+        head = (head + 1) % (capacity - 1);
         count--;
         return item;
     }
@@ -104,7 +104,7 @@ public:
         // 기존 큐의 요소들을 새로운 배열로 복사 (순서 유지)
         // head부터 count만큼의 요소를 순서대로 복사
         for (int i = 0; i < count; ++i) {
-            newArr[i] = std::move(arr[(head + i) % capacity]); // move semantic 적용
+            newArr[i] = std::move(arr[(head + i) % (capacity - 1)]); // move semantic 적용
             newCount++;
         }
 
