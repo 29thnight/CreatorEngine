@@ -2005,14 +2005,20 @@ void Player::StagingStart()
 	ChangeState("staging");
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->Move({ 0 ,0 });
-	m_animator->SetParameter("OnMove", false);
+	m_animator->SetParameter("OnMove", true);
 
 	// tween로
+}
+
+void Player::Staging()
+{
+	m_animator->SetParameter("OnMove", false);
 }
 
 void Player::StagingEnd()
 {
 	ChangeState("Idle");
+	m_animator->SetParameter("OnMove", false);
 }
 
 void Player::Cancancel()

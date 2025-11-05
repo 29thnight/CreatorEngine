@@ -58,6 +58,7 @@ ReflectionScriptField(Player) \
 		meta_method(AddMeleeWeapon) \
 		meta_method(DeleteCurWeapon) \
 		meta_method(StagingStart) \
+		meta_method(Staging) \
 		meta_method(StagingEnd) \
 		meta_method(Move, "dir") \
 		meta_method(PlaySoundStep) \
