@@ -229,7 +229,6 @@ void EntityItem::Update(float tick)
 			if (m_rigid)
 			{
 				//m_rigid->SetIsTrigger(false);
-				m_rigid->UseGravity(false);
 				m_rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 				m_rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			}
@@ -272,7 +271,7 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::DROPPED;
 	timer = 0.f;
-	speed = 2.0f;
+	speed = 4.0f;
 	Mathf::Vector3 offset = {ownerForward.x * distance.x,0, ownerForward.z * distance.x };
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
@@ -298,7 +297,6 @@ void EntityItem::Throw(Player* player,Mathf::Vector3 ownerForward,Mathf::Vector2
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::THROWN;
 	timer = 0.f;
-	speed = 2.0f;
 	Mathf::Vector3 offset = {ownerForward.x * distance.x,0, ownerForward.z * distance.x};
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
