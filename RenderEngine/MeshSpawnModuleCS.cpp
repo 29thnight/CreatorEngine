@@ -1,4 +1,5 @@
 ﻿// MeshSpawnModuleCS.cpp - emitterPosition 추가
+#include "Model.h"
 #include "MeshSpawnModuleCS.h"
 #include "ShaderSystem.h"
 #include "EffectSerializer.h"
@@ -16,6 +17,14 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     , m_uniform(0.0f, 1.0f)
     , m_forcePositionUpdate(false)
     , m_forceRotationUpdate(false)
+    , m_meshVertexBuffer(nullptr)
+    , m_meshVertexSRV(nullptr)
+    , m_meshIndexBuffer(nullptr)
+    , m_meshIndexSRV(nullptr)
+    , m_meshInfoBuffer(nullptr)
+    , m_model(nullptr)
+    , m_meshIndex(0)
+    , m_meshInfoDirty(true)
 {
     // 스폰 파라미터 기본값
     m_spawnParams.spawnRate = 1.0f;
@@ -53,6 +62,11 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
 
     m_originalEmitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
     m_originalParticleScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
+
+    m_meshInfo.vertexCount = 0;
+    m_meshInfo.indexCount = 0;
+    m_meshInfo.meshSpawnMode = 0;
+    m_meshInfo.meshScale = 1.0f;
 }
 
 MeshSpawnModuleCS::~MeshSpawnModuleCS()
@@ -135,12 +149,16 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
 
     // 상수 버퍼 바인딩
-    ID3D11Buffer* constantBuffers[] = { m_spawnParamsBuffer, m_templateBuffer };
-    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 2, constantBuffers);
+    ID3D11Buffer* constantBuffers[] = { m_spawnParamsBuffer, m_templateBuffer, m_meshInfoBuffer };
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 3, constantBuffers);
 
     // 입력 리소스 바인딩
-    ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
-    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
+    ID3D11ShaderResourceView* srvs[] = {
+           m_inputSRV,
+           m_meshVertexSRV,
+           m_meshIndexSRV
+    };
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 3, srvs);
 
     // 출력 리소스 바인딩
     ID3D11UnorderedAccessView* uavs[] = {
@@ -158,11 +176,11 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
     DirectX11::DeviceStates->g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
 
-    ID3D11ShaderResourceView* nullSRVs[] = { nullptr };
-    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 1, nullSRVs);
+    ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr, nullptr };
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetShaderResources(0, 3, nullSRVs);
 
-    ID3D11Buffer* nullBuffers[] = { nullptr, nullptr };
-    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 2, nullBuffers);
+    ID3D11Buffer* nullBuffers[] = { nullptr, nullptr, nullptr };
+    DirectX11::DeviceStates->g_pDeviceContext->CSSetConstantBuffers(0, 3, nullBuffers);
 
     DirectX11::DeviceStates->g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
@@ -273,6 +291,18 @@ bool MeshSpawnModuleCS::CreateConstantBuffers()
     if (FAILED(hr))
         return false;
 
+    D3D11_BUFFER_DESC meshInfoDesc = {};
+    meshInfoDesc.ByteWidth = sizeof(MeshInfo);
+    meshInfoDesc.Usage = D3D11_USAGE_DYNAMIC;
+    meshInfoDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    meshInfoDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = DirectX11::DeviceStates->g_pDevice->CreateBuffer(&meshInfoDesc, nullptr, &m_meshInfoBuffer);
+    if (FAILED(hr))
+        return false;
+
+    return true;
+
     return true;
 }
 
@@ -349,6 +379,15 @@ void MeshSpawnModuleCS::ReleaseResources()
     if (m_templateBuffer) { m_templateBuffer->Release(); m_templateBuffer = nullptr; }
     if (m_randomStateBuffer) { m_randomStateBuffer->Release(); m_randomStateBuffer = nullptr; }
     if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
+}
+
+void MeshSpawnModuleCS::ExtractMeshDataFromModel()
+{
+}
+
+void MeshSpawnModuleCS::CreateMeshBuffers(const std::vector<XMFLOAT3>& vertices, const std::vector<UINT>& indices)
+{
+
 }
 
 // emitterPosition 설정 메서드 추가
@@ -522,6 +561,18 @@ void MeshSpawnModuleCS::SetParticleRandomRotation(const XMFLOAT3& rotation)
 {
     m_meshParticleTemplate.particleRandomRotation = rotation;
     m_templateDirty = true;
+}
+
+void MeshSpawnModuleCS::SetMeshModel(Model* model, int meshIndex)
+{
+}
+
+void MeshSpawnModuleCS::SetMeshSpawnMode(UINT mode)
+{
+}
+
+void MeshSpawnModuleCS::SetMeshScale(float scale)
+{
 }
 
 nlohmann::json MeshSpawnModuleCS::SerializeData() const

@@ -23,6 +23,15 @@ struct alignas(16) MeshParticleTemplateParams
 	float3 particleRandomRotation;
 };
 
+struct MeshInfo
+{
+	UINT vertexCount;
+	UINT indexCount;
+	UINT meshSpawnMode; // 0: 버텍스, 1: 모서리, 2: 표면
+	float meshScale;
+};
+
+class Model;
 class MeshSpawnModuleCS : public ParticleModule , public ISerializable
 {
 private:
@@ -58,6 +67,17 @@ private:
 
 	XMFLOAT3 m_originalEmitterSize;
 	XMFLOAT3 m_originalParticleScale;
+
+	ID3D11Buffer* m_meshVertexBuffer;
+	ID3D11ShaderResourceView* m_meshVertexSRV;
+	ID3D11Buffer* m_meshIndexBuffer;
+	ID3D11ShaderResourceView* m_meshIndexSRV;
+	ID3D11Buffer* m_meshInfoBuffer;
+
+	Model* m_model;
+	int m_meshIndex;
+	MeshInfo m_meshInfo;
+	bool m_meshInfoDirty;
 public:
 	MeshSpawnModuleCS();
 	virtual ~MeshSpawnModuleCS();
@@ -105,7 +125,9 @@ public:
 	}
 	bool IsAllowNewSpawn() const { return m_allowNewSpawn; }
 
-	// 직렬화
+	void SetMeshModel(Model* model, int meshIndex = 0);
+	void SetMeshSpawnMode(UINT mode);
+	void SetMeshScale(float scale);
 public:
 
 	virtual nlohmann::json SerializeData() const override;
@@ -118,4 +140,6 @@ private:
 	bool CreateUtilityBuffers();      // 동일
 	void UpdateConstantBuffers(float deltaTime);  // 동일
 	void ReleaseResources();          // 동일
+	void ExtractMeshDataFromModel();
+	void CreateMeshBuffers(const std::vector<XMFLOAT3>& vertices, const std::vector<UINT>& indices);
 };
