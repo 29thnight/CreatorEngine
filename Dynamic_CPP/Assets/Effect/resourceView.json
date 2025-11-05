@@ -1,6 +1,9 @@
 {
     "currentTime": 0.0,
     "duration": -1.0,
+    "emitterTimings": [
+        0.0
+    ],
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
@@ -108,7 +111,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 454.8905029296875,
+                            "currentTime": 17.957685470581055,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -242,7 +245,7 @@
                         },
                         "shaders": {
                             "pixelShader": "BillBoard",
-                            "vertexShader": "BillBoard"
+                            "vertexShader": "BillBoradUniquePos"
                         },
                         "textures": [
                             {
