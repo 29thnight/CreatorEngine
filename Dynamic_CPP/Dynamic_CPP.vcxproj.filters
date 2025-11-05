@@ -684,6 +684,9 @@
 		<ClInclude Include="Assets\Script\DialogueConductor.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\StoryStaging.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -1266,6 +1269,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\DialogueConductor.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\StoryStaging.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

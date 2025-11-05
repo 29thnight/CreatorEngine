@@ -169,7 +169,7 @@ void EntityMonsterA::Start()
 			m_tutorialUi->Init();
 			m_tutorialUi->SetType(3);
 			m_tutorialUi->SetTarget(GetOwner()->shared_from_this());
-			m_tutorialUi->screenOffset = { 0, -70.f };
+			m_tutorialUi->screenOffset = { 0, -80.f };
 
 		}
 	}

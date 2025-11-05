@@ -387,7 +387,8 @@ void Player::Start()
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 
-
+	BitFlag stagingBit;
+	playerState["staging"] = stagingBit;
 
 	Prefab* SlashPrefab = PrefabUtilitys->LoadPrefab("SlashEffect1");
 	if (SlashPrefab)
@@ -1997,6 +1998,27 @@ void Player::InstantiateWeaponMaterial(GameObject* g)
 	for (auto& m : mesh) {
 		m->m_Material = m->m_Material->Instantiate(m->m_Material, "cloneWeapon");
 	}
+}
+
+void Player::StagingStart()
+{
+	ChangeState("staging");
+	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->Move({ 0 ,0 });
+	m_animator->SetParameter("OnMove", true);
+
+	// tween로
+}
+
+void Player::Staging()
+{
+	m_animator->SetParameter("OnMove", false);
+}
+
+void Player::StagingEnd()
+{
+	ChangeState("Idle");
+	m_animator->SetParameter("OnMove", false);
 }
 
 void Player::Cancancel()

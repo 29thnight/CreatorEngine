@@ -110,6 +110,18 @@ void EntityAsis::Start()
 			}
 		}
 	}
+
+	Prefab* IndicatorStunPre = PrefabUtilitys->LoadPrefab("indicatorStun");
+	if (IndicatorStunPre)
+	{
+		//IndicatorStun
+		IndicatorStun = PrefabUtilitys->InstantiatePrefab(IndicatorStunPre, "indicatorStun");
+		GetOwner()->AddChild(IndicatorStun);
+		IndicatorStun->GetComponent<Transform>()->SetScale({11,0.4,11});
+		IndicatorStun->SetEnabled(false);
+
+	}
+
 	m_maxHP = maxHP;
 	m_currentHP = m_maxHP;
 
@@ -152,7 +164,7 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 		auto owner = item->GetThrowOwner();
 		if (owner) {
 			bool result = AddItem(item);
-			item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
+			//item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
 			if (!result) {
 				// 획득을 실패했을 때.
 			}
@@ -174,7 +186,7 @@ void EntityAsis::OnTriggerStay(const Collision& collision)
 		if (owner) {
 			bool result = AddItem(item);
 			item->canEat = false;
-			item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
+			//item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
 			if (!result) {
 				// 획득을 실패했을 때.
 			}
@@ -390,7 +402,7 @@ void EntityAsis::Purification(float tick)
 
 	// 큐에 있는 아이템들 회전연출
 	auto& arr = m_EntityItemQueue.getArray();
-	int size = arr.size();
+	int size = maxTailCapacity;
 	for (int i = 0; i < size; i++) {
 		if (arr[i] == nullptr) continue; // nullptr 체크
 		float orbitAngle = m_purificationAngle + XM_PI * 2.f * i / 3.f;
@@ -401,7 +413,6 @@ void EntityAsis::Purification(float tick)
 		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
 		arr[i]->GetComponent<RigidBodyComponent>()->SetLinearVelocity(Mathf::Vector3::Zero);
 		arr[i]->GetOwner()->m_transform.SetPosition(finalPos);
-		i++;
 	}
 
 	// 꼬리에 아이템이 있다면 정화를 진행.
@@ -539,7 +550,10 @@ void EntityAsis::Stun()
 			m_EmoteSound->PlayOneShot();
 		}
 	}
-
+	if (IndicatorStun)
+	{
+		IndicatorStun->SetEnabled(true);
+	}
 
 	auto GMObj = GameObject::Find("GameManager");
 	if (GMObj)
@@ -671,6 +685,10 @@ void EntityAsis::Resurrection()
 	if (m_animator)
 	{
 		m_animator->SetParameter("OnResurrection", true);
+	}
+	if (IndicatorStun)
+	{
+		IndicatorStun->SetEnabled(false);
 	}
 	Heal(ResurrectionHP);
 	isStun = false;

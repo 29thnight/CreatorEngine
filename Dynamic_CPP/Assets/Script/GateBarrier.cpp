@@ -45,16 +45,17 @@ void GateBarrier::Start()
 				{
 					m_targets.push_back(gate);
 					gate->invincibility = true;
-					gate->m_barrierEffet->Apply();
 					//gate 들 결계이펙트  켜기 and 무적켜기
 				}
 			}
 		}
+
 	}
 }
 
 void GateBarrier::Update(float tick)
 {
+	TurnOnEffect();
 	if (m_targets.empty()) return;
 	bool active = false;
 
@@ -71,14 +72,31 @@ void GateBarrier::Update(float tick)
 	}
 	if (active == false)  //호스트가 다죽었으면
 	{
-		for (auto& target : m_targets)
+		for (auto& gate : m_targets)
 		{
 			//게이트 결계끄기 and 무적끄기
-			target->invincibility = false;
-			target->m_barrierEffet->StopEffect();
+			gate->invincibility = false;
+			if (gate->m_barrierEffet)
+			{
+				gate->m_barrierEffet->StopEffect();
+			}
 
 		}
 		m_targets.clear(); //일단 스포너 안지우고 비워서 업데이트만 안돌게 
 	}
+}
+
+void GateBarrier::TurnOnEffect()
+{
+	if (OnEffect == true) return;
+
+	for (auto gate : m_targets)
+	{
+		if (gate->m_barrierEffet)
+		{
+			gate->m_barrierEffet->Apply();
+		}
+	}
+	OnEffect = true;
 }
 

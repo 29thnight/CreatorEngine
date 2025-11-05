@@ -6,6 +6,7 @@
 #include "DialogueConductor.h"
 #include "PlayerDialogueUI.h"
 #include "LetterboxController.h"
+#include "StoryStaging.h"
 #include "PlayerObserver.h"
 #include "BackGroundEffect.h"
 #include "TutorialUI.h"

@@ -130,10 +130,10 @@ private:
 	std::mutex smartIdMutex;
 
 	// 풀 설정 상수
-	static const int DEFAULT_POOL_SIZE = 50;
+	static const int DEFAULT_POOL_SIZE = 200;
 	static const int MAX_PARTICLES_PER_SYSTEM = 10000;
-	int maxPoolSize = 100;                              // 런타임 변경 가능
-	static const int MAX_ACTIVE_EFFECTS = 200;          // 활성 이펙트 최대 개수
+	int maxPoolSize = 400;                              // 런타임 변경 가능
+	static const int MAX_ACTIVE_EFFECTS = 500;          // 활성 이펙트 최대 개수
 	static constexpr float FORCE_CLEANUP_TIME = 1200.0f;      // 강제 정리 시간 (초)
 
 	// 메모리 추적
