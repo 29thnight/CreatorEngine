@@ -61,7 +61,10 @@ void TBoss1::Start()
 
 	}
 
+	Transform* tr=m_pOwner->GetComponent<Transform>();
+	Mathf::Vector3 pos = tr->GetWorldPosition();
 	m_decalobj = GameObject::Find("Boss_decal");
+	m_decalobj->GetComponent<Transform>()->SetPosition(pos);
 	
 	if (m_criticalMark == nullptr)
 	{
@@ -479,6 +482,7 @@ void TBoss1::MoveToChunsik(float tick)
 					//보스 위치 변경
 					m_pOwner->GetComponent<Transform>()->SetWorldPosition(ProtrudePos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
 					//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
+					m_decalobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
 					protrudeIndicatorobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
 					float timescale = 1 / indisettime;
 					protrudeIndicatorobj->GetComponent<EffectComponent>()->SetTimeScale(timescale);
@@ -515,6 +519,7 @@ void TBoss1::BurrowMove(float tick)
 					//보스 위치 변경
 					m_pOwner->GetComponent<Transform>()->SetWorldPosition(ProtrudePos); //해당 위치에서 모션만 보여주고 바로 콜라이더 활성화
 					//인디케이터 필요 ==> 해당 위치에 인디케이터 생성 후 잠시 대기 후 튀어나오기
+					m_decalobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
 					protrudeIndicatorobj->GetComponent<Transform>()->SetPosition(ProtrudePos);
 					float timescale = 1 / indisettime;
 					protrudeIndicatorobj->GetComponent<EffectComponent>()->SetTimeScale(timescale);
