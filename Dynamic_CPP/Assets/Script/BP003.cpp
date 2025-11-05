@@ -148,7 +148,9 @@ void BP003::Explosion()
 	Prefab* ExplosionEff = nullptr;
 	ExplosionEff = PrefabUtilitys->LoadPrefab("BossExplosion");
 	GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(ExplosionEff, "entityItem");
-	itemObj->GetComponent<Transform>()->SetWorldPosition(pos);
+	Transform* tr = itemObj->GetComponent<Transform>();
+	tr->SetScale({ m_radius * 0.6f ,1 ,m_radius * 0.6f });
+	tr->SetWorldPosition(pos);
 	itemObj->GetComponent<EffectComponent>()->Apply();
 
 

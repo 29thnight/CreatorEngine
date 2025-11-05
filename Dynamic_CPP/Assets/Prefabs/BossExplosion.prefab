@@ -1,11 +1,11 @@
 m_name: BossExplosion_Prefab
-m_instanceID: 3643717364
+m_instanceID: 3374440886
 m_isEnabled: true
 m_fileGuid: d262320b-681f-599d-b3a6-76ca216ef8ef
 PrefabNode:
   - GameObject: 2166264123
     m_name: BossExplosion
-    m_instanceID: 822555310
+    m_instanceID: 513265587
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -24,7 +24,7 @@ PrefabNode:
     m_components:
       - EffectComponent: 3131036541
         m_name: EffectComponent
-        m_instanceID: 2205211184
+        m_instanceID: 3030725840
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_effectTemplateName: pat13
@@ -34,7 +34,7 @@ PrefabNode:
         m_isPaused: false
         m_loop: false
         m_useAbsolutePosition: false
-        m_currentTime: 1.00633645
-        m_effectInstanceName: explosion1_obj1487449083
+        m_currentTime: 1.00296688
+        m_effectInstanceName: pat13_obj513265587
     m_gameObjectType: 0
     m_isStatic: false

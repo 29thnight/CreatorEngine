@@ -1382,20 +1382,7 @@ void TBoss1::SelectTarget()
 	}
 
 
-	//2P만 존재 하는 경우가 있을까? --> 이건 나중에 생각하자
-	//아니라면 둘이 선택되었던 횟수 비교
-	if (p1Count != p2Count)
-	{
-		if (p1Count < p2Count) {
-			m_target = Player1;
-			p1Count++;
-		}
-		else {
-			m_target = Player2;
-			p2Count++;
-		}
-		return;
-	}
+	
 
 	//코인토스 이전에 스턴 상태인지 확인
 	//우선 둘 다 스턴 상태인지 확인 
@@ -1428,6 +1415,21 @@ void TBoss1::SelectTarget()
 	}
 	
 	//둘다 스턴 혹은 아니라면 코인토스 진행
+	
+	//아니라면 둘이 선택되었던 횟수 비교
+	if (p1Count != p2Count)
+	{
+		if (p1Count < p2Count) {
+			m_target = Player1;
+			p1Count++;
+		}
+		else {
+			m_target = Player2;
+			p2Count++;
+		}
+		return;
+	}
+
 
 
 	//횟수가 같다면?

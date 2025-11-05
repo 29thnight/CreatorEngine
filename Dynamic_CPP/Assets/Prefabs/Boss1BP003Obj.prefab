@@ -1,11 +1,11 @@
 m_name: Boss1BP003Obj_Prefab
-m_instanceID: 2065237880
+m_instanceID: 1603848086
 m_isEnabled: true
 m_fileGuid: 8aa3dda2-6225-542b-947c-95702283deb2
 PrefabNode:
   - GameObject: 2166264123
     m_name: Boss1BP003Obj
-    m_instanceID: 2840140798
+    m_instanceID: 1756540852
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -24,13 +24,13 @@ PrefabNode:
     m_components:
       - ModuleBehavior: 1399118904
         m_name: BP003
-        m_instanceID: 2468509382
+        m_instanceID: 343597338
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 6791f382-8661-55ff-83c7-781945783428
       - EffectComponent: 3131036541
         m_name: EffectComponent
-        m_instanceID: 3842969065
+        m_instanceID: 2325872213
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_effectTemplateName: pat2
@@ -47,11 +47,11 @@ PrefabNode:
     children:
       - GameObject: 2166264123
         m_name: BossBomb
-        m_instanceID: 2062095174
+        m_instanceID: 2646250322
         m_isEnabled: true
         m_attachedSoketID: 0
         m_transform:
-          position: {x: 0, y: 0, z: 0, w: 1}
+          position: {x: 0, y: 0.100000001, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
           m_parentID: 1
@@ -66,11 +66,11 @@ PrefabNode:
         m_components:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
-            m_instanceID: 2118947974
+            m_instanceID: 2837632219
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
-              m_name: weapon_bomb_re2
+              m_name: clonebomb_Clone7
               m_baseColorTexName: Weapon_bomb_low_DefaultMaterial_BaseColor.png
               m_normalTexName: Weapon_bomb_low_DefaultMaterial_Normal.png
               m_ORM_TexName: Weapon_bomb_low_DefaultMaterial_OcclusionRoughnessMetallic.png
