@@ -509,7 +509,7 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 
 	// ParticleSystem 积己 (弥措 备己)
 	auto particleSystem = std::make_shared<ParticleSystem>(
-		MAX_PARTICLES_PER_SYSTEM,
+		1,
 		ParticleDataType::Mesh
 	);
 
