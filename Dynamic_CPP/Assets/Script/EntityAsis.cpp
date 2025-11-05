@@ -164,7 +164,7 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 		auto owner = item->GetThrowOwner();
 		if (owner) {
 			bool result = AddItem(item);
-			//item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
+			item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
 			if (!result) {
 				// »πµÊ¿ª Ω«∆–«ﬂ¿ª ∂ß.
 			}
@@ -186,7 +186,7 @@ void EntityAsis::OnTriggerStay(const Collision& collision)
 		if (owner) {
 			bool result = AddItem(item);
 			item->canEat = false;
-			//item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
+			item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
 			if (!result) {
 				// »πµÊ¿ª Ω«∆–«ﬂ¿ª ∂ß.
 			}

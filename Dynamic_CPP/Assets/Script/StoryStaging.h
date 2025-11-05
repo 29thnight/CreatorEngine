@@ -24,4 +24,5 @@ private:
 	std::vector<GameObject*> players;
 	void StartAction();
 	Mathf::Vector3 stagingPositions[2];
+	Mathf::Vector3 stagingForward[2];
 };
