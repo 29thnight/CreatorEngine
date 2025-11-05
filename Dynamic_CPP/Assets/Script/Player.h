@@ -75,6 +75,12 @@ public:
 	void UpdateSwapWeaponFlash(float tick);
 	void InstantiateWeaponMaterial(GameObject* g);
 
+	// 연출 시 호출
+	[[Method]]
+	void StagingStart();
+	[[Method]]
+	void StagingEnd();
+
 	//플레이어 기본
 	[[Property]]
 	int playerIndex = 0;
