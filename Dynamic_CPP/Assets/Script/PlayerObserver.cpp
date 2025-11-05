@@ -4,6 +4,7 @@
 #include "Camera.h"
 #include "ImageComponent.h"
 #include "Entity.h"
+#include "GameInstance.h"
 #include "pch.h"
 void PlayerObserver::Start()
 {
@@ -13,14 +14,22 @@ void PlayerObserver::Start()
 		m_image->color.w = 1.0f;
 
 	m_elapsedTime = 0.0f;
+
+	m_isCinema = GameInstance::GetInstance()->IsCurrentCinemaMode();
 }
 
 void PlayerObserver::Update(float tick)
 {
     if (m_target.expired() || nullptr == m_rect || nullptr == m_image)
     {
-        GetOwner()->Destroy();
         return;
+    }
+
+    if (m_isCinema)
+    {
+        // 시네마 모드면 화면 밖으로 이동
+        m_rect->SetAnchoredPosition({ -10000.f, -10000.f });
+		return;
     }
 
     m_elapsedTime += tick;

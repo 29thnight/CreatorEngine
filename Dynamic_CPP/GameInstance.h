@@ -48,6 +48,9 @@ public:
 	void ResumeGame();
 	void ExitGame();
 
+	bool IsCurrentCinemaMode() const;
+	void SetSinemaMode(bool cinema) { m_isCinemaMode = cinema; }
+
 public:
 	// Input Device Management
 	void SetPlayerInputDevice(int playerIndex, CharType charType, PlayerDir dir);
@@ -142,6 +145,7 @@ private:
 	// Game Setting
 	bool											m_isViveEnabled{ true };
 	bool											m_isBootstrapCompleted{ false };
+	bool 											m_isCinemaMode{ false };
 };
 
 template<ItemEnhancementType T>

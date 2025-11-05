@@ -79,6 +79,8 @@ public:
 	[[Method]]
 	void StagingStart();
 	[[Method]]
+	void Staging();
+	[[Method]]
 	void StagingEnd();
 
 	//플레이어 기본

@@ -58,6 +58,8 @@ public:
 	int			m_nextSceneIndex{ 0 };
 	[[Property]]
 	bool		m_isTestReward{ false };
+	[[Property]]
+	bool		m_isCinemaMode{ false };
 	bool		m_isLoadingReq{ false };
 	bool		startSelectTimer{ false };
 	bool		m_isSwitching = false;

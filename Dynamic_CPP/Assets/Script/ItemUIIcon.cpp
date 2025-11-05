@@ -12,9 +12,12 @@
 #include "SFXPoolManager.h"
 void ItemUIIcon::Start()
 {
-	m_rect = m_pOwner->GetComponent<RectTransformComponent>();
-	m_image = m_pOwner->GetComponent<ImageComponent>();
-	m_rect->SetSizeDelta({ 80.f, 80.f });
+	if (!m_rect || !m_image)
+    {
+        m_rect = m_pOwner->GetComponent<RectTransformComponent>();
+        m_image = m_pOwner->GetComponent<ImageComponent>();
+	    m_rect->SetSizeDelta({ 80.f, 80.f });
+    }
 
 
 	auto gmObj = GameObject::Find("GameManager");
@@ -224,6 +227,13 @@ void ItemUIIcon::SetItemID(int id)
 void ItemUIIcon::SetItemEnhancement(int id)
 {
 	itemTypeID = id;
+    if (!m_rect || !m_image)
+    {
+        m_rect = m_pOwner->GetComponent<RectTransformComponent>();
+        m_image = m_pOwner->GetComponent<ImageComponent>();
+        m_rect->SetSizeDelta({ 80.f, 80.f });
+    }
+
     if (m_image && 0 < itemTypeID)
     {
         constexpr int CONVERT_TYPE_OFFSET = 1;

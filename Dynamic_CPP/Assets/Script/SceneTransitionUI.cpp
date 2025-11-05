@@ -24,7 +24,7 @@ void SceneTransitionUI::Awake()
 void SceneTransitionUI::Update(float tick)
 {
 	constexpr int MAX_CANVAS_ORDER = 500;
-	constexpr int MIN_CANVAS_ORDER = 0;
+	constexpr int MIN_CANVAS_ORDER = -1;
 
     if (!m_image) return;
     if (m_state == State::Idle)

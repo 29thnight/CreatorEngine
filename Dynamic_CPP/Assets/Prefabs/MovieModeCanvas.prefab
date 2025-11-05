@@ -1,0 +1,301 @@
+m_name: MovieModeCanvas
+m_instanceID: 2767120433
+m_isEnabled: true
+m_fileGuid: 00000000-0000-0000-0000-000000000000
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: MovieModeCanvas
+    m_instanceID: 2514121552
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_parentID: 4294967295
+    m_index: 3
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_childrenIndices: [4, 5, 6, 7, 8]
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - RectTransformComponent: 3002078429
+        m_name: RectTransformComponent
+        m_instanceID: 3170100561
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_anchorMin: {x: 0.5, y: 0.5}
+        m_anchorMax: {x: 0.5, y: 0.5}
+        m_anchoredPosition: {x: -960, y: -540}
+        m_sizeDelta: {x: 1920, y: 1080}
+        m_pivot: {x: 0.5, y: 0.5}
+        m_worldRect: {x: -960, y: -540, width: 1920, height: 1080}
+      - Canvas: 2773063417
+        m_name: Component
+        m_instanceID: 51207380
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        CanvasOrder: 6
+        CanvasName: MovieModeCanvas
+    m_gameObjectType: 6
+    m_isStatic: false
+    children:
+      - GameObject: 2166264123
+        m_name: LetterboxTop
+        m_instanceID: 2418008728
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 4
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 4097154397
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 960, y: -89}
+            m_sizeDelta: {x: 1920, y: 177}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 0, y: -177.5, width: 1920, height: 177}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 2171507459
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: MovieModeCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            texturePaths: [MovieMode.png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 960, y: 88.5}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 0
+        m_gameObjectType: 5
+        m_isStatic: false
+      - GameObject: 2166264123
+        m_name: LetterboxBottom
+        m_instanceID: 2956872615
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 5
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 2081869331
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 960, y: 1177}
+            m_sizeDelta: {x: 1920, y: 177}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 0, y: 1088.5, width: 1920, height: 177}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 3742279294
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: MovieModeCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            texturePaths: [MovieMode.png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 960, y: 88.5}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 0
+        m_gameObjectType: 5
+        m_isStatic: false
+      - GameObject: 2166264123
+        m_name: MovieModeController
+        m_instanceID: 502426026
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: -0, y: 0, z: -0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 0}
+          m_parentID: 3
+        m_index: 6
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - ModuleBehavior: 1399118904
+            barHeight: 177
+            animDuration: 0.600000024
+            startInCinema: false
+            topBarName: LetterboxTop
+            bottomBarName: LetterboxBottom
+            m_name: LetterboxController
+            m_instanceID: 1655732443
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 560f91c9-9d2a-5970-9b16-280eeedd3f4e
+          - ModuleBehavior: 1399118904
+            waitAtLast: true
+            hideWhenReset: true
+            m_name: DialogueConductor
+            m_instanceID: 2367712887
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: acae01f8-cc68-5652-a845-4a11856382c7
+        m_gameObjectType: 0
+        m_isStatic: false
+      - GameObject: 2166264123
+        m_name: P1Dialog
+        m_instanceID: 3036036102
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 7
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 3460377354
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: -238, y: 540}
+            m_sizeDelta: {x: 500, y: 500}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: -488, y: 290, width: 500, height: 500}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 4135898687
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: MovieModeCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            texturePaths: [dialtest.png, dialtest(1).png, dialtest(2).png, dialtest(3).png, dialtest(4).png, dialtest(5).png, dialtest(6).png, dialtest(7).png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 250, y: 250}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 0
+          - ModuleBehavior: 1399118904
+            screenOffset: {x: 0, y: -70}
+            sideOffsetPixels: 40
+            m_name: PlayerDialogueUI
+            m_instanceID: 2205943649
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 54926144-f7ec-5f9a-8d43-2aa9d6ff88bf
+        m_gameObjectType: 5
+        m_isStatic: false
+      - GameObject: 2166264123
+        m_name: P2Dialog
+        m_instanceID: 2474239413
+        m_isEnabled: true
+        m_attachedSoketID: 0
+        m_transform:
+          position: {x: 0, y: 0, z: 0, w: 1}
+          rotation: {x: 0, y: 0, z: 0, w: 1}
+          scale: {x: 1, y: 1, z: 1, w: 1}
+          m_parentID: 3
+        m_index: 8
+        m_parentIndex: 3
+        m_rootIndex: 0
+        m_collisionType: 0
+        m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+        m_childrenIndices: ~
+        m_tag: Untagged
+        m_layer: Default
+        m_components:
+          - RectTransformComponent: 3002078429
+            m_name: RectTransformComponent
+            m_instanceID: 797620465
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_anchorMin: {x: 0.5, y: 0.5}
+            m_anchorMax: {x: 0.5, y: 0.5}
+            m_anchoredPosition: {x: 2134, y: 540}
+            m_sizeDelta: {x: 500, y: 500}
+            m_pivot: {x: 0.5, y: 0.5}
+            m_worldRect: {x: 1884, y: 290, width: 500, height: 500}
+          - ImageComponent: 1187169862
+            m_name: ImageComponent
+            m_instanceID: 966123602
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            _layerorder: 0
+            uiEffects: 0
+            m_ownerCanvasName: MovieModeCanvas
+            navigations: ~
+            m_customPixelShaderPath: ""
+            texturePaths: [dialtest.png, dialtest(1).png, dialtest(2).png, dialtest(3).png, dialtest(4).png, dialtest(5).png, dialtest(6).png, dialtest(7).png]
+            color: {r: 1, g: 1, b: 1, a: 1}
+            curindex: 0
+            rotate: 0
+            origin: {x: 250, y: 250}
+            unionScale: 1
+            clipPercent: 1
+            clipDirection: 0
+          - ModuleBehavior: 1399118904
+            screenOffset: {x: 0, y: -70}
+            sideOffsetPixels: 40
+            m_name: PlayerDialogueUI
+            m_instanceID: 1120261771
+            m_isEnabled: true
+            m_FileID: 00000000-0000-0000-0000-000000000000
+            m_scriptGuid: 54926144-f7ec-5f9a-8d43-2aa9d6ff88bf
+        m_gameObjectType: 5
+        m_isStatic: false

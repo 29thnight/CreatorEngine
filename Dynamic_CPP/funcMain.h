@@ -192,6 +192,9 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("DialogueConductor", []() { return new DialogueConductor(); });
+		CreateFactory::GetInstance()->RegisterFactory("PlayerDialogueUI", []() { return new PlayerDialogueUI(); });
+		CreateFactory::GetInstance()->RegisterFactory("LetterboxController", []() { return new LetterboxController(); });
 		CreateFactory::GetInstance()->RegisterFactory("StoryStaging", []() { return new StoryStaging(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayerObserver", []() { return new PlayerObserver(); });
 		CreateFactory::GetInstance()->RegisterFactory("TutorialScript", []() { return new TutorialScript(); });

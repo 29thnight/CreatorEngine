@@ -3,6 +3,9 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "DialogueConductor.h"
+#include "PlayerDialogueUI.h"
+#include "LetterboxController.h"
 #include "StoryStaging.h"
 #include "PlayerObserver.h"
 #include "BackGroundEffect.h"
