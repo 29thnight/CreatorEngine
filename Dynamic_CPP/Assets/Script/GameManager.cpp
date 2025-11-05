@@ -18,6 +18,7 @@
 #include "GameInstance.h"
 #include "SceneTransitionUI.h"
 #include "TweenManager.h"
+#include "LetterboxController.h"
 #include "CameraMove.h"
 
 void GameManager::Awake()
@@ -84,6 +85,24 @@ void GameManager::Update(float tick)
 	CheatSceneEvent();
 
 	CheckClear(tick);
+	//스테이지 씬 최초 진입 시 시네마 모드
+	if (m_isCinemaMode)
+	{
+		auto letterbox = GameObject::Find("MovieModeController");
+		if (letterbox)
+		{
+			auto controller = letterbox->GetComponent<LetterboxController>();
+			if (controller)
+			{
+				int currentScene = GameInstance::GetInstance()->GetCurrentSceneType();
+				if (currentScene == (int)SceneType::Stage)
+				{
+					controller->EnterCinemaMode();
+				}
+			}
+		}
+		return;
+	}
 	
 	if (InputManagement->IsKeyPressed(KeyBoard::Escape))
 	{

@@ -16,16 +16,23 @@ void ClearPortal::Start()
 	{
 		m_gameManager = GMObj->GetComponent<GameManager>();
 	}
-
+	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
 	auto portalObj = SceneManagers->GetActiveScene()->CreateGameObject("portalEffect", GameObjectType::Empty,GetOwner()->m_index).get();
 	if (portalObj)
 	{
 		m_portalEffect = portalObj->AddComponent<EffectComponent>();
-		portalObj->GetComponent<Transform>()->AddPosition({ 0,0.5,0 });
+		if (static_cast<SceneType>(curScene) == SceneType::Tutorial)
+		{
+			portalObj->GetComponent<Transform>()->AddPosition({ -1.0f,0.5f,0.85f });
+		}
+		else
+		{
+			portalObj->GetComponent<Transform>()->AddPosition({ 0,0.5f,0.0f });
+		}
 		portalObj->GetComponent<Transform>()->SetScale({2.0f,2.0f,2.0f});
 		m_portalEffect->m_effectTemplateName = "portaloff";
 	}
-	auto curScene = GameInstance::GetInstance()->GetCurrentSceneType();
+
 
 	if (static_cast<SceneType>(curScene) == SceneType::Tutorial) //∆©≈‰¿œãö
 	{

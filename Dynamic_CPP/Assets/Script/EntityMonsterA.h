@@ -33,7 +33,15 @@ public:
 	virtual void OnDestroy() override  {}
 
 	virtual void SetStagger(float time) override;
+	
 
+
+	void CheckDeadAnimation();
+	[[Method]]
+	void InDeadAni();
+	bool IndeadAnimation = false;
+	float deadAnicheckTime = 0.2f;
+	
 	BehaviorTreeComponent* enemyBT = nullptr;
 	BlackBoard* blackBoard = nullptr;
 	Animator* m_animator = nullptr;

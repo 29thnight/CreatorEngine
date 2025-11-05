@@ -28,7 +28,7 @@ void SpecialBullet::Update(float tick)
 {
 	__super::Update(tick);
 	Transform* transform = GetOwner()->GetComponent<Transform>();
-	transform->AddPosition(m_moveDir * rangedProjSpd);
+	transform->AddPosition(m_moveDir * rangedProjSpd * tick);
 
 	lifeTime -= tick;
 	if (lifeTime <= 0)

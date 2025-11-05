@@ -44,6 +44,11 @@ public:
 	void ExitCinemaMode();
 	[[Method]]
 	void TestCinemaMode();
+	[[Method]]
+	void Stap1();
+	[[Method]]
+	void Stap2();
+
 	bool IsCinema() const { return m_isCinema; }
 	void SetBubbleVisible(bool visible);
 

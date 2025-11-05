@@ -2,6 +2,7 @@
 #include "TweenManager.h"
 #include "pch.h"
 #include "Player.h"
+#include "LetterboxController.h"
 
 void StoryStaging::Start()
 {
@@ -14,10 +15,17 @@ void StoryStaging::Start()
 		stagingForward[index] = g->m_transform.GetWorldQuaternion();
 		index++;
 	}
+	auto diaConductorObj = GameObject::Find("MovieModeController");
+	if (diaConductorObj)
+	{
+		m_letterboxController = diaConductorObj->GetComponent<LetterboxController>();
+	}
 }
 
 void StoryStaging::OnTriggerEnter(const Collision& collision)
 {
+	if (m_actionEnd) return;
+
 	if (collision.otherObj->m_tag == "Player") {
 		players.push_back(collision.otherObj);
 		if (players.size() == 2) {
@@ -32,6 +40,8 @@ void StoryStaging::OnTriggerEnter(const Collision& collision)
 
 void StoryStaging::OnTriggerExit(const Collision& collision)
 {
+	if (m_actionEnd) return;
+
 	if (collision.otherObj->m_tag == "Player") {
 		players.erase(
 			std::remove_if(players.begin(), players.end(),
@@ -101,6 +111,26 @@ void StoryStaging::StartAction()
 
 		posTween->SetOnComplete([=]() {
 			p->Staging();
+			if(!m_letterboxController)
+			{
+				auto diaConductorObj = GameObject::Find("MovieModeController");
+				if (diaConductorObj)
+				{
+					m_letterboxController = diaConductorObj->GetComponent<LetterboxController>();
+				}
+			}
+
+			switch (stagingID)
+			{
+			case 0:
+				m_letterboxController->Stap1();
+				break;
+			case 1:
+				m_letterboxController->Stap2();
+				break;
+			};
+
+			m_actionEnd = true;
 		});
 
 		tw->AddTween(tween);

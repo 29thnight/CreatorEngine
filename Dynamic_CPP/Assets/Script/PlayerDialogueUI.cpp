@@ -62,7 +62,7 @@ void PlayerDialogueUI::UpdateScreenPositionAndPivot(float /*tick*/)
     {
         const float myX = worldPos.x;
         const float cmpX = Mathf::Vector4(cmp->m_transform.GetWorldPosition()).x;
-        desiredPivotX = (myX < cmpX) ? 1.0f : 0.0f; // 왼쪽이면 우하단(1,0), 오른쪽이면 좌하단(0,0)
+        desiredPivotX = (myX < cmpX) ? 0.0f : 1.0f; // 왼쪽이면 우하단(1,0), 오른쪽이면 좌하단(0,0)
     }
 
     const auto curPivot = m_rect->GetPivot();
@@ -73,7 +73,7 @@ void PlayerDialogueUI::UpdateScreenPositionAndPivot(float /*tick*/)
     if (desiredPivotX == 0.0f) xOffset += sideOffsetPixels;  // 좌하단→오른쪽
     else                       xOffset -= sideOffsetPixels;  // 우하단→왼쪽
 
-    m_rect->SetAnchoredPosition({ screenX/* + xOffset*/, screenY + screenOffset.y });
+    m_rect->SetAnchoredPosition({ screenX + xOffset, screenY + screenOffset.y });
 }
 
 void PlayerDialogueUI::ShowTexture(int textureIndex)

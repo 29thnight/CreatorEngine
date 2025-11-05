@@ -76,7 +76,7 @@ void SwordProjectile::Update(float tick)
 		beLateFrame = true;
 	}
 	Transform* transform = GetOwner()->GetComponent<Transform>();
-	transform->AddPosition(m_moveDir * rangedProjSpd);
+	transform->AddPosition(m_moveDir * rangedProjSpd * tick);
 	lifeTime -= tick;
 	if (lifeTime <= 0)
 	{

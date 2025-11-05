@@ -6,7 +6,8 @@
 #include "PlayerDialogueUI.h"
 #include "DialogueConductor.h"
 #include "EntityAsis.h"
-#include <algorithm> // std::clamp, std::lerp
+#include "Player.h"
+
 
 void LetterboxController::Start()
 {
@@ -169,6 +170,25 @@ void LetterboxController::ExitCinemaMode()
         P2_HPBar->SetEnabled(true);
 	}
 
+	auto p1 = GameObject::Find("1P");
+    if (p1)
+    {
+        auto player1 = p1->GetComponent<Player>();
+        if (player1)
+        {
+            player1->StagingEnd();
+        }
+    }
+    auto p2 = GameObject::Find("2P");
+    if (p2)
+    {
+        auto player2 = p2->GetComponent<Player>();
+        if (player2)
+        {
+            player2->StagingEnd();
+        }
+	}
+
 	SetBubbleVisible(false);
 }
 
@@ -177,6 +197,20 @@ void LetterboxController::TestCinemaMode()
     EnterCinemaMode();
 
     m_dialogueConductor->SetAlternatingRange(0, 6, DialogueConductor::Speaker::P1);
+}
+
+void LetterboxController::Stap1()
+{
+    EnterCinemaMode();
+
+    m_dialogueConductor->SetAlternatingRange(0, 3, DialogueConductor::Speaker::P1);
+}
+
+void LetterboxController::Stap2()
+{
+    EnterCinemaMode();
+
+    m_dialogueConductor->SetAlternatingRange(3, 8, DialogueConductor::Speaker::P1);
 }
 
 void LetterboxController::SetBubbleVisible(bool visible)

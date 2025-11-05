@@ -363,6 +363,16 @@ void TestMonsterB::Update(float tick)
 
 	if (isDead)
 	{
+		deadAnicheckTime -= tick;
+		if (deadAnicheckTime <= 0)
+		{
+			CheckDeadAnimation();
+		}
+	}
+
+
+	if (isDead && IndeadAnimation == false) //죽었는대 장기간 데드애니메이션으로 안가면
+	{
 		deadBugElaspedTime += tick;
 		if (deadBugElaspedTime >= deadBugTime)
 		{
@@ -393,6 +403,23 @@ void TestMonsterB::SetStagger(float time)
 	for (auto& a : anim) {
 		a->StopAnimation(time);
 	}
+}
+
+void TestMonsterB::CheckDeadAnimation()
+{
+	if (isDead == true && IndeadAnimation == false) //죽었는대 버그로 데드애니메이션 안갔으면
+	{
+		if (m_animator)
+		{
+			m_animator->SetParameter("Dead", true);
+			deadAnicheckTime = 0.2f;
+		}
+	}
+}
+
+void TestMonsterB::InDeadAni()
+{
+	IndeadAnimation = true;
 }
 
 void TestMonsterB::Dead()
