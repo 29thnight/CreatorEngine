@@ -6,10 +6,23 @@
 
 using MonoBehaviorHandle = uint32_t;
 
+enum class MonoBehaviorEvent
+{
+    Awake,
+    OnEnable,
+    Start,
+    FixedUpdate,
+    Update,
+    LateUpdate,
+    OnDisable,
+    OnDestroy,
+};
+
 struct MethodHandlePair
 {
     MonoMethod*          method{ nullptr };
     Core::DelegateHandle handle{};
+    MonoBehaviorEvent    event{ MonoBehaviorEvent::Awake };
 };
 
 // C# MonoBehavior 타입별 메서드 포인터 정보
@@ -24,9 +37,9 @@ struct MonoBehaviorInfo
 
 struct MonoBehaviorRecord
 {
-    MonoBehaviorHandle              id{};
-    MonoObject*                     instance{ nullptr };
-    std::vector<MethodHandlePair>   events;
+    MonoBehaviorHandle            id{};
+    MonoObject*                   instance{ nullptr };
+    std::vector<MethodHandlePair> events;
 };
 
 #endif // UNUSE_MONO_LIB

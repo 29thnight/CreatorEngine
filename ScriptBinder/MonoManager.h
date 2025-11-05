@@ -3,9 +3,12 @@
 #ifndef UNUSE_MONO_LIB
 #include <DLLAcrossSingleton.h>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <optional>
+#include <mutex>
+#include "MonoBehaviorRecord.h"
 
 #include <mono/jit/jit.h>
 #include <mono/metadata/assembly.h>
@@ -13,6 +16,7 @@
 #include <mono/metadata/attrdefs.h>
 #include <mono/metadata/mono-debug.h>
 
+class CSharpScriptComponent;
 class MonoManager : public DLLCore::Singleton<MonoManager>
 {
 public:
@@ -74,6 +78,10 @@ public:
     // 이미지/어셈블리 접근
     MonoImage* GetImage(const std::string& assemblyName) const;
 
+    // C# 스크립트 이벤트 바인딩
+    void BindScriptEvents(CSharpScriptComponent* component);
+    void UnbindScriptEvents(CSharpScriptComponent* component);
+
 private:
     MonoManager() = default;
     ~MonoManager() = default;
@@ -83,11 +91,23 @@ private:
     bool CreateAppDomain(const char* domainName);
     void DestroyAppDomain();
 
+    Core::DelegateHandle RegisterEventHandler(class Scene* scene,
+        MonoBehaviorHandle handle,
+        MonoMethod* method,
+        MonoBehaviorEvent eventType,
+        std::string_view eventName) const;
+    void InvokeMonoBehavior(MonoBehaviorHandle handle, MonoMethod* method, void** args, std::string_view eventName) const;
+    std::optional<std::vector<std::string>> LoadEventList(const CSharpScriptComponent* component) const;
+    static std::optional<MonoBehaviorEvent> ToBehaviorEvent(std::string_view name);
+    static int ExpectedParameterCount(MonoBehaviorEvent eventType);
+
 private:
     MonoDomain* m_rootDomain{ nullptr };
     MonoDomain* m_appDomain{ nullptr };
 
     std::unordered_map<std::string, AssemblyPack> m_assemblies;
+    std::unordered_map<CSharpScriptComponent*, MonoBehaviorRecord> m_behaviorRecords;
+    mutable std::mutex m_behaviorMutex;
 };
 static auto MonoManagers = MonoManager::GetInstance();
 #endif // !UNUSE_MONO_LIB
