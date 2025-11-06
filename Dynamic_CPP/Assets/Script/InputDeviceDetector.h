@@ -55,9 +55,9 @@ private:
 	[[Property]]
 	float m_lastDelta = 0.f;    // ¸¶Áö¸· Æ½ÀÇ deltaTime
 	[[Property]]
-	float m_requiredSelectHold{ 0.5f };
+	float m_requiredSelectHold{ 0.001f };
 	[[Property]]
-	float m_requiredCancelHold{ 0.5f };
+	float m_requiredCancelHold{ 0.001f };
 	float m_selectHold{};
 
 	bool m_isSelectComplete{ false };

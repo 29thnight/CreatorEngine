@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "SFXPoolManager.h"
 #include "SoundComponent.h"
+#include "ImageComponent.h"
 #include "GameInstance.h"
 #include "SoundName.h"
 inline constexpr auto IsStageOrTutorial = [](SceneType t) noexcept -> bool
@@ -30,13 +31,34 @@ void SelectTimer::Start()
 		}
 	}
 
-	timerText = GetComponent<TextComponent>();
+	//timerText = GetComponent<TextComponent>();
+	timerImage = GetComponent<ImageComponent>();
 }
 
 void SelectTimer::Update(float tick)
 {
-	if (!gameManager) return;
+	if (!gameManager || !timerImage || m_isSwitchSceneStarted) return;
 	int count = gameManager->selectPlayerCount;
+
+	if (m_isTimerOn)
+	{
+		m_remainTimeInternal -= tick;
+
+		int timer{ static_cast<int>(m_remainTimeInternal) };
+		if (0.5f >= m_remainTimeInternal)
+		{
+			m_isSwitchSceneStarted = true;
+			timerImage->SetEnabled(false);
+			gameManager->SwitchNextSceneWithFade();
+			m_isTimerOn = false;
+			return;
+		}
+		else
+		{
+			timerImage->SetEnabled(true);
+			timerImage->SetTexture(timer);
+		}
+	}
 	
 	if (2 <= count)
 	{
@@ -46,49 +68,15 @@ void SelectTimer::Update(float tick)
 			gameManager->LoadNextScene();
 		}
 
-		if(0 >= m_remainTimeInternal)
-		{
-			m_remainTimeInternal = m_remainTimeSetting;
-		}
-
-		m_remainTimeInternal -= tick;
-
-		if (0 >= m_remainTimeInternal)
-		{
-			//·Îµå ¾À ÀüÈ¯
-			gameManager->SwitchNextScene();
-			return;
-		}
-
-		int timer{ static_cast<int>(m_remainTimeInternal) };
-		std::string ramineTime = std::format("{:02}", timer);
-		if (timerText)
-		{
-			timerText->SetEnabled(true);
-			timerText->SetMessage(ramineTime);
-
-
-			if (gameManager)
-			{
-				auto pool = gameManager->GetSFXPool();
-				if (pool)
-				{
-					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("CountDown"));
-				}
-			}
-
-
-		}
-		
 	}
 	else
 	{
 		m_remainTimeInternal = -1.f;
-		if (timerText)
+		if (timerImage)
 		{
-			timerText->SetMessage("");
-			timerText->SetEnabled(false);
+			timerImage->SetEnabled(false);
 			m_isTimerOn = false;
+			m_remainTimeInternal = m_remainTimeSetting;
 		}
 	}
 }

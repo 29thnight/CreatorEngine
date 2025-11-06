@@ -67,6 +67,12 @@ void BossHPBar::Update(float tick)
     if (m_maxHP <= 0)
         return;
 
+	if (m_currentHP <= 0) //HP 0되면 비활성화
+    {
+        m_currentHP = 0;
+        GetOwner()->SetEnabled(false);
+    }
+
     const float hpRatio = std::clamp(
         static_cast<float>(m_currentHP) / static_cast<float>(m_maxHP), 0.0f, 1.0f);
 

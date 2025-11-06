@@ -7,6 +7,9 @@
 #define NORMAL_MAP 1
 #define BUMP_MAP 2
 
+#define WaterDirectionALL 1 << 10
+#define WaterDirectionBackFlag 1 << 11
+
 #ifndef PI
 #define PI 3.14159265359
 #endif
@@ -174,13 +177,20 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     if (gNormalState == NORMAL_MAP)
     {
+        if ((bitflag & WaterDirectionALL) > 0)
+        {
         //surf.N = CalcNormalFromNormMap(NormalMap, IN.texCoord + float2(totalTime/ 5.f, totalTime/ 5.f), surf);
-        float3 normal1 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(0, totalTime / 10.f), surf);
-        float3 normal2 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(0, totalTime / 9.f), surf);
-        float3 normal3 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(totalTime / 11.f, 0), surf);
-        float3 normal4 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(totalTime / 12.f, 0), surf);
+            float3 normal1 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(0, totalTime / 10.f), surf);
+            float3 normal2 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(0, totalTime / 9.f), surf);
+            float3 normal3 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(totalTime / 11.f, 0), surf);
+            float3 normal4 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(totalTime / 12.f, 0), surf);
         
-        surf.N = (normal1 + normal2 + normal3 + normal4) / 4.f;
+            surf.N = (normal1 + normal2 + normal3 + normal4) / 4.f;
+        }
+        else
+        {
+            surf.N = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(0, totalTime / 7.f), surf);
+        }
     }
     else if (gNormalState == BUMP_MAP)
     {
@@ -331,7 +341,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     
     float3 depthColor = lerp(float3(0, 0, 2), refractionColor * fresnel, e);
-    float3 horizonColor = lerp(depthColor, float3(1, 0.5, 0), fresnel);
+    float3 horizonColor = lerp(depthColor, reflectionColor, fresnel);
     float3 underWaterColor = refractionColor + horizonColor;
     return float4(underWaterColor + float3(l,l,l), 1);
     //return float4(lerp(float3(albedo.rgb), colour, waterDistance), 1);

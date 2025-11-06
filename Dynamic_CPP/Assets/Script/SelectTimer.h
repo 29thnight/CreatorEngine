@@ -16,11 +16,13 @@ public:
 
 private:
 	class GameManager* gameManager{};
-	class TextComponent* timerText{};
+	//class TextComponent* timerText{};
+	class ImageComponent* timerImage{};
 
 private:
 	[[Property]]
 	float m_remainTimeSetting{ 5.f };
 	float m_remainTimeInternal{};
 	bool m_isTimerOn{ false };
+	bool m_isSwitchSceneStarted{ false };
 };

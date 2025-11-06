@@ -21,11 +21,17 @@ cbuffer gBrush : register(b0)
     int maskTextureWidth; // Width of the mask texture
     int maskTextureHeight; // Height of the mask texture
     bool isEditing; // Flag to indicate if editing is enabled
+    
+    matrix view;
+    matrix proj;
 }
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    float4 clipPos = IN.pos;
+    matrix vp = mul(proj, view);
+    float4 p = mul(vp, IN.wPosition);
+    
+    float4 clipPos = p;
     float3 ndc = clipPos.xyz / clipPos.w;
     float2 uv = 0.5 * ndc.xy + 0.5; // Convert NDC to UV space
     uv.y = -uv.y;
