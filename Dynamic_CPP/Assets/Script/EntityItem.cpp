@@ -276,7 +276,7 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)
 	Mathf::Vector3 offset = {ownerForward.x * distance.x,0, ownerForward.z * distance.x };
 	throwDistacneY = distance.y;
 	endPos = startPos + offset;
-	endPos.y += 0.2f;
+	endPos.y += 0.2f -1.0f;
 	if (m_tutorialUi)
 	{
 		m_tutorialUi->GetOwner()->SetEnabled(false);
