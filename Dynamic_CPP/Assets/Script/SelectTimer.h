@@ -23,4 +23,5 @@ private:
 	float m_remainTimeSetting{ 5.f };
 	float m_remainTimeInternal{};
 	bool m_isTimerOn{ false };
+
 };

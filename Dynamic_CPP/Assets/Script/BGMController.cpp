@@ -5,6 +5,11 @@
 #include "SoundComponent.h"
 #include "GameManager.h"
 #include "SFXPoolManager.h"
+void BGMController::Awake()
+{
+	auto instance = GameInstance::GetInstance();
+	nextScene = (SceneType)instance->GetAfterLoadSceneIndex();
+}
 void BGMController::Start()
 {
 	auto instance = GameInstance::GetInstance();
@@ -21,8 +26,15 @@ void BGMController::Start()
 	case SceneType::SelectChar:
 		curSoundName = sounds->GetSoudNameRandom("BgmCharacterSelect");
 		break;
-	case SceneType::Loading:
-		curSoundName = sounds->GetSoudNameRandom("BgmLoad");
+	case SceneType::Loading: //·Îµù + ÄÆ¾À  // 1 ,  2  ,3 À¸·Î ³ª´²Á®ÀÖÀ½
+		if (nextScene == SceneType::Boss)
+		{
+			curSoundName = sounds->GetSoudNameRandom("BgmBoss");
+		}
+		else
+		{
+			curSoundName = sounds->GetSoudNameRandom("BgmLoad");
+		}
 		break;
 	case SceneType::Stage:
 		curSoundName = sounds->GetSoudNameRandom("BgmStage11");

@@ -3,11 +3,12 @@
 #include "ModuleBehavior.h"
 
 class SoundComponent;
+
 class BGMController : public ModuleBehavior
 {
 public:
 	MODULE_BEHAVIOR_BODY(BGMController)
-	virtual void Awake() override {}
+	virtual void Awake() override;
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 	virtual void OnTriggerEnter(const Collision& collision) override {}
@@ -25,5 +26,7 @@ public:
 	class GameObject* m_pBootstrapObject{ nullptr };
 	bool m_isBootstrapCompleted{ false };
 
+	SceneType nextScene =0;
+	
 	bool PlayerAnotherSound = false;
 };
