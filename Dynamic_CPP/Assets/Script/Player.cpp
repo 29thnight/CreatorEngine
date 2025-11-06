@@ -204,7 +204,14 @@ void Player::Start()
 				hpObserver->m_entity = this;
 			}
 		}
-
+		auto instance = GameInstance::GetInstance();
+		auto curScene = (SceneType)instance->GetCurrentSceneType();
+		m_maxHP = maxHP;
+		m_currentHP = m_maxHP;
+		if (curScene == SceneType::Tutorial) //듀토떄 피 80퍼로시작
+		{
+			m_currentHP *= 0.8f;
+		}
 		m_HPbar = GameObject::Find("P1_HPBar");
 		if (m_HPbar)
 		{
@@ -212,8 +219,6 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
-				m_maxHP = maxHP;
-				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
 				hpbar->SetType((int)m_playerType);
@@ -262,8 +267,6 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
-				m_maxHP = maxHP;
-				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
 				hpbar->SetType((int)m_playerType);
