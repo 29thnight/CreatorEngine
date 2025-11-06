@@ -73,7 +73,8 @@ void SoundBarUI::Update(float tick)
             btnPos.x = CalcButtonXFromPercent(m_percent);
 			m_soundBarButtonRect->SetAnchoredPosition(btnPos);
  
-			Sound->setMasterVolume(static_cast<float>(GameInstance::GetInstance()->GetSoundPercent()) / 100.f);
+            GameInstance::GetInstance()->SetSoundPercent(static_cast<float>(m_percent) / 100.f); 
+			Sound->setMasterVolume(static_cast<float>(GameInstance::GetInstance()->GetSoundPercent()));
         }
         else
         {
