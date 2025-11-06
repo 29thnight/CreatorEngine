@@ -120,6 +120,8 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
                     terrainGizmoBuffer.gBrushPosition = terrain->GetCurrentBrush()->m_center;
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
 					terrainGizmoBuffer.isEditMode = terrain->GetCurrentBrush()->m_isEditMode;
+                    terrainGizmoBuffer.view = renderData->m_frameCalculatedView;
+                    terrainGizmoBuffer.proj = renderData->m_frameCalculatedProjection;
                     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &terrainGizmoBuffer);
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);
