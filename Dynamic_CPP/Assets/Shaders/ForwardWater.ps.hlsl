@@ -241,154 +241,100 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     bool useShadowRevice = (bitflag & USE_SHADOW_RECIVE) != 0;
     
-    if ((bitflag & USE_SSRefraction) == 0)
-    {
-        for (int i = 0; i < lightCount; ++i)
-        {
-            Light light = Lights[i];
-            if (light.status == LIGHT_DISABLED)
-                continue;
-            LightingInfo li = EvalLightingInfo(surf, light);
-            float NdotL = max(li.NdotL, 0.0); // clamped n dot l
-            float NdotV = max(surf.NdotV, 0.0);
-        
-        // cook-torrance brdf
-            float NDF = DistributionGGX(max(li.NdotH, 0.0), roughness);
-            float G = GeometrySmith(NdotV, NdotL, roughness);
-            float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0_dielectric);
-            float3 kS = F;
-            float3 kD = float3(1.0, 1.0, 1.0) - kS;
-            kD *= 1.0 - metallic;
-
-
-            float3 numerator = NDF * G * F;
-            float denominator = 4.0 * NdotV * NdotL;
-            float3 specular = numerator / max(denominator, 0.001);
-        
-        //light.color.rgb *= light.intencity;
-
-            Lo += (kD * albedo.rgb / PI + specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
-        }
-
-        float3 ambient = globalAmbient.rgb * albedo.rgb;
-        if (useEnvMap)
-        {
-            float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
-            float3 kD = 1.0 - kS;
-            kD *= 1.0 - metallic;
-            float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
-            float3 diffuse = irradiance * albedo.rgb;
-
-            float3 R = normalize(reflect(-surf.V, surf.N));
-            uint w, h, mips;
-            PrefilteredSpecMap.GetDimensions(0, w, h, mips);
-            float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * (mips - 1)).rgb;
-            float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(max(surf.NdotV, 0.f), roughness)).rg;
-            float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
-            ambient = (kD * diffuse + specular);
-        }
     
-        float3 colour = ambient + Lo + emissive.rgb;
-
-        return float4(colour, albedo.a);
-    }
-    else
-    {
+    float2 screenUV = UVPosition(IN.wPosition.xyz);
+    float prevDepth = prevDepthTexture.Sample(LinearSampler, screenUV).r;
     
-        float2 screenUV = UVPosition(IN.wPosition.xyz);
-        float prevDepth = prevDepthTexture.Sample(LinearSampler, screenUV).r;
-        
-        float3 objWorld = ReconstructWorldPosFromDepth(screenUV, prevDepth, invprojMat, invviewMat);
-        
-        float depth = IN.position.z;
-        
-        float maxDistance = 1.0f;
-        
-        float3 v = viewMat._13_23_33;
-        float d = dot(v, surf.N);
-        
-        float y = objWorld.y - IN.wPosition.y;
-        y = y / maxDistance;
-        float e = saturate(exp(y)); // 깊이에 따라 부드럽게 어두워지는 효과
+    float3 objWorld = ReconstructWorldPosFromDepth(screenUV, prevDepth, invprojMat, invviewMat);
+    
+    float depth = IN.position.z;
+    
+    float maxDistance = 1.0f;
+    
+    float3 v = viewMat._13_23_33;
+    float d = dot(v, surf.N);
+    
+    float y = objWorld.y - IN.wPosition.y;
+    y = y / maxDistance;
+    float e = saturate(exp(y)); // 깊이에 따라 부드럽게 어두워지는 효과
 
-        //float3 s = smoothstep(prevDepth, depth, float3(1, 0, 0));
+    //float3 s = smoothstep(prevDepth, depth, float3(1, 0, 0));
         
     //float2 screenUV = IN.position.xy / IN.position.w;
     //screenUV = screenUV * 0.5 + 0.5;
     //float3 baseNormal = baseNormalTexture.Sample(PointSampler, screenUV).xyz * 2 - 1;
-        float3 view = -surf.V;
-        float3 refractionColor;
+    float3 view = -surf.V;
+    float3 refractionColor;
     
-        refractionColor.r = Refraction(IN.wPosition.xyz, view, surf.N, gIOR).r;
-        refractionColor.g = Refraction(IN.wPosition.xyz, view, surf.N, (gIOR + 0.021)).g;
-        refractionColor.b = Refraction(IN.wPosition.xyz, view, surf.N, (gIOR + 0.021 * 2)).b;
-        
-        float3 prevColor = baseColorTexture.Sample(LinearSampler, screenUV);
-        
-        float3 transmissionColor = refractionColor * albedo.rgb;
-        
-        float3 reflectionColor = float3(0, 0, 0);
-        
-        for (int i = 0; i < lightCount; ++i)
-        {
-            Light light = Lights[i];
-            if (light.status == LIGHT_DISABLED)
-                continue;
-            LightingInfo li = EvalLightingInfo(surf, light);
-            float NdotL = max(li.NdotL, 0.0); // clamped n dot l
-            float NdotV = max(surf.NdotV, 0.0);
-        
-        // cook-torrance brdf
-            float NDF = DistributionGGX(max(li.NdotH, 0.0), roughness);
-            float G = GeometrySmith(NdotV, NdotL, roughness);
-            float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0_dielectric);
-            float3 kS = F;
-            float3 kD = float3(1.0, 1.0, 1.0) - kS;
-            kD *= 1.0 - metallic;
+    refractionColor.r = Refraction(IN.wPosition.xyz, view, surf.N, lerp(gIOR, 1, e)).r;
+    refractionColor.g = Refraction(IN.wPosition.xyz, view, surf.N, lerp(gIOR + 0.021, 1, e)).g;
+    refractionColor.b = Refraction(IN.wPosition.xyz, view, surf.N, lerp(gIOR + 0.021 * 2, 1, e)).b;
+    
+    float3 prevColor = baseColorTexture.Sample(LinearSampler, screenUV);
+    
+    float3 transmissionColor = refractionColor * albedo.rgb;
+    
+    float3 reflectionColor = float3(0, 0, 0);
+    
+    for (int i = 0; i < lightCount; ++i)
+    {
+        Light light = Lights[i];
+        if (light.status == LIGHT_DISABLED)
+            continue;
+        LightingInfo li = EvalLightingInfo(surf, light);
+        float NdotL = max(li.NdotL, 0.0); // clamped n dot l
+        float NdotV = max(surf.NdotV, 0.0);
+    
+    // cook-torrance brdf
+        float NDF = DistributionGGX(max(li.NdotH, 0.0), roughness);
+        float G = GeometrySmith(NdotV, NdotL, roughness);
+        float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0_dielectric);
+        float3 kS = F;
+        float3 kD = float3(1.0, 1.0, 1.0) - kS;
+        kD *= 1.0 - metallic;
 
 
-            float3 numerator = NDF * G * F;
-            float denominator = 4.0 * NdotV * NdotL;
-            float3 specular = numerator / max(denominator, 0.001);
-        
-        //light.color.rgb *= light.intencity;
+        float3 numerator = NDF * G * F;
+        float denominator = 4.0 * NdotV * NdotL;
+        float3 specular = numerator / max(denominator, 0.001);
+    
+    //light.color.rgb *= light.intencity;
 
-            reflectionColor += (specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
-        }
-        float3 ambient = globalAmbient.rgb * albedo.rgb;
-        if (useEnvMap)
-        {
-            float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
-            float3 kD = 1.0 - kS;
-            kD *= 1.0 - metallic;
-            float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
-            float3 diffuse = irradiance * albedo.rgb;
-
-            float3 R = normalize(reflect(-surf.V, surf.N));
-            uint w, h, mips;
-            PrefilteredSpecMap.GetDimensions(0, w, h, mips);
-            float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * (mips - 1)).rgb;
-            float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(max(surf.NdotV, 0.f), roughness)).rg;
-            float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
-            reflectionColor += (specular);
-        }
-        
-        float3 fresnel = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
-        float3 finalColor = transmissionColor * (1.0 - fresnel) + reflectionColor * fresnel;
-        //float dott = abs(dot(surf.N, surf.V));
-        //finalColor = finalColor * dott + gAlbedo.rgb * pow(1.0 - dott, 5) * 15;
-        float3 colour = finalColor + emissive.rgb;
-        
-        float s = smoothstep(0.9, 1, e);
-        float l = lerp(0, 1, s);
-        
-        
-        float3 depthColor = lerp(float3(0, 0, 2), refractionColor * fresnel, e);
-        float3 horizonColor = lerp(depthColor, float3(1, 0.5, 0), fresnel);
-        float3 underWaterColor = refractionColor + horizonColor;
-        return float4(underWaterColor + float3(l,l,l), 1);
-        //return float4(lerp(float3(albedo.rgb), colour, waterDistance), 1);
-
-        //return float4(colour, 1.f);
+        reflectionColor += (specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
     }
+    float3 ambient = globalAmbient.rgb * albedo.rgb;
+    if (useEnvMap)
+    {
+        float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
+        float3 kD = 1.0 - kS;
+        kD *= 1.0 - metallic;
+        float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
+        float3 diffuse = irradiance * albedo.rgb;
+
+        float3 R = normalize(reflect(-surf.V, surf.N));
+        uint w, h, mips;
+        PrefilteredSpecMap.GetDimensions(0, w, h, mips);
+        float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * (mips - 1)).rgb;
+        float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(max(surf.NdotV, 0.f), roughness)).rg;
+        float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
+        reflectionColor += (specular);
+    }
+    
+    float3 fresnel = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
+    float3 finalColor = transmissionColor * (1.0 - fresnel) + reflectionColor * fresnel;
+    //float dott = abs(dot(surf.N, surf.V));
+    //finalColor = finalColor * dott + gAlbedo.rgb * pow(1.0 - dott, 5) * 15;
+    float3 colour = finalColor + emissive.rgb;
+    
+    float s = smoothstep(0.9, 1, e);
+    float l = lerp(0, 1, s);
+    
+    
+    float3 depthColor = lerp(float3(0, 0, 2), refractionColor * fresnel, e);
+    float3 horizonColor = lerp(depthColor, float3(1, 0.5, 0), fresnel);
+    float3 underWaterColor = refractionColor + horizonColor;
+    return float4(underWaterColor + float3(l,l,l), 1);
+    //return float4(lerp(float3(albedo.rgb), colour, waterDistance), 1);
+
+    //return float4(colour, 1.f);
 }
