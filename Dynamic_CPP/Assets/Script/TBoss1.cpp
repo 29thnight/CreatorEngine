@@ -266,6 +266,8 @@ std::string TBoss1::GetPatternPhaseToString(EPatternPhase phase)
 	switch (phase) {
 	case TBoss1::EPatternPhase::Inactive:
 		return "Inactive";
+	case TBoss1::EPatternPhase::Starting:
+		return "Starting";
 	case TBoss1::EPatternPhase::Warning:
 		return "Warning";
 	case TBoss1::EPatternPhase::Spawning:
@@ -280,6 +282,7 @@ std::string TBoss1::GetPatternPhaseToString(EPatternPhase phase)
 		return "Action";
 	case TBoss1::EPatternPhase::Waiting:
 		return "Waiting";
+	
 	default:
 		return "error";
 	}
@@ -802,8 +805,6 @@ void TBoss1::Update_BP0022(float tick)
 {
 	switch (m_patternPhase)
 	{
-	case EPatternPhase::Starting:
-		break;
 	case EPatternPhase::Move:
 		// This phase is for movement. Assume BurrowMove is animation-driven.
 		// When movement animation is complete, OnMoveFinished() will be called.
@@ -811,13 +812,15 @@ void TBoss1::Update_BP0022(float tick)
 		BurrowMove(tick);
 		if (isMoved) {
 			RotateToTarget(); // Lock final direction
-			if (m_anicontroller && m_anicontroller->m_curState) {
-				std::string currentStateName = m_anicontroller->m_curState->m_name;
-				if (currentStateName == "Idle") {
-					m_patternPhase = EPatternPhase::Warning;
-					//if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
-				}
-			}
+			if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+			m_patternPhase = EPatternPhase::Warning;
+			//if (m_anicontroller && m_anicontroller->m_curState) {
+			//	std::string currentStateName = m_anicontroller->m_curState->m_name;
+			//	if (currentStateName == "Idle") {
+			//		m_patternPhase = EPatternPhase::Warning;
+			//		//if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+			//	}
+			//}
 		}
 		break;
 	case EPatternPhase::Warning:
@@ -831,7 +834,7 @@ void TBoss1::Update_BP0022(float tick)
 		if (m_anicontroller && m_anicontroller->m_curState) {
 			std::string currentStateName = m_anicontroller->m_curState->m_name;
 			if (currentStateName == "Idle") {  //이미 모션을 실행 시켰으나 전조모션이 안나간 경우
-				if (m_animator) m_animator->SetParameter("StartMeleeAttack", true);
+				m_animator->SetParameter("StartMeleeAttack", true);
 			}
 		}
 		ShowMeleeIndicator();
