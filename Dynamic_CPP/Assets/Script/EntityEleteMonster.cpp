@@ -172,8 +172,10 @@ void EntityEleteMonster::Update(float tick)
 	//TPCooldown update
 	bool hasTPCooldown = blackBoard->HasKey("TeleportCooldown");
 	bool hasRTCooldown = blackBoard->HasKey("ReteatCooldown");
+	bool hasAtCooldown = blackBoard->HasKey("AtkDelay");
 	float TPCooltime = 0.0f;
 	float RTCooltime = 0.0f;
+	float ATCooltime = 0.0f;
 	if (hasTPCooldown) 
 	{
 		TPCooltime = blackBoard->GetValueAsFloat("TeleportCooldown");
@@ -191,6 +193,16 @@ void EntityEleteMonster::Update(float tick)
 			RTCooltime = 0.0f;
 		}
 		blackBoard->SetValueAsFloat("ReteatCooldown", RTCooltime);
+	}
+
+	if (hasAtCooldown)
+	{
+		ATCooltime = blackBoard->GetValueAsFloat("AtkDelay");
+		ATCooltime -= tick;
+		if (ATCooltime < 0) {
+			ATCooltime = 0.0f;
+		}
+		blackBoard->SetValueAsFloat("AtkDelay", ATCooltime);
 	}
 
 	if (m_isTeleport) {
@@ -409,7 +421,7 @@ void EntityEleteMonster::ShootingAttack()
 		if (m_projectileIndex >= m_projectiles.size()) {
 			m_projectileIndex = 0;
 		}
-
+		blackBoard->SetValueAsFloat("AtkDelay", m_rangedAttackCoolTime);
 
 		if (GM)
 		{

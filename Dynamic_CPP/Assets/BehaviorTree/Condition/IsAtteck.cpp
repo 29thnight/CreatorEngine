@@ -81,6 +81,21 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (dir.Length() < atkRange)
 	{
+		if (identity == "MonsterMage")
+		{
+			if (hasAtkDelay) {
+				bool hasDelay = blackBoard.HasKey("AtkDelay");
+				float AtkDelay = 0.0f;
+				if (hasDelay) {
+					AtkDelay = blackBoard.GetValueAsFloat("AtkDelay");
+				}
+
+				if (AtkDelay > 0.01f) {
+					LOG("IsAtteck ConditionCheck: Attack duration has ended.");
+					return false; // Attack duration has ended, can attack
+				}
+			}
+		}
 		//LOG("IsAtteck ConditionCheck: Entity is within attack range.");
 		return true; // Entity is within attack range, condition met
 	}
