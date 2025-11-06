@@ -184,6 +184,35 @@ void TBoss1::Start()
 
 void TBoss1::Update(float tick)
 {
+	if (isDead)
+	{
+		dead1SoundCount -= tick;
+		if (dead1SoundCount <= 0 && dead2SoundStart == false)
+		{
+			if (GM)
+			{
+				auto pool = GM->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossDie2"));
+					dead2SoundStart = true;
+				}
+			}
+		}
+
+		if (dead2SoundStart == true)
+		{
+			dead2SoundCount -= tick;
+			if (dead2SoundCount <= 0 && OnClear == false)
+			{
+				BossClear();
+				OnClear = true;
+			}
+
+		}
+
+
+	}
 	if (isDead)return;
 	std::cout << "[TBoss1::Update] 프레임 시작. 현재 페이즈: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
 	HitImpulseUpdate(tick);
@@ -226,7 +255,7 @@ void TBoss1::Update(float tick)
 	// 2. Handle pattern-specific logic for the current phase
 	UpdatePatternAction(tick);
 
-
+	
 	//UpdatePattern(tick);
 }
 
@@ -1888,10 +1917,10 @@ void TBoss1::Dead()
 		auto pool = GM->GetSFXPool();
 		if (pool)
 		{
-			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossDie"));
+			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossDie1"));
+
 		}
 		GM->VibKillBoss();
-	
 	}
 }
 
@@ -1904,7 +1933,7 @@ void TBoss1::DeadEvent()
 	deadPos.y += 0.7f;
 	deadObj->GetComponent<Transform>()->SetPosition(deadPos);
 	deadEffect->Initialize();
-	BossClear();
+	//BossClear();
 }
 
 void TBoss1::BossClear()

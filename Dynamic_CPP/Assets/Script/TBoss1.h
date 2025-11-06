@@ -348,7 +348,10 @@ public:
 	[[Method]]
 	void DeadEvent();
 	bool EndDeadAnimation = false;
-
+	float dead1SoundCount = 1.7f;
+	float dead2SoundCount = 3.0f;
+	bool dead2SoundStart = false;
+	bool OnClear = false;
 	void BossClear(); //보스죽음 애니메이션끝나면서 연출 끝나는 타이밍(연출에따라 달라짐) 후에 GameManager에 bossClear 신호 주기
 
 
