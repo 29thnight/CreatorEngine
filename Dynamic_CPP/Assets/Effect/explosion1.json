@@ -118,7 +118,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 12.215767860412598,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -313,7 +313,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 30,
             "modules": [
                 {
@@ -395,7 +395,7 @@
                             }
                         ],
                         "movementParams": {
-                            "currentTime": 25.953088760375977,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -1430,7 +1430,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 12.215767860412598,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -1647,7 +1647,7 @@
                             "useGravity": 0
                         },
                         "movementParams": {
-                            "currentTime": 12.215767860412598,
+                            "currentTime": 0.0,
                             "velocityMode": 0
                         },
                         "orbitalData": {
@@ -2018,5 +2018,5 @@
         "y": 0.0,
         "z": 0.0
     },
-    "timeScale": 1.0
+    "timeScale": 1.600000023841858
 }

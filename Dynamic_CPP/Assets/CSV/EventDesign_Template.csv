@@ -1,6 +1,6 @@
 ID,QuestName,Scene,Category,PlayerScope,PriorQuestID,NextQuestID,AdvancePolicy,Description,Objectives
 3100,Start,Tutorial,UI,Shared,0,3101,AutoAdvance,코리를 따라가세요,ReachTrigger actor=Asis index=1
-3101,DestroyBush,Tutorial,Quest,Shared,3100,3102,AutoAdvance,자원을 파괴하세요,Destroy tag=$targetTag required=1
+3101,DestroyBush,Tutorial,Quest,Shared,3100,3102,AutoAdvance,자원을 파괴하세요,Destroy tag=$targetTag required=4
 3102,DeliveryRsToKori,Tutorial,Quest,Shared,3101,3103,AutoAdvance,코리에게 자원 블록을 전달하세요,Deliver tag=DResource required=2
 3103,SecondStop,Tutorial,Quest,Shared,3102,3104,AutoAdvance,코리를 따라가세요,ReachTrigger actor=Asis index=1
 3104,ProtectKori,Tutorial,Quest,Shared,3103,3105,AutoAdvance,몬스터로부터 코리를 지키세요,KillCount tag=Enemy required=3

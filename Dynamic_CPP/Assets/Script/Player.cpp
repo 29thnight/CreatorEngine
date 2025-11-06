@@ -204,7 +204,14 @@ void Player::Start()
 				hpObserver->m_entity = this;
 			}
 		}
-
+		auto instance = GameInstance::GetInstance();
+		auto curScene = (SceneType)instance->GetCurrentSceneType();
+		m_maxHP = maxHP;
+		m_currentHP = m_maxHP;
+		if (curScene == SceneType::Tutorial) //듀토떄 피 80퍼로시작
+		{
+			m_currentHP *= 0.8f;
+		}
 		m_HPbar = GameObject::Find("P1_HPBar");
 		if (m_HPbar)
 		{
@@ -212,8 +219,6 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
-				m_maxHP = maxHP;
-				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
 				hpbar->SetType((int)m_playerType);
@@ -262,8 +267,6 @@ void Player::Start()
 			if (hpbar)
 			{
 				hpbar->targetIndex = player->m_index;
-				m_maxHP = maxHP;
-				m_currentHP = m_maxHP;
 				hpbar->SetMaxHP(m_maxHP);
 				hpbar->SetCurHP(m_currentHP);
 				hpbar->SetType((int)m_playerType);
@@ -2048,19 +2051,57 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 {
 	m_controller->Move({ 0,0 });
 
-	float offsetX = bombMoveSpeed * dir.x;
-	float offsetZ = bombMoveSpeed * dir.y;
-	bombThrowPositionoffset.x += offsetX;
-	bombThrowPositionoffset.z += offsetZ;
+	//float offsetX = bombMoveSpeed * dir.x;
+	//float offsetZ = bombMoveSpeed * dir.y;
+	//bombThrowPositionoffset.x += offsetX;
+	//bombThrowPositionoffset.z += offsetZ;
 
-	bombThrowPositionoffset.x = std::clamp(bombThrowPositionoffset.x, -MaxThrowDistance, MaxThrowDistance);
-	bombThrowPositionoffset.z = std::clamp(bombThrowPositionoffset.z, -MaxThrowDistance, MaxThrowDistance);
+	////bombThrowPositionoffset.x = std::clamp(bombThrowPositionoffset.x, -MaxThrowDistance, MaxThrowDistance);
+	////bombThrowPositionoffset.z = std::clamp(bombThrowPositionoffset.z, -MaxThrowDistance, MaxThrowDistance);
+	//Transform* transform = GetOwner()->GetComponent<Transform>();
+	//Mathf::Vector3 pos = transform->GetWorldPosition();
+
+
+
+	//bombThrowPosition = pos + bombThrowPositionoffset;
+	//float distance = Distance(bombThrowPosition, pos);
+
+
+	//Mathf::Vector3 bombdir = bombThrowPosition - pos;
+	//bombdir.Normalize();
+	//if (distance >= MaxThrowDistance)
+	//{
+
+	//	bombThrowPosition = pos + bombdir * MaxThrowDistance;
+	//}
+	//
+
+	bombThrowPositionoffset.x += bombMoveSpeed * dir.x;
+	bombThrowPositionoffset.z += bombMoveSpeed * dir.y;
+
+	// 2) 원형(반경) 클램프: XZ 벡터 길이 기준
+	{
+		const float r = MaxThrowDistance;
+		const float len = std::sqrt(bombThrowPositionoffset.x * bombThrowPositionoffset.x +
+			bombThrowPositionoffset.z * bombThrowPositionoffset.z);
+		if (len > r && len > 0.0001f)
+		{
+			const float s = r / len; // 스케일 비율
+			bombThrowPositionoffset.x *= s;
+			bombThrowPositionoffset.z *= s;
+		}
+	}
+
 	Transform* transform = GetOwner()->GetComponent<Transform>();
-	Mathf::Vector3 pos = transform->GetWorldPosition();
+	const Mathf::Vector3 pos = transform->GetWorldPosition();
 
-
-
+	// 3) 목표 지점 갱신 (y는 별도 처리하므로 pos.y 기반)
 	bombThrowPosition = pos + bombThrowPositionoffset;
+
+
+
+
+
 
 
 
