@@ -21,13 +21,15 @@ TextureCube EnvMap : register(t6);
 TextureCube PrefilteredSpecMap : register(t7);
 Texture2D BrdfLUT : register(t8);
 
+Texture2D prevDepthTexture : register(t14);
 Texture2D baseColorTexture : register(t15);
 Texture2D baseNormalTexture : register(t16);
 cbuffer MatrixBuffer : register(b12)
 {
     matrix viewMat;
     matrix projMat;
-    float dadd;
+    matrix invviewMat;
+    matrix invprojMat;
 };
 
 

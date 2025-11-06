@@ -45,6 +45,7 @@ private:
 	ComPtr<ID3D11DepthStencilState> m_depthNoWrite;
 	ComPtr<ID3D11BlendState1> m_blendPassState;
 
+	Texture* m_prevDepthTexture{};
 	Texture* m_CopiedTexture{};
 	Texture* m_normalTexture{};
 	ComPtr<ID3D11Buffer> m_MatrixBuffer{};

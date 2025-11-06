@@ -20,7 +20,8 @@ struct alignas(16) ForwardBuffer
 struct alignas(16) MatrixBuffer {
 	XMMATRIX View;
 	XMMATRIX Proj;
-	float add;
+	XMMATRIX invView;
+	XMMATRIX invProj;
 };
 
 struct alignas(16) TimeBuffer {
@@ -189,6 +190,16 @@ ForwardPass::ForwardPass()
 	);
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	m_prevDepthTexture = Texture::Create(
+		DirectX11::DeviceStates->g_ClientRect.width,
+		DirectX11::DeviceStates->g_ClientRect.height,
+		"depthTexture",
+		DXGI_FORMAT_R24G8_TYPELESS,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_DEPTH_STENCIL
+	);
+	m_prevDepthTexture->CreateSRV(DXGI_FORMAT_R24_UNORM_X8_TYPELESS);
+
 	m_MatrixBuffer = DirectX11::CreateBuffer(sizeof(MatrixBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
@@ -229,13 +240,16 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	ID3D11DeviceContext* deferredPtr = deferredContext;
 
+	DirectX11::CopyResource(deferredPtr, m_prevDepthTexture->m_pTexture, renderData->m_depthStencil->m_pTexture);
 	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 	MatrixBuffer matrixBuffer{};
 	matrixBuffer.Proj = renderData->m_frameCalculatedProjection;
 	matrixBuffer.View = renderData->m_frameCalculatedView;
-	matrixBuffer.add = add;
+	matrixBuffer.invView = XMMatrixInverse(nullptr, matrixBuffer.View);
+	matrixBuffer.invProj = XMMatrixInverse(nullptr, matrixBuffer.Proj);
 	DirectX11::UpdateBuffer(deferredPtr, m_MatrixBuffer.Get(), &matrixBuffer);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
+	DirectX11::PSSetShaderResources(deferredPtr, 14, 1, &m_prevDepthTexture->m_pSRV);
 	DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
 	DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
 	TimeBuffer timeBuffer{
@@ -491,6 +505,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 				DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
 
 				DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, m_MatrixBuffer.GetAddressOf());
+				DirectX11::PSSetShaderResources(deferredPtr, 14, 1, &m_prevDepthTexture->m_pSRV);
 				DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &m_CopiedTexture->m_pSRV);
 				DirectX11::PSSetShaderResources(deferredPtr, 16, 1, &m_normalTexture->m_pSRV);
 				DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
