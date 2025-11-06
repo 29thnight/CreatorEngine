@@ -138,6 +138,15 @@ private:
 	};
 	std::unordered_map<class Player*, PlayerBaseSnapshot> m_baseByPlayer{};
 
+
+	struct WeaponDurabilitySnapshot {
+		int	baseMaxDurability{ 0 };
+		bool initialized{ false };
+	};
+	std::unordered_map<class Weapon*, WeaponDurabilitySnapshot> m_baseByWeapon{};
+	void EnsureWeaponSnapshot(class Weapon* weapon);
+
+
 	void EnsureBaseSnapshot(class Player* player);
 
 public:

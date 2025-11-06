@@ -103,11 +103,10 @@ public:
 	std::atomic_bool			        m_isEditorSceneLoaded{ false };
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
-    std::atomic_bool                    m_loadSceneReturn{ false };
     ThreadPool<std::function<void()>>*  m_threadPool{ nullptr };
 
     std::future<Scene*>                 m_loadingSceneFuture;
-    InputActionManager*                 m_inputActionManager{ nullptr };  //TODO: 삭제처리 없음 필요시 추가해야함 //sehwan&&&&&
+    InputActionManager*                 m_inputActionManager{ nullptr };
 private:
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();

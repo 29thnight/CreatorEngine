@@ -94,6 +94,11 @@ void WeaponSlot::ApplyWeapon(Weapon* weapon)
 		break;
 	case (int)ItemType::Bomb:
 		m_slotImage->SetTexture((int)ItemType::Bomb);
+		if(m_curDurability != 1)
+		{
+			//폭탄은 내구도가 1이 아니면 잘못된 상태이므로 내구도를 1로 고정
+			m_curDurability = 1;
+		}
 		break;
 	default:
 		m_slotImage->SetTexture((int)ItemType::None);

@@ -191,7 +191,7 @@ void LetterboxController::Stap2()
 {
     EnterCinemaMode();
 
-    m_dialogueConductor->SetAlternatingRange(3, 8, DialogueConductor::Speaker::P1);
+    m_dialogueConductor->SetAlternatingRange(3, 7, DialogueConductor::Speaker::P1);
 }
 
 void LetterboxController::SetBubbleVisible(bool visible)
