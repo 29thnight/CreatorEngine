@@ -213,9 +213,9 @@ void TBoss1::Update(float tick)
 
 
 	}
+	HitImpulseUpdate(tick);
 	if (isDead)return;
 	std::cout << "[TBoss1::Update] 프레임 시작. 현재 페이즈: " << GetPatternPhaseToString(m_patternPhase) << std::endl;
-	HitImpulseUpdate(tick);
 	//test code  ==> todo : 필요에 따라 최초 타겟과 타겟을 변경하는 내용 ==> 변경기준 카운트? 거리? 랜덤?
 	//1. 보스 기준으로 가장 가까운 플레이어
 	//2. 이전 타겟과의 선택 횟수 차이가 1 이하인지 확인 (eB_TargetNumLimit)
