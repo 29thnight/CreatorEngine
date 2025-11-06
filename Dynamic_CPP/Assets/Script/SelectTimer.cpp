@@ -3,7 +3,10 @@
 #include "GameManager.h"
 #include "TextComponent.h"
 #include "pch.h"
-
+#include "SFXPoolManager.h"
+#include "SoundComponent.h"
+#include "GameInstance.h"
+#include "SoundName.h"
 inline constexpr auto IsStageOrTutorial = [](SceneType t) noexcept -> bool
 {
 	return t == SceneType::Stage || t == SceneType::Tutorial;
@@ -63,6 +66,18 @@ void SelectTimer::Update(float tick)
 		{
 			timerText->SetEnabled(true);
 			timerText->SetMessage(ramineTime);
+
+
+			if (gameManager)
+			{
+				auto pool = gameManager->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("CountDown"));
+				}
+			}
+
+
 		}
 		
 	}

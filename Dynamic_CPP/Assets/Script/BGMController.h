@@ -24,4 +24,6 @@ public:
 	SoundComponent* m_sound;
 	class GameObject* m_pBootstrapObject{ nullptr };
 	bool m_isBootstrapCompleted{ false };
+
+	bool PlayerAnotherSound = false;
 };

@@ -2002,7 +2002,7 @@ void Player::InstantiateWeaponMaterial(GameObject* g)
 
 void Player::StagingStart()
 {
-	ChangeState("staging");
+	//ChangeState("staging");
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 	controller->Move({ 0 ,0 });
 	m_animator->SetParameter("OnMove", true);
@@ -2038,7 +2038,7 @@ void Player::CancelChargeAttack()
 	m_chargingTime = 0;
 	isCharging = false;
 	canRapidfire = false;
-	if (chargeEffect)
+ 	if (chargeEffect)
 	{
 		chargeEffect->StopEffect();
 	}

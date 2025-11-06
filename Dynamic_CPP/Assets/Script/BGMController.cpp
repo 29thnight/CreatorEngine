@@ -3,6 +3,8 @@
 #include "SoundName.h"
 #include "GameInstance.h"
 #include "SoundComponent.h"
+#include "GameManager.h"
+#include "SFXPoolManager.h"
 void BGMController::Start()
 {
 	auto instance = GameInstance::GetInstance();
@@ -20,7 +22,7 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("BgmCharacterSelect");
 		break;
 	case SceneType::Loading:
-		//curSoundName = sounds->GetSoudNameRandom("BgmTitle");
+		curSoundName = sounds->GetSoudNameRandom("BgmLoad");
 		break;
 	case SceneType::Stage:
 		curSoundName = sounds->GetSoudNameRandom("BgmStage11");
@@ -32,21 +34,13 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("BgmBoss");
 		break;
 	case SceneType::Credits:
-		curSoundName = sounds->GetSoudNameRandom("BgmTitle");
+		curSoundName = sounds->GetSoudNameRandom("BgmCredit");
 		break;
 	case SceneType::GameOver:
-		curSoundName = sounds->GetSoudNameRandom("GameOver");
-		if (m_sound)
-		{
-			m_sound->loop = false;
-		}
+		curSoundName = sounds->GetSoudNameRandom("BgmGameover");
 		break;
 	case SceneType::Clear:
-		curSoundName = sounds->GetSoudNameRandom("StageClear");
-		if (m_sound)
-		{
-			m_sound->loop = false;
-		}
+		curSoundName = sounds->GetSoudNameRandom("BgmClear");
 		break;
 	default:
 		//curSoundName = sounds->GetSoudNameRandom("Test");
@@ -77,6 +71,45 @@ void BGMController::Update(float tick)
 			m_sound->Play();
 			m_isBootstrapCompleted = true;
 		}
+	}
+
+	if (PlayerAnotherSound == false)
+	{
+		auto instance = GameInstance::GetInstance();
+		auto curScene = (SceneType)instance->GetCurrentSceneType();
+		std::string curSoundName{};
+		SoundComponent* sound = nullptr;
+		auto sounds = instance->GetSoundName();
+		SFXPoolManager* soundPool = nullptr;
+		auto GMObj = GameObject::Find("GameManager");
+		if (GMObj)
+		{
+			GameManager* GM = GMObj->GetComponent<GameManager>();
+			if (GM)
+			{
+				auto _soundPool = GM->GetSFXPool();
+				if (_soundPool)
+				{
+					soundPool = _soundPool;
+				}
+			}
+		}
+		switch (curScene)
+		{
+		case SceneType::GameOver:
+			curSoundName = sounds->GetSoudNameRandom("GameOver");
+			if(soundPool)
+				soundPool->PlayOneShot(curSoundName);
+			break;
+		case SceneType::Clear:
+			curSoundName = sounds->GetSoudNameRandom("StageClear");
+			if (soundPool)
+				soundPool->PlayOneShot(curSoundName);
+			break;
+		default:
+			break;
+		}
+		PlayerAnotherSound = true;
 	}
 }
 
