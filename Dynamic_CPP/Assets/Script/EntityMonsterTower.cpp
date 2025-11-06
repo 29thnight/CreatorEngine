@@ -4,6 +4,8 @@
 #include "MeshRenderer.h"
 #include "PrefabUtility.h"
 #include "PlayEffectAll.h"
+#include "BehaviorTreeComponent.h"
+#include "Blackboard.h"
 void EntityMonsterTower::Start()
 {
 	m_maxHP = maxHP;
@@ -46,8 +48,22 @@ void EntityMonsterTower::Start()
 	{
 		towerMonster = PrefabUtilitys->InstantiatePrefab(monsterPrefab, "towerPrefab");
 		auto monsterScript = towerMonster->GetComponentDynamicCast<TestMonsterB>();
-		monsterScript->m_attackRange = attackRange;
-		monsterScript->m_chaseRange = 1.0f;
+		//monsterScript->m_attackRange = attackRange;
+		monsterScript->m_projectileRange = attackRange;
+		monsterScript->m_chaseRange = attackRange -1.0f;
+		monsterScript->m_rangedAttackCoolTime = attackSpeed;
+		auto enemyBT = m_pOwner->GetComponent<BehaviorTreeComponent>();
+		if (enemyBT)
+		{
+			auto blackBoard = enemyBT->GetBlackBoard();
+			if (blackBoard)
+			{
+				blackBoard->SetValueAsFloat("ChaseRange", monsterScript->m_chaseRange); // 추적 거리
+				//blackBoard->SetValueAsFloat("AttackRange", attackRange); //근접 공격 거리
+				blackBoard->SetValueAsFloat("ProjectileRange", attackRange); //투사체 최대 사거리
+				blackBoard->SetValueAsFloat("RangedAttackCoolTime", attackSpeed); //원거리 공격 쿨타임
+			}
+		}
 		monsterScript->m_moveSpeed = 0.f;
 		if (monsterSpawnPosObj)
 		{

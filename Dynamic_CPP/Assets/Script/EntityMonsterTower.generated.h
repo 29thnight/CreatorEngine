@@ -7,6 +7,7 @@ ReflectionScriptField(EntityMonsterTower) \
 	({ \
 		meta_property(maxHP) \
 		meta_property(attackRange) \
+		meta_property(attackSpeed) \
 	}); \
 	FieldEnd(EntityMonsterTower, PropertyOnly) \
 };

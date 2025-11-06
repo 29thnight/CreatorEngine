@@ -11,6 +11,7 @@
 #include "EffectComponent.h"
 #include "PrefabUtility.h"
 #include "PlayEffectAll.h"
+#include "CameraComponent.h"
 void SpecialBullet::Start()
 {
 	__super::Start();
@@ -42,6 +43,59 @@ void SpecialBullet::Update(float tick)
 				GM->GetObjectPoolManager()->GetSpecialBulletPool()->Push(this->GetOwner());
 				m_effect->StopEffect();
 			}
+		}
+		lifeTime = rangedProjDist;
+	}
+
+
+
+	auto camera = CameraManagement->GetLastCamera().get();
+
+	auto camViewProj = camera->CalculateView() * camera->CalculateProjection();
+	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+
+	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	float w = XMVectorGetW(clipSpacePos);
+	if (w < 0.001f) {
+		//카메라 뒤편
+		//여기로 오면 뭔가 잘못 된거임
+		auto GMobj = GameObject::Find("GameManager");
+		if (GMobj)
+		{
+			auto GM = GMobj->GetComponent<GameManager>();
+			if (GM && GM->GetObjectPoolManager() != nullptr)
+			{
+				GM->GetObjectPoolManager()->GetSpecialBulletPool()->Push(this->GetOwner());
+				m_effect->StopEffect();
+			}
+
+		}
+		lifeTime = rangedProjDist;
+	}
+
+	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+
+	float x = XMVectorGetX(ndcPos);
+	float y = XMVectorGetY(ndcPos);
+	x = abs(x);
+	y = abs(y);
+
+
+	if (x > 1 || y > 1)
+	{
+		//카메라 x축 혹은 y축 밖
+		//여기는 일절 충돌 없이 카메라 밖으로 나간경우
+		auto GMobj = GameObject::Find("GameManager");
+		if (GMobj)
+		{
+			auto GM = GMobj->GetComponent<GameManager>();
+			if (GM && GM->GetObjectPoolManager() != nullptr)
+			{
+				GM->GetObjectPoolManager()->GetSpecialBulletPool()->Push(this->GetOwner());
+				m_effect->StopEffect();
+			}
+
 		}
 		lifeTime = rangedProjDist;
 	}

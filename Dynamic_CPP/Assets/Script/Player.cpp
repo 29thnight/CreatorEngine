@@ -2182,7 +2182,7 @@ void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
 				continue;
 			}
 			//Ground 등체크해서 땅바닥바로위처리등 
-			bombThrowPosition.y = hit.point.y + 0.1f;
+			bombThrowPosition.y = hit.point.y + 0.3f;
 		}
 
 	}

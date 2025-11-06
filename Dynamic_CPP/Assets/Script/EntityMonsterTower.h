@@ -37,6 +37,8 @@ private:
 	std::string breakTag = "breakModel";
 	[[Property]]
 	float attackRange = 10.f;
+	[[Property]]
+	float attackSpeed = 8.f;
 	
 	GameObject* deadObj = nullptr;
 };
