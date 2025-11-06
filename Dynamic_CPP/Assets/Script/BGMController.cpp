@@ -27,14 +27,14 @@ void BGMController::Start()
 		curSoundName = sounds->GetSoudNameRandom("BgmCharacterSelect");
 		break;
 	case SceneType::Loading: //·Îµù + ÄÆ¾À  // 1 ,  2  ,3 À¸·Î ³ª´²Á®ÀÖÀ½
-		//if(nextScene == SceneType::Stage)
-
-
-
-
-
-
-		curSoundName = sounds->GetSoudNameRandom("BgmLoad");
+		if (nextScene == SceneType::Boss)
+		{
+			curSoundName = sounds->GetSoudNameRandom("BgmBoss");
+		}
+		else
+		{
+			curSoundName = sounds->GetSoudNameRandom("BgmLoad");
+		}
 		break;
 	case SceneType::Stage:
 		curSoundName = sounds->GetSoudNameRandom("BgmStage11");
