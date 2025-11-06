@@ -527,6 +527,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 				if (lightManager->hasLightWithShadows) {
 					DirectX11::PSSetShaderResources(deferredPtr, 4, 1, &renderData->m_shadowMapTexture->m_pSRV);
 					DirectX11::PSSetConstantBuffer(deferredPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+					DirectX11::PSSetConstantBuffer(deferredPtr, 11, 1, &lightManager->m_pLightCountBuffer);
 					lightManager->PSBindCloudShadowMap(deferredPtr);
 				}
 			}
@@ -621,6 +622,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	{
 		DirectX11::PSSetShaderResources(deferredPtr, 4, 1, &data->m_shadowMapTexture->m_pSRV);
 		DirectX11::PSSetConstantBuffer(deferredPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+		DirectX11::PSSetConstantBuffer(deferredPtr, 11, 1, &lightManager->m_pLightCountBuffer);
 		lightManager->PSBindCloudShadowMap(deferredPtr);
 	}
 

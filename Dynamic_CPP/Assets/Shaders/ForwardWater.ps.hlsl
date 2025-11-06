@@ -341,7 +341,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     
     float3 depthColor = lerp(float3(0, 0, 2), refractionColor * fresnel, e);
-    float3 horizonColor = lerp(depthColor, float3(1, 0.5, 0), fresnel);
+    float3 horizonColor = lerp(depthColor, reflectionColor, fresnel);
     float3 underWaterColor = refractionColor + horizonColor;
     return float4(underWaterColor + float3(l,l,l), 1);
     //return float4(lerp(float3(albedo.rgb), colour, waterDistance), 1);
