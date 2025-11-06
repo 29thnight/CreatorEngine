@@ -104,6 +104,11 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* 
 
 RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
 {
+	if (m_renderDataMap.empty())
+	{
+		return nullptr;
+	}
+
 	auto ptr = m_renderDataMap[cameraIndex];
 	if (nullptr != ptr)
 	{
@@ -120,6 +125,11 @@ RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
 
 RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
 {
+	if (m_renderDataMap.empty())
+	{
+		return nullptr;
+	}
+
 	auto sharedPtr = m_renderDataMap[cameraIndex];
 	return sharedPtr.get();
 }

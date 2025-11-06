@@ -446,6 +446,32 @@ void GameManager::ApplyGlobalEnhancementsToPlayer(Player* player)
          const float finalThrowRange = gi->ApplyToBaseFloat(ItemEnhancementType::ThrowRangeUp, snap.baseThrowRange);
          player->detectDistance = finalThrowRange;
      }
+
+	 // 7) Weapon durability (int, Add) : Weapon::durMax
+	 for (size_t idx = 0; idx < player->m_weaponInventory.size(); ++idx)
+	 {
+		 Weapon* weapon = player->m_weaponInventory[idx];
+		 if (!weapon) continue;
+
+		 EnsureWeaponSnapshot(weapon);
+		 auto& weaponSnap = m_baseByWeapon[weapon];
+		 if (!weaponSnap.initialized) continue;
+
+		 const int oldMax = weapon->durMax;
+		 const int finalMax = gi->ApplyToBaseInt(ItemEnhancementType::WeaponDurabilityUp, weaponSnap.baseMaxDurability);
+		 weapon->durMax = finalMax;
+
+		 const int delta = finalMax - oldMax;
+		 if (delta > 0)
+			 weapon->curDur = std::min(weapon->curDur + delta, finalMax);
+		 else
+			 weapon->curDur = std::min(weapon->curDur, finalMax);
+
+		 if (weapon->curDur < 0)
+			 weapon->curDur = 0;
+
+		 player->m_UpdateDurabilityEvent.UnsafeBroadcast(weapon, static_cast<int>(idx));
+	 }
 }
 
 void GameManager::PushEntity(Entity* entity)
@@ -584,6 +610,17 @@ void GameManager::CheatMiningResource()
 		
 		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 300.f, EForceMode::IMPULSE);
 	}*/
+}
+
+void GameManager::EnsureWeaponSnapshot(Weapon* weapon)
+{
+	if (!weapon) return;
+
+	auto& snap = m_baseByWeapon[weapon];
+	if (snap.initialized) return;
+
+	snap.baseMaxDurability = weapon->durMax;
+	snap.initialized = true;
 }
 
 void GameManager::EnsureBaseSnapshot(Player* player)

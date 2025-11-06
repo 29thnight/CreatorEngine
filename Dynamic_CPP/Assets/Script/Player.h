@@ -38,6 +38,8 @@ public:
 	virtual void OnCollisionStay(const Collision& collision) override;
 	virtual void OnCollisionExit(const Collision& collision) override;
 
+	void InitPlayerObserver(int player_index);
+
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override {}

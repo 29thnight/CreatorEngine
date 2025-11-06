@@ -172,6 +172,7 @@ void DialogueConductor::Update(float tick)
                 if (player1)
                 {
                     player1->StagingEnd();
+					player1->InitPlayerObserver(0);
                 }
             }
             auto p2 = GameObject::Find("2P");
@@ -181,6 +182,7 @@ void DialogueConductor::Update(float tick)
                 if (player2)
                 {
                     player2->StagingEnd();
+					player2->InitPlayerObserver(1);
                 }
             }
             elapsed = 0.f;

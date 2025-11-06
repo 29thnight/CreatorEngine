@@ -20,14 +20,14 @@ void GameBuilderSystem::Initialize()
 		m_buildCommand = std::wstring(L"cmd /c \"")
 			+ L"\"" + m_MSBuildPath + L"\" "
 			+ L"\"" + m_buildSlnPath + L"\" "
-			+ L"/m /t:Build /p:Configuration=GameBuild /p:Platform=x64 /nologo"
+			+ L"/m /t:Rebuild /p:Configuration=GameBuild /p:Platform=x64 /nologo"
 			+ L"\"";
 
 		std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
 		m_scriptBuildCommand = std::wstring(L"cmd /c \"")
 			+ L"\"" + m_MSBuildPath + L"\" "
 			+ L"\"" + slnPath + L"\" "
-			+ L"/m /t:Build /p:Configuration=GameBuild /p:Platform=x64 /nologo"
+			+ L"/m /t:Rebuild /p:Configuration=GameBuild /p:Platform=x64 /nologo"
 			+ L"\"";
 
 		m_isInitialized = true;

@@ -90,9 +90,6 @@
     <Filter Include="Managers\TagManager">
       <UniqueIdentifier>{7326de3f-16cd-476a-9169-7a99837ccb03}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\Pool">
-      <UniqueIdentifier>{c6f9af70-6c32-4634-b5fa-8fa78515e055}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\TerrainComponent">
       <UniqueIdentifier>{cdb0c853-085c-4431-9734-95df997eda57}</UniqueIdentifier>
     </Filter>

@@ -71,6 +71,8 @@ struct MyAllocator {
 
     // For compatibility
     template<typename U> struct rebind { using other = MyAllocator<U>; };
+	bool operator==(const MyAllocator& other) const noexcept { return true; }
+	bool operator!=(const MyAllocator& other) const noexcept { return false; }
 };
 
 template<typename T, typename U>

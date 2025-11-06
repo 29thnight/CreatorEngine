@@ -23,7 +23,7 @@ public:
     // 이는 큐가 가득 찼는지 (head == tail && count == capacity - 1)와
     // 큐가 비었는지 (head == tail && count == 0)를 구분하기 위함입니다.
     explicit CircularQueue(int size) :
-        capacity(size), // 큐가 가득 찼을 때 한 칸을 비워두기 위해 +1
+        capacity(size + 1), // 큐가 가득 찼을 때 한 칸을 비워두기 위해 +1
         arr(size),
         head(0),
         tail(0),

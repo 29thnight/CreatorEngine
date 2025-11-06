@@ -1285,7 +1285,11 @@ Texture* ModelLoader::GenerateTexture(std::string_view textureName, bool isCompr
     auto texture = DataSystems->LoadSharedMaterialTexture(path.string(), isCompress);
     if (texture)
     {
-        texture->m_name = std::string(textureName);
+		if (texture->m_name.empty())
+        {
+            texture->m_name = std::string(textureName);
+        }
+
         {
             std::unique_lock lock(m_modelMutex);
             m_model->m_Textures.push_back(texture.get());

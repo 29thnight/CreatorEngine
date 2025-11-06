@@ -66,6 +66,7 @@ void Player::Awake()
 		GM->PushPlayer(this);
 	}
 }
+
 void Player::Start()
 {
 	m_maxHitImpulseSize = 1.0f;
@@ -227,14 +228,18 @@ void Player::Start()
 			}
 		}
 
-		Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
-		if (observerPrefab)
+		int currSceneType = GameInstance::GetInstance()->GetCurrentSceneType();
+		if(currSceneType != (int)SceneType::Stage)
 		{
-			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P1Observer");
-			auto observer = observerObj->GetComponent<PlayerObserver>();
-			observer->SetPlayerIndex(0);
-			observer->SetTarget(player->shared_from_this());
-			observer->Init();
+			Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
+			if (observerPrefab)
+			{
+				auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P1Observer");
+				auto observer = observerObj->GetComponent<PlayerObserver>();
+				observer->SetPlayerIndex(0);
+				observer->SetTarget(player->shared_from_this());
+				observer->Init();
+			}
 		}
 	}
 	else
@@ -275,14 +280,18 @@ void Player::Start()
 			}
 		}
 
-		Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
-		if (observerPrefab)
+		int currSceneType = GameInstance::GetInstance()->GetCurrentSceneType();
+		if (currSceneType != (int)SceneType::Stage)
 		{
-			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P2Observer");
-			auto observer = observerObj->GetComponent<PlayerObserver>();
-			observer->SetPlayerIndex(1);
-			observer->SetTarget(player->shared_from_this());
-			observer->Init();
+			Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
+			if (observerPrefab)
+			{
+				auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P2Observer");
+				auto observer = observerObj->GetComponent<PlayerObserver>();
+				observer->SetPlayerIndex(1);
+				observer->SetTarget(player->shared_from_this());
+				observer->Init();
+			}
 		}
 	}
 
@@ -2781,6 +2790,34 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 
 				rangeHitEffect->Initialize();
 			}
+		}
+	}
+}
+
+void Player::InitPlayerObserver(int player_index)
+{
+	if (player_index == 0)
+	{
+		Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
+		if (observerPrefab)
+		{
+			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P1Observer");
+			auto observer = observerObj->GetComponent<PlayerObserver>();
+			observer->SetPlayerIndex(0);
+			observer->SetTarget(player->shared_from_this());
+			observer->Init();
+		}
+	}
+	else if (player_index == 1)
+	{
+		Prefab* observerPrefab = PrefabUtilitys->LoadPrefab("PlayerObserver");
+		if (observerPrefab)
+		{
+			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P2Observer");
+			auto observer = observerObj->GetComponent<PlayerObserver>();
+			observer->SetPlayerIndex(1);
+			observer->SetTarget(player->shared_from_this());
+			observer->Init();
 		}
 	}
 }

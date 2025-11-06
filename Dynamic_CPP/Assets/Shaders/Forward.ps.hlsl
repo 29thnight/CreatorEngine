@@ -21,13 +21,15 @@ TextureCube EnvMap : register(t6);
 TextureCube PrefilteredSpecMap : register(t7);
 Texture2D BrdfLUT : register(t8);
 
+Texture2D prevDepthTexture : register(t14);
 Texture2D baseColorTexture : register(t15);
 Texture2D baseNormalTexture : register(t16);
 cbuffer MatrixBuffer : register(b12)
 {
     matrix viewMat;
     matrix projMat;
-    float dadd;
+    matrix invviewMat;
+    matrix invprojMat;
 };
 
 
@@ -77,15 +79,46 @@ struct PixelShaderInput
     float2 texCoord1 : TEXCOORD1;
 };
 
+float3 ReconstructWorldPosFromDepth(float2 uv, float depth, float4x4 invProj, float4x4 invView)
+{
+    float2 clipXY = uv * 2.0 - 1.0;
+    clipXY.y = -clipXY.y;
+    
+    float4 clipSpace = float4(clipXY, depth, 1.0);
+    float4 viewSpace = mul(invProj, clipSpace);
+
+    // perspective divide
+    viewSpace /= viewSpace.w;
+
+    float4 worldSpace = mul(invView, viewSpace);
+    return worldSpace.xyz;
+}
+
+float2 UVPosition(float3 worldPos)
+{
+    matrix vp = mul(projMat, viewMat);
+    float4 projectedPos = mul(vp, float4(worldPos, 1.0));
+    projectedPos.xyz /= projectedPos.w;
+    float2 tempuv = projectedPos.xy * 0.5 + 0.5;
+    tempuv.y = 1.0 - tempuv.y;
+    return tempuv;
+}
+float LinearEyeDepth(float z)
+{
+    return 500.f * 0.1f / ((0.1f - 500.f) * z + 500.f);
+}
+
 float3 Refraction(float3 worldPos, float3 view, float3 baseNormal, float ior)
 {
     float3 refractPos = refract(normalize(view), normalize(baseNormal), ior);
     refractPos = refractPos + worldPos;
-    matrix vp = mul(projMat, viewMat);
-    float4 projectedPos = mul(vp, float4(refractPos, 1.0));
-    projectedPos.xyz /= projectedPos.w;
-    float2 refractUV = projectedPos.xy * 0.5 + 0.5;
-    refractUV.y = 1.0 - refractUV.y;
+    
+    float2 refractUV = UVPosition(refractPos);
+    //matrix vp = mul(projMat, viewMat);
+    //float4 projectedPos = mul(vp, float4(refractPos, 1.0));
+    //projectedPos.xyz /= projectedPos.w;
+    //float2 refractUV = projectedPos.xy * 0.5 + 0.5;
+    //refractUV.y = 1.0 - refractUV.y;
     return baseColorTexture.Sample(PointSampler, refractUV).rgb;
 }
 
@@ -99,7 +132,17 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     if (gNormalState == NORMAL_MAP)
     {
-        surf.N = CalcNormalFromNormMap(NormalMap, IN.texCoord, surf);
+        if ((bitflag & USE_SSRefraction) == 0)
+            surf.N = CalcNormalFromNormMap(NormalMap, IN.texCoord, surf);
+        else
+        {
+            float3 normal1 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(0, totalTime / 10.f), surf);
+            float3 normal2 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(0, totalTime / 9.f), surf);
+            float3 normal3 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(totalTime / 11.f, 0), surf);
+            float3 normal4 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(totalTime / 12.f, 0), surf);
+        
+            surf.N = (normal1 + normal2 + normal3 + normal4) / 4.f;
+        }
     }
     else if (gNormalState == BUMP_MAP)
     {
@@ -211,22 +254,41 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         return float4(colour, albedo.a);
     }
     else
-    {
+    { 
+        float2 screenUV = UVPosition(IN.wPosition.xyz);
+        float prevDepth = prevDepthTexture.Sample(LinearSampler, screenUV).r;
     
+        float3 objWorld = ReconstructWorldPosFromDepth(screenUV, prevDepth, invprojMat, invviewMat);
+    
+        float depth = IN.position.z;
+    
+        float maxDistance = 1.0f;
+    
+        float3 v = viewMat._13_23_33;
+        float d = dot(v, surf.N);
+    
+        float y = objWorld.y - IN.wPosition.y;
+        y = y / maxDistance;
+        float e = saturate(exp(y)); // 깊이에 따라 부드럽게 어두워지는 효과
+
+    //float3 s = smoothstep(prevDepth, depth, float3(1, 0, 0));
+        
     //float2 screenUV = IN.position.xy / IN.position.w;
     //screenUV = screenUV * 0.5 + 0.5;
     //float3 baseNormal = baseNormalTexture.Sample(PointSampler, screenUV).xyz * 2 - 1;
         float3 view = -surf.V;
         float3 refractionColor;
     
-        refractionColor.r = Refraction(IN.wPosition.xyz, view, surf.N, 1 / gIOR).r;
-        refractionColor.g = Refraction(IN.wPosition.xyz, view, surf.N, 1 / (gIOR + dadd)).g;
-        refractionColor.b = Refraction(IN.wPosition.xyz, view, surf.N, 1 / (gIOR + dadd * 2)).b;
-        
+        refractionColor.r = Refraction(IN.wPosition.xyz, view, surf.N, gIOR).r;
+        refractionColor.g = Refraction(IN.wPosition.xyz, view, surf.N, (gIOR + 0.021)).g;
+        refractionColor.b = Refraction(IN.wPosition.xyz, view, surf.N, (gIOR + 0.021 * 2)).b;
+    
+        float3 prevColor = baseColorTexture.Sample(LinearSampler, screenUV);
+    
         float3 transmissionColor = refractionColor * albedo.rgb;
-        
+    
         float3 reflectionColor = float3(0, 0, 0);
-        
+    
         for (int i = 0; i < lightCount; ++i)
         {
             Light light = Lights[i];
@@ -235,8 +297,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
             LightingInfo li = EvalLightingInfo(surf, light);
             float NdotL = max(li.NdotL, 0.0); // clamped n dot l
             float NdotV = max(surf.NdotV, 0.0);
-        
-        // cook-torrance brdf
+    
+    // cook-torrance brdf
             float NDF = DistributionGGX(max(li.NdotH, 0.0), roughness);
             float G = GeometrySmith(NdotV, NdotL, roughness);
             float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0_dielectric);
@@ -248,8 +310,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
             float3 numerator = NDF * G * F;
             float denominator = 4.0 * NdotV * NdotL;
             float3 specular = numerator / max(denominator, 0.001);
-        
-        //light.color.rgb *= light.intencity;
+    
+    //light.color.rgb *= light.intencity;
 
             reflectionColor += (specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
         }
@@ -270,12 +332,23 @@ float4 main(PixelShaderInput IN) : SV_TARGET
             float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
             reflectionColor += (specular);
         }
-        
+    
         float3 fresnel = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
         float3 finalColor = transmissionColor * (1.0 - fresnel) + reflectionColor * fresnel;
-        //float dott = abs(dot(surf.N, surf.V));
-        //finalColor = finalColor * dott + gAlbedo.rgb * pow(1.0 - dott, 5) * 15;
+    //float dott = abs(dot(surf.N, surf.V));
+    //finalColor = finalColor * dott + gAlbedo.rgb * pow(1.0 - dott, 5) * 15;
         float3 colour = finalColor + emissive.rgb;
-        return float4(colour, 1);
+    
+        float s = smoothstep(0.9, 1, e);
+        float l = lerp(0, 1, s);
+    
+    
+        float3 depthColor = lerp(float3(0, 0, 2), refractionColor * fresnel, e);
+        float3 horizonColor = lerp(depthColor, float3(1, 0.5, 0), fresnel);
+        float3 underWaterColor = refractionColor + horizonColor;
+        return float4(underWaterColor + float3(l, l, l), 1);
+    //return float4(lerp(float3(albedo.rgb), colour, waterDistance), 1);
+
+    //return float4(colour, 1.f);
     }
 }
