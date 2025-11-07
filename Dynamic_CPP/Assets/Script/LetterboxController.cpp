@@ -184,7 +184,7 @@ void LetterboxController::Stap1()
 {
     EnterCinemaMode();
 
-    m_dialogueConductor->SetAlternatingRange(0, 3, DialogueConductor::Speaker::P1);
+    m_dialogueConductor->SetAlternatingRange(0, 3, DialogueConductor::Speaker::P2);
 }
 
 void LetterboxController::Stap2()

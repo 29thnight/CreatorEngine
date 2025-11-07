@@ -146,6 +146,7 @@ void ImageSlideshow::ApplyIndex()
 {
     // 인덱스 변경 시 실제 텍스처/사이즈/원점 갱신
     m_image->UpdateTexture();
+	m_image->ResetSize();
 }
 
 void ImageSlideshow::Stop()

@@ -39,11 +39,11 @@ void SelectTimer::Update(float tick)
 {
 	if (!gameManager || !timerImage || m_isSwitchSceneStarted) return;
 	int count = gameManager->selectPlayerCount;
+	static int lastTimer{ -1 };
 
 	if (m_isTimerOn)
 	{
 		m_remainTimeInternal -= tick;
-
 		int timer{ static_cast<int>(m_remainTimeInternal) };
 		if (0.5f >= m_remainTimeInternal)
 		{
@@ -57,6 +57,19 @@ void SelectTimer::Update(float tick)
 		{
 			timerImage->SetEnabled(true);
 			timerImage->SetTexture(timer);
+		}
+
+		if (lastTimer != timer)
+		{
+			if (gameManager)
+			{
+				auto pool = gameManager->GetSFXPool();
+				if (pool)
+				{
+					pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("CountDown"));
+				}
+			}
+			lastTimer = timer;
 		}
 	}
 	
@@ -72,6 +85,7 @@ void SelectTimer::Update(float tick)
 	else
 	{
 		m_remainTimeInternal = -1.f;
+		lastTimer = -1;
 		if (timerImage)
 		{
 			timerImage->SetEnabled(false);

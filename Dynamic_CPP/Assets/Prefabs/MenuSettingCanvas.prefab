@@ -1,11 +1,11 @@
 m_name: MenuSettingCanvas
-m_instanceID: 284190263
+m_instanceID: 2351081491
 m_isEnabled: true
 m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: MenuSettingCanvas
-    m_instanceID: 1495725862
+    m_instanceID: 952680200
     m_isEnabled: true
     m_attachedSoketID: 0
     m_transform:
@@ -13,18 +13,18 @@ PrefabNode:
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 1}
       m_parentID: 0
-    m_index: 1471
+    m_index: 3
     m_parentIndex: 0
     m_rootIndex: 0
     m_collisionType: 0
-    m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
-    m_childrenIndices: [1472, 1477, 1478, 1479]
+    m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
+    m_childrenIndices: [4, 9, 10, 11]
     m_tag: Untagged
     m_layer: Default
     m_components:
       - RectTransformComponent: 3002078429
         m_name: RectTransformComponent
-        m_instanceID: 2277067569
+        m_instanceID: 4080708586
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_anchorMin: {x: 0.5, y: 0.5}
@@ -35,7 +35,7 @@ PrefabNode:
         m_worldRect: {x: -960, y: -540, width: 1920, height: 1080}
       - Canvas: 2773063417
         m_name: Component
-        m_instanceID: 3826550011
+        m_instanceID: 2689931500
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         CanvasOrder: 4
@@ -52,19 +52,19 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1471
-        m_index: 1472
-        m_parentIndex: 1471
+          m_parentID: 3
+        m_index: 4
+        m_parentIndex: 3
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
-        m_childrenIndices: [1473, 1474, 1475, 1476]
+        m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
+        m_childrenIndices: [5, 6, 7, 8, 12, 13, 14, 15]
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
-            m_instanceID: 631800846
+            m_instanceID: 1041660241
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
@@ -75,7 +75,7 @@ PrefabNode:
             m_worldRect: {x: 635.5, y: 165.5, width: 649, height: 749}
           - ImageComponent: 1187169862
             m_name: ImageComponent
-            m_instanceID: 1534842209
+            m_instanceID: 2579691059
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 3
@@ -95,7 +95,7 @@ PrefabNode:
             clipDirection: 0
           - ModuleBehavior: 1399118904
             m_name: PauseMenuButton
-            m_instanceID: 4179002310
+            m_instanceID: 2421256021
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_scriptGuid: 74acdcc6-6299-5cba-97b1-0cea5317fe68
@@ -111,19 +111,19 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 1472
-            m_index: 1473
-            m_parentIndex: 1472
+              m_parentID: 4
+            m_index: 5
+            m_parentIndex: 4
             m_rootIndex: 0
             m_collisionType: 0
-            m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+            m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
             m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 2310498343
+                m_instanceID: 2243933256
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -134,7 +134,7 @@ PrefabNode:
                 m_worldRect: {x: 790, y: 350, width: 340, height: 60}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 1322574858
+                m_instanceID: 1422492480
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 4
@@ -146,25 +146,25 @@ PrefabNode:
                   - mode: 0
                     navObject: 1735511716
                 m_customPixelShaderPath: ""
-                texturePaths: [Pause_btt_retry.png]
+                texturePaths: [Pause_btt_retry.png, Pause_btt_retry_C.png, Pause_btt_main_C.png]
                 color: {r: 1, g: 1, b: 1, a: 1}
-                curindex: 0
+                curindex: 1
                 rotate: 0
                 origin: {x: 170, y: 30}
                 unionScale: 1
                 clipPercent: 1
                 clipDirection: 0
               - ModuleBehavior: 1399118904
-                m_isTintChange: true
+                m_isTintChange: false
                 m_isEntering: false
                 m_name: RestartButton
-                m_instanceID: 3969748428
+                m_instanceID: 2466149844
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 67391d80-4595-5d28-a6e1-6e08439a9c12
               - UIButton: 386227286
                 m_name: UIButton
-                m_instanceID: 1112309371
+                m_instanceID: 1374456751
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 0
@@ -175,7 +175,7 @@ PrefabNode:
             m_gameObjectType: 5
             m_isStatic: false
           - GameObject: 2166264123
-            m_name: title_btt (2)
+            m_name: title_btt (1)
             m_instanceID: 1799549867
             m_isEnabled: true
             m_attachedSoketID: 0
@@ -183,19 +183,19 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 1472
-            m_index: 1474
-            m_parentIndex: 1472
+              m_parentID: 4
+            m_index: 6
+            m_parentIndex: 4
             m_rootIndex: 0
             m_collisionType: 0
-            m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+            m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
             m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 210112548
+                m_instanceID: 2057779615
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -206,7 +206,7 @@ PrefabNode:
                 m_worldRect: {x: 790, y: 456, width: 340, height: 60}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 1922211961
+                m_instanceID: 3215924993
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 4
@@ -218,25 +218,25 @@ PrefabNode:
                   - mode: 1
                     navObject: 3340887795
                 m_customPixelShaderPath: ""
-                texturePaths: [Pause_btt_main.png]
+                texturePaths: [Pause_btt_main.png, Pause_btt_main_C.png, Pause_btt_main_C.png]
                 color: {r: 1, g: 1, b: 1, a: 1}
-                curindex: 0
+                curindex: 2
                 rotate: 0
                 origin: {x: 170, y: 30}
                 unionScale: 1
                 clipPercent: 1
                 clipDirection: 0
               - ModuleBehavior: 1399118904
-                m_isTintChange: true
+                m_isTintChange: false
                 m_isEntering: false
                 m_name: ReturnMainScene
-                m_instanceID: 1883614058
+                m_instanceID: 894574099
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: cc18df0a-857f-53d7-a50f-90a955a2a6b5
               - UIButton: 386227286
                 m_name: UIButton
-                m_instanceID: 2670704324
+                m_instanceID: 987469785
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 0
@@ -255,19 +255,19 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 1472
-            m_index: 1475
-            m_parentIndex: 1472
+              m_parentID: 4
+            m_index: 7
+            m_parentIndex: 4
             m_rootIndex: 0
             m_collisionType: 0
-            m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+            m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
             m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 526056207
+                m_instanceID: 567687532
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -278,7 +278,7 @@ PrefabNode:
                 m_worldRect: {x: 790, y: 563, width: 340, height: 60}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 1895465138
+                m_instanceID: 4035960867
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 4
@@ -290,9 +290,9 @@ PrefabNode:
                   - mode: 1
                     navObject: 1734690583
                 m_customPixelShaderPath: ""
-                texturePaths: [Pause_btt_play.png]
+                texturePaths: [Pause_btt_play.png, Pause_btt_play_C.png]
                 color: {r: 1, g: 1, b: 1, a: 1}
-                curindex: 0
+                curindex: 1
                 rotate: 0
                 origin: {x: 170, y: 30}
                 unionScale: 1
@@ -300,7 +300,7 @@ PrefabNode:
                 clipDirection: 0
               - UIButton: 386227286
                 m_name: UIButton
-                m_instanceID: 4122728158
+                m_instanceID: 1261631711
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 0
@@ -309,10 +309,10 @@ PrefabNode:
                 navigations: ~
                 m_customPixelShaderPath: ""
               - ModuleBehavior: 1399118904
-                m_isTintChange: true
+                m_isTintChange: false
                 m_isEntering: false
                 m_name: ExitPauseButton
-                m_instanceID: 3957742857
+                m_instanceID: 1201457734
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: 6f033c86-c44d-53bd-b05b-caabfe6b2589
@@ -327,19 +327,19 @@ PrefabNode:
               position: {x: 0, y: 0, z: 0, w: 1}
               rotation: {x: 0, y: 0, z: 0, w: 1}
               scale: {x: 1, y: 1, z: 1, w: 1}
-              m_parentID: 1472
-            m_index: 1476
-            m_parentIndex: 1472
+              m_parentID: 4
+            m_index: 8
+            m_parentIndex: 4
             m_rootIndex: 0
             m_collisionType: 0
-            m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+            m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
             m_childrenIndices: ~
             m_tag: Untagged
             m_layer: Default
             m_components:
               - RectTransformComponent: 3002078429
                 m_name: RectTransformComponent
-                m_instanceID: 3464834386
+                m_instanceID: 2016939192
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_anchorMin: {x: 0.5, y: 0.5}
@@ -350,7 +350,7 @@ PrefabNode:
                 m_worldRect: {x: 790, y: 664, width: 340, height: 60}
               - ImageComponent: 1187169862
                 m_name: ImageComponent
-                m_instanceID: 1856307609
+                m_instanceID: 3633316662
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 4
@@ -360,25 +360,25 @@ PrefabNode:
                   - mode: 0
                     navObject: 3340887795
                 m_customPixelShaderPath: ""
-                texturePaths: [Pause_btt_option.png]
+                texturePaths: [Pause_btt_option.png, Pause_btt_option_C.png]
                 color: {r: 1, g: 1, b: 1, a: 1}
-                curindex: 0
+                curindex: 1
                 rotate: 0
                 origin: {x: 170, y: 30}
                 unionScale: 1
                 clipPercent: 1
                 clipDirection: 0
               - ModuleBehavior: 1399118904
-                m_isTintChange: true
+                m_isTintChange: false
                 m_isEntering: false
                 m_name: SettingButton
-                m_instanceID: 3703225985
+                m_instanceID: 3137045190
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 m_scriptGuid: b6a50c64-b6e7-5ac1-9825-df49f42ced81
               - UIButton: 386227286
                 m_name: UIButton
-                m_instanceID: 664766270
+                m_instanceID: 4143380523
                 m_isEnabled: true
                 m_FileID: 00000000-0000-0000-0000-000000000000
                 _layerorder: 0
@@ -388,8 +388,208 @@ PrefabNode:
                 m_customPixelShaderPath: ""
             m_gameObjectType: 5
             m_isStatic: false
+          - GameObject: 2166264123
+            m_name: Pause_btt_retry
+            m_instanceID: 1971202178
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 4
+            m_index: 12
+            m_parentIndex: 4
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_instanceID: 1390279924
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: -160}
+                m_sizeDelta: {x: 340, y: 60}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 790, y: 350, width: 340, height: 60}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_instanceID: 4213070034
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 3
+                uiEffects: 0
+                m_ownerCanvasName: MenuSettingCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                texturePaths: [Pause_btt_retry.png]
+                color: {r: 1, g: 1, b: 1, a: 1}
+                curindex: 0
+                rotate: 0
+                origin: {x: 170, y: 30}
+                unionScale: 1
+                clipPercent: 1
+                clipDirection: 0
+            m_gameObjectType: 5
+            m_isStatic: false
+          - GameObject: 2166264123
+            m_name: Pause_btt_main
+            m_instanceID: 4084678352
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 4
+            m_index: 13
+            m_parentIndex: 4
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_instanceID: 2166488001
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: -54}
+                m_sizeDelta: {x: 340, y: 60}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 790, y: 456, width: 340, height: 60}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_instanceID: 3572378461
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 3
+                uiEffects: 0
+                m_ownerCanvasName: MenuSettingCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                texturePaths: [Pause_btt_main.png]
+                color: {r: 1, g: 1, b: 1, a: 1}
+                curindex: 0
+                rotate: 0
+                origin: {x: 170, y: 30}
+                unionScale: 1
+                clipPercent: 1
+                clipDirection: 0
+            m_gameObjectType: 5
+            m_isStatic: false
+          - GameObject: 2166264123
+            m_name: Pause_btt_play (1)
+            m_instanceID: 2787351252
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 4
+            m_index: 14
+            m_parentIndex: 4
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_instanceID: 4253234045
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 53}
+                m_sizeDelta: {x: 340, y: 60}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 790, y: 563, width: 340, height: 60}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_instanceID: 2517235355
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 3
+                uiEffects: 0
+                m_ownerCanvasName: MenuSettingCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                texturePaths: [Pause_btt_play.png]
+                color: {r: 1, g: 1, b: 1, a: 1}
+                curindex: 0
+                rotate: 0
+                origin: {x: 170, y: 30}
+                unionScale: 1
+                clipPercent: 1
+                clipDirection: 0
+            m_gameObjectType: 5
+            m_isStatic: false
+          - GameObject: 2166264123
+            m_name: Pause_btt_option
+            m_instanceID: 2593572356
+            m_isEnabled: true
+            m_attachedSoketID: 0
+            m_transform:
+              position: {x: 0, y: 0, z: 0, w: 1}
+              rotation: {x: 0, y: 0, z: 0, w: 1}
+              scale: {x: 1, y: 1, z: 1, w: 1}
+              m_parentID: 4
+            m_index: 15
+            m_parentIndex: 4
+            m_rootIndex: 0
+            m_collisionType: 0
+            m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+            m_childrenIndices: ~
+            m_tag: Untagged
+            m_layer: Default
+            m_components:
+              - RectTransformComponent: 3002078429
+                m_name: RectTransformComponent
+                m_instanceID: 1992750034
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                m_anchorMin: {x: 0.5, y: 0.5}
+                m_anchorMax: {x: 0.5, y: 0.5}
+                m_anchoredPosition: {x: 0, y: 154}
+                m_sizeDelta: {x: 340, y: 60}
+                m_pivot: {x: 0.5, y: 0.5}
+                m_worldRect: {x: 790, y: 664, width: 340, height: 60}
+              - ImageComponent: 1187169862
+                m_name: ImageComponent
+                m_instanceID: 1499558360
+                m_isEnabled: true
+                m_FileID: 00000000-0000-0000-0000-000000000000
+                _layerorder: 3
+                uiEffects: 0
+                m_ownerCanvasName: MenuSettingCanvas
+                navigations: ~
+                m_customPixelShaderPath: ""
+                texturePaths: [Pause_btt_option.png]
+                color: {r: 1, g: 1, b: 1, a: 1}
+                curindex: 0
+                rotate: 0
+                origin: {x: 170, y: 30}
+                unionScale: 1
+                clipPercent: 1
+                clipDirection: 0
+            m_gameObjectType: 5
+            m_isStatic: false
       - GameObject: 2166264123
-        m_name: btt_A (1)
+        m_name: btt_A
         m_instanceID: 2557951429
         m_isEnabled: true
         m_attachedSoketID: 0
@@ -397,19 +597,19 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1471
-        m_index: 1477
-        m_parentIndex: 1471
+          m_parentID: 3
+        m_index: 9
+        m_parentIndex: 3
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+        m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
-            m_instanceID: 1520565513
+            m_instanceID: 1750928799
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
@@ -420,7 +620,7 @@ PrefabNode:
             m_worldRect: {x: 719.5, y: 788.5, width: 221, height: 63}
           - ImageComponent: 1187169862
             m_name: ImageComponent
-            m_instanceID: 1635705624
+            m_instanceID: 48299740
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 4
@@ -439,7 +639,7 @@ PrefabNode:
         m_gameObjectType: 5
         m_isStatic: false
       - GameObject: 2166264123
-        m_name: btt_B (3)
+        m_name: btt_B (2)
         m_instanceID: 3537502295
         m_isEnabled: true
         m_attachedSoketID: 0
@@ -447,19 +647,19 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1471
-        m_index: 1478
-        m_parentIndex: 1471
+          m_parentID: 3
+        m_index: 10
+        m_parentIndex: 3
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+        m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
-            m_instanceID: 3378368957
+            m_instanceID: 3467064698
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
@@ -470,7 +670,7 @@ PrefabNode:
             m_worldRect: {x: 991.5, y: 788.5, width: 221, height: 63}
           - ImageComponent: 1187169862
             m_name: ImageComponent
-            m_instanceID: 357062067
+            m_instanceID: 3784965658
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 4
@@ -489,7 +689,7 @@ PrefabNode:
         m_gameObjectType: 5
         m_isStatic: false
       - GameObject: 2166264123
-        m_name: pop_bg (1)
+        m_name: pop_bg
         m_instanceID: 2204225855
         m_isEnabled: true
         m_attachedSoketID: 0
@@ -497,19 +697,19 @@ PrefabNode:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: 0, y: 0, z: 0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 1}
-          m_parentID: 1471
-        m_index: 1479
-        m_parentIndex: 1471
+          m_parentID: 3
+        m_index: 11
+        m_parentIndex: 3
         m_rootIndex: 0
         m_collisionType: 0
-        m_prefabFileGuid: 7ab03b9d-02bb-5392-b33d-58c8439aee63
+        m_prefabFileGuid: 681a84bb-0bba-5862-bb1b-a61aaa27ee3a
         m_childrenIndices: ~
         m_tag: Untagged
         m_layer: Default
         m_components:
           - RectTransformComponent: 3002078429
             m_name: RectTransformComponent
-            m_instanceID: 725309280
+            m_instanceID: 61554657
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_anchorMin: {x: 0.5, y: 0.5}
@@ -520,7 +720,7 @@ PrefabNode:
             m_worldRect: {x: 0, y: 0, width: 1920, height: 1080}
           - ImageComponent: 1187169862
             m_name: ImageComponent
-            m_instanceID: 733420488
+            m_instanceID: 485374697
             m_isEnabled: true
             m_FileID: 00000000-0000-0000-0000-000000000000
             _layerorder: 0

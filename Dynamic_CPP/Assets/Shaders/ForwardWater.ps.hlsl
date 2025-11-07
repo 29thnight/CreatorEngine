@@ -180,10 +180,10 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         if ((bitflag & WaterDirectionALL) > 0)
         {
         //surf.N = CalcNormalFromNormMap(NormalMap, IN.texCoord + float2(totalTime/ 5.f, totalTime/ 5.f), surf);
-            float3 normal1 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(0, totalTime / 10.f), surf);
-            float3 normal2 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(0, totalTime / 9.f), surf);
-            float3 normal3 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f - float2(totalTime / 11.f, 0), surf);
-            float3 normal4 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(totalTime / 12.f, 0), surf);
+            float3 normal1 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 15.f - float2(0, totalTime / 10.f), surf);
+            float3 normal2 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 15.f + float2(0, totalTime / 9.f), surf);
+            float3 normal3 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 15.f - float2(totalTime / 11.f, 0), surf);
+            float3 normal4 = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 15.f + float2(totalTime / 12.f, 0), surf);
         
             surf.N = (normal1 + normal2 + normal3 + normal4) / 4.f;
         }
