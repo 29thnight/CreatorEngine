@@ -169,7 +169,7 @@ void ViveSwitchUI::ApplyButton()
 
         if (InputManagement->IsControllerConnected(1))
         {
-            m_haptics.PlayHeartbeatStrong(1, /*ampMul=*/1.2f, /*repeat=*/2);
+            m_haptics2.PlayHeartbeatStrong(1, /*ampMul=*/1.2f, /*repeat=*/2);
 		}
     }
     m_prevViveEnabled = m_isViveEnabled;

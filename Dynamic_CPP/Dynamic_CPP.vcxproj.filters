@@ -1280,5 +1280,8 @@
 		<ClCompile Include="Assets\Script\TowerTrigger.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
+		<ClCompile Include="ControllerHaptics.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
 	</ItemGroup>
 </Project>

@@ -69,7 +69,19 @@ settings:
     mCustomNearPlane: 0.5
     mCustomFarPlane: 1000
     isOn: true
-  skyboxTextureName: dikhololo_night_4k.hdr
+  bitMask:
+    isOn: true
+    blurOutline: false
+    outlineVelocity: 3
+    m_color1: {r: 1, g: 0, b: 0, a: 3}
+    m_color2: {r: 0, g: 1, b: 0, a: 3}
+    m_color3: {r: 0, g: 0, b: 1, a: 3}
+    m_color4: {r: 1, g: 1, b: 0, a: 3}
+    m_color5: {r: 1, g: 0, b: 1, a: 3}
+    m_color6: {r: 0, g: 1, b: 1, a: 3}
+    m_color7: {r: 0.5, g: 0.5, b: 0.5, a: 3}
+    m_color8: {r: 0.200000003, g: 0.200000003, b: 0.200000003, a: 3}
+  skyboxTextureName: rustig_koppie_puresky_8k.hdr
   m_isSkyboxEnabled: true
   m_windDirection: {x: 1, y: 0, z: 0}
   m_windStrength: 0.100000001

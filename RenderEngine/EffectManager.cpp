@@ -4,11 +4,16 @@
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
 #include "EffectSerializer.h"
+#include "SceneManager.h"
 #include "Profiler.h"
 
 void EffectManager::Initialize()
 {
 	std::filesystem::path effectPath = PathFinder::Relative("Effect\\");
+
+	SceneManagers->resourceTrimEvent.AddLambda([this]() {
+		EmergencyCleanup();
+	});
 
 	// 디렉토리 존재여부
 	if (!std::filesystem::exists(effectPath) || !std::filesystem::is_directory(effectPath)) {

@@ -271,7 +271,10 @@ void GameObject::RemoveComponentTypeID(uint32 typeID)
 	if (iter != m_componentIds.end())
 	{
 		size_t index = iter->second;
-		m_components[index]->Destroy();
+		if (m_components[index])
+		{
+			m_components[index]->Destroy();
+		}
 		m_componentIds.erase(iter);
 	}
 }

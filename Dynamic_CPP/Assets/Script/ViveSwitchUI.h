@@ -44,4 +44,5 @@ private:
 
 	class GameManager* GM = nullptr;
 	ControllerHaptics m_haptics{};
+	ControllerHaptics m_haptics2{};
 };

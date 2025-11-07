@@ -466,6 +466,7 @@
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
 		<ClCompile Include="Assets\Script\TimerTrigger.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
+		<ClCompile Include="ControllerHaptics.cpp" />
 		<ClCompile Include="GameInstance.cpp" />
 		<ClCompile Include="ObjectPool.cpp" />
 		<ClCompile Include="PlayGameData.cpp" />

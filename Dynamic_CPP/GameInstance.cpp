@@ -3,6 +3,7 @@
 #include "DebugLog.h"
 #include "CSVLoader.h"
 #include "SimpleIniFile.h"
+#include "InputManager.h"
 #include "pch.h"
 
 inline constexpr std::string_view ToKey(SceneType t) {
@@ -86,6 +87,10 @@ void GameInstance::Initialize()
 	std::string csvFileName = "ItemEnhancementSetting.csv";
 	LoadItemInfoFromCSV(csvFileName);
 	m_soundName.LoadSoundNameFromCSV();
+
+#ifdef BUILD_FLAG
+	InputManagement->HideCursor();
+#endif
 
 }
 
@@ -397,6 +402,7 @@ void GameInstance::ResumeGame()
 
 void GameInstance::ExitGame()
 {
+	InputManagement->ShowCursor();
 	SceneManagers->SetDecommissioning();
 }
 

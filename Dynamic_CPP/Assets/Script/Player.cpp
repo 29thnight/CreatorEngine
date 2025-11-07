@@ -176,6 +176,16 @@ void Player::Start()
 
 	m_input = GetOwner()->GetComponent<PlayerInputComponent>();
 
+	auto instance = GameInstance::GetInstance();
+	auto curScene = (SceneType)instance->GetCurrentSceneType();
+
+	m_maxHP = maxHP;
+	m_currentHP = m_maxHP;
+	if (curScene == SceneType::Stage) //듀토떄 피 80퍼로시작
+	{
+		m_currentHP *= 0.8f;
+	}
+
 	constexpr int CONVERT_TYPE = 1;
 	int curIndex = (int)GameInstance::GetInstance()->GetPlayerDir(CharType((int)m_playerType + CONVERT_TYPE)) - CONVERT_TYPE;
 	if (curIndex != -1)
@@ -205,14 +215,7 @@ void Player::Start()
 				hpObserver->m_entity = this;
 			}
 		}
-		auto instance = GameInstance::GetInstance();
-		auto curScene = (SceneType)instance->GetCurrentSceneType();
-		m_maxHP = maxHP;
-		m_currentHP = m_maxHP;
-		if (curScene == SceneType::Stage) //듀토떄 피 80퍼로시작
-		{
-			m_currentHP *= 0.8f;
-		}
+
 		m_HPbar = GameObject::Find("P1_HPBar");
 		if (m_HPbar)
 		{
@@ -337,8 +340,6 @@ void Player::Start()
 		Indicator = PrefabUtilitys->InstantiatePrefab(IndicatorPrefab, "Indicator");
 		auto curveindicator = Indicator->GetComponent<CurveIndicator>();
 		curveindicator->EnableIndicator(false);
-
-
 	}
 
 	Prefab* bombIndicatorPrefab = PrefabUtilitys->LoadPrefab("BombIndicator");
@@ -396,8 +397,6 @@ void Player::Start()
 	playerState["EndAttack"] = EndAttackBit;
 	Debug->Log("Player Start");
 	m_animator->SetUseLayer(1, false);
-	m_maxHP = maxHP;
-	m_currentHP = m_maxHP;
 
 	BitFlag stagingBit;
 	playerState["staging"] = stagingBit;
@@ -418,7 +417,6 @@ void Player::Start()
 		slash3 = PrefabUtilitys->InstantiatePrefab(SlashPrefab3, "Slash3");
 	}
 
-
 	Prefab* LSlashPrefab = PrefabUtilitys->LoadPrefab("LSlashEffect1");
 	if (LSlashPrefab)
 	{
@@ -438,7 +436,6 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
-
 	Cheat(); 
 	DetectResource();
 	HitImpulseUpdate(tick);
@@ -449,7 +446,6 @@ void Player::Update(float tick)
 	{
 		UpdateChatchObject();
 	}
-
 
 	if (isAttacking == false && m_comboCount != 0) //&&&&& 콤보카운트 초기화시점 확인필요 지금 0.5초보다 늦게됨 
 	{
@@ -1247,7 +1243,7 @@ void Player::ChargeAttack()
 
 			
 		}
-		if (m_chargingTime >= m_curWeapon->chgTime - 0.05f)  //무기별 차징시간 넘었으면
+		if (m_chargingTime >= m_curWeapon->chgTime - 0.1f)  //무기별 차징시간 넘었으면
 		{
 			//차지공격나감
 			isChargeAttack = true;

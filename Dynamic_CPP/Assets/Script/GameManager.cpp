@@ -564,6 +564,7 @@ void GameManager::CheatSceneEvent()
 	else
 	{
 		if (InputManagement->IsKeyDown(KeyBoard::F1)) {
+			GameInstance::GetInstance()->GetPlayData()->Initialize();
 			m_nextSceneIndex = (int)SceneType::Tutorial;
 			m_isLoadingReq = true;
 			LoadNextScene();
@@ -571,6 +572,7 @@ void GameManager::CheatSceneEvent()
 		}
 
 		if (InputManagement->IsKeyDown(KeyBoard::F2)) {
+			GameInstance::GetInstance()->GetPlayData()->Initialize();
 			m_nextSceneIndex = (int)SceneType::Stage;
 			m_isLoadingReq = true;
 			LoadNextScene();
@@ -578,6 +580,7 @@ void GameManager::CheatSceneEvent()
 		}
 
 		if (InputManagement->IsKeyDown(KeyBoard::F3)) {
+			GameInstance::GetInstance()->GetPlayData()->Initialize();
 			m_nextSceneIndex = (int)SceneType::Boss;
 			m_isLoadingReq = true;
 			LoadNextScene();

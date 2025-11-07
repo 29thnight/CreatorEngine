@@ -50,7 +50,7 @@ void SceneManager::ToggleGamePaused()
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
-        ComponentFactorys->Initialize();
+    ComponentFactorys->Initialize();
 	m_threadPool = new ThreadPool;
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
