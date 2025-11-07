@@ -11,7 +11,7 @@
     "name": "background2",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -51,11 +51,11 @@
                             },
                             "emitterRadius": 5.0,
                             "emitterSize": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
+                                "x": 4.0,
+                                "y": 50.0,
+                                "z": 4.0
                             },
-                            "emitterType": 1,
+                            "emitterType": 2,
                             "spawnRate": 1.0
                         },
                         "state": {
@@ -80,7 +80,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 12.597009658813477,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.12999999523162842,
@@ -107,13 +107,13 @@
                         },
                         "velocityCurve": [],
                         "windData": {
-                            "baseStrength": 2.933000087738037,
+                            "baseStrength": 6.104000091552734,
                             "direction": {
-                                "x": -0.7358914017677307,
-                                "y": -0.6131134629249573,
-                                "z": -0.2873251140117645
+                                "x": -0.9499040842056274,
+                                "y": -0.27380791306495667,
+                                "z": -0.1507035344839096
                             },
-                            "frequency": 0.10000000149011612,
+                            "frequency": 5.0,
                             "turbulence": 2.0
                         }
                     },
@@ -253,7 +253,7 @@
             }
         },
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 5,
             "modules": [
                 {
@@ -297,7 +297,7 @@
                                 "y": 1.0,
                                 "z": 1.0
                             },
-                            "emitterType": 1,
+                            "emitterType": 2,
                             "spawnRate": 1.0
                         },
                         "state": {
@@ -322,7 +322,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 12.597009658813477,
+                            "currentTime": 0.0,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 0.12999999523162842,
@@ -349,13 +349,13 @@
                         },
                         "velocityCurve": [],
                         "windData": {
-                            "baseStrength": 2.933000087738037,
+                            "baseStrength": 6.086999893188477,
                             "direction": {
-                                "x": -0.7358914017677307,
-                                "y": -0.6131134629249573,
-                                "z": -0.2873251140117645
+                                "x": -0.9482429623603821,
+                                "y": -0.27380791306495667,
+                                "z": -0.16082465648651123
                             },
-                            "frequency": 0.10000000149011612,
+                            "frequency": 5.0,
                             "turbulence": 2.0
                         }
                     },
