@@ -3,7 +3,7 @@
 #include "ModuleBehavior.h"
 
 class SoundComponent;
-
+enum class SceneType;
 class BGMController : public ModuleBehavior
 {
 public:
@@ -26,7 +26,7 @@ public:
 	class GameObject* m_pBootstrapObject{ nullptr };
 	bool m_isBootstrapCompleted{ false };
 
-	SceneType nextScene =0;
+	SceneType nextScene{};
 	
 	bool PlayerAnotherSound = false;
 };
