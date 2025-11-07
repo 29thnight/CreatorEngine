@@ -32,7 +32,7 @@ public:
 	bool m_isItemSoldOut{ false };
 	bool m_isActive{ false };
 	bool m_isPrevActive{};
-
+	GameObject* m_Box = nullptr;
 private:
 	class ItemUIIcon* m_controlIcon{};
 	class GameManager* GM = nullptr;

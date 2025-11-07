@@ -10,6 +10,17 @@ void ItemComponent::Start()
     {
         GM = GMObj->GetComponent<GameManager>();
     }
+
+    auto childernIndex = GetOwner()->m_childrenIndices;
+    for (auto childIndex : childernIndex)
+    {
+        auto Obj = GameObject::FindIndex(childIndex);
+        if (Obj->m_tag == "Target")
+        {
+            m_Box = Obj;
+        }
+    }
+
 }
 
 void ItemComponent::OnTriggerEnter(const Collision& collision)
