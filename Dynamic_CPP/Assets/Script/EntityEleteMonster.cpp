@@ -869,11 +869,21 @@ bool EntityEleteMonster::CalculateTeleport(Mathf::Vector3& bestLocation)
 		
 		int hitCount = PhysicsManagers->SphereOverlap(overlapInput, monsterRadius, hitResults);
 
-		if (hitCount > 0)
-		{
-			// 고정 장애물과 겹쳤으므로 이 위치는 사용할 수 없습니다.
+		
+		// 고정 장애물과 겹쳤으므로 이 위치는 사용할 수 없습니다.
+		bool hasItem = false;
+		if (hitCount >= 1) {
+				
+			for (const HitResult& hit : hitResults) {
+				if (hit.gameObject->m_tag != "Ground") {
+					hasItem =true;
+				}
+			}
+		}
+		if (hasItem) {
 			continue;
 		}
+		
 
 		// 3. 유효한 위치이므로, 플레이어로부터 가장 먼 곳인지 확인합니다.
 		float distSqToPlayer = Vector3::DistanceSquared(candidatePos, targetPos);

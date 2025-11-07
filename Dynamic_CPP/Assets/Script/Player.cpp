@@ -209,7 +209,7 @@ void Player::Start()
 		auto curScene = (SceneType)instance->GetCurrentSceneType();
 		m_maxHP = maxHP;
 		m_currentHP = m_maxHP;
-		if (curScene == SceneType::Tutorial) //듀토떄 피 80퍼로시작
+		if (curScene == SceneType::Stage) //듀토떄 피 80퍼로시작
 		{
 			m_currentHP *= 0.8f;
 		}
@@ -1247,7 +1247,7 @@ void Player::ChargeAttack()
 
 			
 		}
-		if (m_chargingTime >= m_curWeapon->chgTime)  //무기별 차징시간 넘었으면
+		if (m_chargingTime >= m_curWeapon->chgTime - 0.05f)  //무기별 차징시간 넘었으면
 		{
 			//차지공격나감
 			isChargeAttack = true;

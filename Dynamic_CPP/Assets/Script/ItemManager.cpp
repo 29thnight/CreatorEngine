@@ -197,7 +197,10 @@ void ItemManager::BuyItem(int slotIndex)
 			}
 		}
 
-
+		if (itemSlots[slotIndex]->m_Box)
+		{
+			itemSlots[slotIndex]->m_Box->Destroy();
+		}
 
 		//아이템 슬롯 비우기
 		ClearItemSlot(slotIndex);
