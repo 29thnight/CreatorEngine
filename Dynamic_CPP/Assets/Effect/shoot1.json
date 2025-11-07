@@ -15,7 +15,7 @@
     "name": "shoot1",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 10,
             "modules": [
                 {
@@ -150,7 +150,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -225,7 +225,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -338,7 +338,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -413,7 +413,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 3,
             "modules": [
                 {
@@ -482,7 +482,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 735.7537231445313,
+                            "currentTime": 43.57187271118164,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -548,7 +548,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
@@ -623,7 +623,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -692,7 +692,7 @@
                         },
                         "impulses": [],
                         "movementParams": {
-                            "currentTime": 787.1670532226563,
+                            "currentTime": 43.57187271118164,
                             "easingEnabled": false,
                             "easingType": 0,
                             "gravityStrength": 9.800000190734863,
@@ -758,7 +758,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -833,7 +833,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -937,7 +937,7 @@
                         },
                         "renderStates": {
                             "blendPreset": 2,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 2
                         },
                         "shaders": {
@@ -967,7 +967,7 @@
             }
         },
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -1125,7 +1125,7 @@
                         ],
                         "renderStates": {
                             "blendPreset": 1,
-                            "depthPreset": 4,
+                            "depthPreset": 2,
                             "rasterizerPreset": 1
                         },
                         "shaders": {
