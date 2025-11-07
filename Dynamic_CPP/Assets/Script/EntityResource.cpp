@@ -138,11 +138,11 @@ void EntityResource::SendDamage(Entity* sender, int damage, HitInfo hitinfo)
 				{
 					GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(itemPrefab, "entityItem");
 					Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
-					spawnPos.y += 0.1f;
+					spawnPos.y += 0.3f;
 					itemObj->m_transform.SetPosition(spawnPos);
 					
 					Random<float> randX(-3.0f, 3.0f);   
-					Random<float> randY(0.2f, 1.f);         
+					Random<float> randY(0.5f, 1.f);         
 					Random<float> randZ(-3.0f, 3.0f);
 
 					float randx = randX();
