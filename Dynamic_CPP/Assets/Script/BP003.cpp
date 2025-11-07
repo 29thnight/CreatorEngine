@@ -78,7 +78,7 @@ void BP003::Update(float tick)
 	}
 }
 
-void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radius, float delay,bool itemDrop, bool useOrbiting, bool clockwise)
+void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radius, float delay,bool itemDrop, bool useOrbiting, bool clockwise,bool is34)
 {
 	m_ownerEntity = owner;
 	m_damage = damage;
@@ -86,7 +86,7 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 	m_itemDrop = itemDrop;
 	m_delay = delay;
 	m_timer = 0.0f;
-
+	bool Is34 = is34;
 	m_pOwner->GetComponent<Transform>()->SetScale({ m_radius ,1 ,m_radius });
 
 	//일단 초기화때 넣자
@@ -109,10 +109,19 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 
 	if (GM)
 	{
+		
+
 		auto pool = GM->GetSFXPool();
 		if (pool)
 		{
-			pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+			if (!Is34)
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttack"));
+			}
+			else
+			{
+				pool->PlayOneShot(GameInstance::GetInstance()->GetSoundName()->GetSoudNameRandom("BossBombAttackSmall"));
+			}
 		}
 	}
 	isInitialize = true;

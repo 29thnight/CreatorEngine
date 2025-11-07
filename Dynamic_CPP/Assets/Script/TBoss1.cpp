@@ -1113,7 +1113,7 @@ void TBoss1::Update_BP0033(float tick)
 			if (index < m_patternItemFlags.size()) {
 				drop = m_patternItemFlags[index];
 			}
-			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop, true, false);
+			script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop, true, false,true);
 			script->isAttackStart = true;
 
 			index++;
@@ -1198,7 +1198,7 @@ void TBoss1::Update_BP0034(float tick)
 					if (pattenIndex + i < m_patternItemFlags.size()) {
 						drop = m_patternItemFlags[pattenIndex + i];
 					}
-					script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop,false);
+					script->Initialize(this, objpos, BP003Damage, BP003RadiusSize, BP003Delay, drop,false, true ,true);
 					script->isAttackStart = true;
 					i++;
 					if (pattenIndex + i > BP0034Points.size()) {
