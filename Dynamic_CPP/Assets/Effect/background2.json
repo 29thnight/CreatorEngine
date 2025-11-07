@@ -12,7 +12,7 @@
     "particleSystems": [
         {
             "isRunning": false,
-            "maxParticles": 5,
+            "maxParticles": 6,
             "modules": [
                 {
                     "data": {
@@ -30,7 +30,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 3.0,
-                            "lifeTime": 3.0,
+                            "lifeTime": 5.0,
                             "rotateSpeed": 1.0,
                             "size": {
                                 "x": 0.10000000149011612,
@@ -49,7 +49,7 @@
                                 "y": 0.0,
                                 "z": 0.0
                             },
-                            "emitterRadius": 5.0,
+                            "emitterRadius": 7.0,
                             "emitterSize": {
                                 "x": 4.0,
                                 "y": 50.0,
@@ -60,7 +60,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 6
                         }
                     },
                     "stage": 2,
@@ -103,15 +103,15 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 6
                         },
                         "velocityCurve": [],
                         "windData": {
-                            "baseStrength": 6.104000091552734,
+                            "baseStrength": 3.0810000896453857,
                             "direction": {
-                                "x": -0.9499040842056274,
-                                "y": -0.27380791306495667,
-                                "z": -0.1507035344839096
+                                "x": -0.7375226616859436,
+                                "y": -0.6753195524215698,
+                                "z": 0.0019703374709933996
                             },
                             "frequency": 5.0,
                             "turbulence": 2.0
@@ -146,7 +146,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 6
                         }
                     },
                     "stage": 2,
@@ -254,7 +254,7 @@
         },
         {
             "isRunning": false,
-            "maxParticles": 5,
+            "maxParticles": 6,
             "modules": [
                 {
                     "data": {
@@ -272,7 +272,7 @@
                             },
                             "initialRotation": 0.0,
                             "initialRotationRange": 3.0,
-                            "lifeTime": 3.0,
+                            "lifeTime": 5.0,
                             "rotateSpeed": 1.0,
                             "size": {
                                 "x": 0.10000000149011612,
@@ -302,7 +302,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 6
                         }
                     },
                     "stage": 2,
@@ -345,15 +345,15 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 6
                         },
                         "velocityCurve": [],
                         "windData": {
-                            "baseStrength": 6.086999893188477,
+                            "baseStrength": 3.0309998989105225,
                             "direction": {
-                                "x": -0.9482429623603821,
-                                "y": -0.27380791306495667,
-                                "z": -0.16082465648651123
+                                "x": -0.7302586436271667,
+                                "y": -0.6831458806991577,
+                                "z": -0.005836579017341137
                             },
                             "frequency": 5.0,
                             "turbulence": 2.0
@@ -388,7 +388,7 @@
                         },
                         "state": {
                             "isInitialized": true,
-                            "particleCapacity": 5
+                            "particleCapacity": 6
                         }
                     },
                     "stage": 2,
