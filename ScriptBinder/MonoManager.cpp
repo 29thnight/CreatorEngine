@@ -5,6 +5,7 @@
 #include "GameObject_Binding.h"
 #include "Transform_Binding.h"
 #include "RectTransform_Binding.h"
+#include "CSharpScriptComponent_Binding.h"
 #include "CSharpScriptComponent.h"
 #include "GameObject.h"
 #include "Scene.h"
@@ -173,6 +174,7 @@ void MonoManager::RegisterInternalCalls()
     Register_Component_ICalls();
     Register_Transform_ICalls();
     Register_RectTransform_ICalls();
+    Register_CSharpScriptComponent_ICalls();
     // ...
 }
 
