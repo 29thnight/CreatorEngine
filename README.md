@@ -12,7 +12,7 @@
 
 개발 언어 : C++ 20
 
-외부 종속 라이브러리 : DX11, Imgui, Assimp, DirextXTK, nlohmann-json, PhysX, imguizmo, spdlog, pugixml, magic-enum, yaml-cpp, efsw, meshoptimizer, boost-uuid, mimalloc, LZ4
+외부 종속 라이브러리 : DX11, Imgui, Assimp, DirextXTK, nlohmann-json, PhysX, imguizmo, spdlog, pugixml, magic-enum, rapidyaml, efsw, meshoptimizer, boost-uuid, mimalloc, LZ4
 
 ## CreatorEngine 기술 스택 및 라이브러리 개요
 
@@ -53,7 +53,7 @@ CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈�
 
 ### 데이터, 메타 & 직렬화
 - **JSON 직렬화**: nlohmann::json을 사용해 파티클 이펙트, 렌더 모듈, 벡터 타입 등을 직렬화/역직렬화합니다.
-- **YAML 설정**: 엔진 환경설정과 프로젝트 메타데이터는 yaml-cpp 기반 싱글턴에서 관리하며, MSBuild 경로 등 개발자 옵션을 노출합니다.
+- **YAML 설정**: 엔진 환경설정과 프로젝트 메타데이터는 rapidyaml 기반 싱글턴에서 관리하며, MSBuild 경로 등 개발자 옵션을 노출합니다.
 - **XML 처리**: 스크립트 핫로드 시스템은 pugixml을 포함해 외부 메타 데이터를 파싱하고 빌드 파이프라인과 연계합니다.
 - **자산 메타 감시**: efsw 파일 감시기를 통해 메타 파일 생성/삭제를 감지하고, 누락된 `.meta` 파일을 자동 생성합니다.
 - **자산 GUID**: boost::uuids 기반 `FileGuid` 타입이 자산 경로에 대한 안정적인 식별자를 생성·역직렬화합니다.
