@@ -18,9 +18,14 @@
 
 CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈형 런타임을 중심으로 구축된 인하우스 게임/툴 엔진입니다. 엔진은 실시간 에디터, 런타임 빌드 파이프라인, 스크립트 핫리로드 등 제작 파이프라인 전반을 아우르는 기능을 제공합니다.
 
-<img width="1917" height="1108" alt="스크린샷 2025-10-26 213538" src="https://github.com/user-attachments/assets/8eb2e961-ec65-457b-b90b-1f17bb39c18f" />
-
-https://29thnight.github.io/CreatorEngine/
+<a href="https://29thnight.github.io/CreatorEngine/">
+  <img
+    src="https://github.com/user-attachments/assets/8eb2e961-ec65-457b-b90b-1f17bb39c18f"
+    alt="스크린샷 2025-10-26 213538"
+    width="1917"
+    height="1108"
+  />
+</a>
 
 ### 플랫폼 & 언어 타깃
 - **운영 체제**: Win32/Win64 환경을 대상으로 하며, 엔진 엔트리 포인트에서 WinAPI 창 관리·메시지 루프와 DX11 초기화를 수행합니다.
