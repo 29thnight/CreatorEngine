@@ -20,7 +20,9 @@ CreatorEngine은 Windows 기반 DX11 렌더링 파이프라인과 C++20 모듈�
 
 <img width="1917" height="1108" alt="스크린샷 2025-10-26 213538" src="https://github.com/user-attachments/assets/8eb2e961-ec65-457b-b90b-1f17bb39c18f" />
 
-[![Watch the intro](https://img.youtube.com/vi/W75M6eNZhf0/hqdefault.jpg)](https://www.youtube.com/watch?v=W75M6eNZhf0 "Creator Engine 소개")
+<a href="https://www.youtube.com/watch?v=W75M6eNZhf0" title="Creator Engine 소개" target="_blank">
+  <img src="https://img.youtube.com/vi/W75M6eNZhf0/hqdefault.jpg" width="1917" height="1108" alt="Watch the intro">
+</a>
 
 ### 플랫폼 & 언어 타깃
 - **운영 체제**: Win32/Win64 환경을 대상으로 하며, 엔진 엔트리 포인트에서 WinAPI 창 관리·메시지 루프와 DX11 초기화를 수행합니다.
