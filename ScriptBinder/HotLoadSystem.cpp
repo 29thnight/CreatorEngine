@@ -14,6 +14,7 @@
 #include "ScriptStringModule.h"
 #include "AnimationState.h"
 #include "MSBuildHelper.h"
+#include "SceneManager.h"
 #include <utility>
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
@@ -464,7 +465,10 @@ void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<
 
 void HotLoadSystem::CompileEvent()
 {
-	m_isCompileEventInvoked = true;
+	if(!SceneManagers->IsGameStart())
+	{
+		m_isCompileEventInvoked = true;
+	}
 }
 
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view name)

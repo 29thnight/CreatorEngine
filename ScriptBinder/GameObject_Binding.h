@@ -1,5 +1,4 @@
 #pragma once
-#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
 
 #include "FormIntPtr.h"
@@ -12,27 +11,6 @@
 
 namespace
 {
-    inline std::string MonoToUTF8(MonoString* mstr)
-    {
-        if (!mstr)
-        {
-            return {};
-        }
-
-        char* utf8 = mono_string_to_utf8(mstr);
-        std::string out = utf8 ? utf8 : "";
-        if (utf8)
-        {
-            mono_free(utf8);
-        }
-        return out;
-    }
-
-    inline MonoString* UTF8ToMono(const std::string& value)
-    {
-        return mono_string_new(mono_domain_get(), value.c_str());
-    }
-
     extern "C"
     {
         static intptr_t ICall_GameObject_Find(MonoObject* /*klass*/, MonoString* mname)

@@ -9,6 +9,7 @@
 #include "ImGuiRegister.h"
 #include "Material.h"
 #include "ImageComponent.h"
+#include "BS_thread_pool.hpp"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {
@@ -34,57 +35,140 @@ void ShaderResourceSystem::Finalize()
 
 void ShaderResourceSystem::LoadShaders()
 {
+
+//	try
+//	{
+//		file::path shaderpath = PathFinder::RelativeToShader();
+//		file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+//		for (auto& dir : file::recursive_directory_iterator(shaderpath))
+//		{
+//			if (dir.is_directory() || dir.path().extension() != ".hlsl")
+//				continue;
+//
+//			file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+//
+//			if (file::exists(cso))
+//			{
+//#ifndef BUILD_FLAG
+//				auto hlslTime = file::last_write_time(dir.path());
+//				auto csoTime = file::last_write_time(cso);
+//
+//				if (hlslTime > csoTime)
+//				{
+//					//m_shaderReloadThreadPool->Enqueue([this, dir]()
+//					//{
+//					//	AddShaderFromPath(dir.path());
+//					//});
+//					//AddShaderFromPath(dir.path());
+//				}
+//				else
+//				{
+//					m_shaderReloadThreadPool->Enqueue([this, cso]()
+//					{
+//						AddShaderFromPath(cso);
+//					});
+//					//AddShaderFromPath(cso);
+//				}
+//#else
+//				m_shaderReloadThreadPool->Enqueue([this, cso]()
+//				{
+//					AddShaderFromPath(cso);
+//				});
+//#endif
+//			}
+//			else
+//			{
+//				m_shaderReloadThreadPool->Enqueue([this, dir]()
+//				{
+//					AddShaderFromPath(dir.path());
+//				});
+//				//AddShaderFromPath(dir.path());
+//			}
+//		}
+//
+//		m_shaderReloadThreadPool->NotifyAllAndWait();
+//	}
+//	catch (const file::filesystem_error& e)
+//	{
+//		Debug->LogWarning("Could not load shaders" + std::string(e.what()));
+//		std::cout << "Could not load shaders" << e.what() << std::endl;
+//	}
+//	catch (const std::exception& e)
+//	{
+//		Debug->LogWarning("Error" + std::string(e.what()));
+//		std::cout << "Error" << e.what() << std::endl;
+//	}
+//
+//	LoadShaderAssets();
 	try
 	{
 		file::path shaderpath = PathFinder::RelativeToShader();
 		file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+
+		// 1) 작업 풀: 멤버로 갖고 있다면 그걸 쓰세요. (여기선 지역 예시)
+		BS::thread_pool pool;
+
+		// 2) 작업 futures를 모아서 마지막에만 대기
+		std::vector<std::future<void>> futures;
+		futures.reserve(512); // 대략 예상 개수만큼 예약(선택)
+
 		for (auto& dir : file::recursive_directory_iterator(shaderpath))
 		{
 			if (dir.is_directory() || dir.path().extension() != ".hlsl")
 				continue;
 
-			file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+			// 경로는 반드시 값으로 캡처(루프 참조 캡처 금지)
+			const file::path hlsl = dir.path();
+			const file::path cso = precompiledpath.string() + hlsl.stem().string() + ".cso";
 
 			if (file::exists(cso))
 			{
 #ifndef BUILD_FLAG
-				auto hlslTime = file::last_write_time(dir.path());
+				auto hlslTime = file::last_write_time(hlsl);
 				auto csoTime = file::last_write_time(cso);
 
 				if (hlslTime > csoTime)
 				{
-					m_shaderReloadThreadPool->Enqueue([this, dir]()
-					{
-						AddShaderFromPath(dir.path());
-					});
-					//AddShaderFromPath(dir.path());
+					// HLSL이 더 최신 → HLSL에서 컴파일/로딩
+					futures.emplace_back(
+						pool.submit_task([this, hlsl] {
+							AddShaderFromPath(hlsl);
+							})
+					);
 				}
 				else
 				{
-					m_shaderReloadThreadPool->Enqueue([this, cso]()
-					{
-						AddShaderFromPath(cso);
-					});
-					//AddShaderFromPath(cso);
+					// CSO가 최신 → CSO 로딩
+					futures.emplace_back(
+						pool.submit_task([this, cso] {
+							AddShaderFromPath(cso);
+							})
+					);
 				}
 #else
-				m_shaderReloadThreadPool->Enqueue([this, cso]()
-				{
-					AddShaderFromPath(cso);
-				});
+				// BUILD_FLAG 켜진 경우엔 CSO만 사용
+				futures.emplace_back(
+					pool.submit_task([this, cso] {
+						AddShaderFromPath(cso);
+						})
+				);
 #endif
 			}
 			else
 			{
-				m_shaderReloadThreadPool->Enqueue([this, dir]()
-				{
-					AddShaderFromPath(dir.path());
-				});
-				//AddShaderFromPath(dir.path());
+				// CSO가 없다면 HLSL에서 처리
+				futures.emplace_back(
+					pool.submit_task([this, hlsl] {
+						AddShaderFromPath(hlsl);
+						})
+				);
 			}
 		}
 
-		m_shaderReloadThreadPool->NotifyAllAndWait();
+		// 3) 모든 제출 작업 완료 대기 (NotifyAllAndWait 대체)
+		for (auto& f : futures) f.get();
+		// 또는 pool.wait(); // 풀에 들어간 모든 작업을 기다릴 때
+
 	}
 	catch (const file::filesystem_error& e)
 	{

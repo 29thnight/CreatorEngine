@@ -85,6 +85,7 @@ public:
 	file::path InputMapPath{};
 	file::path GameBuildSlnPath{};
 	file::path animatorPath{};
+	file::path MonoBleedingEdgePath{};
 
     inline void Initialize()
     {
@@ -100,6 +101,7 @@ public:
 		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
 		DumpPath = file::path(base).append("Dump\\").lexically_normal();
 		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+		MonoBleedingEdgePath = file::path(base).append("..\\..\\MonoBleedingEdge\\").lexically_normal();
 
 #ifdef BUILD_FLAG
 		std::array<WCHAR, MAX_PATH> tempPathBuffer{};
@@ -369,5 +371,13 @@ public:
 	static inline file::path AnimatorjsonPath(std::string_view path)
 	{
 		return file::path(InternalPath::GetInstance()->animatorPath) / path;
+	}
+	static inline file::path MonoBleedingEdgePath()
+	{
+		return InternalPath::GetInstance()->MonoBleedingEdgePath;
+	}
+	static inline file::path MonoBleedingEdgePath(std::string_view path)
+	{
+		return file::path(InternalPath::GetInstance()->MonoBleedingEdgePath) / path;
 	}
 };

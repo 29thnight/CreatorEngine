@@ -19,6 +19,7 @@
 #include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
 #include "InputActionManager.h"
+#include "MonoManager.h"
 
 namespace EngineBootstrap
 {
@@ -53,6 +54,9 @@ namespace EngineBootstrap
         PhysicsManager::GetInstance();
         SceneManager::GetInstance();
         HotLoadSystem::GetInstance();
+#ifndef UNUSE_MONO_LIB
+        MonoManager::GetInstance();
+#endif
         ComponentFactory::GetInstance();
         CameraContainer::GetInstance();
 
@@ -63,6 +67,9 @@ namespace EngineBootstrap
         CameraContainer::Destroy();
         ComponentFactory::Destroy();
         HotLoadSystem::Destroy();
+#ifndef UNUSE_MONO_LIB
+		MonoManager::Destroy();
+#endif
         SceneManager::Destroy();
         PhysicsManager::Destroy();
         PhysicX::Destroy();

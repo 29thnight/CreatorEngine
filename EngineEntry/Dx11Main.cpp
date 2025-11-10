@@ -23,6 +23,7 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#include "MonoManager.h"
 //#include "SwapEvent.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -44,6 +45,13 @@ void DirectX11::Dx11Main::Initialize()
 {
     PROFILER_INITIALIZE(5, 1024);
     PROFILE_REGISTER_THREAD("[GameThread]");
+
+#ifndef UNUSE_MONO_LIB
+	g_progressWindow->SetStatusText(L"Initializing Mono Domain...");
+	auto monoLibPath = PathFinder::MonoBleedingEdgePath("EmbedRuntime").string();
+	auto monoEtcPath = PathFinder::MonoBleedingEdgePath("etc").string();
+	MonoManagers->Initialize("Mono Domain", monoLibPath.c_str(), monoEtcPath.c_str());
+#endif // !UNUSE_MONO_LIB
 
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
     m_deviceResources->RegisterDeviceNotify(this);
@@ -200,6 +208,9 @@ void DirectX11::Dx11Main::Initialize()
 
 void DirectX11::Dx11Main::Finalize()
 {
+#ifndef UNUSE_MONO_LIB
+	MonoManagers->Shutdown();
+#endif // !UNUSE_MONO_LIB
     isGameToRender = false;
     TagManagers->Finalize();
     SceneManagers->Decommissioning();

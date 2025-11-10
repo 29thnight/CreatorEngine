@@ -3,7 +3,6 @@
 
 #include <string>
 #include <utility>
-#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
 
 #include <cstdint>

@@ -1,5 +1,5 @@
 #pragma once
-#define UNUSE_MONO_LIB
+
 #ifndef UNUSE_MONO_LIB
 #include <DLLAcrossSingleton.h>
 #include <string>
@@ -83,6 +83,7 @@ public:
     void UnbindScriptEvents(CSharpScriptComponent* component);
 
 private:
+	friend class DLLCore::Singleton<MonoManager>;
     MonoManager() = default;
     ~MonoManager() = default;
     MonoManager(const MonoManager&) = delete;

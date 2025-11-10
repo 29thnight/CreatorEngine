@@ -1,5 +1,4 @@
 #pragma once
-#define UNUSE_MONO_LIB
 #ifndef UNUSE_MONO_LIB
 #include <mono/metadata/object.h>
 #include "Delegate.h"

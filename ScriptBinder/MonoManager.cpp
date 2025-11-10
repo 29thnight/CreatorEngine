@@ -170,7 +170,7 @@ void MonoManager::RegisterInternalCalls()
     // 여기에 엔진의 모든 바인딩 등록 함수 호출
     Register_Object_ICalls();
     Register_GameObject_ICalls();
-    // Register_Component_ICalls();
+    Register_Component_ICalls();
     Register_Transform_ICalls();
     Register_RectTransform_ICalls();
     // ...

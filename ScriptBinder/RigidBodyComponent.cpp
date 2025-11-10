@@ -6,7 +6,7 @@
 
 void RigidBodyComponent::Awake()
 {
-	std::cout << "RigidBodyComponent::Awake() - InstanceID: " << GetOwner()->GetInstanceID() << std::endl;
+	//std::cout << "RigidBodyComponent::Awake() - InstanceID: " << GetOwner()->GetInstanceID() << std::endl;
 	auto scene = GetOwner()->m_ownerScene;
 	if (scene)
 	{

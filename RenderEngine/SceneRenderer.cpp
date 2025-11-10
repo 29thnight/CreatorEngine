@@ -37,6 +37,7 @@
 #include "Animator.h"
 #include "EffectComponent.h"
 #include "EffectProxyController.h"
+#include "BS_thread_pool.hpp"
 
 using namespace lm;
 
@@ -44,7 +45,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_deviceResources(deviceResources)
 {
     InitializeDeviceState();
-    InitializeShadowMapDesc();
+	InitializeShadowMapDesc();
 
 	m_threadPool = new ThreadPool;
 	m_commandThreadPool = std::make_unique<RenderThreadPool>(DirectX11::DeviceStates->g_pDevice);
@@ -413,7 +414,7 @@ void SceneRenderer::InitializeDeviceState()
 		DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
 		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
 		//DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
-		DirectX11::DeviceStates->g_fullsizeViewport	= m_deviceResources->GetScreenViewport();
+		DirectX11::DeviceStates->g_fullsizeViewport		= m_deviceResources->GetScreenViewport();
 		DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
 		DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
 		DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetLogicalSize();
