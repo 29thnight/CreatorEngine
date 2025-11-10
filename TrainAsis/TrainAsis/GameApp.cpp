@@ -49,6 +49,9 @@ void GameBuilder::App::Finalize()
 {
 	m_main->Finalize();
 	m_deviceResources->ReportLiveDeviceObjects();
+#ifdef BUILD_FLAG
+	DataSystems->Finalize();
+#endif // !BUILD_FLAG
 	CleanupUnpackedGameAssets();
 }
 

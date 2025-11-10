@@ -128,7 +128,9 @@ bool HasImageFile(const file::path& directory)
 
 DataSystem::~DataSystem()
 {
+#ifndef BUILD_FLAG
 	Finalize();
+#endif
 }
 
 void DataSystem::Initialize()
