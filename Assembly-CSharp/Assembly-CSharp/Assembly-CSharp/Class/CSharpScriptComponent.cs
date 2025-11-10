@@ -24,37 +24,5 @@ namespace CreatorEngine
         public bool HasManagedInstance => ICall_HasManagedInstance(m_NativePtr);
 
         public uint BehaviorHandle => ICall_GetBehaviorHandle(m_NativePtr);
-
-        protected virtual void Awake()
-        {
-        }
-
-        protected virtual void OnEnable()
-        {
-        }
-
-        protected virtual void Start()
-        {
-        }
-
-        protected virtual void FixedUpdate(float fixedDeltaTime)
-        {
-        }
-
-        protected virtual void Update(float deltaTime)
-        {
-        }
-
-        protected virtual void LateUpdate(float deltaTime)
-        {
-        }
-
-        protected virtual void OnDisable()
-        {
-        }
-
-        protected virtual void OnDestroy()
-        {
-        }
     }
 }

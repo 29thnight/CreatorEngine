@@ -86,6 +86,7 @@ public:
 	file::path GameBuildSlnPath{};
 	file::path animatorPath{};
 	file::path MonoBleedingEdgePath{};
+	file::path AssemblyCSharpPath{};
 
     inline void Initialize()
     {
@@ -102,7 +103,7 @@ public:
 		DumpPath = file::path(base).append("Dump\\").lexically_normal();
 		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
 		MonoBleedingEdgePath = file::path(base).append("..\\..\\MonoBleedingEdge\\").lexically_normal();
-
+		AssemblyCSharpPath = file::path(base).append("..\\..\\AssemblyCSharp\\AssemblyCSharp\\AssemblyCSharp\\Class\\").lexically_normal();
 #ifdef BUILD_FLAG
 		std::array<WCHAR, MAX_PATH> tempPathBuffer{};
 		const DWORD tempPathLength = GetTempPathW(static_cast<DWORD>(tempPathBuffer.size()), tempPathBuffer.data());
