@@ -1,5 +1,6 @@
 #pragma once
 #ifndef UNUSE_MONO_LIB
+#include "Object_Binding.h"
 #include "FormIntPtr.h"
 #include "CSharpScriptComponent.h"
 
@@ -7,11 +8,6 @@
 
 namespace
 {
-    inline MonoString* UTF8ToMono(const std::string& value)
-    {
-        return mono_string_new(mono_domain_get(), value.c_str());
-    }
-
     extern "C"
     {
         static MonoString* ICall_CSharpScriptComponent_GetScriptName(MonoObject* _this, intptr_t nativePtr) noexcept

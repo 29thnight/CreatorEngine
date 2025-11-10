@@ -1,4 +1,5 @@
 #include "SceneManager.h"
+#include "CSharpScriptComponent.h"
 #include "Scene.h"
 #include "Object.h"
 #include "FileIO.h"
@@ -50,6 +51,10 @@ void SceneManager::ToggleGamePaused()
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
+#ifndef UNUSE_MONO_LIB
+	AUTO_REGISTER_CLASS(CSharpScriptComponent);
+#endif // !UNUSE_MONO_LIB
+
     ComponentFactorys->Initialize();
 	m_threadPool = new ThreadPool;
     m_inputActionManager = new InputActionManager();
