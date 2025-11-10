@@ -663,9 +663,6 @@
 		<ClInclude Include="Assets\Script\TutorialScript.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\BackGroundEffect.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="PlayGameData.h">
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
@@ -1248,9 +1245,6 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\CreditScroll.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\BackGroundEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="PlayGameData.cpp">
