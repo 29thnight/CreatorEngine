@@ -118,6 +118,47 @@ float3 ReconstructWorldPosFromDepth(float2 uv, float depth, float4x4 invProj, fl
     return worldSpace.xyz;
 }
 
+float noise(float2 seed)
+{
+    return frac(sin(dot(seed.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+float4 Raytrace(float3 reflectionDir, int maxCount, float stepSize, float3 wpos, float2 uv, float depth, matrix vp)
+{
+    float4 color = float4(0.0, 0.0f, 0.0f, 0.0f);
+    float3 step = stepSize * reflectionDir;
+    bool success = false;
+    
+    [loop]
+    for (int i = 1; i <= maxCount; i++)
+    {
+        float3 ray = (i + noise(uv)) * step;
+        //float3 ray = (i + Hash12(uv * float2(1920, 1080))) * step; // No noise
+        float3 rayPos = wpos + ray;
+        float4 vpPos = mul(vp, float4(rayPos, 1.0f));
+        //color = vpPos;
+        float rayDepth = vpPos.z / vpPos.w;
+        float2 rayUv = vpPos.xy / vpPos.w * 0.5 + 0.5;
+        rayUv.y = 1 - rayUv.y; // y축 반전 (DirectX 좌표계)
+        float gbufferDepth = prevDepthTexture.Sample(LinearSampler, rayUv).r;
+        if (rayUv.x < 0.0 || rayUv.x > 1.0 || rayUv.y < 0.0 || rayUv.y > 1.0)
+            continue;
+        if (rayDepth > gbufferDepth && rayDepth - gbufferDepth < 0.00416f /*MaxThickness*/)
+        {
+            float a = 0.3f * pow(min(1.0, (stepSize * maxCount / 2) / length(ray)), 2.0);
+            color = color * (1.0f - a) + float4(baseColorTexture.Sample(LinearSampler, rayUv).rgb, 1.0f) * a;
+            break;
+            //success = true;
+        }
+    }
+    //if (!success)
+    //{
+    //    TODO i.e read from local cubemap
+    //}
+	
+    return color;
+}
+
 float LinearEyeDepth(float z)
 {
     return 500.f * 0.1f / ((0.1f - 500.f) * z + 500.f);
@@ -189,7 +230,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         }
         else
         {
-            surf.N = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 10.f + float2(0, totalTime / 7.f), surf);
+            surf.N = CalcNormalFromNormMap(NormalMap, float2(IN.wPosition.x, IN.wPosition.z) / 12.f + float2(0, totalTime / 3.f), surf);
         }
     }
     else if (gNormalState == BUMP_MAP)
@@ -262,11 +303,13 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float maxDistance = 1.0f;
     
     float3 v = viewMat._13_23_33;
+    float3 camDir = invviewMat._14_24_34;
+    v = normalize(IN.wPosition.xyz - camDir);
     float d = dot(v, surf.N);
     
     float y = objWorld.y - IN.wPosition.y;
-    y = y / maxDistance;
-    float e = saturate(exp(y)); // 깊이에 따라 부드럽게 어두워지는 효과
+    float ydown = y / maxDistance;
+    float e = saturate(exp(ydown)); // 깊이에 따라 부드럽게 어두워지는 효과
 
     //float3 s = smoothstep(prevDepth, depth, float3(1, 0, 0));
         
@@ -330,6 +373,17 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         reflectionColor += (specular);
     }
     
+    float3 rrrr = float3(0, 0, 0);
+    
+    // SSR
+    //v.z = -v.z;
+    float3 refDir = normalize(reflect(v, surf.N));
+    
+    rrrr = Raytrace(refDir, 20, 0.114f, IN.wPosition.xyz, screenUV, depth, mul(projMat, viewMat)).rgb;
+    
+    reflectionColor += rrrr;
+    
+    
     float3 fresnel = fresnelSchlickRoughness(saturate(surf.NdotV), F0_dielectric, roughness);
     float3 finalColor = transmissionColor * (1.0 - fresnel) + reflectionColor * fresnel;
     //float dott = abs(dot(surf.N, surf.V));
@@ -344,6 +398,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 horizonColor = lerp(depthColor, reflectionColor, fresnel);
     float3 underWaterColor = refractionColor + horizonColor;
     return float4(underWaterColor + float3(l,l,l), 1);
+    //return Raytrace(refDir, 20, 0.114f, IN.wPosition.xyz, screenUV, depth, mul(projMat, viewMat));
+    //return float4(reflectionColor, 1);
     //return float4(lerp(float3(albedo.rgb), colour, waterDistance), 1);
 
     //return float4(colour, 1.f);
