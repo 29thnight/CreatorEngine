@@ -22,9 +22,6 @@ void TestBehavior::Start()
 	// that this behavior is attached to.
 	// You can also use this method to register any event listeners or perform any other
 	// setup tasks that are needed before the behavior starts running.
-	SceneManagers;
-	boxCollider = m_pOwner->GetComponent<BoxColliderComponent>();
-	rigidBody = m_pOwner->GetComponent<RigidBodyComponent>();
 }
   
 void TestBehavior::FixedUpdate(float fixedTick)
@@ -57,6 +54,14 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
+	auto transform = GetComponent<Transform>();
+	if (transform)
+	{
+		Mathf::Vector3 pos = Mathf::Vector3(transform->position);
+		pos.x += moveDir.x * tick;
+		pos.y += moveDir.y * tick;
+		transform->SetPosition(pos);
+	}
 }
 
 void TestBehavior::LateUpdate(float tick)
