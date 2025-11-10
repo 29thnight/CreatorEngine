@@ -98,10 +98,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 		bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
 
-		// 3. ¿ì¼±¼øÀ§ °áÁ¤
+		// 3. ìš°ì„ ìˆœìœ„ ê²°ì •
 		if (sceneObjectJustSelected)
 		{
-			// °ÔÀÓ ¿ÀºêÁ§Æ® ¼±ÅÃ ½Ã YAML ¼±ÅÃ ÇØÁ¦
+			// ê²Œì„ ì˜¤ë¸Œì íŠ¸ ì„ íƒ ì‹œ YAML ì„ íƒ í•´ì œ
 			selectedNode = std::nullopt;
 			isSelectedNode = false;
 			wasMetaSelectedLastFrame = false;
@@ -109,7 +109,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 		if (metaNodeJustSelected)
 		{
-			// ¸ŞÅ¸ ÆÄÀÏ ¼±ÅÃ ½Ã °ÔÀÓ ¿ÀºêÁ§Æ® ÇØÁ¦
+			// ë©”íƒ€ íŒŒì¼ ì„ íƒ ì‹œ ê²Œì„ ì˜¤ë¸Œì íŠ¸ í•´ì œ
 			selectedSceneObject = nullptr;
 			prevSelectedSceneObject = nullptr;
 			wasMetaSelectedLastFrame = true;
@@ -253,7 +253,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
 						if (nullptr != sprite)
 						{
-							//ÀÌ°Ç ¹º ¹ö±×ÁÒ?
+							//ì´ê±´ ë­” ë²„ê·¸ì£ ?
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
@@ -268,7 +268,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					else if (componentTypeID == type_guid(SoundComponent))
 					{
 						SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
-						if (snd) ImGuiDrawHelperSoundComponent(snd);   // Ä¿½ºÅÒ ÀÎ½ºÆåÅÍ È£Ãâ
+						if (snd) ImGuiDrawHelperSoundComponent(snd);   // ì»¤ìŠ¤í…€ ì¸ìŠ¤í™í„° í˜¸ì¶œ
 					}
 					else if (type)
 					{
@@ -286,23 +286,23 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			}
 			
 			ImGui::Separator();
-			ImVec2 windowSize = ImGui::GetWindowSize();      // ÇöÀç À©µµ¿ìÀÇ ÀüÃ¼ Å©±â
-			ImVec2 buttonSize = ImVec2(180, 0);              // ¹öÆ° °¡·Î Å©±â (¼¼·Î´Â ÀÚµ¿ °è»êµÊ)
+			ImVec2 windowSize = ImGui::GetWindowSize();      // í˜„ì¬ ìœˆë„ìš°ì˜ ì „ì²´ í¬ê¸°
+			ImVec2 buttonSize = ImVec2(180, 0);              // ë²„íŠ¼ ê°€ë¡œ í¬ê¸° (ì„¸ë¡œëŠ” ìë™ ê³„ì‚°ë¨)
 
 			static ImGuiTextFilter searchFilter;
 
-			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // ¼öÆò Áß¾Ó Á¤·Ä
+			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // ìˆ˜í‰ ì¤‘ì•™ ì •ë ¬
 
 			if (ImGui::Button("Add Component", buttonSize))
 			{
 				ImGui::OpenPopup("AddComponent");
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ì›í•˜ëŠ” ì‚¬ì´ì¦ˆ ì§€ì •
 			if (ImGui::BeginPopup("AddComponent"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // ³ë¶õ»ö ÅØ½ºÆ®
-				ImGui::Separator(); // ±¸ºĞ¼±
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // ë…¸ë€ìƒ‰ í…ìŠ¤íŠ¸
+				ImGui::Separator(); // êµ¬ë¶„ì„ 
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -340,18 +340,18 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::EndPopup();
 			}
 
-			// ´ÙÀ½ ÇÁ·¹ÀÓ¿¡¼­ ¿­±â
+			// ë‹¤ìŒ í”„ë ˆì„ì—ì„œ ì—´ê¸°
 			if (m_openScriptPopup)
 			{
 				ImGui::OpenPopup("Scripts");
 				m_openScriptPopup = false;
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ì›í•˜ëŠ” ì‚¬ì´ì¦ˆ ì§€ì •
 			if (ImGui::BeginPopup("Scripts"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "ScriptComponent"); // ³ë¶õ»ö ÅØ½ºÆ®
-				ImGui::Separator(); // ±¸ºĞ¼±
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "ScriptComponent"); // ë…¸ë€ìƒ‰ í…ìŠ¤íŠ¸
+				ImGui::Separator(); // êµ¬ë¶„ì„ 
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -372,7 +372,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::EndPopup();
 			}
 
-			// ´ÙÀ½ ÇÁ·¹ÀÓ¿¡¼­ ¿­±â
+			// ë‹¤ìŒ í”„ë ˆì„ì—ì„œ ì—´ê¸°
 			if (m_openNewScriptPopup)
 			{
 				ImGui::OpenPopup("NewScript");
@@ -390,11 +390,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				isOpen = false;
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ì›í•˜ëŠ” ì‚¬ì´ì¦ˆ ì§€ì •
 			if (ImGui::BeginPopup("NewScript"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "New ScriptComponent"); // ³ë¶õ»ö ÅØ½ºÆ®
-				ImGui::Separator(); // ±¸ºĞ¼±
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "New ScriptComponent"); // ë…¸ë€ìƒ‰ í…ìŠ¤íŠ¸
+				ImGui::Separator(); // êµ¬ë¶„ì„ 
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -482,13 +482,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				{
 					try
 					{
-						YAML::Emitter emitter;
-						emitter << *selectedNode;
-
 						std::ofstream fout(selectedMetaFilePath);
 						if (fout.is_open())
 						{
-							fout << emitter.c_str();
+							const std::string serialized = YAML::Dump(*selectedNode);
+							fout << serialized;
 							fout.close();
 						}
 						else
@@ -567,22 +565,22 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
 	if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
 	{
-		selectedTagIndex = 0; // ±âº»°ªÀ¸·Î Ã¹ ¹øÂ° ÅÂ±× ¼±ÅÃ
+		selectedTagIndex = 0; // ê¸°ë³¸ê°’ìœ¼ë¡œ ì²« ë²ˆì§¸ íƒœê·¸ ì„ íƒ
 	}
-	// Tag ÄŞº¸¹Ú½º
+	// Tag ì½¤ë³´ë°•ìŠ¤
 	ImGui::Text("Tag");
 	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // ÇÈ¼¿ ´ÜÀ§·Î ³Êºñ ¼³Á¤
+	ImGui::SetNextItemWidth(90.0f); // í”½ì…€ ë‹¨ìœ„ë¡œ ë„ˆë¹„ ì„¤ì •
 	if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
 	{
 		for (int i = 0; i <= tagCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == tagCount) // "Add Tag" Ç×¸ñ
+			if (i == tagCount) // "Add Tag" í•­ëª©
 			{
 				if (ImGui::Selectable("Add Tag"))
 				{
-					m_openNewTagPopup = true; // ÆË¾÷ ¿­±â ÇÃ·¡±× ¼³Á¤
+					m_openNewTagPopup = true; // íŒì—… ì—´ê¸° í”Œë˜ê·¸ ì„¤ì •
 				}
 			}
 			else
@@ -593,7 +591,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 					TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
 					selectedTag = tagNames[i];
 					TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
-					selectedTagIndex = i; // ¼±ÅÃµÈ ÀÎµ¦½º ¾÷µ¥ÀÌÆ®
+					selectedTagIndex = i; // ì„ íƒëœ ì¸ë±ìŠ¤ ì—…ë°ì´íŠ¸
 				}
 			}
 
@@ -605,17 +603,17 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	ImGui::SameLine();
 	ImGui::Text("Layer");
 	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // ÇÈ¼¿ ´ÜÀ§·Î ³Êºñ ¼³Á¤
+	ImGui::SetNextItemWidth(90.0f); // í”½ì…€ ë‹¨ìœ„ë¡œ ë„ˆë¹„ ì„¤ì •
 	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
 	{
 		for (int i = 0; i <= layerCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == layerCount) // "Add Layer" Ç×¸ñ
+			if (i == layerCount) // "Add Layer" í•­ëª©
 			{
 				if (ImGui::Selectable("Add Layer"))
 				{
-					m_openNewLayerPopup = true; // ÆË¾÷ ¿­±â ÇÃ·¡±× ¼³Á¤
+					m_openNewLayerPopup = true; // íŒì—… ì—´ê¸° í”Œë˜ê·¸ ì„¤ì •
 				}
 			}
 			else
@@ -625,9 +623,9 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 				{
 					TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), gameObject);
 					selectedLayer = layerNames[i];
-					gameObject->SetCollisionType(); // Ãæµ¹ Å¸ÀÔ ¾÷µ¥ÀÌÆ®
+					gameObject->SetCollisionType(); // ì¶©ëŒ íƒ€ì… ì—…ë°ì´íŠ¸
 					TagManagers->AddObjectToLayer(selectedLayer.ToString(), gameObject);
-					selectedLayerIndex = i; // ¼±ÅÃµÈ ÀÎµ¦½º ¾÷µ¥ÀÌÆ®
+					selectedLayerIndex = i; // ì„ íƒëœ ì¸ë±ìŠ¤ ì—…ë°ì´íŠ¸
 				}
 			}
 
@@ -643,16 +641,16 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	if (m_openNewTagPopup)
 	{
 		ImGui::OpenPopup("New Tag");
-		m_openNewTagPopup = false; // ÆË¾÷ ¿­±â ÇÃ·¡±× ÃÊ±âÈ­
+		m_openNewTagPopup = false; // íŒì—… ì—´ê¸° í”Œë˜ê·¸ ì´ˆê¸°í™”
 	}
 
 	if (m_openNewLayerPopup)
 	{
 		ImGui::OpenPopup("New Layer");
-		m_openNewLayerPopup = false; // ÆË¾÷ ¿­±â ÇÃ·¡±× ÃÊ±âÈ­
+		m_openNewLayerPopup = false; // íŒì—… ì—´ê¸° í”Œë˜ê·¸ ì´ˆê¸°í™”
 	}
 
-	// New Tag ÆË¾÷
+	// New Tag íŒì—…
 	if (ImGui::BeginPopup("New Tag"))
 	{
 		static char newTagName[64] = "";
@@ -663,8 +661,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 			{
 				TagManagers->AddTag(newTagName);
 				selectedTag = newTagName;
-				selectedTagIndex = tagCount; // »õ·Î Ãß°¡µÈ ÅÂ±× ÀÎµ¦½º
-				tagCount = TagManagers->GetTags().size(); // ÅÂ±× °³¼ö ¾÷µ¥ÀÌÆ®
+				selectedTagIndex = tagCount; // ìƒˆë¡œ ì¶”ê°€ëœ íƒœê·¸ ì¸ë±ìŠ¤
+				tagCount = TagManagers->GetTags().size(); // íƒœê·¸ ê°œìˆ˜ ì—…ë°ì´íŠ¸
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -676,7 +674,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 		ImGui::EndPopup();
 	}
 
-	// New Layer ÆË¾÷
+	// New Layer íŒì—…
 	if (ImGui::BeginPopup("New Layer"))
 	{
 		static char newLayerName[64] = "";
@@ -687,8 +685,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 			{
 				TagManagers->AddLayer(newLayerName);
 				selectedLayer = newLayerName;
-				selectedLayerIndex = layerCount; // »õ·Î Ãß°¡µÈ ·¹ÀÌ¾î ÀÎµ¦½º
-				layerCount = TagManagers->GetLayers().size(); // ·¹ÀÌ¾î °³¼ö ¾÷µ¥ÀÌÆ®
+				selectedLayerIndex = layerCount; // ìƒˆë¡œ ì¶”ê°€ëœ ë ˆì´ì–´ ì¸ë±ìŠ¤
+				layerCount = TagManagers->GetLayers().size(); // ë ˆì´ì–´ ê°œìˆ˜ ì—…ë°ì´íŠ¸
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -703,7 +701,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 
 void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 {
-	// ÇöÀç Æ®·£½ºÆû °ª
+	// í˜„ì¬ íŠ¸ëœìŠ¤í¼ ê°’
 	Mathf::Vector4& position = gameObject->m_transform.position;
 	Mathf::Vector4& rotation = gameObject->m_transform.rotation;
 	Mathf::Vector4& scale = gameObject->m_transform.scale;
@@ -942,13 +940,13 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 		}
 	}
 
-	// Behavior Tree ÀÌ¸§ Ç¥½Ã
+	// Behavior Tree ì´ë¦„ í‘œì‹œ
 	if (!BTComponent->name.empty())
 	{
 		ImGui::Text("Behavior Tree: %s", BTComponent->name.c_str());
 	}
 
-	//BlackBoard ÀÌ¸§ Ç¥½Ã
+	//BlackBoard ì´ë¦„ í‘œì‹œ
 	if (!BTComponent->blackBoardName.empty())
 	{
 		ImGui::Text("BlackBoard: %s", BTComponent->blackBoardName.c_str());
@@ -972,7 +970,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			FileGuid guid = DataSystems->GetFileGuid(filepath);
 			if (guid != nullFileGuid)
 			{
-				// ÀÌ¹Ì ÇÁ·ÎÆÄÀÏÀÌ Á¸ÀçÇÏ´Â °æ¿ì
+				// ì´ë¯¸ í”„ë¡œíŒŒì¼ì´ ì¡´ì¬í•˜ëŠ” ê²½ìš°
 				if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
 				{
 					Debug->LogWarning("Volume profile already exists. Replacing with new profile.");
@@ -1256,7 +1254,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 		ImGui::Text("Image");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(150.0f); // ÇÈ¼¿ ´ÜÀ§·Î ³Êºñ ¼³Á¤
+		ImGui::SetNextItemWidth(150.0f); // í”½ì…€ ë‹¨ìœ„ë¡œ ë„ˆë¹„ ì„¤ì •
 		if (ImGui::BeginCombo("##TextureCombo", items[currentTextureIndex]))
 		{
 			for (int i = 0; i < count; ++i)
@@ -1342,7 +1340,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 
 	ImGui::Text("Navigation");
 	auto originNaviContainer = imageComponent->GetNavigations();
-	std::array<Navigation, 4> naviContainer{}; // º¹»çº» »ı¼º
+	std::array<Navigation, 4> naviContainer{}; // ë³µì‚¬ë³¸ ìƒì„±
 
 	for (auto navi : originNaviContainer)
 	{
@@ -1522,9 +1520,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 {
 	using namespace ImGui;
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	//  Clip / Picker
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	TextUnformatted("Clip");
 	ImGui::SameLine();
 	SetNextItemWidth(240);
@@ -1538,9 +1536,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		m_openClipPicker = true;
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	//  Bus / Basic Params
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	SeparatorText("Bus / Params");
 
 	const char* busNames[] = { "BGM","SFX","PLAYER","MONSTER","UI" };
@@ -1561,7 +1559,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	Checkbox("Loop", &sc->loop); ImGui::SameLine();
 	Checkbox("Play On Start", &sc->playOnStart);
 
-	// ·çÇÁ »óÅÂ º¯°æ Áï½Ã Ã¤³Î¿¡ ¹İ¿µ
+	// ë£¨í”„ ìƒíƒœ ë³€ê²½ ì¦‰ì‹œ ì±„ë„ì— ë°˜ì˜
 	if (loopBefore != sc->loop) {
 		auto applyLoop = [&](FMOD::Channel* ch) {
 			if (!ch) return;
@@ -1575,9 +1573,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		applyLoop(sc->Get3DChannel());
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	//  Spatial
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	SeparatorText("Spatial");
 	Checkbox("Spatial (Blend 2D+3D)", &sc->spatial);
 
@@ -1599,12 +1597,12 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		bool rollChanged = ImGui::Combo("Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
 		sc->rolloff = (Rolloff)roll;
 
-		// ±×·¡ÇÁ: spatialÀÌ¸é Ç×»ó Ç¥½Ã
+		// ê·¸ë˜í”„: spatialì´ë©´ í•­ìƒ í‘œì‹œ
 		ImGui::SeparatorText("Distance Rolloff Curve");
 
 		const bool isCustom = (sc->rolloff == Rolloff::Custom);
 
-		// Linear /Inverse ¼±ÅÃ ½Ã: ÀÚµ¿ °î¼±À¸·Î µ¿±âÈ­(ÀĞ±âÀü¿ë)
+		// Linear /Inverse ì„ íƒ ì‹œ: ìë™ ê³¡ì„ ìœ¼ë¡œ ë™ê¸°í™”(ì½ê¸°ì „ìš©)
 		if (!isCustom) {
 			if (rollChanged || minBefore != sc->minDistance || maxBefore != sc->maxDistance || sc->localRolloffCurve.size() < 2) {
 				if (sc->rolloff == Rolloff::Linear)  BuildLinearCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
@@ -1614,11 +1612,11 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			ImGui::TextDisabled("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
 		}
 		else {
-			// Custom: ¿¡µğÆ® °¡´É
+			// Custom: ì—ë””íŠ¸ ê°€ëŠ¥
 			if (sc->localRolloffCurve.size() < 2) {
 				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
 			}
-			// maxDistance º¯°æ ½Ã ¸¶Áö¸· Á¡ X¸¦ ¹üÀ§ ³»·Î º¸Á¤(ÆíÁı ³»¿ëÀº À¯Áö)
+			// maxDistance ë³€ê²½ ì‹œ ë§ˆì§€ë§‰ ì  Xë¥¼ ë²”ìœ„ ë‚´ë¡œ ë³´ì •(í¸ì§‘ ë‚´ìš©ì€ ìœ ì§€)
 			sc->localRolloffCurve.back().distance = std::clamp(sc->localRolloffCurve.back().distance, 0.1f, std::max(0.1f, sc->maxDistance));
 
 			if (ImGui::SmallButton("Reset to Default")) {
@@ -1628,7 +1626,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			ImGui::TextDisabled("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
 		}
 
-		// ½Ç½Ã°£ 3D Ã¤³Î ¹İ¿µ(À§Ä¡/°Å¸®/·Ñ¿ÀÇÁ ¸ğµå µî)
+		// ì‹¤ì‹œê°„ 3D ì±„ë„ ë°˜ì˜(ìœ„ì¹˜/ê±°ë¦¬/ë¡¤ì˜¤í”„ ëª¨ë“œ ë“±)
 		if (auto* ch3 = sc->Get3DChannel()) {
 			FMOD_VECTOR p{ sc->position.x, sc->position.y, sc->position.z };
 			FMOD_VECTOR v{ sc->velocity.x, sc->velocity.y, sc->velocity.z };
@@ -1651,14 +1649,14 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		}
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	//  Reverb Send
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	SeparatorText("Reverb Send");
 	bool useRevBefore = sc->useReverbSend;
 	Checkbox("Enable Reverb Send", &sc->useReverbSend);
 
-	// dB ½½¶óÀÌ´õ(-80~+10), ³»ºÎ´Â ¼±Çü(0~1)·Î º¯È¯ÇØ¼­ FMOD¿¡ Àû¿ë
+	// dB ìŠ¬ë¼ì´ë”(-80~+10), ë‚´ë¶€ëŠ” ì„ í˜•(0~1)ë¡œ ë³€í™˜í•´ì„œ FMODì— ì ìš©
 	SetNextItemWidth(260);
 	DragFloat("Reverb Level (dB)", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
 	SetNextItemWidth(200);
@@ -1678,21 +1676,21 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
-	// °ªÀÌ ¹Ù²î¸é Ç×»ó Àû¿ë
+	// ê°’ì´ ë°”ë€Œë©´ í•­ìƒ ì ìš©
 	if (IsItemEdited() || IsItemDeactivatedAfterEdit()) {
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	//  Preview Controls
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	Separator();
 	if (Button("Play")) { sc->Play(); } ImGui::SameLine();
 	if (Button("Stop")) { sc->Stop(); } ImGui::SameLine();
 	if (Button("OneShot")) { sc->PlayOneShot(); }
 
-	// º¼·ı/ÇÇÄ¡/ÇÁ¶óÀÌ¾î¸®Æ¼ º¯°æ ½Ç½Ã°£ ¹İ¿µ(Ã¤³Î »ì¾ÆÀÖÀ» ¶§)
+	// ë³¼ë¥¨/í”¼ì¹˜/í”„ë¼ì´ì–´ë¦¬í‹° ë³€ê²½ ì‹¤ì‹œê°„ ë°˜ì˜(ì±„ë„ ì‚´ì•„ìˆì„ ë•Œ)
 	auto applyBasic = [&](FMOD::Channel* ch) {
 		if (!ch) return;
 		ch->setVolume(sc->volume);
@@ -1823,7 +1821,7 @@ bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& curve, flo
 		return changed;
 	}
 	else {
-		// readOnly ¸ğµå: »óÈ£ÀÛ¿ë ¾øÀ½, ¾È³»¸¸
+		// readOnly ëª¨ë“œ: ìƒí˜¸ì‘ìš© ì—†ìŒ, ì•ˆë‚´ë§Œ
 		if (hovered) SetTooltip("Graph is read-only (driven by Rolloff mode).");
 		Dummy(size);
 		if (outSelected) *outSelected = -1;
@@ -1836,14 +1834,14 @@ void InspectorWindow::DrawSoundClipPicker()
 	using namespace ImGui;
 	if (!m_openClipPicker) return;
 
-	// µ¶¸³ À©µµ¿ì(¸ğ´Ş ´À³¦)
+	// ë…ë¦½ ìœˆë„ìš°(ëª¨ë‹¬ ëŠë‚Œ)
 	SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
 	if (Begin("Select Audio Clip", &m_openClipPicker,
 		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
 	{
-		// »ó´Ü: °Ë»ö/¸®ÇÁ·¹½Ã
+		// ìƒë‹¨: ê²€ìƒ‰/ë¦¬í”„ë ˆì‹œ
 		if (InputTextWithHint("##search", "Search clip key...", &m_clipSearch)) {
-			// ÀÔ·Â ½Ã Áï½Ã ÇÊÅÍ ¹İ¿µ
+			// ì…ë ¥ ì‹œ ì¦‰ì‹œ í•„í„° ë°˜ì˜
 		}
 		SameLine();
 		if (Button("Refresh")) {
@@ -1851,11 +1849,11 @@ void InspectorWindow::DrawSoundClipPicker()
 		}
 		Separator();
 
-		// ÇÊÅÍ¸µ
+		// í•„í„°ë§
 		auto toLower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), ::tolower); return s; };
 		std::string q = toLower(m_clipSearch);
 
-		// ¸®½ºÆ® ¿µ¿ª
+		// ë¦¬ìŠ¤íŠ¸ ì˜ì—­
 		BeginChild("##cliplist", ImVec2(0, -48), true);
 		static int selectedIndex = -1;
 		const int N = (int)m_clipKeyCache.size();
@@ -1868,10 +1866,10 @@ void InspectorWindow::DrawSoundClipPicker()
 				selectedIndex = i;
 			}
 
-			// ¿ìÃø ÇÁ¸®ºä ¹öÆ°
+			// ìš°ì¸¡ í”„ë¦¬ë·° ë²„íŠ¼
 			if (IsItemHovered() && IsMouseDoubleClicked(0)) 
 			{
-				// ´õºíÅ¬¸¯ = ¼±ÅÃ È®Á¤
+				// ë”ë¸”í´ë¦­ = ì„ íƒ í™•ì •
 				if (m_clipPickerTarget && i >= 0) m_clipPickerTarget->clipKey = key;
 				m_openClipPicker = false;
 				selectedIndex = -1;
@@ -1882,7 +1880,7 @@ void InspectorWindow::DrawSoundClipPicker()
 			{
 				if (m_clipPickerTarget) 
 				{
-					// ¹Ì¸®µè±â: ÇöÀç Å¸°Ù ¹ö½º/º¼·ı/ÇÇÄ¡ »ç¿ë
+					// ë¯¸ë¦¬ë“£ê¸°: í˜„ì¬ íƒ€ê²Ÿ ë²„ìŠ¤/ë³¼ë¥¨/í”¼ì¹˜ ì‚¬ìš©
 					FMOD_VECTOR pos{ m_clipPickerTarget->position.x,
 									 m_clipPickerTarget->position.y,
 									 m_clipPickerTarget->position.z };
@@ -1907,7 +1905,7 @@ void InspectorWindow::DrawSoundClipPicker()
 		}
 		EndChild();
 
-		// ÇÏ´Ü ¹öÆ°
+		// í•˜ë‹¨ ë²„íŠ¼
 		BeginDisabled(selectedIndex < 0);
 		if (Button("Use")) 
 		{
