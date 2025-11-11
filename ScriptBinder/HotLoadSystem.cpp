@@ -464,7 +464,10 @@ void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<
 
 void HotLoadSystem::CompileEvent()
 {
-	m_isCompileEventInvoked = true;
+	if (!SceneManagers->IsGameStart())
+	{
+		m_isCompileEventInvoked = true;
+	}
 }
 
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view name)
