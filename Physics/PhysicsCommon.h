@@ -193,10 +193,15 @@ struct ColliderInfo
 	unsigned int id = unresiterID;	//콜라이더 ID
 	unsigned int layerNumber = 0;	//레이어 넘버
 	PhysicsTransform collsionTransform;	//콜리전 트렌스폼
-	float staticFriction = 1.0f;	//정적 물체 마찰 계수
-	float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
-	float restitution = 0.0f;	//탄성 계수
-	float density = 1.0f;	//밀도
+	//float staticFriction = 1.0f;	//정적 물체 마찰 계수
+	//float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
+	//float restitution = 0.0f;	//탄성 계수
+	//float density = 1.0f;	//밀도
+	
+	float staticFriction = 0.5f;	//정적 물체 마찰 계수
+	float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
+	float restitution = 0.3f;	//탄성 계수
+	float density = 10.0f;	//밀도
 
 };
 

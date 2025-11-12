@@ -33,6 +33,16 @@ public:
 	[[Property]]
 	float radius = 1.0f;
 	[[Property]]
+	float staticFriction = 0.5f;	//정적 물체 마찰 계수
+	[[Property]]
+	float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
+	[[Property]]
+	float restitution = 0.3f;	//탄성 계수
+	[[Property]]
+	float density = 10.0f;	//밀도
+
+
+	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
@@ -50,6 +60,68 @@ public:
 		m_Info.radius = radius;
 		this->radius = m_Info.radius;
 	}
+
+	//collider info
+	float GetStaticFriction()
+	{
+		if (staticFriction != 0.0f)
+		{
+			m_Info.colliderInfo.staticFriction = staticFriction;
+		}
+		return m_Info.colliderInfo.staticFriction;
+	}
+
+	void SetStaticFriction(float staticFriction)
+	{
+		m_Info.colliderInfo.staticFriction = staticFriction;
+		this->staticFriction = m_Info.colliderInfo.staticFriction;
+	}
+
+	float GetDynamicFriction()
+	{
+		if (dynamicFriction != 0.0f)
+		{
+			m_Info.colliderInfo.dynamicFriction = dynamicFriction;
+		}
+		return m_Info.colliderInfo.dynamicFriction;
+	}
+
+	void SetDynamicFriction(float dynamicFriction)
+	{
+		m_Info.colliderInfo.dynamicFriction = dynamicFriction;
+		this->dynamicFriction = m_Info.colliderInfo.dynamicFriction;
+	}
+
+	float GetRestitution()
+	{
+		if (restitution != 0.0f)
+		{
+			m_Info.colliderInfo.restitution = restitution;
+		}
+		return m_Info.colliderInfo.restitution;
+	}
+	void SetRestitution(float restitution)
+	{
+		m_Info.colliderInfo.restitution = restitution;
+		this->restitution = m_Info.colliderInfo.restitution;
+	}
+
+	float GetDensity()
+	{
+		if (density != 0.0f)
+		{
+			m_Info.colliderInfo.density = density;
+		}
+		return m_Info.colliderInfo.density;
+	}
+
+	void SetDensity(float density)
+	{
+		m_Info.colliderInfo.density = density;
+		this->density = m_Info.colliderInfo.density;
+	}
+
+
 	EColliderType GetColliderType() const
 	{
 		return m_type;
@@ -65,6 +137,14 @@ public:
 		{
 			m_Info.radius = radius;
 		}
+
+		m_Info.colliderInfo.layerNumber = GetOwner()->m_collisionType;
+
+		m_Info.colliderInfo.staticFriction = staticFriction;
+		m_Info.colliderInfo.dynamicFriction = dynamicFriction;
+		m_Info.colliderInfo.restitution = restitution;
+		m_Info.colliderInfo.density = density;
+
 		return m_Info;
 	}
 	void SetSphereInfoMation(const SphereColliderInfo& info)
