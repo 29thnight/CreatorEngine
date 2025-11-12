@@ -101,12 +101,12 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 
     if (!sceneObject->m_tag.ToString().empty())
     {
-        TagManager::GetInstance()->AddTagToObject(sceneObject->m_tag.ToString(), sceneObject.get());
+        TagManagers->AddTagToObject(sceneObject->m_tag.ToString(), sceneObject.get());
     }
 
     if (!sceneObject->m_layer.ToString().empty())
     {
-        TagManager::GetInstance()->AddObjectToLayer(sceneObject->m_layer.ToString(), sceneObject.get());
+        TagManagers->AddObjectToLayer(sceneObject->m_layer.ToString(), sceneObject.get());
     }
 
     return sceneObject;
@@ -466,9 +466,9 @@ void Scene::CullMeshData()
         if (!RenderPassData::VaildCheck(camera.get())) return;
         auto data = RenderPassData::GetData(camera.get());
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(allMeshes)]
         {
-            for (auto& mesh : allMeshes)
+            for (auto& mesh : meshs)
             {
                 if (mesh->IsDestroyMark() ||
                     false == mesh->IsEnabled() ||
@@ -478,9 +478,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(staticMeshes)]
         {
-            for (auto& culledMesh : staticMeshes)
+            for (auto& culledMesh : meshs)
             {
                 if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
 
@@ -492,9 +492,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(skinnedMeshes)]
         {
-            for (auto& skinnedMesh : skinnedMeshes)
+            for (auto& skinnedMesh : meshs)
             {
                 if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
 
@@ -506,9 +506,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, terrain = std::move(terrainComponents)]
         {
-            for (auto& terrainComponent : terrainComponents)
+            for (auto& terrainComponent : terrain)
             {
                 if (false == terrainComponent->IsEnabled() || false == terrainComponent->GetOwner()->IsEnabled()) continue;
 
@@ -516,9 +516,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, foliage = std::move(foliageComponents)]
         {
-            for (auto& foliageComponent : foliageComponents)
+            for (auto& foliageComponent : foliage)
             {
                 if (false == foliageComponent->IsEnabled() || false == foliageComponent->GetOwner()->IsEnabled()) continue;
 
@@ -526,9 +526,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, decal = std::move(decalComponents)]
         {
-            for (auto& decalComponent : decalComponents)
+            for (auto& decalComponent : decal)
             {
                 if (false == decalComponent->IsEnabled() || false == decalComponent->GetOwner()->IsEnabled()) continue;
 
@@ -536,9 +536,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, sprites = std::move(spriteRenderers)]
         {
-            for (auto& sprite : spriteRenderers)
+            for (auto& sprite : sprites)
             {
                 if (false == sprite->IsEnabled() || false == sprite->GetOwner()->IsEnabled()) continue;
 
@@ -546,9 +546,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, imageUIs = std::move(imageComponents)]
         {
-            for (auto& image : imageComponents)
+            for (auto& image : imageUIs)
             {
                 if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
 
@@ -568,9 +568,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, textUIs = std::move(textComponents)]
         {
-            for (auto& text : textComponents)
+            for (auto& text : textUIs)
             {
                 if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
 
@@ -587,9 +587,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=]
+        SceneManagers->m_threadPool->Enqueue([=, spSheets = std::move(spriteSheetComponents)]
         {
-            for (auto& spriteSheet : spriteSheetComponents)
+            for (auto& spriteSheet : spSheets)
             {
                 if (false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
                 auto owner = spriteSheet->GetOwner();
@@ -722,11 +722,8 @@ void Scene::FixedUpdate(float deltaSecond)
         m_AIFuture.get();
     }
     PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
-    AllUpdateWorldMatrix(); // render 단계에서 imgui를 통해 transform의 변경이 있으므로 디버그모드에서만 사용.
+    AllUpdateWorldMatrix();
     PROFILE_CPU_END();
-#ifndef BUILD_FLAG
-
-#endif // BUILD_FLAG
 
     PROFILE_CPU_BEGIN("SetInternalPhysicData");
     SetInternalPhysicData();
