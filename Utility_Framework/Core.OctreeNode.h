@@ -1,30 +1,33 @@
 #pragma once
-#include <DirectXCollision.h>
+// CreatorEngine - Core Octree Node (Loose Octree + shared_ptr children, weak_ptr items)
+
 #include <array>
 #include <vector>
+#include <memory>
+#include <DirectXCollision.h>
 
-class MeshRenderer;
-class OctreeNode
-{
-public:
-    DirectX::BoundingBox boundingBox;
-    std::vector<MeshRenderer*> objects;
+class MeshRenderer; // fwd
 
-	OctreeNode* parent = nullptr;
-    std::array<OctreeNode*, 8> children{};
+namespace Creator {
+    namespace Culling {
 
-    int depth = 0;
-    bool isLeaf = true;
+        struct OctreeNode : public std::enable_shared_from_this<OctreeNode>
+        {
+            // Tight bounds: 분할/자식 영역 계산용 (실제 공간 파티션 영역)
+            DirectX::BoundingBox                      tightBounds{};
 
-    OctreeNode(const DirectX::BoundingBox& box, int depth = 0);
-    ~OctreeNode();
+            // Loose bounds: 컬링/레이캐스트/교차 테스트용 (tightBounds * looseFactor)
+            DirectX::BoundingBox                      bounds{};
 
-    void Subdivide(int maxDepth, int maxObjectsPerNode);
-    void Insert(MeshRenderer* object, int maxDepth, int maxObjectsPerNode);
+            std::array<std::shared_ptr<OctreeNode>, 8> children{};    // parent -> child shared ownership
+            std::vector<std::weak_ptr<MeshRenderer>>   items;         // store items as weak_ptr (no ownership)
+            unsigned                                   depth{ 0 };
 
-    bool Contains(const DirectX::BoundingBox& box) const;
-    bool Remove(MeshRenderer* object);
-    bool RemoveRecursive(MeshRenderer* target);
+            inline bool isLeaf() const noexcept {
+                for (auto const& c : children) if (c) return false;
+                return true;
+            }
+        };
 
-	int GetMaxDepth() const;
-};
+    }
+} // namespace Creator::Culling

@@ -11,7 +11,7 @@ class Material;
 class Animator;
 class Camera;
 class OctreeNode;
-class MeshRenderer : public Component, public RegistableEvent<MeshRenderer>
+class MeshRenderer : public Component, public RegistableEvent<MeshRenderer>, public std::enable_shared_from_this<MeshRenderer>
 {
 public:
    ReflectMeshRenderer
@@ -29,10 +29,6 @@ public:
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
     BoundingBox GetBoundingBox() const;
-
-	void CullGroupInsert(OctreeNode* node);
-    void CullGroupClear();
-	std::unordered_set<OctreeNode*>& GetCullGroup() { return m_OctreeNodes; }
 
 public:
     [[Property]]

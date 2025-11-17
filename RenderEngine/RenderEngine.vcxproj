@@ -342,7 +342,6 @@
     <ClInclude Include="ColorGradingPass.h" />
     <ClInclude Include="ColorGradingPassSetting.h" />
     <ClInclude Include="ColorModuleCS.h" />
-    <ClInclude Include="CullingBox.h" />
     <ClInclude Include="CullingManager.h" />
     <ClInclude Include="BaseEffectStruct.h" />
     <ClInclude Include="BillboardModuleGPU.h" />

@@ -76,9 +76,6 @@
     <Filter Include="Core.Container\QuadTree">
       <UniqueIdentifier>{eb38e51c-cf32-4e58-a4a7-f7e93c77d957}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Container\PointOctree">
-      <UniqueIdentifier>{041995e1-a769-49fb-ade3-10561593affe}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Container\MeshCullingOctree[WIP]">
       <UniqueIdentifier>{d3e75a40-9227-4535-bca0-1f9574f2a71b}</UniqueIdentifier>
     </Filter>
@@ -273,9 +270,6 @@
     <ClInclude Include="Core.CountingSemaphore.h">
       <Filter>Core.Thread</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Octree.h">
-      <Filter>Core.Container\PointOctree</Filter>
-    </ClInclude>
     <ClInclude Include="Core.Fence.h">
       <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
@@ -330,6 +324,9 @@
     <ClInclude Include="PakHelper.h">
       <Filter>EngineBootstrap</Filter>
     </ClInclude>
+    <ClInclude Include="Octree.h">
+      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
@@ -353,11 +350,11 @@
     <ClCompile Include="QuadTree.cpp">
       <Filter>Core.Container\QuadTree</Filter>
     </ClCompile>
-    <ClCompile Include="Core.OctreeNode.cpp">
-      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
-    </ClCompile>
     <ClCompile Include="WinProcProxy.cpp">
       <Filter>WindowsApplication\WinProcProxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Octree.cpp">
+      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

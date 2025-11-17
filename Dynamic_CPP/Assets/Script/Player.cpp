@@ -441,7 +441,10 @@ void Player::Update(float tick)
 	HitImpulseUpdate(tick);
 	UpdateEffectPos();
 	UpdateSwapWeaponFlash(tick);
-	m_controller->SetBaseSpeed(moveSpeed);
+	if(m_controller)
+	{
+		m_controller->SetBaseSpeed(moveSpeed);
+	}
 	if (catchedObject)
 	{
 		UpdateChatchObject();
@@ -466,8 +469,12 @@ void Player::Update(float tick)
 			rapidfireElapsedTime = 0;
 		}
 	}
+
 	if (isCharging)
 	{
+
+		if (!m_curWeapon) return;
+
 		m_chargingTime += tick;
 		m_curWeapon->chargingPersent = m_chargingTime / m_curWeapon->chgTime;
 		if (!isChargeAttack && m_chargingTime >= m_curWeapon->chgTime) //차징시간이 무기 차징시간보다 길면
@@ -514,7 +521,7 @@ void Player::Update(float tick)
 			SlotChangeCooldownElapsedTime = 0;
 		}
 	}
-	if (m_curWeapon->IsBroken() && sucessAttack == true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
+	if (m_curWeapon && m_curWeapon->IsBroken() && sucessAttack == true) //무기가 부셔졌고 현재 공격 애니메이션이 방금 끝났으면
 	{
 		isChargeAttack = false; //임시땜빵&&&&&
 		DeleteCurWeapon();

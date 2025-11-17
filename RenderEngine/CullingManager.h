@@ -1,42 +1,63 @@
 #pragma once
-#include "ClassProperty.h"
-#include "Core.Thread.hpp"
+// CreatorEngine - Culling Manager (Singleton over DLL boundary)
+
+#include <memory>
 #include <vector>
 #include <DirectXCollision.h>
-#include <set>
+
+#include "Octree.h"
+#include "DLLAcrossSingleton.h"
 
 class MeshRenderer;
-class OctreeNode;
 
-class CullingManager : public Singleton<CullingManager>
-{
-private:
-	friend class Singleton;
-    CullingManager() = default;
-    ~CullingManager();
+namespace Creator {
+    namespace Culling {
 
-public:
-    void Initialize(const DirectX::BoundingBox& worldBounds, int maxDepth = 5, int maxMeshesPerNode = 10);
-    void Rebuild(const std::vector<MeshRenderer*>& sceneMeshes, const DirectX::BoundingBox& newWorldBounds);
-    void Insert(MeshRenderer* mesh);
-    void SmartCullMeshes(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& outVisibleMeshes) const;
-    void CullMeshes(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& outVisibleMeshes) const;
-	void CullMeshesMultithread(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& outVisibleMeshes) const;
-    bool Remove(MeshRenderer* mesh);
-	void RemoveAll();
-    void UpdateMesh(MeshRenderer* mesh);
-    void Clear();
+        class CullingManager : public DLLCore::Singleton<CullingManager>
+        {
+            // Allow Singleton to call our private/protected ctor/dtor
+            friend class DLLCore::Singleton<CullingManager>;
 
-private:
-    ThreadPool<std::function<void()>>* m_threadPool{ nullptr };
-    OctreeNode* m_root{ nullptr };
-    int m_maxDepth = 5;
-    int m_maxMeshesPerNode = 10;
+        public:
+            // Lifecycle
+            void Initialize(const DirectX::BoundingBox& world, const OctreeConfig& cfg);
+            void Shutdown();
 
-    std::set<MeshRenderer*> m_uniqueMeshes;
+            bool IsInitialized() const noexcept { return static_cast<bool>(m_oct); }
 
-	void CullRoot(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& out) const;
-    void CullRecursive(const DirectX::BoundingFrustum& frustum, OctreeNode* node, std::vector<MeshRenderer*>& out) const;
-};
+            // Registration / Updates
+            void Register(std::shared_ptr<MeshRenderer> mr, std::uint64_t id, const DirectX::BoundingBox& aabb);
+            void Unregister(std::uint64_t id);
+            void UpdateBounds(std::uint64_t id, const DirectX::BoundingBox& aabb);
 
-static auto& CullingManagers = CullingManager::GetInstance();
+            // Queries
+            void FrustumCull(const DirectX::BoundingFrustum& fr, std::vector<std::shared_ptr<MeshRenderer>>& out) const;
+            void BoxQuery(const DirectX::BoundingBox& area, std::vector<std::shared_ptr<MeshRenderer>>& out) const;
+
+            // Front-to-back 프러스텀 컬링
+            void FrustumCullFrontToBack(const DirectX::XMVECTOR& eye,
+                const DirectX::BoundingFrustum& fr,
+                std::vector<std::shared_ptr<MeshRenderer>>& out) const;
+
+            // Raycast (AABB 기반 1차 테스트)
+            void Raycast(const Ray& ray,
+                std::vector<std::pair<std::shared_ptr<MeshRenderer>, float>>& hits,
+                float maxDistance = FLT_MAX) const;
+
+
+            // Stats
+            [[nodiscard]] Octree::Stats GetStats() const;
+
+        private:
+            // ctor/dtor hidden from outside; only Singleton can construct/destroy
+            CullingManager() = default;
+            ~CullingManager() = default;
+
+        private:
+            std::unique_ptr<Octree> m_oct; // thread-safety is handled inside Octree
+        };
+
+    }
+} // namespace Creator::Culling
+
+static auto CullingManagers = Creator::Culling::CullingManager::GetInstance();

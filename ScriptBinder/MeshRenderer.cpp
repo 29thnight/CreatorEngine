@@ -29,7 +29,8 @@ void MeshRenderer::Awake()
 
     if(!m_isSkinnedMesh)
     {
-        CullingManagers->Insert(this);
+		HashedGuid instanceID = GetInstanceID();
+        CullingManagers->Register(shared_from_this(), instanceID.m_ID_Data, GetBoundingBox());
 
 		m_isNeedUpdateCulling = true;
     }
@@ -37,13 +38,19 @@ void MeshRenderer::Awake()
 
 void MeshRenderer::OnDestroy()
 {
-    CullingManagers->Remove(this);
+    //CullingManagers->Remove(this);
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectMeshRenderer(this);
         renderScene->UnregisterCommand(this);
+	}
+
+    if (!m_isSkinnedMesh)
+    {
+        HashedGuid instanceID = GetInstanceID();
+        CullingManagers->Unregister(instanceID.m_ID_Data);
 	}
 }
 
@@ -60,17 +67,4 @@ BoundingBox MeshRenderer::GetBoundingBox() const
     }
 
     return BoundingBox();
-}
-
-void MeshRenderer::CullGroupInsert(OctreeNode* node)
-{
-	if (node)
-	{
-		m_OctreeNodes.insert(node);
-	}
-}
-
-void MeshRenderer::CullGroupClear()
-{
-	m_OctreeNodes.clear();
 }

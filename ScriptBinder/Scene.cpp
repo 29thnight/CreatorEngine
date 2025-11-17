@@ -23,6 +23,7 @@
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
+#include "CullingManager.h"
 #include "AIManager.h"
 #include <execution>
 #include <queue>
@@ -466,9 +467,20 @@ void Scene::CullMeshData()
         if (!RenderPassData::VaildCheck(camera.get())) return;
         auto data = RenderPassData::GetData(camera.get());
 
-        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(allMeshes)]
+        std::vector<std::shared_ptr<MeshRenderer>> visibleMeshes;
+
+		auto frustum = camera->GetFrustum();
+
+		Mathf::xVector camPos = camera->m_eyePosition;
+
+        CullingManagers->FrustumCullFrontToBack(
+            camPos,
+            frustum,
+			visibleMeshes);
+
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& mesh : meshs)
+            for (auto& mesh : allMeshes)
             {
                 if (mesh->IsDestroyMark() ||
                     false == mesh->IsEnabled() ||
@@ -478,23 +490,18 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(staticMeshes)]
+        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(visibleMeshes)]
         {
             for (auto& culledMesh : meshs)
             {
                 if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-                auto frustum = camera->GetFrustum();
-                if (frustum.Intersects(culledMesh->GetBoundingBox()))
-                {
-                    data->PushCullData(culledMesh->GetInstanceID());
-                }
+                data->PushCullData(culledMesh->GetInstanceID());
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(skinnedMeshes)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& skinnedMesh : meshs)
+            for (auto& skinnedMesh : skinnedMeshes)
             {
                 if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
 
@@ -506,9 +513,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, terrain = std::move(terrainComponents)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& terrainComponent : terrain)
+            for (auto& terrainComponent : terrainComponents)
             {
                 if (false == terrainComponent->IsEnabled() || false == terrainComponent->GetOwner()->IsEnabled()) continue;
 
@@ -516,9 +523,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, foliage = std::move(foliageComponents)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& foliageComponent : foliage)
+            for (auto& foliageComponent : foliageComponents)
             {
                 if (false == foliageComponent->IsEnabled() || false == foliageComponent->GetOwner()->IsEnabled()) continue;
 
@@ -526,9 +533,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, decal = std::move(decalComponents)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& decalComponent : decal)
+            for (auto& decalComponent : decalComponents)
             {
                 if (false == decalComponent->IsEnabled() || false == decalComponent->GetOwner()->IsEnabled()) continue;
 
@@ -536,9 +543,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, sprites = std::move(spriteRenderers)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& sprite : sprites)
+            for (auto& sprite : spriteRenderers)
             {
                 if (false == sprite->IsEnabled() || false == sprite->GetOwner()->IsEnabled()) continue;
 
@@ -546,9 +553,10 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, imageUIs = std::move(imageComponents)]
+		//여기 부터는 UI -> 컬링하는 부분이 아님 분리 필요 -> UI 렌더링 데이터 푸시
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& image : imageUIs)
+            for (auto& image : imageComponents)
             {
                 if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
 
@@ -568,9 +576,9 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, textUIs = std::move(textComponents)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& text : textUIs)
+            for (auto& text : textComponents)
             {
                 if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
 
@@ -587,11 +595,11 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, spSheets = std::move(spriteSheetComponents)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& spriteSheet : spSheets)
+            for (auto& spriteSheet : spriteSheetComponents)
             {
-                if (false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
+                if (spriteSheet->IsDestroyMark() || false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
                 auto owner = spriteSheet->GetOwner();
                 if (nullptr == owner) continue;
                 auto scene = owner->GetScene();
@@ -716,8 +724,7 @@ void Scene::Start()
 
 void Scene::FixedUpdate(float deltaSecond)
 {
-    //여기서 반드시 블로킹해서 BT 업데이트를 마친다.
-    if (m_AIFuture.valid())
+    if (m_AIFuture.valid() && m_AIFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
         m_AIFuture.get();
     }
@@ -850,11 +857,14 @@ void Scene::OnDestroy()
     DestroyGameObjects();
     PROFILE_CPU_END();
     //여기서 병렬처리
-    float deltaSecond = Time->GetElapsedSeconds();
-    m_AIFuture = std::async(std::launch::async, [deltaSecond]
+    if(!m_AIFuture.valid())
     {
-        AIManagers->InternalAIUpdate(deltaSecond);
-    });
+        float deltaSecond = Time->GetElapsedSeconds();
+        m_AIFuture = std::async(std::launch::async, [deltaSecond]
+        {
+            AIManagers->InternalAIUpdate(deltaSecond);
+        });
+    }
 }
 
 void Scene::AllDestroyMark()
