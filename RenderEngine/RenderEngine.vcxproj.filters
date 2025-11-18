@@ -569,6 +569,9 @@
     <ClCompile Include="TrailModuleCS.cpp">
       <Filter>RenderPass\EffectPass\555.Generate</Filter>
     </ClCompile>
+    <ClCompile Include="RenderGraphBuilder.cpp">
+      <Filter>Asset</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -945,6 +948,9 @@
     </ClInclude>
     <ClInclude Include="BitMaskPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderGraphBuilder.h">
+      <Filter>Asset</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

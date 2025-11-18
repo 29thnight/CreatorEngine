@@ -153,7 +153,7 @@ void SceneManager::InputEvents(float deltaSecond)
 
 void SceneManager::GameLogic(float deltaSecond)
 {
-    if (!m_activeScene || !m_isGameStart) return;
+    if (!m_activeScene) return;
 
     PROFILE_CPU_BEGIN("Update");
     m_activeScene.load()->Update(deltaSecond);

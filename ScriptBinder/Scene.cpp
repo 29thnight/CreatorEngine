@@ -490,12 +490,16 @@ void Scene::CullMeshData()
             }
         });
 
-        SceneManagers->m_threadPool->Enqueue([=, meshs = std::move(visibleMeshes)]
+        SceneManagers->m_threadPool->Enqueue([=]
         {
-            for (auto& culledMesh : meshs)
+            for (auto& culledMesh : staticMeshes)
             {
                 if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-                data->PushCullData(culledMesh->GetInstanceID());
+                auto frustum = camera->GetFrustum();
+                if (frustum.Intersects(culledMesh->GetBoundingBox()))
+                {
+                    data->PushCullData(culledMesh->GetInstanceID());
+                }
             }
         });
 

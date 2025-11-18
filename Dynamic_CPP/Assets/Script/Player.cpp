@@ -530,13 +530,13 @@ void Player::Update(float tick)
 	{
 		sucessAttack = false;
 	}
-	if (sucessResurrection == true)
+	if (m_animator && sucessResurrection == true)
 	{
 		m_animator->SetParameter("OnResurrection", true);
 		sucessResurrection = false;
 	}
 
-	if (curDashTime >= 0.f)
+	if (m_animator && curDashTime >= 0.f)
 	{
 		curDashTime -= tick;
 		if (curDashTime <= 0.f)
@@ -586,8 +586,6 @@ void Player::Update(float tick)
 	{
 		m_animator->SetParameter("AttackSpeed", MultipleAttackSpeed);
 	}
-
-
 
 	//간혈적 버그 
 	if (isChargeAttack == true)

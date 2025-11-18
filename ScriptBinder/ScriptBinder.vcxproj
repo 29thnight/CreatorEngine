@@ -263,6 +263,7 @@
     <ClCompile Include="DecalComponent.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
+    <ClCompile Include="ModuleBehavior.cpp" />
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
     <ClCompile Include="SoundComponent.cpp" />

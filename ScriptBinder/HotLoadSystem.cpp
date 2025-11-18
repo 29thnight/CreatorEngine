@@ -498,7 +498,6 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view na
 				{
 					if (script->m_awakeEventHandle.IsValid()) continue;
 
-					
 					script->m_awakeEventHandle = activeScene->AwakeEvent.AddShared(sharedThis, &ModuleBehavior::AwakeInvoke);
 				}
 				else if (event == "OnEnable")
