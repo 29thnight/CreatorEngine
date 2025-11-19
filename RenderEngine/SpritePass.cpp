@@ -85,7 +85,7 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
     deferredPtr->OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
     DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 
-    camera.UpdateBuffer(deferredPtr);
+    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
     scene.UseModel(deferredPtr);
 
     for (auto& proxy : renderData->m_spriteRenderQueue)

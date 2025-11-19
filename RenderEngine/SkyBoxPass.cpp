@@ -398,7 +398,7 @@ void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 
 	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);

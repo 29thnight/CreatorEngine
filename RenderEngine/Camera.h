@@ -78,6 +78,7 @@ public:
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
+	void DeferredUpdateBuffer(ID3D11DeviceContext* deferredContext, const Mathf::Matrix& v, const Mathf::Matrix& p, bool shadow = false);
 
 	float CalculateLODDistance(const Mathf::Vector3& position) const;
 

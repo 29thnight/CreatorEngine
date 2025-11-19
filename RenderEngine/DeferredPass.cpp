@@ -170,7 +170,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     DirectX11::OMSetRenderTargets(deferredPtr, 2, rtv, nullptr);
     DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 
-    camera.UpdateBuffer(deferredPtr);
+    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
     DirectX11::UpdateBuffer(deferredPtr, m_shadowcamBuffer.Get(), &cameraview);
     DirectX11::UpdateBuffer(deferredPtr, lightManager->m_shadowMapBuffer, &renderData->m_shadowCamera.m_shadowMapConstant);

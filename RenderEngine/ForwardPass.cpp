@@ -336,7 +336,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		lightManager->PSBindCloudShadowMap(deferredPtr);
 	}
 
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
@@ -626,7 +626,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 		lightManager->PSBindCloudShadowMap(deferredPtr);
 	}
 
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 
 	constexpr size_t kMaxInstancesPerDraw = 2048;
 	for(auto& proxy : data->m_foliageQueue)
