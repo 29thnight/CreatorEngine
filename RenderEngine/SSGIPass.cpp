@@ -142,8 +142,8 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
 
     SSGIParams params;
-    params.view = camera.CalculateView();
-    params.proj = camera.CalculateProjection();
+    params.view = renderData->m_frameCalculatedView;
+    params.proj = renderData->m_frameCalculatedProjection;
     params.inverseView = XMMatrixInverse(nullptr, params.view);
     params.inverseProjection = XMMatrixInverse(nullptr, params.proj);
     params.screenSize = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
@@ -153,7 +153,7 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     params.ratio = ssratio;
     params.intensity = intensity;
 
-    camera.UpdateBuffer(deferredPtr);
+    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
     DirectX11::UpdateBuffer(deferredPtr, m_SSGIBuffer.Get(), &params);
     DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_SSGIBuffer.GetAddressOf());
 

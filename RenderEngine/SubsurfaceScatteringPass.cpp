@@ -79,7 +79,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* defe
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
 
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
 	SubsurfaceScatteringBuffer buffer{};
 	buffer.CameraFOV	= camera.m_fov;

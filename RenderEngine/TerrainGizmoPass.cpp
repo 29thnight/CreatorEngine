@@ -76,7 +76,7 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
     DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
     DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
 
-    camera.UpdateBuffer(deferredPtr);
+    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
     scene.UseModel(deferredPtr);
     for (auto& obj : scene.GetScene()->m_SceneObjects) 
     {
