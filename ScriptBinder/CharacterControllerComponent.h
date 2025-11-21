@@ -222,7 +222,7 @@ public:
 	float m_height = 2.f;
 
 	[[Property]]
-	float maxSpeed = 0.025f;	//최대 속도 //&&&&&speed
+	float maxSpeed = 1.025f;	//최대 속도 //&&&&&speed
 	[[Property]]
 	float acceleration = 1.0f;	//가속도
 	[[Property]]
