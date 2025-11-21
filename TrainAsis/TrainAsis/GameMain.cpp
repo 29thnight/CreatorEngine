@@ -41,10 +41,20 @@ void DirectX11::GameMain::Initialize()
 {
     m_deviceResources->RegisterDeviceNotify(this);
 
-    XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
-    XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
-    BoundingBox fixedBounds(center, extents);
-    CullingManagers->Initialize(fixedBounds, 3, 30);
+    using namespace Creator::Culling;
+    using namespace DirectX;
+
+    BoundingBox worldTight;
+    worldTight.Center = XMFLOAT3(0.f, 0.f, 0.f);
+    worldTight.Extents = XMFLOAT3(5000.f, 5000.f, 5000.f); // +/- 5km
+
+    OctreeConfig cfg{};
+    cfg.nodeCapacity = 32;
+    cfg.maxDepth = 8;
+    cfg.minHalfSize = 1.0f;
+    cfg.looseFactor = 1.5f; // 느슨한 옥트리
+
+    CullingManagers->Initialize(worldTight, cfg);
     TagManagers->Initialize();
 
     m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);

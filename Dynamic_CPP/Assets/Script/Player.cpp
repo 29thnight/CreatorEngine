@@ -2738,7 +2738,9 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 		if (HitPrefab)
 		{
 			GameObject* HitObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
+			if (HitObj == nullptr) return;
 			auto swordHitEffect = HitObj->GetComponent<PlayEffectAll>();
+			if (swordHitEffect == nullptr) return;
 			Transform* hitTransform = HitObj->GetComponent<Transform>();
 			Vector3 normal = hitinfo.hitNormal;
 			normal.Normalize();
@@ -2769,7 +2771,9 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			if (HitPrefab)
 			{
 				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
+				if (HirObj == nullptr) return;
 				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>();
+				if (rangeHitEffect == nullptr) return;
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 
@@ -2785,7 +2789,9 @@ void PlayHitEffect(GameObject* _hitowner, HitInfo hitinfo)
 			if (HitPrefab)
 			{
 				GameObject* HirObj = PrefabUtilitys->InstantiatePrefab(HitPrefab, "HitEffect");
+				if (HirObj == nullptr) return;
 				auto rangeHitEffect = HirObj->GetComponent<PlayEffectAll>(); 
+				if (rangeHitEffect == nullptr) return;
 				Transform* hitTransform = HirObj->GetComponent<Transform>();
 				hitTransform->SetPosition(hitinfo.hitPos);
 
@@ -2803,7 +2809,9 @@ void Player::InitPlayerObserver(int player_index)
 		if (observerPrefab)
 		{
 			auto observerObj = PrefabUtilitys->InstantiatePrefab(observerPrefab, "P1Observer");
+			if (!observerObj) return;
 			auto observer = observerObj->GetComponent<PlayerObserver>();
+			if (!observer) return;
 			observer->SetPlayerIndex(0);
 			observer->SetTarget(player->shared_from_this());
 			observer->Init();

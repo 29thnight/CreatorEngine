@@ -1167,7 +1167,7 @@ void SceneRenderer::PrepareRender()
 	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
 	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
-	auto renderScene = m_renderScene;
+	/*auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
 	PROFILE_CPU_BEGIN("CopySceneData");
 	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
@@ -1354,7 +1354,7 @@ void SceneRenderer::PrepareRender()
 	}
 
 	m_threadPool->NotifyAllAndWait();
-	PROFILE_CPU_END();
+	PROFILE_CPU_END();*/
 
 	EffectProxyController::GetInstance()->PrepareCommandBehavior();
 

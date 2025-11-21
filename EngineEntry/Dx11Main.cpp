@@ -102,43 +102,45 @@ void DirectX11::Dx11Main::Initialize()
     g_progressWindow->SetProgress(80);
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
-        {
+    {
 #ifdef EDITOR
-            bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
-            if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
-            {
-                Meta::UndoCommandManager->Undo();
-            }
+        bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
+        if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
+        {
+            Meta::UndoCommandManager->Undo();
+        }
 
-            if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
-            {
-                Meta::UndoCommandManager->Redo();
-            }
+        if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
+        {
+            Meta::UndoCommandManager->Redo();
+        }
 #endif // !EDITOR
-            UIManagers->Update();
-            Sound->update();
-        });
+        UIManagers->Update();
+        Sound->update();
+    });
     g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
-        {
-            m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
-            m_sceneRenderer->SceneRendering();
-        });
+    {
+        m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
+        m_sceneRenderer->SceneRendering();
+    });
+
     g_progressWindow->SetProgress(82);
     m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
-        {
-            m_gizmoRenderer->OnDrawGizmos();
-        });
+    {
+        m_gizmoRenderer->OnDrawGizmos();
+    });
+
     g_progressWindow->SetProgress(83);
     m_GUIRenderingEventHandle = GUIRenderingEvent.AddLambda([&]()
-        {
-            OnGui();
-        });
+    {
+        OnGui();
+    });
 
     m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]()
-        {
-            m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
-        });
+    {
+        m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
+    });
 
     g_progressWindow->SetProgress(85);
     SceneManagers->ManagerInitialize();

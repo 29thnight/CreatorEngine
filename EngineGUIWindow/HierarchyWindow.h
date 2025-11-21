@@ -12,6 +12,7 @@ public:
 	~HierarchyWindow() = default;
 
 	//void DrawSceneObject(const std::shared_ptr<GameObject>& obj, GameObject* selected, bool forceOpenPath, bool& scrolledOnce);
+	bool IsMatchedRecursive(const std::shared_ptr<GameObject>& obj);
 
 	SceneRenderer* m_sceneRenderer{ nullptr };
 	ImGuiTextFilter m_searchFilter{};

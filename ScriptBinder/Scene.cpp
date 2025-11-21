@@ -461,6 +461,8 @@ void Scene::CullMeshData()
     std::vector<SpriteSheetComponent*> spriteSheetComponents = UIManagers->SpriteSheets;
     std::vector<DecalComponent*> decalComponents = m_decalComponents;
 
+    auto renderScene = SceneManagers->GetRenderScene();
+
     for (auto camera : CameraManagement->GetCameras())
     {
         if (!camera) return;
@@ -482,6 +484,16 @@ void Scene::CullMeshData()
         {
             for (auto& mesh : allMeshes)
             {
+                if (!mesh) continue;
+                try
+                {
+                    renderScene->UpdateCommand(mesh);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating mesh command: " << e.what() << '\n';
+                }
+
                 if (mesh->IsDestroyMark() ||
                     false == mesh->IsEnabled() ||
                     false == mesh->GetOwner()->IsEnabled()
@@ -521,6 +533,15 @@ void Scene::CullMeshData()
         {
             for (auto& terrainComponent : terrainComponents)
             {
+                try
+                {
+                    renderScene->UpdateCommand(terrainComponent);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating terrain command: " << e.what() << std::endl;
+                }
+
                 if (false == terrainComponent->IsEnabled() || false == terrainComponent->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(terrainComponent->GetInstanceID());
@@ -531,6 +552,15 @@ void Scene::CullMeshData()
         {
             for (auto& foliageComponent : foliageComponents)
             {
+                try
+                {
+                    renderScene->UpdateCommand(foliageComponent);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating foliage command: " << e.what() << std::endl;
+                }
+
                 if (false == foliageComponent->IsEnabled() || false == foliageComponent->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(foliageComponent->GetInstanceID());
@@ -541,6 +571,15 @@ void Scene::CullMeshData()
         {
             for (auto& decalComponent : decalComponents)
             {
+                try
+                {
+                    renderScene->UpdateCommand(decalComponent);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating decal command: " << e.what() << std::endl;
+                }
+
                 if (false == decalComponent->IsEnabled() || false == decalComponent->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(decalComponent->GetInstanceID());
@@ -551,6 +590,15 @@ void Scene::CullMeshData()
         {
             for (auto& sprite : spriteRenderers)
             {
+                try
+                {
+                    renderScene->UpdateCommand(sprite);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+                }
+
                 if (false == sprite->IsEnabled() || false == sprite->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(sprite->GetInstanceID());
@@ -562,6 +610,15 @@ void Scene::CullMeshData()
         {
             for (auto& image : imageComponents)
             {
+                try
+                {
+                    renderScene->UpdateCommand(image);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating image command: " << e.what() << std::endl;
+                }
+
                 if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
 
                 auto owner = image->GetOwner();
@@ -584,6 +641,15 @@ void Scene::CullMeshData()
         {
             for (auto& text : textComponents)
             {
+                try
+                {
+                    renderScene->UpdateCommand(text);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating text command: " << e.what() << std::endl;
+                }
+
                 if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
 
                 auto owner = text->GetOwner();
@@ -603,6 +669,15 @@ void Scene::CullMeshData()
         {
             for (auto& spriteSheet : spriteSheetComponents)
             {
+                try
+                {
+                    renderScene->UpdateCommand(spriteSheet);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating sprite command: " << e.what() << std::endl;
+                }
+
                 if (spriteSheet->IsDestroyMark() || false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
                 auto owner = spriteSheet->GetOwner();
                 if (nullptr == owner) continue;
