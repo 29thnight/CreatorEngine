@@ -7,38 +7,44 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `bool Initialize(HWND _hwnd);`
-- `void Update(float deltaTime);`
-- `void KeyBoardUpdate();`
-- `bool IsAnyKeyPressed();`
-- `void MouseUpdate();`
-- `void SetMousePos(POINT pos);`
-- `float2 GetMousePos();`
-- `float2 GetMouseDelta() const;`
-- `bool IsWheelUp();`
-- `bool IsWheelDown();`
-- `bool IsMouseButtonDown(MouseKey button);`
-- `bool IsMouseButtonPressed(MouseKey button);`
-- `bool IsMouseButtonReleased(MouseKey button);`
-- `void HideCursor();`
-- `void ShowCursor();`
-- `void ResetMouseDelta();`
-- `int16 GetWheelDelta() const;`
-- `void PadUpdate();`
-- `void GamePadUpdate();`
-- `bool IsControllerConnected(DWORD Index);`
-- `bool IsControllerButtonDown(DWORD index, ControllerButton btn) const;`
-- `bool IsControllerButtonPressed(DWORD index, ControllerButton btn) const;`
-- `bool IsControllerButtonReleased(DWORD index, ControllerButton btn) const;`
-- `bool IsControllerTriggerL(DWORD index) const;`
-- `bool IsControllerTriggerR(DWORD index) const;`
-- `Mathf::Vector2 GetControllerThumbL(DWORD index) const;`
-- `Mathf::Vector2 GetControllerThumbR(DWORD index) const;`
-- `void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre, float time);`
-- `void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre);`
-- `void UpdateControllerVibration(float tick);`
-- `void SetControllerVibrationTime(DWORD Index, float time);`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Initialize` | initialize 동작을 수행합니다. |
+| `Update` | update을(를) 갱신합니다. |
+| `KeyBoardUpdate` | key board update 동작을 수행합니다. |
+| `IsAnyKeyPressed` | any key pressed 여부를 확인합니다. |
+| `MouseUpdate` | mouse update 동작을 수행합니다. |
+| `SetMousePos` | mouse pos을(를) 설정합니다. |
+| `GetMousePos` | mouse pos을(를) 가져옵니다. |
+| `GetMouseDelta` | mouse delta을(를) 가져옵니다. |
+| `IsWheelUp` | wheel up 여부를 확인합니다. |
+| `IsWheelDown` | wheel down 여부를 확인합니다. |
+| `IsMouseButtonDown` | mouse button down 여부를 확인합니다. |
+| `IsMouseButtonPressed` | mouse button pressed 여부를 확인합니다. |
+| `IsMouseButtonReleased` | mouse button released 여부를 확인합니다. |
+| `HideCursor` | hide cursor 동작을 수행합니다. |
+| `ShowCursor` | show cursor 동작을 수행합니다. |
+| `ResetMouseDelta` | reset mouse delta 동작을 수행합니다. |
+| `GetWheelDelta` | wheel delta을(를) 가져옵니다. |
+| `PadUpdate` | pad update 동작을 수행합니다. |
+| `GamePadUpdate` | game pad update 동작을 수행합니다. |
+| `IsControllerConnected` | controller connected 여부를 확인합니다. |
+| `IsControllerButtonDown` | controller button down 여부를 확인합니다. |
+| `IsControllerButtonPressed` | controller button pressed 여부를 확인합니다. |
+| `IsControllerButtonReleased` | controller button released 여부를 확인합니다. |
+| `IsControllerTriggerL` | controller trigger l 여부를 확인합니다. |
+| `IsControllerTriggerR` | controller trigger r 여부를 확인합니다. |
+| `GetControllerThumbL` | controller thumb l을(를) 가져옵니다. |
+| `GetControllerThumbR` | controller thumb r을(를) 가져옵니다. |
+| `SetControllerVibration` | controller vibration을(를) 설정합니다. |
+| `UpdateControllerVibration` | controller vibration을(를) 갱신합니다. |
+| `SetControllerVibrationTime` | controller vibration time을(를) 설정합니다. |
 ## Public Properties
-- `float							deadZone = 0.24f;`
-- `float							triggerdeadZone = 0.1f;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `deadZone` | dead zone 상태를 보관합니다. |
+| `triggerdeadZone` | triggerdead zone 상태를 보관합니다. |

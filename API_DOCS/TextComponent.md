@@ -7,12 +7,17 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `TextComponent();`
-- `~TextComponent() = default;`
-- `virtual void Awake() override;`
-- `virtual void Update(float tick) override;`
-- `virtual void OnDestroy() override;`
-- `void SetFont(const file::path& path);`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `TextComponent` | text component 동작을 수행합니다. |
+| `~TextComponent` | text component 동작을 수행합니다. |
+| `Awake` | awake 동작을 수행합니다. |
+| `Update` | update을(를) 갱신합니다. |
+| `OnDestroy` | on destroy 동작을 수행합니다. |
+| `SetFont` | font을(를) 설정합니다. |
 ## Public Properties
-- (none)
+
+### Public Properties 역할
+표로 요약할 멤버가 없습니다.

@@ -5,85 +5,80 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `Scene();`
-- `~Scene();`
-- `std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);`
-- `std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);`
-- `std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);`
-- `std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);`
-- `std::shared_ptr<GameObject> TryGetGameObject(GameObject::Index index);`
-- `void DetachGameObjectHierarchy(GameObject* root);`
-- `GameObject::Index AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObject::Index parentIndex);`
-- `AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots);`
-- `std::shared_ptr<GameObject> GetGameObject(std::string_view name);`
-- `void AddSelectedSceneObject(GameObject* sceneObject);`
-- `void RemoveSelectedSceneObject(GameObject* sceneObject);`
-- `void ClearSelectedSceneObjects();`
-- `void AddRootGameObject(std::string_view name);`
-- `void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);`
-- `void DestroyGameObject(GameObject::Index index);`
-- `void CullMeshData();`
-- `void InternalPauseUpdateForUI();`
-- `std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = -1);`
-- `void Awake();`
-- `void OnEnable();`
-- `void Start();`
-- `void FixedUpdate(float deltaSecond);`
-- `void OnTriggerEnter(const Collision& collider);`
-- `void OnTriggerStay(const Collision& collider);`
-- `void OnTriggerExit(const Collision& collider);`
-- `void OnCollisionEnter(const Collision& collider);`
-- `void OnCollisionStay(const Collision& collider);`
-- `void OnCollisionExit(const Collision& collider);`
-- `void Update(float deltaSecond);`
-- `void YieldNull();`
-- `void LateUpdate(float deltaSecond);`
-- `void OnDisable();`
-- `void OnDestroy();`
-- `void AllDestroyMark();`
-- `void ResetSelectedSceneObject();`
-- `void CollectLightComponent(LightComponent* ptr);`
-- `void UnCollectLightComponent(LightComponent* ptr);`
-- `uint32 UpdateLight(LightProperties& lightProperties) const;`
-- `std::pair<size_t, Light&> AddLight();`
-- `Light& GetLight(size_t index);`
-- `void RemoveLight(size_t index);`
-- `void DestroyLight();`
-- `void CollectMeshRenderer(MeshRenderer* ptr);`
-- `void UnCollectMeshRenderer(MeshRenderer* ptr);`
-- `void CollectSpriteRenderer(SpriteRenderer* ptr);`
-- `void UnCollectSpriteRenderer(SpriteRenderer* ptr);`
-- `void CollectTerrainComponent(TerrainComponent* ptr);`
-- `void UnCollectTerrainComponent(TerrainComponent* ptr);`
-- `void CollectFoliageComponent(FoliageComponent* ptr);`
-- `void UnCollectFoliageComponent(FoliageComponent* ptr);`
-- `void CollectDecalComponent(DecalComponent* ptr);`
-- `void UnCollectDecalComponent(DecalComponent* ptr);`
-- `void CollectRigidBodyComponent(RigidBodyComponent* ptr);`
-- `void UnCollectRigidBodyComponent(RigidBodyComponent* ptr);`
-- `void CollectColliderComponent(BoxColliderComponent* ptr);`
-- `void CollectColliderComponent(SphereColliderComponent* ptr);`
-- `void CollectColliderComponent(CapsuleColliderComponent* ptr);`
-- `void CollectColliderComponent(MeshColliderComponent* ptr);`
-- `void CollectColliderComponent(CharacterControllerComponent* ptr);`
-- `void CollectColliderComponent(TerrainColliderComponent* ptr);`
-- `void UnCollectColliderComponent(BoxColliderComponent* ptr);`
-- `void UnCollectColliderComponent(SphereColliderComponent* ptr);`
-- `void UnCollectColliderComponent(CapsuleColliderComponent* ptr);`
-- `void UnCollectColliderComponent(MeshColliderComponent* ptr);`
-- `void UnCollectColliderComponent(CharacterControllerComponent* ptr);`
-- `void UnCollectColliderComponent(TerrainColliderComponent* ptr);`
-- `void AddCanvas(const std::shared_ptr<GameObject>& canvas);`
-- `void RemoveCanvas(const std::shared_ptr<GameObject>& canvas);`
-- `std::shared_ptr<GameObject> FindCanvasName(std::string_view name);`
-- `std::shared_ptr<GameObject> FindCanvasIndex(size_t index);`
-- `void AllUpdateWorldMatrix();`
-- `void AllUIUpdateWorldMatrix();`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Scene` | scene 동작을 수행합니다. |
+| `~Scene` | scene 동작을 수행합니다. |
+| `AddGameObject` | game object을(를) 추가합니다. |
+| `CreateGameObject` | game object을(를) 생성합니다. |
+| `LoadGameObject` | game object을(를) 불러옵니다. |
+| `GetGameObject` | game object을(를) 가져옵니다. |
+| `TryGetGameObject` | try get game object 동작을 수행합니다. |
+| `DetachGameObjectHierarchy` | detach game object hierarchy 동작을 수행합니다. |
+| `AttachExistingGameObject` | attach existing game object 동작을 수행합니다. |
+| `AttachExistingGameObjectHierarchy` | attach existing game object hierarchy 동작을 수행합니다. |
+| `AddSelectedSceneObject` | selected scene object을(를) 추가합니다. |
+| `RemoveSelectedSceneObject` | selected scene object을(를) 제거합니다. |
+| `ClearSelectedSceneObjects` | selected scene objects을(를) 비웁니다. |
+| `AddRootGameObject` | root game object을(를) 추가합니다. |
+| `DestroyGameObject` | game object을(를) 파괴합니다. |
+| `CullMeshData` | cull mesh data 동작을 수행합니다. |
+| `InternalPauseUpdateForUI` | internal pause update for ui 동작을 수행합니다. |
+| `CreateGameObjects` | game objects을(를) 생성합니다. |
+| `Awake` | awake 동작을 수행합니다. |
+| `OnEnable` | on enable 동작을 수행합니다. |
+| `Start` | start 동작을 수행합니다. |
+| `FixedUpdate` | fixed update 동작을 수행합니다. |
+| `OnTriggerEnter` | on trigger enter 동작을 수행합니다. |
+| `OnTriggerStay` | on trigger stay 동작을 수행합니다. |
+| `OnTriggerExit` | on trigger exit 동작을 수행합니다. |
+| `OnCollisionEnter` | on collision enter 동작을 수행합니다. |
+| `OnCollisionStay` | on collision stay 동작을 수행합니다. |
+| `OnCollisionExit` | on collision exit 동작을 수행합니다. |
+| `Update` | update을(를) 갱신합니다. |
+| `YieldNull` | yield null 동작을 수행합니다. |
+| `LateUpdate` | late update 동작을 수행합니다. |
+| `OnDisable` | on disable 동작을 수행합니다. |
+| `OnDestroy` | on destroy 동작을 수행합니다. |
+| `AllDestroyMark` | all destroy mark 동작을 수행합니다. |
+| `ResetSelectedSceneObject` | reset selected scene object 동작을 수행합니다. |
+| `CollectLightComponent` | collect light component 동작을 수행합니다. |
+| `UnCollectLightComponent` | un collect light component 동작을 수행합니다. |
+| `UpdateLight` | light을(를) 갱신합니다. |
+| `AddLight` | light을(를) 추가합니다. |
+| `GetLight` | light을(를) 가져옵니다. |
+| `RemoveLight` | light을(를) 제거합니다. |
+| `DestroyLight` | light을(를) 파괴합니다. |
+| `CollectMeshRenderer` | collect mesh renderer 동작을 수행합니다. |
+| `UnCollectMeshRenderer` | un collect mesh renderer 동작을 수행합니다. |
+| `CollectSpriteRenderer` | collect sprite renderer 동작을 수행합니다. |
+| `UnCollectSpriteRenderer` | un collect sprite renderer 동작을 수행합니다. |
+| `CollectTerrainComponent` | collect terrain component 동작을 수행합니다. |
+| `UnCollectTerrainComponent` | un collect terrain component 동작을 수행합니다. |
+| `CollectFoliageComponent` | collect foliage component 동작을 수행합니다. |
+| `UnCollectFoliageComponent` | un collect foliage component 동작을 수행합니다. |
+| `CollectDecalComponent` | collect decal component 동작을 수행합니다. |
+| `UnCollectDecalComponent` | un collect decal component 동작을 수행합니다. |
+| `CollectRigidBodyComponent` | collect rigid body component 동작을 수행합니다. |
+| `UnCollectRigidBodyComponent` | un collect rigid body component 동작을 수행합니다. |
+| `CollectColliderComponent` | collect collider component 동작을 수행합니다. |
+| `UnCollectColliderComponent` | un collect collider component 동작을 수행합니다. |
+| `AddCanvas` | canvas을(를) 추가합니다. |
+| `RemoveCanvas` | canvas을(를) 제거합니다. |
+| `FindCanvasName` | canvas name을(를) 탐색합니다. |
+| `FindCanvasIndex` | canvas index을(를) 탐색합니다. |
+| `AllUpdateWorldMatrix` | all update world matrix 동작을 수행합니다. |
+| `AllUIUpdateWorldMatrix` | all uiupdate world matrix 동작을 수행합니다. |
 ## Public Properties
-- `std::vector<std::shared_ptr<GameObject>> m_SceneObjects;`
-- `std::future<void> m_AIFuture;`
-- `HashingString m_sceneName;`
-- `GameObject*					m_selectedSceneObject = nullptr;`
-- `std::vector<GameObject*>	m_selectedSceneObjects;`
-- `std::vector<std::shared_ptr<MeshRenderer>> m_visibleMeshesScratch;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `m_SceneObjects` | m scene objects 상태를 보관합니다. |
+| `m_AIFuture` | m aifuture 상태를 보관합니다. |
+| `m_sceneName` | m scene name 상태를 보관합니다. |
+| `m_selectedSceneObject` | m selected scene object 상태를 보관합니다. |
+| `m_selectedSceneObjects` | m selected scene objects 상태를 보관합니다. |
+| `m_visibleMeshesScratch` | m visible meshes scratch 상태를 보관합니다. |

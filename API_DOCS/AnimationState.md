@@ -5,22 +5,28 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `AnimationState();`
-- `~AnimationState();`
-- `AnimationState(AnimationController* Owner, std::string name);`
-- `std::vector<AniTransition*> FindTransitions(const std::string& toStateName);`
-- `void SetBehaviour(std::string name, bool isReload = false);`
-- `void UpdateAnimationSpeed();`
-- `nlohmann::json Serialize();`
-- `AnimationState Deserialize();`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `AnimationState` | animation state 동작을 수행합니다. |
+| `~AnimationState` | animation state 동작을 수행합니다. |
+| `FindTransitions` | transitions을(를) 탐색합니다. |
+| `SetBehaviour` | behaviour을(를) 설정합니다. |
+| `UpdateAnimationSpeed` | animation speed을(를) 갱신합니다. |
+| `Serialize` | serialize 동작을 수행합니다. |
+| `Deserialize` | deserialize 동작을 수행합니다. |
 ## Public Properties
-- `std::vector<std::shared_ptr<AniTransition>> Transitions;`
-- `int index =0;`
-- `int AnimationIndex = 0;`
-- `float animationSpeed = 1;`
-- `float multiplerAnimationSpeed = 1;`
-- `std::string animationSpeedParameterName = "None";`
-- `float m_animationTimeElapsed = 0;`
-- `bool m_isAny = false;`
-- `bool useMultipler = false;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Transitions` | transitions 상태를 보관합니다. |
+| `index` | index 상태를 보관합니다. |
+| `AnimationIndex` | animation index 상태를 보관합니다. |
+| `animationSpeed` | animation speed 상태를 보관합니다. |
+| `multiplerAnimationSpeed` | multipler animation speed 상태를 보관합니다. |
+| `animationSpeedParameterName` | animation speed parameter name 상태를 보관합니다. |
+| `m_animationTimeElapsed` | m animation time elapsed 상태를 보관합니다. |
+| `m_isAny` | m is any 상태를 보관합니다. |
+| `useMultipler` | use multipler 상태를 보관합니다. |

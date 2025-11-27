@@ -7,12 +7,15 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `Prefab() = default;`
-- `Prefab(std::string_view name, const GameObject* source);`
-- `~Prefab() override = default;`
-- `static Prefab* CreateFromGameObject(const GameObject* source, std::string_view name = "");`
-- `GameObject* Instantiate(std::string_view newName = "") const;`
-- `GameObject* Instantiate(Scene* targetScene, std::string_view newName = "") const;`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Prefab` | prefab 동작을 수행합니다. |
+| `~Prefab` | prefab 동작을 수행합니다. |
+| `CreateFromGameObject` | from game object을(를) 생성합니다. |
+| `Instantiate` | instantiate 동작을 수행합니다. |
 ## Public Properties
-- (none)
+
+### Public Properties 역할
+표로 요약할 멤버가 없습니다.

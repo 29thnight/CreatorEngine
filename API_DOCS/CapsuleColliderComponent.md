@@ -7,16 +7,23 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `virtual ~CapsuleColliderComponent() = default;`
-- `void OnTriggerEnter(ICollider* other) override;`
-- `void OnTriggerStay(ICollider* other) override;`
-- `void OnTriggerExit(ICollider* other) override;`
-- `void OnCollisionEnter(ICollider* other) override;`
-- `void OnCollisionStay(ICollider* other) override;`
-- `void OnCollisionExit(ICollider* other) override;`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `~CapsuleColliderComponent` | capsule collider component 동작을 수행합니다. |
+| `OnTriggerEnter` | on trigger enter 동작을 수행합니다. |
+| `OnTriggerStay` | on trigger stay 동작을 수행합니다. |
+| `OnTriggerExit` | on trigger exit 동작을 수행합니다. |
+| `OnCollisionEnter` | on collision enter 동작을 수행합니다. |
+| `OnCollisionStay` | on collision stay 동작을 수행합니다. |
+| `OnCollisionExit` | on collision exit 동작을 수행합니다. |
 ## Public Properties
-- `float staticFriction = 0.5f;`
-- `float dynamicFriction = 0.4f;`
-- `float restitution = 0.3f;`
-- `float density = 10.0f;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `staticFriction` | static friction 상태를 보관합니다. |
+| `dynamicFriction` | dynamic friction 상태를 보관합니다. |
+| `restitution` | restitution 상태를 보관합니다. |
+| `density` | density 상태를 보관합니다. |

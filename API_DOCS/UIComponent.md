@@ -7,33 +7,40 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `UIComponent();`
-- `virtual ~UIComponent() = default;`
-- `void SetCanvas(Canvas* canvas);`
-- `void SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI);`
-- `void DeserializeNavi();`
-- `GameObject* GetNextNavi(Direction dir);`
-- `bool IsNavigationThis();`
-- `void DeserializeShader();`
-- `void SetCustomPixelShader(std::string_view shaderPath);`
-- `std::optional<float> GetFloat(std::string_view name) const;`
-- `void SetFloat(std::string_view name, float value);`
-- `std::optional<float2> GetFloat2(std::string_view name) const;`
-- `void SetFloat2(std::string_view name, const float2& value);`
-- `std::optional<float3> GetFloat3(std::string_view name) const;`
-- `void SetFloat3(std::string_view name, const float3& value);`
-- `std::optional<float4> GetFloat4(std::string_view name) const;`
-- `void SetFloat4(std::string_view name, const float4& value);`
-- `std::optional<int> GetInt(std::string_view name) const;`
-- `void SetInt(std::string_view name, int value);`
-- `std::optional<int2> GetInt2(std::string_view name) const;`
-- `void SetInt2(std::string_view name, const int2& value);`
-- `std::optional<int3> GetInt3(std::string_view name) const;`
-- `void SetInt3(std::string_view name, const int3& value);`
-- `std::optional<int4> GetInt4(std::string_view name) const;`
-- `void SetInt4(std::string_view name, const int4& value);`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `UIComponent` | uicomponent 동작을 수행합니다. |
+| `~UIComponent` | uicomponent 동작을 수행합니다. |
+| `SetCanvas` | canvas을(를) 설정합니다. |
+| `SetNavi` | navi을(를) 설정합니다. |
+| `DeserializeNavi` | deserialize navi 동작을 수행합니다. |
+| `GetNextNavi` | next navi을(를) 가져옵니다. |
+| `IsNavigationThis` | navigation this 여부를 확인합니다. |
+| `DeserializeShader` | deserialize shader 동작을 수행합니다. |
+| `SetCustomPixelShader` | custom pixel shader을(를) 설정합니다. |
+| `GetFloat` | float을(를) 가져옵니다. |
+| `SetFloat` | float을(를) 설정합니다. |
+| `GetFloat2` | float2을(를) 가져옵니다. |
+| `SetFloat2` | float2을(를) 설정합니다. |
+| `GetFloat3` | float3을(를) 가져옵니다. |
+| `SetFloat3` | float3을(를) 설정합니다. |
+| `GetFloat4` | float4을(를) 가져옵니다. |
+| `SetFloat4` | float4을(를) 설정합니다. |
+| `GetInt` | int을(를) 가져옵니다. |
+| `SetInt` | int을(를) 설정합니다. |
+| `GetInt2` | int2을(를) 가져옵니다. |
+| `SetInt2` | int2을(를) 설정합니다. |
+| `GetInt3` | int3을(를) 가져옵니다. |
+| `SetInt3` | int3을(를) 설정합니다. |
+| `GetInt4` | int4을(를) 가져옵니다. |
+| `SetInt4` | int4을(를) 설정합니다. |
 ## Public Properties
-- `UItype type = UItype::None;`
-- `bool isDeserialized = false;`
-- `bool isNavLocked = false;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `type` | type 상태를 보관합니다. |
+| `isDeserialized` | deserialized 여부를 확인합니다. |
+| `isNavLocked` | nav locked 여부를 확인합니다. |
