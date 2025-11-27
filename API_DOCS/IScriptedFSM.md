@@ -5,10 +5,15 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `virtual ~IScriptedFSM() = default;`
-- `virtual void Enter(BlackBoard& bb) = 0;`
-- `virtual void Update(BlackBoard& bb, float deltaTime) = 0;`
-- `virtual void Exit(BlackBoard& bb) = 0;`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `~IScriptedFSM` | iscripted fsm 동작을 수행합니다. |
+| `Enter` | enter 동작을 수행합니다. |
+| `Update` | update을(를) 갱신합니다. |
+| `Exit` | exit 동작을 수행합니다. |
 ## Public Properties
-- (none)
+
+### Public Properties 역할
+표로 요약할 멤버가 없습니다.

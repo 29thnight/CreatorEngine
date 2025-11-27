@@ -7,20 +7,25 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `void Initialize();`
-- `void Finalize();`
-- `void Load();`
-- `void Save();`
-- `void AddTag(std::string_view tag);`
-- `void RemoveTag(std::string_view tag);`
-- `bool HasTag(std::string_view tag) const;`
-- `void AddLayer(std::string_view layer);`
-- `void RemoveLayer(std::string_view layer);`
-- `bool HasLayer(std::string_view layer) const;`
-- `void AddTagToObject(std::string_view tag, GameObject* object);`
-- `void RemoveTagFromObject(std::string_view tag, GameObject* object);`
-- `void AddObjectToLayer(std::string_view layer, GameObject* object);`
-- `void RemoveObjectFromLayer(std::string_view layer, GameObject* object);`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Initialize` | initialize 동작을 수행합니다. |
+| `Finalize` | finalize 동작을 수행합니다. |
+| `Load` | load을(를) 불러옵니다. |
+| `Save` | save을(를) 저장합니다. |
+| `AddTag` | tag을(를) 추가합니다. |
+| `RemoveTag` | tag을(를) 제거합니다. |
+| `HasTag` | has tag 동작을 수행합니다. |
+| `AddLayer` | layer을(를) 추가합니다. |
+| `RemoveLayer` | layer을(를) 제거합니다. |
+| `HasLayer` | has layer 동작을 수행합니다. |
+| `AddTagToObject` | tag to object을(를) 추가합니다. |
+| `RemoveTagFromObject` | tag from object을(를) 제거합니다. |
+| `AddObjectToLayer` | object to layer을(를) 추가합니다. |
+| `RemoveObjectFromLayer` | object from layer을(를) 제거합니다. |
 ## Public Properties
-- (none)
+
+### Public Properties 역할
+표로 요약할 멤버가 없습니다.

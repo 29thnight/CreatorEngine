@@ -7,10 +7,15 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `using ActionFunc = std::function<NodeStatus(float, BlackBoard&)>;`
-- `ActionNode() = default;`
-- `~ActionNode() override = default;`
-- `NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override abstract;`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `ActionFunc` | action func 동작을 수행합니다. |
+| `ActionNode` | action node 동작을 수행합니다. |
+| `~ActionNode` | action node 동작을 수행합니다. |
+| `Tick` | tick 동작을 수행합니다. |
 ## Public Properties
-- (none)
+
+### Public Properties 역할
+표로 요약할 멤버가 없습니다.

@@ -7,18 +7,24 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `Prefab* CreatePrefab(const GameObject* source, std::string_view name = "");`
-- `GameObject* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");`
-- `GameObject* InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name = "");`
-- `void RegisterInstance(GameObject* instance, const Prefab* prefab);`
-- `void UpdateInstances(const Prefab* prefab);`
-- `bool SavePrefab(const Prefab* prefab, const std::string& path);`
-- `Prefab* LoadPrefabFullPath(const std::string& path);`
-- `Prefab* LoadPrefab(const std::string& path);`
-- `Prefab* LoadPrefabGuid(const FileGuid& guid);`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `CreatePrefab` | prefab을(를) 생성합니다. |
+| `InstantiatePrefab` | instantiate prefab 동작을 수행합니다. |
+| `RegisterInstance` | register instance 동작을 수행합니다. |
+| `UpdateInstances` | instances을(를) 갱신합니다. |
+| `SavePrefab` | prefab을(를) 저장합니다. |
+| `LoadPrefabFullPath` | prefab full path을(를) 불러옵니다. |
+| `LoadPrefab` | prefab을(를) 불러옵니다. |
+| `LoadPrefabGuid` | prefab guid을(를) 불러옵니다. |
 ## Public Properties
-- `Core::Delegate<void, GameObject&> prefabInstanceUpdated;`
-- `Core::Delegate<void, GameObject&> prefabInstanceApplied;`
-- `Core::Delegate<void, GameObject&> prefabInstanceReverted;`
-- `Core::Delegate<void, GameObject&> prefabInstanceUnpacked;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `prefabInstanceUpdated` | prefab instance updated 상태를 보관합니다. |
+| `prefabInstanceApplied` | prefab instance applied 상태를 보관합니다. |
+| `prefabInstanceReverted` | prefab instance reverted 상태를 보관합니다. |
+| `prefabInstanceUnpacked` | prefab instance unpacked 상태를 보관합니다. |

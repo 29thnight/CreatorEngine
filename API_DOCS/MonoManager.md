@@ -7,26 +7,33 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `void Shutdown();`
-- `std::optional<AssemblyPack> LoadAssembly(const std::string& name, const std::string& path);`
-- `void UnloadAllAssemblies();`
-- `bool ReloadAll(const std::vector<std::pair<std::string, std::string>>& assemblies);`
-- `MonoThread* AttachCurrentThread();`
-- `void        DetachCurrentThread();`
-- `void RegisterInternalCalls();`
-- `MonoClass* GetClass(const char* nameSpace, const char* klassName, MonoImage* image = nullptr) const;`
-- `MonoMethod* GetMethod(MonoClass* klass, const char* methodName, int paramCount) const;`
-- `MonoObject* InvokeStatic(MonoClass* klass, const char* methodName, void** args, int paramCount, MonoObject** outException = nullptr);`
-- `MonoObject* CreateInstance(MonoClass* klass);`
-- `MonoObject* Invoke(MonoObject* instance, const char* methodName, void** args, int paramCount, MonoObject** outException = nullptr);`
-- `MonoString* ToMonoString(const std::string& s) const;`
-- `std::string FromMonoString(MonoString* ms) const;`
-- `static std::string FormatException(MonoObject* exception);`
-- `void GCCollect();`
-- `void GCWaitForPendingFinalizers();`
-- `MonoImage* GetImage(const std::string& assemblyName) const;`
-- `void BindScriptEvents(CSharpScriptComponent* component);`
-- `void UnbindScriptEvents(CSharpScriptComponent* component);`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Shutdown` | shutdown 동작을 수행합니다. |
+| `LoadAssembly` | assembly을(를) 불러옵니다. |
+| `UnloadAllAssemblies` | unload all assemblies 동작을 수행합니다. |
+| `ReloadAll` | reload all 동작을 수행합니다. |
+| `AttachCurrentThread` | attach current thread 동작을 수행합니다. |
+| `DetachCurrentThread` | detach current thread 동작을 수행합니다. |
+| `RegisterInternalCalls` | register internal calls 동작을 수행합니다. |
+| `GetClass` | class을(를) 가져옵니다. |
+| `GetMethod` | method을(를) 가져옵니다. |
+| `InvokeStatic` | invoke static 동작을 수행합니다. |
+| `CreateInstance` | instance을(를) 생성합니다. |
+| `Invoke` | invoke 동작을 수행합니다. |
+| `ToMonoString` | to mono string 동작을 수행합니다. |
+| `FromMonoString` | from mono string 동작을 수행합니다. |
+| `FormatException` | format exception 동작을 수행합니다. |
+| `GCCollect` | gccollect 동작을 수행합니다. |
+| `GCWaitForPendingFinalizers` | gcwait for pending finalizers 동작을 수행합니다. |
+| `GetImage` | image을(를) 가져옵니다. |
+| `BindScriptEvents` | bind script events 동작을 수행합니다. |
+| `UnbindScriptEvents` | unbind script events 동작을 수행합니다. |
 ## Public Properties
-- `bool enableDebug = false);`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `enableDebug` | debug을(를) 활성화합니다. |

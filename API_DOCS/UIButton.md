@@ -7,10 +7,17 @@
 > 자동 생성된 문서입니다. 실제 사용 시 구현 파일을 함께 참고하세요.
 
 ## Public Methods
-- `void Update(float deltaSecond) override;`
-- `void UpdateCollider();`
-- `bool CheckClick(Mathf::Vector2 _mousePos);`
-- `void Click();`
 
+### Public Methods 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `Update` | update을(를) 갱신합니다. |
+| `UpdateCollider` | collider을(를) 갱신합니다. |
+| `CheckClick` | check click 동작을 수행합니다. |
+| `Click` | click 동작을 수행합니다. |
 ## Public Properties
-- `bool isClick = false;`
+
+### Public Properties 역할
+| 멤버 | 예상 역할 |
+| --- | --- |
+| `isClick` | click 여부를 확인합니다. |
