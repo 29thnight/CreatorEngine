@@ -327,6 +327,9 @@
     <ClInclude Include="Octree.h">
       <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClInclude>
+    <ClInclude Include="ReflectionYamlTemplete.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
