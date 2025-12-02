@@ -5,7 +5,7 @@ constexpr DWORD KEYBOARD_COUNT = 255;
 constexpr int MOUSE_COUNT = 3;
 constexpr int GAMEPAD_KEY_COUNT = 15;
 constexpr DWORD MAX_CONTROLLER = 4;
-
+constexpr DWORD MAX_KEYBOARD = 4;
 enum class InputType
 {
 	Mouse,
