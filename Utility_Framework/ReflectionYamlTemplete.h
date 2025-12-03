@@ -6,6 +6,8 @@
 #include "ModuleBehavior.h"
 #include <yaml-cpp/yaml.h>
 
+namespace MetaYml = YAML;
+
 namespace Meta
 {
 	inline constexpr const char GAMEOBJECT_YAML_KEY[] = "GameObject";
