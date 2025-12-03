@@ -49,7 +49,7 @@ void SceneManager::ToggleGamePaused()
 
 void SceneManager::ManagerInitialize()
 {
-	GC_Initialize();
+	//GC_Initialize();
     REFLECTION_REGISTER_EXECUTE();
     ComponentFactorys->Initialize();
 	m_threadPool = new ThreadPool;
@@ -67,7 +67,7 @@ void SceneManager::Editor()
         if (!activeScenePtr) return;
         PROFILE_CPU_BEGIN("CreateEditorOnlyPlayScene");
         CreateEditorOnlyPlayScene();
-        GC_FullCollect();
+        //GC_FullCollect();
         PROFILE_CPU_END();
         PROFILE_CPU_BEGIN("Reset");
         activeScenePtr->Reset();
@@ -78,7 +78,7 @@ void SceneManager::Editor()
     {
         PROFILE_CPU_BEGIN("DeleteEditorOnlyPlayScene");
         DeleteEditorOnlyPlayScene();
-        GC_FullCollect();
+        //GC_FullCollect();
         PROFILE_CPU_END();
     }
 
@@ -257,7 +257,7 @@ void SceneManager::Decommissioning()
         }
 	}
 
-	GC_Shutdown();
+	//GC_Shutdown();
 }
 
 void SceneManager::SetDecommissioning()

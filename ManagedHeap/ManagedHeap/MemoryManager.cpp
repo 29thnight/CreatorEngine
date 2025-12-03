@@ -18,19 +18,16 @@ extern "C"
     {
         free(ptr);
     }
-    MEMORY_API void* GC_Alloc(size_t size)
-    {
-        return nullptr;
-    }
 
     MEMORY_API void GC_Initialize()
     {
-		GC_init();
+        GC_INIT();
     }
 
     MEMORY_API void GC_Shutdown()
     {
 		GC_deinit();
+        GC_win32_free_heap();
     }
 
     MEMORY_API void GC_FullCollect()

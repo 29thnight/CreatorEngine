@@ -16,6 +16,8 @@
 #include <stack>
 #include <functional>
 #include "MemoryManager.h"
+//#define GC_NO_INLINE_STD_NEW
+//#include "gc_cpp.h"
 
 namespace Managed
 {
@@ -55,12 +57,7 @@ namespace Managed
         virtual ~HeapObject() = default;
     };
 
-    class GCObject {
-    public:
-        void* operator new(size_t size) { return GC_Alloc(size); }
-        void operator delete(void* ptr) noexcept { /* no-op */ }
-        virtual ~GCObject() = default;
-    };
+    class GCObject {}; // GCObject는 HeapObject와 동일
 
     struct NoDelete {
         void operator()(GCObject* p) const noexcept {
@@ -111,13 +108,13 @@ bool operator!=(const MyAllocator<T>&, const MyAllocator<U>&) { return false; }
 template<typename T>
 concept IsManagedObject = std::is_base_of_v<Managed::HeapObject, T>;
 
-template<typename T, typename... Args>
-Managed::GcHandle<T> gc_alloc(Args&&... args)
-{
-    static_assert(std::is_base_of_v<Managed::GCObject, T>, "T must be a Managed::GCObject");
-    T* ptr = new T(std::forward<Args>(args)...);
-    return Managed::GcHandle<T>(ptr, Managed::NoDelete());
-}
+//template<typename T, typename... Args>
+//Managed::GcHandle<T> gc_alloc(Args&&... args)
+//{
+//    static_assert(std::is_base_of_v<Managed::GCObject, T>, "T must be a Managed::GCObject");
+//    T* ptr = new T(std::forward<Args>(args)...);
+//    return Managed::GcHandle<T>(ptr, Managed::NoDelete());
+//}
 
 // 2. shared_alloc using allocate_shared
 template<typename T, typename... Args>

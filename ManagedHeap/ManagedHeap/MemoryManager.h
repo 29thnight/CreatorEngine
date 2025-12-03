@@ -9,7 +9,6 @@
 extern "C" {
     MEMORY_API void*	MyAlloc(size_t size);
     MEMORY_API void		MyFree(void* ptr);
-	MEMORY_API void*	GC_Alloc(size_t size);
 	MEMORY_API void		GC_Initialize();
 	MEMORY_API void		GC_Shutdown();
 	MEMORY_API void		GC_FullCollect();
