@@ -54,6 +54,22 @@ namespace Managed
         // Virtual destructor to ensure proper cleanup of derived classes.
         virtual ~HeapObject() = default;
     };
+
+    class GCObject {
+    public:
+        void* operator new(size_t size) { return GC_Alloc(size); }
+        void operator delete(void* ptr) noexcept { /* no-op */ }
+        virtual ~GCObject() = default;
+    };
+
+    struct NoDelete {
+        void operator()(GCObject* p) const noexcept {
+            // 소멸자도 안 부름, delete도 안 함
+        }
+    };
+
+	template<typename T> requires std::is_base_of_v<GCObject, T>
+    using GcHandle = std::shared_ptr<T>;   // + NoDelete 붙여서 생성
 }
 
 // 1. Custom allocator that uses MyAlloc/MyFree
@@ -94,6 +110,14 @@ bool operator!=(const MyAllocator<T>&, const MyAllocator<U>&) { return false; }
 
 template<typename T>
 concept IsManagedObject = std::is_base_of_v<Managed::HeapObject, T>;
+
+template<typename T, typename... Args>
+Managed::GcHandle<T> gc_alloc(Args&&... args)
+{
+    static_assert(std::is_base_of_v<Managed::GCObject, T>, "T must be a Managed::GCObject");
+    T* ptr = new T(std::forward<Args>(args)...);
+    return Managed::GcHandle<T>(ptr, Managed::NoDelete());
+}
 
 // 2. shared_alloc using allocate_shared
 template<typename T, typename... Args>
