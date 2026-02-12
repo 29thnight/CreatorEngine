@@ -79,8 +79,15 @@ public:
 	}
 
 	//컨트롤러 이동 정	보 반환
-	CharacterMovementInfo GetMovementInfo() const
+	CharacterMovementInfo GetMovementInfo()
 	{
+		m_movementInfo.maxSpeed = maxSpeed;
+		m_movementInfo.acceleration = acceleration;
+		m_movementInfo.staticFriction = staticFriction;
+		m_movementInfo.dynamicFriction = dynamicFriction;
+		m_movementInfo.jumpSpeed = jumpSpeed;
+		m_movementInfo.gravityWeight = gravityWeight;
+
 		return m_movementInfo;
 	}
 	//컨트롤러 이동 정보 설정
@@ -213,6 +220,20 @@ public:
 	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
 	[[Property]]
 	float m_height = 2.f;
+
+	[[Property]]
+	float maxSpeed = 1.025f;	//최대 속도 //&&&&&speed
+	[[Property]]
+	float acceleration = 1.0f;	//가속도
+	[[Property]]
+	float staticFriction = 0.4f;	//정적 물체 마찰 계수
+	[[Property]]
+	float dynamicFriction = 0.1f;	//동적 물체 마찰 계수
+	[[Property]]
+	float jumpSpeed = 0.05f;	//점프 속도
+	[[Property]]
+	float gravityWeight = 0.2f;	//중력 가속도
+
 private:
 	bool m_bIsFall{ false }; //낙하중인지 체크
 	bool m_bOnMove{ false }; //이동중인지 체크

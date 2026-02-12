@@ -393,9 +393,27 @@ void UIRenderProxy::SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer
 
 void UIRenderProxy::UpdateShaderBuffer(ID3D11DeviceContext* deferredContext)
 {
-    if (m_customPixelBuffer && m_customPixelCPUBuffer.size() == m_customPixelBufferSize)
-    {
-		deferredContext->PSSetConstantBuffers(1, 1, m_customPixelBuffer.GetAddressOf());
-        deferredContext->UpdateSubresource(m_customPixelBuffer.Get(), 0, nullptr, m_customPixelCPUBuffer.data(), 0, 0);
+    if (!deferredContext) return;
+    if (!m_customPixelBuffer) {
+        std::cout << "Custom pixel buffer is not created." << std::endl;
+        return;
     }
+    if (m_customPixelCPUBuffer.size() != m_customPixelBufferSize) return;
+
+    // 1) 로컬 ComPtr로 참조 획득 -> 레퍼런스 카운트 보장
+    Microsoft::WRL::ComPtr<ID3D11Buffer> bufferRef = m_customPixelBuffer;
+
+    // 2) (선택) 호출 중 외부에서 CPU 버퍼를 변경할 수 있다면 로컬 복사
+    std::vector<std::byte> cpuCopy = m_customPixelCPUBuffer;
+
+    // 3) 안전하게 raw 포인터로 전달
+    ID3D11Buffer* bufPtr = bufferRef.Get();
+    deferredContext->PSSetConstantBuffers(1, 1, &bufPtr);
+    deferredContext->UpdateSubresource(bufferRef.Get(), 0, nullptr, cpuCopy.data(), 0, 0);
+
+  //  if (m_customPixelBuffer && m_customPixelCPUBuffer.size() == m_customPixelBufferSize)
+  //  {
+		//deferredContext->PSSetConstantBuffers(1, 1, m_customPixelBuffer.GetAddressOf());
+  //      deferredContext->UpdateSubresource(m_customPixelBuffer.Get(), 0, nullptr, m_customPixelCPUBuffer.data(), 0, 0);
+  //  }
 }

@@ -48,10 +48,24 @@ void DirectX11::Dx11Main::Initialize()
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
     m_deviceResources->RegisterDeviceNotify(this);
 
-    XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
-    XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
-    BoundingBox fixedBounds(center, extents);
-    CullingManagers->Initialize(fixedBounds, 3, 30);
+    //XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
+    //XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
+    //BoundingBox fixedBounds(center, extents);
+    //CullingManagers->Initialize(fixedBounds, 3, 30);
+    using namespace Creator::Culling;
+    using namespace DirectX;
+
+    BoundingBox worldTight;
+    worldTight.Center = XMFLOAT3(0.f, 0.f, 0.f);
+    worldTight.Extents = XMFLOAT3(5000.f, 5000.f, 5000.f); // +/- 5km
+
+    OctreeConfig cfg{};
+    cfg.nodeCapacity = 32;
+    cfg.maxDepth = 8;
+    cfg.minHalfSize = 1.0f;
+    cfg.looseFactor = 1.5f; // 느슨한 옥트리
+
+	CullingManagers->Initialize(worldTight, cfg);
     TagManagers->Initialize();
 
     g_progressWindow->SetProgress(50);
@@ -88,43 +102,45 @@ void DirectX11::Dx11Main::Initialize()
     g_progressWindow->SetProgress(80);
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
-        {
+    {
 #ifdef EDITOR
-            bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
-            if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
-            {
-                Meta::UndoCommandManager->Undo();
-            }
+        bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
+        if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
+        {
+            Meta::UndoCommandManager->Undo();
+        }
 
-            if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
-            {
-                Meta::UndoCommandManager->Redo();
-            }
+        if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
+        {
+            Meta::UndoCommandManager->Redo();
+        }
 #endif // !EDITOR
-            UIManagers->Update();
-            Sound->update();
-        });
+        UIManagers->Update();
+        Sound->update();
+    });
     g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
-        {
-            m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
-            m_sceneRenderer->SceneRendering();
-        });
+    {
+        m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
+        m_sceneRenderer->SceneRendering();
+    });
+
     g_progressWindow->SetProgress(82);
     m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
-        {
-            m_gizmoRenderer->OnDrawGizmos();
-        });
+    {
+        m_gizmoRenderer->OnDrawGizmos();
+    });
+
     g_progressWindow->SetProgress(83);
     m_GUIRenderingEventHandle = GUIRenderingEvent.AddLambda([&]()
-        {
-            OnGui();
-        });
+    {
+        OnGui();
+    });
 
     m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]()
-        {
-            m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
-        });
+    {
+        m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
+    });
 
     g_progressWindow->SetProgress(85);
     SceneManagers->ManagerInitialize();
@@ -202,6 +218,7 @@ void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
     TagManagers->Finalize();
+	CullingManagers->Shutdown();
     SceneManagers->Decommissioning();
     EngineSettingInstance->SaveSettings();
     EngineSettingInstance->renderBarrier.Finalize();

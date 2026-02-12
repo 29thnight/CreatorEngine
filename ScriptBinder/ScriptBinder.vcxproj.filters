@@ -359,6 +359,9 @@
     <ClCompile Include="MonoManager.cpp">
       <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
     </ClCompile>
+    <ClCompile Include="ModuleBehavior.cpp">
+      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">

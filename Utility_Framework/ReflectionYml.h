@@ -1,10 +1,5 @@
 #pragma once
-#include "ReflectionFunction.h"
-#include "ReflectionRegister.h"
-#include "IObject.h"
-#include "DataSystem.h"
-#include "ModuleBehavior.h"
-#include <yaml-cpp/yaml.h>
+#include "ReflectionYamlTemplete.h"
 
 namespace Meta
 {
@@ -29,272 +24,28 @@ namespace Meta
 {
 	inline void PropertyToYamlNode(const Meta::Property& prop, MetaYml::Node& node, std::any& value)
 	{
-		HashedGuid typeID = prop.typeID;
-
-		if (typeID == type_guid(int))
+		if (auto* entry = FindYamlSerializer(prop.typeID))
 		{
-			node[prop.name] = std::any_cast<int>(value);
-		}
-		else if (typeID == type_guid(float))
-		{
-			node[prop.name] = std::any_cast<float>(value);
-		}
-		else if (typeID == type_guid(bool))
-		{
-			node[prop.name] = std::any_cast<bool>(value);
-		}
-		else if (typeID == type_guid(int8_t))
-		{
-			node[prop.name] = std::any_cast<int8_t>(value);
-		}
-		else if (typeID == type_guid(uint8_t))
-		{
-			node[prop.name] = std::any_cast<uint8_t>(value);
-		}
-		else if (typeID == type_guid(int16_t))
-		{
-			node[prop.name] = std::any_cast<int16_t>(value);
-		}
-		else if (typeID == type_guid(uint16_t))
-		{
-			node[prop.name] = std::any_cast<uint16_t>(value);
-		}
-		else if (typeID == type_guid(int32_t))
-		{
-			node[prop.name] = std::any_cast<int32_t>(value);
-		}
-		else if (typeID == type_guid(uint32_t))
-		{
-			node[prop.name] = std::any_cast<uint32_t>(value);
-		}
-		else if (typeID == type_guid(int64_t))
-		{
-			node[prop.name] = std::any_cast<int64_t>(value);
-		}
-		else if (typeID == type_guid(uint64_t))
-		{
-			node[prop.name] = std::any_cast<uint64_t>(value);
-		}
-		else if (typeID == type_guid(double))
-		{
-			node[prop.name] = std::any_cast<double>(value);
-		}
-		else if (typeID == type_guid(file::path))
-		{
-			node[prop.name] = std::any_cast<file::path>(value).string();
-		}
-		else if (typeID == type_guid(std::string))
-		{
-			node[prop.name] = std::any_cast<std::string>(value);
-		}
-		else if (typeID == type_guid(HashingString))
-		{
-			node[prop.name] = std::any_cast<HashingString>(value).ToString();
-		}
-		else if (typeID == type_guid(HashedGuid))
-		{
-			node[prop.name] = std::any_cast<HashedGuid>(value).m_ID_Data;
-		}
-		else if (typeID == type_guid(Mathf::Vector2))
-		{
-			Mathf::Vector2 vec = std::any_cast<Mathf::Vector2>(value);
-			MetaYml::Node vecNode;
-			vecNode.SetStyle(MetaYml::EmitterStyle::Flow);
-			vecNode["x"] = vec.x;
-			vecNode["y"] = vec.y;
-			node[prop.name] = vecNode;
-		}
-		else if (typeID == type_guid(Mathf::Vector3))
-		{
-			Mathf::Vector3 vec = std::any_cast<Mathf::Vector3>(value);
-			MetaYml::Node vecNode;
-			vecNode.SetStyle(MetaYml::EmitterStyle::Flow);
-			vecNode["x"] = vec.x;
-			vecNode["y"] = vec.y;
-			vecNode["z"] = vec.z;
-			node[prop.name] = vecNode;
-		}
-		else if (typeID == type_guid(Mathf::Color4))
-		{
-			Mathf::Color4 color = std::any_cast<Mathf::Color4>(value);
-			MetaYml::Node vecNode;
-			vecNode.SetStyle(MetaYml::EmitterStyle::Flow);
-			vecNode["r"] = color.x;
-			vecNode["g"] = color.y;
-			vecNode["b"] = color.z;
-			vecNode["a"] = color.w;
-			node[prop.name] = vecNode;
-		}
-		else if (typeID == type_guid(Mathf::Vector4))
-		{
-			Mathf::Vector4 vec = std::any_cast<Mathf::Vector4>(value);
-			MetaYml::Node vecNode;
-			vecNode.SetStyle(MetaYml::EmitterStyle::Flow);
-			vecNode["x"] = vec.x;
-			vecNode["y"] = vec.y;
-			vecNode["z"] = vec.z;
-			vecNode["w"] = vec.w;
-			node[prop.name] = vecNode;
-		}
-		else if (typeID == type_guid(Mathf::Quaternion))
-		{
-			Mathf::Quaternion quat = std::any_cast<Mathf::Quaternion>(value);
-			MetaYml::Node vecNode;
-			vecNode.SetStyle(MetaYml::EmitterStyle::Flow);
-			vecNode["x"] = quat.x;
-			vecNode["y"] = quat.y;
-			vecNode["z"] = quat.z;
-			vecNode["w"] = quat.w;
-			node[prop.name] = vecNode;
-		}
-		else if (typeID == type_guid(Mathf::Rect))
-		{
-			Mathf::Rect rect = std::any_cast<Mathf::Rect>(value);
-			MetaYml::Node rectNode;
-			rectNode.SetStyle(MetaYml::EmitterStyle::Flow);
-			rectNode["x"] = rect.x;
-			rectNode["y"] = rect.y;
-			rectNode["width"] = rect.width;
-			rectNode["height"] = rect.height;
-			node[prop.name] = rectNode;
-		}
-		else if (typeID == type_guid(FileGuid))
-		{
-			FileGuid fileGuid = std::any_cast<FileGuid>(value);
-			node[prop.name] = fileGuid.ToString();
+			entry->toYaml(prop, node, value);
 		}
 		else
 		{
-			node[prop.name] = "[not suport type]"; // 기타 미지원 타입
+			node[prop.name] = "[not support type]"; // 기타 미지원 타입
 		}
 	}
 
 	inline void YamlNodeToProperty(const Meta::Property& prop, void* instance, const MetaYml::Node& node)
 	{
-		if (node[prop.name])
+		if (!node[prop.name])
+			return;
+
+		if (auto* entry = FindYamlSerializer(prop.typeID))
 		{
-			if (prop.typeID == type_guid(int))
-			{
-				prop.setter(instance, node[prop.name].as<int>());
-			}
-			else if (prop.typeID == type_guid(float))
-			{
-				prop.setter(instance, node[prop.name].as<float>());
-			}
-			else if (prop.typeID == type_guid(bool))
-			{
-				prop.setter(instance, node[prop.name].as<bool>());
-			}
-			else if (prop.typeID == type_guid(int8_t))
-			{
-				prop.setter(instance, node[prop.name].as<int8_t>());
-			}
-			else if (prop.typeID == type_guid(uint8_t))
-			{
-				prop.setter(instance, node[prop.name].as<uint8_t>());
-			}
-			else if (prop.typeID == type_guid(int16_t))
-			{
-				prop.setter(instance, node[prop.name].as<int16_t>());
-			}
-			else if (prop.typeID == type_guid(uint16_t))
-			{
-				prop.setter(instance, node[prop.name].as<uint16_t>());
-			}
-			else if (prop.typeID == type_guid(int32_t))
-			{
-				prop.setter(instance, node[prop.name].as<int32_t>());
-			}
-			else if (prop.typeID == type_guid(uint32_t))
-			{
-				prop.setter(instance, node[prop.name].as<uint32_t>());
-			}
-			else if (prop.typeID == type_guid(int64_t))
-			{
-				prop.setter(instance, node[prop.name].as<int64_t>());
-			}
-			else if (prop.typeID == type_guid(uint64_t))
-			{
-				prop.setter(instance, node[prop.name].as<uint64_t>());
-			}
-			else if (prop.typeID == type_guid(std::string))
-			{
-				prop.setter(instance, node[prop.name].as<std::string>());
-			}
-			else if (prop.typeID == type_guid(file::path))
-			{
-				prop.setter(instance, node[prop.name].as<std::string>());
-			}
-			else if (prop.typeID == type_guid(HashingString))
-			{
-				prop.setter(instance, HashingString(node[prop.name].as<std::string>()));
-			}
-			else if (prop.typeID == type_guid(HashedGuid))
-			{
-				prop.setter(instance, HashedGuid(node[prop.name].as<uint32_t>()));
-			}
-			else if (prop.typeID == type_guid(Mathf::Vector2))
-			{
-				prop.setter(instance, Mathf::Vector2(node[prop.name]["x"].as<float>(), node[prop.name]["y"].as<float>()));
-			}
-			else if (prop.typeID == type_guid(Mathf::Vector3))
-			{
-				prop.setter(instance, Mathf::Vector3(
-						node[prop.name]["x"].as<float>(), 
-						node[prop.name]["y"].as<float>(), 
-						node[prop.name]["z"].as<float>()
-					)
-				);
-			}
-			else if (prop.typeID == type_guid(Mathf::Vector4))
-			{
-				prop.setter(instance, Mathf::Vector4(
-					node[prop.name]["x"].as<float>(),
-					node[prop.name]["y"].as<float>(),
-					node[prop.name]["z"].as<float>(),
-					node[prop.name]["w"].as<float>()
-				)
-				);
-			}
-            else if (prop.typeID == type_guid(Mathf::Color4))
-            {
-                prop.setter(instance, Mathf::Color4(
-                    node[prop.name]["r"].as<float>(), 
-                    node[prop.name]["g"].as<float>(), 
-                    node[prop.name]["b"].as<float>(), 
-                    node[prop.name]["a"].as<float>()
-                )
-                );
-            }
-			else if (prop.typeID == type_guid(Mathf::Quaternion))
-			{
-				prop.setter(instance, Mathf::Quaternion(
-						node[prop.name]["x"].as<float>(), 
-						node[prop.name]["y"].as<float>(),
-						node[prop.name]["z"].as<float>(), 
-						node[prop.name]["w"].as<float>()
-					)
-				);
-			}
-			else if (prop.typeID == type_guid(Mathf::Rect))
-			{
-				prop.setter(instance, Mathf::Rect(
-						node[prop.name]["x"].as<float>(), 
-						node[prop.name]["y"].as<float>(), 
-						node[prop.name]["width"].as<float>(), 
-						node[prop.name]["height"].as<float>()
-					)
-				);
-			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<FileGuid>())
-			{
-				prop.setter(instance, FileGuid(node[prop.name].as<std::string>()));
-			}
-			else
-			{
-				// 기타 미지원 타입
-				Debug->LogError("YamlNodeToProperty: Unsupported type");
-			}
+			entry->fromYaml(prop, instance, node);
+		}
+		else
+		{
+			Debug->LogError("YamlNodeToProperty: Unsupported type");
 		}
 	}
 
@@ -302,11 +53,11 @@ namespace Meta
 	{
 		MetaYml::Node node;
 
-		if (type.name == "GameObject")
+		if (type.name == GAMEOBJECT_YAML_KEY)
 		{
 			node[type.name] = type.typeID.m_ID_Data;
 		}
-		else if(type.name == "Component")
+		else if(type.name == COMPONENT_YAML_KEY)
 		{
 			const Type& compRealType = *FindTypeByInstance(instance);
 			node[compRealType.name] = compRealType.typeID.m_ID_Data;
@@ -370,93 +121,10 @@ namespace Meta
 					}
 					else
 					{
-						HashedGuid ty_name = prop.elementTypeID;
-
-						if (ty_name == type_guid(int))
+						HashedGuid ty_id = prop.elementTypeID;
+						if (auto* vecEntry = FindYamlVectorEntry(ty_id))
 						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<int*>(element));
-						}
-						else if (ty_name == type_guid(float))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<float*>(element));
-						}
-						else if (ty_name == type_guid(bool))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<bool*>(element));
-						}
-						else if (ty_name == type_guid(int8_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<int8_t*>(element));
-						}
-						else if (ty_name == type_guid(uint8_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<uint8_t*>(element));
-						}
-						else if (ty_name == type_guid(int16_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<int16_t*>(element));
-						}
-						else if (ty_name == type_guid(uint16_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<uint16_t*>(element));
-						}
-						else if (ty_name == type_guid(int32_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<int32_t*>(element));
-						}
-						else if (ty_name == type_guid(uint32_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<uint32_t*>(element));
-						}
-						else if (ty_name == type_guid(int64_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<int64_t*>(element));
-						}
-						else if (ty_name == type_guid(uint64_t))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<uint64_t*>(element));
-						}
-						else if (ty_name == type_guid(double))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<double*>(element));
-						}
-						else if (ty_name == type_guid(file::path))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(static_cast<file::path*>(element)->string());
-						}
-						else if (ty_name == type_guid(std::string))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(*static_cast<std::string*>(element));
-						}
-						else if (ty_name == type_guid(HashingString))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(static_cast<HashingString*>(element)->ToString());
-						}
-						else if (ty_name == type_guid(HashedGuid))
-						{
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(static_cast<HashedGuid*>(element)->m_ID_Data);
-						}
-						else if (ty_name == type_guid(FileGuid))
-						{
-							FileGuid fileGuid = *static_cast<FileGuid*>(element);
-							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-							arrayNode.push_back(fileGuid.ToString());
+							vecEntry->toYamlElement(arrayNode, element);
 						}
 						else
 						{
@@ -610,75 +278,11 @@ namespace Meta
 					if (!arrayNode || !arrayNode.IsSequence())
 						continue;
 
-					if (prop.elementTypeID == type_guid(int))
+					if (const auto* ve = FindYamlVectorEntry(prop.elementTypeID))
 					{
-						auto vec = node[prop.name].as<std::vector<int>>();
-						auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->push_back(elem);
-						}
-					}
-					else if (prop.elementTypeID == type_guid(float))
-					{
-						auto vec = node[prop.name].as<std::vector<float>>();
-						auto castInstance = reinterpret_cast<std::vector<float>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->push_back(elem);
-						}
-					}
-					else if (prop.elementTypeID == type_guid(bool))
-					{
-						auto vec = node[prop.name].as<std::vector<bool>>();
-						auto castInstance = reinterpret_cast<std::vector<bool>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->push_back(elem);
-						}
-					}
-					else if (prop.elementTypeID == type_guid(std::string))
-					{
-						auto vec = node[prop.name].as<std::vector<std::string>>();
-						auto castInstance = reinterpret_cast<std::vector<std::string>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->push_back(elem);
-						}
-					}
-					else if (prop.elementTypeID == type_guid(HashingString))
-					{
-						auto vec = node[prop.name].as<std::vector<std::string>>();
-						auto castInstance = reinterpret_cast<std::vector<HashingString>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->emplace_back(elem);
-						}
-					}
-					else if (prop.elementTypeID == type_guid(HashedGuid))
-					{
-						auto vec = node[prop.name].as<std::vector<uint32_t>>();
-						auto castInstance = reinterpret_cast<std::vector<HashedGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->emplace_back(elem);
-						}
-					}
-					else if (prop.elementTypeID == type_guid(FileGuid))
-					{
-						auto vec = node[prop.name].as<std::vector<std::string>>();
-						auto castInstance = reinterpret_cast<std::vector<FileGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
-						castInstance->clear(); // Clear existing elements
-						for (const auto& elem : vec)
-						{
-							castInstance->emplace_back(elem);
-						}
+						// offset 기반으로 instance 안의 vector<T> 를 직접 채운다
+						ve->fromYamlVector(instance, prop.offset, arrayNode);
+						continue;
 					}
 					else
 					{
@@ -724,8 +328,6 @@ namespace Meta
 	{
 		Deserialize(reinterpret_cast<void*>(instance), T::Reflect(), node);
 	}
-
-
 }
 
 namespace Meta

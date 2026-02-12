@@ -65,12 +65,13 @@ public:
     template <class F>
     void Enqueue(F&& f)
     {
-        m_taskCounts.fetch_add(1, std::memory_order_relaxed);
-        ResetEvent(m_waitEvent);
+        int prev = m_taskCounts.fetch_add(1, std::memory_order_relaxed);
 
-        // TaskType로 단 한 번만 생성
+        // 이전에 작업이 하나도 없었다면(0 -> 1 전이)만 Event 리셋
+        if (prev == 0)
+            ResetEvent(m_waitEvent);
+
         TaskType task(std::forward<F>(f));
-        // rvalue 오버로드로 밀어넣기 (move)
         m_tasks->push(std::move(task));
 
         m_semaphore->release();

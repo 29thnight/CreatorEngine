@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("MaterialManager", []() { return new MaterialManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("TowerTrigger", []() { return new TowerTrigger(); });
 		CreateFactory::GetInstance()->RegisterFactory("DialogueConductor", []() { return new DialogueConductor(); });
 		CreateFactory::GetInstance()->RegisterFactory("PlayerDialogueUI", []() { return new PlayerDialogueUI(); });

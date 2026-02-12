@@ -264,6 +264,7 @@
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderDebugManager.cpp" />
+    <ClCompile Include="RenderGraphBuilder.cpp" />
     <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
     <ClCompile Include="TrailModuleCS.cpp" />
@@ -342,7 +343,6 @@
     <ClInclude Include="ColorGradingPass.h" />
     <ClInclude Include="ColorGradingPassSetting.h" />
     <ClInclude Include="ColorModuleCS.h" />
-    <ClInclude Include="CullingBox.h" />
     <ClInclude Include="CullingManager.h" />
     <ClInclude Include="BaseEffectStruct.h" />
     <ClInclude Include="BillboardModuleGPU.h" />
@@ -373,6 +373,7 @@
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderDebugManager.h" />
+    <ClInclude Include="RenderGraphBuilder.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ShaderDSL.h" />
     <ClInclude Include="TrailModuleCS.h" />

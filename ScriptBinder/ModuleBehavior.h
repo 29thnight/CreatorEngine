@@ -64,123 +64,20 @@ private:
     Core::DelegateHandle m_onDisableEventHandle{};
     Core::DelegateHandle m_onDestroyEventHandle{};
 
-	void AwakeInvoke()
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		if (m_isCallAwake == false)
-		{
-			Awake();
-			m_isCallAwake = true;
-		}
-	}
-
-	void OnEnableInvoke()
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		if (false == m_isCallOnEnable)
-		{
-			OnEnable();
-			m_isCallOnEnable = true;
-		}
-	}
-
-	void StartInvoke()
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		if (m_isCallStart == false)
-		{
-			Start();
-			m_isCallStart = true;
-		}
-	}
-
-	void FixedUpdateInvoke(float fixedTick)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		FixedUpdate(fixedTick);
-	}
-
-	void OnTriggerEnterInvoke(const Collision& collider)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		OnTriggerEnter(collider);
-	}
-
-	void OnTriggerStayInvoke(const Collision& collider)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		OnTriggerStay(collider);
-	}
-
-	void OnTriggerExitInvoke(const Collision& collider)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		OnTriggerExit(collider);
-	}
-
-	void OnCollisionEnterInvoke(const Collision& collider)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		OnCollisionEnter(collider);
-	}
-
-	void OnCollisionStayInvoke(const Collision& collider)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		OnCollisionStay(collider);
-	}
-
-	void OnCollisionExitInvoke(const Collision& collider)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		OnCollisionExit(collider);
-	}
-
-	void UpdateInvoke(float tick)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		Update(tick);
-	}
-
-	void LateUpdateInvoke(float tick)
-	{
-		if (true == m_destroyMark || false == m_isEnabled) return;
-
-		LateUpdate(tick);
-	}
-
-	void OnDisableInvoke()
-	{
-		if (true == m_isEnabled) return;
-
-		if (true == m_isCallOnEnable)
-		{
-			OnDisable();
-			m_isCallOnEnable = false;
-		}
-	}
-
-	void OnDestroyInvoke()
-	{
-		if (true != m_destroyMark) return;
-
-		if (true == m_isCallAwake)
-		{
-			OnDestroy();
-			m_isCallAwake = false;
-		}
-	}
+	void AwakeInvoke();
+	void OnEnableInvoke();
+	void StartInvoke();
+	void FixedUpdateInvoke(float fixedTick);
+	void OnTriggerEnterInvoke(const Collision& collider);
+	void OnTriggerStayInvoke(const Collision& collider);
+	void OnTriggerExitInvoke(const Collision& collider);
+	void OnCollisionEnterInvoke(const Collision& collider);
+	void OnCollisionStayInvoke(const Collision& collider);
+	void OnCollisionExitInvoke(const Collision& collider);
+	void UpdateInvoke(float tick);
+	void LateUpdateInvoke(float tick);
+	void OnDisableInvoke();
+	void OnDestroyInvoke();
 
 #pragma endregion
 

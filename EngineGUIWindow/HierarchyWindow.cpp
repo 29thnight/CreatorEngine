@@ -433,6 +433,23 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	auto& selectedSceneObject = scene->m_selectedSceneObject;
 	auto& selectedObjects = scene->m_selectedSceneObjects;
 
+	// 🔍 검색 필터가 활성화된 경우, 자기 자신 + 자식들까지 재귀 검사
+	if (m_searchFilter.IsActive())
+	{
+		// 자식에 검색 결과가 있는 경우까지 보여주고 싶다면
+		// 여기서 바로 return하지 말고,
+		// "자식 중 하나라도 필터를 통과하면 이 노드도 그려준다"
+		// 같은 재귀 체크 로직이 더 필요.
+		if (!IsMatchedRecursive(obj))
+		{
+			// 자기 자신과 모든 자식이 필터에 안 걸리면 아예 그리지 않음
+			return;
+		}
+
+		// 검색 중에는 매치되는 애들은 기본적으로 열어두면 편함
+		ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+	}
+
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
 	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end() || scene->m_selectedSceneObject == obj.get();
 	if (isSelected)
@@ -560,3 +577,27 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		ImGui::TreePop();
 	}
 }
+
+bool HierarchyWindow::IsMatchedRecursive(const std::shared_ptr<GameObject>& obj)
+{
+	if (!obj) return false;
+
+	auto scene = SceneManagers->GetActiveScene();
+	if (!scene) return false;
+
+	// 1) 자기 자신 이름으로 필터 체크
+	const std::string name = obj->m_name.ToString();
+	if (m_searchFilter.PassFilter(name.c_str()))
+		return true;
+
+	// 2) 자식들 재귀 체크
+	for (auto childIndex : obj->m_childrenIndices)
+	{
+		auto child = scene->GetGameObject(childIndex);
+		if (child && IsMatchedRecursive(child))
+			return true;
+	}
+
+	return false;
+}
+

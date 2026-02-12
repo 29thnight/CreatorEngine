@@ -12,6 +12,11 @@ public:
         m_assetMetaRegistry(registry) {}
 
 public:
+    bool containsTMP_anywhere(const std::filesystem::path& p) {
+        std::string s = p.string();
+        return s.find("TMP") != std::string::npos;   // 대/소문자 구분
+    }
+
     void handleFileAction(efsw::WatchID watchid,
         const std::string& dir,
         const std::string& filename,
@@ -22,6 +27,11 @@ public:
 
         fs::path dirPath(dir);
         fs::path filePath = dirPath / filename;
+
+        if (containsTMP_anywhere(filePath))
+        {
+            return;
+        }
 
         switch (action) 
         {
@@ -156,7 +166,7 @@ public:
         std::string line;
 
         // [[ScriptReflectionField]] or [[ScriptReflectionField(...)]]
-        std::regex attrRegex(R"(\[\[\s*ScriptReflectionField(?:\s*\([^)]*\))?\s*\]\])");
+        std::regex attrRegex(/*R"(\[\[\s*ScriptReflectionField(?:\s*\([^)]*\))?\s*\]\])"*/R"(^\s*\[\[ScriptReflectionField(\(.*\))?\]\])");
 
         while (std::getline(fin, line))
         {

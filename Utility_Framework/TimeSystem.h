@@ -173,6 +173,18 @@ namespace DirectX11
 			postFixedUpdate();
 		}
 
+		double NowSeconds() const
+		{
+			static LARGE_INTEGER frequency;
+			static BOOL init = QueryPerformanceFrequency(&frequency);
+
+			LARGE_INTEGER counter;
+			QueryPerformanceCounter(&counter);
+
+			// 초 단위(double)
+			return static_cast<double>(counter.QuadPart) / static_cast<double>(frequency.QuadPart);
+		}
+
 		void UpdateTimeScale(float _timeDelta);
 		void SetTimeScale(float _timeScale,float _changeTimeScaleTime);
 		void SetTimeScale(float _timeScale);

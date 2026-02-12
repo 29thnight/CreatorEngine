@@ -50,6 +50,17 @@ public:
 	[[Property]]
 	float m_height{ 1.0f };
 
+
+	[[Property]]
+	float staticFriction = 0.5f;	//정적 물체 마찰 계수
+	[[Property]]
+	float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
+	[[Property]]
+	float restitution = 0.3f;	//탄성 계수
+	[[Property]]
+	float density = 10.0f;	//밀도
+
+
 private:
 	EColliderType m_type;
 	CapsuleColliderInfo m_Info;
@@ -104,6 +115,15 @@ public:
 		{
 			m_Info.height = m_height;
 		}
+
+		// 임시 콜리젼 레이어
+		m_Info.colliderInfo.layerNumber = GetOwner()->m_collisionType;
+
+		m_Info.colliderInfo.staticFriction = staticFriction;
+		m_Info.colliderInfo.dynamicFriction = dynamicFriction;
+		m_Info.colliderInfo.restitution = restitution;
+		m_Info.colliderInfo.density = density;
+
 		return m_Info;
 	}
 	void SetCapsuleInfoMation(const CapsuleColliderInfo& info)

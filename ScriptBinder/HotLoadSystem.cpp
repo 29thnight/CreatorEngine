@@ -464,7 +464,10 @@ void HotLoadSystem::RecollectScriptComponents(const std::vector<std::shared_ptr<
 
 void HotLoadSystem::CompileEvent()
 {
-	m_isCompileEventInvoked = true;
+	if (!SceneManagers->IsGameStart())
+	{
+		m_isCompileEventInvoked = true;
+	}
 }
 
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view name)
@@ -495,7 +498,6 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view na
 				{
 					if (script->m_awakeEventHandle.IsValid()) continue;
 
-					
 					script->m_awakeEventHandle = activeScene->AwakeEvent.AddShared(sharedThis, &ModuleBehavior::AwakeInvoke);
 				}
 				else if (event == "OnEnable")

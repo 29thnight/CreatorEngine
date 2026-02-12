@@ -1,0 +1,514 @@
+﻿{
+  "assimp:x64-windows": {
+    "package_name": "assimp",
+    "triplet": "x64-windows",
+    "version": "5.4.3",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "The Open Asset import library"
+    ]
+  },
+  "bdwgc:x64-windows": {
+    "package_name": "bdwgc",
+    "triplet": "x64-windows",
+    "version": "8.2.8",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "The Boehm-Demers-Weiser conservative C/C++ Garbage Collector (libgc, bdwgc, boehm-gc)"
+    ]
+  },
+  "boost-assert:x64-windows": {
+    "package_name": "boost-assert",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost assert module"
+    ]
+  },
+  "boost-cmake:x64-windows": {
+    "package_name": "boost-cmake",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost cmake module"
+    ]
+  },
+  "boost-config:x64-windows": {
+    "package_name": "boost-config",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost config module"
+    ]
+  },
+  "boost-headers:x64-windows": {
+    "package_name": "boost-headers",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost headers module"
+    ]
+  },
+  "boost-static-assert:x64-windows": {
+    "package_name": "boost-static-assert",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost static_assert module"
+    ]
+  },
+  "boost-throw-exception:x64-windows": {
+    "package_name": "boost-throw-exception",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost throw_exception module"
+    ]
+  },
+  "boost-type-traits:x64-windows": {
+    "package_name": "boost-type-traits",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost type_traits module"
+    ]
+  },
+  "boost-uninstall:x64-windows": {
+    "package_name": "boost-uninstall",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Internal vcpkg port used to uninstall Boost"
+    ]
+  },
+  "boost-uuid:x64-windows": {
+    "package_name": "boost-uuid",
+    "triplet": "x64-windows",
+    "version": "1.88.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Boost uuid module"
+    ]
+  },
+  "bshoshany-thread-pool:x64-windows": {
+    "package_name": "bshoshany-thread-pool",
+    "triplet": "x64-windows",
+    "version": "5.0.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "BS::thread_pool: a fast, lightweight, modern, and easy-to-use C++17 / C++20 / C++23 thread pool library"
+    ]
+  },
+  "c4core:x64-windows": {
+    "package_name": "c4core",
+    "triplet": "x64-windows",
+    "version": "0.2.6",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Library of low-level C++ utilities"
+    ]
+  },
+  "detours:x64-windows": {
+    "package_name": "detours",
+    "triplet": "x64-windows",
+    "version": "4.0.1",
+    "port_version": 8,
+    "features": [],
+    "desc": [
+      "Detours is a software package for monitoring and instrumenting API calls on Windows."
+    ]
+  },
+  "directxmath:x64-windows": {
+    "package_name": "directxmath",
+    "triplet": "x64-windows",
+    "version": "2025-04-03",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "DirectXMath SIMD C++ math library"
+    ]
+  },
+  "directxtex:x64-windows": {
+    "package_name": "directxtex",
+    "triplet": "x64-windows",
+    "version": "2025-03-24",
+    "port_version": 0,
+    "features": [
+      "dx11"
+    ],
+    "desc": [
+      "DirectXTex texture processing library"
+    ]
+  },
+  "directxtk:x64-windows": {
+    "package_name": "directxtk",
+    "triplet": "x64-windows",
+    "version": "2025-03-20",
+    "port_version": 2,
+    "features": [],
+    "desc": [
+      "A collection of helper classes for writing DirectX 11.x code in C++."
+    ]
+  },
+  "draco:x64-windows": {
+    "package_name": "draco",
+    "triplet": "x64-windows",
+    "version": "1.5.7",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A library for compressing and decompressing 3D geometric meshes and point clouds. It is intended to improve the storage and transmission of 3D graphics."
+    ]
+  },
+  "efsw:x64-windows": {
+    "package_name": "efsw",
+    "triplet": "x64-windows",
+    "version": "1.4.1",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "efsw is a C++ cross-platform file system watcher and notifier."
+    ]
+  },
+  "fmt:x64-windows": {
+    "package_name": "fmt",
+    "triplet": "x64-windows",
+    "version": "11.0.2",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams."
+    ]
+  },
+  "imgui-node-editor:x64-windows": {
+    "package_name": "imgui-node-editor",
+    "triplet": "x64-windows",
+    "version": "0.9.3",
+    "port_version": 2,
+    "features": [],
+    "desc": [
+      "Node Editor built using Dear ImGui"
+    ]
+  },
+  "imgui:x64-windows": {
+    "package_name": "imgui",
+    "triplet": "x64-windows",
+    "version": "1.91.9",
+    "port_version": 0,
+    "features": [
+      "docking-experimental",
+      "dx11-binding",
+      "win32-binding"
+    ],
+    "desc": [
+      "Bloat-free Immediate Mode Graphical User interface for C++ with minimal dependencies."
+    ]
+  },
+  "imguizmo:x64-windows": {
+    "package_name": "imguizmo",
+    "triplet": "x64-windows",
+    "version": "2024-05-29",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "Immediate mode 3D gizmo for scene editing and other controls based on Dear ImGui"
+    ]
+  },
+  "jhasse-poly2tri:x64-windows": {
+    "package_name": "jhasse-poly2tri",
+    "triplet": "x64-windows",
+    "version": "2023-12-27",
+    "port_version": 2,
+    "features": [],
+    "desc": [
+      "Sweep-line algorithm for constrained Delaunay triangulation"
+    ]
+  },
+  "kubazip:x64-windows": {
+    "package_name": "kubazip",
+    "triplet": "x64-windows",
+    "version": "0.3.3",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A portable, simple zip library written in C"
+    ]
+  },
+  "libatomic-ops:x64-windows": {
+    "package_name": "libatomic-ops",
+    "triplet": "x64-windows",
+    "version": "7.8.2",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "The atomic_ops project (Atomic memory update operations portable implementation)"
+    ]
+  },
+  "lua:x64-windows": {
+    "package_name": "lua",
+    "triplet": "x64-windows",
+    "version": "5.4.7",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A powerful, fast, lightweight, embeddable scripting language"
+    ]
+  },
+  "lz4:x64-windows": {
+    "package_name": "lz4",
+    "triplet": "x64-windows",
+    "version": "1.10.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Lossless compression algorithm, providing compression speed at 400 MB/s per core."
+    ]
+  },
+  "magic-enum:x64-windows": {
+    "package_name": "magic-enum",
+    "triplet": "x64-windows",
+    "version": "0.9.7",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code."
+    ]
+  },
+  "meshoptimizer:x64-windows": {
+    "package_name": "meshoptimizer",
+    "triplet": "x64-windows",
+    "version": "0.23",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Mesh optimization library that makes meshes smaller and faster to render"
+    ]
+  },
+  "mimalloc:x64-windows": {
+    "package_name": "mimalloc",
+    "triplet": "x64-windows",
+    "version": "2.2.3",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "Compact general purpose allocator with excellent performance"
+    ]
+  },
+  "minizip:x64-windows": {
+    "package_name": "minizip",
+    "triplet": "x64-windows",
+    "version": "1.3.1",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "Minizip zip file manipulation library"
+    ]
+  },
+  "nlohmann-json:x64-windows": {
+    "package_name": "nlohmann-json",
+    "triplet": "x64-windows",
+    "version": "3.12.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "JSON for Modern C++"
+    ]
+  },
+  "physx:x64-windows": {
+    "package_name": "physx",
+    "triplet": "x64-windows",
+    "version": "5.5.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "The NVIDIA PhysX SDK is a scalable multi-platform physics solution supporting a wide range of devices, from smartphones to high-end multicore CPUs and GPUs. This is the latest NVIDIA official version of the PhysX engine which also directly integrates into Omniverse. This port is NOT officially supported by NVIDIA."
+    ]
+  },
+  "polyclipping:x64-windows": {
+    "package_name": "polyclipping",
+    "triplet": "x64-windows",
+    "version": "6.4.2",
+    "port_version": 13,
+    "features": [],
+    "desc": [
+      "The Clipper library performs clipping and offsetting for both lines and polygons. All four boolean clipping operations are supported - intersection, union, difference and exclusive-or. Polygons can be of any shape including self-intersecting polygons."
+    ]
+  },
+  "pugixml:x64-windows": {
+    "package_name": "pugixml",
+    "triplet": "x64-windows",
+    "version": "1.15",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Light-weight, simple and fast XML parser for C++ with XPath support"
+    ]
+  },
+  "rapidjson:x64-windows": {
+    "package_name": "rapidjson",
+    "triplet": "x64-windows",
+    "version": "2025-02-26",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A fast JSON parser/generator for C++ with both SAX/DOM style API <http://rapidjson.org/>"
+    ]
+  },
+  "ryml:x64-windows": {
+    "package_name": "ryml",
+    "triplet": "x64-windows",
+    "version": "0.9.0",
+    "port_version": 0,
+    "features": [
+      "def-callbacks"
+    ],
+    "desc": [
+      "Rapid YAML library"
+    ]
+  },
+  "sol2:x64-windows": {
+    "package_name": "sol2",
+    "triplet": "x64-windows",
+    "version": "3.5.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Sol3 (sol2 v3.0) - a C++ <-> Lua API wrapper with advanced features and top notch performance"
+    ]
+  },
+  "spdlog:x64-windows": {
+    "package_name": "spdlog",
+    "triplet": "x64-windows",
+    "version": "1.15.3",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "Very fast, header-only/compiled, C++ logging library."
+    ]
+  },
+  "sqlite3:x64-windows": {
+    "package_name": "sqlite3",
+    "triplet": "x64-windows",
+    "version": "3.49.2",
+    "port_version": 0,
+    "features": [
+      "json1"
+    ],
+    "desc": [
+      "SQLite is a software library that implements a self-contained, serverless, zero-configuration, transactional SQL database engine."
+    ]
+  },
+  "stb:x64-windows": {
+    "package_name": "stb",
+    "triplet": "x64-windows",
+    "version": "2024-07-29",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "public domain header-only libraries"
+    ]
+  },
+  "stduuid:x64-windows": {
+    "package_name": "stduuid",
+    "triplet": "x64-windows",
+    "version": "1.2.3",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A C++17 cross-platform implementation for UUIDs"
+    ]
+  },
+  "tinyxml2:x64-windows": {
+    "package_name": "tinyxml2",
+    "triplet": "x64-windows",
+    "version": "11.0.0",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A simple, small, efficient, C++ XML parser"
+    ]
+  },
+  "utfcpp:x64-windows": {
+    "package_name": "utfcpp",
+    "triplet": "x64-windows",
+    "version": "4.0.6",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "UTF-8 with C++ in a Portable Way"
+    ]
+  },
+  "vcpkg-boost:x64-windows": {
+    "package_name": "vcpkg-boost",
+    "triplet": "x64-windows",
+    "version": "2025-03-29",
+    "port_version": 0,
+    "features": [],
+    "desc": []
+  },
+  "vcpkg-cmake-config:x64-windows": {
+    "package_name": "vcpkg-cmake-config",
+    "triplet": "x64-windows",
+    "version": "2024-05-23",
+    "port_version": 0,
+    "features": [],
+    "desc": []
+  },
+  "vcpkg-cmake-get-vars:x64-windows": {
+    "package_name": "vcpkg-cmake-get-vars",
+    "triplet": "x64-windows",
+    "version": "2024-09-22",
+    "port_version": 0,
+    "features": [],
+    "desc": []
+  },
+  "vcpkg-cmake:x64-windows": {
+    "package_name": "vcpkg-cmake",
+    "triplet": "x64-windows",
+    "version": "2024-04-23",
+    "port_version": 0,
+    "features": [],
+    "desc": []
+  },
+  "yaml-cpp:x64-windows": {
+    "package_name": "yaml-cpp",
+    "triplet": "x64-windows",
+    "version": "0.8.0",
+    "port_version": 3,
+    "features": [],
+    "desc": [
+      "yaml-cpp is a YAML parser and emitter in C++ matching the YAML 1.2 spec."
+    ]
+  },
+  "zlib:x64-windows": {
+    "package_name": "zlib",
+    "triplet": "x64-windows",
+    "version": "1.3.1",
+    "port_version": 0,
+    "features": [],
+    "desc": [
+      "A compression library"
+    ]
+  }
+}

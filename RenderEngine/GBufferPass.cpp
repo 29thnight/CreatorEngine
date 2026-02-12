@@ -11,6 +11,7 @@
 #include "MeshRendererProxy.h"
 #include "Terrain.h"
 #include "RenderDebugManager.h"
+#include "Benchmark.hpp"
 
 ID3D11ShaderResourceView* nullSRVs[5]{
 	nullptr,
@@ -175,6 +176,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	std::map<std::string, std::vector<PrimitiveRenderProxy*>> animatedShaderPSOGroups;
 	std::map<InstanceGroupKey, std::vector<PrimitiveRenderProxy*>> instanceGroups;
 
+	//Benchmark clock0;
+
 	for (auto& proxy : data->m_deferredQueue)
 	{
 		if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
@@ -208,9 +211,11 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		}
 	}
 
+	//std::cout << "GBuffer Pass - Classify Render Proxies Time: " << clock0.GetElapsedTime() << " ms\n";
+
 	// --- INITIAL PSO AND RENDER TARGET SETUP ---
 	DirectX11::OMSetRenderTargets(deferredPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
@@ -239,6 +244,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
+
+	//Benchmark clock1;
 
 	for (auto& proxy : animatedProxies)
 	{
@@ -274,11 +281,15 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		proxy->Draw(deferredPtr);
 	}
 
+	//std::cout << "GBuffer Pass - Render Animated Proxies Time: " << clock1.GetElapsedTime() << " ms\n";
+
 	// --- 3. RENDER STATIC OBJECTS (INSTANCED) ---
 	m_instancePSO->Apply(deferredPtr);
 
 	// Bind the pre-created instance buffer SRV to the vertex shader once.
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, m_instanceBufferSRV.GetAddressOf());
+
+	//Benchmark clock2;
 
 	for (auto const& [groupKey, proxies] : instanceGroups)
 	{
@@ -336,6 +347,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// --- Draw all instances in one call ---
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
+
+	//std::cout << "GBuffer Pass - Render Instanced Proxies Time: " << clock2.GetElapsedTime() << " ms\n";
+
+	//Benchmark clock3;
 
 	// --- 3.5 RENDER OBJECTS WITH CUSTOM SHADER PSO (INDIVIDUALLY) ---
 	for (auto const& [psoName, proxies] : shaderPSOGroups)
@@ -402,6 +417,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		}
 	}
 
+	//std::cout << "GBuffer Pass - Render Custom PSO Proxies Time: " << clock3.GetElapsedTime() << " ms\n";
+
+	//Benchmark clock4;
+
 	for (auto const& [psoName, proxies] : animatedShaderPSOGroups) {
 		if (proxies.empty()) continue;
 		auto firstProxy = proxies.front();
@@ -454,7 +473,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			}
 			proxy->m_Material->TrySetFloat("TimeBuffer", "totalTime", Time->GetTotalSeconds());
 			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
-			unsigned int frameCount = Time->GetFrameCount();
+			uint32 frameCount = Time->GetFrameCount();
 			proxy->m_Material->TrySetValue("TimeBuffer", "totalFrame", &frameCount, sizeof(unsigned int));
 			proxy->m_Material->TrySetValue("MeshRendererBuffer", "bitflag", &proxy->m_bitflag, sizeof(unsigned int));
 			proxy->m_Material->TrySetMaterialInfo();
@@ -466,6 +485,8 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->Draw(deferredPtr);
 		}
 	}
+
+	//std::cout << "GBuffer Pass - Render Animated Custom PSO Proxies Time: " << clock4.GetElapsedTime() << " ms\n";
 
 	if(0 == data->m_index)
 	{
@@ -506,7 +527,7 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 
 	DirectX11::OMSetRenderTargets(deferredPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
 
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);

@@ -6,6 +6,10 @@ ReflectionFieldInheritance(SphereColliderComponent, Component) \
 	PropertyField \
 	({ \
 		meta_property(radius) \
+		meta_property(staticFriction) \
+		meta_property(dynamicFriction) \
+		meta_property(restitution) \
+		meta_property(density) \
 		meta_property(m_posOffset) \
 		meta_property(m_rotOffset) \
 	}); \

@@ -21,6 +21,9 @@ public:
 		}
 	}
 
+	CountingSemaphore(const CountingSemaphore&) = delete;
+	CountingSemaphore& operator=(const CountingSemaphore&) = delete;
+
 	void acquire()
 	{
 		// 1. 유저 모드에서 스핀 대기
@@ -34,25 +37,31 @@ public:
 		}
 
 		// 2. 커널 모드 대기
-		if (m_count.fetch_sub(1, std::memory_order_acquire) <= 0)
+		int old = m_count.fetch_sub(1, std::memory_order_acquire);
+
+		if (old <= 0)
 		{
-			WaitForSingleObject(m_semaphore, INFINITE);
+			// 커널 세마포어 대기 (다른 쓰레드의 release()가 깨워줄 것)
+			::WaitForSingleObject(m_semaphore, INFINITE);
 		}
 	}
 
 	void release(int count = 1)
 	{
-		int prev = m_count.fetch_add(count, std::memory_order_release);
+		int old = m_count.fetch_add(count, std::memory_order_release);
 
-		// 블로킹 중인 스레드가 있을 경우에만 세마포어 해제
-		if (prev < 0)
+		if (old < 0)
 		{
-			ReleaseSemaphore(m_semaphore, count, nullptr);
+			int waiting = -old;
+			int toRelease = (count < waiting) ? count : waiting;
+
+			if (toRelease > 0)
+				::ReleaseSemaphore(m_semaphore, toRelease, nullptr);
 		}
 	}
 
 private:
-	static constexpr int SpinCount = 1024;
+	static constexpr int SpinCount = 32;
 
 	std::atomic<int> m_count;
 	HANDLE m_semaphore;

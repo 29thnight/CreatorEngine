@@ -8,10 +8,13 @@ void PlayEffectAll::Start()
 		auto childred = GetOwner()->m_childrenIndices;
 		for (auto& child : childred)
 		{
-			auto effectcomponent = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+			auto childObject = GameObject::FindIndex(child);
+			if (!childObject) continue;
+
+			auto effectcomponent = childObject->GetComponent<EffectComponent>();
 			if (effectcomponent)
 			{
-				m_effects.push_back(effectcomponent);
+				m_effects.push_back(effectcomponent->weak_from_this());
 			}
 		}
 	}
@@ -26,7 +29,11 @@ void PlayEffectAll::Update(float tick)
 		OnEffect = true;
 		for (auto& effect : m_effects)
 		{
-			effect->Apply();
+			auto effectPtr = effect.lock();
+			if (effectPtr)
+			{
+				effectPtr->Apply();
+			}
 		}
 	}
 
@@ -40,7 +47,8 @@ void PlayEffectAll::Update(float tick)
 	bool allFinished = true;
 	for (auto& effect : m_effects)
 	{
-		if (effect->m_isPlaying)
+		auto effectPtr = effect.lock();
+		if (effectPtr && effectPtr->m_isPlaying)
 		{
 			allFinished = false;
 			break;
@@ -63,13 +71,17 @@ void PlayEffectAll::Initialize()
 			auto effectcomponent = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
 			if (effectcomponent)
 			{
-				m_effects.push_back(effectcomponent);
+				m_effects.push_back(effectcomponent->weak_from_this());
 			}
 		}
 	}
 
 	for (auto& effect : m_effects)
 	{
-		effect->Apply();
+		auto effectPtr = effect.lock();
+		if (effectPtr)
+		{
+			effectPtr->Apply();
+		}
 	}
 }

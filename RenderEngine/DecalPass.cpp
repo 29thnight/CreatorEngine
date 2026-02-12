@@ -263,7 +263,7 @@ void DecalPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Re
 	cBuf.g_screenDimensions = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
 	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &cBuf);
 
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
 

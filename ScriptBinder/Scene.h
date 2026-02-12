@@ -286,4 +286,6 @@ public:
     GameObject*					m_selectedSceneObject = nullptr;
 	std::vector<GameObject*>	m_selectedSceneObjects;
     Core::DelegateHandle		resetObjHandle{};
+public:
+	std::vector<std::shared_ptr<MeshRenderer>> m_visibleMeshesScratch;
 };

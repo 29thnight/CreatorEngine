@@ -19,6 +19,7 @@
 #include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
 #include "InputActionManager.h"
+#include "CullingManager.h"
 
 namespace EngineBootstrap
 {
@@ -55,11 +56,13 @@ namespace EngineBootstrap
         HotLoadSystem::GetInstance();
         ComponentFactory::GetInstance();
         CameraContainer::GetInstance();
+        Creator::Culling::CullingManager::GetInstance();
 
     }
 
     inline void FinalizeRuntime()
     {
+		Creator::Culling::CullingManager::Destroy();
         CameraContainer::Destroy();
         ComponentFactory::Destroy();
         HotLoadSystem::Destroy();

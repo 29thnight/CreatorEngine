@@ -79,7 +79,7 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
     DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
     DirectX11::OMSetDepthStencilState(deferredPtr, m_NoWriteDepthStencilState.Get(), 1);
     DirectX11::OMSetBlendState(deferredPtr, DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
-    camera.UpdateBuffer(deferredPtr);
+    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
     DirectX11::VSSetConstantBuffer(deferredPtr, 0, 1, m_UIBuffer.GetAddressOf());
 

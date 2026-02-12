@@ -577,35 +577,99 @@ void MenuBarWindow::RenderMenuBar()
             }
 
             {
-                const char* kDebugLabel = ICON_FA_BUG;
-                ImVec2 text = ImGui::CalcTextSize(kDebugLabel);
-                const ImGuiStyle& style = ImGui::GetStyle();
-                ImVec2 btn = { text.x + style.FramePadding.x * 2.0f,
-                               text.y + style.FramePadding.y * 2.0f };
+                const char* kIconBtn = ICON_FA_CUBES_STACKED " LiveCode ";   // 새로 추가할 앞쪽 아이콘 버튼
+                const char* kMainLbl = ICON_FA_BUG;   // 기존 디버그 버튼
 
-                // 남은 폭(avail)만큼 오른쪽으로 이동하되, 버튼 너비만큼 빼서 오른쪽 끝에 정렬
+                const ImGuiStyle& style = ImGui::GetStyle();
+
+                // 아이콘 전용 버튼은 정사각 사이즈로: 텍스트(아이콘) + 패딩*2
+                ImVec2 iconTxt = ImGui::CalcTextSize(kIconBtn);
+                ImVec2 iconBtn = { iconTxt.x + style.FramePadding.x * 2.0f,
+                                   iconTxt.y + style.FramePadding.y * 2.0f };
+
+                // 메인 버튼
+                ImVec2 mainTxt = ImGui::CalcTextSize(kMainLbl);
+                ImVec2 mainBtn = { mainTxt.x + style.FramePadding.x * 2.0f,
+                                   mainTxt.y + style.FramePadding.y * 2.0f };
+
+                // 두 버튼 사이 간격
+                float gap = style.ItemInnerSpacing.x;
+
+                // 두 버튼을 합친 총 너비
+                float groupWidth = iconBtn.x + gap + mainBtn.x;
+
+                // 그룹을 오른쪽 정렬
                 float avail = ImGui::GetContentRegionAvail().x;
-                if (avail > btn.x) {
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - btn.x));
+                if (avail > groupWidth) {
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - groupWidth));
                 }
                 else {
-                    ImGui::SameLine(); // 공간이 없으면 같은 라인에라도 붙이기
+                    ImGui::SameLine();
                 }
 
-                bool wasDebug = EngineSettingInstance->IsDebugMode();
+                bool isGameRunning = SceneManagers->IsGameStart();
+                if (isGameRunning)
+                {
+                    ImGui::BeginDisabled(true);
+                }
 
-                // 활성화 색상 토글(선택)
+                // 1) 아이콘 전용 버튼
+                if (ImGui::Button(kIconBtn, iconBtn))
+                {
+                    ScriptManager->CompileEvent();
+                }
+
+                if (isGameRunning)
+                {
+                    ImGui::EndDisabled();
+                }
+
+                // 같은 라인에 메인 버튼 배치
+                ImGui::SameLine(0.0f, gap);
+
+                // 2) 메인 디버그 버튼 (기존 로직)
+                bool wasDebug = EngineSettingInstance->IsDebugMode();
                 if (wasDebug) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                 }
 
-                if (ImGui::Button(kDebugLabel, btn)) {
+                if (ImGui::Button(kMainLbl, mainBtn)) {
                     EngineSettingInstance->SetIsDebugMode(!EngineSettingInstance->IsDebugMode());
                 }
 
                 if (wasDebug) ImGui::PopStyleColor(3);
+
+                //const char* kDebugLabel = ICON_FA_BUG;
+                //ImVec2 text = ImGui::CalcTextSize(kDebugLabel);
+                //const ImGuiStyle& style = ImGui::GetStyle();
+                //ImVec2 btn = { text.x + style.FramePadding.x * 2.0f,
+                //               text.y + style.FramePadding.y * 2.0f };
+
+                //// 남은 폭(avail)만큼 오른쪽으로 이동하되, 버튼 너비만큼 빼서 오른쪽 끝에 정렬
+                //float avail = ImGui::GetContentRegionAvail().x;
+                //if (avail > btn.x) {
+                //    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - btn.x));
+                //}
+                //else {
+                //    ImGui::SameLine(); // 공간이 없으면 같은 라인에라도 붙이기
+                //}
+
+                //bool wasDebug = EngineSettingInstance->IsDebugMode();
+
+                //// 활성화 색상 토글(선택)
+                //if (wasDebug) {
+                //    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+                //    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                //    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                //}
+
+                //if (ImGui::Button(kDebugLabel, btn)) {
+                //    EngineSettingInstance->SetIsDebugMode(!EngineSettingInstance->IsDebugMode());
+                //}
+
+                //if (wasDebug) ImGui::PopStyleColor(3);
             }
 
             ImGui::EndMenuBar();

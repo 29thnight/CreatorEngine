@@ -49,6 +49,7 @@ void SceneManager::ToggleGamePaused()
 
 void SceneManager::ManagerInitialize()
 {
+	//GC_Initialize();
     REFLECTION_REGISTER_EXECUTE();
     ComponentFactorys->Initialize();
 	m_threadPool = new ThreadPool;
@@ -62,11 +63,14 @@ void SceneManager::Editor()
     PROFILE_CPU_BEGIN("Editor");
     if(m_isGameStart && !m_isEditorSceneLoaded)
     {
+        auto activeScenePtr = m_activeScene.load();
+        if (!activeScenePtr) return;
         PROFILE_CPU_BEGIN("CreateEditorOnlyPlayScene");
         CreateEditorOnlyPlayScene();
+        //GC_FullCollect();
         PROFILE_CPU_END();
         PROFILE_CPU_BEGIN("Reset");
-        m_activeScene.load()->Reset();
+        activeScenePtr->Reset();
         PROFILE_CPU_END();
 		m_isEditorSceneLoaded = true;
     }
@@ -74,17 +78,20 @@ void SceneManager::Editor()
     {
         PROFILE_CPU_BEGIN("DeleteEditorOnlyPlayScene");
         DeleteEditorOnlyPlayScene();
+        //GC_FullCollect();
         PROFILE_CPU_END();
     }
 
     if (!m_isGameStart)
     {
+        auto activeScenePtr = m_activeScene.load();
+        if (!activeScenePtr) return;
         // Sweep DDOL bucket for destroyed objects
         std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
 		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
         ScriptManager->ReloadDynamicLibrary();
         m_isInitialized = false; // Reset initialization state for editor scene
-		m_activeScene.load()->Awake();
+        activeScenePtr->Awake();
 	}
     PROFILE_CPU_END();
 }
@@ -117,6 +124,8 @@ void SceneManager::Initialization()
         // The future is now invalid after .get(), so this block won't run again until a new scene is loaded.
     }
 
+    if (!m_activeScene) return;
+
     BeforeAwakeSceneLoad();
 
     PROFILE_CPU_BEGIN("Awake");
@@ -132,6 +141,7 @@ void SceneManager::Initialization()
 
 void SceneManager::Physics(float deltaSecond)
 {
+    if (!m_activeScene) return;
     PROFILE_CPU_BEGIN("FixedUpdate");
     m_activeScene.load()->FixedUpdate(deltaSecond);
     PROFILE_CPU_END();
@@ -146,6 +156,8 @@ void SceneManager::InputEvents(float deltaSecond)
 
 void SceneManager::GameLogic(float deltaSecond)
 {
+    if (!m_activeScene) return;
+
     PROFILE_CPU_BEGIN("Update");
     m_activeScene.load()->Update(deltaSecond);
     PROFILE_CPU_END();
@@ -191,11 +203,13 @@ void SceneManager::EndOfFrame()
 
 void SceneManager::Pausing()
 {
+    if (!m_activeScene) return;
     m_activeScene.load()->CullMeshData();
 }
 
 void SceneManager::DisableOrEnable()
 {
+    if (!m_activeScene) return;
     m_activeScene.load()->OnDisable();
     m_activeScene.load()->OnDestroy();
 }
@@ -235,7 +249,6 @@ void SceneManager::Decommissioning()
     m_activeScene = nullptr;
     m_activeSceneIndex = 0;
 
-
     for(auto& scene : m_scenes)
     {
         if (scene)
@@ -243,6 +256,8 @@ void SceneManager::Decommissioning()
             delete scene;
         }
 	}
+
+	//GC_Shutdown();
 }
 
 void SceneManager::SetDecommissioning()
@@ -737,7 +752,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
         }
 
-        resourceTrimEvent.Broadcast();
+        //resourceTrimEvent.Broadcast();
         m_activeScene = m_sceneToActivate.load();
         m_scenes.push_back(m_sceneToActivate);
         m_activeSceneIndex = m_scenes.size() - 1;

@@ -91,7 +91,7 @@ void LightMapPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV); //뎁스를 사용 안하면 라이트맵은 나오지만 사용 시 뒤에 객체가 보이고, 사용하면 라이트맵이 안나오고
 
-	camera.UpdateBuffer(deferredPtr);
+	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 
 	Animator* currentAnimator = nullptr;
