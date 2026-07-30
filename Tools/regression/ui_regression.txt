@@ -1,0 +1,51 @@
+# UI 회귀 시나리오 (PHASE 6-6)
+#
+# 목적: 캔버스·UI를 "에디터가 만들지 않는 순서"로 붙이고 재생/정지를 반복해도
+# 크래시가 없어야 한다. 6-0의 크래시 3건이 전부 이 부류였다.
+# 실행: Academy_4Q.exe --script Tools\regression\ui_regression.txt
+# 통과 기준: 종료 코드 0 + 로그에 UiTextProbe 전체 통과.
+
+wait 60
+model.load C:\Users\lance\OneDrive\Pictures\Gunner_F_Mythic.glb
+wait 90
+model.place Gunner_F_Mythic
+wait 30
+
+# 케이스 1: 캔버스 없이 UI 컴포넌트 먼저 (연결 실패 상태로 재생)
+component.add Root TextComponent
+wait 15
+component.add Root ImageComponent
+wait 15
+play
+wait 60
+stop
+wait 40
+
+# 케이스 2: 캔버스를 나중에 추가 (지연 연결이 이어 줘야 함)
+component.add Root Canvas
+wait 15
+script.add Root UiTextProbe
+wait 20
+play
+wait 120
+stop
+wait 40
+
+# 케이스 3: 빈 캔버스 단독 오브젝트 (6-0-② 재현 조건)
+component.add SK_Hero_GU_F_Mythic.001 Canvas
+wait 15
+play
+wait 60
+stop
+wait 40
+
+# 케이스 4: 재생/정지 반복 (씬 사본 왕복에서 등록 누적·유실 확인)
+play
+wait 40
+stop
+wait 30
+play
+wait 40
+stop
+wait 40
+quit

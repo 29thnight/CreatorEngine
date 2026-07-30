@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreatorEngine 자원 소유권 · 경계 설계 (Phase 2-0)</title>
+<style>
+  :root{--bg:#0f1218;--surface:#171c26;--surface2:#1e2532;--border:#2b3444;
+  --text:#dde3ec;--dim:#8b95a7;--accent:#4da3ff;--green:#7ee0b8;--warn:#f0b25c;
+  --err:#f07178;--purple:#c8a0ff;--code:#12161f}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI","Malgun Gothic",sans-serif;line-height:1.7;font-size:15px}
+  .container{max-width:1040px;margin:0 auto;padding:0 28px 80px}
+  header.hero{padding:56px 0 32px;border-bottom:1px solid var(--border);margin-bottom:40px}
+  .eyebrow{color:var(--accent);font-size:13px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+  h1{font-size:clamp(26px,4vw,38px);font-weight:800;line-height:1.25;margin-bottom:12px}
+  h1 span{color:var(--accent)}
+  .meta{color:var(--dim);font-size:14px}
+  .meta a{color:var(--green)}
+  section{margin-bottom:52px}
+  h2.sec{font-size:24px;font-weight:800;padding-bottom:10px;border-bottom:2px solid var(--accent);margin-bottom:20px;display:flex;align-items:baseline;gap:12px}
+  h2.sec .no{color:var(--accent);font-size:16px}
+  h3{font-size:18px;margin:26px 0 10px;color:var(--green)}
+  h4{font-size:15.5px;margin:20px 0 8px}
+  p{margin-bottom:12px}
+  strong{color:#fff}
+  ul,ol{margin:0 0 14px 22px}
+  li{margin-bottom:5px}
+  code{background:var(--code);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px;color:var(--green)}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;padding:18px 20px;overflow-x:auto;margin:14px 0 20px}
+  pre code{background:none;border:none;padding:0;color:var(--text);font-size:13px;line-height:1.6}
+  .cmt{color:var(--dim)} .kw{color:var(--purple)} .str{color:var(--green)}
+  table{width:100%;border-collapse:collapse;margin:14px 0 20px;font-size:13.5px}
+  th{background:var(--surface2);text-align:left;padding:10px 12px;border:1px solid var(--border);font-weight:700;white-space:nowrap}
+  td{padding:9px 12px;border:1px solid var(--border);vertical-align:top}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .tw{overflow-x:auto}
+  .callout{border-left:4px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;padding:14px 18px;margin:16px 0}
+  .callout.good{border-left-color:var(--green)}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout.risk{border-left-color:var(--err)}
+  .callout .t{font-weight:700;margin-bottom:4px}
+  .callout.good .t{color:var(--green)}
+  .callout.warn .t{color:var(--warn)}
+  .callout.risk .t{color:var(--err)}
+  .callout p:last-child{margin-bottom:0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+  .card h4{margin-top:0}
+  .badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:20px;margin-right:6px}
+  .b-rec{background:rgba(126,224,184,.13);color:var(--green);border:1px solid rgba(126,224,184,.4)}
+  .b-no{background:rgba(240,113,120,.12);color:var(--err);border:1px solid rgba(240,113,120,.4)}
+  .b-mid{background:rgba(240,178,92,.13);color:var(--warn);border:1px solid rgba(240,178,92,.4)}
+  footer{border-top:1px solid var(--border);padding-top:22px;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <div class="eyebrow">Phase 2-0 · Ownership &amp; Boundary Design</div>
+  <h1><span>자원 소유권</span> · 경계 설계</h1>
+  <div class="meta">
+    전제: 스크립트 계층을 CoreCLR로 전면 대체 ·
+    관련: <a href="RefactoringPlanDashboard.html">대시보드</a> ·
+    <a href="ScriptApiMigrationPlan.html">스크립트 API 설계</a> ·
+    <a href="EngineStructureAnalysis.html">구조 분석 12장</a>
+  </div>
+</header>
+
+<!-- ============================================ -->
+<section>
+  <h2 class="sec"><span class="no">01</span>결정 ① 핸들 타입 — 별도 테이블</h2>
+
+  <div class="callout good">
+    <div class="t">결정: 기존 HashedGuid는 그대로 두고, 런타임 전용 ObjectHandle을 새로 둔다</div>
+    <p>두 식별자는 역할이 다릅니다. 하나로 합치려는 시도가 오히려 문제를 만듭니다.</p>
+  </div>
+
+  <h3>1.1 왜 HashedGuid에 세대를 더하면 안 되는가</h3>
+  <p>처음에는 기존 <code>HashedGuid</code>에 세대 필드를 추가하는 안을 검토했으나, 코드를 확인한 결과 부적합합니다.</p>
+  <div class="tw"><table>
+    <tr><th style="width:150px">근거</th><th>내용</th></tr>
+    <tr><td>영속 식별자다</td><td><code>Object::m_instanceID</code>가 <code>[[Property]]</code>로 <strong>직렬화</strong>된다. 구조를 바꾸면 기존 씬·프리팹 파일과 호환이 깨진다.</td></tr>
+    <tr><td>개념이 다르다</td><td><code>HashedGuid</code>는 <code>make_guid()</code>로 만든 <strong>논리적 ID</strong>이고 맵 키로 쓰인다. 세대는 <strong>슬롯 재사용</strong>이라는 런타임 개념이라 층이 다르다.</td></tr>
+    <tr><td>암묵 변환 의존</td><td><code>operator size_t()</code>가 있어 엔진 전반이 정수처럼 쓰고 있다. 크기를 바꾸면 파급이 크다.</td></tr>
+  </table></div>
+
+  <h3>1.2 역할 분리</h3>
+  <div class="tw"><table>
+    <tr><th style="width:150px">타입</th><th>수명</th><th>용도</th></tr>
+    <tr><td><code>FileGuid</code></td><td>영구 (파일)</td><td>에셋 식별. 기존 그대로.</td></tr>
+    <tr><td><code>HashedGuid</code></td><td>영속 (씬 파일)</td><td>오브젝트 논리 ID. 직렬화·맵 키. <strong>기존 그대로.</strong></td></tr>
+    <tr><td><code>ObjectHandle</code></td><td>런타임 (프로세스)</td><td><strong>신규.</strong> 경계를 넘는 유일한 참조 형태. 세대로 무효화 감지.</td></tr>
+  </table></div>
+
+  <h3>1.3 형태</h3>
+<pre><code><span class="kw">struct</span> ObjectHandle
+{
+    uint32_t index;       <span class="cmt">// 슬롯 인덱스 → O(1) 조회</span>
+    uint32_t generation;  <span class="cmt">// 슬롯 재사용 시 증가. 0 = 무효</span>
+};
+<span class="kw">static_assert</span>(<span class="kw">sizeof</span>(ObjectHandle) == 8);  <span class="cmt">// 경계 ABI 고정</span></code></pre>
+  <p>C# 쪽에는 동일 레이아웃의 <code>readonly struct</code>로 대응합니다. blittable이라 마샬링 비용이 없습니다.</p>
+
+  <h3>1.4 프로토타입 검증 결과</h3>
+  <p>구현 후 <strong>17개 항목 전부 통과</strong>했습니다. 특히 Phase 1에서 고쳤던 UAF 패턴이 구조적으로 차단되는지 확인했습니다.</p>
+  <div class="tw"><table>
+    <tr><th style="width:52px">결과</th><th>검증 항목</th></tr>
+    <tr><td><span class="badge b-rec">PASS</span></td><td>해제된 객체의 낡은 핸들 → <code>nullptr</code> (12.3-② 본 팔레트 UAF 패턴 차단)</td></tr>
+    <tr><td><span class="badge b-rec">PASS</span></td><td>슬롯 재사용 시 세대 증가 → 낡은 핸들이 <strong>새 객체를 가리키지 않음</strong></td></tr>
+    <tr><td><span class="badge b-rec">PASS</span></td><td>범위 밖 인덱스·세대 불일치·기본 생성 핸들 모두 안전하게 거부</td></tr>
+    <tr><td><span class="badge b-rec">PASS</span></td><td>10,000회 생성/파괴 후 슬롯 수 <strong>1개</strong> (프리리스트 재사용, 누수 없음)</td></tr>
+    <tr><td><span class="badge b-rec">PASS</span></td><td>8바이트 고정 · trivially copyable</td></tr>
+  </table></div>
+  <div class="callout good">
+    <div class="t">의미</div>
+    <p>Phase 1에서 <em>사후 수정</em>으로 잡았던 UAF를, 이 모델에서는 <strong>애초에 만들 수 없습니다</strong>.
+    해제된 참조에 접근하면 크래시 대신 <code>nullptr</code>이 돌아옵니다.</p>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2 class="sec"><span class="no">02</span>결정 ② 소유권 단일 진실 공급원</h2>
+
+  <p>현재 문제는 "누가 소유자인지"가 코드로 강제되지 않는다는 점입니다.
+  <code>DataSystem</code>의 <code>shared_ptr</code> 맵이 사실상 유일 소유자인데, 사용처는 전부 원시 별칭이라
+  맵에서 지우는 순간 전부 댕글링이 됩니다(12.2 보충 분석).</p>
+
+  <h3>2.1 계층 규칙</h3>
+  <div class="tw"><table>
+    <tr><th style="width:130px">계층</th><th>보유 형태</th><th>규칙</th></tr>
+    <tr><td><strong>DataSystem</strong></td><td><code>shared_ptr&lt;T&gt;</code></td><td><strong>유일한 소유자.</strong> 에셋의 생성·파괴는 여기서만 일어난다.</td></tr>
+    <tr><td>컴포넌트 · Model</td><td><code>shared_ptr&lt;T&gt;</code> (공동 소유)</td><td>사용하는 동안 수명을 보장받는다. 언로드가 즉시 파괴로 이어지지 않는다.</td></tr>
+    <tr><td>렌더 프록시</td><td><code>shared_ptr&lt;T&gt;</code> (공동 소유)</td><td>렌더 스레드가 쓰는 동안 안전. 지연 파괴로 자연 처리.</td></tr>
+    <tr><td><strong>경계 (C#)</strong></td><td><code>ObjectHandle</code> (비소유)</td><td>절대 소유하지 않는다. 유효성은 세대로 판단.</td></tr>
+  </table></div>
+
+  <div class="callout warn">
+    <div class="t">경계는 반드시 비소유여야 한다</div>
+    <p>관리 코드가 네이티브 객체를 <em>소유</em>하면 <code>shared_ptr</code> 순환과 GC 순환이 경계를 넘어 얽힙니다.
+    <strong>어느 쪽도 풀 수 없는 영구 누수</strong>가 되므로, 경계는 항상 비소유 참조(핸들)로 고정합니다.</p>
+  </div>
+
+  <h3>2.2 UnloadUnusedAssets 활성화 조건</h3>
+  <p>12.2-①에서 확인했듯 현재 이 함수는 호출되지 않는 게 아니라 <strong>호출하면 안 되는</strong> 상태입니다.
+  아래가 모두 갖춰진 뒤에야 켤 수 있습니다.</p>
+  <ol>
+    <li>컴포넌트·Model·프록시가 <code>shared_ptr</code> 공동 소유로 전환 (2-2 ~ 2-4)</li>
+    <li>런타임 클론(<code>Material::Instantiate</code>)이 retain 대상에 포함 (2-5)</li>
+    <li><code>ManagedAssetType</code>에 UITexture/SpriteSheet 추가 (2-7)</li>
+    <li>그 후 씬 전환부에서 활성화 (2-8)</li>
+  </ol>
+  <p>순서를 지키지 않으면 "누수 크래시"가 "UAF 크래시"로 바뀔 뿐입니다.</p>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2 class="sec"><span class="no">03</span>결정 ③ 평면 C ABI 형태</h2>
+
+  <p>P/Invoke는 C++ 객체를 넘길 수 없습니다. 경계는 <strong>핸들 + 자유 함수</strong>로만 구성합니다.</p>
+
+<pre><code><span class="cmt">// 네이티브가 export 하는 엔진 API (예시)</span>
+<span class="kw">extern</span> <span class="str">"C"</span> {
+    <span class="cmt">// 조회 — 실패는 예외가 아니라 반환값으로</span>
+    <span class="kw">int</span>  Engine_IsAlive(ObjectHandle h);
+    <span class="kw">int</span>  Engine_GetTransform(ObjectHandle h, Vector3* outPos, Quaternion* outRot, Vector3* outScale);
+
+    <span class="cmt">// 변경</span>
+    <span class="kw">int</span>  Engine_SetPosition(ObjectHandle h, Vector3 pos);
+
+    <span class="cmt">// 문자열은 UTF-8 바이트 + 길이 (string 직접 전달 금지)</span>
+    <span class="kw">int</span>  Engine_FindByName(<span class="kw">const char</span>* utf8, <span class="kw">int</span> len, ObjectHandle* out);
+}</code></pre>
+
+  <div class="two">
+    <div class="card">
+      <h4>규칙</h4>
+      <ul>
+        <li>반환은 <strong>오류 코드</strong>(0=성공). 예외를 경계로 넘기지 않는다.</li>
+        <li>출력은 포인터 인자로. 반환값은 상태 전용.</li>
+        <li>모든 인자는 blittable.</li>
+        <li>함수 이름은 <code>Engine_</code> 접두사로 통일.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>이득 (CoreCLR과 무관하게)</h4>
+      <ul>
+        <li>모듈 간 커플링이 자연히 줄어든다 (Phase 4 선취)</li>
+        <li>JIT/AOT 두 모드가 <strong>같은 바인딩</strong>을 공유</li>
+        <li>테스트가 쉬워진다 (평면 함수라 목킹 용이)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2 class="sec"><span class="no">04</span>결정 ④ 스레드 규칙</h2>
+
+  <div class="callout risk">
+    <div class="t">관리 코드는 게임 스레드에서만 호출한다</div>
+    <p>CoreCLR GC는 수집 시 스레드를 정지시킵니다. 렌더 스레드나 스레드풀 워커가 관리 코드를 호출하면
+    <strong>프레임이 GC에 묶입니다</strong>. 현재 엔진은 프록시 커맨드 큐로 게임/렌더 스레드를 분리해 두었으므로,
+    그 경계를 그대로 활용합니다.</p>
+  </div>
+
+  <div class="tw"><table>
+    <tr><th style="width:150px">스레드</th><th>관리 코드 호출</th><th>비고</th></tr>
+    <tr><td>게임(메인) 스레드</td><td><span class="badge b-rec">허용</span></td><td>모든 스크립트 진입점이 여기서만 실행된다.</td></tr>
+    <tr><td>렌더 스레드</td><td><span class="badge b-no">금지</span></td><td>프록시 커맨드 큐로만 통신. 관리 객체를 만지지 않는다.</td></tr>
+    <tr><td>스레드풀 워커</td><td><span class="badge b-no">금지</span></td><td>에셋 로딩 등. 완료 통지는 게임 스레드에서 처리.</td></tr>
+    <tr><td>물리 콜백</td><td><span class="badge b-mid">큐 경유</span></td><td>PhysX 콜백에서 직접 부르지 않고, 큐에 모아 틱 경계에서 일괄 디스패치.</td></tr>
+  </table></div>
+
+  <p><code>async</code>/<code>await</code>를 쓰려면 <strong>커스텀 <code>SynchronizationContext</code></strong>가 필수입니다.
+  기본 컨텍스트는 스레드풀이라 continuation이 워커로 넘어가 위 규칙을 조용히 위반합니다.</p>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2 class="sec"><span class="no">05</span>결정 ⑤ 네이밍 정리</h2>
+
+  <div class="callout warn">
+    <div class="t">Managed:: 는 .NET 문맥에서 심각한 혼동을 부른다</div>
+    <p>현재 <code>Managed::HeapObject</code>, <code>Managed::SharedPtr</code>는 <strong>mimalloc 기반 커스텀 힙</strong>을 뜻합니다.
+    그런데 .NET에서 "managed"는 <strong>GC 힙</strong>을 의미합니다. CoreCLR이 들어오면
+    "이 객체는 managed인가?"라는 질문에 두 가지 답이 생깁니다.</p>
+  </div>
+
+  <div class="tw"><table>
+    <tr><th style="width:200px">현재</th><th style="width:200px">제안</th><th>이유</th></tr>
+    <tr><td><code>Managed::HeapObject</code></td><td><code>Mem::PooledObject</code></td><td>실제 의미(커스텀 힙 할당)를 그대로 드러낸다.</td></tr>
+    <tr><td><code>Managed::SharedPtr</code></td><td><code>Mem::SharedPtr</code></td><td>동일.</td></tr>
+    <tr><td><code>ManagedHeap.dll</code></td><td><code>MemoryCore.dll</code></td><td>DLL 이름도 함께. 다만 파급이 크므로 <strong>후순위</strong>.</td></tr>
+    <tr><td>(신규)</td><td><code>Clr::</code></td><td>.NET 관련 코드는 이 네임스페이스로 모아 구분을 명확히.</td></tr>
+  </table></div>
+  <p style="color:var(--dim);font-size:13.5px">네임스페이스 치환은 기계적이라 리스크가 낮지만, DLL 이름 변경은 빌드 스크립트·배포 경로에 파급이 있습니다.
+  Phase 2 본작업과 분리해 <strong>Phase 5(코드 정리)에서 일괄 처리</strong>하길 권합니다.</p>
+</section>
+
+<!-- ============================================ -->
+<section>
+  <h2 class="sec"><span class="no">06</span>착수 순서</h2>
+
+  <p>이 문서의 결정을 전제로 Phase 2 후속 항목의 목표가 확정됩니다.</p>
+  <div class="tw"><table>
+    <tr><th style="width:60px">항목</th><th>작업</th><th>이 문서와의 연결</th></tr>
+    <tr><td>2-1</td><td>내부 소유 구조 설계 문서</td><td>02절 계층 규칙을 코드 수준으로 구체화</td></tr>
+    <tr><td>2-2</td><td>Model 내부 소유권 전환</td><td><code>vector&lt;Mesh*&gt;</code> → <code>shared_ptr</code> 컨테이너</td></tr>
+    <tr><td>2-3</td><td>컴포넌트 에셋 참조 전환</td><td>MeshRenderer 우선, 이후 순차 확대</td></tr>
+    <tr><td>2-4</td><td>렌더 프록시 참조 전환</td><td>Phase 1의 본 팔레트 전환과 동일 패턴</td></tr>
+    <tr><td>2-5</td><td>Instantiate 클론 수명</td><td>retain 대상 포함 또는 씬 바인딩</td></tr>
+    <tr><td>2-8</td><td>UnloadUnusedAssets 활성화</td><td><strong>2-2~2-7 완료 후에만</strong> (02.2절)</td></tr>
+    <tr><td>2-10</td><td>스크립트 API 이전</td><td>01절 핸들 + 03절 ABI 위에 구축</td></tr>
+  </table></div>
+
+  <div class="callout good">
+    <div class="t">핸들 테이블은 지금 도입해도 이득이다</div>
+    <p>CoreCLR 편입 전이라도, 프록시가 컴포넌트를 참조하는 지점에 핸들을 쓰면
+    12.3의 댕글링 부류가 구조적으로 사라집니다. <strong>경계 준비와 안정화가 같은 작업</strong>이 되는 셈입니다.</p>
+  </div>
+</section>
+
+<footer>
+  Phase 2-0 산출물. 핸들 프로토타입은 17개 검증 항목을 통과했으며, 구현 시 이 문서의 형태를 기준으로 삼습니다.
+  후속 항목(2-1 이후)은 여기서 확정한 소유권 계층과 경계 규칙을 전제로 진행합니다.
+</footer>
+
+</div>
+</body>
+</html>

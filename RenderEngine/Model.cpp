@@ -20,11 +20,8 @@ Model::Model()
 
 Model::~Model()
 {
-	for (auto& mesh : m_Meshes)
-	{
-		//delete mesh;
-        delete mesh;
-	}
+	// Mesh/Material/Texture는 shared_ptr가 관리하므로 수동 해제하지 않는다.
+	// 다른 곳(컴포넌트·프록시)이 아직 참조 중이면 그쪽 수명이 끝날 때 해제된다.
 
 	for (auto& node : m_nodes)
 	{
@@ -236,21 +233,23 @@ Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
 	}
 }
 
-Mesh* Model::GetMesh(std::string_view name)
+// ── 소유권을 공유하는 조회 ──
+// 참조를 보관하는 쪽(컴포넌트·프록시)은 이쪽을 써야 에셋 언로드에 안전하다.
+
+std::shared_ptr<Mesh> Model::GetMeshShared(std::string_view name)
 {
 	std::string meshName = name.data();
 	for (auto& mesh : m_Meshes)
 	{
-		if (mesh->GetName() == meshName)
+		if (mesh && mesh->GetName() == meshName)
 		{
 			return mesh;
 		}
 	}
-
 	return nullptr;
 }
 
-Mesh* Model::GetMesh(int index)
+std::shared_ptr<Mesh> Model::GetMeshShared(int index)
 {
 	if (index < 0 || index >= m_Meshes.size())
 	{
@@ -259,19 +258,20 @@ Mesh* Model::GetMesh(int index)
 	return m_Meshes[index];
 }
 
-Material* Model::GetMaterial(std::string_view name)
+std::shared_ptr<Material> Model::GetMaterialShared(std::string_view name)
 {
 	std::string materialName = name.data();
 	for (auto& material : m_Materials)
 	{
-		if (material->m_name == materialName)
+		if (material && material->m_name == materialName)
 		{
 			return material;
 		}
 	}
+	return nullptr;
 }
 
-Material* Model::GetMaterial(int index)
+std::shared_ptr<Material> Model::GetMaterialShared(int index)
 {
 	if (index < 0 || index >= m_Materials.size())
 	{
@@ -280,25 +280,54 @@ Material* Model::GetMaterial(int index)
 	return m_Materials[index];
 }
 
-Texture* Model::GetTexture(std::string_view name)
-{
-	std::string textureName = name.data();
-	for (auto& texture : m_Textures)
-	{
-		if (texture->m_name == textureName)
-		{
-			return texture;
-		}
-	}
-}
-
-Texture* Model::GetTexture(int index)
+std::shared_ptr<Texture> Model::GetTextureShared(int index)
 {
 	if (index < 0 || index >= m_Textures.size())
 	{
 		return nullptr;
 	}
 	return m_Textures[index];
+}
+
+// ── 원시 포인터 조회 (기존 호출부 호환) ──
+// Model이 살아 있는 동안에만 유효하다.
+
+Mesh* Model::GetMesh(std::string_view name)
+{
+	return GetMeshShared(name).get();
+}
+
+Mesh* Model::GetMesh(int index)
+{
+	return GetMeshShared(index).get();
+}
+
+Material* Model::GetMaterial(std::string_view name)
+{
+	return GetMaterialShared(name).get();
+}
+
+Material* Model::GetMaterial(int index)
+{
+	return GetMaterialShared(index).get();
+}
+
+Texture* Model::GetTexture(std::string_view name)
+{
+	std::string textureName = name.data();
+	for (auto& texture : m_Textures)
+	{
+		if (texture && texture->m_name == textureName)
+		{
+			return texture.get();
+		}
+	}
+	return nullptr;
+}
+
+Texture* Model::GetTexture(int index)
+{
+	return GetTextureShared(index).get();
 }
 
 Model* Model::LoadModelToScene(Model* model, Scene& Scene)

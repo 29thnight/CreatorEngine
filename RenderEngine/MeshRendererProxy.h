@@ -89,11 +89,17 @@ public:
 
 public:
 	//meshRenderer type
-	Material*						m_Material{ nullptr };
-	Mesh*							m_Mesh{ nullptr };
+	// 렌더 스레드가 사용하는 동안 에셋 수명을 보장한다(12.3-⑦).
+	// 컴포넌트에서 스냅샷할 때 shared_ptr을 그대로 복사하므로,
+	// 원본이 파괴되거나 언로드되어도 이 프록시가 그리는 중에는 안전하다.
+	std::shared_ptr<Material>		m_Material{};
+	std::shared_ptr<Mesh>			m_Mesh{};
 	HashedGuid						m_animatorGuid{};
 	HashedGuid						m_materialGuid{};
-	Mathf::xMatrix*					m_finalTransforms{};
+	// 본 팔레트 버퍼(소유권 공유).
+	// RenderScene::AnimationPalette와 같은 버퍼를 가리키며, 애니메이터가 해제되어도
+	// 이 프록시가 참조하는 동안에는 버퍼가 살아 있다.
+	std::shared_ptr<Mathf::xMatrix[]>	m_finalTransforms{};
 	LightMapping					m_LightMapping;
 	uint32							m_currLOD{ 0 };
 	uint32							m_bitflag{ 0 };

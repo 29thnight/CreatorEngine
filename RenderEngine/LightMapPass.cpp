@@ -89,7 +89,7 @@ void LightMapPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 	//DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::White);
 	DirectX11::ClearDepthStencilView(deferredPtr, renderData->m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV); //µª½º¸¦ »ç¿ë ¾ÈÇÏ¸é ¶óÀÌÆ®¸ÊÀº ³ª¿ÀÁö¸¸ »ç¿ë ½Ã µÚ¿¡ °´Ã¼°¡ º¸ÀÌ°í, »ç¿ëÇÏ¸é ¶óÀÌÆ®¸ÊÀÌ ¾È³ª¿À°í
+	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV); //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ú¿ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½Ì°ï¿½, ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½È³ï¿½ï¿½ï¿½ï¿½ï¿½
 
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
@@ -120,11 +120,11 @@ void LightMapPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 			}
 		}
 
-		Material* mat = renderer->m_Material;
+		Material* mat = renderer->m_Material.get();
 		DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
 		DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 
-		if (renderer->m_LightMapping.lightmapIndex >= 0) // ¶Ç´Â ¶óÀÌÆ®¸ÊÀÌ »ý¼ºµÇ°í ÀÖ´Ù¸é Ãë¼ÒÇÏ´Â ¹æ½ÄÀ¸·Î
+		if (renderer->m_LightMapping.lightmapIndex >= 0) // ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ ï¿½Ö´Ù¸ï¿½ ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		{
 			if (m_plightmaps != nullptr && (*m_plightmaps).size() > renderer->m_LightMapping.lightmapIndex)
 				DirectX11::PSSetShaderResources(deferredPtr, 14, 1, &(*m_plightmaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);

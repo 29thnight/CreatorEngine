@@ -16,6 +16,9 @@ public:
 	void OnDestroy() override;
 
 	void AddUIObject(std::shared_ptr<GameObject> obj);
+
+	// UI 컴포넌트가 파괴될 때 자기 오브젝트를 이 캔버스 목록에서 뺀다.
+	void RemoveUIObject(GameObject* obj);
 	virtual void Update(float tick) override;
 	void SetCanvasOrder(int order) { CanvasOrder = order; }
 	int GetCanvasOrder() const { return CanvasOrder; }
@@ -32,4 +35,5 @@ public:
 	std::string CanvasName = "Canvas";
 	std::string prevCanvasName{};
 };
+
 

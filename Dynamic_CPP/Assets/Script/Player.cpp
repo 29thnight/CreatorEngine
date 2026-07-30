@@ -2009,7 +2009,7 @@ void Player::InstantiateWeaponMaterial(GameObject* g)
 {
 	auto mesh = g->GetComponentsInChildren<MeshRenderer>();
 	for (auto& m : mesh) {
-		m->m_Material = m->m_Material->Instantiate(m->m_Material, "cloneWeapon");
+		m->m_Material = Material::InstantiateShared(m->m_Material.get(), "cloneWeapon");
 	}
 }
 

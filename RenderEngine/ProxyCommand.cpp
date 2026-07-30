@@ -27,7 +27,9 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	bool isShadowRecive				= pComponent->m_shadowRecive;
 	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
-	Material* originMat				= pComponent->m_Material;
+	// 람다로 값 캡처되어 렌더 스레드까지 전달되므로 shared_ptr을 유지한다.
+	// 전달 도중 원본이 교체·해제되어도 이 커맨드가 참조하는 머티리얼은 살아 있다.
+	auto originMat					= pComponent->m_Material;
 
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 
@@ -40,14 +42,23 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		return;
 	}
 
+	// 이 생성자는 Scene::CullMeshData가 스레드풀로 병렬 실행한다.
+	// RenderScene의 Register/Unregister 경로와 같은 락을 잡지 않으면
+	// unordered_map 리해시와 겹쳐 힙이 손상된다.
+	SpinLock lock(renderScene->m_proxyMapFlag);
+
 	auto& proxyObject				= renderScene->m_proxyMap[m_proxyGUID];
+	if (!proxyObject) return;
+
 	HashedGuid aniGuid				= proxyObject->m_animatorGuid;
 	HashedGuid matGuid				= proxyObject->m_materialGuid;
 	HashedGuid originMatGuid		= pComponent->m_Material->m_materialGuid;
 	bool isEnableLOD				= pComponent->m_isEnableLOD;
 	uint32 bitflag					= pComponent->m_bitflag;
 
-	Mathf::xMatrix* palletePtr{ nullptr };
+	// 람다에 값으로 캡처되어 렌더 스레드까지 전달된다.
+	// shared_ptr이므로 캡처된 동안 버퍼 수명이 보장된다.
+	std::shared_ptr<Mathf::xMatrix[]> palletePtr{};
 	bool isAnimationUpdate{ false };
 	bool isMatChange{ false };
 
@@ -69,7 +80,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		{
 			auto* srcPalete = &renderScene->m_animatorMap[aniGuid]->m_FinalTransforms;
 
-			memcpy(palletePtr, srcPalete, TRANSFORM_SIZE);
+			memcpy(palletePtr.get(), srcPalete, TRANSFORM_SIZE);
 		}
 
 		renderScene->m_palleteMap[aniGuid].first = true;
@@ -133,6 +144,9 @@ ProxyCommand::ProxyCommand(SpriteRenderer* pComponent)
     BillboardType billboardType = componentPtr->GetBillboardType();
     auto billboardAxis = componentPtr->GetBillboardAxis();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
+	SpinLock lock(renderScene->m_proxyMapFlag);
+
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
 	Texture* originTexture = pComponent->GetSprite().get();
@@ -179,8 +193,10 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 	auto terrainMesh = pComponent->GetMesh();
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 
+	SpinLock lock(renderScene->m_proxyMapFlag);
+
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
 
 	m_updateFunction = [=]()
@@ -199,6 +215,9 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+
+	SpinLock lock(renderScene->m_proxyMapFlag);
+
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
 
@@ -229,8 +248,10 @@ ProxyCommand::ProxyCommand(DecalComponent* pComponent):
 	auto owner = pComponent->GetOwner();
 	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 
+	SpinLock lock(renderScene->m_proxyMapFlag);
+
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	if (!proxyObject) return;
 
 	Texture* diffuse = pComponent->GetDecalTexture();
@@ -268,11 +289,11 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* pComponent) :
 	auto origin			= DirectX::XMFLOAT2{ pComponent->uiinfo.size.x * 0.5f, pComponent->uiinfo.size.y * 0.5f };
 	auto position		= pComponent->pos;
 	auto scale			= pComponent->scale;
+	// 캔버스가 아직 연결되지 않았거나 먼저 파괴됐으면 널이다.
+	// 지연 연결(6-3) 도입으로 "연결 전 한두 프레임"이 정상 상태가 됐다 —
+	// UIRenderProxy의 같은 자리는 원래부터 널을 걸렀는데 여기만 빠져 있었다.
 	auto* canvas = pComponent->GetOwnerCanvas();
-	int canvasOrder{};
-	{
-		canvasOrder = canvas->GetCanvasOrder();
-	}
+	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
 	int layerOrder		= pComponent->GetLayerOrder();
 	float frameDuration = pComponent->m_frameDuration;
 	auto cpuBuffer		= pComponent->GetCustomPixelCPUBuffer();
@@ -355,11 +376,11 @@ ProxyCommand::ProxyCommand(ImageComponent* pComponent)
 	auto position	= pComponent->pos;
 	auto scale		= pComponent->scale;
 	float rotation	= pComponent->rotate;
+	// 캔버스가 아직 연결되지 않았거나 먼저 파괴됐으면 널이다.
+	// 지연 연결(6-3) 도입으로 "연결 전 한두 프레임"이 정상 상태가 됐다 —
+	// UIRenderProxy의 같은 자리는 원래부터 널을 걸렀는데 여기만 빠져 있었다.
 	auto* canvas = pComponent->GetOwnerCanvas();
-	int canvasOrder{};
-	{
-		canvasOrder = canvas->GetCanvasOrder();
-	}
+	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
 	int layerOrder	= pComponent->GetLayerOrder();
 	auto clipDirection = pComponent->clipDirection;
 	auto clipPercent   = pComponent->clipPercent;
@@ -422,11 +443,11 @@ ProxyCommand::ProxyCommand(TextComponent* pComponent)
     auto color = pComponent->color;
     auto position = pComponent->pos;
     float fontSize = pComponent->fontSize;
+	// 캔버스가 아직 연결되지 않았거나 먼저 파괴됐으면 널이다.
+	// 지연 연결(6-3) 도입으로 "연결 전 한두 프레임"이 정상 상태가 됐다 —
+	// UIRenderProxy의 같은 자리는 원래부터 널을 걸렀는데 여기만 빠져 있었다.
 	auto* canvas = pComponent->GetOwnerCanvas();
-	int canvasOrder{};
-	{
-		canvasOrder = canvas->GetCanvasOrder();
-	}
+	const int canvasOrder = (nullptr != canvas) ? canvas->GetCanvasOrder() : 0;
     int layerOrder = pComponent->GetLayerOrder();
     auto maxSize = pComponent->stretchSize;
     bool stretchX = pComponent->isStretchX;
@@ -493,3 +514,4 @@ void ProxyCommand::ProxyCommandExecute()
 
 	m_updateFunction = nullptr;
 }
+

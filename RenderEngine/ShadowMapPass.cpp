@@ -307,7 +307,7 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* deferred
 		{
 			if (animatorGuid != currentAnimatorGuid && PrimitiveRenderProxy->m_finalTransforms)
 			{
-				DirectX11::UpdateBuffer(deferredContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				DirectX11::UpdateBuffer(deferredContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms.get());
 				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
@@ -323,7 +323,7 @@ void ShadowMapPass::CreateTerrainRenderCommandList(ID3D11DeviceContext* deferred
 	auto renderData = RenderPassData::GetData(&camera);
 
 	for (auto& terrainProxy : renderData->m_terrainQueue) {
-		//UnsafeÇÑ ¹æ¹ı
+		//Unsafeï¿½ï¿½ ï¿½ï¿½ï¿½
 		if (!terrainProxy || (int)terrainProxy->m_proxyType != (int)PrimitiveProxyType::TerrainComponent) continue;
 
 		auto terrainMesh = terrainProxy->m_terrainMesh;

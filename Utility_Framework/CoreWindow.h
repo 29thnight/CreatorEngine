@@ -23,7 +23,10 @@ public:
         s_instance = this;
         RegisterWindowClass();
         CreateAppWindow(title);
-        SetUnhandledExceptionFilter(ErrorDumpHandeler);
+
+        // 크래시 후크는 여기서 걸지 않는다 — LogSystem::InstallCrashGuards가 이미
+        // 전부 걸어 두었고, 여기서 또 걸면 설치 순서 싸움이 된다.
+        // 덤프 기록자 등록은 SetDumpType에서 한다.
     }
 
     ~CoreWindow()
@@ -79,21 +82,48 @@ public:
         }
     }
 
-    static LONG WINAPI ErrorDumpHandeler(EXCEPTION_POINTERS* pExceptionPointers)
+    /// 크래시 덤프를 남긴다. Log가 크래시 경로에서 1회만 불러 준다.
+    ///
+    /// 예전에는 여기가 SEH 필터를 직접 걸었는데, LogSystem::InstallCrashGuards가
+    /// 같은 후크를 이미 걸고 있어 설치 순서에 따라 서로를 덮어썼다. 그래서
+    /// 어떤 크래시는 덤프가 남고 어떤 크래시는 아무것도 남지 않았다.
+    /// 이제 후크 설치는 LogSystem 한 곳이 맡고, 여기는 기록만 한다.
+    static void WriteCrashDump(void* exceptionPointers, const char* reason)
     {
-        int msgResult = MessageBox(NULL, L"Should Create Dump ?", L"Exception", MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
-
-        if (msgResult == IDYES)
+        // 무인 모드(--script/--exec로 돌린 CLI·CI)에서는 물어보지 않고 바로 남긴다.
+        // 대화상자를 띄우면 아무도 답하지 않아 그대로 멈춰 있다가 덤프 없이 죽는다.
+        if (!g_unattended)
         {
-            CreateDump(pExceptionPointers, g_dumpType, s_instance->m_hWnd);
+            const int answer = MessageBox(NULL, L"Should Create Dump ?", L"Exception",
+                MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
+            if (IDYES != answer) return;
         }
 
-        return msgResult;
+        auto* pointers = static_cast<EXCEPTION_POINTERS*>(exceptionPointers);
+        HWND window = s_instance ? s_instance->m_hWnd : nullptr;
+
+        // SEH 경로는 예외 컨텍스트가 있어 정확한 크래시 지점을 뜰 수 있다.
+        // 나머지(abort·terminate 등)는 지금 이 자리의 스택으로 대신한다.
+        const std::string report = (nullptr != pointers)
+            ? BuildCrashReport(pointers)
+            : BuildAbnormalExitReport(reason, nullptr);
+
+        WriteDumpArtifacts(pointers, report, g_dumpType, window);
     }
+
+    /// 무인 실행 여부. CLI가 --script/--exec를 받았을 때 켠다.
+    static void SetUnattended(bool unattended) { g_unattended = unattended; }
+
+    static bool IsUnattended() { return g_unattended; }
 
     static void SetDumpType(DUMP_TYPE dumpType)
     {
         g_dumpType = dumpType;
+
+        // 덤프 종류가 정해지는 유일한 지점이라 여기서 기록자를 등록한다.
+        // 후크 자체는 LogSystem이 걸어 두었고, 크래시 경로 전부(SEH·terminate·abort·
+        // purecall·CRT 잘못된 인자)가 이 콜백으로 모인다.
+        Log::SetCrashDumpWriter(&CoreWindow::WriteCrashDump);
     }
 
     HWND GetHandle() const { return m_hWnd; }
@@ -115,6 +145,7 @@ public:
 private:
     static CoreWindow* s_instance;
     static DUMP_TYPE g_dumpType;
+    static inline bool g_unattended{ false };
     HINSTANCE m_hInstance = nullptr;
     HWND m_hWnd = nullptr;
     int m_width = 800;

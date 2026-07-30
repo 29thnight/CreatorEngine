@@ -328,8 +328,8 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 				)
 			);
 
-			metadata = compressedImage.GetMetadata(); // ¸ÞÅ¸µ¥ÀÌÅÍ °»½Å
-			image = std::move(compressedImage); // ¾ÐÃàµÈ ÀÌ¹ÌÁö·Î ±³Ã¼
+			metadata = compressedImage.GetMetadata(); // ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+			image = std::move(compressedImage); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼
 		}
 	}
 
@@ -440,8 +440,8 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 				)
 			);
 
-			metadata = compressedImage.GetMetadata(); // ¸ÞÅ¸µ¥ÀÌÅÍ °»½Å
-			image = std::move(compressedImage); // ¾ÐÃàµÈ ÀÌ¹ÌÁö·Î ±³Ã¼
+			metadata = compressedImage.GetMetadata(); // ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+			image = std::move(compressedImage); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼
 		}
 	}
 
@@ -468,6 +468,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 
 	return texture;
 }
+
 
 Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
@@ -558,8 +559,8 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 				)
 			);
 
-			metadata = compressedImage.GetMetadata(); // ¸ÞÅ¸µ¥ÀÌÅÍ °»½Å
-			image = std::move(compressedImage); // ¾ÐÃàµÈ ÀÌ¹ÌÁö·Î ±³Ã¼
+			metadata = compressedImage.GetMetadata(); // ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+			image = std::move(compressedImage); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼
 		}
 	}
 
@@ -850,7 +851,7 @@ void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
 		Resize2DViews(width, height);
 		break;
 	case TextureType::TextureCube:
-		ResizeCubeViews(width); // Å¥ºê´Â width = height
+		ResizeCubeViews(width); // Å¥ï¿½ï¿½ï¿½ width = height
 		break;
 	case TextureType::TextureArray:
 		ResizeArrayViews(width, height);

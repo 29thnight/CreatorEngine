@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- 클래스 라이브러리는 기본적으로 runtimeconfig.json을 만들지 않는다.
+         호스트(hostfxr)가 런타임 버전을 결정할 때 이 파일이 반드시 필요하다. -->
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+
+    <!-- 엔진 실행 파일 옆에 바로 떨어뜨려 호스트가 찾기 쉽게 한다. -->
+    <OutputPath>$(MSBuildThisFileDirectory)..\x64\$(Configuration)\Managed\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!-- 06절 AOT 대응: 지금부터 트리밍 경고를 보이게 해두면 나중에 몰아서 고칠 일이 없다. -->
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 소스 제너레이터로 참조한다(런타임 의존성이 아니라 컴파일 타임 도구).
+         [SerializeField] 접근자와 ScriptFactory 등록 코드를 여기서 만들어 낸다. -->
+    <ProjectReference Include="..\ScriptCore.Generators\ScriptCore.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

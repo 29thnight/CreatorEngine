@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreatorEngine 대규모 리팩토링 계획 &amp; 진행률 대시보드</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --surface: #171c26;
+    --surface-2: #1e2532;
+    --border: #2b3444;
+    --text: #dde3ec;
+    --text-dim: #8b95a7;
+    --accent: #4da3ff;
+    --accent-2: #7ee0b8;
+    --warn: #f0b25c;
+    --danger: #f07178;
+    --purple: #c8a0ff;
+    --code-bg: #12161f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    line-height: 1.65;
+    font-size: 15px;
+  }
+  .container { max-width: 1140px; margin: 0 auto; padding: 0 28px 80px; }
+
+  header.hero { padding: 52px 0 30px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+  .hero .eyebrow { color: var(--accent); font-size: 13px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; }
+  .hero h1 { font-size: clamp(26px, 4vw, 40px); font-weight: 800; line-height: 1.25; margin-bottom: 12px; }
+  .hero h1 span { color: var(--accent); }
+  .hero .meta { color: var(--text-dim); font-size: 14px; }
+  .hero .meta a { color: var(--accent-2); }
+
+  /* ===== 전체 진행률 ===== */
+  .overall {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 28px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px 30px;
+    margin: 28px 0 12px;
+  }
+  @media (max-width: 720px) { .overall { grid-template-columns: 1fr; } }
+  .ring-wrap { position: relative; width: 180px; height: 180px; margin: 0 auto; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--surface-2); stroke-width: 14; }
+  .ring-fg { fill: none; stroke: var(--accent); stroke-width: 14; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+  .ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-label .pct { font-size: 34px; font-weight: 800; color: var(--accent-2); }
+  .ring-label .cap { font-size: 12px; color: var(--text-dim); }
+  .overall-side h2 { font-size: 18px; margin-bottom: 10px; }
+  .counts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .count-chip { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 13px; }
+  .count-chip b { font-size: 17px; margin-right: 4px; }
+  .c-done b { color: var(--accent-2); }
+  .c-prog b { color: var(--accent); }
+  .c-todo b { color: var(--text-dim); }
+  .c-block b { color: var(--danger); }
+
+  /* ===== 페이즈 진행 바 요약 ===== */
+  .phase-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin: 16px 0 40px; }
+  .ps-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; cursor: pointer; text-decoration: none; color: var(--text); display: block; }
+  .ps-card:hover { border-color: var(--accent); }
+  .ps-card .ps-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .ps-card .ps-title { font-weight: 700; font-size: 14px; }
+  .ps-card .ps-pct { font-size: 13px; color: var(--accent-2); font-weight: 700; }
+  .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .6s ease; }
+  .ps-card .ps-sub { font-size: 12px; color: var(--text-dim); margin-top: 7px; }
+
+  /* ===== 로드맵(의존 흐름) ===== */
+  .roadmap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 44px; overflow-x: auto; }
+  .roadmap-inner { display: flex; align-items: stretch; gap: 0; min-width: 900px; }
+  .rm-node { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; position: relative; }
+  .rm-node .rm-p { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  .rm-node .rm-t { font-size: 13px; font-weight: 700; margin: 3px 0; }
+  .rm-node .rm-d { font-size: 11.5px; color: var(--text-dim); }
+  .rm-arrow { display: flex; align-items: center; padding: 0 8px; color: var(--text-dim); font-size: 18px; }
+  .rm-note { text-align: center; color: var(--text-dim); font-size: 12.5px; margin-top: 12px; }
+
+  /* ===== 섹션 공통 ===== */
+  section.phase { margin-bottom: 46px; scroll-margin-top: 20px; }
+  h2.sec { font-size: 22px; font-weight: 800; padding-bottom: 10px; border-bottom: 2px solid var(--accent); margin-bottom: 6px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h2.sec .no { color: var(--accent); font-size: 15px; font-weight: 700; }
+  h2.sec .phase-pct { margin-left: auto; font-size: 15px; color: var(--accent-2); }
+  .phase-meta { color: var(--text-dim); font-size: 13.5px; margin-bottom: 14px; }
+  .phase-goal { border-left: 4px solid var(--accent); background: var(--surface); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0 16px; font-size: 14px; }
+  .phase-goal b { color: #fff; }
+
+  code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: Consolas, "Cascadia Code", monospace; font-size: 12.5px; color: var(--accent-2); }
+
+  table.tasks { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 13.5px; }
+  table.tasks th { background: var(--surface-2); text-align: left; padding: 9px 12px; border: 1px solid var(--border); font-weight: 700; white-space: nowrap; }
+  table.tasks td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  table.tasks tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .task-wrap { overflow-x: auto; }
+
+  .st { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 10px; border-radius: 20px; white-space: nowrap; }
+  .st-todo { background: rgba(139,149,167,.12); color: var(--text-dim); border: 1px solid rgba(139,149,167,.35); }
+  .st-progress { background: rgba(77,163,255,.14); color: var(--accent); border: 1px solid rgba(77,163,255,.45); }
+  .st-done { background: rgba(126,224,184,.13); color: var(--accent-2); border: 1px solid rgba(126,224,184,.4); }
+  .st-blocked { background: rgba(240,113,120,.12); color: var(--danger); border: 1px solid rgba(240,113,120,.4); }
+
+  .pr { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 4px; }
+  .pr-p0 { background: rgba(240,113,120,.15); color: var(--danger); }
+  .pr-p1 { background: rgba(240,178,92,.15); color: var(--warn); }
+  .pr-p2 { background: rgba(77,163,255,.13); color: var(--accent); }
+  .pr-p3 { background: rgba(139,149,167,.13); color: var(--text-dim); }
+
+  .verify { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent-2); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0 0; font-size: 13.5px; }
+  .verify .vt { font-weight: 700; color: var(--accent-2); margin-bottom: 4px; }
+  .verify ul { margin: 0 0 0 20px; }
+  .verify li { margin-bottom: 3px; }
+  .verify li.done-item { color: var(--accent-2); list-style: none; margin-left: -14px; }
+
+  .risknote { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--warn); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 10px 0 0; font-size: 13.5px; }
+  .risknote .vt { font-weight: 700; color: var(--warn); margin-bottom: 4px; }
+
+  .howto { background: var(--surface); border: 1px dashed var(--border); border-radius: 10px; padding: 16px 20px; margin: 40px 0; font-size: 13.5px; color: var(--text-dim); }
+  .howto b { color: var(--text); }
+
+  footer { border-top: 1px solid var(--border); padding-top: 22px; color: var(--text-dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <div class="eyebrow">Refactoring Plan &amp; Progress Dashboard</div>
+  <h1><span>CreatorEngine</span> 대규모 리팩토링 계획</h1>
+  <div class="meta">
+    범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 구조적 커플링 제거 · 코드 정리 ·
+    근거: <a href="EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
+    설계: <a href="ResourceOwnershipDesign.html">자원 소유권·경계</a> ·
+    <a href="ScriptApiMigrationPlan.html">스크립트 API 이전</a> ·
+    수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-07-29</span>
+  </div>
+
+  <div class="overall">
+    <div class="ring-wrap">
+      <svg width="180" height="180" viewBox="0 0 180 180">
+        <circle class="ring-bg" cx="90" cy="90" r="78"/>
+        <circle class="ring-fg" id="ring" cx="90" cy="90" r="78" stroke-dasharray="490" stroke-dashoffset="490"/>
+      </svg>
+      <div class="ring-label">
+        <div class="pct" id="overall-pct">0%</div>
+        <div class="cap">전체 진행률</div>
+      </div>
+    </div>
+    <div class="overall-side">
+      <h2>진행 현황 요약</h2>
+      <p style="color:var(--text-dim);font-size:14px">
+        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 6개 페이즈.
+        가중치는 예상 공수(일) 기준으로 계산됩니다. 예상 총 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
+      </p>
+      <div class="counts">
+        <div class="count-chip c-done"><b id="cnt-done">0</b>완료</div>
+        <div class="count-chip c-prog"><b id="cnt-progress">0</b>진행 중</div>
+        <div class="count-chip c-todo"><b id="cnt-todo">0</b>대기</div>
+        <div class="count-chip c-block"><b id="cnt-blocked">0</b>차단됨</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-summary" id="phase-summary"><!-- JS 생성 --></div>
+</header>
+
+<!-- ===== 로드맵 ===== -->
+<div class="roadmap">
+  <div class="roadmap-inner">
+    <div class="rm-node" style="border-color:var(--accent-2)">
+      <div class="rm-p" style="color:var(--accent-2)">PHASE 0</div>
+      <div class="rm-t">안전망 구축</div>
+      <div class="rm-d">진단 인프라 · CI · 기준 측정</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--danger)">
+      <div class="rm-p" style="color:var(--danger)">PHASE 1</div>
+      <div class="rm-t">크래시 핫픽스</div>
+      <div class="rm-d">UAF · COM 누수 · 락 일원화</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--warn)">
+      <div class="rm-p" style="color:var(--warn)">PHASE 2</div>
+      <div class="rm-t">자원 소유권 재설계</div>
+      <div class="rm-d">핸들 모델 → 언로드 활성화</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--accent)">
+      <div class="rm-p" style="color:var(--accent)">PHASE 3</div>
+      <div class="rm-t">렌더러 구조 개선</div>
+      <div class="rm-d">렌더 그래프 · GPU 동기화</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--purple)">
+      <div class="rm-p" style="color:var(--purple)">PHASE 4</div>
+      <div class="rm-t">커플링 제거</div>
+      <div class="rm-d">모듈 경계 · 디렉터리 재구성</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node">
+      <div class="rm-p" style="color:var(--text-dim)">PHASE 5</div>
+      <div class="rm-t">코드 정리·상시화</div>
+      <div class="rm-d">데드 코드 · 규약 · 정적 분석</div>
+    </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--warn)">
+      <div class="rm-p" style="color:var(--warn)">PHASE 6</div>
+      <div class="rm-t">UI 서브시스템 재설계</div>
+      <div class="rm-d">소유권 단일화 · 이름 결합 제거</div>
+    </div>
+  </div>
+  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3·4는 2 완료 후 병행 가능. Phase 5는 각 페이즈 종료마다 부분 수행 후 마지막에 총정리.
+  Phase 6은 Phase 2~4와 독립적이라 Phase 1 이후 언제든 병행 가능(스크립트 API 검증 인프라가 있는 지금이 적기).</div>
+</div>
+
+<!-- ===== PHASE 0 ===== -->
+<section class="phase" id="phase-0">
+  <h2 class="sec"><span class="no">PHASE 0</span>안전망 구축 <span class="phase-pct" data-phase-pct="0"></span></h2>
+  <div class="phase-meta">예상 공수: 10일 · 선행 조건: 없음 · 병행 가능: 전체 작업과 병행</div>
+  <div class="phase-goal"><b>목표:</b> 리팩토링 전후를 정량 비교할 수 있는 계측 체계와, 회귀를 즉시 잡아내는 빌드 검증 체계를 먼저 확보한다.
+  안전망 없는 대규모 리팩토링은 "고쳤는지 알 수 없는 수정"이 되므로 이 페이즈가 모든 작업의 전제다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="0"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준 (Exit Criteria)</div>
+    <ul>
+      <li class="done-item">✔ 씬 전환마다 라이브 객체 수/타입별 증감과 VRAM이 로그에 정량 기록됨</li>
+      <li>씬 전환 10회 반복 벤치마크의 VRAM/객체 수 기준선이 문서화됨 <span style="color:var(--text-dim)">(0-3에서 수행)</span></li>
+      <li class="done-item">✔ master 푸시/PR에서 엔진 라이브러리 7종이 Debug·Release로 자동 컴파일 검증됨</li>
+      <li>ASan 빌드 구성으로 에디터가 기동되고 12.3-② UAF가 실제로 재현·캡처됨</li>
+      <li class="done-item">✔ 크래시 이후 로그 파일을 열었을 때 마지막 로그와 크래시 사유가 남아 있고, 비정상 종료가 배너로 식별됨</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 1 ===== -->
+<section class="phase" id="phase-1">
+  <h2 class="sec"><span class="no">PHASE 1</span>크래시 핫픽스 (소유권 변경 없이 가능한 결함) <span class="phase-pct" data-phase-pct="1"></span></h2>
+  <div class="phase-meta">예상 공수: 13일 · 선행 조건: Phase 0 (계측으로 수정 효과 검증) · 근거: 분석 보고서 12.1 / 12.3</div>
+  <div class="phase-goal"><b>목표:</b> 소유권 모델을 건드리지 않고도 고칠 수 있는 확정 크래시·누수 결함을 전부 제거해
+  현재 빌드를 안정화한다. Phase 2의 대수술 전에 환자를 안정시키는 단계.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="1"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>ASan 빌드에서 "Animator 비활성화 + 스키닝 메시 유지" 시나리오 1시간 반복 무크래시</li>
+      <li>EffectEditor에서 프리셋 100회 변경 후 <code>ReportLiveDeviceObjects</code>의 BlendState/DepthStencilState 수가 증가하지 않음</li>
+      <li>병렬 에셋 로딩(<code>LoadAssetBundle</code>) + 씬 컬링 동시 수행 스트레스에서 힙 손상 미발생</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">리스크</div>
+    락 추가(1-2, 1-8)는 프레임 타임에 영향을 줄 수 있음 — Phase 0의 프로파일러로 전후 프레임 타임을 비교하고, 경합이 크면 맵 샤딩 또는 커맨드 버퍼링으로 완화.
+  </div>
+</section>
+
+<!-- ===== PHASE 2 ===== -->
+<section class="phase" id="phase-2">
+  <h2 class="sec"><span class="no">PHASE 2</span>자원 소유권 모델 재설계 <span class="phase-pct" data-phase-pct="2"></span></h2>
+  <div class="phase-meta">예상 공수: 33일 · 선행 조건: Phase 1 완료 (안정된 기반 위에서만 수술) · 근거: 분석 보고서 12.2 + 보충 분석 + CoreCLR 전환 결정</div>
+  <div class="phase-goal"><b>목표:</b> "shared_ptr 캐시 = 유일 소유, 사용처 = 원시 별칭"이라는 근본 설계 오류를 제거한다.
+  컴포넌트·Model·프록시가 에셋 수명에 안전하게 참여하도록 소유권을 재설계한 뒤, 비로소
+  <code>UnloadUnusedAssets()</code>를 활성화해 씬 전환 시 메모리가 회수되게 만든다. <b>이 프로젝트 리팩토링의 본체.</b></div>
+  <div class="task-wrap"><table class="tasks" data-phase="2"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>씬 A↔B 전환 50회 반복 후 VRAM 사용량이 평탄(±5%)하게 유지됨 — Phase 0 기준선 대비 그래프로 입증</li>
+      <li>언로드 활성 상태에서 게임플레이(클론 머티리얼 사용 포함) 1시간 무크래시 (ASan)</li>
+      <li><code>ReportLiveDeviceObjects</code>에서 씬 언로드 후 이전 씬 전용 텍스처/버퍼가 0개</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">리스크</div>
+    접점이 가장 넓은 페이즈(컴포넌트 직렬화, 에디터 인스펙터, 프록시, 348개 게임 스크립트의 <code>Instantiate</code> 사용처).
+    2-1 설계 결정에서 <b>기존 원시 포인터 API를 유지한 채 내부만 핸들화하는 호환층</b>을 두는 방안을 우선 검토해 게임 코드 변경량을 최소화할 것.
+    핫리로드 DLL 경계에서 shared_ptr 컨트롤 블록이 언로드된 모듈 코드를 참조하지 않도록 삭제자(deleter)를 엔진 측에 고정해야 함.
+  </div>
+</section>
+
+<!-- ===== PHASE 3 ===== -->
+<section class="phase" id="phase-3">
+  <h2 class="sec"><span class="no">PHASE 3</span>렌더러 구조 개선 <span class="phase-pct" data-phase-pct="3"></span></h2>
+  <div class="phase-meta">예상 공수: 20일 · 선행 조건: Phase 2 완료 · 병행: Phase 4와 병행 가능 · 근거: 분석 보고서 4장 / 12.1 / 12.3</div>
+  <div class="phase-goal"><b>목표:</b> 하드코딩된 23단계 패스 순서와 카메라/커맨드 큐 수명 관리를 구조화하고,
+  미완성 상태로 방치된 <code>RenderGraphBuilder</code>의 거취를 결정한다. GPU 동기화가 이름뿐인 지점을 실제 구현으로 교체한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="3"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>카메라 생성·삭제 1,000회 반복 후 <code>RenderPassData</code> 고아 엔트리 0개, 커맨드 리스트 잔류 0개</li>
+      <li>파티클 이펙트 재생 중 버퍼 리사이즈 스트레스에서 디바이스 제거(DEVICE_REMOVED) 미발생</li>
+      <li>패스 추가/제거가 단일 지점(그래프 또는 스케줄러 등록)에서 이루어짐 — 신규 패스 추가 시 수정 파일 1개</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 4 ===== -->
+<section class="phase" id="phase-4">
+  <h2 class="sec"><span class="no">PHASE 4</span>구조적 커플링 제거 <span class="phase-pct" data-phase-pct="4"></span></h2>
+  <div class="phase-meta">예상 공수: 19일 · 선행 조건: Phase 2 완료 · 병행: Phase 3과 병행 가능 · 근거: 분석 보고서 3장 / 13장</div>
+  <div class="phase-goal"><b>목표:</b> RenderEngine ↔ ScriptBinder 양방향 include를 인터페이스 계층으로 절단하고,
+  에디터 UI가 리소스 시스템에 박혀 있는 구조(DataSystem 내 콘텐츠 브라우저)를 분리한다.
+  모듈 경계가 개념(렌더 vs 게임플레이 vs 에디터)과 일치하도록 물리 구조를 재정렬한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>RenderEngine이 ScriptBinder 헤더를 include하지 않음 (인터페이스 헤더만 참조) — include 그래프 검사 스크립트로 CI 게이트화</li>
+      <li>GameBuild 구성에서 에디터 전용 코드(콘텐츠 브라우저, EffectEditor UI)가 링크되지 않음</li>
+      <li>Mono 관련 디렉터리/코드 제거 후 전체 솔루션 클린 빌드 통과</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">리스크</div>
+    디렉터리 재구성(4-5)은 vcxproj·filters·include 경로·코드젠 도구(리플렉션 스캐너)의 경로 가정을 동시에 건드림 —
+    코드젠 도구 3종의 스캔 경로 설정을 먼저 확인하고, 한 서브폴더씩 이동 → 빌드 검증의 소단위 반복으로 진행할 것.
+  </div>
+</section>
+
+<!-- ===== PHASE 5 ===== -->
+<section class="phase" id="phase-5">
+  <h2 class="sec"><span class="no">PHASE 5</span>코드 정리 및 품질 상시화 <span class="phase-pct" data-phase-pct="5"></span></h2>
+  <div class="phase-meta">예상 공수: 10일 · 선행 조건: 각 페이즈 종료 시 부분 수행, 최종 총정리는 Phase 3·4 완료 후</div>
+  <div class="phase-goal"><b>목표:</b> 리팩토링 과정에서 확정된 데드 코드를 제거하고, 재발 방지 장치(정적 분석, include 게이트, 리소스 카운터 회귀 테스트)를
+  CI에 상시화한다. "한 번 청소"가 아니라 "더러워지지 않는 구조"가 목표.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>미사용 심볼·주석 처리 블록·비활성 Mono 경로가 저장소에서 제거되고 빌드 통과</li>
+      <li>CI에 컴파일 + include 경계 검사 + (선택) clang-tidy 핵심 체크가 게이트로 동작</li>
+      <li>씬 전환 메모리 평탄성 벤치마크가 자동화되어 회귀 시 CI 실패</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 6 ===== -->
+<section class="phase" id="phase-6">
+  <h2 class="sec"><span class="no">PHASE 6</span>UI 서브시스템 재설계 <span class="phase-pct" data-phase-pct="6"></span></h2>
+  <div class="phase-meta">예상 공수: 12일 · 선행 조건: Phase 1 완료 권장 · 병행: Phase 2~4와 독립 · 근거: 스크립트 API 바인딩 중 실측 크래시 3건</div>
+  <div class="phase-goal"><b>목표:</b> 캔버스·UI 요소의 등록처를 한 곳으로 줄이고 이름 문자열 결합을 제거한다.
+  스크립트 UI 바인딩 작업 중 <b>런타임에 캔버스를 붙이는 것만으로 엔진이 즉사하는 크래시 3건</b>이 연쇄로 드러났는데,
+  전부 같은 뿌리다 — 하나의 UI 요소가 <code>Canvas.UIObjs</code>(weak_ptr) · <code>UIManager.Images/Texts</code>(원시 포인터) ·
+  <code>Scene.CanvasMap</code>(이름 키) 세 곳에 수동 등록되고, 연결 고리가 이름 문자열이라 어긋난 순간 널 역참조나
+  빈 컨테이너 접근으로 이어진다. Phase 2가 자원 캐시에서 걷어낸 "수동 등록 + 원시 별칭" 문제의 UI판이다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="6"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>빈 씬에서 <code>component.add</code>로 Canvas·Text·Image를 임의 조합으로 붙이고 재생/정지를 반복해도 크래시 없음(CLI 자동화)</li>
+      <li>UI 요소의 등록처가 한 곳으로 줄고, 등록·해제가 생성·파괴에 자동으로 따라감(수동 Register/Unregister 호출 소멸)</li>
+      <li>캔버스 이름 변경·중복 이름 시나리오에서 UI 귀속이 깨지지 않음</li>
+      <li>기존 씬 파일이 수정 없이 로드되고 UiTextProbe 전체 통과 유지</li>
+    </ul>
+  </div>
+</section>
+
+<div class="howto">
+  <b>대시보드 갱신 방법:</b> 이 파일 하단 <code>&lt;script&gt;</code>의 <code>TASKS</code> 배열에서 해당 항목의
+  <code>status</code> 값을 <code>"todo"</code> → <code>"progress"</code> → <code>"done"</code>(또는 <code>"blocked"</code>)으로 바꾸면
+  전체/페이즈 진행률·요약 카드가 자동 재계산됩니다. <code>note</code> 필드에 진행 메모를 남길 수 있습니다.
+  갱신 시 상단 <code>last-updated</code>도 함께 수정하세요.
+</div>
+
+<footer>
+  본 계획은 <a href="EngineStructureAnalysis.html" style="color:var(--accent)">CreatorEngine 구조 분석 보고서</a>(2026-07-29)의
+  발견 사항을 근거로 수립되었습니다. 공수는 1인 순수 작업일 기준 추정치이며, 페이즈 완료 기준(Exit Criteria) 충족 여부로 진행을 판정합니다.
+</footer>
+
+</div>
+
+<script>
+// ============================================================
+// 작업 데이터 — status: "todo" | "progress" | "done" | "blocked"
+// days: 예상 공수(일) — 진행률 가중치로 사용
+// ============================================================
+const TASKS = [
+  // ---------- PHASE 0: 안전망 구축 ----------
+  { phase: 0, id: "0-1", title: "D3D11 라이브 객체 정량 집계 + 씬 전환 델타 리포트",
+    detail: "InfoQueue 메시지를 파싱해 살아있는 GPU 객체를 타입별 숫자로 집계(CaptureLiveObjectCensus). 씬 전환 완료마다 증감을 로그에 남기고(LogLiveObjectDelta) 증가한 타입은 경고로 승격, 종료 시 잔존 총량 기록. VRAM 사용량 동시 수집. 부수적으로 InfoQueue 이중 해제 버그 수정.",
+    refs: "12.4-⑥ · 신규발견", priority: "P0", days: 1.5, status: "done",
+    note: "완료 — 격리 테스트로 파싱 정확도 검증(리소스 12개 해제 시 정확히 -12 관측). BlendState 누수(12.1-①) 계측 가능 확인. [후속 수정] 런타임 타입별 집계는 이 구조에서 불가능한 것으로 결론. ReportLiveDeviceObjects(RLDO_DETAIL)를 실행 중에 부르면 이후 렌더에서 워커 스레드의 FinishCommandList가 d3d11!CContext::RecycleCommandLists에서 죽는다(3/3 재현). renderBarrier로 CB/CE를 세우고 워커 풀이 2프레임 연속 비었음을 확인한 뒤 측정하는 경로까지 만들어 시험했으나 동일하게 크래시했고, 덤프상 크래시 순간 게임 스레드는 배리어에서 대기 중(=순회 중이 아님)이었다. 즉 순회 시점의 경합이 아니라 순회가 디버그 레이어의 커맨드 리스트 재활용 상태를 망가뜨리는 지연 부작용이다(집계 1회 + 이후 렌더만으로도 재현). 이 API는 본래 디바이스 파괴 직전 1회용이므로, allowDeviceEnumeration=true는 종료 리포트에서만 쓰고 런타임 호출(CLI·씬 전환 델타·HUD)은 VRAM만 보고하도록 확정. 런타임 수치는 디버그 레이어 대신 엔진 자체 카운터로 대체(Diagnostics::EngineResourceCensus 신설). Texture·Mesh·Material·Model이 CountedResource&lt;T&gt;를 private 상속해 생성자 개수와 무관하게 인스턴스를 원자적으로 세며, 릴리스 빌드에서도 동작한다. D3D Create* 호출이 53개 파일 212곳에 흩어져 있어 전부 래핑하는 대신, 수명이 씬·에셋을 따라 움직이는 것만 추적하도록 범위를 좁힌 것(패스가 초기화 때 만들고 끝까지 쥐는 상수 버퍼 등은 누수 관심사가 아님). 정확도 검증: GLB 임포트 시 Texture(+6)·Mesh(+2)·Material(+3)·Model(+1)이 Assimp가 보고한 파일 구성과 정확히 일치했고, 종료 리포트의 ID3D11Texture2D:93과 엔진 Texture:93도 일치. CLI에 gpu.baseline 추가, HUD는 무의미해진 'GPU 객체 집계' 버튼을 제거하고 이 카운터를 기준선 대비 증감과 함께 상시 표시" },
+  { phase: 0, id: "0-2", title: "리소스 카운터 HUD (에디터 오버레이)",
+    detail: "DataSystem 캐시 6종·retained 수, RenderScene 프록시/애니메이터/팔레트/RenderPassData 크기, VRAM, 라이브 GPU 객체를 ImGui 창에 표시. 기준선 스냅샷 대비 증감을 색으로 강조해 씬을 오갈 때 무엇이 회수되지 않는지 실행 중에 드러낸다. Animator↔Palette 불일치(12.3-② 징후) 자동 경고 포함. Settings 메뉴에서 열림.",
+    refs: "12.2 · 12.3-②", priority: "P1", days: 1.5, status: "done",
+    note: "완료 — Debug/Release 컴파일 검증. 락 경합을 피해 0.5초 주기 갱신, 무거운 GPU 집계는 수동 트리거로 분리" },
+  { phase: 0, id: "0-8", title: "CLI 자동화 레이어 (콘솔 명령)",
+    detail: "에디터가 GUI 앱이라 자동화 수단이 없어 회귀 검증을 사람이 클릭해야 했다. ConsoleCommandSystem을 추가해 씬 로드/전환, GPU 집계, 에셋 언로드, 종료를 콘솔·실행인자·스크립트 파일로 제어한다. 명령 파싱은 백그라운드 스레드, 실행은 프레임 경계(게임 스레드)로 분리해 스레드 규약을 지킨다.",
+    refs: "0-3 자동화 기반", priority: "P0", days: 1.5, status: "done",
+    note: "완료 — --exec/--script/--console 지원. GUI 조작 없이 기동→측정→종료 전 과정 자동 실행 검증(exit 0). scripts/scene_churn_benchmark.txt 템플릿 포함" },
+  { phase: 0, id: "0-3", title: "씬 전환 반복 벤치마크 시나리오 + 기준선 측정",
+    detail: "씬 A↔B 전환 N회 자동 반복 + 카운터 기록. 현재 상태(누수 있는 상태)의 기준선을 문서화 — Phase 2 효과 입증의 비교 대상.",
+    refs: "12.2-①", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 0, id: "0-4", title: "GitHub Actions 컴파일 CI 구축",
+    detail: "엔진 라이브러리 7종을 Debug/Release 매트릭스로 빌드 검증(.github/workflows/build.yml). vcpkg 바이너리 캐싱, 코드젠 도구 검증 잡 분리, 구성별 산출물 경로 확인 포함. Academy_4Q/TrainAsis는 FMOD 바이너리가 저장소에 없어 링크 불가 — 범위에서 제외하고 워크플로에 명시.",
+    refs: "11.1, 13장 리스크2", priority: "P0", days: 2, status: "done",
+    note: "완료 — Debug/Release 로컬 재현 검증, YAML 유효성 확인. Restore-VcpkgPorts.ps1의 구문 오류와 exit code 미확인 버그도 수정. 첫 CI 실행은 vcpkg 소스 빌드로 장시간 소요(이후 캐시 히트)" },
+  { phase: 0, id: "0-5", title: "ASan(/fsanitize=address) 빌드 구성 추가 + UAF 재현 확인",
+    detail: "MSVC AddressSanitizer 구성으로 에디터 기동, 12.3-② 본 팔레트 UAF를 실제 재현·캡처하여 수정 전 증거 확보.",
+    refs: "12.3-②", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 0, id: "0-7", title: "에디터 기동 불능 수정 (mimalloc 정적 링크 전환)",
+    detail: "ManagedHeap.dll이 vcpkg의 동적 mimalloc(override 빌드)을 링크해 mimalloc-redirect.dll이 로더 초기화와 경합, DllMain이 간헐 실패(ERROR_DLL_INIT_FAILED)하며 에디터가 기동하지 못하던 문제. mimalloc-override.h → mi_ API 직접 호출로 바꾸고 x64-windows-static-md 정적 변형을 링크해 redirect 개입 자체를 제거. FMOD 바이너리 배치도 함께 완료.",
+    refs: "신규발견 · 기동 차단", priority: "P0", days: 1, status: "done",
+    note: "완료 — DLL 개별 프로브로 원인 특정, Release 5회·Debug 3회 연속 기동 성공 확인. vcpkg-installed-ports.json에 새 의존성 등록" },
+  { phase: 0, id: "0-6", title: "로그 시스템 HTML 전환 + 로그 유실 방지 3중 안전망",
+    detail: "HtmlFileSink 신규 도입(레벨 필터·검색·스레드ID·비정상 종료 자동 감지). flush_on(warn)+flush_every(1s)+크래시 훅(terminate/abort/purecall/invalid_param/atexit/SEH)으로 종료 경로 전반에서 로그를 보존. 로그 경로를 실행파일 상대경로에서 PathFinder 절대경로로 교체하고 세션별 파일 보존(최대 20개).",
+    refs: "신규 · 진단 기반", priority: "P0", days: 2.5, status: "done",
+    note: "완료 — 실제 엔진에서 크래시 포착·정상 종료 판정 동작 확인. 초기 구현의 atexit 훅이 파괴된 싱글턴을 역참조해 종료 크래시를 유발했고, 생존 플래그(Log::IsAlive)로 수정. 종료 단계 추적(ShutdownTrace)도 함께 도입" },
+
+  // ---------- PHASE 1: 크래시 핫픽스 ----------
+  { phase: 1, id: "1-1", title: "본 팔레트 UAF 수정 (최우선)",
+    detail: "UnregisterAnimator 시 해당 애니메이터를 참조하는 프록시의 m_finalTransforms 무효화, 또는 malloc/원시 포인터를 shared_ptr<BonePalette> 소유 모델로 교체. Finalize와의 더블 프리 경로도 함께 차단.",
+    refs: "12.3-②", priority: "P0", days: 2, status: "done",
+    note: "완료 — 팔레트 버퍼를 shared_ptr<XMMATRIX[]>로 전환. 애니메이터가 해제돼도 프록시가 참조하는 동안 버퍼가 살아남아 UAF와 Finalize 더블 프리가 함께 사라짐" },
+  { phase: 1, id: "1-2", title: "프록시 맵 락 일원화",
+    detail: "ProxyCommand 생성자 8종과 Register/UnregisterAnimator에 RenderScene과 동일한 SpinLock 적용. m_animatorMap/m_palleteMap 전용 락 규약 문서화.",
+    refs: "12.3-①⑤", priority: "P0", days: 2, status: "done",
+    note: "완료 — Primitive 계열 5종 생성자에 m_proxyMapFlag 적용(UI 3종은 이미 보유). Register/UnregisterAnimator도 동일 락으로 보호. 생성자가 다른 락 경로를 부르지 않아 재진입 데드락 없음을 확인" },
+  { phase: 1, id: "1-3", title: "RenderModules 상태 객체 Release 추가 (6곳)",
+    detail: "Blend/DepthStencil/Rasterizer State 재생성 전 기존 객체 Release. m_prev*State 3종도 소멸자에서 해제.",
+    refs: "12.1-①③", priority: "P0", days: 1, status: "done",
+    note: "완료 — 6곳 모두 PSO의 Adopt* 소유권 API 경유로 변경(재생성 시 이전 객체 자동 Release). SaveRenderState 캡처 3종도 소멸자에서 해제" },
+  { phase: 1, id: "1-4", title: "PipelineStateObject 소유권 정리",
+    detail: "소유/비소유(공유 전역 상태) 포인터 분리 또는 전 필드 ComPtr 전환. 소멸자에서 소유 리소스 전부 해제.",
+    refs: "12.1-②", priority: "P0", days: 1.5, status: "done",
+    note: "완료 — owns 플래그 + Adopt*() API 도입. 8개 패스가 대입하는 전역 공유 상태(g_pBlendState 등)는 비소유로 남겨 이중 해제를 피하고, 직접 생성한 것만 해제" },
+  { phase: 1, id: "1-5", title: "EffectComponent null 프록시 역참조 수정",
+    detail: "Update()에서 proxy null 가드 추가, GetProxy 반환 계약 명문화.",
+    refs: "12.3-③", priority: "P0", days: 0.5, status: "done",
+    note: "완료 — 바로 위 블록은 null 검사를 하면서 정작 아래에서 빠뜨린 지점" },
+  { phase: 1, id: "1-6", title: "return 누락 UB 수정 (Model::GetMaterial/GetTexture, AddCamera)",
+    detail: "미스매치 시 nullptr 반환 추가. CameraContainer::AddCamera 만석 시 명시적 실패 값(-1) 반환 + 호출부 처리. /W4 C4715 경고를 에러로 승격.",
+    refs: "12.2-⑤⑥", priority: "P0", days: 1, status: "done",
+    note: "완료 — Model::GetMaterial/GetTexture(string_view) 미스매치 시 nullptr 반환, AddCamera는 INVALID_CAMERA_INDEX(-1) 반환 + 오류 로그" },
+  { phase: 1, id: "1-7", title: "카메라 인덱스 불일치 수정",
+    detail: "생성자의 예측 인덱스(GetCameraCount) 제거 — RenderPassData 등록을 RegisterContainer()의 실제 슬롯 확정 이후로 이동. 고아 RenderPassData 재발 차단.",
+    refs: "12.2-⑤", priority: "P1", days: 1.5, status: "done",
+    note: "완료 — 생성자의 GetCameraCount() 추측 제거. RegisterContainer에서 실제 슬롯 확정 후 AddRenderPassData 호출하여 소멸자의 Remove와 짝을 맞춤" },
+  { phase: 1, id: "1-8", title: "DataSystem 캐시 맵 락 규약 통일",
+    detail: "LoadSharedTexture/LoadMaterial 무잠금 경로에 뮤텍스 적용, SFonts 전용 뮤텍스 신설, 맵별 보호 규약을 헤더 주석으로 명문화.",
+    refs: "12.2-③", priority: "P0", days: 2, status: "done",
+    note: "완료 — SFonts용 m_fontMutex 신설, LoadSharedTexture/LoadMaterial에 락 적용. 디스크 I/O는 락 밖에 두어 병렬 로딩 성능과 material→texture 락 중첩(데드락 여지)을 모두 회피. 맵별 보호 규약을 헤더에 명문화" },
+  { phase: 1, id: "1-10", title: "전역 싱글턴 포인터 패턴 점검 (파괴 후 접근 차단)",
+    detail: "LogSystem.h의 `static auto Debug = GetInstance()` 패턴이 엔진 전역에 퍼져 있다(SceneManagers, DataSystems, EngineSettingInstance 등). 이 복사본들은 Destroy() 이후에도 파괴된 인스턴스 주소를 그대로 들고 있어 nullptr 검사로 걸러지지 않는다. 종료·핫리로드 시점에 이를 만지는 코드를 전수 점검하고, Log::IsAlive()처럼 생존 확인 수단을 두거나 접근자를 통해서만 얻도록 정리.",
+    refs: "0-6 종료 크래시 근본원인", priority: "P1", days: 2, status: "done",
+    note: "완료 — 전역 포인터 14곳 전수 확인. DLLCore::Singleton에 GetIfAlive()/IsAlive() 안전 접근자를 추가하고(파괴 후 재생성 방지 포함) 패턴의 위험성과 사용 규칙을 헤더에 문서화" },
+  { phase: 1, id: "1-9", title: "셰이더 리로드 실패 시 EraseShader 댕글링 수정",
+    detail: "컴파일 실패 시 엔트리 제거 대신 이전 바이너리 유지(마지막 정상본 롤백) 방식으로 변경.",
+    refs: "12.2-④", priority: "P1", days: 1.5, status: "done",
+    note: "완료 — 컴파일 실패 시 EraseShader 호출을 제거하고 마지막 성공본을 유지. ShaderPSO가 맵 엔트리 주소를 원시 포인터로 참조하므로 erase가 곧 댕글링이었다" },
+
+  // ---------- PHASE 2: 자원 소유권 재설계 ----------
+  { phase: 2, id: "2-0", title: "CoreCLR 편입을 전제한 경계 설계 (선행 결정)",
+    detail: "스크립트 계층을 Dynamic_CPP(C++ 핫리로드)에서 CoreCLR로 전면 대체하기로 확정됨. 이 결정이 소유권 모델을 규정한다 — shared_ptr은 관리 경계를 넘지 못하므로 '내부는 shared_ptr, 경계는 세대 핸들' 구조를 먼저 확정해야 한다. 결정 항목: 핸들 타입(HashedGuid에 세대 추가 vs 별도 테이블), 소유권 단일 진실 공급원, 평면 C ABI 형태, 관리 코드 호출 허용 스레드, Managed:: 네이밍 정리(mimalloc 힙 ↔ .NET GC 혼동).",
+    refs: "ResourceOwnershipDesign.html", priority: "P0", days: 4, status: "done",
+    note: "완료 — 결정 5건 확정(핸들=별도 테이블, 소유권 계층, 평면 C ABI, 게임 스레드 전용, Managed:: 네이밍). 세대 핸들 프로토타입 17개 검증 전부 통과: 낡은 핸들 nullptr 반환, 슬롯 재사용 시 오염 차단, 1만회 생성/파괴 후 슬롯 1개" },
+  { phase: 2, id: "2-1", title: "소유권 모델 설계 결정 (설계 문서)",
+    detail: "2-0에서 확정한 핸들 경계를 전제로 내부 소유 구조를 확정. 핫리로드(AssemblyLoadContext) 경계의 GCHandle 수명, 직렬화(FileGuid) 연동, 기존 원시 포인터 API 호환층 여부를 결정하는 설계 문서 작성.",
+    refs: "12.2 보충", priority: "P0", days: 3, status: "todo", note: "2-0 완료 후 착수" },
+  { phase: 2, id: "2-2", title: "Model 내부 소유권 전환",
+    detail: "vector<Mesh*>/<Material*>/<Texture*> → shared_ptr(또는 핸들) 컨테이너로 전환. GetMesh/GetMaterial/GetTexture 반환 타입 정비.",
+    refs: "Model.h:59-61", priority: "P0", days: 3, status: "done",
+    note: "완료 — 3종 컨테이너를 shared_ptr로 전환. Mesh는 소멸자 delete 제거(참조 남으면 유지), Material/Texture는 비소유→공동소유 승격. ModelLoader가 shared_ptr을 .get()으로 떨어뜨리던 2곳(827·1300행)이 12.2 문제의 근원이었고 그대로 보관하도록 수정. 기존 원시 포인터 Getter는 호환 유지하고 *Shared 버전 추가(2-3에서 사용). [후속 수정] 이 전환 과정에서 ProcessMaterials가 GenerateMaterial()의 원시 포인터를 std::shared_ptr<Material>(...)로 감싸 캐시(make_shared)와 별개 제어 블록을 만드는 회귀가 있었다 — 모델을 처음 임포트한 세션의 종료 시 Models.clear()에서 이중 해제로 항상 크래시. GenerateMaterial 반환 타입을 shared_ptr로 바꿔 해결(최초 임포트 3/3 정상 종료 확인)" },
+  { phase: 2, id: "2-3", title: "컴포넌트 에셋 참조 전환 (MeshRenderer 우선)",
+    detail: "m_Material/m_Mesh를 소유 참여형(shared_ptr/핸들)으로 전환. ComponentFactory·직렬화·인스펙터(ImGuiDrawHelper) 대입 경로 일괄 수정. 이후 SpriteRenderer/Image/Text/Decal/Terrain 등 순차 확대.",
+    refs: "MeshRenderer.h:35-37", priority: "P0", days: 5, status: "done",
+    note: "완료 — MeshRenderer의 m_Material/m_Mesh를 shared_ptr로 전환. [중요 후속 수정] '리플렉션이 shared_ptr을 포인터와 동등 처리하므로 직렬화 경로 무변경'이라는 초기 판단은 틀렸다. isPointer 판정만 동등했을 뿐, ①MakePropertyImpl이 typeName을 ToString&lt;T&gt;()로 만드는데 원시 포인터는 &quot;Material *&quot;→&quot;Material&quot;로 정리되는 반면 shared_ptr은 &quot;std::shared_ptr&lt;class Material&gt;&quot;가 그대로 남아 MetaDataRegistry 조회에 실패했고(→직렬화가 빈 노드를 씀→역직렬화에서 bad conversion), ②TypeCaster::Register&lt;T&gt;()가 shared_ptr을 '값'으로 등록해 shared_ptr 객체 자신의 주소를 반환했다(대상 객체 주소가 아님). 각각 ExtractPointee로 typeName 정정, RegisterSharedPtr&lt;Pointee&gt;() 사용으로 수정. 증상은 '재생 후 정지하면 모델의 메시가 사라짐'이었다. 검증: 재생→정지 왕복에서 오브젝트 68개와 MeshRenderer 계층이 그대로 유지되고 bad conversion 0건. DataSystem::LoadMaterialShared 신설, ComponentFactory·ModelLoader·에디터 UI·드래그앤드롭 임시 포인터까지 일괄 정리" },
+  { phase: 2, id: "2-4", title: "렌더 프록시 에셋 참조 전환",
+    detail: "PrimitiveRenderProxy의 Material*/Mesh*/Texture* 스냅샷을 shared_ptr 보유로 전환 — 렌더 스레드가 사용하는 동안 에셋 수명 보장 (언로드는 지연 파괴로 자연 처리).",
+    refs: "12.3-⑦", priority: "P0", days: 3, status: "done",
+    note: "완료 — 2-3과 연쇄되어 함께 처리. PrimitiveRenderProxy의 m_Material/m_Mesh를 shared_ptr로 전환해 렌더 스레드가 사용하는 동안 수명이 보장된다. ProxyCommand의 람다 캡처도 shared로 유지" },
+  { phase: 2, id: "2-5", title: "Material::Instantiate 클론 수명 관리",
+    detail: "런타임 클론을 씬 수명에 바인딩(씬 언로드 시 함께 회수)하거나 retain 대상에 자동 포함. Instantiate 원시 반환 API를 shared 반환으로 유도 (게임 스크립트 348개 파일 영향 — 호환층으로 완충).",
+    refs: "Material.cpp:63-125", priority: "P0", days: 3, status: "done",
+    note: "완료 — 원시 포인터를 돌려주던 Instantiate()를 제거하고 InstantiateShared()만 남겨, 호출자가 소유권을 함께 받도록 강제. 엔진 코드에는 raw 사용처가 없었고 스크립트 6곳만 정리. 클론은 캐시에도 등록하되(에디터·직렬화용) 캐시가 비어도 참조자가 있으면 살아남는다" },
+  { phase: 2, id: "2-6", title: "ShaderPSO 셰이더 참조 핸들화",
+    detail: "&VertexShaders[name] 원시 포인터 참조 제거 — 이름/핸들 기반 조회 또는 shared_ptr로 전환해 리로드·삭제에 안전하게.",
+    refs: "12.2-④", priority: "P1", days: 2, status: "done",
+    note: "완료 — 조사 결과 unordered_map은 rehash 시에도 요소 주소를 유지하므로(표준 보장) 원시 포인터 참조 자체는 안전했고, 위험원은 erase뿐이었다. 1-9에서 호출부를 없앤 EraseShader를 아예 제거해 불변식을 깨뜨릴 수 없게 하고, RemoveShaders는 종료 전용임을 명시. 핸들화는 과잉 설계로 판단해 보류" },
+  { phase: 2, id: "2-7", title: "ManagedAssetType 확장 + retain 커버리지 보강",
+    detail: "UITexture/SpriteSheet 타입 추가, RetainAssets가 동적 로드 에셋·클론까지 포괄하도록 보강. 키 형식(stem) 일치 검증 추가.",
+    refs: "12.2-②", priority: "P1", days: 1.5, status: "done",
+    note: "완료 — ManagedAssetType에 UITexture/SpriteSheet를 끝에 추가(assetTypeID가 정수 직렬화라 순서 변경 금지)하고 언로드 대상에 포함. 다만 AssetBundleWindow가 이 두 종을 번들에 등록하지 않아 retain 집합이 비는 문제를 발견 — 그대로 켜면 통째로 삭제되므로 '번들이 관리하지 않는 타입은 건너뛴다' 안전장치 추가. 번들 등록 UI는 후속 과제" },
+  { phase: 2, id: "2-8", title: "UnloadUnusedAssets 활성화 + 씬 전환 통합",
+    detail: "SceneManager 씬 전환부에 언로드 호출 통합 (렌더 스레드 프레임 경계에서 실행). 2-1~2-7 완료 후에만 진행.",
+    refs: "12.2-①", priority: "P0", days: 2, status: "done",
+    note: "완료 — SceneManager::BeforeAwakeSceneLoad의 씬 전환 완료 지점(새 씬 RetainAssets 갱신 후)에서 호출. 2-2~2-7 덕분에 캐시에서 지워도 사용 중인 에셋은 참조가 남아 살아남는다. 다만 씬 파일이 없어 실제 전환 효과는 미검증 — scripts/scene_churn_benchmark.txt로 씬 준비 후 즉시 측정 가능" },
+  { phase: 2, id: "2-10", title: "스크립트 API 이전 설계 (ModuleBehavior → C#)",
+    detail: "라이프사이클 14종의 디스패치 방식(틱당 1회 경계 통과 + C# 내부 순회), GameObject/Component 핸들 래퍼, 소스 제너레이터 기반 필드 노출, 물리 콜백 blittable 구조체, 스크립트 간 참조를 C# 내부에서 완결시키는 경계 규칙을 확정. 별도 설계 문서 참조.",
+    refs: "ScriptApiMigrationPlan.html", priority: "P0", days: 4, status: "done",
+    note: "완료 — 프로토타입으로 핵심 설계(틱당 1회 경계·핸들·역호출)를 검증하고, 런타임(.NET 10 LTS)·코루틴 범위·인스펙터 주체·배포 형태·디버깅 규칙을 확정한 뒤, 마지막으로 남아 있던 바인딩 표면을 §11로 확정. 추측 대신 스크립트 348개 파일 32,010줄을 전수 조사해 호출 분포를 근거로 삼았다(GetComponent 734 · GetOwner 497 · 사운드 435 · 문자열 인자 460+). 조사가 기존 가정 셋을 뒤집었다: ①코루틴 사용 0건 — 09.1의 스케줄러는 포팅 선행 과제가 아니라 신규 기능이므로 일정에서 분리, ②Time 클래스도 사실상 미사용(델타는 Update 인자로 전달), ③Transform은 컴포넌트가 아니라 GameObject의 값 멤버. 확정 내용: 스크립트 간 참조·GetOwner는 C# 내부에서 완결해 경계를 넘지 않고, 문자열은 소스 제너레이터가 컴파일 타임 해시로 치환해 마샬링을 없애며, 물리 결과는 호출자 제공 버퍼 규약(stackalloc)으로 소유권을 단순화. T1~T4 티어로 표면을 나눠 T1만으로 수직 슬라이스가 관통되도록 했고, 이전 순서는 S1(T1+제너레이터 골격)→S2(대표 3종)→S3(Entity 계층)→S4(일괄, Player·TBoss1은 마지막)→S5(BT·AniBehavior 5,300줄)→S6(Dynamic_CPP 제거)" },
+  { phase: 2, id: "2-11", title: "S1 수직 슬라이스 — CoreCLR 스크립트 계층 관통",
+    detail: "설계 문서 11.6의 S1. T1 바인딩 일부 + Behaviour 기반 클래스 + 세대 핸들 레지스트리로 스크립트 하나가 로드→라이프사이클→엔진 API 호출까지 실제로 통과하는지 확인.",
+    refs: "ScriptApiMigrationPlan.html §11.6", priority: "P0", days: 3, status: "done",
+    note: "관통 확인 — 신규: ScriptCore(C#/.NET 10, Behaviour·BehaviourRegistry·ObjectHandle·Native 표), ScriptBinder/ClrHost(hostfxr 호스팅·진입점 9종 바인딩·API 표 제공), ScriptBinder/ScriptObjectRegistry(세대 핸들 슬롯 테이블). Dx11Main에 초기화·틱(TickScripts)·종료를 연결하고 Academy_4Q PreBuild가 dotnet build를 태우게 해 C# 변경이 자동 반영된다. 검증: Bobber 스크립트를 Directional Light에 붙이자 Awake→Start→Update가 순서대로 돌고, 스크립트가 계산한 sin 값이 네이티브 Transform에 반영되어 Y가 0→0.393→0.672로 변했다(다른 오브젝트는 불변). 양방향 경계가 전부 동작 — 네이티브→C#(인스턴스 생성·틱), C#→네이티브(Log·GetName·Transform get/set). 조사 중 확인된 제약: 엔진 HashingString이 std::hash&lt;string_view&gt;(구현 정의)를 써서 11.3절의 컴파일 타임 해시 치환을 지금은 쓸 수 없다 — UTF-8 문자열 전달로 대체했고, 엔진이 자체 해시로 바꿀 때 다시 다룬다. 미완(S1 잔여): YAML 직렬화·핫리로드(AssemblyLoadContext), GetComponent 바인딩, 회전/스케일" },
+  { phase: 2, id: "2-13", title: "인스펙터에 C# 스크립트 필드 연결",
+    detail: "소스 제너레이터가 만든 접근자를 통해 에디터 인스펙터가 C# 스크립트의 노출 필드를 그리고 편집한다.",
+    refs: "ScriptApiMigrationPlan.html §4 · 9.3", priority: "P0", days: 1, status: "done",
+    note: "완료 — InspectorWindow::DrawManagedScripts 신설. 네이티브 컴포넌트 순회 뒤에 C# 스크립트 섹션을 그리고, float/int/bool을 DragFloat·DragInt·Checkbox로 편집한다. 09.3 확정대로 렌더링 주체는 네이티브에 두고 관리 측은 메타데이터만 제공. 부착 정보는 ClrHost가 GameObject→인스턴스 맵으로 들고 있다 — C# 스크립트가 아직 네이티브 Component가 아니라 기존 순회에 잡히지 않기 때문이며, ScriptComponent로 승격하면 이 맵과 별도 섹션은 사라진다. 검증용으로 CLI에 scene.select 추가. 인스펙터가 3초간 매 프레임 그려지는 동안 크래시 없이 정상 종료" },
+  { phase: 2, id: "2-12", title: "소스 제너레이터 — 필드 노출·팩토리 등록 자동 생성",
+    detail: "설계 문서 04절. [SerializeField] 필드에 대한 인덱스 기반 접근자와 ScriptFactory 등록 코드를 컴파일 타임에 생성한다. 런타임 리플렉션을 쓰지 않아 Native AOT에서 트리밍되지 않는다.",
+    refs: "ScriptApiMigrationPlan.html §4", priority: "P0", days: 2, status: "done",
+    note: "완료 — ScriptCore.Generators(netstandard2.0, IIncrementalGenerator) 신설. Behaviour 파생 클래스를 훑어 ①FieldCount/GetFieldName/GetFieldType과 타입별 Get·Set switch, ②ScriptFactory.RegisterGenerated를 생성한다(수동 등록 파일 제거). 필드 이름은 _amplitude→\"Amplitude\"로 다듬고 [SerializeField(DisplayName=...)]로 재정의 가능. partial이 아닌데 노출 필드가 있으면 CE001 경고. [설계 수정] 04절 초안의 '오프셋을 담은 FieldDesc' 방식은 C#에서 성립하지 않는다 — 관리 객체의 필드 배치는 런타임이 정하고 GC가 객체를 옮기므로 네이티브가 주소를 잡을 수 없다. 인덱스+접근자로 대체했고, 그 결과 __Serialize/__Deserialize가 불필요해졌다(인스펙터와 직렬화가 같은 접근자를 공유). 검증: Bobber에 float 2개·bool 1개를 노출해 CLI로 읽고(Amplitude 1.0, Speed 2.0, 가로 흔들기 false) 값을 바꾸자(Amplitude 3.5, 가로 흔들기 true) 실제 동작이 X축 이동으로 바뀌며 위치가 (2.336, 0, 0)이 되었다" },
+  { phase: 2, id: "2-14", title: "ScriptComponent 승격 — C# 스크립트를 네이티브 컴포넌트로",
+    detail: "C# 스크립트를 대표하는 네이티브 Component를 만들어 인스펙터 순회·YAML 직렬화·프리팹 복제에 편입시킨다.",
+    refs: "ScriptApiMigrationPlan.html §4", priority: "P0", days: 1, status: "done",
+    note: "완료 — ScriptComponent(Component + RegistableEvent&lt;ScriptComponent&gt;) 신설. [[Property]] m_scriptType 하나만 직렬화하고 Awake에서 ClrHost::CreateBehaviour로 관리 인스턴스를 만든다. 설계상 중요한 선택: Update/LateUpdate/FixedUpdate를 일부러 override하지 않는다 — RegistableEvent는 override한 메서드만 씬 이벤트에 등록하는데, 여기서 등록하면 경계를 스크립트 수만큼 넘게 되어 '틱당 1회'(02절) 설계가 무너진다. 관리 라이프사이클은 ClrHost가 일괄 디스패치하고 이 컴포넌트는 생성·파괴 시점만 잡는다. 승격 효과로 ClrHost의 임시 GameObject→인스턴스 맵과 인스펙터의 별도 섹션이 제거되고, 인스펙터는 기존 컴포넌트 순회에서 자연스럽게 처리된다. 검증: 부착 시 컴포넌트 수가 1→2로 증가(실제 네이티브 컴포넌트), 재생 진입 시 PlayScene 역직렬화로 m_scriptType이 복원되며 Awake/Start가 다시 실행되어 스크립트가 자동 재부착됨 — 직렬화 코드를 따로 쓰지 않고 기존 체계가 그대로 처리. 정지 왕복 후에도 컴포넌트 유지, 크래시 없음" },
+  { phase: 2, id: "2-15", title: "C# 스크립트 노출 필드 값 직렬화",
+    detail: "인스펙터에서 조정한 스크립트 필드 값이 씬·프리팹에 저장되고 재생·로드 후 복원되도록 한다.",
+    refs: "ScriptApiMigrationPlan.html §4", priority: "P0", days: 1, status: "done",
+    note: "완료 — 값은 관리 객체 안에 있어 리플렉션이 직접 볼 수 없으므로, ScriptComponent에 [[Property]] vector&lt;string&gt; m_fieldData를 두고 저장 시점에 옮겨 담는다(형식 \"타입|값|이름\" — 이름을 마지막에 둬서 표시 이름에 구분자가 섞여도 앞 두 칸만 끊어 읽으면 된다). 복원은 Awake에서 인스턴스를 만든 직후 ApplyFields로, C# Awake보다 먼저 수행되어 스크립트가 Awake에서 필드를 읽어도 복원된 값을 본다. 매칭은 인덱스가 아니라 이름 기준 — 스크립트를 고쳐 필드 순서가 바뀌어도 값이 엉뚱한 곳에 들어가지 않고, 없어진 필드나 타입이 바뀐 필드는 조용히 버린다. 캡처 시점은 인스펙터 편집(및 CLI script.set) 순간으로 한정했다. Unity와 같은 규약으로, 런타임에 스크립트가 스스로 바꾼 값은 저장되지 않는다. 검증: Amplitude 1.0→5.0, 가로 흔들기 false→true로 바꾼 뒤 재생하자 PlayScene에 새로 만들어진 인스턴스가 기본값이 아니라 편집값(5.0, true)으로 시작" },
+  { phase: 2, id: "2-16", title: "핫리로드 — AssemblyLoadContext 언로드/재로드",
+    detail: "설계 문서 05절. 게임 스크립트 어셈블리를 언로드 가능한 컨텍스트에 올려 실행 중 교체하고, 인스턴스 상태를 이관한다.",
+    refs: "ScriptApiMigrationPlan.html §5", priority: "P0", days: 2, status: "done",
+    note: "완료 — 어셈블리를 둘로 나눴다. ScriptCore(고정, 기본 컨텍스트)는 네이티브가 붙잡은 진입점을 담고, GameScripts(교체 대상)만 collectible ALC에 올린다. 신설: ScriptCore/ScriptAssemblyLoader(ScriptLoadContext·Load/Unload/Reload), GameScripts 프로젝트. 생성기는 ScriptFactory partial 대신 어셈블리 경계를 넘을 수 있는 ScriptRegistry.RegisterAll(등록 델리게이트를 받는 진입점)을 뱉도록 수정 — 리플렉션 사용이 이 진입점 하나로 묶여 AOT 모드에서 직접 호출로 바꾸기 쉽다. 상태 이관은 2-15의 m_fieldData를 그대로 재사용(PrepareForReload로 값 캡처 후 인스턴스 참조를 끊고, 리로드 뒤 Awake가 복원). 어셈블리는 스트림으로 읽어 파일을 잠그지 않으므로 실행 중 재빌드가 가능하다. 막혔던 두 지점: ①GameScripts가 ScriptCore를 참조하는데 hostfxr로 올린 어셈블리는 통상 probing으로 찾을 수 없어 FileNotFoundException — ALC의 Load 오버라이드에서 실행 중인 인스턴스를 직접 물려줘 해결(새로 로드하면 타입이 두 벌 생겨 캐스팅이 조용히 깨진다), ②언로드가 계속 실패로 보고됨 — 원인은 두 가지로, ScriptFactory의 인스턴스 딕셔너리를 비우지 않은 실제 참조 누수와, WeakReference를 Load에서 잡아 '현재 살아 있는' 컨텍스트를 보던 진단 코드 자체의 오류였다. 검증: 리로드 2회(세대 1→2→3)에서 Amplitude 7.5가 계속 보존되고 '이전 어셈블리 정리됨' 확인, 실행 중 어셈블리를 교체한 뒤 리로드하자 바뀐 코드([Bobber v2])가 실행됨" },
+  { phase: 2, id: "2-17", title: "노출 필드 타입 확장 + 오브젝트 참조",
+    detail: "float/int/bool에 더해 string·Float3·GameObject 참조를 노출 필드로 지원한다. 오브젝트 참조는 씬·프리팹에 저장되고 재생·로드 후 복원되어야 한다.",
+    refs: "ScriptApiMigrationPlan.html §4 · §11.6 S2", priority: "P0", days: 1.5, status: "done",
+    note: "완료 — FieldType에 String(5)·Object(6) 추가, 생성기의 타입 분류와 접근자 생성을 확장, 경계 진입점 6종(GetField/SetField × String·Float3·Object) 추가. 핵심 판단은 오브젝트 참조의 저장 형식이다: 세대 핸들의 슬롯 번호는 실행할 때마다 달라져 파일에 남길 수 없으므로, 씬 직렬화가 이미 보존하는 instanceID로 적고 복원 시 GameObject::FindInstanceID로 되찾는다. 대상이 아직 로드되지 않았거나 삭제된 경우 빈 참조로 두고, 스크립트는 IsAlive로 걸러낸다 — 네이티브 포인터를 들고 있었다면 알 수 없는 상황이라 세대 핸들의 이점이 그대로 드러나는 지점이다. 문자열 값에 구분자·개행이 섞여도 항목 경계가 깨지지 않도록 최소 이스케이프를 넣었다. 인스펙터에 DragFloat3·InputText·오브젝트 슬롯(계층 창 드래그앤드롭 수용) 추가. 검증: FollowTarget 스크립트로 object·Float3·string·float 4종을 CLI에서 읽고 쓴 뒤 재생하자 PlayScene 인스턴스가 '카메라추적' 이름과 Directional Light 참조를 그대로 물려받고 실제로 대상을 따라 이동(1.068→1.970)" },
+  { phase: 2, id: "2-18", title: "S2 — 프리팹 생성·파괴 바인딩",
+    detail: "설계 문서 11.4 T2. Prefab 로드/인스턴스화와 GameObject 파괴를 스크립트에 노출한다(실측 172회 + 34회).",
+    refs: "ScriptApiMigrationPlan.html §11.4", priority: "P0", days: 1, status: "done",
+    note: "완료 — API 표에 Prefab_Exists·Prefab_Instantiate·GameObject_Destroy 추가(표 버전 2로 상향). C# Prefab은 네이티브 Prefab*를 쥐지 않고 이름만 보관한다 — 포인터를 들면 에셋 재로드 때 매달린 참조가 되는데, 스폰은 호출 빈도가 낮아 매번 이름으로 찾는 편이 안전하다. Destroy는 즉시 지우지 않고 엔진의 지연 파괴(Object::Destroy)를 그대로 호출한 뒤 핸들만 즉시 무효화해, 관리 측이 다음 접근에서 바로 걸러내게 했다. 검증: Spawner 스크립트로 Bomb 프리팹을 0.15초 간격 스폰하며 최대 개수 초과분을 큐에서 꺼내 파괴 — Bomb_0~9까지 생성·정리가 정확히 순환하고 생존 수가 유지됨. 부수 발견: Start는 CLI/인스펙터의 필드 설정보다 먼저 실행되므로 에셋 로드를 Start에 두면 빈 값을 본다. 이름이 바뀔 때 다시 로드하는 형태로 바꿨고, 이는 인스펙터에서 실행 중 프리팹을 교체하는 흐름과도 맞는다" },
+  { phase: 2, id: "2-19", title: "라이프사이클 타이밍 수정 — 스폰 직후 Awake",
+    detail: "프리팹 스폰 시 Awake가 다음 프레임으로 밀리던 문제. Instantiate가 반환되기 전에 Awake가 끝나야 스폰 직후 초기화하는 패턴이 성립한다.",
+    refs: "ScriptApiMigrationPlan.html §2", priority: "P0", days: 0.5, status: "done",
+    note: "완료 — 지적받고 실측한 결과 1프레임 지연이 확인됐다(Instantiate 반환 프레임 146, Awake 프레임 147). 원인은 ScriptComponent::Awake가 Scene::Awake 브로드캐스트에 걸려 있고 그 브로드캐스트는 TickScripts보다 앞에서 돌기 때문 — 스폰이 Update(TickScripts) 중에 일어나면 그 프레임의 Awake는 이미 지나간 뒤다. Unity는 Instantiate 반환 전에 Awake를 끝내고 실측 스크립트도 스폰 직후 Initialize를 호출하는 패턴이 47회라 맞춰야 한다. 수정: Prefab_Instantiate가 반환 전에 Scene::Awake(이미 깨운 것은 플래그로 스킵되므로 자식이 여럿이어도 안전)와 ClrHost::FlushPendingAwake를 호출한다. 관리 측에는 활성 목록을 건드리지 않는 AwakeNewlyCreated를 따로 두어 Update 순회 도중 호출해도 안전하게 했다 — 목록 편입(따라서 첫 Update)은 다음 틱으로 미뤄져 Unity와 같은 순서가 된다. 부수: 진단 중 측정 방법 자체의 오류도 발견해(스크립트가 세는 프레임 번호는 TickAwake가 TickUpdate보다 먼저 도는 탓에 항상 같은 값으로 보인다) 엔진 프레임 카운터를 API로 노출했다. 검증: Awake 프레임 146(Instantiate 반환 전), Start 프레임 147" },
+  { phase: 2, id: "2-20", title: "S2 — 물리 콜백 (S2 완료)",
+    detail: "OnTrigger/OnCollision 6종을 관리 스크립트에 전달한다. 충돌마다 경계를 넘지 않도록 큐에 모아 틱 경계에서 일괄 처리.",
+    refs: "ScriptApiMigrationPlan.html §2 · §11.6 S2", priority: "P0", days: 1.5, status: "done",
+    note: "완료 — 조사에서 세 가지 제약이 나왔다: ①네이티브 Collision이 접점 배열을 참조로 들고 있어 blittable이 아니고, ②기존 디스패치가 GetComponents&lt;ModuleBehavior&gt;로 대상을 찾아 ScriptComponent는 아예 호출되지 않으며, ③즉시 호출하면 '틱당 1회' 원칙이 깨진다. 대응: Collision을 (상대 핸들 + 접점 개수 + 대표 접점)으로 평탄화하고 — 접점 전체가 필요해지면 별도 조회 API를 두는 편이 경계를 얇게 유지한다 —, Scene의 콜백 6종에 관리 스크립트 큐 적재를 더하고, 전달은 Dx11Main의 틱 경계에서 배열 포인터 하나로 한 번에 한다(충돌이 몇 건이든 경계 통과 1회). 상대 오브젝트는 핸들로 넘겨 이미 파괴된 경우 관리 측이 세대 검사로 걸러낸다. 검증 편의를 위해 CLI에 component.add/component.list 추가(에디터의 Add Component와 같은 경로). 검증: BoxCollider+RigidBody를 붙인 두 오브젝트가 겹치자 CollisionEnter가 상대 이름·접점 4개·좌표와 함께 도착하고 Exit까지 순환. 이로써 S2 대표 케이스 3종(오브젝트 참조·프리팹·물리)이 모두 확인되어 T2 표면이 확정됐다" },
+  { phase: 2, id: "2-21", title: "GetComponent 바인딩 (실측 1위) + 다중 스크립트 부착",
+    detail: "실측 734회로 1위인 GetComponent를 노출한다. 설계 11.2에 따라 관리 스크립트 조회는 경계를 넘지 않고 C# 내부에서 완결시킨다.",
+    refs: "ScriptApiMigrationPlan.html §11.2 · §3.1", priority: "P0", days: 1, status: "done",
+    note: "완료 — BehaviourRegistry에 ObjectHandle→스크립트 목록 색인을 두어 GetComponent/GetComponents/TryGetComponent/HasComponent가 전부 관리 영역에서 끝난다(P/Invoke 0회). 색인은 보류 큐를 거치지 않고 즉시 갱신한다 — 스폰 직후 Awake 안에서 바로 GetComponent를 부르는 패턴이 흔하기 때문. 타입 파라미터를 where T : Behaviour로 못 박아, 아직 래퍼가 없는 네이티브 컴포넌트를 찾으려 하면 런타임에 null이 아니라 컴파일 단계에서 걸리게 했다. [검증 중 발견] 더 근본적인 제약이 하나 드러났다: GameObject::AddComponent는 타입당 하나로 제한하고 기존 것을 돌려주므로, ScriptComponent 방식으로는 한 오브젝트에 스크립트를 하나밖에 붙일 수 없었다(Unity에서는 여럿이 기본이고, 엔진도 ModuleBehavior용으로 AddScriptComponent라는 별도 경로를 이미 두고 있었다). AddComponentAllowMultiple을 추가해 해결. 검증: Main Camera에 HealthComponent+DamageDealer를 함께 붙이고, 자기 오브젝트 조회(체력 100 확인)와 남의 오브젝트 조회(Directional Light의 체력을 100→93→86…으로 감소)가 모두 동작" },
+  { phase: 2, id: "2-9", title: "메모리 평탄성 검증 및 기준선 갱신",
+    detail: "Phase 0 벤치마크 재실행 — 씬 전환 50회 VRAM 평탄 확인, 게임플레이 1시간 ASan 무크래시 확인, 결과를 문서화.",
+    refs: "Exit Criteria", priority: "P0", days: 2.5, status: "todo", note: "" },
+
+  // ---------- PHASE 3: 렌더러 구조 개선 ----------
+  { phase: 3, id: "3-1", title: "RenderGraphBuilder 거취 결정",
+    detail: "완성(패스/리소스 의존성 자동 관리로 전환) vs 제거(경량 패스 스케줄러로 대체) 결정. 23단계 하드코딩 순서의 유지보수 비용과 전환 비용 비교.",
+    refs: "4.1", priority: "P1", days: 2, status: "todo", note: "" },
+  { phase: 3, id: "3-2", title: "패스 등록/순서의 단일 지점화",
+    detail: "3-1 결정에 따라 SceneRendering()의 하드코딩 호출을 그래프 실행 또는 선언적 패스 리스트로 교체. 패스별 입출력 텍스처 명시.",
+    refs: "4.1", priority: "P1", days: 6, status: "todo", note: "" },
+  { phase: 3, id: "3-3", title: "카메라 수명 · 커맨드 큐 정리",
+    detail: "카메라 삭제 시 패스별 3프레임 커맨드 큐 flush 헬퍼 추가, 인덱스 재사용 레이스 차단, 슬롯 고정 10개 제한의 명시적 정책화.",
+    refs: "12.1-⑤", priority: "P1", days: 2.5, status: "todo", note: "" },
+  { phase: 3, id: "3-4", title: "GPU 동기화 실제 구현",
+    detail: "WaitForGPUCompletion을 ID3D11Query(EVENT) 기반으로 실제 구현, IsReadyForReuse의 Flush-only 로직 교체. 파티클 버퍼 리사이즈를 GPU 완료 후로 지연.",
+    refs: "12.3-⑥", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 3, id: "3-5", title: "Texture 클래스 Rule of Five 정리",
+    detail: "이동 생성자 완성(m_pUAV·플래그·desc 포함) + 이동 대입 정의 또는 이동 자체 삭제. 복사/이동 정책 명문화.",
+    refs: "12.1-④", priority: "P2", days: 1.5, status: "todo", note: "" },
+  { phase: 3, id: "3-6", title: "미사용 Resize()/데드 렌더 코드 정리",
+    detail: "호출부 없는 패스별 Resize() 오버라이드의 의도 확인 후 연결 또는 제거. SceneRenderer의 주석 처리된 구 경로 삭제.",
+    refs: "12.1-⑥", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 3, id: "3-7", title: "EffectManager 동시성 정리",
+    detail: "activeEffects 보호 락 적용, isCleanupRunning 플래그를 리필/정리 작업별로 분리, EffectProxyController 컨테이너 동기화.",
+    refs: "12.3-④⑧", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 3, id: "3-8", title: "씬 구조 변경과 렌더 스레드 동기화",
+    detail: "재생/정지 전환과 씬 교체가 게임 로직 도중(렌더 배리어 이전)에 씬 오브젝트 목록을 통째로 갈아엎던 것을, 커맨드 빌드·실행 스레드가 모두 묶이는 배리어 두 랑데뷰 사이로 이동.",
+    refs: "신규발견", priority: "P0", days: 1, status: "done",
+    note: "완료 — 증상은 모델을 배치한 씬에서 재생 진입 시 100% 접근 위반이었다. 덤프상 커맨드 생성 워커가 GizmoPass가 순회 중이던 m_SceneObjects의 무효 반복자를 밟았고, 원인은 게임 스레드가 CreateEditorOnlyPlayScene으로 오브젝트 68개를 push_back 하는 동안 렌더가 계속 돈 것(오브젝트 3개일 때는 재할당이 적어 드러나지 않았다). SceneManager의 전환 판단과 실행을 HasPendingSceneStructureChange/ApplyPendingSceneStructureChange로 분리하고, 실행을 Dx11Main::Update의 배리어 사이에서만 수행하도록 이동(빌드 스레드는 NotifyAllAndWait로 워커까지 기다린 뒤 배리어에 도달하므로 이 구간은 워커도 idle이다). 씬 교체(BeforeAwakeSceneLoad)도 같은 구간으로 옮겼다. 검증: 재생↔정지 3회 왕복 후 오브젝트 68개 유지, GizmoPass의 방어 코드를 제거한 상태에서도 2/2 정상 종료 — 동기화 자체가 근본 해결임을 확인. GizmoPass의 스냅샷·널 검사는 보험으로 유지" },
+
+  // ---------- PHASE 4: 구조적 커플링 제거 ----------
+  { phase: 4, id: "4-1", title: "렌더-게임플레이 인터페이스 계층 설계",
+    detail: "RenderEngine이 필요로 하는 ScriptBinder 개념(GameObject/컴포넌트 데이터)을 순수 인터페이스/POD 스냅샷으로 추출 — 프록시 계층이 이미 존재하므로 이를 공식 경계로 승격.",
+    refs: "3장 커플링", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 4, id: "4-2", title: "RenderEngine → ScriptBinder include 절단",
+    detail: "RenderScene 등 ScriptBinder 헤더 직접 include 지점을 인터페이스 참조로 교체. include 그래프 검사 스크립트 작성 → CI 게이트 등록.",
+    refs: "3장 커플링", priority: "P1", days: 5, status: "todo", note: "" },
+  { phase: 4, id: "4-3", title: "DataSystem에서 에디터 UI 분리",
+    detail: "콘텐츠 브라우저(OpenContentsBrowser/DrawFileTile 등)를 EngineGUIWindow 측 ContentsBrowserWindow로 이동 — 리소스 시스템은 데이터 API만 노출. EffectEditor의 에디터 전용 부분도 동일 방향.",
+    refs: "4.4, 13장 리스크1", priority: "P1", days: 4, status: "todo", note: "" },
+  { phase: 4, id: "4-4", title: "Mono 데드 코드 제거",
+    detail: "Managed/, MonoBleedingEdge/, Assembly-CSharp/, MonoManager, CSharpScriptComponent, *_Binding.h, UNUSE_MONO_LIB 가드 일괄 제거 (git 히스토리에 보존됨). 저장소·빌드 표면 축소.",
+    refs: "6.2, 13장 리스크3", priority: "P2", days: 1.5, status: "todo", note: "" },
+  { phase: 4, id: "4-5", title: "디렉터리 재구성 (평면 → 도메인별 서브폴더)",
+    detail: "RenderEngine(246파일)·ScriptBinder(235파일)를 Passes/·Resources/·Animation/·Particles/·Proxy/ 등으로 분리. 코드젠 도구 3종의 스캔 경로 검증 포함, 서브폴더 1개 단위로 이동→빌드 반복.",
+    refs: "13장 리스크4", priority: "P2", days: 4, status: "todo", note: "" },
+  { phase: 4, id: "4-6", title: "vcpkg 매니페스트 전환",
+    detail: "classic 모드 + 수동 경로 연결을 vcpkg.json 매니페스트로 통일 — 신규 환경 셋업 재현성 확보.",
+    refs: "11.2", priority: "P3", days: 1.5, status: "todo", note: "" },
+
+  // ---------- PHASE 5: 코드 정리·상시화 ----------
+  { phase: 5, id: "5-1", title: "확정 데드 코드 일괄 제거",
+    detail: "DataSystem::AddModel, GetCommandQueue, 주석 처리 블록, 미사용 VolumetricFog 흔적 등 분석에서 확정된 데드 코드 제거.",
+    refs: "12.2-⑦ 외", priority: "P2", days: 1.5, status: "todo", note: "" },
+  { phase: 5, id: "5-2", title: "동시성 코드 위생 정리",
+    detail: "UI ProxyCommand 생성자의 SpinLock 범위 축소, AnimationJob.cpp 파일 전역 m_currAnimator 멤버화, 락 규약 문서를 코드 주석으로 정착.",
+    refs: "12.3-⑨⑩", priority: "P2", days: 1.5, status: "todo", note: "" },
+  { phase: 5, id: "5-3", title: "정적 분석 CI 게이트",
+    detail: "clang-tidy(또는 MSVC /analyze) 핵심 체크(수명·return 누락·락 규약)를 CI에 추가. C4715 등 치명 경고를 에러 승격.",
+    refs: "13장 리스크2", priority: "P2", days: 2, status: "todo", note: "" },
+  { phase: 5, id: "5-4", title: "리소스 회귀 테스트 자동화",
+    detail: "씬 전환 메모리 평탄성 벤치마크(0-3)를 헤드리스/자동 실행 가능하게 만들어 CI 또는 주기 잡으로 상시화 — 소유권 모델 회귀의 영구 방어선.",
+    refs: "Exit Criteria", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 5, id: "5-5", title: "아키텍처 문서 갱신",
+    detail: "구조 분석 보고서를 리팩토링 후 상태로 갱신, 소유권 모델·모듈 경계·락 규약을 docs/에 공식 문서화.",
+    refs: "5장", priority: "P3", days: 2, status: "todo", note: "" },
+
+  // ---------- PHASE 6: UI 서브시스템 재설계 ----------
+  //
+  // 스크립트 UI 바인딩(kApiVersion 15) 작업 중 실측으로 드러난 결함에서 출발한 페이즈.
+  // "런타임에 캔버스를 붙이고 재생"이라는 단순한 조합만으로 서로 다른 크래시 3건이 연쇄로 나왔다.
+  { phase: 6, id: "6-0", title: "[핫픽스] 캔버스 관련 확정 크래시 3건 제거",
+    detail: "① ComponentFactory::LoadComponent의 Text·SpriteSheet 분기: FindCanvasName 결과를 널 검사 없이 역참조 — 캔버스 이름이 비었거나 없는 이름이면 씬 로드 중 접근 위반(Image 분기에는 이미 검사가 있었음). ② Canvas::GetFrontUIObject: 빈 UIObjs에 front() 호출 — UI 자식 없는 캔버스가 선택되는 순간 __fastfail(0xC0000409). 런타임 생성 캔버스는 항상 비어 있어 100% 재현. ③ UIManager 갱신 루프: (curScene != nullptr || CurCanvas.expired()) — ||가 &&여야 할 자리라 씬이 널이어도 진입해 널 역참조하는 잠재 크래시.",
+    refs: "실측 재현 3/3", priority: "P0", days: 1, status: "done",
+    note: "완료 — 셋 다 수정 후 Canvas+Text+Image 조합 재생/정지에서 UiTextProbe 12건 통과. ②는 fastfail이라 크래시 핸들러(1-*)로도 덤프가 안 남는 유형임을 함께 확인(유저 모드에서 가로챌 수 없음). 단 이 수정들은 증상 제거일 뿐, 아래 구조 문제가 남아 있는 한 같은 부류가 재발한다" },
+  { phase: 6, id: "6-1", title: "UI 요소 등록처 단일화",
+    detail: "같은 UI 요소가 세 곳에 수동 등록된다: Canvas.UIObjs(weak_ptr 벡터), UIManager.Images/Texts/SpriteSheets(원시 포인터 벡터), Scene.Canvases+CanvasMap(weak_ptr + 이름 키 맵). 등록·해제가 전부 수동이라 한 곳이라도 빠지면 dangling이거나 유령 등록이 된다. 등록처를 Scene 하나로 줄이고 나머지는 조회 뷰로 만든다. Canvas::AddUIObject의 타입별 분기(Image면 RegisterImage, Text면 RegisterText...)도 이때 함께 사라진다.",
+    refs: "Phase 2와 동형 문제", priority: "P0", days: 3, status: "done",
+    note: "완료 — 등록을 컴포넌트 Awake로 이관(수명에 자동 귀속), 해제는 OnDestroy에서 무조건 수행(예전엔 씬이 널이면 건너뛰어 dangling 잔존). 레지스트리 등록에 중복 방지 추가. Canvas::AddUIObject는 연결만 담당하고 중복 연결도 무해하게 변경" },
+  { phase: 6, id: "6-2", title: "캔버스-UI 이름 문자열 결합 제거",
+    detail: "UI 컴포넌트가 소속 캔버스를 m_ownerCanvasName 문자열로 기억하고, 캔버스 이름이 바뀌면 Canvas::Update가 매 프레임 비교로 감지해 자식들 문자열을 일괄 갱신한다. CanvasMap도 이름 키라 중복 이름이면 등록이 조용히 거부된다(AddCanvas의 'already exists' 경로). 이름 대신 부모 계층 관계(UI는 캔버스의 자손)를 진실로 삼고, 직렬화에는 이름 대신 관계를 남긴다. 6-0-①의 널 캔버스 크래시가 바로 이 결합이 끊어졌을 때의 증상이었다.",
+    refs: "6-0-① 근원", priority: "P0", days: 3, status: "done",
+    note: "완료 — ①런타임 결합을 원시 포인터에서 GameObject 약참조로 교체(dangling 구조적 제거, GetOwnerCanvas 매회 생존 확인). ②연결 해석을 「조상 계층 우선, 이름은 폴백」으로 전환해 계획 원안(부모 계층을 진실로)까지 완결 — 씬 파일 수정 없이 탐색 순서만 바꿔 달성. 실전 검증: HPCanvas.prefab은 자식들 이름 필드가 낡은 값(Canvas)이었는데 계층 우선이라 자기 캔버스에 정확히 연결(이전엔 0/21 미연결+경고 21건 → 21/21·경고 0건). UI_CanvasesIngame 소환 시 이름 충돌 개명(Canvas (1))에도 자식 24개가 자기 캔버스에 귀속 — 오연결 해소 실증. 연결 시 SetCanvas가 이름을 실제 캔버스로 재기록하므로 낡은 이름은 다음 저장 때 자가 치유. 교차 소속 우려는 추가 검증으로 해소: SettingCanvas 소속 0으로 보였던 것은 비활성 캔버스(m_isEnabled: false) 서브트리가 아직 깨어나지 않아 등록 전이었기 때문. 게임 흐름대로 SettingCanvas를 활성화하자 자식 UI 11개가 깨어나 정확히 SettingCanvas(11)로 귀속 — 이름과 계층이 일치하는 콘텐츠였고, 비활성→활성 지연 등록 경로까지 관계 기반 연결이 처리함을 실증" },
+  { phase: 6, id: "6-3", title: "역직렬화 부작용 분리 (구성/연결 2단계)",
+    detail: "ComponentFactory::LoadComponent가 타입별 분기 안에서 UIManagers->AddCanvas, canvas->AddUIObject 같은 전역 등록 부작용을 수행한다. 재생 버튼이 씬을 직렬화-복원하는 사본 방식이라 이 부작용이 재생마다 재실행되고, 실패 경로(캔버스가 아직 없음)가 곧 크래시였다. 역직렬화를 '값 복원'과 '연결 수립' 2단계로 나누고, 연결은 씬의 모든 오브젝트가 복원된 뒤 한 번에 수행한다 — 순서 의존(캔버스가 UI보다 먼저 복원돼야 함)도 함께 사라진다.",
+    refs: "6-0-① 경로", priority: "P1", days: 2.5, status: "done",
+    note: "완료 — ComponentFactory 세 분기에서 연결 코드 제거. 연결은 UIManager::Update가 프레임 경계에 일괄 수행(기존 DeserializeNavi 지연 보정과 같은 자리). 미연결+이름 보유만 시도하므로 멱등, 실패 시 다음 프레임 재시도(캔버스가 나중에 생겨도 이어짐), 경고는 컴포넌트당 1회. 순서 의존 소멸 — 캔버스보다 UI가 먼저 복원돼도 안전" },
+  { phase: 6, id: "6-4", title: "프레임 루프 정리 로직 이관",
+    detail: "Canvas::Update가 매 프레임 erase_if로 파괴된 UI를 청소하고 이름 변화를 폴링한다. 원 작성자도 코드 주석에 '이 부분 UI Manager에서 통합으로 처리하자'라고 남겨 둔 자리다. 파괴는 OnDestroy 이벤트에서 즉시 등록 해제로, 정렬 갱신은 변경 시점 플래그로 바꿔 폴링을 없앤다. 6-1이 끝나면 등록처가 하나라 이관이 단순해진다.",
+    refs: "원 작성자 TODO 주석", priority: "P2", days: 1.5, status: "done",
+    note: "완료 — Canvas::Update의 매 프레임 erase_if는 컴포넌트 OnDestroy → RemoveUIObject 이벤트로, 이름 변경 폴링은 직접 참조 전환(6-2)으로 소멸. Update에는 정렬 플래그 감지만 남음" },
+  { phase: 6, id: "6-5", title: "빈 컨테이너·최소 1개 전제 전수 감사",
+    detail: "GetFrontUIObject 외에도 UI 경로에 front()/[0]/at(0) 같은 '요소가 최소 1개 있다' 전제가 흩어져 있는지 UIManager·Canvas·UIButton·Navi 코드를 전수 확인하고 빈 상태를 정상 상태로 처리한다. MakeImage의 'Canvases.empty()면 MakeCanvas()' 같은 암묵 생성 경로도 명시적으로 바꾼다.",
+    refs: "6-0-② 일반화", priority: "P2", days: 1, status: "done",
+    note: "완료 — Make* 4곳의 「MakeCanvas 후 front()」 경로에 실패 가드 추가(MakeCanvas는 이름 충돌 시 널 반환인데 그대로 front()로 진행했음). 회귀 실행에서 ProxyCommand 3곳의 널 캔버스 역참조도 발견·수정(UIRenderProxy는 걸렀는데 이쪽만 빠져 있었고, 지연 연결 도입으로 「연결 전 프레임」이 정상 상태가 되면서 표면화)" },
+  { phase: 6, id: "6-6", title: "CLI UI 회귀 시나리오 상시화",
+    detail: "component.add로 Canvas·Text·Image·RectTransform을 임의 조합/순서로 붙이고 재생-정지를 반복하는 CLI 스크립트를 회귀 세트에 추가. UiTextProbe(12건)를 통과 기준으로 삼는다. 6-0의 크래시들이 전부 '에디터에서 정상 순서로 만들면 안 드러나는' 유형이었으므로, 비정상 순서를 기계적으로 찍는 것이 방어선이 된다.",
+    refs: "0-8 인프라 활용", priority: "P1", days: 1, status: "done",
+    note: "완료 — Tools/regression/ui_regression.txt: ①캔버스 없이 UI 먼저+재생 ②캔버스 나중 추가(지연 연결 검증) ③빈 캔버스 단독 ④재생/정지 반복. 4케이스 전부 종료 코드 0, UiTextProbe 12건×3회 통과. 이 시나리오가 첫 실행에서 ProxyCommand 크래시를 즉시 잡아냈다 — 방어선으로 실증됨" },
+];
+
+// ============================================================
+// 렌더링 로직 (수정 불필요)
+// ============================================================
+const PHASE_NAMES = ["안전망 구축", "크래시 핫픽스", "자원 소유권 재설계", "렌더러 구조 개선", "구조적 커플링 제거", "코드 정리·상시화", "UI 서브시스템 재설계"];
+const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
+const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
+const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };
+const PR_CLASS = { P0: "pr-p0", P1: "pr-p1", P2: "pr-p2", P3: "pr-p3" };
+
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+// 페이즈별 테이블 렌더
+document.querySelectorAll("table.tasks").forEach(table => {
+  const p = parseInt(table.dataset.phase, 10);
+  const rows = TASKS.filter(t => t.phase === p);
+  let html = "<tr><th style='width:46px'>ID</th><th>작업 항목</th><th style='width:56px'>우선</th><th style='width:52px'>공수</th><th style='width:72px'>상태</th><th style='width:110px'>근거</th></tr>";
+  for (const t of rows) {
+    html += `<tr>
+      <td><code>${t.id}</code></td>
+      <td><strong>${esc(t.title)}</strong><br><span style="color:var(--text-dim);font-size:12.5px">${esc(t.detail)}</span>${t.note ? `<br><span style="color:var(--accent);font-size:12px">📝 ${esc(t.note)}</span>` : ""}</td>
+      <td><span class="pr ${PR_CLASS[t.priority]}">${t.priority}</span></td>
+      <td>${t.days}일</td>
+      <td><span class="st ${ST_CLASS[t.status]}">${ST_LABEL[t.status]}</span></td>
+      <td style="font-size:12px;color:var(--text-dim)">${esc(t.refs)}</td>
+    </tr>`;
+  }
+  table.innerHTML = html;
+});
+
+// 진행률 계산 (공수 가중)
+function phasePct(p) {
+  const rows = TASKS.filter(t => t.phase === p);
+  const total = rows.reduce((s, t) => s + t.days, 0);
+  const done = rows.reduce((s, t) => s + t.days * ST_WEIGHT[t.status], 0);
+  return total ? Math.round(done / total * 100) : 0;
+}
+const totalDays = TASKS.reduce((s, t) => s + t.days, 0);
+const doneDays = TASKS.reduce((s, t) => s + t.days * ST_WEIGHT[t.status], 0);
+const overallPct = Math.round(doneDays / totalDays * 100);
+
+// 전체 링
+document.getElementById("overall-pct").textContent = overallPct + "%";
+const ring = document.getElementById("ring");
+const CIRC = 2 * Math.PI * 78;
+ring.setAttribute("stroke-dasharray", CIRC);
+ring.setAttribute("stroke-dashoffset", CIRC * (1 - overallPct / 100));
+
+// 카운트
+document.getElementById("total-count").textContent = TASKS.length;
+document.getElementById("total-days").textContent = totalDays;
+for (const st of ["done", "progress", "todo", "blocked"]) {
+  document.getElementById("cnt-" + st).textContent = TASKS.filter(t => t.status === st).length;
+}
+
+// 페이즈 요약 카드
+const summary = document.getElementById("phase-summary");
+for (let p = 0; p < PHASE_NAMES.length; p++) {
+  const rows = TASKS.filter(t => t.phase === p);
+  const days = rows.reduce((s, t) => s + t.days, 0);
+  const pct = phasePct(p);
+  const doneCnt = rows.filter(t => t.status === "done").length;
+  const el = document.createElement("a");
+  el.className = "ps-card";
+  el.href = "#phase-" + p;
+  el.innerHTML = `
+    <div class="ps-head"><span class="ps-title">Phase ${p} · ${PHASE_NAMES[p]}</span><span class="ps-pct">${pct}%</span></div>
+    <div class="bar"><div style="width:${pct}%"></div></div>
+    <div class="ps-sub">${doneCnt}/${rows.length} 완료 · ${days}일 규모</div>`;
+  summary.appendChild(el);
+}
+
+// 섹션 헤더 % 표기
+document.querySelectorAll(".phase-pct").forEach(el => {
+  el.textContent = phasePct(parseInt(el.dataset.phasePct, 10)) + "%";
+});
+</script>
+</body>
+</html>
+
+
+

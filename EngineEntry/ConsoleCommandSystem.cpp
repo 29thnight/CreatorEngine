@@ -1,0 +1,1103 @@
+#ifndef DYNAMICCPP_EXPORTS
+#include "ConsoleCommandSystem.h"
+
+#include "SceneManager.h"
+#include "ClrHost.h"
+#include "ScriptComponent.h"
+#include "PrefabUtility.h"
+#include "ComponentFactory.h"
+#include "Animator.h"
+#include "ConditionParameter.h"
+#include "UIManager.h"
+#include "Canvas.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
+#include "SpriteSheetComponent.h"
+#include "DataSystem.h"
+#include "DeviceResources.h"
+#include "LogSystem.h"
+#include "PathFinder.h"
+#include "CoreWindow.h"
+
+#include <Windows.h>
+#include <algorithm>
+#include <cstdio>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+
+namespace
+{
+    // 앞뒤 공백 제거
+    std::string TrimLine(const std::string& s)
+    {
+        const auto begin = s.find_first_not_of(" \t\r\n");
+        if (begin == std::string::npos) return {};
+        const auto end = s.find_last_not_of(" \t\r\n");
+        return s.substr(begin, end - begin + 1);
+    }
+
+    std::vector<std::string> Split(const std::string& line)
+    {
+        std::vector<std::string> parts;
+        std::istringstream iss(line);
+        std::string token;
+        while (iss >> token) parts.push_back(token);
+        return parts;
+    }
+
+    // 콘솔을 확보한다(GUI 앱이라 기본적으로 없다).
+    //
+    // 터미널에서 실행한 경우에는 그 터미널에 그대로 붙는다. Windows Terminal에서
+    // 띄우면 별도 conhost 창이 뜨지 않고 그 탭에 출력된다.
+    // 부모 콘솔이 없을 때만(탐색기에서 더블클릭 등) 새 콘솔을 만드는데, 이때
+    // 어떤 터미널이 열리는지는 Windows 11의 "기본 터미널 앱" 설정을 따른다.
+    void EnsureConsole()
+    {
+        if (::GetConsoleWindow() != nullptr) return;
+
+        if (!::AttachConsole(ATTACH_PARENT_PROCESS))
+        {
+            if (!::AllocConsole()) return;
+        }
+
+        FILE* dummy = nullptr;
+        freopen_s(&dummy, "CONIN$", "r", stdin);
+        freopen_s(&dummy, "CONOUT$", "w", stdout);
+        freopen_s(&dummy, "CONOUT$", "w", stderr);
+        std::ios::sync_with_stdio(true);
+
+        // 로그와 명령 출력이 한글을 쓰므로 UTF-8로 맞춘다.
+        // (기본 코드페이지 949에서는 소스의 UTF-8 문자열이 깨진다)
+        ::SetConsoleOutputCP(CP_UTF8);
+        ::SetConsoleCP(CP_UTF8);
+    }
+}
+
+ConsoleCommandSystem& ConsoleCommandSystem::Get()
+{
+    static ConsoleCommandSystem instance;
+    return instance;
+}
+
+void ConsoleCommandSystem::InitializeFromCommandLine()
+{
+    int argc = 0;
+    LPWSTR* argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+    if (!argv) return;
+
+    bool wantConsole = false;
+
+    auto toUtf8 = [](const wchar_t* w) -> std::string
+    {
+        if (!w) return {};
+        const int need = ::WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
+        std::string s(need > 0 ? need - 1 : 0, '\0');
+        if (need > 1) ::WideCharToMultiByte(CP_UTF8, 0, w, -1, s.data(), need, nullptr, nullptr);
+        return s;
+    };
+
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = toUtf8(argv[i]);
+
+        if (arg == "--exec" && i + 1 < argc)
+        {
+            Enqueue(toUtf8(argv[++i]));
+            wantConsole = true;
+        }
+        else if (arg == "--script" && i + 1 < argc)
+        {
+            LoadScriptFile(toUtf8(argv[++i]));
+            wantConsole = true;
+        }
+        else if (arg == "--console")
+        {
+            wantConsole = true;
+        }
+    }
+    ::LocalFree(argv);
+
+    if (wantConsole)
+    {
+        // 스크립트로 돌리는 실행에서는 크래시 때 대화상자를 띄우지 않는다 —
+        // 답할 사람이 없어 그대로 멈춰 있다가 덤프도 없이 죽는다.
+        CoreWindow::SetUnattended(true);
+        SuppressCrtDialogs();
+
+        EnsureConsole();
+        std::printf("[CLI] 콘솔 명령 사용 가능. 'help' 입력.\n");
+        StartStdinReader();
+    }
+}
+
+void ConsoleCommandSystem::StartStdinReader()
+{
+    if (m_running.exchange(true)) return;
+
+    // 표준 입력은 블로킹이므로 별도 스레드에서 읽고 큐에만 넣는다.
+    // 실제 실행은 Pump()가 게임 스레드에서 수행한다.
+    m_stdinThread = std::thread([this]
+    {
+        std::string line;
+        while (m_running.load(std::memory_order_acquire) && std::getline(std::cin, line))
+        {
+            Enqueue(line);
+        }
+    });
+}
+
+void ConsoleCommandSystem::LoadScriptFile(const std::string& path)
+{
+    std::ifstream file(path);
+    if (!file)
+    {
+        Debug->LogError("[CLI] 스크립트를 열 수 없습니다: " + path);
+        return;
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        const std::string trimmed = TrimLine(line);
+        if (trimmed.empty() || trimmed[0] == '#') continue;   // 주석/빈 줄 무시
+        Enqueue(trimmed);
+    }
+}
+
+void ConsoleCommandSystem::Enqueue(std::string command)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_pending.push_back(std::move(command));
+}
+
+void ConsoleCommandSystem::Pump()
+{
+    // wait 명령으로 보류 중이면 프레임만 소모한다.
+    if (m_waitFrames > 0)
+    {
+        --m_waitFrames;
+        return;
+    }
+
+    // 씬 로딩이 끝나기 전에는 다음 명령을 실행하지 않는다.
+    // (전환 중 측정하면 중간값이 섞인다)
+    if (SceneManagers->IsSceneLoading()) return;
+
+    std::string command;
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        if (m_pending.empty()) return;
+        command = std::move(m_pending.front());
+        m_pending.pop_front();
+    }
+
+    Execute(TrimLine(command));
+}
+
+void ConsoleCommandSystem::Execute(const std::string& line)
+{
+    if (line.empty()) return;
+
+    const auto parts = Split(line);
+    if (parts.empty()) return;
+
+    const std::string& cmd = parts[0];
+
+    if (cmd == "help")
+    {
+        PrintHelp();
+    }
+    else if (cmd == "quit" || cmd == "exit")
+    {
+        std::printf("[CLI] 종료 요청\n");
+        m_quitRequested.store(true, std::memory_order_release);
+    }
+    else if (cmd == "wait")
+    {
+        m_waitFrames = (parts.size() > 1) ? std::max(0, std::atoi(parts[1].c_str())) : 1;
+        std::printf("[CLI] %d 프레임 대기\n", m_waitFrames);
+    }
+    else if (cmd == "scene.load" || cmd == "scene.switch")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: %s <씬 경로>\n", cmd.c_str());
+            return;
+        }
+
+        // scene.load  : 씬을 열기만 한다(기존 씬 유지)
+        // scene.switch: 씬을 열고 활성 씬으로 교체한다(기존 씬 파괴 → 언로드 유발)
+        Scene* scene = SceneManagers->LoadScene(parts[1]);
+        if (!scene)
+        {
+            Debug->LogError("[CLI] 씬 로드 실패: " + parts[1]);
+            std::printf("[CLI] 씬 로드 실패: %s\n", parts[1].c_str());
+            return;
+        }
+
+        if (cmd == "scene.switch")
+        {
+            SceneManagers->ActivateScene(scene, true);
+        }
+        std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
+    }
+    else if (cmd == "model.load")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: model.load <모델 경로>\n");
+            return;
+        }
+
+        // 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
+        const std::string path = TrimLine(line.substr(cmd.size()));
+        DataSystems->LoadModel(path);
+        std::printf("[CLI] 모델 로드 요청: %s\n", path.c_str());
+    }
+    else if (cmd == "model.place")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: model.place <모델 이름>\n");
+            return;
+        }
+
+        // 콘텐츠 브라우저에서 씬으로 끌어다 놓는 것과 같은 경로.
+        Scene* scene = SceneManagers->GetActiveScene();
+        auto found = DataSystems->Models.find(parts[1]);
+        if (!scene || found == DataSystems->Models.end() || !found->second)
+        {
+            std::printf("[CLI] 씬 또는 모델을 찾을 수 없음: %s\n", parts[1].c_str());
+            return;
+        }
+
+        Model::LoadModelToScene(found->second.get(), *scene);
+        std::printf("[CLI] 씬에 배치: %s\n", parts[1].c_str());
+    }
+    else if (cmd == "script.add")
+    {
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: script.add <오브젝트 이름> <스크립트 타입>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 오브젝트 이름에 공백이 흔하다("Main Camera"). 타입은 마지막 토큰으로 보고,
+        // 그 앞 전체를 이름으로 취급한다.
+        const std::string typeName = parts.back();
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(typeName)));
+
+        auto object = scene->GetGameObject(objectName);
+        if (!object)
+        {
+            Debug->LogError("[스크립트] 오브젝트를 찾을 수 없음: " + objectName);
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        // 한 오브젝트에 스크립트를 여럿 붙일 수 있어야 하므로 중복 허용 경로를 쓴다.
+        // ScriptComponent가 Awake에서 관리 인스턴스를 만든다.
+        const Meta::Type* scriptType = Meta::Find("ScriptComponent");
+        if (nullptr == scriptType)
+        {
+            std::printf("[CLI] ScriptComponent 타입을 찾을 수 없음\n");
+            return;
+        }
+
+        auto script = std::dynamic_pointer_cast<ScriptComponent>(
+            object->AddComponentAllowMultiple(*scriptType));
+        if (!script)
+        {
+            std::printf("[CLI] ScriptComponent 추가 실패\n");
+            return;
+        }
+
+        script->m_scriptType = typeName;
+        script->Awake();   // 씬 Awake는 이미 지나갔을 수 있으므로 여기서 직접 깨운다
+
+        if (!script->HasInstance())
+        {
+            Debug->LogError("[스크립트] 부착 실패 — 타입=" + typeName);
+            std::printf("[CLI] 스크립트 부착 실패 (타입=%s)\n", typeName.c_str());
+            return;
+        }
+
+        const int id = script->GetInstanceId();
+        Debug->LogWarning("[스크립트] " + objectName + " 에 " + typeName + " 부착 (id=" + std::to_string(id) + ")");
+        std::printf("[CLI] 부착 완료: %s <- %s (id=%d)\n", objectName.c_str(), typeName.c_str(), id);
+    }
+    else if (cmd == "scene.select")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: scene.select <오브젝트 이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const std::string objectName = TrimLine(line.substr(cmd.size()));
+        auto object = scene->GetGameObject(objectName);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        // 인스펙터가 보는 선택 상태를 그대로 바꾼다(에디터에서 클릭한 것과 같은 효과).
+        scene->m_selectedSceneObject = object.get();
+        Debug->LogWarning("[CLI] 선택: " + objectName);
+        std::printf("[CLI] 선택: %s\n", objectName.c_str());
+    }
+    else if (cmd == "script.fields")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: script.fields <인스턴스 id>\n");
+            return;
+        }
+
+        auto& clr = ClrHost::Get();
+        const int id = std::atoi(parts[1].c_str());
+        const int count = clr.GetFieldCount(id);
+
+        Debug->LogWarning("[스크립트] 인스턴스 " + parts[1] + " 노출 필드 " + std::to_string(count) + "개");
+
+        for (int i = 0; i < count; ++i)
+        {
+            const std::string name = clr.GetFieldName(id, i);
+            const auto type = clr.GetFieldType(id, i);
+
+            std::string value;
+            switch (type)
+            {
+            case ClrHost::ScriptFieldType::Float:
+                value = "float " + std::to_string(clr.GetFieldFloat(id, i));
+                break;
+            case ClrHost::ScriptFieldType::Int32:
+                value = "int " + std::to_string(clr.GetFieldInt32(id, i));
+                break;
+            case ClrHost::ScriptFieldType::Bool:
+                value = std::string("bool ") + (clr.GetFieldBool(id, i) ? "true" : "false");
+                break;
+            case ClrHost::ScriptFieldType::String:
+                value = "string \"" + clr.GetFieldString(id, i) + "\"";
+                break;
+            case ClrHost::ScriptFieldType::Float2:
+            {
+                const auto v = clr.GetFieldFloat2(id, i);
+                value = "float2 (" + std::to_string(v.x) + ", " + std::to_string(v.y) + ")";
+                break;
+            }
+            case ClrHost::ScriptFieldType::Float3:
+            {
+                const auto v = clr.GetFieldFloat3(id, i);
+                value = "float3 (" + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ")";
+                break;
+            }
+            case ClrHost::ScriptFieldType::Object:
+            {
+                GameObject* target = clr.GetFieldObject(id, i);
+                value = std::string("object ") + (nullptr != target ? target->m_name.ToString() : "(없음)");
+                break;
+            }
+            default:
+                value = "(미지원 타입)";
+                break;
+            }
+
+            Debug->LogWarning("[스크립트]   [" + std::to_string(i) + "] " + name + " = " + value);
+        }
+        std::printf("[CLI] 필드 %d개 기록\n", count);
+    }
+    else if (cmd == "script.set")
+    {
+        if (parts.size() < 4)
+        {
+            std::printf("[CLI] 사용법: script.set <인스턴스 id> <필드 인덱스> <값>\n");
+            return;
+        }
+
+        auto& clr = ClrHost::Get();
+        const int id = std::atoi(parts[1].c_str());
+        const int index = std::atoi(parts[2].c_str());
+
+        // 값에 공백이 들어갈 수 있다(문자열·오브젝트 이름). 인덱스 뒤 전체를 값으로 본다.
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        rest = TrimLine(rest.substr(parts[1].size()));
+        const std::string rawValue = TrimLine(rest.substr(parts[2].size()));
+
+        switch (clr.GetFieldType(id, index))
+        {
+        case ClrHost::ScriptFieldType::Float:
+            clr.SetFieldFloat(id, index, static_cast<float>(std::atof(rawValue.c_str())));
+            break;
+        case ClrHost::ScriptFieldType::Int32:
+            clr.SetFieldInt32(id, index, std::atoi(rawValue.c_str()));
+            break;
+        case ClrHost::ScriptFieldType::Bool:
+            clr.SetFieldBool(id, index, rawValue == "true" || rawValue == "1");
+            break;
+        case ClrHost::ScriptFieldType::String:
+            clr.SetFieldString(id, index, rawValue);
+            break;
+        case ClrHost::ScriptFieldType::Float2:
+        {
+            ClrHost::ScriptFloat2 v{};
+            std::sscanf(rawValue.c_str(), "%f,%f", &v.x, &v.y);
+            clr.SetFieldFloat2(id, index, v);
+            break;
+        }
+        case ClrHost::ScriptFieldType::Float3:
+        {
+            ClrHost::ScriptFloat3 v{};
+            std::sscanf(rawValue.c_str(), "%f,%f,%f", &v.x, &v.y, &v.z);
+            clr.SetFieldFloat3(id, index, v);
+            break;
+        }
+        case ClrHost::ScriptFieldType::Object:
+        {
+            // 오브젝트 참조는 이름으로 지정한다("none"이면 비운다).
+            GameObject* target = nullptr;
+            if (rawValue != "none" && !rawValue.empty())
+            {
+                if (Scene* activeScene = SceneManagers->GetActiveScene())
+                {
+                    auto found = activeScene->GetGameObject(rawValue);
+                    target = found ? found.get() : nullptr;
+                }
+
+                if (nullptr == target)
+                {
+                    std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", rawValue.c_str());
+                    return;
+                }
+            }
+            clr.SetFieldObject(id, index, target);
+            break;
+        }
+        default:
+            std::printf("[CLI] 설정할 수 없는 필드입니다\n");
+            return;
+        }
+
+        // 인스펙터 편집과 같은 취급 — 바뀐 값을 컴포넌트에 담아 직렬화 대상으로 만든다.
+        if (Scene* scene = SceneManagers->GetActiveScene())
+        {
+            for (const auto& object : scene->m_SceneObjects)
+            {
+                if (!object) continue;
+
+                auto script = object->GetComponent<ScriptComponent>();
+                if (nullptr != script && script->GetInstanceId() == id)
+                {
+                    script->CaptureFields();
+                    break;
+                }
+            }
+        }
+
+        Debug->LogWarning("[스크립트] 필드 설정 — id=" + parts[1] + " [" + parts[2] + "] = " + parts[3]);
+        std::printf("[CLI] 필드 설정 완료\n");
+    }
+    else if (cmd == "component.add")
+    {
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: component.add <오브젝트 이름> <컴포넌트 타입>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 오브젝트 이름에 공백이 흔하므로 컴포넌트 타입을 마지막 토큰으로 본다.
+        const std::string typeName = parts.back();
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(typeName)));
+
+        auto object = scene->GetGameObject(objectName);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        // 에디터의 Add Component 메뉴와 같은 경로.
+        auto found = ComponentFactorys->m_componentTypes.find(typeName);
+        if (found == ComponentFactorys->m_componentTypes.end() || nullptr == found->second)
+        {
+            std::printf("[CLI] 알 수 없는 컴포넌트 타입: %s\n", typeName.c_str());
+            return;
+        }
+
+        auto component = object->AddComponent(*found->second);
+        if (!component)
+        {
+            std::printf("[CLI] 컴포넌트 추가 실패\n");
+            return;
+        }
+
+        if (auto initializable = std::dynamic_pointer_cast<System::IInitializable>(component))
+        {
+            initializable->Initialize();
+        }
+
+        Debug->LogWarning("[CLI] 컴포넌트 추가: " + objectName + " <- " + typeName);
+        std::printf("[CLI] 컴포넌트 추가: %s <- %s\n", objectName.c_str(), typeName.c_str());
+    }
+    else if (cmd == "prefab.instantiate")
+    {
+        // 실제 게임 콘텐츠(프리팹)를 씬에 소환한다. UI 프리팹의 지연 연결 검증에
+        // 필요해 추가했지만, 콘텐츠가 걸린 회귀라면 어디든 쓸 수 있다.
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: prefab.instantiate <프리팹 이름> [인스턴스 이름]\n");
+            return;
+        }
+
+        Prefab* prefab = PrefabUtilitys->LoadPrefab(parts[1]);
+        if (nullptr == prefab)
+        {
+            Debug->LogError("[CLI] 프리팹을 찾을 수 없음: " + parts[1]);
+            std::printf("[CLI] 프리팹을 찾을 수 없음: %s\n", parts[1].c_str());
+            return;
+        }
+
+        const std::string instanceName = (parts.size() > 2) ? parts[2] : parts[1];
+        GameObject* instance = PrefabUtilitys->InstantiatePrefab(prefab, instanceName);
+        if (nullptr == instance)
+        {
+            std::printf("[CLI] 인스턴스 생성 실패: %s\n", parts[1].c_str());
+            return;
+        }
+
+        Debug->LogWarning("[CLI] 프리팹 소환: " + parts[1] + " -> " + instanceName);
+        std::printf("[CLI] 프리팹 소환: %s -> %s (index=%d)\n",
+            parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
+    }
+    else if (cmd == "ui.status")
+    {
+        // 지연 연결 상태를 숫자로 본다. 레지스트리 등록 수와 그중 캔버스가 연결된 수,
+        // 그리고 씬의 캔버스 목록 — 검증에서 눈으로 대조할 기준선이다.
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        int imageLinked = 0;
+        for (auto* image : UIManagers->Images) { if (image && image->GetOwnerCanvas()) ++imageLinked; }
+        int textLinked = 0;
+        for (auto* text : UIManagers->Texts) { if (text && text->GetOwnerCanvas()) ++textLinked; }
+        int spriteLinked = 0;
+        for (auto* sprite : UIManagers->SpriteSheets) { if (sprite && sprite->GetOwnerCanvas()) ++spriteLinked; }
+
+        // 캔버스별 소속 UI 수까지 보여 준다 — 오연결(엉뚱한 캔버스에 붙음)은
+        // 총합만 봐서는 안 보이고, 캔버스별 분포가 어긋나야 드러난다.
+        std::string canvasNames;
+        for (auto& weakCanvas : scene->GetCanvases())
+        {
+            if (auto canvas = weakCanvas.lock())
+            {
+                if (!canvasNames.empty()) canvasNames += ", ";
+                canvasNames += canvas->m_name.ToString();
+
+                if (Canvas* canvasComponent = canvas->GetComponent<Canvas>())
+                {
+                    canvasNames += "(" + std::to_string(canvasComponent->UIObjs.size()) + ")";
+                }
+            }
+        }
+
+        char line[512]{};
+        std::snprintf(line, sizeof(line),
+            "[UI 상태] Image %d/%zu 연결 · Text %d/%zu 연결 · Sprite %d/%zu 연결 · 캔버스 %zu개 [%s]",
+            imageLinked, UIManagers->Images.size(),
+            textLinked, UIManagers->Texts.size(),
+            spriteLinked, UIManagers->SpriteSheets.size(),
+            scene->GetCanvases().size(), canvasNames.c_str());
+
+        Debug->LogWarning(line);
+        std::printf("%s\n", line);
+    }
+    else if (cmd == "dump.crash")
+    {
+        // 크래시 처리 자체를 검증하기 위한 명령. 종류별로 경로가 달라서
+        // (SEH / abort / terminate) 각각 실제로 덤프가 남는지 확인해야 한다.
+        const std::string kind = (parts.size() > 1) ? parts[1] : std::string("access");
+
+        Debug->LogWarning("[CLI] 의도적 크래시: " + kind);
+        Log::FlushNow();
+
+        if ("abort" == kind)
+        {
+            std::abort();
+        }
+        else if ("terminate" == kind)
+        {
+            std::terminate();
+        }
+        else if ("throw" == kind)
+        {
+            // 처리되지 않은 C++ 예외 → std::terminate 경로
+            throw std::runtime_error("dump.crash throw");
+        }
+        else if ("access" == kind)
+        {
+            volatile int* p = nullptr;
+            *p = 1;
+        }
+        else
+        {
+            std::printf("[CLI] 사용법: dump.crash <access|abort|terminate|throw>\n");
+        }
+    }
+    else if (cmd == "dump.list" || cmd == "dump.show")
+    {
+        // 크래시가 나면 덤프(.dmp)와 요약(.txt)이 같은 이름으로 함께 남는다.
+        // dump.list는 목록만, dump.show는 가장 최근 요약의 내용까지 찍는다.
+        const file::path dumpDir = PathFinder::DumpPath();
+        std::printf("[CLI] 덤프 경로: %ls\n", dumpDir.c_str());
+
+        std::error_code ec{};
+        if (!file::exists(dumpDir, ec))
+        {
+            std::printf("[CLI] 덤프 폴더가 없습니다\n");
+            return;
+        }
+
+        // 최신순으로 보여 준다 — 방금 난 크래시가 맨 위에 있어야 쓸모가 있다.
+        std::vector<file::directory_entry> dumps;
+        for (const auto& entry : file::directory_iterator(dumpDir, ec))
+        {
+            if (entry.is_regular_file(ec) && entry.path().extension() == ".dmp") dumps.push_back(entry);
+        }
+
+        std::sort(dumps.begin(), dumps.end(), [](const auto& a, const auto& b)
+        {
+            std::error_code cmpEc{};
+            return file::last_write_time(a, cmpEc) > file::last_write_time(b, cmpEc);
+        });
+
+        if (dumps.empty())
+        {
+            Debug->LogWarning("[CLI] 덤프 없음");
+            std::printf("[CLI] 덤프 없음\n");
+            return;
+        }
+
+        // 콘솔은 별도 창이라 스크립트로 돌린 실행에서는 눈에 띄지 않는다.
+        // 로그에도 남겨야 CI나 사후 확인에서 쓸 수 있다.
+        const size_t limit = (parts.size() > 1) ? static_cast<size_t>(std::max(1, std::atoi(parts[1].c_str()))) : 10;
+        for (size_t i = 0; i < dumps.size() && i < limit; ++i)
+        {
+            std::error_code sizeEc{};
+            const auto bytes = file::file_size(dumps[i], sizeEc);
+
+            char entry[512]{};
+            std::snprintf(entry, sizeof(entry), "[CLI] 덤프 [%zu] %s (%.1f MB)",
+                i, dumps[i].path().filename().string().c_str(),
+                static_cast<double>(bytes) / (1024.0 * 1024.0));
+
+            Debug->LogWarning(entry);
+            std::printf("%s\n", entry);
+        }
+
+        if (cmd == "dump.show")
+        {
+            file::path reportPath = dumps.front().path();
+            reportPath.replace_extension(".txt");
+
+            std::ifstream report(reportPath);
+            if (!report)
+            {
+                Debug->LogWarning("[CLI] 요약 파일 없음: " + reportPath.string());
+                std::printf("[CLI] 요약 파일 없음: %ls\n", reportPath.c_str());
+                return;
+            }
+
+            Debug->LogWarning("[CLI] 크래시 요약 " + reportPath.filename().string());
+            std::string line;
+            while (std::getline(report, line))
+            {
+                Debug->LogWarning("  " + line);
+                std::printf("%s\n", line.c_str());
+            }
+        }
+    }
+    else if (cmd == "animator.state")
+    {
+        // 애니메이션 상태와 거기 붙는 스크립트는 원래 컨트롤러 편집기에서 만든다.
+        // 상태 스크립트 바인딩을 검증할 방법이 없으므로 편집기가 하는 일을 CLI로 대신한다.
+        if (parts.size() < 4)
+        {
+            std::printf("[CLI] 사용법: animator.state <오브젝트 이름> <상태 이름> <스크립트 타입>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const std::string behaviourName = parts.back();
+        const std::string stateName = parts[parts.size() - 2];
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(stateName)));
+
+        auto object = scene->GetGameObject(objectName);
+        if (!object) { std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str()); return; }
+
+        Animator* animator = object->GetComponent<Animator>();
+        if (nullptr == animator) { std::printf("[CLI] Animator가 없음: %s\n", objectName.c_str()); return; }
+
+        if (animator->m_animationControllers.empty())
+        {
+            animator->CreateController("CliController");
+        }
+
+        auto controller = animator->m_animationControllers.front();
+        if (!controller) { std::printf("[CLI] 컨트롤러 생성 실패\n"); return; }
+
+        AnimationState* state = controller->CreateState(stateName, -1);
+        if (nullptr == state) { std::printf("[CLI] 상태 생성 실패: %s\n", stateName.c_str()); return; }
+
+        state->SetBehaviour(behaviourName);
+        if (nullptr == state->behaviour)
+        {
+            Debug->LogError("[CLI] 상태 스크립트를 찾을 수 없음: " + behaviourName);
+            std::printf("[CLI] 상태 스크립트를 찾을 수 없음: %s\n", behaviourName.c_str());
+            return;
+        }
+
+        // 현재 상태로 만들어 두면 다음 프레임부터 Update가 돈다.
+        // (전이 조건을 CLI로 짜기는 과하므로, 진입은 여기서 직접 흉내 낸다)
+        controller->m_curState = state;
+        state->behaviour->Enter();
+
+        Debug->LogWarning("[CLI] 애니메이션 상태 추가: " + objectName + " · " + stateName + " <- " + behaviourName);
+        std::printf("[CLI] 애니메이션 상태 추가: %s · %s <- %s\n",
+            objectName.c_str(), stateName.c_str(), behaviourName.c_str());
+    }
+    else if (cmd == "animator.exit")
+    {
+        // 상태에서 빠져나가는 것까지 확인하려면 전이 조건을 짜야 하는데 CLI로는 과하다.
+        // 상태 머신이 전이 때 하는 일(Exit 호출 + 현재 상태 비우기)만 흉내 낸다.
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: animator.exit <오브젝트 이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        const std::string objectName = TrimLine(line.substr(cmd.size()));
+        auto object = scene->GetGameObject(objectName);
+        if (!object) { std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str()); return; }
+
+        Animator* animator = object->GetComponent<Animator>();
+        if (nullptr == animator || animator->m_animationControllers.empty())
+        {
+            std::printf("[CLI] Animator 또는 컨트롤러가 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        auto controller = animator->m_animationControllers.front();
+        if (!controller || nullptr == controller->m_curState)
+        {
+            std::printf("[CLI] 현재 상태 없음\n");
+            return;
+        }
+
+        if (controller->m_curState->behaviour) controller->m_curState->behaviour->Exit();
+        controller->m_curState = nullptr;
+
+        Debug->LogWarning("[CLI] 애니메이션 상태 종료: " + objectName);
+        std::printf("[CLI] 애니메이션 상태 종료: %s\n", objectName.c_str());
+    }
+    else if (cmd == "animator.param")
+    {
+        // 애니메이터 파라미터는 원래 컨트롤러 편집기에서 선언한다. 스크립트에서는 만들 수 없어
+        // 바인딩을 검증할 방법이 없으므로, 편집기가 하는 일을 CLI로 대신한다.
+        if (parts.size() < 4)
+        {
+            std::printf("[CLI] 사용법: animator.param <오브젝트 이름> <파라미터 이름> <bool|float|int|trigger>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 오브젝트 이름에 공백이 흔하므로 뒤의 두 토큰을 파라미터 이름·타입으로 본다.
+        const std::string typeName = parts.back();
+        const std::string paramName = parts[parts.size() - 2];
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(paramName)));
+
+        auto object = scene->GetGameObject(objectName);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        Animator* animator = object->GetComponent<Animator>();
+        if (nullptr == animator)
+        {
+            std::printf("[CLI] Animator가 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        if ("bool" == typeName)         animator->AddParameter(paramName, false, ValueType::Bool);
+        else if ("float" == typeName)   animator->AddParameter(paramName, 0.f,   ValueType::Float);
+        else if ("int" == typeName)     animator->AddParameter(paramName, 0,     ValueType::Int);
+        else if ("trigger" == typeName) animator->AddParameter(paramName, false, ValueType::Trigger);
+        else
+        {
+            std::printf("[CLI] 알 수 없는 파라미터 타입: %s\n", typeName.c_str());
+            return;
+        }
+
+        Debug->LogWarning("[CLI] 애니메이터 파라미터 추가: " + objectName + " <- " + paramName + " (" + typeName + ")");
+        std::printf("[CLI] 애니메이터 파라미터 추가: %s <- %s (%s)\n", objectName.c_str(), paramName.c_str(), typeName.c_str());
+    }
+    else if (cmd == "component.list")
+    {
+        // 붙일 수 있는 컴포넌트 타입을 훑어본다(콜라이더 이름 확인용).
+        const std::string filter = (parts.size() > 1) ? parts[1] : std::string{};
+
+        int count = 0;
+        for (const auto& [typeName, type] : ComponentFactorys->m_componentTypes)
+        {
+            if (!filter.empty() && typeName.find(filter) == std::string::npos) continue;
+
+            Debug->LogWarning("[CLI]   " + typeName);
+            ++count;
+        }
+        std::printf("[CLI] 컴포넌트 타입 %d개 기록\n", count);
+    }
+    else if (cmd == "prefab.create")
+    {
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: prefab.create <오브젝트 이름> <프리팹 이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 오브젝트 이름에 공백이 흔하므로 프리팹 이름을 마지막 토큰으로 본다.
+        const std::string prefabName = parts.back();
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(prefabName)));
+
+        auto object = scene->GetGameObject(objectName);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return;
+        }
+
+        Prefab* prefab = PrefabUtilitys->CreatePrefab(object.get(), prefabName);
+        if (!prefab)
+        {
+            std::printf("[CLI] 프리팹 생성 실패\n");
+            return;
+        }
+
+        const file::path path = PathFinder::Relative("Prefabs\\") / (prefabName + ".prefab");
+        if (!PrefabUtilitys->SavePrefab(prefab, path.string()))
+        {
+            std::printf("[CLI] 프리팹 저장 실패: %s\n", path.string().c_str());
+            return;
+        }
+
+        Debug->LogWarning("[CLI] 프리팹 생성: " + prefabName + " <- " + objectName);
+        std::printf("[CLI] 프리팹 생성: %s\n", path.string().c_str());
+    }
+    else if (cmd == "script.reload")
+    {
+        auto& clr = ClrHost::Get();
+        if (!clr.IsReady())
+        {
+            std::printf("[CLI] CLR이 준비되지 않았습니다\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        std::vector<ScriptComponent*> scripts;
+
+        // 1) 값을 챙기고 인스턴스 참조를 끊는다. 하나라도 남으면 언로드가 실패한다.
+        if (scene)
+        {
+            for (const auto& object : scene->m_SceneObjects)
+            {
+                if (!object) continue;
+
+                auto script = object->GetComponent<ScriptComponent>();
+                if (nullptr != script)
+                {
+                    script->PrepareForReload();
+                    scripts.push_back(script);
+                }
+            }
+        }
+
+        // 2) 어셈블리 교체
+        if (!clr.ReloadScripts())
+        {
+            Debug->LogError("[스크립트] 리로드 실패");
+            std::printf("[CLI] 리로드 실패\n");
+            return;
+        }
+
+        // 3) 인스턴스를 다시 만들고 챙겨 둔 값을 되돌린다
+        int restored = 0;
+        for (ScriptComponent* script : scripts)
+        {
+            script->Awake();
+            if (script->HasInstance()) ++restored;
+        }
+
+        // 언로드 완료 여부는 여기서 묻지 않는다. 리로드 호출 스택이 아직 살아 있어
+        // 항상 "잔존"으로 나온다. 몇 프레임 뒤 script.status로 확인할 것.
+        Debug->LogWarning("[스크립트] 리로드 완료 — 복원 " + std::to_string(restored) + "/" +
+            std::to_string(scripts.size()));
+        std::printf("[CLI] 리로드 완료: %d/%zu 복원 (언로드 확인은 script.status)\n",
+            restored, scripts.size());
+    }
+    else if (cmd == "script.status")
+    {
+        auto& clr = ClrHost::Get();
+        const bool stale = clr.IsPreviousContextAlive();
+
+        Debug->LogWarning(std::string("[스크립트] CLR ") + (clr.IsReady() ? "준비됨" : "비활성") +
+            " · 활성 스크립트 " + std::to_string(clr.LastActiveCount()) + "개" +
+            " · 이전 어셈블리 " + (stale ? "잔존(참조 누수)" : "정리됨"));
+        std::printf("[CLI] CLR %s, 활성 스크립트 %d개, 이전 어셈블리 %s\n",
+            clr.IsReady() ? "준비됨" : "비활성", clr.LastActiveCount(),
+            stale ? "잔존(참조 누수)" : "정리됨");
+    }
+    else if (cmd == "play" || cmd == "stop")
+    {
+        // 에디터의 재생/정지 버튼과 같은 경로(SceneManager::Editor가 다음 프레임에 처리).
+        SceneManagers->SetGameStart(cmd == "play");
+        std::printf("[CLI] %s 요청\n", cmd.c_str());
+    }
+    else if (cmd == "scene.dump")
+    {
+        // 활성 씬의 오브젝트 계층을 로그로 남긴다. 재생/정지 전후로 찍어 비교하면
+        // 무엇이 사라졌는지가 그대로 드러난다.
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return;
+        }
+
+        const std::string label = (parts.size() > 1) ? parts[1] : std::string("dump");
+        Debug->LogWarning("[씬 덤프] " + label + " · 오브젝트 " +
+            std::to_string(scene->m_SceneObjects.size()) + "개");
+
+        for (const auto& object : scene->m_SceneObjects)
+        {
+            if (!object) continue;
+            const auto& p = object->m_transform.position;
+            char position[96]{};
+            std::snprintf(position, sizeof(position), "(%.3f, %.3f, %.3f)", p.x, p.y, p.z);
+
+            Debug->LogWarning("[씬 덤프]   " + object->m_name.ToString() +
+                " (index=" + std::to_string(object->m_index) +
+                ", parent=" + std::to_string(object->m_parentIndex) +
+                ", 컴포넌트 " + std::to_string(object->m_components.size()) + "개"
+                ", pos=" + position + ")");
+        }
+        std::printf("[CLI] 씬 덤프 기록: %s (%zu개)\n", label.c_str(), scene->m_SceneObjects.size());
+    }
+    else if (cmd == "gpu.baseline")
+    {
+        if (auto* device = DirectX11::DeviceResources::GetActive())
+        {
+            device->ResetLiveObjectBaseline();
+            std::printf("[CLI] 기준선 초기화 (이후 gpu.delta는 이 시점과 비교)\n");
+        }
+    }
+    else if (cmd == "gpu.census" || cmd == "gpu.delta")
+    {
+        const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
+        if (auto* device = DirectX11::DeviceResources::GetActive())
+        {
+            // 실행 중에는 VRAM만 남는다. 타입별 집계는 디버그 레이어를 망가뜨려
+            // 이후 렌더에서 죽으므로 종료 시점 리포트로만 얻을 수 있다.
+            if (cmd == "gpu.delta") device->LogLiveObjectDelta(label);
+            else                    device->LogLiveObjectCensus(label);
+
+            std::printf("[CLI] GPU %s 기록: %s (VRAM 기준, 타입별 집계는 종료 리포트 참조)\n",
+                (cmd == "gpu.delta") ? "증감" : "집계", label.c_str());
+        }
+    }
+    else if (cmd == "assets.unload")
+    {
+        DataSystems->UnloadUnusedAssets();
+        std::printf("[CLI] 사용하지 않는 에셋 정리 요청\n");
+    }
+    else if (cmd == "log.flush")
+    {
+        Log::FlushNow();
+        std::printf("[CLI] 로그 flush\n");
+    }
+    else
+    {
+        std::printf("[CLI] 알 수 없는 명령: %s  ('help' 참고)\n", cmd.c_str());
+    }
+}
+
+void ConsoleCommandSystem::PrintHelp() const
+{
+    std::printf(
+        "\n[CLI] 사용 가능한 명령\n"
+        "  scene.load <경로>    씬을 로드한다(활성 씬은 그대로)\n"
+        "  scene.switch <경로>  씬을 로드하고 활성 씬으로 교체한다(언로드 유발)\n"
+        "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
+        "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
+        "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
+        "  play / stop          에디터의 재생·정지와 같은 동작\n"
+        "  script.add <오브젝트> <타입>  C# 스크립트를 오브젝트에 부착한다\n"
+        "  script.fields <id>   스크립트의 노출 필드와 현재 값을 확인한다\n"
+        "  script.set <id> <인덱스> <값>  노출 필드 값을 바꾼다\n"
+        "  script.reload        게임 스크립트 어셈블리를 다시 로드한다(핫리로드)\n"
+        "  script.status        CLR 상태와 활성 스크립트 수를 확인한다\n"
+        "  gpu.baseline         현재 상태를 기준선으로 삼는다\n"
+        "  gpu.census [라벨]    VRAM과 엔진 에셋 수를 로그에 기록\n"
+        "  gpu.delta [라벨]     기준선 대비 증감을 기록(씬 왕복 누수 확인용)\n"
+        "  assets.unload        사용하지 않는 에셋 캐시 정리\n"
+        "  wait <프레임>        지정 프레임만큼 다음 명령을 미룬다\n"
+        "  log.flush            로그를 디스크에 즉시 반영\n"
+        "  quit                 에디터 종료\n"
+        "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n\n");
+}
+
+void ConsoleCommandSystem::Shutdown()
+{
+    m_running.store(false, std::memory_order_release);
+
+    // getline이 블로킹 중일 수 있으므로 detach로 정리한다.
+    // 프로세스 종료 직전이라 스레드 정리보다 교착 회피가 우선이다.
+    if (m_stdinThread.joinable())
+    {
+        m_stdinThread.detach();
+    }
+}
+#endif // !DYNAMICCPP_EXPORTS
+
+
+
+
+
+
+

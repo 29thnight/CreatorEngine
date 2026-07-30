@@ -70,6 +70,7 @@
 #include "Navigation.h"
 #include "Object.h"
 #include "RectTransformComponent.h"
+#include "ScriptComponent.h"
 #include "SpriteRenderer.h"
 #include "SpriteSheetComponent.h"
 #include "Terrain.h"
@@ -139,6 +140,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(SSAOPassSetting);
     AUTO_REGISTER_CLASS(SSGIPassSetting);
     AUTO_REGISTER_CLASS(Scene);
+    AUTO_REGISTER_CLASS(ScriptComponent);
     AUTO_REGISTER_CLASS(ShadowMapPassSetting);
     AUTO_REGISTER_CLASS(Skeleton);
     AUTO_REGISTER_CLASS(SoundComponent);

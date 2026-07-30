@@ -153,6 +153,9 @@ public:
 	}
 
 public:
+	// 슬롯이 가득 찬 경우를 나타내는 인덱스.
+	static constexpr int INVALID_CAMERA_INDEX = -1;
+
 	int AddCamera(std::shared_ptr<Camera> camera)
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
@@ -163,6 +166,11 @@ public:
 				return i;
 			}
 		}
+
+		// 빈 슬롯이 없을 때 반환값 없이 함수가 끝나면 정의되지 않은 동작이 되고,
+		// 릴리스 빌드에서는 쓰레기 값이 인덱스로 쓰여 배열 범위를 벗어난다.
+		Debug->LogError("카메라 슬롯이 가득 찼습니다. 새 카메라를 등록할 수 없습니다.");
+		return INVALID_CAMERA_INDEX;
 	}
 
 	void DeleteCamera(uint32 index)

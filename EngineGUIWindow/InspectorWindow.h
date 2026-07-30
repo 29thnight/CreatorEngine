@@ -22,6 +22,10 @@ private:
 	bool m_openFSMPopup{ false };
 	bool m_openBTPopup{ false };
 
+	// C# 스크립트의 노출 필드를 그린다.
+	// 값 접근은 소스 제너레이터가 만든 인덱스 기반 접근자를 통한다(ClrHost 경유).
+	void DrawManagedScripts(class ScriptComponent* script);
+
 	void ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject);
 	void ImGuiDrawHelperTransformComponent(GameObject* gameObject);
 	void ImGuiDrawHelperFSM(class StateMachineComponent* FSMComponent);
@@ -43,7 +47,7 @@ private:
 private:
 	bool            m_openClipPicker{ false };
 	SoundComponent* m_clipPickerTarget{ nullptr };
-	std::string     m_clipSearch;                 // �˻���
-	std::vector<std::string> m_clipKeyCache;      // ĳ��
+	std::string     m_clipSearch;                 // �˻���
+	std::vector<std::string> m_clipKeyCache;      // ĳ��
 };
 #endif // !DYNAMICCPP_EXPORTS

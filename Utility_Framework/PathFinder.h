@@ -80,6 +80,7 @@ public:
 	file::path ProjectSettingsPath{};
 	file::path TerrainSourcePath{};
 	file::path DumpPath{};
+	file::path LogPath{};
 	file::path NodeEditorPath{};
 	file::path volumeProfilePath{};
 	file::path InputMapPath{};
@@ -99,7 +100,13 @@ public:
         auto base = file::path(ExecuteablePath);
 		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
 		DumpPath = file::path(base).append("Dump\\").lexically_normal();
+		LogPath = file::path(base).append("Log\\").lexically_normal();
 		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+
+		// 로그 디렉터리는 게임 빌드에서도 필요하다.
+		// 아래 일괄 생성 루프는 BUILD_FLAG에서 제외되므로 여기서 먼저 만든다.
+		std::error_code logDirError{};
+		file::create_directories(LogPath, logDirError);
 
 #ifdef BUILD_FLAG
 		std::array<WCHAR, MAX_PATH> tempPathBuffer{};
@@ -208,6 +215,11 @@ public:
 	static inline file::path DumpPath()
 	{
 		return InternalPath::GetInstance()->DumpPath;
+	}
+
+	static inline file::path LogPath()
+	{
+		return InternalPath::GetInstance()->LogPath;
 	}
 
 	static inline file::path Relative(std::string_view path)

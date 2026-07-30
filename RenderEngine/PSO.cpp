@@ -97,7 +97,33 @@ PipelineStateObject::~PipelineStateObject()
 	ShaderSystem->m_shaderReloadedDelegate.Remove(m_shaderReloadEventHandle);
 
 	Memory::SafeDelete(m_inputLayout);
-	Memory::SafeDelete(m_rasterizerState);
+
+	// 소유한 상태 객체만 해제한다.
+	// 패스들이 대입하는 전역 공유 상태나 ComPtr 멤버의 .Get()은 여기서 건드리면 안 된다.
+	if (m_ownsRasterizerState)   Memory::SafeDelete(m_rasterizerState);
+	if (m_ownsBlendState)        Memory::SafeDelete(m_blendState);
+	if (m_ownsDepthStencilState) Memory::SafeDelete(m_depthStencilState);
+}
+
+void PipelineStateObject::AdoptRasterizerState(ID3D11RasterizerState* state)
+{
+	if (m_ownsRasterizerState) Memory::SafeDelete(m_rasterizerState);
+	m_rasterizerState = state;
+	m_ownsRasterizerState = (state != nullptr);
+}
+
+void PipelineStateObject::AdoptBlendState(ID3D11BlendState* state)
+{
+	if (m_ownsBlendState) Memory::SafeDelete(m_blendState);
+	m_blendState = state;
+	m_ownsBlendState = (state != nullptr);
+}
+
+void PipelineStateObject::AdoptDepthStencilState(ID3D11DepthStencilState* state)
+{
+	if (m_ownsDepthStencilState) Memory::SafeDelete(m_depthStencilState);
+	m_depthStencilState = state;
+	m_ownsDepthStencilState = (state != nullptr);
 }
 
 void PipelineStateObject::Apply()

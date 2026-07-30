@@ -30,20 +30,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseDynamicDebugging>false</UseDynamicDebugging>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -51,7 +51,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -137,7 +137,10 @@
     </Link>
     <PreBuildEvent>
       <Command>echo #pragma once &gt; EngineEntry\EngineVersion.h
-for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineEntry\EngineVersion.h</Command>
+for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineEntry\EngineVersion.h
+echo [ScriptCore] 관리 어셈블리 빌드
+dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
+dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -168,7 +171,10 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     </Link>
     <PreBuildEvent>
       <Command>echo #pragma once &gt; EngineEntry\EngineVersion.h
-for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineEntry\EngineVersion.h</Command>
+for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineEntry\EngineVersion.h
+echo [ScriptCore] 관리 어셈블리 빌드
+dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
+dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -185,6 +191,8 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineEntry\Resource.h" />
     <ClInclude Include="EngineEntry\targetver.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
+    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
     <ClInclude Include="EngineGUIWindow\ExternUI.h" />
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
@@ -202,6 +210,8 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
+    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />
@@ -252,3 +262,4 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+

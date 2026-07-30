@@ -42,15 +42,15 @@ struct TimeParams
 
 struct PolarClippingParams
 {
-    float polarClippingEnabled = 0.0f;    // ±ØÁÂÇ¥ Å¬¸®ÇÎ È°¼ºÈ­ ¿©ºÎ
-    float polarAngleProgress = 0.0f;      // 0~1: °¢µµ ÁøÇàµµ
-    float polarStartAngle = 0.0f;         // ½ÃÀÛ °¢µµ (¶óµğ¾È)
-    float polarDirection = 1.0f;          // 1: ½Ã°è¹æÇâ, -1: ¹İ½Ã°è¹æÇâ
+    float polarClippingEnabled = 0.0f;    // ï¿½ï¿½ï¿½ï¿½Ç¥ Å¬ï¿½ï¿½ï¿½ï¿½ È°ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½
+    float polarAngleProgress = 0.0f;      // 0~1: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½àµµ
+    float polarStartAngle = 0.0f;         // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½)
+    float polarDirection = 1.0f;          // 1: ï¿½Ã°ï¿½ï¿½ï¿½ï¿½, -1: ï¿½İ½Ã°ï¿½ï¿½ï¿½ï¿½
 
-    Mathf::Vector3 polarCenter = Mathf::Vector3::Zero;    // ±ØÁÂÇ¥ Áß½ÉÁ¡ (¿ùµå ÁÂÇ¥)
+    Mathf::Vector3 polarCenter = Mathf::Vector3::Zero;    // ï¿½ï¿½ï¿½ï¿½Ç¥ ï¿½ß½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥)
     float pad1 = 0.0f;
 
-    Mathf::Vector3 polarUpAxis = Mathf::Vector3::Up;      // ±ØÁÂÇ¥ À§ÂÊ Ãà
+    Mathf::Vector3 polarUpAxis = Mathf::Vector3::Up;      // ï¿½ï¿½ï¿½ï¿½Ç¥ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
     float pad3 = 0.0f;
 
     Mathf::Vector3 polarReferenceDir = Mathf::Vector3::Zero;
@@ -60,46 +60,50 @@ struct PolarClippingParams
 
 enum class BlendPreset
 {
-    None,           // ºí·»µù ºñÈ°¼ºÈ­
-    Alpha,          // Ç¥ÁØ ¾ËÆÄ ºí·»µù
-    Additive,       // °¡»ê ºí·»µù
-    Multiply,       // °ö¼À ºí·»µù
-    Subtractive,    // °¨»ê ºí·»µù
-    Custom          // »ç¿ëÀÚ Á¤ÀÇ
+    None,           // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
+    Alpha,          // Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    Additive,       // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    Multiply,       // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    Subtractive,    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    Custom          // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 };
 
 enum class DepthPreset
 {
     None,
-    Default,        // ÀĞ±â/¾²±â ¸ğµÎ È°¼ºÈ­, LESS ºñ±³
-    ReadOnly,       // ÀĞ±â¸¸ È°¼ºÈ­, ¾²±â ºñÈ°¼ºÈ­
-    WriteOnly,      // ¾²±â¸¸ È°¼ºÈ­, ºñ±³ ºñÈ°¼ºÈ­
-    Disabled,       // ±íÀÌ Å×½ºÆ® ¿ÏÀü ºñÈ°¼ºÈ­
-    Custom          // »ç¿ëÀÚ Á¤ÀÇ
+    Default,        // ï¿½Ğ±ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ È°ï¿½ï¿½È­, LESS ï¿½ï¿½
+    ReadOnly,       // ï¿½Ğ±â¸¸ È°ï¿½ï¿½È­, ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
+    WriteOnly,      // ï¿½ï¿½ï¿½â¸¸ È°ï¿½ï¿½È­, ï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
+    Disabled,       // ï¿½ï¿½ï¿½ï¿½ ï¿½×½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
+    Custom          // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 };
 
 enum class RasterizerPreset
 {
     None,
-    Default,        // SOLID, BACK ÄÃ¸µ
-    NoCull,         // SOLID, ÄÃ¸µ ¾øÀ½
-    Wireframe,      // WIREFRAME, BACK ÄÃ¸µ
-    WireframeNoCull,// WIREFRAME, ÄÃ¸µ ¾øÀ½
-    Custom          // »ç¿ëÀÚ Á¤ÀÇ
+    Default,        // SOLID, BACK ï¿½Ã¸ï¿½
+    NoCull,         // SOLID, ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½
+    Wireframe,      // WIREFRAME, BACK ï¿½Ã¸ï¿½
+    WireframeNoCull,// WIREFRAME, ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½
+    Custom          // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 };
 
 struct SpriteAnimationBuffer
 {
-    uint32 frameCount;      // ÃÑ ÇÁ·¹ÀÓ ¼ö
+    uint32 frameCount;      // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
     float animationDuration;
-    uint32 gridColumns;     // ½ºÇÁ¶óÀÌÆ® ½ÃÆ® °İÀÚ Å©±â - ¿­
-    uint32 gridRows;        // ½ºÇÁ¶óÀÌÆ® ½ÃÆ® °İÀÚ Å©±â - Çà
+    uint32 gridColumns;     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ - ï¿½ï¿½
+    uint32 gridRows;        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ - ï¿½ï¿½
 };
 
 class RenderModules
 {
 public:
-    virtual ~RenderModules() { Release(); }
+    virtual ~RenderModules()
+    {
+        Release();
+        ReleaseSavedRenderState();
+    }
     virtual void Initialize() {}
     virtual void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) {}
     virtual void Release() {}
@@ -122,10 +126,10 @@ public:
     void SaveRenderState();
     void RestoreRenderState();
 
-    // Å¬¸®ÇÎ ±â´ÉÀÌ ÇÊ¿äÇÑ ÀÚ½Ä Å¬·¡½º¿¡¼­¸¸ ¿À¹ö¶óÀÌµå
+    // Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½Ú½ï¿½ Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìµï¿½
     virtual bool SupportsClipping() const { return false; }
 
-    // Å¬¸®ÇÎ Áö¿ø ¿©ºÎ È®ÀÎ ÈÄ »ç¿ë
+    // Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½
     void EnableClipping(bool enable);
     void SetClippingProgress(float progress);
     void SetClippingAxis(const Mathf::Vector3& axis);
@@ -143,16 +147,16 @@ public:
 
     void SetUseEffectProgress(bool use) { m_useEffectProgress = use; }
 
-    // Owner ½Ã½ºÅÛ ¼³Á¤ ¹× Á¢±Ù
+    // Owner ï¿½Ã½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void SetOwnerSystem(ParticleSystem* owner) { m_ownerSystem = owner; }
     ParticleSystem* GetOwnerSystem() const { return m_ownerSystem; }
 
-    // Owner ½Ã½ºÅÛÀÌ ÀÖ´ÂÁö È®ÀÎ
+    // Owner ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ï¿½ï¿½ È®ï¿½ï¿½
     bool HasOwnerSystem() const { return m_ownerSystem != nullptr; }
 
     bool IsSystemRunning() const;
 
-    // ¼ÎÀÌ´õ °ü¸®
+    // ï¿½ï¿½ï¿½Ì´ï¿½ ï¿½ï¿½ï¿½ï¿½
     void SetVertexShader(const std::string& shaderName);
     void SetPixelShader(const std::string& shaderName);
     void SetShaders(const std::string& vertexShader, const std::string& pixelShader);
@@ -163,22 +167,22 @@ public:
     static std::vector<std::string> GetAvailableVertexShaders();
     static std::vector<std::string> GetAvailablePixelShaders();
 
-    // ºí·»µå »óÅÂ °ü¸®
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void SetBlendPreset(BlendPreset preset);
     void SetCustomBlendState(const D3D11_BLEND_DESC& desc);
     BlendPreset GetBlendPreset() const { return m_blendPreset; }
 
-    // ±íÀÌ ½ºÅÙ½Ç »óÅÂ °ü¸®
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ù½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void SetDepthPreset(DepthPreset preset);
     void SetCustomDepthStencilState(const D3D11_DEPTH_STENCIL_DESC& desc);
     DepthPreset GetDepthPreset() const { return m_depthPreset; }
 
-    // ·¡½ºÅÍ¶óÀÌÀú »óÅÂ °ü¸®
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Í¶ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void SetRasterizerPreset(RasterizerPreset preset);
     void SetCustomRasterizerState(const D3D11_RASTERIZER_DESC& desc);
     RasterizerPreset GetRasterizerPreset() const { return m_rasterizerPreset; }
 
-    // Á÷·ÄÈ­
+    // ï¿½ï¿½ï¿½ï¿½È­
     nlohmann::json SerializeRenderStates() const;
     void DeserializeRenderStates(const nlohmann::json& json);
 
@@ -187,29 +191,29 @@ public:
     virtual void OnShadersChanged() {}
     virtual void OnRenderStatesChanged() {}
 
-    // ´ÙÁß ÅØ½ºÃ³ °ü¸®
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Ø½ï¿½Ã³ ï¿½ï¿½ï¿½ï¿½
     void SetTexture(int slot, Texture* texture);
     void SetTexture(Texture* texture) { SetTexture(0, texture); }
     void AddTexture(Texture* texture);
     void RemoveTexture(int slot);
     void ClearTextures();
 
-    // ÅØ½ºÃ³ Á¢±Ù
+    // ï¿½Ø½ï¿½Ã³ ï¿½ï¿½ï¿½ï¿½
     Texture* GetTexture(int slot) const;
     size_t GetTextureCount() const { return m_textures.size(); }
     const std::vector<Texture*>& GetTextures() const { return m_textures; }
 
-    // ÀÚµ¿ Å©±â Á¶Á¤
+    // ï¿½Úµï¿½ Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void EnsureTextureSlots(size_t count);
 
-    // Á÷·ÄÈ­
+    // ï¿½ï¿½ï¿½ï¿½È­
     nlohmann::json SerializeTextures() const;
     void DeserializeTextures(const nlohmann::json& json);
 
     virtual void BindTextures();
 protected:
     std::vector<Texture*> m_textures;
-    // ¸ğµâ »óÅÂ
+    // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     bool m_enabled = true;
     bool m_isRendering = false;
     mutable std::atomic<bool> m_gpuWorkPending = false;
@@ -217,44 +221,44 @@ protected:
     // owner
     ParticleSystem* m_ownerSystem;
 
-    // ÅØ½ºÃ³
+    // ï¿½Ø½ï¿½Ã³
     Texture* m_assignedTexture;
     Texture* m_dissolveTexture;
 
     // pso
     std::unique_ptr<PipelineStateObject> m_pso;
 
-    // ·»´õ »óÅÂ »ı¼º ÇïÆÛ ÇÔ¼öµé
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
     void CreateBlendState(BlendPreset preset);
     void CreateDepthStencilState(DepthPreset preset);
     void CreateRasterizerState(RasterizerPreset preset);
 
-    // ÇÁ¸®¼ÂÀ» D3D11 ±¸Á¶Ã¼·Î º¯È¯ÇÏ´Â ÇÔ¼öµé
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ D3D11 ï¿½ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
     D3D11_BLEND_DESC GetBlendDesc(BlendPreset preset) const;
     D3D11_DEPTH_STENCIL_DESC GetDepthStencilDesc(DepthPreset preset) const;
     D3D11_RASTERIZER_DESC GetRasterizerDesc(RasterizerPreset preset) const;
     
-    // ¼ÎÀÌ´õ ¼³Á¤
+    // ï¿½ï¿½ï¿½Ì´ï¿½ ï¿½ï¿½ï¿½ï¿½
     std::string m_vertexShaderName = "None";
     std::string m_pixelShaderName = "None";
 
-    // ·»´õ »óÅÂ ¼³Á¤
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     BlendPreset m_blendPreset = BlendPreset::None;
     DepthPreset m_depthPreset = DepthPreset::None;
     RasterizerPreset m_rasterizerPreset = RasterizerPreset::None;
 
-    // Ä¿½ºÅÒ »óÅÂ ÀúÀå
+    // Ä¿ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     D3D11_BLEND_DESC m_customBlendDesc = {};
     D3D11_DEPTH_STENCIL_DESC m_customDepthDesc = {};
     D3D11_RASTERIZER_DESC m_customRasterizerDesc = {};
 
 protected:
-    // ¾È¾²Áö¸¸ ÀÏ´Ü À¯Áö
-    // Å¬¸®ÇÎ °ü·Ã µ¥ÀÌÅÍ¸¦ ºÎ¸ğ¿¡¼­ °ü¸®
+    // ï¿½È¾ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½
+    // Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½Î¸ğ¿¡¼ï¿½ ï¿½ï¿½ï¿½ï¿½
     PolarClippingParams m_clippingParams = {};
     bool m_clippingEnabled = false;
 
-    // Å¬¸®ÇÎ »ó¼ö ¹öÆÛ (ÇÊ¿äÇÑ ÀÚ½Ä Å¬·¡½º¿¡¼­¸¸ »ı¼º)
+    // Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½Ú½ï¿½ Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     virtual void OnClippingStateChanged() {}
     virtual void CreateClippingBuffer() {}
     virtual void UpdateClippingBuffer() {}
@@ -263,6 +267,17 @@ protected:
     bool m_useEffectProgress = false;
 
 private:
+    // SaveRenderState()ê°€ OMGet*/RSGetStateë¡œ ìº¡ì²˜í•œ ì´ì „ ìƒíƒœ.
+    // ì´ APIë“¤ì€ ì°¸ì¡° ì¹´ìš´íŠ¸ë¥¼ ì˜¬ë ¤ì„œ ëŒë ¤ì£¼ë¯€ë¡œ ë°˜ë“œì‹œ ë†“ì•„ì¤˜ì•¼ í•œë‹¤.
+    // SaveRenderStateëŠ” ì¬í˜¸ì¶œ ì‹œ ì´ì „ ìº¡ì²˜ë¥¼ í•´ì œí•˜ì§€ë§Œ ì†Œë©¸ ì‹œì ì—ëŠ”
+    // ë†“ì•„ì£¼ëŠ” ê³³ì´ ì—†ì–´, ë§ˆì§€ë§‰ ìº¡ì²˜ 3ê°œê°€ ì¸ìŠ¤í„´ìŠ¤ë§ˆë‹¤ ëˆ„ìˆ˜ëë‹¤.
+    void ReleaseSavedRenderState()
+    {
+        Memory::SafeDelete(m_prevDepthState);
+        Memory::SafeDelete(m_prevBlendState);
+        Memory::SafeDelete(m_prevRasterizerState);
+    }
+
     ID3D11DepthStencilState* m_prevDepthState = nullptr;
     UINT m_prevStencilRef = 0;
     ID3D11BlendState* m_prevBlendState = nullptr;

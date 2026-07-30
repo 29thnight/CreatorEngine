@@ -100,6 +100,10 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
 	if (curScene->GetCanvases().empty())
 		MakeCanvas();
 
+	// MakeCanvas는 이름 충돌 등으로 실패할 수 있다(널 반환). 그 상태로 front()에
+	// 가면 빈 벡터 접근으로 즉사한다 — GetFrontUIObject에서 실제로 겪은 유형(6-5).
+	if (curScene->GetCanvases().empty()) return nullptr;
+
 	if (!canvas)
 	{
 		if (auto c = curScene->GetCanvases().front().lock())
@@ -168,6 +172,9 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
 	{
 		MakeCanvas();
 	}
+
+	// MakeCanvas 실패 시 빈 벡터 front() 방지(6-5).
+	if (Canvases.empty()) return nullptr;
 
     if (!canvas)
     {
@@ -243,6 +250,9 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
 	if (Canvases.empty())
 		MakeCanvas();
 
+	// MakeCanvas 실패 시 빈 벡터 front() 방지(6-5).
+	if (Canvases.empty()) return nullptr;
+
 	if (!canvas)
 	{
 		if (auto c = Canvases.front().lock())
@@ -297,6 +307,10 @@ std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, co
 
 	if (curScene->GetCanvases().empty())
         MakeCanvas();
+
+	// MakeCanvas 실패 시 빈 벡터 front() 방지(6-5).
+	if (curScene->GetCanvases().empty()) return nullptr;
+
     if (!canvas)
     {
         if (auto c = curScene->GetCanvases().front().lock())
@@ -496,7 +510,11 @@ void UIManager::Update()
 	SortCanvas();
 
 	auto curScene = SceneManagers->GetActiveScene();
-	if (curScene != nullptr || CurCanvas.expired())
+
+	// 원래 (curScene != nullptr || CurCanvas.expired())였는데, 씬이 널이어도
+	// CurCanvas가 만료돼 있으면 참이 되어 바로 아래에서 널 씬을 역참조했다.
+	// 본문 전체가 씬을 쓰므로 씬 존재가 유일한 진짜 전제 조건이다.
+	if (curScene != nullptr)
 	{
 		auto& canvases = curScene->GetCanvases();
 
@@ -519,8 +537,75 @@ void UIManager::Update()
 			break;
 		}
 
+		// 캔버스 연결의 단일 지연 지점(6-3).
+		//
+		// 예전에는 ComponentFactory의 타입별 분기가 역직렬화 도중 연결을 수행해서,
+		// 캔버스가 UI보다 늦게 복원되면 연결이 실패하고(순서 의존) 실패 경로가
+		// 곧 크래시였다. 여기서는 모든 오브젝트가 이미 존재하는 프레임 경계에
+		// 아직 연결되지 않은 것만 잇는다 — 로드 경로가 몇 개든 전부 이 한 곳을 지난다.
+		// AddUIObject가 같은 오브젝트의 UIButton까지 함께 연결하므로 버튼도 처리된다.
+
+		// UI가 소속될 캔버스를 자기 조상 계층에서 찾는다(자기 자신 포함).
+		//
+		// 관계가 진실이고 이름은 폴백이다(6-2 완결). 이름 우선이면 두 가지가 어긋난다:
+		//  · 소환 시 이름 충돌로 캔버스가 개명되면("Canvas"→"Canvas (1)") 자식들이
+		//    엉뚱한 동명 캔버스에 붙는다 — 실측으로 확인한 오연결.
+		//  · 실제 콘텐츠(HPCanvas.prefab)의 이름 필드가 저작 당시 낡은 값("Canvas")을
+		//    담고 있어도 계층은 정확했다. 관계 우선이면 낡은 이름이 저절로 무해해진다.
+		auto findAncestorCanvas = [](GameObject* node) -> Canvas*
+		{
+			// 계층이 꼬여 순환이 생겨도 멈추도록 깊이를 제한한다.
+			constexpr int kMaxDepth = 64;
+
+			for (int depth = 0; nullptr != node && depth < kMaxDepth; ++depth)
+			{
+				if (Canvas* canvas = node->GetComponent<Canvas>()) return canvas;
+
+				const GameObject::Index parentIndex = node->m_parentIndex;
+				if (GameObject::INVALID_INDEX == parentIndex) break;
+
+				node = node->OwnerSceneFindIndex(parentIndex);
+			}
+			return nullptr;
+		};
+
+		auto tryLink = [&](UIComponent* ui)
+		{
+			if (nullptr == ui || nullptr != ui->GetOwnerCanvas()) return;
+
+			GameObject* owner = ui->GetOwner();
+			if (nullptr == owner || owner->GetScene() != curScene) return;
+
+			// 1순위: 조상 계층. 소환 과정에서 캔버스가 개명됐어도 정확히 자기 캔버스를 찾는다.
+			Canvas* canvas = findAncestorCanvas(owner);
+
+			// 2순위: 직렬화된 이름. 계층상 캔버스 아래에 있지 않은 UI를 위한 하위 호환이다.
+			if (nullptr == canvas && !ui->m_ownerCanvasName.empty())
+			{
+				GameObject* canvasObj = FindCanvasName(owner->shared_from_this(), ui->m_ownerCanvasName);
+				canvas = (nullptr != canvasObj) ? canvasObj->GetComponent<Canvas>() : nullptr;
+			}
+
+			if (nullptr != canvas)
+			{
+				// SetCanvas가 이름을 실제 캔버스 기준으로 다시 기록하므로,
+				// 낡은 이름은 다음 저장 때 저절로 고쳐진다.
+				canvas->AddUIObject(owner->shared_from_this());
+			}
+			else if (!ui->m_ownerCanvasName.empty() && !ui->m_canvasLinkLogged)
+			{
+				// 둘 다 실패하면 다음 프레임에 다시 시도한다(캔버스가 나중에 생길 수 있다).
+				// 경고는 컴포넌트당 한 번만 — 매 프레임 재시도라 그대로 두면 로그가 폭주한다.
+				// 이름조차 없는 미연결 UI는 경고하지 않는다(런타임에 갓 만든 정상 상태).
+				ui->m_canvasLinkLogged = true;
+				Debug->LogWarning("UI '" + owner->m_name.ToString() +
+					"' 가 캔버스 '" + ui->m_ownerCanvasName + "' 를 찾지 못했습니다.");
+			}
+		};
+
 		for (auto& image : Images)
 		{
+			tryLink(image);
 			if (!image->isDeserialized)
 			{
 				image->DeserializeNavi();
@@ -529,6 +614,7 @@ void UIManager::Update()
 
 		for (auto& text : Texts)
 		{
+			tryLink(text);
 			if (!text->isDeserialized)
 			{
 				text->DeserializeNavi();
@@ -537,6 +623,7 @@ void UIManager::Update()
 
 		for (auto& spriteSheet : SpriteSheets)
 		{
+			tryLink(spriteSheet);
 			if (!spriteSheet->isDeserialized)
 			{
 				spriteSheet->DeserializeNavi();
@@ -608,3 +695,5 @@ void UIManager::UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet
 {
 	std::erase(SpriteSheets, spriteSheet);
 }
+
+

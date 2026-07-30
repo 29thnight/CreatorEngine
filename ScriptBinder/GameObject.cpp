@@ -60,7 +60,7 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 
 const std::string& GameObject::RemoveSuffixNumberTag() const
 {
-	// Á¤±ÔÇ¥Çö½Ä: ³¡¿¡ ¿À´Â " (¼ýÀÚ)" ¶Ç´Â "(¼ýÀÚ)" ÆÐÅÏ Á¦°Å
+	// ï¿½ï¿½ï¿½ï¿½Ç¥ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ " (ï¿½ï¿½ï¿½ï¿½)" ï¿½Ç´ï¿½ "(ï¿½ï¿½ï¿½ï¿½)" ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	return m_removedSuffixNumberTag;
 }
 
@@ -144,6 +144,35 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 
         m_componentIds[component->GetTypeID()] = m_components.size() - 1;
     }
+
+	return component;
+}
+
+std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Type& type)
+{
+	std::shared_ptr<Component> component = std::shared_ptr<Component>(
+		Meta::MetaFactoryRegistry->CreateShared<Component>(type.name));
+
+	if (!component)
+	{
+		return nullptr;
+	}
+
+	component->SetOwner(this);
+
+	if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
+	{
+		receiver->RegisterOverriddenEvents(this->GetScene());
+	}
+
+	m_components.push_back(component);
+
+	// íƒ€ìž…â†’ì¸ë±ìŠ¤ ë§µì€ í•˜ë‚˜ë§Œ ë‹´ì„ ìˆ˜ ìžˆìœ¼ë¯€ë¡œ ì²˜ìŒ ê²ƒë§Œ ë“±ë¡í•œë‹¤.
+	// ì—¬ëŸ¬ ê°œë¥¼ ë‹¤ë£° ë•ŒëŠ” GetComponentsë¡œ ìˆœíšŒí•´ì•¼ í•œë‹¤.
+	if (m_componentIds.find(component->GetTypeID()) == m_componentIds.end())
+	{
+		m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+	}
 
 	return component;
 }

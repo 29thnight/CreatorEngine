@@ -60,11 +60,6 @@ Material::~Material()
 {
 }
 
-Material* Material::Instantiate(const Material* origin, std::string_view newName)
-{
-	return InstantiateShared(origin, newName).get();
-}
-
 std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
 {
 	if (!origin)
@@ -117,9 +112,13 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 	}
 
 	cloneMaterial->m_name = finalName;
-	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 
-	//DataSystems->SaveMaterial(cloneMaterial.get());
+	// ìºì‹œì—ë„ ë“±ë¡í•´ ì—ë””í„°Â·ì§ë ¬í™”ê°€ ì´ë¦„ìœ¼ë¡œ ì°¾ì„ ìˆ˜ ìˆê²Œ í•œë‹¤.
+	// ìºì‹œê°€ ì •ë¦¬ë˜ë”ë¼ë„ í˜¸ì¶œìê°€ ë°˜í™˜ëœ shared_ptrì„ ë³´ê´€í•˜ëŠ” í•œ í´ë¡ ì€ ì‚´ì•„ ìˆë‹¤.
+	{
+		std::lock_guard<std::mutex> guard(DataSystems->m_materialMutex);
+		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
+	}
 
 	return cloneMaterial;
 }
@@ -340,9 +339,9 @@ bool Material::ReadBytes(const VarView& v, void* dst, size_t size) const
     return true;
 }
 
-// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
-// Å¸ÀÔ ¾ÈÀü Setter / Getter
-// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Setter / Getter
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 bool Material::TrySetFloat(std::string_view cb, std::string_view var, float v)
 {
     return WriteBytes(FindVar(cb, var), &v, sizeof(float));
@@ -363,7 +362,7 @@ bool Material::TryGetInt(std::string_view cb, std::string_view var, int32_t& out
 
 bool Material::TrySetBool(std::string_view cb, std::string_view var, bool v)
 {
-    // HLSL cbuffer boolÀº 4¹ÙÀÌÆ® Á¤·ÄÀ» µû¸£¹Ç·Î int·Î ÀúÀå
+    // HLSL cbuffer boolï¿½ï¿½ 4ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ intï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     int32_t iv = v ? 1 : 0;
     return WriteBytes(FindVar(cb, var), &iv, sizeof(int32_t));
 }
@@ -389,7 +388,7 @@ bool Material::TrySetVector(std::string_view cb, std::string_view var, const Mat
 }
 bool Material::TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const
 {
-    // ÃÖ´ë 16¹ÙÀÌÆ®ÀÇ float4¸¦ ÀĞ¾î¼­ µ¹·ÁÁÜ (var size°¡ 8/12¸é ¾ÕºÎºĞ¸¸ À¯È¿)
+    // ï¿½Ö´ï¿½ 16ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ float4ï¿½ï¿½ ï¿½Ğ¾î¼­ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (var sizeï¿½ï¿½ 8/12ï¿½ï¿½ ï¿½ÕºÎºĞ¸ï¿½ ï¿½ï¿½È¿)
     auto v = FindVar(cb, var);
     if (!v.cb || !v.var) return false;
     std::memset(&out, 0, sizeof(out));
@@ -411,7 +410,7 @@ bool Material::TrySetValue(std::string_view cb, std::string_view var, const void
 	return WriteBytes(FindVar(cb, var), src, size);
 }
 
-// ¦¡¦¡ Qualified name sugar ("CB.Var") ¦¡¦¡
+// ï¿½ï¿½ï¿½ï¿½ Qualified name sugar ("CB.Var") ï¿½ï¿½ï¿½ï¿½
 bool Material::TrySetFloat(std::string_view q, float v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TrySetFloat(cb, var, v);
@@ -461,9 +460,9 @@ bool Material::TryGetMatrix(std::string_view q, Mathf::xMatrix& out) const {
     return TryGetMatrix(cb, var, out);
 }
 
-// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
-// Ä¿½ºÅÒ PSO¿ë: º¯°æµÈ CB¸¸ GPU¿¡ ¹İ¿µ
-// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// Ä¿ï¿½ï¿½ï¿½ï¿½ PSOï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ CBï¿½ï¿½ GPUï¿½ï¿½ ï¿½İ¿ï¿½
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 void Material::ApplyShaderParams(ID3D11DeviceContext* ctx)
 {
     if (!m_shaderPSO) return;

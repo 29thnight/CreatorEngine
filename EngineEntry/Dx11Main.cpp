@@ -11,6 +11,7 @@
 #include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "SceneManager.h"
+#include "ClrHost.h"
 #include "EngineSetting.h"
 #include "CullingManager.h"
 #include "UIManager.h"
@@ -81,6 +82,7 @@ void DirectX11::Dx11Main::Initialize()
     m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
     m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
     m_projectWindow = std::make_unique<AssetBundleWindow>();
+    m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>(m_sceneRenderer.get());
     g_progressWindow->SetProgress(60);
 #endif // !EDITOR
 
@@ -146,6 +148,10 @@ void DirectX11::Dx11Main::Initialize()
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
     PhysicsManagers->Initialize();
+
+    // CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
+    // 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
+    ClrHost::Get().Initialize();
 
     isGameToRender = true;
 
@@ -216,6 +222,10 @@ void DirectX11::Dx11Main::Initialize()
 
 void DirectX11::Dx11Main::Finalize()
 {
+    // 렌더 스레드를 세우기 전에 관리 측을 먼저 정리한다.
+    // 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
+    ClrHost::Get().Shutdown();
+
     isGameToRender = false;
     TagManagers->Finalize();
 	CullingManagers->Shutdown();
@@ -258,6 +268,28 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
     m_sceneRenderer->ReApplyCurrCubeMap();
 }
  
+void DirectX11::Dx11Main::TickScripts(float deltaTime)
+{
+    // 경계는 여기가 전부다. 스크립트가 몇 개든 프레임당 통과 횟수는 고정이고,
+    // 순회는 관리 영역에서 끝난다(설계 문서 02절).
+    // 게임 스레드에서만 부른다 — CoreCLR GC가 스레드를 정지시키기 때문이다.
+    auto& clr = ClrHost::Get();
+    if (!clr.IsReady()) return;
+
+    clr.TickAwake();          // 새로 붙은 스크립트의 Awake/OnEnable
+
+    // 물리에서 모인 충돌 이벤트를 Update 전에 흘려보낸다.
+    // 발생 시점에 바로 부르지 않는 이유는 설계 문서 02절 참고.
+    clr.FlushPhysicsEvents();
+
+    // 애니메이션 상태 전이도 같은 규약이다. 상태 머신이 이번 프레임에 쌓아 둔
+    // Enter/Update/Exit를 발생 순서 그대로 넘긴다.
+    clr.FlushAniEvents();
+
+    clr.TickUpdate(deltaTime);
+    clr.TickLateUpdate(deltaTime);
+}
+
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
@@ -276,6 +308,9 @@ void DirectX11::Dx11Main::Update()
             SceneManagers->Editor();
             SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
             SceneManagers->GameLogic();
+
+            // 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
+            // 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 Awake된다.
         }
         else
         {
@@ -287,6 +322,15 @@ void DirectX11::Dx11Main::Update()
             {
                 SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
                 SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
+
+                // 재생 버튼을 누른 프레임은 아직 에디터 원본 씬이 활성이다 —
+                // 씬 사본 생성은 렌더 배리어 사이(ApplyPendingSceneStructureChange)에서 일어난다.
+                // 여기서 그냥 돌리면 곧 접힐 원본 스크립트가 Awake를 한 번 실행해
+                // 스폰·사운드 같은 부작용이 두 번 일어난다. 한 프레임 미룬다.
+                if (!SceneManagers->HasPendingSceneStructureChange())
+                {
+                    TickScripts(EngineSettingInstance->frameDeltaTime);
+                }
             }
             else
             {
@@ -326,6 +370,11 @@ void DirectX11::Dx11Main::Update()
 
     EngineSettingInstance->renderBarrier.ArriveAndWait();
 
+    // 여기부터 두 번째 랑데뷰까지는 커맨드 빌드/실행 스레드가 모두 묶여 있다.
+    // 빌드 스레드는 워커 풀을 기다린 뒤 도달하므로 워커도 놀고 있다.
+    // 씬 오브젝트 목록을 통째로 갈아엎는 작업은 이 구간에서만 안전하다.
+    SceneManagers->ApplyPendingSceneStructureChange();
+
     PROFILE_CPU_BEGIN("EndOfFrame");
     DisableOrEnable();
     SceneManagers->EndOfFrame();
@@ -351,7 +400,7 @@ bool DirectX11::Dx11Main::ExecuteRenderPass()
 
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
 	if (Time->GetFrameCount() == 0 || GameSceneStart || GameSceneEnd || m_isInvokeResize)
-    { 
+    {
         PROFILE_CPU_END();
         return false;
     }
@@ -468,4 +517,5 @@ void DirectX11::Dx11Main::OnDeviceRestored()
 	CreateWindowSizeDependentResources();
 }
 #endif // !DYNAMICCPP_EXPORTS
+
 

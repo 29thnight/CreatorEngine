@@ -49,6 +49,14 @@ public:
 	virtual void Destroy() override final;
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
+
+	// 같은 타입을 여러 개 붙일 수 있는 형태.
+	//
+	// 일반 AddComponent는 타입당 하나로 제한하고 기존 것을 돌려준다. 스크립트는 그 규칙을
+	// 따를 수 없다 — 한 오브젝트에 스크립트를 여럿 붙이는 것이 보통이기 때문이다.
+	// (ModuleBehavior가 AddScriptComponent라는 별도 경로를 두고 있는 것과 같은 이유이며,
+	//  관리 스크립트를 담는 ScriptComponent도 이쪽을 쓴다)
+	std::shared_ptr<Component> AddComponentAllowMultiple(const Meta::Type& type);
 	ModuleBehavior* AddScriptComponent(std::string_view scriptName);
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);

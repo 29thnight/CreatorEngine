@@ -1,4 +1,6 @@
 #include "Scene.h"
+#include "ClrHost.h"
+#include "ScriptComponent.h"
 #include "HotLoadSystem.h"
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
@@ -830,6 +832,30 @@ void Scene::FixedUpdate(float deltaSecond)
     PROFILE_CPU_END();
 }
 
+namespace
+{
+    // C# 스크립트에도 물리 콜백을 전달한다.
+    //
+    // 위의 ModuleBehavior 경로와 달리 즉시 호출하지 않고 큐에만 담는다 —
+    // 충돌마다 경계를 넘으면 "틱당 1회" 원칙이 무너지기 때문이다(설계 문서 02절).
+    // 실제 전달은 틱 경계의 ClrHost::FlushPhysicsEvents가 한 번에 한다.
+    void QueueManagedCollision(const Collision& collider, ClrHost::PhysicsEventKind kind)
+    {
+        if (nullptr == collider.thisObj) return;
+
+        auto& clr = ClrHost::Get();
+        if (!clr.IsReady()) return;
+
+        for (auto* script : collider.thisObj->GetComponents<ScriptComponent>())
+        {
+            if (nullptr == script || !script->HasInstance()) continue;
+
+            clr.QueuePhysicsEvent(script->GetInstanceId(), kind,
+                collider.otherObj, collider.contactPoints);
+        }
+    }
+}
+
 void Scene::OnTriggerEnter(const Collision& collider)
 {
     auto target = collider.thisObj->GetComponents<ModuleBehavior>();
@@ -837,6 +863,8 @@ void Scene::OnTriggerEnter(const Collision& collider)
         OnTriggerEnterEvent.TargetInvoke(
             t->m_onTriggerEnterEventHandle, collider);
     }
+
+    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::TriggerEnter);
 }
 
 void Scene::OnTriggerStay(const Collision& collider)
@@ -846,6 +874,8 @@ void Scene::OnTriggerStay(const Collision& collider)
         OnTriggerStayEvent.TargetInvoke(
             t->m_onTriggerStayEventHandle, collider);
     }
+
+    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::TriggerStay);
 }
 
 void Scene::OnTriggerExit(const Collision& collider)
@@ -855,6 +885,8 @@ void Scene::OnTriggerExit(const Collision& collider)
         OnTriggerExitEvent.TargetInvoke(
             t->m_onTriggerExitEventHandle, collider);
     }
+
+    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::TriggerExit);
 }
 
 void Scene::OnCollisionEnter(const Collision& collider)
@@ -864,6 +896,8 @@ void Scene::OnCollisionEnter(const Collision& collider)
         OnCollisionEnterEvent.TargetInvoke(
             t->m_onCollisionEnterEventHandle, collider);
     }
+
+    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::CollisionEnter);
 }
 
 void Scene::OnCollisionStay(const Collision& collider)
@@ -873,6 +907,8 @@ void Scene::OnCollisionStay(const Collision& collider)
         OnCollisionStayEvent.TargetInvoke(
             t->m_onCollisionStayEventHandle, collider);
     }
+
+    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::CollisionStay);
 }
 
 void Scene::OnCollisionExit(const Collision& collider)
@@ -882,6 +918,8 @@ void Scene::OnCollisionExit(const Collision& collider)
         OnCollisionExitEvent.TargetInvoke(
             t->m_onCollisionExitEventHandle, collider);
     }
+
+    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::CollisionExit);
 }
 
 void Scene::Update(float deltaSecond)
@@ -1913,3 +1951,4 @@ std::shared_ptr<GameObject> Scene::FindCanvasIndex(size_t index)
     }
     return nullptr;
 }
+

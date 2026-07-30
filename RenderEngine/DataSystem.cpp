@@ -219,7 +219,8 @@ void DataSystem::RenderForEditer()
 		static ImGuiTextFilter searchFilter;
 		float availableWidth = ImGui::GetContentRegionAvail().x;
 
-		static Material* select_material = nullptr;
+		// 드래그앤드롭 대상으로 넘길 것이므로 공동 소유로 붙든다.
+		static std::shared_ptr<Material> select_material = nullptr;
 
 		const float tileWidth = 100.f;
 
@@ -259,7 +260,7 @@ void DataSystem::RenderForEditer()
 				{
 					if (ImGui::IsItemHovered())
 					{
-						select_material = Material.get();
+						select_material = Material;
 					}
 				}
 
@@ -638,10 +639,17 @@ void DataSystem::SaveMaterial(Material* material)
 Material* DataSystem::LoadMaterial(std::string_view name)
 {
     std::string materialName = name.data();
-    if (Materials.find(materialName) != Materials.end())
+
+    // 조회와 삽입만 락으로 감싼다. 중간의 파일 로딩은 LoadMaterialTexture를 호출하는데
+    // 그쪽이 m_textureMutex를 잡으므로, 여기서 락을 유지하면 material→texture 순서의
+    // 락 중첩이 생긴다. 락을 겹치지 않게 두어 데드락 여지를 없앤다.
     {
-		Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
-		return Materials[materialName].get();
+        std::lock_guard<std::mutex> guard(m_materialMutex);
+        if (Materials.find(materialName) != Materials.end())
+        {
+            Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
+            return Materials[materialName].get();
+        }
     }
 #ifndef BUILD_FLAG
     file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
@@ -678,11 +686,34 @@ Material* DataSystem::LoadMaterial(std::string_view name)
     loadTex(material->m_AO_TexName, material->m_AOMap);
     loadTex(material->m_EmissiveTexName, material->m_pEmissive);
 
-    Materials[material->m_name] = material;
-    return material.get();
+    {
+        std::lock_guard<std::mutex> guard(m_materialMutex);
+        // 로딩 중 다른 스레드가 같은 머티리얼을 먼저 넣었을 수 있다.
+        // 그 경우 맵에 있는 쪽을 반환해 인스턴스가 갈라지지 않게 한다.
+        auto& slot = Materials[material->m_name];
+        if (!slot)
+        {
+            slot = material;
+        }
+        return slot.get();
+    }
 #else
     return nullptr;
 #endif
+}
+
+std::shared_ptr<Material> DataSystem::LoadMaterialShared(std::string_view name)
+{
+    // LoadMaterial이 로딩·캐시 삽입을 모두 처리하므로 그대로 태운 뒤,
+    // 맵에서 shared_ptr을 꺼내 돌려준다(참조 카운트를 증가시켜 공동 소유).
+    if (nullptr == LoadMaterial(name))
+    {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> guard(m_materialMutex);
+    auto it = Materials.find(std::string(name));
+    return (it != Materials.end()) ? it->second : nullptr;
 }
 
 Texture* DataSystem::LoadTextureGUID(FileGuid guid)
@@ -741,27 +772,40 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 		file::copy_file(source, destination, file::copy_options::update_existing);
 	}
 	std::string name = file::path(filePath).stem().string();
-	if (Textures.find(name) != Textures.end())
+
+	// 캐시 조회와 삽입만 락으로 감싼다.
+	// 이 함수는 LoadAssetBundle이 스레드풀로 병렬 호출하는데 예전에는 무잠금이라
+	// 동시 삽입 시 unordered_map 리해시와 겹쳐 힙이 손상될 수 있었다.
+	// 디스크 로딩은 오래 걸리므로 락 밖에서 수행한다(같은 파일을 두 번 읽는
+	// 낭비는 있을 수 있으나 삽입 시 정리되며, 정확성에는 문제가 없다).
 	{
-		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
-		return Textures[name];
+		std::lock_guard<std::mutex> guard(m_textureMutex);
+		if (Textures.find(name) != Textures.end())
+		{
+			Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+			return Textures[name];
+		}
 	}
+
 	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
 	if (texture)
 	{
-		switch (type)
 		{
-		case DataSystem::TextureFileType::Texture:
-			Textures[name] = texture;
-			break;
-		case DataSystem::TextureFileType::UITexture:
-			UITextures[name] = texture;
-			break;
-		case DataSystem::TextureFileType::SpriteSheet:
-			SpriteSheets[name] = texture;
-			break;
-		default:
-			break;
+			std::lock_guard<std::mutex> guard(m_textureMutex);
+			switch (type)
+			{
+			case DataSystem::TextureFileType::Texture:
+				Textures[name] = texture;
+				break;
+			case DataSystem::TextureFileType::UITexture:
+				UITextures[name] = texture;
+				break;
+			case DataSystem::TextureFileType::SpriteSheet:
+				SpriteSheets[name] = texture;
+				break;
+			default:
+				break;
+			}
 		}
 		texture->m_name = name;
 		texture->m_extension = file::path(filePath).extension().string();
@@ -928,17 +972,17 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 	file::path destination = PathFinder::Relative("Font\\") / file::path(filePath).filename();
 	std::string name = file::path(filePath).stem().string();
 
-	if (!SFonts.empty())
+	// SFonts는 전용 락이 없어 유일하게 보호되지 않던 캐시였다.
+	std::lock_guard<std::mutex> guard(m_fontMutex);
+
+	if (SFonts.find(name) != SFonts.end())
 	{
-		if (SFonts.find(name) != SFonts.end())
-		{
-			Debug->Log("Font already loaded");
-			return SFonts[name].get();
-		}
+		Debug->Log("Font already loaded");
+		return SFonts[name].get();
 	}
 
 	SFonts.emplace(name, std::make_shared<SpriteFont>(DirectX11::DeviceStates->g_pDevice, destination.c_str()));
-	
+
 	return SFonts[name].get();
 }
 
@@ -1692,10 +1736,28 @@ void DataSystem::ClearRetainedAssets()
 
 void DataSystem::UnloadUnusedAssets()
 {
-	auto removeUnused = [this](auto& container, int type)
+	// 캐시에서 지운다고 곧바로 파괴되는 것이 아니다.
+	// 컴포넌트·프록시·Model이 shared_ptr로 공동 소유하므로(2-2~2-5),
+	// 아직 사용 중인 에셋은 참조가 남아 살아 있고 실제 해제는 마지막 참조가
+	// 사라질 때 일어난다. 여기서 하는 일은 "캐시가 붙들고 있던 몫을 놓는 것"이다.
+	auto removeUnused = [this](auto& container, int type, std::mutex& guardMutex)
 	{
+		// 이 타입을 에셋 번들이 관리하지 않으면 손대지 않는다.
+		//
+		// m_retainedAssets는 번들에 등록된 항목으로만 채워지는데, 현재 AssetBundleWindow는
+		// Model/Material/Texture/SpriteFont 네 종만 등록한다. 그대로 두면 UITexture와
+		// SpriteSheet는 "보존 목록이 비어 있다" = "전부 불필요"로 해석되어 통째로 날아간다.
+		// 번들이 해당 타입을 다루기 시작하면 자동으로 정상 동작한다.
+		auto retainIt = m_retainedAssets.find(type);
+		if (retainIt == m_retainedAssets.end())
+		{
+			return;
+		}
+
+		std::lock_guard<std::mutex> guard(guardMutex);
+
+		auto& retainSet = retainIt->second;
 		auto it = container.begin();
-		auto& retainSet = m_retainedAssets[type];
 		while (it != container.end())
 		{
 			if (retainSet.find(it->first) == retainSet.end())
@@ -1709,8 +1771,11 @@ void DataSystem::UnloadUnusedAssets()
 		}
 	};
 
-	removeUnused(Models, static_cast<int>(ManagedAssetType::Model));
-	removeUnused(Materials, static_cast<int>(ManagedAssetType::Material));
-	removeUnused(Textures, static_cast<int>(ManagedAssetType::Texture));
-	removeUnused(SFonts, static_cast<int>(ManagedAssetType::SpriteFont));
+	removeUnused(Models,       static_cast<int>(ManagedAssetType::Model),       m_modelMutex);
+	removeUnused(Materials,    static_cast<int>(ManagedAssetType::Material),    m_materialMutex);
+	removeUnused(Textures,     static_cast<int>(ManagedAssetType::Texture),     m_textureMutex);
+	removeUnused(SFonts,       static_cast<int>(ManagedAssetType::SpriteFont),  m_fontMutex);
+	// 예전에는 이 두 캐시가 ManagedAssetType에 없어 언로드 대상에서 아예 빠져 있었다(12.2-②).
+	removeUnused(UITextures,   static_cast<int>(ManagedAssetType::UITexture),   m_textureMutex);
+	removeUnused(SpriteSheets, static_cast<int>(ManagedAssetType::SpriteSheet), m_textureMutex);
 }

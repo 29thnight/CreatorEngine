@@ -62,11 +62,18 @@ if ($ports.Count -eq 0) {
 $ports = $ports | Sort-Object -Unique
 $ports | Out-File -FilePath $ResponseFile -Encoding utf8
 
-Write-Host "✅ 설치 대상 (${($ports.Count)})이 $ResponseFile 에 저장되었습니다."
+Write-Host "✅ 설치 대상 $($ports.Count)개가 $ResponseFile 에 저장되었습니다."
 $ports | ForEach-Object { Write-Host "  - $_" }
 
 Write-Host "`n⚙️  vcpkg install @$(Split-Path -Leaf $ResponseFile) 실행 중..."
 # vcpkg 실행 (로그를 실행 경로의 로그 파일로 저장)
 & $VcpkgExe install "@$ResponseFile" 2>&1 | Tee-Object -FilePath $LogFile
+
+# 파이프라인을 거치면 $LASTEXITCODE가 vcpkg의 결과를 그대로 담는다.
+# 이를 확인하지 않으면 설치 실패가 성공으로 보고되어 CI가 통과해 버린다.
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "❌ vcpkg install 실패 (exit code $LASTEXITCODE). 로그: $LogFile"
+    exit $LASTEXITCODE
+}
 
 Write-Host "`n✅ 완료. 로그: $LogFile"

@@ -14,7 +14,7 @@
 #include "WireFramePass.h"
 #include "AAPass.h"
 #include "PostProcessingPass.h"
-//ÀÛ¾÷ÀÚ ¿ë¿ì °ü·Ã
+//ï¿½Û¾ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 #include "ScreenSpaceReflectionPass.h"
 #include "SubsurfaceScatteringPass.h"
 #include "VignettePass.h"
@@ -30,7 +30,7 @@
 #include "BitMaskPass.h"
 #include "TerrainGizmoPass.h"
 #include "DecalPass.h"
-//ÀÛ¾÷ÀÚ ±ÔÃ¶ °ü·Ã
+//ï¿½Û¾ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¶ ï¿½ï¿½ï¿½ï¿½
 #include "EffectEditor.h"
 #endif // !DYNAMICCPP_EXPORTS
 
@@ -69,6 +69,10 @@ public:
 	void CreateCommandListPass();
 	void ReApplyCurrCubeMap();
 	void ApplyVolumeProfile();
+
+	// ì§„ë‹¨/ê³„ì¸¡ìš© ì½ê¸° ì „ìš© ì ‘ê·¼ì.
+	// ì†Œìœ ê¶Œì„ ë„˜ê¸°ì§€ ì•Šìœ¼ë¯€ë¡œ friend ì„ ì–¸ë³´ë‹¤ ê²°í•©ì´ ì•½í•˜ë‹¤.
+	RenderScene* GetRenderScene() const { return m_renderScene.get(); }
 
 private:
 	void InitializeDeviceState();

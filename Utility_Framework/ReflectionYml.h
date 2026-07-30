@@ -45,7 +45,9 @@ namespace Meta
 		}
 		else
 		{
-			Debug->LogError("YamlNodeToProperty: Unsupported type");
+			// 어떤 프로퍼티가 빠지는지 모르면 추적이 불가능하다. 이름과 타입을 남긴다.
+			Debug->LogError(std::string("YamlNodeToProperty: Unsupported type - ")
+				+ prop.name + " (" + prop.typeName + ")");
 		}
 	}
 

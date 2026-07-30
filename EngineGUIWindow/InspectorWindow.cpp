@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "Object.h"
 #include "GameObject.h"
+#include "ClrHost.h"
+#include "ScriptComponent.h"
 #include "ICustomEditor.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
@@ -98,10 +100,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 		bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
 
-		// 3. ¿ì¼±¼øÀ§ °áÁ¤
+		// 3. ï¿½ì¼±ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		if (sceneObjectJustSelected)
 		{
-			// °ÔÀÓ ¿ÀºêÁ§Æ® ¼±ÅÃ ½Ã YAML ¼±ÅÃ ÇØÁ¦
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ YAML ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			selectedNode = std::nullopt;
 			isSelectedNode = false;
 			wasMetaSelectedLastFrame = false;
@@ -109,7 +111,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 		if (metaNodeJustSelected)
 		{
-			// ¸ŞÅ¸ ÆÄÀÏ ¼±ÅÃ ½Ã °ÔÀÓ ¿ÀºêÁ§Æ® ÇØÁ¦
+			// ï¿½ï¿½Å¸ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 			selectedSceneObject = nullptr;
 			prevSelectedSceneObject = nullptr;
 			wasMetaSelectedLastFrame = true;
@@ -192,6 +194,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperModuleBehavior(moduleBehavior);
 						}
 					}
+					else if (componentTypeID == type_guid(ScriptComponent))
+					{
+						ScriptComponent* script = dynamic_cast<ScriptComponent*>(component.get());
+						if (nullptr != script)
+						{
+							DrawManagedScripts(script);
+						}
+					}
 					else if (componentTypeID == type_guid(Animator))
 					{
 						Animator* animator = dynamic_cast<Animator*> (component.get());
@@ -253,7 +263,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
 						if (nullptr != sprite)
 						{
-							//ÀÌ°Ç ¹º ¹ö±×ÁÒ?
+							//ï¿½Ì°ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
@@ -268,7 +278,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					else if (componentTypeID == type_guid(SoundComponent))
 					{
 						SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
-						if (snd) ImGuiDrawHelperSoundComponent(snd);   // Ä¿½ºÅÒ ÀÎ½ºÆåÅÍ È£Ãâ
+						if (snd) ImGuiDrawHelperSoundComponent(snd);   // Ä¿ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½ï¿½ï¿½ï¿½ È£ï¿½ï¿½
 					}
 					else if (type)
 					{
@@ -286,23 +296,23 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			}
 			
 			ImGui::Separator();
-			ImVec2 windowSize = ImGui::GetWindowSize();      // ÇöÀç À©µµ¿ìÀÇ ÀüÃ¼ Å©±â
-			ImVec2 buttonSize = ImVec2(180, 0);              // ¹öÆ° °¡·Î Å©±â (¼¼·Î´Â ÀÚµ¿ °è»êµÊ)
+			ImVec2 windowSize = ImGui::GetWindowSize();      // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ Å©ï¿½ï¿½
+			ImVec2 buttonSize = ImVec2(180, 0);              // ï¿½ï¿½Æ° ï¿½ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ (ï¿½ï¿½ï¿½Î´ï¿½ ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½)
 
 			static ImGuiTextFilter searchFilter;
 
-			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // ¼öÆò Áß¾Ó Á¤·Ä
+			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // ï¿½ï¿½ï¿½ï¿½ ï¿½ß¾ï¿½ ï¿½ï¿½ï¿½ï¿½
 
 			if (ImGui::Button("Add Component", buttonSize))
 			{
 				ImGui::OpenPopup("AddComponent");
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (ImGui::BeginPopup("AddComponent"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // ³ë¶õ»ö ÅØ½ºÆ®
-				ImGui::Separator(); // ±¸ºĞ¼±
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ø½ï¿½Æ®
+				ImGui::Separator(); // ï¿½ï¿½ï¿½Ğ¼ï¿½
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -340,18 +350,18 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::EndPopup();
 			}
 
-			// ´ÙÀ½ ÇÁ·¹ÀÓ¿¡¼­ ¿­±â
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (m_openScriptPopup)
 			{
 				ImGui::OpenPopup("Scripts");
 				m_openScriptPopup = false;
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (ImGui::BeginPopup("Scripts"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "ScriptComponent"); // ³ë¶õ»ö ÅØ½ºÆ®
-				ImGui::Separator(); // ±¸ºĞ¼±
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "ScriptComponent"); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ø½ï¿½Æ®
+				ImGui::Separator(); // ï¿½ï¿½ï¿½Ğ¼ï¿½
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -372,7 +382,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::EndPopup();
 			}
 
-			// ´ÙÀ½ ÇÁ·¹ÀÓ¿¡¼­ ¿­±â
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (m_openNewScriptPopup)
 			{
 				ImGui::OpenPopup("NewScript");
@@ -390,11 +400,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				isOpen = false;
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (ImGui::BeginPopup("NewScript"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "New ScriptComponent"); // ³ë¶õ»ö ÅØ½ºÆ®
-				ImGui::Separator(); // ±¸ºĞ¼±
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "New ScriptComponent"); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ø½ï¿½Æ®
+				ImGui::Separator(); // ï¿½ï¿½ï¿½Ğ¼ï¿½
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -511,6 +521,141 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
+void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
+{
+	if (nullptr == script) return;
+
+	auto& clr = ClrHost::Get();
+
+	if (script->m_scriptType.empty())
+	{
+		ImGui::TextDisabled("ìŠ¤í¬ë¦½íŠ¸ íƒ€ì…ì´ ì§€ì •ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤");
+		return;
+	}
+
+	if (!script->HasInstance())
+	{
+		ImGui::TextColored(ImVec4(1.f, 0.6f, 0.2f, 1.f),
+			"'%s' ì¸ìŠ¤í„´ìŠ¤ ì—†ìŒ (ë“±ë¡ë˜ì§€ ì•Šì€ íƒ€ì…ì´ê±°ë‚˜ CLR ë¯¸ì¤€ë¹„)", script->m_scriptType.c_str());
+		return;
+	}
+
+	const int instanceId = script->GetInstanceId();
+	const int fieldCount = clr.GetFieldCount(instanceId);
+	if (0 == fieldCount)
+	{
+		ImGui::TextDisabled("ë…¸ì¶œëœ í•„ë“œ ì—†ìŒ");
+		return;
+	}
+
+	// ì¸ìŠ¤í„´ìŠ¤ idë¡œ ìŠ¤ì½”í”„ë¥¼ ë¬¶ì–´ì•¼ ê°™ì€ ì´ë¦„ í•„ë“œê°€ ì—¬ëŸ¬ ìŠ¤í¬ë¦½íŠ¸ì— ìˆì–´ë„ ìœ„ì ¯ì´ ì„ì´ì§€ ì•ŠëŠ”ë‹¤.
+	ImGui::PushID(instanceId);
+
+	for (int i = 0; i < fieldCount; ++i)
+	{
+		const std::string name = clr.GetFieldName(instanceId, i);
+		ImGui::PushID(i);
+
+		switch (clr.GetFieldType(instanceId, i))
+		{
+		case ClrHost::ScriptFieldType::Float:
+		{
+			float value = clr.GetFieldFloat(instanceId, i);
+			if (ImGui::DragFloat(name.c_str(), &value, 0.01f))
+			{
+				clr.SetFieldFloat(instanceId, i, value);
+				script->CaptureFields();
+			}
+			break;
+		}
+		case ClrHost::ScriptFieldType::Int32:
+		{
+			int value = clr.GetFieldInt32(instanceId, i);
+			if (ImGui::DragInt(name.c_str(), &value))
+			{
+				clr.SetFieldInt32(instanceId, i, value);
+				script->CaptureFields();
+			}
+			break;
+		}
+		case ClrHost::ScriptFieldType::Bool:
+		{
+			bool value = clr.GetFieldBool(instanceId, i);
+			if (ImGui::Checkbox(name.c_str(), &value))
+			{
+				clr.SetFieldBool(instanceId, i, value);
+				script->CaptureFields();
+			}
+			break;
+		}
+		case ClrHost::ScriptFieldType::Float3:
+		{
+			ClrHost::ScriptFloat3 value = clr.GetFieldFloat3(instanceId, i);
+			if (ImGui::DragFloat3(name.c_str(), &value.x, 0.01f))
+			{
+				clr.SetFieldFloat3(instanceId, i, value);
+				script->CaptureFields();
+			}
+			break;
+		}
+		case ClrHost::ScriptFieldType::String:
+		{
+			std::string value = clr.GetFieldString(instanceId, i);
+
+			char buffer[256]{};
+			const size_t length = std::min(value.size(), sizeof(buffer) - 1);
+			std::memcpy(buffer, value.data(), length);
+
+			if (ImGui::InputText(name.c_str(), buffer, sizeof(buffer)))
+			{
+				clr.SetFieldString(instanceId, i, buffer);
+				script->CaptureFields();
+			}
+			break;
+		}
+		case ClrHost::ScriptFieldType::Object:
+		{
+			GameObject* target = clr.GetFieldObject(instanceId, i);
+			const std::string label = (nullptr != target) ? target->m_name.ToString() : std::string("(ì—†ìŒ)");
+
+			ImGui::Text("%s", name.c_str());
+			ImGui::SameLine();
+			ImGui::Button(label.c_str(), ImVec2(-40.f, 0.f));
+
+			// ê³„ì¸µ ì°½ì—ì„œ ëŒì–´ë‹¤ ë†“ëŠ” ê²ƒì„ ë°›ëŠ”ë‹¤. í˜ì´ë¡œë“œ ì´ë¦„ì€ ê¸°ì¡´ ë“œë˜ê·¸ ì†ŒìŠ¤ì™€ ë§ì¶˜ë‹¤.
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("GameObject"))
+				{
+					if (payload->Data && payload->DataSize == sizeof(GameObject*))
+					{
+						GameObject* dropped = *static_cast<GameObject**>(payload->Data);
+						clr.SetFieldObject(instanceId, i, dropped);
+						script->CaptureFields();
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+
+			ImGui::SameLine();
+			if (ImGui::SmallButton("X"))
+			{
+				clr.SetFieldObject(instanceId, i, nullptr);
+				script->CaptureFields();
+			}
+			break;
+		}
+		default:
+			ImGui::TextDisabled("%s (ì§€ì›í•˜ì§€ ì•ŠëŠ” íƒ€ì…)", name.c_str());
+			break;
+		}
+
+		ImGui::PopID();
+	}
+
+	ImGui::PopID();
+}
+
 void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 {
 	std::string name = gameObject->m_name.ToString();
@@ -567,22 +712,22 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
 	if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
 	{
-		selectedTagIndex = 0; // ±âº»°ªÀ¸·Î Ã¹ ¹øÂ° ÅÂ±× ¼±ÅÃ
+		selectedTagIndex = 0; // ï¿½âº»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã¹ ï¿½ï¿½Â° ï¿½Â±ï¿½ ï¿½ï¿½ï¿½ï¿½
 	}
-	// Tag ÄŞº¸¹Ú½º
+	// Tag ï¿½Şºï¿½ï¿½Ú½ï¿½
 	ImGui::Text("Tag");
 	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // ÇÈ¼¿ ´ÜÀ§·Î ³Êºñ ¼³Á¤
+	ImGui::SetNextItemWidth(90.0f); // ï¿½È¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êºï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
 	{
 		for (int i = 0; i <= tagCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == tagCount) // "Add Tag" Ç×¸ñ
+			if (i == tagCount) // "Add Tag" ï¿½×¸ï¿½
 			{
 				if (ImGui::Selectable("Add Tag"))
 				{
-					m_openNewTagPopup = true; // ÆË¾÷ ¿­±â ÇÃ·¡±× ¼³Á¤
+					m_openNewTagPopup = true; // ï¿½Ë¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 				}
 			}
 			else
@@ -593,7 +738,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 					TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
 					selectedTag = tagNames[i];
 					TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
-					selectedTagIndex = i; // ¼±ÅÃµÈ ÀÎµ¦½º ¾÷µ¥ÀÌÆ®
+					selectedTagIndex = i; // ï¿½ï¿½ï¿½Ãµï¿½ ï¿½Îµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 				}
 			}
 
@@ -605,17 +750,17 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	ImGui::SameLine();
 	ImGui::Text("Layer");
 	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // ÇÈ¼¿ ´ÜÀ§·Î ³Êºñ ¼³Á¤
+	ImGui::SetNextItemWidth(90.0f); // ï¿½È¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êºï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
 	{
 		for (int i = 0; i <= layerCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == layerCount) // "Add Layer" Ç×¸ñ
+			if (i == layerCount) // "Add Layer" ï¿½×¸ï¿½
 			{
 				if (ImGui::Selectable("Add Layer"))
 				{
-					m_openNewLayerPopup = true; // ÆË¾÷ ¿­±â ÇÃ·¡±× ¼³Á¤
+					m_openNewLayerPopup = true; // ï¿½Ë¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 				}
 			}
 			else
@@ -625,9 +770,9 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 				{
 					TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), gameObject);
 					selectedLayer = layerNames[i];
-					gameObject->SetCollisionType(); // Ãæµ¹ Å¸ÀÔ ¾÷µ¥ÀÌÆ®
+					gameObject->SetCollisionType(); // ï¿½æµ¹ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 					TagManagers->AddObjectToLayer(selectedLayer.ToString(), gameObject);
-					selectedLayerIndex = i; // ¼±ÅÃµÈ ÀÎµ¦½º ¾÷µ¥ÀÌÆ®
+					selectedLayerIndex = i; // ï¿½ï¿½ï¿½Ãµï¿½ ï¿½Îµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 				}
 			}
 
@@ -643,16 +788,16 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 	if (m_openNewTagPopup)
 	{
 		ImGui::OpenPopup("New Tag");
-		m_openNewTagPopup = false; // ÆË¾÷ ¿­±â ÇÃ·¡±× ÃÊ±âÈ­
+		m_openNewTagPopup = false; // ï¿½Ë¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
 	}
 
 	if (m_openNewLayerPopup)
 	{
 		ImGui::OpenPopup("New Layer");
-		m_openNewLayerPopup = false; // ÆË¾÷ ¿­±â ÇÃ·¡±× ÃÊ±âÈ­
+		m_openNewLayerPopup = false; // ï¿½Ë¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
 	}
 
-	// New Tag ÆË¾÷
+	// New Tag ï¿½Ë¾ï¿½
 	if (ImGui::BeginPopup("New Tag"))
 	{
 		static char newTagName[64] = "";
@@ -663,8 +808,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 			{
 				TagManagers->AddTag(newTagName);
 				selectedTag = newTagName;
-				selectedTagIndex = tagCount; // »õ·Î Ãß°¡µÈ ÅÂ±× ÀÎµ¦½º
-				tagCount = TagManagers->GetTags().size(); // ÅÂ±× °³¼ö ¾÷µ¥ÀÌÆ®
+				selectedTagIndex = tagCount; // ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ï¿½ï¿½ ï¿½Â±ï¿½ ï¿½Îµï¿½ï¿½ï¿½
+				tagCount = TagManagers->GetTags().size(); // ï¿½Â±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -676,7 +821,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 		ImGui::EndPopup();
 	}
 
-	// New Layer ÆË¾÷
+	// New Layer ï¿½Ë¾ï¿½
 	if (ImGui::BeginPopup("New Layer"))
 	{
 		static char newLayerName[64] = "";
@@ -687,8 +832,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 			{
 				TagManagers->AddLayer(newLayerName);
 				selectedLayer = newLayerName;
-				selectedLayerIndex = layerCount; // »õ·Î Ãß°¡µÈ ·¹ÀÌ¾î ÀÎµ¦½º
-				layerCount = TagManagers->GetLayers().size(); // ·¹ÀÌ¾î °³¼ö ¾÷µ¥ÀÌÆ®
+				selectedLayerIndex = layerCount; // ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½Îµï¿½ï¿½ï¿½
+				layerCount = TagManagers->GetLayers().size(); // ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -703,7 +848,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 
 void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 {
-	// ÇöÀç Æ®·£½ºÆû °ª
+	// ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
 	Mathf::Vector4& position = gameObject->m_transform.position;
 	Mathf::Vector4& rotation = gameObject->m_transform.rotation;
 	Mathf::Vector4& scale = gameObject->m_transform.scale;
@@ -942,13 +1087,13 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 		}
 	}
 
-	// Behavior Tree ÀÌ¸§ Ç¥½Ã
+	// Behavior Tree ï¿½Ì¸ï¿½ Ç¥ï¿½ï¿½
 	if (!BTComponent->name.empty())
 	{
 		ImGui::Text("Behavior Tree: %s", BTComponent->name.c_str());
 	}
 
-	//BlackBoard ÀÌ¸§ Ç¥½Ã
+	//BlackBoard ï¿½Ì¸ï¿½ Ç¥ï¿½ï¿½
 	if (!BTComponent->blackBoardName.empty())
 	{
 		ImGui::Text("BlackBoard: %s", BTComponent->blackBoardName.c_str());
@@ -972,7 +1117,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			FileGuid guid = DataSystems->GetFileGuid(filepath);
 			if (guid != nullFileGuid)
 			{
-				// ÀÌ¹Ì ÇÁ·ÎÆÄÀÏÀÌ Á¸ÀçÇÏ´Â °æ¿ì
+				// ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½
 				if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
 				{
 					Debug->LogWarning("Volume profile already exists. Replacing with new profile.");
@@ -1256,7 +1401,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 		ImGui::Text("Image");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(150.0f); // ÇÈ¼¿ ´ÜÀ§·Î ³Êºñ ¼³Á¤
+		ImGui::SetNextItemWidth(150.0f); // ï¿½È¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êºï¿½ ï¿½ï¿½ï¿½ï¿½
 		if (ImGui::BeginCombo("##TextureCombo", items[currentTextureIndex]))
 		{
 			for (int i = 0; i < count; ++i)
@@ -1342,7 +1487,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 
 	ImGui::Text("Navigation");
 	auto originNaviContainer = imageComponent->GetNavigations();
-	std::array<Navigation, 4> naviContainer{}; // º¹»çº» »ı¼º
+	std::array<Navigation, 4> naviContainer{}; // ï¿½ï¿½ï¿½çº» ï¿½ï¿½ï¿½ï¿½
 
 	for (auto navi : originNaviContainer)
 	{
@@ -1522,9 +1667,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 {
 	using namespace ImGui;
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//  Clip / Picker
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	TextUnformatted("Clip");
 	ImGui::SameLine();
 	SetNextItemWidth(240);
@@ -1538,9 +1683,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		m_openClipPicker = true;
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//  Bus / Basic Params
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	SeparatorText("Bus / Params");
 
 	const char* busNames[] = { "BGM","SFX","PLAYER","MONSTER","UI" };
@@ -1561,7 +1706,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	Checkbox("Loop", &sc->loop); ImGui::SameLine();
 	Checkbox("Play On Start", &sc->playOnStart);
 
-	// ·çÇÁ »óÅÂ º¯°æ Áï½Ã Ã¤³Î¿¡ ¹İ¿µ
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Ã¤ï¿½Î¿ï¿½ ï¿½İ¿ï¿½
 	if (loopBefore != sc->loop) {
 		auto applyLoop = [&](FMOD::Channel* ch) {
 			if (!ch) return;
@@ -1575,9 +1720,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		applyLoop(sc->Get3DChannel());
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//  Spatial
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	SeparatorText("Spatial");
 	Checkbox("Spatial (Blend 2D+3D)", &sc->spatial);
 
@@ -1599,12 +1744,12 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		bool rollChanged = ImGui::Combo("Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
 		sc->rolloff = (Rolloff)roll;
 
-		// ±×·¡ÇÁ: spatialÀÌ¸é Ç×»ó Ç¥½Ã
+		// ï¿½×·ï¿½ï¿½ï¿½: spatialï¿½Ì¸ï¿½ ï¿½×»ï¿½ Ç¥ï¿½ï¿½
 		ImGui::SeparatorText("Distance Rolloff Curve");
 
 		const bool isCustom = (sc->rolloff == Rolloff::Custom);
 
-		// Linear /Inverse ¼±ÅÃ ½Ã: ÀÚµ¿ °î¼±À¸·Î µ¿±âÈ­(ÀĞ±âÀü¿ë)
+		// Linear /Inverse ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½: ï¿½Úµï¿½ ï¿½î¼±ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­(ï¿½Ğ±ï¿½ï¿½ï¿½ï¿½ï¿½)
 		if (!isCustom) {
 			if (rollChanged || minBefore != sc->minDistance || maxBefore != sc->maxDistance || sc->localRolloffCurve.size() < 2) {
 				if (sc->rolloff == Rolloff::Linear)  BuildLinearCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
@@ -1614,11 +1759,11 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			ImGui::TextDisabled("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
 		}
 		else {
-			// Custom: ¿¡µğÆ® °¡´É
+			// Custom: ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 			if (sc->localRolloffCurve.size() < 2) {
 				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
 			}
-			// maxDistance º¯°æ ½Ã ¸¶Áö¸· Á¡ X¸¦ ¹üÀ§ ³»·Î º¸Á¤(ÆíÁı ³»¿ëÀº À¯Áö)
+			// maxDistance ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Xï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 			sc->localRolloffCurve.back().distance = std::clamp(sc->localRolloffCurve.back().distance, 0.1f, std::max(0.1f, sc->maxDistance));
 
 			if (ImGui::SmallButton("Reset to Default")) {
@@ -1628,7 +1773,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			ImGui::TextDisabled("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
 		}
 
-		// ½Ç½Ã°£ 3D Ã¤³Î ¹İ¿µ(À§Ä¡/°Å¸®/·Ñ¿ÀÇÁ ¸ğµå µî)
+		// ï¿½Ç½Ã°ï¿½ 3D Ã¤ï¿½ï¿½ ï¿½İ¿ï¿½(ï¿½ï¿½Ä¡/ï¿½Å¸ï¿½/ï¿½Ñ¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½)
 		if (auto* ch3 = sc->Get3DChannel()) {
 			FMOD_VECTOR p{ sc->position.x, sc->position.y, sc->position.z };
 			FMOD_VECTOR v{ sc->velocity.x, sc->velocity.y, sc->velocity.z };
@@ -1651,14 +1796,14 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		}
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//  Reverb Send
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	SeparatorText("Reverb Send");
 	bool useRevBefore = sc->useReverbSend;
 	Checkbox("Enable Reverb Send", &sc->useReverbSend);
 
-	// dB ½½¶óÀÌ´õ(-80~+10), ³»ºÎ´Â ¼±Çü(0~1)·Î º¯È¯ÇØ¼­ FMOD¿¡ Àû¿ë
+	// dB ï¿½ï¿½ï¿½ï¿½ï¿½Ì´ï¿½(-80~+10), ï¿½ï¿½ï¿½Î´ï¿½ ï¿½ï¿½ï¿½ï¿½(0~1)ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ø¼ï¿½ FMODï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	SetNextItemWidth(260);
 	DragFloat("Reverb Level (dB)", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
 	SetNextItemWidth(200);
@@ -1678,21 +1823,21 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
-	// °ªÀÌ ¹Ù²î¸é Ç×»ó Àû¿ë
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½Ù²ï¿½ï¿½ ï¿½×»ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (IsItemEdited() || IsItemDeactivatedAfterEdit()) {
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
 
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//  Preview Controls
-	// ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	Separator();
 	if (Button("Play")) { sc->Play(); } ImGui::SameLine();
 	if (Button("Stop")) { sc->Stop(); } ImGui::SameLine();
 	if (Button("OneShot")) { sc->PlayOneShot(); }
 
-	// º¼·ı/ÇÇÄ¡/ÇÁ¶óÀÌ¾î¸®Æ¼ º¯°æ ½Ç½Ã°£ ¹İ¿µ(Ã¤³Î »ì¾ÆÀÖÀ» ¶§)
+	// ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½Ä¡/ï¿½ï¿½ï¿½ï¿½ï¿½Ì¾î¸®Æ¼ ï¿½ï¿½ï¿½ï¿½ ï¿½Ç½Ã°ï¿½ ï¿½İ¿ï¿½(Ã¤ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
 	auto applyBasic = [&](FMOD::Channel* ch) {
 		if (!ch) return;
 		ch->setVolume(sc->volume);
@@ -1823,7 +1968,7 @@ bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& curve, flo
 		return changed;
 	}
 	else {
-		// readOnly ¸ğµå: »óÈ£ÀÛ¿ë ¾øÀ½, ¾È³»¸¸
+		// readOnly ï¿½ï¿½ï¿½: ï¿½ï¿½È£ï¿½Û¿ï¿½ ï¿½ï¿½ï¿½ï¿½, ï¿½È³ï¿½ï¿½ï¿½
 		if (hovered) SetTooltip("Graph is read-only (driven by Rolloff mode).");
 		Dummy(size);
 		if (outSelected) *outSelected = -1;
@@ -1836,14 +1981,14 @@ void InspectorWindow::DrawSoundClipPicker()
 	using namespace ImGui;
 	if (!m_openClipPicker) return;
 
-	// µ¶¸³ À©µµ¿ì(¸ğ´Ş ´À³¦)
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
 	if (Begin("Select Audio Clip", &m_openClipPicker,
 		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
 	{
-		// »ó´Ü: °Ë»ö/¸®ÇÁ·¹½Ã
+		// ï¿½ï¿½ï¿½: ï¿½Ë»ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		if (InputTextWithHint("##search", "Search clip key...", &m_clipSearch)) {
-			// ÀÔ·Â ½Ã Áï½Ã ÇÊÅÍ ¹İ¿µ
+			// ï¿½Ô·ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½İ¿ï¿½
 		}
 		SameLine();
 		if (Button("Refresh")) {
@@ -1851,11 +1996,11 @@ void InspectorWindow::DrawSoundClipPicker()
 		}
 		Separator();
 
-		// ÇÊÅÍ¸µ
+		// ï¿½ï¿½ï¿½Í¸ï¿½
 		auto toLower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), ::tolower); return s; };
 		std::string q = toLower(m_clipSearch);
 
-		// ¸®½ºÆ® ¿µ¿ª
+		// ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 		BeginChild("##cliplist", ImVec2(0, -48), true);
 		static int selectedIndex = -1;
 		const int N = (int)m_clipKeyCache.size();
@@ -1868,10 +2013,10 @@ void InspectorWindow::DrawSoundClipPicker()
 				selectedIndex = i;
 			}
 
-			// ¿ìÃø ÇÁ¸®ºä ¹öÆ°
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ°
 			if (IsItemHovered() && IsMouseDoubleClicked(0)) 
 			{
-				// ´õºíÅ¬¸¯ = ¼±ÅÃ È®Á¤
+				// ï¿½ï¿½ï¿½ï¿½Å¬ï¿½ï¿½ = ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
 				if (m_clipPickerTarget && i >= 0) m_clipPickerTarget->clipKey = key;
 				m_openClipPicker = false;
 				selectedIndex = -1;
@@ -1882,7 +2027,7 @@ void InspectorWindow::DrawSoundClipPicker()
 			{
 				if (m_clipPickerTarget) 
 				{
-					// ¹Ì¸®µè±â: ÇöÀç Å¸°Ù ¹ö½º/º¼·ı/ÇÇÄ¡ »ç¿ë
+					// ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½
 					FMOD_VECTOR pos{ m_clipPickerTarget->position.x,
 									 m_clipPickerTarget->position.y,
 									 m_clipPickerTarget->position.z };
@@ -1907,7 +2052,7 @@ void InspectorWindow::DrawSoundClipPicker()
 		}
 		EndChild();
 
-		// ÇÏ´Ü ¹öÆ°
+		// ï¿½Ï´ï¿½ ï¿½ï¿½Æ°
 		BeginDisabled(selectedIndex < 0);
 		if (Button("Use")) 
 		{
@@ -1926,3 +2071,5 @@ void InspectorWindow::DrawSoundClipPicker()
 }
 
 #endif // !DYNAMICCPP_EXPORTS
+
+

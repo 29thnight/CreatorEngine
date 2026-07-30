@@ -349,11 +349,11 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		if (proxy->m_finalTransforms && proxy->m_animatorGuid != currentAnimatorGuid)
 		{
-			DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), proxy->m_finalTransforms);
+			DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), proxy->m_finalTransforms.get());
 			currentAnimatorGuid = proxy->m_animatorGuid;
 		}
 
-		Material* mat = proxy->m_Material;
+		Material* mat = proxy->m_Material.get();
 		auto matinfo = mat->m_materialInfo;
 		proxy->m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
 		if (proxy->m_materialGuid != currentMaterialGuid)
@@ -397,7 +397,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// *** THE KEY OPTIMIZATION IS HERE ***
 		// --- Set material once per group ---
 		// Only update material state if it has changed from the previous group.
-		Material* mat = firstProxy->m_Material;
+		Material* mat = firstProxy->m_Material.get();
 		auto matinfo = mat->m_materialInfo;
 		firstProxy->m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
 		if (groupMaterialGuid != currentMaterialGuid)
@@ -450,7 +450,7 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		auto firstProxy = proxies.front();
 		auto customPSO = firstProxy->m_Material->m_shaderPSO;
 		if (!customPSO) continue;
-		//TEST: PSO°¡ À¯È¿ÇÏÁö ¾Ê´Ù¸é ShaderSystem¿¡¼­ µ¿ÀÏ ÀÌ¸§ÀÇ PSO¸¦ Ã£¾Æ ±³Ã¼
+		//TEST: PSOï¿½ï¿½ ï¿½ï¿½È¿ï¿½ï¿½ï¿½ï¿½ ï¿½Ê´Ù¸ï¿½ ShaderSystemï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ PSOï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½Ã¼
 		auto& shaderPSOContainer = ShaderSystem->ShaderAssets;
 
 		if (customPSO->IsInvalidated())
@@ -459,23 +459,23 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			{
 				for (auto* proxy : proxies)
 				{
-					proxy->m_Material->SetShaderPSO(nullptr); // ±âÁ¸ PSO ÇØÁ¦
+					proxy->m_Material->SetShaderPSO(nullptr); // ï¿½ï¿½ï¿½ï¿½ PSO ï¿½ï¿½ï¿½ï¿½
 					proxy->m_Material->SetShaderPSO(shaderPSOContainer[psoName]);
 				}
 				customPSO = firstProxy->m_Material->m_shaderPSO;
 			}
 			else
 			{
-				continue; // ÇØ´ç ÀÌ¸§ÀÇ PSO°¡ ¾ø´Ù¸é ½ºÅµ
+				continue; // ï¿½Ø´ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ PSOï¿½ï¿½ ï¿½ï¿½ï¿½Ù¸ï¿½ ï¿½ï¿½Åµ
 			}
 		}
 
 
-		// ¸ÓÆ¼¸®¾óÀº ¿ÀÁ÷ 'º¯°æµÈ CBuffer'¸¸ ¾÷·Îµå
+		// ï¿½ï¿½Æ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 'ï¿½ï¿½ï¿½ï¿½ï¿½ CBuffer'ï¿½ï¿½ ï¿½ï¿½ï¿½Îµï¿½
 		for (auto* proxy : proxies)
 		{
 			if (!proxy || (int)proxy->m_proxyType == (int)PrimitiveProxyType::Expired) continue;
-			// PSO´Â ±×·ì ´ÜÀ§·Î 1È¸ Apply
+			// PSOï¿½ï¿½ ï¿½×·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1È¸ Apply
 			customPSO->Apply(deferredPtr);
 			DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
 			DirectX11::OMSetDepthStencilState(deferredPtr, m_depthNoWrite.Get(), 1);
@@ -492,13 +492,13 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			proxy->m_Material->TrySetMatrix("PerApplication", "projection", renderData->m_frameCalculatedProjection);
 			proxy->m_Material->TrySetMaterialInfo();
 
-			//Cbuffer¸¦ View Àü¿ë ÄÁÅ×ÀÌ³Ê·Î º¹»ç
+			//Cbufferï¿½ï¿½ View ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì³Ê·ï¿½ ï¿½ï¿½ï¿½ï¿½
 			proxy->m_Material->UpdateCBufferView();
-			// ÀÌ ¸ÓÆ¼¸®¾óÀÌ º¸°üÇÏ´ø CBuffer º¯°æºÐ¸¸ GPU·Î ¹Ý¿µ
+			// ï¿½ï¿½ ï¿½ï¿½Æ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ CBuffer ï¿½ï¿½ï¿½ï¿½Ð¸ï¿½ GPUï¿½ï¿½ ï¿½Ý¿ï¿½
 			proxy->m_Material->ApplyShaderParams(deferredPtr);
-			// ÅØ½ºÃ³ SRV´Â SetShaderPSO() ¶§ ½½·Ô °íÁ¤ ¹ÙÀÎµùµÊ
+			// ï¿½Ø½ï¿½Ã³ SRVï¿½ï¿½ SetShaderPSO() ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Îµï¿½ï¿½ï¿½
 
-			// ±âÁ¸ forward binding
+			// ï¿½ï¿½ï¿½ï¿½ forward binding
 			{
 				MeshrendererBuffer mbuffer;
 				mbuffer.bitflag = proxy->m_bitflag;
@@ -662,7 +662,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 			if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
 			if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
 
-			// 3) ÀÎ½ºÅÏ½º Çà·Ä ¾÷·Îµå + µå·Î¿ì¸¦ 2048°³¾¿ Ã»Å©·Î
+			// 3) ï¿½Î½ï¿½ï¿½Ï½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Îµï¿½ + ï¿½ï¿½Î¿ì¸¦ 2048ï¿½ï¿½ï¿½ï¿½ Ã»Å©ï¿½ï¿½
 			std::vector<Mathf::xMatrix> instanceMatrices;
 			instanceMatrices.reserve(std::min(instances.size(), kMaxInstancesPerDraw));
 
@@ -671,7 +671,7 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 			{
 				const size_t count = std::min(kMaxInstancesPerDraw, total - base);
 
-				// Ã»Å©¿ë Çà·Ä Ã¤¿ì±â
+				// Ã»Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ Ã¤ï¿½ï¿½ï¿½
 				instanceMatrices.resize(count);
 				for (size_t i = 0; i < count; ++i)
 				{
@@ -679,18 +679,18 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 					instanceMatrices[i] = inst->m_worldMatrix * proxy->m_worldMatrix;
 				}
 
-				// ¹öÆÛ ¾÷µ¥ÀÌÆ® (¹ÙÀÌÆ® ´ÜÀ§)
+				// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® (ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½)
 				D3D11_BOX box{};
 				box.left = 0;
 				box.right = static_cast<UINT>(count * sizeof(Mathf::xMatrix));
 				box.top = 0; box.bottom = 1;
 				box.front = 0; box.back = 1;
 
-				// m_instanceBuffer: ÀÎ½ºÅÏ½Ì¿ë VB (DEFAULT ±ÇÀå)
+				// m_instanceBuffer: ï¿½Î½ï¿½ï¿½Ï½Ì¿ï¿½ VB (DEFAULT ï¿½ï¿½ï¿½ï¿½)
 				deferredPtr->UpdateSubresource(m_instanceBuffer.Get(), 0, &box,
 					instanceMatrices.data(), 0, 0);
 
-				// µå·Î¿ì(Ã»Å© ¼ö¸¸Å­)
+				// ï¿½ï¿½Î¿ï¿½(Ã»Å© ï¿½ï¿½ï¿½ï¿½Å­)
 				mesh->DrawInstanced(deferredPtr, static_cast<UINT>(count));
 			}
 		}

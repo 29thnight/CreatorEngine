@@ -71,6 +71,16 @@ namespace Meta
         std::string typeStr = ToString<T>();
 		HashedGuid typeID = TypeTrait::GUIDCreator::GetTypeID<T>();
         bool isPointer = std::is_pointer_v<T> || is_shared_ptr_v<T>;
+
+        if constexpr (is_shared_ptr_v<T>)
+        {
+            // 타입 이름은 가리키는 대상의 이름이어야 한다.
+            // 원시 포인터는 ToString이 "Material *"에서 " *"를 떼어 "Material"을 주지만,
+            // shared_ptr은 "std::shared_ptr<class Material>"이 그대로 남는다. 그 이름으로는
+            // MetaDataRegistry에서 타입을 찾지 못해 직렬화가 빈 노드를 쓰고, 역직렬화에서
+            // 필드를 읽다가 bad conversion이 난다.
+            typeStr = RemoveObjectPrefix(ExtractPointee(typeStr));
+        }
 		bool isVector = is_vector_v<T>;
 		bool isElementPointer = false;
 
@@ -82,7 +92,12 @@ namespace Meta
         else if constexpr (is_shared_ptr_v<T>)
         {
             using Pointee = typename T::element_type;
-            TypeCaster::GetInstance()->Register<T>();
+            // Register<T>()를 쓰면 안 된다. T가 포인터가 아니라서 "값" 경로로 등록되고,
+            // 그 캐스터는 shared_ptr 객체 자신의 주소를 돌려준다. 직렬화기는 그것을
+            // 대상 객체의 주소로 알고 읽으므로 엉뚱한 메모리를 긁어 필드가 통째로 비고,
+            // 역직렬화 쪽에서 bad conversion이 난다.
+            // 벡터 원소 경로(아래)와 마찬가지로 get()을 돌려주는 캐스터를 등록한다.
+            TypeCaster::GetInstance()->RegisterSharedPtr<Pointee>();
         }
         else if constexpr (requires { typename VectorElementType<T>::Type; })
         {

@@ -983,7 +983,7 @@ GameObject* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector
 		if (!meshComp || !meshComp->m_Mesh)
 			continue;
 
-		const Mesh* mesh = meshComp->m_Mesh;
+		const Mesh* mesh = meshComp->m_Mesh.get();
 
 		BoundingBox worldAABB;
 		worldAABB.Extents = mesh->GetBoundingBox().Extents;
@@ -1021,7 +1021,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 		auto* lightComp = obj->GetComponent<LightComponent>();
 		if (meshComp && meshComp->m_Mesh)
 		{
-			const Mesh* mesh = meshComp->m_Mesh;
+			const Mesh* mesh = meshComp->m_Mesh.get();
 
 			BoundingBox worldAABB;
 			mesh->GetBoundingBox().Transform(

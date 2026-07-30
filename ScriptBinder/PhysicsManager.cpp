@@ -18,24 +18,24 @@
 class Scene;
 void PhysicsManager::Initialize()
 {
-	// PhysicsManager ÃÊ±âÈ­
+	// PhysicsManager ï¿½Ê±ï¿½È­
 	m_bIsInitialized = Physics->Initialize();
 	
-	// ¾À ·Îµå, ¾ğ·Îµå, º¯°æ ÀÌº¥Æ® ÇÚµé·¯ µî·Ï
+	// ï¿½ï¿½ ï¿½Îµï¿½, ï¿½ï¿½Îµï¿½, ï¿½ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ® ï¿½Úµé·¯ ï¿½ï¿½ï¿½
 	m_OnSceneLoadHandle		= sceneLoadedEvent.AddRaw(this, &PhysicsManager::OnLoadScene);
 	m_OnSceneUnloadHandle	= sceneUnloadedEvent.AddRaw(this, &PhysicsManager::OnUnloadScene);
 	m_OnChangeSceneHandle	= SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
 
-	// ¹°¸® ¿£Áø Äİ¹é ÇÔ¼ö ¼³Á¤
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½İ¹ï¿½ ï¿½Ô¼ï¿½ ï¿½ï¿½ï¿½ï¿½
 	Physics->SetCallBackCollisionFunction([this](const CollisionData& data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
 	});
 	
-	//±âº» ÀüÃ¼ Ãæµ¹ ¸ÅÆ®¸¯½º ¼³Á¤
+	//ï¿½âº» ï¿½ï¿½Ã¼ ï¿½æµ¹ ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	std::vector<std::vector<uint8_t>> collisionGrid;
 	collisionGrid.resize(32);
 	for (auto& row : collisionGrid) {
-		row.resize(32, 1); // ±âº»ÀûÀ¸·Î ¸ğµç Ãæµ¹Ã¼°¡ Ãæµ¹ °¡´ÉÇÏµµ·Ï ¼³Á¤
+		row.resize(32, 1); // ï¿½âº»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½æµ¹Ã¼ï¿½ï¿½ ï¿½æµ¹ ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	}
 	SetCollisionMatrix(collisionGrid);
 
@@ -45,41 +45,41 @@ void PhysicsManager::Update(float fixedDeltaTime)
 {
 	if (!m_bIsInitialized) return;
 	
-	// Äİ¹é ÀÌº¥Æ® ÃÊ±âÈ­
+	// ï¿½İ¹ï¿½ ï¿½Ìºï¿½Æ® ï¿½Ê±ï¿½È­
 	m_callbacks.clear();
 	SetPhysicData();
-	// ¹°¸® ¿£Áø¿¡ º¯°æ »çÇ× Àû¿ë
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	//Benchmark bm;
 	ApplyPendingChanges();
-	// ¹°¸® ¿£Áø ¾÷µ¥ÀÌÆ®
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 	Physics->Update(fixedDeltaTime);
 	//std::cout << " Physics->Update" << bm.GetElapsedTime() << std::endl;
 	
-	// 1¼øÀ§: GetPhysicData()
-	// ¹°¸® ½Ã¹Ä·¹ÀÌ¼ÇÀÇ °á°ú¸¦ ¸ğµç °ÔÀÓ¿ÀºêÁ§Æ®ÀÇ Transform¿¡ ¸ÕÀú µ¿±âÈ­ÇÕ´Ï´Ù.
-	// ÀÌ·¸°Ô ÇØ¾ß ¼¼»óÀÇ ¸ğµç °´Ã¼°¡ ¹°¸®ÀûÀ¸·Î ¿Ã¹Ù¸¥ ÃÖ½Å À§Ä¡¿¡ ÀÖ°Ô µË´Ï´Ù.
+	// 1ï¿½ï¿½ï¿½ï¿½: GetPhysicData()
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½Ã¹Ä·ï¿½ï¿½Ì¼ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ Transformï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½Õ´Ï´ï¿½.
+	// ï¿½Ì·ï¿½ï¿½ï¿½ ï¿½Ø¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã¹Ù¸ï¿½ ï¿½Ö½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½Ö°ï¿½ ï¿½Ë´Ï´ï¿½.
 	GetPhysicData();
 
-	// 2¼øÀ§: ProcessCallback()
-	// ¸ğµç °´Ã¼ÀÇ À§Ä¡°¡ ÃÖ½Å »óÅÂ·Î µ¿±âÈ­µÇ¾úÀ¸¹Ç·Î, ÀÌÁ¦ ÀÌ À§Ä¡¸¦ ±âÁØÀ¸·Î
-	// OnCollisionEnter, OnTriggerEnter µîÀÇ ÀÌº¥Æ® ½ºÅ©¸³Æ®¸¦ ½ÇÇàÇÏ´Â °ÍÀÌ ¾ÈÀüÇÏ°í Á¤È®ÇÕ´Ï´Ù.
-	// ¸¸¾à ÀÌ ¼ø¼­°¡ ¹İ´ë°¡ µÇ¸é, ½ºÅ©¸³Æ®´Â 'ÀÌÀü ÇÁ·¹ÀÓÀÇ À§Ä¡'¸¦ ±âÁØÀ¸·Î ·ÎÁ÷À» ½ÇÇàÇÏ´Â ¿À·ù°¡ ¹ß»ıÇÒ ¼ö ÀÖ½À´Ï´Ù.
+	// 2ï¿½ï¿½ï¿½ï¿½: ProcessCallback()
+	// ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½Ö½ï¿½ ï¿½ï¿½ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ç·ï¿½, ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// OnCollisionEnter, OnTriggerEnter ï¿½ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ® ï¿½ï¿½Å©ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½È®ï¿½Õ´Ï´ï¿½.
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½İ´ë°¡ ï¿½Ç¸ï¿½, ï¿½ï¿½Å©ï¿½ï¿½Æ®ï¿½ï¿½ 'ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡'ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ö½ï¿½ï¿½Ï´ï¿½.
 	ProcessCallback();
 
-	// 3¼øÀ§: ApplyPendingControllerPositionChanges()
-	// ÇØ´ç ÇÁ·¹ÀÓÀÇ ¸ğµç ¹°¸®Àû »óÈ£ÀÛ¿ë°ú ÀÌº¥Æ® Ã³¸®°¡ ¿ÏÀüÈ÷ ³¡³µ½À´Ï´Ù.
-	// ÀÌÁ¦ ¸ğµç Á¤»êÀÌ ³¡³­ »óÅÂ¿¡¼­, '¹«ÇÑ º¹µµ'¿Í °°Àº Æ¯¼öÇÑ °ÔÀÓÇÃ·¹ÀÌ È¿°ú(¼ø°£ÀÌµ¿)¸¦
-	// ¸Ç ¸¶Áö¸·¿¡ Àû¿ëÇÏ¿© ´ÙÀ½ ÇÁ·¹ÀÓÀ» ÁØºñ½ÃÅµ´Ï´Ù.
+	// 3ï¿½ï¿½ï¿½ï¿½: ApplyPendingControllerPositionChanges()
+	// ï¿½Ø´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È£ï¿½Û¿ï¿½ï¿½ ï¿½Ìºï¿½Æ® Ã³ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â¿ï¿½ï¿½ï¿½, 'ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½'ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Æ¯ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½ È¿ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½Ìµï¿½)ï¿½ï¿½
+	// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Øºï¿½ï¿½Åµï¿½Ï´ï¿½.
 	ApplyPendingControllerPositionChanges();
 }
 void PhysicsManager::Shutdown()
 {
-	// ¹°¸® ¿£Áø ¾À º¯°æ
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	Physics->ChangeScene();
-	//ÄÁÅ×ÀÌ³Ê Á¦°Å
+	//ï¿½ï¿½ï¿½ï¿½ï¿½Ì³ï¿½ ï¿½ï¿½ï¿½ï¿½
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	Container.clear();
-	// ¹°¸® ¿£Áø Á¾·á
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	Physics->UnInitialize();
 
 	SaveCollisionMatrix();
@@ -127,7 +127,7 @@ void PhysicsManager::ProcessCallback()
 
 		if (isSameID || lhs == iterEnd || rhs == iterEnd)
 		{
-			//ÀÚ½ÅÀÇ Äİ¶óÀÌ´õ¿Í Ãæµ¹ ÀÌ°Å³ª Ãæµ¹Ã¼°¡ ¾ø¾î Á³À» °æ¿ì -> error
+			//ï¿½Ú½ï¿½ï¿½ï¿½ ï¿½İ¶ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ ï¿½æµ¹ ï¿½Ì°Å³ï¿½ ï¿½æµ¹Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ -> error
 			Debug->LogError("Collision Callback Error lfs :" + std::to_string(data.thisId) + " ,rhs : " + std::to_string(data.otherId));
 			continue;
 		}
@@ -288,7 +288,7 @@ int PhysicsManager::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Ve
 			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
 			finalHit.layer = hit.hitObjectLayer;
 
-			//// ÁÂÇ¥°è º¯È¯ (¿Ş¼Õ -> ¿À¸¥¼Õ)
+			//// ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ (ï¿½Ş¼ï¿½ -> ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 			//ConvertVectorPxToDx(hit.hitPoint, finalHit.point);
 			// ConvertVectorPxToDx(hit.hitNormal, finalHit.normal);
 			finalHit.point = hit.hitPoint;
@@ -536,13 +536,13 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	Mathf::Quaternion finalWorldRot = Mathf::Quaternion::Concatenate(offsetRot, pureWorldRot);
 	Mathf::Vector3 finalWorldPos = pureWorldPos + Mathf::Vector3::Transform(offsetPos, pureWorldRot);
 
-	// 3. `collsionTransform` ±¸Á¶Ã¼¸¦ ¿Ã¹Ù¸¥ µ¥ÀÌÅÍ·Î Ã¤¿ó´Ï´Ù.
+	// 3. `collsionTransform` ï¿½ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½Ã¹Ù¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½ Ã¤ï¿½ï¿½Ï´ï¿½.
 	auto& collsionTransform = capsuleInfo.colliderInfo.collsionTransform;
-	collsionTransform.worldPosition = finalWorldPos; // ¼ø¼ö À§Ä¡
-	collsionTransform.worldRotation = finalWorldRot; // ¼ø¼ö È¸Àü
-	collsionTransform.worldScale = transform.GetWorldScale(); // ½ºÄÉÀÏÀº µû·Î ÀúÀå
+	collsionTransform.worldPosition = finalWorldPos; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡
+	collsionTransform.worldRotation = finalWorldRot; // ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½
+	collsionTransform.worldScale = transform.GetWorldScale(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	
-	// ·ÎÄÃ Á¤º¸´Â ±âÁ¸Ã³·³ Ã¤¿ö³Ö½À´Ï´Ù.
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ Ã¤ï¿½ï¿½ï¿½Ö½ï¿½ï¿½Ï´ï¿½.
 	collsionTransform.localMatrix = transform.GetLocalMatrix();
 	collsionTransform.localMatrix.Decompose(
 		collsionTransform.localScale,
@@ -735,9 +735,25 @@ void PhysicsManager::SetPhysicData()
 		auto& transform = colliderInfo.gameObject->m_transform;
 		//colliderInfo.collider.
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
+
+		// ì½œë¼ì´ë”ê°€ ë¶™ì€ ì˜¤ë¸Œì íŠ¸ëŠ” RigidBodyComponentë„ í•¨ê»˜ ìˆë‹¤ê³  ê°€ì •í•˜ê³  ì§œì—¬ ìˆë‹¤
+		// (ì•„ë˜ CCT ë¶„ê¸°ë„ rigidbody->GetLinearVelocity()ë¥¼ ì“´ë‹¤).
+		// í•˜ë‚˜ë¼ë„ ë¹ ì§€ë©´ ì—¬ê¸°ì„œ ë„ ì—­ì°¸ì¡°ë¡œ ì—”ì§„ ì „ì²´ê°€ ì£½ì—ˆë‹¤ â€” ì˜ëª» êµ¬ì„±ëœ
+		// ì˜¤ë¸Œì íŠ¸ í•˜ë‚˜ ë•Œë¬¸ì— í”„ë ˆì„ì„ í†µì§¸ë¡œ ìƒì§€ ì•Šë„ë¡ ê±´ë„ˆë›´ë‹¤.
+		if (nullptr == rigidbody)
+		{
+			static std::unordered_set<unsigned int> reported;
+			if (reported.insert(id).second)
+			{
+				Debug->LogError("[ë¬¼ë¦¬] RigidBodyComponent ì—†ì´ ì½œë¼ì´ë”ë§Œ ë¶™ì€ ì˜¤ë¸Œì íŠ¸ë¥¼ ê±´ë„ˆëœë‹ˆë‹¤: "
+					+ colliderInfo.gameObject->m_name.ToString());
+			}
+			continue;
+		}
+
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
-		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
+		//todo : CCT,Controller,ragdoll,capsule,?ï¿½ì¤‘??deformeSuface
 		//sleeping
 		bool enable = colliderInfo.gameObject->IsEnabled();
 
@@ -805,16 +821,16 @@ void PhysicsManager::SetPhysicData()
 			Mathf::Vector3 scale;
 			worldMatrix_NoScale.Decompose(scale, pureWorldRot, pureWorldPos);
 
-			// 2. Äİ¶óÀÌ´õÀÇ ·ÎÄÃ ¿ÀÇÁ¼ÂÀ» °¡Á®¿É´Ï´Ù.  
+			// 2. ï¿½İ¶ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½É´Ï´ï¿½.  
 			auto offset = colliderInfo.collider->GetPositionOffset();
 			auto rotOffset = colliderInfo.collider->GetRotationOffset();
 
 			auto type = colliderInfo.collider->GetColliderType();
 
-			// 3. ¿ÀÇÁ¼ÂÀ» Àû¿ëÇÏ¿© ¹°¸® °´Ã¼ÀÇ 'ÃÖÁ¾ ¿ùµå Pose'¸¦ °è»êÇÕ´Ï´Ù
+			// 3. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ 'ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Pose'ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½
 			data.rotation = Mathf::Quaternion::Concatenate(rotOffset, pureWorldRot);
 			data.position = pureWorldPos + DirectX::SimpleMath::Vector3::Transform(offset, pureWorldRot);
-			// 4. ¿ùµå ½ºÄÉÀÏ °ªÀ» µû·Î °¡Á®¿É´Ï´Ù.  
+			// 4. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½É´Ï´ï¿½.  
 			data.scale = transform.GetWorldScale();
 			if(data.scale != rigidbody->GetScale())
 			{
@@ -931,12 +947,12 @@ void PhysicsManager::GetPhysicData()
 			auto posOffset = ColliderInfo.collider->GetPositionOffset();
 			auto rotOffset = ColliderInfo.collider->GetRotationOffset();
 
-			// 2. È¸Àü ¿ª¿¬»ê: ¹°¸® ¿ùµå¿¡¼­ ¹ŞÀº È¸Àü°ª(data.rotation)¿¡¼­ Äİ¶óÀÌ´õÀÇ È¸Àü ¿ÀÇÁ¼ÂÀ» Á¦°ÅÇÕ´Ï´Ù.
+			// 2. È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½å¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½ï¿½(data.rotation)ï¿½ï¿½ï¿½ï¿½ ï¿½İ¶ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 			Mathf::Quaternion pureWorldRot;
 			rotOffset.Inverse(pureWorldRot);
 			pureWorldRot = Mathf::Quaternion::Concatenate(pureWorldRot, data.rotation);
 
-			// 3. À§Ä¡ ¿ª¿¬»ê: À§¿¡¼­ °è»êÇÑ '¼ø¼ö ¿ùµå È¸Àü'À» »ç¿ëÇÏ¿© À§Ä¡ ¿ÀÇÁ¼ÂÀÇ ¿µÇâÀ» Á¦°ÅÇÕ´Ï´Ù.
+			// 3. ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ 'ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½'ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 			Mathf::Vector3 pureWorldPos = data.position - DirectX::SimpleMath::Vector3::Transform(posOffset,
 				pureWorldRot);
 
@@ -950,29 +966,29 @@ void PhysicsManager::GetPhysicData()
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
-// ÆæµùµÈ CCT À§Ä¡ º¯°æ ¿äÃ»À» ÀÏ°ı Ã³¸®ÇÏ´Â ÇÔ¼ö
+// ï¿½ï¿½ï¿½ï¿½ï¿½ CCT ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»ï¿½ï¿½ ï¿½Ï°ï¿½ Ã³ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½
 void PhysicsManager::ApplyPendingControllerPositionChanges()
 {
 	if (!Physics || m_pendingControllerPositions.empty()) return;
 
-	// ID¸¦ ÅëÇØ °ÔÀÓ¿ÀºêÁ§Æ®¸¦ Ã£±â À§ÇØ Äİ¶óÀÌ´õ ÄÁÅ×ÀÌ³Ê¿¡ Á¢±ÙÇÕ´Ï´Ù.
+	// IDï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½İ¶ï¿½ï¿½Ì´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì³Ê¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 	auto& colliderContainer = SceneManagers->GetActiveScene()->m_colliderContainer;
 
 	for (const auto& change : m_pendingControllerPositions)
 	{
-		// 1. PhysX ¿£Áø ³»ºÎÀÇ ÄÁÆ®·Ñ·¯ À§Ä¡¸¦ °­Á¦·Î ¼³Á¤ÇÕ´Ï´Ù.
+		// 1. PhysX ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½Ñ·ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 		Physics->SetControllerPosition(change.id, change.position);
 
-		// 2. ÇØ´ç ID¸¦ °¡Áø °ÔÀÓ¿ÀºêÁ§Æ®¸¦ Ã£½À´Ï´Ù.
+		// 2. ï¿½Ø´ï¿½ IDï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ Ã£ï¿½ï¿½ï¿½Ï´ï¿½.
 		auto it = colliderContainer.find(change.id);
 		if (it != colliderContainer.end())
 		{
 			auto& colliderInfo = it->second;
 			if (colliderInfo.gameObject)
 			{
-				// 3. (ÇÙ½É) °ÔÀÓ¿ÀºêÁ§Æ®ÀÇ Transform ÄÄÆ÷³ÍÆ® À§Ä¡µµ Áï½Ã µ¿±âÈ­ÇÕ´Ï´Ù.
-				// CCTÀÇ °æ¿ì ÀÏ¹İÀûÀ¸·Î ¿ÀÇÁ¼ÂÀÌ ¾ø°Å³ª, ÀÖ´õ¶óµµ ¼ø°£ÀÌµ¿Àº ±âÁØÁ¡À» ±âÁØÀ¸·Î ÇÏ´Â °ÍÀÌ ¸íÈ®ÇÕ´Ï´Ù.
-				// ¸¸¾à ¿ÀÇÁ¼ÂÀ» °í·ÁÇØ¾ß ÇÑ´Ù¸é, change.position¿¡¼­ ¿ÀÇÁ¼ÂÀ» »©ÁØ °ªÀ» SetWorldPosition¿¡ ³Ñ°ÜÁÖ¾î¾ß ÇÕ´Ï´Ù.
+				// 3. (ï¿½Ù½ï¿½) ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ Transform ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½Õ´Ï´ï¿½.
+				// CCTï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ï¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Å³ï¿½, ï¿½Ö´ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ìµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È®ï¿½Õ´Ï´ï¿½.
+				// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´Ù¸ï¿½, change.positionï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ SetWorldPositionï¿½ï¿½ ï¿½Ñ°ï¿½ï¿½Ö¾ï¿½ï¿½ ï¿½Õ´Ï´ï¿½.
 				colliderInfo.gameObject->m_transform.SetWorldPosition(change.position);
 			}
 		}
@@ -1026,7 +1042,7 @@ void PhysicsManager::LoadCollisionMatrix()
 			}
 			else
 			{
-				m_collisionMatrix[i][j] = true; // ±âº»°ª ¼³Á¤
+				m_collisionMatrix[i][j] = true; // ï¿½âº»ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			}
 		}
 	}

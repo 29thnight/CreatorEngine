@@ -1,4 +1,5 @@
 #include "ImageComponent.h"
+#include "Canvas.h"
 #include "ImageComponent.h"
 #include "../RenderEngine/DeviceState.h"
 #include "../RenderEngine/Texture.h"
@@ -88,6 +89,10 @@ void ImageComponent::Awake()
 		renderScene->RegisterCommand(this);
 	}
 
+	// 레지스트리 등록은 수명의 시작(Awake)에서 스스로 한다(6-1).
+	// 캔버스 연결과 무관하게 등록되므로, 연결이 늦거나 없어도 유령이 되지 않는다.
+	UIManagers->RegisterImageComponent(this);
+
 	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
 	{
 		const auto& worldRect = rect->GetWorldRect();
@@ -137,7 +142,15 @@ void ImageComponent::OnDestroy()
 	if (scene)
 	{
 		renderScene->UnregisterCommand(this);
-		UIManagers->UnregisterImageComponent(this);
+	}
+
+	// 해제는 무조건 한다. 예전에는 씬이 널이면 건너뛰어 레지스트리에 dangling이 남았다.
+	UIManagers->UnregisterImageComponent(this);
+
+	// 소속 캔버스 목록에서도 빠진다 — Canvas::Update의 매 프레임 청소를 대체한다(6-4).
+	if (Canvas* owner = GetOwnerCanvas())
+	{
+		owner->RemoveUIObject(GetOwner());
 	}
 }
 
@@ -150,3 +163,6 @@ void ImageComponent::UpdateTexture()
 
 	SetTexture(curindex);
 }
+
+
+

@@ -106,10 +106,18 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_gizmoCameraBuffer.Get(), &cameraBuffer);
 
 	std::vector<std::pair<int, std::shared_ptr<GameObject>>> gizmoTargetComponent;
-    gizmoTargetComponent.reserve(scene.GetScene()->m_SceneObjects.size());
 
-    for (auto& object : scene.GetScene()->m_SceneObjects)
+    // 이 목록은 게임 스레드가 채우는 도중일 수 있다(재생 진입 시 PlayScene을 만들면서
+    // 오브젝트를 계속 push_back 한다). 원본을 그대로 순회하면 재할당 한 번에 반복자가
+    // 무효가 되므로, 스냅샷을 떠서 shared_ptr로 수명까지 붙든 뒤 훑는다.
+    // 비어 있는 슬롯이 섞여 들어올 수 있어 널 검사도 함께 한다.
+    const std::vector<std::shared_ptr<GameObject>> sceneObjects = scene.GetScene()->m_SceneObjects;
+    gizmoTargetComponent.reserve(sceneObjects.size());
+
+    for (const auto& object : sceneObjects)
     {
+        if (!object) continue;
+
         if (object->GetComponent<CameraComponent>() != nullptr)
         {
             gizmoTargetComponent.emplace_back(0, object);

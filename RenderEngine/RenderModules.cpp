@@ -3,6 +3,12 @@
 #include "ParticleSystem.h"
 #include "DataSystem.h"
 
+// 상태 객체(Blend/DepthStencil/Rasterizer)를 다시 만들 때는 반드시 기존 것을 먼저 놓아준다.
+// 예전에는 포인터에 nullptr만 대입하고 재생성했는데, D3D11 상태 객체는 COM이라
+// Release 없이 참조를 버리면 그대로 누수된다. 이펙트 프리셋을 바꿀 때마다
+// 드라이버 레벨 객체가 쌓여 장시간 세션에서 핸들이 고갈됐다.
+// Memory::SafeDelete는 IUnknown 파생 타입에 대해 Release 후 nullptr까지 처리한다.
+
 // 관리
 void RenderModules::CleanupRenderState()
 {
@@ -86,10 +92,11 @@ void RenderModules::SetCustomBlendState(const D3D11_BLEND_DESC& desc)
 	m_customBlendDesc = desc;
 
 	if (m_pso) {
-		m_pso->m_blendState = nullptr;
+		ID3D11BlendState* created = nullptr;
 		DirectX11::ThrowIfFailed(
-			DirectX11::DeviceStates->g_pDevice->CreateBlendState(&desc, &m_pso->m_blendState)
+			DirectX11::DeviceStates->g_pDevice->CreateBlendState(&desc, &created)
 		);
+		m_pso->AdoptBlendState(created);
 	}
 	OnRenderStatesChanged();
 }
@@ -107,10 +114,11 @@ void RenderModules::SetCustomDepthStencilState(const D3D11_DEPTH_STENCIL_DESC& d
 	m_customDepthDesc = desc;
 
 	if (m_pso) {
-		m_pso->m_depthStencilState = nullptr;
+		ID3D11DepthStencilState* created = nullptr;
 		DirectX11::ThrowIfFailed(
-			DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&desc, &m_pso->m_depthStencilState)
+			DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&desc, &created)
 		);
+		m_pso->AdoptDepthStencilState(created);
 	}
 	OnRenderStatesChanged();
 }
@@ -128,10 +136,11 @@ void RenderModules::SetCustomRasterizerState(const D3D11_RASTERIZER_DESC& desc)
 	m_customRasterizerDesc = desc;
 
 	if (m_pso) {
-		m_pso->m_rasterizerState = nullptr;
+		ID3D11RasterizerState* created = nullptr;
 		DirectX11::ThrowIfFailed(
-			DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&desc, &m_pso->m_rasterizerState)
+			DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&desc, &created)
 		);
+		m_pso->AdoptRasterizerState(created);
 	}
 	OnRenderStatesChanged();
 }
@@ -170,10 +179,11 @@ void RenderModules::CreateBlendState(BlendPreset preset)
 	D3D11_BLEND_DESC desc = (preset == BlendPreset::Custom) ?
 		m_customBlendDesc : GetBlendDesc(preset);
 
-	m_pso->m_blendState = nullptr;
+	ID3D11BlendState* created = nullptr;
 	DirectX11::ThrowIfFailed(
-		DirectX11::DeviceStates->g_pDevice->CreateBlendState(&desc, &m_pso->m_blendState)
+		DirectX11::DeviceStates->g_pDevice->CreateBlendState(&desc, &created)
 	);
+	m_pso->AdoptBlendState(created);
 }
 
 void RenderModules::CreateDepthStencilState(DepthPreset preset)
@@ -183,10 +193,11 @@ void RenderModules::CreateDepthStencilState(DepthPreset preset)
 	D3D11_DEPTH_STENCIL_DESC desc = (preset == DepthPreset::Custom) ?
 		m_customDepthDesc : GetDepthStencilDesc(preset);
 
-	m_pso->m_depthStencilState = nullptr;
+	ID3D11DepthStencilState* created = nullptr;
 	DirectX11::ThrowIfFailed(
-		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&desc, &m_pso->m_depthStencilState)
+		DirectX11::DeviceStates->g_pDevice->CreateDepthStencilState(&desc, &created)
 	);
+	m_pso->AdoptDepthStencilState(created);
 }
 
 void RenderModules::CreateRasterizerState(RasterizerPreset preset)
@@ -196,10 +207,11 @@ void RenderModules::CreateRasterizerState(RasterizerPreset preset)
 	D3D11_RASTERIZER_DESC desc = (preset == RasterizerPreset::Custom) ?
 		m_customRasterizerDesc : GetRasterizerDesc(preset);
 
-	m_pso->m_rasterizerState= nullptr;
+	ID3D11RasterizerState* created = nullptr;
 	DirectX11::ThrowIfFailed(
-		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&desc, &m_pso->m_rasterizerState)
+		DirectX11::DeviceStates->g_pDevice->CreateRasterizerState(&desc, &created)
 	);
+	m_pso->AdoptRasterizerState(created);
 }
 
 D3D11_BLEND_DESC RenderModules::GetBlendDesc(BlendPreset preset) const

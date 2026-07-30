@@ -1,6 +1,10 @@
 #pragma once
 #include "MaterialInfomation.h"
 #include "MaterialFlowInformation.h"
+// 직접 포함해야 한다. Texture.h를 거쳐 들어오길 기대하면 안 되는데,
+// Texture.h는 본문 전체가 #ifndef DYNAMICCPP_EXPORTS로 막혀 있어
+// 스크립트 DLL 빌드에서는 Diagnostics가 선언되지 않는다.
+#include "EngineResourceCensus.h"
 #include "Texture.h"
 #include "ShaderPSO.h"
 #include "Material.generated.h"
@@ -17,7 +21,7 @@ enum class MaterialRenderingMode
 AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
 struct ID3D11DeviceContext;
-class Material
+class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {
 public:
    ReflectMaterial
@@ -32,7 +36,12 @@ public:
 		return m_materialGuid == other.m_materialGuid;
 	}
 
-	static Material* Instantiate(const Material* origin, std::string_view newName = {});
+	// 머티리얼 클론은 반드시 소유권과 함께 받는다.
+	//
+	// 예전에는 원시 포인터를 돌려주는 Instantiate()가 있었는데, 클론의 유일한
+	// shared_ptr이 DataSystem 캐시에만 있어서 캐시가 정리되면 사용 중인 클론이
+	// 그대로 파괴됐다(12.2 보충 분석). 호출자가 소유권을 함께 받도록 강제해
+	// 그 상황 자체를 없앤다.
 	static std::shared_ptr<Material> InstantiateShared(const Material* origin, std::string_view newName = {});
 
 //initialize material chainable functions
@@ -59,7 +68,7 @@ public:
 	std::shared_ptr<ShaderPSO> GetShaderPSO() const;
 	void ClearShaderPSO();
 
-	// ���� Typed setters/getters (explicit cb/var) ����
+	// ���� Typed setters/getters (explicit cb/var) ����
 	bool TrySetFloat(std::string_view cb, std::string_view var, float v);
 	bool TryGetFloat(std::string_view cb, std::string_view var, float& out) const;
 
@@ -72,14 +81,14 @@ public:
 	bool TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector2& v);
 	bool TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector3& v);
 	bool TrySetVector(std::string_view cb, std::string_view var, const Mathf::Vector4& v);
-	bool TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const; // �ִ� 4���� ��ȯ
+	bool TryGetVector(std::string_view cb, std::string_view var, Mathf::Vector4& out) const; // �ִ� 4���� ��ȯ
 
 	bool TrySetMatrix(std::string_view cb, std::string_view var, const Mathf::xMatrix& m);
 	bool TryGetMatrix(std::string_view cb, std::string_view var, Mathf::xMatrix& out) const;
 
 	bool TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size);
 
-	// ���� Qualified name sugar: "CB.Var" ����
+	// ���� Qualified name sugar: "CB.Var" ����
 	bool TrySetFloat(std::string_view qualified, float v);
 	bool TryGetFloat(std::string_view qualified, float& out) const;
 	bool TrySetInt(std::string_view qualified, int32_t v);
@@ -93,7 +102,7 @@ public:
 	bool TrySetMatrix(std::string_view qualified, const Mathf::xMatrix& m);
 	bool TryGetMatrix(std::string_view qualified, Mathf::xMatrix& out) const;
 
-	// ���� Ŀ���� PSO��: �������� CB�� GPU �ݿ� ����
+	// ���� Ŀ���� PSO��: �������� CB�� GPU �ݿ� ����
 	void ApplyShaderParams(ID3D11DeviceContext* ctx);
 	void TrySetMaterialInfo();
 

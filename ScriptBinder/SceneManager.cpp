@@ -15,6 +15,38 @@
 #include "IRegistableEvent.h"
 #include "TimeSystem.h"
 #include "PrefabEditor.h"
+#ifndef DYNAMICCPP_EXPORTS
+#include "DeviceResources.h"
+#include "ScriptComponent.h"
+
+namespace
+{
+    /// 씬에 붙어 있는 모든 스크립트의 관리 인스턴스를 접는다.
+    ///
+    /// 재생 시작은 에디터 씬을 직렬화해 PlayScene을 새로 만드는 사본 방식이라,
+    /// 원본 씬이 파괴되지 않고 그대로 남는다. 원본의 인스턴스를 그냥 두면
+    /// 사본의 인스턴스와 둘 다 BehaviourRegistry에서 틱을 받아 로직이 두 벌 돈다
+    /// (실측: 활성 스크립트 2개, Update 카운터가 한 프레임 어긋난 두 벌).
+    ///
+    /// 정지해서 에디터 씬으로 돌아오면 Scene::Awake가 매 프레임 도므로
+    /// ScriptComponent::Awake가 저장해 둔 값으로 알아서 되살린다 — 깨우는 쪽은 따로 없다.
+    void SuspendSceneScripts(Scene* scene)
+    {
+        if (nullptr == scene) return;
+
+        for (const auto& object : scene->m_SceneObjects)
+        {
+            if (!object) continue;
+
+            // 한 오브젝트에 스크립트가 여럿 붙을 수 있다.
+            for (ScriptComponent* script : object->GetComponents<ScriptComponent>())
+            {
+                if (nullptr != script) script->SuspendInstance();
+            }
+        }
+    }
+}
+#endif
 
 void SceneManager::SetGameStart(bool isStart)
 {
@@ -58,10 +90,26 @@ void SceneManager::ManagerInitialize()
     InputActionManagers->LoadManager();
 }
 
-void SceneManager::Editor()
+bool SceneManager::HasPendingSceneStructureChange() const
 {
-    PROFILE_CPU_BEGIN("Editor");
-    if(m_isGameStart && !m_isEditorSceneLoaded)
+    const bool needsPlayScene    = m_isGameStart && !m_isEditorSceneLoaded;
+    const bool needsEditorScene  = !m_isGameStart && m_isEditorSceneLoaded;
+    const bool needsActivation   = m_sceneToActivate.load() != nullptr;
+    return needsPlayScene || needsEditorScene || needsActivation;
+}
+
+void SceneManager::ApplyPendingSceneStructureChange()
+{
+    // 호출 지점이 렌더 정지 구간임을 전제로 한다(선언부 주석 참고).
+
+    // 씬 교체도 같은 이유로 여기서 처리한다. 활성 씬을 갈아끼우고 이전 씬을
+    // 파괴하는 작업이라 렌더가 도는 중에 하면 안 된다.
+    if (m_sceneToActivate.load())
+    {
+        BeforeAwakeSceneLoad();
+    }
+
+    if (m_isGameStart && !m_isEditorSceneLoaded)
     {
         auto activeScenePtr = m_activeScene.load();
         if (!activeScenePtr) return;
@@ -81,6 +129,14 @@ void SceneManager::Editor()
         //GC_FullCollect();
         PROFILE_CPU_END();
     }
+}
+
+void SceneManager::Editor()
+{
+    PROFILE_CPU_BEGIN("Editor");
+
+    // 재생/정지 전환은 여기서 하지 않는다. 렌더 스레드가 도는 중이기 때문이다.
+    // Dx11Main이 렌더 배리어 사이에서 ApplyPendingSceneStructureChange를 부른다.
 
     if (!m_isGameStart)
     {
@@ -126,7 +182,8 @@ void SceneManager::Initialization()
 
     if (!m_activeScene) return;
 
-    BeforeAwakeSceneLoad();
+    // 씬 교체(BeforeAwakeSceneLoad)는 여기서 하지 않는다.
+    // Dx11Main이 렌더 배리어 사이에서 처리하므로, 여기서는 교체가 끝난 씬을 깨우기만 한다.
 
     PROFILE_CPU_BEGIN("Awake");
 	m_activeScene.load()->Awake();
@@ -775,6 +832,24 @@ void SceneManager::BeforeAwakeSceneLoad()
         }
         m_sceneToActivate = nullptr;
         Debug->Log(std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
+
+        // 새 씬의 보존 목록(RetainAssets)이 갱신된 뒤이므로 이 시점에 캐시를 정리한다.
+        //
+        // 이 호출은 오랫동안 존재만 하고 불리지 않았다. 소유권 구조상 켜면 사용 중인
+        // 에셋까지 파괴됐기 때문이다(12.2 보충 분석). 이제 컴포넌트·프록시·Model이
+        // shared_ptr로 공동 소유하므로(2-2~2-5) 캐시에서 지워도 참조가 남아 있으면
+        // 살아 있고, 아무도 쓰지 않는 것만 실제로 해제된다.
+        DataSystems->UnloadUnusedAssets();
+
+#ifndef DYNAMICCPP_EXPORTS
+        // 씬 전환마다 GPU 객체/VRAM 증감을 남긴다.
+        // 같은 씬을 오가며 이 값이 계속 증가하면 회수되지 않는 리소스가 있다는 뜻이다.
+        // 실행 중에는 VRAM 증감만 남는다(타입별 집계는 디버그 레이어를 망가뜨린다).
+        if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
+        {
+            deviceResources->LogLiveObjectDelta("씬 전환 완료");
+        }
+#endif
     }
 }
 
@@ -877,6 +952,13 @@ void SceneManager::CreateEditorOnlyPlayScene()
 		Meta::UndoCommandManager->Clear();
         PROFILE_CPU_END();
         //resetSelectedObjectEvent.Broadcast();
+
+#ifndef DYNAMICCPP_EXPORTS
+        // 직렬화 전에 재운다. SuspendInstance가 CaptureFields를 먼저 하므로
+        // 편집 중이던 최신 값이 m_fieldData에 담긴 채로 사본에 실린다.
+        SuspendSceneScripts(m_activeScene.load());
+#endif
+
         PROFILE_CPU_BEGIN("Serialize");
         sceneNode = Meta::Serialize(m_activeScene.load());
         PROFILE_CPU_END();

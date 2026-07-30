@@ -5,7 +5,7 @@
 void TestShader::Start()
 {
 	auto m = GetOwner()->GetComponent<MeshRenderer>();
-	m->m_Material = m->m_Material->Instantiate(m->m_Material, "clonebomb");
+	m->m_Material = Material::InstantiateShared(m->m_Material.get(), "clonebomb");
 }
 
 void TestShader::Update(float tick)

@@ -11,6 +11,7 @@
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InvalidScriptComponent.h"
+#include "ScriptComponent.h"
 #include "FoliageComponent.h"
 #include "BehaviorTreeComponent.h"
 #include "ImageComponent.h"
@@ -97,7 +98,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
         return;
     }
 
-    auto component = obj->AddComponent((*componentType)).get();
+    // ScriptComponent만 한 오브젝트에 여럿 붙을 수 있다.
+    //
+    // AddComponent는 타입이 겹치면 새로 만들지 않고 기존 것을 돌려주므로, 스크립트를
+    // 둘 이상 붙인 오브젝트는 씬을 다시 읽을 때 두 번째부터 통째로 사라졌다.
+    // 재생을 누르면 씬을 직렬화해 사본을 만들기 때문에 여기서 바로 드러난다.
+    // ModuleBehavior가 위쪽에서 AddScriptComponent로 따로 처리하는 것과 같은 이유다.
+    const bool allowMultiple = (componentType->typeID == type_guid(ScriptComponent));
+
+    auto component = allowMultiple
+        ? obj->AddComponentAllowMultiple(*componentType).get()
+        : obj->AddComponent(*componentType).get();
 
     if (component)
     {
@@ -124,10 +135,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             MetaYml::Node getMeshNode = itNode["m_Mesh"];
             if (model && getMeshNode)
             {
-                Material* matPtr = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
+                auto matPtr = model->GetMaterialShared(getMeshNode["m_materialIndex"].as<int>());
                 if (matPtr)
                 {
-                    meshRenderer->m_Material = DataSystems->LoadMaterial(materialName);
+                    // 컴포넌트가 머티리얼을 공동 소유하도록 shared 조회를 쓴다.
+                    meshRenderer->m_Material = DataSystems->LoadMaterialShared(materialName);
                     if (!meshRenderer->m_Material)
                     {
                         meshRenderer->m_Material = matPtr;
@@ -136,7 +148,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                     if (itNode["m_Material"])
                     {
                         auto& materialNode = itNode["m_Material"];
-                        Meta::Deserialize(meshRenderer->m_Material, materialNode);
+                        Meta::Deserialize(meshRenderer->m_Material.get(), materialNode);
                         if (!materialName.empty())
                             meshRenderer->m_Material->m_name = materialName;
 
@@ -210,7 +222,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					}
                 }
 
-                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+                meshRenderer->m_Mesh = model->GetMeshShared(getMeshNode["m_name"].as<std::string>());
                 if (meshRenderer->m_Mesh)
                 {
                     MetaYml::Node getLOD_Node = getMeshNode["m_LODThresholds"];
@@ -573,21 +585,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-			auto canvasObj = UIManagers->FindCanvasName(obj->shared_from_this(), image->m_ownerCanvasName);
-			Canvas* canvas{};
-			if (canvasObj)
-			{
-				canvas = canvasObj->GetComponent<Canvas>();
-			}
-
-			if (canvas)
-			{
-				canvas->AddUIObject(obj->shared_from_this());
-			}
-			else
-			{
-				Debug->LogWarning("Image Component's parent is not Canvas");
-			}
+			// 캔버스 연결은 여기서 하지 않는다(6-3). 역직렬화 도중에는 캔버스가
+			// 아직 복원되지 않았을 수 있어 순서 의존이 생긴다. 연결은 모든 오브젝트가
+			// 존재하는 프레임 경계에 UIManager::Update가 일괄 수행한다.
 
 			for(auto& imagePath : image->GetTexturePaths())
 			{
@@ -625,16 +625,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-			auto canvasObj = UIManagers->FindCanvasName(obj->shared_from_this(), text->m_ownerCanvasName);
-			auto canvas = canvasObj->GetComponent<Canvas>();
-			if (canvas)
-			{
-				canvas->AddUIObject(obj->shared_from_this());
-			}
-			else
-			{
-				Debug->LogWarning("Image Component's parent is not Canvas");
-			}
+			// 캔버스 연결은 UIManager::Update의 일괄 연결로 미룬다(6-3, Image 분기와 동일).
 
 			std::string fontPath = text->GetFontPath();
 			if (!fontPath.empty())
@@ -667,16 +658,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-			auto canvasObj = UIManagers->FindCanvasName(obj->shared_from_this(), spriteSheet->m_ownerCanvasName);
-			auto canvas = canvasObj->GetComponent<Canvas>();
-			if (canvas)
-			{
-				canvas->AddUIObject(obj->shared_from_this());
-			}
-			else
-			{
-				Debug->LogWarning("Image Component's parent is not Canvas");
-			}
+			// 캔버스 연결은 UIManager::Update의 일괄 연결로 미룬다(6-3, Image 분기와 동일).
 
 			if (!spriteSheet->m_spriteSheetPath.empty())
 			{

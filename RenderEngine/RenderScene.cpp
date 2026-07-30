@@ -44,14 +44,8 @@ void RenderScene::Finalize()
 	SpinLock lock(m_proxyMapFlag);
 	m_proxyMap.clear();
 	m_animatorMap.clear();
-	for (auto& pair : m_palleteMap)
-	{
-		if (pair.second.second)
-		{
-			std::free(pair.second.second);
-			pair.second.second = nullptr;
-		}
-	}
+	// 팔레트 버퍼는 shared_ptr가 관리하므로 수동 해제가 필요 없다.
+	// (예전의 수동 free는 UnregisterAnimator와 겹치면 더블 프리가 될 수 있었다.)
 	m_palleteMap.clear();
 	m_renderDataMap.clear();
 	m_animationJob.Finalize();
@@ -100,6 +94,34 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model)
 void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
 {
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
+}
+
+RenderScene::ResourceCounts RenderScene::GetResourceCounts()
+{
+	ResourceCounts counts{};
+
+	{
+		// 프록시 맵을 조작하는 다른 경로와 동일한 락 규약을 따른다.
+		SpinLock lock(m_proxyMapFlag);
+		counts.proxies = m_proxyMap.size();
+		counts.animators = m_animatorMap.size();
+		counts.animationPalettes = m_palleteMap.size();
+	}
+
+	{
+		SpinLock lock(m_uiProxyMapFlag);
+		counts.uiProxies = m_uiProxyMap.size();
+	}
+
+	for (const auto& data : m_renderDataMap)
+	{
+		if (data != nullptr)
+		{
+			++counts.renderPassDatas;
+		}
+	}
+
+	return counts;
 }
 
 RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
@@ -168,15 +190,15 @@ void RenderScene::RegisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
 
 	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
+	// 애니메이터/팔레트 맵은 프록시 맵과 같은 락으로 보호한다.
+	// ProxyCommand 생성자가 스레드풀에서 이 맵들을 동시에 읽기 때문이다.
+	SpinLock lock(m_proxyMapFlag);
+
 	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
 
 	m_animatorMap[animatorGuid] = animatorPtr;
 
-	void* voidPtr = std::malloc(TRANSFORM_SIZE);
-	if(voidPtr)
-	{
-		m_palleteMap[animatorGuid].second = (Mathf::xMatrix*)voidPtr;
-	}
+	m_palleteMap[animatorGuid].second = std::make_shared<Mathf::xMatrix[]>(Skeleton::MAX_BONES);
 }
 
 void RenderScene::UnregisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
@@ -185,16 +207,13 @@ void RenderScene::UnregisterAnimator(const std::shared_ptr<Animator>& animatorPt
 
 	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
-	if (m_animatorMap.find(animatorGuid) == m_animatorMap.end()) return;
-	if (m_palleteMap.find(animatorGuid) == m_palleteMap.end()) return;
+	SpinLock lock(m_proxyMapFlag);
 
 	m_animatorMap.erase(animatorGuid);
 
-	if (m_palleteMap[animatorGuid].second)
-	{
-		free(m_palleteMap[animatorGuid].second);
-		m_palleteMap.erase(animatorGuid);
-	}
+	// 맵에서 지워도 버퍼를 참조 중인 프록시가 있으면 shared_ptr가 수명을 유지한다.
+	// 마지막 참조가 사라질 때 해제되므로 렌더 스레드가 해제된 메모리를 읽는 일이 없다.
+	m_palleteMap.erase(animatorGuid);
 }
 
 void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)

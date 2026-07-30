@@ -13,7 +13,7 @@ void EffectComponent::Initialize()
 {
     EffectRenderProxy* proxy = EffectCommandQueue->RegisterProxy((EffectComponent*)this);
 
-    // Awake¿¡¼­´Â ±âº» ¼³Á¤¸¸ ÇÏ°í ÀÌÆåÆ®´Â »ý¼ºÇÏÁö ¾ÊÀ½
+    // Awakeï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½âº» ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     m_lastPosition = GetOwner()->m_transform.GetWorldPosition();
     m_lastScale = GetOwner()->m_transform.GetWorldScale();
     auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
@@ -28,7 +28,7 @@ void EffectComponent::Initialize()
 
         if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
         {
-            // JSON¿¡¼­ ·ÎµåµÈ ¿øº» ¼³Á¤À¸·Î ÄÄÆ÷³ÍÆ® º¯¼ö ¾÷µ¥ÀÌÆ®
+            // JSONï¿½ï¿½ï¿½ï¿½ ï¿½Îµï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
             m_timeScale = templateTimeScale;
             m_loop = templateLoop;
             m_duration = templateDuration;
@@ -72,7 +72,9 @@ void EffectComponent::Update(float tick)
         m_pendingPlay = false;
     }
 
-    if (!proxy->GetInstanceName().empty() && m_effectInstanceName != proxy->GetInstanceName())
+    // GetProxyëŠ” ë“±ë¡ ì „ì´ê±°ë‚˜ ì´ë¯¸ í•´ì œëœ ì»´í¬ë„ŒíŠ¸ì— ëŒ€í•´ nullptrì„ ë°˜í™˜í•œë‹¤.
+    // ìœ„ m_pendingPlay ë¸”ë¡ì€ ì´ë¥¼ ê²€ì‚¬í•˜ëŠ”ë° ì—¬ê¸°ì„œ ë¹ ëœ¨ë ¤ ë„ ì—­ì°¸ì¡°ê°€ ë‚¬ë‹¤.
+    if (proxy && !proxy->GetInstanceName().empty() && m_effectInstanceName != proxy->GetInstanceName())
     {
         m_effectInstanceName = proxy->GetInstanceName();
     }
@@ -100,7 +102,7 @@ void EffectComponent::Update(float tick)
     if (m_isPlaying) {
         m_currentTime += Time->GetElapsedSeconds() * m_timeScale;
 
-        // Component ·¹º§¿¡¼­ duration Ã¼Å©
+        // Component ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ duration Ã¼Å©
         if (m_duration > 0 && m_currentTime > m_duration) {
             m_isPlaying = false;
         }
@@ -109,14 +111,14 @@ void EffectComponent::Update(float tick)
 
 void EffectComponent::OnDestroy()
 {
-    // ÇöÀç ÀÎ½ºÅÏ½º°¡ ÀÖÀ¸¸é »èÁ¦
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     DestroyCurrentEffect();
     EffectCommandQueue->UnRegisterProxy(this);
 }
 
 void EffectComponent::Apply()
 {
-    // ÇöÀç ¼³Á¤µÈ ÅÛÇÃ¸´À¸·Î Àç»ý
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
     PlayEffectByName(m_effectTemplateName);
 }
 
@@ -133,11 +135,11 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     m_effectTemplateName = effectName;
     m_currentTime = 0.0f;
 
-    // GameObjectÀÇ instanceID¸¦ »ç¿ëÇØ¼­ °íÁ¤ ÀÎ½ºÅÏ½º ÀÌ¸§ »ý¼º
+    // GameObjectï¿½ï¿½ instanceIDï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ø¼ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     size_t gameObjectId = GetOwner()->GetInstanceID();
     std::string customInstanceId = effectName + "_obj" + std::to_string(gameObjectId);
 
-    // ¼³Á¤ ·Îµå
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Îµï¿½
     float templateTimeScale, templateDuration;
     bool templateLoop;
     if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
@@ -160,19 +162,19 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
     Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
 
-    // ±âÁ¸ ÀÎ½ºÅÏ½º ÀÌ¸§°ú ´Ù¸£¸é »õ·Î »ý¼º
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½Ù¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     if (m_effectInstanceName != customInstanceId) {
         if (!m_effectInstanceName.empty()) {
             DestroyCurrentEffect();
         }
         m_effectInstanceName = customInstanceId;
-        m_isNewInstance = true;  // »õ ÀÎ½ºÅÏ½º ÇÃ·¡±×
+        m_isNewInstance = true;  // ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½
     }
     else {
-        m_isNewInstance = false;  // Replace ÇÃ·¡±×
+        m_isNewInstance = false;  // Replace ï¿½Ã·ï¿½ï¿½ï¿½
     }
 
-    // ÇÁ·Ï½Ã ¼³Á¤Àº ¹Ù·Î ÇÏ°í
+    // ï¿½ï¿½ï¿½Ï½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ù·ï¿½ ï¿½Ï°ï¿½
     proxy->UpdateInstanceName(m_effectInstanceName);
     proxy->UpdateTempleteName(m_effectTemplateName);
     proxy->UpdatePosition(currentPos);
@@ -182,7 +184,7 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     proxy->UpdateLoop(m_loop);
     proxy->UpdateDuration(m_duration);
 
-    // Play ¸í·É¸¸ ÇÑ ÇÁ·¹ÀÓ ´Ê°Ô
+    // Play ï¿½ï¿½ï¿½É¸ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê°ï¿½
     m_pendingPlay = true;
 
     m_lastPosition = currentPos;
@@ -194,7 +196,7 @@ void EffectComponent::ChangeEffect(const std::string& newEffectName)
 {
     if (newEffectName.empty()) return;
 
-    // »õ·Î¿î ÀÌÆåÆ® ÀÌ¸§ ¼³Á¤
+    // ï¿½ï¿½ï¿½Î¿ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     m_effectTemplateName = newEffectName;
 
     float templateTimeScale, templateDuration;
@@ -213,13 +215,13 @@ void EffectComponent::ChangeEffect(const std::string& newEffectName)
         }
     }
 
-    // ±âÁ¸ ÀÌÆåÆ®°¡ ÀÖÀ¸¸é Replace, ¾øÀ¸¸é »õ·Î »ý¼º
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Replace, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     if (!m_effectInstanceName.empty()) {
-        // Replace·Î Ã³¸® (ID À¯Áö)
+        // Replaceï¿½ï¿½ Ã³ï¿½ï¿½ (ID ï¿½ï¿½ï¿½ï¿½)
         PlayEffectByName(newEffectName);
     }
     else {
-        // »õ·Î »ý¼º
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         PlayEffectByName(newEffectName);
     }
 }
@@ -275,7 +277,7 @@ void EffectComponent::DestroyCurrentEffect()
         EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
         if (!proxy) return;
 
-        // ÀÌ°Íµµ Ãß°¡ÇØ¾ß ÇÔ!
+        // ï¿½Ì°Íµï¿½ ï¿½ß°ï¿½ï¿½Ø¾ï¿½ ï¿½ï¿½!
         proxy->SetPendingRemoveInstance(m_effectInstanceName);
         proxy->PushCommand(EffectCommandType::RemoveEffect);
 
@@ -292,7 +294,7 @@ void EffectComponent::ForeceUpdatePosition()
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
         Mathf::Vector3 currentPos = Mathf::Vector3(worldPos.m128_f32[0], worldPos.m128_f32[1], worldPos.m128_f32[2]);
 
-        // threshold °Ë»ç ¾øÀÌ Áï½Ã ¾÷µ¥ÀÌÆ®
+        // threshold ï¿½Ë»ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
         auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
         m_lastPosition = currentPos;

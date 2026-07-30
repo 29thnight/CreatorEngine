@@ -60,7 +60,8 @@ public:
 	void ReloadShaderFromPath(const file::path& filepath);
 private:
 	void AddShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
-	void EraseShader(const std::string& name, const std::string& ext);
+	// EraseShader는 의도적으로 제거되었다(ShaderSystem.cpp의 설명 참조).
+	// 개별 셰이더를 맵에서 지우면 그 엔트리를 참조하는 ShaderPSO가 댕글링이 된다.
 	void ReloadShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
 	void RemoveShaders();
 

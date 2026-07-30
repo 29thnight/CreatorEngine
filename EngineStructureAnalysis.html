@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreatorEngine 코드 및 엔진 구조 분석 보고서</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --surface: #171c26;
+    --surface-2: #1e2532;
+    --border: #2b3444;
+    --text: #dde3ec;
+    --text-dim: #8b95a7;
+    --accent: #4da3ff;
+    --accent-2: #7ee0b8;
+    --warn: #f0b25c;
+    --danger: #f07178;
+    --code-bg: #12161f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 28px 80px; }
+
+  header.hero {
+    padding: 64px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .hero .eyebrow {
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 4.5vw, 44px);
+    font-weight: 800;
+    line-height: 1.25;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero .meta { color: var(--text-dim); font-size: 14px; }
+  .hero .meta code { color: var(--accent-2); }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin: 28px 0 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat .num { font-size: 24px; font-weight: 800; color: var(--accent-2); }
+  .stat .label { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 48px;
+  }
+  nav.toc h2 { font-size: 15px; margin-bottom: 12px; color: var(--text-dim); font-weight: 600; }
+  nav.toc ol { list-style: none; counter-reset: toc; columns: 2; column-gap: 40px; }
+  nav.toc li { counter-increment: toc; margin-bottom: 7px; break-inside: avoid; }
+  nav.toc li::before {
+    content: counter(toc, decimal-leading-zero);
+    color: var(--accent);
+    font-weight: 700;
+    margin-right: 10px;
+    font-size: 12px;
+  }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } }
+
+  section { margin-bottom: 64px; }
+  h2.sec {
+    font-size: 26px;
+    font-weight: 800;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  h2.sec .no { color: var(--accent); font-size: 17px; font-weight: 700; }
+  h3 { font-size: 18px; margin: 30px 0 12px; color: var(--accent-2); }
+  h4 { font-size: 15.5px; margin: 22px 0 10px; color: var(--text); }
+  p { margin-bottom: 12px; }
+  p, li { color: var(--text); }
+  strong { color: #fff; }
+  ul, ol { margin: 0 0 14px 22px; }
+  li { margin-bottom: 5px; }
+
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 13px;
+    color: var(--accent-2);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 14px 0 20px;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); font-size: 13px; line-height: 1.65; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 22px;
+    font-size: 13.5px;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--text);
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  td { padding: 9px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .table-wrap { overflow-x: auto; }
+
+  .badge {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .badge.exe  { background: rgba(77,163,255,.15); color: var(--accent); border: 1px solid rgba(77,163,255,.4); }
+  .badge.lib  { background: rgba(126,224,184,.12); color: var(--accent-2); border: 1px solid rgba(126,224,184,.35); }
+  .badge.dll  { background: rgba(240,178,92,.13); color: var(--warn); border: 1px solid rgba(240,178,92,.4); }
+  .badge.tool { background: rgba(200,160,255,.13); color: #c8a0ff; border: 1px solid rgba(200,160,255,.4); }
+  .badge.off  { background: rgba(240,113,120,.12); color: var(--danger); border: 1px solid rgba(240,113,120,.4); }
+
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin: 16px 0 20px;
+  }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.good { border-left-color: var(--accent-2); }
+  .callout.risk { border-left-color: var(--danger); }
+  .callout .title { font-weight: 700; margin-bottom: 4px; }
+  .callout.warn .title { color: var(--warn); }
+  .callout.good .title { color: var(--accent-2); }
+  .callout.risk .title { color: var(--danger); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 18px 0 24px;
+    overflow-x: auto;
+  }
+  .diagram-wrap svg { display: block; margin: 0 auto; min-width: 700px; }
+  .diagram-caption { text-align: center; color: var(--text-dim); font-size: 13px; margin-top: 10px; }
+
+  .pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 20px;
+    counter-reset: pass;
+  }
+  .pipeline .pass {
+    counter-increment: pass;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px 6px 10px;
+    font-size: 13px;
+    font-family: Consolas, monospace;
+  }
+  .pipeline .pass::before {
+    content: counter(pass);
+    color: var(--accent);
+    font-weight: 700;
+    margin-right: 8px;
+    font-size: 11.5px;
+  }
+  .pipeline .pass.editor { border-color: rgba(200,160,255,.5); }
+  .pipeline .pass.post { border-color: rgba(240,178,92,.45); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .card h4 { margin-top: 0; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <div class="eyebrow">Architecture Analysis Report</div>
+  <h1><span>CreatorEngine</span> 코드 및 엔진 구조 분석</h1>
+  <div class="meta">
+    대상 저장소: <code>29thnight/CreatorEngine</code> (master, <code>ea304eba</code> 기준) ·
+    분석일: 2026-07-29 ·
+    플랫폼: Windows / DirectX 11 / C++20 (v143, VS2022)
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="num">11+</div><div class="label">빌드 프로젝트 (exe 2, lib 6, dll 3, 코드젠 툴 3)</div></div>
+    <div class="stat"><div class="num">246</div><div class="label">RenderEngine 파일 수 (~51,000줄)</div></div>
+    <div class="stat"><div class="num">~28</div><div class="label">IRenderPass 파생 렌더 패스</div></div>
+    <div class="stat"><div class="num">348+</div><div class="label">Dynamic_CPP 게임 스크립트 파일</div></div>
+    <div class="stat"><div class="num">40+</div><div class="label">vcpkg 외부 의존 포트</div></div>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>목차</h2>
+  <ol>
+    <li><a href="#overview">프로젝트 개요</a></li>
+    <li><a href="#modules">솔루션 및 모듈 구성</a></li>
+    <li><a href="#deps">모듈 의존 그래프</a></li>
+    <li><a href="#render">렌더링 엔진 (RenderEngine)</a></li>
+    <li><a href="#physics">물리 엔진 (Physics)</a></li>
+    <li><a href="#scripting">스크립팅 및 핫리로드</a></li>
+    <li><a href="#reflection">리플렉션 / 코드 생성 파이프라인</a></li>
+    <li><a href="#core">코어 인프라 (Utility_Framework 외)</a></li>
+    <li><a href="#editor">에디터 (ImGui 기반)</a></li>
+    <li><a href="#game">게임 계층 (Dynamic_CPP / TrainAsis)</a></li>
+    <li><a href="#build">빌드 · CI · 외부 의존성</a></li>
+    <li><a href="#leak">렌더링 자원 누수 / 크래시 분석</a></li>
+    <li><a href="#assessment">종합 평가</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<section id="overview">
+  <h2 class="sec"><span class="no">01</span>프로젝트 개요</h2>
+  <p><strong>CreatorEngine</strong>은 게임 <em>"Kori: The Spritail"</em> 개발을 위해 제작된 인하우스 게임 엔진으로,
+  Windows(WinAPI) 위에서 <strong>DirectX 11(feature level 11.1/11.3)</strong> 렌더러와 <strong>C++20 모듈형 런타임</strong>을 기반으로
+  실시간 에디터, 런타임 게임 빌드 파이프라인, 그리고 <strong>C++ 스크립트 핫리로드</strong>를 제공합니다.</p>
+  <p>전체 구조는 Unity의 개념 모델(GameObject–Component, MonoBehaviour 라이프사이클, Assembly-CSharp, .meta 파일, ShaderLab 유사 DSL)을
+  네이티브 C++로 재해석한 형태이며, 코드 생성 도구(Unreal Header Tool 유사)를 통한 리플렉션 자동화가 아키텍처의 핵심 축을 이룹니다.</p>
+
+  <h3>핵심 기술 스택</h3>
+  <div class="table-wrap"><table>
+    <tr><th>영역</th><th>기술</th></tr>
+    <tr><td>렌더링</td><td>DirectX 11.3 (<code>ID3D11Device3</code>/<code>ID3D11DeviceContext3</code>), 디퍼드+포워드 하이브리드, 멀티스레드 커맨드 리스트</td></tr>
+    <tr><td>물리</td><td>NVIDIA PhysX <strong>5.5.0</strong> (GPU 다이나믹스/브로드페이즈, CUDA, PVD 디버깅)</td></tr>
+    <tr><td>오디오</td><td>FMOD Studio SDK</td></tr>
+    <tr><td>에디터 UI</td><td>Dear ImGui + ImGuizmo + imgui-node-editor (도킹, 기즈모, 노드 그래프)</td></tr>
+    <tr><td>에셋 임포트</td><td>Assimp 5.4.3 (FBX 등), meshoptimizer (LOD/캐시 최적화), DirectXTK / DirectXTex</td></tr>
+    <tr><td>스크립팅</td><td>C++ DLL 핫리로드 (MSBuild 재빌드 + <code>LoadLibrary</code> 교체) — Mono/C# 경로는 설계 후 비활성화</td></tr>
+    <tr><td>직렬화/데이터</td><td>커스텀 리플렉션 + yaml-cpp / nlohmann-json / pugixml, efsw 파일 감시, boost::uuids 기반 <code>FileGuid</code></td></tr>
+    <tr><td>메모리</td><td>mimalloc 오버라이드 DLL(ManagedHeap), 커스텀 <code>Managed::HeapObject</code> 관리 객체</td></tr>
+    <tr><td>패키징</td><td>Paklib — LZ4 압축 + AES-256-CTR 암호화 + SHA-256 무결성 검증 팩 포맷</td></tr>
+  </table></div>
+</section>
+
+<!-- ============================================================ -->
+<section id="modules">
+  <h2 class="sec"><span class="no">02</span>솔루션 및 모듈 구성</h2>
+  <p>솔루션은 두 개로 나뉘며, 동일한 엔진 모듈 집합 위에서 <strong>에디터 실행 파일</strong>과 <strong>게임 배포 실행 파일</strong>이 갈라지는 구조입니다.</p>
+  <ul>
+    <li><strong>CreatorEngine.sln</strong> — 에디터 빌드. 시작 프로젝트는 <code>Academy_4Q</code>("Creator Editor" 창 타이틀).</li>
+    <li><strong>GameBuild.sln</strong> — 게임 배포 빌드. 시작 프로젝트는 <code>TrainAsis</code>("Kori: the Spritail"). <code>GameBuild|x64</code> 전용 구성 보유.</li>
+  </ul>
+
+  <div class="callout">
+    <div class="title">주목할 점: EngineEntry / EngineGUIWindow는 별도 프로젝트가 아님</div>
+    <p><code>EngineEntry</code>(진입점·부트스트랩)와 <code>EngineGUIWindow</code>(에디터 윈도우) 폴더의 소스는 독립 vcxproj 없이
+    <code>Academy_4Q.vcxproj</code>에 직접 포함됩니다. 즉 Academy_4Q가 곧 "에디터 = EngineEntry + EngineGUIWindow + 엔진 라이브러리 링크"의 실체입니다.</p>
+  </div>
+
+  <div class="table-wrap"><table>
+    <tr><th>프로젝트</th><th>타입</th><th>역할</th><th>주요 의존</th></tr>
+    <tr><td><strong>Academy_4Q</strong></td><td><span class="badge exe">EXE</span></td><td>엔진 에디터 실행 파일. <code>EDITOR</code>/<code>GAME</code> 매크로 분기, PreBuild에서 <code>version.txt</code> → <code>EngineVersion.h</code> 생성</td><td>엔진 7개 모듈 전부 + d3d11/dxgi/fmod/DirectXTK</td></tr>
+    <tr><td><strong>TrainAsis</strong></td><td><span class="badge exe">EXE</span></td><td>게임 배포용 실행 파일. .pak 언팩/정리 로직, 렌더 커맨드 빌드/실행 이중 스레드 파이프라인</td><td>Academy_4Q와 동일 모듈 집합</td></tr>
+    <tr><td><strong>RenderEngine</strong></td><td><span class="badge lib">LIB</span></td><td>DX11 렌더 파이프라인 전체 (패스, 셰이더, 에셋, 애니메이션, 파티클)</td><td>ImGuiHelper, ScriptBinder, Utility_Framework</td></tr>
+    <tr><td><strong>ScriptBinder</strong></td><td><span class="badge lib">LIB</span></td><td>씬/GameObject/Component 시스템, HotLoadSystem, AI, 입력(ActionMap), 사운드 매니저 등 게임플레이 프레임워크 (235개 파일)</td><td>(include 관계만; Physics·RenderEngine과 양방향 커플링)</td></tr>
+    <tr><td><strong>Physics</strong></td><td><span class="badge lib">LIB</span></td><td>PhysX 5.5 래퍼 — 강체, CCT, 래그돌, 쿠킹 리소스</td><td>Utility_Framework (+CUDA)</td></tr>
+    <tr><td><strong>Utility_Framework</strong></td><td><span class="badge lib">LIB</span></td><td>공용 인프라 — 스레드풀/동기화, 리플렉션, 수학, Pak, 로깅 (90개 파일)</td><td>ManagedHeap</td></tr>
+    <tr><td><strong>ImGuiHelper</strong></td><td><span class="badge lib">LIB</span></td><td>ImGui 확장 — 노드 에디터, 블루프린트 빌더, 프로파일러, 커스텀 위젯</td><td>Utility_Framework</td></tr>
+    <tr><td><strong>SingletonManager</strong></td><td><span class="badge dll">DLL</span></td><td><code>DLLCore::Singleton&lt;T&gt;</code> — DLL 경계를 넘는 싱글턴 인스턴스 공유</td><td>없음 (최하위)</td></tr>
+    <tr><td><strong>ManagedHeap</strong></td><td><span class="badge dll">DLL</span></td><td>mimalloc 기반 커스텀 힙 / <code>Managed::HeapObject</code> 메모리 관리</td><td>없음 (최하위)</td></tr>
+    <tr><td><strong>Dynamic_CPP</strong></td><td><span class="badge dll">DLL</span></td><td>핫리로드되는 게임 스크립트 DLL — 엔진 모듈 .lib를 직접 링크 (프로젝트 참조 아님), vcpkg 통합 유일 프로젝트</td><td>엔진 7개 모듈 산출물(.lib)</td></tr>
+    <tr><td>AutoRegisterCreateReflection 외 2종</td><td><span class="badge tool">TOOL</span></td><td>빌드 전 실행되는 리플렉션/팩토리 코드 생성·정리 콘솔 도구</td><td>독립</td></tr>
+    <tr><td>Assembly-CSharp</td><td><span class="badge off">비활성</span></td><td>C# 엔진 API 스텁 (Mono 경로 폐기로 미사용)</td><td>—</td></tr>
+  </table></div>
+</section>
+
+<!-- ============================================================ -->
+<section id="deps">
+  <h2 class="sec"><span class="no">03</span>모듈 의존 그래프</h2>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 470" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6b85"/>
+        </marker>
+        <marker id="arr-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#f0b25c"/>
+        </marker>
+      </defs>
+      <style>
+        .box { rx: 8; stroke-width: 1.4; }
+        .lbl { fill: #dde3ec; font-size: 13px; font-weight: 700; text-anchor: middle; }
+        .sub { fill: #8b95a7; font-size: 10px; text-anchor: middle; }
+        .edge { stroke: #5b6b85; stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+        .edge-hot { stroke: #f0b25c; stroke-width: 1.6; fill: none; stroke-dasharray: 6 4; marker-end: url(#arr-hot); }
+      </style>
+
+      <!-- Layer: apps -->
+      <rect class="box" x="120" y="20" width="180" height="46" fill="#1a2c45" stroke="#4da3ff"/>
+      <text class="lbl" x="210" y="40">Academy_4Q</text>
+      <text class="sub" x="210" y="56">에디터 EXE (EngineEntry+GUI)</text>
+
+      <rect class="box" x="360" y="20" width="170" height="46" fill="#1a2c45" stroke="#4da3ff"/>
+      <text class="lbl" x="445" y="40">TrainAsis</text>
+      <text class="sub" x="445" y="56">게임 EXE (Kori: the Spritail)</text>
+
+      <rect class="box" x="600" y="20" width="190" height="46" fill="#3a2c18" stroke="#f0b25c"/>
+      <text class="lbl" x="695" y="40">Dynamic_CPP</text>
+      <text class="sub" x="695" y="56">게임 스크립트 DLL (핫리로드)</text>
+
+      <!-- Layer: engine libs -->
+      <rect class="box" x="80" y="140" width="180" height="46" fill="#16281f" stroke="#7ee0b8"/>
+      <text class="lbl" x="170" y="160">RenderEngine</text>
+      <text class="sub" x="170" y="176">DX11 렌더 파이프라인</text>
+
+      <rect class="box" x="330" y="140" width="180" height="46" fill="#16281f" stroke="#7ee0b8"/>
+      <text class="lbl" x="420" y="160">ScriptBinder</text>
+      <text class="sub" x="420" y="176">씬/컴포넌트/HotLoad</text>
+
+      <rect class="box" x="580" y="140" width="150" height="46" fill="#16281f" stroke="#7ee0b8"/>
+      <text class="lbl" x="655" y="160">Physics</text>
+      <text class="sub" x="655" y="176">PhysX 5.5 래퍼</text>
+
+      <rect class="box" x="80" y="250" width="180" height="46" fill="#16281f" stroke="#7ee0b8"/>
+      <text class="lbl" x="170" y="270">ImGuiHelper</text>
+      <text class="sub" x="170" y="286">노드에디터/프로파일러</text>
+
+      <rect class="box" x="330" y="250" width="200" height="46" fill="#16281f" stroke="#7ee0b8"/>
+      <text class="lbl" x="430" y="270">Utility_Framework</text>
+      <text class="sub" x="430" y="286">스레드풀/리플렉션/수학/Pak</text>
+
+      <!-- Layer: infra dlls -->
+      <rect class="box" x="200" y="370" width="190" height="46" fill="#2e2438" stroke="#c8a0ff"/>
+      <text class="lbl" x="295" y="390">ManagedHeap</text>
+      <text class="sub" x="295" y="406">mimalloc 커스텀 힙 DLL</text>
+
+      <rect class="box" x="450" y="370" width="200" height="46" fill="#2e2438" stroke="#c8a0ff"/>
+      <text class="lbl" x="550" y="390">SingletonManager</text>
+      <text class="sub" x="550" y="406">DLL 간 싱글턴 공유 DLL</text>
+
+      <!-- edges: apps -> libs -->
+      <path class="edge" d="M 185 66 L 172 140"/>
+      <path class="edge" d="M 240 66 L 400 140"/>
+      <path class="edge" d="M 425 66 L 640 140"/>
+      <path class="edge" d="M 415 66 L 424 140"/>
+      <path class="edge" d="M 390 66 L 195 140"/>
+
+      <!-- Dynamic_CPP -> engine libs (hot) -->
+      <path class="edge-hot" d="M 660 66 L 460 140"/>
+      <path class="edge-hot" d="M 690 66 L 665 140"/>
+      <path class="edge-hot" d="M 630 66 L 245 138"/>
+
+      <!-- engine internal -->
+      <path class="edge" d="M 260 163 L 330 163"/>
+      <path class="edge" d="M 155 186 L 165 250"/>
+      <path class="edge" d="M 190 186 L 400 252"/>
+      <path class="edge" d="M 430 186 L 432 250"/>
+      <path class="edge" d="M 645 186 L 510 258"/>
+      <path class="edge" d="M 260 273 L 330 273"/>
+
+      <!-- utility -> managedheap -->
+      <path class="edge" d="M 400 296 L 315 370"/>
+      <!-- all -> singleton (representative) -->
+      <path class="edge" d="M 470 296 L 535 370"/>
+
+      <text class="sub" x="770" y="110" text-anchor="middle">─ ─ 런타임 로드</text>
+      <text class="sub" x="770" y="126" text-anchor="middle">(LoadLibrary)</text>
+    </svg>
+    <div class="diagram-caption">모듈 의존 그래프 — 실선: 정적 링크/프로젝트 참조, 점선: 빌드 산출물(.lib) 직접 링크 후 런타임 DLL 핫로드</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="title">구조적 특이점: RenderEngine ↔ ScriptBinder 양방향 커플링</div>
+    <p><code>RenderEngine</code>은 <code>ScriptBinder</code>를 프로젝트 참조하고(렌더 프록시가 <code>GameObject.h</code> 등을 include),
+    <code>ScriptBinder</code>는 반대로 RenderEngine 헤더를 include 경로로 사용합니다. 링크는 단방향이지만 include 수준에서는
+    상호 의존이며, 모듈 경계가 개념(렌더 vs 게임플레이)만큼 물리적으로 분리되어 있지는 않습니다.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="render">
+  <h2 class="sec"><span class="no">04</span>렌더링 엔진 (RenderEngine)</h2>
+  <p>246개 파일, 약 51,000줄 규모의 <strong>DirectX 11 디퍼드+포워드 하이브리드 렌더러</strong>입니다.
+  DX12 심볼은 존재하지 않으며, D3D11의 지연 컨텍스트(deferred context)와 <code>ID3D11CommandList</code>를 활용한
+  멀티스레드 커맨드 리스트 생성이 핵심 설계입니다.</p>
+
+  <h3>4.1 프레임 파이프라인</h3>
+  <p>오케스트레이터는 <code>SceneRenderer</code>이며, 모든 패스는 추상 클래스 <code>IRenderPass</code>를 상속합니다.
+  각 패스는 카메라별(최대 10) × 프레임별(트리플 버퍼링, 3) 커맨드 리스트 큐를 보유하고, 스레드풀에서 병렬 기록 후 메인 스레드에서 실행합니다.
+  카메라마다 실행되는 실제 패스 순서:</p>
+  <div class="pipeline">
+    <span class="pass">ShadowMapPass</span>
+    <span class="pass">GBufferPass</span>
+    <span class="pass">LightMapPass</span>
+    <span class="pass">DecalPass</span>
+    <span class="pass">SSAOPass</span>
+    <span class="pass">DeferredPass</span>
+    <span class="pass">SSGIPass</span>
+    <span class="pass editor">TerrainGizmoPass</span>
+    <span class="pass">SkyBoxPass</span>
+    <span class="pass">ForwardPass</span>
+    <span class="pass">EffectPass (파티클)</span>
+    <span class="pass">SubsurfaceScatteringPass</span>
+    <span class="pass">ScreenSpaceReflectionPass</span>
+    <span class="pass">VolumetricFogPass</span>
+    <span class="pass post">PostProcessingPass (Bloom)</span>
+    <span class="pass post">BitMaskPass</span>
+    <span class="pass post">AAPass</span>
+    <span class="pass post">ToneMapPass</span>
+    <span class="pass post">VignettePass</span>
+    <span class="pass post">ColorGradingPass</span>
+    <span class="pass">SpritePass</span>
+    <span class="pass">UIPass</span>
+    <span class="pass">BlitPass</span>
+  </div>
+  <p>이 밖에 에디터 전용 <code>GizmoPass</code>/<code>GridPass</code>/<code>WireFramePass</code>/<code>PositionMapPass</code> 등을 포함해
+  <code>IRenderPass</code> 파생 구체 클래스는 약 28개입니다.</p>
+  <div class="callout warn">
+    <div class="title">RenderGraphBuilder — 개발 중, 미사용</div>
+    <p><code>RenderGraphBuilder.h</code>에 텍스처/패스 의존성 그래프 기반 자동 관리 시스템의 골격(<code>RGTextureHandle</code>, <code>PassBuilder</code>)이 존재하지만,
+    실제 프레임 루프는 위와 같이 하드코딩된 순차 호출 방식입니다. 렌더 그래프 전환을 시도 중인 단계로 보입니다.</p>
+  </div>
+
+  <h3>4.2 게임 스레드 ↔ 렌더 스레드 분리: 프록시 아키텍처</h3>
+  <p>GameObject/Component/Scene은 RenderEngine이 아닌 <strong>ScriptBinder</strong>에 정의되어 있고,
+  RenderEngine은 그로부터 파생된 <strong>렌더 프록시(스냅샷)</strong>만 소비합니다.</p>
+  <ul>
+    <li><code>RenderScene</code> — 씬의 렌더 상태 스냅샷. <code>ProxyMap</code>, <code>UIProxyMap</code>, <code>AnimatorMap</code>, 카메라별 <code>RenderDataMap</code> 보유.</li>
+    <li><code>MeshRenderer</code>·<code>TerrainComponent</code>·<code>SpriteRenderer</code>·<code>DecalComponent</code> 등 게임 스레드 컴포넌트가
+    <code>ProxyCommand</code>(Register/Update/Unregister)를 <code>ProxyCommandQueue</code>에 큐잉 → 렌더 스레드가 소비하는 <strong>커맨드 패턴</strong>.</li>
+    <li>프록시 종류: <code>PrimitiveRenderProxy</code>(메시/폴리지/터레인/데칼/스프라이트), <code>UIRenderProxy</code>, <code>EffectRenderProxy</code>.</li>
+  </ul>
+
+  <h3>4.3 셰이더 시스템</h3>
+  <ul>
+    <li><code>ShaderResourceSystem</code> — VS/HS/DS/GS/PS/CS 6종 캐싱, HLSL include 변경 감지 리로드(<code>HLSLIncludeReloadShaders</code>).</li>
+    <li><code>PipelineStateObject</code>(PSO.h) — D3D11에 없는 PSO 개념을 소프트웨어로 묶은 래퍼 (셰이더 6단계 + 상태 객체 + 토폴로지 → <code>Apply()</code>).</li>
+    <li><code>ShaderDSL</code> — Unity ShaderLab 유사 커스텀 텍스트 DSL 파서. <code>Shader "Name" { VS/PS…, keywords, queueTag }</code> 형태를 <code>ShaderAssetDesc</code>로 파싱.</li>
+    <li><code>VisualShaderDSL</code>/<code>VisualShaderPSO</code> — 노드 기반 비주얼 셰이더 트랙 별도 존재.</li>
+    <li><code>Material</code>은 CBuffer 리플렉션 메타데이터(<code>CBEntry</code>/<code>VariableDesc</code>)를 통해 <code>TrySetFloat/Vector…</code> 등 이름 기반 파라미터 조작 지원.</li>
+  </ul>
+
+  <h3>4.4 에셋 / 리소스 관리</h3>
+  <ul>
+    <li><code>DataSystem</code>(싱글턴) — Models/Materials/Textures/SpriteSheets/Fonts를 <code>FileGuid</code> 기반으로 로딩·캐싱. ImGui 콘텐츠 브라우저 내장(에디터 강결합).</li>
+    <li><code>AssetBundle</code>/<code>AssetEntry</code> — retain 집합 기반 번들 로딩·언로드(<code>UnloadUnusedAssets</code>). 단, 언로드 함수는 실제로 호출되지 않음 — <a href="#leak">12장</a> 참조.</li>
+    <li><code>AssetLoadJob</code> + 자체 ThreadPool — 비동기 에셋 로딩.</li>
+    <li><code>AssetMetaRegistry</code> + efsw 파일 감시 — Unity 스타일 <code>.meta</code>(YAML) 자동 생성/관리.</li>
+    <li><code>Mesh</code>는 LOD 시스템(<code>GenerateLODs</code>/<code>SelectLOD</code>) 내장, meshoptimizer로 최적화. <code>Model</code>은 Assimp 임포트.</li>
+  </ul>
+
+  <h3>4.5 애니메이션 &amp; 파티클</h3>
+  <div class="two-col">
+    <div class="card">
+      <h4>스켈레탈 애니메이션</h4>
+      <ul>
+        <li><code>Skeleton</code>/<code>Bone</code> 계층 트리, <code>BoneRegion</code> 분류, <code>Socket</code> 부착, MAX_BONES=512</li>
+        <li><code>Animation</code> — 본별 키프레임 + <code>KeyFrameEvent</code>(스크립트 콜백 연동)</li>
+        <li><code>AnimationJob</code> — 멀티스레드 본 업데이트/블렌딩, GPU 스키닝용 본 팔레트 관리</li>
+        <li>Animator 컴포넌트·상태머신(FSM)은 ScriptBinder 측 <code>AnimationController</code>에 위치</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>GPU 파티클 / 이펙트</h4>
+      <ul>
+        <li><code>ParticleSystem</code> — 컴퓨트 셰이더 + 더블 버퍼링(UAV/SRV)</li>
+        <li>모듈 체인: Spawn/Movement/Color/Size/Life/Trail <code>*ModuleCS</code> (인트루시브 링크드리스트)</li>
+        <li>렌더 모듈: <code>BillboardModuleGPU</code>, <code>MeshModuleGPU</code>, Trail Generate/Render</li>
+        <li><code>EffectManager</code>(IRenderPass) + <code>EffectEditor</code>(에디터 내장 이펙트 편집기)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="physics">
+  <h2 class="sec"><span class="no">05</span>물리 엔진 (Physics)</h2>
+  <p><strong>NVIDIA PhysX 5.5.0</strong>(vcpkg) 기반이며, GPU 가속을 적극 사용합니다
+  (<code>PxCudaContextManager</code> 생성 시도 후 실패 시 CPU 폴백, <code>eENABLE_GPU_DYNAMICS</code> + GPU 브로드페이즈).
+  디버그 빌드에서는 PhysX Visual Debugger(PVD)에 자동 연결됩니다.</p>
+
+  <h3>5.1 3계층 래퍼 구조</h3>
+  <div class="table-wrap"><table>
+    <tr><th>계층</th><th>위치</th><th>역할</th></tr>
+    <tr><td>① SDK 코어 래퍼</td><td><code>Physics/Physx.h</code> — <code>PhysicX</code> 싱글턴</td><td>Foundation/Physics/Scene/ControllerManager 직접 소유. 강체·CCT·래그돌 생성/제거, Raycast/Sweep/Overlap 저수준 API</td></tr>
+    <tr><td>② ECS 브리지</td><td><code>ScriptBinder/PhysicsManager</code></td><td>GameObject↔PxScene 트랜스폼 동기화(<code>SetPhysicData</code>/<code>GetPhysicData</code>), 32×32 충돌 매트릭스, 콜백·지연 변경 큐</td></tr>
+    <tr><td>③ 컴포넌트</td><td><code>RigidBodyComponent</code>, <code>*ColliderComponent</code>, <code>CharacterControllerComponent</code>, <code>RagdollComponent</code></td><td>에디터/스크립트에서 다루는 실제 컴포넌트. 리플렉션 매크로로 자동 직렬화·인스펙터 노출</td></tr>
+  </table></div>
+
+  <h3>5.2 시뮬레이션 틱 흐름 (<code>PhysicX::Update</code>)</h3>
+  <pre><code>Update(fixedDeltaTime)
+ ├ 1. RemoveActors / RemoveControllers   — 대기 중 제거 처리 (simulate 이전이라 안전)
+ ├ 2. RigidBody 갱신                     — 신규 액터 PxScene 등록
+ ├ 3. CCT 갱신                           — 기존 컨트롤러 Update, 대기 리스트에서 신규 캡슐 컨트롤러 생성
+ ├ 4. CollisionData 정리 / Ragdoll 갱신
+ ├ 5. m_scene->simulate(fixedDeltaTime)  — 물리 스텝
+ ├ 6. m_scene->fetchResults(true)        — 블로킹 대기
+ └ 7. m_eventCallback->StartTrigger()    — 트리거 오버랩 이벤트 디스패치</code></pre>
+
+  <h3>5.3 이벤트 전파 체인</h3>
+  <p><code>PhysicsEventCallback</code>(<code>PxSimulationEventCallback</code> 구현)이 <code>onContact</code>/<code>onTrigger</code>를 수신하고,
+  <code>std::function</code> 델리게이트 → <code>PhysicsManager::CallbackEvent</code> → 컴포넌트의
+  <code>OnTriggerEnter/Stay/Exit</code>·<code>OnCollisionEnter/Stay/Exit</code>(<code>ICollider</code> 인터페이스)로 전달되는 구조입니다.
+  주요 클래스: <code>StaticRigidBody</code>/<code>DynamicRigidBody</code>, <code>CharacterController</code>(넉백 이징 커브 지원),
+  <code>RagdollPhysics</code>(<code>PxArticulationReducedCoordinate</code> 기반), Convex/Triangle/HeightField 쿠킹 리소스.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="scripting">
+  <h2 class="sec"><span class="no">06</span>스크립팅 및 핫리로드</h2>
+
+  <div class="callout good">
+    <div class="title">현재 활성 방식: C++ 스크립트 DLL 핫리로드</div>
+    <p>Unity처럼 C#을 쓰는 대신, <strong>C++로 작성한 스크립트를 별도 DLL(<code>Dynamic_CPP</code>)로 MSBuild 재컴파일 후
+    <code>LoadLibrary</code>로 즉시 교체</strong>하는 네이티브 핫리로드 방식을 사용합니다.</p>
+  </div>
+
+  <h3>6.1 HotLoadSystem (ScriptBinder 최대 규모 파일, 2,129줄)</h3>
+  <ul>
+    <li>파일 타임스탬프 비교(<code>IsScriptUpToDate</code>)로 변경 감지 → 백그라운드 스레드에서 MSBuild 커맨드라인으로 <code>Dynamic_CPP</code> 재빌드.</li>
+    <li>빌드된 DLL을 <code>LoadLibraryA</code>로 로드, <code>GetProcAddress</code>로 팩토리 함수 바인딩:
+      <code>CreateModuleBehavior</code>(스크립트), <code>CreateBTActionNode</code>·<code>CreateBTConditionNode</code>(비헤이비어 트리),
+      <code>CreateAniBehavior</code>(애니메이션 FSM 행동).</li>
+    <li><code>ReplaceScriptComponent()</code> — 리로드 후 씬에 존재하는 스크립트 컴포넌트 인스턴스를 새 DLL 클래스로 일괄 교체.</li>
+    <li>스크립트 베이스는 <code>ModuleBehavior</code> — Unity MonoBehaviour와 동일한 라이프사이클:
+      <code>Awake → OnEnable → Start → FixedUpdate → OnTrigger*/OnCollision* → Update → LateUpdate → OnDisable → OnDestroy</code>.</li>
+  </ul>
+
+  <h3>6.2 Mono/C# 경로 — 설계 완료, 전면 비활성화</h3>
+  <p>Unity 유사 Mono 임베딩 구조(<code>MonoManager</code>, <code>CSharpScriptComponent</code>, icall 바인딩, <code>Assembly-CSharp</code> API 스텁,
+  <code>MonoBleedingEdge</code> 런타임 바이너리)가 전부 존재하지만, <code>EngineEntry/framework.h</code>와 각 헤더의
+  <code>#define UNUSE_MONO_LIB</code> 매크로로 <strong>컴파일에서 완전히 제외</strong>되어 있습니다 (README에서도 취소선으로 폐기 명시).</p>
+  <ul>
+    <li>바인딩 설계는 Unity와 동일한 <code>mono_add_internal_call</code> icall 패턴 — <code>"CreatorEngine.GameObject::ICall_Find"</code> 등.</li>
+    <li>C# 측은 <code>[MethodImpl(MethodImplOptions.InternalCall)]</code> extern 선언 (<code>GameObject.cs</code> 등).</li>
+    <li>루트의 <code>bindings.txt</code>는 C#과 무관한 <strong>HLSL 셰이더 리소스 바인딩 표</strong>입니다.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="reflection">
+  <h2 class="sec"><span class="no">07</span>리플렉션 / 코드 생성 파이프라인</h2>
+  <p>Unreal Header Tool과 유사한 <strong>빌드 전(pre-build) 오프라인 코드 생성기</strong> 2종이 리플렉션·직렬화·인스펙터 노출·팩토리 등록을 자동화합니다.</p>
+
+  <div class="table-wrap"><table>
+    <tr><th>도구</th><th>대상</th><th>산출물</th></tr>
+    <tr>
+      <td><strong>AutoRegisterCreateReflection</strong></td>
+      <td>엔진 전체 헤더 — <code>[[Serializable(Inheritance:X)]]</code>, <code>[[Property]]</code>, <code>[[Method]]</code> 어노테이션이 붙은 클래스</td>
+      <td>클래스별 <code>&lt;Class&gt;.generated.h</code> (Reflect 매크로 블록) + <code>ScriptBinder/RegisterReflect.def</code> (AUTO_REGISTER_CLASS 팩토리 일괄 등록)</td>
+    </tr>
+    <tr>
+      <td><strong>ScriptReflectionHeaderTool</strong></td>
+      <td><code>Dynamic_CPP/Assets/Script</code> — <code>MODULE_BEHAVIOR_BODY</code>, <code>[[ScriptReflectionField]]</code></td>
+      <td>스크립트별 <code>.generated.h</code></td>
+    </tr>
+    <tr>
+      <td><strong>ScriptReflectionAndFactoryClear</strong></td>
+      <td>삭제·개명된 스크립트 클래스 정리</td>
+      <td><code>funcMain.h</code>의 <code>RegisterFactory</code> 호출, <code>CreateFactory.h</code> include, vcxproj 항목에서 고아(orphan) 항목 제거</td>
+    </tr>
+  </table></div>
+
+  <p>런타임 측은 <code>Utility_Framework</code>의 매크로 기반 리플렉션(<code>Reflection.hpp</code>, <code>meta_property</code>/<code>meta_method</code>)이 담당하며,
+  이를 통해 <strong>YAML 직렬화</strong>(<code>ReflectionYaml*.h</code>)와 <strong>ImGui 인스펙터 자동 렌더링</strong>(<code>ReflectionImGuiHelper.h</code>)이
+  동일한 메타데이터에서 파생됩니다. 이 자동화 체인이 "코드 어노테이션 → 코드젠 → 직렬화/에디터 UI/팩토리"로 이어지는 엔진의 중추입니다.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="core">
+  <h2 class="sec"><span class="no">08</span>코어 인프라 (Utility_Framework 외)</h2>
+
+  <h3>8.1 동시성 프리미티브 (최근 개선 영역)</h3>
+  <p>최근 커밋 <code>1afe6687</code>("CountingSemaphore 및 ThreadPool 동기화 개선")에서 다듬어진 핵심 구조:</p>
+  <ul>
+    <li><code>ThreadPool&lt;TaskType&gt;</code> — MS PPL <code>concurrent_queue</code> 기반. 워커 수는 <code>GetActiveProcessorCount</code>로 결정,
+    스레드 어피니티/우선순위/초기화·종료 콜백 지원.</li>
+    <li><code>CountingSemaphore</code> — <code>acquire()</code>는 32회 스핀 후 커널 세마포어(<code>WaitForSingleObject</code>) 폴백,
+    <code>release(n)</code>은 실제 대기 스레드 수만큼만 <code>ReleaseSemaphore</code> 호출하는 하이브리드 방식.</li>
+    <li>WaitAll 패턴: 태스크 카운트 0→1 전이 시 수동 리셋 이벤트를 리셋, 잔여 0이 되면 <code>SetEvent</code> →
+    <code>NotifyAllAndWait()</code>가 블로킹 대기.</li>
+    <li>기타: <code>Core.Barrier</code>/<code>Core.Fence</code>/<code>SpinLock</code>/<code>Core.Coroutine</code>(코루틴) 등.</li>
+  </ul>
+
+  <h3>8.2 DLL 경계 싱글턴 — SingletonManager</h3>
+  <p><code>DLLCore::Singleton&lt;T, shareDLL=true&gt;</code> CRTP 템플릿. <code>typeid(T).hash_code()</code>를 키로
+  SingletonManager.dll이 export하는 전역 맵에서 인스턴스를 관리해, <strong>엔진 모듈과 핫리로드되는 게임 DLL이 동일한 싱글턴 인스턴스를 공유</strong>합니다
+  (double-checked locking + <code>std::atomic</code> acquire/release). 엔진 전역의 <code>SceneManagers</code>, <code>EngineSettingInstance</code>,
+  <code>Sound</code> 등이 모두 이 위에 구축되어 있습니다 — 핫리로드 아키텍처의 필수 기반입니다.</p>
+
+  <h3>8.3 그 밖의 인프라</h3>
+  <div class="two-col">
+    <div class="card">
+      <h4>Utility_Framework 주요 구성</h4>
+      <ul>
+        <li>수학: <code>Core.Mathf.h</code>, 난수</li>
+        <li>공간분할: Octree / QuadTree, PathFinder</li>
+        <li>메모리: MemoryPool, RingBuffer, plf::colony</li>
+        <li>패키징: <code>Paklib.hpp</code> — LZ4 + AES-256-CTR + SHA-256</li>
+        <li>로깅: LogSystem(싱크 기반) + 에디터 로그 오버레이</li>
+        <li>크래시: <code>DumpHandler</code> — 덤프에 Git 커밋 해시를 ADS로 기록</li>
+        <li>DX 보조: DeviceResources, HLSLCompiler, CoreWindow</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>진입점 흐름 (EngineEntry)</h4>
+      <ul>
+        <li><code>wWinMain</code> → <code>EngineBootstrap::Run&lt;Core::App&gt;(…, "Creator Editor", 1920×1080)</code></li>
+        <li>로딩 진행창 → <code>CoreWindow</code> 생성 → <code>DeviceResources</code>(DX11) → 메시지 핸들러 등록</li>
+        <li><code>Dx11Main::Initialize</code> → 태스크 체이닝(<code>.Then</code>)으로 메인 업데이트 루프 진입</li>
+        <li><code>GameBuilderSystem</code> 싱글턴 — 에디터에서 게임 빌드 트리거</li>
+        <li>.dmp 파일 드롭 시 ADS의 커밋 해시로 GitHub 커밋 페이지 자동 오픈</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="editor">
+  <h2 class="sec"><span class="no">09</span>에디터 (ImGui 기반)</h2>
+  <p><code>EngineGUIWindow</code>(Academy_4Q에 직접 포함)가 Dear ImGui 도킹 기반 에디터를 구성합니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>윈도우</th><th>역할</th></tr>
+    <tr><td><code>MenuBarWindow</code> (110KB)</td><td>상단 메뉴바 — 파일/빌드/도구 등 에디터 전역 기능 집결</td></tr>
+    <tr><td><code>HierarchyWindow</code></td><td>씬 GameObject 트리</td></tr>
+    <tr><td><code>InspectorWindow</code> (60KB)</td><td>리플렉션 기반 속성 자동 UI + 컴포넌트별 커스텀 드로잉 헬퍼(Animator, MeshRenderer, ModuleBehavior, PlayerInput, RectTransform, Terrain)</td></tr>
+    <tr><td><code>SceneViewWindow</code></td><td>씬 뷰포트, ImGuizmo 이동/회전/스케일 기즈모, 피킹 레이캐스트</td></tr>
+    <tr><td><code>GameViewWindow</code></td><td>플레이 모드 렌더 출력</td></tr>
+    <tr><td><code>AssetBundleWindow</code> / <code>RenderPassWindow</code> / <code>SettingsWindow</code> / <code>ProjectSettingWindow</code></td><td>에셋 번들 관리 / 렌더 패스 디버그·설정 / 엔진·프로젝트 설정</td></tr>
+  </table></div>
+  <p><code>ImGuiHelper</code> 라이브러리는 노드 에디터(<code>NodeEditor</code>+<code>BlueprintBuilder</code> — 애니메이터 컨트롤러·비헤이비어 트리 편집),
+  프로파일러 UI, FontAwesome 아이콘, 커스텀 위젯을 제공합니다. 이펙트 편집기(<code>EffectEditor</code>)와 콘텐츠 브라우저는
+  RenderEngine 측(<code>EffectManager</code>, <code>DataSystem</code>)에 내장되어 있습니다.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="game">
+  <h2 class="sec"><span class="no">10</span>게임 계층 (Dynamic_CPP / TrainAsis)</h2>
+
+  <h3>10.1 Dynamic_CPP — 게임 스크립트 DLL</h3>
+  <p><code>Assets/Script</code>에 약 348개 스크립트 파일. 모든 게임플레이 클래스는 <code>ModuleBehavior</code>를 상속하며,
+  <code>MODULE_BEHAVIOR_BODY</code> + <code>.generated.h</code> 코드젠으로 직렬화·인스펙터 노출이 자동화됩니다.</p>
+  <div class="two-col">
+    <div class="card">
+      <h4>대표 게임플레이 시스템</h4>
+      <ul>
+        <li><code>Entity</code> 베이스 — HP, 피격(<code>SendDamage</code>/<code>HitInfo</code>), 넉백, 아웃라인</li>
+        <li>몬스터/오브젝트: <code>EntityEnemy</code>, <code>EntityMonsterTower</code>, <code>EntityEleteMonster</code>, <code>EntityAsis</code> 등</li>
+        <li>플레이어: <code>Player</code>, <code>PlayerObserver</code>, <code>PlayerSelector</code></li>
+        <li>투사체: <code>Bullet</code>/<code>SpecialBullet</code>/<code>Bomb</code>/<code>Explosion</code></li>
+        <li>관리: <code>GameManager</code>, <code>ObjectPoolManager</code>(풀링), <code>MobSpawner</code></li>
+        <li>연출: <code>DialogueConductor</code>, <code>StoryStaging</code>, 튜토리얼, BGM 트리거</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>AI — 비헤이비어 트리</h4>
+      <ul>
+        <li>Action: <code>ChaseAction</code>, <code>AtteckAction</code>, <code>RetreatAction</code>, <code>TeleportAction</code>, <code>KnockBackAction</code> …</li>
+        <li>Condition: <code>IsChase</code>, <code>IsDetect</code>, <code>IsAtteck</code> …</li>
+        <li>Decorator: <code>Phase1~3</code>, <code>IsBossAtteck</code> (보스 페이즈 패턴)</li>
+        <li>각각 <code>BTActionFactory</code> 등 팩토리로 등록되어 노드 에디터에서 조립, 핫리로드 대상</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>10.2 TrainAsis — 배포용 게임 실행 파일</h3>
+  <ul>
+    <li>에디터 전용 기능이 제거된 게임 플레이어. <code>BUILD_FLAG</code>로 .pak 언팩/정리(<code>PakHelper</code>) 경로 포함.</li>
+    <li><code>GameMain</code>은 렌더 커맨드 <strong>빌드 스레드</strong>(<code>m_CB_Thread</code>)와 <strong>실행/프레젠트 스레드</strong>(<code>m_CE_Thread</code>)를
+    배리어로 동기화하는 이중 스레드 렌더 파이프라인을 운용.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="build">
+  <h2 class="sec"><span class="no">11</span>빌드 · CI · 외부 의존성</h2>
+
+  <h3>11.1 CI (GitHub Actions)</h3>
+  <p>워크플로는 <strong>"Update version file"</strong> 하나만 존재합니다. master 푸시 시 <code>version.txt</code>에 커밋 SHA를 기록하고
+  <code>[skip ci]</code>로 재커밋합니다. 이 SHA는 Academy_4Q PreBuild에서 <code>EngineVersion.h</code>로 주입되고,
+  크래시 덤프의 ADS 해시 → GitHub 커밋 링크 추적과 연계됩니다. <strong>빌드/테스트 CI는 없습니다.</strong></p>
+
+  <h3>11.2 vcpkg 의존성 (x64-windows, 발췌)</h3>
+  <div class="table-wrap"><table>
+    <tr><th>분류</th><th>포트</th></tr>
+    <tr><td>렌더링/에셋</td><td>assimp 5.4.3, directxtk, directxtex, directxmath, meshoptimizer, draco, imgui, imgui-node-editor, imguizmo, stb</td></tr>
+    <tr><td>물리</td><td>physx 5.5.0</td></tr>
+    <tr><td>스크립팅(보조)</td><td>lua, sol2</td></tr>
+    <tr><td>데이터</td><td>nlohmann-json, yaml-cpp, ryml, pugixml, rapidjson, tinyxml2, sqlite3</td></tr>
+    <tr><td>메모리/시스템</td><td>mimalloc, bdwgc, detours, libatomic-ops</td></tr>
+    <tr><td>동시성/유틸</td><td>bshoshany-thread-pool, fmt, spdlog, magic-enum, utfcpp, efsw(파일 감시), boost-uuid, stduuid</td></tr>
+    <tr><td>압축</td><td>lz4, zlib, minizip, kubazip</td></tr>
+  </table></div>
+  <div class="callout warn">
+    <div class="title">vcpkg 통합 불균형</div>
+    <p>vcpkg 통합(<code>VcpkgEnabled=true</code>)은 <code>Dynamic_CPP</code> 프로젝트에만 명시되어 있고, 나머지 엔진 모듈은
+    상대경로 include/lib 수동 연결에 의존합니다. <code>Restore-VcpkgPorts.ps1</code>이 classic 모드 일괄 복구를 담당하지만,
+    신규 환경 셋업 재현성은 매니페스트(vcpkg.json) 방식 대비 취약합니다.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="leak">
+  <h2 class="sec"><span class="no">12</span>렌더링 자원 누수 / 크래시 분석</h2>
+  <p>"렌더링 자원 관리에서 누수로 인한 크래시가 의심된다"는 증상을 전제로, D3D11 COM 수명 관리 · 리소스 캐시/에셋 시스템 ·
+  프록시/이펙트/애니메이션 계층 세 방향에서 코드 레벨 정밀 조사를 수행했습니다.
+  아래 발견 중 <strong>핵심 3건(12.1-①, 12.2-①, 12.3-②)은 소스에서 직접 재검증한 확정 결함</strong>이며,
+  나머지는 조사 에이전트가 파일:라인 근거와 함께 보고한 항목입니다. "가능성" 표기는 코드 결함은 확인됐으나 실제 트리거 경로가 미확정인 경우입니다.</p>
+
+  <div class="callout risk">
+    <div class="title">종합 진단: 크래시의 유력한 근본 원인 3가지</div>
+    <p><strong>① VRAM/RAM 무한 누적</strong> — 씬 전환 시 리소스 언로드 경로(<code>UnloadUnusedAssets</code>)가 어디서도 호출되지 않아
+    모든 에셋 캐시가 증가만 합니다. 장시간 플레이/씬 반복 전환 → 메모리 고갈 크래시의 전형적 패턴입니다.<br>
+    <strong>② 유즈애프터프리(UAF)</strong> — Animator 제거 시 <code>free()</code>된 본 팔레트 버퍼를 스키닝 메시 프록시가 계속 참조하여
+    렌더 패스가 해제된 메모리를 읽습니다. 릴리스 빌드에서 간헐적·비결정적 크래시로 나타납니다.<br>
+    <strong>③ 무동기화 컨테이너 동시 접근</strong> — 프록시 맵과 에셋 캐시 맵에 대해 락이 일부 경로에만 적용되어 있어,
+    병렬 로딩/컬링 중 <code>unordered_map</code> 리해시 경합으로 힙 손상 크래시가 발생할 수 있습니다.</p>
+  </div>
+
+  <h3>12.1 D3D11 COM 객체 수명 결함</h3>
+  <div class="table-wrap"><table>
+    <tr><th style="width:52px">심각도</th><th>위치</th><th>결함 내용 및 크래시 시나리오</th></tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>RenderModules.cpp</code><br>89–92, 110–113, 131–134 외 프리셋 6곳<br><em>(직접 재검증 완료)</em></td>
+      <td><strong>① 상태 객체 재생성 시 Release 누락.</strong> <code>m_pso->m_blendState = nullptr;</code> 후
+      <code>CreateBlendState(&desc, &m_pso->m_blendState)</code> — 기존 <code>ID3D11BlendState</code>의 참조를 <code>Release()</code> 없이 버림.
+      DepthStencil/Rasterizer State도 동일 패턴. EffectEditor에서 블렌드/뎁스 프리셋을 바꾸거나 이펙트 속성을 조정할 때마다
+      드라이버 레벨 상태 객체가 누적 누수 → 장시간 세션에서 핸들 고갈 크래시.</td>
+    </tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>PSO.cpp:95-101</code></td>
+      <td><strong>② PSO 소멸자의 부분 해제.</strong> 소멸자가 <code>m_inputLayout</code>·<code>m_rasterizerState</code>만 해제하고
+      <code>m_blendState</code>·<code>m_depthStencilState</code>는 미해제. 공유 전역 상태를 대입받은 패스에서는 우연히 안전하지만,
+      ①처럼 PSO가 단독 소유한 상태 객체는 이펙트/모듈 파괴 시마다 누수. 소유/비소유 포인터가 한 클래스에 혼재된 설계 결함.</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>RenderModules.cpp:15-26</code></td>
+      <td><strong>③ <code>SaveRenderState()</code>가 캡처한 이전 상태 3종</strong>(<code>OMGetDepthStencilState</code> 등은 AddRef 반환)이
+      소멸자에서 해제되지 않음 — 파티클 모듈 파괴 시마다 COM 참조 3개씩 누수.</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>Texture.cpp:601-634</code></td>
+      <td><strong>④ Texture 이동 생성자 불완전(Rule of Five 위반).</strong> <code>m_pUAV</code>와
+      <code>m_has*</code> 플래그·뷰 desc가 이동되지 않음 — 이동 시 원본 소멸자가 UAV를 해제해 새 객체가 참조 상실,
+      리사이즈 델리게이트가 뷰 재생성을 건너뜀. 현재 값 이동 사용처는 미발견(가능성)이나 향후 코드에서 즉시 발동.</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>DeviceResources.cpp:334, 350</code><br><em>(0-1 작업 중 발견 · 수정 완료)</em></td>
+      <td><strong>⑤ InfoQueue 참조 카운트 과소.</strong> <code>QueryInterface(IID_PPV_ARGS(&amp;m_infoQueue))</code>로
+      ComPtr에 담아 참조를 올린 뒤 <code>m_infoQueue-&gt;Release()</code>를 수동 호출 — ComPtr 소멸자가 한 번 더 Release하므로
+      획득 1회에 해제 2회가 된다. InfoQueue는 디바이스의 서브오브젝트라 디바이스 참조가 하나 모자라게 되어
+      디버그 빌드에서 디바이스 조기 파괴/종료 시 이상 동작을 유발할 수 있다. DXGI InfoQueue도 동일 패턴.
+      <strong>수정 완료</strong> — 수동 Release 제거(진단 인프라가 InfoQueue를 계속 사용하기 위해서도 필요).</td>
+    </tr>
+    <tr>
+      <td><span class="badge lib">MEDIUM</span></td>
+      <td><code>IRenderPass.h:65-97</code>, <code>Camera.h:168-174</code></td>
+      <td><strong>⑥ 카메라 삭제 시 커맨드 리스트 큐 미flush</strong> — 삭제된 카메라 인덱스의 잔여 커맨드가 인덱스 재사용 시
+      새 카메라 컨텍스트에서 실행되거나 종료 시까지 잔류. 인덱스 재사용 타이밍의 논리적 레이스 여지(가능성).</td>
+    </tr>
+  </table></div>
+  <p style="color:var(--text-dim);font-size:13.5px">참고 — 안전 확인된 부분: 커맨드 리스트 실행 후 Release(<code>ExecuteCommandList</code>),
+  <code>IRenderPass</code> 소멸자의 전체 큐 drain, 리사이즈 시 "전체 해제 → 전체 재생성" 2단계 브로드캐스트,
+  <code>Texture</code> 소멸자의 뷰 전체 해제·델리게이트 구독 해제, <code>Mesh</code>의 ComPtr 버퍼 관리는 모두 올바르게 구현되어 있습니다.</p>
+
+  <h3>12.2 리소스 캐시 / 에셋 시스템 — 언바운드 누적</h3>
+  <div class="table-wrap"><table>
+    <tr><th style="width:52px">심각도</th><th>위치</th><th>결함 내용 및 크래시 시나리오</th></tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>DataSystem.cpp:1693</code> (정의)<br><code>SceneManager.cpp:421-423</code> (호출부)<br><em>(직접 재검증 완료)</em></td>
+      <td><strong>① <code>UnloadUnusedAssets()</code>가 저장소 전체에서 단 한 번도 호출되지 않음.</strong>
+      씬 전환 시 <code>ClearRetainedAssets → RetainAssets</code>까지만 수행되고 실제 정리 함수는 데드 코드.
+      결과적으로 <code>Models/Materials/Textures/SFonts</code> 캐시(GPU 버퍼·SRV 포함)가 씬 전환마다 증가만 하는
+      <strong>언바운드 누적 → VRAM 고갈 크래시</strong>. retain/unload 파이프라인 전체가 사실상 no-op.
+      <br><strong>※ 추가 검증(설계 오류 확정):</strong> 단순히 "호출을 추가하면 되는" 문제가 아님 — 현재 소유권 구조상
+      이 함수를 호출하면 사용 중인 에셋이 파괴됨. 아래 보충 분석 참조.</td>
+    </tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>AssetEntry.h:5-11</code>, <code>DataSystem.cpp:190-212, 1693-1716</code></td>
+      <td><strong>② <code>UITextures</code>·<code>SpriteSheets</code>는 구조적으로 언로드 대상 제외.</strong>
+      <code>ManagedAssetType</code> enum에 해당 타입이 없어 ①을 수정해도 이 두 캐시는 영구 잔존. <code>Finalize()</code>도 정리하지 않음.</td>
+    </tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>DataSystem.cpp:495-522, 638-686, 719-777, 926-943</code></td>
+      <td><strong>③ 캐시 맵 락 불일치 + 병렬 로딩.</strong> <code>LoadAssetBundle</code>이 스레드풀로 에셋 로드를 병렬 실행하는데,
+      <code>LoadSharedTexture</code>·<code>LoadMaterial</code>은 무잠금, <code>LoadModel</code>은 부분 잠금, <code>SFonts</code>는 전용 뮤텍스 자체가 없음.
+      동시 삽입에 의한 <code>unordered_map</code> 리해시 경합 → 힙 손상/비결정적 크래시.</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>ShaderSystem.cpp:489-513, 583-619</code></td>
+      <td><strong>④ 셰이더 핫리로드 실패 시 UAF.</strong> HLSL 컴파일 실패 시 <code>EraseShader</code>가 맵 엔트리를 제거하는데,
+      <code>ShaderPSO</code>는 맵 엔트리를 원시 포인터로 참조(<code>&VertexShaders[base]</code>) — 해당 셰이더를 쓰는 모든 머티리얼의
+      다음 Draw에서 댕글링 역참조 크래시. (정상 리로드는 in-place 재컴파일이라 안전.)</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>Camera.cpp:11-21, 154-157</code>, <code>Camera.h:142-166</code></td>
+      <td><strong>⑤ 카메라 인덱스 불일치 → RenderPassData 고아화.</strong> 생성자는 <code>GetCameraCount()</code>(채워진 슬롯 수)로 예측 인덱스를 잡아
+      <code>AddRenderPassData</code>를 등록하고, 이후 <code>AddCamera()</code>(첫 빈 슬롯)가 다른 인덱스를 반환하면 앞서 등록한
+      렌더 타겟/뎁스 텍스처 묶음이 어떤 소멸 경로에서도 해제되지 않는 고아가 됨. Play/Stop·동적 카메라 반복 시 GPU 메모리 누적.
+      또한 <code>AddCamera</code>는 10슬롯 고정에 만석 시 <code>return</code> 없이 종료(UB) — 쓰레기 인덱스로 배열 밖 접근 가능.</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>Model.cpp:262-272, 283-293</code></td>
+      <td><strong>⑥ <code>GetMaterial/GetTexture(string_view)</code> 미스매치 시 return 누락(UB)</strong> — 반환값이 쓰레기 포인터일 수 있어
+      호출부의 null 체크를 무력화하고 역참조 크래시 가능.</td>
+    </tr>
+    <tr>
+      <td><span class="badge lib">MEDIUM</span></td>
+      <td><code>DataSystem.cpp:1631-1645</code></td>
+      <td><code>AddModel</code>이 죽은 코드이며 <code>Models[name]</code> 조회 부작용으로 null 엔트리를 캐시에 삽입 — 캐시 오염.</td>
+    </tr>
+  </table></div>
+
+  <div class="callout risk">
+    <div class="title">보충 분석 (확정): UnloadUnusedAssets는 "호출되지 않는 것"이 아니라 "호출하면 안 되는" 설계 상태</div>
+    <p>추가 검증 결과, <strong>DataSystem의 <code>shared_ptr</code> 캐시 맵이 에셋의 사실상 유일한 소유자이고,
+    컴포넌트에는 원시 포인터만 전달</strong>되는 소유권 구조가 확인되었습니다. 즉 <code>UnloadUnusedAssets()</code>가
+    <code>container.erase(it)</code>로 맵 엔트리를 지우는 순간 참조 카운트가 0이 되어 에셋이 즉시 파괴되며,
+    그 에셋을 사용 중인 모든 컴포넌트의 원시 포인터가 댕글링됩니다. 검증된 소유권 체인:</p>
+    <ul>
+      <li><code>MeshRenderer.h:35-37</code> — <code>Material* m_Material</code>, <code>Mesh* m_Mesh</code> <strong>원시 포인터 멤버</strong>.</li>
+      <li>대입 경로 전부 원시 포인터: <code>DataSystems->Materials[name].get()</code>(ImGuiDrawHelperMeshRenderer.cpp:398),
+      <code>DataSystems->LoadMaterial(...)</code>(ComponentFactory.cpp:130, 원시 반환), <code>model->GetMesh(...)</code>(ComponentFactory.cpp:213).</li>
+      <li><code>Model.h:59-61</code> — Model 자신도 <code>vector&lt;Mesh*&gt;</code>/<code>vector&lt;Material*&gt;</code>/<code>vector&lt;Texture*&gt;</code>
+      원시 포인터로만 보관. 렌더 프록시(12.3-⑦)도 동일.</li>
+      <li><strong>결정적 사례 — 런타임 복제 머티리얼:</strong> <code>Material::Instantiate</code>(Material.cpp:63-66)는
+      <code>InstantiateShared(...).get()</code>으로 원시 포인터를 반환하고, 클론의 유일한 <code>shared_ptr</code>는
+      <code>DataSystems->Materials</code> 맵에 등록됨(Material.cpp:120). 게임 스크립트가 이를 상시 사용
+      (Player.cpp:2012 <code>"cloneWeapon"</code>, Entity.cpp:30, BossBomb.cpp:11 <code>"clonebomb"</code> 등).
+      이 클론 이름들은 어떤 AssetBundle retain 집합에도 존재하지 않으므로, <code>UnloadUnusedAssets()</code>를 호출하는 즉시
+      <strong>사용 중인 클론 머티리얼 전체가 일괄 파괴 → 다음 Draw에서 대량 UAF 크래시</strong>가 발생합니다.</li>
+    </ul>
+    <p>결론: 현재의 "누수(호출 안 함)"는 역설적으로 <strong>우연히 안전한 상태</strong>이며, 진짜 결함은 함수 미호출이 아니라
+    <strong>소유권 모델(shared_ptr 캐시 = 유일 소유 + 사용처 = 원시 별칭)</strong>입니다. 소유권 재설계 없이 언로드를 활성화하면
+    누수 크래시가 UAF 크래시로 바뀔 뿐입니다.</p>
+  </div>
+
+  <h3>12.3 프록시 / 이펙트 / 애니메이션 계층 — 스레드 경합과 UAF</h3>
+  <div class="table-wrap"><table>
+    <tr><th style="width:52px">심각도</th><th>위치</th><th>결함 내용 및 크래시 시나리오</th></tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>RenderScene.cpp:165-198</code> ↔ <code>ProxyCommand.cpp</code> 전 생성자</td>
+      <td><strong>① 프록시 맵 락 없는 동시 접근.</strong> <code>RenderScene</code> 멤버 함수들은 <code>SpinLock</code>으로
+      <code>m_proxyMap</code>/<code>m_uiProxyMap</code>을 보호하지만, <code>ProxyCommand</code> 생성자 8종은 같은 맵을
+      <strong>락 없이</strong> <code>operator[]</code>/<code>find</code>로 접근. <code>Scene::CullMeshData</code>가 이 생성자들을
+      스레드풀에서 병렬 실행하고, <code>Register/UnregisterAnimator</code>도 무잠금으로 <code>m_animatorMap</code>/<code>m_palleteMap</code>을 조작 —
+      리해시 경합으로 힙 손상 크래시.</td>
+    </tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>RenderScene.cpp:175-197</code>, <code>ProxyCommand.cpp:62-97</code>,<br><code>GBufferPass/ForwardPass/ShadowMapPass</code><br><em>(직접 재검증 완료)</em></td>
+      <td><strong>② 본 팔레트 버퍼 UAF.</strong> <code>RegisterAnimator</code>가 <code>std::malloc</code>으로 팔레트 버퍼를 할당하고
+      스키닝 프록시의 <code>m_finalTransforms</code>가 이 원시 포인터를 캐싱. <code>UnregisterAnimator</code>가 <code>free()</code>해도
+      프록시에는 통지가 없어 null이 아닌 해제된 포인터가 잔존 — 렌더 패스는 null 체크만 하므로 해제된 메모리를
+      <code>UpdateBuffer</code>로 읽음. <strong>Animator만 비활성/파괴되고 MeshRenderer가 남는 흔한 상황에서 간헐 크래시.</strong>
+      씬 Finalize와 겹치면 더블 프리 가능성도 있음.</td>
+    </tr>
+    <tr>
+      <td><span class="badge off">CRITICAL</span></td>
+      <td><code>EffectComponent.cpp:60-78</code></td>
+      <td><strong>③ null 프록시 역참조.</strong> <code>GetProxy(this)</code>가 nullptr을 반환할 수 있는데, 한 줄 위에서는
+      <code>if (proxy)</code>로 방어하면서 바로 아래에서 무방비로 <code>proxy->GetInstanceName()</code> 호출 — 초기화 순서가 어긋나면 즉시 크래시.</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>EffectProxyController.cpp:34-56</code></td>
+      <td><strong>④ raw new/delete + 무동기화 프록시 컨테이너</strong> — <code>GetProxy</code>가 반환한 원시 포인터를 컴포넌트가 캐싱하는 구조라
+      ③과 결합해 UAF 여지. <code>PrepareCommandBehavior</code>(매 프레임 순회)와 Register/UnRegister 간 락 없음(가능성).</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>RenderScene.cpp:40-58</code></td>
+      <td><strong>⑤ <code>Finalize()</code>가 <code>m_uiProxyMap</code>을 정리하지 않음</strong> — 씬 파괴 후 UI 프록시 잔존.
+      락 규약도 함수마다 불일치(<code>m_animatorMap</code>을 Finalize는 잠그고 Register/Unregister는 안 잠금).</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>EffectBase.h:266-280</code>, <code>ParticleSystem.cpp:552-596, 666-706</code></td>
+      <td><strong>⑥ <code>WaitForGPUCompletion()</code>이 사실상 no-op.</strong> 전부 주석 처리되어 GPU 동기화를 하지 않고,
+      <code>IsReadyForReuse</code>는 <code>Flush()</code>만 호출(완료 대기 아님). 재생 중 파티클 버퍼 리사이즈 경로
+      (<code>ReleaseParticleBuffers → CreateParticleBuffer</code>)와 겹치면 GPU가 참조 중인 UAV/SRV 해제 레이스(가능성).</td>
+    </tr>
+    <tr>
+      <td><span class="badge dll">HIGH</span></td>
+      <td><code>MeshRendererProxy.h:92-134</code></td>
+      <td><strong>⑦ 프록시의 에셋 원시 포인터</strong>(<code>Material*</code>/<code>Mesh*</code>/<code>Texture*</code>) — 에셋 리로드/언로드 시
+      댕글링 가능(가능성). 12.2-①이 수정되어 실제 언로드가 동작하기 시작하면 이 결함이 표면화되므로 함께 수정 필요.</td>
+    </tr>
+    <tr>
+      <td><span class="badge lib">MEDIUM</span></td>
+      <td><code>EffectManager.cpp</code>, <code>ProxyCommand.cpp</code>(UI 3종), <code>AnimationJob.cpp:13</code></td>
+      <td><code>activeEffects</code> 무동기화 순회·<code>isCleanupRunning</code> 플래그 공용 오용 / UI ProxyCommand 생성자의 SpinLock 과다 보유 구간 /
+      <code>AnimationJob.cpp</code>의 파일 스코프 전역 <code>m_currAnimator</code>(멤버로 오인되는 무동기화 전역).</td>
+    </tr>
+  </table></div>
+  <p style="color:var(--text-dim);font-size:13.5px">참고 — 안전 확인된 패턴: MeshRenderer 계열 <code>ProxyCommand</code>의 람다는
+  <code>shared_ptr</code> 값 캡처라 프록시 파괴 후 실행되어도 UAF가 아니며, UI 계열은 <code>weak_ptr::lock()</code> 방어 패턴을 올바르게 사용.
+  <code>AnimationJob::Update</code>도 <code>shared_ptr</code> 캡처 + <code>NotifyAllAndWait</code>로 작업 중 해제를 방지합니다.</p>
+
+  <h3>12.4 권장 수정 우선순위</h3>
+  <ol>
+    <li><strong>[즉시] 12.3-② 본 팔레트 UAF</strong> — 재현 조건(Animator 비활성화 + 스키닝 메시 유지)이 게임플레이 중 흔하고 증상이 "간헐적 크래시"와 정확히 일치.
+    <code>UnregisterAnimator</code> 시 해당 애니메이터를 참조하는 프록시들의 <code>m_finalTransforms</code>를 무효화하거나, <code>malloc</code>/원시 포인터 대신
+    <code>shared_ptr</code> 버퍼 소유권 모델로 교체.</li>
+    <li><strong>[중기 — 설계 변경 선행 필수] 12.2-① 에셋 소유권 재설계 후 언로드 복구</strong> —
+    보충 분석에서 확정했듯 현재 구조에서 <code>UnloadUnusedAssets()</code> 호출을 추가하는 것만으로는 사용 중 에셋 파괴(UAF)를 유발함.
+    올바른 순서: <em>(1)</em> 컴포넌트·Model·프록시의 에셋 참조를 <code>shared_ptr</code>(또는 세대 핸들)로 전환해
+    "캐시 맵 erase = 참조 해제"가 되도록 소유권 분리 → <em>(2)</em> 런타임 클론(<code>Material::Instantiate</code>)을 retain 대상에 포함하거나
+    씬 수명에 바인딩 → <em>(3)</em> <code>ManagedAssetType</code>에 UITexture/SpriteSheet 추가 → <em>(4)</em> 그 후에 씬 전환부에서
+    <code>UnloadUnusedAssets()</code> 활성화. 단기 완화책으로는 소유권 변경 없이 <strong>씬 전환 횟수 대비 메모리 상한 모니터링</strong>과
+    명시적 재시작 유도가 현실적.</li>
+    <li><strong>[즉시] 12.1-①② 상태 객체 Release</strong> — <code>RenderModules</code> 6곳 재생성 전 Release 추가(또는 ComPtr 전환),
+    <code>PipelineStateObject</code>의 소유/비소유 포인터 분리.</li>
+    <li><strong>[단기] 락 일원화</strong> — <code>ProxyCommand</code> 생성자·<code>Register/UnregisterAnimator</code>에 <code>RenderScene</code>과 동일한
+    SpinLock 적용, <code>DataSystem</code> 캐시 맵별 뮤텍스 규약 통일(특히 <code>LoadSharedTexture</code>/<code>LoadMaterial</code>/<code>SFonts</code>).</li>
+    <li><strong>[단기] 카메라 수명 정리</strong> — 예측 인덱스 제거(등록을 <code>RegisterContainer</code> 이후로 이동), <code>AddCamera</code> 만석 시 명시적 실패 처리,
+    카메라 삭제 시 패스별 커맨드 큐 flush.</li>
+    <li><strong>[중기] 진단 인프라</strong> — 디버그 빌드에 <code>ID3D11Debug::ReportLiveDeviceObjects</code> 주기 리포트와
+    <code>D3D11_CREATE_DEVICE_DEBUG</code> 브레이크를 추가해 위 수정들의 효과를 정량 검증. Address Sanitizer(MSVC <code>/fsanitize=address</code>)로 UAF 재현 확인.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<section id="assessment">
+  <h2 class="sec"><span class="no">13</span>종합 평가</h2>
+
+  <h3>강점</h3>
+  <div class="callout good">
+    <div class="title">1. 일관된 자동화 파이프라인 (어노테이션 → 코드젠 → 직렬화/에디터/팩토리)</div>
+    <p>C++ 속성 어노테이션 하나로 YAML 직렬화, ImGui 인스펙터, 팩토리 등록이 모두 파생되는 체인은 UHT 스타일의 성숙한 설계이며,
+    엔진 컴포넌트와 게임 스크립트 양쪽에 동일 패턴이 적용되어 일관성이 높습니다.</p>
+  </div>
+  <div class="callout good">
+    <div class="title">2. 실용적인 네이티브 핫리로드</div>
+    <p>Mono/C# 경로를 폐기하는 대신 "MSBuild 재빌드 + DLL 교체 + 인스턴스 마이그레이션 + DLL 경계 싱글턴 공유"라는 현실적 조합으로
+    C++ 스크립트의 반복 개발 속도 문제를 해결했습니다. BT 노드·애니메이션 FSM까지 동일 메커니즘으로 핫리로드되는 점이 완성도 있습니다.</p>
+  </div>
+  <div class="callout good">
+    <div class="title">3. 멀티스레드 렌더링 구조</div>
+    <p>게임/렌더 스레드 분리(프록시 커맨드 큐), 트리플 버퍼링, 지연 컨텍스트 병렬 커맨드 리스트 기록, 배포 빌드의 빌드/실행 스레드 분리까지
+    D3D11에서 가능한 멀티스레딩 패턴을 폭넓게 활용하고 있습니다.</p>
+  </div>
+
+  <h3>리스크 및 개선 여지</h3>
+  <div class="callout risk">
+    <div class="title">0. 렌더링 자원 수명 관리 결함 (크래시 유발)</div>
+    <p>씬 전환 시 에셋 언로드 미동작(언바운드 VRAM 누적), 본 팔레트 UAF, 프록시 맵 무동기화 접근, D3D11 상태 객체 누수 등
+    CRITICAL 등급 결함 다수가 확인되었습니다. 상세 근거와 수정 우선순위는 <a href="#leak" style="color:var(--accent)">12장</a> 참조.</p>
+  </div>
+  <div class="callout risk">
+    <div class="title">1. 모듈 간 커플링</div>
+    <p>RenderEngine ↔ ScriptBinder의 include 수준 양방향 의존, DataSystem에 내장된 콘텐츠 브라우저(리소스 관리 + 에디터 UI 혼재) 등
+    개념적 경계와 물리적 경계가 어긋난 지점이 있습니다. 렌더 프록시 계층이 이미 존재하므로 인터페이스 분리로 정리할 여지가 큽니다.</p>
+  </div>
+  <div class="callout risk">
+    <div class="title">2. 빌드/테스트 CI 부재</div>
+    <p>CI는 버전 파일 갱신뿐이며 컴파일 검증·테스트가 없습니다. 핫리로드가 MSBuild에 의존하는 구조 특성상,
+    엔진 헤더 변경이 Dynamic_CPP 빌드를 깨뜨리는 회귀를 자동으로 잡을 수단이 없습니다.</p>
+  </div>
+  <div class="callout warn">
+    <div class="title">3. 데드 코드 및 과도기 상태</div>
+    <p>Mono 스크립팅 전체(Managed/MonoBleedingEdge/Assembly-CSharp/바인딩 코드)가 비활성 상태로 저장소에 남아 있고,
+    RenderGraphBuilder는 미완·미사용입니다. 방향이 확정되었다면 Mono 관련 자산 제거로 저장소·빌드 표면을 줄일 수 있습니다.</p>
+  </div>
+  <div class="callout warn">
+    <div class="title">4. 단일 평면 디렉터리 구조</div>
+    <p>RenderEngine(246파일)·ScriptBinder(235파일)가 하위 폴더 없는 평면 구조라 탐색성이 떨어집니다.
+    패스/리소스/애니메이션/파티클 등 이미 뚜렷한 서브도메인별 폴더 분리가 유효합니다.</p>
+  </div>
+
+  <h3>아키텍처 한 줄 요약</h3>
+  <p><strong>"Unity의 개발 경험(컴포넌트 모델, 인스펙터, .meta, 핫리로드)을 UHT 스타일 코드 생성과 네이티브 DLL 핫스왑으로
+  재구현한, DX11 멀티스레드 렌더러 기반의 인하우스 C++20 엔진."</strong> 자동화 체인과 핫리로드 파이프라인이 가장 큰 자산이며,
+  모듈 경계 정리와 빌드 CI 도입이 다음 단계의 핵심 과제입니다.</p>
+</section>
+
+<footer>
+  본 보고서는 2026-07-29 기준 master 브랜치(<code>ea304eba</code>)의 소스 코드 정적 분석 결과입니다.
+  분석 범위: 솔루션/프로젝트 구성, RenderEngine, Physics, ScriptBinder, 스크립팅/코드젠 도구, 코어 인프라, 에디터, 게임 계층, 빌드/CI,
+  렌더링 자원 수명 관리 결함 정밀 조사(12장 — 2026-07-29 추가).
+</footer>
+
+</div>
+</body>
+</html>

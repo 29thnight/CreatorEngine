@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "Mesh.generated.h"
 #include "ManagedHeapObject.h"
+#include "EngineResourceCensus.h"
 #include <assimp/Importer.hpp>
 
 struct ModelNode : public Managed::HeapObject
@@ -96,7 +97,8 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class Mesh : public Managed::HeapObject, public std::enable_shared_from_this<Mesh>
+class Mesh : public Managed::HeapObject, public std::enable_shared_from_this<Mesh>,
+	private Diagnostics::CountedResource<Diagnostics::EngineResource::Mesh>
 {
 public:
 	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체

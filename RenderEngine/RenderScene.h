@@ -48,7 +48,14 @@ public:
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
 	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, std::shared_ptr<Animator>>;
-	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
+	// 본 팔레트 버퍼는 소유권을 공유한다.
+	//
+	// 렌더 프록시가 이 버퍼를 캐싱하는데, 예전처럼 원시 포인터를 넘기면
+	// UnregisterAnimator가 free한 뒤에도 프록시가 그 주소를 계속 들고 있어
+	// 렌더 패스가 해제된 메모리를 읽었다(use-after-free).
+	// shared_ptr로 두면 프록시가 참조하는 동안 버퍼가 살아남아 그 경합이 사라진다.
+	using AnimationPalette		= std::shared_ptr<DirectX::XMMATRIX[]>;
+	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, AnimationPalette>>;
 	using RenderDataMap			= std::vector<std::shared_ptr<RenderPassData>>;
 public:
 	RenderScene() = default;
@@ -134,6 +141,18 @@ public:
 	void OnProxyDestroy();
 
 	AnimatorMap& GetAnimatorMap() { return m_animatorMap; }
+
+	// 진단용 컨테이너 크기 스냅샷.
+	// 씬을 오갈 때 이 값들이 회수되지 않고 계속 늘어나면 프록시 해제 누락이다.
+	struct ResourceCounts
+	{
+		size_t proxies{ 0 };
+		size_t uiProxies{ 0 };
+		size_t animators{ 0 };
+		size_t animationPalettes{ 0 };
+		size_t renderPassDatas{ 0 };
+	};
+	ResourceCounts GetResourceCounts();
 
 	static concurrent_queue<HashedGuid> RegisteredDestroyProxyGUIDs;
 	static concurrent_queue<HashedGuid> RegisteredDestroyUIProxyGUIDs;

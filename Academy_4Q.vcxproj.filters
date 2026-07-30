@@ -131,6 +131,9 @@
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
       <Filter>Window\AssetBundleWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
@@ -190,6 +193,7 @@
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EngineEntry\Academy_4Q.rc">

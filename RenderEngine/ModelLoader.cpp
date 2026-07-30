@@ -230,7 +230,9 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	//	MeshOptimizer::GenerateShadowMesh(*meshObj);
 	//}
 
-	m_model->m_Meshes.push_back(meshObj);
+	// Mesh는 Managed::HeapObject 파생이라 operator delete가 커스텀 힙으로 라우팅된다.
+	// 따라서 shared_ptr의 기본 deleter로 감싸도 해제 경로는 기존과 동일하다.
+	m_model->m_Meshes.push_back(std::shared_ptr<Mesh>(meshObj));
 
 	return meshObj;
 }
@@ -250,7 +252,7 @@ void ModelLoader::ProcessMaterials()
 	}
 }
 
-Material* ModelLoader::GenerateMaterial(int index)
+std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 {
     std::string baseName{};
 	if (index > -1)
@@ -275,7 +277,7 @@ Material* ModelLoader::GenerateMaterial(int index)
         {
             if (iter->second->m_fileGuid == m_fileGuid)
             {
-                return iter->second.get();
+                return iter->second;
             }
             else
             {
@@ -391,7 +393,7 @@ Material* ModelLoader::GenerateMaterial(int index)
 
 	DataSystems->Materials[material->m_name] = material;
 
-	return material.get();
+	return material;
 }
 
 void ModelLoader::ParseModel()
@@ -446,7 +448,7 @@ void ModelLoader::ParseNode(std::ofstream& outfile, const ModelNode* node)
 
 void ModelLoader::ParseMeshes(std::ofstream& outfile)
 {
-    for (const Mesh* mesh : m_model->m_Meshes)
+    for (const auto& mesh : m_model->m_Meshes)
     {
         uint32_t nameSize = static_cast<uint32_t>(mesh->m_name.size());
         outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
@@ -470,7 +472,7 @@ void ModelLoader::ParseMeshes(std::ofstream& outfile)
 
 void ModelLoader::ParseMaterials(std::ofstream& outfile)
 {
-    for (const Material* mat : m_model->m_Materials)
+    for (const auto& mat : m_model->m_Materials)
     {
         uint32_t nameSize = static_cast<uint32_t>(mat->m_name.size());
         outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
@@ -680,7 +682,7 @@ void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 
 		mesh->AssetInit();
 
-        m_model->m_Meshes.push_back(mesh);
+        m_model->m_Meshes.push_back(std::shared_ptr<Mesh>(mesh));
     }
     //std::cout << "LoadMesh base : " << asset.GetElapsedTime() << std::endl;
 }
@@ -822,7 +824,11 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 
         DataSystems->InsertMaterial(mat);
 
-        m_model->m_Materials.push_back(mat.get());
+        // shared_ptr을 그대로 보관한다.
+        // 예전에는 .get()으로 원시 포인터만 넣어서, DataSystem이 캐시에서 지우면
+        // 이 Model이 참조하던 머티리얼이 그대로 파괴됐다(12.2 보충 분석의 근원 지점).
+        // 이제 DataSystem과 Model이 공동 소유하므로 언로드가 사용 중인 리소스를 죽이지 않는다.
+        m_model->m_Materials.push_back(mat);
 
     }
     //std::cout << "LoadMaterial base : " << asset.GetElapsedTime() << std::endl;
@@ -1017,8 +1023,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
         if (1 == node->m_numMeshes && 0 == node->m_numChildren)
         {
             uint32 meshId = node->m_meshes[0];
-            Mesh* mesh = m_model->m_Meshes[meshId];
-            Material* material = m_model->m_Materials[mesh->m_materialIndex];
+            Mesh* mesh = m_model->m_Meshes[meshId].get();
+            Material* material = m_model->m_Materials[mesh->m_materialIndex].get();
             MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			if (m_model->m_isMakeMeshCollider)
@@ -1031,8 +1037,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 				convexMesh->SetRestitution(0);
 			}
 
-            meshRenderer->m_Mesh = mesh;
-            meshRenderer->m_Material = material;
+            meshRenderer->m_Mesh = m_model->m_Meshes[meshId];
+            meshRenderer->m_Material = m_model->m_Materials[mesh->m_materialIndex];
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
@@ -1046,8 +1052,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 
 		uint32 meshId			= node->m_meshes[i];
-		Mesh* mesh				= m_model->m_Meshes[meshId];
-		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
+		auto mesh				= m_model->m_Meshes[meshId];
+		auto material			= m_model->m_Materials[mesh->m_materialIndex];
                 
 		Mathf::Matrix transform = node->m_transform;
 		Model* model = m_model;
@@ -1155,8 +1161,8 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
 		{
 			uint32 meshId = node->m_meshes[0];
-			Mesh* mesh = m_model->m_Meshes[meshId];
-			Material* material = m_model->m_Materials[meshId];
+			auto mesh = m_model->m_Meshes[meshId];
+			auto material = m_model->m_Materials[meshId];
 
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
@@ -1185,8 +1191,8 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
-		Mesh* mesh = m_model->m_Meshes[meshId];
-		Material* material = m_model->m_Materials[mesh->m_materialIndex];
+		auto mesh = m_model->m_Meshes[meshId];
+		auto material = m_model->m_Materials[mesh->m_materialIndex];
 
 		Mathf::Matrix transform = node->m_transform;
 
@@ -1264,16 +1270,179 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 
 Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index, bool isCompress)
 {
-	bool hasTex = material->GetTextureCount(type) > 0;
-	Texture* texture = nullptr;
-	if (hasTex)
+	if (0 == material->GetTextureCount(type))
 	{
-        aiString str;
-        material->GetTexture(type, index, &str);
-        std::string textureName = str.C_Str();
-        texture = GenerateTexture(textureName, isCompress);
-    }
-    return texture;
+		return nullptr;
+	}
+
+	aiString str;
+	material->GetTexture(type, index, &str);
+
+	// GLB는 텍스처를 모델 파일 안에 담을 수 있고, 이때 머티리얼이 들고 있는 경로는
+	// "*0" 같은 인덱스 참조라 디스크에서 절대 찾을 수 없다.
+	// 임베디드가 있으면 씬이 들고 있는 바이트에서 바로 만들고, 없으면 기존 파일 경로 로직을 탄다.
+	if (m_AIScene)
+	{
+		if (const aiTexture* embedded = m_AIScene->GetEmbeddedTexture(str.C_Str()))
+		{
+			return GenerateEmbeddedTexture(embedded, str.C_Str(), isCompress);
+		}
+	}
+
+	return GenerateTexture(std::string_view(str.C_Str()), isCompress);
+}
+
+Texture* ModelLoader::GenerateEmbeddedTexture(const aiTexture* embedded, std::string_view reference, bool isCompress)
+{
+	if (nullptr == embedded)
+	{
+		return nullptr;
+	}
+
+	{
+		std::unique_lock lock(m_modelMutex);
+		auto cached = m_embeddedTextures.find(embedded);
+		if (cached != m_embeddedTextures.end())
+		{
+			return cached->second.get();
+		}
+	}
+
+	// 메모리에서 바로 텍스처를 만들지 않고 파일로 뽑아낸 뒤 일반 텍스처처럼 로드한다.
+	//
+	// 모델은 최초 임포트 때만 원본(.glb)을 파싱하고, 그 뒤로는 .asset 경로로 로드되면서
+	// 머티리얼이 텍스처를 "이름"으로 찾는다. 메모리에만 존재하는 텍스처는 그 시점에
+	// 찾을 수 없어 머티리얼이 검게 나온다. 파일로 남겨두면 임포트 이후의 모든 경로
+	// (에셋 재로드·머티리얼 직렬화·에디터 브라우저)가 기존 로직 그대로 동작한다.
+	const std::string fileName = MakeEmbeddedTextureFileName(embedded, reference);
+	if (fileName.empty())
+	{
+		return nullptr;
+	}
+
+	const file::path destination = PathFinder::Relative("Materials\\") / fileName;
+
+	if (!file::exists(destination))
+	{
+		if (!ExtractEmbeddedTextureToFile(embedded, destination))
+		{
+			Debug->LogWarning("임베디드 텍스처 추출 실패: " + std::string(reference));
+			return nullptr;
+		}
+
+		Debug->LogDebug("임베디드 텍스처 추출: " + destination.filename().string() +
+			(0 == embedded->mHeight
+				? " [" + std::string(embedded->achFormatHint) + " " + std::to_string(embedded->mWidth) + "바이트]"
+				: " [비압축 " + std::to_string(embedded->mWidth) + "x" + std::to_string(embedded->mHeight) + "]"));
+	}
+
+	// 이후는 디스크에 있는 여느 텍스처와 완전히 동일한 경로를 탄다.
+	Texture* texture = GenerateTexture(fileName, isCompress);
+	if (!texture)
+	{
+		return nullptr;
+	}
+
+	{
+		std::unique_lock lock(m_modelMutex);
+		// GenerateTexture가 이미 m_model->m_Textures에 넣었으므로 여기서는 캐시만 채운다.
+		if (!m_model->m_Textures.empty())
+		{
+			m_embeddedTextures.emplace(embedded, m_model->m_Textures.back());
+		}
+	}
+
+	return texture;
+}
+
+std::string ModelLoader::MakeEmbeddedTextureFileName(const aiTexture* embedded, std::string_view reference) const
+{
+	// 확장자는 Assimp가 주는 힌트를 쓴다("png", "jpg"...). 비압축이면 PNG로 저장한다.
+	std::string extension = (0 == embedded->mHeight) ? std::string(embedded->achFormatHint) : std::string("png");
+	if (extension.empty())
+	{
+		extension = "png";
+	}
+
+	// glTF의 image.name은 선택 항목이라 비어 있을 수 있다. 그때는 참조 인덱스로 만든다.
+	std::string baseName;
+	if (0 < embedded->mFilename.length)
+	{
+		baseName = file::path(embedded->mFilename.C_Str()).stem().string();
+	}
+
+	if (baseName.empty())
+	{
+		std::string label(reference);
+		if (!label.empty() && '*' == label.front())
+		{
+			label.erase(0, 1);
+		}
+		baseName = m_model->name + "_embedded" + label;
+	}
+
+	// 파일명으로 쓸 수 없는 문자는 걷어낸다(머티리얼 이름이 그대로 들어오는 경우가 있다).
+	for (char& character : baseName)
+	{
+		if (nullptr != std::strchr("\\/:*?\"<>|", character))
+		{
+			character = '_';
+		}
+	}
+
+	return baseName.empty() ? std::string{} : baseName + "." + extension;
+}
+
+bool ModelLoader::ExtractEmbeddedTextureToFile(const aiTexture* embedded, const file::path& destination) const
+{
+	std::error_code errorCode;
+	file::create_directories(destination.parent_path(), errorCode);
+
+	if (0 == embedded->mHeight)
+	{
+		// 이미 인코딩된 바이트라 그대로 쓰면 원본 그대로의 파일이 된다.
+		std::ofstream output(destination, std::ios::binary);
+		if (!output)
+		{
+			return false;
+		}
+
+		output.write(reinterpret_cast<const char*>(embedded->pcData), embedded->mWidth);
+		return output.good();
+	}
+
+	// 비압축(aiTexel = BGRA8888)은 PNG로 인코딩해서 저장한다.
+	try
+	{
+		DirectX::ScratchImage image{};
+		DirectX11::ThrowIfFailed(
+			image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM, embedded->mWidth, embedded->mHeight, 1, 1)
+		);
+
+		const DirectX::Image* target = image.GetImage(0, 0, 0);
+		if (nullptr == target)
+		{
+			return false;
+		}
+
+		const uint8_t* source = reinterpret_cast<const uint8_t*>(embedded->pcData);
+		const size_t sourceRowPitch = static_cast<size_t>(embedded->mWidth) * 4;
+		for (uint32 y = 0; y < embedded->mHeight; ++y)
+		{
+			std::memcpy(target->pixels + target->rowPitch * y, source + sourceRowPitch * y, sourceRowPitch);
+		}
+
+		DirectX11::ThrowIfFailed(
+			DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str())
+		);
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		Debug->LogError("임베디드 텍스처 PNG 인코딩 실패: " + std::string(e.what()));
+		return false;
+	}
 }
 
 Texture* ModelLoader::GenerateTexture(std::string_view textureName, bool isCompress)
@@ -1292,7 +1461,8 @@ Texture* ModelLoader::GenerateTexture(std::string_view textureName, bool isCompr
 
         {
             std::unique_lock lock(m_modelMutex);
-            m_model->m_Textures.push_back(texture.get());
+            // 머티리얼과 같은 이유로 shared_ptr을 그대로 보관한다(공동 소유).
+            m_model->m_Textures.push_back(texture);
         }
     }
     return texture.get();

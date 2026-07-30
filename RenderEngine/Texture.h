@@ -2,6 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "TypeDefinition.h"
 #include "ClassProperty.h"
+#include "EngineResourceCensus.h"
 #include "ManagedHeapObject.h"
 #include "Delegate.h"
 #include <d3d11.h>
@@ -17,7 +18,8 @@ enum class TextureType
 	ImageTexture,
 };
 
-class Texture : public Managed::HeapObject
+class Texture : public Managed::HeapObject,
+	private Diagnostics::CountedResource<Diagnostics::EngineResource::Texture>
 {
 public:
 	Texture() = default;
@@ -130,9 +132,10 @@ public:
 	);
 
 	static Managed::UniquePtr<Texture> LoadManagedFromPath(
-		_In_ const file::path& path, 
+		_In_ const file::path& path,
 		bool isCompress = false
 	);
+
 
 	void CreateSRV(
 		_In_ DXGI_FORMAT textureFormat,

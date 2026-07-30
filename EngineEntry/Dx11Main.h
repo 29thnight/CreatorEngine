@@ -18,6 +18,7 @@
 #include "InspectorWindow.h"
 #include "ProgressWindow.h"
 #include "AssetBundleWindow.h"
+#include "ResourceCounterWindow.h"
 
 #include <memory>
 #include <future>
@@ -34,6 +35,7 @@ namespace DirectX11
 		void Finalize();
 		void CreateWindowSizeDependentResources();
 		void Update();
+		void TickScripts(float deltaTime);
 		bool ExecuteRenderPass();
         void InfoWindow();
         void OnGui();
@@ -64,6 +66,7 @@ namespace DirectX11
 		std::unique_ptr<HierarchyWindow> m_hierarchyWindow;
 		std::unique_ptr<InspectorWindow> m_inspectorWindow;
 		std::unique_ptr<AssetBundleWindow> m_projectWindow;
+		std::unique_ptr<ResourceCounterWindow> m_resourceCounterWindow;
 		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
         Core::DelegateHandle m_SceneRenderingEventHandle;
@@ -78,6 +81,7 @@ namespace DirectX11
 		std::atomic_bool m_isLoading = false;
 		std::atomic_bool m_isChangeScene = false;
 		std::atomic_bool m_isInvokeResize = false;
+
 	};
 }
 #endif // !DYNAMICCPP_EXPORTS

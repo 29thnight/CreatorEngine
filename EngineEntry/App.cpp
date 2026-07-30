@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "App.h"
+#include "ConsoleCommandSystem.h"
 #include "Camera.h"
 #include "InputManager.h"
 #include "PathFinder.h"
@@ -61,7 +62,15 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 
 void Core::App::Finalize()
 {
+	ConsoleCommandSystem::Get().Shutdown();
+
 	m_main->Finalize();
+
+	// 종료 시점에 남아있는 GPU 객체를 로그에 정량 기록한다.
+	// 여기서 잡히는 잔존 객체가 곧 세션 전체의 누수 총량이다.
+	// m_main->Finalize()가 커맨드 빌드/실행 스레드를 정리한 뒤라, 여기서는
+	// 디바이스 자식 객체를 안전하게 순회할 수 있다(런타임 호출은 금지).
+	m_deviceResources->LogLiveObjectCensus("에디터 종료 시점", true);
 	m_deviceResources->ReportLiveDeviceObjects();
 }
 
@@ -97,13 +106,25 @@ void Core::App::Run()
         InputManagement->Initialize(m_hWnd);
 		//InputActionManagers->LoadManager();
 		g_progressWindow->SetProgress(100);
-		
+
 		g_progressWindow->Close();
+
+		// 초기화가 끝난 뒤 CLI를 연다. 그래야 명령이 완성된 엔진 위에서 실행된다.
+		ConsoleCommandSystem::Get().InitializeFromCommandLine();
 	})
 	.Then([&]
 	{
 		// 메인 루프
 		m_main->Update();
+
+		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
+		auto& cli = ConsoleCommandSystem::Get();
+		cli.Pump();
+		if (cli.IsQuitRequested())
+		{
+			m_windowClosed = true;
+			PostQuitMessage(0);
+		}
 	});
 }
 
@@ -220,7 +241,8 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			DragQueryFile(hDrop, i, fileName.data(), MAX_PATH);
 			file::path filePath(fileName.data());
 			// 파일 경로 처리
-			if(".fbx" == filePath.extension() || ".gltf" == filePath.extension() ||	".obj" == filePath.extension())
+			if(".fbx" == filePath.extension() || ".gltf" == filePath.extension() ||
+			   ".glb" == filePath.extension() || ".obj" == filePath.extension())
 			{
 				DataSystems->LoadModel(filePath.string());
 			}

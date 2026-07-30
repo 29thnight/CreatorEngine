@@ -501,13 +501,14 @@ void ShaderResourceSystem::ReloadShaderFromPath(const file::path& filepath)
 	}
 	catch (const std::exception& e)
 	{
-		Debug->LogError("Failed to load shader: " + filepath.string() + "\n[shader compile logs] : \n" + e.what());
-		file::path filename = filepath.filename();
-		std::string ext = filename.replace_extension().extension().string();
-		filename.replace_extension();
-		ext.erase(0, 1);
-
-		EraseShader(filename.string(), ext);
+		// 컴파일 실패 시 맵 엔트리를 지우면 안 된다.
+		// ShaderPSO는 맵 엔트리의 주소(&VertexShaders[name])를 원시 포인터로 들고 있어서,
+		// 엔트리를 erase하면 그 셰이더를 쓰는 모든 머티리얼이 다음 Draw에서 해제된
+		// 메모리를 역참조한다. 마지막으로 성공한 셰이더를 그대로 유지해 두면
+		// 화면은 이전 상태로 계속 그려지고, 사용자는 로그를 보고 고치면 된다.
+		Debug->LogError("Failed to load shader: " + filepath.string()
+			+ "\n[shader compile logs] : \n" + e.what()
+			+ "\n=> 이전에 성공한 셰이더를 유지합니다. 수정 후 다시 저장하세요.");
 		return;
 	}
 }
@@ -580,43 +581,15 @@ void ShaderResourceSystem::AddShader(const std::string& name, const std::string&
 	}
 }
 
-void ShaderResourceSystem::EraseShader(const std::string& name, const std::string& ext)
-{
-	if (ext == "vs")
-	{
-		std::unique_lock<std::mutex> lock(m_vertexShaderMutex);
-		VertexShaders.erase(name);
-	}
-	else if (ext == "hs")
-	{
-		std::unique_lock<std::mutex> lock(m_hullShaderMutex);
-		HullShaders.erase(name);
-	}
-	else if (ext == "ds")
-	{
-		std::unique_lock<std::mutex> lock(m_domainShaderMutex);
-		DomainShaders.erase(name);
-	}
-	else if (ext == "gs")
-	{
-		std::unique_lock<std::mutex> lock(m_geometryShaderMutex);
-		GeometryShaders.erase(name);
-	}
-	else if (ext == "ps")
-	{
-		std::unique_lock<std::mutex> lock(m_pixelShaderMutex);
-		PixelShaders.erase(name);
-	}
-	else if (ext == "cs")
-	{
-		std::unique_lock<std::mutex> lock(m_computeShaderMutex);
-		ComputeShaders.erase(name);
-	}
-	else
-	{
-		throw std::runtime_error("Unknown shader type");
-	}
-}
+// EraseShader는 제거되었다.
+//
+// ShaderPSO는 셰이더 맵 엔트리의 주소(&VertexShaders[name])를 원시 포인터로 들고 있다.
+// unordered_map은 rehash 시에도 요소 주소를 유지하므로(표준 보장) 삽입은 안전하지만,
+// erase는 그 엔트리를 참조하던 모든 PSO를 즉시 댕글링으로 만든다.
+// 실제로 셰이더 컴파일 실패 시 erase를 호출해 use-after-free가 발생했다(12.2-④).
+//
+// 런타임 중 개별 셰이더를 제거해야 할 이유가 없으므로 함수 자체를 없애
+// 이 불변식을 실수로 깨뜨릴 수 없게 한다. 전체 정리는 종료 시 RemoveShaders()가 담당한다.
 
 void ShaderResourceSystem::ReloadShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob)
 {
@@ -656,6 +629,8 @@ void ShaderResourceSystem::ReloadShader(const std::string& name, const std::stri
 	}
 }
 
+// 종료 전용. ShaderPSO들이 이미 파괴된 뒤에만 호출해야 한다.
+// 런타임 중에 부르면 살아 있는 PSO의 셰이더 참조가 전부 무효화된다.
 void ShaderResourceSystem::RemoveShaders()
 {
 	VertexShaders.clear();

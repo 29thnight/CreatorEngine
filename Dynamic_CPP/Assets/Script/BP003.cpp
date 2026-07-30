@@ -13,7 +13,7 @@ void BP003::Start()
 {
 	meshRenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
 	for (auto& m : meshRenderers) {
-		m->m_Material = m->m_Material->Instantiate(m->m_Material, "clonebomb");
+		m->m_Material = Material::InstantiateShared(m->m_Material.get(), "clonebomb");
 	}
 }
 
@@ -24,9 +24,9 @@ void BP003::Update(float tick)
 	}
 
 	m_timer += tick;
-	//ÀåÆÇ °°Àº°Å ¿¡´Ï¸ÞÀÌ¼Ç È¿°ú Áà¾ß ÇÑ´Ù°í ÇÏ¸é ¿©±â´Ù°¡
+	//ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï¸ï¿½ï¿½Ì¼ï¿½ È¿ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ñ´Ù°ï¿½ ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½Ù°ï¿½
 
-	//¿©±â´Â ±Ëµµ °øÀü È¿°ú
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ëµï¿½ ï¿½ï¿½ï¿½ï¿½ È¿ï¿½ï¿½
 
 	if (m_useOrbiting) {
 		if (m_orbitingStartDelay < m_timer) {
@@ -43,21 +43,21 @@ void BP003::Update(float tick)
 
 		Mathf::Vector3 ownerPos = m_ownerEntity->GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
-		float orbitingSpeed = 1.0f; //È¸Àü ¼Óµµ 
+		float orbitingSpeed = 1.0f; //È¸ï¿½ï¿½ ï¿½Óµï¿½ 
 
-		// 1. ¸Å ÇÁ·¹ÀÓ ±Ëµµ °¢µµ¸¦ Áõ°¡½ÃÅ´
-		float clockwise = m_clockWise ? 1.0f : -1.0f; //½Ã°è¹æÇâ ¹Ý½Ã°è¹ÝÇâ
+		// 1. ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ëµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å´
+		float clockwise = m_clockWise ? 1.0f : -1.0f; //ï¿½Ã°ï¿½ï¿½ï¿½ï¿½ ï¿½Ý½Ã°ï¿½ï¿½ï¿½ï¿½
 		m_orbitAngle += orbitingSpeed * clockwise * tick;
 
-		// 2. ¿ø À§ÀÇ x, z ÁÂÇ¥ °è»ê
+		// 2. ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ x, z ï¿½ï¿½Ç¥ ï¿½ï¿½ï¿½
 		float offsetX = cos(m_orbitAngle) * m_orbitDistance;
 		float offsetZ = sin(m_orbitAngle) * m_orbitDistance;
 
-		// 3. ¸ñÇ¥¹° À§Ä¡¿¡ offsetÀ» ´õÇØ ³ªÀÇ »õ·Î¿î À§Ä¡¸¦ °è»ê
+		// 3. ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ offsetï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Î¿ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½
 		
 		Mathf::Vector3 newPosition = ownerPos + Mathf::Vector3(offsetX, 0, offsetZ);
 
-		// 4. ³» À§Ä¡¸¦ Á÷Á¢ ¼³Á¤
+		// 4. ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		m_pOwner->GetComponent<Transform>()->SetWorldPosition(newPosition);
 
 	}
@@ -73,8 +73,8 @@ void BP003::Update(float tick)
 	}
 
 	if (ownerDestory) {
-		GetOwner()->SetEnabled(false); //º¸½º Á×À¸¸é ±â´ÉÁ¤Áö
-		GetOwner()->Destroy(); //»èÁ¦ ¸¶Å© ÂïÀ½
+		GetOwner()->SetEnabled(false); //ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		GetOwner()->Destroy(); //ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½
 	}
 }
 
@@ -89,18 +89,18 @@ void BP003::Initialize(Entity* owner, Mathf::Vector3 pos, int damage, float radi
 	bool Is34 = is34;
 	m_pOwner->GetComponent<Transform>()->SetScale({ m_radius ,1 ,m_radius });
 
-	//ÀÏ´Ü ÃÊ±âÈ­¶§ ³ÖÀÚ
+	//ï¿½Ï´ï¿½ ï¿½Ê±ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	m_useOrbiting = useOrbiting;
 	m_clockWise = clockwise;
-	//ÀÚÃ¼ È¸ÀüÀ» À§ÇÑ ³»¿ë
-	//¿ì¼± º¯¼ö º¸½º¶û °Å¸® À¯Áö¸¦ ÇØ¾ß ÇÏ´Ï ¼ÒÈ¯µÈ ÀÌÈÄ º¸½º¿ÍÀÇ °Å¸®¸¦ ÃøÁ¤ÇÏ¿© µé°íÀÖÀÚ
+	//ï¿½ï¿½Ã¼ È¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	//ï¿½ì¼± ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Å¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ø¾ï¿½ ï¿½Ï´ï¿½ ï¿½ï¿½È¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Å¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	Mathf::Vector3 ownerPos = m_ownerEntity->GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	GetOwner()->GetComponent<Transform>()->SetWorldPosition(pos);
 
 	Mathf::Vector3 toMe = pos - ownerPos;
 	toMe.y = 0;
-	m_orbitAngle = atan2(toMe.z, toMe.x); //¼ÒÈ¯‰çÀ»¶§ÀÇ °¢µµ-->È¸Àü½Ã ÀÏÁ¤ÇÑ °ªÀ» 
-	m_orbitDistance = toMe.Length(); //¼ÒÈ¯‰çÀ»¶§ °Å¸® -->È¸Àü½Ä ÀÏÁ¤ÇÑ °Å¸®°¡ ¶³¾îÁ® ÀÖÀ»¼ö ÀÖµµ·Ï
+	m_orbitAngle = atan2(toMe.z, toMe.x); //ï¿½ï¿½È¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½-->È¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 
+	m_orbitDistance = toMe.Length(); //ï¿½ï¿½È¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Å¸ï¿½ -->È¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Å¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Öµï¿½ï¿½ï¿½
 	
 	auto effcomp = GetOwner()->GetComponent<EffectComponent>();
 	effcomp->Apply();
@@ -142,18 +142,18 @@ void BP003::ShaderUpdate()
 
 void BP003::Explosion()
 {
-	//Æø¹ß 
-	//overlap Äõ¸®
+	//ï¿½ï¿½ï¿½ï¿½ 
+	//overlap ï¿½ï¿½ï¿½ï¿½
 	Mathf::Vector3 pos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
 	OverlapInput input;
 	input.position = pos;
 	input.rotation = Mathf::Quaternion::Identity;
-	input.layerMask = 1 << 5; // ÇÃ·¹ÀÌ¾î ·¹ÀÌ¾î¸¸ °Ë»ç
+	input.layerMask = 1 << 5; // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½Ì¾î¸¸ ï¿½Ë»ï¿½
 
 	std::vector<HitResult> res;
 
-	//ÀÌ¶§ Ãß°¡ ÀÌÆåÆ®³ª ÀÎµðÄÉÀÌÅÍ ÁÖ´ø°¡ ¸»´ø°¡
+	//ï¿½Ì¶ï¿½ ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	Prefab* ExplosionEff = nullptr;
 	ExplosionEff = PrefabUtilitys->LoadPrefab("BossExplosion");
 	GameObject* itemObj = PrefabUtilitys->InstantiatePrefab(ExplosionEff, "entityItem");
@@ -165,16 +165,16 @@ void BP003::Explosion()
 
 	PhysicsManagers->SphereOverlap(input, m_radius, res);
 
-	//Äõ¸® °¨Áö½Ã µ¥¹ÌÁö Ã³¸®
+	//ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 	for (auto& hit : res) {
-		//tag ÆÇ´Ü? ·¹ÀÌ¾î ÆÇ´Ü? ÀÌ¸§À¸·Î Ã£À»±î? ¿øÇÑ´Ù¸é ¹Ù²ãµµ ÁÁ°í ¾Æ´Ô ¸»°í ÇÊ¿äÇÏ´Ù¸é init¶§ ·¹ÀÌ¾î ¸¶½ºÅ©±îÁö ³Ñ±â´øÁö
-		//ÇÃ·¹ÀÌ¾î¸¸ Ã£ÀÚ ¾Æ½Ã½º ¾Èµé¾î¿Â´Ù¸ç
+		//tag ï¿½Ç´ï¿½? ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½Ç´ï¿½? ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½ï¿½ï¿½? ï¿½ï¿½ï¿½Ñ´Ù¸ï¿½ ï¿½Ù²ãµµ ï¿½ï¿½ï¿½ï¿½ ï¿½Æ´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½Ï´Ù¸ï¿½ initï¿½ï¿½ ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½Å©ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ±ï¿½ï¿½ï¿½ï¿½
+		//ï¿½Ã·ï¿½ï¿½Ì¾î¸¸ Ã£ï¿½ï¿½ ï¿½Æ½Ã½ï¿½ ï¿½Èµï¿½ï¿½Â´Ù¸ï¿½
 		
 		Entity* objEntity = hit.gameObject->GetComponentDynamicCast<Entity>();
 		objEntity->SendDamage(m_ownerEntity, m_damage);
 	}
 
-	// ¾ÆÀÌÅÛ µå¶ø ºÒ°ªÀ¸·Î ÆÇÁ¤ °Ù¼ö ÇÑ°Ô °íÁ¤
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ò°ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ù¼ï¿½ ï¿½Ñ°ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (m_itemDrop) {  
 		ItemDrop();
 	}
@@ -185,7 +185,7 @@ void BP003::Explosion()
 
 void BP003::ItemDrop()
 {
-	Random<int> randtype(0, 3); //Å¸ÀÔÀº 4°³ Á¾·ù ·£´ý
+	Random<int> randtype(0, 3); //Å¸ï¿½ï¿½ï¿½ï¿½ 4ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
 	int type = randtype();
 	Prefab* itemPrefab = nullptr;
@@ -228,7 +228,7 @@ void BP003::ItemDrop()
 			[=]() { return 0.f; },
 			[=](float val) {
 				Mathf::Vector3 pos = spawnPos;
-				float force = f; // Áß·Â ºñ½ÁÇÏ°Ô yÃà °î¼±
+				float force = f; // ï¿½ß·ï¿½ ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ yï¿½ï¿½ ï¿½î¼±
 				pos.x = Mathf::Lerp(spawnPos.x, spawnPos.x + temp.x, val);
 				pos.z = Mathf::Lerp(spawnPos.z, spawnPos.z + temp.z, val);
 				pos.y = Mathf::Lerp(spawnPos.y, spawnPos.y + temp.y, val)

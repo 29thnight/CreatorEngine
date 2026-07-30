@@ -11,6 +11,8 @@ ReflectionScriptField(BossBomb) \
 		meta_property(rotFrequency) \
 		meta_property(flashFrequency) \
 		meta_property(timeScale) \
+		meta_property(explosionRadius) \
+		meta_property(explosionDamage) \
 	}); \
 	FieldEnd(BossBomb, PropertyOnly) \
 };

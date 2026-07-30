@@ -43,9 +43,12 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         {
             if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
             {
-                Material* newMat = Material::Instantiate(meshRenderer->m_Material);
+                // 클론도 공동 소유로 받는다.
+                // InstantiateShared는 캐시에 등록된 shared_ptr을 그대로 돌려주므로,
+                // 컴포넌트와 DataSystem이 같은 인스턴스를 공유하게 된다.
+                auto newMat = Material::InstantiateShared(meshRenderer->m_Material.get());
                 meshRenderer->m_Material = newMat;
-                DataSystems->SaveMaterial(newMat);
+                DataSystems->SaveMaterial(newMat.get());
             }
             ImGui::EndPopup();
         }
@@ -60,7 +63,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         if (nullptr != meshRenderer->m_Material)
 		{
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
-			auto& mat = meshRenderer->m_Material;
+			auto mat = meshRenderer->m_Material.get();
 			TextureDropTarget(mat);
 			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.x);
 
@@ -83,7 +86,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::SameLine();
             if (ImGui::Button(ICON_FA_BOX "##SelectShader"))
             {
-				ShaderSystem->SetShaderSelectionTarget(meshRenderer->m_Material);
+				ShaderSystem->SetShaderSelectionTarget(meshRenderer->m_Material.get());
                 ImGui::GetContext("SelectShader").Open();
             }
 			ImGui::SameLine();
@@ -192,9 +195,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		static std::vector<float> LODThresholdsSetting; // 0.0f (Culled)는 포함하지 않음
 
 		// 현재 선택된 Mesh가 변경되었는지 확인하고 LODThresholdsSetting을 업데이트
-		if (selectedMesh != meshRenderer->m_Mesh)
+		if (selectedMesh != meshRenderer->m_Mesh.get())
 		{
-			selectedMesh = meshRenderer->m_Mesh;
+			selectedMesh = meshRenderer->m_Mesh.get();
 			if (selectedMesh) // Mesh가 할당된 경우에만 LODThresholds를 가져옴
 			{
 				LODThresholdsSetting.clear();
@@ -395,7 +398,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		{
 			if (!name.empty() && DataSystems->Materials.find(name) != DataSystems->Materials.end())
 			{
-				meshRenderer->m_Material = DataSystems->Materials[name].get();
+				meshRenderer->m_Material = DataSystems->Materials[name];
 			}
 			else
 			{

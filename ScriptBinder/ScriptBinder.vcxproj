@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -37,27 +37,27 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseDynamicDebugging>false</UseDynamicDebugging>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -65,7 +65,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -73,7 +73,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <EnableUnitySupport>true</EnableUnitySupport>
@@ -170,7 +170,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\10.0.10\runtimes\win-x64\native\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -197,7 +197,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\10.0.10\runtimes\win-x64\native\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -226,7 +226,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\10.0.10\runtimes\win-x64\native\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -287,6 +287,10 @@
     <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="RigidBodyComponent.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="ClrHost.cpp" />
+    <ClCompile Include="ManagedAniBehavior.cpp" />
+    <ClCompile Include="ScriptComponent.cpp" />
+    <ClCompile Include="ScriptObjectRegistry.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
@@ -398,6 +402,10 @@
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="ClrHost.h" />
+    <ClInclude Include="ManagedAniBehavior.h" />
+    <ClInclude Include="ScriptComponent.h" />
+    <ClInclude Include="ScriptObjectRegistry.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
@@ -426,3 +434,5 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+
+

@@ -167,8 +167,8 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 	switch (proxyType)
 	{
 	case PrimitiveProxyType::MeshRenderer:
-		mat = proxy->m_Material;
-		mesh = proxy->m_Mesh;
+		mat = proxy->m_Material.get();
+		mesh = proxy->m_Mesh.get();
 		if (nullptr == mat || nullptr == mesh) 
 		{
 			return;

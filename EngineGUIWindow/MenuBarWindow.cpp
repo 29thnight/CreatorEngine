@@ -461,6 +461,14 @@ void MenuBarWindow::RenderMenuBar()
                     m_bShowRenderDebugWindow = true;
 				}
 
+                if (ImGui::MenuItem("Resource Counter"))
+                {
+                    if (!ImGui::GetContext("Resource Counter").IsOpened())
+                    {
+                        ImGui::GetContext("Resource Counter").Open();
+                    }
+                }
+
                 ImVec4 colFrameBg = ImVec4(0.93f, 0.93f, 0.94f, 1.00f);
                 ImVec4 colFrameBgHovered = ImVec4(0.89f, 0.90f, 0.92f, 1.00f);
                 ImVec4 colFrameBgActive = ImVec4(0.85f, 0.86f, 0.89f, 1.00f);

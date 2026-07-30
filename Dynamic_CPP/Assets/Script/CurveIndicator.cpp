@@ -10,11 +10,11 @@ void CurveIndicator::Start()
 		auto object = GameObject::FindIndex(index);
 		if (object) {
 			MeshRenderer* render = object->GetComponent<MeshRenderer>();
-			render->m_Material = render->m_Material->Instantiate(render->m_Material, "IndicatorMaterial");
-			// ¸ÞÅÍ¸®¾óÀÇ ½¦ÀÌ´õ¸¦ º¯°æ ÈÄ Åõ¸íµµ³ª »ö»ó º¯°æ.
+			render->m_Material = Material::InstantiateShared(render->m_Material.get(), "IndicatorMaterial");
+			// ï¿½ï¿½ï¿½Í¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
 
 			indicators.push_back(object);
-			indicatorInitScale.push_back(Mathf::Vector3(object->m_transform.scale)); // º£ÀÌ½º·Î ÇÒ ½ºÄÉÀÏ ÀúÀå
+			indicatorInitScale.push_back(Mathf::Vector3(object->m_transform.scale)); // ï¿½ï¿½ï¿½Ì½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		}
 	}
 }

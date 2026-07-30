@@ -19,6 +19,18 @@ private:
 public:
 	void ManagerInitialize();
     void Editor();
+
+    // ── 씬 구조 변경 (렌더 정지 구간에서만 수행) ──
+    //
+    // 재생/정지 전환은 씬 오브젝트 목록을 통째로 갈아엎는다. 이 작업을 게임 로직
+    // 도중에 하면 커맨드 빌드 스레드와 그 워커 풀이 같은 목록을 순회하는 중일 수
+    // 있어, 벡터 재할당 한 번에 반복자가 무효가 된다(GizmoPass에서 재현됨).
+    //
+    // 그래서 판단과 실행을 나눠, 실행은 렌더 배리어의 두 랑데뷰 사이에서만 한다.
+    // 그 구간에서는 커맨드 빌드/실행 스레드가 이번 프레임 작업을 마치고 두 번째
+    // 랑데뷰에 묶여 있으므로(빌드 스레드는 워커까지 기다린 뒤 도달한다) 안전하다.
+    bool HasPendingSceneStructureChange() const;
+    void ApplyPendingSceneStructureChange();
     void Initialization();
     void Physics(float deltaSecond);
     void InputEvents(float deltaSecond);

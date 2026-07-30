@@ -330,6 +330,7 @@
     <ClInclude Include="ReflectionYamlTemplete.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="HtmlFileSink.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

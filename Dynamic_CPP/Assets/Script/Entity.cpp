@@ -27,7 +27,7 @@ void Entity::HitImpulseStart()
 {
 	auto meshren = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
 	for (auto& m : meshren) {
-		m->m_Material = m->m_Material->Instantiate(m->m_Material);
+		m->m_Material = Material::InstantiateShared(m->m_Material.get());
 	}
 }
 

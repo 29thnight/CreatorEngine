@@ -1,4 +1,4 @@
-﻿{
+{
   "assimp:x64-windows": {
     "package_name": "assimp",
     "triplet": "x64-windows",
@@ -509,6 +509,17 @@
     "features": [],
     "desc": [
       "A compression library"
+    ]
+  },
+  "mimalloc:x64-windows-static-md": {
+    "package_name": "mimalloc",
+    "triplet": "x64-windows-static-md",
+    "version": "2.1.7",
+    "port_version": 1,
+    "features": [],
+    "desc": [
+      "Compact general purpose allocator with excellent performance",
+      "ManagedHeap.dll이 정적 링크하는 변형. 동적(override) 빌드는 mimalloc-redirect가 로더와 경합해 DLL 초기화가 간헐 실패한다."
     ]
   }
 }

@@ -12,23 +12,16 @@ Camera::Camera() : m_isLinkRenderData(true)
 {
 	m_aspectRatio = DirectX11::DeviceStates->g_aspectRatio;
 
-	m_cameraIndex = CameraManagement->GetCameraCount();
-	auto renderScene = SceneManagers->GetRenderScene();
-
-	if(m_isLinkRenderData)
-	{
-		renderScene->AddRenderPassData(m_cameraIndex);
-	}
+	// m_cameraIndex는 RegisterContainer()에서 실제 슬롯이 확정될 때 정해진다.
+	// 예전에는 여기서 GetCameraCount()로 인덱스를 미리 추측해 RenderPassData까지
+	// 등록했는데, 삭제로 생긴 빈 슬롯이 있으면 AddCamera가 반환하는 실제 인덱스와
+	// 어긋나 먼저 등록해 둔 RenderPassData가 어떤 소멸 경로로도 회수되지 않는
+	// 고아(렌더 타겟/뎁스 텍스처 누수)가 됐다.
 
 	XMMATRIX identity = XMMatrixIdentity();
 
-	std::string viewBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ViewBuffer";
-	std::string projBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ProjBuffer";
-
 	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 
 	m_cascadeinfo.resize(cascadeCount);
 }
@@ -154,6 +147,25 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 void Camera::RegisterContainer()
 {
 	m_cameraIndex = CameraManagement->AddCamera(shared_from_this());
+	if (CameraContainer::INVALID_CAMERA_INDEX == m_cameraIndex)
+	{
+		return;
+	}
+
+	// 실제 슬롯이 확정된 뒤에 렌더 데이터를 등록한다.
+	// 이렇게 해야 소멸자의 RemoveRenderPassData(m_cameraIndex)와 짝이 맞는다.
+	if (m_isLinkRenderData)
+	{
+		if (auto renderScene = SceneManagers->GetRenderScene())
+		{
+			renderScene->AddRenderPassData(m_cameraIndex);
+		}
+	}
+
+	const std::string viewBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ViewBuffer";
+	const std::string projBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ProjBuffer";
+	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 }
 
 void Camera::HandleMovement(float deltaTime)

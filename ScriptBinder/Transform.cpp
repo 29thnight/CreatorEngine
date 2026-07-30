@@ -101,44 +101,63 @@ Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 	return *this;
 }
 
+// 부모가 없으면 월드 = 로컬이다.
+//
+// 인덱스 0은 씬 루트라 항상 항등이므로 예전부터 부모 없음과 같이 취급해 왔다.
+// 여기에 널 검사를 더한 이유는, 부모 인덱스가 INVALID_INDEX(-1)인 오브젝트가
+// 실제로 존재하기 때문이다(Main Camera·Directional Light 등 최상위 오브젝트).
+// 전에는 그런 오브젝트에 월드 setter를 부르면 FindIndex가 널을 돌려주고
+// 곧바로 역참조해서 죽었다.
+static GameObject* FindTransformParent(const GameObject* owner)
+{
+	if (nullptr == owner || 0 == owner->m_parentIndex) return nullptr;
+	return GameObject::FindIndex(owner->m_parentIndex);
+}
+
 Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 {
-	// TODO: ���⿡ return ���� �����մϴ�.
-	if (m_owner->m_parentIndex == 0)
-		return SetPosition(pos);
-	else {
-		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
-		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
-		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
-		Mathf::Vector3 newLocalposition = XMVector3TransformCoord(pos, parentWorldInverse);
-		return SetPosition(newLocalposition);
-	}
+	GameObject* parent = FindTransformParent(m_owner);
+	if (nullptr == parent) return SetPosition(pos);
+
+	XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
+	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
+	Mathf::Vector3 newLocalposition = XMVector3TransformCoord(pos, parentWorldInverse);
+	return SetPosition(newLocalposition);
 }
 
 Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 {
-	if (m_owner->m_parentIndex == 0)
-		return SetRotation(quaternion);
-	else {
-		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
-		Mathf::Quaternion parentWorldQua = parent->m_transform.GetWorldQuaternion();
-		Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
-		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(parentWorldInverse, quaternion);
-		return SetRotation(newLocalrotation);
-	}
+	GameObject* parent = FindTransformParent(m_owner);
+	if (nullptr == parent) return SetRotation(quaternion);
+
+	Mathf::Quaternion parentWorldQua = parent->m_transform.GetWorldQuaternion();
+	Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
+
+	// 월드 = 로컬 다음 부모다. XMQuaternionMultiply(A, B)는 "A를 적용한 뒤 B"이므로
+	// 월드 = Multiply(로컬, 부모) 이고, 따라서 로컬 = Multiply(월드, 부모역)이다.
+	// 인자 순서가 뒤집혀 있어서 부모가 회전해 있으면 엉뚱한 축으로 돌아갔다
+	// (부모가 회전한 뼈에 월드 회전을 걸어 실측 확인).
+	Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(quaternion, parentWorldInverse);
+	return SetRotation(newLocalrotation);
 }
 
 Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 {
-	if (m_owner->m_parentIndex == 0)
-		return SetScale(scale);
-	else {
-		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
-		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
-		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
-		Mathf::Vector3 newLocalscale = XMVector3TransformCoord(scale, parentWorldInverse);
-		return SetScale(newLocalscale);
-	}
+	GameObject* parent = FindTransformParent(m_owner);
+	if (nullptr == parent) return SetScale(scale);
+
+	// 스케일은 행렬로 되돌리면 안 된다 — TransformCoord는 이동 성분까지 먹어서
+	// 부모가 원점에서 떨어져 있기만 해도 값이 망가진다. 부모 월드 스케일로 나눈다.
+	Mathf::Vector3 parentWorldScale{};
+	XMStoreFloat3(&parentWorldScale, parent->m_transform.GetWorldScale());
+
+	constexpr float kMinScale = 1e-6f;
+	Mathf::Vector3 newLocalscale{
+		std::abs(parentWorldScale.x) > kMinScale ? scale.x / parentWorldScale.x : scale.x,
+		std::abs(parentWorldScale.y) > kMinScale ? scale.y / parentWorldScale.y : scale.y,
+		std::abs(parentWorldScale.z) > kMinScale ? scale.z / parentWorldScale.z : scale.z };
+
+	return SetScale(newLocalscale);
 }
 
 Mathf::xMatrix Transform::GetLocalMatrix()
@@ -167,11 +186,11 @@ Mathf::xMatrix Transform::GetInverseMatrix() const
 //add joker1092
 Mathf::xMatrix Transform::GetWorldMatrix_NoScale() const
 {
-	// ���� ȸ���� ��ġ������ ����� �����մϴ�.
+	// ���� ȸ���� ��ġ������ ����� �����մϴ�.
 	Mathf::xMatrix localMatrix_NoScale = DirectX::XMMatrixRotationQuaternion(rotation);
 	localMatrix_NoScale *= DirectX::XMMatrixTranslationFromVector(position);
 
-	// �θ� �ִٸ�, �θ��� ������ ���� ���� ����� ��������� �����ݴϴ�.
+	// �θ� �ִٸ�, �θ��� ������ ���� ���� ����� ��������� �����ݴϴ�.
 	if (m_owner && GameObject::IsValidIndex(m_owner->m_parentIndex))
 	{
 		if (auto parent = m_owner->GetScene()->TryGetGameObject(m_owner->m_parentIndex))

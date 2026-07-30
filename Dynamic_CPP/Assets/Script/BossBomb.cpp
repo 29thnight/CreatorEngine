@@ -8,7 +8,7 @@ void BossBomb::Start()
 {
 	meshRenderers = GetOwner()->GetComponentsInchildrenDynamicCast<MeshRenderer>();
 	for(auto& m : meshRenderers){
-		m->m_Material = m->m_Material->Instantiate(m->m_Material, "clonebomb");
+		m->m_Material = Material::InstantiateShared(m->m_Material.get(), "clonebomb");
 	}
 
 	Initialize();
@@ -21,9 +21,9 @@ void BossBomb::Update(float tick)
 	float prevTime = currentTime;
 	currentTime += tick * timeScale;
 
-	if (currentTime >= maxTime && prevTime < maxTime) // 1È¸ Æø¹ß Æ®¸®°Å
+	if (currentTime >= maxTime && prevTime < maxTime) // 1È¸ ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½ï¿½
 	{
-		// Æø¹ßÇÒ ¶§ ÀÌÆåÆ® + µ¥¹ÌÁö
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® + ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		Explosion();
 	}
 	else {
@@ -51,7 +51,7 @@ void BossBomb::ShaderUpdate()
 
 void BossBomb::Explosion()
 {
-	//Æø¹ß ÀÌÆåÆ® ¹× µ¥¹ÌÁö Ã³¸®
+	//ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 	isExplosion = true;
 
 	std::vector<HitResult> hits;

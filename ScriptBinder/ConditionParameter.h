@@ -83,18 +83,20 @@ public:
 		switch (vType)
 		{
 		case ValueType::Float:
-			return fValue;
-			break;
+			return static_cast<T>(fValue);
 		case ValueType::Int:
-			return iValue;
-			break;
+			return static_cast<T>(iValue);
 		case ValueType::Bool:
-			return bValue;
-			break;
+			return static_cast<T>(bValue);
 		case ValueType::Trigger:
-			return bValue;
-			break;
+			// 트리거는 tValue에 담긴다(UpdateParameter·ResetTrigger가 그쪽을 쓴다).
+			// bValue를 읽고 있어서 트리거는 늘 false로 보였다 — 전이 판정은
+			// TransCondition이 tValue를 직접 봐서 무사했고, 읽기 경로만 어긋나 있었다.
+			return static_cast<T>(tValue);
 		}
+
+		// vType이 범위를 벗어나면(직렬화가 깨진 경우 등) 여기로 온다.
+		return T{};
 	}
 
 	template<typename T>

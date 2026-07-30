@@ -1,0 +1,45 @@
+# 씬 전환 반복 벤치마크 (0-3)
+#
+# 사용법:
+#   Academy_4Q.exe --script ..\..\scripts\scene_churn_benchmark.txt
+#
+# 목적:
+#   같은 씬을 오갔을 때 라이브 GPU 객체와 VRAM이 제자리로 돌아오는지 본다.
+#   사이클마다 수치가 계단식으로 올라가면 회수되지 않는 리소스가 있다는 뜻이고,
+#   그 증가량이 곧 사이클당 누수율이다.
+#
+# 주의:
+#   아래 씬 경로는 실제 프로젝트 경로로 바꿔야 한다.
+#   왕복(A→B→A)으로 재는 이유는, 편도만 재면 "새 씬이 더 썼다"와
+#   "이전 씬이 안 지워졌다"를 구분할 수 없기 때문이다.
+
+# --- 기준선 ---
+scene.switch Assets/Scenes/SceneA.scene
+wait 120
+gpu.delta baseline
+
+# --- 사이클 1 ---
+scene.switch Assets/Scenes/SceneB.scene
+wait 120
+scene.switch Assets/Scenes/SceneA.scene
+wait 120
+gpu.delta cycle-1
+
+# --- 사이클 2 ---
+scene.switch Assets/Scenes/SceneB.scene
+wait 120
+scene.switch Assets/Scenes/SceneA.scene
+wait 120
+gpu.delta cycle-2
+
+# --- 사이클 3 ---
+scene.switch Assets/Scenes/SceneB.scene
+wait 120
+scene.switch Assets/Scenes/SceneA.scene
+wait 120
+gpu.delta cycle-3
+
+# --- 마무리 ---
+gpu.census final
+log.flush
+quit
