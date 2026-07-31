@@ -145,8 +145,7 @@ void DirectX11::GameMain::Initialize()
         CoUninitialize();
     });
 
-    m_CB_Thread.detach();
-    m_CE_Thread.detach();
+    // detach하지 않는다. Finalize에서 join으로 회수한다(Dx11Main과 같은 이유).
 }
 
 void DirectX11::GameMain::Finalize()
@@ -156,10 +155,8 @@ void DirectX11::GameMain::Finalize()
     isGameToRender = false;
     EngineSettingInstance->renderBarrier.Finalize();
 
-    while (!isCB_Thread_End || !isCE_Thread_End)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+    if (m_CB_Thread.joinable()) m_CB_Thread.join();
+    if (m_CE_Thread.joinable()) m_CE_Thread.join();
 
     TagManagers->Finalize();
     SceneManagers->Decommissioning();

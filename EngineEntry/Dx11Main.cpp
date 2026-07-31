@@ -217,8 +217,9 @@ void DirectX11::Dx11Main::Initialize()
         CoUninitialize();
     });
 
-    m_CB_Thread.detach();
-    m_CE_Thread.detach();
+    // detach하지 않는다. Finalize에서 join으로 회수한다.
+    // 종료 시점에 살아 있는 스레드는 ExitProcess가 임의 지점에서 죽이므로,
+    // 하필 힙 락을 쥔 순간이면 남은 종료 절차가 그 위에서 힙을 만지게 된다.
 }
 
 void DirectX11::Dx11Main::Finalize()
@@ -243,10 +244,16 @@ void DirectX11::Dx11Main::Finalize()
     // 이게 없으면 아래 대기가 영원히 끝나지 않는다.
     EngineSettingInstance->renderBarrier.Finalize();
 
-    while(!isCB_Thread_End || !isCE_Thread_End)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	}
+    // 플래그 폴링 대신 실제로 회수한다.
+    //
+    // 예전에는 두 스레드를 detach하고 isCB/CE_Thread_End를 100ms마다 확인했다.
+    // 문제가 둘이었다. (1) 플래그는 CoUninitialize 직전에 켜지므로, 그것만 보고
+    // 진행하면 그 스레드는 아직 COM 정리 중이고 프로세스가 죽을 때 그 지점에서
+    // 강제 종료된다. (2) 스레드 진입부의 CoInitializeEx가 실패하면 플래그를
+    // 켜지 않고 그냥 return해서, 대기가 영원히 끝나지 않았다.
+    // join은 둘 다 해결한다 — 스레드가 정말로 끝난 것을 보장한다.
+    if (m_CB_Thread.joinable()) m_CB_Thread.join();
+    if (m_CE_Thread.joinable()) m_CE_Thread.join();
 
     // 여기서부터는 렌더 스레드가 없다. 이제 해체해도 안전하다.
     TagManagers->Finalize();
