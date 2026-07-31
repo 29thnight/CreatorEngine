@@ -92,7 +92,7 @@ void LightMapPass::CreateRenderCommandList(RHICommandContext& context, RenderSce
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	context.SetRenderTarget(rtv, renderData->m_depthStencil->m_pDSV); //������ ��� ���ϸ� ����Ʈ���� �������� ��� �� �ڿ� ��ü�� ���̰�, ����ϸ� ����Ʈ���� �ȳ�����
 
-	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+	renderData->BindFrameCameraBuffers(context);
 	scene.UseModel(deferredPtr);
 
 	Animator* currentAnimator = nullptr;

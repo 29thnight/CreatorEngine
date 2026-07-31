@@ -479,15 +479,20 @@ void GizmoLinePass::DrawUIRect(const Mathf::Rect& rect, const Mathf::Color4& col
 
 void GizmoLinePass::DrawUIRect(const Mathf::Rect& rect, const Mathf::Color4& color, Camera& camera)
 {
+    // 스냅샷이 아직 없으면 그릴 기준이 없다. 살아 있는 카메라로 대신 계산하면
+    // 게임 스레드와 값이 찢어질 수 있으므로 그냥 건너뛴다(PHASE 3-2).
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    const RenderPassData* renderData = RenderPassData::GetData(&camera);
+
     const float minX = rect.x;
     const float maxX = rect.x + rect.width;
     const float minY = rect.y;
     const float maxY = rect.y + rect.height;
 
-    const auto screenToWorld = [&camera](float x, float y)
+    const auto screenToWorld = [renderData](float x, float y)
     {
         const Mathf::Vector2 screenPosition{ x, y };
-        const auto worldPosition = camera.ConvertScreenToWorld(screenPosition, 0.0f);
+        const auto worldPosition = renderData->ConvertScreenToWorld(screenPosition, 0.0f);
         return Mathf::ConvertToDistance(worldPosition);
     };
 

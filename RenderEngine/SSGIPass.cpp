@@ -158,7 +158,7 @@ void SSGIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     params.ratio = ssratio;
     params.intensity = intensity;
 
-    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+    renderData->BindFrameCameraBuffers(context);
     context.UpdateBuffer(m_SSGIBuffer.Get(), &params);
     RHINativeBuffer ssgiBuffer = m_SSGIBuffer.Get();
     context.SetComputeConstantBuffers(0, 1, &ssgiBuffer);

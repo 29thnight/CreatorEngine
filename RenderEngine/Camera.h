@@ -77,8 +77,13 @@ public:
 	void MoveToTarget(Mathf::Vector3 targetPosition);
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow = false);
+	// 남은 두 UpdateBuffer는 렌더가 소유한 카메라에만 쓴다:
+	//   UpdateBuffer(deferredContext, ...)  RenderPassData::m_shadowCamera
+	//   UpdateBuffer(bool)                  SkyBoxPass의 지역 ortho 카메라
+	// 렌더링 대상 카메라(게임 소유)의 상수 버퍼는 RenderPassData가 들고
+	// BindFrameCameraBuffers로 묶는다. DeferredUpdateBuffer는 그래서 사라졌다
+	// — 게임 소유 카메라의 GPU 버퍼를 렌더 스레드가 갱신하던 유일한 통로였다.
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
-	void DeferredUpdateBuffer(ID3D11DeviceContext* deferredContext, const Mathf::Matrix& v, const Mathf::Matrix& p, bool shadow = false);
 
 	float CalculateLODDistance(const Mathf::Vector3& position) const;
 

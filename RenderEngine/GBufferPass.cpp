@@ -216,7 +216,7 @@ void GBufferPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 
 	// --- INITIAL PSO AND RENDER TARGET SETUP ---
 	context.SetRenderTargets(RTV_TypeMax, reinterpret_cast<RHINativeRenderTarget const*>(m_renderTargetViews), data->m_depthStencil->m_pDSV);
-	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
+	data->BindFrameCameraBuffers(context);
 	scene.UseModel(deferredPtr);
 	{
 		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
@@ -524,7 +524,7 @@ void GBufferPass::TerrainRenderCommandList(RHICommandContext& context, RenderSce
 
 	context.SetRenderTargets(RTV_TypeMax, reinterpret_cast<RHINativeRenderTarget const*>(m_renderTargetViews), data->m_depthStencil->m_pDSV);
 
-	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
+	data->BindFrameCameraBuffers(context);
 	scene.UseModel(deferredPtr);
 	{
 		const RHIViewport rhiVp = RHI::Device().GetFullViewport();

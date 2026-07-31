@@ -8,6 +8,7 @@ using namespace concurrency;
 class Camera;
 class PrimitiveRenderProxy;
 class UIRenderProxy;
+class RHICommandContext;
 
 class RenderPassData
 {
@@ -138,6 +139,24 @@ public:
 	{
 		m_frame.fetch_add(1, std::memory_order_relaxed);
 	}
+
+	// 프레임 카메라 상수 버퍼를 갱신하고 VS 슬롯 1·2에 묶는다 (PHASE 3-2).
+	//
+	// 버퍼는 RenderPassData가 소유한다 — Initalize에서 카메라별로 만들어 둔 것이다.
+	// 예전에는 Camera::DeferredUpdateBuffer가 카메라 소유 버퍼(m_ViewBuffer·
+	// m_ProjBuffer)에 썼다. 렌더 스레드가 게임 소유 객체의 GPU 리소스를 갱신하는
+	// 구조였고, 한 프레임에 열 몇 개 패스가 같은 버퍼를 각자의 deferred 컨텍스트에서
+	// 기록했다. 값이 같아서 드러나지 않았을 뿐 소유자가 없는 상태였다.
+	//
+	// 값은 프레임 밀봉 스냅샷에서 가져온다. 살아 있는 카메라를 다시 계산하지 않는다.
+	void BindFrameCameraBuffers(RHICommandContext& context) const;
+
+	// 스크린 좌표를 월드 좌표로 되돌린다. 프레임 밀봉된 역행렬만 쓴다.
+	//
+	// Camera::ConvertScreenToWorld는 살아 있는 카메라에서 역행렬을 그 자리에서
+	// 다시 구한다. 렌더 스레드(기즈모)가 그걸 부르면 게임 스레드가 카메라를
+	// 움직이는 중일 때 같은 프레임 안에서도 기준이 흔들린다.
+	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth) const;
 
 	void ClearRenderTarget();
 

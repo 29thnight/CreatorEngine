@@ -402,7 +402,7 @@ void SkyBoxPass::CreateRenderCommandList(RHICommandContext& context, RenderScene
 		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
-	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+	renderData->BindFrameCameraBuffers(context);
 	scene.UseModel(deferredPtr);
 
 	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);

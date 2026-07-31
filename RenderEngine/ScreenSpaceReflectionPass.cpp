@@ -127,7 +127,7 @@ void ScreenSpaceReflectionPass::CreateRenderCommandList(RHICommandContext& conte
 	RHINativeBuffer constantBuffer = m_Buffer.Get();
 	context.SetPixelShaderConstantBuffers(0, 1, &constantBuffer);
 
-	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+	renderData->BindFrameCameraBuffers(context);
 	context.UpdateBuffer(m_Buffer.Get(), &cbData);
 
 	context.CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);

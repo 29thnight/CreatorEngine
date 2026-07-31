@@ -92,7 +92,7 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
     const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
 
-    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+    renderData->BindFrameCameraBuffers(context);
     scene.UseModel(deferredPtr);
 
     for (auto& proxy : renderData->m_spriteRenderQueue)

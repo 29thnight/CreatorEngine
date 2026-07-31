@@ -1,4 +1,5 @@
 #include "ColorGradingPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
 #include "TimeSystem.h"
@@ -162,7 +163,7 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
 	timer += Time->GetElapsedSeconds();
-	camera.UpdateBuffer();
+	renderData->BindFrameCameraBuffers(RHI::Immediate());
 	CBData cbData;
 	cbData.lerpValue = lerp;
 	cbData.time = timer;

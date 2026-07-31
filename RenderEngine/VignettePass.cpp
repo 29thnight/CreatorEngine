@@ -1,4 +1,5 @@
 #include "VignettePass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
 
@@ -59,7 +60,7 @@ void VignettePass::Execute(RenderScene& scene, Camera& camera)
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
-	camera.UpdateBuffer();
+	renderData->BindFrameCameraBuffers(RHI::Immediate());
 	CBData cbData;
 	cbData.radius = radius;
 	cbData.softness = softness;

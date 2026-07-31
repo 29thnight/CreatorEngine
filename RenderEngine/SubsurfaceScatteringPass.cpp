@@ -87,7 +87,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(RHICommandContext& contex
 	RHINativeBuffer constantBuffer = m_Buffer.Get();
 	context.SetPixelShaderConstantBuffers(0, 1, &constantBuffer);
 
-	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+	renderData->BindFrameCameraBuffers(context);
 
 	SubsurfaceScatteringBuffer buffer{};
 	buffer.CameraFOV	= renderData->m_frameFov;

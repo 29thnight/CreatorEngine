@@ -87,7 +87,7 @@ void UIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& sc
 
     context.SetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
     context.SetBlendState(RHI::Device().GetDefaultBlendState(), nullptr, 0xFFFFFFFF);
-    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+    renderData->BindFrameCameraBuffers(context);
 
     RHINativeBuffer uiBuffer = m_UIBuffer.Get();
     context.SetVertexShaderConstantBuffers(0, 1, &uiBuffer);

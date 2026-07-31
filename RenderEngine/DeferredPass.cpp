@@ -175,7 +175,7 @@ void DeferredPass::CreateRenderCommandList(RHICommandContext& context, RenderSce
     const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
 
-    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+    renderData->BindFrameCameraBuffers(context);
     context.UpdateBuffer(m_Buffer.Get(), &buffer);
     context.UpdateBuffer(m_shadowcamBuffer.Get(), &cameraview);
     context.UpdateBuffer(lightManager->m_shadowMapBuffer, &renderData->m_shadowCamera.m_shadowMapConstant);

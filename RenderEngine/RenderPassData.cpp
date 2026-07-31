@@ -1,4 +1,5 @@
 #include "RenderPassData.h"
+#include "RHI/RHICommandContext.h"
 #include "DeviceState.h"
 #include "RenderScene.h"
 #include "Material.h"
@@ -154,6 +155,34 @@ void RenderPassData::Initalize(uint32 index)
 	m_shadowCamera.m_isOrthographic = true;
 
 	m_isInitalized = true;
+}
+
+void RenderPassData::BindFrameCameraBuffers(RHICommandContext& context) const
+{
+	context.UpdateBuffer(m_ViewBuffer.Get(), &m_frameCalculatedView);
+	context.UpdateBuffer(m_ProjBuffer.Get(), &m_frameCalculatedProjection);
+
+	context.SetVertexShaderConstantBuffer(1, m_ViewBuffer.Get());
+	context.SetVertexShaderConstantBuffer(2, m_ProjBuffer.Get());
+}
+
+Mathf::Vector4 RenderPassData::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth) const
+{
+	// 화면 크기는 카메라 상태가 아니라 전역 뷰포트에서 온다 — Camera 쪽 구현과
+	// 같은 출처다(그쪽도 GetScreenSize()가 g_Viewport를 읽었다).
+	const float width = DirectX11::DeviceStates->g_Viewport.Width;
+	const float height = DirectX11::DeviceStates->g_Viewport.Height;
+
+	// 1. 스크린 좌표를 NDC 좌표로 변환
+	const float x_ndc = (2.0f * screenPosition.x / width) - 1.0f;
+	const float y_ndc = 1.0f - (2.0f * screenPosition.y / height);
+	const Mathf::Vector4 screenPositionNDC{ x_ndc, y_ndc, depth, 1.0f };
+
+	// 2. 역투영 → 3. 역뷰. 둘 다 프레임 밀봉 값이다.
+	const Mathf::Vector4 viewPosition =
+		XMVector3TransformCoord(screenPositionNDC, m_frameCalculatedInverseProjection);
+
+	return XMVector3TransformCoord(viewPosition, m_frameCalculatedInverseView);
 }
 
 void RenderPassData::ClearRenderTarget()

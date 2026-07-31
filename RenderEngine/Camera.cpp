@@ -303,17 +303,6 @@ void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
 	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
-void Camera::DeferredUpdateBuffer(ID3D11DeviceContext* deferredContext, const Mathf::Matrix& v, const Mathf::Matrix& p, bool shadow)
-{
-	Mathf::xMatrix view = v;
-	Mathf::xMatrix proj = p;
-
-	deferredContext->UpdateSubresource(m_ViewBuffer.Get(), 0, nullptr, &view, 0, 0);
-	deferredContext->UpdateSubresource(m_ProjBuffer.Get(), 0, nullptr, &proj, 0, 0);
-
-	deferredContext->VSSetConstantBuffers(1, 1, m_ViewBuffer.GetAddressOf());
-	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
-}
 
 float Camera::CalculateLODDistance(const Mathf::Vector3& position) const
 {

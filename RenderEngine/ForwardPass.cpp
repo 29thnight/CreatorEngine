@@ -340,7 +340,7 @@ void ForwardPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 		lightManager->PSBindCloudShadowMap(deferredPtr);
 	}
 
-	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+	renderData->BindFrameCameraBuffers(context);
 
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
@@ -633,7 +633,7 @@ void ForwardPass::CreateFoliageCommandList(RHICommandContext& context, RenderSce
 		lightManager->PSBindCloudShadowMap(deferredPtr);
 	}
 
-	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
+	data->BindFrameCameraBuffers(context);
 
 	constexpr size_t kMaxInstancesPerDraw = 2048;
 	for(auto& proxy : data->m_foliageQueue)

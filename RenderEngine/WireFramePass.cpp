@@ -1,4 +1,5 @@
 #include "WireFramePass.h"
+#include "RHI/RHI.h"
 #include "Scene.h"
 #include "Camera.h"
 #include "Mesh.h"
@@ -65,7 +66,7 @@ void WireFramePass::Execute(RenderScene& scene, Camera& camera)
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
-	camera.UpdateBuffer();
+	renderData->BindFrameCameraBuffers(RHI::Immediate());
 	scene.UseModel();
 
     DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());

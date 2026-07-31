@@ -265,7 +265,7 @@ void DecalPass::CreateRenderCommandList(RHICommandContext& context, RenderScene&
 	cBuf.g_screenDimensions = { fullVp.width, fullVp.height };
 	context.UpdateBuffer(m_Buffer.Get(), &cBuf);
 
-	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+	renderData->BindFrameCameraBuffers(context);
 	scene.UseModel(deferredPtr);
 	{
 		const RHIViewport rhiVp = RHI::Device().GetFullViewport();

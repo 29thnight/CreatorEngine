@@ -80,7 +80,7 @@ void TerrainGizmoPass::CreateRenderCommandList(RHICommandContext& context, Rende
     context.SetPixelShaderConstantBuffer(0, m_Buffer.Get());
     context.SetPixelShaderResource(0, m_pTempTexture->m_pSRV);
 
-    camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
+    renderData->BindFrameCameraBuffers(context);
     scene.UseModel(deferredPtr);
     for (auto& obj : scene.GetScene()->m_SceneObjects) 
     {
