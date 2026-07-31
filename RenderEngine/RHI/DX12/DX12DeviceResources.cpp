@@ -45,6 +45,28 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }
 
+#if defined(_DEBUG)
+    // 알려진 정상 경로 메시지를 억제한다.
+    //
+    // LOADPIPELINE_NAMENOTFOUND는 파이프라인 라이브러리의 '첫 조회 실패'이고,
+    // 캐시 미스는 설계된 동작이다(그다음에 컴파일해서 저장한다). 그런데 검증
+    // 레이어가 이것을 WARNING으로 올려서, 심각도 필터만으로는 걸러지지 않는다.
+    //
+    // 심각도를 통째로 낮추는 대신 이 ID 하나만 막는다 — 억제 목록이 길어지는 것은
+    // 그 자체로 신호이므로, 새 항목을 넣을 때는 왜 정상인지를 여기 적을 것.
+    {
+        Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
+        if (SUCCEEDED(m_device.As(&infoQueue)))
+        {
+            D3D12_MESSAGE_ID denied[] = { D3D12_MESSAGE_ID_LOADPIPELINE_NAMENOTFOUND };
+            D3D12_INFO_QUEUE_FILTER filter{};
+            filter.DenyList.NumIDs = _countof(denied);
+            filter.DenyList.pIDList = denied;
+            infoQueue->AddStorageFilterEntries(&filter);
+        }
+    }
+#endif
+
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
@@ -199,20 +221,38 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
     if (FAILED(m_device.As(&infoQueue))) return 0;
 
     const uint64_t count = infoQueue->GetNumStoredMessages();
+    uint32_t problems = 0;
+
     for (uint64_t i = 0; i < count; ++i)
     {
         SIZE_T length = 0;
         infoQueue->GetMessage(i, nullptr, &length);
         std::string storage(length, '\0');
         auto* message = reinterpret_cast<D3D12_MESSAGE*>(storage.data());
-        if (SUCCEEDED(infoQueue->GetMessage(i, message, &length)))
+        if (FAILED(infoQueue->GetMessage(i, message, &length))) continue;
+
+        const char* severity = "INFO";
+        bool isProblem = false;
+        switch (message->Severity)
         {
-            outMessages += message->pDescription;
-            outMessages += "\n";
+        case D3D12_MESSAGE_SEVERITY_CORRUPTION: severity = "CORRUPTION"; isProblem = true; break;
+        case D3D12_MESSAGE_SEVERITY_ERROR:      severity = "ERROR";      isProblem = true; break;
+        case D3D12_MESSAGE_SEVERITY_WARNING:    severity = "WARNING";    isProblem = true; break;
+        case D3D12_MESSAGE_SEVERITY_INFO:       severity = "INFO";       break;
+        case D3D12_MESSAGE_SEVERITY_MESSAGE:    severity = "MESSAGE";    break;
         }
+
+        if (isProblem) ++problems;
+
+        outMessages += "[";
+        outMessages += severity;
+        outMessages += "] ";
+        outMessages += message->pDescription;
+        outMessages += "\n";
     }
+
     infoQueue->ClearStoredMessages();
-    return static_cast<uint32_t>(count);
+    return problems;
 #else
     return 0;
 #endif

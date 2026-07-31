@@ -1,10 +1,14 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedSceneRenderer.h"
 #include "DX12DeviceResources.h"
+#include "DX12PSOManager.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
 #include <vector>
+#include <thread>
+#include <chrono>
+#include <cstdio>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -128,26 +132,28 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
     }
 
-    ComPtr<ID3D12PipelineState> pso;
+    // PSO는 매니저를 통해 얻는다(PHASE 3-4). 자가 검증도 실전과 같은 경로를 타야
+    // 캐시·해시가 실제로 동작하는지 확인된다.
+    DX12PSOManager psoManager;
+    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_pso_selftest.cache", error))
     {
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
-        desc.pRootSignature = rootSignature.Get();
-        desc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
-        desc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
-        desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-        desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-        desc.SampleMask = UINT_MAX;
-        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        desc.NumRenderTargets = 1;
-        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.SampleDesc.Count = 1;
+        outLog += "[2/4] PSO 매니저 초기화 실패: " + error + "\n";
+        return false;
+    }
 
-        if (FAILED(resources.GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso))))
-        {
-            outLog += "[2/4] PSO 생성 실패\n";
-            return false;
-        }
+    DX12GraphicsPipelineDesc triangleDesc{};
+    triangleDesc.vsBytecode = vsBlob->GetBufferPointer();
+    triangleDesc.vsSize = vsBlob->GetBufferSize();
+    triangleDesc.psBytecode = psBlob->GetBufferPointer();
+    triangleDesc.psSize = psBlob->GetBufferSize();
+    triangleDesc.rootSignature = rootSignature.Get();
+    triangleDesc.rootSignatureId = 1;
+
+    ID3D12PipelineState* pso = psoManager.GetOrCreate(triangleDesc, error);
+    if (!pso)
+    {
+        outLog += "[2/4] 삼각형 PSO 생성 실패: " + error + "\n";
+        return false;
     }
     // ── 텍스처 블릿 파이프라인: SRV 힙 + 정적 샘플러 루트 시그니처 + 쿼드 PSO ──
     ComPtr<ID3DBlob> quadVsBlob;
@@ -214,28 +220,35 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
     }
 
-    ComPtr<ID3D12PipelineState> quadPso;
-    {
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
-        desc.pRootSignature = quadRootSignature.Get();
-        desc.VS = { quadVsBlob->GetBufferPointer(), quadVsBlob->GetBufferSize() };
-        desc.PS = { quadPsBlob->GetBufferPointer(), quadPsBlob->GetBufferSize() };
-        desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-        desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-        desc.SampleMask = UINT_MAX;
-        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        desc.NumRenderTargets = 1;
-        desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.SampleDesc.Count = 1;
+    DX12GraphicsPipelineDesc quadDesc{};
+    quadDesc.vsBytecode = quadVsBlob->GetBufferPointer();
+    quadDesc.vsSize = quadVsBlob->GetBufferSize();
+    quadDesc.psBytecode = quadPsBlob->GetBufferPointer();
+    quadDesc.psSize = quadPsBlob->GetBufferSize();
+    quadDesc.rootSignature = quadRootSignature.Get();
+    quadDesc.rootSignatureId = 2;
 
-        if (FAILED(resources.GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&quadPso))))
-        {
-            outLog += "[2/4] 쿼드 PSO 생성 실패\n";
-            return false;
-        }
+    ID3D12PipelineState* quadPso = psoManager.GetOrCreate(quadDesc, error);
+    if (!quadPso)
+    {
+        outLog += "[2/4] 쿼드 PSO 생성 실패: " + error + "\n";
+        return false;
     }
-    outLog += "[2/4] 루트 시그니처·PSO 생성 완료(삼각형 + 텍스처 쿼드)\n";
+
+    // 같은 desc를 다시 요청하면 메모리 캐시가 받아야 한다 — 중복 제거 확인.
+    if (psoManager.GetOrCreate(triangleDesc, error) != pso)
+    {
+        outLog += "[2/4] 메모리 캐시 실패 — 같은 desc가 다른 PSO를 돌려줬다\n";
+        return false;
+    }
+
+    {
+        const auto stats = psoManager.GetStats();
+        outLog += "[2/4] 루트 시그니처·PSO 생성 완료(삼각형 + 텍스처 쿼드) — 컴파일 "
+            + std::to_string(stats.compiles) + " · 라이브러리 히트 "
+            + std::to_string(stats.libraryHits) + " · 메모리 히트 "
+            + std::to_string(stats.memoryHits) + "\n";
+    }
 
     // ── 체커보드 텍스처 생성·업로드 ──
     ComPtr<ID3D12Resource> texture;
@@ -372,7 +385,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         commandList->ClearRenderTargetView(rtvHandle, DX12DeviceResources::kClearColor, 0, nullptr);
 
         commandList->SetGraphicsRootSignature(rootSignature.Get());
-        commandList->SetPipelineState(pso.Get());
+        commandList->SetPipelineState(pso);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -380,7 +393,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         ID3D12DescriptorHeap* heaps[] = { srvHeap.Get() };
         commandList->SetDescriptorHeaps(1, heaps);
         commandList->SetGraphicsRootSignature(quadRootSignature.Get());
-        commandList->SetPipelineState(quadPso.Get());
+        commandList->SetPipelineState(quadPso);
         commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGPUDescriptorHandleForHeapStart());
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         commandList->DrawInstanced(4, 1, 0, 0);
@@ -502,17 +515,208 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
     }
 
-    // 검증 레이어가 조용해야 진짜 통과다.
+    // 검증 레이어에 WARNING 이상이 없어야 진짜 통과다(INFO는 로그에만 남는다).
     std::string debugMessages;
-    const uint32_t messageCount = resources.DrainDebugMessages(debugMessages);
-    if (messageCount > 0)
+    const uint32_t problems = resources.DrainDebugMessages(debugMessages);
+    if (problems > 0)
     {
-        outLog += "[4/4] 검증 레이어 메시지 " + std::to_string(messageCount) + "건:\n" + debugMessages;
+        outLog += "[4/4] 검증 레이어 문제 " + std::to_string(problems) + "건:\n" + debugMessages;
         return false;
     }
 
+    // PSO 캐시를 남긴다 — 다음 실행/다음 매니저가 컴파일 없이 복원해야 한다.
+    if (!psoManager.SaveCache(error))
+    {
+        outLog += "[4/4] PSO 캐시 저장 실패: " + error + "\n";
+        return false;
+    }
+
+    {
+        const auto stats = psoManager.GetStats();
+        outLog += "[4/4] PSO 캐시 저장 — 컴파일 " + std::to_string(stats.compiles)
+            + " · 라이브러리 히트 " + std::to_string(stats.libraryHits) + "\n";
+    }
+
+    psoManager.Shutdown();
     outLog += "[4/4] 픽셀 검증·PNG 저장·검증 레이어 클린 — 통과\n";
     resources.Shutdown();
+    return true;
+}
+
+bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog)
+{
+    using Microsoft::WRL::ComPtr;
+
+    // 렌더는 하지 않는다 — 디바이스만 있으면 PSO 생성·캐시는 검증된다.
+    DX12DeviceResources resources;
+    std::string error;
+    if (!resources.Initialize(64, 64, error))
+    {
+        outLog += "디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    ComPtr<ID3DBlob> vsBlob;
+    ComPtr<ID3DBlob> psBlob;
+    if (!CompileShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
+    if (!CompileShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
+
+    ComPtr<ID3D12RootSignature> rootSignature;
+    {
+        D3D12_ROOT_SIGNATURE_DESC desc{};
+        ComPtr<ID3DBlob> serialized;
+        ComPtr<ID3DBlob> errors;
+        if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
+            &serialized, &errors)) ||
+            FAILED(resources.GetDevice()->CreateRootSignature(0,
+                serialized->GetBufferPointer(), serialized->GetBufferSize(),
+                IID_PPV_ARGS(&rootSignature))))
+        {
+            outLog += "루트 시그니처 준비 실패\n";
+            return false;
+        }
+    }
+
+    // 상태만 다른 변형 3종 — 해시가 상태를 실제로 구분하는지 확인한다.
+    // (셰이더가 같아도 다른 PSO여야 한다)
+    DX12GraphicsPipelineDesc base{};
+    base.vsBytecode = vsBlob->GetBufferPointer();
+    base.vsSize = vsBlob->GetBufferSize();
+    base.psBytecode = psBlob->GetBufferPointer();
+    base.psSize = psBlob->GetBufferSize();
+    base.rootSignature = rootSignature.Get();
+    base.rootSignatureId = 1;
+
+    DX12GraphicsPipelineDesc variants[3] = { base, base, base };
+    variants[1].cullMode = D3D12_CULL_MODE_BACK;
+    variants[2].blendEnable = true;
+
+    if (variants[0].ComputeHash() == variants[1].ComputeHash() ||
+        variants[0].ComputeHash() == variants[2].ComputeHash())
+    {
+        outLog += "해시가 상태 차이를 구분하지 못한다\n";
+        return false;
+    }
+
+    // 캐시 파일을 지우고 시작 — 1회차의 '컴파일 N건'을 결정적으로 만든다.
+    std::remove(cacheFilePath.c_str());
+    const std::wstring widePath(cacheFilePath.begin(), cacheFilePath.end());
+
+    // ── 1회차: 캐시 없음 → 전부 컴파일 ──
+    {
+        DX12PSOManager manager;
+        if (!manager.Initialize(resources.GetDevice(), widePath, error))
+        {
+            outLog += "1회차 초기화 실패: " + error + "\n";
+            return false;
+        }
+
+        for (auto& variant : variants)
+        {
+            if (!manager.GetOrCreate(variant, error))
+            {
+                outLog += "1회차 PSO 생성 실패: " + error + "\n";
+                return false;
+            }
+        }
+
+        const auto stats = manager.GetStats();
+        if (stats.compiles != 3 || stats.libraryHits != 0)
+        {
+            outLog += "1회차 기대와 다름 — 컴파일 " + std::to_string(stats.compiles)
+                + "(기대 3) · 라이브러리 히트 " + std::to_string(stats.libraryHits) + "(기대 0)\n";
+            return false;
+        }
+
+        if (!manager.SaveCache(error))
+        {
+            outLog += "1회차 캐시 저장 실패: " + error + "\n";
+            return false;
+        }
+        manager.Shutdown();
+        outLog += "1회차: 컴파일 3 · 캐시 저장 완료\n";
+    }
+
+    // ── 2회차: 캐시 복원 → 컴파일 0 ──
+    {
+        DX12PSOManager manager;
+        if (!manager.Initialize(resources.GetDevice(), widePath, error))
+        {
+            outLog += "2회차 초기화 실패: " + error + "\n";
+            return false;
+        }
+
+        if (!manager.IsLibraryLoaded())
+        {
+            outLog += "2회차: 캐시 파일을 라이브러리로 복원하지 못했다\n";
+            return false;
+        }
+
+        for (auto& variant : variants)
+        {
+            if (!manager.GetOrCreate(variant, error))
+            {
+                outLog += "2회차 PSO 취득 실패: " + error + "\n";
+                return false;
+            }
+        }
+
+        // 메모리 캐시 확인 — 같은 요청을 반복해도 컴파일이 늘지 않아야 한다.
+        for (auto& variant : variants)
+        {
+            manager.GetOrCreate(variant, error);
+        }
+
+        const auto stats = manager.GetStats();
+        if (stats.compiles != 0 || stats.libraryHits != 3 || stats.memoryHits != 3)
+        {
+            outLog += "2회차 기대와 다름 — 컴파일 " + std::to_string(stats.compiles)
+                + "(기대 0) · 라이브러리 히트 " + std::to_string(stats.libraryHits)
+                + "(기대 3) · 메모리 히트 " + std::to_string(stats.memoryHits) + "(기대 3)\n";
+            return false;
+        }
+
+        manager.Shutdown();
+        outLog += "2회차: 컴파일 0 · 라이브러리 히트 3 · 메모리 히트 3 — 캐시가 컴파일을 없앴다\n";
+    }
+
+    // ── 비동기 경로: Pending으로 시작해 결국 Ready ──
+    {
+        DX12PSOManager manager;
+        if (!manager.Initialize(resources.GetDevice(), L"", error))
+        {
+            outLog += "비동기 초기화 실패: " + error + "\n";
+            return false;
+        }
+
+        ID3D12PipelineState* asyncPso = nullptr;
+        const auto first = manager.Request(variants[0], &asyncPso);
+        if (first != DX12PSOManager::RequestState::Pending)
+        {
+            outLog += "비동기 첫 요청이 Pending이 아니다 — 프레임에서 컴파일이 동기로 일어난다\n";
+            return false;
+        }
+
+        // 완료까지 폴링. 실전에서는 이 사이의 프레임이 폴백 PSO로 그려진다.
+        DX12PSOManager::RequestState state = DX12PSOManager::RequestState::Pending;
+        for (int attempt = 0; attempt < 500 && state == DX12PSOManager::RequestState::Pending; ++attempt)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            state = manager.Request(variants[0], &asyncPso);
+        }
+
+        if (state != DX12PSOManager::RequestState::Ready || nullptr == asyncPso)
+        {
+            outLog += "비동기 컴파일이 완료되지 않았다\n";
+            return false;
+        }
+
+        manager.Shutdown();
+        outLog += "비동기: Pending → Ready 확인(프레임 중 컴파일 스톨 없음)\n";
+    }
+
+    resources.Shutdown();
+    outLog += "PSO 캐시 검증 통과\n";
     return true;
 }
 

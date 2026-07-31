@@ -19,6 +19,16 @@ public:
     //   3) 리드백 픽셀이 기대 내용(배경 클리어 + 삼각형)   4) 검증 레이어 메시지 0건
     // 진행 로그는 outLog로 — 실패 지점이 어디인지가 곧 진단이다.
     bool RunSelfTest(const std::string& outputPngPath, uint32_t frameCount, std::string& outLog);
+
+    // PSO 캐시 자가 검증(PHASE 3-4). 같은 프로세스에서 매니저를 두 번 세워
+    // 캐시 파일이 실제로 컴파일을 없애는지 확인한다.
+    //
+    // 통과 조건:
+    //   1회차  컴파일 N건(캐시 파일이 없거나 무효면 정상)
+    //   2회차  컴파일 0건 · 라이브러리 히트 N건 — 이것이 완료 기준
+    //   메모리 캐시  같은 desc 재요청이 컴파일 없이 히트
+    //   비동기       Pending으로 시작해 폴백 없이 결국 Ready
+    bool RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog);
 };
 
 #endif

@@ -820,6 +820,20 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
     }
+    else if (cmd == "dx12.psocache")
+    {
+        // PSO 캐시 자가 검증(PHASE 3-4) — 매니저를 두 번 세워 캐시가 컴파일을
+        // 실제로 없애는지 확인한다.
+        const std::string cachePath = (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache");
+
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunPsoCacheTest(cachePath, log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] dx12.psocache %s\n", passed ? "통과" : "실패");
+    }
     else if (cmd == "window.info")
     {
         // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
@@ -1317,6 +1331,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
+        "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

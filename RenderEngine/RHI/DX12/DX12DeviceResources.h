@@ -41,7 +41,12 @@ public:
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
     void WaitForGpu();
 
-    // 검증 레이어가 쌓은 메시지 수(0이면 클린). 디버그 빌드가 아니면 항상 0.
+    // 검증 레이어 메시지를 비우고, 그중 '실제 문제'(WARNING 이상)의 수를 돌려준다.
+    //
+    // INFO/MESSAGE 등급은 세지 않는다 — 파이프라인 라이브러리의 첫 조회 실패
+    // ("이 이름의 파이프라인이 없음")처럼 정상 경로가 남기는 안내가 여기 들어와서,
+    // 전부 세면 캐시 미스라는 당연한 동작이 검증 실패로 둔갑한다(실측).
+    // 대신 outMessages에는 등급을 붙여 전부 담는다 — 세지 않는 것과 감추는 것은 다르다.
     uint32_t DrainDebugMessages(std::string& outMessages);
 
     ID3D12Device* GetDevice() const { return m_device.Get(); }
