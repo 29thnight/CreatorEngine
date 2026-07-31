@@ -62,6 +62,15 @@ float4 PSQuad(VSQuadOut input) : SV_TARGET
 {
     return gTexture.Sample(gSampler, input.uv);
 }
+
+// 컴퓨트 PSO 검증용 — 내용은 중요하지 않고, 컴퓨트 경로가 캐시를 타는지가 목적.
+RWTexture2D<float4> gOutput : register(u0);
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    gOutput[id.xy] = float4(id.x / 64.0f, id.y / 64.0f, 0, 1);
+}
 )";
 
     // 체커보드 텍스처 파라미터. 픽셀 검증이 같은 상수로 기대값을 계산한다.
@@ -680,7 +689,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         outLog += "2회차: 컴파일 0 · 라이브러리 히트 3 · 메모리 히트 3 — 캐시가 컴파일을 없앴다\n";
     }
 
-    // ── 비동기 경로: Pending으로 시작해 결국 Ready ──
+    // ── 비동기 + 폴백: 컴파일 중에도 프레임이 그릴 것을 갖는다 ──
     {
         DX12PSOManager manager;
         if (!manager.Initialize(resources.GetDevice(), L"", error))
@@ -689,30 +698,156 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
             return false;
         }
 
-        ID3D12PipelineState* asyncPso = nullptr;
-        const auto first = manager.Request(variants[0], &asyncPso);
-        if (first != DX12PSOManager::RequestState::Pending)
+        // 폴백을 먼저 세운다(동기). 이후 다른 desc를 비동기 요청하면 그 사이
+        // 프레임은 폴백으로 그려져야 한다.
+        if (!manager.SetFallback(variants[0], error))
         {
-            outLog += "비동기 첫 요청이 Pending이 아니다 — 프레임에서 컴파일이 동기로 일어난다\n";
+            outLog += "폴백 PSO 준비 실패: " + error + "\n";
             return false;
         }
 
-        // 완료까지 폴링. 실전에서는 이 사이의 프레임이 폴백 PSO로 그려진다.
-        DX12PSOManager::RequestState state = DX12PSOManager::RequestState::Pending;
-        for (int attempt = 0; attempt < 500 && state == DX12PSOManager::RequestState::Pending; ++attempt)
+        ID3D12PipelineState* resolved = nullptr;
+        const auto first = manager.Resolve(variants[1], &resolved);
+        if (first != DX12PSOManager::DrawDecision::UseFallback || nullptr == resolved)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            state = manager.Request(variants[0], &asyncPso);
+            outLog += "컴파일 중인데 폴백이 나오지 않았다 — 프레임이 그릴 것을 잃는다\n";
+            return false;
         }
 
-        if (state != DX12PSOManager::RequestState::Ready || nullptr == asyncPso)
+        // 완료까지 폴링. 실전에서는 이 사이의 프레임이 폴백으로 그려진다.
+        DX12PSOManager::DrawDecision decision = DX12PSOManager::DrawDecision::UseFallback;
+        for (int attempt = 0; attempt < 500 && decision != DX12PSOManager::DrawDecision::UseRequested; ++attempt)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            decision = manager.Resolve(variants[1], &resolved);
+        }
+
+        if (decision != DX12PSOManager::DrawDecision::UseRequested || nullptr == resolved)
         {
             outLog += "비동기 컴파일이 완료되지 않았다\n";
             return false;
         }
 
+        const auto stats = manager.GetStats();
+        if (stats.fallbackDraws == 0)
+        {
+            outLog += "폴백 카운터가 0이다 — 통계가 실제 동작을 반영하지 않는다\n";
+            return false;
+        }
+        if (stats.skippedDraws != 0)
+        {
+            outLog += "폴백이 있는데 Skip이 발생했다\n";
+            return false;
+        }
+
+        outLog += "비동기+폴백: 컴파일 중 폴백 " + std::to_string(stats.fallbackDraws)
+            + "회 → 완료 후 요청 PSO로 전환 · 스킵 0\n";
+
+        // ── 셰이더 리로드: 메모리 캐시가 비워지는가 ──
+        manager.OnShaderReloaded();
+        ID3D12PipelineState* afterReload = nullptr;
+        // 리로드 직후에는 메모리 캐시가 비어 있으므로 다시 Pending이어야 한다.
+        if (manager.Resolve(variants[1], &afterReload) == DX12PSOManager::DrawDecision::UseRequested)
+        {
+            outLog += "리로드 후에도 옛 캐시가 살아 있다\n";
+            return false;
+        }
+        outLog += "셰이더 리로드: 메모리 캐시 비움 확인(디스크 라이브러리는 유지)\n";
+
         manager.Shutdown();
-        outLog += "비동기: Pending → Ready 확인(프레임 중 컴파일 스톨 없음)\n";
+    }
+
+    // ── 컴퓨트 PSO: 같은 캐시 2층을 타는가 ──
+    {
+        ComPtr<ID3DBlob> csBlob;
+        if (!CompileShader("CSMain", "cs_5_0", csBlob, outLog)) return false;
+
+        ComPtr<ID3D12RootSignature> computeRoot;
+        {
+            D3D12_DESCRIPTOR_RANGE range{};
+            range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+            range.NumDescriptors = 1;
+
+            D3D12_ROOT_PARAMETER param{};
+            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            param.DescriptorTable.NumDescriptorRanges = 1;
+            param.DescriptorTable.pDescriptorRanges = &range;
+
+            D3D12_ROOT_SIGNATURE_DESC desc{};
+            desc.NumParameters = 1;
+            desc.pParameters = &param;
+
+            ComPtr<ID3DBlob> serialized;
+            ComPtr<ID3DBlob> errors;
+            if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
+                &serialized, &errors)) ||
+                FAILED(resources.GetDevice()->CreateRootSignature(0,
+                    serialized->GetBufferPointer(), serialized->GetBufferSize(),
+                    IID_PPV_ARGS(&computeRoot))))
+            {
+                outLog += "컴퓨트 루트 시그니처 준비 실패\n";
+                return false;
+            }
+        }
+
+        DX12ComputePipelineDesc computeDesc{};
+        computeDesc.csBytecode = csBlob->GetBufferPointer();
+        computeDesc.csSize = csBlob->GetBufferSize();
+        computeDesc.rootSignature = computeRoot.Get();
+        computeDesc.rootSignatureId = 10;
+
+        const std::string computeCachePath = cacheFilePath + ".compute";
+        std::remove(computeCachePath.c_str());
+        const std::wstring computeWidePath(computeCachePath.begin(), computeCachePath.end());
+
+        {
+            DX12PSOManager manager;
+            if (!manager.Initialize(resources.GetDevice(), computeWidePath, error))
+            {
+                outLog += "컴퓨트 1회차 초기화 실패: " + error + "\n";
+                return false;
+            }
+            if (!manager.GetOrCreateCompute(computeDesc, error))
+            {
+                outLog += "컴퓨트 PSO 생성 실패: " + error + "\n";
+                return false;
+            }
+            if (manager.GetStats().compiles != 1)
+            {
+                outLog += "컴퓨트 1회차 컴파일이 1이 아니다\n";
+                return false;
+            }
+            if (!manager.SaveCache(error))
+            {
+                outLog += "컴퓨트 캐시 저장 실패: " + error + "\n";
+                return false;
+            }
+            manager.Shutdown();
+        }
+
+        {
+            DX12PSOManager manager;
+            if (!manager.Initialize(resources.GetDevice(), computeWidePath, error))
+            {
+                outLog += "컴퓨트 2회차 초기화 실패: " + error + "\n";
+                return false;
+            }
+            if (!manager.GetOrCreateCompute(computeDesc, error))
+            {
+                outLog += "컴퓨트 2회차 취득 실패: " + error + "\n";
+                return false;
+            }
+            const auto stats = manager.GetStats();
+            if (stats.compiles != 0 || stats.libraryHits != 1)
+            {
+                outLog += "컴퓨트 2회차 기대와 다름 — 컴파일 " + std::to_string(stats.compiles)
+                    + "(기대 0) · 라이브러리 히트 " + std::to_string(stats.libraryHits) + "(기대 1)\n";
+                return false;
+            }
+            manager.Shutdown();
+        }
+
+        outLog += "컴퓨트 PSO: 1회차 컴파일 1 → 2회차 컴파일 0 · 라이브러리 히트 1\n";
     }
 
     resources.Shutdown();

@@ -62,6 +62,17 @@ uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
     return hash;
 }
 
+uint64_t DX12ComputePipelineDesc::ComputeHash() const
+{
+    // 그래픽과 다른 시드로 시작한다 — 같은 해시 공간을 쓰지만 종류가 섞이지 않는다.
+    constexpr uint64_t kComputeTag = 0x43'4F'4D'50'55'54'45'00ull; // "COMPUTE"
+    uint64_t hash = HashValue(kComputeTag, kFnvOffset);
+
+    if (csBytecode && csSize > 0) hash = HashBytes(csBytecode, csSize, hash);
+    hash = HashValue(rootSignatureId, hash);
+    return hash;
+}
+
 std::wstring DX12PSOManager::MakeLibraryName(uint64_t hash)
 {
     std::wostringstream oss;
@@ -216,6 +227,135 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     }
 
     return pso;
+}
+
+DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
+    const DX12ComputePipelineDesc& desc, uint64_t hash, std::string& outError)
+{
+    D3D12_COMPUTE_PIPELINE_STATE_DESC d3dDesc{};
+    d3dDesc.pRootSignature = desc.rootSignature;
+    d3dDesc.CS = { desc.csBytecode, desc.csSize };
+
+    const std::wstring name = MakeLibraryName(hash);
+    ComPtr<ID3D12PipelineState> pso;
+
+    if (m_library)
+    {
+        const HRESULT hr = m_library->LoadComputePipeline(name.c_str(), &d3dDesc,
+            IID_PPV_ARGS(&pso));
+        if (SUCCEEDED(hr))
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            ++m_stats.libraryHits;
+            return pso;
+        }
+    }
+
+    if (!m_device)
+    {
+        outError = "디바이스가 없다";
+        return nullptr;
+    }
+
+    const HRESULT hr = m_device->CreateComputePipelineState(&d3dDesc, IID_PPV_ARGS(&pso));
+    if (FAILED(hr))
+    {
+        outError = "컴퓨트 PSO 생성 실패 " + PsoHrToString(hr);
+        std::lock_guard<std::mutex> guard(m_mutex);
+        ++m_stats.failures;
+        return nullptr;
+    }
+
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        ++m_stats.compiles;
+    }
+
+    if (m_library)
+    {
+        m_library->StorePipeline(name.c_str(), pso.Get());
+    }
+
+    return pso;
+}
+
+ID3D12PipelineState* DX12PSOManager::GetOrCreateCompute(const DX12ComputePipelineDesc& desc,
+    std::string& outError)
+{
+    const uint64_t hash = desc.ComputeHash();
+
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        auto found = m_cache.find(hash);
+        if (found != m_cache.end())
+        {
+            ++m_stats.memoryHits;
+            return found->second.Get();
+        }
+    }
+
+    ComPtr<ID3D12PipelineState> pso = CreateOneCompute(desc, hash, outError);
+    if (!pso) return nullptr;
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+    auto [it, inserted] = m_cache.try_emplace(hash, pso);
+    return it->second.Get();
+}
+
+bool DX12PSOManager::SetFallback(const DX12GraphicsPipelineDesc& desc, std::string& outError)
+{
+    // 폴백은 동기로 만든다 — 폴백 자체가 준비되지 않으면 존재 이유가 없다.
+    ID3D12PipelineState* pso = GetOrCreate(desc, outError);
+    if (!pso) return false;
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_fallback = pso;
+    return true;
+}
+
+DX12PSOManager::DrawDecision DX12PSOManager::Resolve(const DX12GraphicsPipelineDesc& desc,
+    ID3D12PipelineState** outPso)
+{
+    ID3D12PipelineState* requested = nullptr;
+    const RequestState state = Request(desc, &requested);
+
+    if (state == RequestState::Ready && requested)
+    {
+        if (outPso) *outPso = requested;
+        return DrawDecision::UseRequested;
+    }
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+    if (m_fallback)
+    {
+        ++m_stats.fallbackDraws;
+        if (outPso) *outPso = m_fallback.Get();
+        return DrawDecision::UseFallback;
+    }
+
+    ++m_stats.skippedDraws;
+    if (outPso) *outPso = nullptr;
+    return DrawDecision::Skip;
+}
+
+void DX12PSOManager::OnShaderReloaded()
+{
+    // 진행 중인 컴파일은 회수한다 — 옛 바이트코드를 참조하는 작업이 남으면
+    // 리로드로 해제된 블롭을 읽을 수 있다.
+    std::vector<std::shared_future<ComPtr<ID3D12PipelineState>>> inFlight;
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        for (auto& [hash, future] : m_pending) inFlight.push_back(future);
+        m_pending.clear();
+    }
+    for (auto& future : inFlight)
+    {
+        if (future.valid()) future.wait();
+    }
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_cache.clear();
+    m_fallback.Reset();
 }
 
 ID3D12PipelineState* DX12PSOManager::GetOrCreate(const DX12GraphicsPipelineDesc& desc,

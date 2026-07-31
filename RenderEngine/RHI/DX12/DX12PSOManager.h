@@ -50,6 +50,18 @@ struct DX12GraphicsPipelineDesc
     uint64_t ComputeHash() const;
 };
 
+// 컴퓨트 파이프라인. 그래픽과 같은 해시 공간을 쓰되 태그로 구분해, 우연히 같은
+// 바이트 배열이 나와도 두 종류가 섞이지 않게 한다.
+struct DX12ComputePipelineDesc
+{
+    const void* csBytecode{ nullptr };
+    size_t      csSize{ 0 };
+    ID3D12RootSignature* rootSignature{ nullptr };
+    uint64_t             rootSignatureId{ 0 };
+
+    uint64_t ComputeHash() const;
+};
+
 class DX12PSOManager
 {
 public:
@@ -59,6 +71,8 @@ public:
         uint32_t libraryHits{ 0 };  // 디스크 캐시에서 복원 — 두 번째 실행의 목표치
         uint32_t compiles{ 0 };     // 실제 드라이버 컴파일 — 재실행에서 0이어야 한다
         uint32_t failures{ 0 };
+        uint32_t fallbackDraws{ 0 };  // 폴백으로 그린 드로우 — 지속적으로 늘면 캐시가 놀고 있다
+        uint32_t skippedDraws{ 0 };   // 폴백조차 없어 건너뛴 드로우
     };
 
     // 비동기 요청의 상태. Pending 프레임은 폴백 PSO를 쓰거나 그 드로우를 건너뛴다 —
@@ -71,8 +85,34 @@ public:
     // 동기 취득 — 미스면 이 자리에서 컴파일한다(로딩 시점용).
     ID3D12PipelineState* GetOrCreate(const DX12GraphicsPipelineDesc& desc, std::string& outError);
 
+    // 컴퓨트 PSO. 같은 캐시 2층을 공유한다.
+    ID3D12PipelineState* GetOrCreateCompute(const DX12ComputePipelineDesc& desc, std::string& outError);
+
     // 비동기 요청 — 준비됐으면 Ready + 포인터, 아니면 Pending(컴파일은 백그라운드로).
     RequestState Request(const DX12GraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
+
+    // ── 폴백 정책 ──
+    //
+    // 비동기 컴파일이 끝나지 않은 프레임에 무엇을 그릴지의 답이다. 폴백을 등록해
+    // 두면 Pending 대신 폴백 PSO가 나와 그 드로우를 계속 그릴 수 있고(보통 단순
+    // 셰이더), 등록하지 않았으면 호출부가 그 드로우를 건너뛴다.
+    //
+    // 어느 쪽이든 프레임이 컴파일을 기다리지 않는 것이 핵심이다.
+    bool SetFallback(const DX12GraphicsPipelineDesc& desc, std::string& outError);
+
+    enum class DrawDecision { UseRequested, UseFallback, Skip };
+
+    // 프레임 기록 경로에서 쓰는 형태. 요청이 준비됐으면 그것을, 아니면 폴백을,
+    // 폴백도 없으면 Skip을 돌려준다.
+    DrawDecision Resolve(const DX12GraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
+
+    // 셰이더 리로드 시 메모리 캐시를 비운다.
+    //
+    // 리로드된 셰이더는 바이트코드가 달라 해시부터 다르므로 '잘못된 PSO를 쓸' 위험은
+    // 없다. 문제는 옛 PSO가 캐시에 남아 메모리만 먹는 것이라, 리로드를 계기로 비운다.
+    // 디스크 라이브러리는 건드리지 않는다 — 키가 다르니 공존해도 무해하고, 되돌릴 때
+    // 다시 히트한다.
+    void OnShaderReloaded();
 
     // 라이브러리를 파일로 남긴다. 종료 시 1회.
     bool SaveCache(std::string& outError);
@@ -89,6 +129,8 @@ private:
     // 라이브러리 로드 → 실패 시 컴파일 → 라이브러리 저장. 락 밖에서 부른다.
     ComPtr<ID3D12PipelineState> CreateOne(const DX12GraphicsPipelineDesc& desc,
         uint64_t hash, std::string& outError);
+    ComPtr<ID3D12PipelineState> CreateOneCompute(const DX12ComputePipelineDesc& desc,
+        uint64_t hash, std::string& outError);
 
     ComPtr<ID3D12Device1>          m_device;
     ComPtr<ID3D12PipelineLibrary>  m_library;
@@ -100,6 +142,7 @@ private:
     mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, ComPtr<ID3D12PipelineState>> m_cache;
     std::unordered_map<uint64_t, std::shared_future<ComPtr<ID3D12PipelineState>>> m_pending;
+    ComPtr<ID3D12PipelineState> m_fallback;
     Stats m_stats;
 };
 
