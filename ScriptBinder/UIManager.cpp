@@ -36,7 +36,9 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
         };
         rect->SetAnchoredPosition({ 0.0f, 0.0f });
         rect->SetSizeDelta({ screenSize[0], screenSize[1] });
-        rect->UpdateLayout({ 0.0f, 0.0f, screenSize[0], screenSize[1] });
+        // 다음 프레임의 캔버스 구동이 어차피 화면 크기로 덮지만, 그 사이에 이 rect를
+        // 읽는 코드가 (0,0,W,H)라는 잘못된 원점을 보지 않도록 여기서 맞춰 둔다.
+        SceneManagers->GetActiveScene()->LayoutUISubtree(newObj.get());
     }
 
 	Canvases.emplace_back(newObj);
@@ -121,10 +123,11 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, const st
     auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
     if (auto* rect = newImage->GetComponent<RectTransformComponent>())
     {
+        rect->SetLayoutScale(canvasRect->GetLayoutScale());
 		rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
 		rect->SetPivot({ 0.5f, 0.5f });
         rect->SetAnchoredPosition(Pos);
-        rect->UpdateLayout(canvasRect->GetWorldRect());
+        SceneManagers->GetActiveScene()->LayoutUISubtree(rect->GetOwner());
     }
 	ImageComponent* imageComp{};
 	if (texture == nullptr)
@@ -195,10 +198,11 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, const s
     auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
     if (auto* rect = newButton->GetComponent<RectTransformComponent>())
     {
+        rect->SetLayoutScale(canvasRect->GetLayoutScale());
         rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
         rect->SetPivot({ 0.5f, 0.5f });
         rect->SetAnchoredPosition(Pos);
-        rect->UpdateLayout(canvasRect->GetWorldRect());
+        SceneManagers->GetActiveScene()->LayoutUISubtree(rect->GetOwner());
     }
 	ImageComponent* imageComp{};
     if (texture == nullptr)
@@ -271,10 +275,11 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, file::pat
 	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	if (auto* rect = newText->GetComponent<RectTransformComponent>())
 	{
+		rect->SetLayoutScale(canvasRect->GetLayoutScale());
 		rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
 		rect->SetPivot({ 0.5f, 0.5f });
 		rect->SetAnchoredPosition(Pos);
-		rect->UpdateLayout(canvasRect->GetWorldRect());
+		SceneManagers->GetActiveScene()->LayoutUISubtree(rect->GetOwner());
 	}
 	TextComponent* textComp = newText->AddComponent<TextComponent>();
 	textComp->SetFont(FontName);
@@ -329,10 +334,11 @@ std::shared_ptr<GameObject> UIManager::MakeSpriteSheet(std::string_view name, co
     auto newSpriteSheet = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
     if (auto* rect = newSpriteSheet->GetComponent<RectTransformComponent>())
     {
+        rect->SetLayoutScale(canvasRect->GetLayoutScale());
         rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
         rect->SetPivot({ 0.5f, 0.5f });
         rect->SetAnchoredPosition(Pos);
-        rect->UpdateLayout(canvasRect->GetWorldRect());
+        SceneManagers->GetActiveScene()->LayoutUISubtree(rect->GetOwner());
     }
 	SpriteSheetComponent* spriteSheetCom = newSpriteSheet->AddComponent<SpriteSheetComponent>();
 	spriteSheetCom->LoadSpriteSheet(spriteSheetPath);

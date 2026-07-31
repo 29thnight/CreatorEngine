@@ -24,6 +24,7 @@
 #include "PlayerInput.h"
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
+#include "DeviceState.h"
 #include "SpriteSheetComponent.h"
 #include "CullingManager.h"
 #include "AIManager.h"
@@ -1677,18 +1678,8 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
     {
     case GameObjectType::UI:
     {
-        const auto& RectTransform = obj->GetComponent<RectTransformComponent>();
-        const auto& objParent = m_SceneObjects[obj->m_parentIndex];
-        if (!RectTransform || !RectTransform->IsEnabled() || !objParent)
-        {
-            return;
-        }
-        const auto& ParentRectTransform = objParent->GetComponent<RectTransformComponent>();
-        if (!ParentRectTransform || !ParentRectTransform->IsEnabled())
-        {
-            return;
-        }
-        RectTransform->UpdateLayout(ParentRectTransform->GetWorldRect());
+        // UI는 트랜스폼 행렬 대신 rect로 배치된다. 레이아웃은 UpdateUILayout이
+        // 전담하므로 여기서는 아무것도 하지 않고 자식 순회만 이어 간다(PHASE 7-5).
         break;
     }
     case GameObjectType::Bone:
@@ -1731,41 +1722,134 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
     }
 }
 
-void Scene::UpdateUIRecursive(GameObject::Index objIndex, bool /*recursive*/)
+void Scene::LayoutUINode(GameObject* obj, const Mathf::Rect& parentRect,
+    float parentScale, bool parentChanged, bool isTopLevel, int depth,
+    std::unordered_set<GameObject*>& visited)
 {
-    if (objIndex == GameObject::INVALID_INDEX || objIndex < 0 ||
-        static_cast<size_t>(objIndex) >= m_SceneObjects.size())
+    if (nullptr == obj || obj->IsDestroyMark()) return;
+
+    // 이미 계산한 노드는 건드리지 않는다. 두 번째 방문은 부모 문맥이 달라서
+    // 배율을 1로 덮어쓰고 캔버스 rect를 앵커로 다시 계산해 버린다.
+    // (1920x1080에서는 배율이 마침 1이라 증상이 없어, 해상도를 바꿔야만 드러난다.)
+    // 계층에 순환이 있어도 여기서 멈춘다.
+    if (!visited.insert(obj).second) return;
+
+    // 방문 집합이 순환을 막지만, 깊이가 비정상적으로 깊어지는 것 자체가 신호다.
+    constexpr int kMaxDepth = 64;
+    if (depth > kMaxDepth)
     {
+        static bool reported = false;
+        if (!reported)
+        {
+            reported = true;
+            Debug->LogError("[UI] 레이아웃 순회가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
+                + obj->m_name.ToString());
+        }
         return;
     }
 
-    const auto& obj = m_SceneObjects[objIndex];
-    if (!obj || obj->IsDestroyMark())
+    Mathf::Rect childRect = parentRect;
+    float childScale = parentScale;
+    bool childChanged = parentChanged;
+    bool childIsTopLevel = false;
+
+    auto* rect = obj->GetComponent<RectTransformComponent>();
+    Canvas* canvas = obj->GetComponent<Canvas>();
+
+    if (nullptr != rect && isTopLevel && nullptr != canvas)
     {
-        return;
+        // 최상위 캔버스는 앵커로 계산되는 대상이 아니라 화면이 값을 정해 주는 노드다(7-1).
+        // 중첩 캔버스(부모가 rect를 정해 주는 경우)는 아래 일반 경로로 간다 — uGUI도
+        // 중첩 캔버스의 스케일러는 무시하고 루트 배율을 물려준다.
+        const Mathf::Rect screenRect = RectTransformComponent::GetScreenRootRect();
+        childScale = canvas->ComputeScaleFactor(screenRect);
+        childChanged = rect->DriveAsCanvasRoot(screenRect, childScale);
+        childRect = rect->GetWorldRect();
+    }
+    else if (nullptr != rect)
+    {
+        // 활성 여부는 보지 않는다. 예전 전파 경로가 그랬고, 그래야 맞다 —
+        // 꺼져 있던 UI를 켜는 순간 rect가 0인 채로 나타나면 안 된다.
+        // (7-5에서 IsEnabled 검사를 넣었다가 무기 슬롯 하위 128개가 통째로
+        //  0,0,0,0으로 무너졌다. 그쪽이 평소 비활성인 계층이었다.)
+        //
+        // 부모 rect가 변했으면 자식도 다시 계산한다 — dirty 규칙은 여기 한 줄이다(F-10).
+        if (parentChanged) rect->MarkDirty();
+        rect->SetLayoutScale(parentScale);
+
+        childChanged = rect->UpdateLayout(parentRect);
+        childRect = rect->GetWorldRect();
+    }
+    else
+    {
+        // RectTransform이 없는 노드는 UI 좌표계에 관여하지 않는다. 그 아래에 UI가
+        // 있으면 최상위로 취급한다 — ResolveParentRect가 쓰던 규칙과 같다.
+        childRect = RectTransformComponent::GetScreenRootRect();
+        childScale = 1.f;
+        childChanged = false;
+        childIsTopLevel = true;
     }
 
-    if (obj->GetType() == GameObjectType::UI)
-    {
-        const auto& RectTransform = obj->GetComponent<RectTransformComponent>();
-        const auto& objParent = m_SceneObjects[obj->m_parentIndex];
-        if (!RectTransform || !RectTransform->IsEnabled() || !objParent)
-        {
-            return;
-        }
-        const auto& ParentRectTransform = objParent->GetComponent<RectTransformComponent>();
-        if (!ParentRectTransform || !ParentRectTransform->IsEnabled())
-        {
-            return;
-        }
-        RectTransform->UpdateLayout(ParentRectTransform->GetWorldRect());
-    }
-
-    for (auto& childIndex : obj->m_childrenIndices)
+    for (auto childIndex : obj->m_childrenIndices)
     {
         if (childIndex == obj->m_index) continue;
-        UpdateUIRecursive(childIndex, true);
+        LayoutUINode(GameObject::FindIndex(childIndex), childRect, childScale,
+            childChanged, childIsTopLevel, depth + 1, visited);
     }
+}
+
+void Scene::UpdateUILayout()
+{
+    if (m_SceneObjects.empty()) return;
+
+    const Mathf::Rect screenRect = RectTransformComponent::GetScreenRootRect();
+    std::unordered_set<GameObject*> visited;
+
+    // 씬 루트의 자식부터 한 번만 훑는다. 캔버스 구동도, 캔버스 밑에 없는 UI도
+    // 전부 이 한 순회 안에서 처리된다.
+    for (auto& rootIndex : m_SceneObjects[0]->m_childrenIndices)
+    {
+        LayoutUINode(GameObject::FindIndex(rootIndex), screenRect, 1.f,
+            /*parentChanged=*/false, /*isTopLevel=*/true, 0, visited);
+    }
+
+    // 루트에서 닿지 않는 캔버스가 있으면 여기서 줍는다. 예전 구현이 Canvases 목록을
+    // 따로 돌았으므로, 그런 캔버스가 있어도 동작이 달라지지 않게 남겨 둔다.
+    for (auto& weakCanvas : Canvases)
+    {
+        auto canvasObj = weakCanvas.lock();
+        if (!canvasObj || canvasObj->IsDestroyMark()) continue;
+        if (visited.count(canvasObj.get())) continue;
+
+        LayoutUINode(canvasObj.get(), screenRect, 1.f, false, true, 0, visited);
+    }
+}
+
+void Scene::LayoutUISubtree(GameObject* root)
+{
+    if (nullptr == root) return;
+
+    // 부모 기준은 컴포넌트와 같은 규칙으로 찾는다 — 여기에 (0,0,W,H)를 따로 적어
+    // 두었던 곳들이 캔버스 규약과 어긋나 있었다(PHASE 7-2에서 두 곳, 7-5에서 세 곳).
+    Mathf::Rect parentRect = RectTransformComponent::GetScreenRootRect();
+    float parentScale = 1.f;
+    bool isTopLevel = true;
+
+    if (GameObject::IsValidIndex(root->m_parentIndex))
+    {
+        if (GameObject* parent = GameObject::FindIndex(root->m_parentIndex))
+        {
+            if (auto* parentRT = parent->GetComponent<RectTransformComponent>())
+            {
+                parentRect = parentRT->GetWorldRect();
+                parentScale = parentRT->GetLayoutScale();
+                isTopLevel = false;
+            }
+        }
+    }
+
+    std::unordered_set<GameObject*> visited;
+    LayoutUINode(root, parentRect, parentScale, /*parentChanged=*/true, isTopLevel, 0, visited);
 }
 
 void Scene::SetInternalPhysicData()
@@ -1856,6 +1940,10 @@ void Scene::SetInternalPhysicData()
 
 void Scene::AllUpdateWorldMatrix()
 {
+    // UI 레이아웃은 부모→자식 의존 사슬이라 직렬로 먼저 끝낸다. 아래 병렬 순회는
+    // 트랜스폼 행렬만 다루므로 UI rect를 건드리지 않는다(PHASE 7-5).
+    UpdateUILayout();
+
     if (m_SceneObjects.empty()) return;
 
     auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
@@ -1873,18 +1961,8 @@ void Scene::AllUpdateWorldMatrix()
 
 void Scene::AllUIUpdateWorldMatrix()
 {
-    if (m_SceneObjects.empty()) return;
-
-    auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
-    auto updateFunc = [this](GameObject::Index index)
-    {
-        UpdateUIRecursive(index);
-    };
-
-    if (!rootObjects.empty())
-    {
-        std::for_each(std::execution::par, rootObjects.begin(), rootObjects.end(), updateFunc);
-    }
+    // 일시정지 중 UI만 갱신하는 경로. 이제 UpdateUILayout 하나면 된다(PHASE 7-5).
+    UpdateUILayout();
 }
 
 void Scene::AddCanvas(const std::shared_ptr<GameObject>& canvas)
@@ -1951,4 +2029,5 @@ std::shared_ptr<GameObject> Scene::FindCanvasIndex(size_t index)
     }
     return nullptr;
 }
+
 

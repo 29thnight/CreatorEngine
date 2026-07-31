@@ -13,6 +13,7 @@ ReflectionFieldInheritance(ImageComponent, UIComponent) \
 		meta_property(unionScale) \
 		meta_property(clipPercent) \
 		meta_property(clipDirection) \
+		meta_property(useNativeTextureSize) \
 	}); \
 	MethodField \
 	({ \

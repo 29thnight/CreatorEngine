@@ -24,7 +24,7 @@ void UIButton::UpdateCollider()
     auto quater = m_pOwner->m_transform.GetWorldQuaternion();
     /*obBox.Orientation = quater;*/
 	XMStoreFloat4(&obBox.Orientation, quater);
-	obBox.Orientation.w = 1.0f; // QuaternionÀÇ w°ªÀ» 1·Î ¼³Á¤ÇÏ¿© È¸ÀüÀÌ ¾øÀ½À» ³ªÅ¸³¿
+	obBox.Orientation.w = 1.0f; // Quaternionï¿½ï¿½ wï¿½ï¿½ï¿½ï¿½ 1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ È¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½
 }
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
@@ -67,6 +67,9 @@ bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 
 void UIButton::Click()
 {
+	// C++ ì½œë°±ì´ ì—†ì–´ë„ ì„¸ìš´ë‹¤ â€” C# ìª½ì€ ConsumeClicked í´ë§ìœ¼ë¡œ ë°›ëŠ”ë‹¤.
+	m_wasClicked = true;
+
 	if (m_clickFunction)
 	{
 		m_clickFunction();

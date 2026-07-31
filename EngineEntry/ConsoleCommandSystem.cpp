@@ -11,10 +11,13 @@
 #include "UIManager.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
+#include "RectTransformComponent.h"
+#include "UIButton.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
 #include "DataSystem.h"
 #include "DeviceResources.h"
+#include "DeviceState.h"
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "CoreWindow.h"
@@ -23,6 +26,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <functional>
+#include <unordered_set>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -583,6 +588,230 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("[CLI] 프리팹 소환: %s -> %s (index=%d)\n",
             parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
     }
+    else if (cmd == "window.resize")
+    {
+        // 해상도 독립 검증용(PHASE 7). 창을 실제로 리사이즈해 엔진의 리사이즈 경로를
+        // 그대로 태운다 — g_ClientRect 갱신부터 UI 리플로우까지 실제 흐름을 검증해야
+        // 의미가 있다.
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: window.resize <너비> <높이>\n");
+            return;
+        }
+
+        const int width = std::atoi(parts[1].c_str());
+        const int height = std::atoi(parts[2].c_str());
+        if (width < 320 || height < 240)
+        {
+            std::printf("[CLI] 너무 작은 크기입니다: %dx%d\n", width, height);
+            return;
+        }
+
+        // GetActiveWindow는 창이 포그라운드가 아니면 null을 준다. 스크립트 실행은
+        // 대개 백그라운드라 이 경로가 실제로 걸리므로, 프로세스의 보이는 최상위 창을
+        // 직접 찾아 대체한다.
+        HWND hwnd = ::GetActiveWindow();
+        if (nullptr == hwnd)
+        {
+            ::EnumWindows([](HWND candidate, LPARAM out) -> BOOL
+            {
+                DWORD pid = 0;
+                ::GetWindowThreadProcessId(candidate, &pid);
+                if (pid != ::GetCurrentProcessId()) return TRUE;
+                if (!::IsWindowVisible(candidate)) return TRUE;
+                if (::GetWindow(candidate, GW_OWNER) != nullptr) return TRUE;
+
+                *reinterpret_cast<HWND*>(out) = candidate;
+                return FALSE;
+            }, reinterpret_cast<LPARAM>(&hwnd));
+        }
+        if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return; }
+
+        // 클라이언트 영역이 요청 크기가 되도록 창 전체 크기를 역산한다.
+        RECT desired{ 0, 0, width, height };
+        const LONG style = ::GetWindowLong(hwnd, GWL_STYLE);
+        const LONG exStyle = ::GetWindowLong(hwnd, GWL_EXSTYLE);
+        ::AdjustWindowRectEx(&desired, style, FALSE, exStyle);
+
+        ::SetWindowPos(hwnd, nullptr, 0, 0,
+            desired.right - desired.left, desired.bottom - desired.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+        // 요청한 크기가 그대로 적용되지 않을 수 있다(모니터보다 큰 창은 잘린다).
+        // 요청값만 찍으면 검증에서 엉뚱한 기준을 잡게 되므로 실제 결과를 읽어 보고한다.
+        RECT actual{};
+        ::GetClientRect(hwnd, &actual);
+        const int actualWidth = actual.right - actual.left;
+        const int actualHeight = actual.bottom - actual.top;
+
+        const std::string message = (actualWidth == width && actualHeight == height)
+            ? "[CLI] 창 크기 변경: " + std::to_string(actualWidth) + "x" + std::to_string(actualHeight)
+            : "[CLI] 창 크기 변경(클램프됨): 요청 " + std::to_string(width) + "x" + std::to_string(height) +
+              " -> 실제 " + std::to_string(actualWidth) + "x" + std::to_string(actualHeight);
+
+        Debug->LogWarning(message);
+        std::printf("%s\n", message.c_str());
+    }
+    else if (cmd == "ui.rect")
+    {
+        // 오브젝트 이하 전체의 worldRect를 재귀로 찍는다. 이름 대신 *를 주면 씬의
+        // 모든 RectTransform을 훑는다 — 해상도를 바꿔 가며, 또는 코드를 고치기
+        // 전후로 같은 명령을 돌려 레이아웃 결과를 통째로 대조하기 위한 것이다(PHASE 7).
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: ui.rect <오브젝트 이름 | *>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 재귀 깊이 상한 — 계층이 순환하더라도 CLI가 스택을 태우지 않게 한다.
+        constexpr int kMaxDepth = 32;
+
+        std::function<void(GameObject*, int)> dump = [&](GameObject* obj, int depth)
+        {
+            if (nullptr == obj || depth > kMaxDepth) return;
+
+            if (auto* rect = obj->GetComponent<RectTransformComponent>())
+            {
+                const auto& world = rect->GetWorldRect();
+                const auto& size = rect->GetSizeDelta();
+                const std::string line =
+                    std::string(static_cast<size_t>(depth) * 2, ' ') + obj->m_name.ToString() +
+                    " world(" + std::to_string(static_cast<int>(world.x)) + ", " +
+                    std::to_string(static_cast<int>(world.y)) + ", " +
+                    std::to_string(static_cast<int>(world.width)) + ", " +
+                    std::to_string(static_cast<int>(world.height)) + ")" +
+                    " sizeDelta(" + std::to_string(static_cast<int>(size.x)) + ", " +
+                    std::to_string(static_cast<int>(size.y)) + ")" +
+                    " anchor(" + std::to_string(rect->GetAnchorMin().x).substr(0, 4) + "," +
+                    std::to_string(rect->GetAnchorMin().y).substr(0, 4) + "-" +
+                    std::to_string(rect->GetAnchorMax().x).substr(0, 4) + "," +
+                    std::to_string(rect->GetAnchorMax().y).substr(0, 4) + ")" +
+                    " scale(" + std::to_string(rect->GetLayoutScale()).substr(0, 5) + ")";
+
+                std::printf("[CLI] %s\n", line.c_str());
+                Debug->LogWarning("[ui.rect] " + line);
+            }
+
+            for (auto childIndex : obj->m_childrenIndices)
+            {
+                dump(GameObject::FindIndex(childIndex), depth + 1);
+            }
+        };
+
+        if (parts[1] == "*")
+        {
+            // 최상위는 "아무의 자식도 아닌 오브젝트"로 가린다. m_parentIndex만 보고
+            // 판별했더니 프리팹 루트 밑의 캔버스가 최상위로도 잡혀 같은 서브트리가
+            // 두 번 찍혔다 — 대조에서 개수가 정확히 두 배가 되어 드러났다.
+            std::unordered_set<GameObject::Index> childIndices;
+            for (const auto& obj : scene->m_SceneObjects)
+            {
+                if (!obj || obj->IsDestroyMark()) continue;
+                for (auto childIndex : obj->m_childrenIndices) childIndices.insert(childIndex);
+            }
+
+            for (const auto& obj : scene->m_SceneObjects)
+            {
+                if (!obj || obj->IsDestroyMark()) continue;
+                if (childIndices.count(obj->m_index)) continue;
+                dump(obj.get(), 0);
+            }
+        }
+        else
+        {
+            GameObject* target = scene->GetGameObject(parts[1]).get();
+            if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
+            dump(target, 0);
+        }
+    }
+    else if (cmd == "ui.anchor" || cmd == "ui.size")
+    {
+        // 스트레치 앵커처럼 저작 데이터에 없는 배치를 검증하려면 값을 직접 넣어 봐야 한다.
+        // ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY> / ui.size <오브젝트> <x> <y>
+        const size_t needed = (cmd == "ui.anchor") ? 6 : 4;
+        if (parts.size() < needed)
+        {
+            std::printf("[CLI] 사용법: ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>"
+                " · ui.size <오브젝트> <x> <y>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        GameObject* target = scene->GetGameObject(parts[1]).get();
+        if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
+
+        auto* rect = target->GetComponent<RectTransformComponent>();
+        if (!rect) { std::printf("[CLI] RectTransform 없음: %s\n", parts[1].c_str()); return; }
+
+        if (cmd == "ui.anchor")
+        {
+            const Mathf::Vector2 min{ std::strtof(parts[2].c_str(), nullptr), std::strtof(parts[3].c_str(), nullptr) };
+            const Mathf::Vector2 max{ std::strtof(parts[4].c_str(), nullptr), std::strtof(parts[5].c_str(), nullptr) };
+            rect->SetAnchorMin(min);
+            rect->SetAnchorMax(max);
+            std::printf("[CLI] %s 앵커 = (%.2f,%.2f)-(%.2f,%.2f)\n",
+                parts[1].c_str(), min.x, min.y, max.x, max.y);
+        }
+        else
+        {
+            const Mathf::Vector2 size{ std::strtof(parts[2].c_str(), nullptr), std::strtof(parts[3].c_str(), nullptr) };
+            rect->SetSizeDelta(size);
+            std::printf("[CLI] %s sizeDelta = (%.2f,%.2f)\n", parts[1].c_str(), size.x, size.y);
+        }
+    }
+    else if (cmd == "ui.hitbox")
+    {
+        // 버튼의 클릭 판정 상자를 rect와 나란히 찍는다. 두 값이 같아야 보이는 곳과
+        // 눌리는 곳이 일치한다 — 해상도가 바뀌어도 유지되는지가 검증 대상이다(PHASE 7-7).
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        int reported = 0;
+        for (const auto& owned : scene->m_SceneObjects)
+        {
+            GameObject* owner = owned.get();
+            if (nullptr == owner || owner->IsDestroyMark()) continue;
+
+            auto* button = owner->GetComponent<UIButton>();
+            if (nullptr == button) continue;
+
+            auto* rect = owner->GetComponent<RectTransformComponent>();
+            if (nullptr == rect) continue;
+
+            const auto& box = button->GetCollider();
+            const auto& world = rect->GetWorldRect();
+            const std::string line = owner->m_name.ToString() +
+                " rect(" + std::to_string(static_cast<int>(world.x)) + ", " +
+                std::to_string(static_cast<int>(world.y)) + ", " +
+                std::to_string(static_cast<int>(world.width)) + ", " +
+                std::to_string(static_cast<int>(world.height)) + ")" +
+                " hitbox(" + std::to_string(static_cast<int>(box.Center.x - box.Extents.x)) + ", " +
+                std::to_string(static_cast<int>(box.Center.y - box.Extents.y)) + ", " +
+                std::to_string(static_cast<int>(box.Extents.x * 2.f)) + ", " +
+                std::to_string(static_cast<int>(box.Extents.y * 2.f)) + ")";
+
+            std::printf("[CLI] %s\n", line.c_str());
+            Debug->LogWarning("[ui.hitbox] " + line);
+            ++reported;
+        }
+
+        if (0 == reported) std::printf("[CLI] 버튼 없음\n");
+    }
+    else if (cmd == "window.info")
+    {
+        // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
+        // 도달했는지를 UI 계산과 같은 출처(g_ClientRect)로 확인한다.
+        const auto& client = DirectX11::DeviceStates->g_ClientRect;
+        std::printf("[CLI] 클라이언트 영역: %.0fx%.0f\n", client.width, client.height);
+        Debug->LogWarning("[CLI] 클라이언트 영역: " +
+            std::to_string(static_cast<int>(client.width)) + "x" +
+            std::to_string(static_cast<int>(client.height)));
+    }
     else if (cmd == "ui.status")
     {
         // 지연 연결 상태를 숫자로 본다. 레지스트리 등록 수와 그중 캔버스가 연결된 수,
@@ -1067,6 +1296,12 @@ void ConsoleCommandSystem::PrintHelp() const
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
+        "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
+        "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
+        "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
+        "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
+        "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"
+        "  ui.hitbox            버튼의 rect와 클릭 판정 상자를 나란히 출력한다\n"
         "  script.add <오브젝트> <타입>  C# 스크립트를 오브젝트에 부착한다\n"
         "  script.fields <id>   스크립트의 노출 필드와 현재 값을 확인한다\n"
         "  script.set <id> <인덱스> <값>  노출 필드 값을 바꾼다\n"

@@ -28,7 +28,18 @@ public sealed class RectTransformComponent : NativeComponent
         set => Native.RectSetPivot(OwnerHandle, value);
     }
 
+    /// <summary>계산된 최종 사각형 (X=x, Y=y, Z=width, W=height 순으로 담겨 온다).</summary>
+    public (float X, float Y, float Width, float Height) WorldRect
+    {
+        get
+        {
+            Color4 raw = Native.RectGetWorldRect(OwnerHandle);
+            return (raw.R, raw.G, raw.B, raw.A);
+        }
+    }
+
     /// <summary>남의 UI를 옮길 때. 프로퍼티 대입은 임시 복사본이라 막혀 있다.</summary>
+
     public void SetAnchoredPosition(Float2 position) => Native.RectSetAnchoredPosition(OwnerHandle, position);
 }
 
@@ -45,6 +56,31 @@ public abstract class UIComponent : NativeComponent
     {
         get => Native.UiGetOrder(OwnerHandle);
         set => Native.UiSetOrder(OwnerHandle, value);
+    }
+
+    /// <summary>
+    /// 패드/키 내비게이션이 지금 이 UI를 가리키고 있는지.
+    /// 게임 메뉴 버튼의 표준 형태가 이 값 + 입력 조합이다(실측 5회):
+    /// <code>if (image.IsSelected &amp;&amp; Input.GetButtonDown(0, GamepadButton.A)) { ... }</code>
+    /// </summary>
+    public bool IsSelected => Native.UiIsSelected(OwnerHandle);
+
+    /// <summary>잠그면 내비게이션이 이 UI에서 다른 곳으로 이동하지 않는다(팝업 고정 등).</summary>
+    public bool NavLock
+    {
+        get => Native.UiIsNavLocked(OwnerHandle);
+        set => Native.UiSetNavLock(OwnerHandle, value);
+    }
+}
+
+/// <summary>UI 내비게이션(패드/키 메뉴 이동) 전역 상태.</summary>
+public static class UINavigation
+{
+    /// <summary>현재 선택된 UI 오브젝트. 없으면 <c>IsAlive</c>가 false다.</summary>
+    public static GameObject Selected
+    {
+        get => new(Native.UiNavGetSelected());
+        set => Native.UiNavSetSelected(value.Handle);
     }
 }
 
@@ -74,6 +110,44 @@ public sealed class ImageComponent : UIComponent
         get => Native.ImageGetClipPercent(OwnerHandle);
         set => Native.ImageSetClipPercent(OwnerHandle, value);
     }
+
+    /// <summary>현재 표시 중인 텍스처 번호(실측 5회 — 상태 아이콘 판별에 쓰인다).</summary>
+    public int TextureIndex => Native.ImageGetTextureIndex(OwnerHandle);
+
+    /// <summary>
+    /// RectTransform의 크기를 현재 텍스처의 픽셀 크기로 맞춘다(uGUI의 SetNativeSize).
+    ///
+    /// 예전에는 엔진이 Awake마다 이것을 자동으로 해서, 스크립트가 SizeDelta를 정해도
+    /// 다음 Awake에 지워졌다. 이제는 부를 때만 동작하므로 크기를 스크립트가 쥔다.
+    /// 텍스처가 아직 로드되지 않았으면(크기 0) 아무것도 하지 않는다.
+    /// </summary>
+    public void SetNativeSize() => Native.ImageSetNativeSize(OwnerHandle);
+
+    /// <summary>회전(라디안). 로딩 스피너 같은 회전 연출에 쓴다(실측 4회).</summary>
+    public float Rotation
+    {
+        get => Native.ImageGetRotation(OwnerHandle);
+        set => Native.ImageSetRotation(OwnerHandle, value);
+    }
+}
+
+/// <summary>
+/// 네이티브 <c>UIButton</c>의 스크립트 쪽 얼굴.
+///
+/// 클릭 판정(마우스 히트 테스트)은 엔진이 하고, 결과만 폴링으로 받는다 —
+/// 콜백 델리게이트를 경계 너머로 넘기지 않는 것이 틱당 1회 규약과 맞고,
+/// 클릭은 프레임당 최대 1회라 래치 하나로 유실 없이 전달된다.
+/// <code>
+/// public override void Update(float tick)
+/// {
+///     if (_button.WasClicked()) OpenMenu();
+/// }
+/// </code>
+/// </summary>
+public sealed class UIButton : UIComponent
+{
+    /// <summary>지난 폴링 이후 클릭됐는지. 읽으면 플래그가 내려간다(소모형).</summary>
+    public bool WasClicked() => Native.ButtonConsumeClicked(OwnerHandle);
 }
 
 /// <summary>
@@ -138,3 +212,4 @@ public sealed class Canvas : NativeComponent
         set => Native.CanvasSetName(OwnerHandle, value);
     }
 }
+

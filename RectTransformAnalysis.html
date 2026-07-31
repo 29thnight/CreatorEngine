@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RectTransform 구조 분석 & uGUI 수준 도달 계획</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2129; --border: #30363d;
+    --text: #c9d1d9; --text-dim: #8b949e; --accent: #58a6ff; --accent-2: #3fb950;
+    --warn: #d29922; --danger: #f85149; --purple: #bc8cff; --crit: #ff4d6d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; line-height: 1.65; padding: 32px 24px 80px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--text-dim); font-size: 13.5px; margin-bottom: 28px; }
+  h2 { font-size: 19px; margin: 42px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h2 .no { color: var(--accent); margin-right: 8px; }
+  h3 { font-size: 15.5px; margin: 22px 0 10px; color: var(--accent); }
+  p { margin: 10px 0; font-size: 14.5px; }
+  code { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 13px; font-family: Consolas, monospace; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 13px; font-family: Consolas, monospace; margin: 12px 0; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th { background: var(--surface2); text-align: left; padding: 9px 12px; border: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 12px; border: 1px solid var(--border); vertical-align: top; }
+  .tldr { border-left: 4px solid var(--danger); background: var(--surface); border-radius: 0 10px 10px 0; padding: 16px 20px; margin: 18px 0; }
+  .tldr b { color: #fff; }
+  .evidence { border-left: 4px solid var(--accent-2); background: var(--surface); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 13.5px; }
+  .sev { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .p0 { background: rgba(255,77,109,.15); color: var(--crit); border: 1px solid var(--crit); }
+  .p1 { background: rgba(210,153,34,.15); color: var(--warn); border: 1px solid var(--warn); }
+  .p2 { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid var(--accent); }
+  .ok { color: var(--accent-2); font-weight: 600; }
+  .no2 { color: var(--danger); font-weight: 600; }
+  .half { color: var(--warn); font-weight: 600; }
+  .flow { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.9; overflow-x: auto; white-space: pre; margin: 12px 0; }
+  .fl-bad { color: var(--danger); }
+  .fl-note { color: var(--text-dim); }
+  ul, ol { margin: 8px 0 8px 22px; font-size: 14px; }
+  li { margin: 5px 0; }
+  .plan-goal { border-left: 4px solid var(--purple); background: var(--surface); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>RectTransform 구조 분석 &amp; uGUI 수준 도달 계획</h1>
+<div class="sub">작성 기준: kApiVersion 17 · 검증 도구: RectLayoutProbe(C#) + CLI 무인 실행 · 관련: RefactoringPlanDashboard PHASE 6(UI 소유권) 후속</div>
+
+<div class="tldr">
+<b>결론: 의심이 맞다 — 현재 UI 레이아웃은 저작 시점 해상도(1920×1080)에 고정되어 있다.</b><br>
+세 겹의 증거가 겹친다. ① 최상위 캔버스는 프레임 레이아웃 드라이버가 <b>구조적으로 건너뛰어</b>
+worldRect가 영영 재계산되지 않고, ② 파생값인 <code>m_worldRect</code>가 프리팹/씬에
+<b>직렬화되어 저작 해상도가 파일에 구워지며</b>, ③ 창 크기 변경 경로(OnResize)에 UI 재배치가
+<b>존재하지 않는다</b>. 셋 다 정적 분석으로 짚고 런타임 테스트로 재현했다.
+1920×1080이 아닌 어떤 해상도에서도 UI는 저작 당시 픽셀 좌표에 그대로 남는다.
+</div>
+
+<!-- ═══════════════ 1. 현재 구조 ═══════════════ -->
+<h2><span class="no">1</span>현재 데이터 흐름</h2>
+
+<div class="flow">[저작]  에디터에서 1920×1080 기준으로 배치
+   │      anchorMin/Max · anchoredPosition · sizeDelta · pivot
+   │      <span class="fl-bad">+ m_worldRect(파생값)까지 통째로 직렬화</span>          ← F-2
+   ▼
+[로드]  ComponentFactory → Meta::Deserialize
+   │      worldRect = 파일의 값 그대로 (예: -960,-540,1920,1080)
+   │      <span class="fl-bad">ImageComponent::Awake가 sizeDelta를 텍스처 픽셀 크기로 덮어씀</span> ← F-7
+   ▼
+[매 프레임]  Scene::UpdateModelRecursive (case GameObjectType::UI)
+   │      부모의 RectTransform.worldRect를 기준으로 UpdateLayout
+   │      <span class="fl-bad">부모에 RectTransform이 없으면 return → 최상위 캔버스는 영영 미갱신</span> ← F-1
+   │      dirty가 아니면 조기 반환 → 부모 rect가 변해도 자식은 모름   ← F-10
+   ▼
+[소비]  worldRect → ImageComponent::pos/scale → UIRenderProxy → 렌더
+        UIButton::CheckClick만 gameView→백버퍼 스케일 변환 수행
+
+[창 크기 변경]  Dx11Main::CreateWindowSizeDependentResources
+        스왑체인·카메라만 재구성. <span class="fl-bad">UI 리핏 경로 없음</span>              ← F-3
+<span class="fl-note">// g_ClientRect 폴백은 Get/SetAnchoredPosition의 좌표 변환(ResolveParentRect)에만
+// 쓰인다 — 프레임 드라이버와 기준이 서로 다르다.</span></div>
+
+<!-- ═══════════════ 2. 발견 사항 ═══════════════ -->
+<h2><span class="no">2</span>정적 분석 발견 사항</h2>
+
+<table>
+<tr><th>#</th><th>발견</th><th>위치</th><th>심각도</th></tr>
+<tr><td>F-1</td><td><b>최상위 캔버스 리레이아웃 부재.</b> 프레임 드라이버(UpdateModelRecursive/UpdateUIRecursive의 UI 분기)는 부모의 RectTransform을 요구하고 없으면 return한다. 캔버스의 부모는 씬 루트(RectTransform 없음)이므로 캔버스의 UpdateLayout은 <b>어떤 경로로도 불리지 않는다</b>. worldRect는 로드 시점 값으로 동결.</td><td>Scene.cpp:1680-1692, 1748-1762</td><td><span class="sev p0">P0</span></td></tr>
+<tr><td>F-2</td><td><b>파생값 직렬화.</b> <code>m_worldRect</code>가 [[Property]]로 파일에 저장된다. 저작 해상도가 데이터에 구워지고, F-1 때문에 로드 후 교정 기회도 없다. 원점 규약마저 파일마다 다르다(중심 원점 <code>-960,-540</code> vs 좌상단 <code>0,0</code> — 실제 프리팹에서 두 형태 공존 확인).</td><td>RectTransformComponent.h:76-77, 프리팹 10여 개</td><td><span class="sev p0">P0</span></td></tr>
+<tr><td>F-3</td><td><b>해상도 변경 대응 부재.</b> OnResize 경로는 스왑체인·카메라만 재구성하고 UI는 건드리지 않는다. MakeCanvas는 생성 순간의 <code>DirectX11::GetWidth/Height</code>로 크기를 박제한다. <code>g_ClientRect</code> 폴백은 Get/Set 좌표 변환에만 쓰여 드라이버와 기준이 불일치한다.</td><td>Dx11Main.cpp:249-, UIManager.cpp:33-39, RectTransformComponent.cpp:70-73</td><td><span class="sev p0">P0</span></td></tr>
+<tr><td>F-4</td><td><b>CanvasScaler 부재.</b> 기준 해상도·스케일 정책(ScaleWithScreenSize/ConstantPixel/match 계수)이라는 개념 자체가 없다. F-1~3을 고쳐 "현재 화면 크기 추종"이 되어도, 1920×1080 기준으로 저작된 픽셀 값들은 다른 화면비에서 비례 축소되지 않는다.</td><td>(해당 구조 없음)</td><td><span class="sev p1">P1</span></td></tr>
+<tr><td>F-5</td><td><b>좌표 규약 혼선.</b> 헤더 주석은 피벗 (0,0)=좌측 하단(y-up)이라 하는데, AnchorPreset은 Top이 y=0(y-down·화면 좌표)이다. 프리팹 데이터의 원점도 두 규약이 공존한다(F-2). 코드·주석·데이터 삼자가 서로 다른 규약을 말한다.</td><td>RectTransformComponent.h:71-73 vs .cpp:167-183</td><td><span class="sev p1">P1</span></td></tr>
+<tr><td>F-6</td><td><b>Stretch 프리셋 복붙 버그.</b> StretchLeft/Center/Right가 전부 동일한 앵커를 설정하고(주석에도 "Middle과 동일"), StretchTop/Middle/Bottom도 마찬가지다. 9종 스트레치 중 실질 3종만 존재한다.</td><td>RectTransformComponent.cpp:186-196</td><td><span class="sev p2">P2</span></td></tr>
+<tr><td>F-7</td><td><b>레이아웃 크기가 텍스처 픽셀에 종속.</b> ImageComponent::Awake가 <code>rect->SetSizeDelta(uiinfo.size)</code>로 저작된 크기를 텍스처 픽셀 크기로 덮어쓴다. 텍스처가 없으면 0×0이 된다 — 런타임 테스트에서 QuestBg의 worldRect가 (172, 101, <b>0, 0</b>)으로 실증. uGUI의 SetNativeSize(명시적 호출)에 해당하는 동작이 암묵 기본값이 된 형태.</td><td>ImageComponent.cpp:96-112</td><td><span class="sev p1">P1</span></td></tr>
+<tr><td>F-8</td><td><b>렌더 위치 계산식 의심.</b> <code>pos = worldRect.x + width * 2 * pivot.x</code> — ×2 계수의 근거가 불명. 피벗 0.5일 때 x+width(우측 끝)가 나온다. origin(텍스처 중심)과 상쇄되는 보정일 가능성이 있으나, 상쇄에 의존한 식은 worldRect 의미를 바꾸는 순간 깨진다.</td><td>ImageComponent.cpp:101-105</td><td><span class="sev p2">P2</span></td></tr>
+<tr><td>F-9</td><td><b>레이아웃 순회 삼중화.</b> 같은 UI 갱신 로직이 UpdateModelRecursive와 UpdateUIRecursive에 복제돼 있고, UpdateLayout 내부에도 자식 재귀가 또 있다(thread_local visited 가드로 순환만 막음). 순회 소유권이 불명확해 갱신 순서·횟수를 추론하기 어렵다.</td><td>Scene.cpp:1661-/1734-, RectTransformComponent.cpp:141-160</td><td><span class="sev p2">P2</span></td></tr>
+<tr><td>F-10</td><td><b>dirty 전파 불완전.</b> 자식의 재계산은 "부모의 UpdateLayout이 돌 때" 전파되는 구조인데, F-1로 최상위가 돌지 않으니 화면 크기 기반의 전파 사슬 전체가 시동조차 걸리지 않는다. 부모 rect만 변한 경우(자식 dirty 아님) 자식이 낡은 값을 유지하는 설계이기도 하다.</td><td>RectTransformComponent.cpp:115-160</td><td><span class="sev p1">P1</span></td></tr>
+</table>
+
+<!-- ═══════════════ 3. 런타임 검증 ═══════════════ -->
+<h2><span class="no">3</span>런타임 검증 (RectLayoutProbe)</h2>
+
+<p>실제 게임 프리팹 <code>Canvas.prefab</code>을 소환하고 C# 바인딩(<code>RectTransform.WorldRect</code>,
+이번 분석을 위해 추가)으로 계산 결과를 직접 읽었다. 무인 CLI 실행, 종료 코드 0.</p>
+
+<pre>[RectLayoutProbe] 화면 (1920, 1080) · 캔버스 SizeDelta (1920, 1080) · worldRect (-960, -540, 1920, 1080)
+[RectLayoutProbe] H1 — worldRect 원점 (-960, -540): 중심 원점(직렬화 원본 그대로)
+[RectLayoutProbe] 자식 'QuestBg' worldRect (172, 101, 0, 0)
+[RectLayoutProbe] 캔버스 SizeDelta를 960x540으로 변경 — 반영 대기
+[RectLayoutProbe] 30프레임 후 캔버스 worldRect (-960, -540, 1920, 1080)
+[RectLayoutProbe] H2 — 캔버스 worldRect 재계산: 안 됨 (드라이버가 최상위를 건너뜀)
+[RectLayoutProbe] H3 — 자식 'QuestBg' 반응: 그대로 (부모 변경 미전파)</pre>
+
+<div class="evidence">
+<b>H1 확정</b> — 캔버스 worldRect가 파일에 저장된 값 그대로다(중심 원점 −960,−540). 현재 화면과 대조·재계산되지 않는다. (F-1+F-2)<br>
+<b>H2 확정</b> — SizeDelta를 960×540으로 바꿔도 30프레임 뒤 worldRect는 1920×1080 그대로. 최상위는 드라이버 사각지대다. (F-1)<br>
+<b>H3 확정</b> — 자식도 전혀 반응하지 않는다. 화면 크기→캔버스→자식으로 내려가는 전파 사슬이 존재하지 않는다. (F-10)<br>
+<b>보너스</b> — QuestBg의 크기 0×0: 텍스처 미로드 상태에서 Awake가 SizeDelta를 0으로 덮어쓴 결과. (F-7 실증)
+</div>
+
+<!-- ═══════════════ 4. uGUI 갭 ═══════════════ -->
+<h2><span class="no">4</span>uGUI 대비 격차 매트릭스</h2>
+
+<table>
+<tr><th>기능</th><th>uGUI</th><th>현재</th><th>비고</th></tr>
+<tr><td>앵커 (min/max 분리, 부분 스트레치)</td><td>O</td><td><span class="half">부분</span></td><td>수학 모델은 uGUI와 동형. 프리셋 버그(F-6)와 규약 혼선(F-5)이 발목</td></tr>
+<tr><td>피벗</td><td>O</td><td><span class="ok">있음</span></td><td>동작함. 주석 규약만 오기</td></tr>
+<tr><td>해상도 추종 (창 크기 변경 대응)</td><td>O</td><td><span class="no2">없음</span></td><td>F-1·F-3. 이번 분석의 핵심 결손</td></tr>
+<tr><td>CanvasScaler (기준 해상도·match)</td><td>O</td><td><span class="no2">없음</span></td><td>F-4</td></tr>
+<tr><td>회전·스케일 반영 레이아웃</td><td>O</td><td><span class="no2">없음</span></td><td>Rect는 축 정렬 x,y,w,h. Image.rotate는 렌더 전용, 버튼 히트만 OBB로 3D 쿼터니언 참조(비대칭)</td></tr>
+<tr><td>SetNativeSize (명시적)</td><td>O</td><td><span class="half">암묵 강제</span></td><td>F-7 — 선택이 아니라 Awake마다 강제 실행</td></tr>
+<tr><td>레이아웃 그룹 / ContentSizeFitter</td><td>O</td><td><span class="no2">없음</span></td><td>수동 배치만 가능</td></tr>
+<tr><td>이벤트 시스템 (클릭·내비게이션)</td><td>O</td><td><span class="half">부분</span></td><td>버튼 클릭 + 패드 내비 존재. 호버/드래그/스크롤 없음</td></tr>
+<tr><td>중첩 캔버스 / 서브캔버스</td><td>O</td><td><span class="half">부분</span></td><td>계층 소속(PHASE 6에서 관계 기반화)은 됨. 렌더 분리·개별 스케일은 없음</td></tr>
+</table>
+
+<!-- ═══════════════ 5. 계획 ═══════════════ -->
+<h2><span class="no">5</span>uGUI 수준 도달 계획 (PHASE 7 제안 · 총 14.5일)</h2>
+
+<div class="plan-goal"><b>전략:</b> "해상도에서 자유로워지는 것"이 목표의 전부다. 순서가 중요하다 —
+파생값 직렬화(F-2)를 끊고 루트 리핏(F-1·F-3)을 만들면 <b>화면 추종</b>이 되고, 그 위에
+CanvasScaler(F-4)를 얹으면 <b>비례 스케일</b>이 된다. 기존 콘텐츠는 기준 해상도를
+1920×1080으로 선언하는 것만으로 무수정 호환된다(현재 데이터가 이미 그 기준으로 저작돼 있으므로).
+레이아웃 그룹 같은 확장은 이 기반이 선 뒤의 별개 단계다.</div>
+
+<table>
+<tr><th>ID</th><th>작업</th><th>내용</th><th>우선</th><th>공수</th></tr>
+<tr><td>7-1</td><td><b>캔버스 루트 리핏</b></td><td>최상위 캔버스의 worldRect를 화면 rect(g_ClientRect)로 매 프레임 갱신하는 루트 드라이버 추가 — F-1의 사각지대 제거. 화면 크기가 변하면 캔버스 dirty → 기존 전파 사슬(F-10)이 자동 시동. OnResize 이벤트에서 전체 dirty 마킹. Get/Set 변환(ResolveParentRect)과 드라이버의 기준 통일.</td><td><span class="sev p0">P0</span></td><td>2일</td></tr>
+<tr><td>7-2</td><td><b>파생값 직렬화 제거</b></td><td><code>m_worldRect</code>를 저장 대상에서 제외하고 로드 시 항상 재계산. 기존 파일의 worldRect 필드는 로드 때 무시(하위 호환 — 파일 수정 불필요). 원점 규약을 좌상단·y-down으로 확정하고 헤더 주석·프리셋·문서 일치화(F-5), Stretch 프리셋 9종 복원(F-6).</td><td><span class="sev p0">P0</span></td><td>2일</td></tr>
+<tr><td>7-3</td><td><b>CanvasScaler</b></td><td>Canvas에 기준 해상도(기본 1920×1080)와 모드(ConstantPixel / ScaleWithScreenSize+match) 추가. 루트 리핏이 화면 rect 대신 "기준 해상도 rect × 스케일"을 공급하는 구조라 7-1 위에 얇게 얹힌다. 폰트 크기·보더에도 동일 스케일 적용. 기존 씬은 기본값으로 현행 유지.</td><td><span class="sev p1">P1</span></td><td>3일</td></tr>
+<tr><td>7-4</td><td><b>SizeDelta-텍스처 분리</b></td><td>ImageComponent::Awake의 SizeDelta 덮어쓰기 제거(F-7). 명시적 <code>SetNativeSize()</code>로 대체하고 C# 바인딩 추가. 텍스처 미로드 시 0×0 붕괴 소멸. 기존 씬에서 "텍스처 크기에 의존하던 이미지"는 로드 시 1회 보정 옵션 제공.</td><td><span class="sev p1">P1</span></td><td>1일</td></tr>
+<tr><td>7-5</td><td><b>레이아웃 순회 일원화</b></td><td>UpdateModelRecursive/UpdateUIRecursive의 중복 UI 분기를 단일 캔버스-루트 패스로 통합(F-9). UpdateLayout 내부 자식 재귀와 thread_local visited 가드 제거 — 순회는 드라이버가, 계산은 컴포넌트가. dirty 규칙 명문화: 부모 rect 변경 시 자식 dirty(F-10).</td><td><span class="sev p1">P1</span></td><td>2일</td></tr>
+<tr><td>7-6</td><td><b>렌더 좌표식 정리</b></td><td>pos의 ×2 계수(F-8)를 worldRect 의미 기준으로 재유도하고 프록시 3종(Image/Text/Sprite)과 버튼 히트 테스트의 좌표 규약을 하나로. 7-1~3 이후 실제 화면에서 픽셀 검증.</td><td><span class="sev p2">P2</span></td><td>1.5일</td></tr>
+<tr><td>7-7</td><td><b>검증 자동화</b></td><td>CLI에 <code>window.resize &lt;w&gt; &lt;h&gt;</code> 추가. RectLayoutProbe를 역방향 단정으로 전환(H1~H3이 이번엔 "반응함"이어야 통과)하고 1280×720/2560×1440/21:9 스위프를 회귀 세트에 편입.</td><td><span class="sev p1">P1</span></td><td>1일</td></tr>
+<tr><td>7-8</td><td><b>(확장) 레이아웃 그룹</b></td><td>Horizontal/Vertical/Grid 레이아웃 그룹 + ContentSizeFitter. 자동 배치가 필요해질 때(인벤토리·목록 UI) 착수 — 기반(7-1~5) 완성이 선행 조건.</td><td><span class="sev p2">P2</span></td><td>2일+</td></tr>
+</table>
+
+<h3>완료 기준</h3>
+<ul>
+  <li>1280×720 / 1920×1080 / 2560×1440 / 21:9에서 동일 씬의 UI가 앵커 의도대로 배치·스케일됨 (스크린샷 대조)</li>
+  <li>실행 중 창 크기 변경 시 1프레임 내 전체 UI 리플로우</li>
+  <li>RectLayoutProbe 역방향 단정 전체 통과 + 해상도 스위프 회귀 편입</li>
+  <li>기존 씬·프리팹 무수정 로드, 1920×1080에서 픽셀 동일(회귀 없음)</li>
+  <li>worldRect가 파일에서 사라지고(신규 저장 기준) 로드 경로가 이를 무시함</li>
+</ul>
+
+<h3>리스크</h3>
+<ul>
+  <li><b>F-8 상쇄 의존</b> — 렌더 좌표식이 worldRect의 현재(잘못된) 의미에 맞춰져 있을 수 있어, 7-1 적용 순간 기존 화면이 틀어질 수 있다. 7-6을 7-1과 같은 브랜치에서 함께 검증할 것.</li>
+  <li><b>중심 원점 프리팹</b> — 원점 규약 확정(7-2) 시 −960,−540형 데이터는 로드 무시로 자연 해소되지만, anchoredPosition에 원점 가정이 스며든 콘텐츠가 있는지 대표 프리팹 4종(HPCanvas·UI_CanvasesIngame·SettingCanvas·SceneTransitionCanvas)으로 선검증.</li>
+  <li><b>에디터 game view</b> — 백버퍼와 game view 크기가 다른 에디터 환경에서 입력 스케일(CheckClick)과 렌더 스케일의 일치를 7-7 스위프에 포함.</li>
+</ul>
+
+</div>
+</body>
+</html>

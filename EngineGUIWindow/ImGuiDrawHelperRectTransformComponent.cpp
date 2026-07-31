@@ -6,46 +6,25 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
-struct PresetInfo {
-	AnchorPreset preset;
-	Mathf::Vector2 anchorMin;
-	Mathf::Vector2 anchorMax;
-	const char* name;
-};
-
-static constexpr std::array<PresetInfo, 16> presets{ {
-		{ AnchorPreset::TopLeft,      {0.f,  0.f},	{0.f,  0.f},	"TopLeft"		},
-		{ AnchorPreset::TopCenter,    {0.5f, 0.f},	{0.5f, 0.f},	"TopCenter"		},
-		{ AnchorPreset::TopRight,     {1.f,  0.f},	{1.f,  0.f},	"TopRight"		},
-		{ AnchorPreset::MiddleLeft,   {0.f,  0.5f},	{0.f,  0.5f},	"MiddleLeft"	},
-		{ AnchorPreset::MiddleCenter, {0.5f, 0.5f}, {0.5f, 0.5f},	"MiddleCenter"	},
-		{ AnchorPreset::MiddleRight,  {1.f,  0.5f},	{1.f,  0.5f},	"MiddleRight"	},
-		{ AnchorPreset::BottomLeft,   {0.f,  1.f},	{0.f,  1.f},	"BottomLeft"	},
-		{ AnchorPreset::BottomCenter, {0.5f, 1.f},	{0.5f, 1.f},	"BottomCenter"	},
-		{ AnchorPreset::BottomRight,  {1.f,  1.f},	{1.f,  1.f},	"BottomRight"	},
-		{ AnchorPreset::StretchLeft,  {0.f,  0.5f},	{1.f,  0.5f},	"StretchLeft"	},
-		{ AnchorPreset::StretchCenter,{0.f,  0.5f},	{1.f,  0.5f},	"StretchCenter"	},
-		{ AnchorPreset::StretchRight, {0.f,  0.5f},	{1.f,  0.5f},	"StretchRight"	},
-		{ AnchorPreset::StretchTop,   {0.5f, 0.f},	{0.5f, 1.f},	"StretchTop"	},
-		{ AnchorPreset::StretchMiddle,{0.5f, 0.f},	{0.5f, 1.f},	"StretchMiddle"	},
-		{ AnchorPreset::StretchBottom,{0.5f, 0.f},	{0.5f, 1.f},	"StretchBottom"	},
-		{ AnchorPreset::StretchAll,   {0.f,  0.f},	{1.f,  1.f},	"StretchAll"	},
-} };
+// í”„ë¦¬ì…‹ í‘œëŠ” RectTransformComponentê°€ ì†Œìœ í•œë‹¤. ì—¬ê¸°ì— ì‚¬ë³¸ì„ ë‘ì—ˆë”ë‹ˆ ê°’ì´
+// ê°ˆë¼ì¡Œê³ , ì–‘ìª½ ëª¨ë‘ ìŠ¤íŠ¸ë ˆì¹˜ 6ì¢…ì´ 3ì¢…ìœ¼ë¡œ ë­‰ê°œì ¸ ìˆì—ˆë‹¤(ë¶„ì„ ë¬¸ì„œ F-6).
+static const AnchorPresetEntry* Presets() { return GetAnchorPresetTable(); }
+static int PresetCount() { return static_cast<int>(GetAnchorPresetCount()); }
 
 static int FindPresetIndex(AnchorPreset p) {
-	for (int i = 0; i < (int)presets.size(); ++i) if (presets[i].preset == p) return i;
+	for (int i = 0; i < PresetCount(); ++i) if (Presets()[i].preset == p) return i;
 	return -1;
 }
 
 static int FindCurrentPresetIndex(RectTransformComponent* rt) {
 	auto a = rt->GetAnchorMin(), b = rt->GetAnchorMax();
-	for (int i = 0; i < (int)presets.size(); ++i)
-		if (VecEq(a, presets[i].anchorMin) && VecEq(b, presets[i].anchorMax)) return i;
+	for (int i = 0; i < PresetCount(); ++i)
+		if (VecEq(a, Presets()[i].anchorMin) && VecEq(b, Presets()[i].anchorMax)) return i;
 	return -1;
 }
 
-// -------------------- ÇÁ¸®¼Â ÆË¾÷: Unity ¹èÄ¡ --------------------
-// 3x3 Æ÷ÀÎÆ® ÇÁ¸®¼Â + °¡·Î½ºÆ®·¹Ä¡ 3 + ¼¼·Î½ºÆ®·¹Ä¡ 3 + ÀüÃ¼½ºÆ®·¹Ä¡ 1
+// -------------------- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¾ï¿½: Unity ï¿½ï¿½Ä¡ --------------------
+// 3x3 ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ + ï¿½ï¿½ï¿½Î½ï¿½Æ®ï¿½ï¿½Ä¡ 3 + ï¿½ï¿½ï¿½Î½ï¿½Æ®ï¿½ï¿½Ä¡ 3 + ï¿½ï¿½Ã¼ï¿½ï¿½Æ®ï¿½ï¿½Ä¡ 1
 static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 {
 	const float pad = 4.f;
@@ -55,13 +34,14 @@ static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 
 	auto drawBtn = [&](AnchorPreset ap) {
 		int i = FindPresetIndex(ap);
-		const auto& pr = presets[i];
-		bool pressed = DrawAnchorIconButton(pr.name, pr.anchorMin, pr.anchorMax, i == cur, cell);
+		if (i < 0) return false;
+		const auto& pr = Presets()[i];
+		bool pressed = DrawAnchorIconButton(pr.label, pr.anchorMin, pr.anchorMax, i == cur, cell);
 		if (pressed) rt->SetAnchorPreset(pr.preset);
 		return pressed;
 		};
 
-	// 3x3 Æ÷ÀÎÆ®
+	// 3x3 ï¿½ï¿½ï¿½ï¿½Æ®
 	{
 		// TL, TC, TR
 		drawBtn(AnchorPreset::TopLeft);   ImGui::SameLine(0, pad);
@@ -81,18 +61,18 @@ static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 	ImGui::Separator();
 	ImGui::Dummy(ImVec2(1, 6));
 
-	// °¡·Î ½ºÆ®·¹Ä¡ 3
+	// ì„¸ë¡œ ìŠ¤íŠ¸ë ˆì¹˜ 3ì¢… â€” ê°€ë¡œ ìœ„ì¹˜(ì¢Œ/ì¤‘ì•™/ìš°)ë§Œ ë‹¤ë¥´ë‹¤
 	drawBtn(AnchorPreset::StretchLeft);   ImGui::SameLine(0, pad);
 	drawBtn(AnchorPreset::StretchCenter); ImGui::SameLine(0, pad);
 	drawBtn(AnchorPreset::StretchRight);
 
-	// ¼¼·Î ½ºÆ®·¹Ä¡ 3
+	// ê°€ë¡œ ìŠ¤íŠ¸ë ˆì¹˜ 3ì¢… â€” ì„¸ë¡œ ìœ„ì¹˜(ìƒ/ì¤‘/í•˜)ë§Œ ë‹¤ë¥´ë‹¤
 	ImGui::Dummy(ImVec2(1, 6));
 	drawBtn(AnchorPreset::StretchTop);     ImGui::SameLine(0, pad);
 	drawBtn(AnchorPreset::StretchMiddle);  ImGui::SameLine(0, pad);
 	drawBtn(AnchorPreset::StretchBottom);
 
-	// ÀüÃ¼ ½ºÆ®·¹Ä¡
+	// ì–‘ì¶• ì „ì²´ ìŠ¤íŠ¸ë ˆì¹˜
 	ImGui::Dummy(ImVec2(1, 6));
 	drawBtn(AnchorPreset::StretchAll);
 }
@@ -110,7 +90,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		auto sizeDelta = rectTransformComponent->GetSizeDelta();
 		auto pivot = rectTransformComponent->GetPivot();
 
-		// ÁÂ: ÇÁ¸®¼Â ÆË¾÷ ¹öÆ° (UnityÃ³·³)
+		// ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¾ï¿½ ï¿½ï¿½Æ° (UnityÃ³ï¿½ï¿½)
 		ImGui::BeginGroup();
 		ImGui::TextUnformatted("Anchors");
 		{
@@ -120,30 +100,29 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 			ImGui::PushID("CurrentPresetButton");
 			bool pressed = ImGui::InvisibleButton("##currentPreset", btnSize);
 
-			// ¹öÆ°ÀÇ ½ÇÁ¦ »ç°¢Çü
+			// ï¿½ï¿½Æ°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ç°¢ï¿½ï¿½
 			ImRect r(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
-			// À§¿¡ ±×¸®±â: °ãÄ§ ¹®Á¦°¡ ÀÖÀ¸¸é ForegroundDrawList »ç¿ë
-			// ImDrawList* dl = ImGui::GetForegroundDrawList(); // Ç×»ó ÃÖ»óÀ§
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½×¸ï¿½ï¿½ï¿½: ï¿½ï¿½Ä§ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ForegroundDrawList ï¿½ï¿½ï¿½
+			// ImDrawList* dl = ImGui::GetForegroundDrawList(); // ï¿½×»ï¿½ ï¿½Ö»ï¿½ï¿½ï¿½
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 
-			// ¹è°æ(È£¹ö/¾×Æ¼ºê ¹İÀÀ)
+			// ï¿½ï¿½ï¿½(È£ï¿½ï¿½/ï¿½ï¿½Æ¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 			ImU32 bgCol = ImGui::IsItemActive() ? IM_COL32(70, 70, 70, 255)
 				: ImGui::IsItemHovered() ? IM_COL32(80, 80, 80, 255)
 				: IM_COL32(60, 60, 60, 255);
 			dl->AddRectFilled(r.Min, r.Max, bgCol, 4.f);
 
-			Mathf::Vector2 calcMin = presets[curIndex].anchorMin;
-			Mathf::Vector2 calcMax = presets[curIndex].anchorMax;
-
+			// curIndexëŠ” í”„ë¦¬ì…‹ê³¼ ì¼ì¹˜í•˜ì§€ ì•Šìœ¼ë©´ -1ì´ë‹¤. ì´ì „ ì½”ë“œëŠ” ì´ ê²€ì‚¬ ì „ì—
+			// presets[curIndex]ë¥¼ ì½ì–´, ì•µì»¤ë¥¼ ì†ìœ¼ë¡œ ì¡°ì ˆí•´ ë‘” ìƒíƒœì—ì„œ ì¸ìŠ¤í™í„°ë¥¼
+			// ì—´ë©´ ë°°ì—´ ë°–ì„ ì½ì—ˆë‹¤.
 			if (curIndex >= 0) {
-				const auto& pr = presets[curIndex];
-				// ¾ÆÀÌÄÜ ºñÁÖ¾ó¸¸ ±×¸®±â (selected=false: ÀÌ¹Ì ÇöÀç ¹öÆ°ÀÌ¶ó Å×µÎ¸® °úµµ ¹æÁö)
+				const auto& pr = Presets()[curIndex];
 				DrawAnchorIconVisual(dl, ImRect(r.Min + ImVec2(4, 4), r.Max - ImVec2(4, 4)),
-					calcMin, calcMax, /*selected=*/false);
+					pr.anchorMin, pr.anchorMax, /*selected=*/false);
 			}
 			else {
-				// Custom »óÅÂ: °£´ÜÇÑ ½ÊÀÚ
+				// Custom ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 				dl->AddLine(ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Min.y + 4), ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Max.y - 4), IM_COL32(200, 200, 200, 255), 1.f);
 				dl->AddLine(ImVec2(r.Min.x + 4, (r.Min.y + r.Max.y) * 0.5f), ImVec2(r.Max.x - 4, (r.Min.y + r.Max.y) * 0.5f), IM_COL32(200, 200, 200, 255), 1.f);
 			}
@@ -153,7 +132,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 
 			if (ImGui::BeginPopup("AnchorPresetPopup"))
 			{
-				DrawAnchorPresetPopup(rectTransformComponent); // ±âÁ¸ ÇÁ¸®¼Â ¸ñ·Ï
+				DrawAnchorPresetPopup(rectTransformComponent); // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 				ImGui::EndPopup();
 			}
 			ImGui::PopID();
@@ -170,7 +149,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 		ImGui::SameLine();
 
-		// ¿ì: °ª ÆíÁı Å×ÀÌºí (¶óº§ | X | Y)
+		// ï¿½ï¿½: ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìºï¿½ (ï¿½ï¿½ | X | Y)
 		if (ImGui::BeginTable("RectTransformTable", 3,
 			ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit, ImVec2(-1, 0)))
 		{
@@ -198,7 +177,9 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 
 			if (anchorsChanged || pivotChanged)
 			{
-				Mathf::Rect parentRect{ 0.f, 0.f, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
+				// í´ë°± rectëŠ” ì»´í¬ë„ŒíŠ¸ê°€ ì •í•œë‹¤ â€” ì—¬ê¸°ì— (0,0,W,H)ë¥¼ ë”°ë¡œ ì ì–´ ë‘ì—ˆë”ë‹ˆ
+				// ìº”ë²„ìŠ¤ ê·œì•½ê³¼ (W/2,H/2)ë§Œí¼ ì–´ê¸‹ë‚¬ë‹¤(PHASE 7-2).
+				Mathf::Rect parentRect = RectTransformComponent::GetScreenRootRect();
 				if (auto* owner = rectTransformComponent->GetOwner(); owner)
 				{
 					if (GameObject::IsValidIndex(owner->m_parentIndex))

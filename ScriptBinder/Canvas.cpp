@@ -8,10 +8,38 @@
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include <algorithm>
+#include <cmath>
 
 Canvas::Canvas()
 {
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<Canvas>();
+}
+
+float Canvas::ComputeScaleFactor(const Mathf::Rect& screenRect) const
+{
+	// 배율이 0이나 음수가 되면 레이아웃이 통째로 무너지므로(역산에서 0으로 나눔)
+	// 어떤 경로로도 그 값이 나가지 않게 한다.
+	constexpr float kMinScale = 0.01f;
+
+	if (CanvasScaleMode::ConstantPixelSize == ScaleMode)
+	{
+		return std::max(kMinScale, ScaleFactor);
+	}
+
+	if (ReferenceResolution.x <= 0.f || ReferenceResolution.y <= 0.f ||
+		screenRect.width <= 0.f || screenRect.height <= 0.f)
+	{
+		return 1.f;
+	}
+
+	// uGUI와 같은 로그 공간 보간. 선형으로 섞으면 match가 0.5일 때 가로세로
+	// 비율이 크게 다른 화면에서 한쪽으로 치우친다.
+	const float logWidth = std::log2(screenRect.width / ReferenceResolution.x);
+	const float logHeight = std::log2(screenRect.height / ReferenceResolution.y);
+	const float match = std::clamp(MatchWidthOrHeight, 0.f, 1.f);
+	const float weighted = logWidth + (logHeight - logWidth) * match;
+
+	return std::max(kMinScale, std::exp2(weighted));
 }
 
 void Canvas::OnDestroy()

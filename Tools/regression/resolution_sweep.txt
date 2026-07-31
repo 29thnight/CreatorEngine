@@ -1,0 +1,64 @@
+# 해상도 스위프 회귀(PHASE 7-7).
+#
+# 각 해상도마다 window.info로 엔진이 실제로 인식한 크기를 먼저 찍고,
+# 이어서 캔버스 rect와 버튼 히트박스를 찍는다. 검증기는 이 순서를 전제로
+# "직전에 본 클라이언트 크기"에 대해 뒤따르는 값들을 판정한다.
+#
+# 요청 크기가 모니터보다 크면 창이 잘리므로, 기대값은 요청값이 아니라
+# window.info가 알려 준 실제 크기에서 계산해야 한다.
+
+wait 90
+prefab.instantiate Canvas
+# 버튼이 실제로 들어 있는 프리팹이라야 히트박스 검사가 의미를 갖는다.
+# (처음에 SettingCanvas를 썼다가 UIButton이 하나도 없어 그 단정이 조용히 건너뛰어졌다)
+prefab.instantiate MenuSettingCanvas
+wait 90
+
+window.info
+ui.rect Canvas
+ui.hitbox
+
+# 16:9 축소
+window.resize 1280 720
+wait 40
+window.info
+ui.rect Canvas
+ui.hitbox
+
+# 16:9 더 축소
+window.resize 960 540
+wait 40
+window.info
+ui.rect Canvas
+ui.hitbox
+
+# 4:3 — 가로세로 비가 달라 로그 보간이 실제로 동작하는 구간
+window.resize 1024 768
+wait 40
+window.info
+ui.rect Canvas
+ui.hitbox
+
+# 21:9 울트라와이드
+window.resize 2560 1080
+wait 40
+window.info
+ui.rect Canvas
+ui.hitbox
+
+# 세로가 긴 창
+window.resize 800 1000
+wait 40
+window.info
+ui.rect Canvas
+ui.hitbox
+
+# 원래 해상도로 복귀 — 무손실인지 확인
+window.resize 1920 1080
+wait 40
+window.info
+ui.rect Canvas
+ui.hitbox
+
+wait 20
+quit

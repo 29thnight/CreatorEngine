@@ -76,6 +76,9 @@ private:
     Mathf::Vector2 stretchSize{ 0.f, 0.f };
     [[Property]]
     float fontSize{ 1.f };
+    // 캔버스에서 물려받은 배율. Update에서 RectTransform으로부터 채워지고,
+    // 렌더 프록시가 fontSize에 곱한다. 파생값이라 직렬화하지 않는다(PHASE 7-3).
+    float layoutScale{ 1.f };
 	[[Property]]
 	TextAlignment horizontalAlignment{ TextAlignment::Center };
     [[Property]]

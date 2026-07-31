@@ -30,16 +30,20 @@ void ImageComponent::SetTexture(int index)
 	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
 }
 
-void ImageComponent::ResetSize()
+void ImageComponent::SetNativeSize()
 {
-	if (m_curtexture)
+	if (!m_curtexture) return;
+
+	uiinfo.size = m_curtexture->GetImageSize();
+	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
+
+	// 크기가 0인 텍스처로 rect를 덮으면 요소가 사라진다. 그런 텍스처는 아직
+	// 로드되지 않았거나 깨진 것이므로, 저작된 크기를 지우지 않고 그대로 둔다.
+	if (uiinfo.size.x <= 0.f || uiinfo.size.y <= 0.f) return;
+
+	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
 	{
-		uiinfo.size = m_curtexture->GetImageSize();
-		origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
-		if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
-		{
-			rect->SetSizeDelta(uiinfo.size);
-		}
+		rect->SetSizeDelta(uiinfo.size);
 	}
 }
 
@@ -93,46 +97,49 @@ void ImageComponent::Awake()
 	// 캔버스 연결과 무관하게 등록되므로, 연결이 늦거나 없어도 유령이 되지 않는다.
 	UIManagers->RegisterImageComponent(this);
 
-	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+	// 크기를 텍스처에 맡기기로 한 이미지만 여기서 한 번 맞춘다.
+	// 예전에는 무조건 했고, 그래서 저작한 크기가 매번 지워졌다(분석 문서 F-7).
+	if (useNativeTextureSize)
 	{
-		const auto& worldRect = rect->GetWorldRect();
-		const auto& pivot = rect->GetPivot();
-
-		pos = { worldRect.x + worldRect.width * 2 * pivot.x,
-				worldRect.y + worldRect.height * 2 * pivot.y,
-				0.0f };
-		scale = { worldRect.width / uiinfo.size.x,
-				  worldRect.height / uiinfo.size.y };
-
-		origin = { uiinfo.size.x * 0.5f,
-				   uiinfo.size.y * 0.5f };
-
-		scale *= unionScale;
-
-		rect->SetSizeDelta(uiinfo.size);
+		SetNativeSize();
 	}
+
+	RefreshTransformFromRect();
 }
 
 void ImageComponent::Update(float tick)
 {
-	if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
-	{
-		const auto& worldRect = rect->GetWorldRect();
-		const auto& pivot = rect->GetPivot();
+	RefreshTransformFromRect();
+}
 
-		pos = { worldRect.x + worldRect.width * 2 * pivot.x,
-				worldRect.y + worldRect.height * 2 * pivot.y,
-				0.0f };
-		scale = { worldRect.width / uiinfo.size.x,
-				  worldRect.height / uiinfo.size.y };
+void ImageComponent::RefreshTransformFromRect()
+{
+	auto* rect = m_pOwner ? m_pOwner->GetComponent<RectTransformComponent>() : nullptr;
+	if (nullptr == rect) return;
 
-		origin = { uiinfo.size.x * 0.5f,
-				   uiinfo.size.y * 0.5f };
+	const auto& worldRect = rect->GetWorldRect();
 
-		scale *= unionScale;
+	// pos는 rect의 중심이다 — SpriteSheetComponent와 UIButton의 히트 테스트가 쓰는
+	// 것과 같은 규약이다(PHASE 7-6).
+	//
+	// 예전 식은 worldRect.x + width * 2 * pivot.x 였다. pivot 0.5에서는 우연히 맞았지만
+	// (2*0.5 = 1이라 아래 렌더 경로의 보정과 정확히 상쇄됐다) pivot이 다른 값이면
+	// width*(2p-1) 만큼 어긋난다. worldRect는 이미 pivot을 반영해 계산된 결과이므로
+	// 여기서 pivot을 또 곱하는 것은 이중 적용이다(분석 문서 F-8).
+	// 현재 에셋의 pivot이 전부 0.5라 증상이 드러나지 않았을 뿐이다.
+	pos = { worldRect.x + worldRect.width * 0.5f,
+			worldRect.y + worldRect.height * 0.5f,
+			0.0f };
 
-		//rect->SetSizeDelta(uiinfo.size);
-	}
+	// 텍스처가 없거나 아직 로드되지 않으면 uiinfo.size가 0이다. 나누면 inf/NaN이
+	// 렌더러까지 흘러가므로 그 프레임의 배율을 1로 둔다 — 예전에는 그대로 나눴다.
+	scale = { uiinfo.size.x > 0.f ? worldRect.width / uiinfo.size.x : 1.f,
+			  uiinfo.size.y > 0.f ? worldRect.height / uiinfo.size.y : 1.f };
+
+	origin = { uiinfo.size.x * 0.5f,
+			   uiinfo.size.y * 0.5f };
+
+	scale *= unionScale;
 }
 
 void ImageComponent::OnDestroy()

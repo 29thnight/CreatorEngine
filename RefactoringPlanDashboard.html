@@ -217,6 +217,12 @@
       <div class="rm-t">UI 서브시스템 재설계</div>
       <div class="rm-d">소유권 단일화 · 이름 결합 제거</div>
     </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--purple)">
+      <div class="rm-p" style="color:var(--purple)">PHASE 7</div>
+      <div class="rm-t">UI 레이아웃 해상도 독립</div>
+      <div class="rm-d">루트 리핏 · CanvasScaler</div>
+    </div>
   </div>
   <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3·4는 2 완료 후 병행 가능. Phase 5는 각 페이즈 종료마다 부분 수행 후 마지막에 총정리.
   Phase 6은 Phase 2~4와 독립적이라 Phase 1 이후 언제든 병행 가능(스크립트 API 검증 인프라가 있는 지금이 적기).</div>
@@ -360,6 +366,28 @@
       <li>UI 요소의 등록처가 한 곳으로 줄고, 등록·해제가 생성·파괴에 자동으로 따라감(수동 Register/Unregister 호출 소멸)</li>
       <li>캔버스 이름 변경·중복 이름 시나리오에서 UI 귀속이 깨지지 않음</li>
       <li>기존 씬 파일이 수정 없이 로드되고 UiTextProbe 전체 통과 유지</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 7 ===== -->
+<section class="phase" id="phase-7">
+  <h2 class="sec"><span class="no">PHASE 7</span>UI 레이아웃 해상도 독립 <span class="phase-pct" data-phase-pct="7"></span></h2>
+  <div class="phase-meta">예상 공수: 14.5일 · 선행 조건: Phase 6 완료 · 근거: RectTransformAnalysis.html (정적 분석 10건 + 런타임 재현)</div>
+  <div class="phase-goal"><b>목표:</b> UI 레이아웃을 저작 해상도(1920×1080) 고정에서 해방한다.
+  현재는 <b>최상위 캔버스가 레이아웃 드라이버의 사각지대</b>라 worldRect가 로드 시점 값으로 동결되고,
+  그 파생값이 프리팹에 직렬화되어 저작 해상도가 파일에 구워진다. 창 크기 변경 경로에도 UI 재배치가 없다.
+  세 결손을 순서대로 걷어내면 <b>화면 추종</b>이 되고, 그 위에 CanvasScaler를 얹으면 <b>비례 스케일</b>이 되어
+  uGUI와 같은 수준에 도달한다. 앵커 수학 모델 자체는 이미 uGUI와 동형이라 기반은 그대로 살린다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="7"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>1280×720 / 1920×1080 / 2560×1440 / 21:9에서 동일 씬의 UI가 앵커 의도대로 배치·스케일됨</li>
+      <li>실행 중 창 크기 변경 시 1프레임 내 전체 UI 리플로우</li>
+      <li>RectLayoutProbe 역방향 단정(H1~H3이 "반응함") 전체 통과 + 해상도 스위프 회귀 편입</li>
+      <li>기존 씬·프리팹 무수정 로드, 1920×1080에서 픽셀 동일(회귀 없음)</li>
+      <li>worldRect가 신규 저장 파일에서 사라지고 로드 경로가 기존 값을 무시함</li>
     </ul>
   </div>
 </section>
@@ -642,12 +670,48 @@ const TASKS = [
     detail: "component.add로 Canvas·Text·Image·RectTransform을 임의 조합/순서로 붙이고 재생-정지를 반복하는 CLI 스크립트를 회귀 세트에 추가. UiTextProbe(12건)를 통과 기준으로 삼는다. 6-0의 크래시들이 전부 '에디터에서 정상 순서로 만들면 안 드러나는' 유형이었으므로, 비정상 순서를 기계적으로 찍는 것이 방어선이 된다.",
     refs: "0-8 인프라 활용", priority: "P1", days: 1, status: "done",
     note: "완료 — Tools/regression/ui_regression.txt: ①캔버스 없이 UI 먼저+재생 ②캔버스 나중 추가(지연 연결 검증) ③빈 캔버스 단독 ④재생/정지 반복. 4케이스 전부 종료 코드 0, UiTextProbe 12건×3회 통과. 이 시나리오가 첫 실행에서 ProxyCommand 크래시를 즉시 잡아냈다 — 방어선으로 실증됨" },
+
+  // ---------- PHASE 7: UI 레이아웃 해상도 독립 ----------
+  //
+  // 근거 문서: RectTransformAnalysis.html — 정적 분석 F-1~F-10 + RectLayoutProbe 런타임 재현.
+  // 핵심 3결손: 최상위 캔버스 리레이아웃 부재(F-1) · 파생값 직렬화(F-2) · 리사이즈 대응 부재(F-3).
+  { phase: 7, id: "7-1", title: "캔버스 루트 리핏",
+    detail: "최상위 캔버스의 worldRect를 화면 rect로 매 프레임 갱신하는 루트 드라이버 추가 — 현재 레이아웃 드라이버는 부모의 RectTransform을 요구하고 없으면 return하는데, 캔버스의 부모는 씬 루트(RectTransform 없음)라 캔버스의 UpdateLayout이 어떤 경로로도 불리지 않는다(F-1). 화면 크기가 변하면 캔버스 dirty → 기존 전파 사슬이 자동 시동(F-10). OnResize에서 전체 dirty 마킹. Get/SetAnchoredPosition의 ResolveParentRect 폴백과 드라이버의 기준을 통일(F-3).",
+    refs: "F-1 · F-3 · F-10", priority: "P0", days: 2, status: "done",
+    note: "완료 — RectTransformComponent::DriveAsCanvasRoot()와 Scene::UpdateCanvasRoots()로 최상위 캔버스를 매 프레임 화면 크기에 맞춘다(중첩 캔버스는 일반 드라이버가 처리하도록 제외). 원점은 -size/2로 두었다: 중앙 앵커(0.5) 자식이 -W/2 + W*0.5 + offset = offset이 되어 좌상단 0-원점 공간에 놓이는데, 기존 저작 데이터의 anchoredPosition이 전부 이 공간을 전제한다. 1920x1080에서 직렬화 값과 비트 단위로 같아 회귀 0. 부수 발견: SceneRenderer의 리사이즈 핸들러가 g_fullsizeViewport만 갱신하고 g_Viewport는 초기화 때 한 번만 기록해, 창을 줄여도 모든 렌더 패스(RSSetViewports)와 Camera::GetScreenSize가 저작 해상도를 계속 봤다. 한 줄 추가로 해결 — 이것이 없으면 캔버스만 따라오고 렌더·입력은 어긋난다. 검증: window.resize / window.info / ui.rect CLI 추가 후 1920x1080 → 1280x720 → 1024x768 → 800x600 → 2560x1440 → 1920x1080 스위프에서 캔버스 worldRect가 매번 (-W/2, -H/2, W, H)로 정확히 추종하고 원래 값으로 무손실 복귀. 재생 모드 RectLayoutProbe 단정 5건 전부 통과. 점 앵커 자식이 고정 픽셀에 머무는 것은 CanvasScaler 부재(7-3) 때문이며 uGUI 무-스케일러 동작과 동일하다." },
+  { phase: 7, id: "7-2", title: "파생값 직렬화 제거 + 좌표 규약 확정",
+    detail: "m_worldRect를 저장 대상에서 제외하고 로드 시 항상 재계산(F-2). 기존 파일의 worldRect 필드는 로드 때 무시해 하위 호환 유지(파일 수정 불필요). 원점 규약을 좌상단·y-down으로 확정하고 헤더 주석·AnchorPreset·데이터 삼자 불일치 해소(F-5). Stretch 프리셋 9종 중 6종이 복붙 중복인 것 복원(F-6).",
+    refs: "F-2 · F-5 · F-6", priority: "P0", days: 2, status: "done",
+    note: "완료 — ① m_worldRect의 [[Property]]를 떼어 직렬화 제외(F-2). 역직렬화가 등록된 프로퍼티만 조회하므로 기존 에셋에 남은 m_worldRect 키는 무시된다 — 파일 수정 0건. ② 좌표 규약을 좌상단·y-down으로 확정하고 헤더에 근거와 함께 명시(F-5). pivot 주석의 '(0,0)은 좌측 하단'만 틀렸고 구현·데이터는 이미 y-down이었다. ③ 프리셋 표를 RectTransformComponent 한 곳으로 모으고 스트레치 6종을 복원(F-6) — 인스펙터가 사본을 따로 들고 있었고 양쪽 다 6종이 3종 값을 나눠 써 버튼 절반이 같은 동작을 했다. 개수·순서·값 겹침을 static_assert 3종으로 막아 재발을 컴파일 타임에 차단. 덤으로 인스펙터가 curIndex>=0 검사 '전에' presets[curIndex]를 읽던 배열 밖 접근도 제거(앵커를 손으로 조절해 둔 오브젝트를 선택하면 걸리는 경로). 직렬화를 걷어내자 숨어 있던 두 결손이 드러났다. 첫째, 캔버스 밑에 없는 UI 루트 7개가 (0,0,0,0)으로 붕괴 — 두 드라이버가 '부모에 RectTransform이 없으면 return'이라 계산 자체를 안 했고, 저장된 worldRect가 그 자리를 메워 가려져 있었다. UpdateLayoutFromParent()로 부모 판별을 컴포넌트에 일원화해 해결. 둘째, 화면 폴백 rect가 (0,0,W,H)라 7-1의 캔버스 규약(-W/2,-H/2,W,H)과 (W/2,H/2)만큼 어긋나 있었다 — GetScreenRootRect() 하나로 통일(Scene·인스펙터의 사본 2개 제거). 검증: 실제 프리팹 8종을 에디터·재생·정지 3구간에서 덤프(2940줄)해 변경 전후 대조. 캔버스 아래 전 노드 비트 단위 동일. 남은 차이는 캔버스 밖 7개뿐이고 전부 sizeDelta가 0인 데서 오는 것으로, 960-129*0.5=895.5 · 960-855*0.5=532.5 · 960-1188*0.5=366 처럼 저작 sizeDelta를 대입하면 정확히 일치한다 — 즉 F-7(7-4) 때문이며 이제는 가려지지 않고 드러난다. 7-1 해상도 스위프 5건과 UI 회귀 12건x4케이스도 통과." },
+  { phase: 7, id: "7-3", title: "CanvasScaler",
+    detail: "Canvas에 기준 해상도(기본 1920x1080)와 스케일 모드(ConstantPixel / ScaleWithScreenSize + match 계수) 추가(F-4). 루트 리핏이 화면 rect 대신 '기준 해상도 rect x 스케일'을 공급하는 구조라 7-1 위에 얇게 얹힌다. 폰트 크기·보더에도 동일 스케일 적용. 기존 씬은 기본값으로 현행 유지 — 현재 데이터가 이미 1920x1080 기준으로 저작돼 있어 기준 해상도 선언만으로 무수정 호환된다.",
+    refs: "F-4", priority: "P1", days: 3, status: "done",
+    note: "완료 — Canvas에 ScaleMode(ConstantPixelSize / ScaleWithScreenSize) · ReferenceResolution(1920x1080) · MatchWidthOrHeight(0.5) · ScaleFactor 추가. 배율 계산은 uGUI와 같은 로그 공간 보간이다(선형으로 섞으면 화면비가 크게 다를 때 한쪽으로 치우친다). 기본값을 ScaleWithScreenSize로 둔 이유: 콘텐츠가 전부 1920x1080 기준이라 그 해상도에서 배율이 정확히 1이 되어 기존 씬은 무수정으로 동일하고, 다른 해상도에서만 비로소 따라 움직인다. ConstantPixelSize를 기본으로 두면 이 단계의 효과가 아무 데서도 나타나지 않는다. 구현상의 핵심 선택: uGUI는 캔버스 rect를 기준 해상도 단위로 두고 렌더 시점에 배율을 곱하지만, 여기서는 rect를 화면 픽셀로 유지한 채 오프셋(anchoredPosition·sizeDelta)에만 배율을 곱했다. 부모 rect가 이미 배율이 반영된 픽셀이므로 (기준크기 x 배율 = 화면크기) 두 방식은 수식이 같은 결과를 낸다. 대신 worldRect가 계속 화면 픽셀이라 렌더 경로도, UIButton의 클릭 판정도 손댈 필요가 없다 — 7-6과 7-7의 입력 스케일 항목이 이 선택으로 자동 해소된다. 배율은 계층을 따라 내려가며(PropagateToChildren), 캔버스 밑에 없는 UI는 1을 물려받아 기존 동작 그대로다. 글자 크기도 같은 배율을 탄다(TextComponent::Update가 rect에서 읽고 UIRenderProxy가 fontSize에 곱한다) — rect만 줄고 글자는 그대로면 화면이 작아질수록 글자가 상자를 뚫는다. 이미지 크기는 scale = worldRect/텍스처크기 공식 덕에 자동으로 맞는다. 중첩 캔버스가 루트 배율을 물려받는 것도 uGUI와 같다. 검증: ① 1920x1080에서 7-2 결과와 2940줄 비트 단위 동일(배율 1) ② 해상도 행렬 — 1280x720 배율 0.666(=1280/1920) · 960x540 0.500 · 1024x768 0.615(로그 보간 실측) · 2564x2160 1.634, 자식 위치가 전부 배율만큼 이동하고 1920 복귀 시 원값 정확히 복원 ③ 스트레치 앵커 직접 검증 — 앵커 (0,0)-(1,1) · sizeDelta(-100,-100)에서 폭이 1920->1820, 1280->1213, 960->910. 부모 크기 항은 배율을 타지 않고 여백만 타는 uGUI 동작이며, 이중 적용이었다면 853이 나왔을 자리다 ④ UI 회귀 12건x4케이스, 7-1 프로브 5건 통과. 검증용 CLI로 ui.anchor · ui.size 추가, ui.rect에 앵커·배율 출력 추가, window.resize가 클램프될 때 실제 크기를 보고하도록 수정(3840 요청이 2564로 잘리는 것을 이 검증에서 발견)." },
+  { phase: 7, id: "7-4", title: "SizeDelta-텍스처 종속 분리",
+    detail: "ImageComponent::Awake가 rect->SetSizeDelta(uiinfo.size)로 저작된 크기를 텍스처 픽셀 크기로 덮어쓰는 동작 제거(F-7). 텍스처 미로드 시 0x0으로 붕괴하는 문제가 런타임 테스트에서 실증됨(QuestBg worldRect 172,101,0,0). uGUI의 SetNativeSize에 해당하는 명시적 호출로 대체하고 C# 바인딩 추가. 기존 씬에서 텍스처 크기에 의존하던 이미지는 로드 시 1회 보정 옵션 제공.",
+    refs: "F-7", priority: "P1", days: 1, status: "done",
+    note: "완료 — ImageComponent::Awake의 무조건 rect->SetSizeDelta(텍스처크기) 제거. 이제 크기는 저작값이 쥐고, 텍스처 크기로 맞추고 싶을 때만 SetNativeSize()를 부른다(uGUI와 같은 모델). 기존 자동 동작이 필요한 이미지를 위해 useNativeTextureSize 프로퍼티를 뒀지만 기본값은 false다 — 에셋 154개의 sizeDelta가 전부 0이 아닌 실제 값이고 그 값이 곧 저작 당시 텍스처 크기라, 끄는 쪽이 기존 결과를 재현하면서 텍스처 로드 타이밍에 흔들리지 않는다. 같이 고친 것들: ① scale = worldRect/텍스처크기가 텍스처 미로드 시 0으로 나눠 inf/NaN을 렌더러로 흘려보내던 것을 방어 ② SetNativeSize가 0x0 텍스처로 rect를 덮어 요소를 없애지 않도록 차단 ③ Awake와 Update에 복제돼 있던 렌더 파라미터 갱신 코드를 RefreshTransformFromRect로 통합 — 한쪽에만 SetSizeDelta가 있고 다른 쪽은 주석 처리돼 두 경로의 동작이 실제로 달랐다 ④ C# 바인딩 Image.SetNativeSize() 추가(표 버전 18, 200개, 순서 검사 통과). 검증이 이번 단계의 핵심이다. 7-2에서 m_worldRect 직렬화를 걷어냈으므로 런타임 값은 앵커·sizeDelta·pivot·부모 rect만으로 처음부터 계산된 것인데, 프리팹 파일에 남아 있는(이제 로드되지 않는) m_worldRect가 에디터의 실제 배치 결과라 완벽한 정답지가 된다. 프리팹 12종을 하나씩 띄워 rect 값 다중집합을 대조한 결과 498개 전부 일치 — Canvas 153 · UI_CanvasesIngame 173 · HPCanvas 117 · ItemPopupCanvas 21 · MenuSettingCanvas 12 · SettingCanvas 11 · PauseBox 3 · BossHPBar 3 · 나머지 5. 이름으로 짝짓지 않은 이유는 range_select (1)~(7)처럼 같은 이름이 프리팹 안팎으로 겹쳐 값이 맞는데도 엉뚱하게 짝지어 실패하기 때문이다(처음에 그 방식으로 짜서 허위 불일치 119건을 봤다). 이 대조를 Tools/regression/verify-authored-rects.ps1로 승격했다(종료 코드로 판정, 7-7 자동화의 일부). 부수 발견: ui.rect *가 같은 서브트리를 두 번 찍고 있었다 — 개수가 정확히 2배로 나와 잡혔고, 최상위 판별을 자식 인덱스 집합 기반으로 고쳤다. UI 회귀 12건x4케이스 · 해상도 스윕 5건 · 스트레치 검증도 통과." },
+  { phase: 7, id: "7-5", title: "레이아웃 순회 일원화",
+    detail: "UpdateModelRecursive와 UpdateUIRecursive에 복제된 UI 분기를 단일 캔버스-루트 패스로 통합(F-9). UpdateLayout 내부의 자식 재귀와 thread_local visited 순환 가드 제거 — 순회는 드라이버가, 계산은 컴포넌트가 담당하도록 책임 분리. dirty 규칙 명문화: 부모 rect가 변하면 자식도 dirty(F-10).",
+    refs: "F-9 · F-10", priority: "P1", days: 2, status: "done",
+    note: "완료 — 흩어져 있던 세 순회(UpdateModelRecursive의 UI 분기 · UpdateUIRecursive · UpdateLayout 안의 자식 재귀)를 Scene::UpdateUILayout 하나로 합쳤다. 순회는 드라이버가, 계산은 컴포넌트가 맡는다: UpdateLayout은 이제 자식으로 내려가지 않고 worldRect가 바뀌었는지만 bool로 돌려준다. 드라이버는 그 값을 자식에게 넘겨 '부모 rect가 변하면 자식도 dirty'라는 규칙을 한 줄로 구현한다(F-10). thread_local visited 순환 가드는 사라졌다 — 드라이버가 방문 집합을 쥐므로 컴포넌트가 순환을 걱정할 필요가 없고, 깊이 상한은 비정상 계층을 알리는 backstop으로만 남겼다. 부수 효과로 데이터 레이스가 하나 사라졌다: 예전에는 병렬 루트 순회(execution::par)가 컴포넌트의 자식 재귀를 호출해 스레드마다 다른 루트에서 같은 노드에 닿을 수 있었고 thread_local 가드는 그것을 막지 못했다. 레이아웃은 부모→자식 의존 사슬이라 이제 직렬로 한 번 돌고, 병렬 순회에는 트랜스폼 행렬만 남겼다. SceneViewWindow의 UI 드래그 3곳도 정리했다 — 각자 부모 rect를 (0,0,W,H)로 만들어 캔버스 규약과 어긋나 있었고 자식으로 전파도 안 돼 부모를 끌면 자식이 안 따라왔다. 이제 Scene::LayoutUISubtree를 부른다. UIManager의 UI 생성 5곳도 같은 함수로 통일하고, 앵커를 정하기 전에 캔버스 배율을 물려주도록 고쳤다(SetAnchoredPosition이 배율로 나눠 raw를 만들기 때문에 배율이 1로 남아 있으면 저장값이 어긋난다). 검증 중 잡은 회귀 2건: ① IsEnabled 검사를 넣었다가 무기 슬롯 하위 128개가 0,0,0,0으로 무너졌다 — 예전 전파 경로는 활성 여부를 보지 않았고 그쪽이 맞다(꺼져 있던 UI를 켜는 순간 rect가 0이면 안 된다). 저작값 대조가 즉시 잡아냈다 ② 캔버스 구동을 별도 패스로 두었더니 이어지는 일반 순회가 캔버스를 다시 방문해 배율을 1로 덮어썼다. 1920x1080에서는 배율이 마침 1이라 저작값 대조를 통과했고 해상도 행렬에서만 드러났을 문제라, 방문 집합을 도입해 진짜 단일 패스로 바꿨다. 최종 검증: 저작값 대조 12프리팹 498 rect 전부 일치 · 해상도 행렬에서 QuestBg 50x47이 배율대로 33x31(0.666) · 25x23(0.5) · 81x76(1.634) · 30x28(0.615)로 따라오고 1920 복귀 시 원값 복원 · 스트레치 검증 · UI 회귀 12건x4케이스 통과." },
+  { phase: 7, id: "7-6", title: "렌더 좌표식 정리",
+    detail: "ImageComponent의 pos = worldRect.x + width * 2 * pivot.x에서 x2 계수의 근거가 불명(F-8). 피벗 0.5일 때 우측 끝이 나오는데 origin(텍스처 중심)과 상쇄되는 보정일 가능성이 있고, 상쇄에 의존한 식은 worldRect 의미를 바꾸는 순간 깨진다. worldRect 의미 기준으로 재유도하고 프록시 3종(Image/Text/Sprite)과 버튼 히트 테스트의 좌표 규약을 하나로 통일. 7-1과 같은 브랜치에서 함께 검증할 것(리스크 항목).",
+    refs: "F-8", priority: "P2", days: 1.5, status: "done",
+    note: "완료 — x2 계수의 정체를 끝까지 따라간 결과, 절반은 정상이고 절반은 버그였다. 정상인 쪽: SpriteBatch에 목적 사각형을 넘길 때 그 좌상단은 '그려질 위치'가 아니라 'origin이 놓일 위치'이고, origin은 소스 크기로 정규화된 뒤 목적 크기에 곱해진다. 클리핑하면 소스와 목적이 같은 비율로 줄어들어 그 곱은 항상 rect 크기의 절반으로 일정하다 — 그래서 클리핑 게이지가 어긋나지 않았다(처음엔 깨져 있을 것으로 의심했으나 수치로 확인하니 멀쩡했다). 버그인 쪽: pos = worldRect.x + width * 2 * pivot.x의 pivot 항이다. worldRect는 이미 pivot을 반영해 계산된 결과라 여기서 또 곱하면 이중 적용이고, pivot 0.5에서만 2*0.5=1이 되어 우연히 맞았다. pivot 0/1이면 rect 폭만큼 통째로 어긋난다(1188폭 상자는 1188px). 에셋 697개의 pivot이 전부 0.5라 드러나지 않았을 뿐, 인스펙터에서 pivot을 만지는 순간 나타난다. 고침: pos를 rect 중심으로 바꿨다 — SpriteSheetComponent가 이미 쓰던 규약이자 UIButton 히트 테스트(obBox.Center)와 같은 값이라, 렌더·클릭·스프라이트시트 세 좌표계가 하나로 통일된다. 그 대신 Draw에서 앵커 보정(+rect 절반)을 한 곳에 명시하고, CalculateClippedRects가 float 사각형을 돌려주도록 바꿔 반올림이 두 번 일어나지 않게 했다(안 그러면 1px이 흔들린다). 검증: 스크린샷 수단이 없어 픽셀 대조는 못 했지만, 더 강한 논증이 가능했다 — 새 코드가 SpriteBatch에 넘기는 값이 '옛 코드가 pivot 0.5에서 넘기던 값'과 같음을 보이면 된다. 지금 화면에 제대로 나오는 것이 바로 그 값이기 때문이다. 실제 프리팹의 worldRect 전체 x 텍스처 크기 2종 x 클리핑 4단계 x 방향 5종 = 27,880개 조합에서 최종 목적 사각형이 비트 단위로 일치(불일치 0). pivot을 바꾸면 옛 값은 폭만큼 벌어지고 새 값은 고정이라는 것도 수치로 확인했다. 저작값 대조 12프리팹 498 rect · UI 회귀 12건x4 · 해상도 스윕 5건 통과. 부산물: 백버퍼 캡처 CLI를 시도했으나 게임 스레드에서 DirectX::CaptureTexture가 죽어(0x0000087A) 되돌리고 별도 작업으로 분리했다 — 렌더 루프 안전 지점에서 실행해야 한다." },
+  { phase: 7, id: "7-7", title: "해상도 스위프 검증 자동화",
+    detail: "CLI에 window.resize 명령 추가. RectLayoutProbe를 역방향 단정으로 전환(H1~H3이 이번엔 '반응함'이어야 통과)하고 1280x720 / 2560x1440 / 21:9 스위프를 회귀 세트에 편입. 에디터 game view와 백버퍼 크기가 다른 환경에서 입력 스케일(CheckClick)과 렌더 스케일의 일치도 함께 확인.",
+    refs: "완료 기준 자동화", priority: "P1", days: 1, status: "done",
+    note: "완료 — Tools/regression/이 실제 회귀 세트가 됐다. run-all.ps1 하나로 세 검사를 돌리고 전부 종료 코드로 판정한다: ① ui_regression.txt(비정상 생성 순서·재생 반복, PHASE 6) ② verify-authored-rects.ps1(저작 배치 재현, 프리팹 12종 rect 498개) ③ verify-resolution-sweep.ps1(신규). 스위프는 1920x1080 -> 1280x720 -> 960x540 -> 1024x768 -> 2560x1080(21:9) -> 800x1000(세로형) -> 1920x1080 복귀 7단계에서 단정 295건을 검사한다 — 캔버스가 화면을 따라오는지(7-1) · 원점 -size/2가 유지되는지(7-2) · 배율이 uGUI 로그 보간 값과 일치하는지(7-3) · 자식 크기가 배율을 따르는지 · 복귀 시 무손실인지 · 버튼 클릭 판정 상자가 보이는 사각형과 같은지(7-6, 21건). 기대값은 요청 해상도가 아니라 window.info가 알려 준 실제 클라이언트 크기에서 계산한다 — 모니터보다 큰 창은 잘리기 때문이다(3840 요청이 2564로 잘리는 것을 7-3에서 겪었다). 입력 스케일 항목은 7-3에서 worldRect를 화면 픽셀로 유지하기로 하면서 구조적으로 해소됐고, 여기서 히트박스 단정으로 상시 확인하게 됐다. 검증에 두 가지 장치를 넣었다: ① 히트박스 단정이 한 건도 실행되지 않으면 실패로 끝난다 — 버튼 없는 프리팹(SettingCanvas)을 띄우는 바람에 그 단정이 통째로 건너뛰어지고도 '전체 통과'가 나온 적이 있다. '확인하지 못했다'와 '확인했고 문제없다'는 다르다 ② 기준 해상도를 거짓으로 주면(-RefWidth 1280) 배율 단정이 전부 실패하고 종료 코드 1이 나오는 것을 확인했다 — 통과만 하는 검사는 검사가 아니다. 남은 것은 픽셀 단위 시각 회귀뿐이며, 백버퍼 캡처가 게임 스레드에서 죽는 문제로 별도 작업에 분리돼 있다. Tools/regression/README.md에 이 내용을 정리했다." },
+  { phase: 7, id: "7-8", title: "(확장) 레이아웃 그룹 · ContentSizeFitter",
+    detail: "Horizontal/Vertical/Grid 레이아웃 그룹과 ContentSizeFitter. 인벤토리·목록처럼 자동 배치가 필요해질 때 착수하며, 기반(7-1~7-5) 완성이 선행 조건이다.",
+    refs: "uGUI 격차", priority: "P2", days: 2, status: "todo", note: "" },
 ];
 
 // ============================================================
 // 렌더링 로직 (수정 불필요)
 // ============================================================
-const PHASE_NAMES = ["안전망 구축", "크래시 핫픽스", "자원 소유권 재설계", "렌더러 구조 개선", "구조적 커플링 제거", "코드 정리·상시화", "UI 서브시스템 재설계"];
+const PHASE_NAMES = ["안전망 구축", "크래시 핫픽스", "자원 소유권 재설계", "렌더러 구조 개선", "구조적 커플링 제거", "코드 정리·상시화", "UI 서브시스템 재설계", "UI 레이아웃 해상도 독립"];
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0 };

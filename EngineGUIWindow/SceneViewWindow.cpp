@@ -495,11 +495,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 						if (auto* rt = target->GetComponent<RectTransformComponent>())
 						{
 							rt->SetAnchoredPosition(it->second + offset);
-							Mathf::Rect parentRect{ 0, 0, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
-							if (auto* parentObj = GameObject::FindIndex(target->m_parentIndex))
-								if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
-									parentRect = parentRT->GetWorldRect();
-							rt->UpdateLayout(parentRect);
+							// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
+							// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
+							// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
+							if (Scene* scene = SceneManagers->GetActiveScene())
+								scene->LayoutUISubtree(target);
 						}
 					}
 				}
@@ -515,11 +515,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					if (auto* r = obj->GetComponent<RectTransformComponent>())
 					{
 						r->SetAnchoredPosition(oldPos);
-						Mathf::Rect parentRect{ 0, 0, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
-						if (auto* parentObj = GameObject::FindIndex(obj->m_parentIndex))
-							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
-								parentRect = parentRT->GetWorldRect();
-						r->UpdateLayout(parentRect);
+						// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
+						// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
+						// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
+						if (Scene* scene = SceneManagers->GetActiveScene())
+							scene->LayoutUISubtree(obj);
 					}
 				},
 				[=]
@@ -527,11 +527,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					if (auto* r = obj->GetComponent<RectTransformComponent>())
 					{
 						r->SetAnchoredPosition(newPos);
-						Mathf::Rect parentRect{ 0, 0, DirectX11::DeviceStates->g_ClientRect.width, DirectX11::DeviceStates->g_ClientRect.height };
-						if (auto* parentObj = GameObject::FindIndex(obj->m_parentIndex))
-							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
-								parentRect = parentRT->GetWorldRect();
-						r->UpdateLayout(parentRect);
+						// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
+						// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
+						// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
+						if (Scene* scene = SceneManagers->GetActiveScene())
+							scene->LayoutUISubtree(obj);
 					}
 				}
 				);

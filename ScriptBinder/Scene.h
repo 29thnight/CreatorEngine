@@ -236,7 +236,17 @@ private:
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
     void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive = false);
-	void UpdateUIRecursive(GameObject::Index objIndex, bool recursive = false);
+
+	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을
+	// 계산하고 자식으로 내려간다(PHASE 7-5).
+	//
+	// isTopLevel은 "부모가 UI 좌표계를 정해 주지 않는다"는 뜻이다. 이때 캔버스라면
+	// 화면 크기로 직접 구동하고(7-1), 아니면 화면 rect를 부모로 삼는다(7-2).
+	// visited는 같은 노드를 두 번 계산하지 않게 막는다 — 두 번째 방문은 배율을
+	// 잘못된 값으로 덮어써서 캔버스 스케일러를 무력화한다.
+	void LayoutUINode(GameObject* obj, const Mathf::Rect& parentRect,
+		float parentScale, bool parentChanged, bool isTopLevel, int depth,
+		std::unordered_set<GameObject*>& visited);
 
 private:
 	void SetInternalPhysicData();
@@ -244,6 +254,21 @@ private:
 public:
     void AllUpdateWorldMatrix();
 	void AllUIUpdateWorldMatrix();
+
+	// UI 레이아웃 전체를 한 번에 갱신한다(PHASE 7-5).
+	//
+	// 예전에는 같은 일이 세 군데에 흩어져 있었다 — UpdateModelRecursive의 UI 분기,
+	// UpdateUIRecursive, 그리고 UpdateLayout 안의 자식 재귀. 어느 것이 언제 몇 번
+	// 도는지 추론할 수 없었고, 앞의 둘이 병렬로 돌면서 세 번째의 재귀를 호출해
+	// 교차 스레드로 같은 노드를 건드릴 수 있었다(분석 문서 F-9).
+	//
+	// 레이아웃은 부모→자식 의존 사슬이라 병렬화할 대상이 아니다. 여기서 직렬로
+	// 한 번 돌고, 트랜스폼 행렬 갱신(비-UI)만 예전처럼 병렬로 남긴다.
+	void UpdateUILayout();
+
+	// 한 서브트리만 즉시 레이아웃한다. 프레임 패스를 기다릴 수 없는 곳
+	// (에디터 드래그, UI 생성 직후)에서 쓴다. 순회 규칙은 프레임 패스와 공유한다.
+	void LayoutUISubtree(GameObject* root);
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};

@@ -14,6 +14,7 @@
 #include "ImageComponent.h"
 #include "TextComponent.h"
 #include "Canvas.h"
+#include "UIButton.h"
 #include "../RenderEngine/Camera.h"
 #include "MeshRenderer.h"
 #include "../RenderEngine/Material.h"
@@ -43,7 +44,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 15;
+	constexpr int kApiVersion = 18;
 
 	struct Float3 { float x, y, z; };
 
@@ -201,6 +202,7 @@ namespace
 		void   (__stdcall* Image_SetColor)(ScriptObjectHandle handle, Float4 color);
 		float  (__stdcall* Image_GetClipPercent)(ScriptObjectHandle handle);
 		void   (__stdcall* Image_SetClipPercent)(ScriptObjectHandle handle, float percent);
+		void   (__stdcall* Image_SetNativeSize)(ScriptObjectHandle handle);
 
 		// 카메라. 월드→스크린 변환을 손으로 하는 파일이 11개나 되어 한 번에 접는다.
 		int    (__stdcall* Camera_Exists)();
@@ -312,6 +314,23 @@ namespace
 		void  (__stdcall* Canvas_SetOrder)(ScriptObjectHandle handle, int order);
 		int   (__stdcall* Canvas_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
 		void  (__stdcall* Canvas_SetName)(ScriptObjectHandle handle, const char* name);
+
+		// UI 내비게이션·버튼·Image 잔여 (IsNavigationThis 5 · SetNavLock 5 · curindex 5 · rotate 4)
+		int   (__stdcall* Ui_IsSelected)(ScriptObjectHandle handle);
+		int   (__stdcall* Ui_IsNavLocked)(ScriptObjectHandle handle);
+		void  (__stdcall* Ui_SetNavLock)(ScriptObjectHandle handle, int locked);
+		ScriptObjectHandle (__stdcall* UiNav_GetSelected)();
+		void  (__stdcall* UiNav_SetSelected)(ScriptObjectHandle handle);
+
+		int   (__stdcall* Button_Exists)(ScriptObjectHandle handle);
+		int   (__stdcall* Button_ConsumeClicked)(ScriptObjectHandle handle);
+
+		int   (__stdcall* Image_GetTextureIndex)(ScriptObjectHandle handle);
+		float (__stdcall* Image_GetRotation)(ScriptObjectHandle handle);
+		void  (__stdcall* Image_SetRotation)(ScriptObjectHandle handle, float rotation);
+
+		// 레이아웃 검증용 — 계산된 최종 사각형(x, y, width, height)을 그대로 읽는다.
+		Float4 (__stdcall* Rect_GetWorldRect)(ScriptObjectHandle handle);
 	};
 
 	ScriptApiTable g_apiTable{};
@@ -1222,6 +1241,13 @@ namespace
 		if (auto* image = ResolveImage(handle)) image->clipPercent = percent;
 	}
 
+	// uGUI의 SetNativeSize. 예전에는 Awake가 자동으로 했고, 그래서 스크립트가
+	// sizeDelta를 정해도 다음 Awake에 지워졌다(분석 문서 F-7). 이제 부를 때만 동작한다.
+	void __stdcall Api_Image_SetNativeSize(ScriptObjectHandle handle)
+	{
+		if (auto* image = ResolveImage(handle)) image->SetNativeSize();
+	}
+
 	// ── 카메라 ──
 	//
 	// 월드 좌표를 화면 픽셀로 바꾸는 코드가 게임 스크립트 11개 파일에 그대로 복제돼 있다
@@ -1989,6 +2015,86 @@ namespace
 		if (auto* canvas = ResolveCanvas(handle)) canvas->SetCanvasName(name);
 	}
 
+	// ── UI 내비게이션·버튼·Image 잔여 ──
+	//
+	// 게임의 메뉴 버튼은 UIButton보다 "ImageComponent + 선택 확인 + 입력" 조합이
+	// 대세다(ImageButton.cpp 패턴). 그래서 선택·잠금은 UIComponent 공통으로 열고,
+	// UIButton 클릭은 콜백 대신 틱 폴링(ConsumeClicked)으로 전달한다.
+
+	int __stdcall Api_Ui_IsSelected(ScriptObjectHandle handle)
+	{
+		auto* ui = ResolveUi(handle);
+		return (nullptr != ui && ui->IsNavigationThis()) ? 1 : 0;
+	}
+
+	int __stdcall Api_Ui_IsNavLocked(ScriptObjectHandle handle)
+	{
+		auto* ui = ResolveUi(handle);
+		return (nullptr != ui && ui->IsNavLock()) ? 1 : 0;
+	}
+
+	void __stdcall Api_Ui_SetNavLock(ScriptObjectHandle handle, int locked)
+	{
+		if (auto* ui = ResolveUi(handle)) ui->SetNavLock(0 != locked);
+	}
+
+	ScriptObjectHandle __stdcall Api_UiNav_GetSelected()
+	{
+		auto selected = UIManagers->SelectUI.lock();
+		return selected ? ScriptObjectRegistry::Get().Register(selected.get()) : ScriptObjectHandle{};
+	}
+
+	void __stdcall Api_UiNav_SetSelected(ScriptObjectHandle handle)
+	{
+		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		if (nullptr == object) return;
+
+		UIManagers->SelectUI = object->shared_from_this();
+	}
+
+	UIButton* ResolveButton(ScriptObjectHandle handle)
+	{
+		GameObject* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object) ? object->GetComponent<UIButton>() : nullptr;
+	}
+
+	int __stdcall Api_Button_Exists(ScriptObjectHandle handle)
+	{
+		return (nullptr != ResolveButton(handle)) ? 1 : 0;
+	}
+
+	int __stdcall Api_Button_ConsumeClicked(ScriptObjectHandle handle)
+	{
+		auto* button = ResolveButton(handle);
+		return (nullptr != button && button->ConsumeClicked()) ? 1 : 0;
+	}
+
+	int __stdcall Api_Image_GetTextureIndex(ScriptObjectHandle handle)
+	{
+		auto* image = ResolveImage(handle);
+		return (nullptr != image) ? image->curindex : 0;
+	}
+
+	float __stdcall Api_Image_GetRotation(ScriptObjectHandle handle)
+	{
+		auto* image = ResolveImage(handle);
+		return (nullptr != image) ? image->rotate : 0.f;
+	}
+
+	void __stdcall Api_Image_SetRotation(ScriptObjectHandle handle, float rotation)
+	{
+		if (auto* image = ResolveImage(handle)) image->rotate = rotation;
+	}
+
+	Float4 __stdcall Api_Rect_GetWorldRect(ScriptObjectHandle handle)
+	{
+		auto* rect = ResolveRect(handle);
+		if (nullptr == rect) return {};
+
+		const auto& worldRect = rect->GetWorldRect();
+		return { worldRect.x, worldRect.y, worldRect.width, worldRect.height };
+	}
+
 	void FillApiTable()
 	{
 		g_apiTable.version    = kApiVersion;
@@ -2106,6 +2212,7 @@ namespace
 		g_apiTable.Image_SetColor              = &Api_Image_SetColor;
 		g_apiTable.Image_GetClipPercent        = &Api_Image_GetClipPercent;
 		g_apiTable.Image_SetClipPercent        = &Api_Image_SetClipPercent;
+		g_apiTable.Image_SetNativeSize         = &Api_Image_SetNativeSize;
 
 		g_apiTable.Camera_Exists               = &Api_Camera_Exists;
 		g_apiTable.Camera_GetScreenSize        = &Api_Camera_GetScreenSize;
@@ -2197,6 +2304,20 @@ namespace
 		g_apiTable.Canvas_SetOrder             = &Api_Canvas_SetOrder;
 		g_apiTable.Canvas_GetName              = &Api_Canvas_GetName;
 		g_apiTable.Canvas_SetName              = &Api_Canvas_SetName;
+
+		g_apiTable.Ui_IsSelected               = &Api_Ui_IsSelected;
+		g_apiTable.Ui_IsNavLocked              = &Api_Ui_IsNavLocked;
+		g_apiTable.Ui_SetNavLock               = &Api_Ui_SetNavLock;
+		g_apiTable.UiNav_GetSelected           = &Api_UiNav_GetSelected;
+		g_apiTable.UiNav_SetSelected           = &Api_UiNav_SetSelected;
+
+		g_apiTable.Button_Exists               = &Api_Button_Exists;
+		g_apiTable.Button_ConsumeClicked       = &Api_Button_ConsumeClicked;
+
+		g_apiTable.Image_GetTextureIndex       = &Api_Image_GetTextureIndex;
+		g_apiTable.Image_GetRotation           = &Api_Image_GetRotation;
+		g_apiTable.Image_SetRotation           = &Api_Image_SetRotation;
+		g_apiTable.Rect_GetWorldRect           = &Api_Rect_GetWorldRect;
 	}
 
 	// ── hostfxr ──
@@ -2658,6 +2779,8 @@ void ClrHost::SetFieldObject(int instanceId, int index, GameObject* object)
 	m_fnSetFieldObject(instanceId, index, handle);
 }
 #endif // !DYNAMICCPP_EXPORTS
+
+
 
 
 

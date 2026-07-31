@@ -56,6 +56,7 @@ internal static class NativeComponentTable
         [typeof(ImageComponent)] = new(handle => new ImageComponent { OwnerHandle = handle }, Native.HasImage),
         [typeof(TextComponent)]  = new(handle => new TextComponent  { OwnerHandle = handle }, Native.HasText),
         [typeof(Canvas)]         = new(handle => new Canvas         { OwnerHandle = handle }, Native.HasCanvas),
+        [typeof(UIButton)]       = new(handle => new UIButton       { OwnerHandle = handle }, Native.HasButton),
         [typeof(MeshRenderer)]   = new(handle => new MeshRenderer   { OwnerHandle = handle }, Native.HasMesh),
 
         [typeof(RigidBodyComponent)] =
@@ -105,3 +106,4 @@ internal static class ComponentKind<T> where T : Component
         }
     }
 }
+

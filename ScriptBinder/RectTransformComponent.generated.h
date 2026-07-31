@@ -10,7 +10,6 @@ ReflectionFieldInheritance(RectTransformComponent, Component) \
 		meta_property(m_anchoredPosition) \
 		meta_property(m_sizeDelta) \
 		meta_property(m_pivot) \
-		meta_property(m_worldRect) \
 	}); \
 	FieldEnd(RectTransformComponent, PropertyOnlyInheritance) \
 };

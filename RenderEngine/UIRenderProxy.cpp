@@ -10,6 +10,15 @@
 #include <DirectXMath.h>
 #include <algorithm>
 
+// 잘린 목적 사각형을 픽셀로 반올림하기 전 상태로 돌려준다.
+//
+// 반올림을 호출부로 미루는 이유: 호출부가 여기에 앵커 보정을 더한 뒤 한 번만
+// 반올림해야 한다. 두 번 반올림하면 값이 1픽셀 흔들린다(PHASE 7-6).
+struct ClippedDestination
+{
+    float left, top, right, bottom;
+};
+
 // Clamps percent to [0, 1] and calculates source and destination rectangles based on the clipping direction.
 inline bool CalculateClippedRects(
     ClipDirection dir,
@@ -17,7 +26,7 @@ inline bool CalculateClippedRects(
     LONG texW, LONG texH,
     float left, float top, float right, float bottom,
     float scaleX, float scaleY,
-    RECT& outSrc, RECT& outDst)
+    RECT& outSrc, ClippedDestination& outDst)
 {
     percent = std::clamp(percent, 0.f, 1.f);
     LONG cutW = static_cast<LONG>(std::floor(texW * percent));
@@ -28,56 +37,31 @@ inline bool CalculateClippedRects(
     case ClipDirection::LeftToRight:
         if (cutW <= 0) return false;
         outSrc = { 0, 0, cutW, texH };
-        outDst = {
-            static_cast<LONG>(std::lround(left)),
-            static_cast<LONG>(std::lround(top)),
-            static_cast<LONG>(std::lround(left + cutW * scaleX)),
-            static_cast<LONG>(std::lround(top + texH * scaleY))
-        };
+        outDst = { left, top, left + cutW * scaleX, top + texH * scaleY };
         return true;
 
     case ClipDirection::RightToLeft:
         if (cutW <= 0) return false;
         outSrc = { texW - cutW, 0, texW, texH };
-        outDst = {
-            static_cast<LONG>(std::lround(right - cutW * scaleX)),
-            static_cast<LONG>(std::lround(top)),
-            static_cast<LONG>(std::lround(right)),
-            static_cast<LONG>(std::lround(top + texH * scaleY))
-        };
+        outDst = { right - cutW * scaleX, top, right, top + texH * scaleY };
         return true;
 
     case ClipDirection::TopToBottom:
         if (cutH <= 0) return false;
         outSrc = { 0, 0, texW, cutH };
-        outDst = {
-            static_cast<LONG>(std::lround(left)),
-            static_cast<LONG>(std::lround(top)),
-            static_cast<LONG>(std::lround(left + texW * scaleX)),
-            static_cast<LONG>(std::lround(top + cutH * scaleY))
-        };
+        outDst = { left, top, left + texW * scaleX, top + cutH * scaleY };
         return true;
 
     case ClipDirection::BottomToTop:
         if (cutH <= 0) return false;
         outSrc = { 0, texH - cutH, texW, texH };
-        outDst = {
-            static_cast<LONG>(std::lround(left)),
-            static_cast<LONG>(std::lround(bottom - cutH * scaleY)),
-            static_cast<LONG>(std::lround(left + texW * scaleX)),
-            static_cast<LONG>(std::lround(bottom))
-        };
+        outDst = { left, bottom - cutH * scaleY, left + texW * scaleX, bottom };
         return true;
 
     case ClipDirection::None:
     default:
         outSrc = { 0, 0, texW, texH };
-        outDst = {
-            static_cast<LONG>(std::lround(left)),
-            static_cast<LONG>(std::lround(top)),
-            static_cast<LONG>(std::lround(right)),
-            static_cast<LONG>(std::lround(bottom))
-        };
+        outDst = { left, top, right, bottom };
         return true;
     }
 }
@@ -116,7 +100,8 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.color = text->color;
 
     data.position = { text->pos.x, text->pos.y };
-    data.fontSize = text->fontSize;
+    // 캔버스 배율은 rect뿐 아니라 글자 크기에도 걸려야 한다(PHASE 7-3).
+    data.fontSize = text->fontSize * text->layoutScale;
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
@@ -213,12 +198,20 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                     LONG texW = static_cast<LONG>(size.x);
                     LONG texH = static_cast<LONG>(size.y);
 
-                    float left = info.position.x - info.origin.x * info.scale.x;
-                    float top = info.position.y - info.origin.y * info.scale.y;
-                    float right = left + texW * info.scale.x;
-                    float bottom = top + texH * info.scale.y;
+                    // position은 rect의 중심(PHASE 7-6). origin은 텍스처 중심이고
+                    // scale은 rect크기/텍스처크기이므로 origin*scale은 rect 크기의 절반이다.
+                    // 따라서 아래 네 값은 화면 좌표 그대로의 rect다 — CalculateClippedRects가
+                    // 이것을 실제 사각형으로 보고 계산하므로 그 전제가 이제 참이 된다.
+                    const float halfWidth = info.origin.x * info.scale.x;
+                    const float halfHeight = info.origin.y * info.scale.y;
 
-                    RECT src{}, dst{};
+                    const float left = info.position.x - halfWidth;
+                    const float top = info.position.y - halfHeight;
+                    const float right = left + texW * info.scale.x;
+                    const float bottom = top + texH * info.scale.y;
+
+                    RECT src{};
+                    ClippedDestination dst{};
                     if (CalculateClippedRects(
                         info.clipDirection,
                         info.clipPercent,
@@ -227,9 +220,23 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                         info.scale.x, info.scale.y,
                         src, dst))
                     {
+                        // SpriteBatch에 넘기는 사각형의 좌상단은 "그려질 위치"가 아니라
+                        // "origin이 놓일 위치"다. 그래서 화면상의 사각형에 rect 크기의
+                        // 절반을 더해 앵커 좌표로 옮긴다.
+                        //
+                        // 이 값은 예전 코드가 pivot 0.5에서 넘기던 것과 정확히 같다
+                        // (예전: pos = x + w, left = pos - w/2 = x + w/2 · 지금:
+                        //  pos = x + w/2, left = x, 앵커 = x + w/2). 즉 지금 화면에
+                        // 제대로 나오는 그 값을 pivot과 무관하게 항상 만든다.
+                        const RECT anchored{
+                            static_cast<LONG>(std::lround(dst.left + halfWidth)),
+                            static_cast<LONG>(std::lround(dst.top + halfHeight)),
+                            static_cast<LONG>(std::lround(dst.right + halfWidth)),
+                            static_cast<LONG>(std::lround(dst.bottom + halfHeight)) };
+
                         spriteBatch->Draw(
                             info.texture->m_pSRV,
-                            dst,
+                            anchored,
                             &src,
                             info.color,
                             info.rotation,

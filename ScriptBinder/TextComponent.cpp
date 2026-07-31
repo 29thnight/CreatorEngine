@@ -53,6 +53,10 @@ void TextComponent::Update(float tick)
         topLeft = { worldRect.x, worldRect.y };
         size = { worldRect.width, worldRect.height };
         hasLayout = true;
+
+        // 글자 크기도 캔버스 배율을 따른다(PHASE 7-3). rect만 줄어들고 글자는
+        // 그대로면 화면이 작아질수록 글자가 상자를 뚫고 나온다.
+        layoutScale = rect->GetLayoutScale();
     }
 
     if (hasLayout)

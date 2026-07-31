@@ -411,6 +411,11 @@ void SceneRenderer::InitializeDeviceState()
 		DirectX11::DeviceStates->g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
 		DirectX11::DeviceStates->g_pRasterizerState		= m_deviceResources->GetRasterizerState();
 		DirectX11::DeviceStates->g_pBlendState			= m_deviceResources->GetBlendState();
+		// g_Viewport는 초기화 때만 기록돼 있어서 창 크기를 바꿔도 저작 해상도에 묶여 있었다.
+		// 모든 렌더 패스가 RSSetViewports에 이 값을 그대로 넘기고, Camera::GetScreenSize도
+		// 여기서 화면 크기를 읽는다. 갱신을 빠뜨리면 리사이즈 후에도 파이프라인과 스크립트가
+		// 옛 해상도를 본다(PHASE 7).
+		DirectX11::DeviceStates->g_Viewport				= m_deviceResources->GetScreenViewport();
 		DirectX11::DeviceStates->g_fullsizeViewport		= m_deviceResources->GetScreenViewport();
 		DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
 		DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();

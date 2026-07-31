@@ -161,6 +161,7 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, Color4, void> Image_SetColor;
     public delegate* unmanaged<ObjectHandle, float> Image_GetClipPercent;
     public delegate* unmanaged<ObjectHandle, float, void> Image_SetClipPercent;
+    public delegate* unmanaged<ObjectHandle, void> Image_SetNativeSize;
 
     // 카메라. 월드→스크린 변환이 게임 스크립트 11개 파일에 복제돼 있어 하나로 접었다.
     public delegate* unmanaged<int> Camera_Exists;
@@ -263,13 +264,30 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, int, void> Canvas_SetOrder;
     public delegate* unmanaged<ObjectHandle, byte*, int, int> Canvas_GetName;
     public delegate* unmanaged<ObjectHandle, byte*, void> Canvas_SetName;
+
+    // UI 내비게이션·버튼·Image 잔여
+    public delegate* unmanaged<ObjectHandle, int> Ui_IsSelected;
+    public delegate* unmanaged<ObjectHandle, int> Ui_IsNavLocked;
+    public delegate* unmanaged<ObjectHandle, int, void> Ui_SetNavLock;
+    public delegate* unmanaged<ObjectHandle> UiNav_GetSelected;
+    public delegate* unmanaged<ObjectHandle, void> UiNav_SetSelected;
+
+    public delegate* unmanaged<ObjectHandle, int> Button_Exists;
+    public delegate* unmanaged<ObjectHandle, int> Button_ConsumeClicked;
+
+    public delegate* unmanaged<ObjectHandle, int> Image_GetTextureIndex;
+    public delegate* unmanaged<ObjectHandle, float> Image_GetRotation;
+    public delegate* unmanaged<ObjectHandle, float, void> Image_SetRotation;
+
+    // 레이아웃 검증용 최종 사각형
+    public delegate* unmanaged<ObjectHandle, Color4> Rect_GetWorldRect;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 15;
+    public const int ExpectedVersion = 18;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -927,6 +945,11 @@ internal static unsafe class Native
         if (_ready && _api.Image_SetClipPercent != null) _api.Image_SetClipPercent(h, percent);
     }
 
+    public static void ImageSetNativeSize(ObjectHandle h)
+    {
+        if (_ready && _api.Image_SetNativeSize != null) _api.Image_SetNativeSize(h);
+    }
+
     // ── 카메라 ──
 
     public static bool HasCamera()
@@ -1350,7 +1373,51 @@ internal static unsafe class Native
         EncodeName(name, buffer);
         _api.Canvas_SetName(h, buffer);
     }
+
+    // ── UI 내비게이션·버튼·Image 잔여 ──
+
+    public static bool UiIsSelected(ObjectHandle h)
+        => _ready && _api.Ui_IsSelected != null && _api.Ui_IsSelected(h) != 0;
+
+    public static bool UiIsNavLocked(ObjectHandle h)
+        => _ready && _api.Ui_IsNavLocked != null && _api.Ui_IsNavLocked(h) != 0;
+
+    public static void UiSetNavLock(ObjectHandle h, bool locked)
+    {
+        if (_ready && _api.Ui_SetNavLock != null) _api.Ui_SetNavLock(h, locked ? 1 : 0);
+    }
+
+    public static ObjectHandle UiNavGetSelected()
+        => _ready && _api.UiNav_GetSelected != null ? _api.UiNav_GetSelected() : ObjectHandle.Invalid;
+
+    public static void UiNavSetSelected(ObjectHandle h)
+    {
+        if (_ready && _api.UiNav_SetSelected != null) _api.UiNav_SetSelected(h);
+    }
+
+    public static bool HasButton(ObjectHandle h)
+        => _ready && _api.Button_Exists != null && _api.Button_Exists(h) != 0;
+
+    public static bool ButtonConsumeClicked(ObjectHandle h)
+        => _ready && _api.Button_ConsumeClicked != null && _api.Button_ConsumeClicked(h) != 0;
+
+    public static int ImageGetTextureIndex(ObjectHandle h)
+        => _ready && _api.Image_GetTextureIndex != null ? _api.Image_GetTextureIndex(h) : 0;
+
+    public static float ImageGetRotation(ObjectHandle h)
+        => _ready && _api.Image_GetRotation != null ? _api.Image_GetRotation(h) : 0f;
+
+    public static void ImageSetRotation(ObjectHandle h, float rotation)
+    {
+        if (_ready && _api.Image_SetRotation != null) _api.Image_SetRotation(h, rotation);
+    }
+
+    // Color4를 (x, y, width, height) 운반체로 재활용한다 — 4 float 블리터블이면 충분하다.
+    public static Color4 RectGetWorldRect(ObjectHandle h)
+        => _ready && _api.Rect_GetWorldRect != null ? _api.Rect_GetWorldRect(h) : default;
 }
+
+
 
 
 
