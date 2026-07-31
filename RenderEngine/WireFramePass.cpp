@@ -70,7 +70,7 @@ void WireFramePass::Execute(RenderScene& scene, Camera& camera)
 
     DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 
-    m_CameraBuffer.m_CameraPosition = camera.m_eyePosition;
+    m_CameraBuffer.m_CameraPosition = renderData->m_frameEyePosition;
 
     DirectX11::UpdateBuffer(m_Buffer.Get(), &m_CameraBuffer);
     DirectX11::VSSetConstantBuffer(4, 1, m_Buffer.GetAddressOf());

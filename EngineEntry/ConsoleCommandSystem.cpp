@@ -1380,6 +1380,39 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::snprintf(line, sizeof(line), "camera %d\n", camera->m_cameraIndex);
             report += line;
 
+            // 프레임 밀봉 카메라 스냅샷. 렌더 스레드가 읽는 값이 여기 전부 있어야
+            // 하고, 이식 전후로 이 숫자들이 같아야 한다.
+            std::snprintf(line, sizeof(line),
+                "  snapshot: eye(%.6f %.6f %.6f) fwd(%.6f %.6f %.6f) right(%.6f %.6f %.6f)"
+                " fov %.6f near %.6f far %.6f ortho %d\n",
+                data->m_frameEyePosition.m128_f32[0], data->m_frameEyePosition.m128_f32[1], data->m_frameEyePosition.m128_f32[2],
+                data->m_frameForward.m128_f32[0], data->m_frameForward.m128_f32[1], data->m_frameForward.m128_f32[2],
+                data->m_frameRight.m128_f32[0], data->m_frameRight.m128_f32[1], data->m_frameRight.m128_f32[2],
+                data->m_frameFov, data->m_frameNearPlane, data->m_frameFarPlane,
+                static_cast<int>(data->m_frameIsOrthographic));
+            report += line;
+
+            // 뷰·투영과 그 역행렬. 패스들이 이제 이것만 읽는다.
+            const char* matrixNames[4] = { "view", "proj", "invView", "invProj" };
+            const Mathf::Matrix matrices[4] = {
+                data->m_frameCalculatedView, data->m_frameCalculatedProjection,
+                data->m_frameCalculatedInverseView, data->m_frameCalculatedInverseProjection };
+
+            for (int m = 0; m < 4; ++m)
+            {
+                std::snprintf(line, sizeof(line), "  %s", matrixNames[m]);
+                report += line;
+                for (int r = 0; r < 4; ++r)
+                {
+                    for (int c = 0; c < 4; ++c)
+                    {
+                        std::snprintf(line, sizeof(line), " %.6f", matrices[m].m[r][c]);
+                        report += line;
+                    }
+                }
+                report += "\n";
+            }
+
             report += "  cascadeEnd:";
             for (float end : data->m_cascadeEnd)
             {
@@ -1410,6 +1443,41 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                     }
                 }
                 report += "\n";
+            }
+
+            // 스냅샷이 살아 있는 카메라와 실제로 같은 값인지 확인한다.
+            //
+            // 이식은 "패스가 camera.CalculateView()를 부르던 것을 스냅샷 읽기로
+            // 바꾼다"인데, 그게 동작 보존인지는 두 값이 같아야 성립한다. 픽셀로는
+            // 노이즈에 묻혀 확인이 안 되므로 여기서 직접 대조한다.
+            // 락스텝이 걸린 지금은 같아야 하고, 락스텝을 푼 뒤에는 의도적으로
+            // 달라진다 — 그때 이 명령은 '한 프레임 차이'를 보여 주는 도구가 된다.
+            {
+                const Mathf::Matrix liveView = camera->CalculateView();
+                const Mathf::Matrix liveProj = camera->CalculateProjection();
+
+                float maxMatrixDelta = 0.f;
+                for (int r = 0; r < 4; ++r)
+                {
+                    for (int c = 0; c < 4; ++c)
+                    {
+                        maxMatrixDelta = (std::max)(maxMatrixDelta,
+                            std::fabs(liveView.m[r][c] - Mathf::Matrix(data->m_frameCalculatedView).m[r][c]));
+                        maxMatrixDelta = (std::max)(maxMatrixDelta,
+                            std::fabs(liveProj.m[r][c] - Mathf::Matrix(data->m_frameCalculatedProjection).m[r][c]));
+                    }
+                }
+
+                const float eyeDelta = Mathf::Vector3(
+                    Mathf::Vector3(data->m_frameEyePosition) - Mathf::Vector3(camera->m_eyePosition)).Length();
+
+                std::snprintf(line, sizeof(line),
+                    "  live-vs-snapshot: matrix %.9f eye %.9f fov %.9f near %.9f far %.9f\n",
+                    maxMatrixDelta, eyeDelta,
+                    std::fabs(data->m_frameFov - camera->m_fov),
+                    std::fabs(data->m_frameNearPlane - camera->m_nearPlane),
+                    std::fabs(data->m_frameFarPlane - camera->m_farPlane));
+                report += line;
             }
 
             const auto& constant = data->m_shadowCamera.m_shadowMapConstant;

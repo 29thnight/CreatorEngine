@@ -224,7 +224,7 @@ void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, Rend
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
 	Mathf::Color4  lightColor = scene.m_LightController->GetLight(0).m_color;
 	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
-	Mathf::Matrix viewProjMat = camera.CalculateView() * camera.CalculateProjection();
+	Mathf::Matrix viewProjMat = renderData->m_frameCalculatedView * renderData->m_frameCalculatedProjection;
 
 	//GIT_COMBINE_WARN_BEGIN : shadowMapPass �ڵ� ������ ���� ���� ����Ǿ����� ���� �� Ȯ�� �ٶ�. by Hero.P
 	auto shadowMapPass = scene.m_LightController->GetShadowMapPass();
@@ -239,7 +239,7 @@ void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, Rend
 	data.ShadowMatrix = cascadeInfo.m_lightViewProjection;
 	data.SunDirection = -lightdir;
 	data.SunColor = lightColor;
-	data.CameraPosition = XMFLOAT4{ camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2], 1.0f };
+	data.CameraPosition = XMFLOAT4{ renderData->m_frameEyePosition.m128_f32[0], renderData->m_frameEyePosition.m128_f32[1], renderData->m_frameEyePosition.m128_f32[2], 1.0f };
 	data.CameraNearFar_FrameIndex_PreviousFrameBlend = XMFLOAT4{ mCustomNearPlane, mCustomFarPlane, static_cast<float>(Time->GetFrameCount()), mPreviousFrameBlendFactor };
 	data.VolumeSize = XMFLOAT4{ static_cast<float>(mCurrentVoxelVolumeSizeX), static_cast<float>(mCurrentVoxelVolumeSizeY), VOXEL_VOLUME_SIZE_Z, 0.0f };
 	data.Anisotropy = mAnisotropy;
@@ -283,7 +283,7 @@ void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, Rend
 	context.SetComputeShaderResources(0, 3, reinterpret_cast<RHINativeShaderResource const*>(nullSRVall));
 	context.SetComputeUnorderedAccessViews(0, 1, reinterpret_cast<RHINativeUnorderedAccess const*>(nullUAV), nullptr);
 
-	mPrevViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
+	mPrevViewProj = XMMatrixTranspose(renderData->m_frameCalculatedView * renderData->m_frameCalculatedProjection);
 
 	// composite
 	m_pso->Apply(deferredPtr);
@@ -294,9 +294,9 @@ void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, Rend
 		context.SetViewports(1, &rhiVp);
 	}
 	CompositeCB compositeData{};
-	compositeData.ViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
-	compositeData.InvView = camera.CalculateInverseView();
-	compositeData.InvProj = camera.CalculateInverseProjection();
+	compositeData.ViewProj = XMMatrixTranspose(renderData->m_frameCalculatedView * renderData->m_frameCalculatedProjection);
+	compositeData.InvView = renderData->m_frameCalculatedInverseView;
+	compositeData.InvProj = renderData->m_frameCalculatedInverseProjection;
 	compositeData.CameraNearFar = XMFLOAT4{ mCustomNearPlane, mCustomFarPlane, 0.0f, 0.0f };
 	compositeData.VolumeSize = data.VolumeSize;
 	compositeData.BlendingWithSceneColorFactor = mBlendingWithSceneColorFactor;

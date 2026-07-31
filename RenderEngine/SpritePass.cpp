@@ -122,9 +122,9 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
             const auto& pos = proxy->m_worldPosition;
             if (proxy->m_billboardType == BillboardType::Spherical)
             {
-				Mathf::Vector3 forward = camera.m_forward;
+				Mathf::Vector3 forward = renderData->m_frameForward;
                 world = Mathf::Matrix::CreateBillboard(pos, 
-                    camera.m_eyePosition, proxy->m_billboardAxis, &forward);
+                    renderData->m_frameEyePosition, proxy->m_billboardAxis, &forward);
             }
             else if (proxy->m_billboardType == BillboardType::Cylindrical)
             {
@@ -137,7 +137,7 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
                 const Mathf::Vector3 pos = t;                // ���� ��ġ ����
 
                 // 1) "ī�޶��� ������ ������"�� �������� ��� (��ġ ����, �׻� -Forward)
-                Mathf::Vector3 facing = -camera.m_forward;   // �ٽ�: look-at ����, -forward ����
+                Mathf::Vector3 facing = -renderData->m_frameForward;   // �ٽ�: look-at ����, -forward ����
                 facing.Normalize();
 
                 // 2) Cylindrical ����: �࿡ ������ ������� ����(�� ����)
@@ -147,8 +147,8 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
                 // 3) ��� ���� ������ ����� Ư�̻�Ȳ ����(ī�޶� Right�� ����)
                 if (len2 < 1e-8f)
                 {
-                    // camera.m_right�� �ִٸ� �켱 ���
-                    Mathf::Vector3 alt = Mathf::Vector3(camera.m_right).LengthSquared() > 0 ? Mathf::Vector3(camera.m_right) : Mathf::Vector3::Right;
+                    // renderData->m_frameRight�� �ִٸ� �켱 ���
+                    Mathf::Vector3 alt = Mathf::Vector3(renderData->m_frameRight).LengthSquared() > 0 ? Mathf::Vector3(renderData->m_frameRight) : Mathf::Vector3::Right;
                     alt.Normalize();
                     facing = alt - axis * alt.Dot(axis);
                     if (facing.LengthSquared() < 1e-8f)
@@ -184,7 +184,7 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
                 //world = S * R * Tm;
                 //------------------------------------------------------------
                 // 1) ���� z (ī�޶� ���� ���� ����)
-                float z = (pos - Mathf::Vector3(camera.m_eyePosition)).Dot(camera.m_forward);
+                float z = (pos - Mathf::Vector3(renderData->m_frameEyePosition)).Dot(renderData->m_frameForward);
                 z = std::max(z, 1e-3f); // 0/���� ����
 
                 // 2) ���ϴ� ȭ�� ����(px) -> �ʿ��� ���� ����
@@ -193,7 +193,7 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
 
                 float requiredWorldHeight = 0.0f;
                 // �۽���Ƽ��: ���� �������� ���� = 2*z*tan(fovY/2)
-                const float frustumH = 2.0f * z * tanf(camera.m_fov * 0.5f);
+                const float frustumH = 2.0f * z * tanf(renderData->m_frameFov * 0.5f);
                 requiredWorldHeight = frustumH * (targetPx / vpH);
 
                 // 3) ���� ���� ���̷� ������ ������ ���� ����

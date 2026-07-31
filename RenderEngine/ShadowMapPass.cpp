@@ -369,16 +369,17 @@ void ShadowMapPass::DevideCascadeEnd(Camera& camera, RenderPassData& renderData)
 	auto& cascadeEnd = renderData.m_cascadeEnd;
 	cascadeEnd.clear();
 
-	cascadeEnd.push_back(camera.m_nearPlane);
+	cascadeEnd.push_back(renderData.m_frameNearPlane);
 
-	const float distanceZ = camera.m_farPlane - camera.m_nearPlane;
+	const float distanceZ = renderData.m_frameFarPlane - renderData.m_frameNearPlane;
 
+	// 분할 비율만 카메라에서 읽는다 — 저작 설정이라 프레임 중 바뀌지 않는다.
 	for (float ratio : camera.m_cascadeDevideRatios)
 	{
 		cascadeEnd.push_back(ratio * distanceZ);
 	}
 
-	cascadeEnd.push_back(camera.m_farPlane);
+	cascadeEnd.push_back(renderData.m_frameFarPlane);
 }
 
 void ShadowMapPass::DevideShadowInfo(Camera& camera, RenderPassData& renderData, Mathf::Vector4 LightDir)

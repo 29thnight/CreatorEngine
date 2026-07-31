@@ -90,7 +90,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(RHICommandContext& contex
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
 	SubsurfaceScatteringBuffer buffer{};
-	buffer.CameraFOV	= camera.m_fov;
+	buffer.CameraFOV	= renderData->m_frameFov;
 	buffer.strength		= strength;
 	buffer.width		= width;
 	buffer.direction	= { 1.f, 0.f };//direction;

@@ -1,6 +1,7 @@
 #include "Mesh.h"
 #include "DeviceState.h"
 #include "Camera.h"
+#include "RenderPassData.h"
 #include "MeshOptimizer.h"
 
 // Helper to create D3D11 buffers for a given LOD
@@ -177,12 +178,21 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const
 		return 0; // No LODs or invalid camera, return LOD 0
 	}
 
+	// 프레임 밀봉된 카메라 스냅샷을 쓴다(PHASE 3-2). LOD 판정은 렌더 스레드에서
+	// 도는데, 여기서 살아 있는 카메라를 다시 읽으면 게임 스레드가 카메라를
+	// 움직이는 중일 때 프록시마다 다른 카메라를 보게 된다.
+	if (!RenderPassData::VaildCheck(camera))
+	{
+		return 0;
+	}
+	const RenderPassData* renderData = RenderPassData::GetData(camera);
+
 	// Get camera's view and projection matrices
-	Mathf::Matrix viewMatrix = camera->CalculateView();
-	Mathf::Matrix projectionMatrix = camera->CalculateProjection();
+	Mathf::Matrix viewMatrix = renderData->m_frameCalculatedView;
+	Mathf::Matrix projectionMatrix = renderData->m_frameCalculatedProjection;
 
 	// Get camera's world position
-	Mathf::Vector3 cameraPosition = camera->m_eyePosition;
+	Mathf::Vector3 cameraPosition = renderData->m_frameEyePosition;
 
 	// Calculate bounding sphere in world space using the provided world matrix
 	// Assuming m_boundingBox and m_boundingSphere are in object-local space

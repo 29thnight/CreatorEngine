@@ -11,13 +11,16 @@
 #include "CharacterControllerComponent.h"
 #include "RectTransformComponent.h"
 
-float GetGizmoScale(Mathf::Vector3 gizmoPosition, const Camera& camera, float targetScreenHeightRatio)
+// 카메라가 아니라 프레임 밀봉 스냅샷을 받는다(PHASE 3-2).
+// 기즈모 크기는 렌더 스레드에서 정해지므로, 여기서 살아 있는 카메라를 읽으면
+// 게임 스레드가 카메라를 움직이는 중일 때 기즈모마다 크기가 달라진다.
+float GetGizmoScale(Mathf::Vector3 gizmoPosition, const RenderPassData& renderData, float targetScreenHeightRatio)
 {
-    Mathf::Vector3 cameraPos = camera.m_eyePosition;
+    Mathf::Vector3 cameraPos = renderData.m_frameEyePosition;
     Mathf::Vector3 distance = XMVector3Length(cameraPos - gizmoPosition);
 	float distanceLength = distance.Length();
 
-    float verticalFovRadians = camera.m_fov * Mathf::Rad2Deg;
+    float verticalFovRadians = renderData.m_frameFov * Mathf::Rad2Deg;
     float screenHeight = 2.0f * distanceLength * tanf(verticalFovRadians * 0.5f);
 
     float gizmoSizeInWorld = screenHeight * targetScreenHeightRatio;
@@ -88,8 +91,8 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
     GizmoCameraBuffer cameraBuffer{
-    .VP = XMMatrixMultiply(camera.CalculateView(), camera.CalculateProjection()),
-    .eyePosition = Mathf::Vector3(camera.m_eyePosition)
+    .VP = XMMatrixMultiply(renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection),
+    .eyePosition = Mathf::Vector3(renderData->m_frameEyePosition)
     };
 
     DirectX11::VSSetConstantBuffer(0, 1, m_gizmoCameraBuffer.GetAddressOf());
@@ -157,7 +160,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
             const Mathf::Vector3 worldPosition = selectedObject->m_transform.GetWorldPosition();
             const Mathf::Vector3 lightDirection = Mathf::Vector3(lightComponent->m_direction);
 
-            float gizmoScale = GetGizmoScale(worldPosition, camera, 0.05f);
+            float gizmoScale = GetGizmoScale(worldPosition, *renderData, 0.05f);
 
             switch (lightComponent->m_lightType)
             {

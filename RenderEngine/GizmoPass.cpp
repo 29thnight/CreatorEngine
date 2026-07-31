@@ -92,8 +92,8 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
 
 	GizmoCameraBuffer cameraBuffer{ 
-		.VP = XMMatrixMultiply(camera.CalculateView(), camera.CalculateProjection()), 
-		.eyePosition = Mathf::Vector3(camera.m_eyePosition) 
+		.VP = XMMatrixMultiply(renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection), 
+		.eyePosition = Mathf::Vector3(renderData->m_frameEyePosition) 
 	};
 
 	const uint32 stride = sizeof(GizmoPos);

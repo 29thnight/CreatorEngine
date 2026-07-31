@@ -43,10 +43,30 @@ public:
 	std::atomic<uint32>			m_index{ 0 };
 	std::atomic<uint32>			m_frame{};
 
-	// 프레임 밀봉된 카메라 행렬. 게임 스레드가 EndOfFrame에서 한 번 채우고,
-	// 렌더 스레드는 이것만 읽는다(살아 있는 Camera를 다시 계산하지 않는다).
+	// 프레임 밀봉된 카메라 스냅샷 (PHASE 3-2).
+	//
+	// 게임 스레드가 EndOfFrame에서 한 번 채우고, 렌더 스레드는 이것만 읽는다.
+	// 예전에는 패스들이 camera.CalculateView()나 camera.m_eyePosition을 그 자리에서
+	// 다시 읽었다. 게임 스레드가 같은 카메라를 움직이는 중이면 값이 찢어지고,
+	// 한 프레임 안에서도 패스마다 다른 카메라를 보게 된다. 밀봉해 두면 그런 부류가
+	// 성립하지 않고, 락스텝(배리어 2-랑데뷰)을 풀 수 있는 전제가 된다.
+	//
+	// 역행렬까지 미리 담는 이유는 호출부가 XMMatrixInverse를 다시 부르지 않게 하기
+	// 위해서다 — 같은 값을 여러 패스가 매 프레임 다시 구하고 있었다.
 	Mathf::xMatrix				m_frameCalculatedView{};
 	Mathf::xMatrix				m_frameCalculatedProjection{};
+	Mathf::xMatrix				m_frameCalculatedInverseView{};
+	Mathf::xMatrix				m_frameCalculatedInverseProjection{};
+
+	Mathf::xVector				m_frameEyePosition{};
+	Mathf::xVector				m_frameForward{};
+	Mathf::xVector				m_frameRight{};
+	Mathf::xVector				m_frameUp{};
+
+	float						m_frameFov{};
+	float						m_frameNearPlane{};
+	float						m_frameFarPlane{};
+	bool						m_frameIsOrthographic{ false };
 
 	// 그림자 캐스케이드 계산용 프레임 스크래치 (PHASE 3-2).
 	//
@@ -93,9 +113,25 @@ public:
 	FrameUIProxyIDs& GetUIRenderDataBuffer();
 	void ClearUIRenderDataBuffer();
 
+	// 프레임 렌더 입력을 밀봉한다. 게임 스레드에서만 부른다(EndOfFrame).
+	//
+	// 여기서 담지 않은 카메라 값을 렌더 스레드가 읽고 있다면 그건 아직 이식되지
+	// 않은 경로다 — 새로 필요해지면 여기에 추가하고 호출부를 스냅샷으로 돌린다.
 	void UpdateData(Camera* pCamera) {
 		m_frameCalculatedView = pCamera->CalculateView();
 		m_frameCalculatedProjection = pCamera->CalculateProjection();
+		m_frameCalculatedInverseView = XMMatrixInverse(nullptr, m_frameCalculatedView);
+		m_frameCalculatedInverseProjection = XMMatrixInverse(nullptr, m_frameCalculatedProjection);
+
+		m_frameEyePosition = pCamera->m_eyePosition;
+		m_frameForward = pCamera->m_forward;
+		m_frameRight = pCamera->m_right;
+		m_frameUp = pCamera->m_up;
+
+		m_frameFov = pCamera->m_fov;
+		m_frameNearPlane = pCamera->m_nearPlane;
+		m_frameFarPlane = pCamera->m_farPlane;
+		m_frameIsOrthographic = pCamera->m_isOrthographic;
 	}
 
 	void AddFrame()

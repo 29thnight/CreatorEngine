@@ -407,7 +407,7 @@ void SkyBoxPass::CreateRenderCommandList(RHICommandContext& context, RenderScene
 
 	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
 	//auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
-	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(camera.m_eyePosition));
+	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(renderData->m_frameEyePosition));
 
 	scene.UpdateModel(modelMatrix, deferredPtr);
 	context.SetPixelShaderResource(0, m_skyBoxCubeMap->m_pSRV);
