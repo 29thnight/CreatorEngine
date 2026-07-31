@@ -2,6 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include <atomic>
 #include <deque>
+#include <future>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -51,11 +52,23 @@ private:
     std::deque<std::string> m_pending;
     std::mutex m_mutex;
 
+    // 표준 입력 읽기 스레드.
+    //
+    // 이 스레드는 종료 시 반드시 회수해야 한다. 블로킹 읽기에 갇힌 채로 프로세스가
+    // 죽으면 ExitProcess가 CRT 내부(힙 락·iostream 버퍼)의 임의 지점에서 그 스레드를
+    // 강제 종료하고, 남은 종료 절차가 그 위에서 힙을 만지게 된다.
+    // m_stdinDone은 스레드가 실제로 빠져나왔는지 기한을 두고 확인하기 위한 것이다.
     std::thread m_stdinThread;
+    std::promise<void> m_stdinDone;
+    std::future<void>  m_stdinDoneFuture;
+
     std::atomic<bool> m_running{ false };
     std::atomic<bool> m_quitRequested{ false };
 
     // wait N : N 프레임 동안 다음 명령을 보류한다.
     int m_waitFrames{ 0 };
+
+    // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
+    bool m_scriptLoadFailed{ false };
 };
 #endif // !DYNAMICCPP_EXPORTS

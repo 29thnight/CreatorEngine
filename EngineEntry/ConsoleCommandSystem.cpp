@@ -95,6 +95,15 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
 
     bool wantConsole = false;
 
+    // 표준 입력을 읽는 스레드는 --console에서만 띄운다.
+    //
+    // --script / --exec는 명령이 파일과 인자에서 오므로 타이핑할 사람이 없다.
+    // 그런데도 예전에는 세 경우 모두 리더를 띄웠고, 그 스레드는 종료 시점에
+    // getline에 갇혀 있다가 detach됐다 — 회귀 세트(전부 --script)에서만 나타난
+    // 종료 구간 힙 손상(0xC0000374)의 구조적 원인이다.
+    // 콘솔 자체(출력)는 세 경우 모두 필요하므로 wantConsole과는 분리한다.
+    bool wantStdinReader = false;
+
     auto toUtf8 = [](const wchar_t* w) -> std::string
     {
         if (!w) return {};
@@ -121,6 +130,11 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         else if (arg == "--console")
         {
             wantConsole = true;
+            wantStdinReader = true;
+        }
+        else if (arg == "--heapcheck")
+        {
+            EnableHeapValidation();
         }
     }
     ::LocalFree(argv);
@@ -133,8 +147,21 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         SuppressCrtDialogs();
 
         EnsureConsole();
-        std::printf("[CLI] 콘솔 명령 사용 가능. 'help' 입력.\n");
-        StartStdinReader();
+
+        if (wantStdinReader)
+        {
+            std::printf("[CLI] 콘솔 명령 사용 가능. 'help' 입력.\n");
+            StartStdinReader();
+        }
+    }
+
+    // 스크립트를 못 열었는데 타이핑할 사람도 없다면, 이 실행은 아무것도 하지
+    // 못한다. 계속 돌게 두면 하네스가 타임아웃으로 죽여야 하고 원인도 안 보인다.
+    if (m_scriptLoadFailed && !wantStdinReader)
+    {
+        std::fputs("[CLI] 실행할 명령이 없어 종료한다.\n", stderr);
+        std::fflush(stderr);
+        m_quitRequested.store(true, std::memory_order_release);
     }
 }
 
@@ -144,8 +171,18 @@ void ConsoleCommandSystem::StartStdinReader()
 
     // 표준 입력은 블로킹이므로 별도 스레드에서 읽고 큐에만 넣는다.
     // 실제 실행은 Pump()가 게임 스레드에서 수행한다.
+    m_stdinDone = std::promise<void>{};
+    m_stdinDoneFuture = m_stdinDone.get_future();
+
     m_stdinThread = std::thread([this]
     {
+        // 어떤 경로로 빠져나가든 종료 사실을 알린다. Shutdown이 이걸 기다린다.
+        struct DoneSignal
+        {
+            std::promise<void>& promise;
+            ~DoneSignal() { promise.set_value(); }
+        } signal{ m_stdinDone };
+
         std::string line;
         while (m_running.load(std::memory_order_acquire) && std::getline(std::cin, line))
         {
@@ -159,7 +196,14 @@ void ConsoleCommandSystem::LoadScriptFile(const std::string& path)
     std::ifstream file(path);
     if (!file)
     {
+        // 로그에만 남기면 아무도 못 본다. 실행 인자를 준 쪽은 대개 자동화라
+        // 콘솔을 보고 있지 않고, 명령이 하나도 없는 에디터는 quit도 받지 못한 채
+        // 그냥 계속 돈다 — 하네스가 타임아웃으로 죽을 때까지. 실제로 겪었다.
+        std::fprintf(stderr, "[CLI] 스크립트를 열 수 없습니다: %s\n", path.c_str());
+        std::fflush(stderr);
         Debug->LogError("[CLI] 스크립트를 열 수 없습니다: " + path);
+
+        m_scriptLoadFailed = true;
         return;
     }
 
@@ -1396,19 +1440,43 @@ void ConsoleCommandSystem::PrintHelp() const
         "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
         "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"
         "  quit                 에디터 종료\n"
-        "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n\n");
+        "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n"
+        "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n\n");
 }
 
 void ConsoleCommandSystem::Shutdown()
 {
     m_running.store(false, std::memory_order_release);
 
-    // getline이 블로킹 중일 수 있으므로 detach로 정리한다.
-    // 프로세스 종료 직전이라 스레드 정리보다 교착 회피가 우선이다.
-    if (m_stdinThread.joinable())
+    if (!m_stdinThread.joinable()) return;
+
+    // 블로킹 중인 콘솔 읽기를 깨운다.
+    //
+    // 예전에는 깨우지 않고 그냥 detach했다. 그러면 이 스레드는 getline 안 —
+    // 즉 CRT의 stdio·iostream 내부 — 에 갇힌 채로 남고, 프로세스가 죽을 때
+    // ExitProcess가 그 임의 지점에서 스레드를 강제 종료한다. 하필 힙 락을 쥔
+    // 순간이었다면 뒤이은 종료 절차가 그 위에서 힙을 만지게 되고, 결과는
+    // 종료 구간의 간헐적 힙 손상(0xC0000374)이다. 회귀 세트가 전부 CLI
+    // 실행이라 이 경로에서만 나타났고, 에디터를 손으로 쓸 때는 보이지 않았다.
+    ::CancelSynchronousIo(static_cast<HANDLE>(m_stdinThread.native_handle()));
+
+    // 취소가 항상 듣는다는 보장은 없어서(콘솔 구현에 따라 다르다) 기한을 둔다.
+    // 종료가 통째로 막히는 것은 더 나쁘다.
+    constexpr auto kJoinTimeout = std::chrono::milliseconds(500);
+    const bool exited = m_stdinDoneFuture.valid()
+        && m_stdinDoneFuture.wait_for(kJoinTimeout) == std::future_status::ready;
+
+    if (exited)
     {
-        m_stdinThread.detach();
+        m_stdinThread.join();
+        return;
     }
+
+    // 최후의 수단. 여기까지 오면 예전과 같은 위험이 남지만, 적어도 스크립트
+    // 실행 경로(--script/--exec)에는 이 스레드가 아예 없다.
+    std::fputs("[CLI] 표준 입력 스레드를 회수하지 못했다 - 종료 중 위험 구간.\n", stdout);
+    std::fflush(stdout);
+    m_stdinThread.detach();
 }
 #endif // !DYNAMICCPP_EXPORTS
 

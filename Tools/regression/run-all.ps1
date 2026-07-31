@@ -58,6 +58,10 @@ Run-Step "해상도 스위프" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-resolution-sweep.ps1") -Exe $Exe -Work $Work
 }
 
+Run-Step "종료 순서" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-shutdown-order.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "크래시 덤프 경로" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-crash-dump.ps1") -Exe $Exe -Work $Work
 }

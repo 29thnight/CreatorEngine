@@ -212,6 +212,11 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
+    <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
+      <!-- init_seg(lib)로 소멸 순서를 맞춘 표식이라 유니티 빌드에 합치면 안 된다.
+           다른 TU와 묶이면 그 TU의 정적 객체까지 소멸 시점이 끌려간다. -->
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />

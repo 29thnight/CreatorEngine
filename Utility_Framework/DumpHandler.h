@@ -437,6 +437,29 @@ inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpTyp
 // 서로 덮어썼고, 설치 순서에 따라 덤프가 남기도 하고 안 남기도 했다.
 // 이제 그 경로들은 Log::SetCrashDumpWriter로 등록된 기록자를 통해 여기 도달한다.
 
+/// CRT 디버그 힙의 전수 검사를 켠다(`--heapcheck`).
+///
+/// 힙 손상(0xC0000374)은 망가뜨린 코드와 죽는 지점이 멀리 떨어져 있어서, 그냥
+/// 두면 '종료 시 간헐 크래시'로만 보인다. 이 플래그를 켜면 모든 할당·해제마다
+/// 힙 전체를 검사하므로, 망가뜨린 그 호출에서 바로 멈춘다 — 간헐이 결정적이 된다.
+///
+/// 대가는 속도다. 프레임이 수십 배 느려지므로 평소 실행에는 켜지 않는다.
+/// Release 빌드에는 CRT 디버그 힙 자체가 없어 아무 일도 하지 않는다.
+inline void EnableHeapValidation()
+{
+#ifdef _DEBUG
+    int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+    flags |= _CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF;
+    _CrtSetDbgFlag(flags);
+
+    std::fputs("[힙검사] CRT 디버그 힙 전수 검사 켜짐 - 매우 느려진다.\n", stdout);
+    std::fflush(stdout);
+#else
+    std::fputs("[힙검사] Release 빌드에는 CRT 디버그 힙이 없어 켤 수 없다.\n", stdout);
+    std::fflush(stdout);
+#endif
+}
+
 // 무인 실행에서 CRT 대화상자가 프로세스를 멈춰 세우지 않게 한다.
 // abort 메시지 창과 디버그 assert 창을 파일/stderr로 돌린다.
 inline void SuppressCrtDialogs()

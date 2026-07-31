@@ -227,17 +227,32 @@ void DirectX11::Dx11Main::Finalize()
     // 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
     ClrHost::Get().Shutdown();
 
+    // 렌더 스레드를 먼저 완전히 세운다. 그 다음에야 그들이 만지던 것을 부순다.
+    //
+    // 예전에는 순서가 반대였다. isGameToRender만 내려놓고 곧바로
+    // SceneManagers->Decommissioning()으로 렌더 씬을 해체했는데, 그 플래그는
+    // 루프 맨 위에서만 확인되므로 CB 스레드는 여전히 한 프레임 분량의 커맨드를
+    // 만드는 중이었다. 그 사이 렌더 씬·패스·RenderPassData가 발밑에서 사라졌고,
+    // 결과는 종료 구간의 간헐 크래시다. 실제 덤프 두 건이 전부 이 모양이었다:
+    //   ShadowMapPass::CreateCommandListCascadeShadow → concurrent_queue::push
+    //   RenderPassData::ClearRenderQueue → concurrent_vector::clear
+    // 둘 다 파괴된 동시성 컨테이너를 만진 흔적(0xFFFFFFFFFFFFFFFF 읽기)이다.
     isGameToRender = false;
-    TagManagers->Finalize();
-	CullingManagers->Shutdown();
-    SceneManagers->Decommissioning();
-    EngineSettingInstance->SaveSettings();
+
+    // 배리어에 걸려 있는 스레드를 깨워야 루프 조건을 다시 볼 수 있다.
+    // 이게 없으면 아래 대기가 영원히 끝나지 않는다.
     EngineSettingInstance->renderBarrier.Finalize();
 
     while(!isCB_Thread_End || !isCE_Thread_End)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
+
+    // 여기서부터는 렌더 스레드가 없다. 이제 해체해도 안전하다.
+    TagManagers->Finalize();
+	CullingManagers->Shutdown();
+    SceneManagers->Decommissioning();
+    EngineSettingInstance->SaveSettings();
 
     m_sceneRenderer->Finalize();
     ShaderSystem->Finalize();

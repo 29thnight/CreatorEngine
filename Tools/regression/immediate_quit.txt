@@ -1,0 +1,14 @@
+# 즉시 종료 시나리오 (층 2 — 종료 순서 회귀)
+#
+# 첫 프레임이 만들어지기도 전에 종료를 건다. 이때 CB/CE 렌더 스레드는 막 떠서
+# 배리어를 돌고 있고, Dx11Main::Finalize가 그들을 세우기 전에 렌더 씬을 해체하면
+# 발밑에서 자료구조가 사라진다:
+#   ShadowMapPass::CreateCommandListCascadeShadow → concurrent_queue::push
+#   RenderPassData::ClearRenderQueue → concurrent_vector::clear
+# 둘 다 파괴된 동시성 컨테이너를 만진 흔적(0xFFFFFFFFFFFFFFFF 읽기)이다.
+#
+# wait를 넣으면 안 된다. 몇 프레임만 지나도 재현되지 않는다 —
+# 실측으로 `wait 2` 하나만 넣어도 8회 전부 통과했고, wait 없이는 6회 전부 죽었다.
+#
+# 종료 코드 0이어야 한다.
+quit

@@ -151,16 +151,19 @@ void DirectX11::GameMain::Initialize()
 
 void DirectX11::GameMain::Finalize()
 {
+    // 렌더 스레드를 먼저 완전히 세우고 나서 그들이 만지던 것을 부순다.
+    // (에디터 쪽 Dx11Main::Finalize와 같은 이유 — 거기에 자세히 적어 두었다)
     isGameToRender = false;
-    TagManagers->Finalize();
-    SceneManagers->Decommissioning();
-    EngineSettingInstance->SaveSettings();
     EngineSettingInstance->renderBarrier.Finalize();
 
     while (!isCB_Thread_End || !isCE_Thread_End)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+
+    TagManagers->Finalize();
+    SceneManagers->Decommissioning();
+    EngineSettingInstance->SaveSettings();
 
     m_sceneRenderer->Finalize();
     ShaderSystem->Finalize();
