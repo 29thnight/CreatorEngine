@@ -42,7 +42,9 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
     g_progressWindow->SetStatusText(L"Initializing Core...");
 
 	CoreWindow coreWindow(hInstance, title, width, height);
-	CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
+	// 덤프 종류 지정과 기록자 등록은 EngineBootstrap::InitializeRuntime이 이미 했다.
+	// 여기서 또 부르면 등록 로그가 두 번 찍히고, 무엇보다 '여기가 등록 지점'이라는
+	// 오해를 남긴다 — 그 오해 때문에 부팅 전반이 덤프 사각지대였다.
     m_hWnd = coreWindow.GetHandle();
 
     g_progressWindow->SetProgress(10);

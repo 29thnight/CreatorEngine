@@ -125,6 +125,10 @@ namespace Log
 	using CrashDumpWriter = void (*)(void* exceptionPointers, const char* reason);
 	void SetCrashDumpWriter(CrashDumpWriter writer);
 
+	/// 덤프 기록자가 등록돼 있는지. 크래시가 나기 전에 물어볼 수 있어야
+	/// '덤프가 없다'를 사후가 아니라 사전에 알 수 있다.
+	bool HasCrashDumpWriter() noexcept;
+
 	// 로그 시스템이 살아 있는지 확인한다.
 	//
 	// 위 전역 Debug는 각 번역 단위에 복사된 원시 포인터라, DebugClass::Destroy()

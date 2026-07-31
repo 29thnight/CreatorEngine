@@ -75,7 +75,19 @@ namespace EngineBootstrap
         Log::Initialize("Editor");
 #endif
 
+        // 크래시 덤프 기록자를 Log::Initialize 바로 다음에 등록한다.
+        //
+        // Log::Initialize가 크래시 후크(SEH·terminate·abort·purecall·CRT 잘못된 인자)를
+        // 이미 다 걸어 둔 상태라, 등록이 늦으면 그 사이에 죽은 크래시는 로그에 CRASH
+        // 줄만 남고 .dmp가 없다. 예전에는 App::Initialize 중반이 유일한 등록 지점이라
+        // 디바이스 생성·셰이더 컴파일·리소스 로드 구간 전체가 덤프 사각지대였다.
+        CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
+
         EngineSettingInstance->Initialize();
+
+        // GitHash는 EngineSetting이 읽어 오므로 초기화 뒤에 다시 캐시한다.
+        // (SetDumpType 시점에는 아직 비어 있다 — 덤프를 남기는 능력이 우선이다.)
+        CacheCrashGitHash();
 
         CoreWindow::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT
         {

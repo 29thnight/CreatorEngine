@@ -39,6 +39,11 @@ public:
             DestroyWindow(m_hWnd);
         }
         UnregisterClass(L"CoreWindowApp", m_hInstance);
+
+        // 창은 App::Initialize의 지역 객체라 종료 단계에서 먼저 사라진다.
+        // s_instance를 그대로 두면 그 뒤에 난 크래시가 WriteCrashDump에서
+        // 파괴된 객체의 m_hWnd를 읽어, 덤프를 쓰기도 전에 2차 크래시로 죽는다.
+        if (s_instance == this) s_instance = nullptr;
     }
 
     template <typename Instance>
@@ -102,13 +107,24 @@ public:
         auto* pointers = static_cast<EXCEPTION_POINTERS*>(exceptionPointers);
         HWND window = s_instance ? s_instance->m_hWnd : nullptr;
 
+        // 덤프 기록 중 다시 죽더라도 로그는 남도록 먼저 밀어낸다.
+        Log::FlushNow();
+
+        // 순서가 핵심이다: .dmp를 먼저 쓰고 요약은 그 뒤에 만든다.
+        //
+        // 요약을 만드는 BuildCrashReport는 dbghelp로 스택을 걷고 std::string을
+        // 늘려 가는데, 힙이 손상됐거나 스택이 고갈된 프로세스에서는 바로 거기서
+        // 또 죽는다. 예전에는 요약이 먼저였던 탓에 로그에 CRASH 줄만 남고
+        // .dmp도 스택도 통째로 없어진 크래시가 실제로 있었다.
+        const file::path dumpPath = WriteMinidumpFile(pointers, g_dumpType);
+
         // SEH 경로는 예외 컨텍스트가 있어 정확한 크래시 지점을 뜰 수 있다.
         // 나머지(abort·terminate 등)는 지금 이 자리의 스택으로 대신한다.
         const std::string report = (nullptr != pointers)
             ? BuildCrashReport(pointers)
             : BuildAbnormalExitReport(reason, nullptr);
 
-        WriteDumpArtifacts(pointers, report, g_dumpType, window);
+        WriteCrashReportArtifacts(dumpPath, report, window);
     }
 
     /// 무인 실행 여부. CLI가 --script/--exec를 받았을 때 켠다.
@@ -123,7 +139,17 @@ public:
         // 덤프 종류가 정해지는 유일한 지점이라 여기서 기록자를 등록한다.
         // 후크 자체는 LogSystem이 걸어 두었고, 크래시 경로 전부(SEH·terminate·abort·
         // purecall·CRT 잘못된 인자)가 이 콜백으로 모인다.
+        //
+        // 부팅 초반(EngineBootstrap::InitializeRuntime)에서 한 번 부르는 것이 계약이다.
+        // 예전에는 App::Initialize 중반에서만 불려서, 그 전에 죽으면 로그만 남고
+        // 덤프는 없었다.
         Log::SetCrashDumpWriter(&CoreWindow::WriteCrashDump);
+
+        // 종료 단계 크래시에서도 GitHash를 읽을 수 있도록 지금 복사해 둔다.
+        CacheCrashGitHash();
+
+        // 쌓인 덤프를 지금 정리한다. 디스크가 차면 다음 크래시의 덤프가 실패한다.
+        PruneOldDumpFiles();
     }
 
     HWND GetHandle() const { return m_hWnd; }

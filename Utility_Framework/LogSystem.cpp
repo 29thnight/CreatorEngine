@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <exception>
@@ -47,7 +48,21 @@ std::terminate_handler g_previousTerminate{ nullptr };
     // 크래시 경로는 중복 진입할 수 있으므로(terminate -> abort) 덤프도 1회로 막는다.
     void WriteCrashDumpOnce(void* exceptionPointers, std::string_view reason)
     {
-        if (nullptr == g_crashDumpWriter) return;
+        if (nullptr == g_crashDumpWriter)
+        {
+            // 조용히 지나가면 '로그에 CRASH 줄은 있는데 .dmp는 없다'가 되고,
+            // 나중에 그 이유를 알 방법이 없어진다. 미등록 자체를 사건으로 남긴다.
+            std::fputs("[크래시] 덤프 기록자가 등록되지 않아 .dmp를 남기지 못했다"
+                " (EngineBootstrap에서 CoreWindow::SetDumpType이 불렸는지 확인할 것).\n", stdout);
+            std::fflush(stdout);
+
+            if (g_logSystemAlive.load(std::memory_order_acquire) && Debug)
+            {
+                Debug->LogError("크래시 덤프 기록자 미등록 - 이번 크래시는 덤프 없이 지나간다.");
+                Debug->FlushNow();
+            }
+            return;
+        }
 
         bool expected = false;
         if (!g_crashDumpWritten.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
@@ -243,6 +258,27 @@ void Log::NotifySehCrash(void* exceptionPointers)
 void Log::SetCrashDumpWriter(CrashDumpWriter writer)
 {
     g_crashDumpWriter = writer;
+
+    // 등록 사실을 시작 로그에 남긴다.
+    //
+    // 예전에는 등록이 빠져도 아무 흔적이 없었고, 크래시가 난 뒤에야 '덤프가
+    // 없네'로 알게 됐다. 이제는 세션 로그 첫머리만 봐도 이번 실행이 덤프를
+    // 남길 수 있는 상태인지 판단할 수 있다.
+    if (!g_logSystemAlive.load(std::memory_order_acquire) || !Debug) return;
+
+    if (nullptr != writer)
+    {
+        Debug->Log("크래시 덤프 기록자 등록 완료 - 이번 실행의 크래시는 .dmp로 남는다.");
+    }
+    else
+    {
+        Debug->LogWarning("크래시 덤프 기록자가 해제됐다 - 이후 크래시는 덤프 없이 지나간다.");
+    }
+}
+
+bool Log::HasCrashDumpWriter() noexcept
+{
+    return nullptr != g_crashDumpWriter;
 }
 
 void Log::InstallCrashGuards()

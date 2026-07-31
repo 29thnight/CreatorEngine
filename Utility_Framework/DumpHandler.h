@@ -4,10 +4,14 @@
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include <DbgHelp.h>
+#include <algorithm>
 #include <atomic>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
+#include <system_error>
 #include <crtdbg.h>
 
 #pragma comment(lib, "dbghelp.lib")
@@ -181,6 +185,47 @@ inline std::string BuildAbnormalExitReport(const char* reason, const char* detai
     return report + BuildStackTrace(context, kHandlerFrames);
 }
 
+/// 보존할 덤프 개수.
+///
+/// 전체 메모리 덤프는 한 개가 2~3GB라 로그(20개)처럼 넉넉히 둘 수 없다. 그냥 두면
+/// 수십 GB까지 불어나고, 디스크가 차는 순간 CreateFile이나 MiniDumpWriteDump가
+/// 실패해 '덤프가 없다'로 되돌아간다 — 정리는 덤프를 남기는 능력의 일부다.
+constexpr size_t kMaxRetainedDumpFiles = 5;
+
+/// 오래된 덤프를 지운다. 크래시 경로가 아니라 시작 시 1회만 부른다 —
+/// 크래시 중에 디렉터리를 순회하다 2차 크래시가 나면 손해가 더 크다.
+inline void PruneOldDumpFiles()
+{
+    std::error_code ec{};
+    const file::path directory = PathFinder::DumpPath();
+    if (!file::exists(directory, ec)) return;
+
+    std::vector<file::path> dumps;
+    for (const auto& entry : file::directory_iterator(directory, ec))
+    {
+        if (ec) break;
+        if (!entry.is_regular_file(ec)) continue;
+        if (entry.path().extension() != ".dmp") continue;
+        dumps.push_back(entry.path());
+    }
+
+    if (dumps.size() <= kMaxRetainedDumpFiles) return;
+
+    // 파일명에 타임스탬프가 들어가므로 사전순 정렬이 곧 시간순이다.
+    std::sort(dumps.begin(), dumps.end());
+
+    const size_t removeCount = dumps.size() - kMaxRetainedDumpFiles;
+    for (size_t i = 0; i < removeCount; ++i)
+    {
+        file::remove(dumps[i], ec);
+
+        // 요약도 같이 지운다. 덤프 없는 .txt만 남으면 열어 볼 수 없는 잔해가 된다.
+        file::path report = dumps[i];
+        report.replace_extension(L".txt");
+        file::remove(report, ec);
+    }
+}
+
 /// 덤프 파일 경로를 만든다. 시각을 넣어 이전 크래시를 덮어쓰지 않게 한다
 /// (예전에는 이름이 고정이라 연속으로 돌리면 직전 것이 사라졌다).
 inline file::path MakeDumpFilePath()
@@ -200,32 +245,85 @@ inline file::path MakeDumpFilePath()
     return result;
 }
 
-/// 덤프 파일과 요약 텍스트를 남긴다.
+/// 크래시 보고서에 박을 GitHash 사본.
 ///
-/// 요약(report)을 인자로 받는 이유는 SEH 경로와 CRT 이상 종료 경로가 이 함수를 함께
-/// 쓰기 때문이다. 후자는 예외 포인터가 없어 pExceptionPointers가 널로 들어온다
-/// (MiniDumpWriteDump는 예외 정보 없이도 쓸 수 있다).
-inline void WriteDumpArtifacts(EXCEPTION_POINTERS* pExceptionPointers, const std::string& report,
-    DUMP_TYPE dumpType, HWND handle)
+/// 종료 단계에서 크래시가 나면 EngineSetting 싱글턴은 이미 파괴돼 있는데,
+/// EngineSettingInstance는 각 번역 단위에 복사된 원시 포인터라 널이 되지 않는다.
+/// 그 상태로 GetGitVersionHash()를 부르면 크래시 핸들러 자신이 UAF로 죽는다.
+/// 그래서 시작 시 한 번 복사해 두고, 크래시 경로는 이 사본만 읽는다.
+inline char g_crashGitHash[64]{ "unknown" };
+
+inline void CacheCrashGitHash()
 {
-    // 덤프 기록 중 다시 죽더라도 로그는 남도록 먼저 밀어낸다.
-    Log::FlushNow();
+    const std::string hash = EngineSettingInstance->GetGitVersionHash();
+    const size_t length = (hash.size() < sizeof(g_crashGitHash) - 1)
+        ? hash.size() : sizeof(g_crashGitHash) - 1;
+
+    std::memcpy(g_crashGitHash, hash.c_str(), length);
+    g_crashGitHash[length] = '\0';
+}
+
+/// 크래시 경로 전용 알림.
+///
+/// 이 경로의 실패는 절대 조용히 지나가면 안 된다 — 조용한 실패가 곧 '로그에는
+/// CRASH 줄이 있는데 .dmp는 없다'는 상황을 만들었다. 로그 시스템이 이미 죽었을
+/// 수도 있어 stdout과 디버거 출력에도 같이 흘린다.
+///
+/// 인자를 std::string이 아니라 const char*로 받는 이유는 힙이 손상된 프로세스에서
+/// 불릴 수 있기 때문이다. 호출부는 고정 버퍼에 snprintf로 찍어서 넘긴다.
+inline void CrashNotify(const char* message)
+{
+    if (nullptr == message) return;
+
+    std::fputs(message, stdout);
+    std::fputc('\n', stdout);
+    std::fflush(stdout);
+
+    ::OutputDebugStringA(message);
+    ::OutputDebugStringA("\n");
+
+    if (Log::IsAlive() && Debug) Debug->LogError(message);
+}
+
+/// 미니덤프 파일만 남긴다. 성공하면 그 경로를, 실패하면 빈 경로를 돌려준다.
+///
+/// 크래시 처리에서 가장 먼저 불러야 하는 함수다. 심볼 해석(BuildStackTrace)은
+/// dbghelp를 부르고 힙을 쓰는데, 힙 손상이나 스택 고갈로 죽은 프로세스에서는
+/// 바로 그 자리가 2차 크래시 지점이 된다. 예전에는 요약을 먼저 만들고 덤프를
+/// 나중에 썼기 때문에, 요약을 만들다 죽으면 덤프가 통째로 사라졌다.
+inline file::path WriteMinidumpFile(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpType)
+{
+    char line[1024]{};
 
     file::path fileName = MakeDumpFilePath();
     if (fileName.empty())
     {
-        Debug->LogError("Failed to get module file name for dump creation.");
-        return;
-	}
+        CrashNotify("[크래시] 모듈 경로를 얻지 못해 덤프를 만들 수 없습니다.");
+        return {};
+    }
 
-    HANDLE hFile = CreateFile(fileName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) return;
+    // 디렉터리가 없으면 CreateFile이 그냥 실패한다. 예전에는 그 실패가 조용한
+    // return으로 끝나서 '덤프가 없다'는 사실만 남았다.
+    std::error_code ec{};
+    file::create_directories(fileName.parent_path(), ec);
+
+    HANDLE hFile = CreateFileW(fileName.c_str(), GENERIC_WRITE, 0, nullptr,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+    if (INVALID_HANDLE_VALUE == hFile)
+    {
+        std::snprintf(line, sizeof(line), "[크래시] 덤프 파일 생성 실패 (GetLastError=%lu): %ls",
+            static_cast<unsigned long>(GetLastError()), fileName.c_str());
+        CrashNotify(line);
+        return {};
+    }
+
     MINIDUMP_EXCEPTION_INFORMATION dumpInfo{};
     dumpInfo.ThreadId = GetCurrentThreadId();
     dumpInfo.ExceptionPointers = pExceptionPointers;
-    dumpInfo.ClientPointers = TRUE;
-    MINIDUMP_TYPE miniDumpType = MiniDumpNormal;
+    dumpInfo.ClientPointers = FALSE;   // 같은 프로세스에서 뜨므로 포인터는 우리 주소 공간이다
 
+    MINIDUMP_TYPE miniDumpType = MiniDumpNormal;
     if (dumpType == DUNP_TYPE_MINI)
     {
         miniDumpType = MINIDUMP_TYPE(
@@ -243,40 +341,66 @@ inline void WriteDumpArtifacts(EXCEPTION_POINTERS* pExceptionPointers, const std
     // 예외 정보가 없으면(abort 등) NULL을 넘긴다 — 그래도 스레드 스택은 다 담긴다.
     MINIDUMP_EXCEPTION_INFORMATION* dumpInfoPtr = (nullptr != pExceptionPointers) ? &dumpInfo : nullptr;
 
-    if (!MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, miniDumpType, dumpInfoPtr, NULL, NULL))
-    {
-        DWORD err = GetLastError();
-    }
-
+    const BOOL written = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
+        miniDumpType, dumpInfoPtr, nullptr, nullptr);
+    const DWORD writeError = written ? 0 : GetLastError();
 
     CloseHandle(hFile);
 
-    std::wstring adsName = fileName.wstring() + L":GitHash";
-    std::ofstream ads(adsName, std::ios::binary);
-    if (ads)
+    if (!written)
     {
-        ads << EngineSettingInstance->GetGitVersionHash(); // 또는 g_EngineGitHash
-        ads.close();
+        // 실패 코드는 HRESULT로 온다. 0바이트 껍데기를 남기면 다음 사람이
+        // '덤프는 있는데 안 열린다'로 헤매므로 지운다.
+        std::snprintf(line, sizeof(line), "[크래시] MiniDumpWriteDump 실패 (HRESULT=0x%08lX): %ls",
+            static_cast<unsigned long>(writeError), fileName.c_str());
+        CrashNotify(line);
+
+        file::remove(fileName, ec);
+        return {};
     }
 
-    // 덤프 옆에 사람이 바로 읽을 수 있는 요약을 남긴다. 디버거를 열지 않고도
-    // 콘솔이나 CI 로그에서 원인 함수를 볼 수 있어야 한다.
-    file::path reportPath = fileName;
-    reportPath.replace_extension(L".txt");
+    std::snprintf(line, sizeof(line), "[크래시] 덤프 기록 완료: %ls", fileName.c_str());
+    CrashNotify(line);
 
-    if (std::ofstream out(reportPath, std::ios::binary); out)
+    return fileName;
+}
+
+/// 덤프 옆에 사람이 바로 읽을 수 있는 요약(.txt)과 GitHash를 남긴다.
+///
+/// 덤프가 이미 디스크에 있는 뒤에 불린다. 여기서 죽어도 덤프는 남는다는 것이
+/// 이 분리의 목적이다.
+inline void WriteCrashReportArtifacts(const file::path& dumpPath, const std::string& report, HWND handle)
+{
+    if (!dumpPath.empty())
     {
-        out << "GitHash: " << EngineSettingInstance->GetGitVersionHash() << "\n\n" << report;
+        std::wstring adsName = dumpPath.wstring() + L":GitHash";
+        std::ofstream ads(adsName, std::ios::binary);
+        if (ads)
+        {
+            ads << g_crashGitHash;
+            ads.close();
+        }
+
+        // 디버거를 열지 않고도 콘솔이나 CI 로그에서 원인 함수를 볼 수 있어야 한다.
+        file::path reportPath = dumpPath;
+        reportPath.replace_extension(L".txt");
+
+        if (std::ofstream out(reportPath, std::ios::binary); out)
+        {
+            out << "GitHash: " << g_crashGitHash << "\n\n" << report;
+        }
+
+        std::printf("[크래시] 요약: %ls\n", reportPath.c_str());
     }
 
     // 콘솔이 붙어 있으면(=CLI 실행) 그 자리에서 보여 준다.
     std::fputs(report.c_str(), stdout);
-    std::printf("[크래시] 덤프: %ls\n[크래시] 요약: %ls\n",
-        fileName.c_str(), reportPath.c_str());
     std::fflush(stdout);
 
-    Debug->LogError(report);
-    Debug->LogError("[크래시] 덤프: " + fileName.string());
+    if (Log::IsAlive() && Debug)
+    {
+        Debug->LogError(report);
+    }
 
     // 크래시 중에는 spdlog를 shutdown하지 않는다.
     // 다른 스레드가 아직 로깅 중일 수 있어 로거 파괴는 2차 크래시를 부른다.
@@ -287,9 +411,25 @@ inline void WriteDumpArtifacts(EXCEPTION_POINTERS* pExceptionPointers, const std
     if (nullptr != handle) PostMessage(handle, WM_CLOSE, 0, 0);
 }
 
+/// 덤프 → 요약 순서로 남긴다. 순서가 계약이다.
+inline void WriteDumpArtifacts(EXCEPTION_POINTERS* pExceptionPointers, const std::string& report,
+    DUMP_TYPE dumpType, HWND handle)
+{
+    // 덤프 기록 중 다시 죽더라도 로그는 남도록 먼저 밀어낸다.
+    Log::FlushNow();
+
+    const file::path dumpPath = WriteMinidumpFile(pExceptionPointers, dumpType);
+    WriteCrashReportArtifacts(dumpPath, report, handle);
+}
+
 inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpType, HWND handle)
 {
-    WriteDumpArtifacts(pExceptionPointers, BuildCrashReport(pExceptionPointers), dumpType, handle);
+    // 덤프부터 쓰고 나서 요약을 만든다 — WriteDumpArtifacts에 넘기면 요약을
+    // 만드는 동안(인자 평가) 죽었을 때 덤프까지 잃는다.
+    Log::FlushNow();
+
+    const file::path dumpPath = WriteMinidumpFile(pExceptionPointers, dumpType);
+    WriteCrashReportArtifacts(dumpPath, BuildCrashReport(pExceptionPointers), handle);
 }
 
 // SEH가 아닌 이상 종료(abort·terminate·purecall·CRT 잘못된 인자)를 받는 후크는

@@ -58,6 +58,10 @@ Run-Step "해상도 스위프" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-resolution-sweep.ps1") -Exe $Exe -Work $Work
 }
 
+Run-Step "크래시 덤프 경로" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-crash-dump.ps1") -Exe $Exe -Work $Work
+}
+
 if ($failed.Count -gt 0) {
     "실패한 검사: " + ($failed -join ', ')
     exit 1

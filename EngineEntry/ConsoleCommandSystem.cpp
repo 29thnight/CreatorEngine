@@ -1312,6 +1312,52 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Log::FlushNow();
         std::printf("[CLI] 로그 flush\n");
     }
+    else if (cmd == "crash.status")
+    {
+        // 이번 실행이 덤프를 남길 수 있는 상태인지 확인한다.
+        // 크래시가 난 뒤에 '덤프가 없네'로 알게 되는 일이 없도록 하는 것이 목적.
+        const bool ready = Log::HasCrashDumpWriter();
+        std::printf("[CLI] 크래시 덤프 기록자: %s\n", ready ? "등록됨" : "미등록");
+        std::printf("[CLI] 덤프 경로: %ls\n", PathFinder::DumpPath().c_str());
+        std::printf("[CLI] 무인 모드: %s\n", CoreWindow::IsUnattended() ? "예(대화상자 없음)" : "아니오");
+    }
+    else if (cmd == "crash.test")
+    {
+        // 크래시 핸들러 자체를 검증하는 수단.
+        //
+        // 덤프 경로는 크래시가 나야만 실행되므로 평소에는 검증이 안 되고,
+        // 검증되지 않은 채로 조용히 망가져 있었다(로그에 CRASH 줄만 남고 .dmp 없음).
+        // 종류별로 일부러 죽여서 각 경로가 .dmp와 .txt를 남기는지 본다.
+        const std::string kind = (parts.size() > 1) ? parts[1] : std::string("av");
+
+        std::printf("[CLI] crash.test %s - 의도적으로 프로세스를 죽인다\n", kind.c_str());
+        Debug->LogWarning("[crash.test] 의도적 크래시: " + kind);
+        Log::FlushNow();
+
+        if (kind == "av")
+        {
+            // 널 역참조. volatile이라 최적화로 사라지지 않는다.
+            volatile int* nullPointer = nullptr;
+            *nullPointer = 1;
+        }
+        else if (kind == "abort")
+        {
+            std::abort();
+        }
+        else if (kind == "terminate")
+        {
+            std::terminate();
+        }
+        else if (kind == "throw")
+        {
+            // 미처리 C++ 예외 → terminate 경로.
+            throw std::runtime_error("crash.test throw");
+        }
+        else
+        {
+            std::printf("[CLI] 알 수 없는 종류: %s (av|abort|terminate|throw)\n", kind.c_str());
+        }
+    }
     else
     {
         std::printf("[CLI] 알 수 없는 명령: %s  ('help' 참고)\n", cmd.c_str());
@@ -1347,6 +1393,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  assets.unload        사용하지 않는 에셋 캐시 정리\n"
         "  wait <프레임>        지정 프레임만큼 다음 명령을 미룬다\n"
         "  log.flush            로그를 디스크에 즉시 반영\n"
+        "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
+        "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"
         "  quit                 에디터 종료\n"
         "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n\n");
 }

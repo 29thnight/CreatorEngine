@@ -36,7 +36,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
 	CoreWindow coreWindow(hInstance, title, width, height);
-	CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
+	// ë¤í”„ ê¸°ë¡ì ë“±ë¡ì€ EngineBootstrap::InitializeRuntimeì´ ë¶€íŒ… ì´ˆë°˜ì— ì´ë¯¸ í–ˆë‹¤.
 	m_hWnd = coreWindow.GetHandle();
 	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
 	SetWindow(coreWindow);
@@ -84,7 +84,7 @@ void GameBuilder::App::Run()
 	})
 	.Then([&]
 	{
-		// ¸ŞÀÎ ·çÇÁ
+		// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		m_main->Update();
 	});
 }
@@ -103,7 +103,7 @@ LRESULT GameBuilder::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lPara
 	wchar_t wch = 0;
 	static BYTE KeyState[256];
 	GetKeyboardState(KeyState);
-	// Virtual Key¸¦ Unicode ¹®ÀÚ·Î º¯È¯
+	// Virtual Keyï¿½ï¿½ Unicode ï¿½ï¿½ï¿½Ú·ï¿½ ï¿½ï¿½È¯
 	if (ToUnicode((UINT)wParam, (UINT)lParam, KeyState, &wch, 1, 0) > 0)
 	{
 		io.AddInputCharacter(wch);
@@ -117,7 +117,7 @@ LRESULT GameBuilder::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lPa
 	if (wParam == SIZE_MINIMIZED)
 	{
 		EngineSettingInstance->SetMinimized(true);
-		return 0; // ÃÖ¼ÒÈ­µÈ °æ¿ì ¹«½Ã
+		return 0; // ï¿½Ö¼ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	}
 
 	if (EngineSettingInstance->IsMinimized())
@@ -125,7 +125,7 @@ LRESULT GameBuilder::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lPa
 		if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
 		{
 			EngineSettingInstance->SetMinimized(false);
-			return 0; // º¹¿øµÈ °æ¿ì ¹«½Ã
+			return 0; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		}
 	}
 
