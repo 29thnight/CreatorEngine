@@ -28,7 +28,7 @@ public:
 
 	void Initialize(Texture* diffuseTexture, Texture* normalTexture, Texture* ormTexture);
 	void Execute(RenderScene& scene, Camera& camera) override;
-	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:

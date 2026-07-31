@@ -15,7 +15,7 @@ public:
     void UseEnvironmentMap(Managed::SharedPtr<Texture> envMap, Managed::SharedPtr<Texture> preFilter, Managed::SharedPtr<Texture> brdfLut);
     void DisableAmbientOcclusion();
     void Execute(RenderScene& scene, Camera& camera) override;
-    void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
+    void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
         void ApplySettings(const DeferredPassSetting& setting);
 

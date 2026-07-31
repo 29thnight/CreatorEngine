@@ -1,4 +1,5 @@
 #include "TerrainGizmoPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "Terrain.h"
@@ -59,22 +60,26 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
     ExecuteCommandList(scene, camera);
 }
 
-void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void TerrainGizmoPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    ID3D11DeviceContext* deferredPtr = deferredContext;
+    ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
     m_pso->Apply(deferredPtr);
 
-    DirectX11::CopyResource(deferredPtr, m_pTempTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+    context.CopyResource(m_pTempTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, nullptr);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-    DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
+    context.SetRenderTarget(rtv, nullptr);
+    {
+		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
+		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		context.SetViewports(1, &rhiVp);
+	}
+    context.SetPixelShaderConstantBuffer(0, m_Buffer.Get());
+    context.SetPixelShaderResource(0, m_pTempTexture->m_pSRV);
 
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
     scene.UseModel(deferredPtr);
@@ -100,20 +105,20 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
 						auto& mask = terrainBrush->m_masks[maskID];
 						if (mask.m_maskSRV)
 						{
-							DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mask.m_maskSRV);
+							context.SetPixelShaderResource(1, mask.m_maskSRV);
 							terrainGizmoBuffer.maskWidth = mask.m_maskWidth;
 							terrainGizmoBuffer.maskHeight = mask.m_maskHeight;
 						}
                         else 
                         {
-                            DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &nullSRV);
+                            context.SetPixelShaderResource(1, nullptr);
 							terrainGizmoBuffer.maskWidth = 0;
 							terrainGizmoBuffer.maskHeight = 0;
                         }
                     }
                     else 
                     {
-                        DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &nullSRV);
+                        context.SetPixelShaderResource(1, nullptr);
 						terrainGizmoBuffer.maskWidth = 0;
 						terrainGizmoBuffer.maskHeight = 0;
                     }
@@ -122,7 +127,7 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
 					terrainGizmoBuffer.isEditMode = terrain->GetCurrentBrush()->m_isEditMode;
                     terrainGizmoBuffer.view = renderData->m_frameCalculatedView;
                     terrainGizmoBuffer.proj = renderData->m_frameCalculatedProjection;
-                    DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &terrainGizmoBuffer);
+                    context.UpdateBuffer(m_Buffer.Get(), &terrainGizmoBuffer);
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);
                     terrainMesh->Draw(deferredPtr);
@@ -132,7 +137,7 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
 
     }
     ID3D11RenderTargetView* nullrtv = nullptr;
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, &nullrtv, nullptr);
+    context.SetRenderTarget(nullrtv, nullptr);
 
     ID3D11CommandList* commandList{};
     deferredPtr->FinishCommandList(false, &commandList);

@@ -1,17 +1,18 @@
 #include "DecalPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
 
 cbuffer PS_CONSTANT_BUFFER
 {
-	XMMATRIX g_inverseViewMatrix; // Ä«¸Þ¶ó View-ProjectionÀÇ ¿ªÇà·Ä
-	XMMATRIX g_inverseProjectionMatrix; // Ä«¸Þ¶ó View-ProjectionÀÇ ¿ªÇà·Ä
-	float2 g_screenDimensions; // È­¸é ÇØ»óµµ (³Êºñ, ³ôÀÌ)
+	XMMATRIX g_inverseViewMatrix; // Ä«ï¿½Þ¶ï¿½ View-Projectionï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
+	XMMATRIX g_inverseProjectionMatrix; // Ä«ï¿½Þ¶ï¿½ View-Projectionï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
+	float2 g_screenDimensions; // È­ï¿½ï¿½ ï¿½Ø»ï¿½ (ï¿½Êºï¿½, ï¿½ï¿½ï¿½ï¿½)
 };
 
 cbuffer PS_DECAL_BUFFER
 {
-	XMMATRIX g_inverseDecalWorldMatrix; // µ¥Ä® °æ°è »óÀÚ WorldÀÇ ¿ªÇà·Ä
+	XMMATRIX g_inverseDecalWorldMatrix; // ï¿½ï¿½Ä® ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Worldï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
 	uint32 g_UseTextures;
 	uint32 sliceX = 1;
 	uint32 sliceY = 1;
@@ -153,7 +154,7 @@ DecalPass::DecalPass()
 			blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
 			blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
 			blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			// ¾ËÆÄ Ã¤³Î ºí·»µù ¼³Á¤ (º¸Åë G-BufferÀÇ ¾ËÆÄ´Â »ç¿ëÇÏÁö ¾ÊÀ¸¹Ç·Î °£´ÜÇÏ°Ô ¼³Á¤)
+			// ï¿½ï¿½ï¿½ï¿½ Ã¤ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ G-Bufferï¿½ï¿½ ï¿½ï¿½ï¿½Ä´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½)
 			blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
 			blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
 			blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
@@ -226,27 +227,27 @@ void DecalPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void DecalPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void DecalPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 	
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // ì „í™˜ê¸° íƒˆì¶œêµ¬(ìž”ì¡´ ë„¤ì´í‹°ë¸Œ ê²½ë¡œìš©)
 
-	DirectX11::CopyResource(deferredPtr, m_CopiedDepthTexture->m_pTexture, renderData->m_depthStencil->m_pTexture);
-	DirectX11::CopyResource(deferredPtr, m_CopiedDiffuseTexture->m_pTexture, m_DiffuseTexture->m_pTexture);
-	DirectX11::CopyResource(deferredPtr, m_CopiedNormalTexture->m_pTexture, m_NormalTexture->m_pTexture);
-	DirectX11::CopyResource(deferredPtr, m_CopiedORMTexture->m_pTexture, m_OccluRoughMetalTexture->m_pTexture);
+	context.CopyResource(m_CopiedDepthTexture->m_pTexture, renderData->m_depthStencil->m_pTexture);
+	context.CopyResource(m_CopiedDiffuseTexture->m_pTexture, m_DiffuseTexture->m_pTexture);
+	context.CopyResource(m_CopiedNormalTexture->m_pTexture, m_NormalTexture->m_pTexture);
+	context.CopyResource(m_CopiedORMTexture->m_pTexture, m_OccluRoughMetalTexture->m_pTexture);
 
 	m_pso->Apply(deferredPtr);
 	//ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	//DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, renderData->m_depthStencil->m_pDSV);
+	//context.SetRenderTarget(view, renderData->m_depthStencil->m_pDSV);
 	ID3D11RenderTargetView* view[3] = {
 		m_DiffuseTexture->GetRTV(),
 		m_NormalTexture->GetRTV(),
 		m_OccluRoughMetalTexture->GetRTV()
 	};
-	DirectX11::OMSetRenderTargets(deferredPtr, 3, view, renderData->m_depthStencil->m_pDSV);
+	context.SetRenderTargets(3, reinterpret_cast<RHINativeRenderTarget const*>(view), renderData->m_depthStencil->m_pDSV);
 
 
 	ID3D11ShaderResourceView* srv[4] = {
@@ -255,20 +256,24 @@ void DecalPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Re
 		m_CopiedNormalTexture->m_pSRV,
 		m_CopiedORMTexture->m_pSRV
     };
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 4, srv);
+	context.SetPixelShaderResources(0, 4, reinterpret_cast<RHINativeShaderResource const*>(srv));
 
 	PS_CONSTANT_BUFFER cBuf;
 	cBuf.g_inverseProjectionMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedProjection);
 	cBuf.g_inverseViewMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedView);
 	cBuf.g_screenDimensions = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
-	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &cBuf);
+	context.UpdateBuffer(m_Buffer.Get(), &cBuf);
 
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+	{
+		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
+		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		context.SetViewports(1, &rhiVp);
+	}
 
-	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
-	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, m_decalBuffer.GetAddressOf());
+	context.SetPixelShaderConstantBuffer(0, m_Buffer.Get());
+	context.SetPixelShaderConstantBuffer(1, m_decalBuffer.Get());
 
 	for (auto& proxy : renderData->m_decalQueue) {
 
@@ -282,35 +287,35 @@ void DecalPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Re
 		decalBuf.sliceX = proxy->m_sliceX;
 		decalBuf.sliceY = proxy->m_sliceY;
 		decalBuf.sliceNum = proxy->m_sliceNum;
-		DirectX11::UpdateBuffer(deferredPtr, m_decalBuffer.Get(), &decalBuf);
+		context.UpdateBuffer(m_decalBuffer.Get(), &decalBuf);
 
 		uint32 decalChannel = DecalChannel::None;
 		decalChannel |= proxy->m_diffuseTexture ? DecalChannel::dDiffuse : 0;
 		decalChannel |= proxy->m_normalTexture ? DecalChannel::dNormal : 0;
 		decalChannel |= proxy->m_occluroughmetalTexture ? DecalChannel::dORM : 0;
-		DirectX11::OMSetBlendState(deferredPtr, m_pBlendStates[decalChannel].Get(), nullptr, 0xFFFFFFFF);
+		context.SetBlendState(m_pBlendStates[decalChannel].Get(), nullptr, 0xFFFFFFFF);
 
 		ID3D11ShaderResourceView* decalTextures[3] = {
 			proxy->m_diffuseTexture ? proxy->m_diffuseTexture->m_pSRV : nullptr,
 			proxy->m_normalTexture ? proxy->m_normalTexture->m_pSRV : nullptr,
 			proxy->m_occluroughmetalTexture ? proxy->m_occluroughmetalTexture->m_pSRV : nullptr
 		};
-		DirectX11::PSSetShaderResources(deferredPtr, 4, 3, decalTextures);
+		context.SetPixelShaderResources(4, 3, reinterpret_cast<RHINativeShaderResource const*>(decalTextures));
 
 		UINT offset = 0;
-		DirectX11::IASetVertexBuffers(deferredPtr, 0, 1, m_vertexBuffer.GetAddressOf(), &m_decalstride, &offset);
-		DirectX11::IASetIndexBuffer(deferredPtr, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		DirectX11::IASetPrimitiveTopology(deferredPtr, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		DirectX11::DrawIndexed(deferredPtr, 36, 0, 0);
+		context.SetVertexBuffer(0, m_vertexBuffer.Get(), m_decalstride, offset);
+		context.SetIndexBuffer(m_indexBuffer.Get(), true, 0);
+		context.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+		context.DrawIndexed(36, 0, 0);
 	}
 
 	// Clear
 	ID3D11ShaderResourceView* nullSRV[7] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 	ID3D11RenderTargetView* nullRTV[3] = { nullptr, nullptr, nullptr };
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 7, nullSRV);
+	context.SetPixelShaderResources(0, 7, reinterpret_cast<RHINativeShaderResource const*>(nullSRV));
 	deferredPtr->OMSetRenderTargets(3, nullRTV, nullptr);
 	ID3D11BlendState* nullBlendState = nullptr;
-	DirectX11::OMSetBlendState(deferredPtr, nullBlendState, nullptr, 0xFFFFFFFF);
+	context.SetBlendState(nullBlendState, nullptr, 0xFFFFFFFF);
 
 
 	ID3D11CommandList* commandList{};

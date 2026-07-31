@@ -1,4 +1,5 @@
 #include "ShadowMapPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
 #include "Scene.h"
@@ -168,16 +169,19 @@ void ShadowMapPass::Resize(uint32_t width, uint32_t height)
 
 }
 
-void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::CreateCommandListCascadeShadow(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
-	auto* deferredContextPtr1 = deferredContext;
+	auto* deferredContextPtr1 = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
+	// RHI 이식(PHASE 3-1, 5차 슬라이스). 프록시 드로우 루프(ProxyToShadow)와
+	// 섀도 카메라 버퍼 갱신은 DX11 고유 경로로 남는다.
+
 	for (auto i : std::views::iota(0, cascadeCount))
 	{
-		DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+		context.ClearDepthStencil(renderData->m_shadowMapDSVarr[i], true, false, 1.0f, 0);
 	}
 
 	if (!m_abled)
@@ -203,10 +207,16 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 
 	m_pso->Apply(deferredContextPtr1);
 	scene.UseModel(deferredContextPtr1);
-	DirectX11::RSSetViewports(deferredContextPtr1, 1, &shadowViewport);
-	DirectX11::VSSetConstantBuffer(deferredContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
-	DirectX11::VSSetConstantBuffer(deferredContextPtr1, 4, 1, m_cascadeIndexBuffer.GetAddressOf());
-	
+
+	const RHIViewport shadowVp{ shadowViewport.TopLeftX, shadowViewport.TopLeftY,
+		shadowViewport.Width, shadowViewport.Height, shadowViewport.MinDepth, shadowViewport.MaxDepth };
+	context.SetViewports(1, &shadowVp);
+
+	RHINativeBuffer boneBuffer = m_boneBuffer.Get();
+	RHINativeBuffer cascadeIndexBuffer = m_cascadeIndexBuffer.Get();
+	context.SetVertexShaderConstantBuffers(3, 1, &boneBuffer);
+	context.SetVertexShaderConstantBuffers(4, 1, &cascadeIndexBuffer);
+
 	renderData->m_shadowCamera.SetShadowInfo(camera.m_cascadeinfo);
 	renderData->m_shadowCamera.UpdateBufferCascade(deferredContextPtr1, true);
 
@@ -215,34 +225,36 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 	{
 		CascadeIndexBuffer m_currentCascadeIndex{};
 		m_currentCascadeIndex.cascadeIndex = i;
-		//renderData->m_shadowCamera.ApplyShadowInfo(i);
 
-		DirectX11::OMSetRenderTargets(deferredContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[i]);
-		DirectX11::UpdateBuffer(deferredContextPtr1, m_cascadeIndexBuffer.Get(), &m_currentCascadeIndex);
-		//renderData->m_shadowCamera.UpdateBuffer(deferredContextPtr1, true);
+		context.SetRenderTargets(0, nullptr, renderData->m_shadowMapDSVarr[i]);
+		context.UpdateBuffer(m_cascadeIndexBuffer.Get(), &m_currentCascadeIndex);
 
-		CreateCommandListProxyToShadow(deferredContext, scene, camera);
-		CreateTerrainRenderCommandList(deferredContext, scene, camera);
+		CreateCommandListProxyToShadow(deferredContextPtr1, scene, camera);
+		CreateTerrainRenderCommandList(deferredContextPtr1, scene, camera);
 	}
 
-	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DirectX11::DeviceStates->g_Viewport);
-	DirectX11::UnbindRenderTargets(deferredContextPtr1);
+	const D3D11_VIEWPORT& fullVp = DirectX11::DeviceStates->g_Viewport;
+	const RHIViewport restoreVp{ fullVp.TopLeftX, fullVp.TopLeftY, fullVp.Width, fullVp.Height, fullVp.MinDepth, fullVp.MaxDepth };
+	context.SetViewports(1, &restoreVp);
+	context.UnbindRenderTargets();
 
-	ID3D11ShaderResourceView* nullSRV[] = { nullptr };
-	DirectX11::VSSetShaderResources(deferredContextPtr1, 0, 1, nullSRV);
+	RHINativeShaderResource nullSRV[] = { nullptr };
+	context.SetVertexShaderResources(0, 1, nullSRV);
 
 	ID3D11CommandList* pCommandList;
 	DirectX11::FinishCommandList(deferredContextPtr1, false, &pCommandList);
 	PushQueue(camera.m_cameraIndex, pCommandList);
 }
 
-void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::CreateCommandListNormalShadow(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
-	auto deferredContextPtr1 = deferredContext;
+	auto* deferredContextPtr1 = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+	// RHI 이식(PHASE 3-1, 5차 슬라이스) — 캐스케이드 변형과 같은 규약.
+
+	context.ClearDepthStencil(renderData->m_shadowMapDSVarr[0], true, false, 1.0f, 0);
 
 	if (!m_abled)
 	{
@@ -270,18 +282,26 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* deferredC
 	constantCopy.m_shadowMapHeight						= desc.m_textureHeight;
 	constantCopy.m_lightViewProjection[0]				= camera.m_cascadeinfo[2].m_lightViewProjection;
 
-	DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
-	DirectX11::OMSetRenderTargets(deferredContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[0]);
-	DirectX11::VSSetConstantBuffer(deferredContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
-	DirectX11::RSSetViewports(deferredContextPtr1, 1, &shadowViewport);
+	context.ClearDepthStencil(renderData->m_shadowMapDSVarr[0], true, false, 1.0f, 0);
+	context.SetRenderTargets(0, nullptr, renderData->m_shadowMapDSVarr[0]);
+
+	RHINativeBuffer boneBuffer = m_boneBuffer.Get();
+	context.SetVertexShaderConstantBuffers(3, 1, &boneBuffer);
+
+	const RHIViewport shadowVp{ shadowViewport.TopLeftX, shadowViewport.TopLeftY,
+		shadowViewport.Width, shadowViewport.Height, shadowViewport.MinDepth, shadowViewport.MaxDepth };
+	context.SetViewports(1, &shadowVp);
+
 	renderData->m_shadowCamera.UpdateBuffer(deferredContextPtr1, true);
 	scene.UseModel(deferredContextPtr1);
 
-	CreateCommandListProxyToShadow(deferredContext, scene, camera);
-	CreateTerrainRenderCommandList(deferredContext, scene, camera);
+	CreateCommandListProxyToShadow(deferredContextPtr1, scene, camera);
+	CreateTerrainRenderCommandList(deferredContextPtr1, scene, camera);
 
-	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DirectX11::DeviceStates->g_Viewport);
-	DirectX11::UnbindRenderTargets(deferredContextPtr1);
+	const D3D11_VIEWPORT& fullVp = DirectX11::DeviceStates->g_Viewport;
+	const RHIViewport restoreVp{ fullVp.TopLeftX, fullVp.TopLeftY, fullVp.Width, fullVp.Height, fullVp.MinDepth, fullVp.MaxDepth };
+	context.SetViewports(1, &restoreVp);
+	context.UnbindRenderTargets();
 
 	ID3D11CommandList* pd3dCommandList1;
 	deferredContextPtr1->FinishCommandList(false, &pd3dCommandList1);
@@ -487,17 +507,17 @@ void ShadowMapPass::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, Li
 	}
 }
 
-void ShadowMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	scene.m_LightController->m_shadowMapConstant.useCasCade = g_useCascade;
 	camera.m_shadowMapConstant.useCasCade = g_useCascade;
 	if (g_useCascade)
 	{
-		CreateCommandListCascadeShadow(defferdContext, scene, camera);
+		CreateCommandListCascadeShadow(context, scene, camera);
 	}
 	else
 	{
-		CreateCommandListNormalShadow(defferdContext, scene, camera);
+		CreateCommandListNormalShadow(context, scene, camera);
 	}
 }
 

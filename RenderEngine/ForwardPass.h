@@ -16,8 +16,8 @@ public:
 		Managed::SharedPtr<Texture> brdfLut);
 
 	void Execute(RenderScene& scene, Camera& camera);
-	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
-	void CreateFoliageCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
+	void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
+	void CreateFoliageCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera);
 	void ControlPanel() override;
 
 	void ApplySettings(const RenderPassSettings& setting);

@@ -1,6 +1,7 @@
 #include "BlitPass.h"
 #include "ShaderSystem.h"
 #include "Camera.h"
+#include "RHI/RHI.h"
 
 BlitPass::BlitPass()
 {
@@ -46,6 +47,9 @@ void BlitPass::Initialize(ID3D11RenderTargetView* backBufferRTV)
 	m_backBufferRTV = backBufferRTV;
 }
 
+// RHI로 이식된 첫 패스(PHASE 3-1). 커맨드 기록이 전역 DirectX11:: 호출 대신
+// RHI 컨텍스트를 통한다 — DX12(EnhancedSceneRenderer)에서는 같은 코드가 커맨드
+// 리스트에 기록된다. PSO Apply는 아직 DX11 고유 경로다(PSO 추상화는 3-4).
 void BlitPass::Execute(RenderScene& scene, Camera& camera)
 {
     if (!RenderPassData::VaildCheck(&camera)) return;
@@ -55,7 +59,12 @@ void BlitPass::Execute(RenderScene& scene, Camera& camera)
 
     m_pso->Apply();
 
-    DirectX11::RSSetViewports(1, &DirectX11::DeviceStates->g_Viewport);
+    RHICommandContext& context = RHI::Immediate();
+
+    const D3D11_VIEWPORT& src = DirectX11::DeviceStates->g_Viewport;
+    const RHIViewport viewport{ src.TopLeftX, src.TopLeftY, src.Width, src.Height,
+                                src.MinDepth, src.MaxDepth };
+    context.SetViewports(1, &viewport);
 
     ID3D11RenderTargetView* rtv = DirectX11::DeviceStates->g_backBufferRTV;
     if (!rtv)
@@ -69,12 +78,14 @@ void BlitPass::Execute(RenderScene& scene, Camera& camera)
         return;
     }
 
-    DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+    RHINativeRenderTarget rtvHandle = rtv;
+    context.SetRenderTargets(1, &rtvHandle, nullptr);
 
-	DirectX11::PSSetShaderResources(0, 1, &renderData->m_renderTarget->m_pSRV);
-	DirectX11::Draw(4, 0);
+    RHINativeShaderResource srvHandle = renderData->m_renderTarget->m_pSRV;
+    context.SetPixelShaderResources(0, 1, &srvHandle);
+    context.Draw(4, 0);
 
-	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets();
+    RHINativeShaderResource nullSRV = nullptr;
+    context.SetPixelShaderResources(0, 1, &nullSRV);
+    context.UnbindRenderTargets();
 }

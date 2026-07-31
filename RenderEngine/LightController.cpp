@@ -2,6 +2,7 @@
 #include "DeviceState.h"
 #include "Camera.h"
 #include "ShadowMapPass.h"
+#include "RHI/DX11RHI.h"
 #include "Texture.h"
 
 
@@ -168,7 +169,8 @@ void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredConte
 {
 	if (hasLightWithShadows && !camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::ShadowPass))
 	{
-		m_shadowMapPass->CreateRenderCommandList(deferredContext, scene, camera);
+		DX11CommandContext rhiContext(deferredContext); // 백엔드 소유 코드 — 직접 생성이 정당하다(PHASE 3-1, 7차)
+		m_shadowMapPass->CreateRenderCommandList(rhiContext, scene, camera);
 	}
 }
 

@@ -1,4 +1,5 @@
 #include "GBufferPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Material.h"
 #include "Skeleton.h"
@@ -160,12 +161,12 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void GBufferPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto data = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
 	// --- 1. CLASSIFY RENDER PROXIES ---
 	// Grouping key is now a pair of (Material GUID, Mesh GUID) to ensure
@@ -214,11 +215,15 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	//std::cout << "GBuffer Pass - Classify Render Proxies Time: " << clock0.GetElapsedTime() << " ms\n";
 
 	// --- INITIAL PSO AND RENDER TARGET SETUP ---
-	DirectX11::OMSetRenderTargets(deferredPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
+	context.SetRenderTargets(RTV_TypeMax, reinterpret_cast<RHINativeRenderTarget const*>(m_renderTargetViews), data->m_depthStencil->m_pDSV);
 	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+	{
+		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
+		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		context.SetViewports(1, &rhiVp);
+	}
+	context.SetPixelShaderConstantBuffer(1, scene.m_LightController->m_pLightBuffer);
 	TimeBuffer timeBuffer{
 		Time->GetTotalSeconds(),
 		Time->GetElapsedSeconds(),
@@ -230,17 +235,17 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		m_windSpeed,
 		m_windWaveFrequency
 	};
-	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
-	DirectX11::UpdateBuffer(deferredPtr, m_windBuffer.Get(), &windBuffer);
+	context.UpdateBuffer(m_TimeBuffer.Get(), &timeBuffer);
+	context.UpdateBuffer(m_windBuffer.Get(), &windBuffer);
 
 	// --- 2. RENDER ANIMATED OBJECTS (INDIVIDUALLY) ---
 	m_pso->Apply(deferredPtr);
-	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
-	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
-	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
-	DirectX11::PSSetConstantBuffer(deferredPtr, 7, 1, m_meshRendererBuffer.GetAddressOf());
-	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
-	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
+	context.SetVertexShaderConstantBuffer(3, m_boneBuffer.Get());
+	context.SetPixelShaderConstantBuffer(0, m_materialBuffer.Get());
+	context.SetPixelShaderConstantBuffer(5, m_TimeBuffer.Get());
+	context.SetPixelShaderConstantBuffer(7, m_meshRendererBuffer.Get());
+	context.SetVertexShaderConstantBuffer(4, m_TimeBuffer.Get());
+	context.SetVertexShaderConstantBuffer(5, m_windBuffer.Get());
 
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
@@ -255,7 +260,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		if (proxy->m_finalTransforms && proxy->m_animatorGuid != currentAnimatorGuid)
 		{
-			DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), proxy->m_finalTransforms.get());
+			context.UpdateBuffer(m_boneBuffer.Get(), proxy->m_finalTransforms.get());
 			currentAnimatorGuid = proxy->m_animatorGuid;
 		}
 
@@ -265,16 +270,16 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		MeshrendererBuffer mbuffer;
 		mbuffer.bitflag = proxy->m_bitflag;
-		DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+		context.UpdateBuffer(m_meshRendererBuffer.Get(), &mbuffer);
 
 		if (proxy->m_materialGuid != currentMaterialGuid)
 		{
-			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
-			if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
-			if (mat->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
-			if (mat->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-			if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
-			if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
+			context.UpdateBuffer(m_materialBuffer.Get(), &matinfo);
+			if (mat->m_pBaseColor) context.SetPixelShaderResource(0, mat->m_pBaseColor->m_pSRV);
+			if (mat->m_pNormal) context.SetPixelShaderResource(1, mat->m_pNormal->m_pSRV);
+			if (mat->m_pOccRoughMetal) context.SetPixelShaderResource(2, mat->m_pOccRoughMetal->m_pSRV);
+			if (mat->m_AOMap) context.SetPixelShaderResource(3, mat->m_AOMap->m_pSRV);
+			if (mat->m_pEmissive) context.SetPixelShaderResource(5, mat->m_pEmissive->m_pSRV);
 			currentMaterialGuid = proxy->m_materialGuid;
 		}
 
@@ -287,7 +292,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	m_instancePSO->Apply(deferredPtr);
 
 	// Bind the pre-created instance buffer SRV to the vertex shader once.
-	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, m_instanceBufferSRV.GetAddressOf());
+	context.SetVertexShaderResource(0, m_instanceBufferSRV.Get());
 
 	//Benchmark clock2;
 
@@ -309,16 +314,16 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		MeshrendererBuffer mbuffer;
 		mbuffer.bitflag = firstProxy->m_bitflag;
-		DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+		context.UpdateBuffer(m_meshRendererBuffer.Get(), &mbuffer);
 
 		if (groupMaterialGuid != currentMaterialGuid)
 		{
-			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
-			if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
-			if (mat->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
-			if (mat->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-			if (mat->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
-			if (mat->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
+			context.UpdateBuffer(m_materialBuffer.Get(), &matinfo);
+			if (mat->m_pBaseColor) context.SetPixelShaderResource(0, mat->m_pBaseColor->m_pSRV);
+			if (mat->m_pNormal) context.SetPixelShaderResource(1, mat->m_pNormal->m_pSRV);
+			if (mat->m_pOccRoughMetal) context.SetPixelShaderResource(2, mat->m_pOccRoughMetal->m_pSRV);
+			if (mat->m_AOMap) context.SetPixelShaderResource(3, mat->m_AOMap->m_pSRV);
+			if (mat->m_pEmissive) context.SetPixelShaderResource(5, mat->m_pEmissive->m_pSRV);
 		}
 
 		// --- Update the instance data buffer using UpdateSubresource ---
@@ -332,17 +337,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			instanceMatrices.push_back(proxy->m_worldMatrix);
 		}
 
-		// Define the destination box to specify the exact region to update.
-		// This prevents reading past the end of the source data.
-		D3D11_BOX destBox;
-		destBox.left = 0;
-		destBox.right = proxies.size() * sizeof(Mathf::xMatrix);
-		destBox.top = 0;
-		destBox.bottom = 1;
-		destBox.front = 0;
-		destBox.back = 1;
-
-		deferredPtr->UpdateSubresource(m_instanceBuffer.Get(), 0, &destBox, instanceMatrices.data(), 0, 0);
+		// 정확한 바이트 구간만 갱신한다(소스 밖 읽기 방지) — RHI UpdateBufferRange가
+		// DX11에서는 box UpdateSubresource, DX12에서는 업로드 복사가 된다.
+		context.UpdateBufferRange(m_instanceBuffer.Get(), 0,
+			static_cast<uint32_t>(proxies.size() * sizeof(Mathf::xMatrix)), instanceMatrices.data());
 
 		// --- Draw all instances in one call ---
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
@@ -389,14 +387,14 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 			MeshrendererBuffer mbuffer;
 			mbuffer.bitflag = proxy->m_bitflag;
-			DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+			context.UpdateBuffer(m_meshRendererBuffer.Get(), &mbuffer);
 
-			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
-			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
-			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
-			if (proxy->m_Material->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &proxy->m_Material->m_pOccRoughMetal->m_pSRV);
-			if (proxy->m_Material->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &proxy->m_Material->m_AOMap->m_pSRV);
-			if (proxy->m_Material->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &proxy->m_Material->m_pEmissive->m_pSRV);
+			context.UpdateBuffer(m_materialBuffer.Get(), &proxy->m_Material);
+			if (proxy->m_Material->m_pBaseColor) context.SetPixelShaderResource(0, proxy->m_Material->m_pBaseColor->m_pSRV);
+			if (proxy->m_Material->m_pNormal) context.SetPixelShaderResource(1, proxy->m_Material->m_pNormal->m_pSRV);
+			if (proxy->m_Material->m_pOccRoughMetal) context.SetPixelShaderResource(2, proxy->m_Material->m_pOccRoughMetal->m_pSRV);
+			if (proxy->m_Material->m_AOMap) context.SetPixelShaderResource(3, proxy->m_Material->m_AOMap->m_pSRV);
+			if (proxy->m_Material->m_pEmissive) context.SetPixelShaderResource(5, proxy->m_Material->m_pEmissive->m_pSRV);
 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
@@ -455,14 +453,14 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 			MeshrendererBuffer mbuffer;
 			mbuffer.bitflag = proxy->m_bitflag;
-			DirectX11::UpdateBuffer(deferredPtr, m_meshRendererBuffer.Get(), &mbuffer);
+			context.UpdateBuffer(m_meshRendererBuffer.Get(), &mbuffer);
 
-			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &proxy->m_Material);
-			if (proxy->m_Material->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &proxy->m_Material->m_pBaseColor->m_pSRV);
-			if (proxy->m_Material->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &proxy->m_Material->m_pNormal->m_pSRV);
-			if (proxy->m_Material->m_pOccRoughMetal) DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &proxy->m_Material->m_pOccRoughMetal->m_pSRV);
-			if (proxy->m_Material->m_AOMap) DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &proxy->m_Material->m_AOMap->m_pSRV);
-			if (proxy->m_Material->m_pEmissive) DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &proxy->m_Material->m_pEmissive->m_pSRV);
+			context.UpdateBuffer(m_materialBuffer.Get(), &proxy->m_Material);
+			if (proxy->m_Material->m_pBaseColor) context.SetPixelShaderResource(0, proxy->m_Material->m_pBaseColor->m_pSRV);
+			if (proxy->m_Material->m_pNormal) context.SetPixelShaderResource(1, proxy->m_Material->m_pNormal->m_pSRV);
+			if (proxy->m_Material->m_pOccRoughMetal) context.SetPixelShaderResource(2, proxy->m_Material->m_pOccRoughMetal->m_pSRV);
+			if (proxy->m_Material->m_AOMap) context.SetPixelShaderResource(3, proxy->m_Material->m_AOMap->m_pSRV);
+			if (proxy->m_Material->m_pEmissive) context.SetPixelShaderResource(5, proxy->m_Material->m_pEmissive->m_pSRV);
 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
 			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
@@ -498,26 +496,26 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	// --- 4. CLEANUP AND FINISH COMMAND LIST ---
 	ID3D11ShaderResourceView* nullSRV[] = { nullptr };
-	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, nullSRV); // Unbind instance buffer
+	context.SetVertexShaderResource(0, nullptr); // Unbind instance buffer
 
 	ID3D11Buffer* nullBuffer[] = { nullptr };
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
-	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, nullBuffer);
+	context.SetPixelShaderResources(0, 5, reinterpret_cast<RHINativeShaderResource const*>(nullSRVs));
+	context.SetVertexShaderConstantBuffer(3, nullptr);
 
 	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
-	deferredPtr->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+	context.SetRenderTargets(RTV_TypeMax, reinterpret_cast<RHINativeRenderTarget const*>(nullRTV), nullptr);
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
 }
 
-void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void GBufferPass::TerrainRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto data = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 	m_pso->Apply(deferredPtr);
 
 	for (auto& RTV : m_renderTargetViews)
@@ -525,12 +523,16 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 		deferredPtr->ClearRenderTargetView(RTV, Colors::Transparent);
 	}
 
-	DirectX11::OMSetRenderTargets(deferredPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
+	context.SetRenderTargets(RTV_TypeMax, reinterpret_cast<RHINativeRenderTarget const*>(m_renderTargetViews), data->m_depthStencil->m_pDSV);
 
 	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+	{
+		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
+		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		context.SetViewports(1, &rhiVp);
+	}
+	context.SetPixelShaderConstantBuffer(1, scene.m_LightController->m_pLightBuffer);
 	TimeBuffer timeBuffer{
 		Time->GetTotalSeconds(),
 		Time->GetElapsedSeconds(),
@@ -542,11 +544,11 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 		m_windSpeed,
 		m_windWaveFrequency
 	};
-	DirectX11::UpdateBuffer(deferredPtr, m_TimeBuffer.Get(), &timeBuffer);
-	DirectX11::UpdateBuffer(deferredPtr, m_windBuffer.Get(), &windBuffer);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 5, 1, m_TimeBuffer.GetAddressOf());
-	DirectX11::VSSetConstantBuffer(deferredPtr, 4, 1, m_TimeBuffer.GetAddressOf());
-	DirectX11::VSSetConstantBuffer(deferredPtr, 5, 1, m_windBuffer.GetAddressOf());
+	context.UpdateBuffer(m_TimeBuffer.Get(), &timeBuffer);
+	context.UpdateBuffer(m_windBuffer.Get(), &windBuffer);
+	context.SetPixelShaderConstantBuffer(5, m_TimeBuffer.Get());
+	context.SetVertexShaderConstantBuffer(4, m_TimeBuffer.Get());
+	context.SetVertexShaderConstantBuffer(5, m_windBuffer.Get());
 
 	for (auto& terrainProxy : data->m_terrainQueue) 
 	{
@@ -558,31 +560,31 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 		if (terrainMesh && terrainMaterial)
 		{
 			// 1. ���̾� ���� ���ε�
-			DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, terrainMaterial->GetLayerBuffer());
+			context.SetPixelShaderConstantBuffers(12, 1, reinterpret_cast<RHINativeBuffer const*>(terrainMaterial->GetLayerBuffer()));
 			scene.UpdateModel(terrainProxy->m_worldMatrix, deferredPtr);
 
 			// 2. ���̾� Albedo �ؽ�ó �迭 ���ε� (t6)
-			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
+			context.SetPixelShaderResources(6, 1, reinterpret_cast<RHINativeShaderResource const*>(terrainMaterial->GetLayerSRV()));
 
 			// 3. [����] Splat Map '�迭' �ؽ�ó ���ε� (t7)
-			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
+			context.SetPixelShaderResources(7, 1, reinterpret_cast<RHINativeShaderResource const*>(terrainMaterial->GetSplatMapSRV()));
 
-			DirectX11::UpdateBuffer(deferredPtr, terrainMaterial->m_layerBuffer.Get(),
+			context.UpdateBuffer(terrainMaterial->m_layerBuffer.Get(),
 				&terrainMaterial->m_layerBufferData);
 
 			terrainMesh->Draw(deferredPtr);
 
 			// --- ���ҽ� ���� ---
 			ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
-			DirectX11::PSSetShaderResources(deferredPtr, 6, 2, nullSRVs);
+			context.SetPixelShaderResources(6, 2, reinterpret_cast<RHINativeShaderResource const*>(nullSRVs));
 		}
 	}
 
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 5, nullSRVs);
+	context.SetPixelShaderResources(0, 5, reinterpret_cast<RHINativeShaderResource const*>(nullSRVs));
 
 	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
 	ZeroMemory(nullRTV, sizeof(nullRTV));
-	deferredPtr->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+	context.SetRenderTargets(RTV_TypeMax, reinterpret_cast<RHINativeRenderTarget const*>(nullRTV), nullptr);
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);

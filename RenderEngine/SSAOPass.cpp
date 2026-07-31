@@ -1,4 +1,5 @@
 #include "SSAOPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
 #include "Scene.h"
@@ -106,12 +107,12 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
     ExecuteCommandList(scene, camera);
 }
 
-void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void SSAOPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    ID3D11DeviceContext* deferredPtr = deferredContext;
+    ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // ì „í™˜ê¸° íƒˆì¶œêµ¬(ìž”ì¡´ ë„¤ì´í‹°ë¸Œ ê²½ë¡œìš©)
 
     m_pso->Apply(deferredPtr);
 
@@ -129,11 +130,17 @@ void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
         return; // Ensure textures are valid
     }
 
-    DirectX11::ClearRenderTargetView(deferredPtr, renderTarget->GetRTV(), Colors::Transparent);
+    // RHI ì´ì‹(PHASE 3-1, 3ì°¨ ìŠ¬ë¼ì´ìŠ¤). RenderDebugManager ìº¡ì²˜ì™€ PSO ApplyëŠ”
+    // DX11 ê³ ìœ  ê²½ë¡œë¡œ ë‚¨ëŠ”ë‹¤.
 
-    ID3D11RenderTargetView* rtv = renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, nullptr);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+    context.ClearRenderTarget(renderTarget->GetRTV(), Colors::Transparent);
+
+    RHINativeRenderTarget rtv = renderTarget->GetRTV();
+    context.SetRenderTargets(1, &rtv, nullptr);
+
+    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    context.SetViewports(1, &viewport);
     Mathf::xMatrix view = camera.CalculateView();
     Mathf::xMatrix proj = camera.CalculateProjection();
     m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
@@ -145,31 +152,32 @@ void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     m_SSAOBuffer.m_windowSize = { (float)DirectX11::DeviceStates->g_ClientRect.width, (float)DirectX11::DeviceStates->g_ClientRect.height };
     m_SSAOBuffer.m_frameIndex = Time->GetFrameCount();
 
-    DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &m_SSAOBuffer);
+    context.UpdateBuffer(m_Buffer.Get(), &m_SSAOBuffer);
 
-    DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
+    RHINativeBuffer ssaoBuffer = m_Buffer.Get();
+    context.SetPixelShaderConstantBuffers(3, 1, &ssaoBuffer);
 
-    ID3D11ShaderResourceView* srvs[4] = {
+    RHINativeShaderResource srvs[4] = {
         renderData->m_depthStencil->m_pSRV,
         normalTexture->m_pSRV,
         m_NoiseTexture->m_pSRV,
         diffuseTexture->m_pSRV
     };
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 4, srvs);
+    context.SetPixelShaderResources(0, 4, srvs);
 
-    DirectX11::Draw(deferredPtr, 4, 0);
+    context.Draw(4, 0);
 
-	//Warn : 1 ÇÁ·¹ÀÓ ¹Ð¸²ÀÌ ¹ß»ýÇÒ ¼ö ÀÖÀ½
+	//Warn : 1 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ð¸ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     if (0 == renderData->m_index)
     {
         RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr,
 			renderTarget->GetRTV(), "SSAO_PASS");
     }
 
-    ID3D11ShaderResourceView* nullSRV[4] = { nullptr, nullptr, nullptr, nullptr };
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 4, nullSRV);
-    ID3D11RenderTargetView* nullRTV = nullptr;
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, &nullRTV, nullptr);
+    RHINativeShaderResource nullSRV[4] = { nullptr, nullptr, nullptr, nullptr };
+    context.SetPixelShaderResources(0, 4, nullSRV);
+    RHINativeRenderTarget nullRTV = nullptr;
+    context.SetRenderTargets(1, &nullRTV, nullptr);
 
     ID3D11CommandList* commandList{};
     deferredPtr->FinishCommandList(false, &commandList);

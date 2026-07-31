@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Dx11Main.h"
 #include "CoreWindow.h"
+#include "RHI/RHI.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
 #include "Physx.h"
@@ -430,7 +431,8 @@ void DirectX11::Dx11Main::InfoWindow()
         << Time->GetFramesPerSecond()
         << L" FrameCount: "
         << Time->GetFrameCount()
-        << "<Dx11>";
+        // 활성 백엔드 이름 — 교체 스위치(3-9)가 생기면 이 표기가 곧 확인 수단이 된다.
+        << "<" << (RHI::IsInitialized() ? RHI::Device().GetName() : "??") << ">";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 }

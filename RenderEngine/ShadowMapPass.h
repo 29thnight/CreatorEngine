@@ -8,7 +8,7 @@ constexpr int cascadeCount = 3;
 cbuffer CascadeIndexBuffer
 {
 	uint32_t cascadeIndex;
-	uint32_t padding[3]; // 16¹ÙÀÌÆ® Á¤·Ä
+	uint32_t padding[3]; // 16ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 };
 
 class Camera;
@@ -27,7 +27,7 @@ public:
 
 	void Initialize(uint32 width, uint32 height);
 	void Execute(RenderScene& scene, Camera& camera) override;
-	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
     void ApplySettings(const ShadowMapPassSetting& setting);
 	virtual void Resize(uint32_t width, uint32_t height) override;
@@ -63,8 +63,8 @@ public:
 	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn = true);
 
 private:
-	void CreateCommandListCascadeShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
-	void CreateCommandListNormalShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
+	void CreateCommandListCascadeShadow(RHICommandContext& context, RenderScene& scene, Camera& camera);
+	void CreateCommandListNormalShadow(RHICommandContext& context, RenderScene& scene, Camera& camera);
 	void CreateCommandListProxyToShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
 	void CreateTerrainRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);

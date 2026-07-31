@@ -11,7 +11,7 @@ public:
 	
 	void Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive, Texture* metalroughocclu, Texture* SSAO);
 	void Execute(RenderScene& scene, Camera& camera) override;
-	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
         void ApplySettings(const SSGIPassSetting& setting);
 	void Resize(uint32_t width, uint32_t height) override;

@@ -1,5 +1,6 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
+#include "RHI/DX11RHI.h"
 #include "EngineSetting.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
@@ -329,6 +330,9 @@ SceneRenderer::~SceneRenderer()
 
 void SceneRenderer::Finalize()
 {
+	// 등록의 역순 — 패스들이 아직 살아 있는 동안에는 RHI가 유효해야 한다.
+	RHI::Shutdown();
+
 	m_diffuseTexture.reset();
 	m_metalRoughTexture.reset();
 	m_normalTexture.reset();
@@ -389,6 +393,13 @@ void SceneRenderer::Finalize()
 
 void SceneRenderer::InitializeDeviceState()
 {
+    // RHI 등록(PHASE 3-1). DeviceStates가 채워지는 곳이 곧 백엔드가 확정되는
+    // 곳이므로 여기서 한다. 교체 스위치(3-9)가 생기면 여기가 분기점이 된다.
+    if (!RHI::IsInitialized())
+    {
+        RHI::Initialize(std::make_unique<DX11RHIDevice>());
+    }
+
     DirectX11::DeviceStates->g_pDevice				= m_deviceResources->GetD3DDevice();
     DirectX11::DeviceStates->g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
     DirectX11::DeviceStates->g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
@@ -966,6 +977,7 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("ShadowPassCommandList");
 			m_renderScene->CreateShadowCommandList(deferredContext , *camera);
 			PROFILE_CPU_END();
@@ -973,22 +985,23 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			{
 				PROFILE_CPU_BEGIN("TerrainPassCommandList");
-				m_pGBufferPass->TerrainRenderCommandList(deferredContext, *m_renderScene, *camera);
+				m_pGBufferPass->TerrainRenderCommandList(rhiContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
 
 			{
 				PROFILE_CPU_BEGIN("GBufferPassCommandList");
-				m_pGBufferPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+				m_pGBufferPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
 
 			if (useTestLightmap)
 			{
 				PROFILE_CPU_BEGIN("LightMapPassCommandList");
-				m_pLightMapPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+				m_pLightMapPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
 			else
@@ -996,64 +1009,72 @@ void SceneRenderer::CreateCommandListPass()
 				PROFILE_CPU_BEGIN("DeferredPassCommandList");
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture);
 				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture);
-				m_pDeferredPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+				m_pDeferredPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("DecalPassCommandList");
-			m_pDecalPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pDecalPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("SSAOPassCommandList");
-			m_pSSAOPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pSSAOPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("SSGIPassCommandList");
-			m_pSSGIPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pSSGIPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("ForwardPassCommandList");
-			m_pForwardPass->CreateFoliageCommandList(deferredContext, *m_renderScene, *camera);
-			m_pForwardPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pForwardPass->CreateFoliageCommandList(rhiContext, *m_renderScene, *camera);
+			m_pForwardPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("SubsurfaceScatteringPassCommandList");
-			m_pSubsurfaceScatteringPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pSubsurfaceScatteringPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("SkyBoxPassCommandList");
-			m_pSkyBoxPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pSkyBoxPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("BitMaskPassCommandList");
-			m_pBitMaskPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pBitMaskPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("ScreenSpaceReflectionPassCommandList");
-			m_pScreenSpaceReflectionPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pScreenSpaceReflectionPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
@@ -1061,8 +1082,9 @@ void SceneRenderer::CreateCommandListPass()
 		{
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 			{
+				DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 				PROFILE_CPU_BEGIN("VolumetricFogPassCommandList");
-				m_pVolumetricFogPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+				m_pVolumetricFogPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			});
 		}
@@ -1070,25 +1092,28 @@ void SceneRenderer::CreateCommandListPass()
 		{
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 			{
+				DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 				PROFILE_CPU_BEGIN("TerrainGizmoPassCommandList");
-				m_pTerrainGizmoPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+				m_pTerrainGizmoPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			});
 		}
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("SpritePassCommnadList");
 			//m_pUIPass->SortUIObjects();
-			m_pSpritePass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pSpritePass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
+			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
 			PROFILE_CPU_BEGIN("UIPassCommnadList");
 			//m_pUIPass->SortUIObjects();
-			m_pUIPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			m_pUIPass->CreateRenderCommandList(rhiContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 

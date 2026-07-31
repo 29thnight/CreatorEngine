@@ -3,6 +3,8 @@
 #include "PSO.h"
 #include "SwapEvent.h"
 
+class RHICommandContext;
+
 enum RTV_Type
 {
 	BaseColor,
@@ -27,8 +29,8 @@ struct IViewEvent
 using namespace concurrency;
 using CommandQueue = concurrent_queue<ID3D11CommandList*>;
 
-constexpr size_t CameraCount = 10; // �ִ� ī�޶� ����
-constexpr size_t FrameCount = 3; // ������ ���� ����
+constexpr size_t CameraCount = 10; // �ִ� ī�޶� ����
+constexpr size_t FrameCount = 3; // ������ ���� ����
 
 class IRenderPass abstract : public IViewEvent
 {
@@ -78,7 +80,10 @@ public:
 		}
 		frameQueue.clear();
 	}
-	virtual void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) {}
+	// 커맨드 기록 진입점(PHASE 3-1, 7차 슬라이스에서 서명 교체).
+	// 빌드 시스템이 RHI 컨텍스트를 만들어 넘긴다 — 패스는 그래픽 API를 직접 받지
+	// 않는다. 아직 네이티브가 필요한 잔존 경로는 context.GetNativeHandle()로 얻는다.
+	virtual void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) {}
 	virtual void ControlPanel() {};
 	void ReloadShaders() { m_pso->ReloadShaders(); }
 	virtual void ResizeRelease() {};
@@ -103,7 +108,7 @@ public:
 
 protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };
-	//CommandQueueMap m_commandQueueMap{}; //ī�޶� �� Ŀ��� ť
+	//CommandQueueMap m_commandQueueMap{}; //ī�޶� �� Ŀ��� ť
 	FrameQueueArray m_frameQueues;
 	Core::DelegateHandle m_swapEventHandle{};
 

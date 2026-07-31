@@ -1,4 +1,5 @@
 #include "SkyBoxPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "Camera.h"
@@ -386,18 +387,22 @@ void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void SkyBoxPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!m_abled || !RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
 	m_pso->Apply(deferredPtr);
 
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+	context.SetRenderTarget(rtv, renderData->m_depthStencil->m_pDSV);
+	{
+		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
+		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		context.SetViewports(1, &rhiVp);
+	}
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 
@@ -406,12 +411,12 @@ void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
 	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(camera.m_eyePosition));
 
 	scene.UpdateModel(modelMatrix, deferredPtr);
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &m_skyBoxCubeMap->m_pSRV);
+	context.SetPixelShaderResource(0, m_skyBoxCubeMap->m_pSRV);
 	m_skyBoxMesh->Draw(deferredPtr);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets(deferredPtr);
+	context.SetPixelShaderResource(0, nullptr);
+	context.UnbindRenderTargets();
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);

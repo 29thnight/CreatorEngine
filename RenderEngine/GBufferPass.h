@@ -14,8 +14,8 @@ public:
 	void SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	//NOTICE : after execute TerrainRenderCommandList this Function
-	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
-	void TerrainRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
+	void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
+	void TerrainRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera);
 	void ApplySettings(const RenderPassSettings& setting);
 	virtual void ControlPanel() override;
 	virtual void Resize(uint32_t width, uint32_t height) override;

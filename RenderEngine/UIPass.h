@@ -24,7 +24,7 @@ public:
     void Initialize(Texture* renderTargetView);
 
     virtual void Execute(RenderScene& scene, Camera& camera) override;
-    virtual void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
+    virtual void CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera) override;
     static bool compareLayer(int a, int b);
 
     void ControlPanel() override;

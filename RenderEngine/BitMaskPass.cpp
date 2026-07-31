@@ -1,4 +1,5 @@
 #include "BitMaskPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "BitMaskPassSetting.h"
@@ -67,81 +68,91 @@ void BitMaskPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void BitMaskPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return; // If the pass is not enabled, skip execution
 
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-	// edge filter
-    ID3D11DeviceContext* deferredPtr = deferredContext;
-    DirectX11::CSSetShader(deferredPtr, m_pEdgefilterShader->GetShader(), nullptr, 0);
-    DirectX11::CSSetSamplers(deferredPtr, 0, 1, &sample->m_SamplerState); // sampler 0
-    DirectX11::CSSetSamplers(deferredPtr, 1, 1, &pointSample->m_SamplerState); // sampler 1
+    // RHI 이식(PHASE 3-1, 3차 슬라이스). 순수 컴퓨트 패스라 새로 넓힌 컴퓨트
+    // 표면(셰이더·샘플러·SRV/UAV·상수 버퍼·Dispatch)의 전체를 이 패스가 지나간다.
+    ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
-    ID3D11ShaderResourceView* srv = { m_pBitmaskTexture->m_pSRV };
-	DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &srv);
-    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+    const uint32_t viewWidth  = static_cast<uint32_t>(DirectX11::DeviceStates->g_Viewport.Width);
+    const uint32_t viewHeight = static_cast<uint32_t>(DirectX11::DeviceStates->g_Viewport.Height);
+
+    // edge filter
+    context.SetComputeShader(m_pEdgefilterShader->GetShader());
+    RHINativeSamplerState linearSampler = sample->m_SamplerState;
+    RHINativeSamplerState pointSampler = pointSample->m_SamplerState;
+    context.SetComputeSamplers(0, 1, &linearSampler);
+    context.SetComputeSamplers(1, 1, &pointSampler);
+
+    RHINativeShaderResource srv = m_pBitmaskTexture->m_pSRV;
+    context.SetComputeShaderResources(0, 1, &srv);
+    RHINativeUnorderedAccess uav = m_pTempTexture2->m_pUAV;
+    context.SetComputeUnorderedAccessViews(0, 1, &uav, nullptr);
 
 	EdgefilterBuffer efparams{};
 	for (int i = 0; i < 8; ++i)
 	{
 		efparams.m_color[i] = m_colors[i];
 	}
-	efparams.m_screenSize = { (float)DirectX11::DeviceStates->g_Viewport.Width, (float)DirectX11::DeviceStates->g_Viewport.Height };
+	efparams.m_screenSize = { (float)viewWidth, (float)viewHeight };
     efparams.m_outlineVelocity = outlineVelocity;
-	DirectX11::UpdateBuffer(deferredPtr, m_EdgefilterBuffer.Get(), &efparams);
-	DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_EdgefilterBuffer.GetAddressOf());
-	DirectX11::Dispatch(deferredPtr, DirectX11::DeviceStates->g_Viewport.Width / 16, DirectX11::DeviceStates->g_Viewport.Height / 16, 1);
+    context.UpdateBuffer(m_EdgefilterBuffer.Get(), &efparams);
+    RHINativeBuffer edgeBuffer = m_EdgefilterBuffer.Get();
+    context.SetComputeConstantBuffers(0, 1, &edgeBuffer);
+    context.Dispatch(viewWidth / 16, viewHeight / 16, 1);
 
-    ID3D11ShaderResourceView* nullsrv = nullptr;
-    ID3D11UnorderedAccessView* nulluav = nullptr;
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
-    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
+    RHINativeShaderResource nullsrv = nullptr;
+    RHINativeUnorderedAccess nulluav = nullptr;
+    context.SetComputeShaderResources(0, 1, &nullsrv);
+    context.SetComputeUnorderedAccessViews(0, 1, &nulluav, nullptr);
 
     if (blurOutline) {
         // Down Dual Filtering
-        DirectX11::CSSetShader(deferredPtr, m_pEdgefilterDownSamplingShader->GetShader(), nullptr, 0);
-        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
+        context.SetComputeShader(m_pEdgefilterDownSamplingShader->GetShader());
+        srv = m_pTempTexture2->m_pSRV;
+        context.SetComputeShaderResources(0, 1, &srv);
+        uav = m_pTempTexture->m_pUAV;
+        context.SetComputeUnorderedAccessViews(0, 1, &uav, nullptr);
 
         UownUpSamplingParams DPparams;
-        DPparams.inputTextureSize = { (float)DirectX11::DeviceStates->g_Viewport.Width, (float)DirectX11::DeviceStates->g_Viewport.Height };
+        DPparams.inputTextureSize = { (float)viewWidth, (float)viewHeight };
         DPparams.ratio = 2;
-        DirectX11::UpdateBuffer(deferredPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
-        DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
+        context.UpdateBuffer(m_EdgefilterSamplingBuffer.Get(), &DPparams);
+        RHINativeBuffer samplingBuffer = m_EdgefilterSamplingBuffer.Get();
+        context.SetComputeConstantBuffers(0, 1, &samplingBuffer);
 
-        DirectX11::Dispatch(deferredPtr,
-            (DirectX11::DeviceStates->g_Viewport.Width + 32 - 1) / 32,
-            (DirectX11::DeviceStates->g_Viewport.Height + 32 - 1) / 32, 1);
-        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
-        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
+        context.Dispatch((viewWidth + 32 - 1) / 32, (viewHeight + 32 - 1) / 32, 1);
+        context.SetComputeShaderResources(0, 1, &nullsrv);
+        context.SetComputeUnorderedAccessViews(0, 1, &nulluav, nullptr);
 
         // Up Dual Filtering
-        DirectX11::CSSetShader(deferredPtr, m_pEdgefilterUpSamplingShader->GetShader(), nullptr, 0);
-        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
-        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
-        DPparams.inputTextureSize = { (float)DirectX11::DeviceStates->g_Viewport.Width / 2, (float)DirectX11::DeviceStates->g_Viewport.Height / 2 };
-        DirectX11::UpdateBuffer(deferredPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
-        DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
-        DirectX11::Dispatch(deferredPtr,
-            (DirectX11::DeviceStates->g_Viewport.Width + 16 - 1) / 16,
-            (DirectX11::DeviceStates->g_Viewport.Height + 16 - 1) / 16, 1);
-        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
-        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
+        context.SetComputeShader(m_pEdgefilterUpSamplingShader->GetShader());
+        srv = m_pTempTexture->m_pSRV;
+        context.SetComputeShaderResources(0, 1, &srv);
+        uav = m_pTempTexture2->m_pUAV;
+        context.SetComputeUnorderedAccessViews(0, 1, &uav, nullptr);
+        DPparams.inputTextureSize = { (float)viewWidth / 2, (float)viewHeight / 2 };
+        context.UpdateBuffer(m_EdgefilterSamplingBuffer.Get(), &DPparams);
+        context.SetComputeConstantBuffers(0, 1, &samplingBuffer);
+        context.Dispatch((viewWidth + 16 - 1) / 16, (viewHeight + 16 - 1) / 16, 1);
+        context.SetComputeShaderResources(0, 1, &nullsrv);
+        context.SetComputeUnorderedAccessViews(0, 1, &nulluav, nullptr);
     }
 
 	//Add Color
-	DirectX11::CSSetShader(deferredPtr, m_pAddColorShader->GetShader(), nullptr, 0);
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &renderData->m_renderTarget->m_pUAV, nullptr);
-    DirectX11::Dispatch(deferredPtr,
-        (DirectX11::DeviceStates->g_Viewport.Width + 16 - 1) / 16,
-        (DirectX11::DeviceStates->g_Viewport.Height + 16 - 1) / 16, 1);
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &nullsrv);
-    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
-
+    context.SetComputeShader(m_pAddColorShader->GetShader());
+    srv = m_pTempTexture2->m_pSRV;
+    context.SetComputeShaderResources(0, 1, &srv);
+    uav = renderData->m_renderTarget->m_pUAV;
+    context.SetComputeUnorderedAccessViews(0, 1, &uav, nullptr);
+    context.Dispatch((viewWidth + 16 - 1) / 16, (viewHeight + 16 - 1) / 16, 1);
+    context.SetComputeShaderResources(0, 1, &nullsrv);
+    context.SetComputeUnorderedAccessViews(0, 1, &nulluav, nullptr);
 
     ID3D11CommandList* commandList{};
     deferredPtr->FinishCommandList(false, &commandList);

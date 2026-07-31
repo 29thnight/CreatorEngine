@@ -1,4 +1,5 @@
 #include "SpritePass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
 #include "BillboardType.h"
@@ -66,7 +67,7 @@ void SpritePass::ControlPanel()
 {
 }
 
-void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
     if (camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::SpritePass))
     {
@@ -75,15 +76,22 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
 
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
-    ID3D11DeviceContext* deferredPtr = deferredContext;
+    ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // ì „í™˜ê¸° íƒˆì¶œêµ¬(ìž”ì¡´ ë„¤ì´í‹°ë¸Œ ê²½ë¡œìš©)
+
+    // RHI ì´ì‹(PHASE 3-1). ì›ëž˜ ì´ íŒ¨ìŠ¤ëŠ” ìžìœ  í•¨ìˆ˜ì™€ deferredPtr-> ì§ì ‘ í˜¸ì¶œì´
+    // ì„žì—¬ ìžˆì—ˆë‹¤ â€” ì§ì ‘ í˜¸ì¶œì€ ë“œë¡œìš°ì½œ ì¹´ìš´íŠ¸Â·ì–´ë…¸í…Œì´ì…˜ì„ ìš°íšŒí•œë‹¤.
+    // RHI ê²½ìœ ë¡œ í†µì¼í•˜ë©´ì„œ ê·¸ ìš°íšŒë„ í•¨ê»˜ ì‚¬ë¼ì§„ë‹¤.
 
     m_pso->Apply(deferredPtr);
-    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
+    RHINativeRenderTarget rtv = renderData->m_renderTarget->GetRTV();
+    context.SetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
-    deferredPtr->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-    deferredPtr->OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+    context.SetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+    context.SetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
+
+    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    context.SetViewports(1, &viewport);
 
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
     scene.UseModel(deferredPtr);
@@ -102,11 +110,11 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
 
         if (proxy->m_enableDepth)
         {
-            deferredPtr->OMSetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
+            context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
         }
         else
         {
-			deferredPtr->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+            context.SetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
         }
 
         auto world = proxy->m_worldMatrix;
@@ -121,48 +129,48 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
             }
             else if (proxy->m_billboardType == BillboardType::Cylindrical)
             {
-                // 0) Ãà(·Ñ °íÁ¤¿ë)°ú ½ºÄÉÀÏ/À§Ä¡¸¸ ±âÁ¸ ¿ùµå¿¡¼­ À¯Áö
-                Mathf::Vector3 axis = proxy->m_billboardAxis; // ¿¹: (0,1,0)
+                // 0) ï¿½ï¿½(ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½å¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+                Mathf::Vector3 axis = proxy->m_billboardAxis; // ï¿½ï¿½: (0,1,0)
                 axis.Normalize();
 
                 Mathf::Vector3 scl; Mathf::Quaternion q; Mathf::Vector3 t;
-                Mathf::Matrix(world).Decompose(scl, q, t);   // t°¡ pos¶ó¸é pos·Î ¹Ù²ã ¾²¼¼¿ä
-                const Mathf::Vector3 pos = t;                // ±âÁ¸ À§Ä¡ À¯Áö
+                Mathf::Matrix(world).Decompose(scl, q, t);   // tï¿½ï¿½ posï¿½ï¿½ï¿½ posï¿½ï¿½ ï¿½Ù²ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+                const Mathf::Vector3 pos = t;                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
 
-                // 1) "Ä«¸Þ¶óÀÇ ¹æÇâÀÇ ¿ª¹æÇâ"À» Á¤¸éÀ¸·Î »ç¿ë (À§Ä¡ ¹«°ü, Ç×»ó -Forward)
-                Mathf::Vector3 facing = -camera.m_forward;   // ÇÙ½É: look-at ±ÝÁö, -forward °íÁ¤
+                // 1) "Ä«ï¿½Þ¶ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ (ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½, ï¿½×»ï¿½ -Forward)
+                Mathf::Vector3 facing = -camera.m_forward;   // ï¿½Ù½ï¿½: look-at ï¿½ï¿½ï¿½ï¿½, -forward ï¿½ï¿½ï¿½ï¿½
                 facing.Normalize();
 
-                // 2) Cylindrical Á¦¾à: Ãà¿¡ ¼öÁ÷ÇÑ Æò¸éÀ¸·Î Åõ¿µ(·Ñ °íÁ¤)
+                // 2) Cylindrical ï¿½ï¿½ï¿½ï¿½: ï¿½à¿¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
                 facing = facing - axis * facing.Dot(axis);
                 float len2 = facing.LengthSquared();
 
-                // 3) Ãà°ú °ÅÀÇ ÆòÇàÇØ »ý±â´Â Æ¯ÀÌ»óÈ² º¸Á¤(Ä«¸Þ¶ó Right¸¦ ±ÇÀå)
+                // 3) ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ Æ¯ï¿½Ì»ï¿½È² ï¿½ï¿½ï¿½ï¿½(Ä«ï¿½Þ¶ï¿½ Rightï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
                 if (len2 < 1e-8f)
                 {
-                    // camera.m_right°¡ ÀÖ´Ù¸é ¿ì¼± »ç¿ë
+                    // camera.m_rightï¿½ï¿½ ï¿½Ö´Ù¸ï¿½ ï¿½ì¼± ï¿½ï¿½ï¿½
                     Mathf::Vector3 alt = Mathf::Vector3(camera.m_right).LengthSquared() > 0 ? Mathf::Vector3(camera.m_right) : Mathf::Vector3::Right;
                     alt.Normalize();
                     facing = alt - axis * alt.Dot(axis);
                     if (facing.LengthSquared() < 1e-8f)
                     {
-                        // ÃÖÈÄ º¸Á¤
+                        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                         alt = Mathf::Vector3::Forward;
                         facing = alt - axis * alt.Dot(axis);
                     }
                 }
                 facing.Normalize();
 
-                // 4) Á÷±³±âÀú ±¸¼º: Y=axis(·Ñ °íÁ¤), Z=facing(Á¤¸é), X=Y¡¿Z
+                // 4) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: Y=axis(ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½), Z=facing(ï¿½ï¿½ï¿½ï¿½), X=Yï¿½ï¿½Z
                 const Mathf::Vector3 yAxis = axis;
-                Mathf::Vector3 zAxis = facing;               // Äõµå°¡ ¹Ù¶óº¼ ·ÎÄÃ Á¤¸é
+                Mathf::Vector3 zAxis = facing;               // ï¿½ï¿½ï¿½å°¡ ï¿½Ù¶ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 Mathf::Vector3 xAxis = yAxis.Cross(zAxis);
                 xAxis.Normalize();
-                // ¼öÄ¡ ¾ÈÁ¤È­¸¦ À§ÇØ Z ÀçÁ¤±ÔÈ­
+                // ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Z ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È­
                 zAxis = xAxis.Cross(yAxis);
                 zAxis.Normalize();
 
-                // 5) È¸Àü Çà·Ä(ÄÃ·³ ¸ÞÀÌÀú °¡Á¤). ¿£Áø Çà·Ä ±Ô¾à¿¡ ¸Â°Ô ÇÊ¿ä½Ã ÀüÄ¡/¹èÄ¡ º¯°æ
+                // 5) È¸ï¿½ï¿½ ï¿½ï¿½ï¿½(ï¿½Ã·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½). ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ô¾à¿¡ ï¿½Â°ï¿½ ï¿½Ê¿ï¿½ï¿½ ï¿½ï¿½Ä¡/ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
                 const Mathf::Matrix R(
                     xAxis.x, yAxis.x, zAxis.x, 0.0f,
                     xAxis.y, yAxis.y, zAxis.y, 0.0f,
@@ -173,35 +181,35 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
                 //const Mathf::Matrix S = Mathf::Matrix::CreateScale(scl);
                 //const Mathf::Matrix Tm = Mathf::Matrix::CreateTranslation(pos);
 
-                //// Äõµå ·ÎÄÃ Àü¸éÃàÀÌ ¿£Áø°ú ´Ù¸£¸é ¿©±â¼­ º¸Á¤ È¸Àü °öÇØµµ µÊ (¿¹: Z->Y º¸Á¤ µî)
+                //// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ù¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½â¼­ ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ ï¿½ï¿½ï¿½Øµï¿½ ï¿½ï¿½ (ï¿½ï¿½: Z->Y ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
                 //world = S * R * Tm;
                 //------------------------------------------------------------
-                // 1) ±íÀÌ z (Ä«¸Þ¶ó Àü¹æ ¹æÇâ ¼ººÐ)
+                // 1) ï¿½ï¿½ï¿½ï¿½ z (Ä«ï¿½Þ¶ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
                 float z = (pos - Mathf::Vector3(camera.m_eyePosition)).Dot(camera.m_forward);
-                z = std::max(z, 1e-3f); // 0/À½¼ö ¹æÁö
+                z = std::max(z, 1e-3f); // 0/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-                // 2) ¿øÇÏ´Â È­¸é ³ôÀÌ(px) -> ÇÊ¿äÇÑ ¿ùµå ³ôÀÌ
+                // 2) ï¿½ï¿½ï¿½Ï´ï¿½ È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(px) -> ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 const float targetPx = std::max(1.0f, proxy->m_spriteTexture->GetSize().y);
                 const float vpH = std::max(1.0f, (float)DirectX11::GetHeight());
 
                 float requiredWorldHeight = 0.0f;
-                // ÆÛ½ºÆåÆ¼ºê: ¼öÁ÷ ÇÁ·¯½ºÅÒ ³ôÀÌ = 2*z*tan(fovY/2)
+                // ï¿½Û½ï¿½ï¿½ï¿½Æ¼ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ = 2*z*tan(fovY/2)
                 const float frustumH = 2.0f * z * tanf(camera.m_fov * 0.5f);
                 requiredWorldHeight = frustumH * (targetPx / vpH);
 
-                // 3) ·ÎÄÃ ±âÁØ ³ôÀÌ·Î ³ª´²¼­ ½ºÄÉÀÏ ÀÎÀÚ µµÃâ
-                const float baseHeight = std::max(1e-6f, 1.f); // À¯´Ö Äõµå¸é 1.0
+                // 3) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+                const float baseHeight = std::max(1e-6f, 1.f); // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ 1.0
                 const float s = requiredWorldHeight / baseHeight;
 
-                // (¼±ÅÃ) ±âÁ¸ sclÀÇ ºñÀ²(°¡·Î¼¼·Î ºñ)¸¸ À¯ÁöÇÏ°í Å©±â ÀÚÃ¼´Â s·Î ¸ÂÃß°í ½Í´Ù¸é:
-                // °¡Àå Å« ÃàÀ» ±âÁØÀ¸·Î Á¤±ÔÈ­ÇØ¼­ ºñÀ²¸¸ ³²±è
+                // (ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ sclï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½Î¼ï¿½ï¿½ï¿½ ï¿½ï¿½)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ Å©ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ sï¿½ï¿½ ï¿½ï¿½ï¿½ß°ï¿½ ï¿½Í´Ù¸ï¿½:
+                // ï¿½ï¿½ï¿½ï¿½ Å« ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½Ø¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                  float maxc = std::max({scl.x, scl.y, scl.z, 1e-6f});
                  Mathf::Vector3 scaleVec = s * (scl / maxc);
 
-                //// ´Ü¼ø/±ÇÀå: ±Õµî ½ºÄÉÀÏ·Î µ¤¾î½á ÇÈ¼¿ °íÁ¤ È¿°ú ±Ø´ëÈ­
+                //// ï¿½Ü¼ï¿½/ï¿½ï¿½ï¿½ï¿½: ï¿½Õµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½È¼ï¿½ ï¿½ï¿½ï¿½ï¿½ È¿ï¿½ï¿½ ï¿½Ø´ï¿½È­
                 //Mathf::Vector3 scaleVec(s, s, s);
 
-                // 4) ÃÖÁ¾ Çà·Ä Á¶¸³ (È¸ÀüÀº ³×°¡ ±¸¼ºÇÑ RÀ» ±×´ë·Î »ç¿ë)
+                // 4) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (È¸ï¿½ï¿½ï¿½ï¿½ ï¿½×°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Rï¿½ï¿½ ï¿½×´ï¿½ï¿½ ï¿½ï¿½ï¿½)
                 const Mathf::Matrix S = Mathf::Matrix::CreateScale(scaleVec);
                 const Mathf::Matrix Tm = Mathf::Matrix::CreateTranslation(pos);
 
@@ -209,18 +217,17 @@ void SpritePass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, R
             }
         }
         scene.UpdateModel(world, deferredPtr);
-        ID3D11ShaderResourceView* srv = proxy->m_spriteTexture->m_pSRV;
-        DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &srv);
+        RHINativeShaderResource srv = proxy->m_spriteTexture->m_pSRV;
+        context.SetPixelShaderResources(0, 1, &srv);
         proxy->m_quadMesh->Draw(deferredPtr);
     }
 
-    ID3D11ShaderResourceView* nullSRV = nullptr;
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
-    ID3D11RenderTargetView* nullRTV = nullptr;
-    deferredPtr->OMSetRenderTargets(1, &nullRTV, nullptr);
-    ID3D11BlendState* nullBlend = nullptr;
-    DirectX11::OMSetBlendState(deferredPtr, nullBlend, nullptr, 0xFFFFFFFF);
-    DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
+    RHINativeShaderResource nullSRV = nullptr;
+    context.SetPixelShaderResources(0, 1, &nullSRV);
+    RHINativeRenderTarget nullRTV = nullptr;
+    context.SetRenderTargets(1, &nullRTV, nullptr);
+    context.SetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
 
     ID3D11CommandList* commandList{};
     deferredPtr->FinishCommandList(false, &commandList);

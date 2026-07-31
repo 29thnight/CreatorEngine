@@ -1,4 +1,5 @@
 #include "SubsurfaceScatteringPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "RenderScene.h"
@@ -65,19 +66,27 @@ void SubsurfaceScatteringPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void SubsurfaceScatteringPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
+
+	// RHI 이식(PHASE 3-1, 4차 슬라이스). 가로/세로 두 번의 블러가 각각
+	// "결과 복사 → 다시 입력" 사이클이라 CopyResource가 두 번 나온다.
 
 	m_pso->Apply(deferredPtr);
-	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, nullptr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
+	RHINativeRenderTarget view = renderData->m_renderTarget->GetRTV();
+	context.SetRenderTargets(1, &view, nullptr);
+
+	const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+	const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+	context.SetViewports(1, &viewport);
+
+	RHINativeBuffer constantBuffer = m_Buffer.Get();
+	context.SetPixelShaderConstantBuffers(0, 1, &constantBuffer);
 
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
@@ -87,35 +96,31 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* defe
 	buffer.width		= width;
 	buffer.direction	= { 1.f, 0.f };//direction;
 
-	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
+	context.UpdateBuffer(m_Buffer.Get(), &buffer);
 
-	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	context.CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
-	ID3D11ShaderResourceView* srvs[3] = {
+	RHINativeShaderResource srvs[3] = {
 		renderData->m_depthStencil->m_pSRV,
 		m_CopiedTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
 	};
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, srvs);
+	context.SetPixelShaderResources(0, 3, srvs);
 
-	DirectX11::Draw(deferredPtr, 4, 0);
+	context.Draw(4, 0);
 
 	buffer.direction = { 0.f, 1.f };
-	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
+	context.UpdateBuffer(m_Buffer.Get(), &buffer);
 
-	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	context.CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, srvs);
+	context.SetPixelShaderResources(0, 3, srvs);
 
-	DirectX11::Draw(deferredPtr, 4, 0);
+	context.Draw(4, 0);
 
-	ID3D11ShaderResourceView* nullSRV[3] = {
-		nullptr,
-		nullptr,
-		nullptr
-	};
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, nullSRV);
-	DirectX11::UnbindRenderTargets(deferredPtr);
+	RHINativeShaderResource nullSRV[3] = { nullptr, nullptr, nullptr };
+	context.SetPixelShaderResources(0, 3, nullSRV);
+	context.UnbindRenderTargets();
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);

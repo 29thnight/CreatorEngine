@@ -1,4 +1,5 @@
 #include "UIPass.h"
+#include "RHI/RHI.h"
 #include <DirectXTK/SpriteBatch.h>
 #include "ShaderSystem.h"
 #include "RenderPassData.h"
@@ -61,27 +62,36 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
     ExecuteCommandList(scene, camera);
 }
 
-void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void UIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
     if (renderData->m_UIRenderQueue.empty()) return;
 
-    ID3D11DeviceContext* deferredPtr = deferredContext;
+    ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
+
+    // RHI 이식(PHASE 3-1). 커맨드 빌드 시스템이 아직 네이티브 deferred 컨텍스트를
+    // 넘기므로 여기서 감싼다 — 서명이 RHICommandContext&로 바뀌면 이 줄이 사라진다.
+    // PSO Apply·SpriteBatch·FinishCommandList는 DX11 고유 경로로 남는다(각각 3-4·이식 후반).
 
     m_pso->Apply(deferredPtr);
 
     auto spriteBatch = std::make_unique<SpriteBatch>(deferredPtr);
 
-    ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, renderData->m_renderTarget->m_pDSV);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-    DirectX11::OMSetDepthStencilState(deferredPtr, m_NoWriteDepthStencilState.Get(), 1);
-    DirectX11::OMSetBlendState(deferredPtr, DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
+    RHINativeRenderTarget view = renderData->m_renderTarget->GetRTV();
+    context.SetRenderTargets(1, &view, renderData->m_renderTarget->m_pDSV);
+
+    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    context.SetViewports(1, &viewport);
+
+    context.SetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+    context.SetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
-    DirectX11::VSSetConstantBuffer(deferredPtr, 0, 1, m_UIBuffer.GetAddressOf());
+    RHINativeBuffer uiBuffer = m_UIBuffer.Get();
+    context.SetVertexShaderConstantBuffers(0, 1, &uiBuffer);
 
     for (auto* proxy : renderData->m_UIRenderQueue)
     {
@@ -109,12 +119,12 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
         spriteBatch->End();
     }
 
-    DirectX11::OMSetDepthStencilState(deferredPtr, DirectX11::DeviceStates->g_pDepthStencilState, 1);
-    DirectX11::OMSetBlendState(deferredPtr, nullptr, nullptr, 0xFFFFFFFF);
+    context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
+    context.SetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
-    ID3D11ShaderResourceView* nullSRV = nullptr;
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
-    DirectX11::UnbindRenderTargets(deferredPtr);
+    RHINativeShaderResource nullSRV = nullptr;
+    context.SetPixelShaderResources(0, 1, &nullSRV);
+    context.UnbindRenderTargets();
 
     ID3D11CommandList* commandList{};
     DirectX11::ThrowIfFailed(

@@ -1,4 +1,5 @@
 #include "ScreenSpaceReflectionPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "RenderScene.h"
@@ -91,14 +92,14 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void ScreenSpaceReflectionPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void ScreenSpaceReflectionPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
 
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
 	CBData cbData;
 	cbData.m_InverseProjection = camera.CalculateInverseProjection();
@@ -110,30 +111,40 @@ void ScreenSpaceReflectionPass::CreateRenderCommandList(ID3D11DeviceContext* def
 	cbData.Time = (float)Time->GetTotalSeconds();
 	cbData.maxRayCount = maxRayCount;
 
+	// RHI 이식(PHASE 3-1, 4차 슬라이스). 히스토리 텍스처 복사 2건이 CopyResource
+	// 표면의 첫 사용처다 — 렌더그래프(3-5)에서 복사 노드가 될 지점.
+
 	m_pso->Apply(deferredPtr);
 
-	DirectX11::CopyResource(deferredPtr, m_prevCopiedSSRTexture->m_pTexture, renderData->m_SSRPrevTexture->m_pTexture);
+	context.CopyResource(m_prevCopiedSSRTexture->m_pTexture, renderData->m_SSRPrevTexture->m_pTexture);
 
-	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
-	DirectX11::OMSetRenderTargets(deferredPtr, 2, view, nullptr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
+	RHINativeRenderTarget view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
+	context.SetRenderTargets(2, view, nullptr);
+
+	const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+	const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+	context.SetViewports(1, &viewport);
+
+	RHINativeBuffer constantBuffer = m_Buffer.Get();
+	context.SetPixelShaderConstantBuffers(0, 1, &constantBuffer);
 
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
-	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &cbData);
+	context.UpdateBuffer(m_Buffer.Get(), &cbData);
 
-	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	context.CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
-	ID3D11ShaderResourceView* srvs[5] = {
+	RHINativeShaderResource srvs[5] = {
 		renderData->m_depthStencil->m_pSRV,
 		m_CopiedTexture->m_pSRV,//m_DiffuseTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
 		m_NormalTexture->m_pSRV,
 		m_prevCopiedSSRTexture->m_pSRV
 	};
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 5, srvs);
-	DirectX11::Draw(deferredPtr, 4, 0);
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 4, nullSRV);
+	context.SetPixelShaderResources(0, 5, srvs);
+	context.Draw(4, 0);
+
+	RHINativeShaderResource nullSrvs[4] = { nullptr, nullptr, nullptr, nullptr };
+	context.SetPixelShaderResources(0, 4, nullSrvs);
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);

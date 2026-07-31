@@ -1,4 +1,5 @@
 #include "VolumetricFogPass.h"
+#include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
 #include "LightController.h"
@@ -133,14 +134,14 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	mCurrentVoxelVolumeSizeY = 90;
 
 	D3D11_TEXTURE3D_DESC texDesc = {};
-	texDesc.Width = mCurrentVoxelVolumeSizeX;							// ÅØ½ºÃ³ °¡·Î
-	texDesc.Height = mCurrentVoxelVolumeSizeY;							// ÅØ½ºÃ³ ¼¼·Î
-	texDesc.Depth = VOXEL_VOLUME_SIZE_Z;            // ±íÀÌ (Z)
-	texDesc.MipLevels = 1;							// Mip Level ¼ö (º¸Åë 1)
-	texDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; // Æ÷¸Ë (¿¹½Ã: HDR Áö¿ø)
-	texDesc.Usage = D3D11_USAGE_DEFAULT;             // GPU¿¡¼­ »ç¿ë
-	texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS; // ¼ÎÀÌ´õ¿¡¼­ ÀÐ±â/¾²±â¿ë
-	texDesc.CPUAccessFlags = 0;     // CPU Á¢±Ù ¾È ÇÔ
+	texDesc.Width = mCurrentVoxelVolumeSizeX;							// ï¿½Ø½ï¿½Ã³ ï¿½ï¿½ï¿½ï¿½
+	texDesc.Height = mCurrentVoxelVolumeSizeY;							// ï¿½Ø½ï¿½Ã³ ï¿½ï¿½ï¿½ï¿½
+	texDesc.Depth = VOXEL_VOLUME_SIZE_Z;            // ï¿½ï¿½ï¿½ï¿½ (Z)
+	texDesc.MipLevels = 1;							// Mip Level ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ 1)
+	texDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; // ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½: HDR ï¿½ï¿½ï¿½ï¿½)
+	texDesc.Usage = D3D11_USAGE_DEFAULT;             // GPUï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+	texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS; // ï¿½ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ð±ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½
+	texDesc.CPUAccessFlags = 0;     // CPU ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½
 	texDesc.MiscFlags = 0;
 
 	HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateTexture3D(&texDesc, nullptr, &mTempVoxelInjectionTexture3D[0]);
@@ -167,7 +168,7 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(mTempVoxelInjectionTexture3D[1], &srvDesc, &mTempVoxelInjectionTexture3DSRV[1]);
 	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(mFinalVoxelInjectionTexture3D, &srvDesc, &mFinalVoxelInjectionTexture3DSRV);
 
-	// Unordered Access View (for Compute Shader µî)
+	// Unordered Access View (for Compute Shader ï¿½ï¿½)
 	D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.Format = texDesc.Format;
 	uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE3D;
@@ -201,18 +202,18 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	ExecuteCommandList(scene, camera);
 }
 
-void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 	auto& lightManager = scene.m_LightController;
-	ID3D11DeviceContext* deferredPtr = deferredContext;
+	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // ì „í™˜ê¸° íƒˆì¶œêµ¬(ìž”ì¡´ ë„¤ì´í‹°ë¸Œ ê²½ë¡œìš©)
 	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 	ID3D11ShaderResourceView* nullSRVall[3] = { nullptr, nullptr, nullptr };
 	ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
 
-	DirectX11::CSSetShader(deferredPtr, m_pMainShader->GetShader(), nullptr, 0);
+	context.SetComputeShader(m_pMainShader->GetShader());
 	deferredPtr->CSSetSamplers(0, 1, &m_pClampSampler);
 	deferredPtr->CSSetSamplers(1, 1, &m_pWrapSampler);
 	deferredPtr->CSSetSamplers(2, 1, &m_pShadowSamper);
@@ -225,7 +226,7 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCon
 	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
 	Mathf::Matrix viewProjMat = camera.CalculateView() * camera.CalculateProjection();
 
-	//GIT_COMBINE_WARN_BEGIN : shadowMapPass ÄÚµå Á¤¸®·Î ÀÎÇÑ ·ÎÁ÷ º¯°æµÇ¾úÀ¸´Ï º´ÇÕ Àü È®ÀÎ ¹Ù¶÷. by Hero.P
+	//GIT_COMBINE_WARN_BEGIN : shadowMapPass ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ù¶ï¿½. by Hero.P
 	auto shadowMapPass = scene.m_LightController->GetShadowMapPass();
 	auto& cascadeInfo = camera.m_cascadeinfo[2];
 	auto& useCascade = shadowMapPass->m_useCascade;
@@ -243,50 +244,54 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCon
 	data.Density = mDensity;
 	data.Strength = mStrength;
 	data.ThicknessFactor = mThicknessFactor;
-	//GIT_COMBINE_WARN_END : shadowMapPass ÄÚµå Á¤¸®·Î ÀÎÇÑ ·ÎÁ÷ º¯°æµÇ¾úÀ¸´Ï º´ÇÕ Àü È®ÀÎ ¹Ù¶÷. by Hero.P
+	//GIT_COMBINE_WARN_END : shadowMapPass ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ù¶ï¿½. by Hero.P
 	if (lightManager->hasLightWithShadows) {
 		lightManager->CSBindCloudShadowMap(deferredPtr);
 	}
-	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &data);
-	DirectX11::UpdateBuffer(deferredPtr, m_lightBuffer.Get(), &lightManager->GetProperties());
-	DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
-	DirectX11::CSSetConstantBuffer(deferredPtr, 2, 1, m_lightBuffer.GetAddressOf());
-	DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &renderData->m_shadowMapTexture->m_pSRV);
-	DirectX11::CSSetShaderResources(deferredPtr, 1, 1, &m_pBlueNoiseTexture->m_pSRV);
-	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
-	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &mTempVoxelInjectionTexture3DUAV[writeIndex], nullptr);
-	DirectX11::Dispatch(deferredPtr,
+	context.UpdateBuffer(m_Buffer.Get(), &data);
+	context.UpdateBuffer(m_lightBuffer.Get(), &lightManager->GetProperties());
+	context.SetComputeConstantBuffer(0, m_Buffer.Get());
+	context.SetComputeConstantBuffer(2, m_lightBuffer.Get());
+	context.SetComputeShaderResource(0, renderData->m_shadowMapTexture->m_pSRV);
+	context.SetComputeShaderResource(1, m_pBlueNoiseTexture->m_pSRV);
+	context.SetComputeShaderResource(2, mTempVoxelInjectionTexture3DSRV[readIndex]);
+	context.SetComputeUnorderedAccessView(0, mTempVoxelInjectionTexture3DUAV[writeIndex]);
+	context.Dispatch(
 		(UINT)ceil(mCurrentVoxelVolumeSizeX / 8.0f),
 		(UINT)ceil(mCurrentVoxelVolumeSizeY / 8.0f),
 		VOXEL_VOLUME_SIZE_Z
 	);
 
-	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, nullSRV);
-	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, nullUAV, nullptr);
+	context.SetComputeShaderResources(2, 1, reinterpret_cast<RHINativeShaderResource const*>(nullSRV));
+	context.SetComputeUnorderedAccessViews(0, 1, reinterpret_cast<RHINativeUnorderedAccess const*>(nullUAV), nullptr);
 	mCurrentTexture3DRead = !mCurrentTexture3DRead;
 
 	// accumulate
 	readIndex = mCurrentTexture3DRead;
-	DirectX11::CSSetShader(deferredPtr, m_pAccumulationShader->GetShader(), nullptr, 0);
+	context.SetComputeShader(m_pAccumulationShader->GetShader());
 	deferredPtr->CSSetSamplers(0, 1, &m_pWrapSampler);
-	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
-	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &mFinalVoxelInjectionTexture3DUAV, nullptr);
-	DirectX11::Dispatch(deferredPtr,
+	context.SetComputeShaderResource(2, mTempVoxelInjectionTexture3DSRV[readIndex]);
+	context.SetComputeUnorderedAccessView(0, mFinalVoxelInjectionTexture3DUAV);
+	context.Dispatch(
 		(UINT)ceil(mCurrentVoxelVolumeSizeX / 8.0f),
 		(UINT)ceil(mCurrentVoxelVolumeSizeY / 8.0f),
 		1
 	);
 
-	DirectX11::CSSetShaderResources(deferredPtr, 0, 3, nullSRVall);
-	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, nullUAV, nullptr);
+	context.SetComputeShaderResources(0, 3, reinterpret_cast<RHINativeShaderResource const*>(nullSRVall));
+	context.SetComputeUnorderedAccessViews(0, 1, reinterpret_cast<RHINativeUnorderedAccess const*>(nullUAV), nullptr);
 
 	mPrevViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
 
 	// composite
 	m_pso->Apply(deferredPtr);
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, nullptr);
-	DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+	context.SetRenderTarget(view, nullptr);
+	{
+		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
+		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		context.SetViewports(1, &rhiVp);
+	}
 	CompositeCB compositeData{};
 	compositeData.ViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
 	compositeData.InvView = camera.CalculateInverseView();
@@ -294,19 +299,19 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCon
 	compositeData.CameraNearFar = XMFLOAT4{ mCustomNearPlane, mCustomFarPlane, 0.0f, 0.0f };
 	compositeData.VolumeSize = data.VolumeSize;
 	compositeData.BlendingWithSceneColorFactor = mBlendingWithSceneColorFactor;
-	DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeData);
-	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+	context.UpdateBuffer(m_CompositeBuffer.Get(), &compositeData);
+	context.SetPixelShaderConstantBuffer(0, m_CompositeBuffer.Get());
 
-	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	context.CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 	ID3D11ShaderResourceView* pTextures[3] = {
 		m_CopiedTexture->m_pSRV,
 		renderData->m_depthStencil->m_pSRV,
 		mFinalVoxelInjectionTexture3DSRV
 	};
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, pTextures);
+	context.SetPixelShaderResources(0, 3, reinterpret_cast<RHINativeShaderResource const*>(pTextures));
 
-	DirectX11::Draw(deferredPtr, 4, 0);
-	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, nullSRVall);
+	context.Draw(4, 0);
+	context.SetPixelShaderResources(0, 3, reinterpret_cast<RHINativeShaderResource const*>(nullSRVall));
 
 	ID3D11CommandList* commandList{};
 	deferredPtr->FinishCommandList(false, &commandList);

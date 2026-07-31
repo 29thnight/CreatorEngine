@@ -1,4 +1,5 @@
 #include "DeferredPass.h"
+#include "RHI/RHI.h"
 #include "Scene.h"
 #include "../EngineEntry/RenderPassSettings.h"
 #include "LightController.h"
@@ -105,7 +106,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     ExecuteCommandList(scene, camera);
 }
 
-void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void DeferredPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
@@ -133,7 +134,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 	auto brdfLut = m_BrdfLut.lock();
 	auto LightEmissiveTexture = m_LightEmissiveTexture.lock();
 
-    ID3D11DeviceContext* deferredPtr = deferredContext;
+    ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
     auto& lightManager = scene.m_LightController;
 
@@ -149,7 +150,10 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 
     bool isShadowMapRender = lightManager->hasLightWithShadows && m_UseLightWithShadows;
 
-    ID3D11ShaderResourceView* srvs[10] = 
+    // RHI 이식(PHASE 3-1, 5차 슬라이스). 라이트 매니저의 버퍼 바인딩과
+    // RenderDebugManager 캡처는 DX11 고유 경로로 남는다.
+
+    RHINativeShaderResource srvs[10] =
     {
         renderData->m_depthStencil->m_pSRV,
         diffuseTexture->m_pSRV,
@@ -164,30 +168,39 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     };
 
     m_pso->Apply(deferredPtr);
-    ID3D11RenderTargetView* emissiveRtv = LightEmissiveTexture->GetRTV();
 
-    ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), LightEmissiveTexture->GetRTV() };
-    DirectX11::OMSetRenderTargets(deferredPtr, 2, rtv, nullptr);
-    DirectX11::RSSetViewports(deferredPtr, 1, &DirectX11::DeviceStates->g_Viewport);
+    RHINativeRenderTarget rtv[2] = { renderData->m_renderTarget->GetRTV(), LightEmissiveTexture->GetRTV() };
+    context.SetRenderTargets(2, rtv, nullptr);
+
+    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    context.SetViewports(1, &viewport);
 
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
-    DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
-    DirectX11::UpdateBuffer(deferredPtr, m_shadowcamBuffer.Get(), &cameraview);
-    DirectX11::UpdateBuffer(deferredPtr, lightManager->m_shadowMapBuffer, &renderData->m_shadowCamera.m_shadowMapConstant);
+    context.UpdateBuffer(m_Buffer.Get(), &buffer);
+    context.UpdateBuffer(m_shadowcamBuffer.Get(), &cameraview);
+    context.UpdateBuffer(lightManager->m_shadowMapBuffer, &renderData->m_shadowCamera.m_shadowMapConstant);
 
-    DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &lightManager->m_pLightBuffer);
-    DirectX11::PSSetConstantBuffer(deferredPtr, 11, 1, &lightManager->m_pLightCountBuffer);
-    DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
-    DirectX11::PSSetConstantBuffer(deferredPtr, 10, 1, m_shadowcamBuffer.GetAddressOf());
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 10, srvs);
-	DirectX11::PSSetShaderResources(deferredPtr, 11, 1, &bitmaskTexture->m_pSRV);
+    RHINativeBuffer lightBuffer = lightManager->m_pLightBuffer;
+    RHINativeBuffer lightCountBuffer = lightManager->m_pLightCountBuffer;
+    RHINativeBuffer deferredBuffer = m_Buffer.Get();
+    RHINativeBuffer shadowCamBuffer = m_shadowcamBuffer.Get();
+    context.SetPixelShaderConstantBuffers(1, 1, &lightBuffer);
+    context.SetPixelShaderConstantBuffers(11, 1, &lightCountBuffer);
+    context.SetPixelShaderConstantBuffers(3, 1, &deferredBuffer);
+    context.SetPixelShaderConstantBuffers(10, 1, &shadowCamBuffer);
+    context.SetPixelShaderResources(0, 10, srvs);
+
+    RHINativeShaderResource bitmaskSrv = bitmaskTexture->m_pSRV;
+    context.SetPixelShaderResources(11, 1, &bitmaskSrv);
 
     if (lightManager->hasLightWithShadows)
     {
-        DirectX11::PSSetConstantBuffer(deferredPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+        RHINativeBuffer shadowMapBuffer = lightManager->m_shadowMapBuffer;
+        context.SetPixelShaderConstantBuffers(2, 1, &shadowMapBuffer);
         lightManager->PSBindCloudShadowMap(deferredPtr);
     }
-    DirectX11::Draw(deferredPtr, 4, 0);
+    context.Draw(4, 0);
 
     if (0 == renderData->m_index)
     {
@@ -198,8 +211,8 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 		);
     }
 
-    DirectX11::PSSetShaderResources(deferredPtr, 0, 10, nullSRV10);
-    DirectX11::OMSetRenderTargets(deferredPtr, 1, nullRTVs, nullptr);
+    context.SetPixelShaderResources(0, 10, reinterpret_cast<RHINativeShaderResource const*>(nullSRV10));
+    context.SetRenderTargets(1, reinterpret_cast<RHINativeRenderTarget const*>(nullRTVs), nullptr);
 
     ID3D11CommandList* commandList{};
     deferredPtr->FinishCommandList(false, &commandList);
