@@ -228,7 +228,9 @@ void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, Rend
 
 	//GIT_COMBINE_WARN_BEGIN : shadowMapPass �ڵ� ������ ���� ���� ����Ǿ����� ���� �� Ȯ�� �ٶ�. by Hero.P
 	auto shadowMapPass = scene.m_LightController->GetShadowMapPass();
-	auto& cascadeInfo = camera.m_cascadeinfo[2];
+	// 캐스케이드 정보는 렌더 측(RenderPassData)이 소유한다 — 예전에는 게임
+	// 소유 카메라를 렌더 스레드가 스크래치로 쓰고 있었다(PHASE 3-2).
+	auto& cascadeInfo = renderData->m_cascadeInfo[RenderPassData::cascadeCount - 1];
 	auto& useCascade = shadowMapPass->m_useCascade;
 
 	MainCB data{};

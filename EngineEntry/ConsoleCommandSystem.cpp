@@ -22,6 +22,7 @@
 #include "PathFinder.h"
 #include "CoreWindow.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "RenderPassData.h"
 
 #include <Windows.h>
 #include <algorithm>
@@ -1356,6 +1357,76 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Log::FlushNow();
         std::printf("[CLI] 로그 flush\n");
     }
+    else if (cmd == "render.shadowinfo")
+    {
+        // 그림자 캐스케이드 계산 결과를 그대로 찍는다(PHASE 3-2 검증용).
+        //
+        // 이 값들은 스크린샷 대조로는 검증할 수 없다. 에디터 창에는 FPS·프로파일러·
+        // 로그 패널이 같이 잡혀서 같은 빌드로 두 번 찍어도 8.8%가 어긋난다 —
+        // 노이즈가 신호보다 크다. 계산값을 직접 대조하는 편이 정확하고 싸다.
+        //
+        // 엔진이 자체 콘솔을 열어 stdout을 CONOUT$로 돌리므로 리디렉션으로는
+        // 잡히지 않는다. 다른 검증 명령과 같이 로그에도 남겨 밖에서 읽게 한다.
+        char line[512]{};
+        std::string report;
+
+        for (auto& camera : CameraManagement->GetCameras())
+        {
+            if (nullptr == camera) continue;
+            if (!RenderPassData::VaildCheck(camera.get())) continue;
+
+            auto* data = RenderPassData::GetData(camera.get());
+
+            std::snprintf(line, sizeof(line), "camera %d\n", camera->m_cameraIndex);
+            report += line;
+
+            report += "  cascadeEnd:";
+            for (float end : data->m_cascadeEnd)
+            {
+                std::snprintf(line, sizeof(line), " %.6f", end);
+                report += line;
+            }
+            report += "\n";
+
+            for (size_t i = 0; i < data->m_cascadeInfo.size(); ++i)
+            {
+                const auto& info = data->m_cascadeInfo[i];
+                std::snprintf(line, sizeof(line),
+                    "  [%zu] eye(%.6f %.6f %.6f) look(%.6f %.6f %.6f) near %.6f far %.6f w %.6f h %.6f\n",
+                    i,
+                    info.m_eyePosition.m128_f32[0], info.m_eyePosition.m128_f32[1], info.m_eyePosition.m128_f32[2],
+                    info.m_lookAt.m128_f32[0], info.m_lookAt.m128_f32[1], info.m_lookAt.m128_f32[2],
+                    info.m_nearPlane, info.m_farPlane, info.m_viewWidth, info.m_viewHeight);
+                report += line;
+
+                const Mathf::Matrix lvp = info.m_lightViewProjection;
+                report += "      lvp";
+                for (int r = 0; r < 4; ++r)
+                {
+                    for (int c = 0; c < 4; ++c)
+                    {
+                        std::snprintf(line, sizeof(line), " %.6f", lvp.m[r][c]);
+                        report += line;
+                    }
+                }
+                report += "\n";
+            }
+
+            const auto& constant = data->m_shadowCamera.m_shadowMapConstant;
+            std::snprintf(line, sizeof(line),
+                "  constant: end1 %.6f end2 %.6f end3 %.6f w %d h %d cascade %d\n",
+                constant.m_casCadeEnd1, constant.m_casCadeEnd2, constant.m_casCadeEnd3,
+                constant.m_shadowMapWidth, constant.m_shadowMapHeight,
+                static_cast<int>(constant.useCasCade));
+            report += line;
+        }
+
+        if (report.empty()) report = "(카메라 없음)\n";
+
+        std::printf("[shadowinfo]\n%s", report.c_str());
+        std::fflush(stdout);
+        Debug->LogWarning("[shadowinfo]\n" + report);
+    }
     else if (cmd == "crash.status")
     {
         // 이번 실행이 덤프를 남길 수 있는 상태인지 확인한다.
@@ -1437,6 +1508,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  assets.unload        사용하지 않는 에셋 캐시 정리\n"
         "  wait <프레임>        지정 프레임만큼 다음 명령을 미룬다\n"
         "  log.flush            로그를 디스크에 즉시 반영\n"
+        "  render.shadowinfo    그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)\n"
         "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
         "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"
         "  quit                 에디터 종료\n"

@@ -89,6 +89,11 @@ void RenderPassData::Initalize(uint32 index)
 	m_forwardQueue.reserve(500);
 	m_shadowRenderQueue.reserve(800);
 
+	// 캐스케이드 스크래치는 여기서 한 번만 크기를 잡는다.
+	// 매 프레임 재할당하지 않아야 렌더 스레드가 힙을 건드릴 일이 없다.
+	m_cascadeInfo.resize(cascadeCount);
+	m_cascadeEnd.reserve(cascadeCount + 1);
+
 	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
 	auto shadowMapTexture = Texture::CreateManagedArray(
 		desc.m_textureWidth,

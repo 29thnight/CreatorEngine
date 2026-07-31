@@ -53,8 +53,13 @@ public:
 	float cloudAlpha = 1.f;
 	bool isCloudOn = true;
 
-	void DevideCascadeEnd(Camera& camera);
-	void DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir);
+	// 캐스케이드 분할과 그림자 정보를 계산한다.
+	//
+	// 결과는 카메라가 아니라 RenderPassData(렌더 측 소유)에 쓴다. 카메라는
+	// 게임 스레드 소유라 렌더 스레드가 쓰면 안 된다 — 예전에는 여기서
+	// camera.m_cascadeEnd를 매 프레임 재할당했다(PHASE 3-2).
+	void DevideCascadeEnd(Camera& camera, RenderPassData& renderData);
+	void DevideShadowInfo(Camera& camera, RenderPassData& renderData, Mathf::Vector4 LightDir);
 
 
 	void UseCloudShadowMap(std::string_view filename);

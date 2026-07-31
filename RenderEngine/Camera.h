@@ -119,8 +119,17 @@ public:
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
 
+	// 캐스케이드 분할 비율. 저작 설정이라 게임 스레드가 소유하고,
+	// 렌더 스레드는 읽기만 한다.
 	std::vector<float>			m_cascadeDevideRatios = { 0.05f, 0.15f };
-	std::vector<float>			m_cascadeEnd;
+
+	// 계산 결과(m_cascadeEnd)는 여기 있지 않다. RenderPassData가 카메라별로
+	// 들고 있다 — 렌더 스레드가 게임 소유 객체의 vector를 재할당하던 것을
+	// 없애기 위해서다(PHASE 3-2).
+	//
+	// m_cascadeinfo는 남는다: RenderPassData::m_shadowCamera(렌더 소유 카메라)가
+	// SetShadowInfo로 받아 UpdateBufferCascade에 쓴다. 게임 소유 카메라의
+	// 이 필드는 쓰이지 않는다.
 	std::vector<ShadowInfo>		m_cascadeinfo;
 	ShadowMapConstant           m_shadowMapConstant;
 

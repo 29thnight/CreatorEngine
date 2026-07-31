@@ -192,16 +192,16 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RHICommandContext& context, R
 	auto  lightdir	= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc		= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
 	auto& constant	= renderData->m_shadowCamera.m_shadowMapConstant;	//type = ShadowMapConstant
-	auto  projMat	= camera.CalculateProjection();						//type = Mathf::xMatrix
+	auto  projMat	= renderData->m_frameCalculatedProjection;			//type = Mathf::xMatrix
 
-	DevideCascadeEnd(camera);
-	DevideShadowInfo(camera, lightdir);
+	DevideCascadeEnd(camera, *renderData);
+	DevideShadowInfo(camera, *renderData, lightdir);
 
 	constant.devideShadow		= m_settingConstant.devideShadow;
 	constant._epsilon			= m_settingConstant._epsilon;
-	constant.m_casCadeEnd1		= Mathf::Vector4::Transform({ 0, 0, camera.m_cascadeEnd[1], 1.f }, projMat).z;
-	constant.m_casCadeEnd2		= Mathf::Vector4::Transform({ 0, 0, camera.m_cascadeEnd[2], 1.f }, projMat).z;
-	constant.m_casCadeEnd3		= Mathf::Vector4::Transform({ 0, 0, camera.m_cascadeEnd[3], 1.f }, projMat).z;
+	constant.m_casCadeEnd1		= Mathf::Vector4::Transform({ 0, 0, renderData->m_cascadeEnd[1], 1.f }, projMat).z;
+	constant.m_casCadeEnd2		= Mathf::Vector4::Transform({ 0, 0, renderData->m_cascadeEnd[2], 1.f }, projMat).z;
+	constant.m_casCadeEnd3		= Mathf::Vector4::Transform({ 0, 0, renderData->m_cascadeEnd[3], 1.f }, projMat).z;
 	constant.m_shadowMapWidth	= desc.m_textureWidth;
 	constant.m_shadowMapHeight  = desc.m_textureHeight;
 
@@ -217,7 +217,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RHICommandContext& context, R
 	context.SetVertexShaderConstantBuffers(3, 1, &boneBuffer);
 	context.SetVertexShaderConstantBuffers(4, 1, &cascadeIndexBuffer);
 
-	renderData->m_shadowCamera.SetShadowInfo(camera.m_cascadeinfo);
+	renderData->m_shadowCamera.SetShadowInfo(renderData->m_cascadeInfo);
 	renderData->m_shadowCamera.UpdateBufferCascade(deferredContextPtr1, true);
 
 	HashedGuid currentAnimatorGuid{};
@@ -262,24 +262,31 @@ void ShadowMapPass::CreateCommandListNormalShadow(RHICommandContext& context, Re
 
 	auto  lightdir			= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc				= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
-	auto& constantCopy		= camera.m_shadowMapConstant;						//type = ShadowMapConstant
+	// 예전에는 이 상수를 camera.m_shadowMapConstant에 썼다. 그런데 셰이더에
+	// 올라가는 것은 renderData->m_shadowCamera.m_shadowMapConstant다
+	// (DeferredPass가 그것을 바인딩한다). 즉 이 경로가 계산한 값은 아무 데도
+	// 가지 않는 죽은 쓰기였고, 동시에 게임 소유 카메라를 렌더 스레드가 쓰는
+	// 경로이기도 했다. 캐스케이드 경로와 같은 곳에 쓰도록 맞춘다.
+	auto& constantCopy		= renderData->m_shadowCamera.m_shadowMapConstant;	//type = ShadowMapConstant
 
 	m_pso->Apply(deferredContextPtr1);
 
-	DevideCascadeEnd(camera);
-	DevideShadowInfo(camera, lightdir);
+	DevideCascadeEnd(camera, *renderData);
+	DevideShadowInfo(camera, *renderData, lightdir);
+
+	const ShadowInfo& lastCascade = renderData->m_cascadeInfo[cascadeCount - 1];
 
 	constantCopy.devideShadow							= m_settingConstant.devideShadow;
 	constantCopy._epsilon								= m_settingConstant._epsilon;
-	renderData->m_shadowCamera.m_eyePosition			= camera.m_cascadeinfo[2].m_eyePosition;
-	renderData->m_shadowCamera.m_lookAt					= camera.m_cascadeinfo[2].m_lookAt;
-	renderData->m_shadowCamera.m_viewHeight				= camera.m_cascadeinfo[2].m_viewHeight;
-	renderData->m_shadowCamera.m_viewWidth				= camera.m_cascadeinfo[2].m_viewWidth;
-	renderData->m_shadowCamera.m_nearPlane				= camera.m_cascadeinfo[2].m_nearPlane;
-	renderData->m_shadowCamera.m_farPlane				= camera.m_cascadeinfo[2].m_farPlane;
+	renderData->m_shadowCamera.m_eyePosition			= lastCascade.m_eyePosition;
+	renderData->m_shadowCamera.m_lookAt					= lastCascade.m_lookAt;
+	renderData->m_shadowCamera.m_viewHeight				= lastCascade.m_viewHeight;
+	renderData->m_shadowCamera.m_viewWidth				= lastCascade.m_viewWidth;
+	renderData->m_shadowCamera.m_nearPlane				= lastCascade.m_nearPlane;
+	renderData->m_shadowCamera.m_farPlane				= lastCascade.m_farPlane;
 	constantCopy.m_shadowMapWidth						= desc.m_textureWidth;
 	constantCopy.m_shadowMapHeight						= desc.m_textureHeight;
-	constantCopy.m_lightViewProjection[0]				= camera.m_cascadeinfo[2].m_lightViewProjection;
+	constantCopy.m_lightViewProjection[0]				= lastCascade.m_lightViewProjection;
 
 	context.ClearDepthStencil(renderData->m_shadowMapDSVarr[0], true, false, 1.0f, 0);
 	context.SetRenderTargets(0, nullptr, renderData->m_shadowMapDSVarr[0]);
@@ -355,23 +362,26 @@ void ShadowMapPass::CreateTerrainRenderCommandList(ID3D11DeviceContext* deferred
 	}
 }
 
-void ShadowMapPass::DevideCascadeEnd(Camera& camera)
+void ShadowMapPass::DevideCascadeEnd(Camera& camera, RenderPassData& renderData)
 {
-	camera.m_cascadeEnd.clear();
+	// 카메라에서는 읽기만 한다. 쓰는 곳은 렌더 측 스크래치다.
+	// Initalize에서 reserve해 두었으므로 clear/push_back이 재할당을 일으키지 않는다.
+	auto& cascadeEnd = renderData.m_cascadeEnd;
+	cascadeEnd.clear();
 
-	camera.m_cascadeEnd.push_back(camera.m_nearPlane);
+	cascadeEnd.push_back(camera.m_nearPlane);
 
-	float distanceZ = camera.m_farPlane - camera.m_nearPlane;
+	const float distanceZ = camera.m_farPlane - camera.m_nearPlane;
 
 	for (float ratio : camera.m_cascadeDevideRatios)
 	{
-		camera.m_cascadeEnd.push_back(ratio * distanceZ);
+		cascadeEnd.push_back(ratio * distanceZ);
 	}
 
-	camera.m_cascadeEnd.push_back(camera.m_farPlane);
+	cascadeEnd.push_back(camera.m_farPlane);
 }
 
-void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
+void ShadowMapPass::DevideShadowInfo(Camera& camera, RenderPassData& renderData, Mathf::Vector4 LightDir)
 {
 	// Normalize light direction once before the loop.
 	if (Mathf::Vector3(LightDir) == Mathf::Vector3{ 0.f, 0.f, 0.f })
@@ -383,15 +393,17 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 		LightDir.Normalize();
 	}
 
-	const auto frustum = DirectX::BoundingFrustum(camera.CalculateProjection());
-	const auto viewInverse = camera.CalculateInverseView();
+	// 살아 있는 카메라에서 다시 계산하지 않고 프레임 밀봉된 행렬을 쓴다.
+	// CalculateInverseView()는 정의상 CalculateView()의 역행렬이라 값은 같다.
+	const auto frustum = DirectX::BoundingFrustum(renderData.m_frameCalculatedProjection);
+	const auto viewInverse = XMMatrixInverse(nullptr, renderData.m_frameCalculatedView);
 
 	for (const int i : std::views::iota(0, cascadeCount))
 	{
 		// 1. Calculate the 8 corners of the cascade slice's frustum in world space.
 		std::array<Mathf::Vector3, 8> sliceFrustumCorners;
-		const float curEnd = camera.m_cascadeEnd[i];
-		const float nextEnd = camera.m_cascadeEnd[i + 1];
+		const float curEnd = renderData.m_cascadeEnd[i];
+		const float nextEnd = renderData.m_cascadeEnd[i + 1];
 
 		sliceFrustumCorners[0] = Mathf::Vector3::Transform({ frustum.RightSlope * curEnd, frustum.TopSlope * curEnd, curEnd }, viewInverse);
 		sliceFrustumCorners[1] = Mathf::Vector3::Transform({ frustum.RightSlope * curEnd, frustum.BottomSlope * curEnd, curEnd }, viewInverse);
@@ -425,7 +437,7 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 		const Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.1f, 500.f);
 
 		// 5. Store the calculated information for the current cascade.
-		ShadowInfo& cascadeInfo = camera.m_cascadeinfo[i];
+		ShadowInfo& cascadeInfo = renderData.m_cascadeInfo[i];
 		cascadeInfo.m_eyePosition = shadowPos;
 		cascadeInfo.m_lookAt = quantizedCenterPos;
 		cascadeInfo.m_nearPlane = 0.1f;
@@ -508,7 +520,16 @@ void ShadowMapPass::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, Li
 void ShadowMapPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& scene, Camera& camera)
 {
 	scene.m_LightController->m_shadowMapConstant.useCasCade = g_useCascade;
-	camera.m_shadowMapConstant.useCasCade = g_useCascade;
+
+	// camera.m_shadowMapConstant에도 같은 값을 쓰고 있었는데, 그 상수는 아무도
+	// 읽지 않는다(셰이더에 올라가는 것은 m_shadowCamera 쪽이다). 게임 소유
+	// 카메라를 렌더 스레드가 쓰는 경로라 지운다 — 그림자 경로에서 이제
+	// 게임 카메라 쓰기는 0건이다(PHASE 3-2).
+	if (RenderPassData::VaildCheck(&camera))
+	{
+		RenderPassData::GetData(&camera)->m_shadowCamera.m_shadowMapConstant.useCasCade = g_useCascade;
+	}
+
 	if (g_useCascade)
 	{
 		CreateCommandListCascadeShadow(context, scene, camera);
