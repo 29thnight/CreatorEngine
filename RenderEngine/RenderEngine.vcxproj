@@ -285,6 +285,8 @@
     <ClCompile Include="BlitPass.cpp" />
     <ClCompile Include="RHI\RHI.cpp" />
     <ClCompile Include="RHI\DX11RHI.cpp" />
+    <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />
     <ClCompile Include="PositionMapPass.cpp" />
@@ -404,6 +406,8 @@
     <ClInclude Include="RHI\RHIDevice.h" />
     <ClInclude Include="RHI\RHI.h" />
     <ClInclude Include="RHI\DX11RHI.h" />
+    <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\DX12\EnhancedSceneRenderer.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="cbuffers.h" />
     <ClInclude Include="LightMapPass.h" />

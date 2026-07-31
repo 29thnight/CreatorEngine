@@ -42,7 +42,12 @@ Run-Step "UI 생성 순서 회귀" {
 
     "통과 $passes 회 · 실패 $fails 회 · 종료 코드 $($proc.ExitCode)"
     if ($crash) { "크래시가 기록됐다" }
-    $global:LASTEXITCODE = if ($passes -ge 4 -and $fails -eq 0 -and -not $crash) { 0 } else { 1 }
+    # 종료 코드도 판정에 넣는다 — 프로브가 다 통과하고도 종료 시점 힙 손상
+    # (0xC0000374)으로 죽은 실행이 '전체 통과'로 지나간 적이 있다. 간헐 크래시는
+    # 검사를 흔들리게 만들지만, 숨겨지는 것보다 흔들리는 쪽이 낫다.
+    $exitOk = ($proc.ExitCode -eq 0)
+    if (-not $exitOk) { ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
+    $global:LASTEXITCODE = if ($passes -ge 4 -and $fails -eq 0 -and -not $crash -and $exitOk) { 0 } else { 1 }
 }
 
 Run-Step "저작 배치 재현" {

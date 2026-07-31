@@ -21,6 +21,7 @@
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "CoreWindow.h"
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 
 #include <Windows.h>
 #include <algorithm>
@@ -802,6 +803,23 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         if (0 == reported) std::printf("[CLI] 버튼 없음\n");
     }
+    else if (cmd == "dx12.selftest")
+    {
+        // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
+        // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
+        const std::string outputPath = (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png");
+
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunSelfTest(outputPath, 6, log);
+
+        for (const auto& line : { log })
+        {
+            std::printf("%s", line.c_str());
+        }
+        Debug->LogWarning(std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
+    }
     else if (cmd == "window.info")
     {
         // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
@@ -1298,6 +1316,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
+        "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"
