@@ -81,8 +81,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(RHICommandContext& contex
 	RHINativeRenderTarget view = renderData->m_renderTarget->GetRTV();
 	context.SetRenderTargets(1, &view, nullptr);
 
-	const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
-	const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+	const RHIViewport viewport = RHI::Device().GetFullViewport();
 	context.SetViewports(1, &viewport);
 
 	RHINativeBuffer constantBuffer = m_Buffer.Get();

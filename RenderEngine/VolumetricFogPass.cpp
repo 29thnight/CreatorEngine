@@ -288,8 +288,7 @@ void VolumetricFogPass::CreateRenderCommandList(RHICommandContext& context, Rend
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	context.SetRenderTarget(view, nullptr);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 	CompositeCB compositeData{};

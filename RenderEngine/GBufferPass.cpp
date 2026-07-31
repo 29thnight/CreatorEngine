@@ -219,8 +219,7 @@ void GBufferPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 	context.SetPixelShaderConstantBuffer(1, scene.m_LightController->m_pLightBuffer);
@@ -528,8 +527,7 @@ void GBufferPass::TerrainRenderCommandList(RHICommandContext& context, RenderSce
 	camera.DeferredUpdateBuffer(deferredPtr, data->m_frameCalculatedView, data->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 	context.SetPixelShaderConstantBuffer(1, scene.m_LightController->m_pLightBuffer);

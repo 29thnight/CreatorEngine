@@ -82,12 +82,11 @@ void UIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& sc
     RHINativeRenderTarget view = renderData->m_renderTarget->GetRTV();
     context.SetRenderTargets(1, &view, renderData->m_renderTarget->m_pDSV);
 
-    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
-    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
 
     context.SetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-    context.SetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
+    context.SetBlendState(RHI::Device().GetDefaultBlendState(), nullptr, 0xFFFFFFFF);
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 
     RHINativeBuffer uiBuffer = m_UIBuffer.Get();
@@ -119,7 +118,7 @@ void UIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& sc
         spriteBatch->End();
     }
 
-    context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
+    context.SetDepthStencilState(RHI::Device().GetDefaultDepthStencilState(), 1);
     context.SetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
     RHINativeShaderResource nullSRV = nullptr;

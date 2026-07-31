@@ -179,7 +179,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
             if (nullptr == cameraComponent) return;
 
             auto camera = cameraComponent->GetCamera();
-            if (nullptr == camera || camera->m_isOrthographic) return; // Ä«¸Þ¶ó°¡ orthographicÀÏ °æ¿ì³ª ¾øÀ» °æ¿ì throughpass
+            if (nullptr == camera || camera->m_isOrthographic) return; // Ä«ï¿½Þ¶ï¿½ orthographicï¿½ï¿½ ï¿½ï¿½ì³ª ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ throughpass
 
             DrawBoundingFrustum(cameraComponent->GetFrustum(), { 1, 0, 1, 1 });
         }
@@ -302,7 +302,7 @@ void GizmoLinePass::DrawLines(LineVertex* vertices, uint32_t vertexCount)
 
 void GizmoLinePass::DrawWireSphere(const Mathf::Vector3& center, float radius, const Mathf::Color4& color)
 {
-    // XY, YZ, XZ Æò¸é¿¡ °¢°¢ ¿øÀ» ±×·Á¼­ ±¸Ã³·³ º¸ÀÌ°Ô
+    // XY, YZ, XZ ï¿½ï¿½é¿¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½×·ï¿½ï¿½ï¿½ ï¿½ï¿½Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½Ì°ï¿½
     DrawWireCircle(center, radius, Mathf::Vector3(0, 1, 0), color); // XZ plane
     DrawWireCircle(center, radius, Mathf::Vector3(1, 0, 0), color); // YZ plane
     DrawWireCircle(center, radius, Mathf::Vector3(0, 0, 1), color); // XY plane

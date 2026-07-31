@@ -261,14 +261,14 @@ void DecalPass::CreateRenderCommandList(RHICommandContext& context, RenderScene&
 	PS_CONSTANT_BUFFER cBuf;
 	cBuf.g_inverseProjectionMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedProjection);
 	cBuf.g_inverseViewMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedView);
-	cBuf.g_screenDimensions = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
+	const RHIViewport fullVp = RHI::Device().GetFullViewport();
+	cBuf.g_screenDimensions = { fullVp.width, fullVp.height };
 	context.UpdateBuffer(m_Buffer.Get(), &cBuf);
 
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
 	scene.UseModel(deferredPtr);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 

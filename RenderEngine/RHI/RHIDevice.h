@@ -21,4 +21,16 @@ public:
     virtual const char* GetName() const = 0;
 
     virtual RHICommandContext& GetImmediateContext() = 0;
+
+    // ── 프레임 상태 쿼리(8차 슬라이스) ──
+    //
+    // 패스 기록 코드가 전역 DeviceStates를 직접 읽던 것을 이 쿼리로 좁힌다.
+    // 렌더그래프(3-5)가 서면 뷰포트는 노드의 타깃 크기에서, 상태 객체는 PSO(3-4)에서
+    // 나오므로 셋 다 그쪽으로 흡수될 예정이다 — 그때까지의 단일 창구.
+    virtual RHIViewport GetFullViewport() const = 0;
+    virtual RHINativeRenderTarget GetBackBufferRenderTarget() const = 0;
+
+    // 엔진 공용 기본 상태(알파 블렌드·기본 깊이). DX12에서는 PSO에 구워진다.
+    virtual RHINativeBlendState GetDefaultBlendState() const = 0;
+    virtual RHINativeDepthStencilState GetDefaultDepthStencilState() const = 0;
 };

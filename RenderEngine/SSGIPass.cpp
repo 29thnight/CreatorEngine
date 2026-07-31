@@ -151,7 +151,7 @@ void SSGIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     params.proj = renderData->m_frameCalculatedProjection;
     params.inverseView = XMMatrixInverse(nullptr, params.view);
     params.inverseProjection = XMMatrixInverse(nullptr, params.proj);
-    params.screenSize = { DirectX11::DeviceStates->g_Viewport.Width, DirectX11::DeviceStates->g_Viewport.Height };
+    params.screenSize = { RHI::Device().GetFullViewport().width, RHI::Device().GetFullViewport().height };
     params.radius = radius;;
     params.thickness = thickness;
     params.frameIndex = Time->GetFrameCount();
@@ -163,8 +163,9 @@ void SSGIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     RHINativeBuffer ssgiBuffer = m_SSGIBuffer.Get();
     context.SetComputeConstantBuffers(0, 1, &ssgiBuffer);
 
-    const uint32_t viewWidth  = static_cast<uint32_t>(DirectX11::DeviceStates->g_Viewport.Width);
-    const uint32_t viewHeight = static_cast<uint32_t>(DirectX11::DeviceStates->g_Viewport.Height);
+    const RHIViewport fullVp = RHI::Device().GetFullViewport();
+    const uint32_t viewWidth  = static_cast<uint32_t>(fullVp.width);
+    const uint32_t viewHeight = static_cast<uint32_t>(fullVp.height);
 
     int ratioMulTread = ssratio * ssthreads;
     context.Dispatch(
@@ -177,7 +178,7 @@ void SSGIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     context.SetComputeUnorderedAccessViews(0, 1, &nulluav, nullptr);
 
     CompositeParams compositeParams;
-    compositeParams.inputTextureSize = { (float)DirectX11::DeviceStates->g_Viewport.Width / (ssratio), (float)DirectX11::DeviceStates->g_Viewport.Height / (ssratio) };
+    compositeParams.inputTextureSize = { fullVp.width / (ssratio), fullVp.height / (ssratio) };
     compositeParams.ratio = ssratio;
     compositeParams.useOnlySSGI = useOnlySSGI;
     RHINativeBuffer compositeBuffer = m_CompositeBuffer.Get();

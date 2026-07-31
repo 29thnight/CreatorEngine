@@ -102,7 +102,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 		auto meshName = renderer->m_Mesh->GetName();
 		if (m_positionMapTextures.find(meshName) == m_positionMapTextures.end()) {
 			if (m_positionMapTextures[meshName] != nullptr) continue;
-			// ¸ðµ¨ÀÇ positionMap »ý¼º
+			// ï¿½ï¿½ï¿½ï¿½ positionMap ï¿½ï¿½ï¿½ï¿½
 			m_positionMapTextures[meshName] = Texture::Create(posNormMapSize, posNormMapSize, "Position Map",
 				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
 			m_positionMapTextures[meshName]->m_textureType = TextureType::ImageTexture;
@@ -160,7 +160,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 
 				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 
-				// ¿§Áö·Î µ¤¾î¾²±â.
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½î¾²ï¿½ï¿½.
 				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &texture->m_pUAV, nullptr);
 				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV);
@@ -181,7 +181,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 
 				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 
-				// ¿§Áö·Î µ¤¾î¾²±â.
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½î¾²ï¿½ï¿½.
 				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &texture->m_pUAV, nullptr);
 				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV);
@@ -235,11 +235,11 @@ void PositionMapPass::CreateTempTexture()
 }
 
 /*
- - ±Ç¿ë¿ì
-¸Þ½¬º°·Î positionMap »ý¼º.
-ÇÈ¼¿¼ÎÀÌ´õ¸¦ »ç¿ëÇÏ¹Ç·Î viewport¿Í positionMapÀÇ width, height°¡ ÀÏÄ¡ÇÏ´ÂÁö È®ÀÎÇÏ±â.
-(ÀÌ°Å ¶§¹®¿¡ »çÀÌÁî ´Þ¶óÁ®¼­ °³°í»ýÇÔ.)
+ - ï¿½Ç¿ï¿½ï¿½
+ï¿½Þ½ï¿½ï¿½ï¿½ï¿½ï¿½ positionMap ï¿½ï¿½ï¿½ï¿½.
+ï¿½È¼ï¿½ï¿½ï¿½ï¿½Ì´ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï¹Ç·ï¿½ viewportï¿½ï¿½ positionMapï¿½ï¿½ width, heightï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½Ï´ï¿½ï¿½ï¿½ È®ï¿½ï¿½ï¿½Ï±ï¿½.
+(ï¿½Ì°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Þ¶ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.)
 
-Ãß°¡ °³¼± °¡´É ¿©ºÎ
-1. °°Àº UV¸¦ »ç¿ëÇÏ´Â ¸Þ½¬ÀÇ °æ¿ì ÇØ´ç ÅØ½ºÃÄ¿¡¼­ ÀÛ¾÷ÇÒ ¼ö ÀÖµµ·Ï ¼öÁ¤ ÇÒ ¼ö ÀÖÀ»°Å°°À½.
+ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+1. ï¿½ï¿½ï¿½ï¿½ UVï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ø´ï¿½ ï¿½Ø½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ ï¿½Û¾ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Öµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ï¿½.
 */

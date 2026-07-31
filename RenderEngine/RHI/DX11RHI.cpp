@@ -26,6 +26,27 @@ void* DX11CommandContext::GetNativeHandle()
     return m_native ? m_native : DirectX11::DeviceStates->g_pDeviceContext;
 }
 
+RHIViewport DX11RHIDevice::GetFullViewport() const
+{
+    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
+    return { vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+}
+
+RHINativeRenderTarget DX11RHIDevice::GetBackBufferRenderTarget() const
+{
+    return DirectX11::DeviceStates->g_backBufferRTV;
+}
+
+RHINativeBlendState DX11RHIDevice::GetDefaultBlendState() const
+{
+    return DirectX11::DeviceStates->g_pBlendState;
+}
+
+RHINativeDepthStencilState DX11RHIDevice::GetDefaultDepthStencilState() const
+{
+    return DirectX11::DeviceStates->g_pDepthStencilState;
+}
+
 void DX11CommandContext::SetViewports(uint32_t count, const RHIViewport* viewports)
 {
     // 실사용은 1개다(모든 패스가 단일 뷰포트). 배열 경로도 규약대로 지원한다.

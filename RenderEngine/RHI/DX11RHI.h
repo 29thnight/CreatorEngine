@@ -73,6 +73,11 @@ public:
     const char* GetName() const override { return "Dx11"; }
     RHICommandContext& GetImmediateContext() override { return m_immediate; }
 
+    RHIViewport GetFullViewport() const override;
+    RHINativeRenderTarget GetBackBufferRenderTarget() const override;
+    RHINativeBlendState GetDefaultBlendState() const override;
+    RHINativeDepthStencilState GetDefaultDepthStencilState() const override;
+
 private:
     DX11CommandContext m_immediate;
 };

@@ -87,10 +87,9 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
     context.SetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
     context.SetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-    context.SetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
+    context.SetBlendState(RHI::Device().GetDefaultBlendState(), nullptr, 0xFFFFFFFF);
 
-    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
-    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
 
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);
@@ -110,7 +109,7 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
 
         if (proxy->m_enableDepth)
         {
-            context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
+            context.SetDepthStencilState(RHI::Device().GetDefaultDepthStencilState(), 1);
         }
         else
         {
@@ -227,7 +226,7 @@ void SpritePass::CreateRenderCommandList(RHICommandContext& context, RenderScene
     RHINativeRenderTarget nullRTV = nullptr;
     context.SetRenderTargets(1, &nullRTV, nullptr);
     context.SetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-    context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
+    context.SetDepthStencilState(RHI::Device().GetDefaultDepthStencilState(), 1);
 
     ID3D11CommandList* commandList{};
     deferredPtr->FinishCommandList(false, &commandList);

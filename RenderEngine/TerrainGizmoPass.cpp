@@ -74,8 +74,7 @@ void TerrainGizmoPass::CreateRenderCommandList(RHICommandContext& context, Rende
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     context.SetRenderTarget(rtv, nullptr);
     {
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
     context.SetPixelShaderConstantBuffer(0, m_Buffer.Get());

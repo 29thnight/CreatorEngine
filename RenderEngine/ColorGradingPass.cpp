@@ -225,9 +225,9 @@ void ColorGradingPass::ControlPanel()
 		ImGui::SliderFloat("Highlights Brightness Scale", &highlights.w, 0.0f, 2.0f);
 
 		ImGui::InputText("##Save LUT Name", &m_tempLUTName[0], sizeof(m_tempLUTName.capacity()));
-		// Ç×»ó false·Î init
+		// ï¿½×»ï¿½ falseï¿½ï¿½ init
 		if (ImGui::Button("Save LUT")) {
-			// ÇØ´ç ¼³Á¤°ªÀ¸·Î LUT Á¦ÀÛ.
+			// ï¿½Ø´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ LUT ï¿½ï¿½ï¿½ï¿½.
 			DirectX11::CSSetShader(m_pColorGradingLUTShader->GetShader(), nullptr, 0);
 			DirectX11::CSSetConstantBuffer(0, 1, m_EditBuffer.GetAddressOf());
 			DirectX11::CSSetUnorderedAccessViews(0, 1, &m_pColorGradingLUTTexture->m_pUAV, nullptr);
@@ -301,7 +301,7 @@ void ColorGradingPass::SetColorGradingTexture(std::string_view filename)
 		ComPtr<ID3D11Resource> srcResource;
 		ComPtr<ID3D11Resource> dstResource;
 
-		// SRV¿¡¼­ ¿øº» ¸®¼Ò½º °¡Á®¿À±â
+		// SRVï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ò½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		m_pDefaultLUTTexture->m_pSRV->GetResource(&srcResource);
 		m_pColorGradingTexture->m_pSRV->GetResource(&dstResource);
 		DirectX11::CopyResource(dstResource.Get(), srcResource.Get());

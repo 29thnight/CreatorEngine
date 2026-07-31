@@ -399,8 +399,7 @@ void SkyBoxPass::CreateRenderCommandList(RHICommandContext& context, RenderScene
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	context.SetRenderTarget(rtv, renderData->m_depthStencil->m_pDSV);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 	camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);

@@ -79,8 +79,9 @@ void BitMaskPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
     // 표면(셰이더·샘플러·SRV/UAV·상수 버퍼·Dispatch)의 전체를 이 패스가 지나간다.
     ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
-    const uint32_t viewWidth  = static_cast<uint32_t>(DirectX11::DeviceStates->g_Viewport.Width);
-    const uint32_t viewHeight = static_cast<uint32_t>(DirectX11::DeviceStates->g_Viewport.Height);
+    const RHIViewport fullVp = RHI::Device().GetFullViewport();
+    const uint32_t viewWidth  = static_cast<uint32_t>(fullVp.width);
+    const uint32_t viewHeight = static_cast<uint32_t>(fullVp.height);
 
     // edge filter
     context.SetComputeShader(m_pEdgefilterShader->GetShader());

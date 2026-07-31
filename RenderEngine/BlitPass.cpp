@@ -61,12 +61,10 @@ void BlitPass::Execute(RenderScene& scene, Camera& camera)
 
     RHICommandContext& context = RHI::Immediate();
 
-    const D3D11_VIEWPORT& src = DirectX11::DeviceStates->g_Viewport;
-    const RHIViewport viewport{ src.TopLeftX, src.TopLeftY, src.Width, src.Height,
-                                src.MinDepth, src.MaxDepth };
+    const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
 
-    ID3D11RenderTargetView* rtv = DirectX11::DeviceStates->g_backBufferRTV;
+    RHINativeRenderTarget rtv = RHI::Device().GetBackBufferRenderTarget();
     if (!rtv)
     {
         rtv = m_backBufferRTV;

@@ -121,8 +121,7 @@ void ScreenSpaceReflectionPass::CreateRenderCommandList(RHICommandContext& conte
 	RHINativeRenderTarget view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
 	context.SetRenderTargets(2, view, nullptr);
 
-	const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
-	const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+	const RHIViewport viewport = RHI::Device().GetFullViewport();
 	context.SetViewports(1, &viewport);
 
 	RHINativeBuffer constantBuffer = m_Buffer.Get();

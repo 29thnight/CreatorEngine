@@ -138,8 +138,7 @@ void SSAOPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     RHINativeRenderTarget rtv = renderTarget->GetRTV();
     context.SetRenderTargets(1, &rtv, nullptr);
 
-    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
-    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
     Mathf::xMatrix view = camera.CalculateView();
     Mathf::xMatrix proj = camera.CalculateProjection();
@@ -149,7 +148,8 @@ void SSAOPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     m_SSAOBuffer.m_CameraPosition = camera.m_eyePosition;
     m_SSAOBuffer.m_Radius = radius;
     m_SSAOBuffer.m_Thickness = thickness;
-    m_SSAOBuffer.m_windowSize = { (float)DirectX11::DeviceStates->g_ClientRect.width, (float)DirectX11::DeviceStates->g_ClientRect.height };
+    const RHIViewport fullVp = RHI::Device().GetFullViewport();
+    m_SSAOBuffer.m_windowSize = { fullVp.width, fullVp.height };
     m_SSAOBuffer.m_frameIndex = Time->GetFrameCount();
 
     context.UpdateBuffer(m_Buffer.Get(), &m_SSAOBuffer);

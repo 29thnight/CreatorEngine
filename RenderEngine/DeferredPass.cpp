@@ -172,8 +172,7 @@ void DeferredPass::CreateRenderCommandList(RHICommandContext& context, RenderSce
     RHINativeRenderTarget rtv[2] = { renderData->m_renderTarget->GetRTV(), LightEmissiveTexture->GetRTV() };
     context.SetRenderTargets(2, rtv, nullptr);
 
-    const D3D11_VIEWPORT& vp = DirectX11::DeviceStates->g_Viewport;
-    const RHIViewport viewport{ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth };
+    const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
 
     camera.DeferredUpdateBuffer(deferredPtr, renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection);

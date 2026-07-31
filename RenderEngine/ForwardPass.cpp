@@ -308,8 +308,7 @@ void ForwardPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	context.SetRenderTarget(view, renderData->m_depthStencil->m_pDSV);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 	scene.UseModel(deferredPtr);
@@ -603,13 +602,12 @@ void ForwardPass::CreateFoliageCommandList(RHICommandContext& context, RenderSce
 	ID3D11RenderTargetView* view = data->m_renderTarget->GetRTV();
 	context.SetRenderTarget(view, data->m_depthStencil->m_pDSV);
 	{
-		const D3D11_VIEWPORT& vpRef = DirectX11::DeviceStates->g_Viewport;
-		const RHIViewport rhiVp{ vpRef.TopLeftX, vpRef.TopLeftY, vpRef.Width, vpRef.Height, vpRef.MinDepth, vpRef.MaxDepth };
+		const RHIViewport rhiVp = RHI::Device().GetFullViewport();
 		context.SetViewports(1, &rhiVp);
 	}
 	scene.UseModel(deferredPtr);
-	context.SetDepthStencilState(DirectX11::DeviceStates->g_pDepthStencilState, 1);
-	context.SetBlendState(DirectX11::DeviceStates->g_pBlendState, nullptr, 0xFFFFFFFF);
+	context.SetDepthStencilState(RHI::Device().GetDefaultDepthStencilState(), 1);
+	context.SetBlendState(RHI::Device().GetDefaultBlendState(), nullptr, 0xFFFFFFFF);
 	context.SetPixelShaderConstantBuffer(1, scene.m_LightController->m_pLightBuffer);
 	context.SetVertexShaderConstantBuffer(3, m_boneBuffer.Get());
 	context.SetPixelShaderConstantBuffer(0, m_materialBuffer.Get());

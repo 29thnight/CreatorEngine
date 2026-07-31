@@ -233,8 +233,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RHICommandContext& context, R
 		CreateTerrainRenderCommandList(deferredContextPtr1, scene, camera);
 	}
 
-	const D3D11_VIEWPORT& fullVp = DirectX11::DeviceStates->g_Viewport;
-	const RHIViewport restoreVp{ fullVp.TopLeftX, fullVp.TopLeftY, fullVp.Width, fullVp.Height, fullVp.MinDepth, fullVp.MaxDepth };
+	const RHIViewport restoreVp = RHI::Device().GetFullViewport();
 	context.SetViewports(1, &restoreVp);
 	context.UnbindRenderTargets();
 
@@ -298,8 +297,7 @@ void ShadowMapPass::CreateCommandListNormalShadow(RHICommandContext& context, Re
 	CreateCommandListProxyToShadow(deferredContextPtr1, scene, camera);
 	CreateTerrainRenderCommandList(deferredContextPtr1, scene, camera);
 
-	const D3D11_VIEWPORT& fullVp = DirectX11::DeviceStates->g_Viewport;
-	const RHIViewport restoreVp{ fullVp.TopLeftX, fullVp.TopLeftY, fullVp.Width, fullVp.Height, fullVp.MinDepth, fullVp.MaxDepth };
+	const RHIViewport restoreVp = RHI::Device().GetFullViewport();
 	context.SetViewports(1, &restoreVp);
 	context.UnbindRenderTargets();
 
