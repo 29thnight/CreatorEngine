@@ -1357,6 +1357,40 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Log::FlushNow();
         std::printf("[CLI] 로그 flush\n");
     }
+    else if (cmd == "render.syncstats")
+    {
+        // 게임/렌더 락스텝의 비용을 숫자로 본다 (PHASE 3-2).
+        //
+        // 락스텝 해체는 크고 위험한 변경이라 "얼마나 손해인가"를 모르고 시작하면
+        // 이득 없는 위험만 떠안는다. 여기서 나온 값이 해체의 근거이자 해체 후
+        // 비교할 기준선이다. 인자로 reset을 주면 그 시점부터 다시 잰다.
+        if (parts.size() > 1 && parts[1] == "reset")
+        {
+            EngineSettingInstance->renderBarrier.ResetStats();
+            std::printf("[CLI] 동기화 통계 초기화\n");
+            Debug->LogWarning("[syncstats] 초기화");
+            return;
+        }
+
+        const BarrierStats stats = EngineSettingInstance->renderBarrier.GetStats();
+
+        // 스레드 3개가 랑데뷰 2번씩 도달하므로 도달 수를 6으로 나누면 프레임 수다.
+        constexpr double kArrivalsPerFrame = 6.0;
+        const double frames = stats.arrivals / kArrivalsPerFrame;
+        const double waitPerFrameMs = (frames > 0.0) ? stats.waitMilliseconds / frames : 0.0;
+
+        char line[512]{};
+        std::snprintf(line, sizeof(line),
+            "도달 %llu (프레임 %.0f) · 실제 대기 %llu (%.1f%%) · 총 대기 %.1f ms · 프레임당 %.3f ms",
+            static_cast<unsigned long long>(stats.arrivals), frames,
+            static_cast<unsigned long long>(stats.spins),
+            (stats.arrivals > 0) ? (100.0 * stats.spins / stats.arrivals) : 0.0,
+            stats.waitMilliseconds, waitPerFrameMs);
+
+        std::printf("[syncstats] %s\n", line);
+        std::fflush(stdout);
+        Debug->LogWarning(std::string("[syncstats] ") + line);
+    }
     else if (cmd == "render.shadowinfo")
     {
         // 그림자 캐스케이드 계산 결과를 그대로 찍는다(PHASE 3-2 검증용).
@@ -1576,6 +1610,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  assets.unload        사용하지 않는 에셋 캐시 정리\n"
         "  wait <프레임>        지정 프레임만큼 다음 명령을 미룬다\n"
         "  log.flush            로그를 디스크에 즉시 반영\n"
+        "  render.syncstats [reset]  게임/렌더 락스텝 배리어의 대기 비용을 출력한다\n"
         "  render.shadowinfo    그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)\n"
         "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
         "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"
