@@ -2250,6 +2250,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
         "  render.exposure      자동 노출이 무엇을 재고 무엇을 결정했는지\n"
         "  render.post <이름> <on|off>  포스트 패스 토글(fog·bloom·ssgi·vignette·colorgrading)\n"
+        "  render.rtinfo        창·뷰포트·추종 텍스처 크기를 나란히 찍는다\n"
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
