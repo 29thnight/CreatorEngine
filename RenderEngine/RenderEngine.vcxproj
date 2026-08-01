@@ -290,6 +290,7 @@
     <ClCompile Include="RHI\DX12\DX12UploadRing.cpp" />
     <ClCompile Include="RHI\DX12\DX12RootSignatureCache.cpp" />
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedRenderGraph.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />

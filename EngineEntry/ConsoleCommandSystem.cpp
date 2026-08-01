@@ -891,6 +891,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.uploadring %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "dx12.rendergraph")
+    {
+        // 렌더 그래프 자가 검증(PHASE 3-5).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunRenderGraphTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] dx12.rendergraph %s\n", passed ? "통과" : "실패");
+    }
     else if (cmd == "dx12.sharedtexture")
     {
         // 병존 출력 경로 실증(PHASE 3-3 미결 결정). DX11 디바이스가 필요하므로
@@ -1666,6 +1677,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.uploadring      업로드 링 자가 검증(정렬·구간분리·되감기·넘침·GPU도달)\n"
         "  dx12.descriptorheap  디스크립터 링·샘플러 힙 자가 검증(연속성·구간·되감기·넘침·중복제거)\n"
         "  dx12.sharedtexture   병존 출력 경로 검증(DX12가 그린 것을 DX11이 SRV로 보는가)\n"
+        "  dx12.rendergraph     렌더 그래프 검증(순서·순환·배리어·컬링·실행)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

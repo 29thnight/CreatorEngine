@@ -3,6 +3,7 @@
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
+#include "EnhancedRenderGraph.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
@@ -10,6 +11,7 @@
 #include <thread>
 #include <chrono>
 #include <cstdio>
+#include <cmath>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -1587,6 +1589,288 @@ bool EnhancedSceneRenderer::RunSharedTextureTest(std::string& outLog)
     resources.Shutdown();
     outLog += "공유 텍스처 출력 경로 검증 통과\n";
     return true;
+}
+
+bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
+{
+    DX12DeviceResources resources;
+    std::string error;
+    if (!resources.Initialize(64, 64, error))
+    {
+        outLog += "[1/5] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    bool passed = true;
+
+    // ── [1/5] 실행 순서 = 선언 순서 ──
+    //
+    // 그래프가 패스를 재정렬하지 않는 것이 계약이다. 재정렬하면 프레임이 실행마다
+    // 달라질 수 있고, 그러면 픽셀 대조(3-6의 정확성 검증 수단)가 흔들린다.
+    // 컬링된 것만 빠져야 한다.
+    {
+        EnhancedRenderGraph graph;
+
+        RGTextureDesc desc{};
+        desc.width = 64; desc.height = 64;
+        desc.allowRenderTarget = true;
+        desc.name = "gbuffer";
+        const RGHandle gbuffer = graph.CreateTexture(desc);
+
+        desc.name = "lit";
+        const RGHandle lit = graph.CreateTexture(desc);
+
+        const RGPassId producer = graph.AddPass("gbuffer",
+            { { gbuffer, RGResourceState::RenderTarget } }, nullptr);
+        const RGPassId consumer = graph.AddPass("lighting",
+            { { gbuffer, RGResourceState::ShaderResource }, { lit, RGResourceState::RenderTarget } },
+            nullptr, true);
+
+        if (!graph.Compile(resources.GetDevice(), error))
+        {
+            outLog += "[1/5] Compile 실패: " + error + "\n";
+            return false;
+        }
+
+        const auto& order = graph.GetExecuteOrder();
+        const bool correct = (2 == order.size())
+            && (order[0] == producer.index) && (order[1] == consumer.index);
+        if (!correct) { passed = false; }
+
+        outLog += "[1/5] 실행 순서 = 선언 순서 " + std::string(correct ? "통과" : "실패")
+            + " (실행 " + std::to_string(order.size()) + "개)\n";
+    }
+
+    // ── [2/5] 선언 순서와 데이터 흐름의 불일치 검출 ──
+    //
+    // 그래프가 만든 리소스를 아무도 쓰기 전에 읽으면 초기화되지 않은 메모리를
+    // 읽는 것이다. 증상은 검은 화면이 아니라 '이전 프레임 내용이 보인다'라서
+    // 알아채기 어렵다 — 컴파일에서 잡아야 한다.
+    //
+    // 임포트한 리소스는 검사하지 않는다는 것도 함께 확인한다. 지난 프레임 결과를
+    // 읽는 것(히스토리 버퍼)이 정상 사용이라 막으면 안 된다.
+    {
+        EnhancedRenderGraph graph;
+
+        RGTextureDesc desc{};
+        desc.width = 64; desc.height = 64; desc.allowRenderTarget = true;
+        desc.name = "transient";
+        const RGHandle transient = graph.CreateTexture(desc);
+
+        // 쓰기 없이 읽기만 하는 패스 — 잡혀야 한다.
+        graph.AddPass("readsUnwritten",
+            { { transient, RGResourceState::ShaderResource } }, nullptr, true);
+
+        std::string flowError;
+        const bool detected = !graph.Compile(resources.GetDevice(), flowError);
+
+        // 임포트 리소스를 먼저 읽는 것은 정상이어야 한다.
+        EnhancedRenderGraph importedGraph;
+        const RGHandle imported = importedGraph.ImportTexture(resources.GetRenderTarget(),
+            RGResourceState::RenderTarget, "external");
+        importedGraph.AddPass("readsImported",
+            { { imported, RGResourceState::ShaderResource } }, nullptr, true);
+
+        std::string importedError;
+        const bool importedOk = importedGraph.Compile(resources.GetDevice(), importedError);
+
+        const bool correct = detected && importedOk;
+        if (!correct) { passed = false; }
+
+        outLog += "[2/5] 흐름 불일치 검출 " + std::string(correct ? "통과" : "실패")
+            + (detected ? (" (" + flowError + ")") : " (transient 미검출)")
+            + (importedOk ? " · 임포트는 허용" : " · 임포트를 잘못 막음") + "\n";
+    }
+
+    // ── [3/5] 배리어 유도 ──
+    //
+    // 그래프를 두는 이유의 절반이다. 상태가 바뀌는 곳에만 정확히 하나씩 나와야
+    // 하고, 같은 상태로 이어지는 곳에는 나오면 안 된다(불필요한 배리어는
+    // 파이프라인을 끊는다).
+    {
+        EnhancedRenderGraph graph;
+
+        RGTextureDesc desc{};
+        desc.width = 64; desc.height = 64; desc.allowRenderTarget = true;
+        desc.name = "color";
+        const RGHandle color = graph.CreateTexture(desc);
+
+        // COMMON → RENDER_TARGET (전이 1)
+        const RGPassId draw = graph.AddPass("draw",
+            { { color, RGResourceState::RenderTarget } }, nullptr);
+        // RENDER_TARGET 유지 (전이 0이어야 한다)
+        const RGPassId drawMore = graph.AddPass("draw2",
+            { { color, RGResourceState::RenderTarget } }, nullptr);
+        // RENDER_TARGET → PIXEL_SHADER_RESOURCE (전이 1)
+        const RGPassId read = graph.AddPass("post",
+            { { color, RGResourceState::ShaderResource } }, nullptr, true);
+
+        if (!graph.Compile(resources.GetDevice(), error))
+        {
+            outLog += "[3/5] Compile 실패: " + error + "\n";
+            return false;
+        }
+
+        const uint32_t drawBarriers = graph.GetPassBarrierCount(draw);
+        const uint32_t keepBarriers = graph.GetPassBarrierCount(drawMore);
+        const uint32_t readBarriers = graph.GetPassBarrierCount(read);
+
+        const bool correct = (1 == drawBarriers) && (0 == keepBarriers) && (1 == readBarriers);
+        if (!correct) { passed = false; }
+
+        outLog += "[3/5] 배리어 유도 " + std::string(correct ? "통과" : "실패")
+            + " (전이 " + std::to_string(drawBarriers)
+            + " · 유지 " + std::to_string(keepBarriers)
+            + " · 전이 " + std::to_string(readBarriers) + ")\n";
+    }
+
+    // ── [4/5] 미사용 패스 컬링 ──
+    //
+    // 결과에 기여하지 않는 패스는 걷어낸다. 그 패스만 쓰던 transient도 만들지
+    // 않아야 한다 — 만들면 프레임마다 낭비가 반복된다.
+    {
+        EnhancedRenderGraph graph;
+
+        RGTextureDesc desc{};
+        desc.width = 64; desc.height = 64; desc.allowRenderTarget = true;
+        desc.name = "used";   const RGHandle used = graph.CreateTexture(desc);
+        desc.name = "orphan"; const RGHandle orphan = graph.CreateTexture(desc);
+
+        const RGPassId keep = graph.AddPass("keep",
+            { { used, RGResourceState::RenderTarget } }, nullptr, true);
+        const RGPassId dead = graph.AddPass("dead",
+            { { orphan, RGResourceState::RenderTarget } }, nullptr);
+
+        if (!graph.Compile(resources.GetDevice(), error))
+        {
+            outLog += "[4/5] Compile 실패: " + error + "\n";
+            return false;
+        }
+
+        const auto stats = graph.GetStats();
+        const bool correct = !graph.IsPassCulled(keep) && graph.IsPassCulled(dead)
+            && (1 == stats.passesCulled) && (1 == stats.transientCreated);
+        if (!correct) { passed = false; }
+
+        outLog += "[4/5] 미사용 패스 컬링 " + std::string(correct ? "통과" : "실패")
+            + " (선언 " + std::to_string(stats.passesDeclared)
+            + " · 컬링 " + std::to_string(stats.passesCulled)
+            + " · transient 생성 " + std::to_string(stats.transientCreated) + "/2)\n";
+    }
+
+    // ── [5/5] 실제 실행 + 픽셀 확인 ──
+    //
+    // 앞의 넷은 계획이 맞는지만 본다. 그 계획대로 GPU가 돌아 결과가 나오는지는
+    // 실행해서 되읽어야 안다 — 배리어가 하나라도 틀리면 검증 레이어가 잡거나
+    // 픽셀이 어긋난다.
+    {
+        EnhancedRenderGraph graph;
+
+        const RGHandle backbuffer = graph.ImportTexture(resources.GetRenderTarget(),
+            RGResourceState::RenderTarget, "backbuffer");
+
+        // 클리어만 하는 패스. 임포트 리소스에 쓰므로 뿌리로 잡혀 살아남는다.
+        graph.AddPass("clear", { { backbuffer, RGResourceState::RenderTarget } },
+            [&resources](const EnhancedRenderGraph::ExecuteContext& context)
+            {
+                const auto rtv = resources.GetRtvHandle();
+                context.commandList->ClearRenderTargetView(rtv,
+                    DX12DeviceResources::kClearColor, 0, nullptr);
+            });
+
+        // 리드백을 위해 COPY_SOURCE로 전이시키는 패스 — 배리어는 그래프가 만든다.
+        graph.AddPass("readback", { { backbuffer, RGResourceState::CopySource } },
+            [&resources](const EnhancedRenderGraph::ExecuteContext& context)
+            {
+                D3D12_TEXTURE_COPY_LOCATION dst{};
+                dst.pResource = resources.GetReadbackBuffer();
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                dst.PlacedFootprint.Footprint.Width = resources.GetWidth();
+                dst.PlacedFootprint.Footprint.Height = resources.GetHeight();
+                dst.PlacedFootprint.Footprint.Depth = 1;
+                dst.PlacedFootprint.Footprint.RowPitch = resources.GetRowPitch();
+
+                D3D12_TEXTURE_COPY_LOCATION src{};
+                src.pResource = resources.GetRenderTarget();
+                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                context.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            }, true);
+
+        // 다음 프레임을 위해 RENDER_TARGET으로 되돌린다(임포트 리소스의 상태 계약).
+        graph.AddPass("restore", { { backbuffer, RGResourceState::RenderTarget } },
+            nullptr, true);
+
+        if (!graph.Compile(resources.GetDevice(), error))
+        {
+            outLog += "[5/5] Compile 실패: " + error + "\n";
+            return false;
+        }
+
+        if (!resources.BeginFrame(error)) { outLog += "[5/5] Begin 실패\n"; return false; }
+        if (!graph.Execute(resources.GetCommandList(), error))
+        {
+            outLog += "[5/5] Execute 실패: " + error + "\n";
+            return false;
+        }
+        if (!resources.EndFrame(error)) { outLog += "[5/5] End 실패\n"; return false; }
+        resources.WaitForGpu();
+
+        void* mapped = nullptr;
+        const size_t readbackBytes = static_cast<size_t>(resources.GetRowPitch()) * resources.GetHeight();
+        D3D12_RANGE range{ 0, readbackBytes };
+        if (FAILED(resources.GetReadbackBuffer()->Map(0, &range, &mapped)))
+        {
+            outLog += "[5/5] 리드백 Map 실패\n";
+            return false;
+        }
+
+        // 클리어 색이 그대로 나와야 한다.
+        const auto* pixels = static_cast<const uint8_t*>(mapped);
+        const uint8_t expectedR = static_cast<uint8_t>(DX12DeviceResources::kClearColor[0] * 255.f + 0.5f);
+        const uint8_t expectedG = static_cast<uint8_t>(DX12DeviceResources::kClearColor[1] * 255.f + 0.5f);
+        const uint8_t expectedB = static_cast<uint8_t>(DX12DeviceResources::kClearColor[2] * 255.f + 0.5f);
+
+        uint32_t mismatches = 0;
+        for (uint32_t y = 0; y < resources.GetHeight(); ++y)
+        {
+            const auto* row = pixels + static_cast<size_t>(y) * resources.GetRowPitch();
+            for (uint32_t x = 0; x < resources.GetWidth(); ++x)
+            {
+                const auto* pixel = row + static_cast<size_t>(x) * 4;
+                // sRGB 변환 없이 그대로 저장되므로 ±1 오차만 허용한다.
+                if (std::abs(pixel[0] - expectedR) > 1 ||
+                    std::abs(pixel[1] - expectedG) > 1 ||
+                    std::abs(pixel[2] - expectedB) > 1)
+                {
+                    ++mismatches;
+                }
+            }
+        }
+        resources.GetReadbackBuffer()->Unmap(0, nullptr);
+
+        const auto stats = graph.GetStats();
+        if (0 != mismatches) { passed = false; }
+
+        outLog += "[5/5] 실행·픽셀 확인 " + std::string(0 == mismatches ? "통과" : "실패")
+            + " (불일치 " + std::to_string(mismatches)
+            + " · 배리어 " + std::to_string(stats.barriersEmitted)
+            + "건을 " + std::to_string(stats.barrierBatches) + "번에 삽입)\n";
+    }
+
+    std::string messages;
+    const uint32_t problems = resources.DrainDebugMessages(messages);
+    if (0 != problems)
+    {
+        passed = false;
+        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
+    }
+
+    resources.Shutdown();
+
+    outLog += passed ? "렌더 그래프 검증 통과\n" : "렌더 그래프 검증 실패\n";
+    return passed;
 }
 
 #endif

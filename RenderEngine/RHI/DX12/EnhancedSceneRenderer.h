@@ -72,6 +72,13 @@ public:
     ///   ③ 공유 핸들을 DX11에서 열어 SRV를 만든다
     ///   ④ DX11로 되읽어 DX12가 그린 픽셀과 대조한다
     bool RunSharedTextureTest(std::string& outLog);
+
+    /// 렌더 그래프 자가 검증 (PHASE 3-5).
+    ///
+    /// 그래프가 하는 일은 전부 눈에 보이지 않는다 — 순서를 정하고, 배리어를 만들고,
+    /// 안 쓰는 패스를 걷어낸다. 틀려도 화면에는 '가끔 이상하게 보인다'로만 나타나서
+    /// 그때는 원인이 그래프인지 패스인지도 구분되지 않는다. 계약을 직접 단정한다.
+    bool RunRenderGraphTest(std::string& outLog);
 };
 
 #endif
