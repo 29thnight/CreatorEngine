@@ -254,6 +254,12 @@ public:
 		m_screenPolicy.follows = true;
 		m_screenPolicy.divisorX = divisorX;
 		m_screenPolicy.divisorY = divisorY;
+
+		// 진단 명부에 올린다. 따라가야 하는데 안 따라간 것을 이름으로 짚을 수
+		// 있어야 한다 — 렌더 타깃은 대부분 중간 결과라 화면에 직접 보이지 않는다.
+		ScreenSizedRegistry::Get().Register(this, m_name,
+			[this]() { return std::make_pair(
+				static_cast<uint32_t>(m_desc.Width), static_cast<uint32_t>(m_desc.Height)); });
 	}
 
 	const ScreenSizePolicy& GetScreenPolicy() const { return m_screenPolicy; }

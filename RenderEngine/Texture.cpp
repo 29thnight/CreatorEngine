@@ -668,6 +668,9 @@ Texture::Texture(Texture&& texture) noexcept
 
 Texture::~Texture()
 {
+	// 명부에서 먼저 뺀다. 남겨 두면 진단이 사라진 텍스처를 읽는다.
+	ScreenSizedRegistry::Get().Unregister(this);
+
 	Memory::SafeDelete(m_pSRV);
 	Memory::SafeDelete(m_pDSV);
 	Memory::SafeDelete(m_pUAV);

@@ -23,6 +23,7 @@
 #include "CoreWindow.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "RenderPassData.h"
+#include "RHI/ScreenSizedResource.h"
 
 #include <Windows.h>
 #include <algorithm>
@@ -1271,6 +1272,99 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("%s", log.c_str());
         Debug->LogWarning("[dx12.scene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
+    }
+    else if (cmd == "render.rtinfo")
+    {
+        // 창 크기 · 뷰포트 · 카메라 렌더 타깃 크기를 나란히 찍는다.
+        //
+        // 셋이 어긋나는 것이 '화면이 구석에 몰린다'의 정체인데, 화면만 보면
+        // 어느 것이 틀렸는지 알 수 없다. 리사이즈를 반복하며 이 셋을 보면
+        // 누적으로 줄어드는지도 바로 드러난다.
+        const auto& clientRect = DirectX11::DeviceStates->g_ClientRect;
+        const auto& viewport = DirectX11::DeviceStates->g_Viewport;
+
+        std::string report;
+        {
+            char line[224]{};
+            std::snprintf(line, sizeof(line),
+                "클라이언트 %.0fx%.0f · 뷰포트 %.0fx%.0f · 버스 %ux%u\n",
+                clientRect.width, clientRect.height,
+                viewport.Width, viewport.Height,
+                ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
+            report += line;
+        }
+
+        for (auto& camera : CameraManagement->GetCameras())
+        {
+            if (!camera || !RenderPassData::VaildCheck(camera.get())) continue;
+
+            auto* data = RenderPassData::GetData(camera.get());
+            if (nullptr == data) continue;
+
+            char line[224]{};
+            std::snprintf(line, sizeof(line),
+                "  카메라 %u · 렌더타깃 %.0fx%.0f%s · 깊이 %.0fx%.0f%s\n",
+                camera->m_cameraIndex,
+                data->m_renderTarget ? data->m_renderTarget->GetWidth() : 0.f,
+                data->m_renderTarget ? data->m_renderTarget->GetHeight() : 0.f,
+                (data->m_renderTarget && data->m_renderTarget->GetScreenPolicy().follows)
+                    ? "(추종)" : "(고정)",
+                data->m_depthStencil ? data->m_depthStencil->GetWidth() : 0.f,
+                data->m_depthStencil ? data->m_depthStencil->GetHeight() : 0.f,
+                (data->m_depthStencil && data->m_depthStencil->GetScreenPolicy().follows)
+                    ? "(추종)" : "(고정)");
+            report += line;
+        }
+
+        // 화면 추종을 선언한 텍스처 전부. 카메라 렌더 타깃만 보면 GBuffer나
+        // 포스트 체인이 어긋난 것을 놓친다 — 그것들은 중간 결과라 화면에
+        // 직접 보이지 않는다.
+        const uint32_t screenWidth = ScreenResizeBus::Get().GetWidth();
+        const uint32_t screenHeight = ScreenResizeBus::Get().GetHeight();
+
+        const auto entries = ScreenSizedRegistry::Get().Snapshot();
+        uint32_t mismatched = 0;
+        std::string mismatchReport;
+
+        for (const auto& entry : entries)
+        {
+            if (!entry.querySize) continue;
+
+            const auto [width, height] = entry.querySize();
+
+            // 1/N 버퍼도 있으므로 '화면 크기와 다르다'만으로는 못 잡는다.
+            // 화면을 정수로 나눈 값 중 하나면 정상으로 본다.
+            bool plausible = false;
+            for (uint32_t divisor = 1; divisor <= 8; ++divisor)
+            {
+                if (width == (screenWidth / divisor) && height == (screenHeight / divisor))
+                {
+                    plausible = true;
+                    break;
+                }
+            }
+
+            if (!plausible)
+            {
+                ++mismatched;
+                char line[224]{};
+                std::snprintf(line, sizeof(line), "    %-34s %ux%u\n",
+                    entry.name.c_str(), width, height);
+                mismatchReport += line;
+            }
+        }
+
+        {
+            char line[160]{};
+            std::snprintf(line, sizeof(line),
+                "  추종 선언 텍스처 %zu개 · 화면과 어긋난 것 %u개\n",
+                entries.size(), mismatched);
+            report += line;
+        }
+        report += mismatchReport;
+
+        Debug->LogWarning("[렌더 타깃]\n" + report);
+        std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
     }
     else if (cmd == "render.post")
     {

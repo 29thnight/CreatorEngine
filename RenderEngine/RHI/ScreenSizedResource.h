@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <string>
+#include <utility>
 #include <vector>
 
 // 화면 크기를 따라가는 리소스의 계약 (PHASE 3-2 / 7 교차).
@@ -60,6 +62,70 @@ struct ScreenSizePolicy
 // 백버퍼를 참조하는 뷰가 하나라도 살아 있으면 리사이즈가 실패하므로, 만들기
 // 전에 전부 놓아야 한다. DX12는 그 제약이 없지만 같은 순서를 따르는 편이
 // 호출부가 백엔드를 몰라도 되게 한다.
+// 화면을 따라가겠다고 선언한 리소스의 명부.
+//
+// 진단용이다. "따라가야 하는데 안 따라간 것"이 하나만 있어도 그 텍스처를 쓰는
+// 패스가 어긋나는데, 화면만 보면 어느 텍스처인지 알 수 없다 — 렌더 타깃이
+// 수십 개고 대부분 중간 결과라 화면에 직접 보이지도 않는다. 이름과 크기를
+// 나란히 찍을 수 있어야 한다(render.rtinfo).
+//
+// 추종을 선언한 것만 들어오므로 목록이 짧다(수십 개). 전부 담았다면 텍스처
+// 수백 개를 훑게 되고 그건 진단이 아니라 소음이다.
+class ScreenSizedRegistry
+{
+public:
+    struct Entry
+    {
+        const void* owner{ nullptr };
+        std::string name;
+        std::function<std::pair<uint32_t, uint32_t>()> querySize;
+    };
+
+    static ScreenSizedRegistry& Get()
+    {
+        static ScreenSizedRegistry instance;
+        return instance;
+    }
+
+    void Register(const void* owner, std::string name,
+        std::function<std::pair<uint32_t, uint32_t>()> querySize)
+    {
+        if (nullptr == owner) return;
+
+        std::lock_guard<std::mutex> guard(m_mutex);
+        Unregister_NoLock(owner);
+        m_entries.push_back(Entry{ owner, std::move(name), std::move(querySize) });
+    }
+
+    void Unregister(const void* owner)
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        Unregister_NoLock(owner);
+    }
+
+    std::vector<Entry> Snapshot() const
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        return m_entries;
+    }
+
+private:
+    void Unregister_NoLock(const void* owner)
+    {
+        for (size_t i = 0; i < m_entries.size(); ++i)
+        {
+            if (m_entries[i].owner == owner)
+            {
+                m_entries.erase(m_entries.begin() + i);
+                return;
+            }
+        }
+    }
+
+    mutable std::mutex m_mutex;
+    std::vector<Entry> m_entries;
+};
+
 class ScreenResizeBus
 {
 public:
