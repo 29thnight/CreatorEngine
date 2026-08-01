@@ -1272,6 +1272,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.scene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.resize")
+    {
+        // 크기 추종 검증(해상도 슬라이스).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunScreenResizeTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.resize] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.resize %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.gbuffer")
     {
         // GBuffer 패스 검증(PHASE 3-6).
@@ -2078,6 +2090,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.sharedtexture   병존 출력 경로 검증(DX12가 그린 것을 DX11이 SRV로 보는가)\n"
         "  dx12.rendergraph     렌더 그래프 검증(순서·흐름·배리어·컬링·실행)\n"
         "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"
+        "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"

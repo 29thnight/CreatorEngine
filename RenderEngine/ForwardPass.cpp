@@ -182,9 +182,7 @@ ForwardPass::ForwardPass()
 		)
 	);
 
-	m_CopiedTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_CopiedTexture = Texture::CreateScreenSized(
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -192,9 +190,7 @@ ForwardPass::ForwardPass()
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_prevDepthTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_prevDepthTexture = Texture::CreateScreenSized(
 		"depthTexture",
 		DXGI_FORMAT_R24G8_TYPELESS,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_DEPTH_STENCIL

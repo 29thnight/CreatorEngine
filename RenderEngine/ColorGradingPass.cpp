@@ -57,9 +57,7 @@ ColorGradingPass::ColorGradingPass()
 	m_Buffer = DirectX11::CreateBuffer(sizeof(CBData), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_EditBuffer = DirectX11::CreateBuffer(sizeof(ColorGradingEdit), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
-	m_pCopiedTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_pCopiedTexture = Texture::CreateScreenSized(
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET

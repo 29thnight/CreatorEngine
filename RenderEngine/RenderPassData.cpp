@@ -76,17 +76,13 @@ void RenderPassData::Initalize(uint32 index)
 
 	std::string cameraRTVName = "RenderPassData(" + std::to_string(index) + ") RTV";
 
-	auto renderTexture = TextureHelper::CreateRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	auto renderTexture = TextureHelper::CreateScreenRenderTexture(
 		cameraRTVName,
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 	m_renderTarget.swap(renderTexture);
 
-	auto depthStencil = TextureHelper::CreateDepthTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	auto depthStencil = TextureHelper::CreateScreenDepthTexture(
 		"RenderPassData(" + std::to_string(index) + ") DSV"
 	);
 	m_depthStencil.swap(depthStencil);
@@ -111,9 +107,7 @@ void RenderPassData::Initalize(uint32 index)
 	);
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 
-	auto ssrTexture = TextureHelper::CreateRenderTexture(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	auto ssrTexture = TextureHelper::CreateScreenRenderTexture(
 		"prevSSRTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);

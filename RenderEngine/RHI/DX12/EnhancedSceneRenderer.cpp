@@ -24,6 +24,8 @@
 #include <chrono>
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
+#include <algorithm>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -2970,6 +2972,227 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     resources.Shutdown();
 
     outLog += passed ? "씬 연결 검증 통과\n" : "씬 연결 검증 실패\n";
+    return passed;
+}
+
+bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
+{
+    bool passed = true;
+
+    // ── [1/3] DX11 텍스처가 정책대로 따라가는가 ──
+    //
+    // 실제 창을 흔들지 않고 크기 통지만 직접 건다. 창을 흔들면 스왑체인
+    // 재생성까지 얽혀 무엇을 재고 있는지 흐려진다.
+    const uint32_t startWidth = (std::max)(1u, ScreenResizeBus::Get().GetWidth());
+    const uint32_t startHeight = (std::max)(1u, ScreenResizeBus::Get().GetHeight());
+
+    {
+        auto* following = Texture::CreateScreenSized("ResizeTest.Following",
+            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
+        auto* half = Texture::CreateScreenSized("ResizeTest.Half",
+            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE, 2, 2);
+        auto* fixed = Texture::Create(2048, 2048, "ResizeTest.Fixed",
+            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
+
+        if (nullptr == following || nullptr == half || nullptr == fixed)
+        {
+            outLog += "[1/3] 검증용 텍스처 생성 실패\n";
+            return false;
+        }
+
+        // 지금 크기와 다른 값으로 흔든다. 같은 값이면 바뀐 것이 없어도 통과한다.
+        const uint32_t newWidth = (1280u == startWidth) ? 1600u : 1280u;
+        const uint32_t newHeight = (720u == startHeight) ? 900u : 720u;
+
+        following->ApplyScreenSize(newWidth, newHeight);
+        half->ApplyScreenSize(newWidth, newHeight);
+        fixed->ApplyScreenSize(newWidth, newHeight);
+
+        char line[256]{};
+        std::snprintf(line, sizeof(line),
+            "[1/3] DX11 %ux%u -> %ux%u · 추종 %.0fx%.0f · 1/2 %.0fx%.0f · 고정 %.0fx%.0f\n",
+            startWidth, startHeight, newWidth, newHeight,
+            following->GetWidth(), following->GetHeight(),
+            half->GetWidth(), half->GetHeight(),
+            fixed->GetWidth(), fixed->GetHeight());
+        outLog += line;
+
+        if (following->GetWidth() != static_cast<float>(newWidth) ||
+            following->GetHeight() != static_cast<float>(newHeight))
+        {
+            passed = false;
+            outLog += "      실패 — 따라가겠다고 선언한 텍스처가 새 크기를 받지 않았다\n";
+        }
+        if (half->GetWidth() != static_cast<float>(newWidth / 2) ||
+            half->GetHeight() != static_cast<float>(newHeight / 2))
+        {
+            passed = false;
+            outLog += "      실패 — 1/2 해상도 버퍼가 나눈 크기로 따라가지 않았다\n";
+        }
+        if (2048.f != fixed->GetWidth() || 2048.f != fixed->GetHeight())
+        {
+            passed = false;
+            outLog += "      실패 — 선언하지 않은 텍스처까지 크기가 바뀌었다"
+                "(그림자 맵·LUT가 창을 따라가는 상태다)\n";
+        }
+
+        Memory::SafeDelete(following);
+        Memory::SafeDelete(half);
+        Memory::SafeDelete(fixed);
+    }
+
+    // ── [2/3] DX12 디바이스가 리사이즈를 받는가 ──
+    DX12DeviceResources resources;
+    std::string error;
+    constexpr uint32_t kInitialWidth = 256;
+    constexpr uint32_t kInitialHeight = 256;
+    if (!resources.Initialize(kInitialWidth, kInitialHeight, error))
+    {
+        outLog += "[2/3] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    constexpr uint32_t kResizedWidth = 384;
+    constexpr uint32_t kResizedHeight = 192;
+    if (!resources.Resize(kResizedWidth, kResizedHeight, error))
+    {
+        outLog += "[2/3] 리사이즈 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
+    }
+
+    {
+        char line[192]{};
+        std::snprintf(line, sizeof(line),
+            "[2/3] DX12 %ux%u -> %ux%u · 보고 %ux%u · rowPitch %u\n",
+            kInitialWidth, kInitialHeight, kResizedWidth, kResizedHeight,
+            resources.GetWidth(), resources.GetHeight(), resources.GetRowPitch());
+        outLog += line;
+    }
+
+    if (resources.GetWidth() != kResizedWidth || resources.GetHeight() != kResizedHeight)
+    {
+        passed = false;
+        outLog += "      실패 — 디바이스가 새 크기를 반영하지 않았다\n";
+    }
+
+    // 리소스가 실제로 다시 만들어졌는지는 설명(desc)으로 본다. 보고 값만 보면
+    // 멤버 변수만 바뀌고 타깃은 그대로인 상태와 구분되지 않는다.
+    if (nullptr != resources.GetRenderTarget())
+    {
+        const auto desc = resources.GetRenderTarget()->GetDesc();
+        if (desc.Width != kResizedWidth || desc.Height != kResizedHeight)
+        {
+            passed = false;
+            outLog += "      실패 — 렌더 타깃 리소스가 옛 크기 그대로다\n";
+        }
+    }
+    else
+    {
+        passed = false;
+        outLog += "      실패 — 리사이즈 뒤 렌더 타깃이 비었다\n";
+    }
+
+    // ── [3/3] 리사이즈한 타깃에 실제로 그리고 되읽을 수 있는가 ──
+    //
+    // 크기만 맞고 뷰가 옛 리소스를 가리키면 여기서 드러난다.
+    if (!resources.BeginFrame(error))
+    {
+        outLog += "[3/3] BeginFrame 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
+    }
+
+    auto* commandList = resources.GetCommandList();
+    const D3D12_CPU_DESCRIPTOR_HANDLE rtv = resources.GetRtvHandle();
+    commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+    commandList->ClearRenderTargetView(rtv, DX12DeviceResources::kClearColor, 0, nullptr);
+
+    {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resources.GetRenderTarget();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &barrier);
+
+        D3D12_TEXTURE_COPY_LOCATION dst{};
+        dst.pResource = resources.GetReadbackBuffer();
+        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        dst.PlacedFootprint.Footprint.Width = kResizedWidth;
+        dst.PlacedFootprint.Footprint.Height = kResizedHeight;
+        dst.PlacedFootprint.Footprint.Depth = 1;
+        dst.PlacedFootprint.Footprint.RowPitch = resources.GetRowPitch();
+
+        D3D12_TEXTURE_COPY_LOCATION src{};
+        src.pResource = resources.GetRenderTarget();
+        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+        std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+        commandList->ResourceBarrier(1, &barrier);
+    }
+
+    if (!resources.EndFrame(error))
+    {
+        outLog += "[3/3] EndFrame 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
+    }
+    resources.WaitForGpu();
+
+    uint32_t clearedPixels = 0;
+    {
+        void* mapped = nullptr;
+        const size_t bytes = static_cast<size_t>(resources.GetRowPitch()) * kResizedHeight;
+        D3D12_RANGE range{ 0, bytes };
+        if (SUCCEEDED(resources.GetReadbackBuffer()->Map(0, &range, &mapped)))
+        {
+            const auto expected = static_cast<int>(
+                DX12DeviceResources::kClearColor[0] * 255.f + 0.5f);
+            const auto* pixels = static_cast<const uint8_t*>(mapped);
+            for (uint32_t y = 0; y < kResizedHeight; ++y)
+            {
+                const auto* row = pixels + static_cast<size_t>(y) * resources.GetRowPitch();
+                for (uint32_t x = 0; x < kResizedWidth; ++x)
+                {
+                    const int red = row[static_cast<size_t>(x) * 4];
+                    if (std::abs(red - expected) <= 2) ++clearedPixels;
+                }
+            }
+            resources.GetReadbackBuffer()->Unmap(0, nullptr);
+        }
+    }
+
+    const uint32_t totalPixels = kResizedWidth * kResizedHeight;
+    {
+        char line[160]{};
+        std::snprintf(line, sizeof(line), "[3/3] 리사이즈 후 렌더 — 클리어 픽셀 %u/%u\n",
+            clearedPixels, totalPixels);
+        outLog += line;
+    }
+
+    if (clearedPixels != totalPixels)
+    {
+        passed = false;
+        outLog += "      실패 — 리사이즈한 타깃에 그린 결과가 새 크기 전체를 덮지 않는다"
+            "(뷰가 옛 리소스를 가리킬 때 나오는 모양이다)\n";
+    }
+
+    std::string messages;
+    const uint32_t problems = resources.DrainDebugMessages(messages);
+    if (0 != problems)
+    {
+        passed = false;
+        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
+    }
+
+    resources.Shutdown();
+
+    outLog += passed ? "크기 추종 검증 통과\n" : "크기 추종 검증 실패\n";
     return passed;
 }
 

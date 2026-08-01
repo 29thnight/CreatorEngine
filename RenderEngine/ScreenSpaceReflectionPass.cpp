@@ -66,9 +66,7 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	m_EmissiveTexture = emissive;
 	m_BitflagTexture = bitflag;
 
-	m_CopiedTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_CopiedTexture = Texture::CreateScreenSized(
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
@@ -76,9 +74,7 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_prevCopiedSSRTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_prevCopiedSSRTexture = Texture::CreateScreenSized(
 		"PreviousCopiedSSRTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET

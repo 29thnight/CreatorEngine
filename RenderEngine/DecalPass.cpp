@@ -106,36 +106,28 @@ DecalPass::DecalPass()
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * indices.size(), D3D11_BIND_INDEX_BUFFER, indices.data());
 	DirectX::SetName(m_indexBuffer.Get(), "DecalIndexBuffer");
 
-	m_CopiedDepthTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_CopiedDepthTexture = Texture::CreateScreenSized(
 		"copiedDepthTexture",
 		DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
 		D3D11_BIND_SHADER_RESOURCE
 	);
 	m_CopiedDepthTexture->CreateSRV(DXGI_FORMAT_R24_UNORM_X8_TYPELESS);
 
-	m_CopiedDiffuseTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_CopiedDiffuseTexture = Texture::CreateScreenSized(
 		"copiedDiffuseTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE
 	);
 	m_CopiedDiffuseTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_CopiedNormalTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_CopiedNormalTexture = Texture::CreateScreenSized(
 		"copiedNormalTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE
 	);
 	m_CopiedNormalTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_CopiedORMTexture = Texture::Create(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	m_CopiedORMTexture = Texture::CreateScreenSized(
 		"copiedORMTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE

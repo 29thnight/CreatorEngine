@@ -5,6 +5,8 @@
 #include <array>
 #include <wrl/client.h>
 #include <d3d12.h>
+
+#include "../ScreenSizedResource.h"
 #include <dxgi1_6.h>
 
 #include "DX12UploadRing.h"
@@ -41,9 +43,21 @@ public:
     // nullptr)를, DX12는 고성능 우선을 골라서 두 정책이 갈릴 수 있다.
     // iGPU+dGPU 노트북에서는 실제로 갈린다. 정책을 맞추는 것으로는 부족하고
     // 같은 물리 어댑터임을 LUID로 확인해야 한다.
+    ///
+    /// followScreenSize가 참이면 창 크기 변경을 구독한다. 기본은 거짓이다 —
+    /// 자가 검증은 256x256처럼 화면과 무관한 크기로 디바이스를 세우고, 그것이
+    /// 창을 따라가면 검증이 창 크기에 좌우된다. DX11 Texture의 기본값을
+    /// '따라가지 않음'으로 둔 것과 같은 이유다.
     bool Initialize(uint32_t width, uint32_t height, std::string& outError,
-        LUID matchAdapterLuid = LUID{ 0, 0 });
+        LUID matchAdapterLuid = LUID{ 0, 0 }, bool followScreenSize = false);
     void Shutdown();
+
+    /// 창 크기가 바뀌었을 때 크기에 딸린 리소스를 다시 만든다.
+    ///
+    /// DX11 쪽 Texture와 같은 계약을 따른다(RHI/ScreenSizedResource.h). 교체
+    /// 후 DX11 경로가 사라져도 크기 추종은 그대로 남아야 하므로, 버스는
+    /// 백엔드 중립이고 이쪽은 그 구독자다.
+    bool Resize(uint32_t width, uint32_t height, std::string& outError);
 
     bool IsInitialized() const { return nullptr != m_device.Get(); }
 
@@ -94,6 +108,10 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    // 크기에 딸린 것들. 초기화와 리사이즈가 같은 코드를 탄다 — 나뉘어 있으면
+    // 한쪽만 고쳐 두 경로가 갈린다.
+    bool CreateSizeDependentResources(uint32_t width, uint32_t height, std::string& outError);
+
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
     ComPtr<ID3D12Device>               m_device;
@@ -118,6 +136,8 @@ private:
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
     uint32_t m_rowPitch{ 0 };
+
+    ScreenResizeBus::Handle m_resizeSubscription{ ScreenResizeBus::kInvalidHandle };
 };
 
 #endif

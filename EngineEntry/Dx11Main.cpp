@@ -2,6 +2,7 @@
 #include "Dx11Main.h"
 #include "CoreWindow.h"
 #include "RHI/RHI.h"
+#include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
 #include "Physx.h"
@@ -273,7 +274,11 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 {
 	//렌더러의 창 크기에 따라 리소스를 다시 만드는 코드를 여기에 추가합니다.
     m_deviceResources->ReleaseSwapChain();
+
+    // 해제 → 크기 통지 두 단계다. DX11 스왑체인은 백버퍼를 참조하는 뷰가
+    // 하나라도 살아 있으면 리사이즈가 실패하므로 만들기 전에 전부 놓아야 한다.
     OnResizeReleaseEvent();
+    ScreenResizeBus::Get().BroadcastRelease();
 
     RECT rect;
     HWND hwnd = m_deviceResources->GetWindow()->GetHandle();
@@ -287,6 +292,11 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
     m_deviceResources->SetLogicalSize(size);
 
     OnResizeEvent(size.width, size.height);
+
+    // 백엔드 중립 버스에도 알린다. DX12 쪽 리소스가 이쪽을 구독하므로,
+    // 교체 후 DX11 경로가 사라져도 크기 추종은 그대로 남는다.
+    ScreenResizeBus::Get().BroadcastResize(
+        static_cast<uint32_t>(size.width), static_cast<uint32_t>(size.height));
 
     m_sceneRenderer->ReApplyCurrCubeMap();
 }

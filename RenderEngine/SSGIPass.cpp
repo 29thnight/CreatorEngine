@@ -87,9 +87,7 @@ SSGIPass::SSGIPass()
     m_pTempTexture3->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture3->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    /*m_pBilateralTexture = Texture::Create(
-        DirectX11::DeviceStates->g_ClientRect.width,
-        DirectX11::DeviceStates->g_ClientRect.height,
+    /*m_pBilateralTexture = Texture::CreateScreenSized(
         "BilateralTexture",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS

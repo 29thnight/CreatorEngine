@@ -82,6 +82,38 @@ Managed::SharedPtr<Texture> Texture::CreateShared(uint32 width, uint32 height, s
 	return managedPtr;
 }
 
+Texture* Texture::CreateScreenSized(
+	_In_ std::string_view name,
+	_In_ DXGI_FORMAT textureFormat,
+	_In_ uint32 bindFlags,
+	_In_opt_ uint32 divisorX,
+	_In_opt_ uint32 divisorY)
+{
+	const ScreenSizePolicy policy{ true, divisorX, divisorY };
+	auto* texture = Create(
+		policy.ApplyX(ScreenResizeBus::Get().GetWidth()),
+		policy.ApplyY(ScreenResizeBus::Get().GetHeight()),
+		name, textureFormat, bindFlags, nullptr);
+	if (nullptr != texture) texture->FollowScreenSize(divisorX, divisorY);
+	return texture;
+}
+
+Managed::SharedPtr<Texture> Texture::CreateSharedScreenSized(
+	_In_ std::string_view name,
+	_In_ DXGI_FORMAT textureFormat,
+	_In_ uint32 bindFlags,
+	_In_opt_ uint32 divisorX,
+	_In_opt_ uint32 divisorY)
+{
+	const ScreenSizePolicy policy{ true, divisorX, divisorY };
+	auto texture = CreateShared(
+		policy.ApplyX(ScreenResizeBus::Get().GetWidth()),
+		policy.ApplyY(ScreenResizeBus::Get().GetHeight()),
+		name, textureFormat, bindFlags, nullptr);
+	if (texture) texture->FollowScreenSize(divisorX, divisorY);
+	return texture;
+}
+
 Texture* Texture::Create(
 	_In_ uint32 ratioX,
 	_In_ uint32 ratioY,
@@ -838,9 +870,36 @@ float2 Texture::GetImageSize() const
 	return float2(m_size.x / m_sizeRatio.x, m_size.y / m_sizeRatio.y);
 }
 
+void Texture::ApplyScreenSize(_In_ uint32 width, _In_ uint32 height)
+{
+	if (!m_screenPolicy.follows) return;
+
+	const uint32 targetWidth = m_screenPolicy.ApplyX(width);
+	const uint32 targetHeight = m_screenPolicy.ApplyY(height);
+
+	if (m_desc.Width == targetWidth && m_desc.Height == targetHeight) return;
+
+	m_desc.Width = targetWidth;
+	m_desc.Height = targetHeight;
+
+	// m_size/m_sizeRatio도 맞춰 둔다. GetImageSize를 읽는 쪽이 있어서
+	// 여기만 고치면 두 값이 갈린다.
+	m_size = { static_cast<float>(width), static_cast<float>(height) };
+	m_sizeRatio = {
+		(0 == m_screenPolicy.divisorX) ? 1.f : static_cast<float>(m_screenPolicy.divisorX),
+		(0 == m_screenPolicy.divisorY) ? 1.f : static_cast<float>(m_screenPolicy.divisorY) };
+}
+
 void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
 {
-	if (m_textureType == TextureType::ImageTexture)
+	// ImageTexture는 파일에서 온 그림이라 창과 무관하다 — 여기서 걸러 왔다.
+	//
+	// 다만 예외가 있다. 렌더 타깃으로 만들어 놓고 표시 편의를 위해 타입만
+	// ImageTexture로 바꿔 둔 것이 있다(PostProcessingPass의 복사본 등).
+	// 그것들까지 걸러 버리면 짝이 되는 카메라 렌더 타깃만 크기가 바뀌어
+	// CopyResource가 크기 불일치로 죽는다(실측으로 겪었다).
+	// 그래서 '화면을 따라가겠다'는 선언이 타입보다 우선한다.
+	if (TextureType::ImageTexture == m_textureType && !m_screenPolicy.follows)
 	{
 		return;
 	}
@@ -856,6 +915,10 @@ void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
 	case TextureType::TextureArray:
 		ResizeArrayViews(width, height);
 		break;
+	case TextureType::ImageTexture:
+		// 위에서 걸러졌으므로 화면 추종을 선언한 것만 여기 온다.
+		Resize2DViews(width, height);
+		break;
 	default:
 		break;
 	}
@@ -864,7 +927,13 @@ void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
 
 void Texture::Resize2DViews(_In_ uint32 width, _In_ uint32 height)
 {
-	//SetSize({ (float)width, (float)height });
+	// 화면을 따라가겠다고 선언한 텍스처만 크기를 바꾼다.
+	//
+	// 여기서 인자를 쓰지 않고 있었다(SetSize가 주석 처리돼 있었다). 그래서
+	// 리사이즈는 '같은 크기로 다시 만들기'였고, 뷰포트만 새 크기를 따라가
+	// 뷰포트와 타깃이 어긋났다. 다만 전부 따라가게 하면 그림자 맵·LUT까지
+	// 창 크기가 되므로 선언한 것만 바꾼다.
+	ApplyScreenSize(width, height);
 
 	DirectX11::ThrowIfFailed(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
@@ -885,7 +954,8 @@ void Texture::ResizeCubeViews(_In_ uint32 size)
 {
 	const uint32 mipLevels = 1;
 
-	//SetSize({ (float)size, (float)size });
+	// 큐브는 정사각이라 가로만 본다.
+	ApplyScreenSize(size, size);
 
 	DirectX11::ThrowIfFailed(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
@@ -898,7 +968,7 @@ void Texture::ResizeCubeViews(_In_ uint32 size)
 
 void Texture::ResizeArrayViews(_In_ uint32 width, _In_ uint32 height)
 {
-	//SetSize({ (float)width, (float)height });
+	ApplyScreenSize(width, height);
 
 	DirectX11::ThrowIfFailed(DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
@@ -917,7 +987,8 @@ void Texture::ResizeArrayViews(_In_ uint32 width, _In_ uint32 height)
 
 void Texture::ResizeRelease()
 {
-	if (m_textureType == TextureType::ImageTexture)
+	// ResizeViews와 같은 예외다. 놓지 않고 다시 만들면 그 자리에서 샌다.
+	if (TextureType::ImageTexture == m_textureType && !m_screenPolicy.follows)
 	{
 		return;
 	}

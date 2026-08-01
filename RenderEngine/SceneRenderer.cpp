@@ -60,9 +60,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	ShaderSystem->Initialize();
 
-	auto ao = Texture::CreateShared(
-		DirectX11::DeviceStates->g_ClientRect.width,
-		DirectX11::DeviceStates->g_ClientRect.height,
+	auto ao = Texture::CreateSharedScreenSized(
 		"AmbientOcclusion",
 		//DXGI_FORMAT_R16_UNORM,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -410,9 +408,19 @@ void SceneRenderer::InitializeDeviceState()
     DirectX11::DeviceStates->g_fullsizeViewport		= m_deviceResources->GetScreenViewport();
     DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
     DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+    // 뷰포트(GetScreenViewport)가 렌더 타깃 크기 = 출력 크기에서 만들어지므로
+    // g_ClientRect도 같은 출처를 써야 한다. 예전에는 초기화가 GetOutputSize를,
+    // 리사이즈가 GetLogicalSize를 써서 DPI 배율이 100%가 아니면 두 값이 갈렸다 —
+    // 첫 프레임에 만들어진 카메라만 다른 해상도의 렌더 타깃을 갖는 상태였다.
     DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetOutputSize();
     DirectX11::DeviceStates->g_aspectRatio			= m_deviceResources->GetAspectRatio();
 	DirectX11::DeviceStates->g_annotation			= m_deviceResources->GetAnnotation();
+
+	// 화면 크기를 버스에 심는다. 화면 크기 텍스처는 여기서 크기를 읽으므로
+	// 어떤 패스가 만들어지기 전에 설정돼 있어야 한다.
+	ScreenResizeBus::Get().SetSize(
+		static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.width),
+		static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.height));
 
 	m_resizeEventHandle = OnResizeEvent.AddLambda([&](uint32_t width, uint32_t height)
 	{
@@ -430,7 +438,8 @@ void SceneRenderer::InitializeDeviceState()
 		DirectX11::DeviceStates->g_fullsizeViewport		= m_deviceResources->GetScreenViewport();
 		DirectX11::DeviceStates->g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
 		DirectX11::DeviceStates->g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
-		DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetLogicalSize();
+		// 초기화와 같은 출처를 쓴다(위 주석 참조).
+		DirectX11::DeviceStates->g_ClientRect			= m_deviceResources->GetOutputSize();
 		DirectX11::DeviceStates->g_aspectRatio			= m_deviceResources->GetAspectRatio();
 		DirectX11::DeviceStates->g_annotation			= m_deviceResources->GetAnnotation();
 
@@ -457,9 +466,7 @@ void SceneRenderer::InitializeTextures()
 {
 	m_threadPool->Enqueue([this]()
 	{
-		auto diffuseTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto diffuseTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"DiffuseRTV",
 			DXGI_FORMAT_R16G16B16A16_FLOAT
 		);
@@ -468,9 +475,7 @@ void SceneRenderer::InitializeTextures()
 
 	m_threadPool->Enqueue([this]()
 	{
-		auto metalRoughTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto metalRoughTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"MetalRoughRTV",
 			DXGI_FORMAT_R16G16B16A16_FLOAT
 		);
@@ -479,9 +484,7 @@ void SceneRenderer::InitializeTextures()
 
 	m_threadPool->Enqueue([this]()
 	{
-		auto normalTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto normalTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"NormalRTV",
 			DXGI_FORMAT_R16G16B16A16_FLOAT
 		);
@@ -490,9 +493,7 @@ void SceneRenderer::InitializeTextures()
 
 	m_threadPool->Enqueue([this]()
 	{
-		auto emissiveTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto emissiveTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"EmissiveRTV",
 			DXGI_FORMAT_R16G16B16A16_FLOAT
 		);
@@ -501,9 +502,7 @@ void SceneRenderer::InitializeTextures()
 
 	m_threadPool->Enqueue([this]()
 	{
-		auto bitmaskTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto bitmaskTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"BitmaskRTV",
 			DXGI_FORMAT_R32_UINT
 		);
@@ -512,9 +511,7 @@ void SceneRenderer::InitializeTextures()
 
 	m_threadPool->Enqueue([this]()
 	{
-		auto toneMappedColourTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto toneMappedColourTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"ToneMappedColourRTV",
 			DXGI_FORMAT_R16G16B16A16_FLOAT
 		);
@@ -523,9 +520,7 @@ void SceneRenderer::InitializeTextures()
 
 	m_threadPool->Enqueue([this]()
 	{
-		auto lightingTexture = TextureHelper::CreateSharedRenderTexture(
-			DirectX11::DeviceStates->g_ClientRect.width,
-			DirectX11::DeviceStates->g_ClientRect.height,
+		auto lightingTexture = TextureHelper::CreateSharedScreenRenderTexture(
 			"LightingRTV",
 			DXGI_FORMAT_R16G16B16A16_FLOAT
 		);

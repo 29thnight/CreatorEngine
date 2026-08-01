@@ -108,8 +108,7 @@ pwsh Tools/featuretest/run-featuretests.ps1
 `build-scenes.ps1`과 `run-featuretests.ps1`은 타임아웃 후 강제 종료하고 산출물
 유무로 판정한다. 별건으로 추적 중이다.
 
-**렌더 타깃 해상도가 창을 따라오지 않는다.** `Texture::Resize2DViews`가 인자를
-쓰지 않고 바뀌지 않은 `m_desc`로 텍스처를 다시 만든다(`RenderEngine/Texture.cpp:865`,
-`SetSize` 호출이 주석 처리돼 있다). 반면 `g_Viewport`는 갱신되므로 창을 리사이즈하면
-뷰포트와 렌더 타깃 크기가 어긋나고, 그려진 부분이 패널 좌상단에만 몰린다.
-스크린샷에서 화면이 구석에 작게 보이는 것이 그 증상이다.
+**렌더 타깃 해상도는 고쳤다.** 예전에는 `Texture::Resize2DViews`가 인자를 쓰지 않아
+창을 리사이즈해도 타깃이 따라오지 않았고, 뷰포트만 따라가 그림이 패널 좌상단에
+몰렸다. 지금은 `RHI/ScreenSizedResource.h`의 정책을 선언한 리소스만 따라간다.
+`dx12.resize`로 확인할 수 있다.
