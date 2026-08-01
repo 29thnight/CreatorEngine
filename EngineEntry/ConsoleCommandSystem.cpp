@@ -1272,6 +1272,30 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.scene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
     }
+    else if (cmd == "render.exposure")
+    {
+        // 자동 노출이 무엇을 보고 무엇을 결정했는지.
+        //
+        // 화면이 어두울 때 원인이 셋으로 갈린다 — 조명이 안 닿거나, 측광이
+        // 엉뚱한 것을 재거나, 노출 계산이 틀렸거나. 결과만 보면 셋이 같아 보인다.
+        const auto& diag = ToneMapPass::GetExposureDiagnostics();
+
+        char buffer[640]{};
+        std::snprintf(buffer, sizeof(buffer),
+            "자동 노출 %s · 이번 프레임 측광 %s\n"
+            "  측정 휘도      %.6f\n"
+            "  수동 노출      %.6f  (f/%.2f · 셔터 %.4f · ISO %.0f)\n"
+            "  자동 배수      %.6f  (기준 0.5 / 측정 휘도)\n"
+            "  최종 목표      %.6f\n"
+            "  적용 중인 노출 %.6f\n",
+            diag.autoEnabled ? "켬" : "끔", diag.sampled ? "있음" : "없음",
+            diag.measuredLuminance,
+            diag.exposureManual, diag.fNumber, diag.shutterTime, diag.iso,
+            diag.exposureAuto, diag.exposureFinal, diag.currentExposure);
+
+        Debug->LogWarning(std::string("[노출]\n") + buffer);
+        std::printf("[CLI] 노출\n%s", buffer);
+    }
     else if (cmd == "dx12.resize")
     {
         // 크기 추종 검증(해상도 슬라이스).
@@ -2091,6 +2115,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.rendergraph     렌더 그래프 검증(순서·흐름·배리어·컬링·실행)\n"
         "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"
         "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
+        "  render.exposure      자동 노출이 무엇을 재고 무엇을 결정했는지\n"
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"

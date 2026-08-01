@@ -108,6 +108,26 @@ pwsh Tools/featuretest/run-featuretests.ps1
 `build-scenes.ps1`과 `run-featuretests.ps1`은 타임아웃 후 강제 종료하고 산출물
 유무로 판정한다. 별건으로 추적 중이다.
 
+**어두운 셰이딩 — 광원 강도 단위 때문이다.** 이 엔진에서 강도 1 근처는 거의 검게
+나온다. 톤맵 노출이 프로젝트 설정(`Dynamic_CPP/ProjectSetting/EngineSettings.asset`)에
+`toneMapExposure: 1.3` · `isAbleAutoExposure: false`로 고정돼 있고, 그 조합에서 눈에
+보이는 밝기가 나오려면 방향광이 수십 단위여야 한다. 기존 게임 씬(`Test1`)의 방향광도
+강도 1이라 같은 이유로 어둡게 나온다 — 이 저장소 상태에서는 정상이다.
+
+조사 과정에서 기각한 가설이 하나 있다: 자동 노출이 밝은 하늘을 측광해 나머지를
+뭉갠다는 것. `render.exposure`로 재 보니 자동 노출은 **꺼져 있고** 적용 노출은
+1.3이었다. 화면만 보면 "노출이 낮다"와 "조명이 약하다"가 같아 보여서, 수치를 내는
+명령을 만들어 갈랐다.
+
+```bash
+pwsh -c "echo 'render.exposure'"   # 엔진 CLI에서 실행
+```
+
+**뿌연 안개는 볼류메트릭 포그다.** 같은 설정 파일에 `volumetricFog.isOn: true` ·
+`mStrength: 2` · `mBlendingWithSceneColorFactor: 0.851`로 저장돼 있다. 최종 색의
+85%가 안개 색이라 씬이 통째로 뿌옇다. 프로젝트가 저작해 둔 값이므로 기능 확인에
+방해가 되면 그 설정을 끄고 볼 것.
+
 **렌더 타깃 해상도는 고쳤다.** 예전에는 `Texture::Resize2DViews`가 인자를 쓰지 않아
 창을 리사이즈해도 타깃이 따라오지 않았고, 뷰포트만 따라가 그림이 패널 좌상단에
 몰렸다. 지금은 `RHI/ScreenSizedResource.h`의 정책을 선언한 리소스만 따라간다.

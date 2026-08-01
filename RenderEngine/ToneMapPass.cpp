@@ -146,6 +146,12 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
                 float exposureFinal = exposureManual * exposureAuto;
 
+                s_exposureDiagnostics.sampled = true;
+                s_exposureDiagnostics.measuredLuminance = luminance;
+                s_exposureDiagnostics.exposureManual = exposureManual;
+                s_exposureDiagnostics.exposureAuto = exposureAuto;
+                s_exposureDiagnostics.exposureFinal = exposureFinal;
+
                 if (fabs(exposureFinal - targetExposure) > lumEpsilon)
                 {
                     targetExposure = exposureFinal;
@@ -183,6 +189,12 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
     m_toneMapConstant.toneMapExposure = currentExposure;
 	m_toneMapConstant.toneMapExposure = std::max(m_toneMapConstant.toneMapExposure, 0.01f); // Ensure exposure is not zero
+
+	s_exposureDiagnostics.autoEnabled = m_isAbleAutoExposure;
+	s_exposureDiagnostics.currentExposure = m_toneMapConstant.toneMapExposure;
+	s_exposureDiagnostics.fNumber = m_fNumber;
+	s_exposureDiagnostics.shutterTime = m_shutterTime;
+	s_exposureDiagnostics.iso = m_ISO;
     m_toneMapConstant.operatorType = (int)m_toneMapType;
 
     DirectX11::UpdateBuffer(m_pToneMapConstantBuffer, &m_toneMapConstant);
