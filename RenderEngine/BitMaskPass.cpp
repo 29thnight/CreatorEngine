@@ -29,14 +29,11 @@ BitMaskPass::BitMaskPass()
     sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
     pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
-    m_pTempTexture = Texture::Create(
-        2,
-        2,
-        DirectX11::DeviceStates->g_ClientRect.width,
-        DirectX11::DeviceStates->g_ClientRect.height,
+    m_pTempTexture = Texture::CreateScreenSized(
         "BitmaskDownTexture",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
-        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
+        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS,
+        2, 2
     );
     m_pTempTexture->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);

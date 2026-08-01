@@ -152,25 +152,21 @@ void PostProcessingPass::TextureInitialization()
     {
         uint32_t ratio = 1u << (i + 1);
         std::string downName = "BloomDownSample" + std::to_string(i);
-        m_bloomDownSampledTextures[i] = Texture::Create(
-            ratio, ratio,
-            DirectX11::DeviceStates->g_ClientRect.width,
-            DirectX11::DeviceStates->g_ClientRect.height,
+        m_bloomDownSampledTextures[i] = Texture::CreateScreenSized(
             downName,
             DXGI_FORMAT_R16G16B16A16_FLOAT,
-            D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
+            D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS,
+            ratio, ratio);
         m_bloomDownSampledTextures[i]->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
         m_bloomDownSampledTextures[i]->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
         m_bloomDownSampledTextures[i]->m_textureType = TextureType::ImageTexture;
 
         std::string upName = "BloomUpSample" + std::to_string(i);
-        m_bloomUpSampledTextures[i] = Texture::Create(
-            ratio, ratio,
-            DirectX11::DeviceStates->g_ClientRect.width,
-            DirectX11::DeviceStates->g_ClientRect.height,
+        m_bloomUpSampledTextures[i] = Texture::CreateScreenSized(
             upName,
             DXGI_FORMAT_R16G16B16A16_FLOAT,
-            D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
+            D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS,
+            ratio, ratio);
         m_bloomUpSampledTextures[i]->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
         m_bloomUpSampledTextures[i]->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
         m_bloomUpSampledTextures[i]->m_textureType = TextureType::ImageTexture;

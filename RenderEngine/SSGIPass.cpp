@@ -51,38 +51,29 @@ SSGIPass::SSGIPass()
     sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
     pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
-    m_pTempTexture = Texture::Create(
-        ssratio,
-        ssratio,
-        DirectX11::DeviceStates->g_ClientRect.width,
-        DirectX11::DeviceStates->g_ClientRect.height,
+    m_pTempTexture = Texture::CreateScreenSized(
         "SSGICopiedTexture",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
+        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS,
+        ssratio, ssratio
     );
     m_pTempTexture->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    m_pTempTexture2 = Texture::Create(
-        ssratio * 2,
-        ssratio * 2,
-        DirectX11::DeviceStates->g_ClientRect.width,
-        DirectX11::DeviceStates->g_ClientRect.height,
+    m_pTempTexture2 = Texture::CreateScreenSized(
         "SSGICopiedTexture2",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
-        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
+        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS,
+        ssratio * 2, ssratio * 2
     );
     m_pTempTexture2->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture2->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    m_pTempTexture3 = Texture::Create(
-        ssratio * 4,
-        ssratio * 4,
-        DirectX11::DeviceStates->g_ClientRect.width,
-        DirectX11::DeviceStates->g_ClientRect.height,
+    m_pTempTexture3 = Texture::CreateScreenSized(
         "SSGICopiedTexture3",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
-        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
+        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS,
+        ssratio * 4, ssratio * 4
     );
     m_pTempTexture3->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture3->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -334,6 +325,12 @@ void SSGIPass::ControlPanel()
     }
 
     if (ImGui::SliderInt("SSGI Ratio", &ssratio, 1, 4, "SSGI Ratio: %d")) {
+        // 비율이 바뀌면 추종 선언을 다시 한다. SetSizeRatio만 고치면 정책이
+        // 옛 나눗수를 들고 있어 다음 리사이즈에서 어긋난다.
+        m_pTempTexture->FollowScreenSize(ssratio, ssratio);
+        m_pTempTexture2->FollowScreenSize(ssratio * 2, ssratio * 2);
+        m_pTempTexture3->FollowScreenSize(ssratio * 4, ssratio * 4);
+
         m_pTempTexture->SetSizeRatio({ float(ssratio), float(ssratio)});
                 m_pTempTexture2->SetSizeRatio({ float(ssratio * 2), float(ssratio * 2) });
                 m_pTempTexture3->SetSizeRatio({ float(ssratio * 4), float(ssratio * 4) });

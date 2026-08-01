@@ -1335,7 +1335,9 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             // 1/N 버퍼도 있으므로 '화면 크기와 다르다'만으로는 못 잡는다.
             // 화면을 정수로 나눈 값 중 하나면 정상으로 본다.
             bool plausible = false;
-            for (uint32_t divisor = 1; divisor <= 8; ++divisor)
+            // SSGI가 1/16까지 쓴다(ssratio 4의 4배). 상한을 그보다 낮게 잡으면
+            // 정상인 것을 어긋난 것으로 센다.
+            for (uint32_t divisor = 1; divisor <= 16; ++divisor)
             {
                 if (width == (screenWidth / divisor) && height == (screenHeight / divisor))
                 {

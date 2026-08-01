@@ -15,7 +15,8 @@ param(
     [int]$Width = 1600,
     [int]$Height = 900,
     [string[]]$Only = @(),
-    [switch]$KeepFog
+    [switch]$KeepFog,
+    [switch]$ResizeTo
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,14 +60,20 @@ foreach ($name in $scenes) {
     # 씬을 열고 오래 머문다. 캡처는 밖에서 하므로 엔진은 그동안 그리기만 하면
     # 되고, 캡처가 끝난 뒤 quit이 돌아 프로세스가 닫힌다.
     $cmdFile = Join-Path $workDir "run_$name.txt"
-    # 창 크기를 건드리지 않는다.
+    # 기본은 창 크기를 건드리지 않는다.
     #
-    # SSGI 패스의 기존 로직이 리사이즈를 견디지 못해 화면이 검게 변한다
-    # (실측: 1920x1080에서는 구·그림자가 정상, 리사이즈 뒤 검정 + 붉은 테두리).
-    # 그 상태로 찍으면 기능이 아니라 그 버그를 찍는 것이 된다. SSGI는
-    # EnhancedSceneRenderer 쪽에서 새 로직으로 다시 만들기로 했으므로,
-    # 그때까지 캡처는 기본 해상도로 한다.
-    $commands = @(
+    # 한때 리사이즈 뒤 화면이 검게 변해(붉은 테두리까지) 캡처가 기능이 아니라
+    # 그 버그를 찍고 있었다. 원인은 SSGI·블룸·비트마스크의 1/N 해상도 버퍼가
+    # 화면 추종 선언에서 빠져 있던 것이었고 지금은 고쳤다.
+    #
+    # 그래도 기본을 '건드리지 않음'으로 두는 이유는 재현성이다 — 캡처 절차가
+    # 변수를 하나 더 넣으면 결과가 그 변수 탓인지 구분하기 어려워진다.
+    # 실제로 그 함정에 한 번 빠졌다. 리사이즈까지 포함해 찍으려면 -ResizeTo를 준다.
+    $commands = @()
+    if ($ResizeTo) {
+        $commands += @("window.resize $Width $Height", "wait 20")
+    }
+    $commands += @(
         "scene.switch $($scenePath -replace '\\', '/')",
         "wait 180"
     )
