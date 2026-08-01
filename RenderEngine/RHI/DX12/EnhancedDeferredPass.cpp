@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedDeferredPass.h"
+#include "EnhancedShadowPass.h"
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
@@ -26,9 +27,12 @@ struct DeferredLight
 cbuffer LightingConstants : register(b0)
 {
     float4x4      gInverseViewProjection;
+    float4x4      gLightViewProjection;
     float4        gEyePosition;
     uint          gLightCount;
-    uint3         gPadding;
+    uint          gHasShadow;
+    float         gShadowBias;
+    uint          gPadding;
     DeferredLight gLights[MAX_DEFERRED_LIGHTS];
 };
 
@@ -37,7 +41,32 @@ Texture2D    gMetalRough : register(t1);
 Texture2D    gNormal     : register(t2);
 Texture2D    gEmissive   : register(t3);
 Texture2D    gDepth      : register(t4);
+Texture2D    gShadowMap  : register(t5);
 SamplerState gSampler    : register(s0);
+
+// 비교 샘플러. 하드웨어가 이웃 텍셀 넷을 비교하고 평균내 준다(2x2 PCF) —
+// 직접 네 번 읽는 것보다 싸고, 가장자리가 부드러워진다.
+SamplerComparisonState gShadowSampler : register(s1);
+
+// 방향광 그림자. 반환값 1은 빛을 받음, 0은 가려짐.
+float SampleShadow(float3 worldPosition)
+{
+    if (gHasShadow == 0) return 1.0f;
+
+    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection);
+    const float3 projected = lightSpace.xyz / lightSpace.w;
+
+    // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
+    // 검은 띠가 생기므로 빛을 받는 것으로 둔다.
+    if (any(abs(projected.xy) > 1.0f) || projected.z > 1.0f) return 1.0f;
+
+    const float2 uv = float2(projected.x * 0.5f + 0.5f, 0.5f - projected.y * 0.5f);
+
+    // 깊이 편향은 호출부가 정한다. 없으면 표면이 자기 그림자에 걸려
+    // 줄무늬(shadow acne)가 생기고, 크면 접지면에서 그림자가 뜬다.
+    // 경사 비례 항은 법선이 있어야 해서 다음 슬라이스로 미룬다.
+    return gShadowMap.SampleCmpLevelZero(gShadowSampler, uv, projected.z - gShadowBias);
+}
 
 struct VSOut
 {
@@ -81,8 +110,9 @@ float4 PSMain(VSOut input) : SV_TARGET
 
         if (type == 0)
         {
-            // 방향광 — 위치와 감쇠가 없다.
+            // 방향광 — 위치와 감쇠가 없다. 그림자는 이쪽에만 붙는다.
             toLight = -normalize(light.direction.xyz);
+            attenuation = SampleShadow(worldPosition);
         }
         else
         {
@@ -160,15 +190,15 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     if (!CompileDeferredShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileDeferredShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    // SRV 4개를 한 테이블로 묶는다. 디스크립터 링에서 연속으로 잘라 쓰므로
+    // SRV를 한 테이블로 묶는다. 디스크립터 링에서 연속으로 잘라 쓰므로
     // 테이블 하나면 충분하고, 바인딩 호출도 한 번이다(상태 변경 최소화).
     D3D12_DESCRIPTOR_RANGE srvRange{};
     srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 5;   // diffuse · metalRough · normal · emissive · depth
+    srvRange.NumDescriptors = 6;   // diffuse · metalRough · normal · emissive · depth · shadow
 
     D3D12_DESCRIPTOR_RANGE samplerRange{};
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 1;
+    samplerRange.NumDescriptors = 2;   // 일반 · 비교(그림자)
 
     D3D12_ROOT_PARAMETER params[3]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -208,14 +238,29 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
 
-    D3D12_SAMPLER_DESC sampler{};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
+    // 인접을 기대하면 안 된다.
+    D3D12_SAMPLER_DESC samplers[2]{};
 
-    m_sampler = context.resources->GetSamplerHeap().GetOrCreate(sampler);
+    samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+
+    // 그림자 비교 샘플러. 경계 색을 1로 두어 맵 밖이 '빛을 받음'이 되게 한다.
+    samplers[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+    samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    samplers[1].BorderColor[0] = 1.f;
+    samplers[1].BorderColor[1] = 1.f;
+    samplers[1].BorderColor[2] = 1.f;
+    samplers[1].BorderColor[3] = 1.f;
+    samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
+
+    m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 2);
     if (0 == m_sampler.ptr)
     {
         outError = "Deferred 샘플러 생성 실패";
@@ -289,6 +334,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
         // 깊이는 DEPTH_WRITE에서 읽기 상태로 넘어와야 한다. 그래프가 알아서
         // 전이를 만들지만, 여기서 선언하지 않으면 만들지 않는다.
         { m_inputs.depth,      RGResourceState::ShaderResource },
+        { m_shadowMap,         RGResourceState::ShaderResource },
         { m_output,            RGResourceState::RenderTarget },
     };
 
@@ -301,8 +347,8 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             const auto rtv = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
             device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtv);
 
-            // SRV 다섯을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
-            const auto srvRange = context.resources->GetDescriptorRing().Allocate(5);
+            // SRV 여섯을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
+            const auto srvRange = context.resources->GetDescriptorRing().Allocate(6);
             if (!srvRange.IsValid()) return;
 
             const RGHandle sources[4] = {
@@ -323,11 +369,18 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
                 &depthSrv, srvRange.CpuAt(4));
 
+            // 그림자 맵도 깊이라 같은 규칙이다.
+            device->CreateShaderResourceView(executeContext.Resolve(m_shadowMap),
+                &depthSrv, srvRange.CpuAt(5));
+
             // 광원 상수를 업로드 링에 올린다.
             LightingConstants constants{};
             constants.inverseViewProjection = m_inverseViewProjection;
+            constants.lightViewProjection = XMMatrixTranspose(m_shadowLightViewProjection);
             constants.eyePosition = m_eyePosition;
             constants.lightCount = static_cast<uint32_t>(m_frameLights.size());
+            constants.hasShadow = m_shadowEnabled ? 1u : 0u;
+            constants.shadowBias = m_shadowBias;
             for (size_t i = 0; i < m_frameLights.size(); ++i)
             {
                 constants.lights[i] = m_frameLights[i];

@@ -227,6 +227,36 @@ D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::GetOrCreate(const D3D12_SAMPLER_DES
     return handle;
 }
 
+D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::CreateRange(const D3D12_SAMPLER_DESC* descs,
+    uint32_t count)
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+    if (!m_heap || nullptr == descs || 0 == count) return handle;
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    if (m_used + count > m_capacity)
+    {
+        ++m_stats.overflows;
+        return handle;
+    }
+
+    const uint32_t base = m_used;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE cpu = m_cpuBase;
+        cpu.ptr += static_cast<SIZE_T>(base + i) * m_incrementSize;
+        m_device->CreateSampler(&descs[i], cpu);
+    }
+
+    m_used += count;
+    m_stats.creates += count;
+
+    handle = m_gpuBase;
+    handle.ptr += static_cast<UINT64>(base) * m_incrementSize;
+    return handle;
+}
+
 DX12SamplerHeap::Stats DX12SamplerHeap::GetStats() const
 {
     std::lock_guard<std::mutex> guard(m_mutex);

@@ -2288,6 +2288,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 그것이 3-5 컬링이 실전에서 동작한다는 확인이다.
     gbuffer.SetKeepAlive(false);
 
+    EnhancedShadowPass shadow;
+    if (!shadow.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] 그림자 초기화 실패: " + error + "\n";
+        return false;
+    }
+
     EnhancedDeferredPass deferred;
     if (!deferred.Initialize(frameContext, error))
     {
@@ -2296,8 +2303,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     DX12GpuProfiler profiler;
+    // 패스가 여섯(그림자·GBuffer·Deferred·리드백 셋)이라 질의가 열둘 든다.
     if (!profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
-        16, DX12DeviceResources::kFrameCount, error))
+        32, DX12DeviceResources::kFrameCount, error))
     {
         outLog += "[2/4] GPU 프로파일러 초기화 실패: " + error + "\n";
         return false;
@@ -2358,8 +2366,42 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         }
     }
 
+    // 그림자 맵 리드백. 깊이 전용 렌더가 실제로 무언가를 기록했는지 세는 데 쓴다.
+    const uint32_t shadowRowPitch =
+        (EnhancedShadowPass::kShadowMapSize * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
+        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+
+    ComPtr<ID3D12Resource> shadowReadback;
+    {
+        D3D12_HEAP_PROPERTIES readbackHeap{};
+        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<uint64_t>(shadowRowPitch) * EnhancedShadowPass::kShadowMapSize;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+            IID_PPV_ARGS(&shadowReadback))))
+        {
+            outLog += "[2/4] 그림자 리드백 버퍼 생성 실패\n";
+            return false;
+        }
+    }
+
     std::vector<DX12GpuProfiler::PassTiming> timings;
     EnhancedRenderGraph::Stats lastGraphStats{};
+
+    // 렌더마다 바꿔 가며 넣는 그림자 설정. 람다가 참조로 잡는다.
+    bool     shadowEnabled = false;
+    float    shadowBias = EnhancedDeferredPass::kDefaultShadowBias;
+    bool     captureShadowMap = false;
+    uint32_t shadowOccluders = 0;
 
     const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
         uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError,
@@ -2373,6 +2415,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         profiler.BeginFrame(0);
 
         // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
+        if (!shadow.PrepareFrame(frameContext, outStepError)) return false;
         if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
         if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
@@ -2380,10 +2423,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         EnhancedRenderGraph graph;
         graph.SetProfiler(&profiler);
 
+        // 그림자를 먼저 선언한다. 선언 순서가 실행 순서라, Deferred가 읽기 전에
+        // 써 두는 것이 선언으로 표현된다 — 뒤집으면 컴파일이 잡아 준다.
+        shadow.Declare(graph, frameContext);
+
         gbuffer.Declare(graph, frameContext);
         const auto outputs = gbuffer.GetOutputs();
 
         deferred.SetInputs(outputs);
+        deferred.SetShadow(shadow.GetShadowMap(), shadow.GetLightViewProjection(),
+            shadowEnabled && shadow.HasDirectionalLight(), shadowBias);
         deferred.Declare(graph, frameContext);
 
         // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
@@ -2427,6 +2476,31 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
             }, true);
 
+        // 그림자 맵도 한 번은 되읽는다. 깊이 전용 렌더가 정말로 기록했는지는
+        // 결과를 봐야 알고, 안 그러면 '맵은 비었는데 통과'가 가능하다.
+        if (captureShadowMap)
+        {
+            graph.AddPass("shadow_readback",
+                { { shadow.GetShadowMap(), RGResourceState::CopySource } },
+                [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                {
+                    D3D12_TEXTURE_COPY_LOCATION dst{};
+                    dst.pResource = shadowReadback.Get();
+                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
+                    dst.PlacedFootprint.Footprint.Width = EnhancedShadowPass::kShadowMapSize;
+                    dst.PlacedFootprint.Footprint.Height = EnhancedShadowPass::kShadowMapSize;
+                    dst.PlacedFootprint.Footprint.Depth = 1;
+                    dst.PlacedFootprint.Footprint.RowPitch = shadowRowPitch;
+
+                    D3D12_TEXTURE_COPY_LOCATION src{};
+                    src.pResource = executeContext.Resolve(shadow.GetShadowMap());
+                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                }, true);
+        }
+
         if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
 
         // 컬링이 GBuffer를 살렸는지 확인한다. 소비자(Deferred)가 읽는데도
@@ -2463,6 +2537,31 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             }
         }
         depthReadback->Unmap(0, nullptr);
+
+        // 그림자 맵에 기록된 텍셀 수. 1.0은 클리어 값 그대로라 '가리는 것 없음'이다.
+        if (captureShadowMap)
+        {
+            shadowOccluders = 0;
+            void* shadowMapped = nullptr;
+            const size_t shadowBytes =
+                static_cast<size_t>(shadowRowPitch) * EnhancedShadowPass::kShadowMapSize;
+            D3D12_RANGE shadowRange{ 0, shadowBytes };
+            if (SUCCEEDED(shadowReadback->Map(0, &shadowRange, &shadowMapped)))
+            {
+                const auto* shadowPixels = static_cast<const uint8_t*>(shadowMapped);
+                for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
+                {
+                    const auto* row = shadowPixels + static_cast<size_t>(y) * shadowRowPitch;
+                    for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
+                    {
+                        float depth = 0.f;
+                        memcpy(&depth, row + static_cast<size_t>(x) * 4, 4);
+                        if (depth < 0.999f) ++shadowOccluders;
+                    }
+                }
+                shadowReadback->Unmap(0, nullptr);
+            }
+        }
 
         // 라이팅 결과의 평균 밝기. 광원이 닿지 않으면 0에 가깝다.
         outAverageLuminance = 0.0;
@@ -2510,11 +2609,27 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     double luminanceMoved = 0.0;
     uint32_t coveredA = 0;
     uint32_t drawCountA = 0;
+
+    // 첫 렌더가 기준선이다 — 그림자를 켜고, 그림자 맵도 한 번 되읽는다.
+    shadowEnabled = true;
+    captureShadowMap = true;
     if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error, timings, lastGraphStats, luminanceLit))
     {
         outLog += "[3/4] 렌더 실패: " + error + "\n";
         return false;
     }
+
+    captureShadowMap = false;
+
+    // 기준선 렌더의 그림자 상태를 여기서 붙잡는다.
+    //
+    // 패스가 들고 있는 상태를 나중에 읽으면 그 사이의 렌더가 덮어쓴다. 실제로
+    // 뒤에 오는 '광원 0개' 렌더가 방향광을 못 찾아 m_hasDirectionalLight를
+    // false로 만들었고, 그 값으로 판정하는 바람에 그림자 단정이 통째로
+    // 건너뛰어지고도 통과가 나왔다 — 재질 때와 같은 부류의 조용한 통과다.
+    const bool     baselineHasDirectional = shadow.HasDirectionalLight();
+    const uint32_t baselineShadowCasters = shadow.GetLastDrawCount();
+    const uint32_t baselineShadowOccluders = shadowOccluders;
 
     const auto meshStats = meshCache.GetStats();
     const auto textureStats = textureCache.GetStats();
@@ -2603,11 +2718,77 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         lights.size(), luminanceLit, luminanceUnlit);
     outLog += luminanceLine;
 
+    // ── 그림자가 실제로 셰이더에 닿는가 ──
+    //
+    // 그림자를 끈 것과 비교만 하면 씬 배치에 답이 좌우된다 — 가리는 것이 없는
+    // 씬에서는 켜나 끄나 같고, 그러면 '그림자 경로가 통째로 죽었다'와 구분되지
+    // 않는다. 그래서 편향을 음수로 밀어 모든 표면이 자기 그림자에 걸리는 렌더를
+    // 하나 더 한다. 그림자 맵을 읽고 비교 샘플러가 도는 이상 반드시 어두워지므로,
+    // 배치와 무관하게 ③④를 판정할 수 있다.
+    double luminanceNoShadow = 0.0;
+    double luminanceForced = 0.0;
+    const bool shadowTestable = baselineHasDirectional && 0 != drawCountA;
+    if (shadowTestable)
+    {
+        uint32_t coveredTemp = 0;
+        uint32_t drawTemp = 0;
+        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+        EnhancedRenderGraph::Stats statsTemp{};
+
+        shadowEnabled = false;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceNoShadow))
+        {
+            outLog += "[4/4] 그림자 끔 렌더 실패: " + error + "\n";
+            return false;
+        }
+
+        shadowEnabled = true;
+        shadowBias = -1.f;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceForced))
+        {
+            outLog += "[4/4] 그림자 강제 렌더 실패: " + error + "\n";
+            return false;
+        }
+        shadowBias = EnhancedDeferredPass::kDefaultShadowBias;
+    }
+
+    char shadowLine[224]{};
+    std::snprintf(shadowLine, sizeof(shadowLine),
+        "      그림자 — 방향광 %s · 캐스터 %u · 맵 기록 텍셀 %u/%u"
+        " · 끔 %.5f · 켬 %.5f · 강제 %.5f\n",
+        baselineHasDirectional ? "있음" : "없음", baselineShadowCasters,
+        baselineShadowOccluders,
+        EnhancedShadowPass::kShadowMapSize * EnhancedShadowPass::kShadowMapSize,
+        luminanceNoShadow, luminanceLit, luminanceForced);
+    outLog += shadowLine;
+
     if (!lights.empty() && luminanceLit <= luminanceUnlit + 1e-5)
     {
         passed = false;
         verdict = "광원을 " + std::to_string(lights.size())
             + "개 넘겼는데 밝기가 광원 0개일 때와 같다 — 광원이 셰이더에 닿지 않는다";
+    }
+    // 깊이 전용 렌더가 무언가 기록했는가(①②).
+    else if (shadowTestable && 0 == baselineShadowOccluders)
+    {
+        passed = false;
+        verdict = "그림자 캐스터가 " + std::to_string(baselineShadowCasters)
+            + "건인데 그림자 맵이 클리어 값 그대로다 — 깊이 전용 렌더나 라이트 행렬이 어긋났다";
+    }
+    // 그림자 맵을 SRV로 읽고 비교 샘플러가 도는가(③④).
+    else if (shadowTestable && luminanceForced >= luminanceNoShadow - 1e-5)
+    {
+        passed = false;
+        verdict = "편향을 음수로 밀어 전부 가려지게 했는데 밝기가 그대로다"
+            " — 그림자 맵이 셰이더에 닿지 않는다";
+    }
+    // 그림자가 밝게 만들면 부호가 뒤집힌 것이다.
+    else if (shadowTestable && luminanceLit > luminanceNoShadow + 1e-5)
+    {
+        passed = false;
+        verdict = "그림자를 켰더니 오히려 밝아졌다 — 비교 방향이나 UV가 뒤집혔다";
     }
     // 재질에 baseColor가 있는데 텍스처가 하나도 안 올라갔다면 재질 경로가
     // 통째로 건너뛰어진 것이다. 이 단정이 없어서 실제로 그 상태로 통과한 적이
@@ -2663,6 +2844,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     textureCache.Shutdown();
     profiler.Shutdown();
     deferred.Shutdown();
+    shadow.Shutdown();
     gbuffer.Shutdown();
     meshCache.Shutdown();
     rootSignatures.Shutdown();
