@@ -8,10 +8,12 @@
 #include "../../FrameCameraSnapshot.h"
 
 class Mesh;
+class Texture;
 class DX12DeviceResources;
 class DX12PSOManager;
 class DX12RootSignatureCache;
 class DX12MeshCache;
+class DX12TextureCache;
 
 // EnhancedRenderPass — DX12 렌더 패스의 기반 (PHASE 3-6).
 //
@@ -38,6 +40,18 @@ struct EnhancedDrawItem
 {
     Mesh*          mesh{ nullptr };
     Mathf::xMatrix worldMatrix{};
+
+    // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —
+    // 렌더가 게임 자료구조를 들고 다니면 수명과 스레드 규약이 다시 얽힌다.
+    Texture*       baseColor{ nullptr };
+    Texture*       normalMap{ nullptr };
+    Texture*       occRoughMetal{ nullptr };
+    Texture*       emissive{ nullptr };
+
+    Mathf::Color4  baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
+    float          metallic{ 0.f };
+    float          roughness{ 1.f };
+    uint32_t       useNormalMap{ 0 };
 };
 
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
@@ -48,6 +62,7 @@ struct EnhancedFrameContext
     DX12PSOManager*         psoManager{ nullptr };
     DX12RootSignatureCache* rootSignatures{ nullptr };
     DX12MeshCache*          meshCache{ nullptr };
+    DX12TextureCache*       textureCache{ nullptr };
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };

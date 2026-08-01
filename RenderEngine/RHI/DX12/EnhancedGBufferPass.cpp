@@ -4,7 +4,9 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "DX12MeshCache.h"
+#include "DX12TextureCache.h"
 #include "../../Mesh.h"
+#include "../../Texture.h"
 
 #include <d3dcompiler.h>
 #include <sstream>
@@ -36,7 +38,18 @@ cbuffer PerFrame : register(b0)
 cbuffer PerDraw : register(b1)
 {
     float4x4 gWorld;
+    float4   gBaseColorFactor;
+    float    gMetallic;
+    float    gRoughness;
+    uint     gUseNormalMap;
+    uint     gPadding;
 };
+
+Texture2D    gBaseColor     : register(t0);
+Texture2D    gNormalMap     : register(t1);
+Texture2D    gOccRoughMetal : register(t2);
+Texture2D    gEmissive      : register(t3);
+SamplerState gSampler       : register(s0);
 
 struct VSIn
 {
@@ -75,11 +88,28 @@ struct PSOut
 
 PSOut PSMain(VSOut input)
 {
+    // 텍스처가 없는 슬롯에는 1x1 흰색이 묶여 있다. 그래서 "텍스처가 있으면"
+    // 분기가 필요 없다 — 분기 없는 쪽이 셰이더에서 빠르고, 재질마다 다른
+    // 셰이더 변형을 만들지 않아도 된다.
+    const float4 albedo = gBaseColor.Sample(gSampler, input.uv) * gBaseColorFactor;
+
+    // occlusion/roughness/metallic은 glTF 규약대로 G에 거칠기, B에 금속성이다.
+    const float3 orm = gOccRoughMetal.Sample(gSampler, input.uv).rgb;
+
+    float3 normal = normalize(input.normal);
+    if (gUseNormalMap != 0)
+    {
+        // 접선 공간 변환은 탄젠트가 상수에 들어오는 다음 슬라이스에서 붙인다.
+        // 지금은 노멀맵을 읽는다는 것 자체가 확인 대상이다.
+        const float3 sampled = gNormalMap.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
+        normal = normalize(normal + sampled * 0.0f + sampled * 0.5f);
+    }
+
     PSOut output;
-    output.diffuse    = float4(input.uv, 0.0f, 1.0f);
-    output.metalRough = float4(0.25f, 0.75f, 0.0f, 1.0f);
-    output.normal     = float4(normalize(input.normal) * 0.5f + 0.5f, 1.0f);
-    output.emissive   = float4(0.0f, 0.5f, 1.0f, 1.0f);
+    output.diffuse    = albedo;
+    output.metalRough = float4(orm.r, orm.g * gRoughness, orm.b + gMetallic, 1.0f);
+    output.normal     = float4(normal * 0.5f + 0.5f, 1.0f);
+    output.emissive   = gEmissive.Sample(gSampler, input.uv);
     output.bitmask    = 0xABCDu;
     return output;
 }
@@ -118,6 +148,7 @@ DXGI_FORMAT EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
 bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     m_drawGeometry.clear();
+    m_drawTextures.clear();
     m_lastDrawCount = 0;
 
     // 프레임 밀봉된 카메라에서 뷰·투영을 만든다. 스냅샷이 없으면 항등으로 두는데,
@@ -146,6 +177,28 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
         }
 
         m_drawGeometry.emplace(draw.mesh, entry);
+
+        // 재질 텍스처도 여기서 올린다. 없는 슬롯은 캐시가 흰색을 돌려주므로
+        // 항상 넷이 채워지고, 셰이더에 분기가 필요 없다.
+        if (nullptr != context.textureCache)
+        {
+            Texture* sources[4] = {
+                draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+
+            DrawTextures textures{};
+            for (uint32_t i = 0; i < 4; ++i)
+            {
+                std::string textureError;
+                const auto uploaded = context.textureCache->GetOrUpload(sources[i], textureError);
+                textures.resources[i] = uploaded.resource;
+                textures.formats[i] = uploaded.format;
+                textures.mipLevels[i] = uploaded.mipLevels;
+
+                if (!textureError.empty()) outError = textureError;
+            }
+            m_drawTextures.emplace(draw.mesh, textures);
+        }
+
         ++m_lastDrawCount;
     }
 
@@ -164,14 +217,33 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     // 상수는 디스크립터 테이블이 아니라 루트 CBV로 넘긴다. 업로드 링에서 자른
     // 조각의 GPU 주소를 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없고,
     // 드로우마다 바뀌는 값에는 이쪽이 싸다(테이블은 디스크립터 힙을 거친다).
-    D3D12_ROOT_PARAMETER params[2]{};
+    D3D12_DESCRIPTOR_RANGE srvRange{};
+    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    srvRange.NumDescriptors = 4;   // baseColor · normal · occRoughMetal · emissive
+
+    D3D12_DESCRIPTOR_RANGE samplerRange{};
+    samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    samplerRange.NumDescriptors = 1;
+
+    D3D12_ROOT_PARAMETER params[4]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;   // b0 — 프레임 상수
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
+    // 드로우 상수는 픽셀 셰이더도 읽는다(재질 계수). ALL로 두면 두 단계 모두 본다.
     params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[1].Descriptor.ShaderRegister = 1;   // b1 — 드로우 상수
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[2].DescriptorTable.NumDescriptorRanges = 1;
+    params[2].DescriptorTable.pDescriptorRanges = &srvRange;
+    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[3].DescriptorTable.NumDescriptorRanges = 1;
+    params[3].DescriptorTable.pDescriptorRanges = &samplerRange;
+    params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
     rootDesc.NumParameters = _countof(params);
@@ -243,6 +315,20 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
     }
 
     if (!CreatePipeline(context, outError)) return false;
+
+    D3D12_SAMPLER_DESC sampler{};
+    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+
+    m_sampler = context.resources->GetSamplerHeap().GetOrCreate(sampler);
+    if (0 == m_sampler.ptr)
+    {
+        outError = "GBuffer 샘플러 생성 실패";
+        return false;
+    }
 
     return true;
 }
@@ -354,18 +440,56 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 그릴 것이 없으면 클리어만 하고 끝난다 — 빈 씬도 정상 경로다.
             if (nullptr == context.draws) return;
 
+            // 힙 바인딩은 드로우 밖에서 한 번만. 드로우마다 바꾸면 그 자체가 비싸다.
+            ID3D12DescriptorHeap* heaps[] = {
+                context.resources->GetDescriptorRing().GetHeap(),
+                context.resources->GetSamplerHeap().GetHeap() };
+            commandList->SetDescriptorHeaps(2, heaps);
+            commandList->SetGraphicsRootDescriptorTable(3, m_sampler);
+
             for (const auto& draw : *context.draws)
             {
                 const auto mesh = m_drawGeometry.find(draw.mesh);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
-                const Mathf::Matrix world = XMMatrixTranspose(draw.worldMatrix);
+                DrawConstants constants{};
+                constants.world = XMMatrixTranspose(draw.worldMatrix);
+                constants.baseColorFactor = draw.baseColorFactor;
+                constants.metallic = draw.metallic;
+                constants.roughness = draw.roughness;
+                constants.useNormalMap = draw.useNormalMap;
+
                 const auto drawConstants = context.resources->GetUploadRing().Allocate(
-                    sizeof(Mathf::Matrix), DX12UploadRing::kConstantBufferAlignment);
+                    sizeof(DrawConstants), DX12UploadRing::kConstantBufferAlignment);
                 if (!drawConstants.IsValid()) break;   // 구간이 찼다 — 남은 드로우는 다음 프레임
 
-                memcpy(drawConstants.cpuAddress, &world, sizeof(world));
+                memcpy(drawConstants.cpuAddress, &constants, sizeof(constants));
                 commandList->SetGraphicsRootConstantBufferView(1, drawConstants.gpuAddress);
+
+                // 재질 텍스처 넷을 연속으로 잘라 테이블 하나로 묶는다.
+                // PrepareFrame이 올려 둔 것을 쓴다 — 기록 중에는 만들지 않는다.
+                const auto textures = m_drawTextures.find(draw.mesh);
+                if (textures != m_drawTextures.end())
+                {
+                    const auto srvRange = context.resources->GetDescriptorRing().Allocate(4);
+                    if (!srvRange.IsValid()) break;
+
+                    for (uint32_t i = 0; i < 4; ++i)
+                    {
+                        auto* resource = textures->second.resources[i];
+                        if (nullptr == resource) continue;
+
+                        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+                        srvDesc.Format = textures->second.formats[i];
+                        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                        srvDesc.Texture2D.MipLevels = textures->second.mipLevels[i];
+
+                        device->CreateShaderResourceView(resource, &srvDesc, srvRange.CpuAt(i));
+                    }
+
+                    commandList->SetGraphicsRootDescriptorTable(2, srvRange.gpu);
+                }
 
                 commandList->IASetVertexBuffers(0, 1, &mesh->second.vertexView);
                 commandList->IASetIndexBuffer(&mesh->second.indexView);
@@ -378,6 +502,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 void EnhancedGBufferPass::Shutdown()
 {
     m_drawGeometry.clear();
+    m_drawTextures.clear();
     m_rtvHeap.Reset();
     m_dsvHeap.Reset();
     m_pso = nullptr;

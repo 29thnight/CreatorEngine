@@ -68,11 +68,33 @@ private:
 
     bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
 
+    // b1에 올라가는 드로우 상수. HLSL 쪽 cbuffer와 배치가 같아야 한다 —
+    // 어긋나면 값이 조용히 밀려서 '재질이 이상하다'로만 드러난다.
+    struct DrawConstants
+    {
+        Mathf::Matrix world{};
+        Mathf::Color4 baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
+        float         metallic{ 0.f };
+        float         roughness{ 1.f };
+        uint32_t      useNormalMap{ 0 };
+        uint32_t      padding{ 0 };
+    };
+
+    // 드로우가 쓸 텍스처. PrepareFrame이 채우고 Record가 읽는다.
+    struct DrawTextures
+    {
+        ID3D12Resource* resources[4]{};
+        DXGI_FORMAT     formats[4]{};
+        uint32_t        mipLevels[4]{};
+    };
+
     Outputs m_outputs;
 
     // 이번 프레임 드로우가 쓸 지오메트리. PrepareFrame에서 채우고 Record가 읽는다 —
     // Record가 메시 캐시를 직접 부르면 기록 중에 리소스를 만들게 되어 규약을 어긴다.
     std::unordered_map<Mesh*, DX12MeshCache::Entry> m_drawGeometry;
+    std::unordered_map<Mesh*, DrawTextures>         m_drawTextures;
+    D3D12_GPU_DESCRIPTOR_HANDLE                     m_sampler{};
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
     Mathf::xMatrix m_frameViewProjection{};

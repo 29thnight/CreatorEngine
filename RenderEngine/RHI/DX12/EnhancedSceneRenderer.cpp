@@ -8,6 +8,9 @@
 #include "EnhancedDeferredPass.h"
 #include "DX12GpuProfiler.h"
 #include "DX12MeshCache.h"
+#include "DX12TextureCache.h"
+#include "../../Material.h"
+#include "../../Texture.h"
 #include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
 
@@ -2177,10 +2180,32 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 않고 메시 포인터와 월드 행렬만 복사한다 — 렌더가 게임 자료구조를 들고
     // 다니면 3-2에서 걷어낸 부류가 되살아난다.
     std::vector<EnhancedDrawItem> draws;
+    uint32_t materialsWithTexture = 0;
     for (auto* proxy : renderData->m_deferredQueue)
     {
         if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
-        draws.push_back({ proxy->m_Mesh.get(), proxy->m_worldMatrix });
+
+        EnhancedDrawItem item{};
+        item.mesh = proxy->m_Mesh.get();
+        item.worldMatrix = proxy->m_worldMatrix;
+
+        // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
+        if (auto* material = proxy->m_Material.get())
+        {
+            item.baseColor = material->m_pBaseColor;
+            item.normalMap = material->m_pNormal;
+            item.occRoughMetal = material->m_pOccRoughMetal;
+            item.emissive = material->m_pEmissive;
+
+            item.baseColorFactor = material->m_materialInfo.m_baseColor;
+            item.metallic = material->m_materialInfo.m_metallic;
+            item.roughness = material->m_materialInfo.m_roughness;
+            item.useNormalMap = (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+
+            if (nullptr != item.baseColor) ++materialsWithTexture;
+        }
+
+        draws.push_back(item);
     }
 
     outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->m_cameraIndex)
@@ -2198,9 +2223,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
     DX12MeshCache meshCache;
+    DX12TextureCache textureCache;
     if (!psoManager.Initialize(resources.GetDevice(), L"dx12_scene.cache", error) ||
         !rootSignatures.Initialize(resources.GetDevice(), error) ||
-        !meshCache.Initialize(&resources, error))
+        !meshCache.Initialize(&resources, error) ||
+        !textureCache.Initialize(&resources, DirectX11::DeviceStates->g_pDevice,
+            DirectX11::DeviceStates->g_pDeviceContext, error))
     {
         outLog += "[2/4] 보조 시스템 초기화 실패: " + error + "\n";
         return false;
@@ -2211,6 +2239,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     frameContext.psoManager = &psoManager;
     frameContext.rootSignatures = &rootSignatures;
     frameContext.meshCache = &meshCache;
+    frameContext.textureCache = &textureCache;
     frameContext.width = kWidth;
     frameContext.height = kHeight;
     frameContext.camera = &cameraSnapshot;
@@ -2365,6 +2394,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     const auto meshStats = meshCache.GetStats();
+    const auto textureStats = textureCache.GetStats();
+    outLog += "      재질 — 텍스처 업로드 " + std::to_string(textureStats.uploads)
+        + "(" + std::to_string(textureStats.bytesUploaded / 1024) + "KB)"
+        + " · 히트 " + std::to_string(textureStats.hits)
+        + " · 실패 " + std::to_string(textureStats.failures)
+        + " · baseColor 있는 드로우 " + std::to_string(materialsWithTexture) + "\n";
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
         + "(" + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
@@ -2415,8 +2450,19 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     bool passed = true;
     std::string verdict;
 
-    // 컬링 확인을 먼저 한다. GBuffer가 걷어내졌다면 이후 단정이 전부 무의미하다.
-    if (0 != lastGraphStats.passesCulled)
+    // 재질에 baseColor가 있는데 텍스처가 하나도 안 올라갔다면 재질 경로가
+    // 통째로 건너뛰어진 것이다. 이 단정이 없어서 실제로 그 상태로 통과한 적이
+    // 있다(업로드 0건인데 검증 통과) — 확인하지 못한 것과 확인했고 문제없는
+    // 것은 다르다.
+    const auto finalTextureStats = textureCache.GetStats();
+    if (0 != materialsWithTexture && 0 == finalTextureStats.uploads)
+    {
+        passed = false;
+        verdict = "재질에 baseColor가 " + std::to_string(materialsWithTexture)
+            + "건 있는데 텍스처 업로드가 0이다 — 재질 경로가 건너뛰어졌다";
+    }
+    // 컬링 확인. GBuffer가 걷어내졌다면 이후 단정이 전부 무의미하다.
+    else if (0 != lastGraphStats.passesCulled)
     {
         passed = false;
         verdict = "Deferred가 읽는데도 패스가 "
@@ -2455,6 +2501,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
     }
 
+    textureCache.Shutdown();
     profiler.Shutdown();
     deferred.Shutdown();
     gbuffer.Shutdown();
