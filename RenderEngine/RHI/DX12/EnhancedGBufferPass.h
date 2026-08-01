@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
+#include <map>
 #include <unordered_map>
 #include <wrl/client.h>
 
@@ -48,7 +49,14 @@ public:
     void Shutdown() override;
 
     // 이번 프레임에 실제로 그린 드로우 수. 씬 연결이 됐는지 확인하는 값이다.
+    /// 이번 프레임에 그릴 드로우 수(같은 메시라도 드로우마다 센다).
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
+
+    /// 올린 메시 종류와 재질 종류. 둘이 드로우 수와 다른 것이 정상이다 —
+    /// 같은 메시를 여러 번 그리거나 같은 재질을 여럿이 공유한다.
+    /// 재질 수가 늘 1이면 드로우별 키잉이 죽은 것이다.
+    uint32_t GetLastMeshCount() const { return m_lastMeshCount; }
+    uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
 
     /// 이 패스를 컬링 뿌리로 표시할지.
     ///
@@ -93,13 +101,30 @@ private:
     // 이번 프레임 드로우가 쓸 지오메트리. PrepareFrame에서 채우고 Record가 읽는다 —
     // Record가 메시 캐시를 직접 부르면 기록 중에 리소스를 만들게 되어 규약을 어긴다.
     std::unordered_map<Mesh*, DX12MeshCache::Entry> m_drawGeometry;
-    std::unordered_map<Mesh*, DrawTextures>         m_drawTextures;
+
+    // 재질은 메시가 아니라 재질로 키잉한다.
+    //
+    // 전에는 Mesh*를 키로 썼는데, 그러면 같은 메시를 다른 재질로 두 번 그릴 때
+    // 두 번째가 첫 번째의 텍스처로 그려진다. 메시 중복 제거 블록 안에 재질
+    // 업로드가 들어 있어서 두 번째는 통째로 건너뛰어졌다.
+    //
+    // 키는 텍스처 포인터 넷이다. 여기서 포인터를 키로 쓰는 것은 옳다 —
+    // 우리가 묻는 것이 '같은 텍스처 객체인가'(동일성)이기 때문이다. 루트
+    // 시그니처·입력 레이아웃 때 겪은 함정은 '같은 내용인가'(동등성)를 물어야
+    // 하는데 주소를 해시한 것이라 성격이 다르다.
+    //
+    // 해시맵 대신 정렬 맵을 쓴다. 재질 종류는 프레임당 많아야 수십이고,
+    // 배열 키에 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다.
+    using MaterialKey = std::array<Texture*, 4>;
+    std::map<MaterialKey, DrawTextures>             m_drawTextures;
     D3D12_GPU_DESCRIPTOR_HANDLE                     m_sampler{};
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
     Mathf::xMatrix m_frameViewProjection{};
 
     uint32_t m_lastDrawCount{ 0 };
+    uint32_t m_lastMeshCount{ 0 };
+    uint32_t m_lastMaterialCount{ 0 };
     bool     m_keepAlive{ true };
 
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —

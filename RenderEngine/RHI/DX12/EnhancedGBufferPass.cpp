@@ -175,48 +175,63 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
     if (nullptr == context.draws || nullptr == context.meshCache) return true;
 
-    // 이번 프레임에 그릴 메시를 미리 올린다. 같은 메시가 여러 번 나와도 캐시가
-    // 한 번만 올린다.
+    // 지오메트리와 재질을 따로 훑는다.
+    //
+    // 예전에는 메시 중복 제거 블록 안에서 재질까지 올렸는데, 그러면 같은 메시를
+    // 다른 재질로 두 번 그릴 때 두 번째 재질이 통째로 건너뛰어진다. 중복 제거의
+    // 단위가 둘이 다르다 — 지오메트리는 메시별로, 재질은 재질별로 한 번이다.
     for (const auto& draw : *context.draws)
     {
         if (nullptr == draw.mesh) continue;
-        if (m_drawGeometry.find(draw.mesh) != m_drawGeometry.end()) continue;
 
-        std::string uploadError;
-        const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
-        if (!entry.IsValid())
+        if (m_drawGeometry.find(draw.mesh) == m_drawGeometry.end())
         {
-            // 빈 메시는 그냥 건너뛴다. 업로드 실패는 알린다 — 조용히 안 그리면
-            // '왜 이 오브젝트만 안 보이지'가 된다.
-            if (!uploadError.empty()) outError = uploadError;
+            std::string uploadError;
+            const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
+            if (!entry.IsValid())
+            {
+                // 빈 메시는 그냥 건너뛴다. 업로드 실패는 알린다 — 조용히 안 그리면
+                // '왜 이 오브젝트만 안 보이지'가 된다.
+                if (!uploadError.empty()) outError = uploadError;
+                continue;
+            }
+
+            m_drawGeometry.emplace(draw.mesh, entry);
+        }
+        else if (!m_drawGeometry[draw.mesh].IsValid())
+        {
             continue;
         }
 
-        m_drawGeometry.emplace(draw.mesh, entry);
-
-        // 재질 텍스처도 여기서 올린다. 없는 슬롯은 캐시가 흰색을 돌려주므로
-        // 항상 넷이 채워지고, 셰이더에 분기가 필요 없다.
+        // 재질 텍스처. 없는 슬롯은 캐시가 흰색을 돌려주므로 항상 넷이 채워지고,
+        // 셰이더에 분기가 필요 없다.
         if (nullptr != context.textureCache)
         {
-            Texture* sources[4] = {
+            const MaterialKey key{
                 draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
 
-            DrawTextures textures{};
-            for (uint32_t i = 0; i < 4; ++i)
+            if (m_drawTextures.find(key) == m_drawTextures.end())
             {
-                std::string textureError;
-                const auto uploaded = context.textureCache->GetOrUpload(sources[i], textureError);
-                textures.resources[i] = uploaded.resource;
-                textures.formats[i] = uploaded.format;
-                textures.mipLevels[i] = uploaded.mipLevels;
+                DrawTextures textures{};
+                for (uint32_t i = 0; i < 4; ++i)
+                {
+                    std::string textureError;
+                    const auto uploaded = context.textureCache->GetOrUpload(key[i], textureError);
+                    textures.resources[i] = uploaded.resource;
+                    textures.formats[i] = uploaded.format;
+                    textures.mipLevels[i] = uploaded.mipLevels;
 
-                if (!textureError.empty()) outError = textureError;
+                    if (!textureError.empty()) outError = textureError;
+                }
+                m_drawTextures.emplace(key, textures);
             }
-            m_drawTextures.emplace(draw.mesh, textures);
         }
 
         ++m_lastDrawCount;
     }
+
+    m_lastMeshCount = static_cast<uint32_t>(m_drawGeometry.size());
+    m_lastMaterialCount = static_cast<uint32_t>(m_drawTextures.size());
 
     return true;
 }
@@ -495,7 +510,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
                 // 재질 텍스처 넷을 연속으로 잘라 테이블 하나로 묶는다.
                 // PrepareFrame이 올려 둔 것을 쓴다 — 기록 중에는 만들지 않는다.
-                const auto textures = m_drawTextures.find(draw.mesh);
+                const MaterialKey materialKey{
+                    draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+                const auto textures = m_drawTextures.find(materialKey);
                 if (textures != m_drawTextures.end())
                 {
                     const auto srvRange = context.resources->GetDescriptorRing().Allocate(4);

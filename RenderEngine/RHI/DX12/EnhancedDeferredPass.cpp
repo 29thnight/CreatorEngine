@@ -101,12 +101,44 @@ VSOut VSMain(uint id : SV_VertexID)
     return output;
 }
 
+// ── GGX 정반사 ──
+//
+// 거칠기·금속성을 확산 감쇠로만 쓰던 것을 실제 BRDF로 바꾼다. 그 전에는
+// 재질 격자를 그려도 가로(거칠기)·세로(금속성)가 거의 같아 보였다 —
+// 값이 셰이더에 닿는지는 확인할 수 있어도 '무엇을 하는지'는 볼 수 없었다.
+//
+// Trowbridge-Reitz(GGX) 분포 + Smith 높이 상관 가시성 + Schlick 프레넬.
+// glTF/UE4가 쓰는 조합이라 저작 도구에서 만든 값이 의도대로 보인다.
+float DistributionGGX(float ndoth, float alpha)
+{
+    const float a2 = alpha * alpha;
+    const float d = ndoth * ndoth * (a2 - 1.0f) + 1.0f;
+    return a2 / max(3.14159265f * d * d, 1e-6f);
+}
+
+float VisibilitySmith(float ndotv, float ndotl, float alpha)
+{
+    // 높이 상관(height-correlated) Smith. 분모의 4*NdotV*NdotL까지 흡수한 형태라
+    // 호출부에서 다시 나누지 않는다.
+    const float a2 = alpha * alpha;
+    const float v = ndotl * sqrt(ndotv * ndotv * (1.0f - a2) + a2);
+    const float l = ndotv * sqrt(ndotl * ndotl * (1.0f - a2) + a2);
+    return 0.5f / max(v + l, 1e-6f);
+}
+
+float3 FresnelSchlick(float3 f0, float vdoth)
+{
+    return f0 + (1.0f - f0) * pow(saturate(1.0f - vdoth), 5.0f);
+}
+
 float4 PSMain(VSOut input) : SV_TARGET
 {
     const float3 albedo   = gDiffuse.Sample(gSampler, input.uv).rgb;
     const float3 normal   = normalize(gNormal.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f);
     const float3 emissive = gEmissive.Sample(gSampler, input.uv).rgb;
-    const float  rough    = saturate(gMetalRough.Sample(gSampler, input.uv).g);
+    const float2 orm      = gMetalRough.Sample(gSampler, input.uv).gb;
+    const float  rough    = saturate(orm.x);
+    const float  metallic = saturate(orm.y);
     const float  depth    = gDepth.Sample(gSampler, input.uv).r;
 
     // 깊이에서 월드 위치를 복원한다. GBuffer에 위치를 따로 저장하는 방법도 있지만
@@ -115,6 +147,19 @@ float4 PSMain(VSOut input) : SV_TARGET
     const float4 clipPosition = float4(ndc, depth, 1.0f);
     const float4 worldHomogeneous = mul(clipPosition, gInverseViewProjection);
     const float3 worldPosition = worldHomogeneous.xyz / worldHomogeneous.w;
+
+    // 시선 방향과 재질 항은 광원마다 같으므로 루프 밖에서 한 번만 만든다.
+    const float3 viewDirection = normalize(gEyePosition.xyz - worldPosition);
+    const float  ndotv = saturate(dot(normal, viewDirection)) + 1e-5f;
+
+    // 유전체의 기본 반사율 0.04는 관행값이다(대부분의 비금속이 4% 근처).
+    // 금속은 알베도가 곧 반사색이다.
+    const float3 f0 = lerp(0.04f, albedo, metallic);
+    const float3 diffuseAlbedo = albedo / 3.14159265f;
+
+    // 거칠기를 그대로 쓰면 0에서 정반사가 점 하나가 되어 화면에서 사라진다.
+    // 제곱해 쓰는 것이 관행이고, 하한을 두어 완전 거울을 피한다.
+    const float alpha = max(rough * rough, 1e-3f);
 
     float3 lit = 0.0f;
     for (uint i = 0; i < gLightCount; ++i)
@@ -155,12 +200,23 @@ float4 PSMain(VSOut input) : SV_TARGET
         }
 
         const float ndotl = saturate(dot(normal, toLight));
-        lit += albedo * light.color.rgb * light.color.a * ndotl * attenuation;
-    }
+        if (ndotl <= 0.0f || attenuation <= 0.0f) continue;
 
-    // 거칠기는 아직 확산 감쇠로만 쓴다. 정반사 항은 DX11과 픽셀 대조를 시작하는
-    // 시점에 그쪽 BRDF에 맞춰 넣는다 — 지금 임의로 넣으면 대조가 어긋난다.
-    lit *= (1.0f - rough * 0.5f);
+        const float3 halfVector = normalize(toLight + viewDirection);
+        const float  ndoth = saturate(dot(normal, halfVector));
+        const float  vdoth = saturate(dot(viewDirection, halfVector));
+
+        const float3 fresnel = FresnelSchlick(f0, vdoth);
+        const float3 specular = fresnel
+            * DistributionGGX(ndoth, alpha)
+            * VisibilitySmith(ndotv, ndotl, alpha);
+
+        // 에너지 보존: 반사되지 않은 몫만 확산으로 간다. 금속은 확산이 없다.
+        const float3 kd = (1.0f - fresnel) * (1.0f - metallic);
+
+        const float3 radiance = light.color.rgb * light.color.a * ndotl * attenuation;
+        lit += (kd * diffuseAlbedo + specular) * radiance;
+    }
 
     return float4(lit + emissive, 1.0f);
 }

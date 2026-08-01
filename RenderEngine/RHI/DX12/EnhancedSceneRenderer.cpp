@@ -2675,6 +2675,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         + " · 히트 " + std::to_string(textureStats.hits)
         + " · 실패 " + std::to_string(textureStats.failures)
         + " · baseColor 있는 드로우 " + std::to_string(materialsWithTexture) + "\n";
+    outLog += "      키잉 — 드로우 " + std::to_string(gbuffer.GetLastDrawCount())
+        + " · 메시 " + std::to_string(gbuffer.GetLastMeshCount())
+        + " · 재질 " + std::to_string(gbuffer.GetLastMaterialCount()) + "\n";
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
         + "(" + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
@@ -2839,6 +2842,112 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         frameContext.draws = &draws;
     }
 
+    // ── 드로우별 재질 키잉이 사는가 ──
+    //
+    // 같은 메시를 재질만 바꿔 두 번 그린다. 전에는 재질을 메시로 키잉해서
+    // 두 번째가 첫 번째의 텍스처로 그려졌는데, 실제 씬에서는 메시마다 재질이
+    // 달라 그 상태로도 통과했다 — 그래서 일부러 겹치는 경우를 만든다.
+    // 씬의 재질에 기대지 않는다. 이 씬의 baseColor가 전부 비어 있으면
+    // '다른 재질'을 만들 수 없어 단정이 조용히 통과한다 — 실제로 그랬다.
+    // 그래서 검증용 텍스처 둘을 직접 만들어 포인터를 갈라 놓는다.
+    uint32_t keyedMaterialCount = 0;
+    if (!draws.empty())
+    {
+        auto* keyTextureA = Texture::Create(4, 4, "MatKeyA",
+            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
+        auto* keyTextureB = Texture::Create(4, 4, "MatKeyB",
+            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
+
+        if (nullptr != keyTextureA && nullptr != keyTextureB)
+        {
+            keyTextureA->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
+            keyTextureB->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
+
+            std::vector<EnhancedDrawItem> sameMeshDraws;
+
+            EnhancedDrawItem first = draws.front();
+            first.baseColor = keyTextureA;
+            sameMeshDraws.push_back(first);
+
+            EnhancedDrawItem variant = draws.front();   // 메시는 같다
+            variant.baseColor = keyTextureB;            // 재질만 다르다
+            sameMeshDraws.push_back(variant);
+
+            frameContext.draws = &sameMeshDraws;
+
+            // PrepareFrame을 직접 부르지 않고 렌더를 한 번 돌린다.
+            //
+            // PrepareFrame은 업로드를 위해 커맨드 리스트에 기록하는데, 프레임
+            // 밖에서 부르면 닫힌 리스트를 만진다("This API cannot be called on
+            // a closed command list" 4건이 실제로 나왔다). 프레임 경계를 여는
+            // 경로가 이미 있으니 그것을 쓴다.
+            uint32_t coveredTemp = 0;
+            uint32_t drawTemp = 0;
+            double luminanceTemp = 0.0;
+            std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+            EnhancedRenderGraph::Stats statsTemp{};
+
+            if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+                timingsTemp, statsTemp, luminanceTemp))
+            {
+                outLog += "[4/4] 재질 키잉 렌더 실패: " + error + "\n";
+                return false;
+            }
+            keyedMaterialCount = gbuffer.GetLastMaterialCount();
+
+            frameContext.draws = &draws;
+        }
+
+        Memory::SafeDelete(keyTextureA);
+        Memory::SafeDelete(keyTextureB);
+    }
+
+    // ── 정반사 항이 사는가 ──
+    //
+    // 같은 씬을 거칠기 0과 1로 그려 밝기를 비교한다. 확산 감쇠만 있던 예전
+    // 셰이더에서도 값은 달라지지만, 그때는 거칠기가 밝기를 '깎기만' 했다.
+    // GGX가 들어오면 거친 쪽이 더 어두운 관계가 유지되면서 차이가 커진다.
+    double luminanceSmooth = 0.0;
+    double luminanceRough = 0.0;
+    {
+        std::vector<EnhancedDrawItem> smoothDraws = draws;
+        std::vector<EnhancedDrawItem> roughDraws = draws;
+        for (auto& item : smoothDraws) { item.roughness = 0.05f; item.metallic = 0.f; }
+        for (auto& item : roughDraws) { item.roughness = 1.0f; item.metallic = 0.f; }
+
+        uint32_t coveredTemp = 0;
+        uint32_t drawTemp = 0;
+        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+        EnhancedRenderGraph::Stats statsTemp{};
+
+        frameContext.draws = &smoothDraws;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceSmooth))
+        {
+            outLog += "[4/4] 매끈한 재질 렌더 실패: " + error + "\n";
+            return false;
+        }
+
+        frameContext.draws = &roughDraws;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceRough))
+        {
+            outLog += "[4/4] 거친 재질 렌더 실패: " + error + "\n";
+            return false;
+        }
+
+        frameContext.draws = &draws;
+    }
+
+    {
+        char line[224]{};
+        std::snprintf(line, sizeof(line),
+            "      재질 경로 — 같은 메시 두 재질 키 %u개 · 거칠기 0.05 밝기 %.5f"
+            " · 거칠기 1.0 밝기 %.5f\n",
+            keyedMaterialCount, luminanceSmooth, luminanceRough);
+        outLog += line;
+    }
+
     char shadowLine[320]{};
     std::snprintf(shadowLine, sizeof(shadowLine),
         "      그림자 — 방향광 %s · 캐스터 %u(컬링 %u) · 분할 %.1f/%.1f/%.1f"
@@ -2857,6 +2966,21 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         passed = false;
         verdict = "광원을 " + std::to_string(lights.size())
             + "개 넘겼는데 밝기가 광원 0개일 때와 같다 — 광원이 셰이더에 닿지 않는다";
+    }
+    // 드로우별 재질 키잉. 같은 메시에 재질 둘을 넣었으므로 키가 둘이어야 한다.
+    else if (!draws.empty() && 2 != keyedMaterialCount)
+    {
+        passed = false;
+        verdict = "같은 메시에 서로 다른 재질 둘을 넣었는데 재질 키가 "
+            + std::to_string(keyedMaterialCount)
+            + "개다 — 재질이 메시로 키잉되어 뒤엣것이 무시된다";
+    }
+    // 정반사 항. 거칠기가 밝기를 바꾸지 못하면 BRDF가 결과에 닿지 않는 것이다.
+    else if (0 != drawCountA && std::fabs(luminanceSmooth - luminanceRough) <= 1e-5)
+    {
+        passed = false;
+        verdict = "거칠기를 0.05와 1.0으로 바꿔 그렸는데 밝기가 같다"
+            " — 정반사 항이 결과에 닿지 않는다";
     }
     // 깊이 전용 렌더가 무언가 기록했는가(①②).
     else if (shadowTestable && 0 == baselineShadowOccluders)
@@ -2914,8 +3038,18 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 통째로 건너뛰어진 것이다. 이 단정이 없어서 실제로 그 상태로 통과한 적이
     // 있다(업로드 0건인데 검증 통과) — 확인하지 못한 것과 확인했고 문제없는
     // 것은 다르다.
+    // ★ 아래 체인은 앞 체인과 별개다. 앞에서 이미 실패했으면 들어가지 않는다.
+    //
+    // 예전에는 그냥 이어 붙어 있어서, 앞에서 잡은 실패의 사유가 이 체인의 마지막
+    // else("카메라 이동으로 커버리지가 바뀌었다")에 덮여 사라졌다. 실패로는
+    // 끝나지만 왜 실패했는지가 성공 메시지로 바뀌어 있었다 — 실제로 재질 키잉
+    // 단정을 넣고 나서 그 모양으로 한 번 속았다.
     const auto finalTextureStats = textureCache.GetStats();
-    if (passed && 0 != materialsWithTexture && 0 == finalTextureStats.uploads)
+    if (!passed)
+    {
+        // 사유는 앞에서 정했다. 여기서 덮지 않는다.
+    }
+    else if (passed && 0 != materialsWithTexture && 0 == finalTextureStats.uploads)
     {
         passed = false;
         verdict = "재질에 baseColor가 " + std::to_string(materialsWithTexture)
