@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <wrl/client.h>
@@ -52,6 +53,17 @@ public:
         uint64_t peakFrameBytes{ 0 };// 한 프레임이 쓴 최대치. 구간 크기를 정하는 근거가 된다
     };
 
+    // 통계는 원자적으로 센다. 커맨드 기록이 병렬로 돌면 여러 스레드가 같은
+    // 링에서 잘라 가고, 그때 통계가 어긋나면 '구간을 얼마나 썼는가'라는
+    // 유일한 근거를 잃는다.
+    struct AtomicStats
+    {
+        std::atomic<uint64_t> allocations{ 0 };
+        std::atomic<uint64_t> bytesAllocated{ 0 };
+        std::atomic<uint64_t> overflows{ 0 };
+        std::atomic<uint64_t> peakFrameBytes{ 0 };
+    };
+
     bool Initialize(ID3D12Device* device, uint64_t bytesPerFrame, uint32_t frameCount,
         std::string& outError);
     void Shutdown();
@@ -67,10 +79,18 @@ public:
     // 깨지는 방식으로만 드러나서 추적이 어렵다.
     Allocation Allocate(uint64_t size, uint64_t alignment);
 
-    Stats    GetStats() const { return m_stats; }
+    Stats GetStats() const
+    {
+        Stats stats{};
+        stats.allocations = m_stats.allocations.load(std::memory_order_relaxed);
+        stats.bytesAllocated = m_stats.bytesAllocated.load(std::memory_order_relaxed);
+        stats.overflows = m_stats.overflows.load(std::memory_order_relaxed);
+        stats.peakFrameBytes = m_stats.peakFrameBytes.load(std::memory_order_relaxed);
+        return stats;
+    }
     uint64_t GetBytesPerFrame() const { return m_bytesPerFrame; }
     uint32_t GetFrameCount() const { return m_frameCount; }
-    uint64_t GetFrameUsedBytes() const { return m_cursor; }
+    uint64_t GetFrameUsedBytes() const { return m_cursor.load(std::memory_order_relaxed); }
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -83,9 +103,17 @@ private:
     uint32_t m_frameCount{ 0 };
 
     uint32_t m_frameIndex{ 0 };
-    uint64_t m_cursor{ 0 };   // 현재 프레임 구간 안에서의 사용량
+    // 커서는 원자적이다. 커맨드 기록을 여러 스레드가 나눠 하면 같은 링에서
+    // 동시에 잘라 가고, 그때 단순 증가면 두 스레드가 같은 구간을 받는다 —
+    // 증상은 '가끔 상수가 다른 드로우 것으로 보인다'라 추적이 매우 어렵다.
+    //
+    // fetch_add로는 부족하다. 정렬을 맞춘 뒤에 크기를 더해야 하는데 그 둘이
+    // 한 연산이 아니기 때문이다. compare_exchange로 묶는다.
+    std::atomic<uint64_t> m_cursor{ 0 };   // 현재 프레임 구간 안에서의 사용량
 
-    Stats m_stats;
+    AtomicStats m_stats;
+
+    void RecordPeak(uint64_t used);
 };
 
 #endif

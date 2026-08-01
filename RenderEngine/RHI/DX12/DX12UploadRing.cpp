@@ -71,8 +71,11 @@ bool DX12UploadRing::Initialize(ID3D12Device* device, uint64_t bytesPerFrame, ui
     m_mapped = static_cast<uint8_t*>(mapped);
     m_gpuBase = m_buffer->GetGPUVirtualAddress();
     m_frameIndex = 0;
-    m_cursor = 0;
-    m_stats = Stats{};
+    m_cursor.store(0, std::memory_order_relaxed);
+    m_stats.allocations.store(0, std::memory_order_relaxed);
+    m_stats.bytesAllocated.store(0, std::memory_order_relaxed);
+    m_stats.overflows.store(0, std::memory_order_relaxed);
+    m_stats.peakFrameBytes.store(0, std::memory_order_relaxed);
 
     m_buffer->SetName(L"DX12UploadRing");
     return true;
@@ -98,13 +101,19 @@ void DX12UploadRing::BeginFrame(uint32_t frameIndex)
     if (0 == m_frameCount) return;
 
     // 직전 프레임이 얼마나 썼는지를 남긴다 — 구간 크기를 정하는 유일한 근거다.
-    if (m_cursor > m_stats.peakFrameBytes)
-    {
-        m_stats.peakFrameBytes = m_cursor;
-    }
+    RecordPeak(m_cursor.load(std::memory_order_relaxed));
 
     m_frameIndex = frameIndex % m_frameCount;
-    m_cursor = 0;
+    m_cursor.store(0, std::memory_order_relaxed);
+}
+
+void DX12UploadRing::RecordPeak(uint64_t used)
+{
+    uint64_t peak = m_stats.peakFrameBytes.load(std::memory_order_relaxed);
+    while (used > peak &&
+        !m_stats.peakFrameBytes.compare_exchange_weak(peak, used, std::memory_order_relaxed))
+    {
+    }
 }
 
 DX12UploadRing::Allocation DX12UploadRing::Allocate(uint64_t size, uint64_t alignment)
@@ -112,15 +121,29 @@ DX12UploadRing::Allocation DX12UploadRing::Allocate(uint64_t size, uint64_t alig
     Allocation allocation{};
     if (nullptr == m_mapped || 0 == size) return allocation;
 
-    const uint64_t alignedCursor = AlignUp(m_cursor, alignment);
-    if (alignedCursor + size > m_bytesPerFrame)
+    // 정렬과 예약을 한 연산으로 묶는다.
+    //
+    // fetch_add로는 안 된다. 커서를 정렬로 올린 뒤 크기를 더해야 하는데 그 둘
+    // 사이에 다른 스레드가 끼면 두 스레드가 같은 구간을 받는다 — 증상은
+    // '가끔 상수가 다른 드로우 것으로 보인다'라 추적이 매우 어렵다.
+    uint64_t current = m_cursor.load(std::memory_order_relaxed);
+    uint64_t alignedCursor = 0;
+    uint64_t next = 0;
+
+    do
     {
-        // 다른 프레임 구간을 침범하지 않는다. 침범하면 GPU가 아직 읽고 있는
-        // 데이터를 덮어쓰게 되고, 증상은 '다음 프레임에 가끔 이상한 것이 보인다'로
-        // 나타나 추적이 매우 어렵다. 거절하고 세어 둔다.
-        ++m_stats.overflows;
-        return allocation;
-    }
+        alignedCursor = AlignUp(current, alignment);
+        next = alignedCursor + size;
+
+        if (next > m_bytesPerFrame)
+        {
+            // 다른 프레임 구간을 침범하지 않는다. 침범하면 GPU가 아직 읽고 있는
+            // 데이터를 덮어쓰게 되고, 증상은 '다음 프레임에 가끔 이상한 것이 보인다'로
+            // 나타나 추적이 매우 어렵다. 거절하고 세어 둔다.
+            m_stats.overflows.fetch_add(1, std::memory_order_relaxed);
+            return allocation;
+        }
+    } while (!m_cursor.compare_exchange_weak(current, next, std::memory_order_relaxed));
 
     const uint64_t absoluteOffset = static_cast<uint64_t>(m_frameIndex) * m_bytesPerFrame + alignedCursor;
 
@@ -130,14 +153,9 @@ DX12UploadRing::Allocation DX12UploadRing::Allocate(uint64_t size, uint64_t alig
     allocation.offset = absoluteOffset;
     allocation.size = size;
 
-    m_cursor = alignedCursor + size;
-
-    ++m_stats.allocations;
-    m_stats.bytesAllocated += size;
-    if (m_cursor > m_stats.peakFrameBytes)
-    {
-        m_stats.peakFrameBytes = m_cursor;
-    }
+    m_stats.allocations.fetch_add(1, std::memory_order_relaxed);
+    m_stats.bytesAllocated.fetch_add(size, std::memory_order_relaxed);
+    RecordPeak(next);
 
     return allocation;
 }

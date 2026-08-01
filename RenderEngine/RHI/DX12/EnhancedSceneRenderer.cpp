@@ -7,6 +7,7 @@
 #include "EnhancedGBufferPass.h"
 #include "EnhancedDeferredPass.h"
 #include "DX12GpuProfiler.h"
+#include "DX12CommandListPool.h"
 #include "DX12MeshCache.h"
 #include "DX12TextureCache.h"
 #include "../../Material.h"
@@ -3327,6 +3328,393 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
     resources.Shutdown();
 
     outLog += passed ? "크기 추종 검증 통과\n" : "크기 추종 검증 실패\n";
+    return passed;
+}
+
+bool EnhancedSceneRenderer::RunParallelRecordTest(std::string& outLog)
+{
+    using Microsoft::WRL::ComPtr;
+
+    bool passed = true;
+
+    constexpr uint32_t kWidth = 256;
+    constexpr uint32_t kHeight = 256;
+
+    DX12DeviceResources resources;
+    std::string error;
+    if (!resources.Initialize(kWidth, kHeight, error))
+    {
+        outLog += "[1/4] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    // ── [1/4] 업로드 링을 여러 스레드가 동시에 잘라도 겹치지 않는가 ──
+    //
+    // 경합은 매번 나지 않는다. 그래서 결과 픽셀만 보면 우연히 통과할 수 있고,
+    // 그 우연은 나중에 '가끔 상수가 다른 드로우 것으로 보인다'로 돌아온다.
+    // 할당 구간을 직접 모아 겹침을 본다.
+    {
+        constexpr uint32_t kThreads = 8;
+        constexpr uint32_t kPerThread = 256;
+
+        std::vector<std::vector<std::pair<uint64_t, uint64_t>>> ranges(kThreads);
+        std::vector<std::thread> threads;
+
+        for (uint32_t t = 0; t < kThreads; ++t)
+        {
+            threads.emplace_back([&, t]()
+            {
+                ranges[t].reserve(kPerThread);
+                for (uint32_t i = 0; i < kPerThread; ++i)
+                {
+                    // 크기를 섞는다. 같은 크기만 쓰면 정렬 계산이 항상 같아
+                    // 경합 창이 좁아진다.
+                    const uint64_t size = 16ull + (i % 7) * 48ull;
+                    const auto allocation = resources.GetUploadRing().Allocate(
+                        size, DX12UploadRing::kConstantBufferAlignment);
+                    if (allocation.IsValid())
+                    {
+                        ranges[t].emplace_back(allocation.offset, allocation.offset + size);
+                    }
+                }
+            });
+        }
+        for (auto& thread : threads) thread.join();
+
+        std::vector<std::pair<uint64_t, uint64_t>> all;
+        for (auto& list : ranges) all.insert(all.end(), list.begin(), list.end());
+        std::sort(all.begin(), all.end());
+
+        uint32_t overlaps = 0;
+        for (size_t i = 1; i < all.size(); ++i)
+        {
+            if (all[i].first < all[i - 1].second) ++overlaps;
+        }
+
+        char line[192]{};
+        std::snprintf(line, sizeof(line),
+            "[1/4] 업로드 링 — 스레드 %u · 할당 %zu건 · 겹침 %u건\n",
+            kThreads, all.size(), overlaps);
+        outLog += line;
+
+        if (0 != overlaps)
+        {
+            passed = false;
+            outLog += "      실패 — 두 스레드가 같은 구간을 받았다\n";
+        }
+        if (all.size() < kThreads)
+        {
+            passed = false;
+            outLog += "      실패 — 할당이 거의 이뤄지지 않았다(구간이 너무 작다)\n";
+        }
+    }
+
+    // ── [2/4] 디스크립터 링도 같은가 ──
+    {
+        constexpr uint32_t kThreads = 8;
+        constexpr uint32_t kPerThread = 128;
+
+        std::vector<std::vector<std::pair<uint64_t, uint64_t>>> ranges(kThreads);
+        std::vector<std::thread> threads;
+
+        for (uint32_t t = 0; t < kThreads; ++t)
+        {
+            threads.emplace_back([&, t]()
+            {
+                ranges[t].reserve(kPerThread);
+                for (uint32_t i = 0; i < kPerThread; ++i)
+                {
+                    const uint32_t count = 1u + (i % 4);
+                    const auto allocation = resources.GetDescriptorRing().Allocate(count);
+                    if (allocation.IsValid())
+                    {
+                        ranges[t].emplace_back(allocation.gpu.ptr,
+                            allocation.gpu.ptr + static_cast<uint64_t>(count)
+                                * allocation.incrementSize);
+                    }
+                }
+            });
+        }
+        for (auto& thread : threads) thread.join();
+
+        std::vector<std::pair<uint64_t, uint64_t>> all;
+        for (auto& list : ranges) all.insert(all.end(), list.begin(), list.end());
+        std::sort(all.begin(), all.end());
+
+        uint32_t overlaps = 0;
+        for (size_t i = 1; i < all.size(); ++i)
+        {
+            if (all[i].first < all[i - 1].second) ++overlaps;
+        }
+
+        char line[192]{};
+        std::snprintf(line, sizeof(line),
+            "[2/4] 디스크립터 링 — 스레드 %u · 할당 %zu건 · 겹침 %u건\n",
+            kThreads, all.size(), overlaps);
+        outLog += line;
+
+        if (0 != overlaps)
+        {
+            passed = false;
+            outLog += "      실패 — 두 스레드가 같은 디스크립터 구간을 받았다\n";
+        }
+    }
+
+    // ── [3/4] 순차와 병렬의 결과가 같은가 ──
+    //
+    // 같은 타깃에 색을 순서대로 덮는 패스를 여러 개 둔다. 순서가 지켜지면
+    // 마지막 패스의 색만 남는다. 순서가 깨지거나 리스트가 두 번 실행되면
+    // 다른 색이 나오고, 그 차이는 픽셀 대조로 잡힌다.
+    constexpr uint32_t kPassCount = 6;
+
+    const uint32_t rowPitch = (kWidth * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
+        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+
+    ComPtr<ID3D12Resource> readback;
+    {
+        D3D12_HEAP_PROPERTIES readbackHeap{};
+        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<uint64_t>(rowPitch) * kHeight;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+            IID_PPV_ARGS(&readback))))
+        {
+            outLog += "[3/4] 리드백 버퍼 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+    }
+
+    ComPtr<ID3D12DescriptorHeap> rtvHeap;
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+        heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        heapDesc.NumDescriptors = 1;
+        if (FAILED(resources.GetDevice()->CreateDescriptorHeap(&heapDesc,
+            IID_PPV_ARGS(&rtvHeap))))
+        {
+            outLog += "[3/4] RTV 힙 생성 실패\n";
+            resources.Shutdown();
+            return false;
+        }
+    }
+
+    DX12CommandListPool pool;
+    if (!pool.Initialize(resources.GetDevice(), 4, DX12DeviceResources::kFrameCount, error))
+    {
+        outLog += "[3/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
+        resources.Shutdown();
+        return false;
+    }
+
+    // 순차/병렬을 같은 코드로 돌린다. 그래야 차이가 '병렬이라서'로 좁혀진다.
+    const auto renderOnce = [&](uint32_t workers, std::vector<uint8_t>& outPixels,
+        EnhancedRenderGraph::Stats& outStats, std::string& outStepError) -> bool
+    {
+        if (!resources.BeginFrame(outStepError)) return false;
+        pool.BeginFrame(0);
+
+        EnhancedRenderGraph graph;
+
+        RGTextureDesc targetDesc{};
+        targetDesc.width = kWidth;
+        targetDesc.height = kHeight;
+        targetDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        targetDesc.allowRenderTarget = true;
+        targetDesc.name = "Parallel.Target";
+
+        // 클리어 값을 리소스에 미리 알린다. 다른 값으로 클리어하면 검증 레이어가
+        // "느려진다"고 경고하고, 그 경고를 검증에서 무시하기 시작하면 다른 곳의
+        // 진짜 실수도 같이 묻힌다.
+        targetDesc.clearColor[0] = 0.25f;
+        targetDesc.clearColor[1] = 0.5f;
+        targetDesc.clearColor[2] = 0.75f;
+        targetDesc.clearColor[3] = 1.f;
+        const RGHandle target = graph.CreateTexture(targetDesc);
+
+        // 패스마다 자기 가로 띠만 지운다.
+        //
+        // 색으로 순서를 확인하려면 패스마다 다른 색을 써야 하는데 그러면 위
+        // 경고가 난다. 대신 띠를 나눠 '전 구간이 빠짐없이 덮이는가'를 본다 —
+        // 리스트 하나가 통째로 빠지면 그 띠가 미정의 값으로 남는다.
+        //
+        // 순서 자체는 순차와 병렬의 픽셀이 완전히 같은지로 확인한다([3/4]).
+        for (uint32_t i = 0; i < kPassCount; ++i)
+        {
+            graph.AddPass("clear" + std::to_string(i),
+                { { target, RGResourceState::RenderTarget } },
+                [&, i](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                {
+                    const auto rtv = rtvHeap->GetCPUDescriptorHandleForHeapStart();
+                    resources.GetDevice()->CreateRenderTargetView(
+                        executeContext.Resolve(target), nullptr, rtv);
+
+                    const LONG bandTop = static_cast<LONG>(kHeight * i / kPassCount);
+                    const LONG bandBottom = static_cast<LONG>(kHeight * (i + 1) / kPassCount);
+                    const D3D12_RECT band{ 0, bandTop, static_cast<LONG>(kWidth), bandBottom };
+
+                    const float color[4] = { 0.25f, 0.5f, 0.75f, 1.f };
+                    executeContext.commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+                    executeContext.commandList->ClearRenderTargetView(rtv, color, 1, &band);
+                }, true);
+        }
+
+        graph.AddPass("readback", { { target, RGResourceState::CopySource } },
+            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                D3D12_TEXTURE_COPY_LOCATION dst{};
+                dst.pResource = readback.Get();
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                dst.PlacedFootprint.Footprint.Width = kWidth;
+                dst.PlacedFootprint.Footprint.Height = kHeight;
+                dst.PlacedFootprint.Footprint.Depth = 1;
+                dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
+
+                D3D12_TEXTURE_COPY_LOCATION src{};
+                src.pResource = executeContext.Resolve(target);
+                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            }, true);
+
+        if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
+
+        // 업로드(여기서는 없지만 실제 패스에서는 있다)가 워커 리스트보다 먼저
+        // 가야 하므로 중간 제출로 경계를 만든다.
+        if (!resources.FlushCommandList(outStepError)) return false;
+
+        if (!graph.ExecuteParallel(pool, resources.GetCommandQueue(), workers, outStepError))
+        {
+            return false;
+        }
+        outStats = graph.GetStats();
+
+        if (!resources.EndFrame(outStepError)) return false;
+        resources.WaitForGpu();
+
+        outPixels.assign(static_cast<size_t>(rowPitch) * kHeight, 0);
+        void* mapped = nullptr;
+        D3D12_RANGE range{ 0, outPixels.size() };
+        if (FAILED(readback->Map(0, &range, &mapped)))
+        {
+            outStepError = "리드백 Map 실패";
+            return false;
+        }
+        memcpy(outPixels.data(), mapped, outPixels.size());
+        readback->Unmap(0, nullptr);
+        return true;
+    };
+
+    std::vector<uint8_t> sequential;
+    std::vector<uint8_t> parallel;
+    EnhancedRenderGraph::Stats sequentialStats{};
+    EnhancedRenderGraph::Stats parallelStats{};
+
+    if (!renderOnce(1, sequential, sequentialStats, error))
+    {
+        outLog += "[3/4] 순차 실행 실패: " + error + "\n";
+        pool.Shutdown();
+        resources.Shutdown();
+        return false;
+    }
+    if (!renderOnce(4, parallel, parallelStats, error))
+    {
+        outLog += "[3/4] 병렬 실행 실패: " + error + "\n";
+        pool.Shutdown();
+        resources.Shutdown();
+        return false;
+    }
+
+    size_t differing = 0;
+    for (size_t i = 0; i < sequential.size() && i < parallel.size(); ++i)
+    {
+        if (sequential[i] != parallel[i]) ++differing;
+    }
+
+    {
+        char line[224]{};
+        std::snprintf(line, sizeof(line),
+            "[3/4] 순차(워커 %u·리스트 %u) vs 병렬(워커 %u·리스트 %u) — 다른 바이트 %zu\n",
+            sequentialStats.recordWorkers, sequentialStats.submittedLists,
+            parallelStats.recordWorkers, parallelStats.submittedLists, differing);
+        outLog += line;
+    }
+
+    if (0 != differing)
+    {
+        passed = false;
+        outLog += "      실패 — 병렬 결과가 순차와 다르다\n";
+    }
+    if (parallelStats.recordWorkers <= 1)
+    {
+        passed = false;
+        outLog += "      실패 — 병렬로 요청했는데 워커가 하나다(비교가 성립하지 않는다)\n";
+    }
+
+    // ── [4/4] 모든 패스의 띠가 빠짐없이 덮였는가 ──
+    //
+    // 리스트 하나가 통째로 빠지면 그 띠가 미정의 값으로 남는다.
+    //
+    // 제출 순서 자체는 [3/4]가 본다 — 순서가 달라지면 순차와 픽셀이 갈린다.
+    // 리스트 중복 제출은 구조로 막았다(연속 블록 배분이라 워커당 한 번이고,
+    // 제출 리스트 수 == 워커 수로 확인한다).
+    {
+        const auto expected = static_cast<int>(0.25f * 255.f + 0.5f);
+
+        uint32_t wrongPixels = 0;
+        for (uint32_t y = 0; y < kHeight; ++y)
+        {
+            const uint8_t* row = parallel.data() + static_cast<size_t>(y) * rowPitch;
+            for (uint32_t x = 0; x < kWidth; ++x)
+            {
+                if (std::abs(static_cast<int>(row[static_cast<size_t>(x) * 4]) - expected) > 1)
+                {
+                    ++wrongPixels;
+                }
+            }
+        }
+
+        char line[192]{};
+        std::snprintf(line, sizeof(line),
+            "[4/4] 띠 덮임 — 기대와 다른 픽셀 %u/%u · 제출 리스트 %u(워커 %u)\n",
+            wrongPixels, kWidth * kHeight,
+            parallelStats.submittedLists, parallelStats.recordWorkers);
+        outLog += line;
+
+        if (0 != wrongPixels)
+        {
+            passed = false;
+            outLog += "      실패 — 덮이지 않은 구간이 있다(리스트가 빠졌다)\n";
+        }
+        if (parallelStats.submittedLists != parallelStats.recordWorkers)
+        {
+            passed = false;
+            outLog += "      실패 — 제출 리스트 수가 워커 수와 다르다\n";
+        }
+    }
+
+    std::string messages;
+    const uint32_t problems = resources.DrainDebugMessages(messages);
+    if (0 != problems)
+    {
+        passed = false;
+        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
+    }
+
+    pool.Shutdown();
+    resources.Shutdown();
+
+    outLog += passed ? "병렬 기록 검증 통과\n" : "병렬 기록 검증 실패\n";
     return passed;
 }
 

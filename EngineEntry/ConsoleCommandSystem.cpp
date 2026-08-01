@@ -1443,6 +1443,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.resize] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.resize %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.parallel")
+    {
+        // 커맨드 기록 병렬화 검증(PHASE 3-6).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunParallelRecordTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.parallel] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.parallel %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.gbuffer")
     {
         // GBuffer 패스 검증(PHASE 3-6).
@@ -2250,6 +2262,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.rendergraph     렌더 그래프 검증(순서·흐름·배리어·컬링·실행)\n"
         "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"
         "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
+        "  dx12.parallel        커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)\n"
         "  render.exposure      자동 노출이 무엇을 재고 무엇을 결정했는지\n"
         "  render.post <이름> <on|off>  포스트 패스 토글(fog·bloom·ssgi·vignette·colorgrading)\n"
         "  render.rtinfo        창·뷰포트·추종 텍스처 크기를 나란히 찍는다\n"

@@ -288,6 +288,22 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     return true;
 }
 
+bool DX12DeviceResources::FlushCommandList(std::string& outError)
+{
+    HRESULT hr = m_commandList->Close();
+    if (FAILED(hr)) { outError = "중간 제출 Close 실패 " + HrToString(hr); return false; }
+
+    ID3D12CommandList* lists[] = { m_commandList.Get() };
+    m_queue->ExecuteCommandLists(1, lists);
+
+    // 얼로케이터는 그대로 둔다. 리스트만 다시 여는 것은 제출 직후에도 된다 —
+    // 얼로케이터를 되돌리면 GPU가 읽는 중인 메모리를 재사용하게 된다.
+    hr = m_commandList->Reset(m_allocators[m_frameIndex].Get(), nullptr);
+    if (FAILED(hr)) { outError = "중간 제출 Reset 실패 " + HrToString(hr); return false; }
+
+    return true;
+}
+
 bool DX12DeviceResources::EndFrame(std::string& outError)
 {
     HRESULT hr = m_commandList->Close();

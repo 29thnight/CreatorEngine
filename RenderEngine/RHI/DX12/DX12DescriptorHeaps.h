@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <mutex>
@@ -59,6 +60,16 @@ public:
         uint32_t peakFrameDescriptors{ 0 };
     };
 
+    // 업로드 링과 같은 이유로 원자적으로 센다 — 커맨드 기록이 병렬로 돌면
+    // 여러 스레드가 같은 링에서 잘라 간다.
+    struct AtomicStats
+    {
+        std::atomic<uint64_t> allocations{ 0 };
+        std::atomic<uint64_t> descriptors{ 0 };
+        std::atomic<uint64_t> overflows{ 0 };
+        std::atomic<uint32_t> peakFrameDescriptors{ 0 };
+    };
+
     bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
         uint32_t descriptorsPerFrame, uint32_t frameCount, std::string& outError);
     void Shutdown();
@@ -78,8 +89,16 @@ public:
     ID3D12DescriptorHeap* GetHeap() const { return m_heap.Get(); }
     uint32_t GetDescriptorsPerFrame() const { return m_descriptorsPerFrame; }
     uint32_t GetFrameCount() const { return m_frameCount; }
-    uint32_t GetFrameUsed() const { return m_cursor; }
-    Stats    GetStats() const { return m_stats; }
+    uint32_t GetFrameUsed() const { return m_cursor.load(std::memory_order_relaxed); }
+    Stats GetStats() const
+    {
+        Stats stats{};
+        stats.allocations = m_stats.allocations.load(std::memory_order_relaxed);
+        stats.descriptors = m_stats.descriptors.load(std::memory_order_relaxed);
+        stats.overflows = m_stats.overflows.load(std::memory_order_relaxed);
+        stats.peakFrameDescriptors = m_stats.peakFrameDescriptors.load(std::memory_order_relaxed);
+        return stats;
+    }
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -92,9 +111,14 @@ private:
     uint32_t m_descriptorsPerFrame{ 0 };
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
-    uint32_t m_cursor{ 0 };
 
-    Stats m_stats;
+    // 커서는 원자적이다. 이유는 업로드 링과 같다 — 두 스레드가 같은 구간을
+    // 받으면 디스크립터가 서로를 덮고, 증상은 '가끔 엉뚱한 텍스처가 보인다'다.
+    std::atomic<uint32_t> m_cursor{ 0 };
+
+    AtomicStats m_stats;
+
+    void RecordPeak(uint32_t used);
 };
 
 // 샘플러 힙 + 중복 제거 캐시.

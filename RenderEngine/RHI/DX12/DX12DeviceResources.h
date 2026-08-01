@@ -65,6 +65,16 @@ public:
     bool BeginFrame(std::string& outError);
     // 커맨드 리스트를 닫고 제출한 뒤 펜스 신호를 건다.
     bool EndFrame(std::string& outError);
+
+    /// 프레임 중간에 지금까지 기록한 것을 제출하고 리스트를 다시 연다.
+    ///
+    /// 병렬 기록에 필요하다. 업로드(PrepareFrame)는 이 리스트에 기록되는데,
+    /// 그것이 워커 리스트보다 먼저 실행되어야 한다. EndFrame이 마지막에
+    /// 제출하는 구조라 그대로 두면 순서가 뒤집힌다.
+    ///
+    /// 얼로케이터는 되돌리지 않는다 — GPU가 아직 그 메모리를 읽는 중이다.
+    /// 리스트만 다시 여는 것은 제출 직후에도 허용된다.
+    bool FlushCommandList(std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
     void WaitForGpu();
 

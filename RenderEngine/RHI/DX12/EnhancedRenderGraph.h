@@ -8,6 +8,7 @@
 #include <d3d12.h>
 
 #include "DX12GpuProfiler.h"
+#include "DX12CommandListPool.h"
 
 // DX12 실행 경로용 렌더 그래프 (PHASE 3-5).
 //
@@ -82,6 +83,11 @@ struct RGTextureDesc
 
     DXGI_FORMAT format{ DXGI_FORMAT_R8G8B8A8_UNORM };
     bool        allowRenderTarget{ false };
+
+    // 최적 클리어 값. 리소스를 만들 때 넘기는 힌트이고, 실제 ClearRenderTargetView가
+    // 다른 값을 쓰면 검증 레이어가 "느려진다"고 경고한다. 힌트를 안 주는 것도
+    // 경고 대상이라(3-3 실측) 기본값을 두고 필요하면 호출부가 맞춘다.
+    float       clearColor[4]{ 0.f, 0.f, 0.f, 0.f };
     bool        allowDepthStencil{ false };
     bool        allowUnorderedAccess{ false };
     std::string name;
@@ -112,6 +118,11 @@ public:
         uint32_t barriersEmitted{ 0 };
         uint32_t barrierBatches{ 0 };   // 배리어를 몇 번에 나눠 넣었는가 — 적을수록 좋다
         uint32_t transientCreated{ 0 };
+
+        // 병렬 기록에서만 채워진다. 제출 리스트 수가 워커 수보다 적으면
+        // 놀고 있는 워커가 있다는 뜻이다(패스가 워커보다 적을 때 정상).
+        uint32_t recordWorkers{ 0 };
+        uint32_t submittedLists{ 0 };
     };
 
     void Reset();
@@ -156,6 +167,26 @@ public:
 
     // 검증·진단용. Compile 뒤에 유효하다.
     const std::vector<uint16_t>& GetExecuteOrder() const { return m_executeOrder; }
+    /// 패스를 여러 커맨드 리스트에 나눠 기록하고 선언 순서로 제출한다.
+    ///
+    /// ── 왜 이 순서인가 ──
+    ///
+    /// DX12는 ExecuteCommandLists에 넘긴 순서대로 실행한다. 그러므로 기록을
+    /// 병렬로 해도 제출 순서만 선언 순서를 지키면 그래프가 넣은 배리어의 앞뒤
+    /// 관계가 그대로 보존된다. 3-5에서 "선언 순서 = 실행 순서"를 계약으로
+    /// 정해 둔 것이 여기서 값을 한다 — 재정렬하는 그래프였다면 병렬 기록과
+    /// 배리어 순서를 동시에 만족시키기 어려웠다.
+    ///
+    /// ── 왜 패스 단위로 나누는가 ──
+    ///
+    /// 한 패스를 여러 리스트로 쪼개면 그 안의 상태(루트 시그니처·PSO·힙 바인딩)를
+    /// 리스트마다 다시 걸어야 하고, 배리어가 패스 중간에 끼면 순서가 깨진다.
+    /// 패스 하나는 리스트 하나가 통째로 맡는다.
+    ///
+    /// workerCount가 1이면 순차 실행과 같은 경로를 탄다 — 비교 기준이 된다.
+    bool ExecuteParallel(DX12CommandListPool& pool, ID3D12CommandQueue* queue,
+        uint32_t workerCount, std::string& outError);
+
     bool IsPassCulled(RGPassId pass) const;
     uint32_t GetPassBarrierCount(RGPassId pass) const;
 

@@ -2,6 +2,10 @@
 #include "EnhancedRenderGraph.h"
 
 #include <algorithm>
+#include <atomic>
+#include <thread>
+
+#include <algorithm>
 #include <queue>
 #include <sstream>
 
@@ -297,6 +301,10 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
         {
             clearValue.DepthStencil.Depth = 1.f;
         }
+        else
+        {
+            for (int i = 0; i < 4; ++i) clearValue.Color[i] = resource.desc.clearColor[i];
+        }
 
         const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
             D3D12_RESOURCE_STATE_COMMON, wantsClearValue ? &clearValue : nullptr,
@@ -430,6 +438,151 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
         if (nullptr != m_profiler) m_profiler->EndPass(commandList, timerSlot);
     }
 
+    return true;
+}
+
+bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
+    ID3D12CommandQueue* queue, uint32_t workerCount, std::string& outError)
+{
+    if (!m_compiled)
+    {
+        outError = "Compile을 먼저 불러야 한다";
+        return false;
+    }
+    if (!pool.IsInitialized() || nullptr == queue)
+    {
+        outError = "커맨드 리스트 풀이나 큐가 없다";
+        return false;
+    }
+
+    const size_t passCount = m_executeOrder.size();
+    if (0 == passCount) return true;
+
+    const uint32_t workers = (std::max)(1u, (std::min)(
+        (std::min)(workerCount, pool.GetWorkerCount()),
+        static_cast<uint32_t>(passCount)));
+
+    // ── 배분: 연속 블록 ──
+    //
+    // 라운드로빈으로 흩으면 안 된다. 워커가 A,B,A 순으로 돌아오면 A의 리스트를
+    // 두 번 제출해야 하는데, 그러면 A가 기록한 커맨드 전체가 두 번 실행된다.
+    // 리스트는 통째로 실행되는 단위라 '그 안의 일부만' 제출할 수 없다.
+    //
+    // 연속 블록이면 워커 순서 = 선언 순서가 되고, 리스트도 한 번씩만 제출된다.
+    // 대신 부하가 한쪽에 몰릴 수 있다 — 패스별 비용을 알기 전에는 균등 분할이
+    // 최선이고, 비용 기반 분할은 프로파일러가 패스별 시간을 병렬 경로에서도
+    // 줄 수 있게 된 뒤에 얹는다.
+    std::vector<uint32_t> passWorker(passCount, 0);
+    for (size_t i = 0; i < passCount; ++i)
+    {
+        passWorker[i] = static_cast<uint32_t>(i * workers / passCount);
+    }
+
+    // 리스트를 먼저 전부 연다.
+    //
+    // Open은 얼로케이터를 Reset하므로 스레드 안전하지 않다. 기록에 들어가기
+    // 전에 한 스레드에서 끝내 두면 워커는 '이미 열린 리스트에 기록'만 한다.
+    std::vector<ID3D12GraphicsCommandList*> workerLists(workers, nullptr);
+    for (uint32_t worker = 0; worker < workers; ++worker)
+    {
+        workerLists[worker] = pool.Open(worker, outError);
+        if (nullptr == workerLists[worker]) return false;
+    }
+
+    // 워커에서 터진 예외를 삼키지 않는다. 조용히 사라지면 '가끔 화면이 빈다'가
+    // 되고, 그 상태는 원인을 찾기가 매우 어렵다.
+    std::vector<std::string> workerErrors(workers);
+    std::atomic<bool> failed{ false };
+
+    const auto recordRange = [&](uint32_t worker)
+    {
+        ExecuteContext context{};
+        context.commandList = workerLists[worker];
+        context.graph = this;
+
+        try
+        {
+            for (size_t order = 0; order < passCount; ++order)
+            {
+                if (passWorker[order] != worker) continue;
+
+                Pass& pass = m_passes[m_executeOrder[order]];
+
+                // 패스별 GPU 타임스탬프는 병렬 경로에서 재지 않는다.
+                // 질의 슬롯은 리스트 하나 안에서 순서가 맞아야 하는데 지금은
+                // 리스트가 여럿이다. 워커별 질의 힙으로 나누는 것이 다음 단계다.
+                if (!pass.barriers.empty())
+                {
+                    context.commandList->ResourceBarrier(
+                        static_cast<UINT>(pass.barriers.size()), pass.barriers.data());
+                }
+
+                if (pass.execute) pass.execute(context);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            workerErrors[worker] = e.what();
+            failed.store(true, std::memory_order_relaxed);
+        }
+        catch (...)
+        {
+            workerErrors[worker] = "알 수 없는 예외";
+            failed.store(true, std::memory_order_relaxed);
+        }
+    };
+
+    if (1 == workers)
+    {
+        // 워커가 하나면 스레드를 띄우지 않는다. 비교 기준을 잴 때 스레드 생성
+        // 비용이 섞이면 '병렬이 느리다'가 무엇 때문인지 흐려진다.
+        recordRange(0);
+    }
+    else
+    {
+        std::vector<std::thread> threads;
+        threads.reserve(workers - 1);
+        for (uint32_t worker = 1; worker < workers; ++worker)
+        {
+            threads.emplace_back(recordRange, worker);
+        }
+        recordRange(0);   // 호출 스레드도 한 몫 한다
+        for (auto& thread : threads) thread.join();
+    }
+
+    if (failed.load(std::memory_order_relaxed))
+    {
+        for (uint32_t worker = 0; worker < workers; ++worker)
+        {
+            if (!workerErrors[worker].empty())
+            {
+                outError = "워커 " + std::to_string(worker) + " 기록 실패: "
+                    + workerErrors[worker];
+                return false;
+            }
+        }
+        outError = "워커 기록 실패(사유 미상)";
+        return false;
+    }
+
+    if (!pool.CloseAll(outError)) return false;
+
+    // 제출은 워커 번호 순서다. 연속 블록 배분이므로 그것이 곧 선언 순서다.
+    std::vector<ID3D12CommandList*> submission;
+    submission.reserve(workers);
+    for (uint32_t worker = 0; worker < workers; ++worker)
+    {
+        if (!pool.HasRecorded(worker)) continue;
+        submission.push_back(workerLists[worker]);
+    }
+
+    if (!submission.empty())
+    {
+        queue->ExecuteCommandLists(static_cast<UINT>(submission.size()), submission.data());
+    }
+
+    m_stats.recordWorkers = workers;
+    m_stats.submittedLists = static_cast<uint32_t>(submission.size());
     return true;
 }
 

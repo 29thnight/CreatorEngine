@@ -67,8 +67,11 @@ bool DX12DescriptorRing::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_
     m_cpuBase = m_heap->GetCPUDescriptorHandleForHeapStart();
     m_gpuBase = m_heap->GetGPUDescriptorHandleForHeapStart();
     m_frameIndex = 0;
-    m_cursor = 0;
-    m_stats = Stats{};
+    m_cursor.store(0, std::memory_order_relaxed);
+    m_stats.allocations.store(0, std::memory_order_relaxed);
+    m_stats.descriptors.store(0, std::memory_order_relaxed);
+    m_stats.overflows.store(0, std::memory_order_relaxed);
+    m_stats.peakFrameDescriptors.store(0, std::memory_order_relaxed);
 
     m_heap->SetName(L"DX12DescriptorRing");
     return true;
@@ -91,13 +94,19 @@ void DX12DescriptorRing::BeginFrame(uint32_t frameIndex)
     if (0 == m_frameCount) return;
 
     // 직전 프레임 사용량을 남긴다 — 구간 크기를 정하는 유일한 근거다.
-    if (m_cursor > m_stats.peakFrameDescriptors)
-    {
-        m_stats.peakFrameDescriptors = m_cursor;
-    }
+    RecordPeak(m_cursor.load(std::memory_order_relaxed));
 
     m_frameIndex = frameIndex % m_frameCount;
-    m_cursor = 0;
+    m_cursor.store(0, std::memory_order_relaxed);
+}
+
+void DX12DescriptorRing::RecordPeak(uint32_t used)
+{
+    uint32_t peak = m_stats.peakFrameDescriptors.load(std::memory_order_relaxed);
+    while (used > peak &&
+        !m_stats.peakFrameDescriptors.compare_exchange_weak(peak, used, std::memory_order_relaxed))
+    {
+    }
 }
 
 DX12DescriptorRing::Allocation DX12DescriptorRing::Allocate(uint32_t count)
@@ -105,13 +114,21 @@ DX12DescriptorRing::Allocation DX12DescriptorRing::Allocate(uint32_t count)
     Allocation allocation{};
     if (!m_heap || 0 == count) return allocation;
 
-    if (m_cursor + count > m_descriptorsPerFrame)
-    {
-        ++m_stats.overflows;
-        return allocation;
-    }
+    // 예약을 한 연산으로 묶는다(업로드 링과 같은 이유).
+    uint32_t current = m_cursor.load(std::memory_order_relaxed);
+    uint32_t next = 0;
 
-    const uint32_t absoluteIndex = m_frameIndex * m_descriptorsPerFrame + m_cursor;
+    do
+    {
+        next = current + count;
+        if (next > m_descriptorsPerFrame)
+        {
+            m_stats.overflows.fetch_add(1, std::memory_order_relaxed);
+            return allocation;
+        }
+    } while (!m_cursor.compare_exchange_weak(current, next, std::memory_order_relaxed));
+
+    const uint32_t absoluteIndex = m_frameIndex * m_descriptorsPerFrame + current;
 
     allocation.cpu = m_cpuBase;
     allocation.cpu.ptr += static_cast<SIZE_T>(absoluteIndex) * m_incrementSize;
@@ -122,14 +139,9 @@ DX12DescriptorRing::Allocation DX12DescriptorRing::Allocate(uint32_t count)
     allocation.count = count;
     allocation.incrementSize = m_incrementSize;
 
-    m_cursor += count;
-
-    ++m_stats.allocations;
-    m_stats.descriptors += count;
-    if (m_cursor > m_stats.peakFrameDescriptors)
-    {
-        m_stats.peakFrameDescriptors = m_cursor;
-    }
+    m_stats.allocations.fetch_add(1, std::memory_order_relaxed);
+    m_stats.descriptors.fetch_add(count, std::memory_order_relaxed);
+    RecordPeak(next);
 
     return allocation;
 }
