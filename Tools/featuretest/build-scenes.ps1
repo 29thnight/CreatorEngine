@@ -53,11 +53,10 @@ function New-CameraAndSun {
         [string]$CamPos = "0 6 -14",
         [string]$CamRot = "18 0 0",
         [string]$SunRot = "50 -35 0",
-        # 강도 1 근처는 이 엔진에서 거의 검게 나온다. 톤맵 노출이 프로젝트
-        # 설정에 1.3으로 고정돼 있고(자동 노출 꺼짐) 그 조합에서 눈에 보이는
-        # 밝기가 나오려면 수십 단위가 필요하다 — 실측으로 정한 값이다.
-        # 기존 게임 씬(Test1)도 강도 1이라 같은 이유로 어둡게 나온다.
-        [double]$SunIntensity = 40
+        # 한때 40~50으로 올렸던 적이 있는데 그건 오진이었다. 화면이 검었던 것은
+        # 강도 단위 때문이 아니라 캡처 전에 창을 리사이즈했고 SSGI 패스가 그것을
+        # 견디지 못했기 때문이다. 리사이즈를 빼고 나니 원래 값으로 정상이다.
+        [double]$SunIntensity = 1.6
     )
     return @(
         "object.create MainCamera Camera",
@@ -102,7 +101,7 @@ $scenes = @(
         Body = {
             $c = @()
             $c += Import-Models @("Plane","Cube","Sphere","IcoSphere","Cylinder","Cone","Torus","Suzanne")
-            $c += New-CameraAndSun -CamPos "0 4 -12" -CamRot "12 0 0" -SunIntensity 40
+            $c += New-CameraAndSun -CamPos "0 4 -12" -CamRot "12 0 0"
             $c += Place-Primitive "Plane"     "Ground"    "0 0 0 0 0 0 1 1 1"
             # 한 줄로 세운다. 크기가 통일돼 있어 줄만 맞추면 비교가 쉽다.
             $c += Place-Primitive "Cube"      "P_Cube"      "-5.25 0.5 0 0 0 0 1 1 1"
@@ -123,7 +122,7 @@ $scenes = @(
             $c = @()
             $c += Import-Models @("Plane","Cube","Torus","Cylinder","Suzanne")
             # 카메라를 낮고 멀리 둔다. 그림자는 지면에 누워 있어 시선이 낮아야 보인다.
-            $c += New-CameraAndSun -CamPos "0 5 -16" -CamRot "14 0 0" -SunRot "55 -40 0" -SunIntensity 45
+            $c += New-CameraAndSun -CamPos "0 5 -16" -CamRot "14 0 0" -SunRot "55 -40 0"
             $c += Place-Primitive "Plane" "Ground" "0 0 0 0 0 0 1 1 1"
 
             # 깊이 방향으로 5개. 캐스케이드 분할이 43/105/500쯤에서 갈리므로
@@ -148,7 +147,7 @@ $scenes = @(
             # 재질' 임포트 경로도 같이 확인된다.
             $c = @()
             $c += Import-Models @("Plane","MatGrid")
-            $c += New-CameraAndSun -CamPos "0 2 -11" -CamRot "6 0 0" -SunIntensity 50
+            $c += New-CameraAndSun -CamPos "0 2 -11" -CamRot "6 0 0" -SunIntensity 2.0
             $c += Place-Primitive "Plane" "Ground" "0 -2 0 0 0 0 1 1 1"
             $c += Place-Primitive "MatGrid" "MaterialGrid" "0 0 0 0 0 0 1 1 1"
             return $c
@@ -161,7 +160,7 @@ $scenes = @(
         Body = {
             $c = @()
             $c += Import-Models @("Plane","Sphere","Cube")
-            $c += New-CameraAndSun -CamPos "0 7 -13" -CamRot "24 0 0" -SunIntensity 8
+            $c += New-CameraAndSun -CamPos "0 7 -13" -CamRot "24 0 0" -SunIntensity 0.35
             $c += Place-Primitive "Plane" "Ground" "0 0 0 0 0 0 1 1 1"
 
             # 광원마다 아래에 물체를 둔다. 빈 바닥만으로는 감쇠 모양이 잘 안 보인다.
@@ -174,7 +173,7 @@ $scenes = @(
                 "object.transform PointLight -4 4 -2 0 0 0",
                 "object.property PointLight LightComponent m_lightType PointLight",
                 "object.property PointLight LightComponent m_color 1,0.35,0.25,1",
-                "object.property PointLight LightComponent m_intencity 150",
+                "object.property PointLight LightComponent m_intencity 6",
                 "object.property PointLight LightComponent m_range 14",
 
                 "object.create SpotLight Light",
@@ -183,7 +182,7 @@ $scenes = @(
                 "object.transform SpotLight 4 7 -2 70 0 0",
                 "object.property SpotLight LightComponent m_lightType SpotLight",
                 "object.property SpotLight LightComponent m_color 0.35,0.6,1,1",
-                "object.property SpotLight LightComponent m_intencity 200",
+                "object.property SpotLight LightComponent m_intencity 8",
                 "object.property SpotLight LightComponent m_range 20",
                 "object.property SpotLight LightComponent m_spotLightAngle 45"
             )
