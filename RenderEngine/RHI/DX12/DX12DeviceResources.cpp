@@ -16,7 +16,8 @@ namespace
     }
 }
 
-bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::string& outError)
+bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::string& outError,
+    LUID matchAdapterLuid)
 {
     m_width = width;
     m_height = height;
@@ -36,11 +37,26 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     HRESULT hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&m_factory));
     if (FAILED(hr)) { outError = "DXGI 팩토리 생성 실패 " + HrToString(hr); return false; }
 
-    // 고성능 어댑터 우선 — DX11 쪽과 다른 어댑터가 잡히면 비교가 무의미해지므로
-    // 같은 정책(고성능 우선)을 쓴다.
-    hr = m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-        IID_PPV_ARGS(&m_adapter));
-    if (FAILED(hr)) { outError = "어댑터 열거 실패 " + HrToString(hr); return false; }
+    // 어댑터 선택.
+    //
+    // LUID를 받았으면 그 어댑터를 찾는다 — 공유 텍스처는 같은 물리 어댑터에서만
+    // 성립하므로, DX11과 짝을 맞추는 것이 성능 정책보다 우선이다.
+    // 받지 않았으면(독립 자가 검증 등) 고성능 우선.
+    if (0 != matchAdapterLuid.LowPart || 0 != matchAdapterLuid.HighPart)
+    {
+        hr = m_factory->EnumAdapterByLuid(matchAdapterLuid, IID_PPV_ARGS(&m_adapter));
+        if (FAILED(hr))
+        {
+            outError = "지정 LUID의 어댑터를 찾지 못했다 " + HrToString(hr);
+            return false;
+        }
+    }
+    else
+    {
+        hr = m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+            IID_PPV_ARGS(&m_adapter));
+        if (FAILED(hr)) { outError = "어댑터 열거 실패 " + HrToString(hr); return false; }
+    }
 
     hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }

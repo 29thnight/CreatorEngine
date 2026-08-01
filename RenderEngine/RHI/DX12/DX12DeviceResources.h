@@ -32,7 +32,17 @@ public:
     static constexpr float kClearColor[4] = { 0.1f, 0.1f, 0.15f, 1.f };
 
     // 실패 사유를 문자열로 돌려준다 — 브링업 단계의 실패는 전부 진단 가능해야 한다.
-    bool Initialize(uint32_t width, uint32_t height, std::string& outError);
+    //
+    // matchAdapterLuid가 0이 아니면 그 LUID의 어댑터에 디바이스를 만든다.
+    //
+    // 이게 필요한 이유: 병존 기간에 DX12가 그린 텍스처를 DX11이 SRV로 열어
+    // 화면에 올린다(에디터의 씬 뷰는 ImGui::Image로 SRV를 표시한다). 공유는
+    // 같은 어댑터일 때만 성립하는데, DX11은 기본 어댑터(D3D11CreateDevice에
+    // nullptr)를, DX12는 고성능 우선을 골라서 두 정책이 갈릴 수 있다.
+    // iGPU+dGPU 노트북에서는 실제로 갈린다. 정책을 맞추는 것으로는 부족하고
+    // 같은 물리 어댑터임을 LUID로 확인해야 한다.
+    bool Initialize(uint32_t width, uint32_t height, std::string& outError,
+        LUID matchAdapterLuid = LUID{ 0, 0 });
     void Shutdown();
 
     bool IsInitialized() const { return nullptr != m_device.Get(); }
