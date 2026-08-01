@@ -1272,6 +1272,45 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.scene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
     }
+    else if (cmd == "render.post")
+    {
+        // 포스트 패스를 런타임에 껐다 켠다.
+        //
+        // 프로젝트 설정 파일(EngineSettings.asset)을 건드리지 않는다. 그쪽은
+        // 저작물이고, 확인하려고 잠깐 끈 것이 저장돼 남으면 다음 사람이 왜
+        // 룩이 달라졌는지 모른다. 메모리 설정만 바꾸고 재적용 플래그를 세운다.
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: render.post <fog|bloom|ssgi|vignette|colorgrading> <on|off>\n");
+            return;
+        }
+
+        const std::string target = parts[1];
+        const bool enable = (parts[2] == "on" || parts[2] == "1" || parts[2] == "true");
+
+        auto& settings = EngineSettingInstance->GetRenderPassSettingsRW();
+
+        bool known = true;
+        if (target == "fog")               settings.volumetricFog.isOn = enable;
+        else if (target == "bloom")        settings.bloom.applyBloom = enable;
+        else if (target == "ssgi")         settings.ssgi.isOn = enable;
+        else if (target == "vignette")     settings.vignette.isOn = enable;
+        else if (target == "colorgrading") settings.colorGrading.isOn = enable;
+        else known = false;
+
+        if (!known)
+        {
+            Debug->LogError("[CLI] 알 수 없는 포스트 패스: " + target);
+            std::printf("[CLI] 알 수 없는 포스트 패스: %s\n", target.c_str());
+            return;
+        }
+
+        // 다음 프레임의 안전 지점에서 SceneRenderer::ApplyVolumeProfile이 돈다.
+        SceneManagers->VolumeProfileApply();
+
+        Debug->LogWarning("[CLI] 포스트 패스 " + target + " " + (enable ? "켬" : "끔"));
+        std::printf("[CLI] 포스트 패스 %s %s\n", target.c_str(), enable ? "켬" : "끔");
+    }
     else if (cmd == "render.exposure")
     {
         // 자동 노출이 무엇을 보고 무엇을 결정했는지.
@@ -2116,6 +2155,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"
         "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
         "  render.exposure      자동 노출이 무엇을 재고 무엇을 결정했는지\n"
+        "  render.post <이름> <on|off>  포스트 패스 토글(fog·bloom·ssgi·vignette·colorgrading)\n"
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"

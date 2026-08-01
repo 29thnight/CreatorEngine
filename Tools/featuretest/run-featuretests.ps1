@@ -14,7 +14,8 @@ param(
     [int]$TimeoutSec = 180,
     [int]$Width = 1600,
     [int]$Height = 900,
-    [string[]]$Only = @()
+    [string[]]$Only = @(),
+    [switch]$KeepFog
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,9 +63,25 @@ foreach ($name in $scenes) {
         "window.resize $Width $Height",
         "wait 20",
         "scene.switch $($scenePath -replace '\\', '/')",
-        "wait 180",
+        "wait 180"
+    )
+
+    # 볼류메트릭 포그를 끈다.
+    #
+    # 프로젝트 설정에 mStrength 2 · blending 0.851로 저장돼 있어 최종 색의
+    # 85%가 안개 색이다. 게임의 룩으로는 의도된 값이지만, 기능 하나를
+    # 확인하려고 찍는 그림에서는 보려는 것을 덮어 버린다.
+    # 설정 파일을 고치지 않고 런타임에만 끈다 — 저작물을 건드리면 다음 사람이
+    # 왜 룩이 달라졌는지 모른다.
+    if (-not $KeepFog) {
+        $commands += @("render.post fog off", "wait 60")
+    }
+
+    # 캡처가 끝날 때까지 살아 있어야 한다. wait는 프레임 수라 프레임률이
+    # 높으면 금방 지나간다 — 초 단위 대기(Start-Sleep)보다 넉넉히 잡는다.
+    $commands += @(
         "scene.dump $name",
-        "wait 600",
+        "wait 20000",
         "quit"
     )
     Set-Content -Path $cmdFile -Value ($commands -join "`n") -NoNewline -Encoding UTF8
@@ -76,8 +93,10 @@ foreach ($name in $scenes) {
         -WorkingDirectory (Split-Path -Parent $Exe) -PassThru -NoNewWindow
 
     # 씬 로드와 첫 프레임이 안정될 때까지 기다린 뒤 찍는다. 너무 일찍 찍으면
-    # 로딩 중 화면이 남고, 그건 '렌더가 됐다'의 증거가 아니다.
-    Start-Sleep -Seconds 12
+    # 로딩 창이 그대로 남고, 그건 '렌더가 됐다'의 증거가 아니다 — 실제로
+    # 한 번 로딩 화면이 찍혔다. 창 제목으로 거르려 했으나 이 창은 프로세스
+    # API로 제목이 읽히지 않아, 대기 시간으로 막는다.
+    Start-Sleep -Seconds 22
 
     $captureOutput = & pwsh $capture -OutFile $png -TimeoutSec 30 2>&1
     $captureOk = ($LASTEXITCODE -eq 0)
