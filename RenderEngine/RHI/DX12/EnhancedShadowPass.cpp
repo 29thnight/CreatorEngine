@@ -111,23 +111,28 @@ bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::st
         return false;
     }
 
+    auto* device = context.resources->GetDevice();
+
+    // 캐스케이드마다 DSV가 하나씩 필요하다. 배열 텍스처를 슬라이스 단위로
+    // 묶어 그리기 때문이다(SRV는 배열 전체 하나로 충분하다).
     D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
     dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    if (FAILED(context.resources->GetDevice()->CreateDescriptorHeap(&dsvHeapDesc,
-        IID_PPV_ARGS(&m_dsvHeap))))
+    dsvHeapDesc.NumDescriptors = kCascadeCount;
+    if (FAILED(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap))))
     {
         outError = "그림자 DSV 힙 생성 실패";
         return false;
     }
+    m_dsvIncrement = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
     return CreatePipeline(context, outError);
 }
 
-void EnhancedShadowPass::ComputeLightMatrix(const EnhancedFrameContext& context)
+void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
 {
     m_hasDirectionalLight = false;
-    m_lightViewProjection = XMMatrixIdentity();
+    m_shadowData = EnhancedShadowData{};
+    for (auto& cascade : m_cascades) cascade = Cascade{};
 
     if (nullptr == context.camera || nullptr == context.lights) return;
 
@@ -137,85 +142,150 @@ void EnhancedShadowPass::ComputeLightMatrix(const EnhancedFrameContext& context)
     {
         if (0 == static_cast<uint32_t>(light.position.w))
         {
-            m_lightDirection = light.direction;
+            m_lightDirection = Mathf::Vector3{ light.direction.x, light.direction.y,
+                light.direction.z };
             m_hasDirectionalLight = true;
             break;
         }
     }
     if (!m_hasDirectionalLight) return;
 
-    // 카메라 프러스텀의 앞쪽 일부를 감싸는 상자를 만든다. 전체를 덮으면 먼 곳까지
-    // 한 장에 들어가 해상도가 낮아진다 — 캐스케이드가 필요한 이유이고, 단일
-    // 캐스케이드에서는 가까운 구간만 덮는 것이 실용적이다.
-    constexpr float kCoverage = 0.3f;
+    if (m_lightDirection.LengthSquared() < 1e-6f) m_lightDirection = { 0.f, -1.f, 0.f };
+    m_lightDirection.Normalize();
 
     const DirectX::BoundingFrustum frustum(context.camera->projection);
     const Mathf::xMatrix inverseView = context.camera->inverseView;
 
-    const float nearDistance = context.camera->nearPlane;
-    const float farDistance = context.camera->nearPlane
-        + (context.camera->farPlane - context.camera->nearPlane) * kCoverage;
+    const float nearPlane = context.camera->nearPlane;
+    const float farPlane = context.camera->farPlane;
 
-    std::array<Mathf::Vector3, 8> corners{};
+    // ── 분할 지점 ──
+    //
+    // 로그 분할은 원근 투영에 맞는 이론값이지만 그대로 쓰면 첫 캐스케이드가
+    // 지나치게 좁아진다(near가 작을수록 심하다). 균등 분할과 섞는다.
+    std::array<float, kCascadeCount + 1> splits{};
+    splits[0] = nearPlane;
+    splits[kCascadeCount] = farPlane;
+    for (uint32_t i = 1; i < kCascadeCount; ++i)
+    {
+        const float ratio = static_cast<float>(i) / static_cast<float>(kCascadeCount);
+        const float logSplit = nearPlane * std::pow(farPlane / (std::max)(nearPlane, 1e-4f), ratio);
+        const float uniformSplit = nearPlane + (farPlane - nearPlane) * ratio;
+        splits[i] = kSplitLambda * logSplit + (1.f - kSplitLambda) * uniformSplit;
+    }
+
     const float slopes[4][2] = {
         { frustum.RightSlope, frustum.TopSlope },
         { frustum.RightSlope, frustum.BottomSlope },
         { frustum.LeftSlope,  frustum.TopSlope },
         { frustum.LeftSlope,  frustum.BottomSlope },
     };
-    for (int i = 0; i < 4; ++i)
+
+    for (uint32_t index = 0; index < kCascadeCount; ++index)
     {
-        corners[i] = Mathf::Vector3::Transform(
-            { slopes[i][0] * nearDistance, slopes[i][1] * nearDistance, nearDistance }, inverseView);
-        corners[i + 4] = Mathf::Vector3::Transform(
-            { slopes[i][0] * farDistance, slopes[i][1] * farDistance, farDistance }, inverseView);
+        const float sliceNear = splits[index];
+        const float sliceFar = splits[index + 1];
+
+        std::array<Mathf::Vector3, 8> corners{};
+        for (int i = 0; i < 4; ++i)
+        {
+            corners[i] = Mathf::Vector3::Transform(
+                { slopes[i][0] * sliceNear, slopes[i][1] * sliceNear, sliceNear }, inverseView);
+            corners[i + 4] = Mathf::Vector3::Transform(
+                { slopes[i][0] * sliceFar, slopes[i][1] * sliceFar, sliceFar }, inverseView);
+        }
+
+        // 경계 구를 쓴다. 축 정렬 상자를 쓰면 카메라가 회전할 때 상자 크기가
+        // 출렁여 그림자 가장자리가 떨린다 — 구는 회전에 불변이다.
+        Mathf::Vector3 center = Mathf::Vector3::Zero;
+        for (const auto& corner : corners) center += corner;
+        center /= 8.f;
+
+        float radius = 0.f;
+        for (const auto& corner : corners)
+        {
+            radius = (std::max)(radius, Mathf::Vector3::Distance(center, corner));
+        }
+        // 반지름도 계단으로 만든다. 카메라가 앞뒤로 조금 움직일 때마다 반지름이
+        // 미세하게 달라지면 투영 배율이 바뀌고, 그것도 지글거림이 된다.
+        radius = std::ceil(radius * 16.f) / 16.f;
+
+        // 중심을 텍셀 단위로 양자화한다. 이게 없으면 카메라가 조금만 움직여도
+        // 그림자 가장자리가 지글거린다(shadow shimmering).
+        const float texelsPerUnit = static_cast<float>(kShadowMapSize) / (radius * 2.f);
+        center.x = std::floor(center.x * texelsPerUnit) / texelsPerUnit;
+        center.y = std::floor(center.y * texelsPerUnit) / texelsPerUnit;
+        center.z = std::floor(center.z * texelsPerUnit) / texelsPerUnit;
+
+        // 광원을 구 밖으로 충분히 물린다. 가까우면 상자 밖의 그림자 드리우개가 잘린다.
+        const float backOff = radius * 2.f;
+        const Mathf::xVector lightPosition = Mathf::Vector3(center - m_lightDirection * backOff);
+
+        // 광원이 정확히 위나 아래를 볼 때 up이 평행해지는 것을 피한다.
+        const Mathf::xVector up = (std::fabs(m_lightDirection.y) > 0.99f)
+            ? Mathf::xVector{ 0.f, 0.f, 1.f, 0.f }
+            : Mathf::xVector{ 0.f, 1.f, 0.f, 0.f };
+
+        const Mathf::xMatrix lightView = XMMatrixLookAtLH(lightPosition, center, up);
+        const Mathf::xMatrix lightProjection = XMMatrixOrthographicOffCenterLH(
+            -radius, radius, -radius, radius, 0.f, backOff + radius * 2.f);
+
+        Cascade& cascade = m_cascades[index];
+        cascade.lightViewProjection = XMMatrixMultiply(lightView, lightProjection);
+        cascade.center = center;
+        cascade.radius = radius;
+        cascade.splitDepth = sliceFar;
+
+        m_shadowData.lightViewProjection[index] = cascade.lightViewProjection;
     }
 
-    // 경계 구를 쓴다. 축 정렬 상자를 쓰면 카메라가 회전할 때 상자 크기가 출렁여
-    // 그림자 가장자리가 떨린다 — 구는 회전에 불변이다.
-    Mathf::Vector3 center = Mathf::Vector3::Zero;
-    for (const auto& corner : corners) center += corner;
-    center /= 8.f;
+    // 셰이더가 읽는 형태로 옮긴다. 분할 지점과 편향을 float4 하나씩에 담고
+    // 있으므로 캐스케이드가 셋을 넘으면 담는 방식부터 바꿔야 한다.
+    static_assert(3 == kCascadeCount, "splitDepths·bias가 float4 하나에 셋을 담는다");
 
-    float radius = 0.f;
-    for (const auto& corner : corners)
-    {
-        radius = (std::max)(radius, Mathf::Vector3::Distance(center, corner));
-    }
+    m_shadowData.splitDepths = Mathf::Vector4{ m_cascades[0].splitDepth,
+        m_cascades[1].splitDepth, m_cascades[2].splitDepth, 0.f };
 
-    // 텍셀 단위로 양자화한다. 이게 없으면 카메라가 조금만 움직여도 그림자
-    // 가장자리가 지글거린다(shadow shimmering).
-    const float texelsPerUnit = static_cast<float>(kShadowMapSize) / (radius * 2.f);
-    center.x = std::floor(center.x * texelsPerUnit) / texelsPerUnit;
-    center.y = std::floor(center.y * texelsPerUnit) / texelsPerUnit;
-    center.z = std::floor(center.z * texelsPerUnit) / texelsPerUnit;
+    // 먼 캐스케이드는 텍셀 하나가 덮는 월드 범위가 넓다. 같은 편향을 쓰면
+    // 그쪽에만 여드름이 남으므로 반지름 비만큼 키운다.
+    const float baseRadius = (std::max)(m_cascades[0].radius, 1e-4f);
+    m_shadowData.bias = Mathf::Vector4{
+        m_baseBias,
+        m_baseBias * (m_cascades[1].radius / baseRadius),
+        m_baseBias * (m_cascades[2].radius / baseRadius),
+        0.f };
 
-    Mathf::Vector3 direction{ m_lightDirection.x, m_lightDirection.y, m_lightDirection.z };
-    if (direction.LengthSquared() < 1e-6f) direction = Mathf::Vector3(0.f, -1.f, 0.f);
-    direction.Normalize();
+    m_shadowData.cameraForward = context.camera->forward;
+    m_shadowData.lightDirection = Mathf::Vector4{ m_lightDirection.x, m_lightDirection.y,
+        m_lightDirection.z, 0.f };
+    m_shadowData.enabled = true;
+}
 
-    // 광원을 구 밖으로 충분히 물린다. 가까우면 상자 밖의 그림자 드리우개가 잘린다.
-    const float backOff = radius * 2.f;
-    const Mathf::xVector lightPosition = Mathf::Vector3(center - direction * backOff);
+bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const Mathf::Vector3& center,
+    float radius) const
+{
+    // 캐스케이드 경계 구를 광원 방향으로 늘린 원기둥과의 교차 판정이다.
+    //
+    // 상자(구) 안에 있는지만 보면 안 된다 — 밖에 있어도 광원과 상자 사이에
+    // 있으면 상자 안에 그림자를 드리운다. 그래서 광원 방향 성분은 '광원 쪽으로는
+    // 무한히' 허용하고, 그 방향에 수직인 거리만 잰다.
+    const Mathf::Vector3 offset = center - cascade.center;
+    const float along = offset.Dot(m_lightDirection);
 
-    // 광원이 정확히 위나 아래를 볼 때 up이 평행해지는 것을 피한다.
-    const Mathf::xVector up = (std::fabs(direction.y) > 0.99f)
-        ? Mathf::xVector{ 0.f, 0.f, 1.f, 0.f }
-        : Mathf::xVector{ 0.f, 1.f, 0.f, 0.f };
+    // 상자 뒤쪽(광원 반대편)으로 완전히 벗어난 것은 그림자를 드리울 수 없다.
+    if (along > cascade.radius + radius) return false;
 
-    const Mathf::xMatrix lightView = XMMatrixLookAtLH(lightPosition, center, up);
-    const Mathf::xMatrix lightProjection = XMMatrixOrthographicOffCenterLH(
-        -radius, radius, -radius, radius, 0.f, backOff + radius * 2.f);
-
-    m_lightViewProjection = XMMatrixMultiply(lightView, lightProjection);
+    const Mathf::Vector3 perpendicular = offset - m_lightDirection * along;
+    return perpendicular.Length() <= cascade.radius + radius;
 }
 
 bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     m_drawGeometry.clear();
     m_lastDrawCount = 0;
+    m_lastCulledCount = 0;
 
-    ComputeLightMatrix(context);
+    ComputeCascades(context);
 
     if (nullptr == context.draws || nullptr == context.meshCache) return true;
 
@@ -234,8 +304,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             continue;
         }
 
-        m_drawGeometry.emplace(draw.mesh, entry);
-        ++m_lastDrawCount;
+        Geometry geometry{};
+        geometry.entry = entry;
+        geometry.boundRadius = draw.mesh->GetBoundingSphere().Radius;
+        m_drawGeometry.emplace(draw.mesh, geometry);
     }
 
     return true;
@@ -246,9 +318,10 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
     RGTextureDesc desc{};
     desc.width = kShadowMapSize;
     desc.height = kShadowMapSize;
+    desc.arraySize = kCascadeCount;
     desc.format = kShadowFormat;
     desc.allowDepthStencil = true;
-    desc.name = "Shadow.Cascade0";
+    desc.name = "Shadow.Cascades";
     m_shadowMap = graph.CreateTexture(desc);
 
     // 방향광이 없으면 그리지 않는다. 다만 리소스는 선언해 두어야 Deferred가
@@ -258,12 +331,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
         {
             auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
-
-            const auto dsv = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-            dsvDesc.Format = kShadowFormat;
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            device->CreateDepthStencilView(executeContext.Resolve(m_shadowMap), &dsvDesc, dsv);
+            auto* shadowMap = executeContext.Resolve(m_shadowMap);
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(kShadowMapSize), static_cast<float>(kShadowMapSize), 0.f, 1.f };
@@ -272,35 +340,74 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
 
-            // 렌더 타깃 없이 깊이만 묶는다.
-            commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
-            commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
-
-            if (!m_hasDirectionalLight || nullptr == context.draws) return;
-
-            commandList->SetGraphicsRootSignature(m_rootSignature);
-            commandList->SetPipelineState(m_pso);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-            for (const auto& draw : *context.draws)
+            const bool draws = m_hasDirectionalLight && nullptr != context.draws;
+            if (draws)
             {
-                const auto mesh = m_drawGeometry.find(draw.mesh);
-                if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
+                // 캐스케이드마다 상태를 다시 걸지 않는다. PSO와 루트 시그니처는
+                // 셋이 같으므로 바깥에서 한 번이면 된다.
+                commandList->SetGraphicsRootSignature(m_rootSignature);
+                commandList->SetPipelineState(m_pso);
+                commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            }
 
-                ShadowConstants constants{};
-                constants.lightViewProjection = XMMatrixTranspose(m_lightViewProjection);
-                constants.world = XMMatrixTranspose(draw.worldMatrix);
+            for (uint32_t index = 0; index < kCascadeCount; ++index)
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+                dsv.ptr += static_cast<SIZE_T>(index) * m_dsvIncrement;
 
-                const auto allocation = context.resources->GetUploadRing().Allocate(
-                    sizeof(ShadowConstants), DX12UploadRing::kConstantBufferAlignment);
-                if (!allocation.IsValid()) break;
+                D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+                dsvDesc.Format = kShadowFormat;
+                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+                dsvDesc.Texture2DArray.FirstArraySlice = index;
+                dsvDesc.Texture2DArray.ArraySize = 1;
+                device->CreateDepthStencilView(shadowMap, &dsvDesc, dsv);
 
-                memcpy(allocation.cpuAddress, &constants, sizeof(constants));
-                commandList->SetGraphicsRootConstantBufferView(0, allocation.gpuAddress);
+                // 렌더 타깃 없이 깊이만 묶는다.
+                commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+                commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
-                commandList->IASetVertexBuffers(0, 1, &mesh->second.vertexView);
-                commandList->IASetIndexBuffer(&mesh->second.indexView);
-                commandList->DrawIndexedInstanced(mesh->second.indexCount, 1, 0, 0, 0);
+                if (!draws) continue;
+
+                const Cascade& cascade = m_cascades[index];
+                const Mathf::xMatrix transposed = XMMatrixTranspose(cascade.lightViewProjection);
+
+                for (const auto& draw : *context.draws)
+                {
+                    const auto found = m_drawGeometry.find(draw.mesh);
+                    if (found == m_drawGeometry.end() || !found->second.entry.IsValid()) continue;
+
+                    // 경계 구를 월드로 옮긴다. 비균등 배율에서는 최대 축으로
+                    // 잡아야 보수적이다 — 작게 잡으면 그림자가 사라진다.
+                    const Mathf::xVector worldCenter = XMVector3Transform(
+                        XMVectorSet(0.f, 0.f, 0.f, 1.f), draw.worldMatrix);
+                    const float scale = (std::max)({
+                        XMVectorGetX(XMVector3Length(draw.worldMatrix.r[0])),
+                        XMVectorGetX(XMVector3Length(draw.worldMatrix.r[1])),
+                        XMVectorGetX(XMVector3Length(draw.worldMatrix.r[2])) });
+
+                    if (!CastsInto(cascade, Mathf::Vector3(worldCenter),
+                        found->second.boundRadius * scale))
+                    {
+                        ++m_lastCulledCount;
+                        continue;
+                    }
+
+                    ShadowConstants constants{};
+                    constants.lightViewProjection = transposed;
+                    constants.world = XMMatrixTranspose(draw.worldMatrix);
+
+                    const auto allocation = context.resources->GetUploadRing().Allocate(
+                        sizeof(ShadowConstants), DX12UploadRing::kConstantBufferAlignment);
+                    if (!allocation.IsValid()) break;
+
+                    memcpy(allocation.cpuAddress, &constants, sizeof(constants));
+                    commandList->SetGraphicsRootConstantBufferView(0, allocation.gpuAddress);
+
+                    commandList->IASetVertexBuffers(0, 1, &found->second.entry.vertexView);
+                    commandList->IASetIndexBuffer(&found->second.entry.indexView);
+                    commandList->DrawIndexedInstanced(found->second.entry.indexCount, 1, 0, 0, 0);
+                    ++m_lastDrawCount;
+                }
             }
         },
         // 그림자 맵을 읽는 것은 Deferred다. 뿌리로 표시하지 않아도 컬링이
@@ -312,6 +419,7 @@ void EnhancedShadowPass::Shutdown()
 {
     m_drawGeometry.clear();
     m_dsvHeap.Reset();
+    m_dsvIncrement = 0;
     m_pso = nullptr;
     m_rootSignature = nullptr;
 }

@@ -67,6 +67,37 @@ struct EnhancedLight
     Mathf::Vector4 attenuation{};    // x 상수 · y 선형 · z 이차 · w 반경
 };
 
+// 캐스케이드 그림자의 단수. 셋은 실측 관행에서 온 수다 — 하나면 가까운 곳의
+// 해상도를 위해 먼 곳을 포기해야 하고, 넷 이상은 정점 처리와 맵 메모리가 늘어난
+// 만큼의 화질을 돌려주지 않는다. 기존 DX11 경로(ShadowMapPass)도 셋이다.
+inline constexpr uint32_t kShadowCascadeCount = 3;
+
+// 그림자 패스가 만들고 라이팅 패스가 읽는 것. 두 패스가 이 구조를 공유하는 편이
+// 인자를 낱개로 넘기는 것보다 낫다 — 캐스케이드가 늘거나 줄 때 서명이 아니라
+// 이 구조만 바뀐다.
+struct EnhancedShadowData
+{
+    Mathf::Matrix lightViewProjection[kShadowCascadeCount]{};
+
+    // 각 캐스케이드가 끝나는 뷰 깊이(카메라 정면 방향 거리). 픽셀이 어느
+    // 캐스케이드에 속하는지 셰이더가 이 값으로 고른다.
+    Mathf::Vector4 splitDepths{};
+
+    // 캐스케이드별 깊이 편향. 먼 캐스케이드는 텍셀 하나가 덮는 월드 범위가
+    // 넓어 같은 편향으로는 여드름이 남는다 — 반지름 비로 키운다.
+    Mathf::Vector4 bias{};
+
+    // 뷰 깊이를 구하려면 카메라 정면이 필요하다. 뷰 행렬에서 뽑을 수도 있지만
+    // 셰이더가 매 픽셀 그것을 하는 것보다 넘기는 편이 싸다.
+    Mathf::Vector4 cameraForward{};
+
+    // 그림자를 드리우는 방향광의 방향(정규화). 라이팅은 광원 목록에서 같은
+    // 값을 얻지만, 캐스터 컬링을 밖에서 검증하려면 이쪽이 필요하다.
+    Mathf::Vector4 lightDirection{};
+
+    bool enabled{ false };
+};
+
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext

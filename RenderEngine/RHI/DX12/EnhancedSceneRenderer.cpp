@@ -18,6 +18,7 @@
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
+#include <array>
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -2378,7 +2379,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         D3D12_RESOURCE_DESC desc{};
         desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<uint64_t>(shadowRowPitch) * EnhancedShadowPass::kShadowMapSize;
+        desc.Width = static_cast<uint64_t>(shadowRowPitch) * EnhancedShadowPass::kShadowMapSize
+            * EnhancedShadowPass::kCascadeCount;
         desc.Height = 1;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
@@ -2398,10 +2400,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     EnhancedRenderGraph::Stats lastGraphStats{};
 
     // 렌더마다 바꿔 가며 넣는 그림자 설정. 람다가 참조로 잡는다.
+    constexpr float kTestShadowBias = 0.0015f;
+
     bool     shadowEnabled = false;
-    float    shadowBias = EnhancedDeferredPass::kDefaultShadowBias;
+    float    shadowBias = kTestShadowBias;
     bool     captureShadowMap = false;
     uint32_t shadowOccluders = 0;
+    std::array<uint32_t, EnhancedShadowPass::kCascadeCount> cascadeOccluders{};
 
     const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
         uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError,
@@ -2415,6 +2420,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         profiler.BeginFrame(0);
 
         // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
+        shadow.SetBias(shadowBias);
         if (!shadow.PrepareFrame(frameContext, outStepError)) return false;
         if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
         if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
@@ -2431,8 +2437,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         const auto outputs = gbuffer.GetOutputs();
 
         deferred.SetInputs(outputs);
-        deferred.SetShadow(shadow.GetShadowMap(), shadow.GetLightViewProjection(),
-            shadowEnabled && shadow.HasDirectionalLight(), shadowBias);
+
+        EnhancedShadowData shadowData = shadow.GetShadowData();
+        shadowData.enabled = shadowData.enabled && shadowEnabled;
+        deferred.SetShadow(shadow.GetShadowMap(), shadowData);
+
         deferred.Declare(graph, frameContext);
 
         // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
@@ -2493,11 +2502,21 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                     dst.PlacedFootprint.Footprint.Depth = 1;
                     dst.PlacedFootprint.Footprint.RowPitch = shadowRowPitch;
 
-                    D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(shadow.GetShadowMap());
-                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                    // 캐스케이드마다 서브리소스가 하나씩이다. 배열을 한 번에
+                    // 옮기는 복사는 없으므로 슬라이스별로 부른다.
+                    const uint64_t sliceBytes = static_cast<uint64_t>(shadowRowPitch)
+                        * EnhancedShadowPass::kShadowMapSize;
+                    for (uint32_t slice = 0; slice < EnhancedShadowPass::kCascadeCount; ++slice)
+                    {
+                        dst.PlacedFootprint.Offset = sliceBytes * slice;
 
-                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                        D3D12_TEXTURE_COPY_LOCATION src{};
+                        src.pResource = executeContext.Resolve(shadow.GetShadowMap());
+                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                        src.SubresourceIndex = slice;
+
+                        executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                    }
                 }, true);
         }
 
@@ -2542,21 +2561,34 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (captureShadowMap)
         {
             shadowOccluders = 0;
+            cascadeOccluders.fill(0);
             void* shadowMapped = nullptr;
-            const size_t shadowBytes =
-                static_cast<size_t>(shadowRowPitch) * EnhancedShadowPass::kShadowMapSize;
+            const size_t shadowBytes = static_cast<size_t>(shadowRowPitch)
+                * EnhancedShadowPass::kShadowMapSize * EnhancedShadowPass::kCascadeCount;
             D3D12_RANGE shadowRange{ 0, shadowBytes };
             if (SUCCEEDED(shadowReadback->Map(0, &shadowRange, &shadowMapped)))
             {
                 const auto* shadowPixels = static_cast<const uint8_t*>(shadowMapped);
-                for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
+                const size_t rows = static_cast<size_t>(EnhancedShadowPass::kShadowMapSize)
+                    * EnhancedShadowPass::kCascadeCount;
+
+                // 캐스케이드별로 따로 센다. 합계만 보면 한 장만 채워져도
+                // 통과하는데, 그건 캐스케이드가 도는 것이 아니다.
+                for (size_t y = 0; y < rows; ++y)
                 {
-                    const auto* row = shadowPixels + static_cast<size_t>(y) * shadowRowPitch;
+                    const auto* row = shadowPixels + y * shadowRowPitch;
+                    const uint32_t cascade = static_cast<uint32_t>(
+                        y / EnhancedShadowPass::kShadowMapSize);
+
                     for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
                     {
                         float depth = 0.f;
                         memcpy(&depth, row + static_cast<size_t>(x) * 4, 4);
-                        if (depth < 0.999f) ++shadowOccluders;
+                        if (depth < 0.999f)
+                        {
+                            ++shadowOccluders;
+                            ++cascadeOccluders[cascade];
+                        }
                     }
                 }
                 shadowReadback->Unmap(0, nullptr);
@@ -2629,7 +2661,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 건너뛰어지고도 통과가 나왔다 — 재질 때와 같은 부류의 조용한 통과다.
     const bool     baselineHasDirectional = shadow.HasDirectionalLight();
     const uint32_t baselineShadowCasters = shadow.GetLastDrawCount();
+    const uint32_t baselineShadowCulled = shadow.GetLastCulledCount();
     const uint32_t baselineShadowOccluders = shadowOccluders;
+    const auto     baselineCascadeOccluders = cascadeOccluders;
+    const EnhancedShadowData baselineShadowData = shadow.GetShadowData();
 
     const auto meshStats = meshCache.GetStats();
     const auto textureStats = textureCache.GetStats();
@@ -2751,16 +2786,67 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             outLog += "[4/4] 그림자 강제 렌더 실패: " + error + "\n";
             return false;
         }
-        shadowBias = EnhancedDeferredPass::kDefaultShadowBias;
+        shadowBias = kTestShadowBias;
     }
 
-    char shadowLine[224]{};
+    // ── 캐스터 컬링이 실제로 자르는가 ──
+    //
+    // 기준선에서 컬링 0이 나오는 것은 정상이다(작은 씬에서는 모든 오브젝트가
+    // 모든 캐스케이드에 걸린다). 문제는 그 0이 '자를 것이 없었다'와 '판정이 늘
+    // 참이다'를 구분하지 못한다는 것이다. 그래서 잘릴 수밖에 없는 것을 하나
+    // 넣어 본다 — 광원 방향에 수직으로 멀리 옮긴 드로우는 어느 캐스케이드에도
+    // 그림자를 드리울 수 없으므로 셋 다에서 걸러져야 한다.
+    uint32_t culledWithFarCaster = 0;
+    if (shadowTestable)
+    {
+        Mathf::Vector3 lightDir{ baselineShadowData.lightDirection.x,
+            baselineShadowData.lightDirection.y, baselineShadowData.lightDirection.z };
+
+        const Mathf::Vector3 axis = (std::fabs(lightDir.x) < 0.9f)
+            ? Mathf::Vector3{ 1.f, 0.f, 0.f } : Mathf::Vector3{ 0.f, 1.f, 0.f };
+        Mathf::Vector3 perpendicular = lightDir.Cross(axis);
+        perpendicular.Normalize();
+
+        // 마지막 캐스케이드가 덮는 거리보다 훨씬 멀리. 경계 근처에 두면
+        // 판정이 맞는지 애매해진다.
+        const Mathf::Vector3 offset = perpendicular * (baselineShadowData.splitDepths.z * 100.f);
+
+        std::vector<EnhancedDrawItem> farDraws = draws;
+        EnhancedDrawItem farCaster = draws.front();
+        farCaster.worldMatrix = XMMatrixMultiply(farCaster.worldMatrix,
+            XMMatrixTranslation(offset.x, offset.y, offset.z));
+        farDraws.push_back(farCaster);
+
+        frameContext.draws = &farDraws;
+
+        uint32_t coveredTemp = 0;
+        uint32_t drawTemp = 0;
+        double luminanceTemp = 0.0;
+        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+        EnhancedRenderGraph::Stats statsTemp{};
+
+        shadowEnabled = true;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceTemp))
+        {
+            outLog += "[4/4] 캐스터 컬링 렌더 실패: " + error + "\n";
+            return false;
+        }
+        culledWithFarCaster = shadow.GetLastCulledCount();
+
+        frameContext.draws = &draws;
+    }
+
+    char shadowLine[320]{};
     std::snprintf(shadowLine, sizeof(shadowLine),
-        "      그림자 — 방향광 %s · 캐스터 %u · 맵 기록 텍셀 %u/%u"
+        "      그림자 — 방향광 %s · 캐스터 %u(컬링 %u) · 분할 %.1f/%.1f/%.1f"
+        " · 캐스케이드 텍셀 %u/%u/%u · 먼 캐스터 컬링 %u"
         " · 끔 %.5f · 켬 %.5f · 강제 %.5f\n",
-        baselineHasDirectional ? "있음" : "없음", baselineShadowCasters,
-        baselineShadowOccluders,
-        EnhancedShadowPass::kShadowMapSize * EnhancedShadowPass::kShadowMapSize,
+        baselineHasDirectional ? "있음" : "없음", baselineShadowCasters, baselineShadowCulled,
+        baselineShadowData.splitDepths.x, baselineShadowData.splitDepths.y,
+        baselineShadowData.splitDepths.z,
+        baselineCascadeOccluders[0], baselineCascadeOccluders[1], baselineCascadeOccluders[2],
+        culledWithFarCaster,
         luminanceNoShadow, luminanceLit, luminanceForced);
     outLog += shadowLine;
 
@@ -2776,6 +2862,38 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         passed = false;
         verdict = "그림자 캐스터가 " + std::to_string(baselineShadowCasters)
             + "건인데 그림자 맵이 클리어 값 그대로다 — 깊이 전용 렌더나 라이트 행렬이 어긋났다";
+    }
+    // 캐스케이드가 실제로 셋 다 도는가.
+    //
+    // 합계만 보면 한 장만 채워져도 통과한다. 그건 배열을 만들어 놓고 슬라이스
+    // 0에만 그리는 상태와 구분되지 않는다 — 캐스케이드를 넣은 의미가 사라진다.
+    else if (shadowTestable && (0 == baselineCascadeOccluders[0] ||
+        0 == baselineCascadeOccluders[1] || 0 == baselineCascadeOccluders[2]))
+    {
+        passed = false;
+        verdict = "캐스케이드 기록 텍셀이 "
+            + std::to_string(baselineCascadeOccluders[0]) + "/"
+            + std::to_string(baselineCascadeOccluders[1]) + "/"
+            + std::to_string(baselineCascadeOccluders[2])
+            + " — 빈 캐스케이드가 있다(슬라이스별 DSV나 캐스터 컬링 판정을 볼 것)";
+    }
+    // 캐스터 컬링이 자를 수 있는가. 잘릴 수밖에 없는 것을 하나 넣었으므로
+    // 캐스케이드 셋에서 각각 한 번씩 걸러져야 한다.
+    else if (shadowTestable && culledWithFarCaster < EnhancedShadowPass::kCascadeCount)
+    {
+        passed = false;
+        verdict = "그림자를 드리울 수 없는 캐스터를 넣었는데 컬링이 "
+            + std::to_string(culledWithFarCaster) + "건뿐이다(기대 "
+            + std::to_string(EnhancedShadowPass::kCascadeCount)
+            + ") — 캐스터 컬링 판정이 늘 참이다";
+    }
+    // 분할이 단조 증가하는가. 뒤집히면 셰이더의 캐스케이드 선택이 조용히 틀린다.
+    else if (shadowTestable &&
+        !(baselineShadowData.splitDepths.x < baselineShadowData.splitDepths.y &&
+          baselineShadowData.splitDepths.y < baselineShadowData.splitDepths.z))
+    {
+        passed = false;
+        verdict = "캐스케이드 분할이 단조 증가하지 않는다";
     }
     // 그림자 맵을 SRV로 읽고 비교 샘플러가 도는가(③④).
     else if (shadowTestable && luminanceForced >= luminanceNoShadow - 1e-5)

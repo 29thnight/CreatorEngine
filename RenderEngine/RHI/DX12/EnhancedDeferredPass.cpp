@@ -24,15 +24,19 @@ struct DeferredLight
     float4 attenuation;   // x 상수 · y 선형 · z 이차 · w 반경
 };
 
+#define SHADOW_CASCADE_COUNT 3
+
 cbuffer LightingConstants : register(b0)
 {
     float4x4      gInverseViewProjection;
-    float4x4      gLightViewProjection;
+    float4x4      gLightViewProjection[SHADOW_CASCADE_COUNT];
     float4        gEyePosition;
+    float4        gCameraForward;
+    float4        gCascadeSplits;   // xyz = 각 캐스케이드가 끝나는 뷰 깊이
+    float4        gShadowBias;      // xyz = 캐스케이드별 깊이 편향
     uint          gLightCount;
     uint          gHasShadow;
-    float         gShadowBias;
-    uint          gPadding;
+    uint2         gPadding;
     DeferredLight gLights[MAX_DEFERRED_LIGHTS];
 };
 
@@ -41,31 +45,44 @@ Texture2D    gMetalRough : register(t1);
 Texture2D    gNormal     : register(t2);
 Texture2D    gEmissive   : register(t3);
 Texture2D    gDepth      : register(t4);
-Texture2D    gShadowMap  : register(t5);
+Texture2DArray gShadowMap : register(t5);
 SamplerState gSampler    : register(s0);
 
 // 비교 샘플러. 하드웨어가 이웃 텍셀 넷을 비교하고 평균내 준다(2x2 PCF) —
 // 직접 네 번 읽는 것보다 싸고, 가장자리가 부드러워진다.
 SamplerComparisonState gShadowSampler : register(s1);
 
-// 방향광 그림자. 반환값 1은 빛을 받음, 0은 가려짐.
+// 방향광 캐스케이드 그림자. 반환값 1은 빛을 받음, 0은 가려짐.
 float SampleShadow(float3 worldPosition)
 {
     if (gHasShadow == 0) return 1.0f;
 
-    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection);
+    // 어느 캐스케이드인지는 카메라로부터의 뷰 깊이로 고른다. 캐스케이드를
+    // 하나씩 투영해 보고 들어맞는 것을 찾는 방법도 있지만 그쪽은 행렬 곱이
+    // 최대 셋이다 — 분할 지점이 뷰 깊이 기준이라 비교 둘이면 같은 답이 나온다.
+    const float viewDepth = dot(worldPosition - gEyePosition.xyz, gCameraForward.xyz);
+
+    uint cascade = 0;
+    if (viewDepth > gCascadeSplits.x) cascade = 1;
+    if (viewDepth > gCascadeSplits.y) cascade = 2;
+
+    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection[cascade]);
     const float3 projected = lightSpace.xyz / lightSpace.w;
 
     // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
-    // 검은 띠가 생기므로 빛을 받는 것으로 둔다.
+    // 검은 띠가 생기므로 빛을 받는 것으로 둔다. 마지막 캐스케이드 너머
+    // (그림자 거리 밖)도 이 경로로 걸러진다.
     if (any(abs(projected.xy) > 1.0f) || projected.z > 1.0f) return 1.0f;
 
     const float2 uv = float2(projected.x * 0.5f + 0.5f, 0.5f - projected.y * 0.5f);
 
-    // 깊이 편향은 호출부가 정한다. 없으면 표면이 자기 그림자에 걸려
-    // 줄무늬(shadow acne)가 생기고, 크면 접지면에서 그림자가 뜬다.
+    // 깊이 편향은 호출부가 캐스케이드별로 정한다. 먼 캐스케이드는 텍셀 하나가
+    // 덮는 월드 범위가 넓어 같은 값으로는 여드름이 남는다.
     // 경사 비례 항은 법선이 있어야 해서 다음 슬라이스로 미룬다.
-    return gShadowMap.SampleCmpLevelZero(gShadowSampler, uv, projected.z - gShadowBias);
+    const float bias = gShadowBias[cascade];
+
+    return gShadowMap.SampleCmpLevelZero(gShadowSampler,
+        float3(uv, (float)cascade), projected.z - bias);
 }
 
 struct VSOut
@@ -334,7 +351,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
         // 깊이는 DEPTH_WRITE에서 읽기 상태로 넘어와야 한다. 그래프가 알아서
         // 전이를 만들지만, 여기서 선언하지 않으면 만들지 않는다.
         { m_inputs.depth,      RGResourceState::ShaderResource },
-        { m_shadowMap,         RGResourceState::ShaderResource },
+        { m_shadowMap,         RGResourceState::ShaderResource },   // 캐스케이드 배열
         { m_output,            RGResourceState::RenderTarget },
     };
 
@@ -369,18 +386,30 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
                 &depthSrv, srvRange.CpuAt(4));
 
-            // 그림자 맵도 깊이라 같은 규칙이다.
+            // 그림자 맵도 깊이지만 배열이라 차원까지 바꿔 봐야 한다.
+            D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrv{};
+            shadowSrv.Format = DXGI_FORMAT_R32_FLOAT;
+            shadowSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+            shadowSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            shadowSrv.Texture2DArray.MipLevels = 1;
+            shadowSrv.Texture2DArray.ArraySize = kShadowCascadeCount;
             device->CreateShaderResourceView(executeContext.Resolve(m_shadowMap),
-                &depthSrv, srvRange.CpuAt(5));
+                &shadowSrv, srvRange.CpuAt(5));
 
             // 광원 상수를 업로드 링에 올린다.
             LightingConstants constants{};
             constants.inverseViewProjection = m_inverseViewProjection;
-            constants.lightViewProjection = XMMatrixTranspose(m_shadowLightViewProjection);
+            for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
+            {
+                constants.lightViewProjection[i] =
+                    XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
+            }
             constants.eyePosition = m_eyePosition;
+            constants.cameraForward = m_shadowData.cameraForward;
+            constants.cascadeSplits = m_shadowData.splitDepths;
+            constants.shadowBias = m_shadowData.bias;
             constants.lightCount = static_cast<uint32_t>(m_frameLights.size());
-            constants.hasShadow = m_shadowEnabled ? 1u : 0u;
-            constants.shadowBias = m_shadowBias;
+            constants.hasShadow = m_shadowData.enabled ? 1u : 0u;
             for (size_t i = 0; i < m_frameLights.size(); ++i)
             {
                 constants.lights[i] = m_frameLights[i];

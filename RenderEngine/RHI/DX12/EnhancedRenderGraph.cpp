@@ -280,7 +280,7 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
         desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         desc.Width = resource.desc.width;
         desc.Height = resource.desc.height;
-        desc.DepthOrArraySize = 1;
+        desc.DepthOrArraySize = static_cast<UINT16>((std::max)(1u, resource.desc.arraySize));
         desc.MipLevels = 1;
         desc.Format = resource.desc.format;
         desc.SampleDesc.Count = 1;

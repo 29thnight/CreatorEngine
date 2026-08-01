@@ -26,10 +26,6 @@ public:
     // 많은 씬이 나왔을 때 재는 것이 먼저다.
     static constexpr uint32_t kMaxLights = 64;
 
-    // 그림자 깊이 편향의 기본값. 2048 맵 · 카메라 프러스텀 앞 30% 기준으로 고른
-    // 값이라, 맵 크기나 덮는 범위를 바꾸면 같이 손봐야 한다.
-    static constexpr float kDefaultShadowBias = 0.0015f;
-
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
@@ -42,18 +38,12 @@ public:
     // GBuffer 출력을 입력으로 받는다. Declare 전에 넣어 줘야 한다.
     void SetInputs(const EnhancedGBufferPass::Outputs& inputs) { m_inputs = inputs; }
 
-    // 그림자 맵과 라이트 공간 행렬. 그림자 패스가 없으면 넣지 않아도 되고,
+    // 그림자 맵과 캐스케이드 정보. 그림자 패스가 없으면 넣지 않아도 되고,
     // 그때는 그림자 없이 도는 것이 정상 경로다.
-    //
-    // bias는 씬마다 손봐야 하는 값이라 상수로 박지 않는다 — 너무 작으면 표면이
-    // 자기 그림자에 걸려 줄무늬가 생기고, 너무 크면 접지면에서 그림자가 뜬다.
-    void SetShadow(RGHandle shadowMap, const Mathf::Matrix& lightViewProjection, bool enabled,
-        float bias = kDefaultShadowBias)
+    void SetShadow(RGHandle shadowMap, const EnhancedShadowData& data)
     {
         m_shadowMap = shadowMap;
-        m_shadowLightViewProjection = lightViewProjection;
-        m_shadowEnabled = enabled;
-        m_shadowBias = bias;
+        m_shadowData = data;
     }
 
     RGHandle GetOutput() const { return m_output; }
@@ -67,12 +57,14 @@ private:
     struct LightingConstants
     {
         Mathf::Matrix  inverseViewProjection{};
-        Mathf::Matrix  lightViewProjection{};
+        Mathf::Matrix  lightViewProjection[kShadowCascadeCount]{};
         Mathf::Vector4 eyePosition{};
+        Mathf::Vector4 cameraForward{};
+        Mathf::Vector4 cascadeSplits{};
+        Mathf::Vector4 shadowBias{};
         uint32_t       lightCount{ 0 };
         uint32_t       hasShadow{ 0 };
-        float          shadowBias{ 0.f };
-        uint32_t       padding{ 0 };
+        uint32_t       padding[2]{};
         EnhancedLight  lights[kMaxLights]{};
     };
 
@@ -84,10 +76,8 @@ private:
     Mathf::Vector4 m_eyePosition{};
     uint32_t       m_droppedLights{ 0 };
 
-    RGHandle       m_shadowMap;
-    Mathf::Matrix  m_shadowLightViewProjection{};
-    bool           m_shadowEnabled{ false };
-    float          m_shadowBias{ kDefaultShadowBias };
+    RGHandle           m_shadowMap;
+    EnhancedShadowData m_shadowData{};
 
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 

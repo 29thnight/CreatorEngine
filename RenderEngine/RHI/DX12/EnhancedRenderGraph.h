@@ -73,6 +73,13 @@ struct RGTextureDesc
 {
     uint32_t    width{ 0 };
     uint32_t    height{ 0 };
+
+    // 배열 슬라이스. 캐스케이드 그림자맵처럼 같은 규격이 여러 장 필요할 때 쓴다.
+    // 텍스처를 여러 개 만드는 것보다 낫다 — 리소스가 하나라 배리어도 하나고
+    // (전이는 전체 서브리소스 단위라 슬라이스가 늘어도 배리어 수가 그대로다),
+    // 셰이더에서 슬라이스 번호가 좌표의 일부라 분기 없이 고를 수 있다.
+    uint32_t    arraySize{ 1 };
+
     DXGI_FORMAT format{ DXGI_FORMAT_R8G8B8A8_UNORM };
     bool        allowRenderTarget{ false };
     bool        allowDepthStencil{ false };
