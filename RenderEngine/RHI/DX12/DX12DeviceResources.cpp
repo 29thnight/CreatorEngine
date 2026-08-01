@@ -137,9 +137,19 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     readbackDesc.SampleDesc.Count = 1;
     readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
+    // 버퍼는 초기 상태 지정이 무시되고 COMMON으로 만들어진다 — COPY_DEST를 넘기면
+    // 검증 레이어가 경고를 쌓는다(업로드 링 검증에서 잡혔다).
     hr = m_device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_readback));
+        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_readback));
     if (FAILED(hr)) { outError = "리드백 버퍼 생성 실패 " + HrToString(hr); return false; }
+
+    // 프레임 업로드 링. 구간 크기는 브링업 단계의 잠정치다 — 실제 씬을 이식하면
+    // GetStats().peakFrameBytes가 필요한 값을 알려 준다(추정하지 말고 재서 정한다).
+    constexpr uint64_t kUploadBytesPerFrame = 8ull * 1024 * 1024;
+    if (!m_uploadRing.Initialize(m_device.Get(), kUploadBytesPerFrame, kFrameCount, outError))
+    {
+        return false;
+    }
 
     return true;
 }
@@ -150,6 +160,10 @@ void DX12DeviceResources::Shutdown()
     {
         WaitForGpu();
     }
+
+    // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
+    m_uploadRing.Shutdown();
+
     if (m_fenceEvent)
     {
         CloseHandle(m_fenceEvent);
@@ -176,6 +190,10 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
 
     hr = m_commandList->Reset(allocator.Get(), nullptr);
     if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); return false; }
+
+    // 업로드 링 되감기는 반드시 위 펜스 대기 뒤여야 한다. GPU가 이 슬롯의
+    // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
+    m_uploadRing.BeginFrame(m_frameIndex);
 
     return true;
 }

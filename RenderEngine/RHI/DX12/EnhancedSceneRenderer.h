@@ -29,6 +29,17 @@ public:
     //   메모리 캐시  같은 desc 재요청이 컴파일 없이 히트
     //   비동기       Pending으로 시작해 폴백 없이 결국 Ready
     bool RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog);
+
+    /// 업로드 링 자가 검증(PHASE 3-3).
+    ///
+    /// 링의 계약은 눈에 보이지 않는다 — 잘못돼도 "다음 프레임에 가끔 이상한 것이
+    /// 보인다"로만 드러난다. 그래서 규약을 직접 단정한다:
+    ///   ① 요청한 정렬이 지켜지는가
+    ///   ② 프레임 구간이 서로 겹치지 않는가(다른 프레임 데이터를 덮지 않는가)
+    ///   ③ BeginFrame이 같은 구간을 되감는가(무한정 자라지 않는가)
+    ///   ④ 구간을 넘기면 조용히 침범하지 않고 거절하는가
+    ///   ⑤ 링을 거친 데이터가 실제로 GPU 텍스처에 도달하는가(리드백 대조)
+    bool RunUploadRingTest(std::string& outLog);
 };
 
 #endif

@@ -287,6 +287,7 @@
     <ClCompile Include="RHI\DX11RHI.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\DX12\DX12PSOManager.cpp" />
+    <ClCompile Include="RHI\DX12\DX12UploadRing.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />

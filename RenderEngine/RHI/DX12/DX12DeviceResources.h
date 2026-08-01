@@ -7,6 +7,8 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 
+#include "DX12UploadRing.h"
+
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
 //
 // 브링업 단계에서는 스왑체인을 만들지 않는다 — 창은 DX11 스왑체인이 점유 중이고,
@@ -58,6 +60,14 @@ public:
     uint32_t GetHeight() const { return m_height; }
     uint32_t GetRowPitch() const { return m_rowPitch; }
 
+    // 프레임 업로드 링. BeginFrame이 이 프레임 구간을 되감아 준다.
+    //
+    // 여기 묶어 두는 이유: 링의 반납 규칙이 "BeginFrame이 그 슬롯의 펜스를
+    // 기다린 뒤에 되감는다"에 기대고 있다. 링을 따로 들고 다니면 그 계약이
+    // 호출부 규율이 되고, 한 곳만 어겨도 GPU가 읽는 중인 데이터를 덮어쓴다.
+    DX12UploadRing& GetUploadRing() { return m_uploadRing; }
+    const DX12UploadRing& GetUploadRing() const { return m_uploadRing; }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -77,6 +87,8 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE        m_rtvHandle{};
     ComPtr<ID3D12Resource>             m_renderTarget;
     ComPtr<ID3D12Resource>             m_readback;
+
+    DX12UploadRing                     m_uploadRing;
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };
