@@ -50,6 +50,13 @@ public:
     // 이번 프레임에 실제로 그린 드로우 수. 씬 연결이 됐는지 확인하는 값이다.
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
 
+    /// 이 패스를 컬링 뿌리로 표시할지.
+    ///
+    /// 소비자(Deferred)가 붙기 전에는 GBuffer 출력을 읽는 패스가 없어서 컬링에
+    /// 걸린다. 그때만 true로 살려 둔다. 소비자가 붙으면 false로 두는 것이 맞고,
+    /// 그래도 살아남는지가 곧 3-5 컬링의 실전 확인이다.
+    void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
+
     // Declare 뒤에 유효하다.
     const Outputs& GetOutputs() const { return m_outputs; }
 
@@ -71,6 +78,7 @@ private:
     Mathf::xMatrix m_frameViewProjection{};
 
     uint32_t m_lastDrawCount{ 0 };
+    bool     m_keepAlive{ true };
 
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —
     // 리소스가 프레임마다 바뀔 수 있으므로 뷰를 캐시하지 않는다.

@@ -290,9 +290,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     }
     usages.push_back({ depth, RGResourceState::DepthWrite });
 
-    // 지금은 이 패스의 출력을 읽는 패스가 없어서 컬링에 걸린다. 뿌리로 표시해
-    // 살려 둔다 — Deferred가 붙으면 그쪽이 읽으므로 이 표시는 빼야 한다.
-    const bool keepAlive = true;
+    // 소비자가 없을 때만 뿌리로 표시해 살려 둔다(SetKeepAlive).
+    // Deferred가 붙으면 그쪽이 읽으므로 표시 없이도 살아남아야 한다.
+    const bool keepAlive = m_keepAlive;
 
     graph.AddPass(GetName(), usages,
         [this, &context, targets, depth](const EnhancedRenderGraph::ExecuteContext& executeContext)

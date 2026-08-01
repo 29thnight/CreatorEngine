@@ -7,6 +7,8 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
+#include "DX12GpuProfiler.h"
+
 // DX12 실행 경로용 렌더 그래프 (PHASE 3-5).
 //
 // 기존 RenderGraphBuilder를 쓰지 않는 이유:
@@ -136,6 +138,13 @@ public:
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
     bool Execute(ID3D12GraphicsCommandList* commandList, std::string& outError);
 
+    // 패스별 GPU 시간을 잰다. 붙여 두면 Execute가 패스마다 자동으로 감싼다 —
+    // 패스 작성자가 계측을 잊어버릴 수 있는 종류의 일을 구조가 대신한다.
+    //
+    // 배리어는 측정 구간 안에 넣는다. 배리어도 GPU 시간을 쓰고, 그 비용이
+    // 어느 패스 때문에 생겼는지가 곧 그 패스의 비용이기 때문이다.
+    void SetProfiler(DX12GpuProfiler* profiler) { m_profiler = profiler; }
+
     Stats GetStats() const { return m_stats; }
 
     // 검증·진단용. Compile 뒤에 유효하다.
@@ -183,6 +192,7 @@ private:
     std::vector<Resource> m_resources;
     std::vector<Pass>     m_passes;
     std::vector<uint16_t> m_executeOrder;
+    DX12GpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
     Stats m_stats;
 };

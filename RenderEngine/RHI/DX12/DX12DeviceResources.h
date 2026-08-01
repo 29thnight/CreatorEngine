@@ -63,6 +63,9 @@ public:
     uint32_t DrainDebugMessages(std::string& outMessages);
 
     ID3D12Device* GetDevice() const { return m_device.Get(); }
+
+    // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).
+    ID3D12CommandQueue* GetCommandQueue() const { return m_queue.Get(); }
     ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList.Get(); }
     ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }

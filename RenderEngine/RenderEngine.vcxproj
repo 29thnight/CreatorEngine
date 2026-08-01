@@ -293,6 +293,8 @@
     <ClCompile Include="RHI\DX12\EnhancedRenderGraph.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedGBufferPass.cpp" />
     <ClCompile Include="RHI\DX12\DX12MeshCache.cpp" />
+    <ClCompile Include="RHI\DX12\DX12GpuProfiler.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedDeferredPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />

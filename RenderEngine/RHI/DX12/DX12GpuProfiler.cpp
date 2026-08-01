@@ -1,0 +1,178 @@
+#ifndef DYNAMICCPP_EXPORTS
+#include "DX12GpuProfiler.h"
+
+#include <sstream>
+
+namespace
+{
+    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
+    std::string ProfilerHrToString(HRESULT hr)
+    {
+        std::ostringstream oss;
+        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
+        return oss.str();
+    }
+}
+
+bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue,
+    uint32_t maxPassesPerFrame, uint32_t frameCount, std::string& outError)
+{
+    if (nullptr == device || nullptr == queue || 0 == maxPassesPerFrame || 0 == frameCount)
+    {
+        outError = "GPU 프로파일러 인자가 잘못됐다";
+        return false;
+    }
+
+    // 큐마다 타임스탬프 주파수가 다를 수 있다. 여기서 한 번 받아 둔다 —
+    // 나중에 다른 큐의 값으로 나누면 조용히 틀린 시간이 나온다.
+    const HRESULT freqResult = queue->GetTimestampFrequency(&m_ticksPerSecond);
+    if (FAILED(freqResult) || 0 == m_ticksPerSecond)
+    {
+        outError = "타임스탬프 주파수 조회 실패 " + ProfilerHrToString(freqResult);
+        return false;
+    }
+
+    m_maxPassesPerFrame = maxPassesPerFrame;
+    m_frameCount = frameCount;
+
+    const uint32_t queriesPerFrame = maxPassesPerFrame * 2;   // 패스마다 시작·끝
+    const uint32_t totalQueries = queriesPerFrame * frameCount;
+
+    D3D12_QUERY_HEAP_DESC heapDesc{};
+    heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+    heapDesc.Count = totalQueries;
+
+    HRESULT hr = device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(&m_queryHeap));
+    if (FAILED(hr))
+    {
+        outError = "질의 힙 생성 실패 " + ProfilerHrToString(hr);
+        return false;
+    }
+
+    D3D12_HEAP_PROPERTIES readbackHeap{};
+    readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = static_cast<uint64_t>(totalQueries) * sizeof(uint64_t);
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    hr = device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_readback));
+    if (FAILED(hr))
+    {
+        outError = "질의 리드백 버퍼 생성 실패 " + ProfilerHrToString(hr);
+        return false;
+    }
+
+    m_queryHeap->SetName(L"DX12GpuProfilerQueries");
+    m_readback->SetName(L"DX12GpuProfilerReadback");
+    return true;
+}
+
+void DX12GpuProfiler::Shutdown()
+{
+    m_records.clear();
+    m_readback.Reset();
+    m_queryHeap.Reset();
+    m_maxPassesPerFrame = 0;
+    m_frameCount = 0;
+    m_usedPasses = 0;
+}
+
+void DX12GpuProfiler::BeginFrame(uint32_t frameIndex)
+{
+    if (0 == m_frameCount) return;
+    m_frameIndex = frameIndex % m_frameCount;
+    m_usedPasses = 0;
+    m_records.clear();
+}
+
+uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name)
+{
+    if (!m_queryHeap || nullptr == commandList) return kInvalidSlot;
+    if (m_usedPasses >= m_maxPassesPerFrame) return kInvalidSlot;
+
+    const uint32_t slot = m_usedPasses++;
+    const uint32_t base = (m_frameIndex * m_maxPassesPerFrame + slot) * 2;
+
+    PassRecord record{};
+    record.name = name;
+    record.beginQuery = base;
+    record.endQuery = base + 1;
+    m_records.push_back(record);
+
+    commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, base);
+    return slot;
+}
+
+void DX12GpuProfiler::EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot)
+{
+    if (!m_queryHeap || nullptr == commandList || kInvalidSlot == slot) return;
+    if (slot >= m_records.size()) return;
+
+    commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+        m_records[slot].endQuery);
+}
+
+void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList)
+{
+    if (!m_queryHeap || nullptr == commandList || 0 == m_usedPasses) return;
+
+    // 이 프레임 구간만 옮긴다. 전부 옮기면 다른 프레임이 쓰는 중인 영역까지 건드린다.
+    const uint32_t base = m_frameIndex * m_maxPassesPerFrame * 2;
+    const uint32_t count = m_usedPasses * 2;
+
+    commandList->ResolveQueryData(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+        base, count, m_readback.Get(), static_cast<uint64_t>(base) * sizeof(uint64_t));
+}
+
+bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& outError)
+{
+    outTimings.clear();
+    m_lastTotalMs = 0.0;
+
+    if (!m_readback || m_records.empty()) return true;
+
+    const uint32_t base = m_frameIndex * m_maxPassesPerFrame * 2;
+    const size_t offset = static_cast<size_t>(base) * sizeof(uint64_t);
+    const size_t bytes = static_cast<size_t>(m_usedPasses) * 2 * sizeof(uint64_t);
+
+    void* mapped = nullptr;
+    D3D12_RANGE range{ offset, offset + bytes };
+    const HRESULT hr = m_readback->Map(0, &range, &mapped);
+    if (FAILED(hr))
+    {
+        outError = "질의 리드백 Map 실패 " + ProfilerHrToString(hr);
+        return false;
+    }
+
+    const auto* timestamps = static_cast<const uint64_t*>(mapped);
+    for (const auto& record : m_records)
+    {
+        const uint64_t begin = timestamps[record.beginQuery];
+        const uint64_t end = timestamps[record.endQuery];
+
+        PassTiming timing{};
+        timing.name = record.name;
+        // 순서가 뒤집힌 값은 버린다. 큐가 비어 있거나 질의가 기록되지 않은
+        // 경우인데, 그대로 빼면 거대한 음수가 나와 합계를 망친다.
+        timing.milliseconds = (end > begin)
+            ? (static_cast<double>(end - begin) / static_cast<double>(m_ticksPerSecond)) * 1000.0
+            : 0.0;
+
+        m_lastTotalMs += timing.milliseconds;
+        outTimings.push_back(std::move(timing));
+    }
+
+    // 쓰지 않았으므로 빈 범위로 Unmap한다.
+    const D3D12_RANGE emptyRange{ 0, 0 };
+    m_readback->Unmap(0, &emptyRange);
+    return true;
+}
+
+#endif

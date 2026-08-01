@@ -413,6 +413,12 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
     {
         Pass& pass = m_passes[passIndex];
 
+        // 배리어를 측정 구간 안에 둔다. 배리어도 GPU 시간을 쓰고, 그 비용이
+        // 어느 패스 때문에 생겼는지가 곧 그 패스의 비용이다.
+        const uint32_t timerSlot = (nullptr != m_profiler)
+            ? m_profiler->BeginPass(commandList, pass.name)
+            : DX12GpuProfiler::kInvalidSlot;
+
         if (!pass.barriers.empty())
         {
             commandList->ResourceBarrier(static_cast<UINT>(pass.barriers.size()),
@@ -420,6 +426,8 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
         }
 
         if (pass.execute) pass.execute(context);
+
+        if (nullptr != m_profiler) m_profiler->EndPass(commandList, timerSlot);
     }
 
     return true;

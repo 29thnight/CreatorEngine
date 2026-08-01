@@ -5,6 +5,8 @@
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedGBufferPass.h"
+#include "EnhancedDeferredPass.h"
+#include "DX12GpuProfiler.h"
 #include "DX12MeshCache.h"
 #include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
@@ -2221,6 +2223,25 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         return false;
     }
 
+    // Deferred가 GBuffer를 읽으므로 뿌리 표시를 뗀다 — 그래도 살아남아야 하고,
+    // 그것이 3-5 컬링이 실전에서 동작한다는 확인이다.
+    gbuffer.SetKeepAlive(false);
+
+    EnhancedDeferredPass deferred;
+    if (!deferred.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] Deferred 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12GpuProfiler profiler;
+    if (!profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
+        16, DX12DeviceResources::kFrameCount, error))
+    {
+        outLog += "[2/4] GPU 프로파일러 초기화 실패: " + error + "\n";
+        return false;
+    }
+
     // 깊이를 리드백할 버퍼. 커버리지(그려진 픽셀 수)를 세는 데 쓴다.
     const uint32_t depthRowPitch = (kWidth * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
         & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
@@ -2249,20 +2270,32 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     // 한 번 그리고 커버리지를 센다. 카메라를 바꿔 두 번 부른다.
+    std::vector<DX12GpuProfiler::PassTiming> timings;
+    EnhancedRenderGraph::Stats lastGraphStats{};
+
     const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
-        uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError) -> bool
+        uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError,
+        std::vector<DX12GpuProfiler::PassTiming>& outTimings,
+        EnhancedRenderGraph::Stats& outGraphStats) -> bool
     {
         frameContext.camera = &camera;
 
         if (!resources.BeginFrame(outStepError)) return false;
+        profiler.BeginFrame(0);
 
         // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
         if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
+        if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
         EnhancedRenderGraph graph;
+        graph.SetProfiler(&profiler);
+
         gbuffer.Declare(graph, frameContext);
         const auto outputs = gbuffer.GetOutputs();
+
+        deferred.SetInputs(outputs);
+        deferred.Declare(graph, frameContext);
 
         graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -2284,9 +2317,17 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             }, true);
 
         if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
+
+        // 컬링이 GBuffer를 살렸는지 확인한다. 소비자(Deferred)가 읽는데도
+        // 걷어냈다면 화면이 비고, 원인이 컬링이라는 것을 알아채기 어렵다.
+        outGraphStats = graph.GetStats();
+
         if (!graph.Execute(resources.GetCommandList(), outStepError)) return false;
+        profiler.ResolveFrame(resources.GetCommandList());
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
+
+        if (!profiler.Collect(outTimings, outStepError)) return false;
 
         void* mapped = nullptr;
         const size_t bytes = static_cast<size_t>(depthRowPitch) * kHeight;
@@ -2317,7 +2358,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // ── [3/4] 씬 카메라로 렌더 ──
     uint32_t coveredA = 0;
     uint32_t drawCountA = 0;
-    if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error))
+    if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error, timings, lastGraphStats))
     {
         outLog += "[3/4] 렌더 실패: " + error + "\n";
         return false;
@@ -2329,6 +2370,30 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         + "(" + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
         + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
 
+    // 그래프가 GBuffer를 살렸는지. Deferred가 읽으므로 뿌리 표시 없이 살아남아야 한다.
+    outLog += "      그래프 — 선언 " + std::to_string(lastGraphStats.passesDeclared)
+        + " · 컬링 " + std::to_string(lastGraphStats.passesCulled)
+        + " · 실행 " + std::to_string(lastGraphStats.passesExecuted)
+        + " · 배리어 " + std::to_string(lastGraphStats.barriersEmitted)
+        + "건을 " + std::to_string(lastGraphStats.barrierBatches) + "번에\n";
+
+    // 패스별 GPU 시간. 3-6의 성능 판정이 여기서 시작된다 — DX11 대비 비교는
+    // 같은 씬을 양쪽으로 그릴 수 있게 되는 시점(재질 연결 후)에 붙인다.
+    double totalMs = 0.0;
+    for (const auto& timing : timings)
+    {
+        char line[128]{};
+        std::snprintf(line, sizeof(line), "      GPU %-18s %.4f ms\n",
+            timing.name.c_str(), timing.milliseconds);
+        outLog += line;
+        totalMs += timing.milliseconds;
+    }
+    {
+        char line[96]{};
+        std::snprintf(line, sizeof(line), "      GPU %-18s %.4f ms\n", "(합계)", totalMs);
+        outLog += line;
+    }
+
     // ── [4/4] 카메라를 옮겨 다시 렌더 ──
     //
     // 이것이 이 검증의 핵심이다. 상수 버퍼가 실제로 셰이더에 닿지 않으면
@@ -2339,7 +2404,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     uint32_t coveredB = 0;
     uint32_t drawCountB = 0;
-    if (!renderAndCount(movedCamera, coveredB, drawCountB, error))
+    std::vector<DX12GpuProfiler::PassTiming> timingsB;
+    EnhancedRenderGraph::Stats statsB{};
+    if (!renderAndCount(movedCamera, coveredB, drawCountB, error, timingsB, statsB))
     {
         outLog += "[4/4] 이동 카메라 렌더 실패: " + error + "\n";
         return false;
@@ -2348,7 +2415,14 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     bool passed = true;
     std::string verdict;
 
-    if (0 == drawCountA)
+    // 컬링 확인을 먼저 한다. GBuffer가 걷어내졌다면 이후 단정이 전부 무의미하다.
+    if (0 != lastGraphStats.passesCulled)
+    {
+        passed = false;
+        verdict = "Deferred가 읽는데도 패스가 "
+            + std::to_string(lastGraphStats.passesCulled) + "개 걷어내졌다";
+    }
+    else if (0 == drawCountA)
     {
         // 씬이 비어 있으면 연결 자체를 확인할 수 없다. 통과로 처리하면
         // '아무것도 안 그렸는데 통과'가 되므로 실패로 알린다.
@@ -2381,6 +2455,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
     }
 
+    profiler.Shutdown();
+    deferred.Shutdown();
     gbuffer.Shutdown();
     meshCache.Shutdown();
     rootSignatures.Shutdown();
