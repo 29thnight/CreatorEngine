@@ -5,6 +5,9 @@
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedGBufferPass.h"
+#include "DX12MeshCache.h"
+#include "../../RenderPassData.h"
+#include "../../MeshRendererProxy.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
@@ -2135,6 +2138,256 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     resources.Shutdown();
 
     outLog += passed ? "GBuffer 패스 검증 통과\n" : "GBuffer 패스 검증 실패\n";
+    return passed;
+}
+
+bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
+{
+    using Microsoft::WRL::ComPtr;
+
+    constexpr uint32_t kWidth = 256;
+    constexpr uint32_t kHeight = 256;
+
+    // ── [1/4] 씬에서 카메라 스냅샷과 드로우 목록을 뽑는다 ──
+    //
+    // 프록시를 그대로 넘기지 않고 필요한 것만 복사한다. 렌더가 게임 자료구조를
+    // 직접 읽으면 3-2에서 걷어낸 부류(렌더가 게임 상태를 만짐)가 되살아난다.
+    Camera* sceneCamera = nullptr;
+    for (auto& camera : CameraManagement->GetCameras())
+    {
+        if (camera && RenderPassData::VaildCheck(camera.get()))
+        {
+            sceneCamera = camera.get();
+            break;
+        }
+    }
+
+    if (nullptr == sceneCamera)
+    {
+        outLog += "[1/4] 활성 카메라가 없다(에디터 실행 중에만 의미 있는 검증)\n";
+        return false;
+    }
+
+    const RenderPassData* renderData = RenderPassData::GetData(sceneCamera);
+    const FrameCameraSnapshot cameraSnapshot = renderData->GetFrameSnapshot();
+
+    // 커맨드 빌드 스레드가 채워 둔 deferred 큐를 그대로 읽는다. 프록시를 넘기지
+    // 않고 메시 포인터와 월드 행렬만 복사한다 — 렌더가 게임 자료구조를 들고
+    // 다니면 3-2에서 걷어낸 부류가 되살아난다.
+    std::vector<EnhancedDrawItem> draws;
+    for (auto* proxy : renderData->m_deferredQueue)
+    {
+        if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
+        draws.push_back({ proxy->m_Mesh.get(), proxy->m_worldMatrix });
+    }
+
+    outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->m_cameraIndex)
+        + " · 드로우 후보 " + std::to_string(draws.size()) + "\n";
+
+    // ── [2/4] DX12 쪽 준비 ──
+    DX12DeviceResources resources;
+    std::string error;
+    if (!resources.Initialize(kWidth, kHeight, error))
+    {
+        outLog += "[2/4] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12PSOManager psoManager;
+    DX12RootSignatureCache rootSignatures;
+    DX12MeshCache meshCache;
+    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_scene.cache", error) ||
+        !rootSignatures.Initialize(resources.GetDevice(), error) ||
+        !meshCache.Initialize(&resources, error))
+    {
+        outLog += "[2/4] 보조 시스템 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    EnhancedFrameContext frameContext{};
+    frameContext.resources = &resources;
+    frameContext.psoManager = &psoManager;
+    frameContext.rootSignatures = &rootSignatures;
+    frameContext.meshCache = &meshCache;
+    frameContext.width = kWidth;
+    frameContext.height = kHeight;
+    frameContext.camera = &cameraSnapshot;
+    frameContext.draws = &draws;
+
+    EnhancedGBufferPass gbuffer;
+    if (!gbuffer.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] GBuffer 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    // 깊이를 리드백할 버퍼. 커버리지(그려진 픽셀 수)를 세는 데 쓴다.
+    const uint32_t depthRowPitch = (kWidth * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
+        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+
+    ComPtr<ID3D12Resource> depthReadback;
+    {
+        D3D12_HEAP_PROPERTIES readbackHeap{};
+        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<uint64_t>(depthRowPitch) * kHeight;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+            IID_PPV_ARGS(&depthReadback))))
+        {
+            outLog += "[2/4] 깊이 리드백 버퍼 생성 실패\n";
+            return false;
+        }
+    }
+
+    // 한 번 그리고 커버리지를 센다. 카메라를 바꿔 두 번 부른다.
+    const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
+        uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError) -> bool
+    {
+        frameContext.camera = &camera;
+
+        if (!resources.BeginFrame(outStepError)) return false;
+
+        // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
+        if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
+        outDrawCount = gbuffer.GetLastDrawCount();
+
+        EnhancedRenderGraph graph;
+        gbuffer.Declare(graph, frameContext);
+        const auto outputs = gbuffer.GetOutputs();
+
+        graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
+            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                D3D12_TEXTURE_COPY_LOCATION dst{};
+                dst.pResource = depthReadback.Get();
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
+                dst.PlacedFootprint.Footprint.Width = kWidth;
+                dst.PlacedFootprint.Footprint.Height = kHeight;
+                dst.PlacedFootprint.Footprint.Depth = 1;
+                dst.PlacedFootprint.Footprint.RowPitch = depthRowPitch;
+
+                D3D12_TEXTURE_COPY_LOCATION src{};
+                src.pResource = executeContext.Resolve(outputs.depth);
+                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            }, true);
+
+        if (!graph.Compile(resources.GetDevice(), outStepError)) return false;
+        if (!graph.Execute(resources.GetCommandList(), outStepError)) return false;
+        if (!resources.EndFrame(outStepError)) return false;
+        resources.WaitForGpu();
+
+        void* mapped = nullptr;
+        const size_t bytes = static_cast<size_t>(depthRowPitch) * kHeight;
+        D3D12_RANGE range{ 0, bytes };
+        if (FAILED(depthReadback->Map(0, &range, &mapped)))
+        {
+            outStepError = "깊이 리드백 Map 실패";
+            return false;
+        }
+
+        // 깊이 1.0은 아무것도 안 그려진 곳이다(클리어 값).
+        outCovered = 0;
+        const auto* pixels = static_cast<const uint8_t*>(mapped);
+        for (uint32_t y = 0; y < kHeight; ++y)
+        {
+            const auto* row = pixels + static_cast<size_t>(y) * depthRowPitch;
+            for (uint32_t x = 0; x < kWidth; ++x)
+            {
+                float depth = 0.f;
+                memcpy(&depth, row + static_cast<size_t>(x) * 4, 4);
+                if (depth < 0.999f) ++outCovered;
+            }
+        }
+        depthReadback->Unmap(0, nullptr);
+        return true;
+    };
+
+    // ── [3/4] 씬 카메라로 렌더 ──
+    uint32_t coveredA = 0;
+    uint32_t drawCountA = 0;
+    if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error))
+    {
+        outLog += "[3/4] 렌더 실패: " + error + "\n";
+        return false;
+    }
+
+    const auto meshStats = meshCache.GetStats();
+    outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
+        + " · 메시 업로드 " + std::to_string(meshStats.uploads)
+        + "(" + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
+        + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
+
+    // ── [4/4] 카메라를 옮겨 다시 렌더 ──
+    //
+    // 이것이 이 검증의 핵심이다. 상수 버퍼가 실제로 셰이더에 닿지 않으면
+    // 두 결과가 같다 — '그려지긴 하는데 카메라를 무시한다'를 잡는다.
+    FrameCameraSnapshot movedCamera = cameraSnapshot;
+    movedCamera.view = XMMatrixMultiply(cameraSnapshot.view,
+        XMMatrixTranslation(0.f, 0.f, 500.f));
+
+    uint32_t coveredB = 0;
+    uint32_t drawCountB = 0;
+    if (!renderAndCount(movedCamera, coveredB, drawCountB, error))
+    {
+        outLog += "[4/4] 이동 카메라 렌더 실패: " + error + "\n";
+        return false;
+    }
+
+    bool passed = true;
+    std::string verdict;
+
+    if (0 == drawCountA)
+    {
+        // 씬이 비어 있으면 연결 자체를 확인할 수 없다. 통과로 처리하면
+        // '아무것도 안 그렸는데 통과'가 되므로 실패로 알린다.
+        passed = false;
+        verdict = "드로우가 0건이다 — 씬에 메시를 배치한 뒤 다시 실행할 것";
+    }
+    else if (0 == coveredA)
+    {
+        passed = false;
+        verdict = "드로우는 있는데 깊이에 아무것도 기록되지 않았다";
+    }
+    else if (coveredA == coveredB)
+    {
+        passed = false;
+        verdict = "카메라를 옮겨도 커버리지가 같다 — 상수 버퍼가 셰이더에 닿지 않는다";
+    }
+    else
+    {
+        verdict = "카메라 이동으로 커버리지가 " + std::to_string(coveredA)
+            + " → " + std::to_string(coveredB) + "로 바뀌었다";
+    }
+
+    outLog += "[4/4] " + std::string(passed ? "통과" : "실패") + " — " + verdict + "\n";
+
+    std::string messages;
+    const uint32_t problems = resources.DrainDebugMessages(messages);
+    if (0 != problems)
+    {
+        passed = false;
+        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
+    }
+
+    gbuffer.Shutdown();
+    meshCache.Shutdown();
+    rootSignatures.Shutdown();
+    psoManager.Shutdown();
+    resources.Shutdown();
+
+    outLog += passed ? "씬 연결 검증 통과\n" : "씬 연결 검증 실패\n";
     return passed;
 }
 

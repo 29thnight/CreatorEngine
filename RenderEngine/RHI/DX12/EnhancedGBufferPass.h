@@ -1,9 +1,11 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
+#include <unordered_map>
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
+#include "DX12MeshCache.h"
 
 // GBuffer 패스 (PHASE 3-6, 첫 패스).
 //
@@ -41,8 +43,12 @@ public:
     const char* GetName() const override { return "GBuffer"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
+
+    // 이번 프레임에 실제로 그린 드로우 수. 씬 연결이 됐는지 확인하는 값이다.
+    uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
 
     // Declare 뒤에 유효하다.
     const Outputs& GetOutputs() const { return m_outputs; }
@@ -53,23 +59,18 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    struct Vertex
-    {
-        float position[3];
-        float normal[3];
-        float uv[2];
-    };
-
-    bool CreateGeometry(const EnhancedFrameContext& context, std::string& outError);
     bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
 
     Outputs m_outputs;
 
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    ComPtr<ID3D12Resource> m_indexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexView{};
-    D3D12_INDEX_BUFFER_VIEW  m_indexView{};
-    uint32_t m_indexCount{ 0 };
+    // 이번 프레임 드로우가 쓸 지오메트리. PrepareFrame에서 채우고 Record가 읽는다 —
+    // Record가 메시 캐시를 직접 부르면 기록 중에 리소스를 만들게 되어 규약을 어긴다.
+    std::unordered_map<Mesh*, DX12MeshCache::Entry> m_drawGeometry;
+
+    // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
+    Mathf::xMatrix m_frameViewProjection{};
+
+    uint32_t m_lastDrawCount{ 0 };
 
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —
     // 리소스가 프레임마다 바뀔 수 있으므로 뷰를 캐시하지 않는다.

@@ -3,6 +3,8 @@
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
+#include "DX12MeshCache.h"
+#include "../../Mesh.h"
 
 #include <d3dcompiler.h>
 #include <sstream>
@@ -26,6 +28,16 @@ namespace
     // 각각 기록되는지 확인하려면 값이 구분되어야 한다. 한 타깃만 기록되고
     // 나머지가 비어 있어도 '그려지긴 한다'로 보이는 것을 막는다.
     constexpr const char* kGBufferShader = R"(
+cbuffer PerFrame : register(b0)
+{
+    float4x4 gViewProjection;
+};
+
+cbuffer PerDraw : register(b1)
+{
+    float4x4 gWorld;
+};
+
 struct VSIn
 {
     float3 position : POSITION;
@@ -43,10 +55,11 @@ struct VSOut
 VSOut VSMain(VSIn input)
 {
     VSOut output;
-    // 첫 슬라이스는 클립 공간 좌표를 그대로 쓴다. 뷰·투영은 카메라 스냅샷이
-    // 연결되는 슬라이스에서 상수 버퍼로 들어온다.
-    output.position = float4(input.position, 1.0f);
-    output.normal   = input.normal;
+    const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
+    output.position = mul(worldPosition, gViewProjection);
+    // 법선은 회전만 적용한다. 비균등 스케일은 역전치 행렬이 필요하고,
+    // 그건 재질 연결 슬라이스에서 상수에 함께 넣는다.
+    output.normal   = mul(input.normal, (float3x3)gWorld);
     output.uv       = input.uv;
     return output;
 }
@@ -102,70 +115,39 @@ DXGI_FORMAT EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
     }
 }
 
-bool EnhancedGBufferPass::CreateGeometry(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
-    // 화면을 채우는 쿼드. 첫 슬라이스의 목적은 입력 조립이 도는지 확인하는 것이라
-    // 지오메트리 자체는 단순할수록 좋다 — UV가 그대로 diffuse로 나가므로
-    // 픽셀 검증이 위치와 값을 동시에 본다.
-    const Vertex vertices[] = {
-        { { -0.8f,  0.8f, 0.5f }, { 0.f, 0.f, -1.f }, { 0.f, 0.f } },
-        { {  0.8f,  0.8f, 0.5f }, { 0.f, 0.f, -1.f }, { 1.f, 0.f } },
-        { { -0.8f, -0.8f, 0.5f }, { 0.f, 0.f, -1.f }, { 0.f, 1.f } },
-        { {  0.8f, -0.8f, 0.5f }, { 0.f, 0.f, -1.f }, { 1.f, 1.f } },
-    };
-    const uint16_t indices[] = { 0, 1, 2, 2, 1, 3 };
-    m_indexCount = _countof(indices);
+    m_drawGeometry.clear();
+    m_lastDrawCount = 0;
 
-    auto* device = context.resources->GetDevice();
+    // 프레임 밀봉된 카메라에서 뷰·투영을 만든다. 스냅샷이 없으면 항등으로 두는데,
+    // 그러면 클립 공간에 바로 그리게 되므로 '카메라가 안 붙었다'가 화면에 드러난다.
+    m_frameViewProjection = (nullptr != context.camera)
+        ? XMMatrixMultiply(context.camera->view, context.camera->projection)
+        : XMMatrixIdentity();
 
-    const auto createUploadBuffer = [&](const void* data, size_t bytes,
-        ComPtr<ID3D12Resource>& outResource, const wchar_t* name) -> bool
+    if (nullptr == context.draws || nullptr == context.meshCache) return true;
+
+    // 이번 프레임에 그릴 메시를 미리 올린다. 같은 메시가 여러 번 나와도 캐시가
+    // 한 번만 올린다.
+    for (const auto& draw : *context.draws)
     {
-        D3D12_HEAP_PROPERTIES heap{};
-        // 정점·인덱스는 프레임마다 바뀌지 않으므로 업로드 힙에 두고 그대로 읽는다.
-        // 실제 씬 메시는 DEFAULT 힙 + 업로드 링 복사로 가야 하고, 그건 씬 연결
-        // 슬라이스에서 메시가 실제로 들어올 때 함께 정한다.
-        heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+        if (nullptr == draw.mesh) continue;
+        if (m_drawGeometry.find(draw.mesh) != m_drawGeometry.end()) continue;
 
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = bytes;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        const HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outResource));
-        if (FAILED(hr))
+        std::string uploadError;
+        const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
+        if (!entry.IsValid())
         {
-            outError = "GBuffer 버퍼 생성 실패 " + GBufferHrToString(hr);
-            return false;
+            // 빈 메시는 그냥 건너뛴다. 업로드 실패는 알린다 — 조용히 안 그리면
+            // '왜 이 오브젝트만 안 보이지'가 된다.
+            if (!uploadError.empty()) outError = uploadError;
+            continue;
         }
 
-        void* mapped = nullptr;
-        if (FAILED(outResource->Map(0, nullptr, &mapped)))
-        {
-            outError = "GBuffer 버퍼 Map 실패";
-            return false;
-        }
-        memcpy(mapped, data, bytes);
-        outResource->Unmap(0, nullptr);
-        outResource->SetName(name);
-        return true;
-    };
-
-    if (!createUploadBuffer(vertices, sizeof(vertices), m_vertexBuffer, L"GBufferVertices")) return false;
-    if (!createUploadBuffer(indices, sizeof(indices), m_indexBuffer, L"GBufferIndices")) return false;
-
-    m_vertexView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-    m_vertexView.SizeInBytes = sizeof(vertices);
-    m_vertexView.StrideInBytes = sizeof(Vertex);
-
-    m_indexView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-    m_indexView.SizeInBytes = sizeof(indices);
-    m_indexView.Format = DXGI_FORMAT_R16_UINT;
+        m_drawGeometry.emplace(draw.mesh, entry);
+        ++m_lastDrawCount;
+    }
 
     return true;
 }
@@ -178,7 +160,22 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     if (!CompileGBufferShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
     // 루트 시그니처는 캐시가 식별자를 준다 — 손번호를 붙이지 않는 것이 3-4의 계약이다.
+    //
+    // 상수는 디스크립터 테이블이 아니라 루트 CBV로 넘긴다. 업로드 링에서 자른
+    // 조각의 GPU 주소를 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없고,
+    // 드로우마다 바뀌는 값에는 이쪽이 싸다(테이블은 디스크립터 힙을 거친다).
+    D3D12_ROOT_PARAMETER params[2]{};
+    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[0].Descriptor.ShaderRegister = 0;   // b0 — 프레임 상수
+    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[1].Descriptor.ShaderRegister = 1;   // b1 — 드로우 상수
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
+    rootDesc.NumParameters = _countof(params);
+    rootDesc.pParameters = params;
     rootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
@@ -245,7 +242,6 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
         return false;
     }
 
-    if (!CreateGeometry(context, outError)) return false;
     if (!CreatePipeline(context, outError)) return false;
 
     return true;
@@ -343,17 +339,45 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            commandList->IASetVertexBuffers(0, 1, &m_vertexView);
-            commandList->IASetIndexBuffer(&m_indexView);
-            commandList->DrawIndexedInstanced(m_indexCount, 1, 0, 0, 0);
+
+            // 프레임 상수는 한 번만 올린다. 드로우마다 올리면 같은 값을 수백 번
+            // 복사하는 꼴이고, 그건 CE 단계를 늘리는 방향이다.
+            //
+            // HLSL은 행 우선으로 읽으므로 전치해서 넣는다.
+            const Mathf::Matrix viewProjection = XMMatrixTranspose(m_frameViewProjection);
+            const auto frameConstants = context.resources->GetUploadRing().Allocate(
+                sizeof(Mathf::Matrix), DX12UploadRing::kConstantBufferAlignment);
+            if (!frameConstants.IsValid()) return;
+            memcpy(frameConstants.cpuAddress, &viewProjection, sizeof(viewProjection));
+            commandList->SetGraphicsRootConstantBufferView(0, frameConstants.gpuAddress);
+
+            // 그릴 것이 없으면 클리어만 하고 끝난다 — 빈 씬도 정상 경로다.
+            if (nullptr == context.draws) return;
+
+            for (const auto& draw : *context.draws)
+            {
+                const auto mesh = m_drawGeometry.find(draw.mesh);
+                if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
+
+                const Mathf::Matrix world = XMMatrixTranspose(draw.worldMatrix);
+                const auto drawConstants = context.resources->GetUploadRing().Allocate(
+                    sizeof(Mathf::Matrix), DX12UploadRing::kConstantBufferAlignment);
+                if (!drawConstants.IsValid()) break;   // 구간이 찼다 — 남은 드로우는 다음 프레임
+
+                memcpy(drawConstants.cpuAddress, &world, sizeof(world));
+                commandList->SetGraphicsRootConstantBufferView(1, drawConstants.gpuAddress);
+
+                commandList->IASetVertexBuffers(0, 1, &mesh->second.vertexView);
+                commandList->IASetIndexBuffer(&mesh->second.indexView);
+                commandList->DrawIndexedInstanced(mesh->second.indexCount, 1, 0, 0, 0);
+            }
         },
         keepAlive);
 }
 
 void EnhancedGBufferPass::Shutdown()
 {
-    m_vertexBuffer.Reset();
-    m_indexBuffer.Reset();
+    m_drawGeometry.clear();
     m_rtvHeap.Reset();
     m_dsvHeap.Reset();
     m_pso = nullptr;
