@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Camera.h"
+#include "FrameCameraSnapshot.h"
 #include "Texture.h"
 #include "concurrent_vector.h"
 
@@ -44,30 +45,25 @@ public:
 	std::atomic<uint32>			m_index{ 0 };
 	std::atomic<uint32>			m_frame{};
 
-	// 프레임 밀봉된 카메라 스냅샷 (PHASE 3-2).
+	// 프레임 카메라 스냅샷 — 이중 버퍼 + 게시/래치 (PHASE 3-2).
 	//
-	// 게임 스레드가 EndOfFrame에서 한 번 채우고, 렌더 스레드는 이것만 읽는다.
-	// 예전에는 패스들이 camera.CalculateView()나 camera.m_eyePosition을 그 자리에서
-	// 다시 읽었다. 게임 스레드가 같은 카메라를 움직이는 중이면 값이 찢어지고,
-	// 한 프레임 안에서도 패스마다 다른 카메라를 보게 된다. 밀봉해 두면 그런 부류가
-	// 성립하지 않고, 락스텝(배리어 2-랑데뷰)을 풀 수 있는 전제가 된다.
+	// 게임 스레드가 EndOfFrame에서 뒷면을 채우고 게시하면, 렌더 스레드는 프레임
+	// 시작에 게시된 면을 한 번 래치해 그 프레임 내내 같은 면만 읽는다.
 	//
-	// 역행렬까지 미리 담는 이유는 호출부가 XMMatrixInverse를 다시 부르지 않게 하기
-	// 위해서다 — 같은 값을 여러 패스가 매 프레임 다시 구하고 있었다.
-	Mathf::xMatrix				m_frameCalculatedView{};
-	Mathf::xMatrix				m_frameCalculatedProjection{};
-	Mathf::xMatrix				m_frameCalculatedInverseView{};
-	Mathf::xMatrix				m_frameCalculatedInverseProjection{};
+	// 예전에는 스냅샷이 한 벌뿐이라 게임 스레드가 제자리에서 갱신했다. 지금은
+	// 배리어가 그 구간을 배타로 만들어 주지만, 배리어를 걷어내면 렌더가 절반만
+	// 갱신된 스냅샷을 보게 된다. 이중 버퍼로 만들어 두면 그 부류가 성립하지 않는다.
+	//
+	// 래치를 프레임당 한 번만 하는 이유: 매 읽기마다 게시 인덱스를 다시 보면
+	// 같은 프레임 안에서도 패스마다 다른 스냅샷을 볼 수 있다.
+	FrameCameraSnapshot			m_snapshotBuffers[2];
 
-	Mathf::xVector				m_frameEyePosition{};
-	Mathf::xVector				m_frameForward{};
-	Mathf::xVector				m_frameRight{};
-	Mathf::xVector				m_frameUp{};
+	// 게임 스레드가 쓰고 렌더 스레드가 읽는다. release/acquire로 짝을 맞춘다.
+	std::atomic<uint32>			m_publishedSnapshot{ 0 };
 
-	float						m_frameFov{};
-	float						m_frameNearPlane{};
-	float						m_frameFarPlane{};
-	bool						m_frameIsOrthographic{ false };
+	// 렌더 스레드가 프레임 시작에 래치한 값. 즉시 경로도 읽으므로 atomic이되
+	// 동기화 의미는 없다(relaxed).
+	std::atomic<uint32>			m_latchedSnapshot{ 0 };
 
 	// 그림자 캐스케이드 계산용 프레임 스크래치 (PHASE 3-2).
 	//
@@ -114,25 +110,45 @@ public:
 	FrameUIProxyIDs& GetUIRenderDataBuffer();
 	void ClearUIRenderDataBuffer();
 
-	// 프레임 렌더 입력을 밀봉한다. 게임 스레드에서만 부른다(EndOfFrame).
+	// 프레임 렌더 입력을 밀봉해 게시한다. 게임 스레드에서만 부른다(EndOfFrame).
 	//
-	// 여기서 담지 않은 카메라 값을 렌더 스레드가 읽고 있다면 그건 아직 이식되지
-	// 않은 경로다 — 새로 필요해지면 여기에 추가하고 호출부를 스냅샷으로 돌린다.
-	void UpdateData(Camera* pCamera) {
-		m_frameCalculatedView = pCamera->CalculateView();
-		m_frameCalculatedProjection = pCamera->CalculateProjection();
-		m_frameCalculatedInverseView = XMMatrixInverse(nullptr, m_frameCalculatedView);
-		m_frameCalculatedInverseProjection = XMMatrixInverse(nullptr, m_frameCalculatedProjection);
+	// 렌더가 읽고 있지 않은 뒷면을 채운 뒤 인덱스를 뒤집는다. 뒤집기가 release라
+	// 그 앞의 쓰기가 전부 렌더 쪽에 보인다.
+	void UpdateData(Camera* pCamera)
+	{
+		const uint32 backIndex = 1u - m_publishedSnapshot.load(std::memory_order_relaxed);
+		FrameCameraSnapshot& snapshot = m_snapshotBuffers[backIndex];
 
-		m_frameEyePosition = pCamera->m_eyePosition;
-		m_frameForward = pCamera->m_forward;
-		m_frameRight = pCamera->m_right;
-		m_frameUp = pCamera->m_up;
+		snapshot.view = pCamera->CalculateView();
+		snapshot.projection = pCamera->CalculateProjection();
+		snapshot.inverseView = XMMatrixInverse(nullptr, snapshot.view);
+		snapshot.inverseProjection = XMMatrixInverse(nullptr, snapshot.projection);
 
-		m_frameFov = pCamera->m_fov;
-		m_frameNearPlane = pCamera->m_nearPlane;
-		m_frameFarPlane = pCamera->m_farPlane;
-		m_frameIsOrthographic = pCamera->m_isOrthographic;
+		snapshot.eyePosition = pCamera->m_eyePosition;
+		snapshot.forward = pCamera->m_forward;
+		snapshot.right = pCamera->m_right;
+		snapshot.up = pCamera->m_up;
+
+		snapshot.fov = pCamera->m_fov;
+		snapshot.nearPlane = pCamera->m_nearPlane;
+		snapshot.farPlane = pCamera->m_farPlane;
+		snapshot.isOrthographic = pCamera->m_isOrthographic;
+
+		m_publishedSnapshot.store(backIndex, std::memory_order_release);
+	}
+
+	// 렌더 스레드가 프레임 시작에 한 번 부른다. 이후 이 프레임의 모든 읽기는
+	// 같은 면을 본다 — 패스마다 다른 스냅샷을 보는 일이 없다.
+	void LatchFrameSnapshot()
+	{
+		m_latchedSnapshot.store(m_publishedSnapshot.load(std::memory_order_acquire),
+			std::memory_order_relaxed);
+	}
+
+	// 래치된 스냅샷. 렌더 경로는 카메라가 아니라 이것만 읽는다.
+	const FrameCameraSnapshot& GetFrameSnapshot() const
+	{
+		return m_snapshotBuffers[m_latchedSnapshot.load(std::memory_order_relaxed)];
 	}
 
 	void AddFrame()

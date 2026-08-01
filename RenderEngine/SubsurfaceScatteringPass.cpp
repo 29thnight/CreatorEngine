@@ -90,7 +90,7 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(RHICommandContext& contex
 	renderData->BindFrameCameraBuffers(context);
 
 	SubsurfaceScatteringBuffer buffer{};
-	buffer.CameraFOV	= renderData->m_frameFov;
+	buffer.CameraFOV	= renderData->GetFrameSnapshot().fov;
 	buffer.strength		= strength;
 	buffer.width		= width;
 	buffer.direction	= { 1.f, 0.f };//direction;

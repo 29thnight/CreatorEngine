@@ -104,7 +104,7 @@ void LightMapPass::CreateRenderCommandList(RHICommandContext& context, RenderSce
 		CB buf{};
 		buf.offset = renderer->m_LightMapping.lightmapOffset;
 		buf.size = renderer->m_LightMapping.lightmapTiling;
-		buf.cameraPos = XMFLOAT3(renderData->m_frameEyePosition.m128_f32[0], renderData->m_frameEyePosition.m128_f32[1], renderData->m_frameEyePosition.m128_f32[2]);
+		buf.cameraPos = XMFLOAT3(renderData->GetFrameSnapshot().eyePosition.m128_f32[0], renderData->GetFrameSnapshot().eyePosition.m128_f32[1], renderData->GetFrameSnapshot().eyePosition.m128_f32[2]);
 		buf.lightmapIndex = renderer->m_LightMapping.lightmapIndex;
 		context.UpdateBuffer(m_cbuffer.Get(), &buf);
 		context.SetPixelShaderConstantBuffer(1, m_cbuffer.Get());

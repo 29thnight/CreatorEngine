@@ -124,8 +124,8 @@ void TerrainGizmoPass::CreateRenderCommandList(RHICommandContext& context, Rende
                     terrainGizmoBuffer.gBrushPosition = terrain->GetCurrentBrush()->m_center;
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
 					terrainGizmoBuffer.isEditMode = terrain->GetCurrentBrush()->m_isEditMode;
-                    terrainGizmoBuffer.view = renderData->m_frameCalculatedView;
-                    terrainGizmoBuffer.proj = renderData->m_frameCalculatedProjection;
+                    terrainGizmoBuffer.view = renderData->GetFrameSnapshot().view;
+                    terrainGizmoBuffer.proj = renderData->GetFrameSnapshot().projection;
                     context.UpdateBuffer(m_Buffer.Get(), &terrainGizmoBuffer);
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);

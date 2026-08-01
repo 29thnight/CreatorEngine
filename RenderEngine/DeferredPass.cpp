@@ -139,10 +139,10 @@ void DeferredPass::CreateRenderCommandList(RHICommandContext& context, RenderSce
     auto& lightManager = scene.m_LightController;
 
     cameraView cameraview{};
-    cameraview.cameraView = renderData->m_frameCalculatedView;
+    cameraview.cameraView = renderData->GetFrameSnapshot().view;
 
     DeferredBuffer buffer{};
-    buffer.m_InverseProjection = XMMatrixInverse(nullptr, renderData->m_frameCalculatedProjection);
+    buffer.m_InverseProjection = XMMatrixInverse(nullptr, renderData->GetFrameSnapshot().projection);
     buffer.m_InverseView = XMMatrixInverse(nullptr, cameraview.cameraView);
     buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
     buffer.m_useEnvironmentMap = m_UseEnvironmentMap;

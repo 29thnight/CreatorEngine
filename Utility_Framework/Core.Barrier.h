@@ -12,11 +12,42 @@
 //
 // 계측 비용은 스핀에 실제로 들어간 경우에만 QPC 두 번이다(먼저 도착해 바로
 // 통과하는 경우는 재지 않는다). 프레임당 스레드 3 x 랑데뷰 2 수준이라 무시할 만하다.
-struct BarrierStats
+// 랑데뷰별로 따로 잰다.
+//
+// 두 랑데뷰는 성격이 다르다. 1번은 "세 스레드 중 가장 느린 놈"을 기다리는
+// 것이고, 2번은 "게임 스레드의 배타 구간"을 기다리는 것이다. 합쳐 놓으면
+// 배타 구간을 없애는 게 이득인지 아닌지 판단할 수 없다.
+constexpr int kBarrierSlotCount = 2;
+
+// 어느 스레드가 긴 쪽인지 가르기 위한 역할 라벨.
+//
+// 랑데뷰 1의 대기는 "가장 느린 스레드"를 기다리는 시간인데, 그게 매번 같은
+// 스레드인지 번갈아 바뀌는지에 따라 처방이 다르다. 늘 같다면 그 스레드를
+// 파이프라이닝하거나 최적화해야 하고, 번갈아라면 균형 문제다.
+enum class BarrierRole : int { Game = 0, CommandBuild = 1, CommandExecute = 2, Count = 3 };
+constexpr int kBarrierRoleCount = static_cast<int>(BarrierRole::Count);
+
+struct BarrierSlotStats
 {
 	uint64_t arrivals{ 0 };     // 배리어에 도달한 횟수
 	uint64_t spins{ 0 };        // 그중 실제로 기다린 횟수
 	double   waitMilliseconds{ 0.0 };
+
+	// 역할별 대기 시간과 '마지막 도착자'(= 그 랑데뷰의 긴 쪽) 횟수.
+	double   roleWaitMilliseconds[kBarrierRoleCount]{};
+	uint64_t roleLastArrivals[kBarrierRoleCount]{};
+};
+
+struct BarrierStats
+{
+	BarrierSlotStats slots[kBarrierSlotCount];
+
+	uint64_t TotalArrivals() const
+	{
+		uint64_t sum = 0;
+		for (const auto& slot : slots) sum += slot.arrivals;
+		return sum;
+	}
 };
 
 class Barrier
@@ -37,19 +68,39 @@ public:
 	BarrierStats GetStats() const
 	{
 		BarrierStats stats{};
-		stats.arrivals = m_arrivals.load(std::memory_order_relaxed);
-		stats.spins = m_spins.load(std::memory_order_relaxed);
-		stats.waitMilliseconds = (m_ticksPerSecond > 0.0)
-			? (static_cast<double>(m_waitTicks.load(std::memory_order_relaxed)) / m_ticksPerSecond) * 1000.0
-			: 0.0;
+		for (int slot = 0; slot < kBarrierSlotCount; ++slot)
+		{
+			stats.slots[slot].arrivals = m_arrivals[slot].load(std::memory_order_relaxed);
+			stats.slots[slot].spins = m_spins[slot].load(std::memory_order_relaxed);
+			stats.slots[slot].waitMilliseconds = (m_ticksPerSecond > 0.0)
+				? (static_cast<double>(m_waitTicks[slot].load(std::memory_order_relaxed)) / m_ticksPerSecond) * 1000.0
+				: 0.0;
+
+			for (int role = 0; role < kBarrierRoleCount; ++role)
+			{
+				stats.slots[slot].roleWaitMilliseconds[role] = (m_ticksPerSecond > 0.0)
+					? (static_cast<double>(m_roleWaitTicks[slot][role].load(std::memory_order_relaxed)) / m_ticksPerSecond) * 1000.0
+					: 0.0;
+				stats.slots[slot].roleLastArrivals[role] =
+					m_roleLastArrivals[slot][role].load(std::memory_order_relaxed);
+			}
+		}
 		return stats;
 	}
 
 	void ResetStats()
 	{
-		m_arrivals.store(0, std::memory_order_relaxed);
-		m_spins.store(0, std::memory_order_relaxed);
-		m_waitTicks.store(0, std::memory_order_relaxed);
+		for (int slot = 0; slot < kBarrierSlotCount; ++slot)
+		{
+			m_arrivals[slot].store(0, std::memory_order_relaxed);
+			m_spins[slot].store(0, std::memory_order_relaxed);
+			m_waitTicks[slot].store(0, std::memory_order_relaxed);
+			for (int role = 0; role < kBarrierRoleCount; ++role)
+			{
+				m_roleWaitTicks[slot][role].store(0, std::memory_order_relaxed);
+				m_roleLastArrivals[slot][role].store(0, std::memory_order_relaxed);
+			}
+		}
 	}
 
 	~Barrier()
@@ -80,7 +131,10 @@ public:
 	}
 
 	// 스레드가 도달했을 때 호출한다. 마지막 도착자가 세대를 올려 나머지를 깨운다.
-	void ArriveAndWait()
+	//
+	// slot은 계측용 라벨일 뿐 동기화 의미는 없다. 프레임당 랑데뷰가 둘이라
+	// 첫 번째는 0, 두 번째는 1을 넘긴다 — 어느 쪽이 비싼지 갈라 보기 위해서다.
+	void ArriveAndWait(int slot = 0, BarrierRole role = BarrierRole::Game)
 	{
 		if (m_breakRequested.load(std::memory_order_acquire))
 		{
@@ -94,12 +148,16 @@ public:
 			return;
 		}
 
-		m_arrivals.fetch_add(1, std::memory_order_relaxed);
+		const int statSlot = (slot >= 0 && slot < kBarrierSlotCount) ? slot : 0;
+		const int statRole = static_cast<int>(role);
+		m_arrivals[statSlot].fetch_add(1, std::memory_order_relaxed);
 
 		const int previousCount = m_count.fetch_sub(1, std::memory_order_acq_rel);
 		if (previousCount == 1)
 		{
 			// 마지막 도착자는 기다리지 않는다 — 여기는 재지 않는다.
+			// 대신 '누가 긴 쪽이었는지'로 센다.
+			m_roleLastArrivals[statSlot][statRole].fetch_add(1, std::memory_order_relaxed);
 			m_count.store(m_threshold, std::memory_order_release);
 			m_generation.fetch_add(1, std::memory_order_release);
 			return;
@@ -135,9 +193,10 @@ public:
 		LARGE_INTEGER end{};
 		QueryPerformanceCounter(&end);
 
-		m_spins.fetch_add(1, std::memory_order_relaxed);
-		m_waitTicks.fetch_add(static_cast<uint64_t>(end.QuadPart - begin.QuadPart),
-			std::memory_order_relaxed);
+		m_spins[statSlot].fetch_add(1, std::memory_order_relaxed);
+		const uint64_t elapsed = static_cast<uint64_t>(end.QuadPart - begin.QuadPart);
+		m_waitTicks[statSlot].fetch_add(elapsed, std::memory_order_relaxed);
+		m_roleWaitTicks[statSlot][statRole].fetch_add(elapsed, std::memory_order_relaxed);
 	}
 
 private:
@@ -148,9 +207,11 @@ private:
 	std::atomic<bool> m_breakRequested;
 
 	// 계측. relaxed로만 다뤄서 동기화 의미에 끼어들지 않게 한다.
-	std::atomic<uint64_t> m_arrivals{ 0 };
-	std::atomic<uint64_t> m_spins{ 0 };
-	std::atomic<uint64_t> m_waitTicks{ 0 };
+	std::atomic<uint64_t> m_arrivals[kBarrierSlotCount]{};
+	std::atomic<uint64_t> m_spins[kBarrierSlotCount]{};
+	std::atomic<uint64_t> m_waitTicks[kBarrierSlotCount]{};
+	std::atomic<uint64_t> m_roleWaitTicks[kBarrierSlotCount][kBarrierRoleCount]{};
+	std::atomic<uint64_t> m_roleLastArrivals[kBarrierSlotCount][kBarrierRoleCount]{};
 	double m_ticksPerSecond{ 0.0 };
 };
 

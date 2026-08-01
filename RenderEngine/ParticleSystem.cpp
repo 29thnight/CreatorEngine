@@ -75,8 +75,8 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 	auto renderData = RenderPassData::GetData(&camera);
 
 	Mathf::Matrix world = XMMatrixIdentity();
-	Mathf::Matrix view = XMMatrixTranspose(renderData->m_frameCalculatedView);
-	Mathf::Matrix projection = XMMatrixTranspose(renderData->m_frameCalculatedProjection);
+	Mathf::Matrix view = XMMatrixTranspose(renderData->GetFrameSnapshot().view);
+	Mathf::Matrix projection = XMMatrixTranspose(renderData->GetFrameSnapshot().projection);
 
 	// 최종 처리된 파티클 SRV와 인스턴스 수 가져오기
 	ID3D11ShaderResourceView* finalParticleSRV = GetCurrentRenderingSRV();

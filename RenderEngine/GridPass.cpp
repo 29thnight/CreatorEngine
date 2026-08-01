@@ -109,14 +109,14 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
     auto deviceContext = DirectX11::DeviceStates->g_pDeviceContext;
 
 	m_gridConstant.world = XMMatrixIdentity();
-	m_gridConstant.view = renderData->m_frameCalculatedView;
-	m_gridConstant.projection = renderData->m_frameCalculatedProjection;
+	m_gridConstant.view = renderData->GetFrameSnapshot().view;
+	m_gridConstant.projection = renderData->GetFrameSnapshot().projection;
 
     float blendFactor[4] = { 0.5f, 0.5f, 0.5f, 0.5f }; // 블렌드 팩터 (사용되지 않음)
     UINT sampleMask = 0xffffffff; // 샘플 마스크 (모든 샘플 활성화)
 	DirectX11::OMSetBlendState(DirectX11::DeviceStates->g_pBlendState, blendFactor, sampleMask);
 
-	CameraPos camPos = { renderData->m_frameEyePosition };
+	CameraPos camPos = { renderData->GetFrameSnapshot().eyePosition };
     DirectX11::UpdateBuffer(m_pCamPosBuffer.Get(), &camPos);
     DirectX11::VSSetConstantBuffer(0, 1, m_pGridConstantBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_pUniformBuffer.GetAddressOf());

@@ -159,8 +159,8 @@ void RenderPassData::Initalize(uint32 index)
 
 void RenderPassData::BindFrameCameraBuffers(RHICommandContext& context) const
 {
-	context.UpdateBuffer(m_ViewBuffer.Get(), &m_frameCalculatedView);
-	context.UpdateBuffer(m_ProjBuffer.Get(), &m_frameCalculatedProjection);
+	context.UpdateBuffer(m_ViewBuffer.Get(), &GetFrameSnapshot().view);
+	context.UpdateBuffer(m_ProjBuffer.Get(), &GetFrameSnapshot().projection);
 
 	context.SetVertexShaderConstantBuffer(1, m_ViewBuffer.Get());
 	context.SetVertexShaderConstantBuffer(2, m_ProjBuffer.Get());
@@ -180,9 +180,9 @@ Mathf::Vector4 RenderPassData::ConvertScreenToWorld(Mathf::Vector2 screenPositio
 
 	// 2. 역투영 → 3. 역뷰. 둘 다 프레임 밀봉 값이다.
 	const Mathf::Vector4 viewPosition =
-		XMVector3TransformCoord(screenPositionNDC, m_frameCalculatedInverseProjection);
+		XMVector3TransformCoord(screenPositionNDC, GetFrameSnapshot().inverseProjection);
 
-	return XMVector3TransformCoord(viewPosition, m_frameCalculatedInverseView);
+	return XMVector3TransformCoord(viewPosition, GetFrameSnapshot().inverseView);
 }
 
 void RenderPassData::ClearRenderTarget()

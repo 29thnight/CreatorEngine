@@ -147,8 +147,8 @@ void SSGIPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
     context.SetComputeUnorderedAccessViews(0, 1, &uav, nullptr);
 
     SSGIParams params;
-    params.view = renderData->m_frameCalculatedView;
-    params.proj = renderData->m_frameCalculatedProjection;
+    params.view = renderData->GetFrameSnapshot().view;
+    params.proj = renderData->GetFrameSnapshot().projection;
     params.inverseView = XMMatrixInverse(nullptr, params.view);
     params.inverseProjection = XMMatrixInverse(nullptr, params.proj);
     params.screenSize = { RHI::Device().GetFullViewport().width, RHI::Device().GetFullViewport().height };

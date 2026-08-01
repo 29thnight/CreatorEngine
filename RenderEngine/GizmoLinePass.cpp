@@ -16,11 +16,11 @@
 // 게임 스레드가 카메라를 움직이는 중일 때 기즈모마다 크기가 달라진다.
 float GetGizmoScale(Mathf::Vector3 gizmoPosition, const RenderPassData& renderData, float targetScreenHeightRatio)
 {
-    Mathf::Vector3 cameraPos = renderData.m_frameEyePosition;
+    Mathf::Vector3 cameraPos = renderData.GetFrameSnapshot().eyePosition;
     Mathf::Vector3 distance = XMVector3Length(cameraPos - gizmoPosition);
 	float distanceLength = distance.Length();
 
-    float verticalFovRadians = renderData.m_frameFov * Mathf::Rad2Deg;
+    float verticalFovRadians = renderData.GetFrameSnapshot().fov * Mathf::Rad2Deg;
     float screenHeight = 2.0f * distanceLength * tanf(verticalFovRadians * 0.5f);
 
     float gizmoSizeInWorld = screenHeight * targetScreenHeightRatio;
@@ -91,8 +91,8 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
     GizmoCameraBuffer cameraBuffer{
-    .VP = XMMatrixMultiply(renderData->m_frameCalculatedView, renderData->m_frameCalculatedProjection),
-    .eyePosition = Mathf::Vector3(renderData->m_frameEyePosition)
+    .VP = XMMatrixMultiply(renderData->GetFrameSnapshot().view, renderData->GetFrameSnapshot().projection),
+    .eyePosition = Mathf::Vector3(renderData->GetFrameSnapshot().eyePosition)
     };
 
     DirectX11::VSSetConstantBuffer(0, 1, m_gizmoCameraBuffer.GetAddressOf());

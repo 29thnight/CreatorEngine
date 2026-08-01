@@ -108,8 +108,8 @@ void DirectX11::GameMain::Initialize()
         {
             if (m_isInvokeResize)
             {
-                EngineSettingInstance->renderBarrier.ArriveAndWait();
-                EngineSettingInstance->renderBarrier.ArriveAndWait();
+                EngineSettingInstance->renderBarrier.ArriveAndWait(0);
+                EngineSettingInstance->renderBarrier.ArriveAndWait(1);
                 std::this_thread::yield();
                 continue;
             }
@@ -216,13 +216,13 @@ void DirectX11::GameMain::Update()
         }
     });
 
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(0);
 
     DisableOrEnable();
     SceneManagers->EndOfFrame();
     //RenderCommandFence.Begin();
     //RenderCommandFence.Wait();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(1);
 
     if (SceneManagers->IsDecommissioning())
     {
@@ -285,8 +285,8 @@ void DirectX11::GameMain::CommandBuildThread()
     if (Time->GetFrameCount() == 0)
     {
         //RenderCommandFence.Signal();
-        EngineSettingInstance->renderBarrier.ArriveAndWait();
-        EngineSettingInstance->renderBarrier.ArriveAndWait();
+        EngineSettingInstance->renderBarrier.ArriveAndWait(0);
+        EngineSettingInstance->renderBarrier.ArriveAndWait(1);
         return;
     }
 
@@ -294,8 +294,8 @@ void DirectX11::GameMain::CommandBuildThread()
     m_sceneRenderer->CreateCommandListPass();
     //RHICommandFence.Wait();
     //RenderCommandFence.Signal();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(0);
+    EngineSettingInstance->renderBarrier.ArriveAndWait(1);
 }
 
 void DirectX11::GameMain::CommandExecuteThread()
@@ -305,8 +305,8 @@ void DirectX11::GameMain::CommandExecuteThread()
         m_deviceResources->Present();
     }
     //RHICommandFence.Signal();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(0);
+    EngineSettingInstance->renderBarrier.ArriveAndWait(1);
 }
 
 void DirectX11::GameMain::InvokeResizeFlag()

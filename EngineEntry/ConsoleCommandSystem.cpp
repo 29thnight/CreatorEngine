@@ -1374,22 +1374,55 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         const BarrierStats stats = EngineSettingInstance->renderBarrier.GetStats();
 
-        // 스레드 3개가 랑데뷰 2번씩 도달하므로 도달 수를 6으로 나누면 프레임 수다.
-        constexpr double kArrivalsPerFrame = 6.0;
-        const double frames = stats.arrivals / kArrivalsPerFrame;
-        const double waitPerFrameMs = (frames > 0.0) ? stats.waitMilliseconds / frames : 0.0;
+        // 스레드 3개가 랑데뷰마다 도달하므로 슬롯별 도달 수를 3으로 나누면 프레임 수다.
+        constexpr double kThreadCount = 3.0;
 
+        // 랑데뷰 1은 "가장 느린 스레드"를, 2는 "게임 스레드의 배타 구간"을 기다린다.
+        // 어느 쪽이 비싼지가 곧 다음 작업의 방향이다.
+        static const char* kSlotNames[kBarrierSlotCount] = {
+            "랑데뷰1(가장 느린 스레드 대기)",
+            "랑데뷰2(게임 배타 구간 대기)" };
+
+        std::string report;
         char line[512]{};
-        std::snprintf(line, sizeof(line),
-            "도달 %llu (프레임 %.0f) · 실제 대기 %llu (%.1f%%) · 총 대기 %.1f ms · 프레임당 %.3f ms",
-            static_cast<unsigned long long>(stats.arrivals), frames,
-            static_cast<unsigned long long>(stats.spins),
-            (stats.arrivals > 0) ? (100.0 * stats.spins / stats.arrivals) : 0.0,
-            stats.waitMilliseconds, waitPerFrameMs);
+        double totalPerFrame = 0.0;
 
-        std::printf("[syncstats] %s\n", line);
+        for (int slot = 0; slot < kBarrierSlotCount; ++slot)
+        {
+            const auto& s = stats.slots[slot];
+            const double frames = s.arrivals / kThreadCount;
+            const double perFrameMs = (frames > 0.0) ? s.waitMilliseconds / frames : 0.0;
+            totalPerFrame += perFrameMs;
+
+            std::snprintf(line, sizeof(line),
+                "\n  %s: 프레임 %.0f · 대기 %llu/%llu · 총 %.1f ms · 프레임당 %.3f ms",
+                kSlotNames[slot], frames,
+                static_cast<unsigned long long>(s.spins),
+                static_cast<unsigned long long>(s.arrivals),
+                s.waitMilliseconds, perFrameMs);
+            report += line;
+
+            // 역할별로 갈라 본다. '마지막 도착'이 곧 그 랑데뷰의 긴 쪽이다.
+            static const char* kRoleNames[kBarrierRoleCount] = { "게임", "커맨드빌드", "커맨드실행" };
+            for (int role = 0; role < kBarrierRoleCount; ++role)
+            {
+                const double roleFrames = (frames > 0.0) ? frames : 1.0;
+                std::snprintf(line, sizeof(line),
+                    "\n      %-10s 대기 %.3f ms/프레임 · 마지막 도착 %llu회 (%.1f%%)",
+                    kRoleNames[role],
+                    s.roleWaitMilliseconds[role] / roleFrames,
+                    static_cast<unsigned long long>(s.roleLastArrivals[role]),
+                    (frames > 0.0) ? (100.0 * s.roleLastArrivals[role] / frames) : 0.0);
+                report += line;
+            }
+        }
+
+        std::snprintf(line, sizeof(line), "\n  합계 프레임당 %.3f ms", totalPerFrame);
+        report += line;
+
+        std::printf("[syncstats]%s\n", report.c_str());
         std::fflush(stdout);
-        Debug->LogWarning(std::string("[syncstats] ") + line);
+        Debug->LogWarning("[syncstats]" + report);
     }
     else if (cmd == "render.shadowinfo")
     {
@@ -1419,18 +1452,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             std::snprintf(line, sizeof(line),
                 "  snapshot: eye(%.6f %.6f %.6f) fwd(%.6f %.6f %.6f) right(%.6f %.6f %.6f)"
                 " fov %.6f near %.6f far %.6f ortho %d\n",
-                data->m_frameEyePosition.m128_f32[0], data->m_frameEyePosition.m128_f32[1], data->m_frameEyePosition.m128_f32[2],
-                data->m_frameForward.m128_f32[0], data->m_frameForward.m128_f32[1], data->m_frameForward.m128_f32[2],
-                data->m_frameRight.m128_f32[0], data->m_frameRight.m128_f32[1], data->m_frameRight.m128_f32[2],
-                data->m_frameFov, data->m_frameNearPlane, data->m_frameFarPlane,
-                static_cast<int>(data->m_frameIsOrthographic));
+                data->GetFrameSnapshot().eyePosition.m128_f32[0], data->GetFrameSnapshot().eyePosition.m128_f32[1], data->GetFrameSnapshot().eyePosition.m128_f32[2],
+                data->GetFrameSnapshot().forward.m128_f32[0], data->GetFrameSnapshot().forward.m128_f32[1], data->GetFrameSnapshot().forward.m128_f32[2],
+                data->GetFrameSnapshot().right.m128_f32[0], data->GetFrameSnapshot().right.m128_f32[1], data->GetFrameSnapshot().right.m128_f32[2],
+                data->GetFrameSnapshot().fov, data->GetFrameSnapshot().nearPlane, data->GetFrameSnapshot().farPlane,
+                static_cast<int>(data->GetFrameSnapshot().isOrthographic));
             report += line;
 
             // 뷰·투영과 그 역행렬. 패스들이 이제 이것만 읽는다.
             const char* matrixNames[4] = { "view", "proj", "invView", "invProj" };
             const Mathf::Matrix matrices[4] = {
-                data->m_frameCalculatedView, data->m_frameCalculatedProjection,
-                data->m_frameCalculatedInverseView, data->m_frameCalculatedInverseProjection };
+                data->GetFrameSnapshot().view, data->GetFrameSnapshot().projection,
+                data->GetFrameSnapshot().inverseView, data->GetFrameSnapshot().inverseProjection };
 
             for (int m = 0; m < 4; ++m)
             {
@@ -1496,21 +1529,21 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                     for (int c = 0; c < 4; ++c)
                     {
                         maxMatrixDelta = (std::max)(maxMatrixDelta,
-                            std::fabs(liveView.m[r][c] - Mathf::Matrix(data->m_frameCalculatedView).m[r][c]));
+                            std::fabs(liveView.m[r][c] - Mathf::Matrix(data->GetFrameSnapshot().view).m[r][c]));
                         maxMatrixDelta = (std::max)(maxMatrixDelta,
-                            std::fabs(liveProj.m[r][c] - Mathf::Matrix(data->m_frameCalculatedProjection).m[r][c]));
+                            std::fabs(liveProj.m[r][c] - Mathf::Matrix(data->GetFrameSnapshot().projection).m[r][c]));
                     }
                 }
 
                 const float eyeDelta = Mathf::Vector3(
-                    Mathf::Vector3(data->m_frameEyePosition) - Mathf::Vector3(camera->m_eyePosition)).Length();
+                    Mathf::Vector3(data->GetFrameSnapshot().eyePosition) - Mathf::Vector3(camera->m_eyePosition)).Length();
 
                 std::snprintf(line, sizeof(line),
                     "  live-vs-snapshot: matrix %.9f eye %.9f fov %.9f near %.9f far %.9f\n",
                     maxMatrixDelta, eyeDelta,
-                    std::fabs(data->m_frameFov - camera->m_fov),
-                    std::fabs(data->m_frameNearPlane - camera->m_nearPlane),
-                    std::fabs(data->m_frameFarPlane - camera->m_farPlane));
+                    std::fabs(data->GetFrameSnapshot().fov - camera->m_fov),
+                    std::fabs(data->GetFrameSnapshot().nearPlane - camera->m_nearPlane),
+                    std::fabs(data->GetFrameSnapshot().farPlane - camera->m_farPlane));
                 report += line;
             }
 

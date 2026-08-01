@@ -140,12 +140,12 @@ void SSAOPass::CreateRenderCommandList(RHICommandContext& context, RenderScene& 
 
     const RHIViewport viewport = RHI::Device().GetFullViewport();
     context.SetViewports(1, &viewport);
-    Mathf::xMatrix view = renderData->m_frameCalculatedView;
-    Mathf::xMatrix proj = renderData->m_frameCalculatedProjection;
+    Mathf::xMatrix view = renderData->GetFrameSnapshot().view;
+    Mathf::xMatrix proj = renderData->GetFrameSnapshot().projection;
     m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
     m_SSAOBuffer.m_InverseViewProjection = XMMatrixInverse(nullptr, m_SSAOBuffer.m_ViewProjection);
-    m_SSAOBuffer.m_InverseProjection = renderData->m_frameCalculatedInverseProjection;
-    m_SSAOBuffer.m_CameraPosition = renderData->m_frameEyePosition;
+    m_SSAOBuffer.m_InverseProjection = renderData->GetFrameSnapshot().inverseProjection;
+    m_SSAOBuffer.m_CameraPosition = renderData->GetFrameSnapshot().eyePosition;
     m_SSAOBuffer.m_Radius = radius;
     m_SSAOBuffer.m_Thickness = thickness;
     const RHIViewport fullVp = RHI::Device().GetFullViewport();

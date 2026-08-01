@@ -192,7 +192,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RHICommandContext& context, R
 	auto  lightdir	= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc		= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
 	auto& constant	= renderData->m_shadowCamera.m_shadowMapConstant;	//type = ShadowMapConstant
-	auto  projMat	= renderData->m_frameCalculatedProjection;			//type = Mathf::xMatrix
+	auto  projMat	= renderData->GetFrameSnapshot().projection;			//type = Mathf::xMatrix
 
 	DevideCascadeEnd(camera, *renderData);
 	DevideShadowInfo(camera, *renderData, lightdir);
@@ -369,9 +369,9 @@ void ShadowMapPass::DevideCascadeEnd(Camera& camera, RenderPassData& renderData)
 	auto& cascadeEnd = renderData.m_cascadeEnd;
 	cascadeEnd.clear();
 
-	cascadeEnd.push_back(renderData.m_frameNearPlane);
+	cascadeEnd.push_back(renderData.GetFrameSnapshot().nearPlane);
 
-	const float distanceZ = renderData.m_frameFarPlane - renderData.m_frameNearPlane;
+	const float distanceZ = renderData.GetFrameSnapshot().farPlane - renderData.GetFrameSnapshot().nearPlane;
 
 	// 분할 비율만 카메라에서 읽는다 — 저작 설정이라 프레임 중 바뀌지 않는다.
 	for (float ratio : camera.m_cascadeDevideRatios)
@@ -379,7 +379,7 @@ void ShadowMapPass::DevideCascadeEnd(Camera& camera, RenderPassData& renderData)
 		cascadeEnd.push_back(ratio * distanceZ);
 	}
 
-	cascadeEnd.push_back(renderData.m_frameFarPlane);
+	cascadeEnd.push_back(renderData.GetFrameSnapshot().farPlane);
 }
 
 void ShadowMapPass::DevideShadowInfo(Camera& camera, RenderPassData& renderData, Mathf::Vector4 LightDir)
@@ -396,8 +396,8 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, RenderPassData& renderData,
 
 	// 살아 있는 카메라에서 다시 계산하지 않고 프레임 밀봉된 행렬을 쓴다.
 	// CalculateInverseView()는 정의상 CalculateView()의 역행렬이라 값은 같다.
-	const auto frustum = DirectX::BoundingFrustum(renderData.m_frameCalculatedProjection);
-	const auto viewInverse = XMMatrixInverse(nullptr, renderData.m_frameCalculatedView);
+	const auto frustum = DirectX::BoundingFrustum(renderData.GetFrameSnapshot().projection);
+	const auto viewInverse = XMMatrixInverse(nullptr, renderData.GetFrameSnapshot().view);
 
 	for (const int i : std::views::iota(0, cascadeCount))
 	{

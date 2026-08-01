@@ -72,7 +72,7 @@ void RenderScene::ShadowStage(Camera& camera)
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	m_LightController->SetEyePosition(renderData->m_frameEyePosition);
+	m_LightController->SetEyePosition(renderData->GetFrameSnapshot().eyePosition);
 	m_LightController->Update();
 	m_LightController->RenderAnyShadowMap(*this, camera);
 }

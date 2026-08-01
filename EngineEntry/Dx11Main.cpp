@@ -171,8 +171,8 @@ void DirectX11::Dx11Main::Initialize()
         {
             if (m_isInvokeResize)
             {
-                EngineSettingInstance->renderBarrier.ArriveAndWait();
-                EngineSettingInstance->renderBarrier.ArriveAndWait();
+                EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
+                EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
                 continue;
             }
 
@@ -391,7 +391,7 @@ void DirectX11::Dx11Main::Update()
     PROFILE_CPU_END();
 #endif // !EDITOR
 
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::Game);
 
     // 여기부터 두 번째 랑데뷰까지는 커맨드 빌드/실행 스레드가 모두 묶여 있다.
     // 빌드 스레드는 워커 풀을 기다린 뒤 도달하므로 워커도 놀고 있다.
@@ -406,7 +406,7 @@ void DirectX11::Dx11Main::Update()
     PROFILE_FRAME();
     //RenderCommandFence.Begin();
     //RenderCommandFence.Wait();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::Game);
 
     if (SceneManagers->IsDecommissioning())
     {
@@ -497,8 +497,8 @@ void DirectX11::Dx11Main::CommandBuildThread()
     {
         PROFILE_CPU_END();
         //RenderCommandFence.Signal();
-        EngineSettingInstance->renderBarrier.ArriveAndWait();
-        EngineSettingInstance->renderBarrier.ArriveAndWait();
+        EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
+        EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
         return;
     }
 
@@ -507,8 +507,8 @@ void DirectX11::Dx11Main::CommandBuildThread()
     PROFILE_CPU_END();
     //RHICommandFence.Wait();
     //RenderCommandFence.Signal();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandBuild);
+    EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandBuild);
 }
 
 void DirectX11::Dx11Main::CommandExecuteThread()
@@ -520,8 +520,8 @@ void DirectX11::Dx11Main::CommandExecuteThread()
         PROFILE_CPU_END();
 	}
     //RHICommandFence.Signal();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
-    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandExecute);
+    EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandExecute);
 }
 
 void DirectX11::Dx11Main::InvokeResizeFlag()

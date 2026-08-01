@@ -102,10 +102,10 @@ void ScreenSpaceReflectionPass::CreateRenderCommandList(RHICommandContext& conte
 	ID3D11DeviceContext* deferredPtr = static_cast<ID3D11DeviceContext*>(context.GetNativeHandle()); // 전환기 탈출구(잔존 네이티브 경로용)
 
 	CBData cbData;
-	cbData.m_InverseProjection = renderData->m_frameCalculatedInverseProjection;
-	cbData.m_InverseView = renderData->m_frameCalculatedInverseView;
-	cbData.m_viewProjection = renderData->m_frameCalculatedView * renderData->m_frameCalculatedProjection;
-	cbData.m_cameraPosition = renderData->m_frameEyePosition;
+	cbData.m_InverseProjection = renderData->GetFrameSnapshot().inverseProjection;
+	cbData.m_InverseView = renderData->GetFrameSnapshot().inverseView;
+	cbData.m_viewProjection = renderData->GetFrameSnapshot().view * renderData->GetFrameSnapshot().projection;
+	cbData.m_cameraPosition = renderData->GetFrameSnapshot().eyePosition;
 	cbData.stepSize = stepSize;
 	cbData.MaxThickness = MaxThickness;
 	cbData.Time = (float)Time->GetTotalSeconds();

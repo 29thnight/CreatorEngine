@@ -396,8 +396,8 @@ void GBufferPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 			if (proxy->m_Material->m_pEmissive) context.SetPixelShaderResource(5, proxy->m_Material->m_pEmissive->m_pSRV);
 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
-			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
-			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->GetFrameSnapshot().view);
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->GetFrameSnapshot().projection);
 			proxy->m_Material->TrySetFloat("TimeBuffer", "totalTime", Time->GetTotalSeconds());
 			proxy->m_Material->TrySetFloat("TimeBuffer", "deltaTime", Time->GetElapsedSeconds());
 			unsigned int frameCount = Time->GetFrameCount();
@@ -462,8 +462,8 @@ void GBufferPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 			if (proxy->m_Material->m_pEmissive) context.SetPixelShaderResource(5, proxy->m_Material->m_pEmissive->m_pSRV);
 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
-			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->m_frameCalculatedView);
-			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->m_frameCalculatedProjection);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", data->GetFrameSnapshot().view);
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", data->GetFrameSnapshot().projection);
 			if(proxy->m_finalTransforms)
 			{
 				proxy->m_Material->TrySetValue("BoneTransformation", "BoneTransforms", proxy->m_finalTransforms.get(), sizeof(Mathf::xMatrix) * 50);

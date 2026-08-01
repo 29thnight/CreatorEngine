@@ -259,8 +259,8 @@ void DecalPass::CreateRenderCommandList(RHICommandContext& context, RenderScene&
 	context.SetPixelShaderResources(0, 4, reinterpret_cast<RHINativeShaderResource const*>(srv));
 
 	PS_CONSTANT_BUFFER cBuf;
-	cBuf.g_inverseProjectionMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedProjection);
-	cBuf.g_inverseViewMatrix = XMMatrixInverse(nullptr, renderData->m_frameCalculatedView);
+	cBuf.g_inverseProjectionMatrix = XMMatrixInverse(nullptr, renderData->GetFrameSnapshot().projection);
+	cBuf.g_inverseViewMatrix = XMMatrixInverse(nullptr, renderData->GetFrameSnapshot().view);
 	const RHIViewport fullVp = RHI::Device().GetFullViewport();
 	cBuf.g_screenDimensions = { fullVp.width, fullVp.height };
 	context.UpdateBuffer(m_Buffer.Get(), &cBuf);

@@ -244,8 +244,8 @@ void ForwardPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 	context.CopyResource(m_prevDepthTexture->m_pTexture, renderData->m_depthStencil->m_pTexture);
 	context.CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 	MatrixBuffer matrixBuffer{};
-	matrixBuffer.Proj = renderData->m_frameCalculatedProjection;
-	matrixBuffer.View = renderData->m_frameCalculatedView;
+	matrixBuffer.Proj = renderData->GetFrameSnapshot().projection;
+	matrixBuffer.View = renderData->GetFrameSnapshot().view;
 	matrixBuffer.invView = XMMatrixInverse(nullptr, matrixBuffer.View);
 	matrixBuffer.invProj = XMMatrixInverse(nullptr, matrixBuffer.Proj);
 	context.UpdateBuffer(m_MatrixBuffer.Get(), &matrixBuffer);
@@ -492,8 +492,8 @@ void ForwardPass::CreateRenderCommandList(RHICommandContext& context, RenderScen
 			if (proxy->m_Material->m_pEmissive) context.SetPixelShaderResource(5, proxy->m_Material->m_pEmissive->m_pSRV);
 
 			proxy->m_Material->TrySetMatrix("PerObject", "model", proxy->m_worldMatrix);
-			proxy->m_Material->TrySetMatrix("PerFrame", "view", renderData->m_frameCalculatedView);
-			proxy->m_Material->TrySetMatrix("PerApplication", "projection", renderData->m_frameCalculatedProjection);
+			proxy->m_Material->TrySetMatrix("PerFrame", "view", renderData->GetFrameSnapshot().view);
+			proxy->m_Material->TrySetMatrix("PerApplication", "projection", renderData->GetFrameSnapshot().projection);
 			proxy->m_Material->TrySetMaterialInfo();
 
 			//Cbuffer�� View ���� �����̳ʷ� ����

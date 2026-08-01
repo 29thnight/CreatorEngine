@@ -939,6 +939,13 @@ void SceneRenderer::CreateCommandListPass()
 		if (!RenderPassData::VaildCheck(camera.get())) return;
 		auto data = RenderPassData::GetData(camera.get());
 
+		// 이 프레임이 쓸 카메라 스냅샷을 여기서 한 번 고정한다 (PHASE 3-2).
+		//
+		// 이후 모든 패스는 같은 면을 본다. 매 읽기마다 게시 인덱스를 다시 보면
+		// 게임 스레드가 그 사이에 게시했을 때 패스마다 다른 카메라를 보게 된다.
+		// 커맨드 빌드 스레드가 프레임의 유일한 래치 지점이다.
+		data->LatchFrameSnapshot();
+
 		PROFILE_CPU_BEGIN("PrepareCommandBuilding");
 		for (auto& instanceID : data->GetShadowRenderDataBuffer())
 		{

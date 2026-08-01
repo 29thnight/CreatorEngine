@@ -188,11 +188,11 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const
 	const RenderPassData* renderData = RenderPassData::GetData(camera);
 
 	// Get camera's view and projection matrices
-	Mathf::Matrix viewMatrix = renderData->m_frameCalculatedView;
-	Mathf::Matrix projectionMatrix = renderData->m_frameCalculatedProjection;
+	Mathf::Matrix viewMatrix = renderData->GetFrameSnapshot().view;
+	Mathf::Matrix projectionMatrix = renderData->GetFrameSnapshot().projection;
 
 	// Get camera's world position
-	Mathf::Vector3 cameraPosition = renderData->m_frameEyePosition;
+	Mathf::Vector3 cameraPosition = renderData->GetFrameSnapshot().eyePosition;
 
 	// Calculate bounding sphere in world space using the provided world matrix
 	// Assuming m_boundingBox and m_boundingSphere are in object-local space
