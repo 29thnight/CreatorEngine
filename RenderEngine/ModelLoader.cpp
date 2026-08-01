@@ -329,14 +329,24 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 		if (m_loadType == LoadType::GLTF)
 		{
             material->ConvertToLinearSpace(true);
-            Texture* albedo = GenerateTexture(mat, AI_MATKEY_BASE_COLOR_TEXTURE);
+
+            // glTF의 baseColorTexture가 어느 슬롯으로 들어오는지는 Assimp 버전을
+            // 탄다. BASE_COLOR로 넣는 버전도 있고 DIFFUSE로만 넣는 버전도 있다.
+            // 하나만 보면 '텍스처가 있는데 재질이 비어 있다'가 되고, 그 증상은
+            // 화면에서 '검게 나온다'로만 드러나 원인이 멀다(실측으로 겪었다).
+            Texture* albedo = GenerateTextureFromAny(mat,
+                { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE }, "baseColor");
             if (albedo)
             {
                 material->UseBaseColorMap(albedo);
                 material->m_baseColorTexName = albedo->m_name;
             }
 
-            Texture* occlusionMetalRough = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE);
+            // 금속·거칠기도 같은 사정이다. glTF는 한 텍스처에 담지만 Assimp는
+            // 버전에 따라 METALNESS/DIFFUSE_ROUGHNESS/UNKNOWN 중 하나로 준다.
+            Texture* occlusionMetalRough = GenerateTextureFromAny(mat,
+                { aiTextureType_METALNESS, aiTextureType_DIFFUSE_ROUGHNESS,
+                  aiTextureType_UNKNOWN }, "metallicRoughness");
             if (occlusionMetalRough)
             {
                 material->UseOccRoughMetalMap(occlusionMetalRough);
@@ -1266,6 +1276,38 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 	}
 
 	return rootObject.get();
+}
+
+// 여러 슬롯을 순서대로 훑어 처음 잡히는 텍스처를 돌려준다.
+//
+// Assimp의 glTF 임포터가 어느 aiTextureType에 넣는지는 버전마다 다르다. 한
+// 슬롯만 보고 없으면 포기하면, 파일에는 텍스처가 있는데 재질이 비어 있는 상태가
+// 되고 화면에서는 '검게 나온다'로만 보인다 — 원인이 임포터라는 것을 알아채기
+// 어렵다. 그래서 후보를 나열하고, 어느 슬롯에서 잡혔는지(또는 전부 비었는지)를
+// 로그에 남긴다.
+Texture* ModelLoader::GenerateTextureFromAny(aiMaterial* material,
+    std::initializer_list<aiTextureType> candidates, std::string_view label)
+{
+    if (nullptr == material) return nullptr;
+
+    for (aiTextureType type : candidates)
+    {
+        if (0 == material->GetTextureCount(type)) continue;
+
+        Texture* texture = GenerateTexture(material, type, 0, false);
+        if (nullptr != texture)
+        {
+            Debug->LogDebug("[임포터] " + std::string(label) + " 슬롯 "
+                + std::to_string(static_cast<int>(type)) + "에서 찾음: " + texture->m_name);
+            return texture;
+        }
+
+        Debug->LogWarning("[임포터] " + std::string(label) + " 슬롯 "
+            + std::to_string(static_cast<int>(type)) + "에 항목은 있으나 로드 실패");
+    }
+
+    Debug->LogDebug("[임포터] " + std::string(label) + " 텍스처 없음");
+    return nullptr;
 }
 
 Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index, bool isCompress)

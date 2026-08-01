@@ -1,4 +1,5 @@
 #pragma once
+#include <initializer_list>
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Mesh.h"
 #include "Texture.h"
@@ -61,6 +62,14 @@ private:
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
     Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0, bool isCompress = false);
+
+    /// 여러 슬롯을 순서대로 훑어 처음 잡히는 텍스처를 돌려준다.
+    ///
+    /// Assimp의 glTF 임포터가 baseColor를 BASE_COLOR에 넣는지 DIFFUSE에
+    /// 넣는지는 버전을 탄다. 한 슬롯만 보면 파일에 텍스처가 있는데도 재질이
+    /// 비어 있는 상태가 되고, 화면에서는 검게 나오는 것으로만 보인다.
+    Texture* GenerateTextureFromAny(aiMaterial* material,
+        std::initializer_list<aiTextureType> candidates, std::string_view label);
     Texture* GenerateTexture(std::string_view textureName, bool isCompress = false);
     // GLB/glTF처럼 텍스처 바이트가 모델 파일 안에 들어있는 경우를 처리한다.
     // 파일로 뽑아낸 뒤 일반 텍스처 경로에 태운다(이유는 구현부 주석 참고).

@@ -37,6 +37,39 @@ Model::~Model()
 	}
 }
 
+namespace
+{
+    // .asset 캐시를 그대로 써도 되는가.
+    //
+    // 예전에는 존재 여부만 봤다. 그래서 원본(.glb/.fbx)을 다시 내보내도 캐시가
+    // 있으면 그것을 읽었고, 바뀐 내용이 반영되지 않았다. 증상이 고약하다 —
+    // 저작 도구에서 텍스처를 넣어 다시 뽑았는데 엔진에서는 재질이 계속 비어
+    // 있고, 파일에는 텍스처가 멀쩡히 들어 있으니 임포터를 의심하게 된다.
+    // 실제로 그 길로 한참 갔다.
+    //
+    // 원본이 캐시보다 새것이면 캐시를 버린다. 원본이 없으면(.asset만 배포된
+    // 경우) 캐시가 유일한 진실이므로 그대로 쓴다.
+    bool IsModelAssetUsable(const file::path& sourcePath, const file::path& assetPath)
+    {
+        std::error_code errorCode;
+        if (!file::exists(assetPath, errorCode)) return false;
+        if (!file::exists(sourcePath, errorCode)) return true;
+        if (sourcePath == assetPath) return true;
+
+        const auto assetTime = file::last_write_time(assetPath, errorCode);
+        if (errorCode) return true;
+
+        const auto sourceTime = file::last_write_time(sourcePath, errorCode);
+        if (errorCode) return true;
+
+        if (sourceTime <= assetTime) return true;
+
+        Debug->LogWarning("[임포터] 원본이 캐시보다 새것이라 다시 임포트한다: "
+            + sourcePath.filename().string());
+        return false;
+    }
+}
+
 Model* Model::LoadModel(std::string_view filePath)
 {
 	file::path path_ = filePath.data();
@@ -45,7 +78,7 @@ Model* Model::LoadModel(std::string_view filePath)
 	{
 		file::path assetPath = filePath.data();
 		assetPath = assetPath.replace_extension(".asset");
-		if (file::exists(assetPath))
+		if (IsModelAssetUsable(path_, assetPath))
 		{
 			Benchmark asset;
 			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
@@ -143,7 +176,7 @@ Managed::SharedPtr<Model> Model::LoadModelShared(std::string_view filePath)
 	{
 		file::path assetPath = filePath.data();
 		assetPath = assetPath.replace_extension(".asset");
-		if (file::exists(assetPath))
+		if (IsModelAssetUsable(path_, assetPath))
 		{
 			//Benchmark asset;
 			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
