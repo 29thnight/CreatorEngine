@@ -53,16 +53,20 @@ SamplerState gSampler       : register(s0);
 
 struct VSIn
 {
-    float3 position : POSITION;
-    float3 normal   : NORMAL;
-    float2 uv       : TEXCOORD0;
+    float3 position  : POSITION;
+    float3 normal    : NORMAL;
+    float2 uv        : TEXCOORD0;
+    float3 tangent   : TANGENT;
+    float3 bitangent : BINORMAL;
 };
 
 struct VSOut
 {
-    float4 position : SV_POSITION;
-    float3 normal   : NORMAL;
-    float2 uv       : TEXCOORD0;
+    float4 position  : SV_POSITION;
+    float3 normal    : NORMAL;
+    float2 uv        : TEXCOORD0;
+    float3 tangent   : TANGENT;
+    float3 bitangent : BINORMAL;
 };
 
 VSOut VSMain(VSIn input)
@@ -70,10 +74,14 @@ VSOut VSMain(VSIn input)
     VSOut output;
     const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
     output.position = mul(worldPosition, gViewProjection);
-    // 법선은 회전만 적용한다. 비균등 스케일은 역전치 행렬이 필요하고,
-    // 그건 재질 연결 슬라이스에서 상수에 함께 넣는다.
-    output.normal   = mul(input.normal, (float3x3)gWorld);
-    output.uv       = input.uv;
+
+    // 법선·탄젠트는 회전만 적용한다. 비균등 스케일에는 역전치 행렬이 필요한데,
+    // 그건 스케일이 실제로 문제가 되는 씬이 나왔을 때 상수에 추가한다 —
+    // 지금 넣으면 검증할 수 없는 값이 하나 더 늘어난다.
+    output.normal    = mul(input.normal,    (float3x3)gWorld);
+    output.tangent   = mul(input.tangent,   (float3x3)gWorld);
+    output.bitangent = mul(input.bitangent, (float3x3)gWorld);
+    output.uv        = input.uv;
     return output;
 }
 
@@ -99,10 +107,18 @@ PSOut PSMain(VSOut input)
     float3 normal = normalize(input.normal);
     if (gUseNormalMap != 0)
     {
-        // 접선 공간 변환은 탄젠트가 상수에 들어오는 다음 슬라이스에서 붙인다.
-        // 지금은 노멀맵을 읽는다는 것 자체가 확인 대상이다.
+        // 접선 공간 변환. 탄젠트를 법선에 대해 다시 직교화한다(그람-슈미트) —
+        // 보간을 거치면 둘이 어긋나고, 그대로 쓰면 조명이 미묘하게 틀어진다.
+        const float3 n = normal;
+        const float3 t = normalize(input.tangent - n * dot(n, input.tangent));
+
+        // 종법선은 저장된 것을 쓰되 방향(핸디드니스)만 원본에서 가져온다.
+        // cross로 다시 만들면 UV가 뒤집힌 메시에서 조명이 반대로 나온다.
+        const float  handedness = (dot(cross(n, t), input.bitangent) < 0.0f) ? -1.0f : 1.0f;
+        const float3 b = cross(n, t) * handedness;
+
         const float3 sampled = gNormalMap.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
-        normal = normalize(normal + sampled * 0.0f + sampled * 0.5f);
+        normal = normalize(sampled.x * t + sampled.y * b + sampled.z * n);
     }
 
     PSOut output;
@@ -256,11 +272,22 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
 
     // 입력 레이아웃. 정점 구조체와 순서가 맞아야 하고, 어긋나면 검증 레이어가
     // 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
+    // 오프셋은 엔진 Vertex 구조체를 그대로 따른다:
+    //   position 0 · normal 12 · uv0 24 · uv1 32 · tangent 40 · bitangent 52
+    // 어긋나면 검증 레이어가 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
     static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
+
+    // 오프셋이 Vertex와 어긋나면 조용히 틀리므로 컴파일 시점에 못박는다.
+    static_assert(offsetof(Vertex, normal) == 12, "Vertex 레이아웃이 바뀌었다 — 입력 요소 오프셋을 맞출 것");
+    static_assert(offsetof(Vertex, uv0) == 24, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, tangent) == 40, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, bitangent) == 52, "Vertex 레이아웃이 바뀌었다");
 
     DX12GraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;

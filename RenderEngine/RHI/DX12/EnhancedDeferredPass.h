@@ -21,9 +21,19 @@ class EnhancedDeferredPass : public EnhancedRenderPass
 public:
     const char* GetName() const override { return "Deferred"; }
 
+    // 셰이더 상수 한도. 광원 64개면 상수 버퍼가 약 4KB로, 루트 CBV로 넘기기에
+    // 무난하다. 그 이상은 구조를 바꿔야 한다(타일드/클러스터드) — 광원이 실제로
+    // 많은 씬이 나왔을 때 재는 것이 먼저다.
+    static constexpr uint32_t kMaxLights = 64;
+
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
+
+    // 이번 프레임에 실제로 넘긴 광원 수. 한도를 넘으면 잘린다.
+    uint32_t GetLastLightCount() const { return static_cast<uint32_t>(m_frameLights.size()); }
+    uint32_t GetLastDroppedLights() const { return m_droppedLights; }
 
     // GBuffer 출력을 입력으로 받는다. Declare 전에 넣어 줘야 한다.
     void SetInputs(const EnhancedGBufferPass::Outputs& inputs) { m_inputs = inputs; }
@@ -35,8 +45,23 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    // b0에 올라가는 라이팅 상수. HLSL의 cbuffer와 배치가 같아야 한다.
+    struct LightingConstants
+    {
+        Mathf::Matrix  inverseViewProjection{};
+        Mathf::Vector4 eyePosition{};
+        uint32_t       lightCount{ 0 };
+        uint32_t       padding[3]{};
+        EnhancedLight  lights[kMaxLights]{};
+    };
+
     EnhancedGBufferPass::Outputs m_inputs;
     RGHandle m_output;
+
+    std::vector<EnhancedLight> m_frameLights;
+    Mathf::Matrix  m_inverseViewProjection{};
+    Mathf::Vector4 m_eyePosition{};
+    uint32_t       m_droppedLights{ 0 };
 
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 

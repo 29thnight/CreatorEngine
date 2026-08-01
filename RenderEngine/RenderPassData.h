@@ -178,5 +178,10 @@ public:
 
 	static bool VaildCheck(Camera* pCamera);
 	static RenderPassData* GetData(Camera* pCamera);
+
+	// 활성 렌더 씬. SceneManager 접근을 이 .cpp 한 곳에 가둔다 —
+	// RenderEngine 하위 폴더(RHI/DX12 등)에서 SceneManager.h를 직접 include하면
+	// 그쪽 전이 의존(AssetBundle.h 등)이 인용 경로 규칙에 걸려 풀리지 않는다.
+	static class RenderScene* GetActiveRenderScene();
 };
 #endif // !DYNAMICCPP_EXPORTS

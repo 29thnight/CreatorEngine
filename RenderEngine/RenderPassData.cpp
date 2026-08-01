@@ -33,6 +33,11 @@ RenderPassData* RenderPassData::GetData(Camera* pCamera)
 	return nullptr;
 }
 
+RenderScene* RenderPassData::GetActiveRenderScene()
+{
+	return SceneManagers->GetRenderScene();
+}
+
 RenderPassData::RenderPassData() : m_shadowCamera(false)
 {
 }

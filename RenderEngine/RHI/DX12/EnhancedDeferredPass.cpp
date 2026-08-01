@@ -13,10 +13,30 @@ namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
     constexpr const char* kDeferredShader = R"(
+#define MAX_DEFERRED_LIGHTS 64
+
+struct DeferredLight
+{
+    float4 position;      // w = 타입 (0 방향광 · 1 점광 · 2 스포트)
+    float4 direction;     // w = 스포트 각도
+    float4 color;         // rgb 색 · a 세기
+    float4 attenuation;   // x 상수 · y 선형 · z 이차 · w 반경
+};
+
+cbuffer LightingConstants : register(b0)
+{
+    float4x4      gInverseViewProjection;
+    float4        gEyePosition;
+    uint          gLightCount;
+    uint3         gPadding;
+    DeferredLight gLights[MAX_DEFERRED_LIGHTS];
+};
+
 Texture2D    gDiffuse    : register(t0);
 Texture2D    gMetalRough : register(t1);
 Texture2D    gNormal     : register(t2);
 Texture2D    gEmissive   : register(t3);
+Texture2D    gDepth      : register(t4);
 SamplerState gSampler    : register(s0);
 
 struct VSOut
@@ -38,17 +58,64 @@ VSOut VSMain(uint id : SV_VertexID)
 float4 PSMain(VSOut input) : SV_TARGET
 {
     const float3 albedo   = gDiffuse.Sample(gSampler, input.uv).rgb;
-    const float3 normal   = gNormal.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
+    const float3 normal   = normalize(gNormal.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f);
     const float3 emissive = gEmissive.Sample(gSampler, input.uv).rgb;
-    const float  rough    = gMetalRough.Sample(gSampler, input.uv).g;
+    const float  rough    = saturate(gMetalRough.Sample(gSampler, input.uv).g);
+    const float  depth    = gDepth.Sample(gSampler, input.uv).r;
 
-    // 실제 광원은 다음 슬라이스에서 붙는다. 지금은 GBuffer 값이 실제로 읽히는지가
-    // 목적이므로 고정 방향광 하나로 조합한다 — 네 타깃이 전부 결과에 기여해야
-    // 픽셀 검증이 '읽기가 되는가'를 볼 수 있다.
-    const float3 lightDirection = normalize(float3(0.3f, 0.6f, -0.7f));
-    const float  ndotl = saturate(dot(normalize(normal), lightDirection));
+    // 깊이에서 월드 위치를 복원한다. GBuffer에 위치를 따로 저장하는 방법도 있지만
+    // 타깃 하나가 더 늘고 대역폭이 그만큼 든다 — 깊이가 이미 있으니 역행렬로 푼다.
+    const float2 ndc = float2(input.uv.x * 2.0f - 1.0f, 1.0f - input.uv.y * 2.0f);
+    const float4 clipPosition = float4(ndc, depth, 1.0f);
+    const float4 worldHomogeneous = mul(clipPosition, gInverseViewProjection);
+    const float3 worldPosition = worldHomogeneous.xyz / worldHomogeneous.w;
 
-    return float4(albedo * ndotl * (1.0f - rough * 0.5f) + emissive, 1.0f);
+    float3 lit = 0.0f;
+    for (uint i = 0; i < gLightCount; ++i)
+    {
+        const DeferredLight light = gLights[i];
+        const uint type = (uint)light.position.w;
+
+        float3 toLight;
+        float  attenuation = 1.0f;
+
+        if (type == 0)
+        {
+            // 방향광 — 위치와 감쇠가 없다.
+            toLight = -normalize(light.direction.xyz);
+        }
+        else
+        {
+            const float3 offset = light.position.xyz - worldPosition;
+            const float  distance = length(offset);
+            toLight = offset / max(distance, 1e-4f);
+
+            attenuation = 1.0f / (light.attenuation.x
+                + light.attenuation.y * distance
+                + light.attenuation.z * distance * distance);
+
+            // 반경 밖은 잘라낸다. 감쇠식만 쓰면 먼 광원이 미세하게 계속 기여해
+            // 광원 수에 비례해 화면이 밝아진다.
+            attenuation *= saturate(1.0f - distance / max(light.attenuation.w, 1e-4f));
+
+            if (type == 2)
+            {
+                // 스포트 — 원뿔 밖을 부드럽게 끈다.
+                const float cosAngle = dot(-toLight, normalize(light.direction.xyz));
+                const float cutoff = cos(light.direction.w * 0.5f);
+                attenuation *= smoothstep(cutoff, lerp(cutoff, 1.0f, 0.2f), cosAngle);
+            }
+        }
+
+        const float ndotl = saturate(dot(normal, toLight));
+        lit += albedo * light.color.rgb * light.color.a * ndotl * attenuation;
+    }
+
+    // 거칠기는 아직 확산 감쇠로만 쓴다. 정반사 항은 DX11과 픽셀 대조를 시작하는
+    // 시점에 그쪽 BRDF에 맞춰 넣는다 — 지금 임의로 넣으면 대조가 어긋난다.
+    lit *= (1.0f - rough * 0.5f);
+
+    return float4(lit + emissive, 1.0f);
 }
 )";
 
@@ -97,13 +164,13 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     // 테이블 하나면 충분하고, 바인딩 호출도 한 번이다(상태 변경 최소화).
     D3D12_DESCRIPTOR_RANGE srvRange{};
     srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 4;
+    srvRange.NumDescriptors = 5;   // diffuse · metalRough · normal · emissive · depth
 
     D3D12_DESCRIPTOR_RANGE samplerRange{};
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
     samplerRange.NumDescriptors = 1;
 
-    D3D12_ROOT_PARAMETER params[2]{};
+    D3D12_ROOT_PARAMETER params[3]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     params[0].DescriptorTable.NumDescriptorRanges = 1;
     params[0].DescriptorTable.pDescriptorRanges = &srvRange;
@@ -113,6 +180,12 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     params[1].DescriptorTable.NumDescriptorRanges = 1;
     params[1].DescriptorTable.pDescriptorRanges = &samplerRange;
     params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // 광원 상수. 루트 CBV로 넘긴다 — 업로드 링 주소를 그대로 꽂으면 되고,
+    // 프레임마다 한 번이라 디스크립터를 만들 이유가 없다.
+    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[2].Descriptor.ShaderRegister = 0;
+    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
     rootDesc.NumParameters = _countof(params);
@@ -152,6 +225,50 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     return true;
 }
 
+bool EnhancedDeferredPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
+{
+    m_frameLights.clear();
+    m_droppedLights = 0;
+
+    if (nullptr != context.camera)
+    {
+        const Mathf::xMatrix viewProjection =
+            XMMatrixMultiply(context.camera->view, context.camera->projection);
+
+        // HLSL이 행 우선으로 읽으므로 전치해서 넣는다. 역행렬을 여기서 구해 두면
+        // 픽셀마다 다시 구하지 않는다.
+        m_inverseViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProjection));
+        m_eyePosition = context.camera->eyePosition;
+    }
+    else
+    {
+        m_inverseViewProjection = XMMatrixIdentity();
+        m_eyePosition = Mathf::Vector4{};
+    }
+
+    if (nullptr == context.lights) return true;
+
+    for (const auto& light : *context.lights)
+    {
+        if (m_frameLights.size() >= kMaxLights)
+        {
+            // 조용히 버리지 않는다. 광원이 몇 개부터 사라지는지 모르면
+            // '어느 순간부터 어두워진다'로만 드러난다.
+            ++m_droppedLights;
+            continue;
+        }
+        m_frameLights.push_back(light);
+    }
+
+    if (0 != m_droppedLights)
+    {
+        outError = "광원 " + std::to_string(m_droppedLights) + "개가 한도("
+            + std::to_string(kMaxLights) + ")를 넘어 잘렸다";
+    }
+
+    return true;
+}
+
 void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
     RGTextureDesc outputDesc{};
@@ -169,6 +286,9 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
         { m_inputs.metalRough, RGResourceState::ShaderResource },
         { m_inputs.normal,     RGResourceState::ShaderResource },
         { m_inputs.emissive,   RGResourceState::ShaderResource },
+        // 깊이는 DEPTH_WRITE에서 읽기 상태로 넘어와야 한다. 그래프가 알아서
+        // 전이를 만들지만, 여기서 선언하지 않으면 만들지 않는다.
+        { m_inputs.depth,      RGResourceState::ShaderResource },
         { m_output,            RGResourceState::RenderTarget },
     };
 
@@ -181,8 +301,8 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             const auto rtv = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
             device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtv);
 
-            // SRV 넷을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
-            const auto srvRange = context.resources->GetDescriptorRing().Allocate(4);
+            // SRV 다섯을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
+            const auto srvRange = context.resources->GetDescriptorRing().Allocate(5);
             if (!srvRange.IsValid()) return;
 
             const RGHandle sources[4] = {
@@ -192,6 +312,31 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
                 device->CreateShaderResourceView(executeContext.Resolve(sources[i]), nullptr,
                     srvRange.CpuAt(i));
             }
+
+            // 깊이는 포맷을 바꿔서 봐야 한다. D32_FLOAT로 만든 리소스를 SRV로
+            // 읽으려면 명시적으로 알려 줘야 하고, nullptr 설명으로는 실패한다.
+            D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
+            depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
+            depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            depthSrv.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
+                &depthSrv, srvRange.CpuAt(4));
+
+            // 광원 상수를 업로드 링에 올린다.
+            LightingConstants constants{};
+            constants.inverseViewProjection = m_inverseViewProjection;
+            constants.eyePosition = m_eyePosition;
+            constants.lightCount = static_cast<uint32_t>(m_frameLights.size());
+            for (size_t i = 0; i < m_frameLights.size(); ++i)
+            {
+                constants.lights[i] = m_frameLights[i];
+            }
+
+            const auto lightConstants = context.resources->GetUploadRing().Allocate(
+                sizeof(LightingConstants), DX12UploadRing::kConstantBufferAlignment);
+            if (!lightConstants.IsValid()) return;
+            memcpy(lightConstants.cpuAddress, &constants, sizeof(constants));
 
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
@@ -210,6 +355,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             commandList->SetPipelineState(m_pso);
             commandList->SetGraphicsRootDescriptorTable(0, srvRange.gpu);
             commandList->SetGraphicsRootDescriptorTable(1, m_sampler);
+            commandList->SetGraphicsRootConstantBufferView(2, lightConstants.gpuAddress);
 
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             commandList->DrawInstanced(3, 1, 0, 0);

@@ -54,6 +54,19 @@ struct EnhancedDrawItem
     uint32_t       useNormalMap{ 0 };
 };
 
+// 셰이더가 읽는 형태의 광원 하나.
+//
+// 엔진의 Light를 그대로 쓰지 않는 이유는 크기다 — Light는 감쇠 계수·그림자
+// 행렬까지 들고 있어 255개면 상수 버퍼 한도를 넘본다. 라이팅에 실제로 필요한
+// 것만 추린다. 배치는 HLSL 쪽과 맞춰야 하므로 16바이트 경계를 지킨다.
+struct EnhancedLight
+{
+    Mathf::Vector4 position{};       // w = 타입 (0 방향광 · 1 점광 · 2 스포트)
+    Mathf::Vector4 direction{};      // w = 스포트 각도(라디안)
+    Mathf::Color4  color{};          // rgb 색 · a 세기
+    Mathf::Vector4 attenuation{};    // x 상수 · y 선형 · z 이차 · w 반경
+};
+
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
@@ -72,6 +85,10 @@ struct EnhancedFrameContext
 
     // 이 프레임에 그릴 것들. 비어 있으면 패스는 클리어만 한다.
     const std::vector<EnhancedDrawItem>* draws{ nullptr };
+
+    // 이 프레임의 광원. 씬의 Light를 그대로 들지 않고 셰이더가 쓰는 형태로
+    // 복사해 온다 — 메시·재질과 같은 이유다.
+    const std::vector<EnhancedLight>* lights{ nullptr };
 };
 
 class EnhancedRenderPass

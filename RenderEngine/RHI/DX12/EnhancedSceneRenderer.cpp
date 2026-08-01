@@ -10,6 +10,8 @@
 #include "DX12MeshCache.h"
 #include "DX12TextureCache.h"
 #include "../../Material.h"
+#include "../../RenderScene.h"
+#include "../../LightController.h"
 #include "../../Texture.h"
 #include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
@@ -2208,8 +2210,37 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         draws.push_back(item);
     }
 
+    // 광원도 씬에서 뽑아 셰이더가 쓰는 형태로 복사한다. 엔진의 Light는 감쇠
+    // 계수와 그림자 행렬까지 들고 있어 그대로 상수 버퍼에 올리기엔 크다.
+    std::vector<EnhancedLight> lights;
+    if (auto* renderScene = RenderPassData::GetActiveRenderScene())
+    {
+        auto* lightController = renderScene->m_LightController;
+        if (nullptr != lightController)
+        {
+            for (uint32 i = 0; i < lightController->m_lightCount; ++i)
+            {
+                const Light& source = lightController->GetLight(i);
+
+                EnhancedLight light{};
+                light.position = source.m_position;
+                light.position.w = static_cast<float>(source.m_lightType);
+                light.direction = source.m_direction;
+                light.direction.w = XMConvertToRadians(source.m_spotLightAngle);
+                light.color = source.m_color;
+                light.color.w = source.m_intencity;
+                light.attenuation = Mathf::Vector4{
+                    source.m_constantAttenuation, source.m_linearAttenuation,
+                    source.m_quadraticAttenuation, source.m_range };
+
+                lights.push_back(light);
+            }
+        }
+    }
+
     outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->m_cameraIndex)
-        + " · 드로우 후보 " + std::to_string(draws.size()) + "\n";
+        + " · 드로우 후보 " + std::to_string(draws.size())
+        + " · 광원 " + std::to_string(lights.size()) + "\n";
 
     // ── [2/4] DX12 쪽 준비 ──
     DX12DeviceResources resources;
@@ -2244,6 +2275,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     frameContext.height = kHeight;
     frameContext.camera = &cameraSnapshot;
     frameContext.draws = &draws;
+    frameContext.lights = &lights;
 
     EnhancedGBufferPass gbuffer;
     if (!gbuffer.Initialize(frameContext, error))
@@ -2299,13 +2331,41 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     // 한 번 그리고 커버리지를 센다. 카메라를 바꿔 두 번 부른다.
+    // 라이팅 결과 리드백. 16비트 float 4채널이라 픽셀당 8바이트.
+    const uint32_t lightingRowPitch = (kWidth * 8 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
+        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+
+    ComPtr<ID3D12Resource> lightingReadback;
+    {
+        D3D12_HEAP_PROPERTIES readbackHeap{};
+        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<uint64_t>(lightingRowPitch) * kHeight;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+            IID_PPV_ARGS(&lightingReadback))))
+        {
+            outLog += "[2/4] 라이팅 리드백 버퍼 생성 실패\n";
+            return false;
+        }
+    }
+
     std::vector<DX12GpuProfiler::PassTiming> timings;
     EnhancedRenderGraph::Stats lastGraphStats{};
 
     const auto renderAndCount = [&](const FrameCameraSnapshot& camera,
         uint32_t& outCovered, uint32_t& outDrawCount, std::string& outStepError,
         std::vector<DX12GpuProfiler::PassTiming>& outTimings,
-        EnhancedRenderGraph::Stats& outGraphStats) -> bool
+        EnhancedRenderGraph::Stats& outGraphStats,
+        double& outAverageLuminance) -> bool
     {
         frameContext.camera = &camera;
 
@@ -2325,6 +2385,28 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         deferred.SetInputs(outputs);
         deferred.Declare(graph, frameContext);
+
+        // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
+        // 안다 — 재질 때 "업로드 0인데 통과"를 겪었으므로 같은 함정을 막는다.
+        graph.AddPass("lighting_readback",
+            { { deferred.GetOutput(), RGResourceState::CopySource } },
+            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                D3D12_TEXTURE_COPY_LOCATION dst{};
+                dst.pResource = lightingReadback.Get();
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dst.PlacedFootprint.Footprint.Format = EnhancedDeferredPass::kOutputFormat;
+                dst.PlacedFootprint.Footprint.Width = kWidth;
+                dst.PlacedFootprint.Footprint.Height = kHeight;
+                dst.PlacedFootprint.Footprint.Depth = 1;
+                dst.PlacedFootprint.Footprint.RowPitch = lightingRowPitch;
+
+                D3D12_TEXTURE_COPY_LOCATION src{};
+                src.pResource = executeContext.Resolve(deferred.GetOutput());
+                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            }, true);
 
         graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -2381,13 +2463,54 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             }
         }
         depthReadback->Unmap(0, nullptr);
+
+        // 라이팅 결과의 평균 밝기. 광원이 닿지 않으면 0에 가깝다.
+        outAverageLuminance = 0.0;
+        void* litMapped = nullptr;
+        const size_t litBytes = static_cast<size_t>(lightingRowPitch) * kHeight;
+        D3D12_RANGE litRange{ 0, litBytes };
+        if (SUCCEEDED(lightingReadback->Map(0, &litRange, &litMapped)))
+        {
+            const auto halfToFloat = [](uint16_t half) -> float
+            {
+                const uint32_t sign = (half >> 15) & 0x1;
+                const uint32_t exponent = (half >> 10) & 0x1F;
+                const uint32_t mantissa = half & 0x3FF;
+                uint32_t bits = 0;
+                if (0 == exponent) bits = sign << 31;
+                else if (31 == exponent) bits = (sign << 31) | 0x7F800000u | (mantissa << 13);
+                else bits = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13);
+                float result = 0.f;
+                memcpy(&result, &bits, sizeof(result));
+                return result;
+            };
+
+            const auto* litPixels = static_cast<const uint8_t*>(litMapped);
+            double sum = 0.0;
+            for (uint32_t y = 0; y < kHeight; ++y)
+            {
+                const auto* row = litPixels + static_cast<size_t>(y) * lightingRowPitch;
+                for (uint32_t x = 0; x < kWidth; ++x)
+                {
+                    uint16_t halves[4]{};
+                    memcpy(halves, row + static_cast<size_t>(x) * 8, 8);
+                    sum += (halfToFloat(halves[0]) + halfToFloat(halves[1])
+                        + halfToFloat(halves[2])) / 3.0;
+                }
+            }
+            outAverageLuminance = sum / (kWidth * kHeight);
+            lightingReadback->Unmap(0, nullptr);
+        }
+
         return true;
     };
 
     // ── [3/4] 씬 카메라로 렌더 ──
+    double luminanceLit = 0.0;
+    double luminanceMoved = 0.0;
     uint32_t coveredA = 0;
     uint32_t drawCountA = 0;
-    if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error, timings, lastGraphStats))
+    if (!renderAndCount(cameraSnapshot, coveredA, drawCountA, error, timings, lastGraphStats, luminanceLit))
     {
         outLog += "[3/4] 렌더 실패: " + error + "\n";
         return false;
@@ -2441,7 +2564,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     uint32_t drawCountB = 0;
     std::vector<DX12GpuProfiler::PassTiming> timingsB;
     EnhancedRenderGraph::Stats statsB{};
-    if (!renderAndCount(movedCamera, coveredB, drawCountB, error, timingsB, statsB))
+    if (!renderAndCount(movedCamera, coveredB, drawCountB, error, timingsB, statsB, luminanceMoved))
     {
         outLog += "[4/4] 이동 카메라 렌더 실패: " + error + "\n";
         return false;
@@ -2450,19 +2573,55 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     bool passed = true;
     std::string verdict;
 
+    // ── 광원이 실제로 셰이더에 닿는가 ──
+    //
+    // 광원을 비운 채로 한 번 더 그려 밝기를 비교한다. 상수가 안 닿으면 두 결과가
+    // 같고, 그러면 '광원 목록은 넘겼는데 라이팅은 안 된다'를 못 잡는다.
+    // 카메라 상수 때 쓴 것과 같은 논리다.
+    double luminanceUnlit = 0.0;
+    if (!lights.empty())
+    {
+        const std::vector<EnhancedLight> noLights;
+        frameContext.lights = &noLights;
+
+        uint32_t coveredDark = 0;
+        uint32_t drawCountDark = 0;
+        std::vector<DX12GpuProfiler::PassTiming> timingsDark;
+        EnhancedRenderGraph::Stats statsDark{};
+        if (!renderAndCount(cameraSnapshot, coveredDark, drawCountDark, error,
+            timingsDark, statsDark, luminanceUnlit))
+        {
+            outLog += "[4/4] 광원 0 렌더 실패: " + error + "\n";
+            return false;
+        }
+        frameContext.lights = &lights;
+    }
+
+    char luminanceLine[160]{};
+    std::snprintf(luminanceLine, sizeof(luminanceLine),
+        "      라이팅 — 광원 %zu개 밝기 %.5f · 광원 0개 밝기 %.5f\n",
+        lights.size(), luminanceLit, luminanceUnlit);
+    outLog += luminanceLine;
+
+    if (!lights.empty() && luminanceLit <= luminanceUnlit + 1e-5)
+    {
+        passed = false;
+        verdict = "광원을 " + std::to_string(lights.size())
+            + "개 넘겼는데 밝기가 광원 0개일 때와 같다 — 광원이 셰이더에 닿지 않는다";
+    }
     // 재질에 baseColor가 있는데 텍스처가 하나도 안 올라갔다면 재질 경로가
     // 통째로 건너뛰어진 것이다. 이 단정이 없어서 실제로 그 상태로 통과한 적이
     // 있다(업로드 0건인데 검증 통과) — 확인하지 못한 것과 확인했고 문제없는
     // 것은 다르다.
     const auto finalTextureStats = textureCache.GetStats();
-    if (0 != materialsWithTexture && 0 == finalTextureStats.uploads)
+    if (passed && 0 != materialsWithTexture && 0 == finalTextureStats.uploads)
     {
         passed = false;
         verdict = "재질에 baseColor가 " + std::to_string(materialsWithTexture)
             + "건 있는데 텍스처 업로드가 0이다 — 재질 경로가 건너뛰어졌다";
     }
     // 컬링 확인. GBuffer가 걷어내졌다면 이후 단정이 전부 무의미하다.
-    else if (0 != lastGraphStats.passesCulled)
+    else if (passed && 0 != lastGraphStats.passesCulled)
     {
         passed = false;
         verdict = "Deferred가 읽는데도 패스가 "
