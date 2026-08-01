@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "EnhancedGBufferPass.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
@@ -1870,6 +1871,270 @@ bool EnhancedSceneRenderer::RunRenderGraphTest(std::string& outLog)
     resources.Shutdown();
 
     outLog += passed ? "렌더 그래프 검증 통과\n" : "렌더 그래프 검증 실패\n";
+    return passed;
+}
+
+bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
+{
+    using Microsoft::WRL::ComPtr;
+
+    constexpr uint32_t kWidth = 128;
+    constexpr uint32_t kHeight = 128;
+
+    DX12DeviceResources resources;
+    std::string error;
+    if (!resources.Initialize(kWidth, kHeight, error))
+    {
+        outLog += "[1/3] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12PSOManager psoManager;
+    if (!psoManager.Initialize(resources.GetDevice(), L"dx12_gbuffer.cache", error))
+    {
+        outLog += "[1/3] PSO 매니저 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12RootSignatureCache rootSignatures;
+    if (!rootSignatures.Initialize(resources.GetDevice(), error))
+    {
+        outLog += "[1/3] 루트 시그니처 캐시 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    EnhancedFrameContext frameContext{};
+    frameContext.resources = &resources;
+    frameContext.psoManager = &psoManager;
+    frameContext.rootSignatures = &rootSignatures;
+    frameContext.width = kWidth;
+    frameContext.height = kHeight;
+
+    EnhancedGBufferPass gbuffer;
+    if (!gbuffer.Initialize(frameContext, error))
+    {
+        outLog += "[1/3] GBuffer 패스 초기화 실패: " + error + "\n";
+        return false;
+    }
+    outLog += "[1/3] 패스 초기화 완료 — 정점·인덱스 버퍼, MRT 5 PSO, 깊이\n";
+
+    // ── [2/3] 그래프에 선언하고 실행 ──
+    EnhancedRenderGraph graph;
+    gbuffer.Declare(graph, frameContext);
+    const auto outputs = gbuffer.GetOutputs();
+
+    // 리드백을 위해 각 타깃을 COPY_SOURCE로 옮기는 패스를 붙인다.
+    // 배리어는 그래프가 만든다 — 여기서 손으로 넣지 않는 것이 요점이다.
+    struct ReadbackTarget
+    {
+        const char*     name;
+        RGHandle        handle;
+        DXGI_FORMAT     format;
+        uint32_t        bytesPerPixel;
+        ComPtr<ID3D12Resource> buffer;
+        uint32_t        rowPitch;
+    };
+
+    std::vector<ReadbackTarget> targets = {
+        { "Diffuse",    outputs.diffuse,    DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
+        { "MetalRough", outputs.metalRough, DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
+        { "Normal",     outputs.normal,     DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
+        { "Emissive",   outputs.emissive,   DXGI_FORMAT_R16G16B16A16_FLOAT, 8, nullptr, 0 },
+        { "Bitmask",    outputs.bitmask,    DXGI_FORMAT_R32_UINT,           4, nullptr, 0 },
+    };
+
+    for (auto& target : targets)
+    {
+        target.rowPitch = (kWidth * target.bytesPerPixel + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
+            & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+
+        D3D12_HEAP_PROPERTIES readbackHeap{};
+        readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<uint64_t>(target.rowPitch) * kHeight;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+            D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+            IID_PPV_ARGS(&target.buffer))))
+        {
+            outLog += "[2/3] 리드백 버퍼 생성 실패\n";
+            return false;
+        }
+    }
+
+    std::vector<EnhancedRenderGraph::RGPassUsage> readbackUsages;
+    for (const auto& target : targets)
+    {
+        readbackUsages.push_back({ target.handle, RGResourceState::CopySource });
+    }
+
+    graph.AddPass("gbuffer_readback", readbackUsages,
+        [&targets](const EnhancedRenderGraph::ExecuteContext& context)
+        {
+            for (const auto& target : targets)
+            {
+                D3D12_TEXTURE_COPY_LOCATION dst{};
+                dst.pResource = target.buffer.Get();
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dst.PlacedFootprint.Footprint.Format = target.format;
+                dst.PlacedFootprint.Footprint.Width = kWidth;
+                dst.PlacedFootprint.Footprint.Height = kHeight;
+                dst.PlacedFootprint.Footprint.Depth = 1;
+                dst.PlacedFootprint.Footprint.RowPitch = target.rowPitch;
+
+                D3D12_TEXTURE_COPY_LOCATION src{};
+                src.pResource = context.Resolve(target.handle);
+                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                context.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            }
+        }, true);
+
+    if (!graph.Compile(resources.GetDevice(), error))
+    {
+        outLog += "[2/3] 그래프 Compile 실패: " + error + "\n";
+        return false;
+    }
+
+    if (!resources.BeginFrame(error)) { outLog += "[2/3] Begin 실패\n"; return false; }
+    if (!graph.Execute(resources.GetCommandList(), error))
+    {
+        outLog += "[2/3] 그래프 Execute 실패: " + error + "\n";
+        return false;
+    }
+    if (!resources.EndFrame(error)) { outLog += "[2/3] End 실패\n"; return false; }
+    resources.WaitForGpu();
+
+    const auto graphStats = graph.GetStats();
+    outLog += "[2/3] 그래프 실행 완료 — 패스 " + std::to_string(graphStats.passesExecuted)
+        + " · transient " + std::to_string(graphStats.transientCreated)
+        + " · 배리어 " + std::to_string(graphStats.barriersEmitted)
+        + "건을 " + std::to_string(graphStats.barrierBatches) + "번에 삽입\n";
+
+    // ── [3/3] 타깃별 픽셀 확인 ──
+    //
+    // 셰이더가 타깃마다 다른 값을 쓰므로, 각 타깃이 기대값을 갖는지 따로 본다.
+    // 하나만 기록되고 나머지가 0으로 남는 경우를 잡는 것이 이 검사의 목적이다.
+    const auto halfToFloat = [](uint16_t half) -> float
+    {
+        const uint32_t sign = (half >> 15) & 0x1;
+        const uint32_t exponent = (half >> 10) & 0x1F;
+        const uint32_t mantissa = half & 0x3FF;
+
+        uint32_t bits = 0;
+        if (0 == exponent)
+        {
+            bits = sign << 31;   // 0 또는 비정규 — 검증 값 범위에서는 0으로 충분하다
+        }
+        else if (31 == exponent)
+        {
+            bits = (sign << 31) | 0x7F800000u | (mantissa << 13);
+        }
+        else
+        {
+            bits = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13);
+        }
+
+        float result = 0.f;
+        memcpy(&result, &bits, sizeof(result));
+        return result;
+    };
+
+    // 쿼드가 -0.8~0.8을 덮으므로 화면 중앙은 반드시 그려진 곳이다.
+    const uint32_t sampleX = kWidth / 2;
+    const uint32_t sampleY = kHeight / 2;
+
+    bool passed = true;
+    std::string detail;
+
+    for (size_t i = 0; i < targets.size(); ++i)
+    {
+        auto& target = targets[i];
+
+        void* mapped = nullptr;
+        const size_t bytes = static_cast<size_t>(target.rowPitch) * kHeight;
+        D3D12_RANGE range{ 0, bytes };
+        if (FAILED(target.buffer->Map(0, &range, &mapped)))
+        {
+            outLog += "[3/3] " + std::string(target.name) + " Map 실패\n";
+            return false;
+        }
+
+        const auto* row = static_cast<const uint8_t*>(mapped)
+            + static_cast<size_t>(sampleY) * target.rowPitch;
+
+        bool ok = false;
+        std::string got;
+
+        if (DXGI_FORMAT_R32_UINT == target.format)
+        {
+            uint32_t value = 0;
+            memcpy(&value, row + static_cast<size_t>(sampleX) * 4, 4);
+            ok = (0xABCDu == value);
+            got = std::to_string(value);
+        }
+        else
+        {
+            uint16_t halves[4]{};
+            memcpy(halves, row + static_cast<size_t>(sampleX) * 8, 8);
+            const float r = halfToFloat(halves[0]);
+            const float g = halfToFloat(halves[1]);
+            const float b = halfToFloat(halves[2]);
+
+            char buffer[96]{};
+            std::snprintf(buffer, sizeof(buffer), "(%.3f %.3f %.3f)", r, g, b);
+            got = buffer;
+
+            constexpr float kEpsilon = 0.01f;
+            switch (i)
+            {
+            case 0: // Diffuse = uv, 중앙이므로 0.5 근처
+                ok = std::fabs(r - 0.5f) < 0.05f && std::fabs(g - 0.5f) < 0.05f;
+                break;
+            case 1: // MetalRough = (0.25, 0.75, 0)
+                ok = std::fabs(r - 0.25f) < kEpsilon && std::fabs(g - 0.75f) < kEpsilon;
+                break;
+            case 2: // Normal = (0,0,-1) 인코딩 → (0.5, 0.5, 0)
+                ok = std::fabs(r - 0.5f) < kEpsilon && std::fabs(b - 0.f) < kEpsilon;
+                break;
+            case 3: // Emissive = (0, 0.5, 1)
+                ok = std::fabs(g - 0.5f) < kEpsilon && std::fabs(b - 1.f) < kEpsilon;
+                break;
+            default:
+                break;
+            }
+        }
+
+        target.buffer->Unmap(0, nullptr);
+
+        if (!ok) passed = false;
+        detail += std::string("      ") + target.name + " " + (ok ? "통과" : "실패")
+            + " " + got + "\n";
+    }
+
+    outLog += "[3/3] 타깃별 픽셀 확인 " + std::string(passed ? "통과" : "실패") + "\n" + detail;
+
+    std::string messages;
+    const uint32_t problems = resources.DrainDebugMessages(messages);
+    if (0 != problems)
+    {
+        passed = false;
+        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
+    }
+
+    gbuffer.Shutdown();
+    rootSignatures.Shutdown();
+    psoManager.Shutdown();
+    resources.Shutdown();
+
+    outLog += passed ? "GBuffer 패스 검증 통과\n" : "GBuffer 패스 검증 실패\n";
     return passed;
 }
 

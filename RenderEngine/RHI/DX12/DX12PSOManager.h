@@ -41,6 +41,15 @@ struct DX12GraphicsPipelineDesc
     bool            depthEnable{ false };
     bool            blendEnable{ false };
 
+    // 입력 레이아웃. 호출부가 소유하고, 이 구조체는 참조만 든다 —
+    // GetOrCreate가 돌아올 때까지만 살아 있으면 된다.
+    //
+    // 해시는 반드시 내용으로 해야 한다. D3D12_INPUT_ELEMENT_DESC의 SemanticName은
+    // const char*라 통째로 바이트 해시하면 문자열 주소를 해시하게 되고, 같은
+    // 레이아웃이 매번 다른 키가 되어 캐시가 논다(루트 시그니처에서 겪은 것과 같다).
+    const D3D12_INPUT_ELEMENT_DESC* inputElements{ nullptr };
+    uint32_t                        inputElementCount{ 0 };
+
     D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType{ D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE };
     uint32_t    numRenderTargets{ 1 };
     DXGI_FORMAT rtvFormats[8]{ DXGI_FORMAT_R8G8B8A8_UNORM };

@@ -47,6 +47,24 @@ uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
     if (psBytecode && psSize > 0) hash = HashBytes(psBytecode, psSize, hash);
 
     hash = HashValue(rootSignatureId, hash);
+
+    // 입력 레이아웃도 내용으로. SemanticName은 포인터라 문자열을 따라 들어간다.
+    hash = HashValue(inputElementCount, hash);
+    for (uint32_t i = 0; i < inputElementCount; ++i)
+    {
+        const D3D12_INPUT_ELEMENT_DESC& element = inputElements[i];
+        if (element.SemanticName)
+        {
+            hash = HashBytes(element.SemanticName, strlen(element.SemanticName), hash);
+        }
+        hash = HashValue(element.SemanticIndex, hash);
+        hash = HashValue(element.Format, hash);
+        hash = HashValue(element.InputSlot, hash);
+        hash = HashValue(element.AlignedByteOffset, hash);
+        hash = HashValue(element.InputSlotClass, hash);
+        hash = HashValue(element.InstanceDataStepRate, hash);
+    }
+
     hash = HashValue(fillMode, hash);
     hash = HashValue(cullMode, hash);
     hash = HashValue(depthEnable, hash);
@@ -173,6 +191,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     d3dDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     d3dDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
     d3dDesc.SampleMask = UINT_MAX;
+    d3dDesc.InputLayout = { desc.inputElements, desc.inputElementCount };
     d3dDesc.PrimitiveTopologyType = desc.topologyType;
     d3dDesc.NumRenderTargets = desc.numRenderTargets;
     for (uint32_t i = 0; i < desc.numRenderTargets && i < 8; ++i)
