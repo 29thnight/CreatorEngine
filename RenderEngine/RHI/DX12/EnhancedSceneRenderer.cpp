@@ -2,6 +2,7 @@
 #include "EnhancedSceneRenderer.h"
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
+#include "DX12RootSignatureCache.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
@@ -121,22 +122,23 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     if (!CompileShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
     if (!CompileShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
-    ComPtr<ID3D12RootSignature> rootSignature;
+    // 루트 시그니처는 캐시를 통해 얻는다(PHASE 3-4). 식별자를 손으로 붙이지 않는
+    // 것이 요점 — 두 패스가 같은 번호를 다른 레이아웃에 붙이면 PSO 캐시가 엉뚱한
+    // 파이프라인을 돌려주는데, 원인이 '캐시 히트'라 추적이 어렵다.
+    DX12RootSignatureCache rootSignatureCache;
+    if (!rootSignatureCache.Initialize(resources.GetDevice(), error))
+    {
+        outLog += "[2/4] 루트 시그니처 캐시 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12RootSignatureCache::Entry triangleRoot;
     {
         D3D12_ROOT_SIGNATURE_DESC desc{};
-        ComPtr<ID3DBlob> serialized;
-        ComPtr<ID3DBlob> errors;
-        if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
-            &serialized, &errors)))
+        triangleRoot = rootSignatureCache.GetOrCreate(desc, error);
+        if (!triangleRoot.IsValid())
         {
-            outLog += "[2/4] 루트 시그니처 직렬화 실패\n";
-            return false;
-        }
-        if (FAILED(resources.GetDevice()->CreateRootSignature(0,
-            serialized->GetBufferPointer(), serialized->GetBufferSize(),
-            IID_PPV_ARGS(&rootSignature))))
-        {
-            outLog += "[2/4] 루트 시그니처 생성 실패\n";
+            outLog += "[2/4] 루트 시그니처 생성 실패: " + error + "\n";
             return false;
         }
     }
@@ -155,8 +157,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     triangleDesc.vsSize = vsBlob->GetBufferSize();
     triangleDesc.psBytecode = psBlob->GetBufferPointer();
     triangleDesc.psSize = psBlob->GetBufferSize();
-    triangleDesc.rootSignature = rootSignature.Get();
-    triangleDesc.rootSignatureId = 1;
+    triangleDesc.rootSignature = triangleRoot.signature;
+    triangleDesc.rootSignatureId = triangleRoot.id;
 
     ID3D12PipelineState* pso = psoManager.GetOrCreate(triangleDesc, error);
     if (!pso)
@@ -183,7 +185,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
     }
 
-    ComPtr<ID3D12RootSignature> quadRootSignature;
+    DX12RootSignatureCache::Entry quadRoot;
     {
         D3D12_DESCRIPTOR_RANGE range{};
         range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -210,21 +212,10 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         desc.NumStaticSamplers = 1;
         desc.pStaticSamplers = &sampler;
 
-        ComPtr<ID3DBlob> serialized;
-        ComPtr<ID3DBlob> errors;
-        if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
-            &serialized, &errors)))
+        quadRoot = rootSignatureCache.GetOrCreate(desc, error);
+        if (!quadRoot.IsValid())
         {
-            outLog += "[2/4] 쿼드 루트 시그니처 직렬화 실패";
-            if (errors) { outLog += ": "; outLog += static_cast<const char*>(errors->GetBufferPointer()); }
-            outLog += "\n";
-            return false;
-        }
-        if (FAILED(resources.GetDevice()->CreateRootSignature(0,
-            serialized->GetBufferPointer(), serialized->GetBufferSize(),
-            IID_PPV_ARGS(&quadRootSignature))))
-        {
-            outLog += "[2/4] 쿼드 루트 시그니처 생성 실패\n";
+            outLog += "[2/4] 쿼드 루트 시그니처 생성 실패: " + error + "\n";
             return false;
         }
     }
@@ -234,8 +225,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     quadDesc.vsSize = quadVsBlob->GetBufferSize();
     quadDesc.psBytecode = quadPsBlob->GetBufferPointer();
     quadDesc.psSize = quadPsBlob->GetBufferSize();
-    quadDesc.rootSignature = quadRootSignature.Get();
-    quadDesc.rootSignatureId = 2;
+    quadDesc.rootSignature = quadRoot.signature;
+    quadDesc.rootSignatureId = quadRoot.id;
 
     ID3D12PipelineState* quadPso = psoManager.GetOrCreate(quadDesc, error);
     if (!quadPso)
@@ -382,7 +373,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         //  얼로케이터 회전은 BeginFrame의 펜스 대기 6사이클이 이미 증명한다.)
         commandList->ClearRenderTargetView(rtvHandle, DX12DeviceResources::kClearColor, 0, nullptr);
 
-        commandList->SetGraphicsRootSignature(rootSignature.Get());
+        commandList->SetGraphicsRootSignature(triangleRoot.signature);
         commandList->SetPipelineState(pso);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
@@ -390,7 +381,7 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         // 텍스처 쿼드 — 디스크립터 힙 바인딩은 루트 테이블 설정보다 먼저(검증 레이어 규칙).
         ID3D12DescriptorHeap* heaps[] = { srvHeap.Get() };
         commandList->SetDescriptorHeaps(1, heaps);
-        commandList->SetGraphicsRootSignature(quadRootSignature.Get());
+        commandList->SetGraphicsRootSignature(quadRoot.signature);
         commandList->SetPipelineState(quadPso);
         commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGPUDescriptorHandleForHeapStart());
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -559,20 +550,85 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     if (!CompileShader("VSMain", "vs_5_0", vsBlob, outLog)) return false;
     if (!CompileShader("PSMain", "ps_5_0", psBlob, outLog)) return false;
 
-    ComPtr<ID3D12RootSignature> rootSignature;
+    DX12RootSignatureCache rootSignatureCache;
+    if (!rootSignatureCache.Initialize(resources.GetDevice(), error))
+    {
+        outLog += "루트 시그니처 캐시 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12RootSignatureCache::Entry emptyRoot;
     {
         D3D12_ROOT_SIGNATURE_DESC desc{};
-        ComPtr<ID3DBlob> serialized;
-        ComPtr<ID3DBlob> errors;
-        if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
-            &serialized, &errors)) ||
-            FAILED(resources.GetDevice()->CreateRootSignature(0,
-                serialized->GetBufferPointer(), serialized->GetBufferSize(),
-                IID_PPV_ARGS(&rootSignature))))
+        emptyRoot = rootSignatureCache.GetOrCreate(desc, error);
+        if (!emptyRoot.IsValid())
         {
-            outLog += "루트 시그니처 준비 실패\n";
+            outLog += "루트 시그니처 준비 실패: " + error + "\n";
             return false;
         }
+    }
+
+    // ── 루트 시그니처 캐시 자체 검증 ──
+    //
+    // PSO 캐시의 키에 rootSignatureId가 들어가므로, 이 식별자가 레이아웃을
+    // 제대로 구분하지 못하면 PSO 캐시가 엉뚱한 파이프라인을 돌려준다.
+    // 예전에는 호출부가 번호를 손으로 붙였고(1, 2, 10), 그 규율이 깨지는 순간
+    // 원인이 '캐시 히트'인 버그가 된다. 구조가 막는지 여기서 확인한다.
+    {
+        // 같은 레이아웃을 다시 요청하면 같은 객체·같은 id여야 한다.
+        D3D12_ROOT_SIGNATURE_DESC sameDesc{};
+        const auto again = rootSignatureCache.GetOrCreate(sameDesc, error);
+
+        // 레이아웃이 다르면 id가 달라야 한다 — 이것이 손번호가 못 하던 일이다.
+        D3D12_DESCRIPTOR_RANGE range{};
+        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        range.NumDescriptors = 1;
+
+        D3D12_ROOT_PARAMETER param{};
+        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        param.DescriptorTable.NumDescriptorRanges = 1;
+        param.DescriptorTable.pDescriptorRanges = &range;
+        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_ROOT_SIGNATURE_DESC tableDesc{};
+        tableDesc.NumParameters = 1;
+        tableDesc.pParameters = &param;
+        const auto tableRoot = rootSignatureCache.GetOrCreate(tableDesc, error);
+
+        // 같은 내용을 다른 주소에 담아도 같은 id여야 한다. 구조체를 통째로
+        // 바이트 해시하면 포인터를 해시하게 되어 여기서 걸린다 — 그러면 캐시가
+        // 통째로 놀고, 증상은 '왜인지 매번 컴파일한다'로만 보인다.
+        D3D12_DESCRIPTOR_RANGE rangeCopy = range;
+        D3D12_ROOT_PARAMETER paramCopy = param;
+        paramCopy.DescriptorTable.pDescriptorRanges = &rangeCopy;
+        D3D12_ROOT_SIGNATURE_DESC tableCopyDesc{};
+        tableCopyDesc.NumParameters = 1;
+        tableCopyDesc.pParameters = &paramCopy;
+        const auto tableCopyRoot = rootSignatureCache.GetOrCreate(tableCopyDesc, error);
+
+        const bool sameReused = again.IsValid() && again.id == emptyRoot.id
+            && again.signature == emptyRoot.signature;
+        const bool differentSeparated = tableRoot.IsValid() && tableRoot.id != emptyRoot.id;
+        const bool contentHashed = tableCopyRoot.IsValid()
+            && tableCopyRoot.id == tableRoot.id
+            && tableCopyRoot.signature == tableRoot.signature;
+
+        if (!sameReused || !differentSeparated || !contentHashed)
+        {
+            outLog += "루트 시그니처 캐시 검증 실패 (재사용 ";
+            outLog += sameReused ? "O" : "X";
+            outLog += " · 구분 ";
+            outLog += differentSeparated ? "O" : "X";
+            outLog += " · 내용해시 ";
+            outLog += contentHashed ? "O" : "X";
+            outLog += ")\n";
+            return false;
+        }
+
+        const auto rootStats = rootSignatureCache.GetStats();
+        outLog += "루트 시그니처 캐시 검증 통과 — 생성 " + std::to_string(rootStats.creates)
+            + " · 히트 " + std::to_string(rootStats.hits)
+            + " · 보관 " + std::to_string(rootSignatureCache.GetCachedCount()) + "\n";
     }
 
     // 상태만 다른 변형 3종 — 해시가 상태를 실제로 구분하는지 확인한다.
@@ -582,8 +638,8 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
     base.vsSize = vsBlob->GetBufferSize();
     base.psBytecode = psBlob->GetBufferPointer();
     base.psSize = psBlob->GetBufferSize();
-    base.rootSignature = rootSignature.Get();
-    base.rootSignatureId = 1;
+    base.rootSignature = emptyRoot.signature;
+    base.rootSignatureId = emptyRoot.id;
 
     DX12GraphicsPipelineDesc variants[3] = { base, base, base };
     variants[1].cullMode = D3D12_CULL_MODE_BACK;
@@ -751,7 +807,7 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         ComPtr<ID3DBlob> csBlob;
         if (!CompileShader("CSMain", "cs_5_0", csBlob, outLog)) return false;
 
-        ComPtr<ID3D12RootSignature> computeRoot;
+        DX12RootSignatureCache::Entry computeRoot;
         {
             D3D12_DESCRIPTOR_RANGE range{};
             range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
@@ -766,15 +822,10 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
             desc.NumParameters = 1;
             desc.pParameters = &param;
 
-            ComPtr<ID3DBlob> serialized;
-            ComPtr<ID3DBlob> errors;
-            if (FAILED(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1,
-                &serialized, &errors)) ||
-                FAILED(resources.GetDevice()->CreateRootSignature(0,
-                    serialized->GetBufferPointer(), serialized->GetBufferSize(),
-                    IID_PPV_ARGS(&computeRoot))))
+            computeRoot = rootSignatureCache.GetOrCreate(desc, error);
+            if (!computeRoot.IsValid())
             {
-                outLog += "컴퓨트 루트 시그니처 준비 실패\n";
+                outLog += "컴퓨트 루트 시그니처 준비 실패: " + error + "\n";
                 return false;
             }
         }
@@ -782,8 +833,8 @@ bool EnhancedSceneRenderer::RunPsoCacheTest(const std::string& cacheFilePath, st
         DX12ComputePipelineDesc computeDesc{};
         computeDesc.csBytecode = csBlob->GetBufferPointer();
         computeDesc.csSize = csBlob->GetBufferSize();
-        computeDesc.rootSignature = computeRoot.Get();
-        computeDesc.rootSignatureId = 10;
+        computeDesc.rootSignature = computeRoot.signature;
+        computeDesc.rootSignatureId = computeRoot.id;
 
         const std::string computeCachePath = cacheFilePath + ".compute";
         std::remove(computeCachePath.c_str());
