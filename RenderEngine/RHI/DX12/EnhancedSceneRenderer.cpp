@@ -172,50 +172,62 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
     if (!CompileShader("VSQuad", "vs_5_0", quadVsBlob, outLog)) return false;
     if (!CompileShader("PSQuad", "ps_5_0", quadPsBlob, outLog)) return false;
 
-    ComPtr<ID3D12DescriptorHeap> srvHeap;
-    {
-        D3D12_DESCRIPTOR_HEAP_DESC desc{};
-        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        desc.NumDescriptors = 1;
-        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        if (FAILED(resources.GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&srvHeap))))
-        {
-            outLog += "[2/4] SRV 힙 생성 실패\n";
-            return false;
-        }
-    }
-
+    // SRV는 프레임 디스크립터 링에서, 샘플러는 샘플러 힙에서 얻는다(PHASE 3-4).
+    //
+    // 예전에는 단발 SRV 힙 하나를 만들고 샘플러를 루트에 정적으로 박아 두었다.
+    // 그건 브링업에서 '텍스처가 보인다'를 증명하기 위한 최소 구성이었고, 실제
+    // 패스 이식에는 못 쓴다 — 패스마다 힙을 만들면 힙 교체가 패스 경계마다
+    // 일어나고, 정적 샘플러는 머티리얼마다 다른 필터를 감당하지 못한다.
     DX12RootSignatureCache::Entry quadRoot;
     {
-        D3D12_DESCRIPTOR_RANGE range{};
-        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        range.NumDescriptors = 1;
+        // 테이블 둘: SRV 하나, 샘플러 하나. 샘플러가 루트에서 빠지면서
+        // 파라미터가 하나 늘었고, 그만큼 레이아웃이 달라져 루트 시그니처 캐시의
+        // id도 달라진다(그래서 PSO 캐시도 자동으로 새 키를 쓴다).
+        D3D12_DESCRIPTOR_RANGE srvRange{};
+        srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        srvRange.NumDescriptors = 1;
 
-        D3D12_ROOT_PARAMETER param{};
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.DescriptorTable.NumDescriptorRanges = 1;
-        param.DescriptorTable.pDescriptorRanges = &range;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        D3D12_DESCRIPTOR_RANGE samplerRange{};
+        samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+        samplerRange.NumDescriptors = 1;
 
-        // 샘플러는 정적으로 루트에 박는다 — 샘플러 힙 없이 완료 기준(텍스처 블릿)을
-        // 증명할 수 있고, 실전의 샘플러 힙 설계는 PSOManager(3-4) 몫이다.
-        D3D12_STATIC_SAMPLER_DESC sampler{};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        D3D12_ROOT_PARAMETER params[2]{};
+        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[0].DescriptorTable.NumDescriptorRanges = 1;
+        params[0].DescriptorTable.pDescriptorRanges = &srvRange;
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[1].DescriptorTable.NumDescriptorRanges = 1;
+        params[1].DescriptorTable.pDescriptorRanges = &samplerRange;
+        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         D3D12_ROOT_SIGNATURE_DESC desc{};
-        desc.NumParameters = 1;
-        desc.pParameters = &param;
-        desc.NumStaticSamplers = 1;
-        desc.pStaticSamplers = &sampler;
+        desc.NumParameters = 2;
+        desc.pParameters = params;
 
         quadRoot = rootSignatureCache.GetOrCreate(desc, error);
         if (!quadRoot.IsValid())
         {
             outLog += "[2/4] 쿼드 루트 시그니처 생성 실패: " + error + "\n";
+            return false;
+        }
+    }
+
+    // 샘플러는 프레임마다 바뀌지 않으므로 한 번만 만들어 둔다.
+    D3D12_GPU_DESCRIPTOR_HANDLE samplerHandle{};
+    {
+        D3D12_SAMPLER_DESC sampler{};
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+
+        samplerHandle = resources.GetSamplerHeap().GetOrCreate(sampler);
+        if (0 == samplerHandle.ptr)
+        {
+            outLog += "[2/4] 샘플러 생성 실패\n";
             return false;
         }
     }
@@ -342,10 +354,8 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         }
         resources.WaitForGpu();
 
-        resources.GetDevice()->CreateShaderResourceView(texture.Get(), nullptr,
-            srvHeap->GetCPUDescriptorHandleForHeapStart());
     }
-    outLog += "[2/4] 체커보드 텍스처 업로드·SRV 생성 완료\n";
+    outLog += "[2/4] 체커보드 텍스처 업로드 완료\n";
 
     // ── 프레임 루프: 얼로케이터 3개가 frameCount 동안 회전한다 ──
     for (uint32_t frame = 0; frame < frameCount; ++frame)
@@ -378,12 +388,30 @@ bool EnhancedSceneRenderer::RunSelfTest(const std::string& outputPngPath,
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->DrawInstanced(3, 1, 0, 0);
 
-        // 텍스처 쿼드 — 디스크립터 힙 바인딩은 루트 테이블 설정보다 먼저(검증 레이어 규칙).
-        ID3D12DescriptorHeap* heaps[] = { srvHeap.Get() };
-        commandList->SetDescriptorHeaps(1, heaps);
+        // 텍스처 쿼드 — SRV를 이번 프레임 디스크립터 링에서 잘라 쓴다.
+        //
+        // 프레임마다 새로 자르고 뷰를 다시 만드는 것이 요점이다. 실제 씬에서는
+        // 프레임마다 보이는 텍스처 집합이 달라지므로 고정 힙으로는 감당이 안 된다.
+        // (뷰 생성 대신 CPU 전용 힙에서 CopyDescriptorsSimple로 가져오는 최적화가
+        //  있지만, 그건 뷰가 재사용될 때의 얘기라 이식 뒤에 판단한다.)
+        const auto srvSlot = resources.GetDescriptorRing().Allocate(1);
+        if (!srvSlot.IsValid())
+        {
+            outLog += "[3/4] 디스크립터 링 할당 실패(구간 부족)\n";
+            return false;
+        }
+        resources.GetDevice()->CreateShaderResourceView(texture.Get(), nullptr, srvSlot.cpu);
+
+        // 힙 바인딩은 루트 테이블 설정보다 먼저(검증 레이어 규칙).
+        // CBV/SRV/UAV 힙과 샘플러 힙은 종류가 달라 동시에 하나씩 바인딩된다.
+        ID3D12DescriptorHeap* heaps[] = {
+            resources.GetDescriptorRing().GetHeap(),
+            resources.GetSamplerHeap().GetHeap() };
+        commandList->SetDescriptorHeaps(2, heaps);
         commandList->SetGraphicsRootSignature(quadRoot.signature);
         commandList->SetPipelineState(quadPso);
-        commandList->SetGraphicsRootDescriptorTable(0, srvHeap->GetGPUDescriptorHandleForHeapStart());
+        commandList->SetGraphicsRootDescriptorTable(0, srvSlot.gpu);
+        commandList->SetGraphicsRootDescriptorTable(1, samplerHandle);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         commandList->DrawInstanced(4, 1, 0, 0);
 
@@ -1126,6 +1154,186 @@ bool EnhancedSceneRenderer::RunUploadRingTest(std::string& outLog)
     resources.Shutdown();
 
     outLog += passed ? "업로드 링 검증 통과\n" : "업로드 링 검증 실패\n";
+    return passed;
+}
+
+bool EnhancedSceneRenderer::RunDescriptorHeapTest(std::string& outLog)
+{
+    DX12DeviceResources resources;
+    std::string error;
+
+    if (!resources.Initialize(64, 64, error))
+    {
+        outLog += "[1/5] 디바이스 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    DX12DescriptorRing& ring = resources.GetDescriptorRing();
+    const uint32_t perFrame = ring.GetDescriptorsPerFrame();
+    const uint32_t frameCount = ring.GetFrameCount();
+    bool passed = true;
+
+    // ── [1/5] 핸들 연속성 ──
+    //
+    // 디스크립터 테이블은 연속이어야 한다. 구간 안의 i번째 핸들이 increment 크기
+    // 간격으로 정확히 떨어지지 않으면, 테이블 두 번째 원소부터 엉뚱한 리소스를
+    // 가리키게 된다 — 화면에는 '텍스처 하나만 틀리게' 나와서 원인을 찾기 어렵다.
+    {
+        if (!resources.BeginFrame(error)) { outLog += "[1/5] Begin 실패\n"; return false; }
+
+        const auto range = ring.Allocate(4);
+        uint32_t broken = 0;
+        if (!range.IsValid() || 4 != range.count || 0 == range.incrementSize)
+        {
+            ++broken;
+        }
+        else
+        {
+            for (uint32_t i = 0; i < range.count; ++i)
+            {
+                const auto handle = range.CpuAt(i);
+                if (handle.ptr != range.cpu.ptr + static_cast<SIZE_T>(i) * range.incrementSize)
+                {
+                    ++broken;
+                }
+            }
+
+            // 다음 할당은 앞 구간 바로 뒤에 붙어야 한다(겹치지도, 비지도 않게).
+            const auto next = ring.Allocate(1);
+            if (!next.IsValid() ||
+                next.cpu.ptr != range.cpu.ptr + static_cast<SIZE_T>(4) * range.incrementSize ||
+                next.gpu.ptr != range.gpu.ptr + static_cast<UINT64>(4) * range.incrementSize)
+            {
+                ++broken;
+            }
+        }
+
+        if (!resources.EndFrame(error)) { outLog += "[1/5] End 실패\n"; return false; }
+
+        if (0 != broken) { passed = false; }
+        outLog += "[1/5] 핸들 연속성 " + std::string(0 == broken ? "통과" : "실패")
+            + " (어긋남 " + std::to_string(broken) + "건)\n";
+    }
+
+    // ── [2/5] 프레임 구간 분리 ──
+    {
+        uint32_t outOfRange = 0;
+        for (uint32_t frame = 0; frame < frameCount; ++frame)
+        {
+            if (!resources.BeginFrame(error)) { outLog += "[2/5] Begin 실패\n"; return false; }
+
+            const auto allocation = ring.Allocate(8);
+            if (!allocation.IsValid()) { ++outOfRange; }
+            else
+            {
+                // 기준 힙에서 몇 번째 디스크립터인지 역산해 구간 안인지 본다.
+                const SIZE_T base = ring.GetHeap()->GetCPUDescriptorHandleForHeapStart().ptr;
+                const uint32_t index = static_cast<uint32_t>(
+                    (allocation.cpu.ptr - base) / allocation.incrementSize);
+                const uint32_t segment = index / perFrame;
+                const uint32_t within = index % perFrame;
+                if (segment >= frameCount || within + allocation.count > perFrame)
+                {
+                    ++outOfRange;
+                }
+            }
+
+            if (!resources.EndFrame(error)) { outLog += "[2/5] End 실패\n"; return false; }
+        }
+
+        if (0 != outOfRange) { passed = false; }
+        outLog += "[2/5] 프레임 구간 분리 " + std::string(0 == outOfRange ? "통과" : "실패")
+            + " (범위 이탈 " + std::to_string(outOfRange) + "건)\n";
+    }
+
+    // ── [3/5] 되감기 ──
+    {
+        uint32_t firstUsed = 0;
+        uint32_t lastUsed = 0;
+        for (uint32_t frame = 0; frame < frameCount * 2; ++frame)
+        {
+            if (!resources.BeginFrame(error)) { outLog += "[3/5] Begin 실패\n"; return false; }
+            ring.Allocate(16);
+            lastUsed = ring.GetFrameUsed();
+            if (0 == frame) firstUsed = lastUsed;
+            if (!resources.EndFrame(error)) { outLog += "[3/5] End 실패\n"; return false; }
+        }
+
+        const bool rewound = (firstUsed == lastUsed) && (0 != firstUsed);
+        if (!rewound) { passed = false; }
+        outLog += "[3/5] 되감기 " + std::string(rewound ? "통과" : "실패")
+            + " (첫 프레임 " + std::to_string(firstUsed)
+            + "개 · " + std::to_string(frameCount * 2) + "번째 " + std::to_string(lastUsed) + "개)\n";
+    }
+
+    // ── [4/5] 넘침 거절 ──
+    {
+        if (!resources.BeginFrame(error)) { outLog += "[4/5] Begin 실패\n"; return false; }
+
+        const uint64_t before = ring.GetStats().overflows;
+        const auto tooMany = ring.Allocate(perFrame + 1);
+        const uint64_t after = ring.GetStats().overflows;
+        const auto normal = ring.Allocate(1);
+
+        if (!resources.EndFrame(error)) { outLog += "[4/5] End 실패\n"; return false; }
+
+        const bool rejected = !tooMany.IsValid() && (after == before + 1) && normal.IsValid();
+        if (!rejected) { passed = false; }
+        outLog += "[4/5] 넘침 거절 " + std::string(rejected ? "통과" : "실패") + "\n";
+    }
+
+    // ── [5/5] 샘플러 중복 제거 ──
+    //
+    // 샘플러 힙은 상한이 2048로 작다. 같은 설정을 머티리얼마다 새로 만들면
+    // 큰 씬에서 상한에 먼저 부딪히고, 그때 증상은 '어느 순간부터 샘플러가
+    // 안 만들어진다'라 원인이 멀다.
+    {
+        DX12SamplerHeap& samplers = resources.GetSamplerHeap();
+
+        D3D12_SAMPLER_DESC linear{};
+        linear.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        linear.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        linear.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        linear.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        linear.MaxLOD = D3D12_FLOAT32_MAX;
+
+        D3D12_SAMPLER_DESC point = linear;
+        point.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+
+        const auto a = samplers.GetOrCreate(linear);
+        const auto again = samplers.GetOrCreate(linear);   // 같은 설정 → 같은 핸들
+        const auto b = samplers.GetOrCreate(point);        // 다른 설정 → 다른 핸들
+
+        const bool deduped = (0 != a.ptr) && (a.ptr == again.ptr);
+        const bool separated = (0 != b.ptr) && (b.ptr != a.ptr);
+
+        if (!deduped || !separated) { passed = false; }
+
+        const auto samplerStats = samplers.GetStats();
+        outLog += "[5/5] 샘플러 중복 제거 "
+            + std::string((deduped && separated) ? "통과" : "실패")
+            + " (생성 " + std::to_string(samplerStats.creates)
+            + " · 히트 " + std::to_string(samplerStats.hits)
+            + " · 보관 " + std::to_string(samplers.GetCachedCount()) + ")\n";
+    }
+
+    std::string messages;
+    const uint32_t problems = resources.DrainDebugMessages(messages);
+    if (0 != problems)
+    {
+        passed = false;
+        outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + messages;
+    }
+
+    const auto ringStats = ring.GetStats();
+    outLog += "링 통계: 할당 " + std::to_string(ringStats.allocations)
+        + "건 · 디스크립터 " + std::to_string(ringStats.descriptors)
+        + "개 · 최대 프레임 사용 " + std::to_string(ringStats.peakFrameDescriptors)
+        + " / 구간 " + std::to_string(perFrame) + "\n";
+
+    resources.Shutdown();
+
+    outLog += passed ? "디스크립터 힙 검증 통과\n" : "디스크립터 힙 검증 실패\n";
     return passed;
 }
 

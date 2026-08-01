@@ -8,6 +8,7 @@
 #include <dxgi1_6.h>
 
 #include "DX12UploadRing.h"
+#include "DX12DescriptorHeaps.h"
 
 // DX12 디바이스 기반(PHASE 3-3, EnhancedSceneRenderer의 토대).
 //
@@ -68,6 +69,15 @@ public:
     DX12UploadRing& GetUploadRing() { return m_uploadRing; }
     const DX12UploadRing& GetUploadRing() const { return m_uploadRing; }
 
+    // 프레임 디스크립터 링. 업로드 링과 같은 이유로 여기 묶는다 — 되감기 시점이
+    // 펜스 대기 뒤여야 한다는 계약이 호출부 규율이 되면 언젠가 어긋난다.
+    DX12DescriptorRing& GetDescriptorRing() { return m_descriptorRing; }
+    const DX12DescriptorRing& GetDescriptorRing() const { return m_descriptorRing; }
+
+    // 샘플러 힙은 프레임과 무관하다(설정이 바뀌지 않는다) — 되감지 않는다.
+    DX12SamplerHeap& GetSamplerHeap() { return m_samplerHeap; }
+    const DX12SamplerHeap& GetSamplerHeap() const { return m_samplerHeap; }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -89,6 +99,8 @@ private:
     ComPtr<ID3D12Resource>             m_readback;
 
     DX12UploadRing                     m_uploadRing;
+    DX12DescriptorRing                 m_descriptorRing;
+    DX12SamplerHeap                    m_samplerHeap;
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

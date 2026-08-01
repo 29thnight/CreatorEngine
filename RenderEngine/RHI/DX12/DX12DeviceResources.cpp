@@ -151,6 +151,21 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
 
+    // 디스크립터 링·샘플러 힙. 크기는 브링업 잠정치이고, 실제 씬을 이식하면
+    // peakFrameDescriptors가 필요한 값을 알려 준다(추정하지 말고 재서 정한다).
+    constexpr uint32_t kDescriptorsPerFrame = 4096;
+    if (!m_descriptorRing.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        kDescriptorsPerFrame, kFrameCount, outError))
+    {
+        return false;
+    }
+
+    constexpr uint32_t kSamplerCapacity = 128;
+    if (!m_samplerHeap.Initialize(m_device.Get(), kSamplerCapacity, outError))
+    {
+        return false;
+    }
+
     return true;
 }
 
@@ -163,6 +178,8 @@ void DX12DeviceResources::Shutdown()
 
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadRing.Shutdown();
+    m_descriptorRing.Shutdown();
+    m_samplerHeap.Shutdown();
 
     if (m_fenceEvent)
     {
@@ -194,6 +211,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     // 업로드 링 되감기는 반드시 위 펜스 대기 뒤여야 한다. GPU가 이 슬롯의
     // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
     m_uploadRing.BeginFrame(m_frameIndex);
+    m_descriptorRing.BeginFrame(m_frameIndex);
 
     return true;
 }

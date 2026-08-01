@@ -40,6 +40,15 @@ public:
     ///   ④ 구간을 넘기면 조용히 침범하지 않고 거절하는가
     ///   ⑤ 링을 거친 데이터가 실제로 GPU 텍스처에 도달하는가(리드백 대조)
     bool RunUploadRingTest(std::string& outLog);
+
+    /// 디스크립터 링·샘플러 힙 자가 검증(PHASE 3-4).
+    ///
+    /// 링 계약은 업로드 링과 같은 부류라 같은 것을 단정한다(핸들 연속·구간 분리·
+    /// 되감기·넘침 거절). 샘플러는 성격이 달라 중복 제거를 본다.
+    ///
+    /// GPU 도달은 여기서 따로 재지 않는다 — RunSelfTest의 픽셀 검증이 이미 링에서
+    /// 자른 SRV와 샘플러 힙을 거쳐 체커보드 색을 대조하므로, 그것이 곧 종단 증명이다.
+    bool RunDescriptorHeapTest(std::string& outLog);
 };
 
 #endif
