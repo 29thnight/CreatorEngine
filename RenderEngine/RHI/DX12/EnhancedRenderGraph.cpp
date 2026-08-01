@@ -540,6 +540,16 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
     }
     else
     {
+        // ★ 여기가 지금 병렬화가 손해인 이유다.
+        //
+        // 매번 std::thread를 만들고 조인한다. 실측(FT_Material, 패스 6·드로우 11):
+        //   순차 1.3761 ms · 병렬(워커 4) 2.3419 ms — 0.59배, 즉 1.7배 느리다.
+        // 기록 자체가 가벼운 씬에서는 스레드 생성 비용이 기록 비용을 넘는다.
+        //
+        // 고칠 방향은 지속 스레드 풀이다(엔진에 이미 ThreadPool이 있다).
+        // 지금 그것을 붙이지 않은 이유는, 먼저 '병렬이 순차와 같은 그림을
+        // 내는가'를 확정하고 싶었기 때문이다 — 정확성이 안 잡힌 상태에서
+        // 성능을 손보면 무엇이 무엇을 고쳤는지 구분되지 않는다.
         std::vector<std::thread> threads;
         threads.reserve(workers - 1);
         for (uint32_t worker = 1; worker < workers; ++worker)

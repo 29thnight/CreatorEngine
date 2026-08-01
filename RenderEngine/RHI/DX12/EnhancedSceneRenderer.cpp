@@ -2402,6 +2402,19 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     std::vector<DX12GpuProfiler::PassTiming> timings;
     EnhancedRenderGraph::Stats lastGraphStats{};
 
+    // 실제 씬 패스를 병렬 경로에 태우기 위한 것. 람다가 참조로 잡는다.
+    DX12CommandListPool commandPool;
+    if (!commandPool.Initialize(resources.GetDevice(), 4,
+        DX12DeviceResources::kFrameCount, error))
+    {
+        outLog += "[2/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    bool     useParallelRecording = false;
+    uint32_t parallelWorkers = 1;
+    double   lastRecordMilliseconds = 0.0;
+
     // 렌더마다 바꿔 가며 넣는 그림자 설정. 람다가 참조로 잡는다.
     constexpr float kTestShadowBias = 0.0015f;
 
@@ -2420,6 +2433,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         frameContext.camera = &camera;
 
         if (!resources.BeginFrame(outStepError)) return false;
+        commandPool.BeginFrame(0);
         profiler.BeginFrame(0);
 
         // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
@@ -2529,7 +2543,33 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         // 걷어냈다면 화면이 비고, 원인이 컬링이라는 것을 알아채기 어렵다.
         outGraphStats = graph.GetStats();
 
-        if (!graph.Execute(resources.GetCommandList(), outStepError)) return false;
+        // ── 기록 시간 측정 ──
+        //
+        // 병렬화가 줄이는 것은 CPU 기록 시간이다. GPU 시간은 같은 커맨드를
+        // 같은 순서로 실행하므로 줄지 않는다 — 그쪽을 근거로 삼으면 '병렬화가
+        // 효과 없다'는 잘못된 결론이 나온다.
+        const auto recordBegin = std::chrono::steady_clock::now();
+
+        if (useParallelRecording)
+        {
+            // 업로드(PrepareFrame)가 워커 리스트보다 먼저 실행되어야 한다.
+            if (!resources.FlushCommandList(outStepError)) return false;
+
+            if (!graph.ExecuteParallel(commandPool, resources.GetCommandQueue(),
+                parallelWorkers, outStepError))
+            {
+                return false;
+            }
+            outGraphStats = graph.GetStats();
+        }
+        else
+        {
+            if (!graph.Execute(resources.GetCommandList(), outStepError)) return false;
+        }
+
+        lastRecordMilliseconds = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - recordBegin).count();
+
         profiler.ResolveFrame(resources.GetCommandList());
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
@@ -2949,6 +2989,90 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         outLog += line;
     }
 
+    // ── 실제 씬 패스를 병렬 경로에 태운다 ──
+    //
+    // 여기까지의 병렬 검증은 클리어만 하는 인공 패스였다. 실제 패스는 업로드
+    // 링·디스크립터 링·PSO를 모두 쓰므로, 그 조합에서도 결과가 같은지는 따로
+    // 봐야 한다.
+    //
+    // 재는 것은 CPU 기록 시간이다. 병렬화가 줄이는 것이 그것이고, GPU 시간은
+    // 같은 커맨드를 같은 순서로 실행하므로 줄지 않는다.
+    double sequentialRecordMs = 0.0;
+    double parallelRecordMs = 0.0;
+    double parallelLuminance = 0.0;
+    uint32_t parallelCovered = 0;
+    uint32_t parallelWorkersUsed = 0;
+
+    if (0 != drawCountA)
+    {
+        constexpr uint32_t kMeasureRuns = 20;
+
+        uint32_t coveredTemp = 0;
+        uint32_t drawTemp = 0;
+        double luminanceTemp = 0.0;
+        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+        EnhancedRenderGraph::Stats statsTemp{};
+
+        // 한 번은 버린다. 첫 실행에는 PSO 조회·힙 준비 같은 일회성 비용이 섞인다.
+        useParallelRecording = false;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceTemp))
+        {
+            outLog += "[4/4] 순차 기록 예열 실패: " + error + "\n";
+            return false;
+        }
+
+        double sequentialTotal = 0.0;
+        for (uint32_t run = 0; run < kMeasureRuns; ++run)
+        {
+            if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+                timingsTemp, statsTemp, luminanceTemp))
+            {
+                outLog += "[4/4] 순차 기록 실패: " + error + "\n";
+                return false;
+            }
+            sequentialTotal += lastRecordMilliseconds;
+        }
+        sequentialRecordMs = sequentialTotal / kMeasureRuns;
+
+        useParallelRecording = true;
+        parallelWorkers = 4;
+        if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceTemp))
+        {
+            outLog += "[4/4] 병렬 기록 예열 실패: " + error + "\n";
+            return false;
+        }
+
+        double parallelTotal = 0.0;
+        for (uint32_t run = 0; run < kMeasureRuns; ++run)
+        {
+            if (!renderAndCount(cameraSnapshot, parallelCovered, drawTemp, error,
+                timingsTemp, statsTemp, parallelLuminance))
+            {
+                outLog += "[4/4] 병렬 기록 실패: " + error + "\n";
+                return false;
+            }
+            parallelTotal += lastRecordMilliseconds;
+        }
+        parallelRecordMs = parallelTotal / kMeasureRuns;
+        parallelWorkersUsed = statsTemp.recordWorkers;
+
+        useParallelRecording = false;
+        parallelWorkers = 1;
+    }
+
+    {
+        char line[288]{};
+        std::snprintf(line, sizeof(line),
+            "      병렬 기록 — 순차 %.4f ms · 병렬 %.4f ms(워커 %u) · %.2f배"
+            " · 커버리지 %u vs %u · 밝기 %.5f vs %.5f\n",
+            sequentialRecordMs, parallelRecordMs, parallelWorkersUsed,
+            (parallelRecordMs > 0.0) ? (sequentialRecordMs / parallelRecordMs) : 0.0,
+            coveredA, parallelCovered, luminanceLit, parallelLuminance);
+        outLog += line;
+    }
+
     char shadowLine[320]{};
     std::snprintf(shadowLine, sizeof(shadowLine),
         "      그림자 — 방향광 %s · 캐스터 %u(컬링 %u) · 분할 %.1f/%.1f/%.1f"
@@ -2967,6 +3091,27 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         passed = false;
         verdict = "광원을 " + std::to_string(lights.size())
             + "개 넘겼는데 밝기가 광원 0개일 때와 같다 — 광원이 셰이더에 닿지 않는다";
+    }
+    // 병렬 경로가 순차와 같은 그림을 내는가.
+    //
+    // 실제 패스는 업로드 링·디스크립터 링·PSO를 다 쓴다. 인공 패스로 확인한
+    // 동일성이 여기서도 성립하는지는 따로 봐야 한다 — 링에서 잘라 간 구간이
+    // 어긋나면 커버리지가 아니라 밝기 쪽에서 먼저 드러난다.
+    else if (0 != drawCountA && coveredA != parallelCovered)
+    {
+        passed = false;
+        verdict = "병렬 기록의 커버리지가 순차와 다르다("
+            + std::to_string(coveredA) + " vs " + std::to_string(parallelCovered) + ")";
+    }
+    else if (0 != drawCountA && std::fabs(luminanceLit - parallelLuminance) > 1e-4)
+    {
+        passed = false;
+        verdict = "병렬 기록의 밝기가 순차와 다르다 — 링에서 잘라 간 구간이 어긋났을 수 있다";
+    }
+    else if (0 != drawCountA && parallelWorkersUsed <= 1)
+    {
+        passed = false;
+        verdict = "병렬로 요청했는데 워커가 하나다 — 비교가 성립하지 않는다";
     }
     // 드로우별 재질 키잉. 같은 메시에 재질 둘을 넣었으므로 키가 둘이어야 한다.
     else if (!draws.empty() && 2 != keyedMaterialCount)
@@ -3104,6 +3249,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     meshCache.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();
+    commandPool.Shutdown();
     resources.Shutdown();
 
     outLog += passed ? "씬 연결 검증 통과\n" : "씬 연결 검증 실패\n";
