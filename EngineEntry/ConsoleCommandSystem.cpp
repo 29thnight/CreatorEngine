@@ -54,6 +54,135 @@ namespace
         return parts;
     }
 
+    // "1,2,3" 또는 "1 2 3"을 성분으로 쪼갠다. 두 형태를 다 받는 이유는
+    // 벡터를 한 토큰으로 쓰는 편이 스크립트에서 읽기 쉽지만, 손으로 칠 때는
+    // 공백이 더 자연스러워서다.
+    std::vector<float> ParseNumbers(const std::string& raw)
+    {
+        std::vector<float> numbers;
+        std::string buffer = raw;
+        for (char& c : buffer) { if (',' == c) c = ' '; }
+
+        std::istringstream iss(buffer);
+        float value = 0.f;
+        while (iss >> value) numbers.push_back(value);
+        return numbers;
+    }
+
+    float NumberAt(const std::vector<float>& numbers, size_t index, float fallback)
+    {
+        return (index < numbers.size()) ? numbers[index] : fallback;
+    }
+
+    // 리플렉션으로 프로퍼티 하나를 설정한다.
+    //
+    // 인스펙터(ReflectionImGuiHelper)가 하는 일과 같은 목록을 훑는다. 컴포넌트마다
+    // 전용 CLI를 만들지 않는 이유가 그것이다 — 종류가 늘 때마다 두 곳을 고치게 된다.
+    //
+    // 부모 타입까지 올라간다. 컴포넌트 프로퍼티는 상속 계층에 흩어져 있고
+    // (m_isEnabled는 Component에, m_lightType은 LightComponent에) 인스펙터도
+    // 재귀로 훑는다.
+    bool ApplyReflectedProperty(void* instance, const Meta::Type* type,
+        const std::string& field, const std::string& raw)
+    {
+        if (nullptr == type) return false;
+
+        for (const auto& prop : type->properties)
+        {
+            if (nullptr == prop.name || field != prop.name) continue;
+            if (!prop.setter) return false;
+
+            const HashedGuid hash = prop.typeID;
+            const auto numbers = ParseNumbers(raw);
+
+            if (hash == GUIDCreator::GetTypeID<float>())
+            {
+                prop.setter(instance, NumberAt(numbers, 0, 0.f));
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<int>())
+            {
+                prop.setter(instance, static_cast<int>(NumberAt(numbers, 0, 0.f)));
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<unsigned int>() || prop.typeName == "UINT")
+            {
+                prop.setter(instance, static_cast<unsigned int>(NumberAt(numbers, 0, 0.f)));
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<bool>() || prop.typeName == "bool32")
+            {
+                prop.setter(instance, raw == "true" || raw == "1");
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<std::string>())
+            {
+                prop.setter(instance, raw);
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<Mathf::Vector2>())
+            {
+                prop.setter(instance, Mathf::Vector2{
+                    NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f) });
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<Mathf::Vector3>())
+            {
+                prop.setter(instance, Mathf::Vector3{
+                    NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f),
+                    NumberAt(numbers, 2, 0.f) });
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>())
+            {
+                prop.setter(instance, Mathf::Vector4{
+                    NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f),
+                    NumberAt(numbers, 2, 0.f), NumberAt(numbers, 3, 1.f) });
+                return true;
+            }
+            if (hash == GUIDCreator::GetTypeID<Mathf::Color4>())
+            {
+                prop.setter(instance, Mathf::Color4{
+                    NumberAt(numbers, 0, 1.f), NumberAt(numbers, 1, 1.f),
+                    NumberAt(numbers, 2, 1.f), NumberAt(numbers, 3, 1.f) });
+                return true;
+            }
+
+            // 열거형은 이름으로도 숫자로도 받는다. 이름 쪽이 스크립트를 읽을 때
+            // 무슨 뜻인지 바로 보인다(Directional vs 0).
+            if (const Meta::EnumType* enumType = Meta::MetaEnumRegistry->Find(prop.typeName))
+            {
+                for (const auto& entry : enumType->values)
+                {
+                    if (nullptr != entry.name && raw == entry.name)
+                    {
+                        prop.setter(instance, entry.value);
+                        return true;
+                    }
+                }
+
+                if (!numbers.empty())
+                {
+                    prop.setter(instance, static_cast<int>(numbers[0]));
+                    return true;
+                }
+            }
+
+            std::printf("[CLI] 지원하지 않는 프로퍼티 타입: %s (%s)\n",
+                prop.name, prop.typeName.c_str());
+            return false;
+        }
+
+        return ApplyReflectedProperty(instance, type->parent, field, raw);
+    }
+
+    bool ApplyReflectedProperty(Component* component, const std::string& field,
+        const std::string& raw)
+    {
+        if (nullptr == component) return false;
+        return ApplyReflectedProperty(component, Meta::Find(component->ToString()), field, raw);
+    }
+
     // 콘솔을 확보한다(GUI 앱이라 기본적으로 없다).
     //
     // 터미널에서 실행한 경우에는 그 터미널에 그대로 붙는다. Windows Terminal에서
@@ -293,6 +422,246 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             SceneManagers->ActivateScene(scene, true);
         }
         std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
+    }
+    else if (cmd == "scene.new")
+    {
+        // 빈 씬에서 시작한다. 기능별 테스트 씬은 '무엇이 들어 있는지'를 전부
+        // 알아야 결과를 판정할 수 있는데, 열려 있던 씬 위에 쌓으면 그게 깨진다.
+        const std::string name = (parts.size() > 1)
+            ? TrimLine(line.substr(cmd.size())) : std::string("FeatureTest");
+
+        // SceneManager::CreateScene을 쓰지 않는다. 그쪽은 옛 씬을 그 자리에서
+        // 해체하고 새 씬을 활성으로 바꾸는데, 그 '그 자리'가 프레임 중간이라
+        // 커맨드를 만들고 있던 렌더 워커의 발밑에서 자료구조가 사라진다.
+        // 실측으로 ShadowMapPass::CreateCommandListCascadeShadow →
+        // DX11CommandContext::UpdateBuffer에서 죽었다.
+        //
+        // scene.switch가 쓰는 경로를 그대로 쓴다: 씬만 만들어 두고 교체는
+        // ActivateScene에 맡긴다 — 그쪽은 BeforeAwakeSceneLoad(프레임의 안전
+        // 지점)까지 미룬다.
+        Scene* scene = Scene::CreateNewScene(name);
+        if (!scene)
+        {
+            Debug->LogError("[CLI] 씬 생성 실패: " + name);
+            std::printf("[CLI] 씬 생성 실패: %s\n", name.c_str());
+            return;
+        }
+
+        SceneManagers->ActivateScene(scene, true);
+
+        Debug->LogWarning("[CLI] 새 씬: " + name);
+        std::printf("[CLI] 새 씬: %s\n", name.c_str());
+    }
+    else if (cmd == "scene.save")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: scene.save <저장 경로>\n");
+            return;
+        }
+
+        // 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
+        const std::string path = TrimLine(line.substr(cmd.size()));
+
+        if (!SceneManagers->GetActiveScene())
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return;
+        }
+
+        // 상위 디렉터리를 만들어 준다. 없으면 ofstream이 조용히 실패하고
+        // '저장했다'는 메시지만 남는다.
+        std::error_code directoryError{};
+        file::create_directories(file::path(path).parent_path(), directoryError);
+
+        SceneManagers->SaveScene(path);
+
+        // 실제로 파일이 생겼는지 확인한다 — SaveScene은 실패를 돌려주지 않는다.
+        if (!file::exists(path))
+        {
+            Debug->LogError("[CLI] 씬 저장 실패: " + path);
+            std::printf("[CLI] 씬 저장 실패: %s\n", path.c_str());
+            return;
+        }
+
+        const auto bytes = file::file_size(path);
+        Debug->LogWarning("[CLI] 씬 저장: " + path);
+        std::printf("[CLI] 씬 저장: %s (%llu 바이트)\n", path.c_str(),
+            static_cast<unsigned long long>(bytes));
+    }
+    else if (cmd == "object.create")
+    {
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: object.create <이름> [Empty|Light|Camera|Mesh]\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        GameObjectType type = GameObjectType::Empty;
+        std::string name = parts[1];
+        if (parts.size() > 2)
+        {
+            const std::string& typeName = parts[2];
+            if (typeName == "Light")       type = GameObjectType::Light;
+            else if (typeName == "Camera") type = GameObjectType::Camera;
+            else if (typeName == "Mesh")   type = GameObjectType::Mesh;
+            else if (typeName != "Empty")
+            {
+                std::printf("[CLI] 알 수 없는 오브젝트 타입: %s\n", typeName.c_str());
+                return;
+            }
+        }
+
+        auto object = scene->CreateGameObject(name, type);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트 생성 실패: %s\n", name.c_str());
+            return;
+        }
+
+        Debug->LogWarning("[CLI] 오브젝트 생성: " + name);
+        std::printf("[CLI] 오브젝트 생성: %s\n", name.c_str());
+    }
+    else if (cmd == "object.rename")
+    {
+        // 같은 모델을 여러 번 배치하면 이름이 겹쳐 이후 명령이 첫 번째만 잡는다.
+        // 하나 놓고 바로 이름을 바꾸면 그 문제가 없다.
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: object.rename <이전 이름> <새 이름>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        // 이전 이름에 공백이 흔하다. 같은 모델을 두 번 놓으면 엔진이
+        // "Prim_Cube (1)"처럼 번호를 붙이기 때문이다. 그래서 새 이름을 마지막
+        // 토큰으로 보고 그 앞 전체를 이전 이름으로 본다(prefab.create와 같은 규칙).
+        const std::string newName = parts.back();
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        const std::string oldName = TrimLine(rest.substr(0, rest.rfind(newName)));
+
+        auto object = scene->GetGameObject(oldName);
+        if (!object)
+        {
+            Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + oldName);
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", oldName.c_str());
+            return;
+        }
+
+        object->m_name = newName;
+        Debug->LogWarning("[CLI] 이름 변경: " + oldName + " -> " + newName);
+        std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
+    }
+    else if (cmd == "object.transform")
+    {
+        // object.transform <이름> <px> <py> <pz> [rx ry rz] [sx sy sz]
+        // 회전은 오일러 각(도)이다. 라디안을 쓰면 스크립트를 읽을 때 값이
+        // 무슨 뜻인지 바로 안 보인다.
+        if (parts.size() < 5)
+        {
+            std::printf("[CLI] 사용법: object.transform <이름> <px> <py> <pz>"
+                " [rx ry rz] [sx sy sz]\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        auto object = scene->GetGameObject(parts[1]);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
+            return;
+        }
+
+        const auto number = [&](size_t index, float fallback) -> float
+        {
+            return (parts.size() > index)
+                ? static_cast<float>(std::atof(parts[index].c_str())) : fallback;
+        };
+
+        const Mathf::Vector3 position{ number(2, 0.f), number(3, 0.f), number(4, 0.f) };
+        const Mathf::Vector3 euler{ number(5, 0.f), number(6, 0.f), number(7, 0.f) };
+        const Mathf::Vector3 scale{ number(8, 1.f), number(9, 1.f), number(10, 1.f) };
+
+        object->m_transform.SetPosition(position);
+        object->m_transform.SetRotation(Mathf::Quaternion::CreateFromYawPitchRoll(
+            XMConvertToRadians(euler.y), XMConvertToRadians(euler.x),
+            XMConvertToRadians(euler.z)));
+        object->m_transform.SetScale(scale);
+        object->m_transform.UpdateWorldMatrix();
+
+        char message[192]{};
+        std::snprintf(message, sizeof(message),
+            "[CLI] 변환 설정: %s pos(%.2f %.2f %.2f) rot(%.1f %.1f %.1f) scale(%.2f %.2f %.2f)",
+            parts[1].c_str(), position.x, position.y, position.z,
+            euler.x, euler.y, euler.z, scale.x, scale.y, scale.z);
+        Debug->LogWarning(message);
+        std::printf("%s\n", message);
+    }
+    else if (cmd == "object.property")
+    {
+        // object.property <오브젝트> <컴포넌트> <필드> <값...>
+        //
+        // 리플렉션으로 설정한다. 컴포넌트마다 전용 명령을 만들면 종류가 늘 때마다
+        // CLI가 같이 늘고, 그건 인스펙터가 이미 하는 일을 두 번 하는 것이다 —
+        // 인스펙터도 같은 프로퍼티 목록을 훑는다.
+        if (parts.size() < 5)
+        {
+            std::printf("[CLI] 사용법: object.property <오브젝트> <컴포넌트> <필드> <값...>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        auto object = scene->GetGameObject(parts[1]);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
+            return;
+        }
+
+        Component* target = nullptr;
+        for (const auto& component : object->m_components)
+        {
+            if (component && component->ToString() == parts[2])
+            {
+                target = component.get();
+                break;
+            }
+        }
+        if (nullptr == target)
+        {
+            Debug->LogError("[CLI] 컴포넌트를 찾을 수 없음: " + parts[1] + "." + parts[2]);
+            std::printf("[CLI] 컴포넌트를 찾을 수 없음: %s\n", parts[2].c_str());
+            return;
+        }
+
+        // 값에 쉼표로 구분한 성분이 들어올 수 있다(벡터·색). 필드 이름 뒤 전체.
+        std::string rest = TrimLine(line.substr(cmd.size()));
+        for (size_t i = 1; i <= 3; ++i) rest = TrimLine(rest.substr(rest.find(parts[i]) + parts[i].size()));
+        const std::string rawValue = rest;
+
+        if (!ApplyReflectedProperty(target, parts[3], rawValue))
+        {
+            // 실패를 로그에도 남긴다. 콘솔 출력은 스크립트 실행에서 리다이렉트되지
+            // 않아 보이지 않고, 그러면 '설정한 줄 알았는데 안 된' 씬이 저장된다.
+            Debug->LogError("[CLI] 프로퍼티 설정 실패: " + parts[2] + "." + parts[3]
+                + " = " + rawValue);
+            std::printf("[CLI] 프로퍼티 설정 실패: %s.%s\n", parts[2].c_str(), parts[3].c_str());
+            return;
+        }
+
+        Debug->LogWarning("[CLI] 프로퍼티 설정: " + parts[1] + "." + parts[2] + "."
+            + parts[3] + " = " + rawValue);
+        std::printf("[CLI] 프로퍼티 설정: %s.%s = %s\n", parts[2].c_str(), parts[3].c_str(),
+            rawValue.c_str());
     }
     else if (cmd == "model.load")
     {
@@ -1688,11 +2057,17 @@ void ConsoleCommandSystem::PrintHelp() const
 {
     std::printf(
         "\n[CLI] 사용 가능한 명령\n"
+        "  scene.new [이름]     빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)\n"
         "  scene.load <경로>    씬을 로드한다(활성 씬은 그대로)\n"
         "  scene.switch <경로>  씬을 로드하고 활성 씬으로 교체한다(언로드 유발)\n"
+        "  scene.save <경로>    활성 씬을 .creator로 저장한다\n"
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
+        "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"
+        "  object.rename <이전> <새>  오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)\n"
+        "  object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]  변환을 지정한다(회전은 도)\n"
+        "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
