@@ -282,8 +282,8 @@ bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const Mathf::Vector3&
 bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     m_drawGeometry.clear();
-    m_lastDrawCount = 0;
-    m_lastCulledCount = 0;
+    m_lastDrawCount.store(0, std::memory_order_relaxed);
+    m_lastCulledCount.store(0, std::memory_order_relaxed);
 
     ComputeCascades(context);
 
@@ -310,6 +310,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         m_drawGeometry.emplace(draw.mesh, geometry);
     }
 
+    // 조각 수를 정하는 근거. 컬링 전 후보라 상한이지만, '몇 조각으로 나눌까'에는
+    // 그것으로 충분하다 — 정확한 수는 그려 봐야 알고, 그때는 이미 늦다.
+    m_lastCasterCandidates = static_cast<uint32_t>(context.draws->size());
+
     return true;
 }
 
@@ -326,8 +330,17 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
     // 방향광이 없으면 그리지 않는다. 다만 리소스는 선언해 두어야 Deferred가
     // 읽을 것이 있다 — 클리어만 된 맵은 '그림자 없음'과 같은 뜻이다.
-    graph.AddPass(GetName(), { { m_shadowMap, RGResourceState::DepthWrite } },
-        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
+    // 쪼갤 수 있는 패스로 선언한다.
+    //
+    // 병렬 경로의 패스별 GPU 시간을 재 보니 이 패스가 가장 무거웠다
+    // (드로우 704에서 Shadow 0.4864 ms · GBuffer 0.2345 ms). 캐스케이드 셋에
+    // 드로우를 전부 다시 그리기 때문이다.
+    //
+    // 조각 경계는 두 층이다. 캐스케이드가 바깥, 드로우 범위가 안쪽 —
+    // 캐스케이드가 셋뿐이라 그것만으로는 세 조각이 상한이 된다.
+    graph.AddSplitPass(GetName(), { { m_shadowMap, RGResourceState::DepthWrite } },
+        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext,
+            uint32_t slice, uint32_t sliceCount)
         {
             auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
@@ -350,7 +363,21 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             }
 
-            for (uint32_t index = 0; index < kCascadeCount; ++index)
+            // 조각 하나가 (캐스케이드, 드로우 범위) 하나를 맡는다.
+            //
+            // 캐스케이드당 조각 수를 먼저 정하고, 그 안에서 드로우를 나눈다.
+            // sliceCount가 1이면 캐스케이드 전부·드로우 전부가 되어 통째로
+            // 기록하는 것과 같다 — 그것이 분할 콜백의 계약이다.
+            const uint32_t slicesPerCascade = (std::max)(1u, sliceCount / kCascadeCount);
+            const uint32_t cascadeBegin = (sliceCount <= kCascadeCount)
+                ? (kCascadeCount * slice / sliceCount) : (slice / slicesPerCascade);
+            const uint32_t cascadeEnd = (sliceCount <= kCascadeCount)
+                ? (kCascadeCount * (slice + 1) / sliceCount) : (cascadeBegin + 1);
+            const uint32_t drawSlice = (sliceCount <= kCascadeCount)
+                ? 0u : (slice % slicesPerCascade);
+            const uint32_t drawSliceCount = (sliceCount <= kCascadeCount) ? 1u : slicesPerCascade;
+
+            for (uint32_t index = cascadeBegin; index < cascadeEnd && index < kCascadeCount; ++index)
             {
                 D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
                 dsv.ptr += static_cast<SIZE_T>(index) * m_dsvIncrement;
@@ -364,15 +391,29 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                 // 렌더 타깃 없이 깊이만 묶는다.
                 commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
-                commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+
+                // 클리어는 그 캐스케이드의 첫 조각에서만. 뒤 조각이 또 지우면
+                // 앞 조각이 그린 것이 사라진다.
+                if (0 == drawSlice)
+                {
+                    commandList->ClearDepthStencilView(dsv,
+                        D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+                }
 
                 if (!draws) continue;
 
                 const Cascade& cascade = m_cascades[index];
                 const Mathf::xMatrix transposed = XMMatrixTranspose(cascade.lightViewProjection);
 
-                for (const auto& draw : *context.draws)
+                // 자기 몫의 드로우만 본다. 컬링 판정도 그 범위 안에서만 센다.
+                const size_t drawCount = context.draws->size();
+                const size_t drawBegin = drawCount * drawSlice / drawSliceCount;
+                const size_t drawEnd = drawCount * (drawSlice + 1) / drawSliceCount;
+
+                for (size_t drawIndex = drawBegin; drawIndex < drawEnd; ++drawIndex)
                 {
+                    const auto& draw = (*context.draws)[drawIndex];
+
                     const auto found = m_drawGeometry.find(draw.mesh);
                     if (found == m_drawGeometry.end() || !found->second.entry.IsValid()) continue;
 
@@ -388,7 +429,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     if (!CastsInto(cascade, Mathf::Vector3(worldCenter),
                         found->second.boundRadius * scale))
                     {
-                        ++m_lastCulledCount;
+                        m_lastCulledCount.fetch_add(1, std::memory_order_relaxed);
                         continue;
                     }
 
@@ -406,13 +447,37 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     commandList->IASetVertexBuffers(0, 1, &found->second.entry.vertexView);
                     commandList->IASetIndexBuffer(&found->second.entry.indexView);
                     commandList->DrawIndexedInstanced(found->second.entry.indexCount, 1, 0, 0, 0);
-                    ++m_lastDrawCount;
+                    m_lastDrawCount.fetch_add(1, std::memory_order_relaxed);
                 }
             }
         },
+        // 조각 수는 캐스터 수로 정한다. GBuffer와 같은 이유로 무조건 쪼개지
+        // 않는다 — 조각마다 상태를 다시 걸어야 하고, 그 비용이 드로우 몇 개
+        // 그리는 것보다 크면 손해다.
+        ComputeSliceCount(),
         // 그림자 맵을 읽는 것은 Deferred다. 뿌리로 표시하지 않아도 컬링이
         // 살려야 하고, 그것이 3-5 컬링의 또 한 번의 확인이다.
         false);
+}
+
+uint32_t EnhancedShadowPass::ComputeSliceCount() const
+{
+    // 캐스케이드가 셋이므로 최소 단위는 셋이다. 그 위로는 드로우 수를 보고
+    // 캐스케이드마다 몇 조각으로 더 나눌지 정한다.
+    //
+    // 조각당 최소 드로우 수는 GBuffer와 같은 값을 쓴다. 실측으로 정한 경계이고,
+    // 두 패스의 드로우당 기록 비용이 비슷하다(둘 다 상수 하나 올리고 드로우 하나).
+    constexpr uint32_t kMinDrawsPerSlice = 32;
+
+    // 후보 수를 쓴다. 실제 그린 수(m_lastDrawCount)는 Record에서 채워지므로
+    // Declare 시점에는 지난 프레임 값이고, 그것으로 이번 프레임의 조각 수를
+    // 정하면 씬이 바뀔 때 한 프레임씩 늦는다.
+    const uint32_t drawCount = m_lastCasterCandidates;
+
+    if (drawCount <= kMinDrawsPerSlice) return kCascadeCount;
+
+    const uint32_t perCascade = (std::max)(1u, drawCount / kMinDrawsPerSlice);
+    return (std::min)(DX12CommandListPool::kMaxWorkers, kCascadeCount * perCascade);
 }
 
 void EnhancedShadowPass::Shutdown()

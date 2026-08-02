@@ -1,11 +1,13 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
+#include <atomic>
 #include <unordered_map>
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
 #include "DX12MeshCache.h"
+#include "DX12CommandListPool.h"
 
 // 그림자 패스 (PHASE 3-6, 세 번째 패스).
 //
@@ -62,8 +64,8 @@ public:
 
     // 캐스케이드 전체에서 실제로 그린 드로우 수와, 컬링으로 뺀 수.
     // 컬링이 도는지는 뺀 수가 말해 준다 — 0만 나오면 판정이 늘 참인 것이다.
-    uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
-    uint32_t GetLastCulledCount() const { return m_lastCulledCount; }
+    uint32_t GetLastDrawCount() const { return m_lastDrawCount.load(std::memory_order_relaxed); }
+    uint32_t GetLastCulledCount() const { return m_lastCulledCount.load(std::memory_order_relaxed); }
 
     // 기본 편향. 캐스케이드별로는 반지름 비만큼 키워 쓴다.
     void SetBias(float bias) { m_baseBias = bias; }
@@ -94,6 +96,9 @@ private:
     };
 
     bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
+
+    /// 조각 수. 캐스케이드가 최소 단위이고 그 위로는 드로우 수를 본다.
+    uint32_t ComputeSliceCount() const;
     void ComputeCascades(const EnhancedFrameContext& context);
 
     // 이 메시가 해당 캐스케이드에 그림자를 드리울 수 있는가.
@@ -108,8 +113,11 @@ private:
     Mathf::Vector3     m_lightDirection{ 0.f, -1.f, 0.f };
     bool               m_hasDirectionalLight{ false };
     float              m_baseBias{ 0.0015f };
-    uint32_t           m_lastDrawCount{ 0 };
-    uint32_t           m_lastCulledCount{ 0 };
+    // 병렬 기록에서는 여러 워커가 동시에 센다. 단순 증가면 값이 조용히
+    // 작아지고, 그러면 '컬링이 도는가'라는 단정이 우연히 통과한다.
+    uint32_t              m_lastCasterCandidates{ 0 };
+    std::atomic<uint32_t> m_lastDrawCount{ 0 };
+    std::atomic<uint32_t> m_lastCulledCount{ 0 };
 
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     uint32_t                     m_dsvIncrement{ 0 };
