@@ -22,8 +22,16 @@ namespace
 cbuffer ShadowConstants : register(b0)
 {
     float4x4 gLightViewProjection;
-    float4x4 gWorld;
 };
+
+// 드로우마다 바뀌는 것은 월드 행렬 하나뿐이다. GBuffer처럼 재질까지 실을
+// 필요가 없어 인스턴스 구조체가 행렬 하나로 끝난다.
+struct ShadowInstance
+{
+    float4x4 world;
+};
+
+StructuredBuffer<ShadowInstance> gInstances : register(t0);
 
 struct VSIn
 {
@@ -32,8 +40,9 @@ struct VSIn
 
 // 깊이만 쓰므로 픽셀 셰이더가 없다. 위치 외에는 아무것도 보간하지 않는다 —
 // 그림자 패스는 드로우 수가 많아 정점 처리 비용이 그대로 프레임에 얹힌다.
-float4 VSMain(VSIn input) : SV_POSITION
+float4 VSMain(VSIn input, uint instanceId : SV_InstanceID) : SV_POSITION
 {
+    const float4x4 gWorld = gInstances[instanceId].world;
     const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
     return mul(worldPosition, gLightViewProjection);
 }
@@ -60,14 +69,21 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     ComPtr<ID3DBlob> vsBlob;
     if (!CompileShadowShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
 
-    D3D12_ROOT_PARAMETER param{};
-    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    param.Descriptor.ShaderRegister = 0;
-    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    D3D12_ROOT_PARAMETER params[2]{};
+    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[0].Descriptor.ShaderRegister = 0;
+    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    // 인스턴스 배열은 루트 SRV로 넘긴다. 업로드 링에서 자른 조각의 GPU 주소를
+    // 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없다 — 배치마다 바뀌는
+    // 값이라 디스크립터 테이블보다 이쪽이 싸다.
+    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    params[1].Descriptor.ShaderRegister = 0;
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
-    rootDesc.NumParameters = 1;
-    rootDesc.pParameters = &param;
+    rootDesc.NumParameters = _countof(params);
+    rootDesc.pParameters = params;
     rootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
@@ -282,8 +298,10 @@ bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const Mathf::Vector3&
 bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     m_drawGeometry.clear();
+    m_sortedDraws.clear();
     m_lastDrawCount.store(0, std::memory_order_relaxed);
     m_lastCulledCount.store(0, std::memory_order_relaxed);
+    m_lastBatchCount.store(0, std::memory_order_relaxed);
 
     ComputeCascades(context);
 
@@ -310,9 +328,31 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         m_drawGeometry.emplace(draw.mesh, geometry);
     }
 
+    // 메시 기준으로 정렬해 둔다. 같은 메시가 붙어 있어야 Record에서 한 번의
+    // 드로우로 묶인다.
+    //
+    // 그림자는 정렬을 망설일 이유가 없다. GBuffer에서는 '순서를 바꾸면 깊이
+    // 테스트 결과가 달라질까'를 따져야 했지만(따져 보니 불투명·LESS라 무관했다),
+    // 여기는 애초에 깊이만 쓰고 색을 안 쓴다 — 어느 순서로 그리든 최종 깊이는
+    // 가장 가까운 값 하나다.
+    //
+    // 드로우 자체가 아니라 인덱스를 정렬한다. context.draws는 GBuffer도 같이
+    // 보는 것이라 건드리면 안 된다.
+    m_sortedDraws.reserve(context.draws->size());
+    for (size_t index = 0; index < context.draws->size(); ++index)
+    {
+        if (nullptr != (*context.draws)[index].mesh) m_sortedDraws.push_back(index);
+    }
+
+    std::stable_sort(m_sortedDraws.begin(), m_sortedDraws.end(),
+        [&](size_t a, size_t b)
+        {
+            return (*context.draws)[a].mesh < (*context.draws)[b].mesh;
+        });
+
     // 조각 수를 정하는 근거. 컬링 전 후보라 상한이지만, '몇 조각으로 나눌까'에는
     // 그것으로 충분하다 — 정확한 수는 그려 봐야 알고, 그때는 이미 늦다.
-    m_lastCasterCandidates = static_cast<uint32_t>(context.draws->size());
+    m_lastCasterCandidates = static_cast<uint32_t>(m_sortedDraws.size());
 
     return true;
 }
@@ -403,16 +443,79 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 if (!draws) continue;
 
                 const Cascade& cascade = m_cascades[index];
-                const Mathf::xMatrix transposed = XMMatrixTranspose(cascade.lightViewProjection);
+
+                // 광원 행렬은 캐스케이드마다 한 번만 올린다. 예전에는 드로우마다
+                // 월드와 함께 올렸는데, 같은 값을 수백 번 복사하는 것이 CE 단계를
+                // 늘리는 방향이다.
+                ShadowConstants constants{};
+                constants.lightViewProjection = XMMatrixTranspose(cascade.lightViewProjection);
+
+                const auto cbAllocation = context.resources->GetUploadRing().Allocate(
+                    sizeof(ShadowConstants), DX12UploadRing::kConstantBufferAlignment);
+                if (!cbAllocation.IsValid()) continue;
+
+                memcpy(cbAllocation.cpuAddress, &constants, sizeof(constants));
+                commandList->SetGraphicsRootConstantBufferView(0, cbAllocation.gpuAddress);
 
                 // 자기 몫의 드로우만 본다. 컬링 판정도 그 범위 안에서만 센다.
-                const size_t drawCount = context.draws->size();
+                const size_t drawCount = m_sortedDraws.size();
                 const size_t drawBegin = drawCount * drawSlice / drawSliceCount;
                 const size_t drawEnd = drawCount * (drawSlice + 1) / drawSliceCount;
 
-                for (size_t drawIndex = drawBegin; drawIndex < drawEnd; ++drawIndex)
+                // ── 배치를 여기서 만드는 이유 ──
+                //
+                // GBuffer는 배치를 PrepareFrame에서 한 번 만들어 두고 Record는
+                // 읽기만 한다. 그림자는 그럴 수 없다 — 컬링(CastsInto)이
+                // 캐스케이드마다 다른 답을 내므로 어느 인스턴스가 살아남는지가
+                // 캐스케이드마다 다르다. 미리 만든 배치를 그대로 쓰면 컬린 것까지
+                // 그리게 되고, 그러면 컬링이 하는 일이 없어진다.
+                //
+                // 그래서 조각 안에서 모은다. 지역 변수인 것이 중요하다 —
+                // 워커들이 동시에 도는 자리라 멤버에 모으면 서로 덮어쓴다.
+                std::vector<Mathf::Matrix> instances;
+                instances.reserve(drawEnd - drawBegin);
+
+                Mesh* batchMesh = nullptr;
+
+                // 모아 둔 인스턴스를 드로우 하나로 낸다.
+                const auto flushBatch = [&]()
                 {
-                    const auto& draw = (*context.draws)[drawIndex];
+                    if (instances.empty() || nullptr == batchMesh) return;
+
+                    const auto found = m_drawGeometry.find(batchMesh);
+                    if (found != m_drawGeometry.end() && found->second.entry.IsValid())
+                    {
+                        const uint64_t instanceBytes =
+                            sizeof(Mathf::Matrix) * static_cast<uint64_t>(instances.size());
+                        const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
+                            instanceBytes, sizeof(Mathf::Matrix));
+
+                        if (instanceBuffer.IsValid())
+                        {
+                            memcpy(instanceBuffer.cpuAddress, instances.data(),
+                                static_cast<size_t>(instanceBytes));
+                            commandList->SetGraphicsRootShaderResourceView(
+                                1, instanceBuffer.gpuAddress);
+
+                            commandList->IASetVertexBuffers(0, 1, &found->second.entry.vertexView);
+                            commandList->IASetIndexBuffer(&found->second.entry.indexView);
+                            commandList->DrawIndexedInstanced(found->second.entry.indexCount,
+                                static_cast<UINT>(instances.size()), 0, 0, 0);
+
+                            // 드로우 수는 인스턴스 수로 센다. 배치로 세면 병합이
+                            // 늘수록 '캐스터가 줄었다'로 보여 컬링 단정이 흐려진다.
+                            m_lastDrawCount.fetch_add(
+                                static_cast<uint32_t>(instances.size()), std::memory_order_relaxed);
+                            m_lastBatchCount.fetch_add(1, std::memory_order_relaxed);
+                        }
+                    }
+
+                    instances.clear();
+                };
+
+                for (size_t sortedIndex = drawBegin; sortedIndex < drawEnd; ++sortedIndex)
+                {
+                    const auto& draw = (*context.draws)[m_sortedDraws[sortedIndex]];
 
                     const auto found = m_drawGeometry.find(draw.mesh);
                     if (found == m_drawGeometry.end() || !found->second.entry.IsValid()) continue;
@@ -433,22 +536,18 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         continue;
                     }
 
-                    ShadowConstants constants{};
-                    constants.lightViewProjection = transposed;
-                    constants.world = XMMatrixTranspose(draw.worldMatrix);
+                    // 메시가 바뀌면 지금까지 모은 것을 낸다. 정렬해 두었으므로
+                    // 같은 메시는 이미 붙어 있다.
+                    if (draw.mesh != batchMesh)
+                    {
+                        flushBatch();
+                        batchMesh = draw.mesh;
+                    }
 
-                    const auto allocation = context.resources->GetUploadRing().Allocate(
-                        sizeof(ShadowConstants), DX12UploadRing::kConstantBufferAlignment);
-                    if (!allocation.IsValid()) break;
-
-                    memcpy(allocation.cpuAddress, &constants, sizeof(constants));
-                    commandList->SetGraphicsRootConstantBufferView(0, allocation.gpuAddress);
-
-                    commandList->IASetVertexBuffers(0, 1, &found->second.entry.vertexView);
-                    commandList->IASetIndexBuffer(&found->second.entry.indexView);
-                    commandList->DrawIndexedInstanced(found->second.entry.indexCount, 1, 0, 0, 0);
-                    m_lastDrawCount.fetch_add(1, std::memory_order_relaxed);
+                    instances.push_back(XMMatrixTranspose(draw.worldMatrix));
                 }
+
+                flushBatch();
             }
         },
         // 조각 수는 캐스터 수로 정한다. GBuffer와 같은 이유로 무조건 쪼개지
@@ -469,10 +568,18 @@ uint32_t EnhancedShadowPass::ComputeSliceCount() const
     // 두 패스의 드로우당 기록 비용이 비슷하다(둘 다 상수 하나 올리고 드로우 하나).
     constexpr uint32_t kMinDrawsPerSlice = 32;
 
-    // 후보 수를 쓴다. 실제 그린 수(m_lastDrawCount)는 Record에서 채워지므로
-    // Declare 시점에는 지난 프레임 값이고, 그것으로 이번 프레임의 조각 수를
-    // 정하면 씬이 바뀔 때 한 프레임씩 늦는다.
-    const uint32_t drawCount = m_lastCasterCandidates;
+    // ★ 기준은 드로우가 아니라 '캐스케이드당 배치 수'다.
+    //
+    // 인스턴싱을 넣기 전에는 드로우 후보 수를 썼다. 지금 그대로 두면 손해가
+    // 난다 — 드로우 704가 메시 11종이면 배치는 11개인데, 후보 704로 조각을
+    // 계산하면 여덟 조각으로 나뉘고 각 조각이 자기 범위 안에서만 묶으므로
+    // 배치가 도로 잘게 쪼개진다. 분할이 병합을 스스로 깨는 꼴이다.
+    //
+    // 배치 수는 Record에서 나오므로 Declare 시점에는 모른다. 대신 고유 메시
+    // 수를 쓴다 — 정렬해서 같은 메시를 묶으므로 캐스케이드당 배치 수는
+    // 정확히 그 값이 상한이다(컬링이 빼면 그보다 적어진다).
+    const uint32_t drawCount = (std::min)(
+        m_lastCasterCandidates, static_cast<uint32_t>(m_drawGeometry.size()));
 
     if (drawCount <= kMinDrawsPerSlice) return kCascadeCount;
 

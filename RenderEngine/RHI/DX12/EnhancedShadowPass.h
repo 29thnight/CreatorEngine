@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <unordered_map>
+#include <vector>
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
@@ -67,16 +68,21 @@ public:
     uint32_t GetLastDrawCount() const { return m_lastDrawCount.load(std::memory_order_relaxed); }
     uint32_t GetLastCulledCount() const { return m_lastCulledCount.load(std::memory_order_relaxed); }
 
+    // 실제로 낸 드로우 콜 수. 드로우 수와 나란히 봐야 병합이 도는지 알 수 있다 —
+    // GBuffer에서 배치 수를 안 찍었다가 병합이 통째로 죽어 있는 것을 놓칠 뻔했다.
+    uint32_t GetLastBatchCount() const { return m_lastBatchCount.load(std::memory_order_relaxed); }
+
     // 기본 편향. 캐스케이드별로는 반지름 비만큼 키워 쓴다.
     void SetBias(float bias) { m_baseBias = bias; }
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    // 월드 행렬은 여기서 빠졌다 — 인스턴스 버퍼(t0)로 옮겼다. 광원 행렬은
+    // 캐스케이드마다 한 번만 바뀌므로 상수 버퍼에 남는다.
     struct ShadowConstants
     {
         Mathf::Matrix lightViewProjection{};
-        Mathf::Matrix world{};
     };
 
     // 한 캐스케이드가 덮는 범위. 컬링 판정에 중심과 반지름이 필요해서 행렬만
@@ -118,6 +124,10 @@ private:
     uint32_t              m_lastCasterCandidates{ 0 };
     std::atomic<uint32_t> m_lastDrawCount{ 0 };
     std::atomic<uint32_t> m_lastCulledCount{ 0 };
+    std::atomic<uint32_t> m_lastBatchCount{ 0 };
+
+    // 메시 기준으로 정렬한 드로우 인덱스. 원본을 건드리지 않으려고 인덱스만 든다.
+    std::vector<size_t> m_sortedDraws;
 
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     uint32_t                     m_dsvIncrement{ 0 };

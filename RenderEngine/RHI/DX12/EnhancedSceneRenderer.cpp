@@ -2710,6 +2710,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     const bool     baselineHasDirectional = shadow.HasDirectionalLight();
     const uint32_t baselineShadowCasters = shadow.GetLastDrawCount();
     const uint32_t baselineShadowCulled = shadow.GetLastCulledCount();
+    const uint32_t baselineShadowBatches = shadow.GetLastBatchCount();
     const uint32_t baselineShadowOccluders = shadowOccluders;
     const auto     baselineCascadeOccluders = cascadeOccluders;
     const EnhancedShadowData baselineShadowData = shadow.GetShadowData();
@@ -3182,10 +3183,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     char shadowLine[320]{};
     std::snprintf(shadowLine, sizeof(shadowLine),
-        "      그림자 — 방향광 %s · 캐스터 %u(컬링 %u) · 분할 %.1f/%.1f/%.1f"
+        "      그림자 — 방향광 %s · 캐스터 %u(배치 %u · 컬링 %u) · 분할 %.1f/%.1f/%.1f"
         " · 캐스케이드 텍셀 %u/%u/%u · 먼 캐스터 컬링 %u"
         " · 끔 %.5f · 켬 %.5f · 강제 %.5f\n",
-        baselineHasDirectional ? "있음" : "없음", baselineShadowCasters, baselineShadowCulled,
+        baselineHasDirectional ? "있음" : "없음", baselineShadowCasters,
+        baselineShadowBatches, baselineShadowCulled,
         baselineShadowData.splitDepths.x, baselineShadowData.splitDepths.y,
         baselineShadowData.splitDepths.z,
         baselineCascadeOccluders[0], baselineCascadeOccluders[1], baselineCascadeOccluders[2],
@@ -3265,6 +3267,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             + std::to_string(baselineCascadeOccluders[1]) + "/"
             + std::to_string(baselineCascadeOccluders[2])
             + " — 빈 캐스케이드가 있다(슬라이스별 DSV나 캐스터 컬링 판정을 볼 것)";
+    }
+    else if (baselineShadowBatches > baselineShadowCasters)
+    {
+        // 배치가 캐스터보다 많으면 인스턴스가 안 묶인 정도가 아니라 빈 드로우를
+        // 내고 있다는 뜻이다. 둘이 같은 것은 정상이다 — 메시가 전부 다른 씬이면
+        // 묶일 것이 없다.
+        passed = false;
+        verdict = "그림자 배치가 " + std::to_string(baselineShadowBatches)
+            + "개인데 캐스터는 " + std::to_string(baselineShadowCasters)
+            + "개다 — 인스턴스 없는 드로우를 내고 있다";
     }
     // 캐스터 컬링이 자를 수 있는가. 잘릴 수밖에 없는 것을 하나 넣었으므로
     // 캐스케이드 셋에서 각각 한 번씩 걸러져야 한다.
