@@ -2420,6 +2420,17 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     uint32_t parallelWorkers = 1;
     double   lastRecordMilliseconds = 0.0;
 
+    // 교차점을 재는 동안에는 되무름을 끈다(0). 켜 두면 임계값 아래 규모에서
+    // 병렬 시간이 순차와 같아져, 정작 재려던 '얼마나 지는가'가 가려진다.
+    // 되무름이 실제로 도는지는 측정이 끝난 뒤 기본값으로 따로 확인한다.
+    uint32_t parallelCostThreshold = 0;
+
+    // 되무름 확인 결과.
+    bool     declineObserved = false;
+    uint32_t declineCost = 0;
+    uint32_t declineWorkers = 0;
+    uint32_t declineCoverage = 0;
+
     // 렌더마다 바꿔 가며 넣는 그림자 설정. 람다가 참조로 잡는다.
     constexpr float kTestShadowBias = 0.0015f;
 
@@ -2450,6 +2461,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         EnhancedRenderGraph graph;
         graph.SetProfiler(&profiler);
+        graph.SetParallelRecordCostThreshold(parallelCostThreshold);
 
         // 그림자를 먼저 선언한다. 선언 순서가 실행 순서라, Deferred가 읽기 전에
         // 써 두는 것이 선언으로 표현된다 — 뒤집으면 컴파일이 잡아 준다.
@@ -3090,7 +3102,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 답해야 할 질문이다.
     if (0 != drawCountA)
     {
-        constexpr uint32_t kScales[] = { 4, 16, 64 };
+        // 32를 넣은 이유: 16(기록량 715, 0.85배)과 64(2827, 1.51배) 사이 어딘가에
+        // 교차점이 있는데 그 구간이 너무 넓어 임계값을 숫자로 정할 수 없었다.
+        constexpr uint32_t kScales[] = { 4, 16, 32, 64 };
         constexpr uint32_t kMeasureRuns = 10;
 
         for (uint32_t scale : kScales)
@@ -3129,7 +3143,14 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                     return false;
                 }
 
-                double total = 0.0;
+                // 평균이 아니라 중앙값을 쓴다.
+                //
+                // 같은 빌드로 세 번 재니 순차 시간이 4.14 · 5.66 · 5.66 ms로
+                // ±18% 흔들렸다. OS 스케줄링이나 다른 프로세스가 한 번 끼면
+                // 그 실행만 크게 늘어나는데, 평균은 그것을 그대로 받는다.
+                // 중앙값은 이상치 하나에 움직이지 않는다.
+                std::vector<double> samples;
+                samples.reserve(kMeasureRuns);
                 for (uint32_t run = 0; run < kMeasureRuns; ++run)
                 {
                     if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
@@ -3137,9 +3158,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                     {
                         return false;
                     }
-                    total += lastRecordMilliseconds;
+                    samples.push_back(lastRecordMilliseconds);
                 }
-                outMilliseconds = total / kMeasureRuns;
+                std::sort(samples.begin(), samples.end());
+                outMilliseconds = samples[samples.size() / 2];
                 return true;
             };
 
@@ -3154,10 +3176,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             char line[256]{};
             std::snprintf(line, sizeof(line),
                 "        드로우 %zu(배치 %u) — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
-                " · 기록 단위 %u(워커 %u)\n",
+                " · 기록 단위 %u(워커 %u) · 기록량 %u%s\n",
                 scaled.size(), gbuffer.GetLastBatchCount(), scaledSequential, scaledParallel,
                 (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0,
-                statsTemp.recordUnits, statsTemp.recordWorkers);
+                statsTemp.recordUnits, statsTemp.recordWorkers,
+                statsTemp.totalRecordCost,
+                statsTemp.parallelDeclined ? "(순차로 되무름)" : "");
             outLog += line;
 
             // 병렬 경로의 패스별 GPU 시간. 마지막 규모에서만 찍는다 —
@@ -3177,8 +3201,50 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         }
 
         frameContext.draws = &draws;
+
+        // ── 되무름이 실제로 도는가 ──
+        //
+        // 임계값을 기본값으로 되돌리고 원래 씬(작은 규모)을 병렬로 요청한다.
+        // 되물러야 맞다. 이것을 확인하지 않으면 임계값이 조용히 죽어 있어도
+        // 모른다 — 그러면 작은 씬에서 계속 손해를 보면서 '병렬이니 빠르겠지'로
+        // 넘어간다.
+        parallelCostThreshold = EnhancedRenderGraph::kParallelRecordCostThreshold;
+        useParallelRecording = true;
+        parallelWorkers = 6;
+
+        uint32_t declineCovered = 0;
+        uint32_t declineDraws = 0;
+        double   declineLuminance = 0.0;
+        std::vector<DX12GpuProfiler::PassTiming> declineTimings;
+        EnhancedRenderGraph::Stats declineStats{};
+
+        if (renderAndCount(cameraSnapshot, declineCovered, declineDraws, error,
+            declineTimings, declineStats, declineLuminance))
+        {
+            declineObserved = declineStats.parallelDeclined;
+            declineCost = declineStats.totalRecordCost;
+            declineWorkers = declineStats.recordWorkers;
+            declineCoverage = declineCovered;
+        }
+        else
+        {
+            outLog += "[4/4] 되무름 확인 렌더 실패: " + error + "\n";
+            return false;
+        }
+
+        parallelCostThreshold = 0;
         useParallelRecording = false;
         parallelWorkers = 1;
+    }
+
+    {
+        char line[224]{};
+        std::snprintf(line, sizeof(line),
+            "      되무름 — 기록량 %u(임계 %u) · %s · 워커 %u · 커버리지 %u\n",
+            declineCost, EnhancedRenderGraph::kParallelRecordCostThreshold,
+            declineObserved ? "순차로 되무름" : "병렬 유지",
+            declineWorkers, declineCoverage);
+        outLog += line;
     }
 
     char shadowLine[320]{};
@@ -3267,6 +3333,21 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             + std::to_string(baselineCascadeOccluders[1]) + "/"
             + std::to_string(baselineCascadeOccluders[2])
             + " — 빈 캐스케이드가 있다(슬라이스별 DSV나 캐스터 컬링 판정을 볼 것)";
+    }
+    else if (0 != declineCost && !declineObserved)
+    {
+        // 기록량이 임계값 아래인데 병렬로 갔다면 되무름이 죽은 것이다.
+        passed = false;
+        verdict = "기록량 " + std::to_string(declineCost) + "(임계 "
+            + std::to_string(EnhancedRenderGraph::kParallelRecordCostThreshold)
+            + ")인데 병렬로 갔다 — 되무름이 동작하지 않는다";
+    }
+    else if (declineObserved && declineCoverage != coveredA)
+    {
+        // 되물렀는데 그림이 달라지면 순차 경로가 병렬 경로와 다른 일을 한 것이다.
+        passed = false;
+        verdict = "되무른 뒤 커버리지가 " + std::to_string(declineCoverage)
+            + "로 기준 " + std::to_string(coveredA) + "과 다르다";
     }
     else if (baselineShadowBatches > baselineShadowCasters)
     {

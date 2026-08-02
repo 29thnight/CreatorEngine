@@ -556,7 +556,10 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
         ComputeSliceCount(),
         // 그림자 맵을 읽는 것은 Deferred다. 뿌리로 표시하지 않아도 컬링이
         // 살려야 하고, 그것이 3-5 컬링의 또 한 번의 확인이다.
-        false);
+        false,
+        // 캐스케이드마다 후보를 전부 다시 훑는다 — 컬링 판정이 캐스케이드별로
+        // 돌기 때문이다. 그래서 기록량이 후보 수의 세 배다.
+        m_lastCasterCandidates * kCascadeCount);
 }
 
 uint32_t EnhancedShadowPass::ComputeSliceCount() const

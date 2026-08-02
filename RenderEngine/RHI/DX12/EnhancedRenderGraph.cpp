@@ -117,7 +117,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
 
 RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
-    uint32_t maxSlices, bool hasSideEffect)
+    uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
     Pass pass{};
     pass.name = name;
@@ -125,6 +125,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.hasSideEffect = hasSideEffect;
+    pass.recordCost = recordCost;
 
     RGPassId id{};
     id.index = static_cast<uint16_t>(m_passes.size());
@@ -493,7 +494,35 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
         uint32_t sliceCount{ 1 };
     };
 
-    const uint32_t poolWorkers = (std::max)(1u,
+    // ── 병렬로 갈 만한가 ──
+    //
+    // 인스턴싱을 넣고 나서 이 판단이 필요해졌다. 기록량이 줄면서 임계값이
+    // 옮겨 갔기 때문이다 — 드로우 44에서 0.69배, 176에서 0.92배로 병렬 쪽이
+    // 지는 구간이 생겼다. 워커를 깨우고 리스트를 여러 개 제출하는 비용이
+    // 기록 자체보다 커지는 지점이 있고, 그 아래에서는 순차가 맞다.
+    //
+    // 임계값은 실측으로 정한다. 여기서 미리 정해 두고 '대충 이쯤이면 되겠지'로
+    // 넘어가면, 다음에 기록 비용이 또 바뀌었을 때 아무도 다시 재지 않는다.
+    uint32_t totalRecordCost = 0;
+    for (const size_t index : m_executeOrder)
+    {
+        totalRecordCost += m_passes[index].recordCost;
+    }
+
+    // 호출부가 병렬을 요청했더라도 그래프가 되무른다 — 이 판단을 호출부마다
+    // 복제하면 한 곳이 빠졌을 때 조용히 느려진다.
+    //
+    // 되무르는 방법은 별도 경로가 아니라 '워커 1·조각 1'이다. 조각까지 1로
+    // 되돌리는 것이 중요하다 — 워커만 1로 두면 한 워커가 조각들을 연달아
+    // 맡으면서 조각마다 상태를 다시 거는 비용이 그대로 남는다. 조각 1은
+    // 통째로 기록한 것과 같다는 것이 분할 조각의 계약이다.
+    const bool declineParallel =
+        (0 != totalRecordCost && totalRecordCost < m_parallelCostThreshold);
+
+    m_stats.totalRecordCost = totalRecordCost;
+    m_stats.parallelDeclined = declineParallel;
+
+    const uint32_t poolWorkers = declineParallel ? 1u : (std::max)(1u,
         (std::min)(workerCount, pool.GetWorkerCount()));
 
     std::vector<RecordUnit> units;
@@ -506,7 +535,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
         // 조각 수는 워커 수를 넘겨 봐야 소용이 없다 — 어차피 같은 워커가
         // 여러 조각을 연달아 맡게 되고, 그러면 조각마다 상태를 다시 거는
         // 비용만 늘어난다.
-        const uint32_t slices = (nullptr != pass.splitExecute)
+        const uint32_t slices = (nullptr != pass.splitExecute && !declineParallel)
             ? (std::max)(1u, (std::min)(pass.maxSlices, poolWorkers))
             : 1u;
 

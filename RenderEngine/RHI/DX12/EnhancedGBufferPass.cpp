@@ -681,7 +681,11 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         //
         // 그래서 조각당 최소 드로우 수를 둔다. 그 아래로는 쪼개지 않는다.
         ComputeSliceCount(),
-        keepAlive);
+        keepAlive,
+        // 기록량은 배치가 아니라 드로우 수를 따른다. 배치로 묶여도 인스턴스를
+        // 모으는 일은 드로우마다 돌기 때문이다. 배치 수를 더하는 것은 배치마다
+        // 드는 상태 설정 비용의 몫이다.
+        static_cast<uint32_t>(m_instances.size()) + m_lastBatchCount);
 }
 
 uint32_t EnhancedGBufferPass::ComputeSliceCount() const

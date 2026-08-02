@@ -138,7 +138,49 @@ public:
         // 기록 단위 수. 분할하지 않으면 패스 수와 같다. 이 값이 워커 수보다
         // 작으면 노는 워커가 생긴다 — 분할이 필요한지 판단하는 근거다.
         uint32_t recordUnits{ 0 };
+
+        // 병렬을 요청받았지만 기록량이 적어 순차로 되물렀는가, 그리고 그
+        // 판단의 근거가 된 총 기록량.
+        //
+        // 되무른 사실을 통계로 내보내는 이유: 이것이 없으면 '병렬을 켰는데
+        // 왜 워커가 1이지'를 코드를 읽어야 알 수 있다. 조용히 다르게 도는
+        // 것이 가장 나쁘다.
+        bool     parallelDeclined{ false };
+        uint32_t totalRecordCost{ 0 };
     };
+
+    /// 병렬로 갈 최소 기록량. 이 아래에서는 워커를 깨우는 비용이 기록보다 크다.
+    ///
+    /// ★ 이 값은 잠정이다. 실측이 확정해 주지 못했다.
+    ///
+    /// Debug 빌드로 두 번 재니 같은 규모에서 배수가 이렇게 갈렸다:
+    ///     기록량  187 → 0.79배 / 0.77배
+    ///     기록량  715 → 1.01배 / 0.77배
+    ///     기록량 1419 → 1.37배 / 0.96배
+    ///     기록량 2827 → 1.65배 / 0.92배
+    /// 실행 안에서는 중앙값을 쓰는데도 실행 사이가 흔들린다(드로우 704 순차
+    /// 기록이 4.01~6.65 ms). 교차점을 숫자로 집을 수 없는 정도의 편차다.
+    ///
+    /// 그래서 확인한 것과 확인하지 못한 것을 나눠 둔다:
+    ///   확인함 — 기록량 715 이하는 두 실행 모두 병렬이 지거나 무승부였다.
+    ///            즉 이 값 아래를 순차로 보내는 것은 손해가 아니다.
+    ///   확인 못함 — 715와 2827 사이 어디가 진짜 경계인지. 1024는 그 구간의
+    ///            아래쪽을 잡은 보수적인 선택일 뿐 측정이 지목한 값이 아니다.
+    ///
+    /// 제대로 정하려면 Release 빌드로 재야 한다. Debug는 STL 검사와 최적화
+    /// 부재로 기록 비용 자체가 부풀려져 있어, 여기서 얻은 경계가 실제 경계라고
+    /// 볼 근거가 없다. Release 실행 환경(에셋 배치)이 갖춰지면 다시 잰다.
+    static constexpr uint32_t kParallelRecordCostThreshold = 1024;
+
+    /// 임계값을 바꾼다. 0이면 되무르지 않는다.
+    ///
+    /// 자가 검증이 교차점을 재려고 쓴다 — 임계값이 켜진 채로는 '임계값 아래에서
+    /// 병렬이 얼마나 지는가'를 잴 수 없다. 되무름이 병렬 시간을 순차와 같게
+    /// 만들어 버리기 때문이다. 재는 도구가 재려는 것을 가리면 안 된다.
+    void SetParallelRecordCostThreshold(uint32_t threshold)
+    {
+        m_parallelCostThreshold = threshold;
+    }
 
     void Reset();
 
@@ -173,8 +215,18 @@ public:
     ///
     /// maxSlices는 상한이다. 그래프가 워커 수와 견주어 실제 조각 수를 정하고,
     /// 순차 경로에서는 1로 부른다.
+    /// recordCost — 이 패스가 기록하면서 할 일의 양(단위 없는 상대값).
+    ///
+    /// 조각 수(maxSlices)와 다르다. 조각 수는 '얼마나 쪼갤 수 있나'이고
+    /// 인스턴싱 뒤에는 배치 수를 따르는데, 실제 기록 비용은 배치가 아니라
+    /// 드로우 수를 따른다 — 컬링 판정과 인스턴스 수집이 드로우마다 돌기
+    /// 때문이다. 드로우 700개가 배치 11개로 묶여도 훑는 일은 700번이다.
+    ///
+    /// 그래서 '쪼갤까'와 '병렬로 갈까'를 같은 숫자로 정할 수 없다. 이 값은
+    /// 뒤쪽 질문에만 쓴다.
     RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,
-        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false);
+        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
+        uint32_t recordCost = 0);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
     bool Compile(ID3D12Device* device, std::string& outError);
@@ -245,6 +297,7 @@ private:
         ExecuteCallback          execute;
         SplitExecuteCallback     splitExecute;
         uint32_t                 maxSlices{ 1 };
+        uint32_t                 recordCost{ 0 };
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
         std::vector<D3D12_RESOURCE_BARRIER> barriers;   // 이 패스 직전에 한 번에 넣는다
@@ -261,6 +314,8 @@ private:
     DX12GpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
     Stats m_stats;
+
+    uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
 };
 
 #endif
