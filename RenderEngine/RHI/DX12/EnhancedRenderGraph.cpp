@@ -115,6 +115,23 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     return id;
 }
 
+RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
+    const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
+    uint32_t maxSlices, bool hasSideEffect)
+{
+    Pass pass{};
+    pass.name = name;
+    pass.usages = usages;
+    pass.splitExecute = std::move(execute);
+    pass.maxSlices = (std::max)(1u, maxSlices);
+    pass.hasSideEffect = hasSideEffect;
+
+    RGPassId id{};
+    id.index = static_cast<uint16_t>(m_passes.size());
+    m_passes.push_back(std::move(pass));
+    return id;
+}
+
 bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 {
     // ── 실행 순서는 선언 순서다. 그래프가 다시 정렬하지 않는다. ──
@@ -433,7 +450,10 @@ bool EnhancedRenderGraph::Execute(ID3D12GraphicsCommandList* commandList, std::s
                 pass.barriers.data());
         }
 
-        if (pass.execute) pass.execute(context);
+        // 분할 패스는 조각 하나로 부른다 — 통째로 기록하는 것과 같아야 한다는
+        // 것이 계약이고, 순차 경로가 그 계약의 기준이 된다.
+        if (pass.splitExecute) pass.splitExecute(context, 0, 1);
+        else if (pass.execute)  pass.execute(context);
 
         if (nullptr != m_profiler) m_profiler->EndPass(commandList, timerSlot);
     }
@@ -458,34 +478,64 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
     const size_t passCount = m_executeOrder.size();
     if (0 == passCount) return true;
 
-    const uint32_t workers = (std::max)(1u, (std::min)(
-        (std::min)(workerCount, pool.GetWorkerCount()),
-        static_cast<uint32_t>(passCount)));
+    // ── 기록 단위 만들기 ──
+    //
+    // 단위는 패스가 아니라 '조각'이다. 쪼갤 수 있는 패스는 여러 조각이 되고,
+    // 그렇지 않은 패스는 조각 하나다.
+    //
+    // 왜 필요한가: 패스 단위 병렬화는 '가장 무거운 패스'보다 빨라질 수 없다.
+    // 실측에서 워커를 늘려도 1.25배에서 평평했는데, GBuffer·Shadow가 기록
+    // 시간의 대부분을 차지하고 나머지 패스는 거의 비어 있었기 때문이다.
+    struct RecordUnit
+    {
+        size_t   order{ 0 };        // 실행 순서에서의 위치
+        uint32_t slice{ 0 };
+        uint32_t sliceCount{ 1 };
+    };
+
+    const uint32_t poolWorkers = (std::max)(1u,
+        (std::min)(workerCount, pool.GetWorkerCount()));
+
+    std::vector<RecordUnit> units;
+    units.reserve(passCount * 2);
+
+    for (size_t order = 0; order < passCount; ++order)
+    {
+        const Pass& pass = m_passes[m_executeOrder[order]];
+
+        // 조각 수는 워커 수를 넘겨 봐야 소용이 없다 — 어차피 같은 워커가
+        // 여러 조각을 연달아 맡게 되고, 그러면 조각마다 상태를 다시 거는
+        // 비용만 늘어난다.
+        const uint32_t slices = (nullptr != pass.splitExecute)
+            ? (std::max)(1u, (std::min)(pass.maxSlices, poolWorkers))
+            : 1u;
+
+        for (uint32_t slice = 0; slice < slices; ++slice)
+        {
+            units.push_back(RecordUnit{ order, slice, slices });
+        }
+    }
+
+    const size_t unitCount = units.size();
+    const uint32_t workers = (std::max)(1u,
+        (std::min)(poolWorkers, static_cast<uint32_t>(unitCount)));
 
     // ── 배분: 연속 블록 ──
     //
     // 라운드로빈으로 흩으면 안 된다. 워커가 A,B,A 순으로 돌아오면 A의 리스트를
     // 두 번 제출해야 하는데, 그러면 A가 기록한 커맨드 전체가 두 번 실행된다.
-    // 리스트는 통째로 실행되는 단위라 '그 안의 일부만' 제출할 수 없다.
+    // 리스트는 통째로 실행되는 단위라 그 안의 일부만 제출할 수 없다.
     //
     // 연속 블록이면 워커 순서 = 선언 순서가 되고, 리스트도 한 번씩만 제출된다.
     //
-    // ★ 대신 부하가 한쪽에 몰린다. 실측으로 그 대가를 확인했다.
-    // 워커를 패스 수보다 적게 주면(패스 6 · 워커 4 → 0,0,1,2,2,3) 가장 무거운
-    // 두 패스(Shadow·GBuffer)가 한 워커에 몰려 병렬화 효과가 거의 사라진다:
-    //   드로우 44에서 1.12배 · 176에서 0.81배 · 704에서 1.14배 — 방향조차 흔들렸다.
-    // 워커를 패스 수 이상으로 주어 1:1이 되게 하면 일관된다:
-    //   드로우 44에서 1.23배 · 176에서 1.20배 · 704에서 1.25배.
-    //
-    // 그래서 호출부는 워커를 넉넉히 주는 편이 낫다(아래에서 패스 수로 클램프한다).
-    // 남은 불균형은 패스 자체의 비용 차이다 — Shadow·GBuffer가 대부분을 차지하고
-    // 리드백 패스들은 거의 비어 있어, 이론 상한이 전체÷가장무거운패스로 묶인다.
-    // 그 위로 가려면 한 패스의 드로우를 여러 리스트로 쪼개야 하고, 그건
-    // 배리어가 끼지 않는 구간에서만 되므로 별도 슬라이스다.
-    std::vector<uint32_t> passWorker(passCount, 0);
-    for (size_t i = 0; i < passCount; ++i)
+    // ★ 워커를 단위 수보다 적게 주면 무거운 것들이 한 워커에 몰린다. 실측으로
+    // 그 대가를 확인했다 — 패스 6 · 워커 4에서 Shadow와 GBuffer가 같은 워커에
+    // 가면서 드로우 44에서 1.12배, 176에서 0.81배로 방향조차 흔들렸다.
+    // 워커를 넉넉히 주면(아래에서 단위 수로 클램프한다) 일관된다.
+    std::vector<uint32_t> unitWorker(unitCount, 0);
+    for (size_t i = 0; i < unitCount; ++i)
     {
-        passWorker[i] = static_cast<uint32_t>(i * workers / passCount);
+        unitWorker[i] = static_cast<uint32_t>(i * workers / unitCount);
     }
 
     // 리스트를 먼저 전부 연다.
@@ -512,22 +562,27 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
         try
         {
-            for (size_t order = 0; order < passCount; ++order)
+            for (size_t i = 0; i < unitCount; ++i)
             {
-                if (passWorker[order] != worker) continue;
+                if (unitWorker[i] != worker) continue;
 
-                Pass& pass = m_passes[m_executeOrder[order]];
+                const RecordUnit& unit = units[i];
+                Pass& pass = m_passes[m_executeOrder[unit.order]];
 
                 // 패스별 GPU 타임스탬프는 병렬 경로에서 재지 않는다.
                 // 질의 슬롯은 리스트 하나 안에서 순서가 맞아야 하는데 지금은
                 // 리스트가 여럿이다. 워커별 질의 힙으로 나누는 것이 다음 단계다.
-                if (!pass.barriers.empty())
+
+                // 배리어는 패스의 첫 조각에만 넣는다. 조각들은 순서대로
+                // 실행되므로 앞에 한 번이면 뒤 조각까지 덮는다.
+                if (0 == unit.slice && !pass.barriers.empty())
                 {
                     context.commandList->ResourceBarrier(
                         static_cast<UINT>(pass.barriers.size()), pass.barriers.data());
                 }
 
-                if (pass.execute) pass.execute(context);
+                if (pass.splitExecute) pass.splitExecute(context, unit.slice, unit.sliceCount);
+                else if (pass.execute) pass.execute(context);
             }
         }
         catch (const std::exception& e)
@@ -586,6 +641,7 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
     m_stats.recordWorkers = workers;
     m_stats.submittedLists = static_cast<uint32_t>(submission.size());
+    m_stats.recordUnits = static_cast<uint32_t>(unitCount);
     return true;
 }
 

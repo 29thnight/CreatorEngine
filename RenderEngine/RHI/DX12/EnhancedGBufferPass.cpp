@@ -9,6 +9,7 @@
 #include "../../Texture.h"
 
 #include <d3dcompiler.h>
+#include <algorithm>
 #include <sstream>
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -422,8 +423,16 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     // Deferred가 붙으면 그쪽이 읽으므로 표시 없이도 살아남아야 한다.
     const bool keepAlive = m_keepAlive;
 
-    graph.AddPass(GetName(), usages,
-        [this, &context, targets, depth](const EnhancedRenderGraph::ExecuteContext& executeContext)
+    // 쪼갤 수 있는 패스로 선언한다.
+    //
+    // 이 패스가 기록 시간의 대부분을 차지한다 — 패스 단위 병렬화만으로는
+    // '가장 무거운 패스'보다 빨라질 수 없어 1.25배에서 평평했다.
+    //
+    // 조각 상한은 워커 상한과 맞춘다. 그보다 잘게 쪼개도 같은 워커가 연달아
+    // 맡게 되고, 그러면 조각마다 상태를 다시 거는 비용만 늘어난다.
+    graph.AddSplitPass(GetName(), usages,
+        [this, &context, targets, depth](const EnhancedRenderGraph::ExecuteContext& executeContext,
+            uint32_t slice, uint32_t sliceCount)
         {
             auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
@@ -457,12 +466,19 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
             // 클리어 값은 0으로 둔다. 그려진 곳과 안 그려진 곳이 값으로 구분되어야
             // 픽셀 검증이 '다섯 타깃 각각이 실제로 기록됐는가'를 볼 수 있다.
+            //
+            // 클리어는 첫 조각에서만 한다. 조각들은 순서대로 실행되므로 뒤
+            // 조각이 또 지우면 앞 조각이 그린 것이 사라진다.
             constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
-            for (uint32_t i = 0; i < kRenderTargetCount; ++i)
+            if (0 == slice)
             {
-                commandList->ClearRenderTargetView(rtvHandles[i], kZero, 0, nullptr);
+                for (uint32_t i = 0; i < kRenderTargetCount; ++i)
+                {
+                    commandList->ClearRenderTargetView(rtvHandles[i], kZero, 0, nullptr);
+                }
+                commandList->ClearDepthStencilView(dsvHandle,
+                    D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
             }
-            commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
@@ -489,8 +505,18 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->SetDescriptorHeaps(2, heaps);
             commandList->SetGraphicsRootDescriptorTable(3, m_sampler);
 
-            for (const auto& draw : *context.draws)
+            // 자기 몫의 드로우만 그린다.
+            //
+            // 조각들은 선언 순서대로 실행되므로 결과는 통째로 그린 것과 같다 —
+            // 깊이 테스트처럼 순서에 의존하는 것도 그대로다.
+            const size_t drawCount = context.draws->size();
+            const size_t sliceBegin = drawCount * slice / sliceCount;
+            const size_t sliceEnd = drawCount * (slice + 1) / sliceCount;
+
+            for (size_t drawIndex = sliceBegin; drawIndex < sliceEnd; ++drawIndex)
             {
+                const auto& draw = (*context.draws)[drawIndex];
+
                 const auto mesh = m_drawGeometry.find(draw.mesh);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
@@ -540,7 +566,30 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 commandList->DrawIndexedInstanced(mesh->second.indexCount, 1, 0, 0, 0);
             }
         },
+        // 조각 수는 드로우 수로 정한다.
+        //
+        // ★ 상한만 두고 무조건 쪼갰더니 작은 씬에서 오히려 느려졌다.
+        // 실측: 드로우 44에서 1.23배(분할 없음) → 0.71배(6조각)로 뒤집혔다.
+        // 조각마다 상태를 다시 걸어야 하기 때문이다 — RTV 5개와 DSV를 만들고
+        // 뷰포트·루트 시그니처·PSO·힙을 세우고 프레임 상수를 올린다. 그 비용이
+        // 드로우 일곱 개 그리는 것보다 크다.
+        //
+        // 그래서 조각당 최소 드로우 수를 둔다. 그 아래로는 쪼개지 않는다.
+        ComputeSliceCount(),
         keepAlive);
+}
+
+uint32_t EnhancedGBufferPass::ComputeSliceCount() const
+{
+    // 조각당 최소 드로우 수. 실측으로 정했다 — 드로우 44를 6조각으로 나누면
+    // 조각당 일곱이고 그때 상태 설정 비용이 이겼다. 176(조각당 29)부터는
+    // 분할이 이겼으므로 그 사이 어딘가가 경계다.
+    constexpr uint32_t kMinDrawsPerSlice = 32;
+
+    if (m_lastDrawCount <= kMinDrawsPerSlice) return 1;
+
+    const uint32_t byDraws = m_lastDrawCount / kMinDrawsPerSlice;
+    return (std::max)(1u, (std::min)(DX12CommandListPool::kMaxWorkers, byDraws));
 }
 
 void EnhancedGBufferPass::Shutdown()

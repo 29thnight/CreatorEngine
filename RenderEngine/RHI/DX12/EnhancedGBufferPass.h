@@ -7,6 +7,7 @@
 
 #include "EnhancedRenderPass.h"
 #include "DX12MeshCache.h"
+#include "DX12CommandListPool.h"
 
 // GBuffer 패스 (PHASE 3-6, 첫 패스).
 //
@@ -75,6 +76,12 @@ private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
+
+    /// 이번 프레임의 드로우 수로 조각 수를 정한다.
+    ///
+    /// 무조건 쪼개면 작은 씬에서 손해다 — 조각마다 상태를 다시 걸어야 하고,
+    /// 그 비용이 드로우 몇 개 그리는 것보다 크다(실측으로 겪었다).
+    uint32_t ComputeSliceCount() const;
 
     // b1에 올라가는 드로우 상수. HLSL 쪽 cbuffer와 배치가 같아야 한다 —
     // 어긋나면 값이 조용히 밀려서 '재질이 이상하다'로만 드러난다.

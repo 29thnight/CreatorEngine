@@ -110,6 +110,17 @@ public:
 
     using ExecuteCallback = std::function<void(const ExecuteContext&)>;
 
+    /// 쪼갤 수 있는 패스의 기록 콜백.
+    ///
+    /// slice/sliceCount로 자기 몫만 기록한다. sliceCount가 1이면 통째로
+    /// 기록하는 것과 같아야 한다 — 순차 경로가 그 형태로 부른다.
+    ///
+    /// ★ 조각마다 상태를 다시 걸어야 한다. 커맨드 리스트는 서로의 상태를
+    /// 물려받지 않으므로, 루트 시그니처·PSO·렌더 타깃·뷰포트·힙 바인딩을
+    /// 조각마다 세워야 한다. 클리어처럼 한 번만 해야 하는 것은 slice==0에서만.
+    using SplitExecuteCallback =
+        std::function<void(const ExecuteContext&, uint32_t slice, uint32_t sliceCount)>;
+
     struct Stats
     {
         uint32_t passesDeclared{ 0 };
@@ -123,6 +134,10 @@ public:
         // 놀고 있는 워커가 있다는 뜻이다(패스가 워커보다 적을 때 정상).
         uint32_t recordWorkers{ 0 };
         uint32_t submittedLists{ 0 };
+
+        // 기록 단위 수. 분할하지 않으면 패스 수와 같다. 이 값이 워커 수보다
+        // 작으면 노는 워커가 생긴다 — 분할이 필요한지 판단하는 근거다.
+        uint32_t recordUnits{ 0 };
     };
 
     void Reset();
@@ -149,6 +164,17 @@ public:
 
     RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
         ExecuteCallback execute, bool hasSideEffect = false);
+
+    /// 여러 커맨드 리스트에 나눠 기록할 수 있는 패스.
+    ///
+    /// 왜 필요한가: 패스 단위 병렬화는 '가장 무거운 패스' 이상으로 빨라질 수
+    /// 없다. 실측에서 GBuffer·Shadow가 기록 시간의 대부분을 차지해 워커를
+    /// 늘려도 1.25배에서 평평해졌다. 그 벽을 넘으려면 한 패스 안을 쪼개야 한다.
+    ///
+    /// maxSlices는 상한이다. 그래프가 워커 수와 견주어 실제 조각 수를 정하고,
+    /// 순차 경로에서는 1로 부른다.
+    RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
     bool Compile(ID3D12Device* device, std::string& outError);
@@ -217,6 +243,8 @@ private:
         std::string              name;
         std::vector<RGPassUsage> usages;
         ExecuteCallback          execute;
+        SplitExecuteCallback     splitExecute;
+        uint32_t                 maxSlices{ 1 };
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
         std::vector<D3D12_RESOURCE_BARRIER> barriers;   // 이 패스 직전에 한 번에 넣는다
