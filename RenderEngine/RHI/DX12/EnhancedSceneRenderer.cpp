@@ -3102,9 +3102,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 답해야 할 질문이다.
     if (0 != drawCountA)
     {
-        // 32를 넣은 이유: 16(기록량 715, 0.85배)과 64(2827, 1.51배) 사이 어딘가에
-        // 교차점이 있는데 그 구간이 너무 넓어 임계값을 숫자로 정할 수 없었다.
-        constexpr uint32_t kScales[] = { 4, 16, 32, 64 };
+        // ★ 규모를 크게 잡는 이유는 Release 실측 때문이다.
+        //
+        // 처음에는 {4, 16, 64}였다. Debug에서는 그 안에 교차점이 있는 것처럼
+        // 보였는데(기록량 1419에서 1.37배), Release로 재니 2827에서도 0.72배로
+        // 병렬이 졌다. 순차 기록이 Debug 5~6 ms에서 Release 0.36 ms로 15배
+        // 빨라지면서 워커를 깨우는 비용이 상대적으로 훨씬 커진 것이다.
+        //
+        // 즉 Debug에서 본 교차점은 Debug의 것이었다. 실제 경계를 보려면
+        // 그보다 한참 큰 규모까지 훑어야 한다.
+        constexpr uint32_t kScales[] = { 4, 64, 256, 1024 };
         constexpr uint32_t kMeasureRuns = 10;
 
         for (uint32_t scale : kScales)

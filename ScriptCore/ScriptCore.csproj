@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="$(MSBuildThisFileDirectory)..\EngineOutput.props" />
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -10,8 +12,11 @@
          호스트(hostfxr)가 런타임 버전을 결정할 때 이 파일이 반드시 필요하다. -->
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
 
-    <!-- 엔진 실행 파일 옆에 바로 떨어뜨려 호스트가 찾기 쉽게 한다. -->
-    <OutputPath>$(MSBuildThisFileDirectory)..\x64\$(Configuration)\Managed\</OutputPath>
+    <!-- 엔진 실행 파일 옆에 바로 떨어뜨려 호스트가 찾기 쉽게 한다.
+         자리는 EngineOutput.props가 정한다 — 네이티브 OutDir과 여기가 따로
+         놀면 Release처럼 한쪽만 어긋나고, 그 증상은 '스크립트가 없는 엔진'이라
+         원인을 찾기 어렵다. -->
+    <OutputPath>$(EngineOutDir)Managed\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
     <!-- 06절 AOT 대응: 지금부터 트리밍 경고를 보이게 해두면 나중에 몰아서 고칠 일이 없다. -->

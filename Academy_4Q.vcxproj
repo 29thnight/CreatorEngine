@@ -74,6 +74,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <Import Project="$(SolutionDir)EngineOutput.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(SolutionDir)\EngineEntry\;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -142,7 +143,12 @@ echo [ScriptCore] 관리 어셈블리 빌드
 dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
 dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
-  </ItemDefinitionGroup>
+      <PostBuildEvent>
+      <Command>if not exist "$(DotNetHostPackDir)nethost.dll" (echo [PostBuild] nethost.dll not found: $(DotNetHostPackDir) &amp; echo [PostBuild] ClrHost.cpp links nethost.lib from the same pack version - install .NET $(DotNetHostPackVersion) host pack or update DotNetHostPackVersion in EngineOutput.props &amp; exit /b 1)
+xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
+      <Message>nethost.dll 배치($(DotNetHostPackVersion))</Message>
+    </PostBuildEvent>
+</ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
@@ -176,7 +182,12 @@ echo [ScriptCore] 관리 어셈블리 빌드
 dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
 dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
-  </ItemDefinitionGroup>
+      <PostBuildEvent>
+      <Command>if not exist "$(DotNetHostPackDir)nethost.dll" (echo [PostBuild] nethost.dll not found: $(DotNetHostPackDir) &amp; echo [PostBuild] ClrHost.cpp links nethost.lib from the same pack version - install .NET $(DotNetHostPackVersion) host pack or update DotNetHostPackVersion in EngineOutput.props &amp; exit /b 1)
+xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
+      <Message>nethost.dll 배치($(DotNetHostPackVersion))</Message>
+    </PostBuildEvent>
+</ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h" />
     <ClInclude Include="EngineEntry\Dx11Main.h" />
