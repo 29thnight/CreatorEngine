@@ -557,9 +557,12 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
         // 그림자 맵을 읽는 것은 Deferred다. 뿌리로 표시하지 않아도 컬링이
         // 살려야 하고, 그것이 3-5 컬링의 또 한 번의 확인이다.
         false,
-        // 캐스케이드마다 후보를 전부 다시 훑는다 — 컬링 판정이 캐스케이드별로
-        // 돌기 때문이다. 그래서 기록량이 후보 수의 세 배다.
-        m_lastCasterCandidates * kCascadeCount);
+        // 기록량은 배치 수다(GBuffer와 같은 기준). 캐스케이드마다 전부 다시
+        // 그리므로 고유 메시 수의 세 배가 배치 수의 상한이다.
+        //
+        // 후보 수(캐스케이드당 드로우 수)를 쓰지 않는 이유는 GBuffer에서와
+        // 같다 — 실측이 비용을 정하는 것은 배치라고 말했다.
+        static_cast<uint32_t>(m_drawGeometry.size()) * kCascadeCount);
 }
 
 uint32_t EnhancedShadowPass::ComputeSliceCount() const

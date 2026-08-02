@@ -2425,6 +2425,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 되무름이 실제로 도는지는 측정이 끝난 뒤 기본값으로 따로 확인한다.
     uint32_t parallelCostThreshold = 0;
 
+    // 규모 측정에서 재질을 가르지 않은 경우와 가른 경우의 배치 수.
+    // 둘이 같으면 재질 키가 죽어 두 모드가 같은 씬이 된 것이다.
+    uint32_t uniformBatchCount = 0;
+    uint32_t variedBatchCount = 0;
+
     // 되무름 확인 결과.
     bool     declineObserved = false;
     uint32_t declineCost = 0;
@@ -3114,6 +3119,47 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         constexpr uint32_t kScales[] = { 4, 64, 256, 1024 };
         constexpr uint32_t kMeasureRuns = 10;
 
+        // ── 재질을 갈라 놓을 텍스처 ──
+        //
+        // 지금까지의 규모 확대는 같은 메시 11종을 복제해서 재질이 전부 같았다.
+        // 그러면 인스턴싱이 최대로 먹어 드로우 11264가 배치 11개로 묶이는데,
+        // 그것은 병렬 기록에 최악의 조건이다 — 나눌 것이 배치 11개뿐이다.
+        //
+        // 실제 씬은 재질이 다양해 배치가 수백 개다. 그 조건에서도 병렬이
+        // 지는지 봐야 '병렬 기록은 값을 못 한다'를 말할 수 있다. 지금까지는
+        // '이 조건에서는 값을 못 했다'까지만 확인한 것이었다.
+        //
+        // 4x4 텍스처를 여러 개 만들어 복제마다 돌려 쓴다. 픽셀 내용은 상관없다
+        // — 재질 키가 포인터라 객체가 다르기만 하면 배치가 갈린다.
+        constexpr uint32_t kMaterialVariants = 64;
+        std::vector<Texture*> variantTextures;
+        variantTextures.reserve(kMaterialVariants);
+        for (uint32_t index = 0; index < kMaterialVariants; ++index)
+        {
+            auto* texture = Texture::Create(4, 4, "ScaleMat" + std::to_string(index),
+                DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
+            if (nullptr == texture) break;
+
+            texture->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
+            variantTextures.push_back(texture);
+        }
+
+        // 재질을 가르지 않은 경우와 가른 경우를 나란히 잰다. 하나만 재면
+        // 배치 수가 결과를 얼마나 좌우하는지 알 수 없다.
+        struct MaterialMode
+        {
+            const char* label;
+            bool        varyMaterial;
+        };
+        constexpr MaterialMode kMaterialModes[] = {
+            { "재질 1종", false },
+            { "재질 다종", true },
+        };
+
+        for (const MaterialMode& mode : kMaterialModes)
+        {
+        if (mode.varyMaterial && variantTextures.empty()) continue;
+
         for (uint32_t scale : kScales)
         {
             std::vector<EnhancedDrawItem> scaled;
@@ -3127,6 +3173,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                     // 것이므로, 겹쳐 그려 픽셀을 태우면 무엇을 재는지 흐려진다.
                     clone.worldMatrix = XMMatrixMultiply(item.worldMatrix,
                         XMMatrixTranslation(static_cast<float>(copy) * 12.f, 0.f, 0.f));
+
+                    if (mode.varyMaterial)
+                    {
+                        clone.baseColor = variantTextures[copy % variantTextures.size()];
+                    }
+
                     scaled.push_back(clone);
                 }
             }
@@ -3180,10 +3232,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 return false;
             }
 
-            char line[256]{};
+            char line[288]{};
             std::snprintf(line, sizeof(line),
-                "        드로우 %zu(배치 %u) — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
+                "        [%s] 드로우 %zu(배치 %u) — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
                 " · 기록 단위 %u(워커 %u) · 기록량 %u%s\n",
+                mode.label,
                 scaled.size(), gbuffer.GetLastBatchCount(), scaledSequential, scaledParallel,
                 (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0,
                 statsTemp.recordUnits, statsTemp.recordWorkers,
@@ -3191,10 +3244,22 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 statsTemp.parallelDeclined ? "(순차로 되무름)" : "");
             outLog += line;
 
+            // 재질을 갈랐는데 배치가 안 갈렸다면 이 측정은 아무것도 재지
+            // 않은 것이다 — 두 모드가 같은 씬이 되므로 비교가 성립하지 않는다.
+            // 실제로 재질 키가 죽어 있으면 이렇게 된다.
+            if (mode.varyMaterial)
+            {
+                variedBatchCount = gbuffer.GetLastBatchCount();
+            }
+            else
+            {
+                uniformBatchCount = gbuffer.GetLastBatchCount();
+            }
+
             // 병렬 경로의 패스별 GPU 시간. 마지막 규모에서만 찍는다 —
             // 이 값이 다음 최적화의 근거가 된다. 무엇이 무거운지 모르면
             // 어디를 쪼갤지 정할 수 없다.
-            if (scale == kScales[std::size(kScales) - 1])
+            if (mode.varyMaterial && scale == kScales[std::size(kScales) - 1])
             {
                 for (const auto& timing : timingsTemp)
                 {
@@ -3206,6 +3271,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 }
             }
         }
+        }
+
+        for (auto* texture : variantTextures) Memory::SafeDelete(texture);
+        variantTextures.clear();
 
         frameContext.draws = &draws;
 
@@ -3340,6 +3409,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             + std::to_string(baselineCascadeOccluders[1]) + "/"
             + std::to_string(baselineCascadeOccluders[2])
             + " — 빈 캐스케이드가 있다(슬라이스별 DSV나 캐스터 컬링 판정을 볼 것)";
+    }
+    else if (0 != variedBatchCount && variedBatchCount <= uniformBatchCount)
+    {
+        passed = false;
+        verdict = "재질을 갈랐는데 배치가 " + std::to_string(variedBatchCount)
+            + "로 재질 1종의 " + std::to_string(uniformBatchCount)
+            + "보다 크지 않다 — 두 모드가 같은 씬이라 병렬 비교가 성립하지 않는다";
     }
     else if (0 != declineCost && !declineObserved)
     {

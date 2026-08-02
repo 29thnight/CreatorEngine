@@ -682,10 +682,17 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         // 그래서 조각당 최소 드로우 수를 둔다. 그 아래로는 쪼개지 않는다.
         ComputeSliceCount(),
         keepAlive,
-        // 기록량은 배치가 아니라 드로우 수를 따른다. 배치로 묶여도 인스턴스를
-        // 모으는 일은 드로우마다 돌기 때문이다. 배치 수를 더하는 것은 배치마다
-        // 드는 상태 설정 비용의 몫이다.
-        static_cast<uint32_t>(m_instances.size()) + m_lastBatchCount);
+        // ★ 기록량은 배치 수다. 드로우 수가 아니다.
+        //
+        // 처음에는 인스턴스 수 + 배치 수로 뒀다. 드로우마다 컬링과 인스턴스
+        // 수집이 도니 그쪽이 비용을 따를 거라고 봤는데, 재 보니 아니었다.
+        // 같은 드로우 704를 배치 11로 묶으면 순차 0.34 ms, 배치 704로 흩으면
+        // 1.25~2.08 ms다 — 네 배 넘게 차이 난다. 인스턴스를 배열에 밀어 넣는
+        // 일은 싸고, 배치마다 디스크립터·버퍼·PSO를 다시 거는 일이 비싸다.
+        //
+        // 병렬 이득도 배치를 따라간다: 배치 11이면 드로우 11264에서도
+        // 0.95~1.52배로 갈리고, 배치 704면 드로우 704에서 이미 1.43~2.10배다.
+        m_lastBatchCount);
 }
 
 uint32_t EnhancedGBufferPass::ComputeSliceCount() const
