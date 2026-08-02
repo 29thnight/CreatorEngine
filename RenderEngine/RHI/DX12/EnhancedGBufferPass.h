@@ -2,6 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
 #include <map>
+#include <vector>
 #include <unordered_map>
 #include <wrl/client.h>
 
@@ -59,6 +60,10 @@ public:
     uint32_t GetLastMeshCount() const { return m_lastMeshCount; }
     uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
 
+    /// 실제로 발행한 DrawIndexedInstanced 횟수. 드로우 수보다 작을수록 병합이
+    /// 잘 된 것이다 — 이 둘이 늘 같으면 인스턴싱이 죽은 것이다.
+    uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
+
     /// 이 패스를 컬링 뿌리로 표시할지.
     ///
     /// 소비자(Deferred)가 붙기 전에는 GBuffer 출력을 읽는 패스가 없어서 컬링에
@@ -83,9 +88,14 @@ private:
     /// 그 비용이 드로우 몇 개 그리는 것보다 크다(실측으로 겪었다).
     uint32_t ComputeSliceCount() const;
 
-    // b1에 올라가는 드로우 상수. HLSL 쪽 cbuffer와 배치가 같아야 한다 —
+    /// 같은 (메시, 재질)을 묶어 배치를 만든다. PrepareFrame이 부른다.
+    void BuildBatches(const EnhancedFrameContext& context);
+
+    using MaterialKey = std::array<Texture*, 4>;
+
+    // 인스턴스 하나. HLSL의 StructuredBuffer 원소와 배치가 같아야 한다 —
     // 어긋나면 값이 조용히 밀려서 '재질이 이상하다'로만 드러난다.
-    struct DrawConstants
+    struct InstanceData
     {
         Mathf::Matrix world{};
         Mathf::Color4 baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
@@ -93,6 +103,18 @@ private:
         float         roughness{ 1.f };
         uint32_t      useNormalMap{ 0 };
         uint32_t      padding{ 0 };
+    };
+
+    // 한 번의 DrawIndexedInstanced로 그릴 묶음.
+    //
+    // 같은 메시와 같은 재질을 쓰는 드로우들이다. 둘 중 하나라도 다르면
+    // 정점 버퍼나 SRV 테이블을 바꿔야 하므로 같은 드로우로 묶을 수 없다.
+    struct DrawBatch
+    {
+        Mesh*        mesh{ nullptr };
+        MaterialKey  material{};
+        uint32_t     firstInstance{ 0 };   // m_instances 안에서의 시작
+        uint32_t     instanceCount{ 0 };
     };
 
     // 드로우가 쓸 텍스처. PrepareFrame이 채우고 Record가 읽는다.
@@ -122,8 +144,12 @@ private:
     //
     // 해시맵 대신 정렬 맵을 쓴다. 재질 종류는 프레임당 많아야 수십이고,
     // 배열 키에 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다.
-    using MaterialKey = std::array<Texture*, 4>;
     std::map<MaterialKey, DrawTextures>             m_drawTextures;
+
+    // PrepareFrame이 채우고 Record가 읽는다. 인스턴스 데이터는 배치 순서대로
+    // 연속이라, 배치 하나가 [firstInstance, +instanceCount) 구간을 가리킨다.
+    std::vector<InstanceData> m_instances;
+    std::vector<DrawBatch>    m_batches;
     D3D12_GPU_DESCRIPTOR_HANDLE                     m_sampler{};
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
@@ -132,6 +158,7 @@ private:
     uint32_t m_lastDrawCount{ 0 };
     uint32_t m_lastMeshCount{ 0 };
     uint32_t m_lastMaterialCount{ 0 };
+    uint32_t m_lastBatchCount{ 0 };
     bool     m_keepAlive{ true };
 
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —

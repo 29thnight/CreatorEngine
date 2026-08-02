@@ -2723,7 +2723,8 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         + " · baseColor 있는 드로우 " + std::to_string(materialsWithTexture) + "\n";
     outLog += "      키잉 — 드로우 " + std::to_string(gbuffer.GetLastDrawCount())
         + " · 메시 " + std::to_string(gbuffer.GetLastMeshCount())
-        + " · 재질 " + std::to_string(gbuffer.GetLastMaterialCount()) + "\n";
+        + " · 재질 " + std::to_string(gbuffer.GetLastMaterialCount())
+        + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
         + "(" + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
@@ -2897,6 +2898,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // '다른 재질'을 만들 수 없어 단정이 조용히 통과한다 — 실제로 그랬다.
     // 그래서 검증용 텍스처 둘을 직접 만들어 포인터를 갈라 놓는다.
     uint32_t keyedMaterialCount = 0;
+    uint32_t keyedBatchCount = 0;
     if (!draws.empty())
     {
         auto* keyTextureA = Texture::Create(4, 4, "MatKeyA",
@@ -2940,6 +2942,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 return false;
             }
             keyedMaterialCount = gbuffer.GetLastMaterialCount();
+            keyedBatchCount = gbuffer.GetLastBatchCount();
 
             frameContext.draws = &draws;
         }
@@ -3149,9 +3152,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
             char line[256]{};
             std::snprintf(line, sizeof(line),
-                "        드로우 %zu — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
+                "        드로우 %zu(배치 %u) — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
                 " · 기록 단위 %u(워커 %u)\n",
-                scaled.size(), scaledSequential, scaledParallel,
+                scaled.size(), gbuffer.GetLastBatchCount(), scaledSequential, scaledParallel,
                 (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0,
                 statsTemp.recordUnits, statsTemp.recordWorkers);
             outLog += line;
@@ -3216,6 +3219,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         passed = false;
         verdict = "병렬로 요청했는데 워커가 하나다 — 비교가 성립하지 않는다";
+    }
+    // 인스턴싱이 도는가.
+    //
+    // 같은 메시에 서로 다른 재질 둘을 넣었으므로 배치가 둘이어야 한다.
+    // 하나면 재질이 다른 것까지 묶은 것이고, 셋 이상이면 묶이지 않은 것이다.
+    else if (!draws.empty() && 2 != keyedBatchCount)
+    {
+        passed = false;
+        verdict = "같은 메시에 서로 다른 재질 둘을 넣었는데 배치가 "
+            + std::to_string(keyedBatchCount) + "개다 — 인스턴싱 병합이 어긋났다";
     }
     // 드로우별 재질 키잉. 같은 메시에 재질 둘을 넣었으므로 키가 둘이어야 한다.
     else if (!draws.empty() && 2 != keyedMaterialCount)

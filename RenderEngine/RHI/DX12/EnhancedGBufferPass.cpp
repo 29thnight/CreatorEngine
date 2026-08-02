@@ -36,15 +36,22 @@ cbuffer PerFrame : register(b0)
     float4x4 gViewProjection;
 };
 
-cbuffer PerDraw : register(b1)
+// 드로우별 상수를 cbuffer가 아니라 구조화 버퍼로 넘긴다.
+//
+// 같은 메시·재질을 쓰는 드로우가 여럿이면 인스턴스로 묶어 한 번에 그린다.
+// cbuffer로는 그럴 수 없다 — 드로우마다 다른 값을 넣어야 하므로 드로우도
+// 그만큼 나뉜다. 인스턴스 인덱스로 읽으면 한 드로우로 끝난다.
+struct InstanceData
 {
-    float4x4 gWorld;
-    float4   gBaseColorFactor;
-    float    gMetallic;
-    float    gRoughness;
-    uint     gUseNormalMap;
-    uint     gPadding;
+    float4x4 world;
+    float4   baseColorFactor;
+    float    metallic;
+    float    roughness;
+    uint     useNormalMap;
+    uint     padding;
 };
+
+StructuredBuffer<InstanceData> gInstances : register(t4);
 
 Texture2D    gBaseColor     : register(t0);
 Texture2D    gNormalMap     : register(t1);
@@ -68,13 +75,25 @@ struct VSOut
     float2 uv        : TEXCOORD0;
     float3 tangent   : TANGENT;
     float3 bitangent : BINORMAL;
+
+    // 픽셀 셰이더는 SV_InstanceID를 받을 수 없다. 재질 값은 정점에서 실어
+    // 보내되 보간하지 않는다 — 인스턴스 안에서 상수이기 때문이다.
+    nointerpolation float4 baseColorFactor : COLOR0;
+    nointerpolation float3 material        : TEXCOORD1;  // x 금속성 · y 거칠기 · z 노멀맵
 };
 
-VSOut VSMain(VSIn input)
+VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
+    const InstanceData instance = gInstances[instanceId];
+    const float4x4 gWorld = instance.world;
+
     VSOut output;
     const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
     output.position = mul(worldPosition, gViewProjection);
+
+    output.baseColorFactor = instance.baseColorFactor;
+    output.material = float3(instance.metallic, instance.roughness,
+        (float)instance.useNormalMap);
 
     // 법선·탄젠트는 회전만 적용한다. 비균등 스케일에는 역전치 행렬이 필요한데,
     // 그건 스케일이 실제로 문제가 되는 씬이 나왔을 때 상수에 추가한다 —
@@ -100,13 +119,13 @@ PSOut PSMain(VSOut input)
     // 텍스처가 없는 슬롯에는 1x1 흰색이 묶여 있다. 그래서 "텍스처가 있으면"
     // 분기가 필요 없다 — 분기 없는 쪽이 셰이더에서 빠르고, 재질마다 다른
     // 셰이더 변형을 만들지 않아도 된다.
-    const float4 albedo = gBaseColor.Sample(gSampler, input.uv) * gBaseColorFactor;
+    const float4 albedo = gBaseColor.Sample(gSampler, input.uv) * input.baseColorFactor;
 
     // occlusion/roughness/metallic은 glTF 규약대로 G에 거칠기, B에 금속성이다.
     const float3 orm = gOccRoughMetal.Sample(gSampler, input.uv).rgb;
 
     float3 normal = normalize(input.normal);
-    if (gUseNormalMap != 0)
+    if (input.material.z != 0.0f)
     {
         // 접선 공간 변환. 탄젠트를 법선에 대해 다시 직교화한다(그람-슈미트) —
         // 보간을 거치면 둘이 어긋나고, 그대로 쓰면 조명이 미묘하게 틀어진다.
@@ -124,7 +143,7 @@ PSOut PSMain(VSOut input)
 
     PSOut output;
     output.diffuse    = albedo;
-    output.metalRough = float4(orm.r, orm.g * gRoughness, orm.b + gMetallic, 1.0f);
+    output.metalRough = float4(orm.r, orm.g * input.material.y, orm.b + input.material.x, 1.0f);
     output.normal     = float4(normal * 0.5f + 0.5f, 1.0f);
     output.emissive   = gEmissive.Sample(gSampler, input.uv);
     output.bitmask    = 0xABCDu;
@@ -234,7 +253,91 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastMeshCount = static_cast<uint32_t>(m_drawGeometry.size());
     m_lastMaterialCount = static_cast<uint32_t>(m_drawTextures.size());
 
+    BuildBatches(context);
+
     return true;
+}
+
+void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
+{
+    m_instances.clear();
+    m_batches.clear();
+    m_lastBatchCount = 0;
+
+    if (nullptr == context.draws) return;
+
+    m_instances.reserve(context.draws->size());
+
+    // 같은 (메시, 재질)을 묶는다.
+    //
+    // 둘 중 하나라도 다르면 같은 드로우로 묶을 수 없다 — 메시가 다르면 정점·
+    // 인덱스 버퍼를, 재질이 다르면 SRV 테이블을 바꿔야 하기 때문이다.
+    //
+    // ★ 정렬해야 실제로 묶인다.
+    //
+    // 처음에는 '연속한 같은 것'만 묶었다. 순서를 흔들면 깊이 테스트 결과가
+    // 달라질까 봐서였는데, 재 보니 배치 수가 드로우 수와 똑같았다(704 → 704) —
+    // 씬의 드로우 순서는 대개 메시가 번갈아 나오므로 연속이 거의 없다.
+    // 병합이 통째로 죽어 있었고, 수치를 안 봤으면 몰랐을 것이다.
+    //
+    // 정렬해도 되는 이유: GBuffer는 불투명만 그리고 깊이 함수가 LESS다.
+    // 겹치는 픽셀은 더 가까운 쪽이 이기므로 그리는 순서와 무관하다.
+    // (같은 깊이면 순서를 타지만 그건 원래 불안정한 경우다.)
+    //
+    // 투명 재질이 들어오면 이 전제가 깨진다 — 그때는 불투명만 정렬하고
+    // 투명은 뒤에서 앞으로 따로 그려야 한다.
+    std::vector<const EnhancedDrawItem*> sorted;
+    sorted.reserve(context.draws->size());
+    for (const auto& draw : *context.draws)
+    {
+        if (nullptr == draw.mesh) continue;
+
+        const auto geometry = m_drawGeometry.find(draw.mesh);
+        if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
+
+        sorted.push_back(&draw);
+    }
+
+    std::stable_sort(sorted.begin(), sorted.end(),
+        [](const EnhancedDrawItem* a, const EnhancedDrawItem* b)
+        {
+            if (a->mesh != b->mesh) return a->mesh < b->mesh;
+
+            const MaterialKey keyA{ a->baseColor, a->normalMap, a->occRoughMetal, a->emissive };
+            const MaterialKey keyB{ b->baseColor, b->normalMap, b->occRoughMetal, b->emissive };
+            return keyA < keyB;
+        });
+
+    for (const auto* drawPtr : sorted)
+    {
+        const auto& draw = *drawPtr;
+
+        const MaterialKey key{
+            draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+
+        if (m_batches.empty() || m_batches.back().mesh != draw.mesh
+            || m_batches.back().material != key)
+        {
+            DrawBatch batch{};
+            batch.mesh = draw.mesh;
+            batch.material = key;
+            batch.firstInstance = static_cast<uint32_t>(m_instances.size());
+            batch.instanceCount = 0;
+            m_batches.push_back(batch);
+        }
+
+        InstanceData instance{};
+        instance.world = XMMatrixTranspose(draw.worldMatrix);
+        instance.baseColorFactor = draw.baseColorFactor;
+        instance.metallic = draw.metallic;
+        instance.roughness = draw.roughness;
+        instance.useNormalMap = draw.useNormalMap;
+
+        m_instances.push_back(instance);
+        ++m_batches.back().instanceCount;
+    }
+
+    m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
 }
 
 bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
@@ -263,9 +366,11 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     // 드로우 상수는 픽셀 셰이더도 읽는다(재질 계수). ALL로 두면 두 단계 모두 본다.
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[1].Descriptor.ShaderRegister = 1;   // b1 — 드로우 상수
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    // 인스턴스 버퍼는 루트 SRV로 넘긴다. 디스크립터를 만들 필요 없이 업로드
+    // 링의 GPU 주소를 그대로 꽂으면 되고, 배치마다 한 번이면 된다.
+    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    params[1].Descriptor.ShaderRegister = 4;   // t4 — 인스턴스 데이터
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     params[2].DescriptorTable.NumDescriptorRanges = 1;
@@ -505,40 +610,39 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->SetDescriptorHeaps(2, heaps);
             commandList->SetGraphicsRootDescriptorTable(3, m_sampler);
 
-            // 자기 몫의 드로우만 그린다.
+            // 자기 몫의 배치만 그린다.
             //
-            // 조각들은 선언 순서대로 실행되므로 결과는 통째로 그린 것과 같다 —
-            // 깊이 테스트처럼 순서에 의존하는 것도 그대로다.
-            const size_t drawCount = context.draws->size();
-            const size_t sliceBegin = drawCount * slice / sliceCount;
-            const size_t sliceEnd = drawCount * (slice + 1) / sliceCount;
+            // 단위가 드로우가 아니라 배치다. 같은 메시·재질을 쓰는 드로우들이
+            // 인스턴스 하나로 묶여 DrawIndexedInstanced 한 번에 나간다 —
+            // 드로우마다 상수를 올리고 SRV 테이블을 만들던 것이 배치마다 한 번이 된다.
+            //
+            // 조각들은 선언 순서대로 실행되므로 결과는 통째로 그린 것과 같다.
+            const size_t batchCount = m_batches.size();
+            const size_t sliceBegin = batchCount * slice / sliceCount;
+            const size_t sliceEnd = batchCount * (slice + 1) / sliceCount;
 
-            for (size_t drawIndex = sliceBegin; drawIndex < sliceEnd; ++drawIndex)
+            for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
             {
-                const auto& draw = (*context.draws)[drawIndex];
+                const DrawBatch& batch = m_batches[batchIndex];
+                if (0 == batch.instanceCount) continue;
 
-                const auto mesh = m_drawGeometry.find(draw.mesh);
+                const auto mesh = m_drawGeometry.find(batch.mesh);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
-                DrawConstants constants{};
-                constants.world = XMMatrixTranspose(draw.worldMatrix);
-                constants.baseColorFactor = draw.baseColorFactor;
-                constants.metallic = draw.metallic;
-                constants.roughness = draw.roughness;
-                constants.useNormalMap = draw.useNormalMap;
+                // 이 배치의 인스턴스를 업로드 링에 연속으로 올린다.
+                const uint64_t instanceBytes =
+                    sizeof(InstanceData) * static_cast<uint64_t>(batch.instanceCount);
+                const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
+                    instanceBytes, sizeof(InstanceData));
+                if (!instanceBuffer.IsValid()) break;   // 구간이 찼다 — 남은 배치는 다음 프레임
 
-                const auto drawConstants = context.resources->GetUploadRing().Allocate(
-                    sizeof(DrawConstants), DX12UploadRing::kConstantBufferAlignment);
-                if (!drawConstants.IsValid()) break;   // 구간이 찼다 — 남은 드로우는 다음 프레임
-
-                memcpy(drawConstants.cpuAddress, &constants, sizeof(constants));
-                commandList->SetGraphicsRootConstantBufferView(1, drawConstants.gpuAddress);
+                memcpy(instanceBuffer.cpuAddress, &m_instances[batch.firstInstance],
+                    static_cast<size_t>(instanceBytes));
+                commandList->SetGraphicsRootShaderResourceView(1, instanceBuffer.gpuAddress);
 
                 // 재질 텍스처 넷을 연속으로 잘라 테이블 하나로 묶는다.
                 // PrepareFrame이 올려 둔 것을 쓴다 — 기록 중에는 만들지 않는다.
-                const MaterialKey materialKey{
-                    draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
-                const auto textures = m_drawTextures.find(materialKey);
+                const auto textures = m_drawTextures.find(batch.material);
                 if (textures != m_drawTextures.end())
                 {
                     const auto srvRange = context.resources->GetDescriptorRing().Allocate(4);
@@ -563,7 +667,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
                 commandList->IASetVertexBuffers(0, 1, &mesh->second.vertexView);
                 commandList->IASetIndexBuffer(&mesh->second.indexView);
-                commandList->DrawIndexedInstanced(mesh->second.indexCount, 1, 0, 0, 0);
+                commandList->DrawIndexedInstanced(mesh->second.indexCount,
+                    batch.instanceCount, 0, 0, 0);
             }
         },
         // 조각 수는 드로우 수로 정한다.
@@ -586,10 +691,12 @@ uint32_t EnhancedGBufferPass::ComputeSliceCount() const
     // 분할이 이겼으므로 그 사이 어딘가가 경계다.
     constexpr uint32_t kMinDrawsPerSlice = 32;
 
-    if (m_lastDrawCount <= kMinDrawsPerSlice) return 1;
+    // 기준은 드로우가 아니라 배치다. 인스턴싱으로 묶인 뒤에는 배치 수가
+    // 기록 비용을 결정한다 — 드로우 700개가 배치 11개로 묶였다면 쪼갤 것이 없다.
+    if (m_lastBatchCount <= kMinDrawsPerSlice) return 1;
 
-    const uint32_t byDraws = m_lastDrawCount / kMinDrawsPerSlice;
-    return (std::max)(1u, (std::min)(DX12CommandListPool::kMaxWorkers, byDraws));
+    const uint32_t byBatches = m_lastBatchCount / kMinDrawsPerSlice;
+    return (std::max)(1u, (std::min)(DX12CommandListPool::kMaxWorkers, byBatches));
 }
 
 void EnhancedGBufferPass::Shutdown()
