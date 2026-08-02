@@ -1,6 +1,10 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <array>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -58,6 +62,19 @@ public:
 
     ID3D12GraphicsCommandList* Get(uint32_t worker) const;
 
+    /// job을 워커 수만큼 병렬로 돌리고 전부 끝날 때까지 기다린다.
+    ///
+    /// 워커 0은 호출 스레드가 맡는다. 스레드를 하나 덜 쓰기도 하지만,
+    /// 호출 스레드가 놀면서 남을 기다리는 것이 낭비라서다.
+    ///
+    /// ── 왜 지속 스레드인가 ──
+    ///
+    /// 처음에는 매 프레임 std::thread를 만들었다. 실측으로 그것이 손해였다:
+    /// 순차 1.3761 ms · 병렬 2.3419 ms(워커 4) — 1.7배 느렸다. 기록 자체가
+    /// 가벼운 씬에서는 스레드 생성 비용이 기록 비용을 넘는다.
+    /// 스레드를 한 번만 만들고 깨우는 쪽으로 바꾼다.
+    void RunParallel(const std::function<void(uint32_t)>& job, uint32_t workerCount);
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -71,6 +88,23 @@ private:
     // [프레임][워커]. 프레임 구간이 바깥인 이유는 BeginFrame이 구간 단위로
     // 통째로 Reset하기 때문이다.
     std::vector<std::vector<Slot>> m_slots;
+
+    // ── 지속 워커 스레드 ──
+    //
+    // 워커 0은 호출 스레드라 스레드를 만들지 않는다. 그래서 스레드는
+    // workerCount-1개다.
+    void WorkerLoop(uint32_t worker);
+
+    std::vector<std::thread> m_threads;
+    std::mutex               m_mutex;
+    std::condition_variable  m_wakeSignal;
+    std::condition_variable  m_doneSignal;
+
+    const std::function<void(uint32_t)>* m_job{ nullptr };
+    uint32_t m_jobWorkerCount{ 0 };
+    uint64_t m_generation{ 0 };      // 깨우기 세대. 가짜 깨움을 걸러 낸다
+    uint32_t m_pending{ 0 };
+    bool     m_stopping{ false };
 
     ComPtr<ID3D12Device> m_device;
     uint32_t m_workerCount{ 0 };

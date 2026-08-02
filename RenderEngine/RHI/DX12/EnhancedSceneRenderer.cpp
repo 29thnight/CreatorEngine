@@ -2404,7 +2404,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     // 실제 씬 패스를 병렬 경로에 태우기 위한 것. 람다가 참조로 잡는다.
     DX12CommandListPool commandPool;
-    if (!commandPool.Initialize(resources.GetDevice(), 4,
+    // 워커를 패스 수 이상으로 둔다.
+    //
+    // 4개로 뒀을 때 연속 블록 배분이 Shadow와 GBuffer를 한 워커에 몰았다
+    // (패스 6 · 워커 4 → 0,0,1,2,2,3). 그 둘이 이 그래프에서 가장 무거운
+    // 패스라 병렬화 효과가 거의 사라졌다. 워커가 패스 수 이상이면 1:1이 된다.
+    if (!commandPool.Initialize(resources.GetDevice(), 8,
         DX12DeviceResources::kFrameCount, error))
     {
         outLog += "[2/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
@@ -3036,7 +3041,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         sequentialRecordMs = sequentialTotal / kMeasureRuns;
 
         useParallelRecording = true;
-        parallelWorkers = 4;
+        parallelWorkers = 6;
         if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
             timingsTemp, statsTemp, luminanceTemp))
         {
@@ -3071,6 +3076,88 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             (parallelRecordMs > 0.0) ? (sequentialRecordMs / parallelRecordMs) : 0.0,
             coveredA, parallelCovered, luminanceLit, parallelLuminance);
         outLog += line;
+    }
+
+    // ── 규모를 키워 다시 잰다 ──
+    //
+    // 병렬화가 이기려면 기록 비용이 동기화 비용을 넘어야 한다. 패스 6·드로우
+    // 11에서는 기록이 너무 싸서 무엇을 해도 진다. 드로우를 늘려 그 경계가
+    // 어디인지 본다 — '병렬화가 값을 하는가'가 아니라 '언제부터 하는가'가
+    // 답해야 할 질문이다.
+    if (0 != drawCountA)
+    {
+        constexpr uint32_t kScales[] = { 4, 16, 64 };
+        constexpr uint32_t kMeasureRuns = 10;
+
+        for (uint32_t scale : kScales)
+        {
+            std::vector<EnhancedDrawItem> scaled;
+            scaled.reserve(draws.size() * scale);
+            for (uint32_t copy = 0; copy < scale; ++copy)
+            {
+                for (const auto& item : draws)
+                {
+                    EnhancedDrawItem clone = item;
+                    // 화면 밖으로 흩는다. 픽셀 비용이 아니라 기록 비용을 재는
+                    // 것이므로, 겹쳐 그려 픽셀을 태우면 무엇을 재는지 흐려진다.
+                    clone.worldMatrix = XMMatrixMultiply(item.worldMatrix,
+                        XMMatrixTranslation(static_cast<float>(copy) * 12.f, 0.f, 0.f));
+                    scaled.push_back(clone);
+                }
+            }
+
+            frameContext.draws = &scaled;
+
+            uint32_t coveredTemp = 0;
+            uint32_t drawTemp = 0;
+            double luminanceTemp = 0.0;
+            std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+            EnhancedRenderGraph::Stats statsTemp{};
+
+            const auto measure = [&](bool parallelMode, double& outMilliseconds) -> bool
+            {
+                useParallelRecording = parallelMode;
+                parallelWorkers = parallelMode ? 6u : 1u;
+
+                if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+                    timingsTemp, statsTemp, luminanceTemp))
+                {
+                    return false;
+                }
+
+                double total = 0.0;
+                for (uint32_t run = 0; run < kMeasureRuns; ++run)
+                {
+                    if (!renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+                        timingsTemp, statsTemp, luminanceTemp))
+                    {
+                        return false;
+                    }
+                    total += lastRecordMilliseconds;
+                }
+                outMilliseconds = total / kMeasureRuns;
+                return true;
+            };
+
+            double scaledSequential = 0.0;
+            double scaledParallel = 0.0;
+            if (!measure(false, scaledSequential) || !measure(true, scaledParallel))
+            {
+                outLog += "[4/4] 규모 측정 실패: " + error + "\n";
+                return false;
+            }
+
+            char line[224]{};
+            std::snprintf(line, sizeof(line),
+                "        드로우 %zu — 순차 %.4f ms · 병렬 %.4f ms · %.2f배\n",
+                scaled.size(), scaledSequential, scaledParallel,
+                (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0);
+            outLog += line;
+        }
+
+        frameContext.draws = &draws;
+        useParallelRecording = false;
+        parallelWorkers = 1;
     }
 
     char shadowLine[320]{};

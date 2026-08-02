@@ -66,11 +66,102 @@ bool DX12CommandListPool::Initialize(ID3D12Device* device, uint32_t workerCount,
         }
     }
 
+    // 워커 스레드를 띄운다. 워커 0은 호출 스레드가 맡으므로 만들지 않는다.
+    m_stopping = false;
+    m_threads.reserve(workerCount - 1);
+    for (uint32_t worker = 1; worker < workerCount; ++worker)
+    {
+        m_threads.emplace_back(&DX12CommandListPool::WorkerLoop, this, worker);
+    }
+
     return true;
+}
+
+void DX12CommandListPool::WorkerLoop(uint32_t worker)
+{
+    uint64_t seen = 0;
+
+    for (;;)
+    {
+        const std::function<void(uint32_t)>* job = nullptr;
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_wakeSignal.wait(lock, [&]
+            {
+                return m_stopping || (m_generation != seen && worker < m_jobWorkerCount);
+            });
+
+            if (m_stopping) return;
+
+            seen = m_generation;
+            job = m_job;
+        }
+
+        if (nullptr != job) (*job)(worker);
+
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (0 != m_pending && 0 == --m_pending)
+            {
+                m_doneSignal.notify_one();
+            }
+        }
+    }
+}
+
+void DX12CommandListPool::RunParallel(const std::function<void(uint32_t)>& job,
+    uint32_t workerCount)
+{
+    if (0 == workerCount) return;
+
+    if (1 == workerCount || m_threads.empty())
+    {
+        // 워커가 하나면 깨우지 않는다. 비교 기준을 잴 때 동기화 비용이 섞이면
+        // '병렬이 느리다'가 무엇 때문인지 흐려진다.
+        job(0);
+        return;
+    }
+
+    workerCount = (std::min)(workerCount, m_workerCount);
+
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        m_job = &job;
+        m_jobWorkerCount = workerCount;
+        m_pending = workerCount - 1;   // 워커 0은 호출 스레드
+        ++m_generation;
+    }
+    m_wakeSignal.notify_all();
+
+    job(0);
+
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_doneSignal.wait(lock, [&] { return 0 == m_pending; });
+        m_job = nullptr;
+        m_jobWorkerCount = 0;
+    }
 }
 
 void DX12CommandListPool::Shutdown()
 {
+    // 스레드를 먼저 세운다. 슬롯을 놓은 뒤에 세우면 워커가 사라진 리스트를 만진다.
+    if (!m_threads.empty())
+    {
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            m_stopping = true;
+            ++m_generation;
+        }
+        m_wakeSignal.notify_all();
+
+        for (auto& thread : m_threads)
+        {
+            if (thread.joinable()) thread.join();
+        }
+        m_threads.clear();
+    }
+
     m_slots.clear();
     m_device.Reset();
     m_workerCount = 0;

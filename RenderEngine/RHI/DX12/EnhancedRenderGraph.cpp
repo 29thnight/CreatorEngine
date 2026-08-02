@@ -469,9 +469,19 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
     // 리스트는 통째로 실행되는 단위라 '그 안의 일부만' 제출할 수 없다.
     //
     // 연속 블록이면 워커 순서 = 선언 순서가 되고, 리스트도 한 번씩만 제출된다.
-    // 대신 부하가 한쪽에 몰릴 수 있다 — 패스별 비용을 알기 전에는 균등 분할이
-    // 최선이고, 비용 기반 분할은 프로파일러가 패스별 시간을 병렬 경로에서도
-    // 줄 수 있게 된 뒤에 얹는다.
+    //
+    // ★ 대신 부하가 한쪽에 몰린다. 실측으로 그 대가를 확인했다.
+    // 워커를 패스 수보다 적게 주면(패스 6 · 워커 4 → 0,0,1,2,2,3) 가장 무거운
+    // 두 패스(Shadow·GBuffer)가 한 워커에 몰려 병렬화 효과가 거의 사라진다:
+    //   드로우 44에서 1.12배 · 176에서 0.81배 · 704에서 1.14배 — 방향조차 흔들렸다.
+    // 워커를 패스 수 이상으로 주어 1:1이 되게 하면 일관된다:
+    //   드로우 44에서 1.23배 · 176에서 1.20배 · 704에서 1.25배.
+    //
+    // 그래서 호출부는 워커를 넉넉히 주는 편이 낫다(아래에서 패스 수로 클램프한다).
+    // 남은 불균형은 패스 자체의 비용 차이다 — Shadow·GBuffer가 대부분을 차지하고
+    // 리드백 패스들은 거의 비어 있어, 이론 상한이 전체÷가장무거운패스로 묶인다.
+    // 그 위로 가려면 한 패스의 드로우를 여러 리스트로 쪼개야 하고, 그건
+    // 배리어가 끼지 않는 구간에서만 되므로 별도 슬라이스다.
     std::vector<uint32_t> passWorker(passCount, 0);
     for (size_t i = 0; i < passCount; ++i)
     {
@@ -532,33 +542,16 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
         }
     };
 
-    if (1 == workers)
-    {
-        // 워커가 하나면 스레드를 띄우지 않는다. 비교 기준을 잴 때 스레드 생성
-        // 비용이 섞이면 '병렬이 느리다'가 무엇 때문인지 흐려진다.
-        recordRange(0);
-    }
-    else
-    {
-        // ★ 여기가 지금 병렬화가 손해인 이유다.
-        //
-        // 매번 std::thread를 만들고 조인한다. 실측(FT_Material, 패스 6·드로우 11):
-        //   순차 1.3761 ms · 병렬(워커 4) 2.3419 ms — 0.59배, 즉 1.7배 느리다.
-        // 기록 자체가 가벼운 씬에서는 스레드 생성 비용이 기록 비용을 넘는다.
-        //
-        // 고칠 방향은 지속 스레드 풀이다(엔진에 이미 ThreadPool이 있다).
-        // 지금 그것을 붙이지 않은 이유는, 먼저 '병렬이 순차와 같은 그림을
-        // 내는가'를 확정하고 싶었기 때문이다 — 정확성이 안 잡힌 상태에서
-        // 성능을 손보면 무엇이 무엇을 고쳤는지 구분되지 않는다.
-        std::vector<std::thread> threads;
-        threads.reserve(workers - 1);
-        for (uint32_t worker = 1; worker < workers; ++worker)
-        {
-            threads.emplace_back(recordRange, worker);
-        }
-        recordRange(0);   // 호출 스레드도 한 몫 한다
-        for (auto& thread : threads) thread.join();
-    }
+    // 풀의 지속 워커를 쓴다.
+    //
+    // 처음에는 매 프레임 std::thread를 만들었는데 실측으로 그것이 손해였다:
+    // 순차 1.3761 ms · 병렬 2.3419 ms(워커 4) — 1.7배 느렸다. 기록 자체가
+    // 가벼운 씬에서는 스레드 생성 비용이 기록 비용을 넘는다.
+    //
+    // 워커가 하나면 풀이 깨우지 않고 그 자리에서 부른다 — 비교 기준에
+    // 동기화 비용이 섞이지 않아야 한다.
+    const std::function<void(uint32_t)> job = recordRange;
+    pool.RunParallel(job, workers);
 
     if (failed.load(std::memory_order_relaxed))
     {
