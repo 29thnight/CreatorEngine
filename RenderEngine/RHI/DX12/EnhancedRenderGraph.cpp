@@ -569,9 +569,18 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
                 const RecordUnit& unit = units[i];
                 Pass& pass = m_passes[m_executeOrder[unit.order]];
 
-                // 패스별 GPU 타임스탬프는 병렬 경로에서 재지 않는다.
-                // 질의 슬롯은 리스트 하나 안에서 순서가 맞아야 하는데 지금은
-                // 리스트가 여럿이다. 워커별 질의 힙으로 나누는 것이 다음 단계다.
+                // 패스별 GPU 시간을 병렬 경로에서도 잰다.
+                //
+                // 질의 힙은 하나여도 된다 — 인덱스가 겹치지 않으면 여러 커맨드
+                // 리스트가 같은 힙에 써도 되고, 슬롯 예약이 원자적이라 겹치지
+                // 않는다. 워커마다 힙을 나눌 필요는 없었다.
+                //
+                // 분할 패스는 조각마다 구간을 찍는다. 수집 때 이름으로 묶어
+                // 처음 시작~마지막 끝으로 합친다 — GPU 타임라인은 하나이고
+                // 조각들은 순서대로 실행되므로 그 구간이 곧 패스 전체 시간이다.
+                const uint32_t timerSlot = (nullptr != m_profiler)
+                    ? m_profiler->BeginPass(context.commandList, pass.name)
+                    : DX12GpuProfiler::kInvalidSlot;
 
                 // 배리어는 패스의 첫 조각에만 넣는다. 조각들은 순서대로
                 // 실행되므로 앞에 한 번이면 뒤 조각까지 덮는다.
@@ -583,6 +592,8 @@ bool EnhancedRenderGraph::ExecuteParallel(DX12CommandListPool& pool,
 
                 if (pass.splitExecute) pass.splitExecute(context, unit.slice, unit.sliceCount);
                 else if (pass.execute) pass.execute(context);
+
+                if (nullptr != m_profiler) m_profiler->EndPass(context.commandList, timerSlot);
             }
         }
         catch (const std::exception& e)

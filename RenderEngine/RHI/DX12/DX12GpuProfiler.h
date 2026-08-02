@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -62,6 +63,7 @@ private:
         std::string name;
         uint32_t    beginQuery{ 0 };
         uint32_t    endQuery{ 0 };
+        bool        used{ false };
     };
 
     ComPtr<ID3D12QueryHeap> m_queryHeap;
@@ -70,11 +72,21 @@ private:
     uint32_t m_maxPassesPerFrame{ 0 };
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
-    uint32_t m_usedPasses{ 0 };
+    // 슬롯 카운터는 원자적이다.
+    //
+    // 병렬 기록에서는 여러 워커가 동시에 BeginPass를 부른다. 단순 증가면
+    // 두 워커가 같은 슬롯을 받고, 그러면 한쪽의 타임스탬프가 다른 쪽 것으로
+    // 덮여 '어느 패스가 얼마나 걸렸는가'가 조용히 틀린 값이 된다.
+    //
+    // 질의 힙 자체는 하나로 충분하다 — 인덱스가 겹치지 않으면 여러 커맨드
+    // 리스트가 같은 힙에 써도 된다. 워커마다 힙을 나눌 필요는 없었다.
+    std::atomic<uint32_t> m_usedPasses{ 0 };
 
     // 틱을 밀리초로 바꾸는 값. 큐마다 다를 수 있어 초기화 때 받아 둔다.
     uint64_t m_ticksPerSecond{ 0 };
 
+    // 레코드는 미리 크기를 잡고 인덱스로 접근한다. push_back은 재할당을
+    // 일으켜 병렬에서 성립하지 않는다.
     std::vector<PassRecord> m_records;
     double m_lastTotalMs{ 0.0 };
 };

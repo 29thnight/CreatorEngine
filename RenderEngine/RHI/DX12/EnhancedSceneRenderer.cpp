@@ -3147,12 +3147,29 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 return false;
             }
 
-            char line[224]{};
+            char line[256]{};
             std::snprintf(line, sizeof(line),
-                "        드로우 %zu — 순차 %.4f ms · 병렬 %.4f ms · %.2f배\n",
+                "        드로우 %zu — 순차 %.4f ms · 병렬 %.4f ms · %.2f배"
+                " · 기록 단위 %u(워커 %u)\n",
                 scaled.size(), scaledSequential, scaledParallel,
-                (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0);
+                (scaledParallel > 0.0) ? (scaledSequential / scaledParallel) : 0.0,
+                statsTemp.recordUnits, statsTemp.recordWorkers);
             outLog += line;
+
+            // 병렬 경로의 패스별 GPU 시간. 마지막 규모에서만 찍는다 —
+            // 이 값이 다음 최적화의 근거가 된다. 무엇이 무거운지 모르면
+            // 어디를 쪼갤지 정할 수 없다.
+            if (scale == kScales[std::size(kScales) - 1])
+            {
+                for (const auto& timing : timingsTemp)
+                {
+                    char timingLine[160]{};
+                    std::snprintf(timingLine, sizeof(timingLine),
+                        "          GPU(병렬) %-22s %.4f ms\n",
+                        timing.name.c_str(), timing.milliseconds);
+                    outLog += timingLine;
+                }
+            }
         }
 
         frameContext.draws = &draws;
