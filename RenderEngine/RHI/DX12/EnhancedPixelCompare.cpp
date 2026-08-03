@@ -124,30 +124,36 @@ namespace
 //   다만 이 차이는 반대편 관찰을 설명한다 — DX12만 그린 40픽셀이 그것이다.
 //   (양쪽을 맞출지는 별도 판단이다. 컬링을 끈 데는 이유가 있었다.)
 //
-// ── z-fighting 가설: 확인하지 못했다 ──
+// ── z-fighting 가설: 기각됐다 ──
 //
-// 결정적 실험을 넣었다 — 문제의 드로우를 단독으로 그린다. 겹칠 상대가
-// 없는데도 같은 자리가 비면 겹침이 원인이 아니다.
+// 결정적 실험: 문제의 드로우를 단독으로 그린다. 겹칠 상대가 없는데도 같은
+// 자리가 비면 겹침이 원인이 아니다.
 //
-// 그런데 실험 자체를 신뢰할 수 없다:
-//   - 대상을 고르는 계산이 앞선 진단과 다른 드로우를 지목한다. 화면 y 범위
-//     진단은 9번(-706~2347)을 지목하는데, 여기 span 계산(radius/w)은 1번,
-//     기준을 바꾸니 4번을 골랐다. 둘이 갈리는 것 자체가 이 계산이 틀렸다는
-//     신호다.
-//   - 대상을 1번에서 4번으로 바꿨는데 결과가 839654픽셀로 정확히 같았다.
-//     서로 다른 드로우가 픽셀 하나까지 같을 수는 없다 — 단독 렌더가 실제로
-//     대상을 바꾸고 있는지조차 확인되지 않았다.
-//   - 고른 대상은 y 634부터 그린다. 차이 구간(528~683)의 위쪽을 그리는
-//     드로우가 아니므로, 애초에 물어야 할 것을 묻고 있지 않다.
+// 실험을 한 번 잘못 짰다가 고쳤다. 처음에는 대상 선택을 여기서만 다른 식
+// (월드 반지름)으로 계산해 엉뚱한 드로우를 집었고, 단독 렌더가 실제로
+// 반영되는지도 찍지 않았다. 대상을 바꿔도 결과가 픽셀 하나까지 같게 나오는
+// 것을 보고서야 실험을 의심했다. 고친 것 둘:
+//   - 대상 선택을 '드로우별 화면 y 범위' 진단과 같은 식으로 통일했다.
+//     지금은 두 진단이 같은 드로우(4번)를 지목한다.
+//   - 단독 렌더에 실제 드로우 수와 배치 수를 함께 찍는다. 1·1로 나온다.
 //
-// 그래서 '겹침이 아니다'라고 나온 판정은 근거가 없다. 실험을 고치기 전에는
-// z-fighting 가설을 지지할 수도 기각할 수도 없다.
+// 결과: 그 평면을 단독으로 그려도 y 634~1079다(픽셀 839654).
+//   겹칠 상대가 전혀 없는데 같은 한계에 걸린다. 겹침이 원인이 아니다.
+//   오히려 단독일 때 더 적게 그린다 — 전체 렌더의 556~634는 다른 드로우들이
+//   채우는 몫이었다.
 //
-// 실험을 고치는 방법:
-//   - 대상 선택을 화면 y 범위 진단과 같은 코드로 통일할 것. 두 곳에서 다르게
-//     계산하니 서로 다른 답이 나왔다.
-//   - 단독 렌더가 실제로 반영되는지 먼저 확인할 것. 드로우 수와 배치 수를
-//     함께 찍어 1이 나오는지 본다. 지금은 그것을 찍지 않아 알 수 없다.
+// 남은 사실: 이 평면은 DX12에서 y 634까지만 그려진다. DX11은 528까지 그린다.
+//   삼각형 단위로 빠지는 것은 확인됐고(경계가 들쭉날쭉), 겹침도 클리핑도
+//   컬링도 아니다.
+//
+// 다음에 볼 것:
+//   - 단독 렌더의 경계 모양을 따로 잴 것. 앞서 '들쭉날쭉'을 잰 것은 여러
+//     드로우가 섞인 전체 렌더였다. 이 평면 하나만의 경계가 직선인지 계단인지
+//     보면 클리핑과 삼각형 누락을 다시 가를 수 있다.
+//   - 그 메시의 삼각형 수와 정점 분포. 평면이 격자로 잘려 있다면 어느 줄부터
+//     빠지는지가 far 거리와 대응하는지 볼 것.
+//   - DX11이 이 드로우를 인스턴싱 경로(m_instancePSO)로 그리는지. 정점
+//     스트라이드나 입력 레이아웃이 다르면 같은 버퍼를 다르게 읽는다.
 //
 //   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
 //
@@ -665,11 +671,11 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         {
             if (nullptr == draws[i].mesh) continue;
 
-            // ★ 월드 반지름이 아니라 '화면에서 차지하는 세로 폭'으로 고른다.
+            // ★ 뒤쪽 '드로우별 화면 y 범위' 진단과 같은 식을 쓴다.
             //
-            // 처음에는 월드 반지름으로 골랐다가 엉뚱한 드로우(1번)를 집었다.
-            // 원근 때문에 월드에서 큰 것이 화면에서도 넓다는 보장이 없다.
-            // 차이 구간을 그릴 수 있는지가 기준이므로 화면 공간에서 재야 한다.
+            // 앞서 여기만 다른 식을 써서 엉뚱한 드로우를 집었다. 같은 질문에
+            // 두 코드가 다른 답을 내면 둘 중 하나는 틀린 것이고, 어느 쪽인지
+            // 알 수 없다. 식을 하나로 맞춘다.
             const auto sphere = draws[i].mesh->GetBoundingSphere();
             const float scale = (std::max)({
                 XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[0])),
@@ -683,7 +689,18 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             const float w = XMVectorGetW(clip);
             if (w <= 0.f) continue;
 
-            const float span = (sphere.Radius * scale) / w;
+            const float ndcY = XMVectorGetY(clip) / w;
+            const float screenY = (1.f - ndcY) * 0.5f * static_cast<float>(compareHeight);
+            const float screenR = (sphere.Radius * scale) / w
+                * 0.5f * static_cast<float>(compareHeight);
+
+            // 차이 구간의 위쪽(DX12가 안 그린 y 528~556)을 덮을 수 있는
+            // 드로우여야 한다. 그중 화면에서 가장 넓게 걸치는 것을 고른다.
+            const float top = screenY - screenR;
+            const float bottom = screenY + screenR;
+            if (bottom < 528.f || top > 556.f) continue;
+
+            const float span = bottom - top;
             if (span > widestSpan) { widestSpan = span; widestIndex = i; }
         }
 
@@ -705,12 +722,14 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
                 }
             }
 
-            char line[256]{};
+            char line[288]{};
             std::snprintf(line, sizeof(line),
-                "        단독 렌더(드로우 %zu) — y %u~%u · 픽셀 %zu → %s\n",
-                widestIndex, soloTop, soloBottom, soloCovered,
-                (soloTop < 540u) ? "겹침이 원인(z-fighting 쪽)"
-                                 : "단독으로도 같은 자리가 빈다(겹침 아님)");
+                "        단독 렌더(드로우 %zu · 실제 드로우 %u · 배치 %u) — y %u~%u"
+                " · 픽셀 %zu → %s\n",
+                widestIndex, gbuffer.GetLastDrawCount(), gbuffer.GetLastBatchCount(),
+                soloTop, soloBottom, soloCovered,
+                (soloTop <= 530u) ? "겹침이 원인(z-fighting 쪽)"
+                                  : "단독으로도 같은 자리가 빈다(겹침 아님)");
             outLog += line;
         }
 
