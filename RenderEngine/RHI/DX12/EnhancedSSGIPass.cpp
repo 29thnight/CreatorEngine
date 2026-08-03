@@ -306,6 +306,24 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 }
 )";
 
+    /// R16_FLOAT 한 성분을 float으로.
+    ///
+    /// XMConvertHalfToFloat을 쓸 수도 있지만 리드백 해석 두 곳뿐이라
+    /// 의존을 늘리지 않는다.
+    float SsgiHalfToFloat(uint16_t half)
+    {
+        const uint32_t sign = (half >> 15) & 0x1u;
+        const uint32_t exponent = (half >> 10) & 0x1Fu;
+        const uint32_t mantissa = half & 0x3FFu;
+
+        if (0 == exponent) return 0.f;   // 비정규는 0으로 본다
+
+        const uint32_t bits = (sign << 31) | ((exponent + 112u) << 23) | (mantissa << 13);
+        float value = 0.f;
+        memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
     struct ResolveParams
     {
         Mathf::Matrix inverseProjection{};
@@ -1312,6 +1330,25 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             return false;
         }
 
+        // 노멀도 만든다.
+        //
+        // 필터가 노멀 가중을 쓰므로 없으면 그 항을 잴 수 없다. 대체물(깊이
+        // 텍스처)을 꽂으면 깊이값을 노멀로 해석하게 되고, 그러면
+        // filterNormalPower를 스윕해도 무엇을 재는지 알 수 없다.
+        D3D12_RESOURCE_DESC normalDesc = depthDesc;
+        normalDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+        ComPtr<ID3D12Resource> testNormal;
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
+            D3D12_HEAP_FLAG_NONE, &normalDesc,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&testNormal))))
+        {
+            outLog += "[3/3] 테스트 노멀 생성 실패\n";
+            ssgi.Shutdown();
+            resources.Shutdown();
+            return false;
+        }
+
         // ★ 깊이를 실제로 채운다.
         //
         // 만들기만 하고 두면 초기화되지 않은 메모리를 깊이로 읽는다. 그
@@ -1329,7 +1366,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
             D3D12_DESCRIPTOR_RANGE uavRange{};
             uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            uavRange.NumDescriptors = 1;
+            uavRange.NumDescriptors = 2;   // 깊이 + 노멀
 
             D3D12_ROOT_PARAMETER depthParams[2]{};
             depthParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -1377,7 +1414,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
             const auto cb = resources.GetUploadRing().Allocate(
                 sizeof(depthCb), DX12UploadRing::kConstantBufferAlignment);
-            const auto uavTable = resources.GetDescriptorRing().Allocate(1);
+            const auto uavTable = resources.GetDescriptorRing().Allocate(2);
             if (cb.IsValid() && uavTable.IsValid())
             {
                 memcpy(cb.cpuAddress, &depthCb, sizeof(depthCb));
@@ -1387,6 +1424,12 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
                 resources.GetDevice()->CreateUnorderedAccessView(depth.Get(), nullptr,
                     &uavDesc, uavTable.CpuAt(0));
+
+                D3D12_UNORDERED_ACCESS_VIEW_DESC normalUav{};
+                normalUav.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                normalUav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                resources.GetDevice()->CreateUnorderedAccessView(testNormal.Get(), nullptr,
+                    &normalUav, uavTable.CpuAt(1));
 
                 auto* cmd = resources.GetCommandList();
                 ID3D12DescriptorHeap* depthHeaps[] = { resources.GetDescriptorRing().GetHeap() };
@@ -1405,7 +1448,12 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 toSrv.Transition.StateAfter =
                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
                 toSrv.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                cmd->ResourceBarrier(1, &toSrv);
+
+                D3D12_RESOURCE_BARRIER normalToSrv = toSrv;
+                normalToSrv.Transition.pResource = testNormal.Get();
+
+                D3D12_RESOURCE_BARRIER both[] = { toSrv, normalToSrv };
+                cmd->ResourceBarrier(2, both);
             }
 
             if (!resources.EndFrame(error))
@@ -1496,6 +1544,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         EnhancedSSGIPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
             RGResourceState::ShaderResource, "SSGI.TestDepth");
+        inputs.normal = graph.ImportTexture(testNormal.Get(),
+            RGResourceState::ShaderResource, "SSGI.TestNormal");
         ssgi.SetInputs(inputs);
 
         ssgi.Declare(graph, frameContext);
@@ -1684,6 +1734,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 EnhancedSSGIPass::Inputs sweepInputs{};
                 sweepInputs.depth = sweepGraph.ImportTexture(depth.Get(),
                     RGResourceState::ShaderResource, "SSGI.SweepDepth");
+                sweepInputs.normal = sweepGraph.ImportTexture(testNormal.Get(),
+                    RGResourceState::ShaderResource, "SSGI.SweepNormal");
                 ssgi.SetInputs(sweepInputs);
 
                 ssgi.Declare(sweepGraph, frameContext);
@@ -1769,6 +1821,164 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                         " — 그 값이 셰이더에 닿지 않는다\n";
                     passed = false;
                 }
+            }
+        }
+
+        // ── 필터 상수 스윕 ──
+        //
+        // 필터가 하는 일은 노이즈를 줄이는 것이다. 그러니 지표는 분산이다 —
+        // 리졸브 결과와 필터 결과의 표준편차를 나란히 보면 실제로 일하는지
+        // 알 수 있다. 값을 바꿔도 감소율이 그대로면 그 상수는 안 닿는 것이다.
+        //
+        // 깊이 시그마: 작을수록 깊이 차이에 민감해져 덜 섞는다.
+        // 노멀 지수: 클수록 노멀이 다른 이웃을 강하게 배제한다.
+        {
+            struct FilterCase { float depthSigma; float normalPower; };
+            const FilterCase cases[] = {
+                { 0.0001f, 16.f }, { 0.01f, 16.f }, { 1.0f, 16.f },
+                { 0.01f,    1.f }, { 0.01f, 64.f },
+            };
+
+            outLog += "[3/3] 필터 스윕 — 시그마/지수 → 이웃 차이(리졸브 → 필터)\n";
+
+            std::vector<double> reductions;
+
+            for (const FilterCase& filterCase : cases)
+            {
+                EnhancedSSGIPass::Tuning tuning = ssgi.GetTuning();
+                tuning.filterDepthSigma = filterCase.depthSigma;
+                tuning.filterNormalPower = filterCase.normalPower;
+                ssgi.SetTuning(tuning);
+
+                double sigmaBefore = 0.0;
+                double sigmaAfter = 0.0;
+
+                // 리졸브와 필터를 각각 읽는다. 한 프레임에 둘 다 읽으려면
+                // 리드백 버퍼가 둘이어야 하는데, 두 번 도는 편이 단순하다.
+                for (uint32_t stage = 0; stage < 2; ++stage)
+                {
+                    if (!resources.BeginFrame(error)) break;
+                    if (!ssgi.PrepareFrame(frameContext, error)) break;
+
+                    EnhancedRenderGraph filterGraph;
+
+                    EnhancedSSGIPass::Inputs filterInputs{};
+                    filterInputs.depth = filterGraph.ImportTexture(depth.Get(),
+                        RGResourceState::ShaderResource, "SSGI.FilterDepth");
+                    filterInputs.normal = filterGraph.ImportTexture(testNormal.Get(),
+                        RGResourceState::ShaderResource, "SSGI.FilterNormal");
+                    ssgi.SetInputs(filterInputs);
+
+                    ssgi.Declare(filterGraph, frameContext);
+
+                    const RGHandle target = (0 == stage)
+                        ? ssgi.GetResolvedResult() : ssgi.GetOutput();
+                    const RGHandle readSource = (0 == stage)
+                        ? ssgi.GetResolvedResult() : ssgi.GetFilteredResult();
+                    (void)target;
+
+                    filterGraph.AddPass("SSGI.FilterReadback",
+                        { { readSource, RGResourceState::CopySource } },
+                        [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                        {
+                            D3D12_TEXTURE_COPY_LOCATION dst{};
+                            dst.pResource = readback.Get();
+                            dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                            dst.PlacedFootprint.Footprint.Format = EnhancedSSGIPass::kGIFormat;
+                            dst.PlacedFootprint.Footprint.Width = giW;
+                            dst.PlacedFootprint.Footprint.Height = giH;
+                            dst.PlacedFootprint.Footprint.Depth = 1;
+                            dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
+
+                            D3D12_TEXTURE_COPY_LOCATION src{};
+                            src.pResource = executeContext.Resolve(readSource);
+                            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                            executeContext.commandList->CopyTextureRegion(
+                                &dst, 0, 0, 0, &src, nullptr);
+                        }, true);
+
+                    if (!filterGraph.Compile(resources.GetDevice(), error)) break;
+                    if (!filterGraph.Execute(resources.GetCommandList(), error)) break;
+                    if (!resources.EndFrame(error)) break;
+                    resources.WaitForGpu();
+
+                    void* mapped = nullptr;
+                    D3D12_RANGE range{ 0, static_cast<SIZE_T>(rowPitch) * giH };
+                    if (FAILED(readback->Map(0, &range, &mapped))) break;
+
+                    const auto* pixels = static_cast<const uint8_t*>(mapped);
+
+                    // ★ 표준편차가 아니라 '이웃 간 차이'를 잰다.
+                    //
+                    // 처음에는 전체 표준편차를 썼다. 필터 전후로 0.079422 →
+                    // 0.079416, 감소 0.0%가 나왔다. 필터가 죽은 것처럼 보였지만
+                    // 지표가 틀린 것이었다 — 표준편차는 공간 구조(밝은 곳과
+                    // 어두운 곳의 차이)를 포함하고, 필터는 그것을 지우면 안 된다.
+                    //
+                    // 노이즈는 이웃 픽셀 사이에서 튀고 구조는 완만하다. 그래서
+                    // 오른쪽·아래 이웃과의 차이 평균을 본다. 필터가 일하면
+                    // 이 값이 줄고, 구조를 지우는지는 별개로 봐야 한다.
+                    double diffSum = 0.0;
+                    size_t counted = 0;
+
+                    const auto lumaAt = [&](uint32_t x, uint32_t y) -> double
+                    {
+                        const auto* row = reinterpret_cast<const uint16_t*>(pixels
+                            + static_cast<size_t>(y) * rowPitch);
+                        const float r = SsgiHalfToFloat(row[x * 4 + 0]);
+                        const float g = SsgiHalfToFloat(row[x * 4 + 1]);
+                        const float b = SsgiHalfToFloat(row[x * 4 + 2]);
+                        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                    };
+
+                    for (uint32_t y = 0; y + 1 < giH; ++y)
+                    {
+                        for (uint32_t x = 0; x + 1 < giW; ++x)
+                        {
+                            const double here = lumaAt(x, y);
+                            diffSum += std::abs(lumaAt(x + 1, y) - here);
+                            diffSum += std::abs(lumaAt(x, y + 1) - here);
+                            counted += 2;
+                        }
+                    }
+
+                    readback->Unmap(0, nullptr);
+
+                    if (0 != counted)
+                    {
+                        const double roughness = diffSum / static_cast<double>(counted);
+                        if (0 == stage) sigmaBefore = roughness;
+                        else            sigmaAfter = roughness;
+                    }
+                }
+
+                const double reduction = (sigmaBefore > 1e-9)
+                    ? (1.0 - sigmaAfter / sigmaBefore) : 0.0;
+                reductions.push_back(reduction);
+
+                char line[224]{};
+                std::snprintf(line, sizeof(line),
+                    "        시그마 %7.4f · 지수 %5.1f → %.6f → %.6f (감소 %.1f%%)\n",
+                    filterCase.depthSigma, filterCase.normalPower,
+                    sigmaBefore, sigmaAfter, reduction * 100.0);
+                outLog += line;
+            }
+
+            // ★ 값을 바꿔도 감소율이 그대로면 그 상수는 안 닿는 것이다.
+            if (reductions.size() >= 3)
+            {
+                const double spread =
+                    *std::max_element(reductions.begin(), reductions.end())
+                    - *std::min_element(reductions.begin(), reductions.end());
+
+                char line[192]{};
+                std::snprintf(line, sizeof(line),
+                    "        감소율 폭 %.1f%%p — %s\n",
+                    spread * 100.0,
+                    (spread < 0.01) ? "상수가 결과를 거의 안 바꾼다"
+                                    : "상수가 결과를 바꾼다");
+                outLog += line;
             }
         }
 

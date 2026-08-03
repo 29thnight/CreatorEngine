@@ -24,7 +24,8 @@ namespace SsgiShaders
     // 맞출 수 있는 최소 구성이다: 구가 바닥에 간접광을 던지고, 바닥이
     // 구의 아래쪽을 비춘다.
     constexpr const char* kTestDepth = R"(
-RWTexture2D<float> gDepth : register(u0);
+RWTexture2D<float>  gDepth  : register(u0);
+RWTexture2D<float4> gNormal : register(u1);
 
 cbuffer TestDepthParams : register(b0)
 {
@@ -64,6 +65,29 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     }
 
     gDepth[id.xy] = depth;
+
+    // ★ 노멀도 함께 만든다.
+    //
+    // 필터가 노멀 가중을 쓰므로 노멀이 없으면 그 항이 무의미해진다.
+    // 대체물(깊이 텍스처)을 꽂으면 깊이값을 노멀로 해석하게 되고,
+    // 그러면 filterNormalPower를 스윕해도 무엇을 재는지 알 수 없다.
+    //
+    // GBuffer 규약대로 [0,1]로 인코딩한다(셰이더가 *2-1로 편다).
+    float3 normal = float3(0.0f, 1.0f, 0.0f);   // 바닥은 위를 본다
+
+    if (r < 0.15f)
+    {
+        // 구 표면 노멀: 중심에서 바깥으로.
+        const float z = sqrt(max(0.0f, 1.0f - saturate(r / 0.15f) * saturate(r / 0.15f)));
+        normal = normalize(float3(d.x, -d.y, z));
+    }
+    else if (uv.y <= 0.5f)
+    {
+        // 하늘. 값은 안 쓰이지만 0으로 두면 normalize가 NaN을 낸다.
+        normal = float3(0.0f, 0.0f, 1.0f);
+    }
+
+    gNormal[id.xy] = float4(normal * 0.5f + 0.5f, 1.0f);
 }
 )";
 
