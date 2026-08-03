@@ -100,6 +100,47 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
 
+    /// 조율 가능한 상수.
+    ///
+    /// 헤더에 박아 두지 않고 밖에서 바꿀 수 있게 한다. 값을 정하려면
+    /// 여러 값으로 돌려 봐야 하는데, 상수로 두면 재빌드가 한 번씩 든다.
+    /// 기본값은 눈대중이고 실측으로 조인다.
+    struct Tuning
+    {
+        // 추적 거리는 결과를 실제로 바꾼다(실측):
+        //   거리  2 → 히트 0.2354 · 8 → 0.1592 · 32 → 0.1359
+        // 멀리 볼수록 히트가 주는 것은 같은 스텝 수로 넓은 범위를 훑어
+        // 해상도가 떨어지기 때문이다. 다만 히트 비율이 높다고 좋은 것은
+        // 아니다 — 가까운 것만 맞추면 GI가 국소적이 된다. 어느 값이 옳은지는
+        // 그림을 봐야 정할 수 있고, 8은 아직 눈대중이다.
+        float traceDistance{ 8.f };
+
+        // ★ 두께는 현재 거의 아무 일도 하지 않는다(실측).
+        //
+        //   0.0002 → 0.1587 · 0.002 → 0.1597 · 0.02 → 0.1596 · 0.5 → 0.1592
+        //   100배를 바꿔도 0.6% 안에서 움직인다.
+        //
+        // 두 가지가 겹쳐 있다:
+        //   ① 단위가 안 맞았다. '뷰 공간 두께'라고 적어 놓고 셰이더는 클립
+        //      깊이(0~1 비선형)와 비교한다. 0.5는 클립 깊이에서 거대한 값이라
+        //      검사가 늘 통과했다.
+        //   ② 작은 값으로 바꿔도 안 걸린다. Hi-Z 행진이 밉 0에서 교차를
+        //      판정하는 순간 rayDepth - cellDepth가 이미 매우 작기 때문이다.
+        //
+        // 그래서 이 값은 지금 '조일 상수'가 아니다. 두께 검사를 살리려면
+        // 클립 깊이를 뷰 공간으로 되돌려 비교하도록 셰이더를 고쳐야 하고,
+        // 그 전에는 어떤 값을 넣어도 같다.
+        float traceThickness{ 0.5f };
+        float accumDepthTolerance{ 0.01f };
+        float filterDepthSigma{ 0.01f };
+        float filterNormalPower{ 16.f };
+        float compositeDepthSigma{ 0.01f };
+        float intensity{ 1.f };
+    };
+
+    void SetTuning(const Tuning& tuning) { m_tuning = tuning; }
+    const Tuning& GetTuning() const { return m_tuning; }
+
     /// 합성까지 끝난 결과. 뒤 패스가 읽는다.
     RGHandle GetOutput() const { return m_output; }
 
@@ -124,6 +165,7 @@ private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};
+    Tuning   m_tuning{};
     RGHandle m_output;
     RGHandle m_traceResult;   // 행진 원본(노이즈가 살아 있다)
 

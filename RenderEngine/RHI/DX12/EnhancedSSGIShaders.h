@@ -14,6 +14,59 @@
 
 namespace SsgiShaders
 {
+    // ── 검증용 절차적 깊이 ──
+    //
+    // 검증이 깊이 텍스처를 만들기만 하고 채우지 않았다. 초기화되지 않은
+    // 메모리를 깊이로 읽으면 히트 비율 같은 숫자가 뜻을 잃는다 — 무엇을
+    // 재는지 모르는 채로 상수를 조이게 된다.
+    //
+    // 바닥 평면 하나와 가운데 구 하나. 화면 공간 행진이 실제로 무언가를
+    // 맞출 수 있는 최소 구성이다: 구가 바닥에 간접광을 던지고, 바닥이
+    // 구의 아래쪽을 비춘다.
+    constexpr const char* kTestDepth = R"(
+RWTexture2D<float> gDepth : register(u0);
+
+cbuffer TestDepthParams : register(b0)
+{
+    uint2 gSize;
+    float gNear;
+    float gFar;
+};
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= gSize.x || id.y >= gSize.y) return;
+
+    const float2 uv = (float2(id.xy) + 0.5f) / float2(gSize);
+
+    // 화면 아래 절반은 바닥. 위로 갈수록 멀어진다.
+    // 위 절반은 하늘(깊이 1).
+    float depth = 1.0f;
+
+    if (uv.y > 0.5f)
+    {
+        // 바닥: y가 0.5(지평선)에서 1(발밑)로 갈수록 가까워진다.
+        const float t = (uv.y - 0.5f) * 2.0f;
+        depth = lerp(0.999f, 0.5f, t);
+    }
+
+    // 가운데 구. 화면 중앙에 원으로 놓는다.
+    const float2 center = float2(0.5f, 0.45f);
+    const float2 d = (uv - center) * float2(1.0f, float(gSize.y) / float(gSize.x));
+    const float r = length(d);
+
+    if (r < 0.15f)
+    {
+        // 구 표면: 가장자리에서 멀고 중앙에서 가깝다.
+        const float bulge = sqrt(max(0.0f, 0.15f * 0.15f - r * r)) / 0.15f;
+        depth = min(depth, 0.7f - bulge * 0.1f);
+    }
+
+    gDepth[id.xy] = depth;
+}
+)";
+
     // ── 리졸브: 시간적 재투영 + 누적 ──
     //
     // 이 설계에서 가장 크게 아끼는 자리다. 프레임당 슬라이스를 적게 쓰는

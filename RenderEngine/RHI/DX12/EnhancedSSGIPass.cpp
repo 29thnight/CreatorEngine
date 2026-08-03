@@ -222,6 +222,14 @@ bool TraceHiZ(float3 origin, float3 direction, float2 startUV, out float2 hitUV)
             if (0 == mip)
             {
                 // 두께를 넘어 뚫고 지나간 것이면 히트로 보지 않는다.
+                //
+                // ★ 이 검사는 현재 거의 발동하지 않는다(실측: 두께를 100배
+                //   바꿔도 히트 비율이 0.6% 안에서 움직인다). 이유가 둘이다.
+                //   ① rayDepth와 cellDepth가 클립 깊이(0~1 비선형)인데
+                //      gThickness는 뷰 공간 값으로 의도됐다 — 단위가 다르다.
+                //   ② Hi-Z가 밉 0까지 수렴한 시점에는 두 값의 차이가 이미
+                //      매우 작다.
+                //   살리려면 두 깊이를 뷰 공간으로 되돌려 비교해야 한다.
                 // 이것이 없으면 얇은 물체 뒤가 전부 막힌 것으로 잡힌다.
                 if (rayDepth - cellDepth > gThickness) return false;
 
@@ -773,8 +781,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.frameIndex = m_frameIndex;
                 // 실측으로 정할 값들이다. 지금은 눈으로 볼 수 있는 범위를
                 // 잡아 두고, 리졸브가 붙은 뒤 씬에 맞춰 조인다.
-                params.maxDistance = 8.f;
-                params.thickness = 0.5f;
+                params.maxDistance = m_tuning.traceDistance;
+                params.thickness = m_tuning.traceThickness;
 
                 const auto cb = context.resources->GetUploadRing().Allocate(
                     sizeof(TraceParams), DX12UploadRing::kConstantBufferAlignment);
@@ -984,7 +992,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.maxAccum = kMaxAccumFrames;
         // 실측으로 조일 값이다. 너무 크면 다른 표면을 같은 것으로 보고,
         // 너무 작으면 정지 상태에서도 히스토리를 버린다.
-        params.depthTolerance = 0.01f;
+        params.depthTolerance = m_tuning.accumDepthTolerance;
 
         const uint32_t readIndex = (m_historyIndex + kHistoryCount - 1) % kHistoryCount;
 
@@ -1032,8 +1040,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         FilterParams params{};
         params.width = m_giWidth;
         params.height = m_giHeight;
-        params.depthSigma = 0.01f;
-        params.normalPower = 16.f;
+        params.depthSigma = m_tuning.filterDepthSigma;
+        params.normalPower = m_tuning.filterNormalPower;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({ m_resolved, RGResourceState::ShaderResource });
@@ -1060,8 +1068,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.outputHeight = context.height;
         params.giWidth = m_giWidth;
         params.giHeight = m_giHeight;
-        params.intensity = 1.f;
-        params.depthSigma = 0.01f;
+        params.intensity = m_tuning.intensity;
+        params.depthSigma = m_tuning.compositeDepthSigma;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({ m_filtered, RGResourceState::ShaderResource });
@@ -1296,12 +1304,118 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         ComPtr<ID3D12Resource> depth;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &depthDesc,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&depth))))
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&depth))))
         {
             outLog += "[3/3] 깊이 텍스처 생성 실패\n";
             ssgi.Shutdown();
             resources.Shutdown();
             return false;
+        }
+
+        // ★ 깊이를 실제로 채운다.
+        //
+        // 만들기만 하고 두면 초기화되지 않은 메모리를 깊이로 읽는다. 그
+        // 상태로는 히트 비율 같은 숫자가 뜻을 잃고, 무엇을 재는지 모르는 채
+        // 상수를 조이게 된다. 바닥 평면과 구 하나를 절차적으로 그린다.
+        {
+            ComPtr<ID3DBlob> depthBlob;
+            if (!CompileSsgiShader(SsgiShaders::kTestDepth, nullptr, depthBlob, error))
+            {
+                outLog += "[3/3] 테스트 깊이 셰이더 컴파일 실패: " + error + "\n";
+                ssgi.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+
+            D3D12_DESCRIPTOR_RANGE uavRange{};
+            uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+            uavRange.NumDescriptors = 1;
+
+            D3D12_ROOT_PARAMETER depthParams[2]{};
+            depthParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+            depthParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            depthParams[1].DescriptorTable.NumDescriptorRanges = 1;
+            depthParams[1].DescriptorTable.pDescriptorRanges = &uavRange;
+
+            D3D12_ROOT_SIGNATURE_DESC depthRootDesc{};
+            depthRootDesc.NumParameters = _countof(depthParams);
+            depthRootDesc.pParameters = depthParams;
+
+            const auto depthRoot = rootSignatures.GetOrCreate(depthRootDesc, error);
+            if (!depthRoot.IsValid())
+            {
+                outLog += "[3/3] 테스트 깊이 루트 시그니처 실패: " + error + "\n";
+                ssgi.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+
+            DX12ComputePipelineDesc depthPsoDesc{};
+            depthPsoDesc.csBytecode = depthBlob->GetBufferPointer();
+            depthPsoDesc.csSize = depthBlob->GetBufferSize();
+            depthPsoDesc.rootSignature = depthRoot.signature;
+            depthPsoDesc.rootSignatureId = depthRoot.id;
+
+            auto* depthPso = psoManager.GetOrCreateCompute(depthPsoDesc, error);
+            if (nullptr == depthPso)
+            {
+                outLog += "[3/3] 테스트 깊이 PSO 실패: " + error + "\n";
+                ssgi.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+
+            if (!resources.BeginFrame(error))
+            {
+                outLog += "[3/3] 깊이 채우기 BeginFrame 실패: " + error + "\n";
+                ssgi.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+
+            struct { uint32_t w, h; float nearP, farP; } depthCb{ kWidth, kHeight, 0.1f, 100.f };
+
+            const auto cb = resources.GetUploadRing().Allocate(
+                sizeof(depthCb), DX12UploadRing::kConstantBufferAlignment);
+            const auto uavTable = resources.GetDescriptorRing().Allocate(1);
+            if (cb.IsValid() && uavTable.IsValid())
+            {
+                memcpy(cb.cpuAddress, &depthCb, sizeof(depthCb));
+
+                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+                uavDesc.Format = DXGI_FORMAT_R32_FLOAT;
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                resources.GetDevice()->CreateUnorderedAccessView(depth.Get(), nullptr,
+                    &uavDesc, uavTable.CpuAt(0));
+
+                auto* cmd = resources.GetCommandList();
+                ID3D12DescriptorHeap* depthHeaps[] = { resources.GetDescriptorRing().GetHeap() };
+                cmd->SetDescriptorHeaps(1, depthHeaps);
+                cmd->SetComputeRootSignature(depthRoot.signature);
+                cmd->SetPipelineState(depthPso);
+                cmd->SetComputeRootConstantBufferView(0, cb.gpuAddress);
+                cmd->SetComputeRootDescriptorTable(1, uavTable.gpu);
+                cmd->Dispatch((kWidth + 7) / 8, (kHeight + 7) / 8, 1);
+
+                // SSGI가 SRV로 읽으므로 전이한다.
+                D3D12_RESOURCE_BARRIER toSrv{};
+                toSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                toSrv.Transition.pResource = depth.Get();
+                toSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                toSrv.Transition.StateAfter =
+                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                toSrv.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                cmd->ResourceBarrier(1, &toSrv);
+            }
+
+            if (!resources.EndFrame(error))
+            {
+                outLog += "[3/3] 깊이 채우기 EndFrame 실패: " + error + "\n";
+                ssgi.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+            resources.WaitForGpu();
         }
 
         // ★ 결과를 읽는 패스를 붙인다.
@@ -1346,6 +1460,8 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             outLog += "[3/3] 리드백 버퍼 생성 실패\n";
             passed = false;
         }
+
+        std::vector<double> sweepHits;
 
         // ── 여러 프레임 돌린다 ──
         //
@@ -1527,6 +1643,130 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 else
                 {
                     outLog += "[3/3] 누적을 잴 픽셀이 없다 — 전부 하늘로 판정됐다\n";
+                    passed = false;
+                }
+            }
+        }
+
+        // ── 상수 스윕 ──
+        //
+        // 값을 정하기 전에 그 값이 결과를 실제로 바꾸는지부터 본다.
+        // 바꿔도 숫자가 그대로면 그 상수는 지금 아무 일도 안 하는 것이고,
+        // 그때는 값을 고르는 것이 아니라 배선을 봐야 한다 — 누적에서
+        // 이미 그렇게 세 번 틀렸다.
+        //
+        // 히트 비율은 트레이스 출력의 a 채널이다. 추적 거리와 두께가
+        // 그것을 좌우한다.
+        {
+            struct SweepCase { float distance; float thickness; };
+            const SweepCase cases[] = {
+                { 2.f,  0.5f }, { 8.f,  0.5f }, { 32.f, 0.5f },
+                // 두께는 클립 깊이 차이와 비교되므로 훨씬 작은 눈금으로 본다.
+                { 8.f,  0.0002f }, { 8.f,  0.002f }, { 8.f,  0.02f },
+            };
+
+            outLog += "[3/3] 추적 스윕 — 거리/두께 → 히트 비율\n";
+
+            for (const SweepCase& sweepCase : cases)
+            {
+                EnhancedSSGIPass::Tuning tuning = ssgi.GetTuning();
+                tuning.traceDistance = sweepCase.distance;
+                tuning.traceThickness = sweepCase.thickness;
+                ssgi.SetTuning(tuning);
+
+                if (!resources.BeginFrame(error)) break;
+                if (!ssgi.PrepareFrame(frameContext, error)) break;
+
+                EnhancedRenderGraph sweepGraph;
+
+                // 깊이는 그래프마다 새로 임포트한다. 핸들은 그래프에 매인
+                // 것이라 앞 그래프의 것을 넘겨 쓰면 다른 리소스를 가리킨다.
+                EnhancedSSGIPass::Inputs sweepInputs{};
+                sweepInputs.depth = sweepGraph.ImportTexture(depth.Get(),
+                    RGResourceState::ShaderResource, "SSGI.SweepDepth");
+                ssgi.SetInputs(sweepInputs);
+
+                ssgi.Declare(sweepGraph, frameContext);
+
+                sweepGraph.AddPass("SSGI.SweepReadback",
+                    { { ssgi.GetTraceResult(), RGResourceState::CopySource } },
+                    [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                    {
+                        D3D12_TEXTURE_COPY_LOCATION dst{};
+                        dst.pResource = readback.Get();
+                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                        dst.PlacedFootprint.Footprint.Format = EnhancedSSGIPass::kGIFormat;
+                        dst.PlacedFootprint.Footprint.Width = giW;
+                        dst.PlacedFootprint.Footprint.Height = giH;
+                        dst.PlacedFootprint.Footprint.Depth = 1;
+                        dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
+
+                        D3D12_TEXTURE_COPY_LOCATION src{};
+                        src.pResource = executeContext.Resolve(ssgi.GetTraceResult());
+                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                        executeContext.commandList->CopyTextureRegion(
+                            &dst, 0, 0, 0, &src, nullptr);
+                    }, true);
+
+                if (!sweepGraph.Compile(resources.GetDevice(), error)) break;
+                if (!sweepGraph.Execute(resources.GetCommandList(), error)) break;
+                if (!resources.EndFrame(error)) break;
+                resources.WaitForGpu();
+
+                void* mapped = nullptr;
+                D3D12_RANGE range{ 0, static_cast<SIZE_T>(rowPitch) * giH };
+                if (FAILED(readback->Map(0, &range, &mapped))) break;
+
+                const auto* pixels = static_cast<const uint8_t*>(mapped);
+                double hitSum = 0.0;
+                size_t counted = 0;
+
+                for (uint32_t y = 0; y < giH; ++y)
+                {
+                    const auto* row = reinterpret_cast<const uint16_t*>(pixels
+                        + static_cast<size_t>(y) * rowPitch);
+
+                    for (uint32_t x = 0; x < giW; ++x)
+                    {
+                        const uint16_t half = row[x * 4 + 3];
+                        const uint32_t exponent = (half >> 10) & 0x1Fu;
+                        const uint32_t mantissa = half & 0x3FFu;
+
+                        float value = 0.f;
+                        if (0 != exponent)
+                        {
+                            const uint32_t bits = ((exponent + 112u) << 23) | (mantissa << 13);
+                            memcpy(&value, &bits, sizeof(value));
+                        }
+
+                        hitSum += value;
+                        ++counted;
+                    }
+                }
+
+                readback->Unmap(0, nullptr);
+
+                char line[192]{};
+                std::snprintf(line, sizeof(line),
+                    "        거리 %5.1f · 두께 %4.2f → 히트 %.4f\n",
+                    sweepCase.distance, sweepCase.thickness,
+                    (0 != counted) ? (hitSum / static_cast<double>(counted)) : 0.0);
+                outLog += line;
+
+                sweepHits.push_back((0 != counted)
+                    ? (hitSum / static_cast<double>(counted)) : 0.0);
+            }
+
+            // ★ 값을 바꿔도 결과가 그대로면 그 상수는 지금 안 쓰이는 것이다.
+            if (sweepHits.size() >= 3)
+            {
+                const double spread = *std::max_element(sweepHits.begin(), sweepHits.end())
+                    - *std::min_element(sweepHits.begin(), sweepHits.end());
+                if (spread < 1e-4)
+                {
+                    outLog += "추적 상수를 바꿔도 히트 비율이 그대로다"
+                        " — 그 값이 셰이더에 닿지 않는다\n";
                     passed = false;
                 }
             }
