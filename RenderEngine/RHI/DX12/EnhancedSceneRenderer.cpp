@@ -6,6 +6,7 @@
 #include "EnhancedRenderGraph.h"
 #include "EnhancedGBufferPass.h"
 #include "EnhancedDeferredPass.h"
+#include "EnhancedSSGIPass.h"
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
 #include "DX12MeshCache.h"
@@ -2300,16 +2301,25 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     EnhancedDeferredPass deferred;
+    EnhancedSSGIPass     ssgi;
     if (!deferred.Initialize(frameContext, error))
     {
         outLog += "[2/4] Deferred 초기화 실패: " + error + "\n";
         return false;
     }
 
+    if (!ssgi.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] SSGI 초기화 실패: " + error + "\n";
+        return false;
+    }
+
     DX12GpuProfiler profiler;
-    // 패스가 여섯(그림자·GBuffer·Deferred·리드백 셋)이라 질의가 열둘 든다.
+    // SSGI가 붙어 패스가 스무 개를 넘는다(Hi-Z 밉 여덟 + 트레이스·리졸브·
+    // 필터·합성·히스토리). 질의는 패스당 둘이라 넉넉히 잡는다 — 모자라면
+    // 뒤쪽 패스의 시간이 조용히 0으로 나온다.
     if (!profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
-        32, DX12DeviceResources::kFrameCount, error))
+        64, DX12DeviceResources::kFrameCount, error))
     {
         outLog += "[2/4] GPU 프로파일러 초기화 실패: " + error + "\n";
         return false;
@@ -2462,6 +2472,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (!shadow.PrepareFrame(frameContext, outStepError)) return false;
         if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
         if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
+        if (!ssgi.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
         EnhancedRenderGraph graph;
@@ -2482,6 +2493,22 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         deferred.SetShadow(shadow.GetShadowMap(), shadowData);
 
         deferred.Declare(graph, frameContext);
+
+        // ── SSGI ──
+        //
+        // Deferred 뒤에 온다. 간접광의 광원이 직접광 결과이기 때문이다 —
+        // 순서가 뒤집히면 아직 아무도 안 쓴 것을 읽게 되고, 그래프가
+        // 컴파일에서 잡는다("선언 순서가 데이터 흐름과 어긋난다").
+        {
+            EnhancedSSGIPass::Inputs ssgiInputs{};
+            ssgiInputs.depth = outputs.depth;
+            ssgiInputs.normal = outputs.normal;
+            ssgiInputs.diffuse = outputs.diffuse;
+            ssgiInputs.metalRough = outputs.metalRough;
+            ssgiInputs.lighting = deferred.GetOutput();
+            ssgi.SetInputs(ssgiInputs);
+        }
+        ssgi.Declare(graph, frameContext);
 
         // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
         // 안다 — 재질 때 "업로드 0인데 통과"를 겪었으므로 같은 함정을 막는다.
@@ -3536,6 +3563,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     textureCache.Shutdown();
     profiler.Shutdown();
+    ssgi.Shutdown();
     deferred.Shutdown();
     shadow.Shutdown();
     gbuffer.Shutdown();
