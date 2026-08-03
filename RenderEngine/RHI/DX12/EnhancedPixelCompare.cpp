@@ -21,6 +21,16 @@ namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 
+    /// 즉시 로그.
+    ///
+    /// outLog는 함수가 끝나야 기록된다. 크래시하면 통째로 사라져, 어디까지
+    /// 갔는지 알 수 없다 — 실제로 그 상태로 원인을 추측하고 있었다.
+    /// 단계마다 바로 남기면 마지막 줄이 크래시 지점을 가리킨다.
+    void PixelCompareTrace(const std::string& message)
+    {
+        Debug->LogWarning("[dx12.compare] " + message);
+    }
+
     /// 커버리지 비트맵을 만든다. 그려진 픽셀이면 true.
     ///
     /// bitmask 타깃(R32_UINT)은 그려진 곳에만 0이 아닌 값이 들어간다.
@@ -44,32 +54,51 @@ namespace
     }
 }
 
-// ★★ 미완성이다. 이 함수는 현재 크래시한다. ★★
+// DX11 대조. 크래시는 고쳤고, 남은 8.75% 차이는 원인을 좁혔지만 규명하지 못했다.
 //
-// 진행된 것:
-//   - DX11 GBuffer 캡처가 동작한다(1920x1080 · 그려진 픽셀 983038/2073600).
-//     캡처는 렌더 스레드가 프레임 끝에서 수행하고, 드로우 목록도 큐가
-//     지워지기 직전에 함께 뜬다.
+// ── 크래시의 원인은 그래프 수명이었다 ──
 //
-// 막힌 것:
-//   - 캡처한 드로우로 DX12 GBuffer를 그리면 DX12DeviceResources::EndFrame에서
-//     ACCESS_VIOLATION이 난다. 스택 상단이 전부 드라이버 내부(NVDEV_Thunk →
-//     D3D12GetInterface)라 호출부만 보고는 원인을 알 수 없다.
+// EnhancedRenderGraph를 if 블록 안에 선언했다. 블록을 벗어나며 그래프가
+// 소멸하고 transient 리소스(GBuffer 타깃·깊이)가 해제되는데, 그것들을
+// 참조하는 커맨드는 아직 제출 전이었다. EndFrame의 ExecuteCommandLists가
+// 이미 없는 리소스를 읽고 그 자리에서 죽었다.
 //
-// 배제한 것(둘 다 시도했고 크래시가 그대로였다):
-//   - 해상도. 1920x1080에서 512x288로 줄여도 같은 자리에서 죽는다.
-//   - 텍스처 업로드. 재질을 비워 DX12TextureCache가 DX11 컨텍스트를 만지지
-//     않게 해도 같다. (그래도 그 코드는 남겨 둔다 — 게임 스레드에서 DX11
-//     컨텍스트를 만지는 것은 그 자체로 위험하고, 커버리지에 필요도 없다.)
+// 스택 상단이 전부 드라이버 내부라 한참 헤맸다. 해상도도(512x288도 같음),
+// 텍스처 업로드도(재질을 비워도 같음), 드로우 데이터도 아니었다 — 메시
+// 업로드는 dx12.scene과 정확히 같은 값(11개 1439448바이트)이 나왔다.
+// 답을 준 것은 단계별 즉시 로그와 크래시 줄 번호였다. outLog는 함수가
+// 끝나야 기록되므로 크래시하면 통째로 사라진다는 것을 먼저 고쳤어야 했다.
+//
+// 규칙: 그래프의 수명은 그 커맨드가 GPU에 제출될 때까지다.
+//
+// ── 현재 결과 ──
+//
+//   DX11 983038 · DX12 897044 · 일치 897004
+//   DX11만 86034 · DX12만 40 · 겹침 비율 0.9124
+//
+// DX12만 그린 픽셀이 40개뿐이다. 위치는 정확하다는 뜻이고, 이식에서 틀리기
+// 쉬운 것(월드 변환·뷰 투영)은 맞다고 볼 근거가 된다.
+//
+// ── 남은 차이: 좁혔지만 규명하지 못했다 ──
+//
+// DX11만 그린 픽셀의 분포를 찍었다: x 0~1919(화면 전체 폭) · y 528~683의
+// 가로 띠이고 95.2%가 덩어리 내부다. 윤곽이 한 픽셀씩 어긋난 것이 아니라
+// 넓은 면이 통째로 빠졌다.
+//
+// 처음에는 '먼 곳의 깊이가 1.0에 붙어 클리어 값과 구분되지 않는다'로 봤다.
+// 그래서 DX12 쪽도 깊이 대신 bitmask를 읽게 바꿨는데 결과가 한 픽셀도
+// 바뀌지 않았다 — DX12 셰이더는 그리는 픽셀에 둘을 함께 쓰므로 두 신호가
+// 같은 답을 준다. 가설이 틀렸고, DX12가 실제로 그 영역을 안 그린다.
+//
+// (bitmask로 바꾼 것은 되돌리지 않았다. 양쪽이 같은 신호를 세는 편이
+//  대조로서 옳다 — 우연히 같았을 뿐 원래 다른 것을 묻고 있었다.)
 //
 // 다음에 볼 것:
-//   - dx12.scene은 같은 구조로 잘 돈다. 둘의 차이를 좁히는 것이 가장 빠른
-//     길이다 — 그쪽은 자체 드로우 목록을 쓰고 Shadow·Deferred도 함께 선언한다.
-//   - 캡처 스냅샷의 Mesh* 수명. 렌더 스레드가 뜬 뒤 프레임이 지나는 동안
-//     유효한지 확인하지 못했다.
-//   - D3D12 디버그 레이어를 켜고 무엇이 잘못됐는지 직접 물을 것.
-//
-// 통과하지 않는 것을 통과처럼 두지 않으려고 이 주석을 남긴다.
+//   - DX12가 그린 영역의 y 범위. 683에서 잘렸다면 far plane 쪽 문제다.
+//   - DX11 GBuffer에 deferredQueue 외에 무엇이 더 그려지는가.
+//     GBufferPass::TerrainRenderCommandList가 따로 있고, BitMaskPass도
+//     별도로 존재한다 — 캡처한 bitmask가 GBuffer만의 결과가 아닐 수 있다.
+//   - 기준 0.95는 아직 근거가 없다. 차이의 원인을 알고 나서 정할 값이다.
 bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
@@ -121,18 +150,20 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         return false;
     }
 
-    // ── 대조 격자를 줄이는 이유 ──
+    // ── 원해상도로 대조한다 ──
     //
-    // 화면 해상도 그대로(1920x1080) DX12를 그리면 EndFrame에서 죽는다.
-    // 스택이 드라이버 내부라 원인을 아직 좁히지 못했고, 별건으로 남겼다.
+    // 한때 512로 줄여서 쟀다. 화면 해상도로 그리면 크래시한다고 봤기
+    // 때문인데, 원인은 해상도가 아니라 그래프 수명이었다(위 주석 참고).
     //
-    // 다만 그것을 기다릴 이유가 없다. 대조가 묻는 것은 '어느 픽셀이
-    // 그려졌는가'이고, 그 답은 격자를 줄여도 유지된다 — 기하가 어긋나면
-    // 축소한 격자에서도 어긋난다. 경계 픽셀의 정밀도만 잃는다.
+    // 줄인 채로 두지 않는 이유는 그 측정이 공정하지 않았기 때문이다.
+    // DX11 쪽은 1920x1080을 '칸에 하나라도 그려졌으면 그려진 것'으로 줄이므로
+    // 커버리지가 부풀고, DX12는 줄인 해상도에서 직접 그리므로 부풀지 않는다.
+    // 그 상태로 재니 겹침 0.9084에 'DX12만 그린 칸 0'이 나왔다 — DX12가
+    // 덜 그린 것처럼 보이지만 실제로는 비교 방법이 만든 차이였다.
     //
-    // 종횡비는 유지한다. 여기서 비율이 틀어지면 대조가 잡으려는 바로 그
-    // 종류의 오차(투영 어긋남)를 대조 자신이 만들어 낸다.
-    constexpr uint32_t kMaxCompareWidth = 512;
+    // 대조가 잡으려는 것은 두 경로의 차이인데, 대조 자신이 차이를 만들면
+    // 무엇을 보고 있는지 알 수 없게 된다.
+    constexpr uint32_t kMaxCompareWidth = 4096;
 
     const uint32_t compareWidth = (std::min)(kMaxCompareWidth, dx11Width);
     const uint32_t compareHeight = (std::max)(1u,
@@ -235,12 +266,15 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         return false;
     }
 
+    PixelCompareTrace("DX12 초기화 진입");
     DX12DeviceResources resources;
     if (!resources.Initialize(compareWidth, compareHeight, error))
     {
         outLog += "[2/3] DX12 초기화 실패: " + error + "\n";
         return false;
     }
+
+    PixelCompareTrace("DX12 디바이스 준비됨");
 
     DX12PSOManager psoManager;
     DX12RootSignatureCache rootSignatures;
@@ -271,6 +305,8 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     frameContext.camera = &cameraSnapshot;
     frameContext.draws = &draws;
     frameContext.lights = &lights;
+
+    PixelCompareTrace("캐시 준비됨");
 
     EnhancedGBufferPass gbuffer;
     if (!gbuffer.Initialize(frameContext, error))
@@ -310,41 +346,78 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 
     bool renderOk = true;
     {
+        // ★ 그래프를 EndFrame 바깥 스코프에 둔다. 이것이 크래시의 원인이었다.
+        //
+        // 처음에는 아래 if (renderOk) 블록 안에 선언했다. 블록을 벗어나면서
+        // 그래프가 소멸하고, 그래프가 소유한 transient 리소스(GBuffer 타깃과
+        // 깊이)가 함께 해제된다. 그런데 그것들을 참조하는 커맨드는 아직
+        // 제출되지 않았다 — EndFrame의 ExecuteCommandLists에서 이미 없는
+        // 리소스를 읽고 그 자리에서 죽었다.
+        //
+        // 스택 상단이 전부 드라이버 내부라 한참 헤맸다. 해상도도, 텍스처
+        // 업로드도, 드로우 데이터도 아니었다(데이터는 dx12.scene과 정확히
+        // 같은 값이 나왔다). 답을 준 것은 크래시 줄 번호였다 —
+        // DX12DeviceResources.cpp:309가 ExecuteCommandLists라는 것을 확인한
+        // 순간 '제출 전에 무엇이 사라졌나'로 질문이 바뀌었다.
+        //
+        // 규칙: 그래프의 수명은 그 커맨드가 GPU에 제출될 때까지다.
+        EnhancedRenderGraph graph;
+
+        PixelCompareTrace("BeginFrame");
         if (!resources.BeginFrame(error)) { renderOk = false; }
 
+        PixelCompareTrace("PrepareFrame(메시 업로드)");
         if (renderOk && !gbuffer.PrepareFrame(frameContext, error)) { renderOk = false; }
 
         if (renderOk)
         {
-            EnhancedRenderGraph graph;
             gbuffer.Declare(graph, frameContext);
             const auto outputs = gbuffer.GetOutputs();
 
-            graph.AddPass("depth_readback", { { outputs.depth, RGResourceState::CopySource } },
+            graph.AddPass("bitmask_readback", { { outputs.bitmask, RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     D3D12_TEXTURE_COPY_LOCATION dst{};
                     dst.pResource = depthReadback.Get();
                     dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                    dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
+                    dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_UINT;
                     dst.PlacedFootprint.Footprint.Width = compareWidth;
                     dst.PlacedFootprint.Footprint.Height = compareHeight;
                     dst.PlacedFootprint.Footprint.Depth = 1;
                     dst.PlacedFootprint.Footprint.RowPitch = depthRowPitch;
 
                     D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(outputs.depth);
+                    src.pResource = executeContext.Resolve(outputs.bitmask);
                     src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
                     executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
                 }, true);
 
+                {
+                // 무엇을 그리려 하는지 남긴다. GPU가 터지는 종류의 문제는
+                // 데이터가 이상해서 나는 경우가 많은데, 커맨드만 봐서는
+                // 알 수 없다.
+                const auto meshStats = meshCache.GetStats();
+                char trace[224]{};
+                std::snprintf(trace, sizeof(trace),
+                    "드로우 %zu · 메시 업로드 %u(%llu바이트) · 첫 메시 %p",
+                    draws.size(), meshStats.uploads,
+                    static_cast<unsigned long long>(meshStats.bytesUploaded),
+                    static_cast<const void*>(draws.front().mesh));
+                PixelCompareTrace(trace);
+            }
+
+            PixelCompareTrace("그래프 Compile");
             if (!graph.Compile(resources.GetDevice(), error)) { renderOk = false; }
+            PixelCompareTrace("그래프 Execute");
             if (renderOk && !graph.Execute(resources.GetCommandList(), error)) { renderOk = false; }
         }
 
+        PixelCompareTrace("EndFrame");
         if (renderOk && !resources.EndFrame(error)) { renderOk = false; }
+        PixelCompareTrace("WaitForGpu");
         if (renderOk) resources.WaitForGpu();
+        PixelCompareTrace("렌더 완료");
     }
 
     if (!renderOk)
@@ -368,16 +441,28 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             return false;
         }
 
-        // 깊이 1.0은 아무것도 안 그려진 곳이다(클리어 값).
+        // ★ 깊이가 아니라 bitmask로 센다.
+        //
+        // 처음에는 깊이를 읽어 '1.0이 아니면 그려진 것'으로 셌다. 그러자
+        // DX11만 그린 픽셀이 86034개 나왔는데, 위치를 찍어 보니 화면 전체
+        // 폭에 걸친 가로 띠(y 528~683)였고 95.2%가 덩어리 내부였다.
+        // 윤곽 오차가 아니라 바닥 평면의 먼 쪽이 통째로 빠진 것이다.
+        //
+        // 원인은 렌더가 아니라 판정이었다. 먼 곳의 깊이는 1.0에 붙어 클리어
+        // 값과 구분되지 않는다. DX11 쪽은 bitmask로 세니 깊이와 무관하게
+        // '그렸다'가 되고, 두 신호가 애초에 같은 것을 묻고 있지 않았다.
+        //
+        // 양쪽 다 bitmask로 센다. 대조에서 가장 중요한 것은 두 쪽이 같은
+        // 질문에 답하는 것이다.
         const auto* pixels = static_cast<const uint8_t*>(mapped);
         for (uint32_t y = 0; y < compareHeight; ++y)
         {
-            const auto* row = reinterpret_cast<const float*>(pixels
+            const auto* row = reinterpret_cast<const uint32_t*>(pixels
                 + static_cast<size_t>(y) * depthRowPitch);
 
             for (uint32_t x = 0; x < compareWidth; ++x)
             {
-                dx12Coverage[static_cast<size_t>(y) * compareWidth + x] = (row[x] < 1.0f);
+                dx12Coverage[static_cast<size_t>(y) * compareWidth + x] = (0 != row[x]);
             }
         }
 
@@ -413,6 +498,47 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         if (a && b) ++both;
         else if (a)  ++onlyDX11;
         else if (b)  ++onlyDX12;
+    }
+
+    // DX11에만 있는 픽셀이 어디에 있는지 본다.
+    //
+    // 총합만으로는 '물체 하나가 통째로 빠졌다'와 '윤곽이 한 픽셀씩 다르다'를
+    // 구분할 수 없다. 둘은 원인이 전혀 다르다 — 앞은 드로우 목록이나 컬링,
+    // 뒤는 래스터 규칙이다.
+    uint32_t missMinX = UINT32_MAX, missMaxX = 0;
+    uint32_t missMinY = UINT32_MAX, missMaxY = 0;
+    size_t missInterior = 0;   // 상하좌우가 모두 DX11만인 픽셀 = 덩어리 내부
+
+    for (uint32_t y = 0; y < compareHeight; ++y)
+    {
+        for (uint32_t x = 0; x < compareWidth; ++x)
+        {
+            const size_t index = static_cast<size_t>(y) * compareWidth + x;
+            if (!dx11Coverage[index] || dx12Coverage[index]) continue;
+
+            missMinX = (std::min)(missMinX, x); missMaxX = (std::max)(missMaxX, x);
+            missMinY = (std::min)(missMinY, y); missMaxY = (std::max)(missMaxY, y);
+
+            // 가장자리는 건너뛴다.
+            if (0 == x || 0 == y || x + 1 >= compareWidth || y + 1 >= compareHeight) continue;
+
+            const auto onlyA = [&](size_t i) { return dx11Coverage[i] && !dx12Coverage[i]; };
+            if (onlyA(index - 1) && onlyA(index + 1)
+                && onlyA(index - compareWidth) && onlyA(index + compareWidth))
+            {
+                ++missInterior;
+            }
+        }
+    }
+
+    if (0 != onlyDX11)
+    {
+        char line[224]{};
+        std::snprintf(line, sizeof(line),
+            "        DX11만 — 범위 x %u~%u · y %u~%u · 덩어리 내부 %zu(%.1f%%)\n",
+            missMinX, missMaxX, missMinY, missMaxY, missInterior,
+            100.0 * static_cast<double>(missInterior) / static_cast<double>(onlyDX11));
+        outLog += line;
     }
 
     const size_t unionCount = both + onlyDX11 + onlyDX12;
