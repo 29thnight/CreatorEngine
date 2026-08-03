@@ -340,6 +340,17 @@ void SceneRenderer::CaptureDrawSnapshot(RenderPassData* data)
 	if (!m_captureRequested.load(std::memory_order_acquire)) return;
 	if (nullptr == data) return;
 
+	// 다른 큐도 함께 센다.
+	//
+	// DX11 GBufferPass는 deferredQueue만 그리지 않는다 — TerrainRenderCommandList가
+	// 같은 렌더 타깃에 지형을 그리고, foliage도 있다. 대조에서 'DX11만 그린
+	// 픽셀'이 화면 전체 폭의 가로 띠로 나왔는데, 그것이 이 큐들 때문인지
+	// 확인할 방법이 없었다.
+	Debug->LogWarning("[캡처] deferred " + std::to_string(data->m_deferredQueue.size())
+		+ " · terrain " + std::to_string(data->m_terrainQueue.size())
+		+ " · foliage " + std::to_string(data->m_foliageQueue.size())
+		+ " · forward " + std::to_string(data->m_forwardQueue.size()));
+
 	m_captureDraws.clear();
 	m_captureDraws.reserve(data->m_deferredQueue.size());
 

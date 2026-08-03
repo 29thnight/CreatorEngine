@@ -14,6 +14,7 @@
 #include "../../MeshRendererProxy.h"
 
 #include <algorithm>
+#include <map>
 #include <cstdio>
 #include <vector>
 
@@ -79,26 +80,46 @@ namespace
 // DX12만 그린 픽셀이 40개뿐이다. 위치는 정확하다는 뜻이고, 이식에서 틀리기
 // 쉬운 것(월드 변환·뷰 투영)은 맞다고 볼 근거가 된다.
 //
-// ── 남은 차이: 좁혔지만 규명하지 못했다 ──
+// ── 남은 차이 8.75%: 대상은 특정했고 원인은 못 찾았다 ──
 //
-// DX11만 그린 픽셀의 분포를 찍었다: x 0~1919(화면 전체 폭) · y 528~683의
-// 가로 띠이고 95.2%가 덩어리 내부다. 윤곽이 한 픽셀씩 어긋난 것이 아니라
-// 넓은 면이 통째로 빠졌다.
+// 관찰:
+//   DX11만 그린 픽셀 — x 0~1919(화면 전체 폭) · y 528~683 · 95.2%가 덩어리 내부
+//   세로 범위 — DX11 y 528~1079 · DX12 y 556~1079
 //
-// 처음에는 '먼 곳의 깊이가 1.0에 붙어 클리어 값과 구분되지 않는다'로 봤다.
-// 그래서 DX12 쪽도 깊이 대신 bitmask를 읽게 바꿨는데 결과가 한 픽셀도
-// 바뀌지 않았다 — DX12 셰이더는 그리는 픽셀에 둘을 함께 쓰므로 두 신호가
-// 같은 답을 준다. 가설이 틀렸고, DX12가 실제로 그 영역을 안 그린다.
+// ★ 범인은 드로우 9번이다. 드로우별 화면 y 범위를 재 보니:
+//     0:419~847  1:367~899  2~6:370~879  7,8:490~776  10:470~796
+//     9:-706~2347   ← 화면을 한참 넘어서는 거대한 평면(바닥)
+//   나머지 열 개는 전부 y 367~899 안에 있어 y 528 위쪽을 채울 수 없다.
+//   차이 구간을 그릴 수 있는 것은 9번뿐이다.
 //
-// (bitmask로 바꾼 것은 되돌리지 않았다. 양쪽이 같은 신호를 세는 편이
-//  대조로서 옳다 — 우연히 같았을 뿐 원래 다른 것을 묻고 있었다.)
+//   값(bitmask)으로 추론하다 두 번 틀린 뒤 직접 센 결과다. 추론보다 세는 것이
+//   빨랐다.
+//
+// 그래서 질문이 좁혀졌다: 왜 DX12는 그 거대한 평면의 먼 쪽을 덜 그리는가.
+//
+// 배제한 것(각각 확인함):
+//   1. 깊이 판정 방식 — DX12도 깊이 대신 bitmask를 읽게 바꿨으나 결과가 한
+//      픽셀도 안 바뀌었다. 셰이더가 그리는 픽셀에 둘을 함께 쓰므로 같은 답이다.
+//   2. 다른 렌더 큐 — terrain·foliage·forward 모두 0이다.
+//   3. 깊이 포맷 — 양쪽 다 D32_FLOAT(RenderPassData.cpp:124, kDepthFormat).
+//   4. 깊이 비교 함수 — 양쪽 다 LESS(RenderModules.cpp DepthPreset::Default,
+//      DX12PSOManager.cpp:192).
+//   5. 투영 행렬의 출처 — DX11의 BindFrameCameraBuffers도 이 검증도 같은
+//      프레임 밀봉 스냅샷(GetFrameSnapshot)에서 값을 가져온다.
+//   6. bitmask 잔상 — GBufferPass::Execute가 매 프레임 모든 RTV를 지운다.
+//   7. BitMaskPass — bitmask를 SRV로 읽기만 한다.
+//   8. 오브젝트 누락 — 9번은 DX12도 그린다(y 556부터). 안 그리는 것이 아니라
+//      먼 쪽만 덜 그린다.
 //
 // 다음에 볼 것:
-//   - DX12가 그린 영역의 y 범위. 683에서 잘렸다면 far plane 쪽 문제다.
-//   - DX11 GBuffer에 deferredQueue 외에 무엇이 더 그려지는가.
-//     GBufferPass::TerrainRenderCommandList가 따로 있고, BitMaskPass도
-//     별도로 존재한다 — 캡처한 bitmask가 GBuffer만의 결과가 아닐 수 있다.
-//   - 기준 0.95는 아직 근거가 없다. 차이의 원인을 알고 나서 정할 값이다.
+//   - 경계가 깔끔하지 않다는 점이 단서다. y 528~556은 통째로 없고 556~683은
+//     부분적이다. far plane 클리핑이라면 경계가 한 줄로 떨어져야 한다.
+//     삼각형 단위로 잘리고 있을 가능성 — 그 평면이 몇 개의 삼각형인지,
+//     DX12가 인덱스를 전부 그리는지 볼 것.
+//   - DX11 GBufferPass는 인스턴싱 경로(m_instancePSO)를 쓴다. 큰 평면을
+//     쪼개 그리거나 다른 정점 스트라이드를 쓰는지 확인할 것.
+//   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
+//
 bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
@@ -529,6 +550,127 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
                 ++missInterior;
             }
         }
+    }
+
+    // ── 어느 오브젝트가 빠졌는가 ──
+    //
+    // DX11 bitmask는 그린 것이 무엇인지 값으로 남긴다. 차이 나는 띠에만
+    // 나타나는 값이 있으면 그것이 범인을 지목한다. 전체에 고루 있는 값이면
+    // 오브젝트가 빠진 것이 아니라 다른 이유다.
+    {
+        std::map<uint32_t, size_t> valuesInGap;     // 차이 나는 곳
+        std::map<uint32_t, size_t> valuesInMatch;   // 양쪽 다 그린 곳
+
+        for (uint32_t y = 0; y < dx11Height; ++y)
+        {
+            const auto* row = reinterpret_cast<const uint32_t*>(dx11Bytes.data()
+                + static_cast<size_t>(y) * dx11RowPitch);
+
+            for (uint32_t x = 0; x < dx11Width; ++x)
+            {
+                if (0 == row[x]) continue;
+
+                const size_t index = static_cast<size_t>(y) * compareWidth + x;
+                if (index >= dx12Coverage.size()) continue;
+
+                if (dx12Coverage[index]) ++valuesInMatch[row[x]];
+                else                     ++valuesInGap[row[x]];
+            }
+        }
+
+        std::string summary = "        bitmask 값 — 차이 구간: ";
+        for (const auto& entry : valuesInGap)
+        {
+            summary += std::to_string(entry.first) + "(" + std::to_string(entry.second) + ") ";
+        }
+        summary += "· 일치 구간: ";
+        for (const auto& entry : valuesInMatch)
+        {
+            summary += std::to_string(entry.first) + "(" + std::to_string(entry.second) + ") ";
+        }
+        outLog += summary + "\n";
+    }
+
+    // ── 어느 드로우가 그 띠를 그리는가 ──
+    //
+    // 값으로 추론하는 것을 그만두고 직접 센다. DX11 커버리지에서 차이 나는
+    // 영역의 y 범위를 잡고, 드로우마다 그 범위에 걸치는지 화면 공간 경계로
+    // 확인한다. 11개뿐이라 전부 훑어도 싸다.
+    {
+        uint32_t gapMinY = UINT32_MAX, gapMaxY = 0;
+        for (uint32_t y = 0; y < compareHeight; ++y)
+        {
+            for (uint32_t x = 0; x < compareWidth; ++x)
+            {
+                const size_t index = static_cast<size_t>(y) * compareWidth + x;
+                if (dx11Coverage[index] && !dx12Coverage[index])
+                {
+                    gapMinY = (std::min)(gapMinY, y);
+                    gapMaxY = (std::max)(gapMaxY, y);
+                }
+            }
+        }
+
+        const Mathf::xMatrix viewProjection =
+            XMMatrixMultiply(cameraSnapshot.view, cameraSnapshot.projection);
+
+        std::string report = "        드로우별 화면 y 범위 — ";
+        for (size_t i = 0; i < draws.size(); ++i)
+        {
+            const auto* mesh = draws[i].mesh;
+            if (nullptr == mesh) continue;
+
+            // 경계 구를 화면으로 옮긴다. 정확한 실루엣이 아니라 어느 드로우가
+            // 그 띠에 닿는지만 보면 되므로 이것으로 충분하다.
+            const auto sphere = mesh->GetBoundingSphere();
+            const Mathf::xVector center = XMVector3Transform(
+                XMVectorSet(sphere.Center.x, sphere.Center.y, sphere.Center.z, 1.f),
+                draws[i].worldMatrix);
+
+            const float scale = (std::max)({
+                XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[0])),
+                XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[1])),
+                XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[2])) });
+            const float radius = sphere.Radius * scale;
+
+            const Mathf::xVector clip = XMVector4Transform(center, viewProjection);
+            const float w = XMVectorGetW(clip);
+            if (w <= 0.f) { report += std::to_string(i) + ":뒤 "; continue; }
+
+            const float ndcY = XMVectorGetY(clip) / w;
+            const float screenY = (1.f - ndcY) * 0.5f * static_cast<float>(compareHeight);
+            const float screenR = radius / w * 0.5f * static_cast<float>(compareHeight);
+
+            const int top = static_cast<int>(screenY - screenR);
+            const int bottom = static_cast<int>(screenY + screenR);
+            const bool touchesGap = (bottom >= static_cast<int>(gapMinY))
+                && (top <= static_cast<int>(gapMaxY));
+
+            report += std::to_string(i) + ":" + std::to_string(top) + "~"
+                + std::to_string(bottom) + (touchesGap ? "* " : " ");
+        }
+
+        outLog += report + "(*=차이 구간 y " + std::to_string(gapMinY) + "~"
+            + std::to_string(gapMaxY) + "에 걸침)\n";
+    }
+
+    // 두 커버리지의 세로 범위. DX12가 위나 아래에서 잘렸는지 본다.
+    {
+        uint32_t a0 = UINT32_MAX, a1 = 0, b0 = UINT32_MAX, b1 = 0;
+        for (uint32_t y = 0; y < compareHeight; ++y)
+        {
+            for (uint32_t x = 0; x < compareWidth; ++x)
+            {
+                const size_t index = static_cast<size_t>(y) * compareWidth + x;
+                if (dx11Coverage[index]) { a0 = (std::min)(a0, y); a1 = (std::max)(a1, y); }
+                if (dx12Coverage[index]) { b0 = (std::min)(b0, y); b1 = (std::max)(b1, y); }
+            }
+        }
+
+        char line[160]{};
+        std::snprintf(line, sizeof(line),
+            "        세로 범위 — DX11 y %u~%u · DX12 y %u~%u\n", a0, a1, b0, b1);
+        outLog += line;
     }
 
     if (0 != onlyDX11)
