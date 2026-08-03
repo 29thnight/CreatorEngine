@@ -111,13 +111,27 @@ namespace
 //   8. 오브젝트 누락 — 9번은 DX12도 그린다(y 556부터). 안 그리는 것이 아니라
 //      먼 쪽만 덜 그린다.
 //
-// 다음에 볼 것:
-//   - 경계가 깔끔하지 않다는 점이 단서다. y 528~556은 통째로 없고 556~683은
-//     부분적이다. far plane 클리핑이라면 경계가 한 줄로 떨어져야 한다.
-//     삼각형 단위로 잘리고 있을 가능성 — 그 평면이 몇 개의 삼각형인지,
-//     DX12가 인덱스를 전부 그리는지 볼 것.
-//   - DX11 GBufferPass는 인스턴싱 경로(m_instancePSO)를 쓴다. 큰 평면을
-//     쪼개 그리거나 다른 정점 스트라이드를 쓰는지 확인할 것.
+// ★ 잘림은 삼각형 단위다(확인함).
+//   열마다 DX12 커버리지의 위쪽 끝을 재 보니 y 556~684로 128픽셀에 걸쳐
+//   변동하고 계단이 94곳이다. far plane 클리핑은 화면 공간 수평선을 따라
+//   일어나므로 모든 열에서 같은 y여야 한다 — 직선이 아니므로 클리핑이 아니다.
+//   삼각형이 통째로 빠지고 있다.
+//
+// ★ 컬링도 아니다(확인함). 오히려 반대 방향이다.
+//   DX11은 CD3D11_DEFAULT() 래스터라이저라 CullMode가 BACK이고,
+//   DX12는 D3D12_CULL_MODE_NONE이다(EnhancedGBufferPass.cpp:423).
+//   DX12가 컬링을 덜 하므로 더 많이 그려야 하는데 덜 그린다.
+//   다만 이 차이는 반대편 관찰을 설명한다 — DX12만 그린 40픽셀이 그것이다.
+//   (양쪽을 맞출지는 별도 판단이다. 컬링을 끈 데는 이유가 있었다.)
+//
+// 다음에 볼 것 — 가장 유력한 것은 깊이 정밀도에 따른 z-fighting이다:
+//   삼각형 단위로 갈리고, 먼 곳(정밀도가 떨어지는 곳)에 몰려 있고, 경계가
+//   들쭉날쭉하다. 세 가지가 모두 이 방향과 맞는다. 두 경로의 정점 변환
+//   부동소수 순서가 다르면 겹친 면의 승자가 바뀐다.
+//   확인 방법: 그 평면이 다른 면과 같은 깊이에 겹쳐 있는지 본다. 겹쳐
+//   있다면 이것은 이식 오류가 아니라 원래 불안정한 경우이고, 대조의 판정
+//   기준이 그 불안정을 감안해야 한다.
+//
 //   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
 //
 bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
@@ -589,6 +603,64 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             summary += std::to_string(entry.first) + "(" + std::to_string(entry.second) + ") ";
         }
         outLog += summary + "\n";
+    }
+
+    // ── 잘린 경계의 모양 ──
+    //
+    // 이것이 '삼각형 단위로 잘리는가'에 직접 답한다.
+    //
+    // 열마다 DX12 커버리지의 위쪽 끝(가장 작은 y)을 구한다. far plane
+    // 클리핑이면 그 끝이 모든 열에서 같아 직선이 된다 — 클리핑은 화면 공간의
+    // 수평선을 따라 일어나기 때문이다. 삼각형이 통째로 빠지는 것이면 빠진
+    // 삼각형의 폭만큼 계단이 생겨 열마다 값이 튄다.
+    {
+        std::vector<uint32_t> topPerColumn(compareWidth, UINT32_MAX);
+        for (uint32_t x = 0; x < compareWidth; ++x)
+        {
+            for (uint32_t y = 0; y < compareHeight; ++y)
+            {
+                if (dx12Coverage[static_cast<size_t>(y) * compareWidth + x])
+                {
+                    topPerColumn[x] = y;
+                    break;
+                }
+            }
+        }
+
+        uint32_t minTop = UINT32_MAX, maxTop = 0;
+        size_t   columns = 0;
+        double   sum = 0.0;
+        size_t   steps = 0;      // 이웃 열과 2 이상 차이 나는 곳
+        uint32_t previous = UINT32_MAX;
+
+        for (uint32_t x = 0; x < compareWidth; ++x)
+        {
+            const uint32_t top = topPerColumn[x];
+            if (UINT32_MAX == top) { previous = UINT32_MAX; continue; }
+
+            minTop = (std::min)(minTop, top);
+            maxTop = (std::max)(maxTop, top);
+            sum += top;
+            ++columns;
+
+            if (UINT32_MAX != previous)
+            {
+                const uint32_t delta = (top > previous) ? (top - previous) : (previous - top);
+                if (delta >= 2) ++steps;
+            }
+            previous = top;
+        }
+
+        if (0 != columns)
+        {
+            char line[256]{};
+            std::snprintf(line, sizeof(line),
+                "        DX12 상단 경계 — 열 %zu · y %u~%u(평균 %.1f) · 계단 %zu곳"
+                " → %s\n",
+                columns, minTop, maxTop, sum / static_cast<double>(columns), steps,
+                (steps <= columns / 100) ? "직선(클리핑 쪽)" : "들쭉날쭉(삼각형 단위 쪽)");
+            outLog += line;
+        }
     }
 
     // ── 어느 드로우가 그 띠를 그리는가 ──
