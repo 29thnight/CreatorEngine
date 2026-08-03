@@ -5,6 +5,7 @@
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
+#include "EnhancedSSGIShaders.h"
 
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -15,12 +16,18 @@
 // 남은 단계(순서대로 채운다):
 //   [v] 1. Hi-Z 피라미드 빌드 — 깊이 밉을 min으로 줄여 간다
 //   [v] 2. 행진(트레이스) — Hi-Z를 타고 1/2 해상도로
-//   [ ] 3. 리졸브 — 지난 프레임을 재투영해 누적
-//   [ ] 4. 필터 — bilateral 한 번
-//   [ ] 5. 합성 — 업샘플 + 라이팅에 더하기
+//   [v] 3. 리졸브 — 지난 프레임을 재투영해 누적
+//   [v] 4. 필터 — bilateral 한 번
+//   [v] 5. 합성 — 업샘플 + 라이팅에 더하기
 //
-// 3~5가 없으므로 아직 호출부에 붙이면 안 된다. GetOutput()이 트레이스 결과를
-// 그대로 주는데, 그것은 노이즈가 살아 있는 원본이다.
+// 다섯 단계가 다 돈다(dx12.ssgi: 선언 14 · 실행 14 · 배리어 26).
+//
+// 아직 남은 것:
+//   - 실제 씬에 붙이지 않았다. 검증은 합성 깊이로 도는 것만 확인했고,
+//     GBuffer·라이팅을 물려 그림이 맞는지는 보지 않았다.
+//   - 기존 DX11 SSGI와 시간을 대조하지 않았다. '아낀다'는 아직 추정이다.
+//   - 상수 셋(누적 허용 깊이차 0.01, 필터 시그마 0.01·노멀 지수 16,
+//     추적 거리 8·두께 0.5)이 전부 눈대중이다. 실측으로 조여야 한다.
 
 namespace
 {
@@ -291,6 +298,39 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 }
 )";
 
+    struct ResolveParams
+    {
+        Mathf::Matrix inverseProjection{};
+        Mathf::Matrix inverseView{};
+        Mathf::Matrix previousViewProjection{};
+        uint32_t      width{ 0 };
+        uint32_t      height{ 0 };
+        uint32_t      hasHistory{ 0 };
+        uint32_t      maxAccum{ 0 };
+        float         depthTolerance{ 0.f };
+        float         pad0{ 0.f };
+        float         pad1[2]{};
+    };
+
+    struct FilterParams
+    {
+        uint32_t width{ 0 };
+        uint32_t height{ 0 };
+        float    depthSigma{ 0.f };
+        float    normalPower{ 0.f };
+    };
+
+    struct CompositeParams
+    {
+        uint32_t outputWidth{ 0 };
+        uint32_t outputHeight{ 0 };
+        uint32_t giWidth{ 0 };
+        uint32_t giHeight{ 0 };
+        float    intensity{ 0.f };
+        float    depthSigma{ 0.f };
+        float    pad[2]{};
+    };
+
     struct HiZParams
     {
         uint32_t targetWidth{ 0 };
@@ -415,7 +455,96 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
     traceDesc.rootSignatureId = root.id;
 
     m_tracePSO = context.psoManager->GetOrCreateCompute(traceDesc, outError);
-    return nullptr != m_tracePSO;
+    if (nullptr == m_tracePSO) return false;
+
+    // ── 리졸브·필터·합성 PSO ──
+    //
+    // 셋 다 같은 루트 시그니처를 쓴다. 요구하는 SRV 수가 다르지만 넓은
+    // 테이블에 얹어도 비용이 없고, 시그니처를 나누면 패스 사이에서 바꾸는
+    // 비용이 더 든다.
+    struct StagePSO
+    {
+        const char*           source;
+        ID3D12PipelineState** target;
+    };
+
+    const StagePSO stages[] = {
+        { SsgiShaders::kResolve,   &m_resolvePSO },
+        { SsgiShaders::kFilter,    &m_filterPSO },
+        { SsgiShaders::kComposite, &m_compositePSO },
+    };
+
+    for (const StagePSO& stage : stages)
+    {
+        ComPtr<ID3DBlob> blob;
+        if (!CompileSsgiShader(stage.source, nullptr, blob, outError)) return false;
+
+        DX12ComputePipelineDesc desc{};
+        desc.csBytecode = blob->GetBufferPointer();
+        desc.csSize = blob->GetBufferSize();
+        desc.rootSignature = root.signature;
+        desc.rootSignatureId = root.id;
+
+        *stage.target = context.psoManager->GetOrCreateCompute(desc, outError);
+        if (nullptr == *stage.target) return false;
+    }
+
+    return true;
+}
+
+bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
+    std::string& outError)
+{
+    // 크기가 그대로면 다시 만들지 않는다. 매 프레임 만들면 그것만으로
+    // 프레임 예산을 먹고, 히스토리가 매번 비어 누적이 성립하지 않는다.
+    if (nullptr != m_history[0])
+    {
+        D3D12_RESOURCE_DESC existing = m_history[0]->GetDesc();
+        if (existing.Width == m_giWidth && existing.Height == m_giHeight) return true;
+    }
+
+    // 크기가 바뀌었다 — 히스토리를 버린다. 낡은 크기의 값을 새 크기에
+    // 섞으면 화면이 어긋난 채로 번진다.
+    m_historyValid = false;
+
+    auto* device = context.resources->GetDevice();
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    for (uint32_t i = 0; i < kHistoryCount; ++i)
+    {
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = m_giWidth;
+        desc.Height = m_giHeight;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+        desc.Format = kGIFormat;
+        HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr,
+            IID_PPV_ARGS(&m_history[i]));
+        if (FAILED(hr))
+        {
+            outError = "SSGI 히스토리 생성 실패 " + SsgiHrToString(hr);
+            return false;
+        }
+
+        desc.Format = kHiZFormat;
+        hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr,
+            IID_PPV_ARGS(&m_historyDepth[i]));
+        if (FAILED(hr))
+        {
+            outError = "SSGI 히스토리 깊이 생성 실패 " + SsgiHrToString(hr);
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
@@ -438,17 +567,24 @@ bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::st
         ++m_hiZMipCount;
     }
 
+    if (!EnsureHistory(context, outError)) return false;
+
     // 프레임마다 노이즈를 돌리기 위한 인덱스. 시간축이 샘플 수를 대신하려면
     // 프레임마다 다른 방향을 봐야 한다.
     ++m_frameIndex;
 
-    // 재투영에 쓸 지난 프레임 행렬을 갱신한다. 실제 사용은 리졸브 단계에서.
-    if (nullptr != context.camera)
-    {
-        m_previousViewProjection = XMMatrixMultiply(context.camera->view,
-            context.camera->projection);
-        m_hasPreviousFrame = true;
-    }
+    // 히스토리 슬롯을 번갈아 쓴다. 이번 프레임이 쓰는 것과 지난 프레임이
+    // 쓴 것이 달라야 한다 — 같으면 읽으면서 쓰게 된다.
+    m_historyIndex = (m_historyIndex + 1) % kHistoryCount;
+
+    // ★ 이전 프레임 행렬은 여기서 갱신하지 않는다.
+    //
+    // 처음에는 PrepareFrame에서 현재 행렬을 m_previousViewProjection에
+    // 넣었다. 그러면 리졸브가 '지난 프레임'이라며 이번 프레임 행렬을 쓰게
+    // 되고, 재투영이 늘 제자리를 가리켜 카메라가 움직여도 히스토리를
+    // 버리지 않는다 — 움직이면 번지는데 원인이 안 보인다.
+    //
+    // 갱신은 Declare가 끝난 뒤(이번 프레임 값을 다 쓴 뒤)에 한다.
 
     return true;
 }
@@ -483,8 +619,24 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     giDesc.height = m_giHeight;
     giDesc.format = kGIFormat;
     giDesc.allowUnorderedAccess = true;
+
     giDesc.name = "SSGI.Trace";
-    m_output = graph.CreateTexture(giDesc);
+    m_traceResult = graph.CreateTexture(giDesc);
+
+    giDesc.name = "SSGI.Resolved";
+    m_resolved = graph.CreateTexture(giDesc);
+
+    giDesc.name = "SSGI.Filtered";
+    m_filtered = graph.CreateTexture(giDesc);
+
+    // 합성은 전 해상도다. 라이팅에 간접광을 더한 결과를 뒤 패스가 읽는다.
+    RGTextureDesc outDesc{};
+    outDesc.width = context.width;
+    outDesc.height = context.height;
+    outDesc.format = kGIFormat;
+    outDesc.allowUnorderedAccess = true;
+    outDesc.name = "SSGI.Output";
+    m_output = graph.CreateTexture(outDesc);
 
     // ── 1단계: Hi-Z 빌드 ──
     //
@@ -597,7 +749,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         {
             usages.push_back({ m_inputs.lighting, RGResourceState::ShaderResource });
         }
-        usages.push_back({ m_output, RGResourceState::UnorderedAccess });
+        usages.push_back({ m_traceResult, RGResourceState::UnorderedAccess });
 
         graph.AddPass("SSGI.Trace", usages,
             [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -699,7 +851,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 uavDesc.Format = kGIFormat;
                 uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
                 device->CreateUnorderedAccessView(
-                    executeContext.Resolve(m_output), nullptr, &uavDesc, uavTable.CpuAt(0));
+                    executeContext.Resolve(m_traceResult), nullptr, &uavDesc, uavTable.CpuAt(0));
 
                 ID3D12DescriptorHeap* heaps[] = {
                     context.resources->GetDescriptorRing().GetHeap() };
@@ -714,11 +866,282 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 commandList->Dispatch((m_giWidth + 7) / 8, (m_giHeight + 7) / 8, 1);
             });
     }
+
+    // ── 3~5단계 공통 ──
+    //
+    // 세 패스가 같은 모양이라 헬퍼로 묶는다: 상수 올리기, SRV 테이블 채우기,
+    // UAV 하나, Dispatch. 손으로 세 번 쓰면 한 곳만 고치고 나머지를 잊는
+    // 종류의 실수가 난다 — 이 작업에서 이미 두 번 겪었다(대상 선택 계산,
+    // 경계 측정).
+    const auto declareStage = [this, &graph, &context](
+        const std::string& name,
+        const std::vector<EnhancedRenderGraph::RGPassUsage>& usages,
+        ID3D12PipelineState* pso,
+        RGHandle target,
+        const std::vector<RGHandle>& srvHandles,
+        const std::vector<ID3D12Resource*>& externalSrvs,
+        const void* constants, size_t constantBytes,
+        uint32_t dispatchWidth, uint32_t dispatchHeight,
+        bool hasSideEffect)
+    {
+        // 상수는 값으로 복사해 둔다. 람다가 프레임 뒤에 실행되므로 호출부의
+        // 지역 변수를 가리키면 그때는 이미 사라져 있다.
+        std::vector<uint8_t> constantCopy(constantBytes);
+        memcpy(constantCopy.data(), constants, constantBytes);
+
+        graph.AddPass(name, usages,
+            [this, &context, pso, target, srvHandles, externalSrvs, constantCopy,
+             dispatchWidth, dispatchHeight]
+            (const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                auto* commandList = executeContext.commandList;
+                auto* device = context.resources->GetDevice();
+
+                const auto cb = context.resources->GetUploadRing().Allocate(
+                    constantCopy.size(), DX12UploadRing::kConstantBufferAlignment);
+                if (!cb.IsValid()) return;
+                memcpy(cb.cpuAddress, constantCopy.data(), constantCopy.size());
+
+                const auto srvTable = context.resources->GetDescriptorRing()
+                    .Allocate(kMaxHiZMips + 2);
+                const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
+                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+
+                // 그래프 리소스와 외부 리소스를 순서대로 꽂는다.
+                std::vector<ID3D12Resource*> sources;
+                for (const RGHandle handle : srvHandles)
+                {
+                    sources.push_back(executeContext.Resolve(handle));
+                }
+                for (ID3D12Resource* external : externalSrvs)
+                {
+                    sources.push_back(external);
+                }
+
+                // ★ 남는 슬롯도 반드시 채운다. 비워 두면 GPU가 초기화되지
+                //   않은 디스크립터를 읽고 그 자리에서 죽는다 — 트레이스에서
+                //   이미 겪었다.
+                ID3D12Resource* fallback = sources.empty()
+                    ? executeContext.Resolve(m_hiZMips[0]) : sources.front();
+
+                for (uint32_t i = 0; i < kMaxHiZMips + 2; ++i)
+                {
+                    ID3D12Resource* resource = (i < sources.size() && nullptr != sources[i])
+                        ? sources[i] : fallback;
+                    if (nullptr == resource) continue;
+
+                    const D3D12_RESOURCE_DESC desc = resource->GetDesc();
+
+                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+                    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                    srvDesc.Texture2D.MipLevels = 1;
+                    // 깊이는 D32_FLOAT로 만들어져 SRV에서는 R32_FLOAT로 본다.
+                    srvDesc.Format = (DXGI_FORMAT_D32_FLOAT == desc.Format)
+                        ? DXGI_FORMAT_R32_FLOAT : desc.Format;
+
+                    device->CreateShaderResourceView(resource, &srvDesc, srvTable.CpuAt(i));
+                }
+
+                auto* targetResource = executeContext.Resolve(target);
+                const D3D12_RESOURCE_DESC targetDesc = targetResource->GetDesc();
+
+                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+                uavDesc.Format = targetDesc.Format;
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                device->CreateUnorderedAccessView(targetResource, nullptr, &uavDesc,
+                    uavTable.CpuAt(0));
+
+                ID3D12DescriptorHeap* heaps[] = {
+                    context.resources->GetDescriptorRing().GetHeap() };
+                commandList->SetDescriptorHeaps(1, heaps);
+
+                commandList->SetComputeRootSignature(m_rootSignature);
+                commandList->SetPipelineState(pso);
+                commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
+                commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
+                commandList->SetComputeRootDescriptorTable(2, uavTable.gpu);
+
+                commandList->Dispatch((dispatchWidth + 7) / 8, (dispatchHeight + 7) / 8, 1);
+            }, hasSideEffect);
+    };
+
+    // ── 3단계: 리졸브(재투영 + 누적) ──
+    {
+        ResolveParams params{};
+        if (nullptr != context.camera)
+        {
+            const Mathf::xMatrix projection = context.camera->projection;
+            params.inverseProjection = XMMatrixTranspose(
+                XMMatrixInverse(nullptr, projection));
+            params.inverseView = XMMatrixTranspose(
+                XMMatrixInverse(nullptr, context.camera->view));
+        }
+        params.previousViewProjection = XMMatrixTranspose(m_previousViewProjection);
+        params.width = m_giWidth;
+        params.height = m_giHeight;
+        params.hasHistory = (m_historyValid && m_hasPreviousFrame) ? 1u : 0u;
+        params.maxAccum = kMaxAccumFrames;
+        // 실측으로 조일 값이다. 너무 크면 다른 표면을 같은 것으로 보고,
+        // 너무 작으면 정지 상태에서도 히스토리를 버린다.
+        params.depthTolerance = 0.01f;
+
+        const uint32_t readIndex = (m_historyIndex + kHistoryCount - 1) % kHistoryCount;
+
+        std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+        usages.push_back({ m_traceResult, RGResourceState::ShaderResource });
+        usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        if (m_inputs.normal.IsValid())
+        {
+            usages.push_back({ m_inputs.normal, RGResourceState::ShaderResource });
+        }
+        usages.push_back({ m_resolved, RGResourceState::UnorderedAccess });
+
+        // ★ 슬롯 순서가 셰이더 선언과 맞아야 한다.
+        //   t0 트레이스 · t1 히스토리 · t2 히스토리깊이 · t3 깊이 · t4 노멀
+        //
+        // 그런데 헬퍼는 그래프 핸들을 먼저 꽂고 외부 리소스를 뒤에 꽂는다.
+        // 히스토리(외부)가 t1·t2에 와야 하므로 이 순서로는 맞출 수 없다 —
+        // 리졸브만 SRV를 직접 만든다면 헬퍼를 쓰는 뜻이 없어지므로,
+        // 셰이더 쪽 레지스터를 헬퍼 순서에 맞춘다.
+        //
+        // 실제 순서: t0 트레이스 · t1 깊이 · t2 노멀 · t3 히스토리 · t4 히스토리깊이
+        std::vector<RGHandle> ordered{ m_traceResult, m_hiZMips[0] };
+        if (m_inputs.normal.IsValid()) ordered.push_back(m_inputs.normal);
+
+        std::vector<ID3D12Resource*> orderedExternal{
+            m_history[readIndex].Get(), m_historyDepth[readIndex].Get() };
+
+        declareStage("SSGI.Resolve", usages, m_resolvePSO, m_resolved,
+            ordered, orderedExternal, &params, sizeof(params),
+            m_giWidth, m_giHeight, false);
+    }
+
+    // ── 4단계: bilateral 필터 ──
+    {
+        FilterParams params{};
+        params.width = m_giWidth;
+        params.height = m_giHeight;
+        params.depthSigma = 0.01f;
+        params.normalPower = 16.f;
+
+        std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+        usages.push_back({ m_resolved, RGResourceState::ShaderResource });
+        usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        if (m_inputs.normal.IsValid())
+        {
+            usages.push_back({ m_inputs.normal, RGResourceState::ShaderResource });
+        }
+        usages.push_back({ m_filtered, RGResourceState::UnorderedAccess });
+
+        std::vector<RGHandle> srvHandles{ m_resolved, m_hiZMips[0] };
+        if (m_inputs.normal.IsValid()) srvHandles.push_back(m_inputs.normal);
+
+        declareStage("SSGI.Filter", usages, m_filterPSO, m_filtered,
+            srvHandles, {}, &params, sizeof(params),
+            m_giWidth, m_giHeight, false);
+    }
+
+    // ── 5단계: 업샘플 + 합성 ──
+    {
+        CompositeParams params{};
+        params.outputWidth = context.width;
+        params.outputHeight = context.height;
+        params.giWidth = m_giWidth;
+        params.giHeight = m_giHeight;
+        params.intensity = 1.f;
+        params.depthSigma = 0.01f;
+
+        std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+        usages.push_back({ m_filtered, RGResourceState::ShaderResource });
+        usages.push_back({ m_hiZMips[0], RGResourceState::ShaderResource });
+        if (m_inputs.lighting.IsValid())
+        {
+            usages.push_back({ m_inputs.lighting, RGResourceState::ShaderResource });
+        }
+        usages.push_back({ m_inputs.depth, RGResourceState::ShaderResource });
+        if (m_inputs.diffuse.IsValid())
+        {
+            usages.push_back({ m_inputs.diffuse, RGResourceState::ShaderResource });
+        }
+        usages.push_back({ m_output, RGResourceState::UnorderedAccess });
+
+        // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈
+        std::vector<RGHandle> srvHandles{ m_filtered, m_hiZMips[0] };
+        if (m_inputs.lighting.IsValid()) srvHandles.push_back(m_inputs.lighting);
+        srvHandles.push_back(m_inputs.depth);
+        if (m_inputs.diffuse.IsValid()) srvHandles.push_back(m_inputs.diffuse);
+
+        // 합성 결과는 그래프 밖으로 나간다 — 뿌리로 표시한다.
+        declareStage("SSGI.Composite", usages, m_compositePSO, m_output,
+            srvHandles, {}, &params, sizeof(params),
+            context.width, context.height, true);
+    }
+
+    // ── 히스토리 갱신 ──
+    //
+    // 이번 프레임 결과를 다음 프레임이 읽도록 복사한다. 그래프의 transient는
+    // 프레임이 끝나면 사라지므로 영속 리소스로 옮겨야 한다.
+    {
+        std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+        usages.push_back({ m_filtered, RGResourceState::CopySource });
+        usages.push_back({ m_hiZMips[0], RGResourceState::CopySource });
+
+        auto* historyTarget = m_history[m_historyIndex].Get();
+        auto* historyDepthTarget = m_historyDepth[m_historyIndex].Get();
+
+        graph.AddPass("SSGI.StoreHistory", usages,
+            [this, historyTarget, historyDepthTarget]
+            (const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                auto* commandList = executeContext.commandList;
+
+                // 영속 리소스는 그래프가 상태를 모른다. 복사 전후로 손으로
+                // 전이한다 — 그래프에 맡길 수 없는 것은 여기서 책임진다.
+                D3D12_RESOURCE_BARRIER toCopy[2]{};
+                for (uint32_t i = 0; i < 2; ++i)
+                {
+                    toCopy[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                    toCopy[i].Transition.pResource = (0 == i) ? historyTarget : historyDepthTarget;
+                    toCopy[i].Transition.StateBefore =
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                    toCopy[i].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+                    toCopy[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                }
+                commandList->ResourceBarrier(2, toCopy);
+
+                commandList->CopyResource(historyTarget,
+                    executeContext.Resolve(m_filtered));
+                commandList->CopyResource(historyDepthTarget,
+                    executeContext.Resolve(m_hiZMips[0]));
+
+                D3D12_RESOURCE_BARRIER back[2]{};
+                for (uint32_t i = 0; i < 2; ++i)
+                {
+                    back[i] = toCopy[i];
+                    back[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+                    back[i].Transition.StateAfter =
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                }
+                commandList->ResourceBarrier(2, back);
+            }, true);
+    }
+
+    // 이번 프레임 행렬을 다음 프레임의 '이전'으로 남긴다. Declare가 끝난
+    // 뒤라야 이번 프레임 리졸브가 진짜 지난 프레임 값을 쓴다.
+    if (nullptr != context.camera)
+    {
+        m_previousViewProjection = XMMatrixMultiply(context.camera->view,
+            context.camera->projection);
+        m_hasPreviousFrame = true;
+    }
+    m_historyValid = true;
 }
 
 void EnhancedSSGIPass::Shutdown()
 {
     for (auto& texture : m_history) texture.Reset();
+    for (auto& texture : m_historyDepth) texture.Reset();
 
     m_historyValid = false;
     m_hasPreviousFrame = false;
@@ -781,7 +1204,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         resources.Shutdown();
         return false;
     }
-    outLog += "[1/3] 셰이더 컴파일·PSO 생성 통과(Hi-Z 빌드 · 트레이스)\n";
+    outLog += "[1/3] 셰이더 컴파일·PSO 생성 통과(Hi-Z·트레이스·리졸브·필터·합성)\n";
 
     // ── [2/3] 밉 수 산정 ──
     if (!ssgi.PrepareFrame(frameContext, error))
@@ -865,8 +1288,15 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         // 없으면 트레이스가 컬링돼 Dispatch가 한 번도 안 돈다. 실제로 첫
         // 실행이 '선언 9 · 실행 0'이었다 — 셰이더 컴파일만 확인하고 넘어갈
         // 뻔했다. 컬링이 도는 것은 옳지만, 도는지 보려면 읽는 쪽이 있어야 한다.
-        const uint32_t giW = kWidth / EnhancedSSGIPass::kResolutionDivisor;
-        const uint32_t giH = kHeight / EnhancedSSGIPass::kResolutionDivisor;
+        // ★ 리드백 크기는 읽는 리소스에 맞춘다.
+        //
+        // 처음에는 GI 해상도(1/2)로 잡았다. 합성이 붙으면서 출력이 전 해상도가
+        // 됐는데 리드백은 그대로였고, CopyTextureRegion이 "목적지 경계를
+        // 넘는다"로 실패했다. 그 실패가 커맨드 리스트를 무효로 만들어
+        // EndFrame의 Close가 E_INVALIDARG를 냈다 — 증상이 나온 자리와
+        // 원인이 있는 자리가 달랐다.
+        const uint32_t giW = kWidth;
+        const uint32_t giH = kHeight;
         const uint32_t rowPitch = ((giW * 8u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
             & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
 
@@ -947,8 +1377,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             outLog += line;
         }
 
-        // Hi-Z 밉마다 하나 + 트레이스 + 리드백.
-        const uint32_t expectedPasses = expectedMips + 2;
+        // Hi-Z 밉마다 하나 + 트레이스 + 리졸브 + 필터 + 합성
+        // + 히스토리 저장 + 리드백.
+        const uint32_t expectedPasses = expectedMips + 6;
         if (stats.passesDeclared != expectedPasses)
         {
             outLog += "선언된 패스가 " + std::to_string(stats.passesDeclared)

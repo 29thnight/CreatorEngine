@@ -103,6 +103,10 @@ public:
     /// 합성까지 끝난 결과. 뒤 패스가 읽는다.
     RGHandle GetOutput() const { return m_output; }
 
+    /// 단계별 중간 결과. 검증과 디버그 뷰가 본다.
+    RGHandle GetTraceResult() const { return m_traceResult; }
+    RGHandle GetResolvedResult() const { return m_resolved; }
+
     /// 시간적 누적이 실제로 도는가.
     ///
     /// 이 값이 늘 1이면 재투영이 죽은 것이고, 그러면 '시간축이 샘플 수를
@@ -121,15 +125,26 @@ private:
 
     Inputs   m_inputs{};
     RGHandle m_output;
+    RGHandle m_traceResult;   // 행진 원본(노이즈가 살아 있다)
 
     // Hi-Z 피라미드. 밉마다 UAV가 필요해 핸들을 따로 든다.
     std::array<RGHandle, kMaxHiZMips> m_hiZMips{};
     uint32_t m_hiZMipCount{ 0 };
 
     // 히스토리는 그래프의 transient가 아니다 — 프레임을 넘겨 살아야 한다.
+    //
+    // GI와 깊이를 함께 든다. 깊이가 없으면 '재투영한 자리가 정말 같은
+    // 표면인가'를 물을 수 없고, 그러면 카메라가 움직일 때 엉뚱한 픽셀의
+    // 값을 섞게 된다 — 증상이 '움직이면 번진다'라서 노이즈로 오해하기 쉽다.
     std::array<ComPtr<ID3D12Resource>, kHistoryCount> m_history;
+    std::array<ComPtr<ID3D12Resource>, kHistoryCount> m_historyDepth;
     uint32_t m_historyIndex{ 0 };
     bool     m_historyValid{ false };
+
+    bool EnsureHistory(const EnhancedFrameContext& context, std::string& outError);
+
+    RGHandle m_filtered;      // bilateral 결과(1/2 해상도)
+    RGHandle m_resolved;      // 누적 결과(1/2 해상도)
 
     // 재투영에 쓸 지난 프레임 뷰·투영.
     Mathf::Matrix m_previousViewProjection{};
