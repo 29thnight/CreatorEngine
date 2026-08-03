@@ -1006,8 +1006,18 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         // 셰이더 쪽 레지스터를 헬퍼 순서에 맞춘다.
         //
         // 실제 순서: t0 트레이스 · t1 깊이 · t2 노멀 · t3 히스토리 · t4 히스토리깊이
+        //
+        // ★ 입력이 없어도 자리를 비우지 않는다.
+        //
+        // 처음에는 normal이 유효할 때만 push_back했다. 그러자 검증(노멀
+        // 미설정)에서 슬롯이 한 칸씩 밀려 t3에 히스토리 깊이가, t4에 엉뚱한
+        // 것이 들어갔다. 누적이 2에서 멈췄고 — 히스토리의 a를 못 읽으니
+        // 늘 1로 봤다 — depthTolerance를 100까지 키워도 그대로였다.
+        //
+        // 조건부로 슬롯 수가 바뀌는 것 자체가 위험하다. 자리는 고정하고
+        // 없는 것만 대체물로 채운다.
         std::vector<RGHandle> ordered{ m_traceResult, m_hiZMips[0] };
-        if (m_inputs.normal.IsValid()) ordered.push_back(m_inputs.normal);
+        ordered.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
 
         std::vector<ID3D12Resource*> orderedExternal{
             m_history[readIndex].Get(), m_historyDepth[readIndex].Get() };
@@ -1034,8 +1044,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         }
         usages.push_back({ m_filtered, RGResourceState::UnorderedAccess });
 
+        // 자리를 고정한다(리졸브와 같은 이유).
         std::vector<RGHandle> srvHandles{ m_resolved, m_hiZMips[0] };
-        if (m_inputs.normal.IsValid()) srvHandles.push_back(m_inputs.normal);
+        srvHandles.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
 
         declareStage("SSGI.Filter", usages, m_filterPSO, m_filtered,
             srvHandles, {}, &params, sizeof(params),
@@ -1067,10 +1078,11 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         usages.push_back({ m_output, RGResourceState::UnorderedAccess });
 
         // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈
+        // 자리를 고정한다(리졸브와 같은 이유).
         std::vector<RGHandle> srvHandles{ m_filtered, m_hiZMips[0] };
-        if (m_inputs.lighting.IsValid()) srvHandles.push_back(m_inputs.lighting);
+        srvHandles.push_back(m_inputs.lighting.IsValid() ? m_inputs.lighting : m_hiZMips[0]);
         srvHandles.push_back(m_inputs.depth);
-        if (m_inputs.diffuse.IsValid()) srvHandles.push_back(m_inputs.diffuse);
+        srvHandles.push_back(m_inputs.diffuse.IsValid() ? m_inputs.diffuse : m_hiZMips[0]);
 
         // 합성 결과는 그래프 밖으로 나간다 — 뿌리로 표시한다.
         declareStage("SSGI.Composite", usages, m_compositePSO, m_output,
@@ -1083,8 +1095,18 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 이번 프레임 결과를 다음 프레임이 읽도록 복사한다. 그래프의 transient는
     // 프레임이 끝나면 사라지므로 영속 리소스로 옮겨야 한다.
     {
+        // ★ 저장하는 것은 필터 결과가 아니라 리졸브 결과다.
+        //
+        // 처음에는 필터 결과를 넣었다. 그러자 누적이 2에서 멈췄다(여덟
+        // 프레임을 돌려도 평균 2.00). 두 가지가 겹친 탓이다:
+        //   ① 필터가 float4 전체를 이웃과 가중 평균하므로 a 채널(누적
+        //      프레임 수)도 함께 뭉개진다.
+        //   ② 설계상으로도 틀렸다 — 필터 결과를 히스토리에 넣으면 블러가
+        //      매 프레임 다시 블러되어 계속 번진다.
+        //
+        // 누적은 리졸브 결과를 이어가고, 필터는 화면에 낼 때만 쓴다.
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_filtered, RGResourceState::CopySource });
+        usages.push_back({ m_resolved, RGResourceState::CopySource });
         usages.push_back({ m_hiZMips[0], RGResourceState::CopySource });
 
         auto* historyTarget = m_history[m_historyIndex].Get();
@@ -1111,7 +1133,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 commandList->ResourceBarrier(2, toCopy);
 
                 commandList->CopyResource(historyTarget,
-                    executeContext.Resolve(m_filtered));
+                    executeContext.Resolve(m_resolved));
                 commandList->CopyResource(historyDepthTarget,
                     executeContext.Resolve(m_hiZMips[0]));
 
@@ -1196,6 +1218,29 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
     frameContext.width = kWidth;
     frameContext.height = kHeight;
 
+    // ★ 카메라를 넣어야 재투영이 성립한다.
+    //
+    // 처음에는 width/height만 넣었다. 그러자 리졸브가 이전 프레임 행렬을
+    // 못 얻어 히스토리를 통째로 버렸고, 여덟 프레임을 돌려도 누적이 1에
+    // 머물렀다(평균 1.00 · 최소 1 · 최대 1). 셰이더도 그래프도 멀쩡한데
+    // 검증 쪽 입력이 빠져 있었던 것이다.
+    //
+    // 카메라를 고정해 둔다 — 정지 상태에서 누적이 쌓이는지가 질문이므로
+    // 움직이면 답이 흐려진다.
+    FrameCameraSnapshot camera{};
+    camera.view = XMMatrixLookAtLH(
+        XMVectorSet(0.f, 1.f, -3.f, 1.f),
+        XMVectorSet(0.f, 0.f, 0.f, 1.f),
+        XMVectorSet(0.f, 1.f, 0.f, 0.f));
+    camera.projection = XMMatrixPerspectiveFovLH(
+        XM_PIDIV4, static_cast<float>(kWidth) / static_cast<float>(kHeight), 0.1f, 100.f);
+    camera.inverseView = XMMatrixInverse(nullptr, camera.view);
+    camera.inverseProjection = XMMatrixInverse(nullptr, camera.projection);
+    camera.nearPlane = 0.1f;
+    camera.farPlane = 100.f;
+
+    frameContext.camera = &camera;
+
     // ── [1/3] 셰이더 컴파일과 PSO 생성 ──
     EnhancedSSGIPass ssgi;
     if (!ssgi.Initialize(frameContext, error))
@@ -1259,30 +1304,6 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             return false;
         }
 
-        if (!resources.BeginFrame(error))
-        {
-            outLog += "[3/3] BeginFrame 실패: " + error + "\n";
-            ssgi.Shutdown();
-            resources.Shutdown();
-            return false;
-        }
-
-        EnhancedRenderGraph graph;
-
-        EnhancedSSGIPass::Inputs inputs{};
-        inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::ShaderResource, "SSGI.TestDepth");
-        ssgi.SetInputs(inputs);
-
-        ssgi.Declare(graph, frameContext);
-
-        const auto output = ssgi.GetOutput();
-        if (!output.IsValid())
-        {
-            outLog += "[3/3] 출력 핸들이 비었다 — Declare가 패스를 선언하지 않았다\n";
-            passed = false;
-        }
-
         // ★ 결과를 읽는 패스를 붙인다.
         //
         // 없으면 트레이스가 컬링돼 Dispatch가 한 번도 안 돈다. 실제로 첫
@@ -1291,12 +1312,16 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         // ★ 리드백 크기는 읽는 리소스에 맞춘다.
         //
         // 처음에는 GI 해상도(1/2)로 잡았다. 합성이 붙으면서 출력이 전 해상도가
-        // 됐는데 리드백은 그대로였고, CopyTextureRegion이 "목적지 경계를
-        // 넘는다"로 실패했다. 그 실패가 커맨드 리스트를 무효로 만들어
+        // 됐는데 리드백은 그대로였고, CopyTextureRegion이 "목적지 경계를\n// 넘는다"로 실패했다. 그 실패가 커맨드 리스트를 무효로 만들어
         // EndFrame의 Close가 E_INVALIDARG를 냈다 — 증상이 나온 자리와
         // 원인이 있는 자리가 달랐다.
-        const uint32_t giW = kWidth;
-        const uint32_t giH = kHeight;
+        // ★ 리드백 대상은 리졸브 결과다.
+        //
+        // 합성 결과가 아니라 리졸브를 읽는 이유: a 채널에 누적 프레임 수가
+        // 들어 있다. 그것이 '시간축이 샘플 수를 대신한다'는 전제가 실제로
+        // 도는지 보여 주는 유일한 숫자다. 합성 결과에는 그 정보가 없다.
+        const uint32_t giW = kWidth / EnhancedSSGIPass::kResolutionDivisor;
+        const uint32_t giH = kHeight / EnhancedSSGIPass::kResolutionDivisor;
         const uint32_t rowPitch = ((giW * 8u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
             & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
 
@@ -1322,9 +1347,54 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             passed = false;
         }
 
+        // ── 여러 프레임 돌린다 ──
+        //
+        // 한 프레임만 돌면 누적이 늘 1이고, 그러면 '시간축이 샘플 수를
+        // 대신한다'는 이 설계의 전제를 확인할 수 없다. 카메라를 고정한 채
+        // 여러 프레임 돌려 누적이 실제로 쌓이는지 본다.
+        //
+        // 정지 상태에서 쌓이지 않으면 재투영이 어긋난 것이고, 그때는
+        // depthTolerance가 너무 빡빡하다는 뜻이다.
+        constexpr uint32_t kTestFrames = 8;
+        EnhancedRenderGraph::Stats stats{};
+
+        for (uint32_t frameIndex = 0; frameIndex < kTestFrames && passed; ++frameIndex)
+        {
+        if (!resources.BeginFrame(error))
+        {
+            outLog += "[3/3] BeginFrame 실패: " + error + "\n";
+            ssgi.Shutdown();
+            resources.Shutdown();
+            return false;
+        }
+
+        if (!ssgi.PrepareFrame(frameContext, error))
+        {
+            outLog += "[3/3] PrepareFrame 실패: " + error + "\n";
+            passed = false;
+            break;
+        }
+
+        EnhancedRenderGraph graph;
+
+        EnhancedSSGIPass::Inputs inputs{};
+        inputs.depth = graph.ImportTexture(depth.Get(),
+            RGResourceState::ShaderResource, "SSGI.TestDepth");
+        ssgi.SetInputs(inputs);
+
+        ssgi.Declare(graph, frameContext);
+
+        const auto output = ssgi.GetOutput();
+        if (!output.IsValid())
+        {
+            outLog += "[3/3] 출력 핸들이 비었다 — Declare가 패스를 선언하지 않았다\n";
+            passed = false;
+        }
+
         if (passed && output.IsValid())
         {
-            graph.AddPass("SSGI.Readback", { { output, RGResourceState::CopySource } },
+            graph.AddPass("SSGI.Readback",
+                { { ssgi.GetResolvedResult(), RGResourceState::CopySource } },
                 [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
                     D3D12_TEXTURE_COPY_LOCATION dst{};
@@ -1337,7 +1407,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                     dst.PlacedFootprint.Footprint.RowPitch = rowPitch;
 
                     D3D12_TEXTURE_COPY_LOCATION src{};
-                    src.pResource = executeContext.Resolve(output);
+                    src.pResource = executeContext.Resolve(ssgi.GetResolvedResult());
                     src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
                     executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
@@ -1356,7 +1426,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             passed = false;
         }
 
-        const auto stats = graph.GetStats();
+        stats = graph.GetStats();
 
         if (!resources.EndFrame(error))
         {
@@ -1367,6 +1437,7 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
         {
             resources.WaitForGpu();
         }
+        }   // 프레임 루프 끝
 
         {
             char line[224]{};
@@ -1375,6 +1446,90 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
                 stats.passesDeclared, stats.passesExecuted, stats.passesCulled,
                 stats.barriersEmitted, stats.barrierBatches);
             outLog += line;
+        }
+
+        // ── 누적이 실제로 쌓이는가 ──
+        //
+        // 리졸브 결과의 a 채널에 누적 프레임 수가 들어 있다. 카메라를
+        // 고정하고 여덟 프레임 돌렸으므로, 재투영이 맞으면 8까지 올라가야
+        // 한다. 1에 머물면 매 프레임 히스토리를 버리는 것이고, 그러면
+        // 프레임당 슬라이스 둘만 쓰는 셈이라 품질만 나빠진다.
+        {
+            void* mapped = nullptr;
+            const size_t bytes = static_cast<size_t>(rowPitch) * giH;
+            D3D12_RANGE range{ 0, bytes };
+
+            if (SUCCEEDED(readback->Map(0, &range, &mapped)))
+            {
+                const auto* pixels = static_cast<const uint8_t*>(mapped);
+
+                double accumSum = 0.0;
+                float  accumMin = 1e9f;
+                float  accumMax = 0.f;
+                size_t counted = 0;
+
+                for (uint32_t y = 0; y < giH; ++y)
+                {
+                    // R16G16B16A16_FLOAT — 반정밀도 넷. a가 누적 수다.
+                    const auto* row = reinterpret_cast<const uint16_t*>(pixels
+                        + static_cast<size_t>(y) * rowPitch);
+
+                    for (uint32_t x = 0; x < giW; ++x)
+                    {
+                        const uint16_t half = row[x * 4 + 3];
+
+                        // half → float. 지수·가수를 직접 편다. DirectXMath의
+                        // XMConvertHalfToFloat를 쓸 수도 있지만 여기 하나뿐이라
+                        // 의존을 늘리지 않는다.
+                        const uint32_t sign = (half >> 15) & 0x1u;
+                        const uint32_t exponent = (half >> 10) & 0x1Fu;
+                        const uint32_t mantissa = half & 0x3FFu;
+
+                        float value = 0.f;
+                        if (0 != exponent)
+                        {
+                            const uint32_t bits = (sign << 31)
+                                | ((exponent + 112u) << 23) | (mantissa << 13);
+                            memcpy(&value, &bits, sizeof(value));
+                        }
+
+                        if (value <= 0.f) continue;   // 하늘은 0이다
+
+                        accumSum += value;
+                        accumMin = (std::min)(accumMin, value);
+                        accumMax = (std::max)(accumMax, value);
+                        ++counted;
+                    }
+                }
+
+                readback->Unmap(0, nullptr);
+
+                if (0 != counted)
+                {
+                    const double average = accumSum / static_cast<double>(counted);
+
+                    char line[256]{};
+                    std::snprintf(line, sizeof(line),
+                        "[3/3] 누적 — %u프레임 뒤 평균 %.2f · 최소 %.0f · 최대 %.0f"
+                        " (픽셀 %zu)\n",
+                        kTestFrames, average, accumMin, accumMax, counted);
+                    outLog += line;
+
+                    // ★ 정지 상태에서 누적이 안 쌓이면 전제가 무너진 것이다.
+                    //   여덟 프레임을 돌았으니 평균이 절반은 넘어야 한다.
+                    if (average < kTestFrames * 0.5)
+                    {
+                        outLog += "누적이 쌓이지 않는다 — 재투영이 매 프레임"
+                            " 히스토리를 버리고 있다(depthTolerance를 볼 것)\n";
+                        passed = false;
+                    }
+                }
+                else
+                {
+                    outLog += "[3/3] 누적을 잴 픽셀이 없다 — 전부 하늘로 판정됐다\n";
+                    passed = false;
+                }
+            }
         }
 
         // Hi-Z 밉마다 하나 + 트레이스 + 리졸브 + 필터 + 합성
