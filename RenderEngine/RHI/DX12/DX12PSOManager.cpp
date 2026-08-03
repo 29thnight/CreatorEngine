@@ -179,6 +179,21 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     d3dDesc.PS = { desc.psBytecode, desc.psSize };
     d3dDesc.RasterizerState.FillMode = desc.fillMode;
     d3dDesc.RasterizerState.CullMode = desc.cullMode;
+
+    // ★ DepthClipEnable을 명시한다.
+    //
+    // D3D12_GRAPHICS_PIPELINE_STATE_DESC를 0으로 초기화하면 이 값이 FALSE가
+    // 된다. D3D11의 CD3D11_DEFAULT()는 TRUE이므로, 아무것도 쓰지 않는 것이
+    // 곧 '두 경로가 다르게 동작한다'는 뜻이었다.
+    //
+    // 0 초기화가 기본값을 준다는 착각이 부르는 종류의 차이다. D3D12는
+    // 구조체를 그대로 받으므로 '안 쓴 필드'가 0이 되고, 0이 API의 기본값과
+    // 같으리라는 보장이 없다.
+    //
+    // DX11 대조에서 바닥 평면의 먼 쪽이 DX12에서만 잘리는 것을 쫓다가 찾았다.
+    // 경계가 완전한 직선(계단 0곳)이라 클리핑이 의심됐고, 클리핑 관련 설정
+    // 중 두 경로가 갈리는 것이 이것뿐이었다.
+    d3dDesc.RasterizerState.DepthClipEnable = TRUE;
     d3dDesc.BlendState.RenderTarget[0].BlendEnable = desc.blendEnable ? TRUE : FALSE;
     d3dDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
     d3dDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;

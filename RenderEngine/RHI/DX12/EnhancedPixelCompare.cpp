@@ -199,13 +199,29 @@ namespace
 // 클리핑이 맞다면 두 경로의 far 경계가 다르다는 뜻이다. 그런데 투영 행렬은
 // 같은 프레임 밀봉 스냅샷에서 온다(확인함). 그렇다면 행렬 이후의 무언가다.
 //
+// 배제한 것(계속):
+//   9.  뷰포트 MinDepth/MaxDepth — 0~1이다(EnhancedGBufferPass.cpp:563).
+//   10. DepthClipEnable — 불일치를 찾아 고쳤지만 원인은 아니었다.
+//       DX12PSOManager가 desc를 0 초기화한 뒤 FillMode·CullMode만 써서 이
+//       값이 FALSE로 남아 있었고, DX11의 CD3D11_DEFAULT()는 TRUE다. 맞춰
+//       두는 것이 옳으므로 TRUE로 명시했다(그 자체로 값어치 있는 수정이다).
+//       그런데 고친 뒤 결과가 한 픽셀도 바뀌지 않았다 — 897044·839654·0.9124
+//       그대로다. 논리적으로도 맞다: FALSE면 far 너머가 깊이 1.0으로 클램프돼
+//       LESS 테스트에서 탈락하고, TRUE면 클리핑돼 안 그려진다. 둘 다 안 그린다.
+//   11. 정점 셰이더의 곱셈 순서·전치 — 정상이다.
+//       CPU에서 viewProjection = view * projection(행 벡터 규약), 셰이더에서
+//       mul(position, gWorld) → mul(worldPosition, gViewProjection)로 같은
+//       규약, 전치는 XMMatrixTranspose 한 번뿐(HLSL 열 우선 대응). 두 규약이
+//       일관되고 중복 전치도 없다.
+//
 // 다음에 볼 것:
-//   - (확인함) DX12 뷰포트의 MinDepth/MaxDepth는 0~1이다
-//     (EnhancedGBufferPass.cpp:563). 여기가 아니다.
-//   - DX11 GBufferPass의 래스터라이저 DepthClipEnable. CD3D11_DEFAULT()는
-//     TRUE지만, 두 경로의 클립 공간 해석이 같은지는 직접 확인하지 않았다.
-//   - 정점 셰이더가 스냅샷 행렬을 곱하는 순서와 전치. 먼 쪽에서만 어긋나는
-//     것과는 잘 맞지 않지만, 아직 직접 보지 않았다.
+//   - DX11이 이 드로우를 정말 같은 월드 행렬로 그리는가. 캡처 스냅샷은
+//     프록시의 m_worldMatrix를 복사하는데, DX11 GBufferPass는 인스턴싱
+//     경로(m_instancePSO)를 쓴다. 그쪽이 인스턴스 버퍼에 다른 행렬을 넣거나
+//     정점 스트라이드가 다르면 같은 메시를 다르게 그린다. 지금까지 두 경로가
+//     '같은 입력을 쓴다'고 전제해 왔는데, 그 전제 자체를 확인하지 않았다.
+//   - 그 평면의 정점 좌표 범위. 월드에서 far를 넘는지 직접 계산해 볼 것.
+//     넘는다면 두 경로가 같은 far를 쓰는지가 다시 질문이 된다.
 //
 //   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
 //
