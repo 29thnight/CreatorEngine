@@ -147,6 +147,60 @@ private:
 	lm::LightMap lightMap;
 //Debug
 public:
+	// 현재 살아 있는 렌더러. 대조 검증이 DX11 결과를 찾아가는 통로다.
+	//
+	// 싱글턴을 새로 만들지 않고 '가장 최근에 생성된 것'을 가리키기만 한다 —
+	// 엔진에 SceneRenderer는 하나뿐이지만, 그것을 규칙으로 못 박으면 나중에
+	// 둘을 띄우려 할 때 이 포인터가 아니라 설계가 막게 된다. 소멸자에서
+	// 자기 자신일 때만 지운다.
+	static SceneRenderer* GetActive() { return s_active; }
+
+	// DX12 이식의 정확성 대조용(PHASE 3-6). DX11이 그린 GBuffer를 밖에서
+	// 읽을 수 있어야 '같은 씬을 같은 그림으로 그리는가'를 물을 수 있다.
+	//
+	// 소유권을 넘기지 않는다 — 대조는 읽기만 한다. 여기로 얻은 텍스처에
+	// 쓰기 시작하면 렌더러가 모르는 사이에 프레임 결과가 바뀐다.
+	//
+	// bitmask를 고른 이유: R32_UINT이고 그려진 곳에만 값이 들어가 커버리지를
+	// 그대로 읽을 수 있다. 색 타깃은 셰이더가 다르면 값도 다르지만, '어느
+	// 픽셀이 그려졌는가'는 셰이더와 무관하게 기하·변환·컬링이 정한다.
+	const Texture* GetGBufferBitmaskTexture() const { return m_bitmaskTexture.get(); }
+	const Texture* GetGBufferDiffuseTexture() const { return m_diffuseTexture.get(); }
+
+	// ── GBuffer 캡처 ──
+	//
+	// 텍스처 포인터를 넘겨 주는 것만으로는 부족했다. DX11 즉시 컨텍스트는
+	// 스레드 안전하지 않은데, 콘솔 명령은 게임 스레드에서 돌고 렌더는
+	// CommandExecuteThread에서 돈다. 밖에서 CopyResource·Map을 부르자
+	// 렌더 스레드가 그리는 중에 깨졌다(실제로 크래시했다).
+	//
+	// 그래서 복사는 렌더 스레드가 자기 프레임 끝에서 한다. 밖에서는 요청만
+	// 걸고 결과를 가져간다 — 컨텍스트를 만지는 것은 언제나 한 스레드다.
+	void RequestGBufferCapture() { m_captureRequested.store(true, std::memory_order_release); }
+
+	/// 캡처와 짝이 되는 드로우 스냅샷.
+	///
+	/// 픽셀만 가져와서는 대조가 되지 않는다 — 같은 입력으로 그렸는지 알 수
+	/// 없기 때문이다. 그런데 렌더 큐(m_deferredQueue)는 커맨드 리스트를 만든
+	/// 직후 비워지므로, 게임 스레드가 나중에 읽으면 이미 비어 있다(실제로
+	/// '그릴 것이 없다'가 나왔다). 그래서 지워지기 직전에 같이 뜬다.
+	struct GBufferCaptureDraw
+	{
+		Mesh*         mesh{ nullptr };
+		Mathf::xMatrix worldMatrix{};
+		Texture*      baseColor{ nullptr };
+		Texture*      normalMap{ nullptr };
+		Texture*      occRoughMetal{ nullptr };
+		Texture*      emissive{ nullptr };
+	};
+
+	const std::vector<GBufferCaptureDraw>& GetCaptureDraws() const { return m_captureDraws; }
+
+	/// 준비돼 있으면 결과를 옮겨 담고 true. 아직이면 false — 호출부가 몇 프레임
+	/// 기다렸다 다시 물어야 한다.
+	bool ConsumeGBufferCapture(std::vector<uint8_t>& outBytes, uint32_t& outWidth,
+		uint32_t& outHeight, uint32_t& outRowPitch, DXGI_FORMAT& outFormat);
+
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }
 	void SetLightmapPass()  { useTestLightmap = !useTestLightmap; }
 
@@ -156,4 +210,20 @@ private:
 	bool										m_bShowRenderState	{ false };
 	std::atomic_bool							useTestLightmap		{ false };
 	bool										m_bShowGridSettings	{ false };
+
+	static SceneRenderer* s_active;
+
+	// GBuffer 캡처 상태. 렌더 스레드가 쓰고 게임 스레드가 읽는다.
+	void ProcessGBufferCapture();
+	void CaptureDrawSnapshot(RenderPassData* data);
+
+	std::atomic_bool     m_captureRequested{ false };
+	std::atomic_bool     m_captureReady{ false };
+	std::mutex           m_captureMutex;
+	std::vector<uint8_t> m_captureBytes;
+	uint32_t             m_captureWidth{ 0 };
+	uint32_t             m_captureHeight{ 0 };
+	uint32_t             m_captureRowPitch{ 0 };
+	DXGI_FORMAT          m_captureFormat{ DXGI_FORMAT_UNKNOWN };
+	std::vector<GBufferCaptureDraw> m_captureDraws;
 };

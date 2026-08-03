@@ -1261,6 +1261,19 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.uploadring %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "dx12.compare")
+    {
+        // DX11과의 픽셀 대조(PHASE 3-6). 에디터가 한 프레임 이상 그린 뒤에만
+        // 의미가 있다 — DX11 GBuffer에 남아 있는 결과를 읽기 때문이다.
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunPixelCompareTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.compare] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.compare %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.scene")
     {
         // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.

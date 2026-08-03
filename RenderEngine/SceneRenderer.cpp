@@ -41,9 +41,13 @@
 
 using namespace lm;
 
+SceneRenderer* SceneRenderer::s_active = nullptr;
+
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
 	m_deviceResources(deviceResources)
 {
+	s_active = this;
+
     InitializeDeviceState();
     InitializeShadowMapDesc();
 
@@ -323,7 +327,112 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 SceneRenderer::~SceneRenderer()
 {
+	// 자기 자신일 때만 지운다. 다른 인스턴스가 이미 자리를 가져갔다면
+	// 그것을 지워서는 안 된다.
+	if (this == s_active) s_active = nullptr;
+
 	m_deviceResources.reset();
+}
+
+void SceneRenderer::CaptureDrawSnapshot(RenderPassData* data)
+{
+	// 큐가 지워지기 직전에만 불린다. 요청이 없으면 아무 일도 하지 않는다.
+	if (!m_captureRequested.load(std::memory_order_acquire)) return;
+	if (nullptr == data) return;
+
+	m_captureDraws.clear();
+	m_captureDraws.reserve(data->m_deferredQueue.size());
+
+	for (auto* proxy : data->m_deferredQueue)
+	{
+		if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
+
+		GBufferCaptureDraw draw{};
+		draw.mesh = proxy->m_Mesh.get();
+		draw.worldMatrix = proxy->m_worldMatrix;
+
+		if (auto* material = proxy->m_Material.get())
+		{
+			draw.baseColor = material->m_pBaseColor;
+			draw.normalMap = material->m_pNormal;
+			draw.occRoughMetal = material->m_pOccRoughMetal;
+			draw.emissive = material->m_pEmissive;
+		}
+
+		m_captureDraws.push_back(draw);
+	}
+}
+
+void SceneRenderer::ProcessGBufferCapture()
+{
+	// 렌더 스레드에서만 불린다. 요청이 없으면 아무 일도 하지 않는다 —
+	// 상시 비용이 붙으면 진단 장치가 측정 대상을 바꾼다.
+	if (!m_captureRequested.load(std::memory_order_acquire)) return;
+	if (nullptr == m_bitmaskTexture || nullptr == m_bitmaskTexture->m_pTexture) return;
+
+	auto* device = DirectX11::DeviceStates->g_pDevice;
+	auto* context = DirectX11::DeviceStates->g_pDeviceContext;
+	if (nullptr == device || nullptr == context) return;
+
+	D3D11_TEXTURE2D_DESC desc{};
+	m_bitmaskTexture->m_pTexture->GetDesc(&desc);
+
+	D3D11_TEXTURE2D_DESC stagingDesc = desc;
+	stagingDesc.Usage = D3D11_USAGE_STAGING;
+	stagingDesc.BindFlags = 0;
+	stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	stagingDesc.MiscFlags = 0;
+	stagingDesc.MipLevels = 1;
+	stagingDesc.ArraySize = 1;
+
+	ComPtr<ID3D11Texture2D> staging;
+	if (FAILED(device->CreateTexture2D(&stagingDesc, nullptr, &staging)))
+	{
+		// 요청은 내린다. 실패한 채로 남겨 두면 호출부가 영원히 기다린다.
+		m_captureRequested.store(false, std::memory_order_release);
+		return;
+	}
+
+	context->CopyResource(staging.Get(), m_bitmaskTexture->m_pTexture);
+
+	D3D11_MAPPED_SUBRESOURCE mapped{};
+	if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+	{
+		m_captureRequested.store(false, std::memory_order_release);
+		return;
+	}
+
+	{
+		std::lock_guard<std::mutex> guard(m_captureMutex);
+		m_captureWidth = desc.Width;
+		m_captureHeight = desc.Height;
+		m_captureRowPitch = mapped.RowPitch;
+		m_captureFormat = desc.Format;
+		m_captureBytes.assign(static_cast<size_t>(mapped.RowPitch) * desc.Height, 0);
+		memcpy(m_captureBytes.data(), mapped.pData, m_captureBytes.size());
+	}
+
+	context->Unmap(staging.Get(), 0);
+
+	m_captureRequested.store(false, std::memory_order_release);
+	m_captureReady.store(true, std::memory_order_release);
+}
+
+bool SceneRenderer::ConsumeGBufferCapture(std::vector<uint8_t>& outBytes, uint32_t& outWidth,
+	uint32_t& outHeight, uint32_t& outRowPitch, DXGI_FORMAT& outFormat)
+{
+	if (!m_captureReady.load(std::memory_order_acquire)) return false;
+
+	std::lock_guard<std::mutex> guard(m_captureMutex);
+	outBytes = std::move(m_captureBytes);
+	outWidth = m_captureWidth;
+	outHeight = m_captureHeight;
+	outRowPitch = m_captureRowPitch;
+	outFormat = m_captureFormat;
+
+	m_captureBytes.clear();
+	m_captureReady.store(false, std::memory_order_release);
+	return true;
 }
 
 void SceneRenderer::Finalize()
@@ -901,6 +1010,11 @@ void SceneRenderer::SceneRendering()
 		PROFILE_CPU_END();
 
 	}
+
+	// 대조 검증이 요청했으면 여기서 GBuffer를 CPU로 내린다.
+	// 프레임을 다 그린 뒤이므로 읽는 것이 완성된 결과이고,
+	// 이 스레드가 컨텍스트의 유일한 사용자다.
+	ProcessGBufferCapture();
 }
 
 void SceneRenderer::CreateCommandListPass()
@@ -1120,6 +1234,9 @@ void SceneRenderer::CreateCommandListPass()
 		});
 
 		m_commandThreadPool->NotifyAllAndWait();
+
+		// 큐가 살아 있는 마지막 지점이다. 대조 검증이 요청했으면 여기서 뜬다.
+		CaptureDrawSnapshot(data);
 
 		data->ClearRenderQueue();
 		data->ClearShadowRenderQueue();
