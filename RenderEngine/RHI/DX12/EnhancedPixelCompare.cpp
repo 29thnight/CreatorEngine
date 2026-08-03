@@ -124,13 +124,30 @@ namespace
 //   다만 이 차이는 반대편 관찰을 설명한다 — DX12만 그린 40픽셀이 그것이다.
 //   (양쪽을 맞출지는 별도 판단이다. 컬링을 끈 데는 이유가 있었다.)
 //
-// 다음에 볼 것 — 가장 유력한 것은 깊이 정밀도에 따른 z-fighting이다:
-//   삼각형 단위로 갈리고, 먼 곳(정밀도가 떨어지는 곳)에 몰려 있고, 경계가
-//   들쭉날쭉하다. 세 가지가 모두 이 방향과 맞는다. 두 경로의 정점 변환
-//   부동소수 순서가 다르면 겹친 면의 승자가 바뀐다.
-//   확인 방법: 그 평면이 다른 면과 같은 깊이에 겹쳐 있는지 본다. 겹쳐
-//   있다면 이것은 이식 오류가 아니라 원래 불안정한 경우이고, 대조의 판정
-//   기준이 그 불안정을 감안해야 한다.
+// ── z-fighting 가설: 확인하지 못했다 ──
+//
+// 결정적 실험을 넣었다 — 문제의 드로우를 단독으로 그린다. 겹칠 상대가
+// 없는데도 같은 자리가 비면 겹침이 원인이 아니다.
+//
+// 그런데 실험 자체를 신뢰할 수 없다:
+//   - 대상을 고르는 계산이 앞선 진단과 다른 드로우를 지목한다. 화면 y 범위
+//     진단은 9번(-706~2347)을 지목하는데, 여기 span 계산(radius/w)은 1번,
+//     기준을 바꾸니 4번을 골랐다. 둘이 갈리는 것 자체가 이 계산이 틀렸다는
+//     신호다.
+//   - 대상을 1번에서 4번으로 바꿨는데 결과가 839654픽셀로 정확히 같았다.
+//     서로 다른 드로우가 픽셀 하나까지 같을 수는 없다 — 단독 렌더가 실제로
+//     대상을 바꾸고 있는지조차 확인되지 않았다.
+//   - 고른 대상은 y 634부터 그린다. 차이 구간(528~683)의 위쪽을 그리는
+//     드로우가 아니므로, 애초에 물어야 할 것을 묻고 있지 않다.
+//
+// 그래서 '겹침이 아니다'라고 나온 판정은 근거가 없다. 실험을 고치기 전에는
+// z-fighting 가설을 지지할 수도 기각할 수도 없다.
+//
+// 실험을 고치는 방법:
+//   - 대상 선택을 화면 y 범위 진단과 같은 코드로 통일할 것. 두 곳에서 다르게
+//     계산하니 서로 다른 답이 나왔다.
+//   - 단독 렌더가 실제로 반영되는지 먼저 확인할 것. 드로우 수와 배치 수를
+//     함께 찍어 1이 나오는지 본다. 지금은 그것을 찍지 않아 알 수 없다.
 //
 //   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
 //
@@ -379,8 +396,20 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         return false;
     }
 
-    bool renderOk = true;
+    // 한 번 그리고 커버리지를 돌려준다.
+    //
+    // 두 번 쓴다 — 전체 드로우로 한 번, z-fighting 가설을 확인하려고 문제의
+    // 드로우만 단독으로 한 번. 겹칠 상대가 없는데도 같은 자리가 빠지면
+    // 겹침이 원인이 아니다.
+    const auto renderCoverage = [&](const std::vector<EnhancedDrawItem>& useDraws,
+        std::vector<bool>& outCoverage) -> bool
     {
+        frameContext.draws = &useDraws;
+        outCoverage.assign(static_cast<size_t>(compareWidth) * compareHeight, false);
+
+        bool renderOk = true;
+        {
+    
         // ★ 그래프를 EndFrame 바깥 스코프에 둔다. 이것이 크래시의 원인이었다.
         //
         // 처음에는 아래 if (renderOk) 블록 안에 선언했다. 블록을 벗어나면서
@@ -436,9 +465,9 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
                 char trace[224]{};
                 std::snprintf(trace, sizeof(trace),
                     "드로우 %zu · 메시 업로드 %u(%llu바이트) · 첫 메시 %p",
-                    draws.size(), meshStats.uploads,
+                    useDraws.size(), meshStats.uploads,
                     static_cast<unsigned long long>(meshStats.bytesUploaded),
-                    static_cast<const void*>(draws.front().mesh));
+                    static_cast<const void*>(useDraws.front().mesh));
                 PixelCompareTrace(trace);
             }
 
@@ -463,8 +492,7 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         return false;
     }
 
-    std::vector<bool> dx12Coverage(static_cast<size_t>(compareWidth) * compareHeight, false);
-    {
+        {
         void* mapped = nullptr;
         const size_t bytes = static_cast<size_t>(depthRowPitch) * compareHeight;
         D3D12_RANGE range{ 0, bytes };
@@ -497,11 +525,22 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 
             for (uint32_t x = 0; x < compareWidth; ++x)
             {
-                dx12Coverage[static_cast<size_t>(y) * compareWidth + x] = (0 != row[x]);
+                outCoverage[static_cast<size_t>(y) * compareWidth + x] = (0 != row[x]);
             }
         }
 
         depthReadback->Unmap(0, nullptr);
+    }
+        return true;
+    };
+
+    std::vector<bool> dx12Coverage;
+    if (!renderCoverage(draws, dx12Coverage))
+    {
+        outLog += "[2/3] DX12 렌더 실패: " + error + "\n";
+        gbuffer.Shutdown();
+        resources.Shutdown();
+        return false;
     }
 
     size_t dx12Covered = 0;
@@ -603,6 +642,80 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             summary += std::to_string(entry.first) + "(" + std::to_string(entry.second) + ") ";
         }
         outLog += summary + "\n";
+    }
+
+    // ── z-fighting 가설의 결정적 실험 ──
+    //
+    // 가설: 그 평면이 다른 면과 같은 깊이에 겹쳐 있고, 두 경로의 부동소수
+    // 계산 차이로 겹친 면의 승자가 갈린다.
+    //
+    // 그렇다면 그 평면을 단독으로 그릴 때는 겹칠 상대가 없으므로 전부
+    // 그려져야 한다. 단독으로 그려도 같은 자리가 빠지면 겹침이 원인이 아니다.
+    //
+    // 대상은 화면에서 가장 넓게 걸치는 드로우로 고른다 — 앞선 측정에서
+    // 그것(9번)만이 차이 구간을 그릴 수 있었다.
+    {
+        size_t widestIndex = 0;
+        float widestSpan = -1.f;
+
+        const Mathf::xMatrix viewProjection =
+            XMMatrixMultiply(cameraSnapshot.view, cameraSnapshot.projection);
+
+        for (size_t i = 0; i < draws.size(); ++i)
+        {
+            if (nullptr == draws[i].mesh) continue;
+
+            // ★ 월드 반지름이 아니라 '화면에서 차지하는 세로 폭'으로 고른다.
+            //
+            // 처음에는 월드 반지름으로 골랐다가 엉뚱한 드로우(1번)를 집었다.
+            // 원근 때문에 월드에서 큰 것이 화면에서도 넓다는 보장이 없다.
+            // 차이 구간을 그릴 수 있는지가 기준이므로 화면 공간에서 재야 한다.
+            const auto sphere = draws[i].mesh->GetBoundingSphere();
+            const float scale = (std::max)({
+                XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[0])),
+                XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[1])),
+                XMVectorGetX(XMVector3Length(draws[i].worldMatrix.r[2])) });
+
+            const Mathf::xVector center = XMVector3Transform(
+                XMVectorSet(sphere.Center.x, sphere.Center.y, sphere.Center.z, 1.f),
+                draws[i].worldMatrix);
+            const Mathf::xVector clip = XMVector4Transform(center, viewProjection);
+            const float w = XMVectorGetW(clip);
+            if (w <= 0.f) continue;
+
+            const float span = (sphere.Radius * scale) / w;
+            if (span > widestSpan) { widestSpan = span; widestIndex = i; }
+        }
+
+        std::vector<EnhancedDrawItem> soloDraw{ draws[widestIndex] };
+        std::vector<bool> soloCoverage;
+
+        if (renderCoverage(soloDraw, soloCoverage))
+        {
+            uint32_t soloTop = UINT32_MAX, soloBottom = 0;
+            size_t soloCovered = 0;
+            for (uint32_t y = 0; y < compareHeight; ++y)
+            {
+                for (uint32_t x = 0; x < compareWidth; ++x)
+                {
+                    if (!soloCoverage[static_cast<size_t>(y) * compareWidth + x]) continue;
+                    soloTop = (std::min)(soloTop, y);
+                    soloBottom = (std::max)(soloBottom, y);
+                    ++soloCovered;
+                }
+            }
+
+            char line[256]{};
+            std::snprintf(line, sizeof(line),
+                "        단독 렌더(드로우 %zu) — y %u~%u · 픽셀 %zu → %s\n",
+                widestIndex, soloTop, soloBottom, soloCovered,
+                (soloTop < 540u) ? "겹침이 원인(z-fighting 쪽)"
+                                 : "단독으로도 같은 자리가 빈다(겹침 아님)");
+            outLog += line;
+        }
+
+        // 전체 드로우로 되돌린다. 뒤의 단정이 이 목록을 본다.
+        frameContext.draws = &draws;
     }
 
     // ── 잘린 경계의 모양 ──
