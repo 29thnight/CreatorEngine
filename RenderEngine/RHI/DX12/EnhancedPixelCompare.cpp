@@ -32,6 +32,56 @@ namespace
         Debug->LogWarning("[dx12.compare] " + message);
     }
 
+    /// 커버리지의 위쪽 경계 모양을 한 줄로 설명한다.
+    ///
+    /// 열마다 커버리지의 가장 작은 y를 구한다. far plane 클리핑이면 화면
+    /// 공간의 수평선을 따라 일어나므로 모든 열에서 같은 y가 되어 직선이다.
+    /// 삼각형이 통째로 빠지는 것이면 빠진 삼각형의 폭만큼 계단이 생긴다.
+    ///
+    /// ★ 함수로 뺀 이유: 전체 렌더와 단독 렌더를 같은 식으로 재야 한다.
+    /// 이번 작업에서 같은 질문을 두 곳에서 다르게 계산했다가 서로 다른 답이
+    /// 나왔고, 어느 쪽이 맞는지 알 수 없어 실험을 통째로 다시 했다.
+    std::string PixelCompareDescribeTopEdge(const std::vector<bool>& coverage,
+        uint32_t width, uint32_t height, const char* label)
+    {
+        uint32_t minTop = UINT32_MAX, maxTop = 0;
+        size_t   columns = 0, steps = 0;
+        double   sum = 0.0;
+        uint32_t previous = UINT32_MAX;
+
+        for (uint32_t x = 0; x < width; ++x)
+        {
+            uint32_t top = UINT32_MAX;
+            for (uint32_t y = 0; y < height; ++y)
+            {
+                if (coverage[static_cast<size_t>(y) * width + x]) { top = y; break; }
+            }
+
+            if (UINT32_MAX == top) { previous = UINT32_MAX; continue; }
+
+            minTop = (std::min)(minTop, top);
+            maxTop = (std::max)(maxTop, top);
+            sum += top;
+            ++columns;
+
+            if (UINT32_MAX != previous)
+            {
+                const uint32_t delta = (top > previous) ? (top - previous) : (previous - top);
+                if (delta >= 2) ++steps;
+            }
+            previous = top;
+        }
+
+        if (0 == columns) return std::string("        ") + label + " — 그려진 열이 없다\n";
+
+        char line[288]{};
+        std::snprintf(line, sizeof(line),
+            "        %s — 열 %zu · y %u~%u(평균 %.1f) · 계단 %zu곳 → %s\n",
+            label, columns, minTop, maxTop, sum / static_cast<double>(columns), steps,
+            (steps <= columns / 100) ? "직선(클리핑 쪽)" : "들쭉날쭉(삼각형 단위 쪽)");
+        return line;
+    }
+
     /// 커버리지 비트맵을 만든다. 그려진 픽셀이면 true.
     ///
     /// bitmask 타깃(R32_UINT)은 그려진 곳에만 0이 아닌 값이 들어간다.
@@ -111,49 +161,51 @@ namespace
 //   8. 오브젝트 누락 — 9번은 DX12도 그린다(y 556부터). 안 그리는 것이 아니라
 //      먼 쪽만 덜 그린다.
 //
-// ★ 잘림은 삼각형 단위다(확인함).
-//   열마다 DX12 커버리지의 위쪽 끝을 재 보니 y 556~684로 128픽셀에 걸쳐
-//   변동하고 계단이 94곳이다. far plane 클리핑은 화면 공간 수평선을 따라
-//   일어나므로 모든 열에서 같은 y여야 한다 — 직선이 아니므로 클리핑이 아니다.
-//   삼각형이 통째로 빠지고 있다.
+// ★ 정정: 잘림은 삼각형 단위가 아니라 클리핑이다.
+//
+//   한때 '삼각형 단위'로 판정했다. 열마다 커버리지의 위쪽 끝을 재니 계단이
+//   94곳이었기 때문이다. 그런데 그것은 전체 렌더로 잰 값이었다 — 열한 개
+//   물체의 윤곽이 겹치면 당연히 들쭉날쭉하다. 그 측정은 이 평면이 어떻게
+//   잘리는지에 대해 아무것도 말해 주지 않았다.
+//
+//   문제의 평면 하나만 그려 다시 재니 계단 0곳, 완전한 직선이다:
+//     단독 상단 경계 — 열 1920 · y 634~684(평균 642.7) · 계단 0곳
+//     전체 상단 경계 — 열 1920 · y 556~684(평균 612.8) · 계단 94곳
+//
+//   직선 경계는 클리핑의 모양이다. 삼각형이 통째로 빠지는 것이라면 빠진
+//   삼각형의 폭만큼 계단이 생겨야 하는데 하나도 없다.
+//
+//   (y 634~684로 50픽셀 폭이 있는 것은 카메라가 기울어 far 경계가 화면에
+//    비스듬히 놓이기 때문이다. 이웃 열과 2 이상 차이 나는 곳이 없으므로
+//    완만한 곡선이지 계단이 아니다.)
 //
 // ★ 컬링도 아니다(확인함). 오히려 반대 방향이다.
 //   DX11은 CD3D11_DEFAULT() 래스터라이저라 CullMode가 BACK이고,
 //   DX12는 D3D12_CULL_MODE_NONE이다(EnhancedGBufferPass.cpp:423).
 //   DX12가 컬링을 덜 하므로 더 많이 그려야 하는데 덜 그린다.
 //   다만 이 차이는 반대편 관찰을 설명한다 — DX12만 그린 40픽셀이 그것이다.
-//   (양쪽을 맞출지는 별도 판단이다. 컬링을 끈 데는 이유가 있었다.)
 //
-// ── z-fighting 가설: 기각됐다 ──
+// ★ z-fighting도 아니다(확인함).
+//   그 평면을 단독으로 그려도 y 634~1079로 같은 한계에 걸린다. 겹칠 상대가
+//   전혀 없는데 잘리므로 겹침이 원인일 수 없다.
+//   (실험을 한 번 잘못 짰다가 고쳤다. 대상 선택을 여기서만 다른 식으로
+//    계산해 엉뚱한 드로우를 집었고, 단독 렌더가 실제로 반영되는지도 찍지
+//    않았다. 지금은 두 진단이 같은 드로우를 지목하고 '실제 드로우 1·배치 1'을
+//    함께 찍는다. 경계 계산도 함수 하나로 통일했다 — 같은 질문을 두 곳에서
+//    다르게 계산한 것이 이 작업에서 가장 많이 시간을 먹은 실수였다.)
 //
-// 결정적 실험: 문제의 드로우를 단독으로 그린다. 겹칠 상대가 없는데도 같은
-// 자리가 비면 겹침이 원인이 아니다.
+// ── 그래서 지금 남은 것 ──
 //
-// 실험을 한 번 잘못 짰다가 고쳤다. 처음에는 대상 선택을 여기서만 다른 식
-// (월드 반지름)으로 계산해 엉뚱한 드로우를 집었고, 단독 렌더가 실제로
-// 반영되는지도 찍지 않았다. 대상을 바꿔도 결과가 픽셀 하나까지 같게 나오는
-// 것을 보고서야 실험을 의심했다. 고친 것 둘:
-//   - 대상 선택을 '드로우별 화면 y 범위' 진단과 같은 식으로 통일했다.
-//     지금은 두 진단이 같은 드로우(4번)를 지목한다.
-//   - 단독 렌더에 실제 드로우 수와 배치 수를 함께 찍는다. 1·1로 나온다.
-//
-// 결과: 그 평면을 단독으로 그려도 y 634~1079다(픽셀 839654).
-//   겹칠 상대가 전혀 없는데 같은 한계에 걸린다. 겹침이 원인이 아니다.
-//   오히려 단독일 때 더 적게 그린다 — 전체 렌더의 556~634는 다른 드로우들이
-//   채우는 몫이었다.
-//
-// 남은 사실: 이 평면은 DX12에서 y 634까지만 그려진다. DX11은 528까지 그린다.
-//   삼각형 단위로 빠지는 것은 확인됐고(경계가 들쭉날쭉), 겹침도 클리핑도
-//   컬링도 아니다.
+// 클리핑이 맞다면 두 경로의 far 경계가 다르다는 뜻이다. 그런데 투영 행렬은
+// 같은 프레임 밀봉 스냅샷에서 온다(확인함). 그렇다면 행렬 이후의 무언가다.
 //
 // 다음에 볼 것:
-//   - 단독 렌더의 경계 모양을 따로 잴 것. 앞서 '들쭉날쭉'을 잰 것은 여러
-//     드로우가 섞인 전체 렌더였다. 이 평면 하나만의 경계가 직선인지 계단인지
-//     보면 클리핑과 삼각형 누락을 다시 가를 수 있다.
-//   - 그 메시의 삼각형 수와 정점 분포. 평면이 격자로 잘려 있다면 어느 줄부터
-//     빠지는지가 far 거리와 대응하는지 볼 것.
-//   - DX11이 이 드로우를 인스턴싱 경로(m_instancePSO)로 그리는지. 정점
-//     스트라이드나 입력 레이아웃이 다르면 같은 버퍼를 다르게 읽는다.
+//   - (확인함) DX12 뷰포트의 MinDepth/MaxDepth는 0~1이다
+//     (EnhancedGBufferPass.cpp:563). 여기가 아니다.
+//   - DX11 GBufferPass의 래스터라이저 DepthClipEnable. CD3D11_DEFAULT()는
+//     TRUE지만, 두 경로의 클립 공간 해석이 같은지는 직접 확인하지 않았다.
+//   - 정점 셰이더가 스냅샷 행렬을 곱하는 순서와 전치. 먼 쪽에서만 어긋나는
+//     것과는 잘 맞지 않지만, 아직 직접 보지 않았다.
 //
 //   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
 //
@@ -731,6 +783,13 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
                 (soloTop <= 530u) ? "겹침이 원인(z-fighting 쪽)"
                                   : "단독으로도 같은 자리가 빈다(겹침 아님)");
             outLog += line;
+
+            // ★ 이 평면 하나만의 경계 모양. 앞서 '들쭉날쭉'을 잰 것은 여러
+            // 드로우가 섞인 전체 렌더였다 — 여러 물체의 윤곽이 겹치면 당연히
+            // 들쭉날쭉하므로 그 측정으로는 클리핑 여부를 가를 수 없었다.
+            // 하나만 그린 결과라야 그 평면이 어떻게 잘리는지 보인다.
+            outLog += PixelCompareDescribeTopEdge(soloCoverage, compareWidth, compareHeight,
+                "단독 상단 경계");
         }
 
         // 전체 드로우로 되돌린다. 뒤의 단정이 이 목록을 본다.
@@ -745,55 +804,8 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     // 클리핑이면 그 끝이 모든 열에서 같아 직선이 된다 — 클리핑은 화면 공간의
     // 수평선을 따라 일어나기 때문이다. 삼각형이 통째로 빠지는 것이면 빠진
     // 삼각형의 폭만큼 계단이 생겨 열마다 값이 튄다.
-    {
-        std::vector<uint32_t> topPerColumn(compareWidth, UINT32_MAX);
-        for (uint32_t x = 0; x < compareWidth; ++x)
-        {
-            for (uint32_t y = 0; y < compareHeight; ++y)
-            {
-                if (dx12Coverage[static_cast<size_t>(y) * compareWidth + x])
-                {
-                    topPerColumn[x] = y;
-                    break;
-                }
-            }
-        }
-
-        uint32_t minTop = UINT32_MAX, maxTop = 0;
-        size_t   columns = 0;
-        double   sum = 0.0;
-        size_t   steps = 0;      // 이웃 열과 2 이상 차이 나는 곳
-        uint32_t previous = UINT32_MAX;
-
-        for (uint32_t x = 0; x < compareWidth; ++x)
-        {
-            const uint32_t top = topPerColumn[x];
-            if (UINT32_MAX == top) { previous = UINT32_MAX; continue; }
-
-            minTop = (std::min)(minTop, top);
-            maxTop = (std::max)(maxTop, top);
-            sum += top;
-            ++columns;
-
-            if (UINT32_MAX != previous)
-            {
-                const uint32_t delta = (top > previous) ? (top - previous) : (previous - top);
-                if (delta >= 2) ++steps;
-            }
-            previous = top;
-        }
-
-        if (0 != columns)
-        {
-            char line[256]{};
-            std::snprintf(line, sizeof(line),
-                "        DX12 상단 경계 — 열 %zu · y %u~%u(평균 %.1f) · 계단 %zu곳"
-                " → %s\n",
-                columns, minTop, maxTop, sum / static_cast<double>(columns), steps,
-                (steps <= columns / 100) ? "직선(클리핑 쪽)" : "들쭉날쭉(삼각형 단위 쪽)");
-            outLog += line;
-        }
-    }
+    outLog += PixelCompareDescribeTopEdge(dx12Coverage, compareWidth, compareHeight,
+        "DX12 상단 경계(전체)");
 
     // ── 어느 드로우가 그 띠를 그리는가 ──
     //
