@@ -1919,12 +1919,65 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
         return false;
     }
 
+    // ★ 이 검증은 오래 빨간불이었고 아무도 못 봤다.
+    //
+    // 2차 슬라이스(b57cb128)에서 GBuffer 패스의 내장 삼각형을 걷어내고
+    // context.draws를 그리도록 바꿨는데, 이 검증은 draws를 채우지 않았다.
+    // 그래서 그 뒤로 줄곧 아무것도 안 그렸고 다섯 타깃이 전부 0으로 읽혔다.
+    // "타깃별 픽셀 확인 실패"라는 한 줄만 남아서, 그것이 '그림이 틀렸다'가
+    // 아니라 '그리지도 않았다'라는 것을 아무도 읽지 않았다.
+    //
+    // 검증이 자기 기하를 들게 고친다. 패스가 씬에서 그림을 받는 구조가 된
+    // 이상, 검증도 씬 노릇을 해야 한다.
+    DX12MeshCache meshCache;
+    DX12TextureCache textureCache;
+    if (!meshCache.Initialize(&resources, error) ||
+        !textureCache.Initialize(&resources, DirectX11::DeviceStates->g_pDevice,
+            DirectX11::DeviceStates->g_pDeviceContext, error))
+    {
+        outLog += "[1/3] 캐시 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    // 카메라를 주지 않으므로 뷰·투영은 항등이고, 정점 좌표가 곧 클립 좌표다.
+    // -0.8~0.8을 덮게 두면 화면 중앙은 반드시 그려진 곳이 된다.
+    std::vector<Vertex> quadVertices(4);
+    const Mathf::Vector3 quadCorners[4] = {
+        { -0.8f, -0.8f, 0.5f }, { -0.8f, 0.8f, 0.5f },
+        {  0.8f,  0.8f, 0.5f }, {  0.8f, -0.8f, 0.5f },
+    };
+    const Mathf::Vector2 quadUVs[4] = { {0,1}, {0,0}, {1,0}, {1,1} };
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        quadVertices[i].position = quadCorners[i];
+        quadVertices[i].normal = { 0.f, 0.f, -1.f };
+        quadVertices[i].uv0 = quadUVs[i];
+        quadVertices[i].tangent = { 1.f, 0.f, 0.f };
+        quadVertices[i].bitangent = { 0.f, 1.f, 0.f };
+    }
+    std::vector<uint32> quadIndices = { 0, 1, 2, 0, 2, 3 };
+    Mesh quadMesh("GBufferTest.Quad", std::move(quadVertices), std::move(quadIndices));
+
+    // 재질 값은 다섯 타깃이 서로 다른 값을 갖도록 고른다. 한 타깃만 기록되고
+    // 나머지가 0으로 남는 경우를 잡는 것이 이 검증의 목적이라, 값들이 서로
+    // 구분되지 않으면 검사 자체가 무의미해진다.
+    std::vector<EnhancedDrawItem> draws(1);
+    draws[0].mesh = &quadMesh;
+    draws[0].worldMatrix = XMMatrixIdentity();
+    draws[0].baseColorFactor = { 0.2f, 0.4f, 0.6f, 1.f };
+    draws[0].metallic = 0.25f;
+    draws[0].roughness = 0.75f;
+    draws[0].useNormalMap = 0;
+
     EnhancedFrameContext frameContext{};
     frameContext.resources = &resources;
     frameContext.psoManager = &psoManager;
     frameContext.rootSignatures = &rootSignatures;
+    frameContext.meshCache = &meshCache;
+    frameContext.textureCache = &textureCache;
     frameContext.width = kWidth;
     frameContext.height = kHeight;
+    frameContext.draws = &draws;
 
     EnhancedGBufferPass gbuffer;
     if (!gbuffer.Initialize(frameContext, error))
@@ -1935,6 +1988,18 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     outLog += "[1/3] 패스 초기화 완료 — 정점·인덱스 버퍼, MRT 5 PSO, 깊이\n";
 
     // ── [2/3] 그래프에 선언하고 실행 ──
+    //
+    // PrepareFrame이 Declare보다 먼저이고, 프레임 안이어야 한다 — 메시·텍스처
+    // 업로드가 커맨드를 기록하기 때문이다. 순서가 뒤집히면 배치가 비어 있고,
+    // 그것이 바로 이 검증이 오래 빨간불이던 모습이다.
+    if (!resources.BeginFrame(error)) { outLog += "[2/3] Begin 실패\n"; return false; }
+
+    if (!gbuffer.PrepareFrame(frameContext, error))
+    {
+        outLog += "[2/3] PrepareFrame 실패: " + error + "\n";
+        return false;
+    }
+
     EnhancedRenderGraph graph;
     gbuffer.Declare(graph, frameContext);
     const auto outputs = gbuffer.GetOutputs();
@@ -2019,7 +2084,6 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
         return false;
     }
 
-    if (!resources.BeginFrame(error)) { outLog += "[2/3] Begin 실패\n"; return false; }
     if (!graph.Execute(resources.GetCommandList(), error))
     {
         outLog += "[2/3] 그래프 Execute 실패: " + error + "\n";
@@ -2029,6 +2093,12 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
     resources.WaitForGpu();
 
     const auto graphStats = graph.GetStats();
+    // ★ 배치 수를 함께 찍는다.
+    //
+    // 이것이 없어서 '그리지도 않았다'가 '그림이 틀렸다'로 읽혔다. 0이면
+    // 픽셀을 볼 것도 없이 여기가 원인이다.
+    outLog += "[2/3] 드로우 " + std::to_string(gbuffer.GetLastDrawCount())
+        + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
     outLog += "[2/3] 그래프 실행 완료 — 패스 " + std::to_string(graphStats.passesExecuted)
         + " · transient " + std::to_string(graphStats.transientCreated)
         + " · 배리어 " + std::to_string(graphStats.barriersEmitted)
@@ -2108,20 +2178,34 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
             std::snprintf(buffer, sizeof(buffer), "(%.3f %.3f %.3f)", r, g, b);
             got = buffer;
 
+            // ★ 기대값은 지금 셰이더가 쓰는 것이다.
+            //
+            // 예전 값(Diffuse=uv, MetalRough=(0.25,0.75,0), Emissive=(0,0.5,1))은
+            // 내장 삼각형 시절 셰이더가 상수로 쓰던 것이라 이미 맞지 않는다.
+            // 지금은 재질에서 온다. 텍스처를 안 준 슬롯에는 1x1 흰색이 묶이므로:
+            //
+            //   Diffuse    = 흰색 x baseColorFactor      = (0.2, 0.4, 0.6)
+            //   MetalRough = (orm.r, orm.g x roughness, orm.b + metallic)
+            //              = (1, 0.75, 1.25)
+            //   Normal     = (0,0,-1) x 0.5 + 0.5        = (0.5, 0.5, 0)
+            //   Emissive   = 흰색                        = (1, 1, 1)
+            //   Bitmask    = 0xABCD
             constexpr float kEpsilon = 0.01f;
             switch (i)
             {
-            case 0: // Diffuse = uv, 중앙이므로 0.5 근처
-                ok = std::fabs(r - 0.5f) < 0.05f && std::fabs(g - 0.5f) < 0.05f;
+            case 0: // Diffuse = baseColorFactor
+                ok = std::fabs(r - 0.2f) < kEpsilon && std::fabs(g - 0.4f) < kEpsilon
+                    && std::fabs(b - 0.6f) < kEpsilon;
                 break;
-            case 1: // MetalRough = (0.25, 0.75, 0)
-                ok = std::fabs(r - 0.25f) < kEpsilon && std::fabs(g - 0.75f) < kEpsilon;
+            case 1: // MetalRough = (1, roughness, 1 + metallic)
+                ok = std::fabs(g - 0.75f) < kEpsilon && std::fabs(b - 1.25f) < kEpsilon;
                 break;
             case 2: // Normal = (0,0,-1) 인코딩 → (0.5, 0.5, 0)
                 ok = std::fabs(r - 0.5f) < kEpsilon && std::fabs(b - 0.f) < kEpsilon;
                 break;
-            case 3: // Emissive = (0, 0.5, 1)
-                ok = std::fabs(g - 0.5f) < kEpsilon && std::fabs(b - 1.f) < kEpsilon;
+            case 3: // Emissive = 흰색 폴백
+                ok = std::fabs(r - 1.f) < kEpsilon && std::fabs(g - 1.f) < kEpsilon
+                    && std::fabs(b - 1.f) < kEpsilon;
                 break;
             default:
                 break;

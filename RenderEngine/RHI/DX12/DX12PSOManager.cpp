@@ -36,6 +36,35 @@ namespace
     {
         return HashBytes(&value, sizeof(T), seed);
     }
+
+    // 캐시 파일 머리에 찍는 도장. 자세한 사연은 Initialize의 주석에 있다.
+#pragma pack(push, 1)
+    struct CacheHeader
+    {
+        uint64_t magic{ 0 };
+        uint64_t schemaStamp{ 0 };
+    };
+#pragma pack(pop)
+
+    constexpr uint64_t kCacheMagic = 0x4345'5053'4F'00'01ull;   // "CEPSO" + 포맷 1
+
+    CacheHeader MakeCacheHeader()
+    {
+        // 스키마 도장 = 이 파일의 컴파일 시각.
+        //
+        // desc를 D3D12 desc로 옮기는 코드가 이 파일에 있으므로, 여기가 다시
+        // 컴파일됐으면 변환이 바뀌었을 수 있다고 본다. 주석 한 줄만 고쳐도
+        // 캐시가 버려지지만 그 대가는 PSO 몇 개 재컴파일뿐이고, 반대 방향의
+        // 대가는 '낡은 캐시로 조용히 다른 PSO를 쓰는 것'이라 비교가 안 된다.
+        //
+        // 손으로 올리는 버전 번호를 쓰지 않는 이유도 같다 — 올리는 것을
+        // 잊는 순간 같은 증상으로 돌아오고, 그때는 원인이 캐시라는 것부터
+        // 다시 알아내야 한다.
+        CacheHeader header{};
+        header.magic = kCacheMagic;
+        header.schemaStamp = HashBytes(__DATE__ __TIME__, sizeof(__DATE__ __TIME__) - 1);
+        return header;
+    }
 }
 
 uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
@@ -113,25 +142,65 @@ bool DX12PSOManager::Initialize(ID3D12Device* device, const std::wstring& cacheF
 
     // 기존 캐시 파일을 읽어 라이브러리를 복원한다. 드라이버나 어댑터가 바뀌었으면
     // 여기서 실패하고(런타임이 판정한다) 빈 라이브러리로 시작한다.
+    //
+    // ★ 런타임의 판정만으로는 모자란다. 그쪽은 드라이버·어댑터가 바뀐 것만
+    //   알지, 우리가 desc를 D3D12 desc로 옮기는 방식이 바뀐 것은 모른다.
+    //   실제로 그것으로 한 번 물렸다: 래스터라이저의 DepthClipEnable을 FALSE
+    //   에서 TRUE로 고쳤는데, 그 필드는 우리 desc 구조체에 없어 해시에도 안
+    //   들어간다. 그래서 이름(해시)은 그대로인데 내용이 달라졌고, 예전 캐시
+    //   파일을 쥔 채로 실행하면 매번 이렇게 경고가 났다:
+    //
+    //     Load*Pipeline: The pipeline state desc provided does not match
+    //                    the one used to create the PSO stored with name "..."
+    //     StorePipeline: A pipeline with name "..." already exists
+    //
+    //   dx12.selftest는 검증 레이어 메시지 0건이 통과 조건이라 이것만으로
+    //   실패했다. 그림은 멀쩡했고 캐시 파일만 낡았던 것이다.
+    //
+    // 그래서 파일 앞에 스키마 도장을 찍는다. 도장이 다르면 파일을 버린다.
+    // 도장 값은 이 파일의 컴파일 시각이다 — 변환 코드가 여기 있으므로,
+    // 여기가 다시 컴파일됐으면 변환이 바뀌었을 수 있다고 본다. 사람이
+    // 버전을 올려 주기를 기대하는 방식은 잊는 순간 같은 증상으로 돌아온다.
     std::ifstream file(m_cachePath, std::ios::binary | std::ios::ate);
     if (file)
     {
-        const auto size = static_cast<size_t>(file.tellg());
+        const auto fileSize = static_cast<size_t>(file.tellg());
         file.seekg(0);
-        m_libraryBlob.resize(size);
-        file.read(reinterpret_cast<char*>(m_libraryBlob.data()), size);
-        file.close();
 
-        const HRESULT hr = m_device->CreatePipelineLibrary(m_libraryBlob.data(),
-            m_libraryBlob.size(), IID_PPV_ARGS(&m_library));
-        if (SUCCEEDED(hr))
+        CacheHeader stored{};
+        bool headerOk = false;
+        if (fileSize > sizeof(CacheHeader))
         {
-            m_libraryLoadedFromDisk = true;
+            file.read(reinterpret_cast<char*>(&stored), sizeof(stored));
+            const CacheHeader expected = MakeCacheHeader();
+            headerOk = (stored.magic == expected.magic)
+                && (stored.schemaStamp == expected.schemaStamp);
+        }
+
+        if (headerOk)
+        {
+            m_libraryBlob.resize(fileSize - sizeof(CacheHeader));
+            file.read(reinterpret_cast<char*>(m_libraryBlob.data()),
+                static_cast<std::streamsize>(m_libraryBlob.size()));
+            file.close();
+
+            const HRESULT hr = m_device->CreatePipelineLibrary(m_libraryBlob.data(),
+                m_libraryBlob.size(), IID_PPV_ARGS(&m_library));
+            if (SUCCEEDED(hr))
+            {
+                m_libraryLoadedFromDisk = true;
+            }
+            else
+            {
+                // D3D12_ERROR_DRIVER_VERSION_MISMATCH / ADAPTER_NOT_FOUND 등 — 정상 경로다.
+                m_libraryBlob.clear();
+            }
         }
         else
         {
-            // D3D12_ERROR_DRIVER_VERSION_MISMATCH / ADAPTER_NOT_FOUND 등 — 정상 경로다.
+            file.close();
             m_libraryBlob.clear();
+            ++m_stats.cacheDiscarded;
         }
     }
 
@@ -477,6 +546,9 @@ bool DX12PSOManager::SaveCache(std::string& outError)
 
     std::ofstream file(m_cachePath, std::ios::binary | std::ios::trunc);
     if (!file) { outError = "캐시 파일 열기 실패"; return false; }
+
+    const CacheHeader header = MakeCacheHeader();
+    file.write(reinterpret_cast<const char*>(&header), sizeof(header));
     file.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(size));
     return true;
 }

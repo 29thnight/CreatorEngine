@@ -82,6 +82,10 @@ public:
         uint32_t failures{ 0 };
         uint32_t fallbackDraws{ 0 };  // 폴백으로 그린 드로우 — 지속적으로 늘면 캐시가 놀고 있다
         uint32_t skippedDraws{ 0 };   // 폴백조차 없어 건너뛴 드로우
+
+        // 스키마 도장이 달라 통째로 버린 캐시 파일. 매 실행 1이면 도장이
+        // 실행마다 달라지고 있다는 뜻이고, 그러면 디스크 캐시가 늘 논다.
+        uint32_t cacheDiscarded{ 0 };
     };
 
     // 비동기 요청의 상태. Pending 프레임은 폴백 PSO를 쓰거나 그 드로우를 건너뛴다 —
