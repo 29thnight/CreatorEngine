@@ -2452,6 +2452,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     bool     shadowEnabled = false;
     float    shadowBias = kTestShadowBias;
     bool     captureShadowMap = false;
+
+    // 켜면 lighting_readback이 라이팅 대신 SSGI 합성 결과를 복사한다.
+    // 같은 크기·포맷이라 버퍼를 하나 더 만들 이유가 없다.
+    bool     captureSSGIOutput = false;
     uint32_t shadowOccluders = 0;
     std::array<uint32_t, EnhancedShadowPass::kCascadeCount> cascadeOccluders{};
 
@@ -2512,8 +2516,17 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
         // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
         // 안다 — 재질 때 "업로드 0인데 통과"를 겪었으므로 같은 함정을 막는다.
-        graph.AddPass("lighting_readback",
-            { { deferred.GetOutput(), RGResourceState::CopySource } },
+        // SSGI 출력도 사용에 넣는다. 플래그에 따라 어느 쪽을 복사할지가
+        // 기록 시점에 갈리는데, 배리어는 선언으로 정해지므로 둘 다 선언해야
+        // 어느 쪽을 읽어도 상태가 맞다.
+        std::vector<EnhancedRenderGraph::RGPassUsage> readbackUsages{
+            { deferred.GetOutput(), RGResourceState::CopySource } };
+        if (ssgi.GetOutput().IsValid())
+        {
+            readbackUsages.push_back({ ssgi.GetOutput(), RGResourceState::CopySource });
+        }
+
+        graph.AddPass("lighting_readback", readbackUsages,
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 D3D12_TEXTURE_COPY_LOCATION dst{};
@@ -2525,8 +2538,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
                 dst.PlacedFootprint.Footprint.Depth = 1;
                 dst.PlacedFootprint.Footprint.RowPitch = lightingRowPitch;
 
+                const bool useSSGI = captureSSGIOutput && ssgi.GetOutput().IsValid();
+
                 D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = executeContext.Resolve(deferred.GetOutput());
+                src.pResource = executeContext.Resolve(
+                    useSSGI ? ssgi.GetOutput() : deferred.GetOutput());
                 src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
                 executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
@@ -2744,6 +2760,99 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     }
 
     captureShadowMap = false;
+
+    // ── SSGI 전후 그림을 남긴다 ──
+    //
+    // 스윕 숫자로는 두께·거리의 옳은 값을 정할 수 없었다(합성 씬은 깊이와
+    // 노멀이 서로 모순이라 총 히트 비율이 아무것에도 반응하지 않는다).
+    // 최종 판정은 결국 실제 씬의 그림이다. 라이팅만(끔)과 SSGI 합성(켬)을
+    // 나란히 저장해 눈으로 비교할 수 있게 한다.
+    {
+        const auto savePng = [&](const char* path) -> bool
+        {
+            void* mapped = nullptr;
+            const size_t bytes = static_cast<size_t>(lightingRowPitch) * kHeight;
+            D3D12_RANGE range{ 0, bytes };
+            if (FAILED(lightingReadback->Map(0, &range, &mapped))) return false;
+
+            // R16G16B16A16_FLOAT → R8G8B8A8. 노출을 낮춰 담는다.
+            //
+            // ★ 처음에는 감마만 입혔더니 끔/켬 PNG가 바이트까지 동일했다.
+            //   라이팅이 대부분 1.0을 넘어 클램프됐고, 포화된 픽셀에는 GI를
+            //   더해도 같은 흰색이 된다 — 차이를 재려는 그림이 차이를 가리고
+            //   있었다. 0.35배로 낮춰 밝은 영역에도 여유를 남긴다.
+            constexpr float kExposure = 0.35f;
+            const auto halfToF = [](uint16_t half) -> float
+            {
+                const uint32_t exponent = (half >> 10) & 0x1Fu;
+                const uint32_t mantissa = half & 0x3FFu;
+                if (0 == exponent) return 0.f;
+                const uint32_t bits = ((exponent + 112u) << 23) | (mantissa << 13);
+                float value = 0.f;
+                memcpy(&value, &bits, sizeof(value));
+                return value;
+            };
+
+            std::vector<uint8_t> rgba(static_cast<size_t>(kWidth) * kHeight * 4);
+            const auto* source = static_cast<const uint8_t*>(mapped);
+
+            for (uint32_t y = 0; y < kHeight; ++y)
+            {
+                const auto* row = reinterpret_cast<const uint16_t*>(source
+                    + static_cast<size_t>(y) * lightingRowPitch);
+
+                for (uint32_t x = 0; x < kWidth; ++x)
+                {
+                    for (uint32_t channel = 0; channel < 3; ++channel)
+                    {
+                        const float linear = (std::min)(1.f,
+                            (std::max)(0.f, halfToF(row[x * 4 + channel]) * kExposure));
+                        rgba[(static_cast<size_t>(y) * kWidth + x) * 4 + channel] =
+                            static_cast<uint8_t>(powf(linear, 1.f / 2.2f) * 255.f + 0.5f);
+                    }
+                    rgba[(static_cast<size_t>(y) * kWidth + x) * 4 + 3] = 255;
+                }
+            }
+
+            lightingReadback->Unmap(0, nullptr);
+
+            DirectX::Image image{};
+            image.width = kWidth;
+            image.height = kHeight;
+            image.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            image.rowPitch = static_cast<size_t>(kWidth) * 4;
+            image.slicePitch = image.rowPitch * kHeight;
+            image.pixels = rgba.data();
+
+            const std::string narrow(path);
+            const std::wstring wide(narrow.begin(), narrow.end());
+            return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+                DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), wide.c_str()));
+        };
+
+        // 기준선 렌더의 리드백이 아직 라이팅(끔)을 들고 있다.
+        const bool savedOff = savePng("dx12_ssgi_off.png");
+
+        // SSGI 합성을 리드백해 다시 저장한다.
+        captureSSGIOutput = true;
+        uint32_t coveredTemp = 0;
+        uint32_t drawTemp = 0;
+        double luminanceTemp = 0.0;
+        std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
+        EnhancedRenderGraph::Stats statsTemp{};
+        bool savedOn = false;
+
+        if (renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+            timingsTemp, statsTemp, luminanceTemp))
+        {
+            savedOn = savePng("dx12_ssgi_on.png");
+        }
+        captureSSGIOutput = false;
+
+        outLog += std::string("      SSGI 그림 — 끔 ") + (savedOff ? "저장" : "실패")
+            + " · 켬 " + (savedOn ? "저장" : "실패")
+            + " (dx12_ssgi_off/on.png)\n";
+    }
 
     // 기준선 렌더의 그림자 상태를 여기서 붙잡는다.
     //

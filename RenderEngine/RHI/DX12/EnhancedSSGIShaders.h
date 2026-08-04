@@ -64,6 +64,23 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         depth = min(depth, 0.7f - bulge * 0.1f);
     }
 
+    // ★ 떠 있는 얇은 가로 판.
+    //
+    // 두께 검사를 검증하려고 넣었다. 바닥과 구만으로는 '광선이 얇은 물체
+    // 뒤를 지나가는' 기하가 없어서, 두께를 뷰 공간으로 고쳐도 히트 비율이
+    // 꿈쩍하지 않았다(0.05 → 0.5507 · 5.0 → 0.5506) — 거부 경로가 발동할
+    // 자리 자체가 없었던 것이다.
+    //
+    // 판은 바닥보다 훨씬 앞에 떠 있으므로, 바닥에서 위로 가는 광선이 판의
+    // 뒤편 깊이 간극을 지나게 된다. 두께가 작으면 '뚫고 지나감'으로 거부되고
+    // 크면 히트로 잡힌다 — 두께 값이 처음으로 결과를 가른다.
+    const bool inBar = (uv.x > 0.25f) && (uv.x < 0.75f)
+        && (uv.y > 0.62f) && (uv.y < 0.66f);
+    if (inBar)
+    {
+        depth = min(depth, 0.55f);
+    }
+
     gDepth[id.xy] = depth;
 
     // ★ 노멀도 함께 만든다.
@@ -85,6 +102,12 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     {
         // 하늘. 값은 안 쓰이지만 0으로 두면 normalize가 NaN을 낸다.
         normal = float3(0.0f, 0.0f, 1.0f);
+    }
+
+    if (inBar)
+    {
+        // 판은 카메라를 본다.
+        normal = float3(0.0f, 0.0f, -1.0f);
     }
 
     gNormal[id.xy] = float4(normal * 0.5f + 0.5f, 1.0f);

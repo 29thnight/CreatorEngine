@@ -123,6 +123,7 @@ cbuffer TraceParams : register(b0)
     uint2    gDepthSize;
     uint     gMipCount;
     uint     gFrameIndex;
+    uint2    gLightingSize;   // 라이팅 텍스처 해상도 — GI 해상도와 다르다
     float    gMaxDistance;      // 뷰 공간 최대 추적 거리
     float    gThickness;        // 표면 두께 가정(뷰 공간)
 };
@@ -172,6 +173,25 @@ float Hash(uint2 p, uint frame)
     return float(n & 0x00ffffffu) / float(0x01000000u);
 }
 
+// 방향에 맞는 셀 경계까지의 t 증가량.
+//
+// ★ 한때 floor+1(양의 방향 경계)만 봤다. 위로 가는 광선(delta.y < 0)은
+//   반대쪽 경계까지의 거리를 얻어 최대 한 셀을 헛디뎠다. 성분별로
+//   진행 방향의 경계를 고른다. 거의 0인 성분은 그 축으로는 영원히
+//   경계를 안 만나므로 큰 값으로 밀어 min에서 빠지게 한다.
+float StepToCellEdge(float2 uv, float2 direction, uint2 size)
+{
+    const float2 texel = 1.0f / float2(size);
+    const float2 cellIndex = floor(uv / texel);
+    const float2 boundary = (cellIndex + step(0.0f, direction)) * texel;
+
+    float2 toEdge = float2(1e9f, 1e9f);
+    if (abs(direction.x) > 1e-8f) toEdge.x = (boundary.x - uv.x) / direction.x;
+    if (abs(direction.y) > 1e-8f) toEdge.y = (boundary.y - uv.y) / direction.y;
+
+    return max(min(toEdge.x, toEdge.y), 1e-4f);
+}
+
 // Hi-Z 행진. 히트하면 true와 히트 UV를 준다.
 bool TraceHiZ(float3 origin, float3 direction, float2 startUV, out float2 hitUV)
 {
@@ -192,7 +212,15 @@ bool TraceHiZ(float3 origin, float3 direction, float2 startUV, out float2 hitUV)
     const float endDepth = endClip.z;
 
     uint mip = min(2u, gMipCount - 1u);   // 중간 밉에서 시작한다
-    float t = 0.0f;
+
+    // ★ 시작 셀을 벗어난 지점에서 출발한다.
+    //
+    //   t=0에서 시작하면 첫 비교가 자기 픽셀의 깊이와 이루어지고, 시작
+    //   깊이가 곧 그 셀의 깊이이므로 모든 광선이 그 자리에서 '히트'한다.
+    //   실측이 그것을 드러냈다 — 히트 비율 0.5507이 비하늘 픽셀 비율
+    //   (9032/16384 = 0.551)과 정확히 일치했고, 씬에 무엇을 넣어도 숫자가
+    //   꿈쩍하지 않았다. 트레이스 전체가 자기 조명을 되먹이고 있었던 것이다.
+    float t = StepToCellEdge(startUV, delta, gDepthSize) + 1e-4f;
     const uint kMaxSteps = 64u;
 
     for (uint step = 0; step < kMaxSteps; ++step)
@@ -210,10 +238,7 @@ bool TraceHiZ(float3 origin, float3 direction, float2 startUV, out float2 hitUV)
         if (rayDepth < cellDepth)
         {
             // 이 셀은 광선보다 뒤에 있다 = 비었다. 셀 경계까지 건너뛴다.
-            const float2 texel = 1.0f / float2(size);
-            const float2 next = (floor(uv / texel) + 1.0f) * texel;
-            const float2 toEdge = (next - uv) / max(abs(delta), 1e-6f);
-            t += max(min(toEdge.x, toEdge.y), 1e-4f) * sign(1.0f);
+            t += StepToCellEdge(uv, delta, size);
 
             if (mip + 1 < gMipCount) ++mip;   // 비었으니 더 크게 건넌다
         }
@@ -222,16 +247,20 @@ bool TraceHiZ(float3 origin, float3 direction, float2 startUV, out float2 hitUV)
             if (0 == mip)
             {
                 // 두께를 넘어 뚫고 지나간 것이면 히트로 보지 않는다.
-                //
-                // ★ 이 검사는 현재 거의 발동하지 않는다(실측: 두께를 100배
-                //   바꿔도 히트 비율이 0.6% 안에서 움직인다). 이유가 둘이다.
-                //   ① rayDepth와 cellDepth가 클립 깊이(0~1 비선형)인데
-                //      gThickness는 뷰 공간 값으로 의도됐다 — 단위가 다르다.
-                //   ② Hi-Z가 밉 0까지 수렴한 시점에는 두 값의 차이가 이미
-                //      매우 작다.
-                //   살리려면 두 깊이를 뷰 공간으로 되돌려 비교해야 한다.
                 // 이것이 없으면 얇은 물체 뒤가 전부 막힌 것으로 잡힌다.
-                if (rayDepth - cellDepth > gThickness) return false;
+                //
+                // ★ 뷰 공간에서 비교한다. 한때 클립 깊이(0~1 비선형) 차이를
+                //   gThickness(뷰 공간 값)와 그대로 비교했는데, 단위가 달라
+                //   검사가 사실상 죽어 있었다 — 두께를 100배 바꿔도 히트
+                //   비율이 0.6% 안에서만 움직였다(실측). 클립 깊이는 원근
+                //   나눗셈 때문에 먼 곳에서 촘촘해지므로, 같은 클립 차이가
+                //   가까이서는 몇 cm, 멀리서는 몇 m를 뜻한다. 두께는
+                //   물리량이니 뷰 공간에서 재야 한다.
+                //
+                //   선형화는 히트 판정 시점에만 하므로 비용은 행렬 곱 둘이다.
+                const float rayViewZ = ViewFromDepth(uv, rayDepth).z;
+                const float cellViewZ = ViewFromDepth(uv, cellDepth).z;
+                if (rayViewZ - cellViewZ > gThickness) return false;
 
                 hitUV = uv;
                 return true;
@@ -292,7 +321,10 @@ void CSMain(uint3 id : SV_DispatchThreadID)
             // 맞은 표면의 직접광이 이 픽셀의 간접광이 된다.
             // Load로 읽는다. 히트 지점의 색을 그대로 쓰므로 보간이 필요
             // 없고, 샘플러를 안 만들면 힙도 바인딩도 하나 준다.
-            gathered += gLighting.Load(int3(hitUV * gDepthSize, 0)).rgb;
+            // ★ 라이팅은 자기 해상도 좌표로 읽는다. 한때 gDepthSize(1/2
+            //   해상도)를 곱했는데, 실제 씬의 라이팅은 전 해상도라 왼쪽 위
+            //   사분면만 읽고 있었다 — GI가 화면 절반 밖의 빛을 절대 못 봤다.
+            gathered += gLighting.Load(int3(hitUV * gLightingSize, 0)).rgb;
             ++hits;
         }
     }
@@ -375,6 +407,8 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         uint32_t      depthHeight{ 0 };
         uint32_t      mipCount{ 0 };
         uint32_t      frameIndex{ 0 };
+        uint32_t      lightingWidth{ 0 };
+        uint32_t      lightingHeight{ 0 };
         float         maxDistance{ 0.f };
         float         thickness{ 0.f };
     };
@@ -797,6 +831,11 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.depthHeight = m_giHeight;
                 params.mipCount = m_hiZMipCount;
                 params.frameIndex = m_frameIndex;
+                // 라이팅이 없으면 대체물(Hi-Z 0)이 꽂히므로 그 해상도를 준다.
+                params.lightingWidth = m_inputs.lighting.IsValid()
+                    ? context.width : m_giWidth;
+                params.lightingHeight = m_inputs.lighting.IsValid()
+                    ? context.height : m_giHeight;
                 // 실측으로 정할 값들이다. 지금은 눈으로 볼 수 있는 범위를
                 // 잡아 두고, 리졸브가 붙은 뒤 씬에 맞춰 조인다.
                 params.maxDistance = m_tuning.traceDistance;
@@ -1711,8 +1750,9 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
             struct SweepCase { float distance; float thickness; };
             const SweepCase cases[] = {
                 { 2.f,  0.5f }, { 8.f,  0.5f }, { 32.f, 0.5f },
-                // 두께는 클립 깊이 차이와 비교되므로 훨씬 작은 눈금으로 본다.
-                { 8.f,  0.0002f }, { 8.f,  0.002f }, { 8.f,  0.02f },
+                // 두께 검사가 뷰 공간으로 바뀌었으므로 뷰 단위 눈금으로 본다.
+                // 0.05는 얇은 판, 0.5는 사람 몸통, 5는 벽 두께쯤 된다.
+                { 8.f,  0.05f }, { 8.f,  5.0f },
             };
 
             outLog += "[3/3] 추적 스윕 — 거리/두께 → 히트 비율\n";
