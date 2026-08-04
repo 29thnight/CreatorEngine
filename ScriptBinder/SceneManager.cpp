@@ -273,46 +273,32 @@ void SceneManager::DisableOrEnable()
 
 void SceneManager::Decommissioning()
 {
-    // ★ 단계마다 즉시 찍는다.
-    //
-    //   종료가 여기서 멈추는 것을 추적 로그로 좁혀 왔다. 함수 단위로는
-    //   더 못 좁히므로 안쪽을 나눈다 — 씬이 여러 개일 때 어느 씬에서
-    //   멈추는지도 봐야 한다(씬 전환을 한 실행에서만 나는 증상이다).
+    // 씬 수를 남긴다. 여기가 예상보다 많으면 목록에 중복이 들어간
+    // 것이고, 그것이 종료 시 더블 delete로 번진다(실제로 겪었다).
     std::printf("[SHUTDOWN] Decommissioning 진입(씬 %zu)\n", m_scenes.size());
 
     if (auto* renderScene = m_ActiveRenderScene.load())
     {
         renderScene->Finalize();
     }
-    std::printf("[SHUTDOWN] RenderScene Finalize 반환\n");
 
-    size_t sceneIndex = 0;
     for (auto& scene : m_scenes)
     {
         if (scene)
         {
-            std::printf("[SHUTDOWN] 씬 %zu OnDisable\n", sceneIndex);
             scene->OnDisable();
-            std::printf("[SHUTDOWN] 씬 %zu AllDestroyMark\n", sceneIndex);
             scene->AllDestroyMark();
-            std::printf("[SHUTDOWN] 씬 %zu OnDestroy\n", sceneIndex);
             scene->OnDestroy();
-            std::printf("[SHUTDOWN] 씬 %zu 완료\n", sceneIndex);
         }
-        ++sceneIndex;
     }
 
     // Destroy and clear DontDestroyOnLoad objects
-    std::printf("[SHUTDOWN] DontDestroyOnLoad 진입\n");
     for (auto& o : m_dontDestroyOnLoadObjects) if (o) o->Destroy();
     m_dontDestroyOnLoadObjects.clear();
-    std::printf("[SHUTDOWN] DontDestroyOnLoad 반환\n");
 
     Memory::SafeDelete(m_inputActionManager);
-    std::printf("[SHUTDOWN] inputActionManager 반환\n");
 
     Memory::SafeDelete(m_threadPool);
-    std::printf("[SHUTDOWN] threadPool 반환\n");
 
 	PlayModeEvent.Clear();
 	InputEvent.Clear();
@@ -329,17 +315,12 @@ void SceneManager::Decommissioning()
     m_activeScene = nullptr;
     m_activeSceneIndex = 0;
 
-    std::printf("[SHUTDOWN] 씬 삭제 진입\n");
-    size_t deleteIndex = 0;
     for(auto& scene : m_scenes)
     {
         if (scene)
         {
-            std::printf("[SHUTDOWN] 씬 %zu delete 진입(ptr=%p)\n", deleteIndex, static_cast<void*>(scene));
             delete scene;
-            std::printf("[SHUTDOWN] 씬 %zu delete 반환\n", deleteIndex);
         }
-        ++deleteIndex;
 	}
 
 	//GC_Shutdown();
