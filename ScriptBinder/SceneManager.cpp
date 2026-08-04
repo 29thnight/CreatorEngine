@@ -335,7 +335,7 @@ void SceneManager::Decommissioning()
     {
         if (scene)
         {
-            std::printf("[SHUTDOWN] 씬 %zu delete 진입\n", deleteIndex);
+            std::printf("[SHUTDOWN] 씬 %zu delete 진입(ptr=%p)\n", deleteIndex, static_cast<void*>(scene));
             delete scene;
             std::printf("[SHUTDOWN] 씬 %zu delete 반환\n", deleteIndex);
         }
@@ -839,8 +839,30 @@ void SceneManager::BeforeAwakeSceneLoad()
 
         //resourceTrimEvent.Broadcast();
         m_activeScene = m_sceneToActivate.load();
-        m_scenes.push_back(m_sceneToActivate);
-        m_activeSceneIndex = m_scenes.size() - 1;
+
+        // ★ 이미 목록에 있으면 다시 넣지 않는다.
+        //
+        // scene.switch는 LoadScene으로 씬을 연 뒤 ActivateScene을 부른다.
+        // LoadScene이 이미 m_scenes에 넣었는데 여기서 또 넣으면 같은
+        // 포인터가 두 번 들어간다. 위의 erase_if는 옛 씬만 지우므로
+        // 그 중복을 막지 못한다.
+        //
+        // 그 결과가 종료 시 더블 delete다. 두 번째 delete가 이미 파괴된
+        // Scene의 델리게이트를 만지고, 그 스핀락 플래그가 쓰레기 값으로
+        // set이면 Clear()가 영원히 돈다 — 크래시가 아니라 무한 대기라
+        // '종료가 가끔 멈춘다'로만 보였다.
+        const auto found = std::find(m_scenes.begin(), m_scenes.end(),
+            m_sceneToActivate.load());
+        if (found == m_scenes.end())
+        {
+            m_scenes.push_back(m_sceneToActivate);
+            m_activeSceneIndex = m_scenes.size() - 1;
+        }
+        else
+        {
+            m_activeSceneIndex = static_cast<size_t>(
+                std::distance(m_scenes.begin(), found));
+        }
         // Debug log the time taken to activate the scene
         Debug->Log(std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
 

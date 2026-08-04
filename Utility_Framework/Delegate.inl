@@ -64,9 +64,22 @@ namespace Core
 	template <typename Ret, typename... Args>
 	void Delegate<Ret, Args...>::Clear()
 	{
-		SpinLock lock(atomic_flag_);
-		isStopped_ = true;
-		callbacks_.clear();
+		// ★ 콜백 파괴를 락 밖으로 뺀다.
+		//
+		// 예전에는 callbacks_.clear()를 락 안에서 했다. 그 clear가 람다를
+		// 파괴하는데, 람다가 잡고 있던 것의 소멸자가 같은 델리게이트의
+		// Remove를 부르면 같은 스핀락을 다시 잡으려 든다. SpinLock은
+		// 재진입 불가이고 대기에 상한이 없으므로 거기서 영원히 돈다.
+		//
+		// swap으로 소유권만 옮기고 락을 놓은 뒤에 파괴하면, 그 연쇄가
+		// 일어나도 락이 비어 있어 통과한다.
+		std::vector<CallbackInfo> doomed;
+		{
+			SpinLock lock(atomic_flag_);
+			isStopped_ = true;
+			doomed.swap(callbacks_);
+		}
+		// 여기서 doomed가 파괴된다 — 락 밖이다.
 	}
 
 	template <typename Ret, typename... Args>
