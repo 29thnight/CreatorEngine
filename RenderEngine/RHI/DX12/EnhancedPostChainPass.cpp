@@ -21,6 +21,11 @@
 // 자가 검증(dx12.post, 256x256) 실측:
 //   밝은 곳 0.957(ACES(3.0)=0.954에 비네트) · 번짐 0.373 · 배경 0.216 ·
 //   구석 0.000 · FXAA 계단 이웃 차이 45.1% 감소 · 블룸 5단
+//
+// 톤매퍼 대조 — 밝고 채도 높은 빨강(4,0,0)에서:
+//   ACES (0.608 0.000 0.000) 채도 1.000  ← 채널별 곡선이라 R만 포화
+//   AgX  (0.624 0.341 0.341) 채도 0.453  ← 채널을 섞어 흰색으로 수렴
+//   두 톤매퍼가 다른 픽셀 60612/65536
 
 namespace
 {
@@ -59,6 +64,7 @@ namespace
     constexpr uint32_t kFlagToneMap = 2u;
     constexpr uint32_t kFlagVignette = 4u;
     constexpr uint32_t kFlagGrading = 8u;
+    constexpr uint32_t kFlagAgX = 16u;
 
     bool CompilePostShader(const char* body,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
@@ -375,6 +381,10 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         PostParams params = makeParams(bloomW, bloomH, m_width, m_height);
         if (m_bloomChainValid)          params.flags |= kFlagBloom;
         if (m_tuning.toneMapEnabled)    params.flags |= kFlagToneMap;
+        if (EnhancedPostChainPass::ToneMapper::AgX == m_tuning.toneMapper)
+        {
+            params.flags |= kFlagAgX;
+        }
         if (m_tuning.vignetteEnabled)   params.flags |= kFlagVignette;
         if (m_tuning.gradingEnabled)    params.flags |= kFlagGrading;
 

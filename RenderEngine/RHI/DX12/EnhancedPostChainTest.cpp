@@ -90,6 +90,16 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         color = (float(id.y) < edge + 20.0f) ? 0.9f : 0.05f;
     }
 
+    // 밝고 채도 높은 빨강. 여기서 톤매퍼 둘이 갈린다.
+    //
+    // ACES는 채널마다 따로 곡선을 먹이므로 R만 포화하고 G·B는 0에 남아
+    // 채도가 그대로다. AgX는 먼저 채널을 섞으므로 G·B가 같이 올라가
+    // 흰색 쪽으로 수렴한다. 그 차이가 이 패치의 채도로 드러난다.
+    if (id.x >= 160 && id.x < 200 && id.y >= 40 && id.y < 80)
+    {
+        color = float3(4.0f, 0.0f, 0.0f);
+    }
+
     gColor[id.xy] = float4(color, 1.0f);
 }
 )";
@@ -258,9 +268,36 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
     }
 
     bool passed = true;
+    bool sceneFilled = false;
     EnhancedRenderGraph::Stats graphStats{};
 
+    // ★ 톤매퍼 둘을 각각 한 번씩 그린다.
+    //
+    // 하나만 그리면 '스위치가 먹었는가'를 알 수 없다. 두 결과가 같으면
+    // 플래그가 셰이더에 안 닿은 것인데, 그건 어느 한쪽 그림만 봐서는
+    // 절대 드러나지 않는다.
+    struct Frame
     {
+        EnhancedPostChainPass::ToneMapper mapper;
+        const char*                       name;
+        std::vector<float>                r;
+        std::vector<float>                g;
+        std::vector<float>                b;
+        std::vector<float>                preAA;
+    };
+    Frame frames[2] = {
+        { EnhancedPostChainPass::ToneMapper::ACES, "ACES", {}, {}, {}, {} },
+        { EnhancedPostChainPass::ToneMapper::AgX,  "AgX",  {}, {}, {}, {} },
+    };
+
+    for (Frame& frame : frames)
+    {
+        if (!passed) break;
+
+        EnhancedPostChainPass::Tuning tuning = post.GetTuning();
+        tuning.toneMapper = frame.mapper;
+        post.SetTuning(tuning);
+
         if (!resources.BeginFrame(error))
         {
             outLog += "[2/4] BeginFrame 실패: " + error + "\n";
@@ -278,9 +315,21 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         // ★ 그래프는 제출 이후까지 살아 있어야 한다(dx12.compare 크래시).
         EnhancedRenderGraph graph;
 
-        const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
-            RGResourceState::UnorderedAccess, "PostChain.TestHDR");
+        // ★ 임포트 상태는 지난 프레임이 남긴 것이어야 한다.
+        //
+        // 그래프는 임포트한 리소스를 끝에서 되돌려 놓지 않는다. 첫 프레임은
+        // 씬 채우기가 UAV로 쓰고 블룸·Uber가 SRV로 읽으므로 끝 상태가 SRV인데,
+        // 두 번째 프레임에 UAV라고 선언하면 배리어의 before가 어긋난다.
+        // SSAO 스케일 검증에서 같은 것에 물렸고, 여기서 또 물렸다.
+        const RGResourceState importState = sceneFilled
+            ? RGResourceState::ShaderResource : RGResourceState::UnorderedAccess;
 
+        const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
+            importState, "PostChain.TestHDR");
+
+        // 씬은 첫 프레임에만 채운다. 내용이 같으므로 다시 채울 이유가 없고,
+        // 두 톤매퍼가 정확히 같은 입력을 보는 것이 대조의 전제다.
+        if (!sceneFilled)
         graph.AddPass("PostChain.TestScene",
             { { hdrHandle, RGResourceState::UnorderedAccess } },
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
@@ -384,6 +433,41 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         else
         {
             resources.WaitForGpu();
+            sceneFilled = true;
+        }
+
+        if (passed)
+        {
+            const auto read = [&](ID3D12Resource* buffer, uint32_t channel,
+                std::vector<float>& out) -> bool
+            {
+                void* mapped = nullptr;
+                D3D12_RANGE range{ 0, static_cast<SIZE_T>(kLdrRowPitch * kPostHeight) };
+                if (FAILED(buffer->Map(0, &range, &mapped))) return false;
+
+                out.resize(static_cast<size_t>(kPostWidth) * kPostHeight);
+                for (uint32_t y = 0; y < kPostHeight; ++y)
+                {
+                    const auto* row = static_cast<const uint8_t*>(mapped)
+                        + static_cast<size_t>(y) * kLdrRowPitch;
+                    for (uint32_t x = 0; x < kPostWidth; ++x)
+                    {
+                        out[static_cast<size_t>(y) * kPostWidth + x] =
+                            row[x * 4 + channel] / 255.f;
+                    }
+                }
+                buffer->Unmap(0, nullptr);
+                return true;
+            };
+
+            if (!read(finalReadback.Get(), 0, frame.r) ||
+                !read(finalReadback.Get(), 1, frame.g) ||
+                !read(finalReadback.Get(), 2, frame.b) ||
+                !read(preAAReadback.Get(), 0, frame.preAA))
+            {
+                outLog += "[2/4] 리드백 Map 실패\n";
+                passed = false;
+            }
         }
     }
 
@@ -396,8 +480,10 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
             graphStats.passesExecuted, post.GetBloomMipCount());
         outLog += line;
 
-        // 씬 + 임계 + 다운(n-1) + 업(n-1) + Uber + FXAA + 리드백
-        const uint32_t expected = 1 + 1 + (post.GetBloomMipCount() - 1) * 2 + 1 + 1 + 1;
+        // 임계 + 다운(n-1) + 업(n-1) + Uber + FXAA + 리드백.
+        // 씬은 첫 프레임에만 있으므로 세지 않는다 — graphStats는 마지막
+        // 프레임의 것이다.
+        const uint32_t expected = 1 + (post.GetBloomMipCount() - 1) * 2 + 1 + 1 + 1;
         if (graphStats.passesExecuted < expected)
         {
             outLog += "패스가 걷어내졌다 — 결과를 읽는 사슬이 끊겼다\n";
@@ -406,38 +492,12 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
     }
 
     // ── 단정 ──
-    std::vector<float> finalPixels;   // R 채널만
-    std::vector<float> preAAPixels;
-
-    if (passed)
-    {
-        const auto read = [&](ID3D12Resource* buffer, std::vector<float>& out) -> bool
-        {
-            void* mapped = nullptr;
-            D3D12_RANGE range{ 0, static_cast<SIZE_T>(kLdrRowPitch * kPostHeight) };
-            if (FAILED(buffer->Map(0, &range, &mapped))) return false;
-
-            out.resize(static_cast<size_t>(kPostWidth) * kPostHeight);
-            for (uint32_t y = 0; y < kPostHeight; ++y)
-            {
-                const auto* row = static_cast<const uint8_t*>(mapped)
-                    + static_cast<size_t>(y) * kLdrRowPitch;
-                for (uint32_t x = 0; x < kPostWidth; ++x)
-                {
-                    out[static_cast<size_t>(y) * kPostWidth + x] = row[x * 4] / 255.f;
-                }
-            }
-            buffer->Unmap(0, nullptr);
-            return true;
-        };
-
-        if (!read(finalReadback.Get(), finalPixels) ||
-            !read(preAAReadback.Get(), preAAPixels))
-        {
-            outLog += "[3/4] 리드백 Map 실패\n";
-            passed = false;
-        }
-    }
+    //
+    // 체인 자체의 단정은 ACES 결과로 본다. 톤매퍼는 곡선만 다르고 블룸·
+    // 비네트·FXAA는 같은 코드를 지나므로, 둘 다 재는 것은 같은 것을 두 번
+    // 재는 셈이다. 톤매퍼끼리의 대조는 그 뒤에 따로 한다.
+    const std::vector<float>& finalPixels = frames[0].r;
+    const std::vector<float>& preAAPixels = frames[0].preAA;
 
     if (passed)
     {
@@ -531,6 +591,73 @@ bool EnhancedSceneRenderer::RunPostChainTest(std::string& outLog)
         else if (after >= before)
         {
             outLog += "FXAA가 이웃 차이를 줄이지 못했다 — FXAA가 죽었다\n";
+            passed = false;
+        }
+    }
+
+    // ── 톤매퍼 대조 ──
+    if (passed)
+    {
+        // 빨강 패치의 한가운데. 씬 셰이더가 (160~200, 40~80)에 뒀다.
+        const uint32_t px = 180;
+        const uint32_t py = 60;
+        const size_t index = static_cast<size_t>(py) * kPostWidth + px;
+
+        // 채도 = (max - min) / max. 흰색으로 수렴할수록 0에 가깝다.
+        const auto saturationOf = [&](const Frame& frame)
+        {
+            const float r = frame.r[index];
+            const float g = frame.g[index];
+            const float b = frame.b[index];
+            const float hi = std::max(r, std::max(g, b));
+            const float lo = std::min(r, std::min(g, b));
+            return (hi > 1e-4f) ? ((hi - lo) / hi) : 0.f;
+        };
+
+        const float acesSat = saturationOf(frames[0]);
+        const float agxSat = saturationOf(frames[1]);
+
+        char line[288]{};
+        std::snprintf(line, sizeof(line),
+            "[5/5] 톤매퍼 — 밝은 빨강(4,0,0)에서 채도 ACES %.3f · AgX %.3f\n"
+            "      ACES (%.3f %.3f %.3f) · AgX (%.3f %.3f %.3f)\n",
+            acesSat, agxSat,
+            frames[0].r[index], frames[0].g[index], frames[0].b[index],
+            frames[1].r[index], frames[1].g[index], frames[1].b[index]);
+        outLog += line;
+
+        // ① 두 결과가 실제로 달라야 한다. 같으면 플래그가 셰이더에 안 닿은
+        //    것인데, 어느 한쪽 그림만 봐서는 절대 드러나지 않는다.
+        uint32_t differing = 0;
+        for (size_t i = 0; i < frames[0].r.size(); ++i)
+        {
+            if (std::fabs(frames[0].r[i] - frames[1].r[i]) > 1.5f / 255.f) ++differing;
+        }
+        std::snprintf(line, sizeof(line),
+            "      두 톤매퍼가 다른 픽셀 %u/%u\n",
+            differing, kPostWidth * kPostHeight);
+        outLog += line;
+
+        if (0 == differing)
+        {
+            outLog += "두 톤매퍼 결과가 같다 — 톤매퍼 플래그가 셰이더에 닿지 않는다\n";
+            passed = false;
+        }
+
+        // ② AgX가 밝은 채도를 ACES보다 낮춰야 한다. 이것이 AgX를 쓰는
+        //    이유 자체다 — 밝아질수록 흰색으로 수렴하는 것.
+        if (agxSat >= acesSat)
+        {
+            outLog += "AgX가 ACES보다 채도를 낮추지 못했다 — 채널 혼합 행렬이 "
+                      "빠졌거나 순서가 뒤집혔다\n";
+            passed = false;
+        }
+
+        // ③ AgX도 포화하면 안 된다. 1.0이면 그냥 잘린 것이라 곡선이
+        //    돌았는지 알 수 없다.
+        if (frames[1].r[index] > 0.999f)
+        {
+            outLog += "AgX 결과가 1.0이다 — 곡선이 아니라 그냥 잘린 것이다\n";
             passed = false;
         }
     }
