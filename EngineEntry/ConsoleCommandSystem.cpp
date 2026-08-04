@@ -1543,6 +1543,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.skybox] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.skybox %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.ibl")
+    {
+        // IBL 생성 체인 검증(PHASE 3-6).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunIBLTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ibl] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ibl %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;
@@ -2580,6 +2592,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.gizmoscene      Gizmo 씬 연결 검증(밀봉 복사·4패스 체인·타깃 공유)\n"
         "  dx12.shadowquality   그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)\n"
         "  dx12.skybox          스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)\n"
+        "  dx12.ibl             IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

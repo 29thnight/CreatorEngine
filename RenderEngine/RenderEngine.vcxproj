@@ -314,6 +314,8 @@
     <ClCompile Include="RHI\DX12\EnhancedShadowQualityTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSkyBoxPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSkyBoxTest.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedIBLGenerator.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedIBLTest.cpp" />
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainScaleTest.cpp" />

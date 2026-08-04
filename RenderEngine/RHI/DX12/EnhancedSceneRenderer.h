@@ -294,6 +294,14 @@ public:
     /// 드러난다)·전면 커버(z=w x 0.99999 quirk — 깨지면 화면이 통째로
     /// 빈다)·카메라 반응을 단정한다. IBL 생성 체인은 별도 슬라이스다.
     bool RunSkyBoxTest(std::string& outLog);
+
+    /// IBL 생성 체인 검증 (PHASE 3-6).
+    ///
+    /// 반구가 갈리는 equirect(위 빨강·아래 초록)로 rect→cube의 방향,
+    /// 조도의 반구 우세, 프리필터의 거칠기 수렴, BRDF LUT의 해석적
+    /// 극한(매끈 모서리 = (1,0))을 단정한다. 절대값 단정은 피한다 —
+    /// 원본의 톤 정책(로그 평균·NoL 이중 가중)에 묶여 있기 때문이다.
+    bool RunIBLTest(std::string& outLog);
 };
 
 #endif
