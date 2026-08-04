@@ -95,7 +95,17 @@ public:
         RGHandle normal;
         RGHandle diffuse;
         RGHandle metalRough;
-        RGHandle lighting;   // 직접광 결과 — 간접광의 광원이 된다
+        RGHandle lighting;
+
+        /// SSAO 결과(반해상도, x = AO). 간접광에 곱한다.
+        ///
+        /// 직접광이 아니라 간접광에 곱하는 것이 요점이다 — AO가 모형화하는
+        /// 것은 '주변에서 오는 빛이 얼마나 막히는가'이고, 그 주변광이 곧
+        /// 여기의 GI다. 직접광에 곱하면 광원이 실제로 보이는 곳까지
+        /// 어두워져 그림자가 두 번 진 것처럼 보인다.
+        ///
+        /// 비어 있으면 AO 없이(=1) 합성한다.
+        RGHandle ambientOcclusion;   // 직접광 결과 — 간접광의 광원이 된다
     };
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }

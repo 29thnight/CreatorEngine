@@ -386,7 +386,12 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         uint32_t giHeight{ 0 };
         float    intensity{ 0.f };
         float    depthSigma{ 0.f };
-        float    pad[2]{};
+
+        // 0이면 AO 입력이 없다는 뜻이다. 슬롯 수를 조건부로 바꾸는 대신
+        // 값으로 구분한다 — 슬롯이 밀리면 레지스터가 어긋나고, 그 증상은
+        // '결과가 조용히 이상해진다'라서 잡기 어렵다.
+        uint32_t aoWidth{ 0 };
+        uint32_t aoHeight{ 0 };
     };
 
     struct HiZParams
@@ -1140,14 +1145,26 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         {
             usages.push_back({ m_inputs.diffuse, RGResourceState::ShaderResource });
         }
+        if (m_inputs.ambientOcclusion.IsValid())
+        {
+            usages.push_back({ m_inputs.ambientOcclusion, RGResourceState::ShaderResource });
+        }
         usages.push_back({ m_output, RGResourceState::UnorderedAccess });
 
-        // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈
+        // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈 · t5 AO
         // 자리를 고정한다(리졸브와 같은 이유).
         std::vector<RGHandle> srvHandles{ m_filtered, m_hiZMips[0] };
         srvHandles.push_back(m_inputs.lighting.IsValid() ? m_inputs.lighting : m_hiZMips[0]);
         srvHandles.push_back(m_inputs.depth);
         srvHandles.push_back(m_inputs.diffuse.IsValid() ? m_inputs.diffuse : m_hiZMips[0]);
+        srvHandles.push_back(m_inputs.ambientOcclusion.IsValid()
+            ? m_inputs.ambientOcclusion : m_hiZMips[0]);
+
+        if (m_inputs.ambientOcclusion.IsValid())
+        {
+            params.aoWidth = (context.width + 1) / 2;
+            params.aoHeight = (context.height + 1) / 2;
+        }
 
         // 합성 결과는 그래프 밖으로 나간다 — 뿌리로 표시한다.
         declareStage("SSGI.Composite", usages, m_compositePSO, m_output,

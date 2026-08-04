@@ -8,6 +8,7 @@
 #include "EnhancedDeferredPass.h"
 #include "EnhancedSSGIPass.h"
 #include "EnhancedForwardPass.h"
+#include "EnhancedSSAOPass.h"
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
 #include "DX12MeshCache.h"
@@ -2429,6 +2430,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         return false;
     }
 
+    EnhancedSSAOPass ssao;
+    if (!ssao.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] SSAO 초기화 실패: " + error + "\n";
+        return false;
+    }
+
     DX12GpuProfiler profiler;
     // SSGI가 붙어 패스가 스무 개를 넘는다(Hi-Z 밉 여덟 + 트레이스·리졸브·
     // 필터·합성·히스토리). 질의는 패스당 둘이라 넉넉히 잡는다 — 모자라면
@@ -2571,6 +2579,9 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 켜면 lighting_readback이 라이팅 대신 SSGI 합성 결과를 복사한다.
     // 같은 크기·포맷이라 버퍼를 하나 더 만들 이유가 없다.
     bool     captureSSGIOutput = false;
+    // SSAO의 방향 회전에 쓸 프레임 번호. 고정하면 잡음이 화면에 박혀
+    // 디노이즈가 지우지 못한다.
+    uint32_t ssaoFrameIndex = 0;
     uint32_t shadowOccluders = 0;
     std::array<uint32_t, EnhancedShadowPass::kCascadeCount> cascadeOccluders{};
 
@@ -2593,6 +2604,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
         if (!ssgi.PrepareFrame(frameContext, outStepError)) return false;
         if (!forward.PrepareFrame(frameContext, outStepError)) return false;
+        if (!ssao.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
         EnhancedRenderGraph graph;
@@ -2612,6 +2624,21 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         shadowData.enabled = shadowData.enabled && shadowEnabled;
         deferred.SetShadow(shadow.GetShadowMap(), shadowData);
 
+        // ── SSAO ──
+        //
+        // GBuffer 뒤, Deferred 앞이다. 라이팅이 AO를 곱해 쓰는 것이 최종
+        // 목적지이므로 그 전에 만들어져야 하고, 입력(깊이·노멀)은 GBuffer가
+        // 채운다. 순서가 뒤집히면 그래프가 컴파일에서 잡는다
+        // ("아직 아무도 안 쓴 것을 읽는다").
+        {
+            EnhancedSSAOPass::Inputs ssaoInputs{};
+            ssaoInputs.depth = outputs.depth;
+            ssaoInputs.normal = outputs.normal;
+            ssao.SetInputs(ssaoInputs);
+        }
+        ssao.SetFrameIndex(ssaoFrameIndex++);
+        ssao.Declare(graph, frameContext);
+
         deferred.Declare(graph, frameContext);
 
         // ── SSGI ──
@@ -2626,6 +2653,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             ssgiInputs.diffuse = outputs.diffuse;
             ssgiInputs.metalRough = outputs.metalRough;
             ssgiInputs.lighting = deferred.GetOutput();
+
+            // AO는 간접광에만 곱한다. SSAO가 안 돌았으면 비어 있고,
+            // 그러면 합성이 AO 없이(=1) 간다.
+            ssgiInputs.ambientOcclusion = ssao.GetOutput();
             ssgi.SetInputs(ssgiInputs);
         }
         ssgi.Declare(graph, frameContext);
