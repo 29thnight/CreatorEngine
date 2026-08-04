@@ -1423,6 +1423,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.postscale] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.postscale %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.ui")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunUITest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ui] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ui %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;

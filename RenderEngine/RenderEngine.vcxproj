@@ -300,6 +300,8 @@
     <ClCompile Include="RHI\DX12\EnhancedShadowPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedForwardPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSAOPass.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedUIPass.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedUITest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainTest.cpp" />
