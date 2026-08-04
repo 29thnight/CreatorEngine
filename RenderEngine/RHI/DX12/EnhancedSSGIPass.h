@@ -155,6 +155,13 @@ public:
         float filterDepthSigma{ 0.01f };
         float filterNormalPower{ 16.f };
         float compositeDepthSigma{ 0.01f };
+
+        // 그림 비교로 정했다(FT_Material, 노출 0.35 PNG):
+        //   0.5 — 차이가 거의 안 보인다 · 1.0 — 색 번짐이 보이되 과하지 않다
+        //   2.0 — 바닥이 씻겨 나간다(과노출처럼 보임)
+        // 1.0을 유지한다. 거리(2/8/32)는 세 그림이 사실상 동일했다 — 이 씬은
+        // 기하가 가까워 거리 값이 그림을 못 가른다. 8을 중간값으로 두되,
+        // 먼 반사가 중요한 씬이 생기면 그림으로 다시 정한다.
         float intensity{ 1.f };
     };
 

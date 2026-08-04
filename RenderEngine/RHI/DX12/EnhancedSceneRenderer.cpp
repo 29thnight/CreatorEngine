@@ -2833,25 +2833,48 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         // 기준선 렌더의 리드백이 아직 라이팅(끔)을 들고 있다.
         const bool savedOff = savePng("dx12_ssgi_off.png");
 
-        // SSGI 합성을 리드백해 다시 저장한다.
+        // SSGI 합성을 상수 변형별로 저장한다. intensity와 추적 거리의 옳은
+        // 값은 숫자로 정할 수 없었으므로(합성 스윕의 한계) 그림을 나란히
+        // 놓고 고른다.
         captureSSGIOutput = true;
         uint32_t coveredTemp = 0;
         uint32_t drawTemp = 0;
         double luminanceTemp = 0.0;
         std::vector<DX12GpuProfiler::PassTiming> timingsTemp;
         EnhancedRenderGraph::Stats statsTemp{};
-        bool savedOn = false;
+        uint32_t savedCount = 0;
 
-        if (renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
-            timingsTemp, statsTemp, luminanceTemp))
+        struct PictureCase { float intensity; float distance; const char* path; };
+        const PictureCase pictureCases[] = {
+            { 0.5f, 8.f,  "dx12_ssgi_i05_d8.png" },
+            { 1.0f, 8.f,  "dx12_ssgi_on.png" },
+            { 2.0f, 8.f,  "dx12_ssgi_i20_d8.png" },
+            { 1.0f, 2.f,  "dx12_ssgi_i10_d2.png" },
+            { 1.0f, 32.f, "dx12_ssgi_i10_d32.png" },
+        };
+
+        const EnhancedSSGIPass::Tuning savedTuning = ssgi.GetTuning();
+
+        for (const PictureCase& pictureCase : pictureCases)
         {
-            savedOn = savePng("dx12_ssgi_on.png");
+            EnhancedSSGIPass::Tuning tuning = savedTuning;
+            tuning.intensity = pictureCase.intensity;
+            tuning.traceDistance = pictureCase.distance;
+            ssgi.SetTuning(tuning);
+
+            if (renderAndCount(cameraSnapshot, coveredTemp, drawTemp, error,
+                timingsTemp, statsTemp, luminanceTemp)
+                && savePng(pictureCase.path))
+            {
+                ++savedCount;
+            }
         }
+
+        ssgi.SetTuning(savedTuning);
         captureSSGIOutput = false;
 
         outLog += std::string("      SSGI 그림 — 끔 ") + (savedOff ? "저장" : "실패")
-            + " · 켬 " + (savedOn ? "저장" : "실패")
-            + " (dx12_ssgi_off/on.png)\n";
+            + " · 변형 " + std::to_string(savedCount) + "/5 저장\n";
     }
 
     // 기준선 렌더의 그림자 상태를 여기서 붙잡는다.
