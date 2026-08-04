@@ -304,6 +304,8 @@
     <ClCompile Include="RHI\DX12\EnhancedUITest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedGridPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedGridTest.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedGizmoLinePass.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedGizmoLineTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainTest.cpp" />
