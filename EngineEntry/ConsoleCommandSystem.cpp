@@ -221,6 +221,16 @@ namespace
         if (!redirected(STD_ERROR_HANDLE))  freopen_s(&dummy, "CONOUT$", "w", stderr);
         std::ios::sync_with_stdio(true);
 
+        // ★ 버퍼링을 끈다.
+        //
+        // 씬 로드가 멈추는 것을 쫓다가 출력이 0바이트인 실행을 만났다.
+        // 프로세스를 죽여도 아무것도 안 남아서, 어디까지 갔는지조차 알 수
+        // 없었다 — 멈춘 자리를 찾는 일에 로그가 없는 것이 가장 나쁘다.
+        //
+        // 버퍼링을 끄면 느려지지만, 이 경로는 진단용 CLI라 그 대가가 싸다.
+        setvbuf(stdout, nullptr, _IONBF, 0);
+        setvbuf(stderr, nullptr, _IONBF, 0);
+
         // 로그와 명령 출력이 한글을 쓰므로 UTF-8로 맞춘다.
         // (기본 코드페이지 949에서는 소스의 UTF-8 문자열이 깨진다)
         ::SetConsoleOutputCP(CP_UTF8);
@@ -426,7 +436,20 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         // scene.load  : 씬을 열기만 한다(기존 씬 유지)
         // scene.switch: 씬을 열고 활성 씬으로 교체한다(기존 씬 파괴 → 언로드 유발)
+        //
+        // ★ 단계마다 즉시 찍는다.
+        //
+        //   씬 교체가 멈추는 것을 쫓다가 출력이 0바이트인 실행을 만났다.
+        //   프로세스를 죽여도 아무것도 안 남아 어디까지 갔는지조차 알 수
+        //   없었다. 함수가 끝나야 찍히는 로그는 멈춘 자리를 못 알려 준다 —
+        //   dx12.compare 크래시 때와 같은 자리다(그때도 outLog가 함수 끝에
+        //   가서야 쓰여서 세 번을 헛짚었다).
+        std::printf("[CLI] %s 시작: %s\n", cmd.c_str(), parts[1].c_str());
+
         Scene* scene = SceneManagers->LoadScene(parts[1]);
+        std::printf("[CLI] LoadScene 반환: %s\n",
+            (nullptr != scene) ? "성공" : "널");
+
         if (!scene)
         {
             Debug->LogError("[CLI] 씬 로드 실패: " + parts[1]);
@@ -436,7 +459,9 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         if (cmd == "scene.switch")
         {
+            std::printf("[CLI] ActivateScene 진입\n");
             SceneManagers->ActivateScene(scene, true);
+            std::printf("[CLI] ActivateScene 반환\n");
         }
         std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
     }

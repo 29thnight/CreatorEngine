@@ -2372,16 +2372,35 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     uint32_t uiSkipped = 0;
     {
         std::vector<UIRenderProxy*> flat;
+
+        // ★ 카메라마다 무엇이 들어 있는지 남긴다.
+        //
+        //   'UI 0'만 보면 큐가 빈 것인지, 그 원천(UIRenderDataBuffer)이
+        //   빈 것인지, 아예 볼 카메라가 없는 것인지 구분되지 않는다.
+        //   셋은 고칠 곳이 완전히 다르다.
+        uint32_t cameraCount = 0;
+        uint32_t validCount = 0;
+        uint32_t bufferTotal = 0;
+
         for (auto& camera : CameraManagement->GetCameras())
         {
+            ++cameraCount;
             if (!camera || !RenderPassData::VaildCheck(camera.get())) continue;
+            ++validCount;
 
-            const auto* data = RenderPassData::GetData(camera.get());
+            auto* data = RenderPassData::GetData(camera.get());
             if (nullptr == data) continue;
+
+            bufferTotal += static_cast<uint32_t>(data->GetUIRenderDataBuffer().size());
 
             flat.insert(flat.end(),
                 data->m_UIRenderQueue.begin(), data->m_UIRenderQueue.end());
         }
+
+        outLog += "      UI 원천 — 카메라 " + std::to_string(cameraCount)
+            + "(유효 " + std::to_string(validCount) + ")"
+            + " · UIRenderDataBuffer " + std::to_string(bufferTotal)
+            + " · 큐 " + std::to_string(flat.size()) + "\n";
 
         uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
             flat.data(), flat.size(), uiRects);
@@ -4005,7 +4024,10 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         // "메시를 배치하라"고 하면 엉뚱한 곳을 보게 된다 — 이 검증이 보는 것은
         // deferred 경로뿐이라는 사실이 메시지에 들어 있어야 한다.
         passed = false;
-        verdict = forwardDraws.empty()
+        verdict = (!uiRects.empty())
+            ? ("deferred 드로우가 0건이다(UI는 " + std::to_string(uiRects.size())
+                + "건) — 이 검증은 deferred 경로를 보므로 메시가 필요하다")
+            : forwardDraws.empty()
             ? "드로우가 0건이다 — 씬에 메시를 배치한 뒤 다시 실행할 것"
             : ("deferred 드로우가 0건이다(포워드는 "
                 + std::to_string(forwardDraws.size())
