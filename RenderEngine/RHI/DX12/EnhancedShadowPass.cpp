@@ -269,7 +269,9 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         m_baseBias,
         m_baseBias * (m_cascades[1].radius / baseRadius),
         m_baseBias * (m_cascades[2].radius / baseRadius),
-        0.f };
+        m_slopeScale };
+
+    m_shadowData.cascadeBlendBand = m_blendBand;
 
     m_shadowData.cameraForward = context.camera->forward;
     m_shadowData.lightDirection = Mathf::Vector4{ m_lightDirection.x, m_lightDirection.y,

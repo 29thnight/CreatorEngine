@@ -150,6 +150,25 @@ public:
 	BoundingBox GetBoundingBox() const { return m_boundingBox; }
 	BoundingSphere GetBoundingSphere() const { return m_boundingSphere; }
 
+	/// 정점에서 로컬 바운드를 다시 계산한다. ModelLoader가 임포트 때 하는
+	/// 계산과 같다 — 로더를 거치지 않는 절차 생성 메시는 바운드가 기본값
+	/// (반지름 1)으로 남아 그림자 캐스터 컬링 같은 판정이 조용히 틀어진다.
+	void RecalculateBounds()
+	{
+		if (m_vertices.empty()) return;
+
+		Mathf::Vector3 minPoint = m_vertices[0].position;
+		Mathf::Vector3 maxPoint = m_vertices[0].position;
+		for (const Vertex& vertex : m_vertices)
+		{
+			minPoint = Mathf::Vector3::Min(minPoint, vertex.position);
+			maxPoint = Mathf::Vector3::Max(maxPoint, vertex.position);
+		}
+
+		DirectX::BoundingBox::CreateFromPoints(m_boundingBox, minPoint, maxPoint);
+		DirectX::BoundingSphere::CreateFromBoundingBox(m_boundingSphere, m_boundingBox);
+	}
+
 	std::vector<Vertex> GetVertices() const{ return m_vertices; }
 	std::vector<uint32> GetIndices() const { return m_indices; }
 	ComPtr<ID3D11Buffer> GetVertexBuffer() { return m_vertexBuffer; }

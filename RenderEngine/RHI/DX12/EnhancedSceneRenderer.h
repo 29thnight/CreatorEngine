@@ -280,6 +280,13 @@ public:
     /// 그린다. transient가 둘(그리드의 색·깊이)뿐인 것이 체인의 증명이다 —
     /// Inputs를 채워 잇는 것은 이 검증이 처음이다. 에디터 실행 중에만 의미 있다.
     bool RunGizmoSceneTest(std::string& outLog);
+
+    /// 그림자 품질 검증 (PHASE 3-6 — 경사 비례 편향 · 캐스케이드 경계 블렌딩).
+    ///
+    /// 둘 다 A/B로 잰다: 스치는 빛의 맨바닥에서 경사 항 끔/켬의 여드름 수,
+    /// 분할 경계를 가로지르는 줄무늬에서 블렌딩 끔/켬의 차이 픽셀 수.
+    /// '끈 쪽이 실제로 실패'까지 확인한다 — 켠 쪽만 보면 조건이 약해도 통과한다.
+    bool RunShadowQualityTest(std::string& outLog);
 };
 
 #endif

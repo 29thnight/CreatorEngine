@@ -75,6 +75,13 @@ public:
     // 기본 편향. 캐스케이드별로는 반지름 비만큼 키워 쓴다.
     void SetBias(float bias) { m_baseBias = bias; }
 
+    // 경사 비례 계수 — 최종 편향 = 캐스케이드 편향 x (1 + 계수 x tan(경사각)).
+    // 0이면 상수 편향만 쓴다(자가 검증의 A/B 재료).
+    void SetSlopeScale(float scale) { m_slopeScale = scale; }
+
+    // 캐스케이드 경계 블렌딩 폭(분할 깊이 비율). 0이면 하드 스위치.
+    void SetCascadeBlendBand(float band) { m_blendBand = band; }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -119,6 +126,11 @@ private:
     Mathf::Vector3     m_lightDirection{ 0.f, -1.f, 0.f };
     bool               m_hasDirectionalLight{ false };
     float              m_baseBias{ 0.0015f };
+
+    // 경사 비례 계수 2는 관행 범위(1~3)의 가운데다. tan은 셰이더에서 8로
+    // 상한을 두므로 최악에도 편향이 기본의 17배를 넘지 않는다.
+    float              m_slopeScale{ 2.f };
+    float              m_blendBand{ 0.15f };
     // 병렬 기록에서는 여러 워커가 동시에 센다. 단순 증가면 값이 조용히
     // 작아지고, 그러면 '컬링이 도는가'라는 단정이 우연히 통과한다.
     uint32_t              m_lastCasterCandidates{ 0 };

@@ -33,10 +33,11 @@ cbuffer LightingConstants : register(b0)
     float4        gEyePosition;
     float4        gCameraForward;
     float4        gCascadeSplits;   // xyz = 각 캐스케이드가 끝나는 뷰 깊이
-    float4        gShadowBias;      // xyz = 캐스케이드별 깊이 편향
+    float4        gShadowBias;      // xyz = 캐스케이드별 깊이 편향 · w = 경사 비례 계수
     uint          gLightCount;
     uint          gHasShadow;
-    uint2         gPadding;
+    float         gCascadeBlendBand; // 경계 블렌딩 폭(분할 깊이 비율) · 0이면 하드 스위치
+    uint          gPadding;
     DeferredLight gLights[MAX_DEFERRED_LIGHTS];
 };
 
@@ -52,8 +53,31 @@ SamplerState gSampler    : register(s0);
 // 직접 네 번 읽는 것보다 싸고, 가장자리가 부드러워진다.
 SamplerComparisonState gShadowSampler : register(s1);
 
+// 한 캐스케이드에서의 그림자 표본. slopeTan은 호출부가 한 번만 계산한다.
+float SampleShadowCascade(uint cascade, float3 worldPosition, float slopeTan)
+{
+    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection[cascade]);
+    const float3 projected = lightSpace.xyz / lightSpace.w;
+
+    // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
+    // 검은 띠가 생기므로 빛을 받는 것으로 둔다. 마지막 캐스케이드 너머
+    // (그림자 거리 밖)도 이 경로로 걸러진다.
+    if (any(abs(projected.xy) > 1.0f) || projected.z > 1.0f) return 1.0f;
+
+    const float2 uv = float2(projected.x * 0.5f + 0.5f, 0.5f - projected.y * 0.5f);
+
+    // 깊이 편향 = 캐스케이드 편향 x (1 + 경사 계수 x tan). 상수 항은 먼
+    // 캐스케이드일수록 크고(텍셀이 넓다), 경사 항은 표면이 빛과 비스듬할수록
+    // 크다 — 텍셀 하나 안에서 실제 깊이가 tan만큼 변하기 때문이다.
+    const float bias = gShadowBias[cascade] * (1.0f + gShadowBias.w * slopeTan);
+
+    return gShadowMap.SampleCmpLevelZero(gShadowSampler,
+        float3(uv, (float)cascade), projected.z - bias);
+}
+
 // 방향광 캐스케이드 그림자. 반환값 1은 빛을 받음, 0은 가려짐.
-float SampleShadow(float3 worldPosition)
+// normal·toLight는 경사 비례 편향의 재료다 — 호출부(광원 루프)가 이미 갖고 있다.
+float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
 {
     if (gHasShadow == 0) return 1.0f;
 
@@ -66,23 +90,29 @@ float SampleShadow(float3 worldPosition)
     if (viewDepth > gCascadeSplits.x) cascade = 1;
     if (viewDepth > gCascadeSplits.y) cascade = 2;
 
-    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection[cascade]);
-    const float3 projected = lightSpace.xyz / lightSpace.w;
+    // tan(경사각) = sqrt(1-cos²)/cos. 수평에 가까울수록 폭주하므로 8로 자른다 —
+    // 그 너머는 어차피 ndotl이 0에 가까워 빛 기여 자체가 사라진다.
+    const float ndotl = saturate(dot(normal, toLight));
+    const float slopeTan = min(sqrt(max(1.0f - ndotl * ndotl, 0.0f)) / max(ndotl, 1e-3f), 8.0f);
 
-    // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
-    // 검은 띠가 생기므로 빛을 받는 것으로 둔다. 마지막 캐스케이드 너머
-    // (그림자 거리 밖)도 이 경로로 걸러진다.
-    if (any(abs(projected.xy) > 1.0f) || projected.z > 1.0f) return 1.0f;
+    float shadow = SampleShadowCascade(cascade, worldPosition, slopeTan);
 
-    const float2 uv = float2(projected.x * 0.5f + 0.5f, 0.5f - projected.y * 0.5f);
+    // 경계 블렌딩 — 분할 앞 구간에서 다음 캐스케이드와 섞는다. 두 캐스케이드는
+    // 해상도가 달라 그림자 가장자리가 미세하게 어긋나는데, 하드 스위치면 그
+    // 어긋남이 경계에서 선으로 보인다. 비용은 구간 안에서만 표본 하나 추가다.
+    if (gCascadeBlendBand > 0.0f && cascade < SHADOW_CASCADE_COUNT - 1)
+    {
+        const float split = (cascade == 0) ? gCascadeSplits.x : gCascadeSplits.y;
+        const float bandStart = split * (1.0f - gCascadeBlendBand);
+        if (viewDepth > bandStart)
+        {
+            const float blend = saturate((viewDepth - bandStart) / max(split - bandStart, 1e-4f));
+            shadow = lerp(shadow,
+                SampleShadowCascade(cascade + 1, worldPosition, slopeTan), blend);
+        }
+    }
 
-    // 깊이 편향은 호출부가 캐스케이드별로 정한다. 먼 캐스케이드는 텍셀 하나가
-    // 덮는 월드 범위가 넓어 같은 값으로는 여드름이 남는다.
-    // 경사 비례 항은 법선이 있어야 해서 다음 슬라이스로 미룬다.
-    const float bias = gShadowBias[cascade];
-
-    return gShadowMap.SampleCmpLevelZero(gShadowSampler,
-        float3(uv, (float)cascade), projected.z - bias);
+    return shadow;
 }
 
 struct VSOut
@@ -174,7 +204,7 @@ float4 PSMain(VSOut input) : SV_TARGET
         {
             // 방향광 — 위치와 감쇠가 없다. 그림자는 이쪽에만 붙는다.
             toLight = -normalize(light.direction.xyz);
-            attenuation = SampleShadow(worldPosition);
+            attenuation = SampleShadow(worldPosition, normal, toLight);
         }
         else
         {
@@ -466,6 +496,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             constants.shadowBias = m_shadowData.bias;
             constants.lightCount = static_cast<uint32_t>(m_frameLights.size());
             constants.hasShadow = m_shadowData.enabled ? 1u : 0u;
+            constants.cascadeBlendBand = m_shadowData.cascadeBlendBand;
             for (size_t i = 0; i < m_frameLights.size(); ++i)
             {
                 constants.lights[i] = m_frameLights[i];

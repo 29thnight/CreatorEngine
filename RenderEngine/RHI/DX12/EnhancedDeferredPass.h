@@ -64,7 +64,8 @@ private:
         Mathf::Vector4 shadowBias{};
         uint32_t       lightCount{ 0 };
         uint32_t       hasShadow{ 0 };
-        uint32_t       padding[2]{};
+        float          cascadeBlendBand{ 0.f };
+        uint32_t       padding{ 0 };
         EnhancedLight  lights[kMaxLights]{};
     };
 
