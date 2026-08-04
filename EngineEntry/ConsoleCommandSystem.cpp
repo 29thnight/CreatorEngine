@@ -1459,6 +1459,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ui] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ui %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.grid")
+    {
+        // 그리드 패스 검증(PHASE 3-6, Gizmo 계열 첫 슬라이스).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunGridTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.grid] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.grid %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;
@@ -2489,6 +2501,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  render.post <이름> <on|off>  포스트 패스 토글(fog·bloom·ssgi·vignette·colorgrading)\n"
         "  render.rtinfo        창·뷰포트·추종 텍스처 크기를 나란히 찍는다\n"
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
+        "  dx12.grid            그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"
