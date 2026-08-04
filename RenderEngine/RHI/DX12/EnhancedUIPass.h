@@ -104,6 +104,23 @@ public:
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetRects(const std::vector<Rect>* rects) { m_rects = rects; }
 
+    /// UI 큐를 사각형 목록으로 옮긴다.
+    ///
+    /// 프록시를 그대로 들지 않고 필요한 것만 복사한다 — 렌더가 게임
+    /// 자료구조를 들고 다니면 수명과 스레드 규약이 다시 얽힌다(3-2에서
+    /// 걷어낸 부류다).
+    ///
+    /// 클리핑은 DX11 경로와 같은 함수(UIClipping.h)를 쓴다. 두 곳에 따로
+    /// 두면 하나가 틀려도 알 수 없다.
+    ///
+    /// 텍스트·스프라이트시트는 아직 건너뛴다. 건너뛴 수를 돌려주므로
+    /// '아직 안 되는 것'과 '되는데 안 나오는 것'이 구분된다.
+    /// 컨테이너 종류를 묻지 않으려고 포인터와 개수로 받는다 — 엔진의 UI
+    /// 큐는 concurrent_vector라, 그 타입을 이 헤더가 알 이유가 없다.
+    static uint32_t BuildRectsFromQueue(
+        class UIRenderProxy* const* proxies, size_t count,
+        std::vector<Rect>& outRects);
+
     RGHandle GetOutput() const { return m_output; }
 
     /// 배칭이 실제로 도는지 보는 수. 사각형 수와 배치 수가 같으면 한 건도

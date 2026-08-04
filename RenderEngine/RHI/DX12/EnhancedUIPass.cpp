@@ -5,6 +5,9 @@
 #include "DX12RootSignatureCache.h"
 #include "DX12TextureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "../../UIRenderProxy.h"
+#include "../../UIClipping.h"
+#include "../../Texture.h"
 
 #include <d3dcompiler.h>
 #include <algorithm>
@@ -16,7 +19,22 @@
 
 // 단계(순서대로 채운다):
 //   [v] 1. 사각형 인스턴싱 + 배칭 + 자가 검증
-//   [ ] 2. 씬 연결(UI 큐 → 사각형) + 배칭 실측
+//   [~] 2. 씬 연결(UI 큐 → 사각형) — 배선은 섰고 UI 큐가 찬 상태로는 미확인
+//
+// ★ 2단계가 반만 섰다. 변환과 배선은 들어갔고 그래프에서 UI.Draw가 돌지만
+//   (dx12.scene에서 0.0020~0.0031 ms), UI 큐가 실제로 찬 상태로는 확인하지
+//   못했다. 캔버스 프리팹을 소환하면 씬 큐가 통째로 비기 때문이다:
+//
+//     프리팹 없음 — 드로우 후보 4 · UI 0(건너뜀 0) · 통과
+//     프리팹 있음 — 드로우 후보 0 · UI 0(건너뜀 0) · 실패
+//
+//   deferred 큐까지 같이 비므로 UI만의 문제가 아니다. 캔버스 소환이 카메라를
+//   더하거나 활성 씬을 바꿔서 dx12.scene이 다른 카메라를 보는 쪽으로 보이고,
+//   그건 이 패스 밖의 일이다.
+//
+//   건너뜀이 0인 것이 중요하다 — 텍스처 없는 이미지가 큐에 있었다면 변환이
+//   그것을 세었을 것이다. 즉 '큐에 있는데 못 옮긴' 것이 아니라 '큐가 비어
+//   있는' 것이다.
 //
 // 자가 검증(dx12.ui, 256x256) 실측:
 //   같은 텍스처 넷 → 배치 1 · 텍스처를 번갈아 두면 → 배치 4
@@ -115,6 +133,85 @@ float4 PSMain(VSOut input) : SV_TARGET
         }
         return true;
     }
+}
+
+
+// ── UI 큐를 사각형으로 ──
+//
+// 프록시가 들고 있는 것은 DirectXTK SpriteBatch에 넘길 형태다(앵커 좌표·
+// origin·회전). 그것을 화면 사각형으로 푸는 계산이 DX11 Draw 안에 있었는데,
+// 그 계산을 여기서 다시 쓰지 않고 같은 함수를 부른다 — 두 곳에 따로 두면
+// 하나가 틀려도 알 수 없다.
+uint32_t EnhancedUIPass::BuildRectsFromQueue(
+    UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects)
+{
+    outRects.clear();
+    outRects.reserve(count);
+
+    uint32_t skipped = 0;
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        auto* proxy = proxies[i];
+        if (nullptr == proxy) { ++skipped; continue; }
+
+        const auto* image = std::get_if<UIRenderProxy::ImageData>(&proxy->GetData());
+        if (nullptr == image)
+        {
+            // 텍스트·스프라이트시트. 폰트 아틀라스가 붙기 전까지 건너뛴다.
+            ++skipped;
+            continue;
+        }
+        if (nullptr == image->texture) { ++skipped; continue; }
+
+        const auto size = image->texture->GetImageSize();
+        const long texW = static_cast<long>(size.x);
+        const long texH = static_cast<long>(size.y);
+        if (texW <= 0 || texH <= 0) { ++skipped; continue; }
+
+        // position은 rect의 중심이고 origin*scale이 rect 크기의 절반이다
+        // (PHASE 7-6). 그래서 아래 네 값이 화면 좌표 그대로의 사각형이다.
+        const float halfWidth = image->origin.x * image->scale.x;
+        const float halfHeight = image->origin.y * image->scale.y;
+
+        const float left = image->position.x - halfWidth;
+        const float top = image->position.y - halfHeight;
+        const float right = left + texW * image->scale.x;
+        const float bottom = top + texH * image->scale.y;
+
+        ClippedSource src{};
+        ClippedDestination dst{};
+        if (!CalculateClippedRects(image->clipDirection, image->clipPercent,
+            texW, texH, left, top, right, bottom,
+            image->scale.x, image->scale.y, src, dst))
+        {
+            // 잘린 폭이 0 — 그릴 것이 없다. 이건 건너뛴 것이 아니라
+            // '안 그리는 것이 맞는' 경우라 통계에 안 센다.
+            continue;
+        }
+
+        Rect rect{};
+        rect.left = dst.left;
+        rect.top = dst.top;
+        rect.right = dst.right;
+        rect.bottom = dst.bottom;
+
+        // 텍셀 구간을 UV로. DX11은 이것을 RECT로 SpriteBatch에 넘기고,
+        // 여기서는 셰이더가 UV로 읽는다.
+        rect.uvLeft = static_cast<float>(src.left) / static_cast<float>(texW);
+        rect.uvTop = static_cast<float>(src.top) / static_cast<float>(texH);
+        rect.uvRight = static_cast<float>(src.right) / static_cast<float>(texW);
+        rect.uvBottom = static_cast<float>(src.bottom) / static_cast<float>(texH);
+
+        rect.color = image->color;
+        rect.canvasOrder = image->canvasOrder;
+        rect.layerOrder = image->layerOrder;
+        rect.texture = image->texture.get();
+
+        outRects.push_back(rect);
+    }
+
+    return skipped;
 }
 
 bool EnhancedUIPass::Initialize(const EnhancedFrameContext& context, std::string& outError)

@@ -94,6 +94,16 @@ public:
 
 	bool isCustomShader() const { return m_customPixelShader != nullptr && m_customPixelBuffer != nullptr; }
 
+    /// 담고 있는 것(이미지·텍스트·스프라이트시트)을 읽기 전용으로 준다.
+    ///
+    /// DX12 UI 패스가 이것을 사각형으로 옮긴다. 그리기 자체를 프록시가 하던
+    /// 구조(Draw(spriteBatch))는 DX11 전용이라 그쪽에서는 쓸 수 없다 —
+    /// 자료만 꺼내 가고 그리기는 패스가 한다.
+    const std::variant<ImageData, TextData, SpriteSheetData>& GetData() const
+    {
+        return m_data;
+    }
+
     const HashedGuid& GetInstanceID() const { return m_instancedID; }
     bool IsEnabled() const { return m_isEnabled; }
 	void SetEnabled(bool enable) { m_isEnabled = enable; }

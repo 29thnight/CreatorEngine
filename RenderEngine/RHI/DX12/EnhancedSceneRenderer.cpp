@@ -14,6 +14,7 @@
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
 #include "EnhancedPostChainPass.h"
+#include "EnhancedUIPass.h"
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
 #include "DX12MeshCache.h"
@@ -2355,10 +2356,43 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         }
     }
 
+    // UI 큐를 사각형으로.
+    //
+    // ★ 카메라 하나가 아니라 전부를 훑는다.
+    //
+    //   UI는 캔버스에 속하지 카메라에 속하지 않는다. 처음에 씬 카메라
+    //   하나의 큐만 봤더니 캔버스를 소환해도 사각형이 늘 0이었다 —
+    //   UI 프록시가 다른 카메라의 RenderPassData에 들어 있었기 때문이다.
+    //   그 상태로 두면 '변환이 틀렸다'와 '엉뚱한 곳을 봤다'가 구분되지
+    //   않는다.
+    //
+    // 텍스트·스프라이트시트는 아직 건너뛰고, 건너뛴 수를 남겨
+    // '아직 안 되는 것'과 '되는데 안 나오는 것'을 가른다.
+    std::vector<EnhancedUIPass::Rect> uiRects;
+    uint32_t uiSkipped = 0;
+    {
+        std::vector<UIRenderProxy*> flat;
+        for (auto& camera : CameraManagement->GetCameras())
+        {
+            if (!camera || !RenderPassData::VaildCheck(camera.get())) continue;
+
+            const auto* data = RenderPassData::GetData(camera.get());
+            if (nullptr == data) continue;
+
+            flat.insert(flat.end(),
+                data->m_UIRenderQueue.begin(), data->m_UIRenderQueue.end());
+        }
+
+        uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
+            flat.data(), flat.size(), uiRects);
+    }
+
     outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->m_cameraIndex)
         + " · 드로우 후보 " + std::to_string(draws.size())
         + " · 포워드 " + std::to_string(forwardDraws.size())
-        + " · 광원 " + std::to_string(lights.size()) + "\n";
+        + " · 광원 " + std::to_string(lights.size())
+        + " · UI " + std::to_string(uiRects.size())
+        + "(건너뜀 " + std::to_string(uiSkipped) + ")\n";
 
     // ── [2/4] DX12 쪽 준비 ──
     DX12DeviceResources resources;
@@ -2466,6 +2500,14 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             return false;
         }
     }
+
+    EnhancedUIPass uiPass;
+    if (!uiPass.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] UI 초기화 실패: " + error + "\n";
+        return false;
+    }
+    uiPass.SetRects(&uiRects);
 
     EnhancedPostChainPass postChain;
     if (!postChain.Initialize(frameContext, error))
@@ -2643,6 +2685,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (!forward.PrepareFrame(frameContext, outStepError)) return false;
         if (!ssao.PrepareFrame(frameContext, outStepError)) return false;
         if (!postChain.PrepareFrame(frameContext, outStepError)) return false;
+        if (!uiPass.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
         EnhancedRenderGraph graph;
@@ -2730,6 +2773,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             postChain.SetInputs(postInputs);
         }
         postChain.Declare(graph, frameContext);
+
+        // ── UI ──
+        //
+        // 포스트 체인 뒤다. UI에 톤맵·비네트가 걸리면 안 된다 —
+        // 화면에 붙는 것이라 작가가 지정한 색이 그대로 나와야 하고,
+        // 비네트가 구석의 버튼을 어둡게 만들면 그건 버그다.
+        uiPass.Declare(graph, frameContext);
 
         // ★ 포스트 체인 결과를 읽는 자리를 둔다.
         //
@@ -3167,6 +3217,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // Forward+가 실제 씬에서 무엇을 했는지. 포워드 큐가 비면 셰이딩은
     // 선언되지 않는 것이 정상이라, 그 사실을 수로 남겨야 "안 도는 것"과
     // "그릴 것이 없는 것"이 구분된다.
+    // UI가 무엇을 했는지. 사각형 수와 배치 수를 나란히 남긴다 —
+    // 둘이 같으면 배칭이 한 건도 안 묶은 것이고, 그건 그림으로 안 드러난다.
+    outLog += "      UI — 사각형 " + std::to_string(uiPass.GetLastRectCount())
+        + " · 배치 " + std::to_string(uiPass.GetLastBatchCount())
+        + " · 건너뜀 " + std::to_string(uiSkipped) + "\n";
+
     // 포스트 체인이 무엇을 했는지. 최종 LDR이 선언됐는지와 블룸 단수를
     // 남긴다 — 안 돌면 '선언 안 됨'으로 드러난다.
     outLog += "      포스트 체인 — 최종 " + std::string(

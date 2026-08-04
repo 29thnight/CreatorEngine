@@ -10,61 +10,10 @@
 #include <DirectXMath.h>
 #include <algorithm>
 
-// 잘린 목적 사각형을 픽셀로 반올림하기 전 상태로 돌려준다.
-//
-// 반올림을 호출부로 미루는 이유: 호출부가 여기에 앵커 보정을 더한 뒤 한 번만
-// 반올림해야 한다. 두 번 반올림하면 값이 1픽셀 흔들린다(PHASE 7-6).
-struct ClippedDestination
-{
-    float left, top, right, bottom;
-};
+// 클리핑 계산은 UIClipping.h로 옮겼다. DX12 UI 패스가 같은 계산을
+// 해야 하는데, 두 곳에 따로 두면 하나가 틀려도 알 수 없다.
+#include "UIClipping.h"
 
-// Clamps percent to [0, 1] and calculates source and destination rectangles based on the clipping direction.
-inline bool CalculateClippedRects(
-    ClipDirection dir,
-    float percent,
-    LONG texW, LONG texH,
-    float left, float top, float right, float bottom,
-    float scaleX, float scaleY,
-    RECT& outSrc, ClippedDestination& outDst)
-{
-    percent = std::clamp(percent, 0.f, 1.f);
-    LONG cutW = static_cast<LONG>(std::floor(texW * percent));
-    LONG cutH = static_cast<LONG>(std::floor(texH * percent));
-
-    switch (dir)
-    {
-    case ClipDirection::LeftToRight:
-        if (cutW <= 0) return false;
-        outSrc = { 0, 0, cutW, texH };
-        outDst = { left, top, left + cutW * scaleX, top + texH * scaleY };
-        return true;
-
-    case ClipDirection::RightToLeft:
-        if (cutW <= 0) return false;
-        outSrc = { texW - cutW, 0, texW, texH };
-        outDst = { right - cutW * scaleX, top, right, top + texH * scaleY };
-        return true;
-
-    case ClipDirection::TopToBottom:
-        if (cutH <= 0) return false;
-        outSrc = { 0, 0, texW, cutH };
-        outDst = { left, top, left + texW * scaleX, top + cutH * scaleY };
-        return true;
-
-    case ClipDirection::BottomToTop:
-        if (cutH <= 0) return false;
-        outSrc = { 0, texH - cutH, texW, texH };
-        outDst = { left, bottom - cutH * scaleY, left + texW * scaleX, bottom };
-        return true;
-
-    case ClipDirection::None:
-    default:
-        outSrc = { 0, 0, texW, texH };
-        outDst = { left, top, right, bottom };
-        return true;
-    }
-}
 //==================================================================
 UIRenderProxy::UIRenderProxy(ImageComponent* image) noexcept
 {
@@ -210,7 +159,7 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                     const float right = left + texW * info.scale.x;
                     const float bottom = top + texH * info.scale.y;
 
-                    RECT src{};
+                    ClippedSource src{};
                     ClippedDestination dst{};
                     if (CalculateClippedRects(
                         info.clipDirection,
@@ -234,10 +183,15 @@ void UIRenderProxy::Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) con
                             static_cast<LONG>(std::lround(dst.right + halfWidth)),
                             static_cast<LONG>(std::lround(dst.bottom + halfHeight)) };
 
+                        // SpriteBatch는 RECT를 받는다. ClippedSource와 담는
+                        // 것은 같지만 형을 맞춰 넘긴다 — 같은 배치라고 믿고
+                        // 캐스트하면 한쪽 정의가 바뀔 때 조용히 깨진다.
+                        const RECT srcRect{ src.left, src.top, src.right, src.bottom };
+
                         spriteBatch->Draw(
                             info.texture->m_pSRV,
                             anchored,
-                            &src,
+                            &srcRect,
                             info.color,
                             info.rotation,
                             info.origin,
