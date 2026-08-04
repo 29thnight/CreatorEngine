@@ -18,11 +18,9 @@
 //   [v] 2. 컬링 자가 검증 — 타일 카운트 리드백, 알려진 배치로 단정
 //   [v] 3. 포워드 셰이딩 — draws 드로우 + 타일 목록 조회
 //   [v] 4. 참조 경로(전 광원 루프)와 픽셀 대조 — EnhancedForwardShadeTest.cpp
-//   [ ] 5. 광원 수 스케일링 실측 — Forward+가 이기는 경계 찾기
+//   [v] 5. 광원 수 스케일링 실측 — EnhancedForwardScaleTest.cpp
 //
-// 5는 실제 씬 경로(dx12.scene)에 붙여 GPU 타임스탬프로 잰다. 128x128
-// 자가 검증에서는 컬링 비용도 셰이딩 비용도 측정 잡음에 묻혀, 거기서 나온
-// 수는 경계에 대해 아무것도 말해 주지 않는다.
+// 다섯 단계가 다 섰다. 남은 것은 실제 씬(dx12.scene) 연결이다.
 
 namespace
 {
@@ -179,10 +177,17 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID,
 
     if (0 == groupIndex)
     {
-        // 넘친 타일은 상한으로 자른다. 잘렸다는 사실은 카운트가 상한과
-        // 같은 것으로 읽는 쪽이 알 수 있다(정확한 초과량은 담지 않는다 —
-        // 그것까지 담으면 버퍼가 하나 더 필요한데, '잘렸는가'만 알면 된다).
+        // 앞쪽 절반은 셰이딩이 읽는 값이라 상한으로 자른다.
         gTileCount[tileIndex] = min(sCount, MAX_LIGHTS_PER_TILE);
+
+        // ★ 뒤쪽 절반에 자르기 전의 수를 그대로 남긴다.
+        //
+        // 처음에는 '카운트가 상한과 같으면 잘린 것'으로 읽으면 된다고 적었는데,
+        // 그것으로는 정확히 32개인 타일과 200개가 잘린 타일이 구분되지 않는다.
+        // 성능 실측에서 이 구분이 결론을 뒤집는다 — 광원을 버리고 빨라진 것을
+        // '빨라졌다'로 읽으면 안 되기 때문이다. 타일 하나당 4바이트면
+        // 1080p에서 32KB고, 그 값으로 '조용히 사라짐'이 수가 된다.
+        gTileCount[gTileGrid.x * gTileGrid.y + tileIndex] = sCount;
     }
 }
 )";
@@ -571,7 +576,9 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
 
     // 버퍼는 COMMON으로 만들어지고 첫 사용에서 승격된다 — UAV를 초기
     // 상태로 주면 검증 레이어가 '무시한다'고 경고만 남긴다.
-    desc.Width = static_cast<uint64_t>(tileTotal) * sizeof(uint32_t);
+    // 두 배다. 앞 절반은 셰이딩이 읽는 자른 값, 뒤 절반은 자르기 전의
+    // 원래 값 — 넘침이 얼마나 났는지가 수로 남아야 성능 수치를 믿을 수 있다.
+    desc.Width = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
     HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
         D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_tileCountBuffer));
     if (FAILED(hr))
@@ -677,7 +684,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             D3D12_UNORDERED_ACCESS_VIEW_DESC countUav{};
             countUav.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
             countUav.Format = DXGI_FORMAT_UNKNOWN;
-            countUav.Buffer.NumElements = tileTotal;
+            countUav.Buffer.NumElements = tileTotal * 2;
             countUav.Buffer.StructureByteStride = sizeof(uint32_t);
             device->CreateUnorderedAccessView(m_tileCountBuffer.Get(), nullptr,
                 &countUav, uavTable.CpuAt(0));

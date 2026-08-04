@@ -1297,6 +1297,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.forwardshade] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forwardshade %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.forwardscale")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunForwardPlusScaleTest(log);
+        const std::string verdict = passed ? "완료" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.forwardscale] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.forwardscale %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;

@@ -586,8 +586,8 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     // 그대로 손해다 — 그 경계를 짐작이 아니라 실측으로 적는다.
     if (passed)
     {
-        outLog += "   ※ 광원 수 스케일링(5단계)은 GPU 타임스탬프가 붙는 실제 씬\n"
-                  "     경로에서 잰다 — 128x128에서는 두 경로 다 측정 잡음에 묻힌다\n";
+        outLog += "   ※ 광원 수 스케일링(5단계)은 dx12.forwardscale에서 1280x720으로\n"
+                  "     잰다 — 128x128에서는 두 경로 다 측정 잡음에 묻힌다\n";
     }
 
     std::string validation;
