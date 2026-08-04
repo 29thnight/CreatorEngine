@@ -265,6 +265,13 @@ public:
     /// 카메라가 핵심이다 — GS를 VS로 옮기며 확장 수식이 틀리면 정면에서는
     /// 멀쩡해 보이고 옆에서만 엣지온으로 사라진다.
     bool RunGizmoIconTest(std::string& outLog);
+
+    /// 와이어프레임 패스 검증 (PHASE 3-6, Gizmo 계열 4차 슬라이스).
+    ///
+    /// 합성 쿼드로 변·내부·인스턴싱 병합·메시 캐시를 따로 단정한다.
+    /// 내부 표본이 핵심이다 — fillMode가 SOLID로 남으면 변 표본은 전부
+    /// 통과하면서 내부까지 칠해진다.
+    bool RunWireFrameTest(std::string& outLog);
 };
 
 #endif
