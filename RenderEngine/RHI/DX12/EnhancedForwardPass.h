@@ -86,10 +86,16 @@ public:
     uint32_t GetLastCulledLightCount() const { return m_lastCulledLights; }
     uint32_t GetLastOverflowTileCount() const { return m_lastOverflowTiles; }
 
+    /// 타일 버퍼. 자가 검증이 리드백하고, 셰이딩(3단계)이 SRV로 읽는다.
+    /// 그래프가 버퍼를 다루지 않아 패스가 소유한다 — 상태 전이는 쓰는 쪽 책임.
+    ID3D12Resource* GetTileCountBuffer() const { return m_tileCountBuffer.Get(); }
+    ID3D12Resource* GetTileListBuffer() const { return m_tileListBuffer.Get(); }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+    bool EnsureTileBuffers(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};
     RGHandle m_output;
@@ -98,6 +104,11 @@ private:
 
     uint32_t m_tileCountX{ 0 };
     uint32_t m_tileCountY{ 0 };
+
+    // 타일 버퍼는 그래프 transient가 아니다 — 그래프가 버퍼를 지원하지 않는다.
+    ComPtr<ID3D12Resource> m_tileCountBuffer;
+    ComPtr<ID3D12Resource> m_tileListBuffer;
+    uint32_t               m_allocatedTiles{ 0 };
 
     uint32_t m_lastCulledLights{ 0 };
     uint32_t m_lastOverflowTiles{ 0 };

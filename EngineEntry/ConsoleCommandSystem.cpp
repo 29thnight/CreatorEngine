@@ -1261,6 +1261,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.uploadring %s\n", passed ? "통과" : "실패");
     }
+    else if (cmd == "dx12.forward")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunForwardPlusTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.forward] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.forward %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;
