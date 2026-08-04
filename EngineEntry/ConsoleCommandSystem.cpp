@@ -199,10 +199,24 @@ namespace
             if (!::AllocConsole()) return;
         }
 
+        // 이미 파일이나 파이프로 리다이렉트된 스트림은 건드리지 않는다.
+        //
+        // CONOUT$로 무조건 다시 여는 코드가 `Academy_4Q.exe --exec ... > out.txt`를
+        // 조용히 무력화하고 있었다 — 명령은 돌고 출력은 콘솔 창으로만 가서
+        // 파일에는 아무것도 남지 않았다. 자동 검증에서는 그 출력이 결과 전부라,
+        // '통과했는지 알 수 없음'과 '실패'가 구분되지 않는 상태였다.
+        const auto redirected = [](DWORD stdHandle)
+        {
+            const HANDLE handle = ::GetStdHandle(stdHandle);
+            if (nullptr == handle || INVALID_HANDLE_VALUE == handle) return false;
+            const DWORD type = ::GetFileType(handle);
+            return FILE_TYPE_DISK == type || FILE_TYPE_PIPE == type;
+        };
+
         FILE* dummy = nullptr;
-        freopen_s(&dummy, "CONIN$", "r", stdin);
-        freopen_s(&dummy, "CONOUT$", "w", stdout);
-        freopen_s(&dummy, "CONOUT$", "w", stderr);
+        if (!redirected(STD_INPUT_HANDLE))  freopen_s(&dummy, "CONIN$", "r", stdin);
+        if (!redirected(STD_OUTPUT_HANDLE)) freopen_s(&dummy, "CONOUT$", "w", stdout);
+        if (!redirected(STD_ERROR_HANDLE))  freopen_s(&dummy, "CONOUT$", "w", stderr);
         std::ios::sync_with_stdio(true);
 
         // 로그와 명령 출력이 한글을 쓰므로 UTF-8로 맞춘다.
@@ -1271,6 +1285,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("%s", log.c_str());
         Debug->LogWarning("[dx12.forward] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forward %s\n", verdict.c_str());
+    }
+    else if (cmd == "dx12.forwardshade")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunForwardPlusShadeTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.forwardshade] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.forwardshade %s\n", verdict.c_str());
     }
     else if (cmd == "dx12.ssgi")
     {

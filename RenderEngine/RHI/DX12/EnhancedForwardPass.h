@@ -79,6 +79,9 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
 
+    /// 참조 경로(전 광원 루프)로 그린다. 대조와 성능 기준선 측정용이다.
+    void SetUseReferencePath(bool use) { m_useReferencePath = use; }
+
     RGHandle GetOutput() const { return m_output; }
 
     /// 컬링 통계. 타일 목록이 실제로 채워지는지 밖에서 본다 —
@@ -91,11 +94,25 @@ public:
     ID3D12Resource* GetTileCountBuffer() const { return m_tileCountBuffer.Get(); }
     ID3D12Resource* GetTileListBuffer() const { return m_tileListBuffer.Get(); }
 
+    /// 셰이딩 파이프라인. 자가 검증이 컬링 경로와 참조 경로를 같은 기하로
+    /// 그려 픽셀을 대조한다 — 둘이 다르면 컬링이 광원을 잘못 떨어뜨린 것이다.
+    ID3D12PipelineState* GetShadePSO() const { return m_shadePSO; }
+    ID3D12PipelineState* GetReferencePSO() const { return m_referencePSO; }
+    ID3D12RootSignature* GetShadeRootSignature() const { return m_shadeRootSignature; }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool EnsureTileBuffers(const EnhancedFrameContext& context, std::string& outError);
+
+    void TransitionTileBuffers(ID3D12GraphicsCommandList* commandList,
+        D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) const;
+
+    /// 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가
+    /// 뜻을 가지려면 PSO 말고는 아무것도 달라선 안 된다.
+    bool RecordShading(ID3D12GraphicsCommandList* commandList,
+        const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount);
 
     Inputs   m_inputs{};
     RGHandle m_output;
@@ -110,11 +127,22 @@ private:
     ComPtr<ID3D12Resource> m_tileListBuffer;
     uint32_t               m_allocatedTiles{ 0 };
 
+    // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
+    // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).
+    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+
     uint32_t m_lastCulledLights{ 0 };
     uint32_t m_lastOverflowTiles{ 0 };
+    bool     m_useReferencePath{ false };
 
     ID3D12PipelineState* m_cullPSO{ nullptr };
     ID3D12PipelineState* m_shadePSO{ nullptr };
+
+    // 참조 경로(전 광원 루프) PSO. 대조의 정답지이자 성능 비교의 기준선이다.
+    // 셰이더는 같고 매크로 하나만 다르다 — 조명 계산이 달라지면 무엇 때문에
+    // 결과가 다른지 알 수 없게 된다.
+    ID3D12PipelineState* m_referencePSO{ nullptr };
+
     ID3D12RootSignature* m_cullRootSignature{ nullptr };
     ID3D12RootSignature* m_shadeRootSignature{ nullptr };
 };

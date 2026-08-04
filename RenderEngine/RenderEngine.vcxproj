@@ -299,6 +299,7 @@
     <ClCompile Include="RHI\DX12\EnhancedDeferredPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedShadowPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedForwardPass.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedForwardShadeTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPixelCompare.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSGIPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />

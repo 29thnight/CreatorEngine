@@ -16,11 +16,13 @@
 // 남은 단계(순서대로 채운다):
 //   [v] 1. 광원 컬링 컴퓨트 — 타일 프러스텀 vs 광원 구, 타일 목록 쓰기
 //   [v] 2. 컬링 자가 검증 — 타일 카운트 리드백, 알려진 배치로 단정
-//   [ ] 3. 포워드 셰이딩 — forwardQueue 드로우 + 타일 목록 조회
-//   [ ] 4. 참조 경로(전 광원 루프)와 픽셀 대조
+//   [v] 3. 포워드 셰이딩 — draws 드로우 + 타일 목록 조회
+//   [v] 4. 참조 경로(전 광원 루프)와 픽셀 대조 — EnhancedForwardShadeTest.cpp
 //   [ ] 5. 광원 수 스케일링 실측 — Forward+가 이기는 경계 찾기
 //
-// 3이 없으므로 아직 씬 경로에 붙이면 안 된다. 지금 Declare는 컬링만 선언한다.
+// 5는 실제 씬 경로(dx12.scene)에 붙여 GPU 타임스탬프로 잰다. 128x128
+// 자가 검증에서는 컬링 비용도 셰이딩 비용도 측정 잡음에 묻혀, 거기서 나온
+// 수는 경계에 대해 아무것도 말해 주지 않는다.
 
 namespace
 {
@@ -185,6 +187,150 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID,
 }
 )";
 
+    // ── 포워드 셰이딩 ──
+    //
+    // Forward+의 핵심이 여기 한 줄이다:
+    //
+    //   for (i = 0; i < gTileCount[tile]; ++i)   ← 전체 광원이 아니라 타일 목록
+    //
+    // 기존 포워드는 픽셀마다 gLightCount를 돌았다. 여기서는 자기 타일에
+    // 닿는 광원만 돈다. 씬 광원이 수백 개여도 타일당 몇 개면 그만큼만 돈다.
+    //
+    // 참조 경로(REFERENCE_PATH)는 같은 셰이더에서 매크로로 갈린다. 전 광원을
+    // 도는 옛 방식이고, 픽셀 대조의 정답지 역할을 한다 — 컬링이 광원을
+    // 잘못 떨어뜨리면 두 결과가 갈린다. 셰이더를 따로 쓰면 조명 계산 자체가
+    // 달라져 무엇 때문에 다른지 알 수 없으므로, 광원을 고르는 부분만 다르게
+    // 하고 나머지는 같은 코드를 쓴다.
+    constexpr const char* kShadeShader = R"(
+struct VSIn
+{
+    float3 position  : POSITION;
+    float3 normal    : NORMAL;
+    float2 uv        : TEXCOORD;
+    float3 tangent   : TANGENT;
+    float3 bitangent : BINORMAL;
+};
+
+struct VSOut
+{
+    float4 position  : SV_POSITION;
+    float3 worldPos  : TEXCOORD0;
+    float3 normal    : TEXCOORD1;
+};
+
+struct ShadeInstance
+{
+    float4x4 world;
+    float4   baseColor;
+};
+
+StructuredBuffer<ShadeInstance> gInstances : register(t0);
+StructuredBuffer<float4>        gLights    : register(t1);
+StructuredBuffer<uint>          gTileCount : register(t2);
+StructuredBuffer<uint>          gTileList  : register(t3);
+
+cbuffer ShadeParams : register(b0)
+{
+    float4x4 gViewProjection;
+    uint2    gTileGrid;
+    uint     gLightCount;
+    uint     gPad0;
+};
+
+VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
+{
+    const ShadeInstance instance = gInstances[instanceId];
+
+    const float4 worldPosition = mul(float4(input.position, 1.0f), instance.world);
+
+    VSOut output;
+    output.position = mul(worldPosition, gViewProjection);
+    output.worldPos = worldPosition.xyz;
+    output.normal   = mul(input.normal, (float3x3)instance.world);
+    return output;
+}
+
+// 광원 하나의 기여. 컬링 경로와 참조 경로가 같은 코드를 쓴다 —
+// 다른 것은 '어떤 광원을 도는가'뿐이어야 대조가 뜻을 갖는다.
+float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
+{
+    const float4 position    = gLights[lightIndex * 4 + 0];
+    const float4 color       = gLights[lightIndex * 4 + 2];
+    const float4 attenuation = gLights[lightIndex * 4 + 3];
+
+    float3 toLight;
+    float  falloff = 1.0f;
+
+    if (position.w < 0.5f)
+    {
+        // 방향광. direction 슬롯은 여기서 안 쓰고 position을 방향으로 본다.
+        toLight = normalize(-position.xyz);
+    }
+    else
+    {
+        const float3 delta = position.xyz - worldPos;
+        const float  distance = length(delta);
+        toLight = delta / max(distance, 1e-6f);
+
+        // 반경 밖은 0. 컬링이 반경으로 자르므로 셰이딩도 같은 기준이라야
+        // 경계에서 두 경로가 갈리지 않는다.
+        const float radius = attenuation.w;
+        if (distance > radius) return float3(0, 0, 0);
+
+        const float denominator = attenuation.x
+            + attenuation.y * distance
+            + attenuation.z * distance * distance;
+        falloff = 1.0f / max(denominator, 1e-6f);
+    }
+
+    const float ndotl = saturate(dot(normal, toLight));
+    return color.rgb * color.a * ndotl * falloff;
+}
+
+float4 PSMain(VSOut input) : SV_TARGET
+{
+    const float3 normal = normalize(input.normal);
+    float3 lighting = 0.0f;
+
+#ifdef REFERENCE_PATH
+    // 참조: 전 광원을 돈다(옛 포워드 방식).
+    for (uint i = 0; i < gLightCount; ++i)
+    {
+        lighting += Contribute(i, input.worldPos, normal);
+    }
+#else
+    // Forward+: 자기 타일의 목록만 돈다.
+    const uint2 tile = uint2(input.position.xy) / TILE_SIZE;
+    const uint  tileIndex = min(tile.y, gTileGrid.y - 1) * gTileGrid.x
+        + min(tile.x, gTileGrid.x - 1);
+
+    const uint count = gTileCount[tileIndex];
+    for (uint i = 0; i < count; ++i)
+    {
+        const uint lightIndex = gTileList[tileIndex * MAX_LIGHTS_PER_TILE + i];
+        lighting += Contribute(lightIndex, input.worldPos, normal);
+    }
+#endif
+
+    return float4(lighting, 1.0f);
+}
+)";
+
+    struct ShadeInstance
+    {
+        Mathf::Matrix  world{};
+        Mathf::Vector4 baseColor{};
+    };
+
+    struct ShadeParams
+    {
+        Mathf::Matrix viewProjection{};
+        uint32_t      tileGridX{ 0 };
+        uint32_t      tileGridY{ 0 };
+        uint32_t      lightCount{ 0 };
+        uint32_t      pad0{ 0 };
+    };
+
     struct CullParams
     {
         Mathf::Matrix view{};
@@ -196,6 +342,23 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID,
         uint32_t      lightCount{ 0 };
         uint32_t      pad[3]{};
     };
+
+    bool CompileFwdShaderEntry(const char* source, const D3D_SHADER_MACRO* defines,
+        const char* entry, const char* target,
+        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+    {
+        Microsoft::WRL::ComPtr<ID3DBlob> errors;
+        const HRESULT hr = D3DCompile(source, strlen(source), nullptr, defines, nullptr,
+            entry, target, 0, 0, &outBlob, &errors);
+        if (FAILED(hr))
+        {
+            outError = std::string("Forward+ 셰이더 컴파일 실패(") + entry + "): ";
+            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
+            else        outError += FwdHrToString(hr);
+            return false;
+        }
+        return true;
+    }
 
     bool CompileFwdShader(const char* source, const D3D_SHADER_MACRO* defines,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
@@ -282,7 +445,102 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     desc.rootSignatureId = root.id;
 
     m_cullPSO = context.psoManager->GetOrCreateCompute(desc, outError);
-    return nullptr != m_cullPSO;
+    if (nullptr == m_cullPSO) return false;
+
+    // ── 셰이딩 루트 시그니처 ──
+    //
+    // b0 상수 · t0 인스턴스 · t1 광원 · t2 타일 카운트 · t3 타일 목록.
+    // 넷 다 구조화 버퍼라 루트 SRV로 꽂는다 — 디스크립터 테이블을 만들 이유가
+    // 없고, 드로우마다 인스턴스 버퍼 주소만 바뀌므로 이쪽이 싸다.
+    D3D12_ROOT_PARAMETER shadeParams[5]{};
+    shadeParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    shadeParams[0].Descriptor.ShaderRegister = 0;
+
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        shadeParams[1 + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        shadeParams[1 + i].Descriptor.ShaderRegister = i;
+    }
+
+    D3D12_ROOT_SIGNATURE_DESC shadeRootDesc{};
+    shadeRootDesc.NumParameters = _countof(shadeParams);
+    shadeRootDesc.pParameters = shadeParams;
+    shadeRootDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+    const auto shadeRoot = context.rootSignatures->GetOrCreate(shadeRootDesc, outError);
+    if (!shadeRoot.IsValid()) return false;
+    m_shadeRootSignature = shadeRoot.signature;
+
+    static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    // GBuffer와 같은 정점 레이아웃을 쓰므로 같은 단정을 건다.
+    static_assert(offsetof(Vertex, normal) == 12, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, uv0) == 24, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, tangent) == 40, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, bitangent) == 52, "Vertex 레이아웃이 바뀌었다");
+
+    // 컬링 경로와 참조 경로를 둘 다 만든다. 참조는 대조의 정답지다.
+    struct ShadeVariant
+    {
+        bool                  reference;
+        ID3D12PipelineState** target;
+    };
+    const ShadeVariant variants[] = {
+        { false, &m_shadePSO },
+        { true,  &m_referencePSO },
+    };
+
+    for (const ShadeVariant& variant : variants)
+    {
+        std::vector<D3D_SHADER_MACRO> shadeDefines;
+        shadeDefines.push_back({ "TILE_SIZE", tileSize.c_str() });
+        shadeDefines.push_back({ "MAX_LIGHTS_PER_TILE", maxLights.c_str() });
+        if (variant.reference) shadeDefines.push_back({ "REFERENCE_PATH", "1" });
+        shadeDefines.push_back({ nullptr, nullptr });
+
+        ComPtr<ID3DBlob> vsBlob;
+        ComPtr<ID3DBlob> psBlob;
+        if (!CompileFwdShaderEntry(kShadeShader, shadeDefines.data(),
+                "VSMain", "vs_5_0", vsBlob, outError)) return false;
+        if (!CompileFwdShaderEntry(kShadeShader, shadeDefines.data(),
+                "PSMain", "ps_5_0", psBlob, outError)) return false;
+
+        DX12GraphicsPipelineDesc shadeDesc{};
+        shadeDesc.inputElements = kInputElements;
+        shadeDesc.inputElementCount = _countof(kInputElements);
+        shadeDesc.vsBytecode = vsBlob->GetBufferPointer();
+        shadeDesc.vsSize = vsBlob->GetBufferSize();
+        shadeDesc.psBytecode = psBlob->GetBufferPointer();
+        shadeDesc.psSize = psBlob->GetBufferSize();
+        shadeDesc.rootSignature = shadeRoot.signature;
+        shadeDesc.rootSignatureId = shadeRoot.id;
+        shadeDesc.depthEnable = false;   // 포워드 검증은 깊이 없이 색만 본다
+        shadeDesc.cullMode = D3D12_CULL_MODE_NONE;
+        shadeDesc.numRenderTargets = 1;
+        shadeDesc.rtvFormats[0] = kOutputFormat;
+
+        *variant.target = context.psoManager->GetOrCreate(shadeDesc, outError);
+        if (nullptr == *variant.target) return false;
+    }
+
+    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    rtvHeapDesc.NumDescriptors = 1;
+    const HRESULT rtvHr = context.resources->GetDevice()->CreateDescriptorHeap(
+        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
+    if (FAILED(rtvHr))
+    {
+        outError = "Forward+ RTV 힙 생성 실패: " + FwdHrToString(rtvHr);
+        return false;
+    }
+
+    return true;
 }
 
 bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
@@ -451,9 +709,168 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->ResourceBarrier(2, uavBarriers);
         },
         // 결과(타일 버퍼)가 그래프 밖 리소스라 컬링이 이 패스를 못 본다 —
-        // 뿌리로 표시해야 걷어내지지 않는다. 셰이딩이 붙으면 그쪽이 뿌리가
-        // 되고 이 표시는 뗀다.
+        // 뿌리로 표시해야 걷어내지지 않는다. 셰이딩 출력도 지금은 소비자가
+        // 없으므로 둘 다 뿌리다. 후처리가 붙으면 셰이딩만 남기고 뗀다.
         true);
+
+    if (nullptr == m_shadePSO || nullptr == m_rtvHeap) return;
+
+    // ── 포워드 셰이딩 ──
+    //
+    // 타일 버퍼를 UAV에서 SRV로 넘긴다. 그래프가 버퍼를 모르므로 배리어를
+    // 여기서 직접 건다 — 빼먹으면 셰이딩이 컬링 이전의 값을 읽는다.
+    RGTextureDesc outputDesc{};
+    outputDesc.width = context.width;
+    outputDesc.height = context.height;
+    outputDesc.format = kOutputFormat;
+    outputDesc.allowRenderTarget = true;
+    outputDesc.name = "Forward+.Shade";
+    m_output = graph.CreateTexture(outputDesc);
+
+    graph.AddPass("Forward+.Shade",
+        { { m_output, RGResourceState::RenderTarget } },
+        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        {
+            auto* commandList = executeContext.commandList;
+            auto* device = context.resources->GetDevice();
+
+            const uint32_t lightCount = (nullptr == context.lights)
+                ? 0u : static_cast<uint32_t>(context.lights->size());
+
+            TransitionTileBuffers(commandList,
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+            const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+            device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
+
+            const D3D12_VIEWPORT viewport{ 0.f, 0.f,
+                static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
+            const D3D12_RECT scissor{ 0, 0,
+                static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
+            commandList->RSSetViewports(1, &viewport);
+            commandList->RSSetScissorRects(1, &scissor);
+            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+            constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
+            commandList->ClearRenderTargetView(rtvHandle, kZero, 0, nullptr);
+
+            const bool drew = RecordShading(commandList, context,
+                m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount);
+            (void)drew;
+
+            // UAV로 돌려놓는다. '그래프가 끝나면 타일 버퍼는 UAV'라는 불변을
+            // 지키기 위해서다 — 셰이딩이 도는지 여부에 따라 끝 상태가 달라지면
+            // 뒤에 붙는 패스(리드백 등)가 어느 상태를 가정할지 알 수 없게 된다.
+            TransitionTileBuffers(commandList,
+                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        },
+        true);
+}
+
+void EnhancedForwardPass::TransitionTileBuffers(ID3D12GraphicsCommandList* commandList,
+    D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) const
+{
+    D3D12_RESOURCE_BARRIER barriers[2]{};
+    ID3D12Resource* const buffers[2] = { m_tileCountBuffer.Get(), m_tileListBuffer.Get() };
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[i].Transition.pResource = buffers[i];
+        barriers[i].Transition.StateBefore = before;
+        barriers[i].Transition.StateAfter = after;
+        barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    }
+    commandList->ResourceBarrier(2, barriers);
+}
+
+// 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가 뜻을
+// 가지려면 PSO 말고는 아무것도 달라선 안 된다. 같은 것을 두 곳에서 따로
+// 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
+bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
+    const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount)
+{
+    if (nullptr == pso || nullptr == context.draws || context.draws->empty()) return false;
+
+    auto& uploadRing = context.resources->GetUploadRing();
+
+    // 광원 배열. 컬링이 올린 것과 같은 내용이지만 다시 올린다 — 컬링의
+    // 할당을 셰이딩까지 들고 오면 두 패스가 링 수명으로 묶인다.
+    const uint64_t lightBytes =
+        static_cast<uint64_t>((0 == lightCount) ? 1 : lightCount) * sizeof(EnhancedLight);
+    const auto lightUpload = uploadRing.Allocate(lightBytes, 16);
+    if (!lightUpload.IsValid()) return false;
+    if (0 != lightCount)
+    {
+        memcpy(lightUpload.cpuAddress, context.lights->data(),
+            static_cast<size_t>(lightCount) * sizeof(EnhancedLight));
+    }
+
+    // 인스턴스는 한 번에 올리고 드로우마다 주소만 옮긴다. 루트 SRV는 주소를
+    // 받으므로 드로우별 재업로드가 필요 없다.
+    const size_t drawCount = context.draws->size();
+    const auto instanceUpload = uploadRing.Allocate(
+        drawCount * sizeof(ShadeInstance), sizeof(ShadeInstance));
+    if (!instanceUpload.IsValid()) return false;
+
+    auto* instances = static_cast<ShadeInstance*>(instanceUpload.cpuAddress);
+    for (size_t i = 0; i < drawCount; ++i)
+    {
+        const EnhancedDrawItem& draw = (*context.draws)[i];
+        instances[i].world = XMMatrixTranspose(draw.worldMatrix);
+        instances[i].baseColor = Mathf::Vector4{ draw.baseColorFactor.x,
+            draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
+    }
+
+    ShadeParams params{};
+    if (nullptr != context.camera)
+    {
+        params.viewProjection = XMMatrixTranspose(
+            XMMatrixMultiply(context.camera->view, context.camera->projection));
+    }
+    params.tileGridX = m_tileCountX;
+    params.tileGridY = m_tileCountY;
+    params.lightCount = lightCount;
+
+    const auto cb = uploadRing.Allocate(
+        sizeof(ShadeParams), DX12UploadRing::kConstantBufferAlignment);
+    if (!cb.IsValid()) return false;
+    memcpy(cb.cpuAddress, &params, sizeof(params));
+
+    commandList->SetGraphicsRootSignature(m_shadeRootSignature);
+    commandList->SetPipelineState(pso);
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+    commandList->SetGraphicsRootShaderResourceView(2, lightUpload.gpuAddress);
+    commandList->SetGraphicsRootShaderResourceView(3,
+        m_tileCountBuffer->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootShaderResourceView(4,
+        m_tileListBuffer->GetGPUVirtualAddress());
+
+    bool drewAnything = false;
+    for (size_t i = 0; i < drawCount; ++i)
+    {
+        const EnhancedDrawItem& draw = (*context.draws)[i];
+        if (nullptr == draw.mesh || nullptr == context.meshCache) continue;
+
+        std::string uploadError;
+        const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
+        if (!entry.IsValid()) continue;
+
+        commandList->SetGraphicsRootShaderResourceView(1,
+            instanceUpload.gpuAddress + static_cast<uint64_t>(i) * sizeof(ShadeInstance));
+
+        commandList->IASetVertexBuffers(0, 1, &entry.vertexView);
+        commandList->IASetIndexBuffer(&entry.indexView);
+        commandList->DrawIndexedInstanced(entry.indexCount, 1, 0, 0, 0);
+        drewAnything = true;
+    }
+
+    return drewAnything;
 }
 
 void EnhancedForwardPass::Shutdown()
@@ -466,8 +883,11 @@ void EnhancedForwardPass::Shutdown()
     m_lastCulledLights = 0;
     m_lastOverflowTiles = 0;
 
+    m_rtvHeap.Reset();
+
     m_cullPSO = nullptr;
     m_shadePSO = nullptr;
+    m_referencePSO = nullptr;
     m_cullRootSignature = nullptr;
     m_shadeRootSignature = nullptr;
 }
