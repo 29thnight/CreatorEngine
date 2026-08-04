@@ -1483,6 +1483,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.gizmoline] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoline %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.gizmoicon")
+    {
+        // 기즈모 아이콘 패스 검증(PHASE 3-6, Gizmo 계열 3차 슬라이스).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunGizmoIconTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.gizmoicon] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.gizmoicon %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;
@@ -2515,6 +2527,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
         "  dx12.grid            그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)\n"
         "  dx12.gizmoline       기즈모 라인 패스 검증(도형 정점 수·픽셀·드로우 병합)\n"
+        "  dx12.gizmoicon       기즈모 아이콘 패스 검증(빌보드 회전·알파 상한·배칭)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

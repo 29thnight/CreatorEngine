@@ -258,6 +258,13 @@ public:
     /// 반응을 따로 단정한다. 드로우 병합이 핵심이다 — DX11은 도형마다 Map과
     /// 드로우가 나갔고(캡슐 하나 = 12회), 병합해도 그림은 똑같이 나온다.
     bool RunGizmoLineTest(std::string& outLog);
+
+    /// 기즈모 아이콘(빌보드) 패스 검증 (PHASE 3-6, Gizmo 계열 3차 슬라이스).
+    ///
+    /// 픽셀(알파 상한 0.5)·빌보드 회전·배칭·시야를 따로 단정한다. 측면
+    /// 카메라가 핵심이다 — GS를 VS로 옮기며 확장 수식이 틀리면 정면에서는
+    /// 멀쩡해 보이고 옆에서만 엣지온으로 사라진다.
+    bool RunGizmoIconTest(std::string& outLog);
 };
 
 #endif
