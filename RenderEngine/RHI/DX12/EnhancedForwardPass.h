@@ -1,0 +1,111 @@
+#pragma once
+#ifndef DYNAMICCPP_EXPORTS
+#include <cstdint>
+#include <wrl/client.h>
+
+#include "EnhancedRenderPass.h"
+
+// Forward+ 패스 (PHASE 3-6, 신규 작성).
+//
+// ── 왜 Forward+인가 ──
+//
+// 기존 DX11 ForwardPass는 드로우마다 전체 광원을 상수 버퍼로 받아 픽셀마다
+// 모든 광원을 돈다. 광원이 N개면 픽셀 비용이 N에 비례하고, 실제로는 대부분의
+// 픽셀에 닿는 광원이 몇 개뿐이므로 그 차이가 전부 낭비다.
+//
+// Forward+(타일드 포워드)는 상용 엔진(언리얼 모바일 포워드, 유니티 URP
+// Forward+)이 쓰는 방식이다. 화면을 타일로 나누고, 컴퓨트가 타일마다
+// '이 타일에 닿는 광원 목록'을 만든 뒤, 픽셀 셰이더는 자기 타일의 목록만
+// 돈다. 비용이 '광원 수'가 아니라 '내 타일에 닿는 광원 수'에 비례한다.
+//
+// ── 구조 (두 단계) ──
+//
+//   1. 광원 컬링(컴퓨트) — 타일(16x16 픽셀)마다:
+//      · 깊이 버퍼에서 타일의 min/max 깊이를 구한다 (불투명 깊이 재사용 —
+//        GBuffer가 이미 채웠으므로 공짜다)
+//      · 타일 프러스텀(4개 옆면 + min/max 깊이)을 만든다
+//      · 광원 구를 프러스텀과 교차 검사해 통과한 인덱스를 타일 목록에 쓴다
+//   2. 포워드 셰이딩(그래픽스) — forwardQueue의 드로우를 그리며, 픽셀
+//      셰이더가 SV_Position에서 타일 번호를 계산해 그 목록의 광원만 돈다.
+//
+// ── 자료 배치 ──
+//
+//   광원 배열     StructuredBuffer<EnhancedLight> — 프레임마다 업로드 링에서
+//   타일 목록     RWStructuredBuffer<uint>, 타일당 kMaxLightsPerTile 슬롯 고정
+//   타일 카운트   RWStructuredBuffer<uint>, 타일당 1개
+//
+//   가변 길이 목록(오프셋 + 컴팩션) 대신 고정 슬롯을 쓴다. 컴팩션은 전역
+//   원자 카운터가 필요해 컬링이 직렬화 지점을 갖게 되는데, 타일당 몇 개
+//   안 되는 씬에서는 고정 슬롯의 메모리 낭비(타일 수 × 슬롯 × 4바이트)가
+//   그 복잡성보다 싸다. 1920x1080 = 8160 타일 × 32슬롯 × 4B ≈ 1MB.
+//
+// ── 판정 ──
+//
+//   정확성: 같은 씬을 '전 광원 루프'(참조 경로)로도 그려 픽셀을 대조한다.
+//     컬링이 광원을 잘못 떨어뜨리면 경계 타일이 어두워지는데, 그 증상은
+//     눈으로 잡기 어렵다 — 대조가 잡아야 한다.
+//   성능: 광원 수를 늘려 가며 GPU 시간을 잰다. 컬링 비용 + 셰이딩 비용이
+//     전 광원 루프보다 싸지는 교차점이 어디인지 본다. 광원이 몇 개 안 되면
+//     Forward+가 오히려 손해일 수 있다 — 그 경계를 실측으로 적는다.
+//
+// SSGI에서 배운 규율을 그대로 쓴다: 셰이더는 부르는 자리가 생겨야 컴파일
+// 오류가 드러난다(자가 검증 먼저), 진단 리드백 없이는 '도는 것처럼 보이는'
+// 상태를 구분할 수 없다(타일 카운트 리드백을 처음부터), 상수는 실측으로.
+class EnhancedForwardPass : public EnhancedRenderPass
+{
+public:
+    /// 타일 한 변(픽셀). 16은 컴퓨트 스레드 그룹과 일치시키기 좋고,
+    /// 상용 엔진들의 통상값이다. 실측으로 바꿀 근거가 생기면 바꾼다.
+    static constexpr uint32_t kTileSize = 16;
+
+    /// 타일당 최대 광원 수. 넘치면 앞에서부터 자르고 잘린 수를 통계로 센다 —
+    /// 조용히 자르면 '광원이 가끔 사라진다'가 되어 원인을 못 찾는다.
+    static constexpr uint32_t kMaxLightsPerTile = 32;
+
+    static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+    const char* GetName() const override { return "Forward+"; }
+
+    bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
+    void Shutdown() override;
+
+    struct Inputs
+    {
+        RGHandle depth;      // GBuffer 깊이 — 타일 min/max의 원천
+        RGHandle lighting;   // 불투명 결과 — 포워드는 이 위에 그린다
+    };
+
+    void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
+
+    RGHandle GetOutput() const { return m_output; }
+
+    /// 컬링 통계. 타일 목록이 실제로 채워지는지 밖에서 본다 —
+    /// SSGI의 누적 카운터와 같은 역할이다. 늘 0이면 컬링이 죽은 것이다.
+    uint32_t GetLastCulledLightCount() const { return m_lastCulledLights; }
+    uint32_t GetLastOverflowTileCount() const { return m_lastOverflowTiles; }
+
+private:
+    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+
+    Inputs   m_inputs{};
+    RGHandle m_output;
+    RGHandle m_tileList;     // 타일별 광원 인덱스 (고정 슬롯)
+    RGHandle m_tileCount;    // 타일별 광원 수
+
+    uint32_t m_tileCountX{ 0 };
+    uint32_t m_tileCountY{ 0 };
+
+    uint32_t m_lastCulledLights{ 0 };
+    uint32_t m_lastOverflowTiles{ 0 };
+
+    ID3D12PipelineState* m_cullPSO{ nullptr };
+    ID3D12PipelineState* m_shadePSO{ nullptr };
+    ID3D12RootSignature* m_cullRootSignature{ nullptr };
+    ID3D12RootSignature* m_shadeRootSignature{ nullptr };
+};
+
+#endif
