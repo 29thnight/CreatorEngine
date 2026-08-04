@@ -223,6 +223,14 @@ public:
     /// 합친 패스(Uber)는 특히 그렇다 — 넷이 한 셰이더에 들어 있어서 하나가
     /// 빠져도 '어딘가 조금 다르다'로만 보인다.
     bool RunPostChainTest(std::string& outLog);
+
+    /// 포스트 체인 신구 시간 비교 (PHASE 3-6).
+    ///
+    /// 합친 패스(Uber) 하나와, 그것을 옛 방식대로 넷으로 나눈 것을 잰다.
+    /// 참조 경로는 같은 셰이더에 플래그만 하나씩 켜서 네 번 돌린다 —
+    /// 갈리는 것이 화면 왕복 횟수 하나뿐이라야 나온 수가 무엇을 뜻하는지
+    /// 분명해진다.
+    bool RunPostChainScaleTest(std::string& outLog);
 };
 
 #endif

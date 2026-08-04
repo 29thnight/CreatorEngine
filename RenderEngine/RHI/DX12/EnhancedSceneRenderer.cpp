@@ -6,9 +6,14 @@
 #include "EnhancedRenderGraph.h"
 #include "EnhancedGBufferPass.h"
 #include "EnhancedDeferredPass.h"
+// ★ 자기가 쓰는 것은 자기가 포함한다. 유니티 빌드가 같은 덩어리의
+//   다른 파일에서 끌어와 주고 있어서 없어도 빌드가 됐는데, 파일 하나를
+//   프로젝트에 더한 것만으로 묶음이 바뀌어 갑자기 터졌다.
+#include "EnhancedShadowPass.h"
 #include "EnhancedSSGIPass.h"
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
+#include "EnhancedPostChainPass.h"
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
 #include "DX12MeshCache.h"
@@ -2437,6 +2442,38 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         return false;
     }
 
+    // 포스트 체인 결과가 살아 있는지 확인하는 작은 목적지. 내용은 안 본다 —
+    // 소비자가 있다는 사실만으로 그래프가 체인을 걷어내지 않는다.
+    ComPtr<ID3D12Resource> postChainProbe;
+    {
+        D3D12_HEAP_PROPERTIES probeHeap{};
+        probeHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+        D3D12_RESOURCE_DESC probeDesc{};
+        probeDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        probeDesc.Width = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+        probeDesc.Height = 1;
+        probeDesc.DepthOrArraySize = 1;
+        probeDesc.MipLevels = 1;
+        probeDesc.SampleDesc.Count = 1;
+        probeDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        if (FAILED(resources.GetDevice()->CreateCommittedResource(&probeHeap,
+            D3D12_HEAP_FLAG_NONE, &probeDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, IID_PPV_ARGS(&postChainProbe))))
+        {
+            outLog += "[2/4] 포스트 체인 프로브 생성 실패\n";
+            return false;
+        }
+    }
+
+    EnhancedPostChainPass postChain;
+    if (!postChain.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] 포스트 체인 초기화 실패: " + error + "\n";
+        return false;
+    }
+
     DX12GpuProfiler profiler;
     // SSGI가 붙어 패스가 스무 개를 넘는다(Hi-Z 밉 여덟 + 트레이스·리졸브·
     // 필터·합성·히스토리). 질의는 패스당 둘이라 넉넉히 잡는다 — 모자라면
@@ -2605,6 +2642,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (!ssgi.PrepareFrame(frameContext, outStepError)) return false;
         if (!forward.PrepareFrame(frameContext, outStepError)) return false;
         if (!ssao.PrepareFrame(frameContext, outStepError)) return false;
+        if (!postChain.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
         EnhancedRenderGraph graph;
@@ -2677,6 +2715,60 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             forward.SetInputs(forwardInputs);
         }
         forward.Declare(graph, frameContext);
+
+        // ── 포스트 체인 ──
+        //
+        // 맨 뒤다. 조명·간접광·포워드가 다 얹힌 HDR을 받아 블룸·톤맵·
+        // 비네트·그레이딩·FXAA를 걸어 LDR로 내보낸다.
+        //
+        // 입력은 SSGI 합성 결과가 있으면 그것, 없으면 Deferred 결과다 —
+        // 간접광이 얹히기 전의 그림에 톤맵을 걸면 노출이 다르게 잡힌다.
+        {
+            EnhancedPostChainPass::Inputs postInputs{};
+            postInputs.color = ssgi.GetOutput().IsValid()
+                ? ssgi.GetOutput() : deferred.GetOutput();
+            postChain.SetInputs(postInputs);
+        }
+        postChain.Declare(graph, frameContext);
+
+        // ★ 포스트 체인 결과를 읽는 자리를 둔다.
+        //
+        // 이것이 없으면 그래프가 체인을 통째로 걷어낸다(블룸 5단 + Uber +
+        // FXAA = 11패스). 실제로 그렇게 물렸고, 씬 검증의 '패스가 걷어내졌다'
+        // 단정이 잡아 줬다.
+        //
+        // 최종 목적지는 화면이지만 이 검증은 화면에 안 내보내므로, 결과가
+        // 살아 있다는 것만 확인하는 작은 복사를 둔다. 3-9에서 스왑체인이
+        // 붙으면 그쪽이 진짜 소비자가 되고 이 패스는 없어진다.
+        if (postChain.GetOutput().IsValid() && nullptr != postChainProbe)
+        {
+            const RGHandle postHandle = postChain.GetOutput();
+            graph.AddPass("post_probe",
+                { { postHandle, RGResourceState::CopySource } },
+                [&, postHandle](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                {
+                    D3D12_TEXTURE_COPY_LOCATION src{};
+                    src.pResource = executeContext.Resolve(postHandle);
+                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                    D3D12_TEXTURE_COPY_LOCATION dst{};
+                    dst.pResource = postChainProbe.Get();
+                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    dst.PlacedFootprint.Footprint.Format =
+                        EnhancedPostChainPass::kLDRFormat;
+                    dst.PlacedFootprint.Footprint.Width = 8;
+                    dst.PlacedFootprint.Footprint.Height = 1;
+                    dst.PlacedFootprint.Footprint.Depth = 1;
+                    dst.PlacedFootprint.Footprint.RowPitch =
+                        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+
+                    D3D12_BOX box{};
+                    box.right = 8;
+                    box.bottom = 1;
+                    box.back = 1;
+                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+                }, true);
+        }
 
         // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
         // 안다 — 재질 때 "업로드 0인데 통과"를 겪었으므로 같은 함정을 막는다.
@@ -3075,6 +3167,11 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // Forward+가 실제 씬에서 무엇을 했는지. 포워드 큐가 비면 셰이딩은
     // 선언되지 않는 것이 정상이라, 그 사실을 수로 남겨야 "안 도는 것"과
     // "그릴 것이 없는 것"이 구분된다.
+    // 포스트 체인이 무엇을 했는지. 최종 LDR이 선언됐는지와 블룸 단수를
+    // 남긴다 — 안 돌면 '선언 안 됨'으로 드러난다.
+    outLog += "      포스트 체인 — 최종 " + std::string(
+        postChain.GetOutput().IsValid() ? "선언됨" : "생략")
+        + " · 블룸 " + std::to_string(postChain.GetBloomMipCount()) + "단\n";
     outLog += "      Forward+ — 포워드 드로우 " + std::to_string(forwardDraws.size())
         + " · 셰이딩 " + std::string(forward.GetOutput().IsValid()
             ? "선언됨" : "생략(포워드 큐 비어 있음)") + "\n";

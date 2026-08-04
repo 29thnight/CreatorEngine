@@ -1412,6 +1412,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.post] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.post %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.postscale")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunPostChainScaleTest(log);
+        const std::string verdict = passed ? "완료" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.postscale] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.postscale %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;

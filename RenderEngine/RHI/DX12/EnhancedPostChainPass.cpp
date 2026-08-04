@@ -16,7 +16,7 @@
 
 // 단계(순서대로 채운다):
 //   [v] 1. 블룸 체인 + Uber + FXAA + 자가 검증
-//   [ ] 2. 실제 씬 연결 + 기존 체인과 시간 비교
+//   [v] 2. 실제 씬 연결 + 기존 체인과 시간 비교
 //
 // 자가 검증(dx12.post, 256x256) 실측:
 //   밝은 곳 0.957(ACES(3.0)=0.954에 비네트) · 번짐 0.373 · 배경 0.216 ·
@@ -378,19 +378,75 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         const uint32_t bloomH = m_bloomChainValid
             ? (m_height / kBloomStartDivisor) : m_height;
 
-        PostParams params = makeParams(bloomW, bloomH, m_width, m_height);
-        if (m_bloomChainValid)          params.flags |= kFlagBloom;
-        if (m_tuning.toneMapEnabled)    params.flags |= kFlagToneMap;
+        uint32_t toneFlags = 0;
+        if (m_tuning.toneMapEnabled) toneFlags |= kFlagToneMap;
         if (EnhancedPostChainPass::ToneMapper::AgX == m_tuning.toneMapper)
         {
-            params.flags |= kFlagAgX;
+            toneFlags |= kFlagAgX;
         }
-        if (m_tuning.vignetteEnabled)   params.flags |= kFlagVignette;
-        if (m_tuning.gradingEnabled)    params.flags |= kFlagGrading;
 
-        declareStage("PostChain.Uber", m_uberPSO,
-            m_inputs.color, m_bloomChainValid ? bloomResult : m_inputs.color,
-            m_toneMapped, params, m_width, m_height, false);
+        if (!m_useSeparatePasses)
+        {
+            PostParams params = makeParams(bloomW, bloomH, m_width, m_height);
+            if (m_bloomChainValid)        params.flags |= kFlagBloom;
+            params.flags |= toneFlags;
+            if (m_tuning.vignetteEnabled) params.flags |= kFlagVignette;
+            if (m_tuning.gradingEnabled)  params.flags |= kFlagGrading;
+
+            declareStage("PostChain.Uber", m_uberPSO,
+                m_inputs.color, m_bloomChainValid ? bloomResult : m_inputs.color,
+                m_toneMapped, params, m_width, m_height, false);
+        }
+        else
+        {
+            // ── 참조 경로: 넷을 나눠 돈다 ──
+            //
+            // 옛 체인의 구조를 그대로 흉내 낸다. 셰이더는 같은 것을 쓰고
+            // 플래그만 하나씩 켠다 — 그래야 갈리는 것이 화면 왕복 횟수
+            // 하나뿐이고, 나온 수가 무엇을 뜻하는지 분명해진다.
+            //
+            // 톤맵 앞은 HDR, 뒤는 LDR이다. 뒤까지 HDR로 두면 참조 경로가
+            // 대역폭에서 네 배 불리해져 비교가 공정하지 않다.
+            RGTextureDesc hdrDesc{};
+            hdrDesc.width = m_width;
+            hdrDesc.height = m_height;
+            hdrDesc.format = kHDRFormat;
+            hdrDesc.allowUnorderedAccess = true;
+            hdrDesc.name = "PostChain.RefBloomed";
+            const RGHandle bloomed = graph.CreateTexture(hdrDesc);
+
+            RGTextureDesc stepDesc = ldrDesc;
+            stepDesc.name = "PostChain.RefToned";
+            const RGHandle toned = graph.CreateTexture(stepDesc);
+            stepDesc.name = "PostChain.RefVignetted";
+            const RGHandle vignetted = graph.CreateTexture(stepDesc);
+
+            // ① 블룸 합성 (HDR → HDR)
+            PostParams bloomParams = makeParams(bloomW, bloomH, m_width, m_height);
+            if (m_bloomChainValid) bloomParams.flags |= kFlagBloom;
+            declareStage("PostChain.RefBloom", m_uberPSO,
+                m_inputs.color, m_bloomChainValid ? bloomResult : m_inputs.color,
+                bloomed, bloomParams, m_width, m_height, false);
+
+            // ② 톤맵 (HDR → LDR)
+            PostParams toneParams = makeParams(m_width, m_height, m_width, m_height);
+            toneParams.flags = toneFlags;
+            declareStage("PostChain.RefToneMap", m_uberPSO,
+                bloomed, RGHandle{}, toned, toneParams, m_width, m_height, false);
+
+            // ③ 비네트 (LDR → LDR)
+            PostParams vignetteParams = makeParams(m_width, m_height, m_width, m_height);
+            if (m_tuning.vignetteEnabled) vignetteParams.flags |= kFlagVignette;
+            declareStage("PostChain.RefVignette", m_uberPSO,
+                toned, RGHandle{}, vignetted, vignetteParams, m_width, m_height, false);
+
+            // ④ 그레이딩 (LDR → LDR)
+            PostParams gradeParams = makeParams(m_width, m_height, m_width, m_height);
+            if (m_tuning.gradingEnabled) gradeParams.flags |= kFlagGrading;
+            declareStage("PostChain.RefGrading", m_uberPSO,
+                vignetted, RGHandle{}, m_toneMapped, gradeParams,
+                m_width, m_height, false);
+        }
     }
 
     // ── FXAA ──
@@ -419,6 +475,7 @@ void EnhancedPostChainPass::Shutdown()
     m_bloomMipCount = 0;
     m_bloomChainValid = false;
 
+    m_useSeparatePasses = false;
     m_thresholdPSO = nullptr;
     m_downsamplePSO = nullptr;
     m_upsamplePSO = nullptr;

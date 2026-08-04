@@ -6,6 +6,15 @@
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
 
+// ★ 자기가 쓰는 것은 자기가 포함한다.
+//
+// 전에는 이 둘이 없어도 빌드가 됐다. 유니티 빌드가 같은 덩어리에 묶은
+// 다른 파일이 끌어와 주고 있었기 때문이다. 파일 하나를 프로젝트에 더한
+// 것만으로 묶음이 바뀌어 갑자기 'Vertex는 선언되지 않은 식별자'가 났다.
+// 남의 include에 얹혀 있으면 이런 식으로 무관한 변경에서 터진다.
+#include "DX12MeshCache.h"
+#include "../../Mesh.h"
+
 #include <d3dcompiler.h>
 #include <algorithm>
 #include <sstream>

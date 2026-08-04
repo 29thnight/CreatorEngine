@@ -1,0 +1,466 @@
+#ifndef DYNAMICCPP_EXPORTS
+#include "EnhancedPostChainPass.h"
+#include "DX12DeviceResources.h"
+#include "DX12GpuProfiler.h"
+#include "DX12PSOManager.h"
+#include "DX12RootSignatureCache.h"
+#include "EnhancedRenderGraph.h"
+#include "EnhancedSceneRenderer.h"
+
+#include <d3dcompiler.h>
+#include <algorithm>
+#include <cstdio>
+#include <string>
+#include <vector>
+
+#pragma comment(lib, "d3dcompiler.lib")
+
+// 포스트 체인 신구 시간 비교 (PHASE 3-6, 2단계).
+//
+// ── 무엇과 무엇을 재는가 ──
+//
+// 합친 패스(Uber) 하나와, 그것을 옛 방식대로 넷으로 나눈 것을 잰다.
+//
+// 실제 DX11 체인과 직접 재지 않는다. 그러면 API 차이·드라이버 차이·프레임
+// 구조 차이가 전부 수에 섞여, 빨라진 것이 '합쳤기 때문'인지 'DX12이기
+// 때문'인지 구분할 수 없다.
+//
+// ★ 참조 경로는 같은 셰이더를 쓴다. 플래그만 하나씩 켜서 네 번 돌린다 —
+//   갈리는 것이 화면 왕복 횟수 하나뿐이라야 나온 수가 무엇을 뜻하는지
+//   분명해진다. 셰이더를 따로 쓰면 그 안의 차이까지 수에 섞인다.
+//
+// 블룸 체인과 FXAA는 양쪽이 똑같이 지나가므로 비교에서 뺀다. 재는 것은
+// '픽셀 국소 연산 넷을 합친 것이 값을 하는가' 하나다.
+namespace
+{
+    constexpr uint32_t kPostWarmupFrames = 3;
+    constexpr uint32_t kPostMeasureFrames = 9;
+
+    // 검사 입력. 자가 검증과 같은 배치를 쓴다 — 배치가 다르면 분기가
+    // 달리 타서 두 검증의 수를 나란히 놓을 수 없다.
+    constexpr const char* kPostScaleSceneShader = R"(
+RWTexture2D<float4> gColor : register(u0);
+
+cbuffer SceneParams : register(b0)
+{
+    uint2 gSize;
+    uint2 gPad;
+};
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xy >= gSize)) return;
+
+    float3 color = 0.25f;
+
+    const int2 center = int2(gSize) / 2;
+    const int2 delta = abs(int2(id.xy) - center);
+    if (delta.x < int(gSize.x) / 16 && delta.y < int(gSize.y) / 16)
+    {
+        color = 3.0f;
+    }
+
+    gColor[id.xy] = float4(color, 1.0f);
+}
+)";
+
+    struct PostScaleSceneParams
+    {
+        uint32_t sizeX{ 0 };
+        uint32_t sizeY{ 0 };
+        uint32_t pad[2]{};
+    };
+
+    double PostMedian(std::vector<double>& values)
+    {
+        if (values.empty()) return 0.0;
+        std::sort(values.begin(), values.end());
+        return values[values.size() / 2];
+    }
+}
+
+bool EnhancedSceneRenderer::RunPostChainScaleTest(std::string& outLog)
+{
+    using Microsoft::WRL::ComPtr;
+
+    outLog += "── 포스트 체인 신구 시간 비교 (PHASE 3-6) ──\n";
+
+    struct Resolution { uint32_t width; uint32_t height; };
+    const Resolution kResolutions[] = {
+        {  640,  360 },
+        { 1280,  720 },
+        { 1920, 1080 },
+    };
+
+    struct Point
+    {
+        uint32_t width{ 0 };
+        uint32_t height{ 0 };
+        double   uberMs{ 0.0 };
+        double   separateMs{ 0.0 };
+    };
+    std::vector<Point> points;
+
+    bool passed = true;
+
+    for (const Resolution& resolution : kResolutions)
+    {
+        if (!passed) break;
+
+        std::string error;
+
+        DX12DeviceResources resources;
+        if (!resources.Initialize(resolution.width, resolution.height, error))
+        {
+            outLog += "DX12 초기화 실패: " + error + "\n";
+            return false;
+        }
+
+        DX12PSOManager psoManager;
+        DX12RootSignatureCache rootSignatures;
+        DX12GpuProfiler profiler;
+        if (!psoManager.Initialize(resources.GetDevice(), L"dx12_post.cache", error) ||
+            !rootSignatures.Initialize(resources.GetDevice(), error) ||
+            !profiler.Initialize(resources.GetDevice(), resources.GetCommandQueue(),
+                48, DX12DeviceResources::kFrameCount, error))
+        {
+            outLog += "초기화 실패: " + error + "\n";
+            resources.Shutdown();
+            return false;
+        }
+
+        EnhancedFrameContext frameContext{};
+        frameContext.resources = &resources;
+        frameContext.psoManager = &psoManager;
+        frameContext.rootSignatures = &rootSignatures;
+        frameContext.width = resolution.width;
+        frameContext.height = resolution.height;
+
+        EnhancedPostChainPass post;
+        if (!post.Initialize(frameContext, error))
+        {
+            outLog += "포스트 체인 초기화 실패: " + error + "\n";
+            resources.Shutdown();
+            return false;
+        }
+
+        ComPtr<ID3D12Resource> hdr;
+        {
+            D3D12_HEAP_PROPERTIES heap{};
+            heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+            D3D12_RESOURCE_DESC desc{};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            desc.Width = resolution.width;
+            desc.Height = resolution.height;
+            desc.DepthOrArraySize = 1;
+            desc.MipLevels = 1;
+            desc.Format = EnhancedPostChainPass::kHDRFormat;
+            desc.SampleDesc.Count = 1;
+            desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+            if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
+                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                nullptr, IID_PPV_ARGS(&hdr))))
+            {
+                outLog += "HDR 생성 실패\n";
+                post.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+        }
+
+        ID3D12PipelineState* scenePSO = nullptr;
+        ID3D12RootSignature* sceneRoot = nullptr;
+        {
+            D3D12_DESCRIPTOR_RANGE uavRange{};
+            uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+            uavRange.NumDescriptors = 1;
+            uavRange.BaseShaderRegister = 0;
+
+            D3D12_ROOT_PARAMETER params[2]{};
+            params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+            params[0].Descriptor.ShaderRegister = 0;
+            params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            params[1].DescriptorTable.NumDescriptorRanges = 1;
+            params[1].DescriptorTable.pDescriptorRanges = &uavRange;
+
+            D3D12_ROOT_SIGNATURE_DESC rootDesc{};
+            rootDesc.NumParameters = _countof(params);
+            rootDesc.pParameters = params;
+
+            const auto root = rootSignatures.GetOrCreate(rootDesc, error);
+            ComPtr<ID3DBlob> blob;
+            ComPtr<ID3DBlob> errors;
+            if (!root.IsValid() ||
+                FAILED(D3DCompile(kPostScaleSceneShader, strlen(kPostScaleSceneShader),
+                    nullptr, nullptr, nullptr, "CSMain", "cs_5_0", 0, 0, &blob, &errors)))
+            {
+                outLog += "씬 셰이더 준비 실패\n";
+                post.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+            sceneRoot = root.signature;
+
+            DX12ComputePipelineDesc desc{};
+            desc.csBytecode = blob->GetBufferPointer();
+            desc.csSize = blob->GetBufferSize();
+            desc.rootSignature = root.signature;
+            desc.rootSignatureId = root.id;
+
+            scenePSO = psoManager.GetOrCreateCompute(desc, error);
+            if (nullptr == scenePSO)
+            {
+                outLog += "씬 PSO 생성 실패: " + error + "\n";
+                post.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+        }
+
+        // 결과를 살려 두는 목적지. 없으면 그래프가 체인을 통째로 걷어내고
+        // '0 ms'가 '빠른 것'으로 읽힌다 — SSAO 스케일에서 그렇게 물렸다.
+        ComPtr<ID3D12Resource> keepAlive;
+        {
+            D3D12_HEAP_PROPERTIES readbackHeap{};
+            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+            D3D12_RESOURCE_DESC desc{};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            desc.Width = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+            desc.Height = 1;
+            desc.DepthOrArraySize = 1;
+            desc.MipLevels = 1;
+            desc.SampleDesc.Count = 1;
+            desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+            if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr, IID_PPV_ARGS(&keepAlive))))
+            {
+                outLog += "유지용 버퍼 생성 실패\n";
+                post.Shutdown();
+                resources.Shutdown();
+                return false;
+            }
+        }
+
+        uint32_t frameIndex = 0;
+        bool sceneFilled = false;
+
+        // 한 프레임을 그리고 '픽셀 국소 연산' 부분의 GPU 시간을 돌려준다.
+        // 두 경로가 이 함수 하나를 쓴다 — 측정 절차가 갈리면 그 차이가
+        // 결과에 섞인다.
+        const auto renderFrame = [&](bool separate, double& outMs) -> bool
+        {
+            outMs = 0.0;
+            post.SetUseSeparatePasses(separate);
+
+            if (!resources.BeginFrame(error)) return false;
+            profiler.BeginFrame(frameIndex % DX12DeviceResources::kFrameCount);
+            ++frameIndex;
+
+            if (!post.PrepareFrame(frameContext, error)) return false;
+
+            EnhancedRenderGraph graph;
+            graph.SetProfiler(&profiler);
+
+            // ★ 임포트 상태는 지난 프레임이 남긴 것이어야 한다. 그래프는
+            //   임포트 리소스를 끝에서 되돌리지 않는다(SSAO·포스트 자가
+            //   검증에서 각각 한 번씩 물린 자리다).
+            const RGResourceState importState = sceneFilled
+                ? RGResourceState::ShaderResource : RGResourceState::UnorderedAccess;
+
+            const RGHandle hdrHandle = graph.ImportTexture(hdr.Get(),
+                importState, "PostChain.ScaleHDR");
+
+            if (!sceneFilled)
+            {
+                graph.AddPass("PostChain.ScaleScene",
+                    { { hdrHandle, RGResourceState::UnorderedAccess } },
+                    [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                    {
+                        auto* commandList = executeContext.commandList;
+                        auto* device = resources.GetDevice();
+
+                        PostScaleSceneParams params{};
+                        params.sizeX = resolution.width;
+                        params.sizeY = resolution.height;
+
+                        const auto cb = resources.GetUploadRing().Allocate(
+                            sizeof(PostScaleSceneParams),
+                            DX12UploadRing::kConstantBufferAlignment);
+                        if (!cb.IsValid()) return;
+                        memcpy(cb.cpuAddress, &params, sizeof(params));
+
+                        const auto uavTable = resources.GetDescriptorRing().Allocate(1);
+                        if (!uavTable.IsValid()) return;
+
+                        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+                        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                        uavDesc.Format = EnhancedPostChainPass::kHDRFormat;
+                        device->CreateUnorderedAccessView(hdr.Get(), nullptr,
+                            &uavDesc, uavTable.CpuAt(0));
+
+                        ID3D12DescriptorHeap* heaps[] = {
+                            resources.GetDescriptorRing().GetHeap() };
+                        commandList->SetDescriptorHeaps(1, heaps);
+
+                        commandList->SetComputeRootSignature(sceneRoot);
+                        commandList->SetPipelineState(scenePSO);
+                        commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
+                        commandList->SetComputeRootDescriptorTable(1, uavTable.gpu);
+                        commandList->Dispatch((resolution.width + 7) / 8,
+                            (resolution.height + 7) / 8, 1);
+                    });
+            }
+
+            EnhancedPostChainPass::Inputs inputs{};
+            inputs.color = hdrHandle;
+            post.SetInputs(inputs);
+            post.Declare(graph, frameContext);
+
+            const RGHandle output = post.GetOutput();
+            if (!output.IsValid()) return false;
+
+            graph.AddPass("PostChain.ScaleKeepAlive",
+                { { output, RGResourceState::CopySource } },
+                [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                {
+                    D3D12_TEXTURE_COPY_LOCATION src{};
+                    src.pResource = executeContext.Resolve(output);
+                    src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                    D3D12_TEXTURE_COPY_LOCATION dst{};
+                    dst.pResource = keepAlive.Get();
+                    dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    dst.PlacedFootprint.Footprint.Format =
+                        EnhancedPostChainPass::kLDRFormat;
+                    dst.PlacedFootprint.Footprint.Width = 8;
+                    dst.PlacedFootprint.Footprint.Height = 1;
+                    dst.PlacedFootprint.Footprint.Depth = 1;
+                    dst.PlacedFootprint.Footprint.RowPitch =
+                        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+
+                    D3D12_BOX box{};
+                    box.right = 8;
+                    box.bottom = 1;
+                    box.back = 1;
+                    executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
+                }, true);
+
+            if (!graph.Compile(resources.GetDevice(), error)) return false;
+            if (!graph.Execute(resources.GetCommandList(), error)) return false;
+
+            profiler.ResolveFrame(resources.GetCommandList());
+
+            if (!resources.EndFrame(error)) return false;
+            resources.WaitForGpu();
+            sceneFilled = true;
+
+            std::vector<DX12GpuProfiler::PassTiming> timings;
+            std::string collectError;
+            if (!profiler.Collect(timings, collectError)) return false;
+
+            // 합친 쪽은 Uber 하나, 나눈 쪽은 Ref로 시작하는 넷의 합이다.
+            for (const auto& timing : timings)
+            {
+                if (timing.name.find("PostChain.Uber") != std::string::npos ||
+                    timing.name.find("PostChain.Ref") != std::string::npos)
+                {
+                    outMs += timing.milliseconds;
+                }
+            }
+            return true;
+        };
+
+        std::vector<double> uberSamples;
+        std::vector<double> separateSamples;
+
+        for (uint32_t i = 0; i < kPostWarmupFrames + kPostMeasureFrames; ++i)
+        {
+            double uberMs = 0.0;
+            double separateMs = 0.0;
+
+            if (!renderFrame(false, uberMs) || !renderFrame(true, separateMs))
+            {
+                outLog += "프레임 실패: " + error + "\n";
+                passed = false;
+                break;
+            }
+            if (i >= kPostWarmupFrames)
+            {
+                uberSamples.push_back(uberMs);
+                separateSamples.push_back(separateMs);
+            }
+        }
+
+        std::string validation;
+        const uint32_t problems = resources.DrainDebugMessages(validation);
+        if (0 != problems)
+        {
+            passed = false;
+            outLog += "검증 레이어 문제 " + std::to_string(problems) + "건\n" + validation;
+        }
+
+        if (passed)
+        {
+            Point point{};
+            point.width = resolution.width;
+            point.height = resolution.height;
+            point.uberMs = PostMedian(uberSamples);
+            point.separateMs = PostMedian(separateSamples);
+            points.push_back(point);
+
+            char line[224]{};
+            std::snprintf(line, sizeof(line),
+                "  %4ux%-4u — 합친 것 %6.3f ms · 나눈 것(4패스) %6.3f ms · %4.2f배\n",
+                point.width, point.height, point.uberMs, point.separateMs,
+                (point.uberMs > 1e-6) ? (point.separateMs / point.uberMs) : 0.0);
+            outLog += line;
+        }
+
+        post.Shutdown();
+        profiler.Shutdown();
+        rootSignatures.Shutdown();
+        psoManager.Shutdown();
+        resources.Shutdown();
+    }
+
+    // ── 측정이 뜻이 있었는지 ──
+    //
+    // 0을 맨 앞에서 잡는다. 아무것도 안 돈 것이 '빠른 것'으로 읽히는 것이
+    // 이 부류의 검증에서 가장 위험한 실패다(SSAO 스케일에서 실제로 겪었고,
+    // 그때는 '해상도에 반응하는가'만 봐서 0 대 0이 그대로 통과했다).
+    if (passed)
+    {
+        for (const Point& point : points)
+        {
+            if (point.uberMs < 1e-6 || point.separateMs < 1e-6)
+            {
+                outLog += "측정값이 0이다 — 패스가 걷어내졌거나 타임스탬프가 "
+                          "안 붙었다\n";
+                passed = false;
+                break;
+            }
+        }
+    }
+
+    if (passed && points.size() >= 2)
+    {
+        const double first = points.front().separateMs;
+        const double last = points.back().separateMs;
+        if (last < first * 2.0)
+        {
+            outLog += "참조 경로가 해상도에 반응하지 않는다 — 측정이 잡음에 묻혔다\n";
+            passed = false;
+        }
+    }
+
+    outLog += passed ? "포스트 체인 시간 비교 완료\n" : "포스트 체인 시간 비교 실패\n";
+    return passed;
+}
+
+#endif

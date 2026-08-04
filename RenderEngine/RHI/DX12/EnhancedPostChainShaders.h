@@ -283,15 +283,16 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     }
 
     // ② 톤맵
+    //
+    // 톤맵을 안 하는 경우에 saturate를 걸지 않는다. 참조 경로(단계를 나눠
+    // 도는 옛 방식)에서는 블룸 합성 결과가 아직 HDR인 채로 다음 단계에
+    // 넘어가야 하는데, 여기서 잘라 버리면 그 뒤의 톤맵이 볼 것이 없다.
+    // 최종 목적지가 UNORM이면 그쪽이 알아서 클램프한다.
     if (0 != (gFlags & kFlagToneMap))
     {
         color = (0 != (gFlags & kFlagAgX))
             ? ToneMapAgX(color * gExposure)
             : ToneMapACES(color * gExposure);
-    }
-    else
-    {
-        color = saturate(color);
     }
 
     // ③ 비네트 — 화면 중심에서 멀수록 어둡게.
@@ -312,7 +313,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         color = saturate((color - 0.5f) * gContrast + 0.5f);
     }
 
-    gOutput[id.xy] = float4(saturate(color), 1.0f);
+    gOutput[id.xy] = float4(color, 1.0f);
 }
 )";
 
