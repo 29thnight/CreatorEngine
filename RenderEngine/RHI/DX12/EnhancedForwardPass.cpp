@@ -20,7 +20,9 @@
 //   [v] 4. 참조 경로(전 광원 루프)와 픽셀 대조 — EnhancedForwardShadeTest.cpp
 //   [v] 5. 광원 수 스케일링 실측 — EnhancedForwardScaleTest.cpp
 //
-// 다섯 단계가 다 섰다. 남은 것은 실제 씬(dx12.scene) 연결이다.
+// 다섯 단계가 다 섰고 실제 씬(dx12.scene)에도 붙었다. 씬에서의 실측:
+//   불투명만  — 컬링 0.0031 ms · 셰이딩 생략(포워드 큐 비어 있음)
+//   투명 4건  — 컬링 0.0031 ms · 셰이딩 0.184 ms
 
 namespace
 {
@@ -525,7 +527,11 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         shadeDesc.psSize = psBlob->GetBufferSize();
         shadeDesc.rootSignature = shadeRoot.signature;
         shadeDesc.rootSignatureId = shadeRoot.id;
-        shadeDesc.depthEnable = false;   // 포워드 검증은 깊이 없이 색만 본다
+        // 깊이 테스트를 켠다. 포워드 물체는 이미 그려진 불투명 기하 뒤에
+        // 있으면 가려져야 한다 — 끄면 벽 뒤 물체가 비쳐 보이는데, 그것은
+        // 화면을 봐야만 알 수 있고 수치 검증에는 안 잡히는 부류다.
+        shadeDesc.depthEnable = true;
+        shadeDesc.dsvFormat = kDepthFormat;
         shadeDesc.cullMode = D3D12_CULL_MODE_NONE;
         shadeDesc.numRenderTargets = 1;
         shadeDesc.rtvFormats[0] = kOutputFormat;
@@ -542,6 +548,17 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     if (FAILED(rtvHr))
     {
         outError = "Forward+ RTV 힙 생성 실패: " + FwdHrToString(rtvHr);
+        return false;
+    }
+
+    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
+    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+    dsvHeapDesc.NumDescriptors = 1;
+    const HRESULT dsvHr = context.resources->GetDevice()->CreateDescriptorHeap(
+        &dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap));
+    if (FAILED(dsvHr))
+    {
+        outError = "Forward+ DSV 힙 생성 실패: " + FwdHrToString(dsvHr);
         return false;
     }
 
@@ -720,7 +737,17 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         // 없으므로 둘 다 뿌리다. 후처리가 붙으면 셰이딩만 남기고 뗀다.
         true);
 
-    if (nullptr == m_shadePSO || nullptr == m_rtvHeap) return;
+    // 그릴 포워드 물체가 없으면 셰이딩을 선언하지 않는다.
+    //
+    // 빈 패스를 도는 낭비를 아끼는 것이 아니라, 선언 자체가 깊이를 DepthWrite로
+    // 요구하기 때문이다 — 깊이 텍스처가 DSV로 만들어지지 않은 경로(컬링만 쓰는
+    // 자가 검증 등)에서는 그 요구가 곧 검증 레이어 오류이자 디바이스 제거다.
+    // 실제로 컬링 검증이 이것으로 죽었다.
+    if (nullptr == m_shadePSO || nullptr == m_rtvHeap || nullptr == m_dsvHeap ||
+        nullptr == context.forwardDraws || context.forwardDraws->empty())
+    {
+        return;
+    }
 
     // ── 포워드 셰이딩 ──
     //
@@ -735,7 +762,8 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     m_output = graph.CreateTexture(outputDesc);
 
     graph.AddPass("Forward+.Shade",
-        { { m_output, RGResourceState::RenderTarget } },
+        { { m_output, RGResourceState::RenderTarget },
+          { m_inputs.depth, RGResourceState::DepthWrite } },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
@@ -752,13 +780,22 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
             device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtvHandle);
 
+            // 깊이는 GBuffer가 채운 것을 그대로 쓴다. 지우지 않는다 —
+            // 지우면 이미 그려진 불투명 기하가 포워드 물체를 가리지 못한다.
+            const auto dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+            dsvDesc.Format = kDepthFormat;
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+            device->CreateDepthStencilView(
+                executeContext.Resolve(m_inputs.depth), &dsvDesc, dsvHandle);
+
             const D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(context.width), static_cast<float>(context.height), 0.f, 1.f };
             const D3D12_RECT scissor{ 0, 0,
                 static_cast<LONG>(context.width), static_cast<LONG>(context.height) };
             commandList->RSSetViewports(1, &viewport);
             commandList->RSSetScissorRects(1, &scissor);
-            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+            commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
             constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
             commandList->ClearRenderTargetView(rtvHandle, kZero, 0, nullptr);
@@ -800,7 +837,8 @@ void EnhancedForwardPass::TransitionTileBuffers(ID3D12GraphicsCommandList* comma
 bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
     const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount)
 {
-    if (nullptr == pso || nullptr == context.draws || context.draws->empty()) return false;
+    if (nullptr == pso || nullptr == context.forwardDraws ||
+        context.forwardDraws->empty()) return false;
 
     auto& uploadRing = context.resources->GetUploadRing();
 
@@ -818,7 +856,7 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
 
     // 인스턴스는 한 번에 올리고 드로우마다 주소만 옮긴다. 루트 SRV는 주소를
     // 받으므로 드로우별 재업로드가 필요 없다.
-    const size_t drawCount = context.draws->size();
+    const size_t drawCount = context.forwardDraws->size();
     const auto instanceUpload = uploadRing.Allocate(
         drawCount * sizeof(ShadeInstance), sizeof(ShadeInstance));
     if (!instanceUpload.IsValid()) return false;
@@ -826,7 +864,7 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
     auto* instances = static_cast<ShadeInstance*>(instanceUpload.cpuAddress);
     for (size_t i = 0; i < drawCount; ++i)
     {
-        const EnhancedDrawItem& draw = (*context.draws)[i];
+        const EnhancedDrawItem& draw = (*context.forwardDraws)[i];
         instances[i].world = XMMatrixTranspose(draw.worldMatrix);
         instances[i].baseColor = Mathf::Vector4{ draw.baseColorFactor.x,
             draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
@@ -861,7 +899,7 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
     bool drewAnything = false;
     for (size_t i = 0; i < drawCount; ++i)
     {
-        const EnhancedDrawItem& draw = (*context.draws)[i];
+        const EnhancedDrawItem& draw = (*context.forwardDraws)[i];
         if (nullptr == draw.mesh || nullptr == context.meshCache) continue;
 
         std::string uploadError;
@@ -891,6 +929,7 @@ void EnhancedForwardPass::Shutdown()
     m_lastOverflowTiles = 0;
 
     m_rtvHeap.Reset();
+    m_dsvHeap.Reset();
 
     m_cullPSO = nullptr;
     m_shadePSO = nullptr;

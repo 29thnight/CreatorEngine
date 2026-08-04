@@ -53,6 +53,21 @@ namespace
 {
     constexpr uint32_t kShadeWidth = 128;
     constexpr uint32_t kShadeHeight = 128;
+    // ★ 깊이 평면을 판보다 아주 조금 뒤에 둔다.
+    //
+    // 셰이딩이 깊이 테스트를 하게 되면서 필요해진 조정이다. 둘이 같은 자리면
+    // LESS 테스트가 판을 떨어뜨려 아무것도 안 그려지고, 그 실패는
+    // '화면이 검다'로만 드러난다.
+    //
+    // 처음에는 판을 앞으로 당겼는데(0.25 → 0.245) 그러면 광원 배치까지 같이
+    // 움직여 '타일당 정확히 9개'라는 기하 예측이 깨진다(실제로 10.56이 나왔다).
+    // 예측 가능한 배치가 이 검증의 값어치이므로, 판을 두고 깊이 평면을
+    // 뒤로 옮기는 쪽으로 고쳤다:
+    //
+    //   판 뷰 z 0.25   → 깊이 0.6006
+    //   깊이 평면 0.605 → 뷰 z 0.2528  (판보다 뒤 → LESS 통과)
+    //   광원 z 범위 0.14~0.26이 0.2528을 포함 → 컬링의 깊이 검사도 통과
+    constexpr float    kSurfaceDepth = 0.605f;
     constexpr float    kSurfaceViewZ = 0.25f;
     constexpr float    kSurfaceHalf = 0.25f;
     constexpr uint32_t kTileTotal =
@@ -190,7 +205,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     frameContext.width = kShadeWidth;
     frameContext.height = kShadeHeight;
     frameContext.camera = &camera;
-    frameContext.draws = &draws;
+    frameContext.forwardDraws = &draws;
     frameContext.lights = &lights;
 
     EnhancedForwardPass forward;
@@ -203,7 +218,13 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     outLog += "[1/4] 셰이딩 VS/PS·참조 경로 PSO 생성 통과\n";
 
     // ── 깊이 평면 ──
-    ComPtr<ID3D12Resource> depth;
+    //
+    // GBuffer가 채운 깊이를 흉내 낸다. 예전에는 업로드 링에서 R32_FLOAT
+    // 텍스처로 복사해 넣었는데, 셰이딩이 깊이 테스트를 하게 되면서 DSV가
+    // 필요해져 실제 프레임과 같은 방식(D32_FLOAT + 클리어)으로 바꿨다.
+    // 코드도 짧아졌다 — 상수 하나로 채우는 일에 업로드 복사는 과했다.
+    ComPtr<ID3D12Resource>       depth;
+    ComPtr<ID3D12DescriptorHeap> depthDsvHeap;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -214,19 +235,49 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         depthDesc.Height = kShadeHeight;
         depthDesc.DepthOrArraySize = 1;
         depthDesc.MipLevels = 1;
-        depthDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        depthDesc.Format = EnhancedForwardPass::kDepthFormat;
         depthDesc.SampleDesc.Count = 1;
+        depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format = EnhancedForwardPass::kDepthFormat;
+        clearValue.DepthStencil.Depth = kSurfaceDepth;
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
-            D3D12_HEAP_FLAG_NONE, &depthDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&depth))))
+            D3D12_HEAP_FLAG_NONE, &depthDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &clearValue, IID_PPV_ARGS(&depth))))
         {
             outLog += "[2/4] 깊이 생성 실패\n";
             forward.Shutdown();
             resources.Shutdown();
             return false;
         }
+
+        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
+        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        dsvHeapDesc.NumDescriptors = 1;
+        if (FAILED(resources.GetDevice()->CreateDescriptorHeap(
+            &dsvHeapDesc, IID_PPV_ARGS(&depthDsvHeap))))
+        {
+            outLog += "[2/4] 깊이 DSV 힙 생성 실패\n";
+            forward.Shutdown();
+            resources.Shutdown();
+            return false;
+        }
     }
+
+    // 프레임마다 다시 채운다. 셰이딩이 자기 기하의 깊이를 쓰므로, 안 지우면
+    // 두 번째 경로가 첫 번째가 남긴 깊이에서 출발해 대조가 뜻을 잃는다.
+    const auto fillDepth = [&]()
+    {
+        const auto dsv = depthDsvHeap->GetCPUDescriptorHandleForHeapStart();
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+        dsvDesc.Format = EnhancedForwardPass::kDepthFormat;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        resources.GetDevice()->CreateDepthStencilView(depth.Get(), &dsvDesc, dsv);
+        resources.GetCommandList()->ClearDepthStencilView(
+            dsv, D3D12_CLEAR_FLAG_DEPTH, kSurfaceDepth, 0, 0, nullptr);
+    };
 
     // ── 두 경로를 한 번씩 그려 픽셀을 모은다 ──
     constexpr uint32_t kPixelCount = kShadeWidth * kShadeHeight;
@@ -237,7 +288,6 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
     std::vector<float> pixels[2];
     std::vector<uint32_t> tileCounts;
     bool passed = true;
-    bool depthFilled = false;
 
     for (uint32_t pass = 0; pass < 2 && passed; ++pass)
     {
@@ -251,55 +301,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
             break;
         }
 
-        // 깊이는 첫 프레임에만 채운다. 두 번째 프레임에는 이미 SRV 상태다.
-        if (!depthFilled)
-        {
-            const uint32_t rowPitch =
-                ((kShadeWidth * 4u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
-                & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
-            const auto upload = resources.GetUploadRing().Allocate(
-                static_cast<uint64_t>(rowPitch) * kShadeHeight, 512);
-            if (!upload.IsValid())
-            {
-                outLog += "[2/4] 깊이 업로드 할당 실패\n";
-                passed = false;
-            }
-            else
-            {
-                for (uint32_t y = 0; y < kShadeHeight; ++y)
-                {
-                    auto* row = reinterpret_cast<float*>(
-                        static_cast<uint8_t*>(upload.cpuAddress)
-                        + static_cast<size_t>(y) * rowPitch);
-                    for (uint32_t x = 0; x < kShadeWidth; ++x) row[x] = 0.6f;
-                }
-
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = depth.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = upload.resource;
-                src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                src.PlacedFootprint.Offset = upload.offset;
-                src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
-                src.PlacedFootprint.Footprint.Width = kShadeWidth;
-                src.PlacedFootprint.Footprint.Height = kShadeHeight;
-                src.PlacedFootprint.Footprint.Depth = 1;
-                src.PlacedFootprint.Footprint.RowPitch = rowPitch;
-
-                resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-
-                D3D12_RESOURCE_BARRIER toSrv{};
-                toSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                toSrv.Transition.pResource = depth.Get();
-                toSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-                toSrv.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                toSrv.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                resources.GetCommandList()->ResourceBarrier(1, &toSrv);
-                depthFilled = true;
-            }
-        }
+        fillDepth();
 
         if (passed && !forward.PrepareFrame(frameContext, error))
         {
@@ -350,7 +352,7 @@ bool EnhancedSceneRenderer::RunForwardPlusShadeTest(std::string& outLog)
         {
             EnhancedForwardPass::Inputs inputs{};
             inputs.depth = graph.ImportTexture(depth.Get(),
-                RGResourceState::ShaderResource, "Fwd.ShadeDepth");
+                RGResourceState::DepthWrite, "Fwd.ShadeDepth");
             forward.SetInputs(inputs);
 
             forward.Declare(graph, frameContext);

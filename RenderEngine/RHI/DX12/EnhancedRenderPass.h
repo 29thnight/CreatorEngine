@@ -115,7 +115,17 @@ struct EnhancedFrameContext
     const FrameCameraSnapshot* camera{ nullptr };
 
     // 이 프레임에 그릴 것들. 비어 있으면 패스는 클리어만 한다.
+    //
+    // draws는 불투명(deferred) 큐다 — GBuffer가 그린다.
     const std::vector<EnhancedDrawItem>* draws{ nullptr };
+
+    // 포워드 큐. Forward+가 그린다.
+    //
+    // draws와 나누는 이유는 두 큐가 서로 다른 파이프라인을 타기 때문이다.
+    // 하나로 합쳐 두면 GBuffer가 포워드 물체까지 GBuffer에 기록하거나
+    // Forward+가 이미 deferred로 그려진 것을 한 번 더 그리게 되는데,
+    // 둘 다 '그림이 조금 이상하다'로만 드러나 원인을 찾기 어렵다.
+    const std::vector<EnhancedDrawItem>* forwardDraws{ nullptr };
 
     // 이 프레임의 광원. 씬의 Light를 그대로 들지 않고 셰이더가 쓰는 형태로
     // 복사해 온다 — 메시·재질과 같은 이유다.

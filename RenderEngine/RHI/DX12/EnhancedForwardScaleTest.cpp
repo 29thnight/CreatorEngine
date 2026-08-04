@@ -39,6 +39,10 @@ namespace
 {
     constexpr uint32_t kScaleWidth = 1280;
     constexpr uint32_t kScaleHeight = 720;
+    // 깊이 평면을 판보다 아주 조금 뒤에 둔다(뷰 z 0.2528 대 0.25). 같은 자리면
+    // LESS 깊이 테스트가 판을 떨어뜨려 아무것도 안 그려지고, 그러면 셰이딩
+    // 시간이 0에 가까워져 측정이 통째로 거짓이 된다.
+    constexpr float    kScaleSurfaceDepth = 0.605f;
     constexpr float    kScaleSurfaceZ = 0.25f;
 
     // 워밍업 + 측정. 측정 프레임은 홀수로 둬서 중앙값이 실제 표본이 되게 한다.
@@ -170,7 +174,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     frameContext.width = kScaleWidth;
     frameContext.height = kScaleHeight;
     frameContext.camera = &camera;
-    frameContext.draws = &draws;
+    frameContext.forwardDraws = &draws;
     frameContext.lights = &lights;
 
     EnhancedForwardPass forward;
@@ -182,7 +186,11 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     }
 
     // ── 깊이 평면 ──
-    ComPtr<ID3D12Resource> depth;
+    //
+    // 셰이딩이 깊이 테스트를 하므로 D32_FLOAT + DSV로 만든다(실제 프레임과
+    // 같은 방식). 예전의 업로드 복사는 DSV를 만들 수 없어 못 쓴다.
+    ComPtr<ID3D12Resource>       depth;
+    ComPtr<ID3D12DescriptorHeap> depthDsvHeap;
     {
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -193,14 +201,31 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         depthDesc.Height = kScaleHeight;
         depthDesc.DepthOrArraySize = 1;
         depthDesc.MipLevels = 1;
-        depthDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        depthDesc.Format = EnhancedForwardPass::kDepthFormat;
         depthDesc.SampleDesc.Count = 1;
+        depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearValue{};
+        clearValue.Format = EnhancedForwardPass::kDepthFormat;
+        clearValue.DepthStencil.Depth = kScaleSurfaceDepth;
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
-            D3D12_HEAP_FLAG_NONE, &depthDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&depth))))
+            D3D12_HEAP_FLAG_NONE, &depthDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &clearValue, IID_PPV_ARGS(&depth))))
         {
             outLog += "깊이 생성 실패\n";
+            forward.Shutdown();
+            resources.Shutdown();
+            return false;
+        }
+
+        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
+        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        dsvHeapDesc.NumDescriptors = 1;
+        if (FAILED(resources.GetDevice()->CreateDescriptorHeap(
+            &dsvHeapDesc, IID_PPV_ARGS(&depthDsvHeap))))
+        {
+            outLog += "깊이 DSV 힙 생성 실패\n";
             forward.Shutdown();
             resources.Shutdown();
             return false;
@@ -208,7 +233,6 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
     }
 
     bool passed = true;
-    bool depthFilled = false;
     uint32_t frameIndex = 0;
 
     // 한 프레임을 그리고 패스별 GPU 시간을 돌려준다. 두 경로가 이 함수
@@ -224,47 +248,16 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         profiler.BeginFrame(frameIndex % DX12DeviceResources::kFrameCount);
         ++frameIndex;
 
-        if (!depthFilled)
+        // 프레임마다 다시 채운다. 셰이딩이 자기 기하의 깊이를 쓰므로,
+        // 안 지우면 다음 프레임의 컬링이 이전 프레임 기하의 깊이를 본다.
         {
-            const uint32_t rowPitch =
-                ((kScaleWidth * 4u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
-                & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
-            const auto upload = resources.GetUploadRing().Allocate(
-                static_cast<uint64_t>(rowPitch) * kScaleHeight, 512);
-            if (!upload.IsValid()) return false;
-
-            for (uint32_t y = 0; y < kScaleHeight; ++y)
-            {
-                auto* row = reinterpret_cast<float*>(
-                    static_cast<uint8_t*>(upload.cpuAddress)
-                    + static_cast<size_t>(y) * rowPitch);
-                for (uint32_t x = 0; x < kScaleWidth; ++x) row[x] = 0.6f;
-            }
-
-            D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = depth.Get();
-            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-            D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = upload.resource;
-            src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            src.PlacedFootprint.Offset = upload.offset;
-            src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
-            src.PlacedFootprint.Footprint.Width = kScaleWidth;
-            src.PlacedFootprint.Footprint.Height = kScaleHeight;
-            src.PlacedFootprint.Footprint.Depth = 1;
-            src.PlacedFootprint.Footprint.RowPitch = rowPitch;
-
-            resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-
-            D3D12_RESOURCE_BARRIER toSrv{};
-            toSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            toSrv.Transition.pResource = depth.Get();
-            toSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-            toSrv.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            toSrv.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            resources.GetCommandList()->ResourceBarrier(1, &toSrv);
-            depthFilled = true;
+            const auto dsv = depthDsvHeap->GetCPUDescriptorHandleForHeapStart();
+            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+            dsvDesc.Format = EnhancedForwardPass::kDepthFormat;
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+            resources.GetDevice()->CreateDepthStencilView(depth.Get(), &dsvDesc, dsv);
+            resources.GetCommandList()->ClearDepthStencilView(
+                dsv, D3D12_CLEAR_FLAG_DEPTH, kScaleSurfaceDepth, 0, 0, nullptr);
         }
 
         if (!forward.PrepareFrame(frameContext, error)) return false;
@@ -274,7 +267,7 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
 
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::ShaderResource, "Fwd.ScaleDepth");
+            RGResourceState::DepthWrite, "Fwd.ScaleDepth");
         forward.SetInputs(inputs);
 
         forward.Declare(graph, frameContext);
@@ -355,12 +348,19 @@ bool EnhancedSceneRenderer::RunForwardPlusScaleTest(std::string& outLog)
         EnhancedRenderGraph graph;
         EnhancedForwardPass::Inputs inputs{};
         inputs.depth = graph.ImportTexture(depth.Get(),
-            RGResourceState::ShaderResource, "Fwd.ScaleDepth");
+            RGResourceState::DepthWrite, "Fwd.ScaleDepth");
         forward.SetInputs(inputs);
         forward.Declare(graph, frameContext);
 
-        graph.AddPass("Fwd.ScaleTileReadback",
-            { { inputs.depth, RGResourceState::ShaderResource } },
+        // ★ 사용을 선언하지 않는다.
+        //
+        // 처음에는 깊이를 ShaderResource로 걸어 뒀는데, 그러면 그래프의 마지막
+        // 상태가 셰이딩의 DepthWrite가 아니라 이 패스의 PSR이 되고, 다음
+        // 프레임의 ClearDepthStencilView가 PSR 상태의 텍스처를 지우려 들어
+        // 검증 레이어가 운다. 이 패스가 정말 읽는 것은 타일 버퍼뿐이고 그것은
+        // 그래프 밖 리소스라, 걸 사용이 애초에 없다 — 순서는 뿌리 표시와
+        // 선언 순서가 지킨다.
+        graph.AddPass("Fwd.ScaleTileReadback", {},
             [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 auto* commandList = executeContext.commandList;

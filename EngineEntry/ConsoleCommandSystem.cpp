@@ -30,6 +30,8 @@
 #include <cstdio>
 #include <fstream>
 #include <functional>
+#include "../ScriptBinder/MeshRenderer.h"
+#include "../RenderEngine/Material.h"
 #include <unordered_set>
 #include <iostream>
 #include <sstream>
@@ -618,6 +620,75 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             euler.x, euler.y, euler.z, scale.x, scale.y, scale.z);
         Debug->LogWarning(message);
         std::printf("%s\n", message);
+    }
+    else if (cmd == "render.matmode")
+    {
+        // render.matmode <오브젝트> <opaque|transparent>
+        //
+        // 재질의 렌더링 모드를 바꾼다. 이것이 프록시가 deferred 큐로 가느냐
+        // forward 큐로 가느냐를 정한다(RenderPassData가 이 값 하나로 나눈다).
+        //
+        // 전용 명령을 만든 이유: object.property는 컴포넌트의 반사 필드를
+        // 설정하는데, m_renderingMode는 컴포넌트가 아니라 그 아래 Material의
+        // 필드라 경로가 닿지 않는다. 그리고 이 값 없이는 Forward+ 경로를
+        // 실제 씬에서 한 번도 실행해 볼 수 없다 — 씬에 투명 재질이 없으면
+        // forward 큐가 늘 비고, 그러면 '되는지 안 되는지 모르는' 상태가 된다.
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: render.matmode <오브젝트> <opaque|transparent>\n");
+            return;
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        auto object = scene->GetGameObject(parts[1]);
+        if (!object)
+        {
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
+            return;
+        }
+
+        const bool transparent = ("transparent" == parts[2]);
+        if (!transparent && "opaque" != parts[2])
+        {
+            std::printf("[CLI] 모드는 opaque 또는 transparent여야 한다: %s\n",
+                parts[2].c_str());
+            return;
+        }
+
+        // 자식까지 훑는다. 모델 하나가 메시 여러 개로 들어오는 것이 보통이라
+        // 루트만 바꾸면 큐가 그대로 비어 있고, 그건 '명령이 안 먹었다'와
+        // 구분되지 않는다.
+        //
+        // ★ 재질은 모델 단위로 공유된다. 같은 모델을 두 번 배치한 뒤 하나만
+        //   바꾸려 해도 둘 다 바뀐다 — Material 객체가 하나이기 때문이다.
+        //   '불투명 하나 + 투명 하나' 배치를 만들려다 이것으로 한 번 헛돌았다.
+        //   그렇게 하려면 재질 복제가 먼저 필요하고, 그건 이 명령의 몫이 아니다.
+        uint32_t changed = 0;
+        std::function<void(GameObject*)> apply = [&](GameObject* node)
+        {
+            if (nullptr == node) return;
+            for (const auto& component : node->m_components)
+            {
+                auto* renderer = dynamic_cast<MeshRenderer*>(component.get());
+                if (nullptr == renderer || nullptr == renderer->m_Material) continue;
+
+                renderer->m_Material->m_renderingMode = transparent
+                    ? MaterialRenderingMode::Transparent
+                    : MaterialRenderingMode::Opaque;
+                ++changed;
+            }
+            for (auto& child : node->m_childrenIndices)
+            {
+                apply(GameObject::FindIndex(child));
+            }
+        };
+        apply(object.get());
+
+        Debug->LogWarning("[CLI] 렌더링 모드 " + parts[2] + " — 재질 "
+            + std::to_string(changed) + "개");
+        std::printf("[CLI] 렌더링 모드 %s — 재질 %u개\n", parts[2].c_str(), changed);
     }
     else if (cmd == "object.property")
     {

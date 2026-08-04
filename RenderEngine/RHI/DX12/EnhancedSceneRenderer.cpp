@@ -7,6 +7,7 @@
 #include "EnhancedGBufferPass.h"
 #include "EnhancedDeferredPass.h"
 #include "EnhancedSSGIPass.h"
+#include "EnhancedForwardPass.h"
 #include "DX12GpuProfiler.h"
 #include "DX12CommandListPool.h"
 #include "DX12MeshCache.h"
@@ -2186,33 +2187,54 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     // 커맨드 빌드 스레드가 채워 둔 deferred 큐를 그대로 읽는다. 프록시를 넘기지
     // 않고 메시 포인터와 월드 행렬만 복사한다 — 렌더가 게임 자료구조를 들고
     // 다니면 3-2에서 걷어낸 부류가 되살아난다.
-    std::vector<EnhancedDrawItem> draws;
-    uint32_t materialsWithTexture = 0;
-    for (auto* proxy : renderData->m_deferredQueue)
+
+    // 큐 하나를 드로우 목록으로 옮긴다. deferred와 forward가 같은 복사
+    // 규칙을 쓰므로 함수로 뽑았다 — 두 곳에 같은 코드를 두면 한쪽만 고치고
+    // 다른 쪽을 잊는 부류의 버그가 생긴다.
+    const auto copyQueue = [&](const auto& queue, std::vector<EnhancedDrawItem>& out)
     {
-        if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
-
-        EnhancedDrawItem item{};
-        item.mesh = proxy->m_Mesh.get();
-        item.worldMatrix = proxy->m_worldMatrix;
-
-        // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
-        if (auto* material = proxy->m_Material.get())
+        for (auto* proxy : queue)
         {
-            item.baseColor = material->m_pBaseColor;
-            item.normalMap = material->m_pNormal;
-            item.occRoughMetal = material->m_pOccRoughMetal;
-            item.emissive = material->m_pEmissive;
+            if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
 
-            item.baseColorFactor = material->m_materialInfo.m_baseColor;
-            item.metallic = material->m_materialInfo.m_metallic;
-            item.roughness = material->m_materialInfo.m_roughness;
-            item.useNormalMap = (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+            EnhancedDrawItem item{};
+            item.mesh = proxy->m_Mesh.get();
+            item.worldMatrix = proxy->m_worldMatrix;
 
-            if (nullptr != item.baseColor) ++materialsWithTexture;
+            // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
+            if (auto* material = proxy->m_Material.get())
+            {
+                item.baseColor = material->m_pBaseColor;
+                item.normalMap = material->m_pNormal;
+                item.occRoughMetal = material->m_pOccRoughMetal;
+                item.emissive = material->m_pEmissive;
+
+                item.baseColorFactor = material->m_materialInfo.m_baseColor;
+                item.metallic = material->m_materialInfo.m_metallic;
+                item.roughness = material->m_materialInfo.m_roughness;
+                item.useNormalMap =
+                    (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+            }
+
+            out.push_back(item);
         }
+    };
 
-        draws.push_back(item);
+    std::vector<EnhancedDrawItem> draws;
+    std::vector<EnhancedDrawItem> forwardDraws;
+    copyQueue(renderData->m_deferredQueue, draws);
+    copyQueue(renderData->m_forwardQueue, forwardDraws);
+
+    // ★ deferred 큐만 센다.
+    //
+    // 이 수는 GBuffer의 텍스처 업로드 단정이 쓰는 값이다. 두 큐를 합쳐 세면
+    // 씬이 전부 forward로 갔을 때 "baseColor는 4건인데 업로드가 0" 이라는
+    // 오진이 나온다 — GBuffer는 그릴 것이 없었을 뿐이다. 실제로 그렇게 찍혔고,
+    // 그건 두 큐 복사를 한 함수로 묶으면서 카운터까지 딸려 들어간 탓이었다.
+    uint32_t materialsWithTexture = 0;
+    for (const EnhancedDrawItem& item : draws)
+    {
+        if (nullptr != item.baseColor) ++materialsWithTexture;
     }
 
     // 광원도 씬에서 뽑아 셰이더가 쓰는 형태로 복사한다. 엔진의 Light는 감쇠
@@ -2245,6 +2267,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
 
     outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->m_cameraIndex)
         + " · 드로우 후보 " + std::to_string(draws.size())
+        + " · 포워드 " + std::to_string(forwardDraws.size())
         + " · 광원 " + std::to_string(lights.size()) + "\n";
 
     // ── [2/4] DX12 쪽 준비 ──
@@ -2280,6 +2303,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     frameContext.height = kHeight;
     frameContext.camera = &cameraSnapshot;
     frameContext.draws = &draws;
+    frameContext.forwardDraws = &forwardDraws;
     frameContext.lights = &lights;
 
     EnhancedGBufferPass gbuffer;
@@ -2311,6 +2335,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     if (!ssgi.Initialize(frameContext, error))
     {
         outLog += "[2/4] SSGI 초기화 실패: " + error + "\n";
+        return false;
+    }
+
+    EnhancedForwardPass forward;
+    if (!forward.Initialize(frameContext, error))
+    {
+        outLog += "[2/4] Forward+ 초기화 실패: " + error + "\n";
         return false;
     }
 
@@ -2477,6 +2508,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         if (!gbuffer.PrepareFrame(frameContext, outStepError)) return false;
         if (!deferred.PrepareFrame(frameContext, outStepError)) return false;
         if (!ssgi.PrepareFrame(frameContext, outStepError)) return false;
+        if (!forward.PrepareFrame(frameContext, outStepError)) return false;
         outDrawCount = gbuffer.GetLastDrawCount();
 
         EnhancedRenderGraph graph;
@@ -2513,6 +2545,23 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             ssgi.SetInputs(ssgiInputs);
         }
         ssgi.Declare(graph, frameContext);
+
+        // ── Forward+ ──
+        //
+        // 불투명 셰이딩이 끝난 뒤에 온다. 포워드 물체는 GBuffer에 기록되지
+        // 않고 자기 색을 직접 계산하므로 deferred 결과 위에 얹히는 것이 맞고,
+        // 깊이는 GBuffer가 채운 것을 그대로 써서 불투명 기하에 가려진다.
+        //
+        // 컬링은 그 깊이에서 타일 min/max를 뽑는다 — GBuffer가 이미 채웠으므로
+        // 공짜다. 이것이 Forward+를 deferred 뒤에 두는 이유이기도 하다.
+        {
+            EnhancedForwardPass::Inputs forwardInputs{};
+            forwardInputs.depth = outputs.depth;
+            forwardInputs.lighting = ssgi.GetOutput().IsValid()
+                ? ssgi.GetOutput() : deferred.GetOutput();
+            forward.SetInputs(forwardInputs);
+        }
+        forward.Declare(graph, frameContext);
 
         // Deferred 출력도 되읽는다. 광원이 실제로 셰이더에 닿는지는 결과를 봐야
         // 안다 — 재질 때 "업로드 0인데 통과"를 겪었으므로 같은 함정을 막는다.
@@ -2908,6 +2957,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
 
     // 그래프가 GBuffer를 살렸는지. Deferred가 읽으므로 뿌리 표시 없이 살아남아야 한다.
+    // Forward+가 실제 씬에서 무엇을 했는지. 포워드 큐가 비면 셰이딩은
+    // 선언되지 않는 것이 정상이라, 그 사실을 수로 남겨야 "안 도는 것"과
+    // "그릴 것이 없는 것"이 구분된다.
+    outLog += "      Forward+ — 포워드 드로우 " + std::to_string(forwardDraws.size())
+        + " · 셰이딩 " + std::string(forward.GetOutput().IsValid()
+            ? "선언됨" : "생략(포워드 큐 비어 있음)") + "\n";
+
     outLog += "      그래프 — 선언 " + std::to_string(lastGraphStats.passesDeclared)
         + " · 컬링 " + std::to_string(lastGraphStats.passesCulled)
         + " · 실행 " + std::to_string(lastGraphStats.passesExecuted)
@@ -3496,7 +3552,19 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         luminanceNoShadow, luminanceLit, luminanceForced);
     outLog += shadowLine;
 
-    if (!lights.empty() && luminanceLit <= luminanceUnlit + 1e-5)
+    // ★ 그릴 것이 없으면 이 단정은 판정할 수 없다.
+    //
+    // 처음에는 draws를 보지 않고 밝기만 비교했는데, 씬의 재질을 전부 투명으로
+    // 바꿔 보니(전부 forward 큐로 감) "광원이 셰이더에 닿지 않는다"고 나왔다.
+    // 광원은 멀쩡했고 Deferred가 칠할 기하가 하나도 없었을 뿐이다.
+    // 원인을 잘못 지목하는 진단은 없느니만 못하다 — 그 방향으로 몇 시간을
+    // 쓰게 만든다.
+    if (draws.empty())
+    {
+        outLog += "      ※ 불투명 드로우가 없어 라이팅 단정은 판정하지 않았다"
+                  "(씬의 재질이 전부 forward 큐로 갔다)\n";
+    }
+    else if (!lights.empty() && luminanceLit <= luminanceUnlit + 1e-5)
     {
         passed = false;
         verdict = "광원을 " + std::to_string(lights.size())
@@ -3664,8 +3732,16 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     {
         // 씬이 비어 있으면 연결 자체를 확인할 수 없다. 통과로 처리하면
         // '아무것도 안 그렸는데 통과'가 되므로 실패로 알린다.
+        //
+        // 포워드 큐가 차 있는 경우를 따로 적는다. 씬에 물체가 멀쩡히 있는데도
+        // "메시를 배치하라"고 하면 엉뚱한 곳을 보게 된다 — 이 검증이 보는 것은
+        // deferred 경로뿐이라는 사실이 메시지에 들어 있어야 한다.
         passed = false;
-        verdict = "드로우가 0건이다 — 씬에 메시를 배치한 뒤 다시 실행할 것";
+        verdict = forwardDraws.empty()
+            ? "드로우가 0건이다 — 씬에 메시를 배치한 뒤 다시 실행할 것"
+            : ("deferred 드로우가 0건이다(포워드는 "
+                + std::to_string(forwardDraws.size())
+                + "건) — 이 검증은 deferred 경로를 보므로 불투명 재질이 필요하다");
     }
     else if (0 == coveredA)
     {

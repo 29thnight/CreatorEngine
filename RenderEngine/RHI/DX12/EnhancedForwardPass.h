@@ -91,6 +91,10 @@ public:
 
     static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
+    /// GBuffer가 만든 깊이를 그대로 쓴다. 포맷이 어긋나면 PSO 생성은
+    /// 통과하고 실행에서 검증 레이어가 운다.
+    static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+
     const char* GetName() const override { return "Forward+"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
@@ -157,6 +161,7 @@ private:
     // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
     // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 
     uint32_t m_lastCulledLights{ 0 };
     uint32_t m_lastOverflowTiles{ 0 };
