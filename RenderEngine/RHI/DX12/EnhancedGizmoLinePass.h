@@ -72,6 +72,12 @@ public:
         const Mathf::Color4& color);
     void AddWireCircle(const Mathf::Vector3& center, float radius,
         const Mathf::Vector3& up, const Mathf::Color4& color);
+
+    /// 방향광 기즈모 — 9세그먼트 원 + 세그먼트 시작점마다 방향 선(길이
+    /// 반지름x3). DX11 DrawWireCircleAndLines의 이식.
+    void AddWireCircleWithDirectionLines(const Mathf::Vector3& center, float radius,
+        const Mathf::Vector3& up, const Mathf::Vector3& direction,
+        const Mathf::Color4& color);
     void AddWireSphere(const Mathf::Vector3& center, float radius,
         const Mathf::Color4& color);
     void AddWireBox(const Mathf::Matrix& transform, const Mathf::Vector3& extents,

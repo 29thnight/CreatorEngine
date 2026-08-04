@@ -272,6 +272,14 @@ public:
     /// 내부 표본이 핵심이다 — fillMode가 SOLID로 남으면 변 표본은 전부
     /// 통과하면서 내부까지 칠해진다.
     bool RunWireFrameTest(std::string& outLog);
+
+    /// Gizmo 계열 씬 연결 검증 (PHASE 3-6, Gizmo 계열 5차 슬라이스).
+    ///
+    /// 활성 씬의 아이콘 대상·선택 기즈모·콜라이더를 밀봉 복사하고, 그리드 →
+    /// 와이어프레임 → 아이콘 → 라인을 한 그래프에서 같은 타깃으로 이어
+    /// 그린다. transient가 둘(그리드의 색·깊이)뿐인 것이 체인의 증명이다 —
+    /// Inputs를 채워 잇는 것은 이 검증이 처음이다. 에디터 실행 중에만 의미 있다.
+    bool RunGizmoSceneTest(std::string& outLog);
 };
 
 #endif

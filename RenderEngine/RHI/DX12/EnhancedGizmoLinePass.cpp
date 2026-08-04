@@ -113,6 +113,35 @@ void EnhancedGizmoLinePass::AddWireCircle(const Mathf::Vector3& center, float ra
     }
 }
 
+void EnhancedGizmoLinePass::AddWireCircleWithDirectionLines(const Mathf::Vector3& center,
+    float radius, const Mathf::Vector3& up, const Mathf::Vector3& direction,
+    const Mathf::Color4& color)
+{
+    using namespace Mathf;
+    const int segmentCount = 9;
+    const float lineLength = radius * 3.f;
+
+    Vector3 right = XMVector3Normalize(XMVector3Cross(up, Vector3(0, 1, 0)));
+    if (XMVectorGetX(XMVector3LengthSq(right)) < 1e-5f)
+        right = XMVector3Normalize(XMVector3Cross(up, Vector3(1, 0, 0)));
+    const Vector3 forward = XMVector3Normalize(XMVector3Cross(right, up));
+
+    Vector3 dirNormalized = direction;
+    dirNormalized.Normalize();
+
+    for (int i = 0; i < segmentCount; ++i)
+    {
+        const float angle0 = XM_2PI * (i / (float)segmentCount);
+        const float angle1 = XM_2PI * ((i + 1) / (float)segmentCount);
+
+        const Vector3 p0 = center + radius * (cosf(angle0) * right + sinf(angle0) * forward);
+        const Vector3 p1 = center + radius * (cosf(angle1) * right + sinf(angle1) * forward);
+
+        AddLine(p0, p1, color);
+        AddLine(p0, p0 + dirNormalized * lineLength, color);
+    }
+}
+
 void EnhancedGizmoLinePass::AddWireSphere(const Mathf::Vector3& center, float radius,
     const Mathf::Color4& color)
 {
