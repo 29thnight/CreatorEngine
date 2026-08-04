@@ -64,16 +64,28 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 
 void Core::App::Finalize()
 {
+	// ★ 단계마다 즉시 찍는다.
+	//
+	//   종료가 멈추는 자리를 쫓는데 로그가 없으면 어디까지 갔는지조차
+	//   알 수 없다. 함수가 끝나야 찍히는 것은 소용이 없다 —
+	//   dx12.compare 크래시와 씬 로드 행에서 각각 같은 자리를 겪었다.
+	std::printf("[SHUTDOWN] Finalize 진입\n");
+
 	ConsoleCommandSystem::Get().Shutdown();
+	std::printf("[SHUTDOWN] CLI Shutdown 반환\n");
 
 	m_main->Finalize();
+	std::printf("[SHUTDOWN] Dx11Main Finalize 반환\n");
 
 	// 종료 시점에 남아있는 GPU 객체를 로그에 정량 기록한다.
 	// 여기서 잡히는 잔존 객체가 곧 세션 전체의 누수 총량이다.
 	// m_main->Finalize()가 커맨드 빌드/실행 스레드를 정리한 뒤라, 여기서는
 	// 디바이스 자식 객체를 안전하게 순회할 수 있다(런타임 호출은 금지).
 	m_deviceResources->LogLiveObjectCensus("에디터 종료 시점", true);
+	std::printf("[SHUTDOWN] LogLiveObjectCensus 반환\n");
+
 	m_deviceResources->ReportLiveDeviceObjects();
+	std::printf("[SHUTDOWN] Finalize 완료\n");
 }
 
 void Core::App::SetWindow(CoreWindow& coreWindow)

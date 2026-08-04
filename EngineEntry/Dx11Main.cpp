@@ -227,7 +227,11 @@ void DirectX11::Dx11Main::Finalize()
 {
     // 렌더 스레드를 세우기 전에 관리 측을 먼저 정리한다.
     // 스크립트가 들고 있던 핸들이 남아 있으면 이후 파괴 순서가 꼬인다.
+    // ★ 단계마다 즉시 찍는다. 종료가 멈추는 자리를 찾는 데 로그가
+    //   없으면 어디까지 갔는지조차 알 수 없다.
+    std::printf("[SHUTDOWN] ClrHost 진입\n");
     ClrHost::Get().Shutdown();
+    std::printf("[SHUTDOWN] ClrHost 반환\n");
 
     // 렌더 스레드를 먼저 완전히 세운다. 그 다음에야 그들이 만지던 것을 부순다.
     //
@@ -244,6 +248,7 @@ void DirectX11::Dx11Main::Finalize()
     // 배리어에 걸려 있는 스레드를 깨워야 루프 조건을 다시 볼 수 있다.
     // 이게 없으면 아래 대기가 영원히 끝나지 않는다.
     EngineSettingInstance->renderBarrier.Finalize();
+    std::printf("[SHUTDOWN] renderBarrier.Finalize 반환\n");
 
     // 플래그 폴링 대신 실제로 회수한다.
     //
@@ -253,17 +258,34 @@ void DirectX11::Dx11Main::Finalize()
     // 강제 종료된다. (2) 스레드 진입부의 CoInitializeEx가 실패하면 플래그를
     // 켜지 않고 그냥 return해서, 대기가 영원히 끝나지 않았다.
     // join은 둘 다 해결한다 — 스레드가 정말로 끝난 것을 보장한다.
+    std::printf("[SHUTDOWN] CB join 진입(joinable=%d)\n",
+        m_CB_Thread.joinable() ? 1 : 0);
     if (m_CB_Thread.joinable()) m_CB_Thread.join();
+    std::printf("[SHUTDOWN] CB join 반환\n");
+
+    std::printf("[SHUTDOWN] CE join 진입(joinable=%d)\n",
+        m_CE_Thread.joinable() ? 1 : 0);
     if (m_CE_Thread.joinable()) m_CE_Thread.join();
+    std::printf("[SHUTDOWN] CE join 반환\n");
 
     // 여기서부터는 렌더 스레드가 없다. 이제 해체해도 안전하다.
     TagManagers->Finalize();
+    std::printf("[SHUTDOWN] TagManagers 반환\n");
+
 	CullingManagers->Shutdown();
+    std::printf("[SHUTDOWN] CullingManagers 반환\n");
+
     SceneManagers->Decommissioning();
+    std::printf("[SHUTDOWN] SceneManagers 반환\n");
+
     EngineSettingInstance->SaveSettings();
+    std::printf("[SHUTDOWN] SaveSettings 반환\n");
 
     m_sceneRenderer->Finalize();
+    std::printf("[SHUTDOWN] SceneRenderer 반환\n");
+
     ShaderSystem->Finalize();
+    std::printf("[SHUTDOWN] ShaderSystem 반환\n");
     OnResizeReleaseEvent.Clear();
 	OnResizeEvent.Clear();
     m_deviceResources->RegisterDeviceNotify(nullptr);

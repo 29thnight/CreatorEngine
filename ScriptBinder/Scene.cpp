@@ -58,21 +58,40 @@ Scene::Scene()
 
 Scene::~Scene()
 {
+    // ★ 단계마다 즉시 찍는다. 두 번째 씬의 delete에서 종료가 멈추는 것을
+    //   추적 로그로 여기까지 좁혀 왔다.
+    std::printf("[SHUTDOWN] ~Scene 진입(오브젝트 %zu)\n", m_SceneObjects.size());
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
+    std::printf("[SHUTDOWN] ~Scene 이벤트 해제 반환\n");
+    std::printf("[SHUTDOWN] ~Scene AwakeEvent\n");
     AwakeEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnEnableEvent\n");
     OnEnableEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene StartEvent\n");
     StartEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene FixedUpdateEvent\n");
     FixedUpdateEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene InternalPhysicsUpdateEvent\n");
     InternalPhysicsUpdateEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnTriggerEnterEvent\n");
     OnTriggerEnterEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnTriggerStayEvent\n");
     OnTriggerStayEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnTriggerExitEvent\n");
     OnTriggerExitEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnCollisionEnterEvent\n");
     OnCollisionEnterEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnCollisionStayEvent\n");
     OnCollisionStayEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnCollisionExitEvent\n");
     OnCollisionExitEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene UpdateEvent\n");
     UpdateEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene LateUpdateEvent\n");
     LateUpdateEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnDisableEvent\n");
     OnDisableEvent.Clear();
+    std::printf("[SHUTDOWN] ~Scene OnDestroyEvent\n");
     OnDestroyEvent.Clear();
 
     m_gameObjectNameSet.clear();
@@ -86,7 +105,9 @@ Scene::~Scene()
     m_foliageComponents.clear();
     m_decalComponents.clear();
     m_spriteRenderers.clear();
+    std::printf("[SHUTDOWN] ~Scene 컨테이너 정리 완료\n");
     m_SceneObjects.clear();
+    std::printf("[SHUTDOWN] ~Scene 완료\n");
 }
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
