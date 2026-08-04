@@ -287,6 +287,13 @@ public:
     /// 분할 경계를 가로지르는 줄무늬에서 블렌딩 끔/켬의 차이 픽셀 수.
     /// '끈 쪽이 실제로 실패'까지 확인한다 — 켠 쪽만 보면 조건이 약해도 통과한다.
     bool RunShadowQualityTest(std::string& outLog);
+
+    /// 스카이박스 패스 검증 (PHASE 3-6).
+    ///
+    /// 면마다 원색을 깐 합성 큐브맵으로 방향(축 뒤집힘이 원색 차이로
+    /// 드러난다)·전면 커버(z=w x 0.99999 quirk — 깨지면 화면이 통째로
+    /// 빈다)·카메라 반응을 단정한다. IBL 생성 체인은 별도 슬라이스다.
+    bool RunSkyBoxTest(std::string& outLog);
 };
 
 #endif
