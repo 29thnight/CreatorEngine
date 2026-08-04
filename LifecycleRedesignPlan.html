@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreatorEngine 생명주기 재설계 계획 — 델리게이트 프레임 루프의 은퇴</title>
+<style>
+:root {
+  --bg:#0f1218; --surface:#171c26; --surface2:#1e2532; --border:#2b3444;
+  --text:#dde3ec; --dim:#8b95a7; --accent:#4da3ff; --green:#7ee0b8;
+  --warn:#f0b25c; --err:#f07178; --purple:#c8a0ff; --code:#12161f;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:"Segoe UI","Malgun Gothic",sans-serif;line-height:1.7;font-size:15px}
+.container{max-width:1060px;margin:0 auto;padding:0 28px 80px}
+header.hero{padding:56px 0 32px;border-bottom:1px solid var(--border);margin-bottom:40px}
+.eyebrow{color:var(--accent);font-size:13px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;line-height:1.25;margin-bottom:12px}
+h1 span{color:var(--accent)}
+.meta{color:var(--dim);font-size:14px}
+.meta code{font-size:12.5px}
+section{margin-bottom:56px}
+h2.sec{font-size:24px;font-weight:800;padding-bottom:10px;border-bottom:2px solid var(--accent);margin-bottom:20px;display:flex;align-items:baseline;gap:12px}
+h2.sec .no{color:var(--accent);font-size:16px}
+h3{font-size:18px;margin:26px 0 10px;color:var(--green)}
+h4{font-size:15.5px;margin:20px 0 8px}
+p{margin-bottom:12px}
+strong{color:#fff}
+ul,ol{margin:0 0 14px 22px}
+li{margin-bottom:5px}
+code{background:var(--code);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:13px;color:var(--green)}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:16px 18px;overflow-x:auto;margin:14px 0 18px}
+pre code{background:none;border:none;padding:0;color:var(--text);font-size:13px;line-height:1.6}
+table{width:100%;border-collapse:collapse;margin:14px 0 20px;font-size:13.5px}
+th{background:var(--surface2);text-align:left;padding:9px 12px;border:1px solid var(--border);color:#fff;white-space:nowrap}
+td{padding:8px 12px;border:1px solid var(--border);vertical-align:top}
+tr:nth-child(even) td{background:var(--surface)}
+.tag{display:inline-block;border-radius:4px;padding:1px 8px;font-size:12px;font-weight:700;white-space:nowrap}
+.tag.dead{background:#26333f;color:var(--dim)}
+.tag.keep{background:#1d3328;color:var(--green)}
+.tag.risk{background:#3a2326;color:var(--err)}
+.tag.warn{background:#3a3123;color:var(--warn)}
+.tag.p0{background:#3a2326;color:var(--err)}
+.tag.p1{background:#3a3123;color:var(--warn)}
+.tag.p2{background:#1d3328;color:var(--green)}
+.callout{border-left:4px solid var(--accent);background:var(--surface);border-radius:0 8px 8px 0;padding:14px 18px;margin:16px 0}
+.callout.red{border-color:var(--err)}
+.callout.green{border-color:var(--green)}
+.callout.warn{border-color:var(--warn)}
+.callout p:last-child{margin-bottom:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.card h4{margin-top:0;color:var(--accent)}
+.flow{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin:14px 0 18px;font-family:Consolas,monospace;font-size:13px;line-height:1.9;overflow-x:auto;white-space:pre}
+.flow b{color:var(--accent);font-weight:700}
+.flow i{color:var(--dim);font-style:normal}
+.flow em{color:var(--warn);font-style:normal}
+.small{font-size:13px;color:var(--dim)}
+.fileref{font-family:Consolas,monospace;font-size:12.5px;color:var(--purple)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <div class="eyebrow">CreatorEngine · Lifecycle Redesign</div>
+  <h1>생명주기 재설계 계획 — <span>델리게이트 프레임 루프의 은퇴</span></h1>
+  <div class="meta">
+    작성일 2026-08-04 · 전제: 스크립트 전면 C# 전환 완료 (2-10 ~ 2-21 done), C++ 스크립트 경로는 별도 브랜치 보존<br>
+    선행 문서: <code>ScriptApiMigrationPlan.html</code> · <code>RefactoringPlanDashboard.html</code> (PHASE 2/4) · <code>EngineStructureAnalysis.html</code>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">01</span>전제 재정립 — C# 전환 이후의 지형</h2>
+
+<p>이 문서 이전의 위험 평가는 "사용자 스크립트가 네이티브 델리게이트에 직접 구독하는 세계"를 가정했다.
+그 세계는 끝났다. master 기준 실행 주체별 디스패치 경로는 이제 이렇다.</p>
+
+<table>
+<tr><th>실행 주체</th><th>디스패치 경로</th><th>상태</th></tr>
+<tr>
+  <td><strong>사용자 스크립트 (C#)</strong></td>
+  <td><code>ClrHost::TickAwake/TickFixedUpdate/TickUpdate/TickLateUpdate</code> — 틱당 경계 통과 4회 고정, C# 내부 일괄 순회. 물리 콜백도 blittable 구조체로 라우팅 (2-20)</td>
+  <td><span class="tag keep">유지 — 이미 올바른 모델</span></td>
+</tr>
+<tr>
+  <td><strong>엔진 내장 컴포넌트 26종</strong></td>
+  <td><code>RegistableEvent&lt;T&gt;</code> CRTP → <code>Scene</code> 델리게이트 8종에 <code>AddLambda</code>(raw 캡처)</td>
+  <td><span class="tag risk">이 문서의 대상</span></td>
+</tr>
+<tr>
+  <td>C++ 스크립트 (<code>ModuleBehavior</code> + <code>HotLoadSystem</code> + <code>Dynamic_CPP</code>)</td>
+  <td><code>AddShared</code>(weak_ptr) 구독 — master에는 코드가 남아 있으나 실사용 경로 아님</td>
+  <td><span class="tag dead">브랜치 보존 · master 은퇴 대상</span></td>
+</tr>
+<tr>
+  <td>Mono 경로 (<code>MonoManager</code>)</td>
+  <td><code>AwakeEvent.AddLambda</code> 등 — 데드 코드 (대시보드 4-4에서 제거 예정)</td>
+  <td><span class="tag dead">은퇴 대상</span></td>
+</tr>
+<tr>
+  <td>엔진 시스템 이벤트 (<code>sceneLoadedEvent</code>, <code>OnResizeEvent</code>, 렌더 이벤트 등)</td>
+  <td><code>Core::Delegate</code> — 프레임 루프 바깥, 구독자가 진짜로 동적</td>
+  <td><span class="tag keep">유지 — 델리게이트의 정당한 용도</span></td>
+</tr>
+</table>
+
+<div class="callout">
+<p><strong>핵심 관찰:</strong> 델리게이트는 "누가 구독할지 컴파일 타임에 모르는" 상황을 위한 도구다.
+사용자 스크립트가 C#으로 떠난 지금, <strong>프레임 루프(생명주기)에는 모르는 구독자가 없다.</strong>
+구독자는 엔진이 직접 컴파일하는 26종의 고정 집합이고, 이들의 override 분포는 전수 조사 결과 다음과 같다.</p>
+</div>
+
+<table>
+<tr><th>생명주기</th><th>네이티브 override 수 (26종 중)</th><th>해당 컴포넌트</th></tr>
+<tr><td><code>Awake</code></td><td><strong>21</strong></td><td>Collect/UnCollect 등록이 대부분 — 콜라이더 6종, 렌더러류, 라이트 등</td></tr>
+<tr><td><code>OnDestroy</code></td><td><strong>24</strong></td><td>위의 해제 대칭</td></tr>
+<tr><td><code>Update</code></td><td><strong>13</strong></td><td>Animator, Camera, Canvas, Decal, Effect, Foliage, Image, Light, PlayerInput, Sound, SpriteSheet, Text, UIButton</td></tr>
+<tr><td><code>Start</code></td><td>2</td><td>CharacterController, Sound</td></tr>
+<tr><td><code>LateUpdate</code></td><td>2</td><td>CharacterController, Sound</td></tr>
+<tr><td><code>FixedUpdate</code></td><td>1</td><td>CharacterController</td></tr>
+<tr><td><code>OnEnable</code> / <code>OnDisable</code></td><td><strong>0 / 0</strong></td><td>없음 — 매 프레임 브로드캐스트 스캔이 아무 일도 하지 않는다</td></tr>
+</table>
+
+<p class="small">조사 방법: 26종 헤더의 <code>override</code> 선언 전수 grep. <code>ScriptComponent</code>는 설계 의도대로 Awake/OnDestroy만 받는다
+(관리 측 라이프사이클은 ClrHost가 일괄 디스패치 — <span class="fileref">ScriptComponent.h</span> 주석 참조).</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">02</span>위험 재평가 — 무엇이 소멸했고 무엇이 남았나</h2>
+
+<h3>소멸했거나 심각도가 내려간 것</h3>
+<table>
+<tr><th>이전 평가</th><th>재평가</th></tr>
+<tr>
+  <td>"같은 엔진에 안전성이 정반대인 생명주기 체계가 두 벌" (CRTP raw 캡처 vs ModuleBehavior weak_ptr)</td>
+  <td><span class="tag dead">소멸</span> — ModuleBehavior 경로가 브랜치로 이관. master의 실경로는 하나로 수렴</td>
+</tr>
+<tr>
+  <td>CRTP <code>final</code> 상속 함정 — 파생 클래스의 override가 조용히 안 불림</td>
+  <td><span class="tag warn">심각도 하락</span> — 사용자 확장은 C#으로 갔으므로 노출면 축소.
+  단, 엔진 컴포넌트를 파생할 때(<span class="fileref">UIComponent → ImageComponent → 파생</span>) 여전히 함정이므로 구조 교체 시 함께 제거</td>
+</tr>
+<tr>
+  <td>스크립트 수만큼 경계를 넘는 디스패치 비용</td>
+  <td><span class="tag dead">소멸</span> — ClrHost 고정 경계 4회로 이미 해결 (2-10 설계 그대로)</td>
+</tr>
+</table>
+
+<h3>그대로 유효한 것 — 이제 유일한 실경로가 네이티브 26종이므로 오히려 더 선명해졌다</h3>
+<table>
+<tr><th>#</th><th>위험</th><th>근거</th><th>실사고 이력</th></tr>
+<tr>
+  <td><span class="tag p0">R1</span></td>
+  <td><strong>Broadcast 복사-후-호출 UAF 창.</strong> 락 안에서 콜백 벡터를 복사하고 락 밖에서 호출 — 순회 도중 컴포넌트가 파괴되면
+  <code>Remove</code>는 원본만 지우고 로컬 사본은 죽은 <code>this</code>를 호출한다</td>
+  <td class="fileref">Delegate.inl:86–104</td>
+  <td>본 팔레트 UAF(1-1), EffectComponent null 프록시(1-5)와 동족</td>
+</tr>
+<tr>
+  <td><span class="tag p0">R2</span></td>
+  <td><strong>즉시 파괴 — 지연 파괴 부재.</strong> 순회 중 <code>Destroy</code>가 실제 소멸로 이어질 수 있는 구조.
+  유니티(프레임 경계)·언리얼(GC 경계)이 원천 차단하는 그 창구</td>
+  <td class="fileref">Scene.cpp DestroyGameObjects / DestroyComponents</td>
+  <td>씬 중복 등록 더블 delete (커밋 0361b228)</td>
+</tr>
+<tr>
+  <td><span class="tag p1">R3</span></td>
+  <td><strong>재진입 불가 스핀락.</strong> <code>Clear()</code>의 swap 우회는 증상 치료 —
+  콜백 실행 중 같은 델리게이트에 Add/Remove가 재진입하는 다른 조합은 여전히 열려 있다</td>
+  <td class="fileref">Delegate.inl:67–83 (주석 자체가 진단서)</td>
+  <td>종료 행 — <code>Scene::~Scene</code>의 <code>AwakeEvent.Clear()</code> (커밋 c712011f)</td>
+</tr>
+<tr>
+  <td><span class="tag p1">R4</span></td>
+  <td><strong>매 프레임 전체 벡터 복사.</strong> Update/LateUpdate/FixedUpdate 브로드캐스트마다
+  <code>std::function</code> 벡터 통째 복사 + 우선순위 정렬 순서라 타입이 흩어진 순회</td>
+  <td class="fileref">Delegate.inl:88–92</td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><span class="tag p2">R5</span></td>
+  <td><code>isStopped_</code> 락 밖 읽기(형식상 data race), 예외를 <code>std::cout</code> 한 줄로 삼킴</td>
+  <td class="fileref">Delegate.inl:98, 102</td>
+  <td>—</td>
+</tr>
+</table>
+
+<div class="callout red">
+<p><strong>재평가 결론:</strong> 위험의 목록은 줄지 않았다 — <strong>위험의 주인이 바뀌었다.</strong>
+이전에는 "사용자 스크립트가 밟을 지뢰"였다면, 지금은 전부 <strong>엔진 자신이 밟는 지뢰</strong>다
+(씬 전환·종료·프리팹 파괴 때마다). 그리고 주인이 엔진이라는 사실이 해법을 단순하게 만든다:
+동적 구독이 필요 없는 고정 집합이므로, <strong>델리게이트를 고칠 필요 없이 프레임 루프에서 빼면 된다.</strong>
+C# 쪽이 이미 증명한 모델(고정 경계 + 소유 리스트 일괄 순회)을 네이티브에도 똑같이 적용하는 것이다.</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">03</span>목표 구조 — Scene 소유 생명주기 레지스트리</h2>
+
+<p>설계 원칙은 하나다: <strong>"Scene은 이미 답을 알고 있다."</strong>
+<code>CollectMeshRenderer / CollectLightComponent / CollectColliderComponent…</code> — Scene은 렌더·물리 대상에 대해
+이미 "타입별 소유 리스트 + 등록/해제" 패턴을 쓰고 있고, 이 패턴에서는 사고가 나지 않았다.
+생명주기도 같은 패턴으로 옮긴다.</p>
+
+<h3>3.1 구성 요소</h3>
+
+<div class="grid2">
+<div class="card">
+<h4>① Component가 생명주기를 직접 소유</h4>
+<p><code>IRegistableEvent</code>의 가상 훅(Awake~OnDestroy)을 <code>Component</code> 기본 클래스로 흡수.
+유니티 MonoBehaviour 메시지 모델과 동일. CRTP 상속 26곳, <code>enable_shared_from_this</code> 혼합 상속,
+다이아몬드 우회가 전부 사라진다.</p>
+</div>
+<div class="card">
+<h4>② LifecycleMask — 판정은 한 곳에서 1회</h4>
+<p>"이 타입이 Update를 구현했나"는 지금의 <code>if constexpr(&amp;T::Update != …)</code> 트릭을
+<strong>ComponentFactory 등록 지점 한 곳</strong>으로 옮겨 타입당 1회 계산, <code>Meta::Type</code>에 비트마스크로 저장.
+유니티가 리플렉션으로 하는 일을 컴파일 타임에 하는 것. <code>final</code> 함정은 마스크 계산을
+"최종 등록 타입" 기준으로 하므로 소멸.</p>
+</div>
+<div class="card">
+<h4>③ Scene이 단계 리스트를 소유</h4>
+<p><code>m_pendingAwake</code> / <code>m_pendingStart</code> 큐 + <code>m_updateList</code> /
+<code>m_lateUpdateList</code> / <code>m_fixedUpdateList</code>. 원소는 <code>Component*</code>
+(소유는 기존대로 GameObject의 <code>shared_ptr</code>). 등록·해제는 swap-and-pop O(1),
+해제는 <strong>프레임 경계에서만</strong> 일어나므로 순회 중 무효화가 불가능.</p>
+</div>
+<div class="card">
+<h4>④ 지연 파괴 일원화</h4>
+<p><code>Destroy</code>는 마킹만. 프레임 끝 단일 지점에서
+<code>OnDisable → OnDestroy → 리스트 제거 → erase</code>.
+R1·R2가 클래스째 소멸한다 — "순회 중인 것이 죽는" 상황 자체가 표현 불가능해진다.</p>
+</div>
+</div>
+
+<h3>3.2 프레임 시퀀스</h3>
+<div class="flow"><b>┌ 프레임 시작</b>
+│  pendingAwake 큐 소진   <i>→ Awake() 호출, 마스크 보고 update 리스트들에 편입, pendingStart로</i>
+│  pendingStart 큐 소진   <i>→ Start()</i>
+│  <em>ClrHost.TickAwake()</em>                       <i>← C# 신규 스크립트 (기존 유지)</i>
+│
+│  [고정 스텝 루프] FixedUpdate 리스트 순회 → 물리 → <em>ClrHost.TickFixedUpdate()</em>
+│  Update 리스트 순회      → <em>ClrHost.TickUpdate()</em>   → 코루틴
+│  LateUpdate 리스트 순회  → <em>ClrHost.TickLateUpdate()</em>
+│
+│  <b>프레임 끝 — 파괴 지점(유일)</b>
+│  destroyQueue: OnDisable → OnDestroy → 리스트 swap-and-pop → GameObject에서 erase
+<b>└ 렌더 스냅샷</b>
+
+<i>· 순회 중 AddComponent → pendingAwake에 적재, 이번 프레임 순회에 끼어들지 않음 (재진입 안전)</i>
+<i>· 순회 중 Destroy     → 마킹 + destroyQueue 적재, 리스트는 건드리지 않음 (무효화 안전)</i>
+<i>· SetEnabled(bool)    → 상태 전이 시 OnEnable/OnDisable 직접 호출 + update 리스트 편입/이탈</i>
+<i>                        (매 프레임 브로드캐스트 스캔 폐지 — 어차피 네이티브 구현 0곳)</i></div>
+
+<h3>3.3 스레드 규약</h3>
+<p>생명주기 API(<code>AddComponent</code> / <code>Destroy</code> / 리스트 순회)는 <strong>게임 스레드 전용</strong>으로 선언하고
+락을 아예 두지 않는다. ClrHost가 이미 같은 규약이다("관리 코드 호출은 게임 스레드로 한정" — <span class="fileref">ClrHost.h:24</span>).
+크로스 스레드에서 오는 요청(AI future, 로더)은 프레임 시작에 소진하는 커맨드 큐로 받는다.
+스핀락·재진입·데드락 문제는 락을 잘 잡아서가 아니라 <strong>락이 필요 없는 설계로</strong> 푼다.</p>
+
+<h3>3.4 Core::Delegate의 거취</h3>
+<p><strong>삭제하지 않는다.</strong> <code>sceneLoadedEvent</code>, <code>OnResizeEvent</code>, 렌더 이벤트, 에디터 이벤트처럼
+구독자가 진짜로 동적인 곳에서는 올바른 도구다. 다만 <strong>프레임당 N회 도는 뜨거운 경로에서 뺀다.</strong>
+남는 사용처에 대해 R5(경합 읽기, 예외 삼킴)만 소규모 수리한다.</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">04</span>단계별 계획</h2>
+
+<table>
+<tr><th>단계</th><th>내용</th><th>산출물 / 완료 기준</th><th>규모</th></tr>
+<tr>
+  <td><span class="tag p0">L-0</span><br>안전망</td>
+  <td>ASan 빌드 구성(대시보드 0-5와 동일 항목) + CLI 씬 회귀 시나리오(로드→플레이→전환→종료)를 기준선으로 고정.
+  6-6에서 만든 CLI UI 회귀 체계 재사용</td>
+  <td>전환 전/후 동일 시나리오가 크래시·릭 없이 통과하는 기준 로그</td>
+  <td>1일</td>
+</tr>
+<tr>
+  <td><span class="tag p0">L-1</span><br>레지스트리 도입</td>
+  <td><code>Component</code>에 생명주기 가상 훅 흡수 · <code>LifecycleMask</code> 계산을 ComponentFactory 등록부로 이동 ·
+  <code>Scene</code>에 pending 큐 + 단계 리스트 + 프레임 끝 파괴 지점 구현.
+  이 단계에서는 <strong>기존 델리게이트 경로와 병행</strong>(신규 경로는 플래그 뒤에)</td>
+  <td><span class="fileref">Component.h/.cpp, Scene.h/.cpp, ComponentFactory.cpp, GameObject.inl/.cpp</span> ·
+  두 경로 스위치 가능, CLI 시나리오 양쪽 통과</td>
+  <td>3일</td>
+</tr>
+<tr>
+  <td><span class="tag p1">L-2</span><br>26종 전환</td>
+  <td>각 컴포넌트에서 <code>RegistableEvent&lt;T&gt;</code> 상속 제거(선언 한 줄씩 — 기계적).
+  <code>SceneManager</code>의 DDOL 재등록(<span class="fileref">SceneManager.cpp:959</span>)을 레지스트리 이관으로 교체.
+  <code>SetEnabled</code> 전이 시 직접 호출로 OnEnable/OnDisable 이행</td>
+  <td>26개 헤더 + <span class="fileref">SceneManager.cpp</span> · 델리게이트 경로 참조 0건</td>
+  <td>2일</td>
+</tr>
+<tr>
+  <td><span class="tag p1">L-3</span><br>구 경로 철거</td>
+  <td><code>IRegistableEvent.h</code> 삭제 · <code>Scene</code>의 생명주기 델리게이트 8종 제거
+  (<code>OnTrigger/OnCollision</code> 6종은 C# 라우팅(2-20) 확인 후 <code>TargetInvoke</code> 경로와 함께 정리) ·
+  <code>Scene::~Scene</code>의 <code>Clear()</code> 연쇄 소멸 — 종료 행 재발 방지 확인</td>
+  <td>씬 전환 churn 벤치에서 파괴/재등록 비용 비교 리포트 · 종료 시나리오 통과</td>
+  <td>2일</td>
+</tr>
+<tr>
+  <td><span class="tag p2">L-4</span><br>레거시 은퇴</td>
+  <td>master에서 <code>ModuleBehavior</code> + <code>HotLoadSystem</code> + <code>Dynamic_CPP</code> 스크립트 은퇴
+  (브랜치에 보존 완료 전제). 대시보드 4-4(Mono 데드 코드)와 같은 PR 흐름으로 묶어 진행 가능</td>
+  <td>빌드 표면 축소 · <span class="fileref">Dx11Main.cpp</span>의 ScriptManager 배선 제거</td>
+  <td>1.5일</td>
+</tr>
+<tr>
+  <td><span class="tag p2">L-5</span><br>Delegate 위생</td>
+  <td>남는 시스템 이벤트용 Delegate에 한정: <code>isStopped_</code> 락 규약 정리, 예외를 LogSystem으로,
+  <code>Clear()</code> 후 재사용 불가 상태 해소</td>
+  <td><span class="fileref">Delegate.inl</span> 소규모 수리 · 기존 구독처 동작 불변</td>
+  <td>0.5일</td>
+</tr>
+</table>
+
+<div class="callout warn">
+<p><strong>순서에 대한 주석:</strong> L-1을 병행 구조(플래그 스위치)로 두는 이유는 26종을 한 번에 옮기다
+중간 상태에서 빌드가 깨지는 기간을 만들지 않기 위해서다. 렌더러 전환(3-9)과 같은 은퇴 절차 패턴.
+L-4는 독립적이므로 L-1~L-3과 병렬로 진행해도 된다 — 단 브랜치 보존 확인이 선행 조건.</p>
+</div>
+
+<h3>검증 계획</h3>
+<ul>
+  <li><strong>기능 동등성:</strong> L-0의 CLI 시나리오(로드→플레이→전환→종료)가 각 단계 후 동일하게 통과. Awake/Start 호출 순서는 로그 대시보드로 전/후 diff.</li>
+  <li><strong>수명 안전:</strong> ASan 빌드로 씬 churn 반복 — 순회 중 파괴·재진입 케이스를 CLI 명령으로 강제 재현(플레이 중 Destroy 연타, Update 안에서 AddComponent).</li>
+  <li><strong>성능:</strong> <code>scripts/scene_churn_benchmark</code> 기준선 대비 — 기대 효과는 프레임당 벡터 복사 3회 제거 + Update 순회의 타입 지역성.</li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">05</span>하지 않는 것</h2>
+<ul>
+  <li><strong>전면 ECS 전환</strong> — 컴포넌트 26종 고정 집합에 아키타입 스토리지는 과잉. 지금 문제는 데이터 배치가 아니라 수명 규약이다.</li>
+  <li><strong>C# 디스패치 변경</strong> — ClrHost 고정 경계 모델은 이 재설계가 <em>따라가는</em> 기준이지 대상이 아니다.</li>
+  <li><strong>Core::Delegate 전면 재작성</strong> — 프레임 루프에서 빼는 것으로 충분. 시스템 이벤트용으로는 현행 유지 + L-5 위생 수리만.</li>
+  <li><strong>세대(generation) 핸들 도입</strong> — 지연 파괴 + 게임 스레드 규약이 서면 리스트의 raw 포인터는 불변식으로 안전하다.
+  2-6 조사("핸들화는 과잉 설계로 판단해 보류")와 같은 판단. 크로스 스레드 참조가 생기는 시점에 재검토.</li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">06</span>리스크와 롤백</h2>
+<table>
+<tr><th>리스크</th><th>완화</th></tr>
+<tr>
+  <td>숨은 순서 의존 — 현행 우선순위 정렬(priority) 순서에 기대는 컴포넌트가 있을 수 있다</td>
+  <td>L-1에서 호출 순서 로그를 전/후 diff. 순서 의존이 발견되면 리스트를 등록순 유지로 고정하고 해당 의존을 명시적 단계로 승격</td>
+</tr>
+<tr>
+  <td>DDOL 재바인딩 경로(AttachExistingGameObjectHierarchy)의 재등록 누락</td>
+  <td>L-2에서 DDOL 전용 CLI 시나리오 추가 (씬 전환 후 DDOL 오브젝트의 Update 지속 확인)</td>
+</tr>
+<tr>
+  <td>PlayScene 사본 방식(에디터 플레이)과 pending 큐의 상호작용</td>
+  <td>ScriptComponent::SuspendInstance 패턴과 동일하게 — 원본 씬의 리스트는 동결, 사본만 순회</td>
+</tr>
+<tr>
+  <td>중간 상태에서의 회귀</td>
+  <td>L-1 병행 플래그로 즉시 구 경로 복귀 가능. L-3(철거)은 L-2가 CLI 통과한 뒤에만</td>
+</tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 class="sec"><span class="no">07</span>부록 — .NET GC를 엔진 스케줄에 종속시키기</h2>
+
+<p>CoreCLR 도입으로 힙이 두 개가 됐다. 원칙은 본문과 같다:
+<strong>GC에 수명을 맡기지 않는다(세대 핸들 설계 유지). 대신 GC가 도는 시점을 엔진이 쥔다.</strong>
+현재 <span class="fileref">ScriptCore.runtimeconfig.json</span>은 순정 기본값(Workstation + Background GC)이고,
+GC를 의도적으로 쓰는 곳은 핫리로드 ALC 언로드 검증(<span class="fileref">ScriptAssemblyLoader.cs:150</span>) 한 곳뿐이다.
+아래 두 항목을 이 계획에 편입한다 — 합쳐서 0.5일 규모, L-0(안전망)과 함께 진행하는 것이 자연스럽다.</p>
+
+<h3>A-1. GC 스케줄링 — 씬 경계 Collect + 플레이 모드 LatencyMode</h3>
+<table>
+<tr><th>작업</th><th>내용</th><th>지점</th></tr>
+<tr>
+  <td><strong>씬 전환 시 확정 수집</strong></td>
+  <td><code>GC.Collect(2, Forced, blocking: true)</code> + <code>WaitForPendingFinalizers</code>.
+  파괴된 씬의 Behaviour 인스턴스·필드가 참조하던 관리 객체를 씬 경계에서 확정 회수 —
+  핫리로드가 이미 쓰는 패턴을 씬 언로드로 확장하는 것.
+  <code>UnloadUnusedAssets</code>(2-8)와 같은 프레임 경계에서 실행해 네이티브·관리 힙이 같은 시점에 평탄해지게 한다</td>
+  <td class="fileref">ClrHost::NotifySceneUnload 흐름 (관리 측 진입점에 추가)</td>
+</tr>
+<tr>
+  <td><strong>플레이 모드 지연 모드</strong></td>
+  <td>플레이 진입 시 <code>GCSettings.LatencyMode = SustainedLowLatency</code>(gen2 블로킹 수집 억제 → 프레임 스파이크 완화),
+  에디터 모드 복귀 시 <code>Interactive</code>로 원복. Bootstrap 두 줄</td>
+  <td class="fileref">ScriptCore/Bootstrap.cs (플레이 시작/정지 알림 경계)</td>
+</tr>
+</table>
+<p class="small">보류 항목: <code>TryStartNoGCRegion</code>(컷씬·스폰 버스트용)은 예산 산정이 필요하므로 A-2 계측 이후 별도 판단.
+Server GC 전환은 하지 않는다 — 관리 코드가 게임 스레드 하나에서만 도는 구조에서 이득이 거의 없고 메모리만 더 쓴다.</p>
+
+<h3>A-2. GC 계측 — 리소스 HUD 편입 (대시보드 2-9 직결)</h3>
+<table>
+<tr><th>작업</th><th>내용</th><th>지점</th></tr>
+<tr>
+  <td><strong>틱당 GC 지표 수출</strong></td>
+  <td><code>GC.GetGCMemoryInfo()</code>(힙 크기·pause 시간), <code>GC.CollectionCount(0/1/2)</code>를
+  틱당 1회 blittable 구조체로 경계 너머로 뽑는다 — 경계 통과 규약(틱당 고정 횟수)에 +1</td>
+  <td class="fileref">ClrHost Tick 반환값 또는 전용 폴링 함수 1개</td>
+</tr>
+<tr>
+  <td><strong>HUD·검증 연동</strong></td>
+  <td>리소스 카운터 HUD(0-2)에 gen0/1/2 수집 횟수와 관리 힙 크기 표시.
+  씬 churn 벤치(2-9 "메모리 평탄성 검증")의 판정 기준에 관리 힙 평탄성을 추가 —
+  "씬 전환 N회 반복 후 네이티브·관리 힙 모두 기준선 복귀"가 완료 조건이 된다</td>
+  <td class="fileref">EngineResourceCensus / 리소스 HUD 오버레이</td>
+</tr>
+</table>
+
+<div class="callout green">
+<p><strong>편입 위치:</strong> A-1·A-2는 L-0(안전망)과 함께 선행 실행한다.
+L-3의 씬 전환 churn 벤치가 "델리게이트 철거 전/후 비교"를 할 때 관리 힙 지표까지 같은 그래프에서 읽을 수 있어야
+재설계 효과와 GC 효과를 분리해 판정할 수 있기 때문이다.</p>
+</div>
+</section>
+
+<footer class="small" style="border-top:1px solid var(--border);padding-top:20px">
+CreatorEngine · 생명주기 재설계 계획 · 총 예상 규모 10.5일 (L-0~L-5 + 부록 A-1·A-2, L-4 병렬 시 단축 가능) ·
+이 문서는 <code>RefactoringPlanDashboard.html</code>의 신규 트랙으로 편입 예정
+</footer>
+
+</div>
+</body>
+</html>
