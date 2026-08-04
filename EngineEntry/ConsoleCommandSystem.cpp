@@ -1379,6 +1379,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.forwardscale] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forwardscale %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.ssao")
+    {
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunSSAOTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ssao] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ssao %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.ssgi")
     {
         EnhancedSceneRenderer renderer;
