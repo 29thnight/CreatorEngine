@@ -1163,6 +1163,13 @@ void SceneRenderer::CreateCommandListPass()
 		data->ClearShadowRenderDataBuffer();
 		PROFILE_CPU_END();
 
+		// 렌더러 교체 스위치(3-9). DX12 모드에서는 아무도 실행하지 않을 DX11
+		// 커맨드 리스트를 만들 이유가 없다 — 실측에서 병목이 CE에서 CB로
+		// 옮겨온 원인(마지막 도착 100%)이 바로 이 빌드였다. 위의 큐 적재는
+		// DX12 상시 러너의 입력이라 그대로 두고, 아래의 큐 클리어도 그대로
+		// 둔다 — 라이브 캡처가 검증된 클리어 타이밍을 바꾸지 않는다.
+		if (!m_scenePassesSuspended)
+		{
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
 			DX11CommandContext rhiContext(deferredContext); // 백엔드 소유자인 SceneRenderer가 직접 만든다(PHASE 3-1, 7차)
@@ -1309,6 +1316,7 @@ void SceneRenderer::CreateCommandListPass()
 
 		// 큐가 살아 있는 마지막 지점이다. 대조 검증이 요청했으면 여기서 뜬다.
 		CaptureDrawSnapshot(data);
+		}   // if (!m_scenePassesSuspended)
 
 		data->ClearRenderQueue();
 		data->ClearShadowRenderQueue();
