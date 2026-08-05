@@ -2297,7 +2297,12 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             // 512행렬(32KB)을 여기서 복사하면 프록시마다 그만큼 든다.
             // 팔레트 버퍼는 프록시가 shared_ptr로 붙들고 있어 이 프레임 동안
             // 살아 있다(MeshRendererProxy의 수명 계약).
-            if (proxy->m_finalTransforms)
+            //
+            // 조건은 DX11 GBufferPass의 분류와 같다 — 팔레트가 있어도
+            // m_isAnimationEnabled가 꺼져 있으면 DX11은 바인드 포즈로 그린다.
+            if (proxy->m_isAnimationEnabled
+                && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
+                && proxy->m_finalTransforms)
             {
                 item.bonePalette = proxy->m_finalTransforms.get();
                 item.boneCount = Skeleton::MAX_BONES;

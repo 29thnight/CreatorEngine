@@ -772,17 +772,39 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
                 }
             }
 
-            char entry[288]{};
+            // 0픽셀이면 스키닝을 빼고 다시 그려 본다. 바인드 포즈로는
+            // 그려지는데 스킨드로는 안 그려진다면 팔레트가 정점을 화면
+            // 밖으로 보낸 것이고, 둘 다 0이면 애초에 시야 밖이다.
+            size_t soloBindPose = SIZE_MAX;
+            if (0 == soloCovered && 0 != draws[i].boneCount)
+            {
+                EnhancedDrawItem bindPose = draws[i];
+                bindPose.bonePalette = nullptr;
+                bindPose.boneCount = 0;
+
+                std::vector<EnhancedDrawItem> bindDraw{ bindPose };
+                std::vector<bool> bindCoverage;
+                if (renderCoverage(bindDraw, bindCoverage))
+                {
+                    soloBindPose = 0;
+                    for (const bool covered : bindCoverage) { if (covered) ++soloBindPose; }
+                }
+            }
+
+            char entry[352]{};
             std::snprintf(entry, sizeof(entry),
                 "%zu:%zu픽셀(DX11 안 %.1f%% · 정점 %zu · 반경 %.1f · 본 최대 %.0f/%u"
-                " · 최소 가중합 %.3f) ",
+                " · 최소 가중합 %.3f%s) ",
                 i, soloCovered,
                 (0 != soloCovered)
                     ? 100.0 * static_cast<double>(soloInsideDX11)
                         / static_cast<double>(soloCovered)
                     : 0.0,
                 vertexCount, boundRadius, maxBoneIndex, draws[i].boneCount,
-                (minWeightSum > 1e8f) ? 0.f : minWeightSum);
+                (minWeightSum > 1e8f) ? 0.f : minWeightSum,
+                (SIZE_MAX == soloBindPose)
+                    ? ""
+                    : (0 == soloBindPose ? " · 바인드포즈도 0" : " · 바인드포즈는 그려짐"));
             report += entry;
         }
         outLog += report + "\n";

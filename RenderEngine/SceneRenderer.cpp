@@ -371,7 +371,23 @@ void SceneRenderer::CaptureDrawSnapshot(RenderPassData* data)
 
 		// 본 팔레트를 값으로 복사한다. 애니메이터당 한 번이면 된다 —
 		// 한 캐릭터의 메시 여럿이 같은 팔레트를 공유한다.
-		if (proxy->m_finalTransforms)
+		//
+		// ★ 조건은 GBufferPass의 분류와 정확히 같아야 한다.
+		//
+		// 팔레트가 있다는 것만으로 스킨드로 표시했더니 대조가 어긋났다.
+		// DX11은 (m_isAnimationEnabled && 유효한 animatorGuid)일 때만
+		// 스키닝 셰이더로 보내고, 그렇지 않으면 인스턴싱 경로 —
+		// InstancedVertexShader에는 스키닝 블록이 아예 없다 — 로 보내
+		// 바인드 포즈로 그린다. 팔레트는 그때도 남아 있으므로, 팔레트
+		// 존재만 보면 DX11이 안 쓴 포즈를 DX12가 쓰게 된다.
+		//
+		// 대조의 전제는 'DX11이 그 픽셀을 그릴 때 쓴 바로 그 입력'이다.
+		// 적용 여부까지 그 판정을 따라야 전제가 성립한다.
+		const bool dx11UsesSkinning = proxy->m_isAnimationEnabled
+			&& (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
+			&& proxy->m_finalTransforms;
+
+		if (dx11UsesSkinning)
 		{
 			draw.hasSkinning = true;
 			if (m_capturePalettes.find(draw.animatorKey) == m_capturePalettes.end())
