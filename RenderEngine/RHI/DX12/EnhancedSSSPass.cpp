@@ -1,0 +1,386 @@
+#ifndef DYNAMICCPP_EXPORTS
+#include "EnhancedSSSPass.h"
+#include "DX12DeviceResources.h"
+#include "DX12PSOManager.h"
+#include "DX12RootSignatureCache.h"
+#include "EnhancedRenderGraph.h"
+
+#include <d3dcompiler.h>
+#include <cstring>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#pragma comment(lib, "d3dcompiler.lib")
+
+namespace
+{
+    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
+    std::string SssHrToString(HRESULT hr)
+    {
+        std::ostringstream oss;
+        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
+        return oss.str();
+    }
+
+    // DX11 SSS.ps.hlsl의 이식. 25샘플 커널과 표면 추종 수식을 그대로 옮겼다 —
+    // 그림의 기준선이므로 상수 하나도 건드리지 않는다.
+    //
+    // 바꾼 것은 셋뿐이다:
+    //   · 정점을 SV_VertexID 풀스크린 삼각형으로(DX11은 Fullscreen.vs + Draw(4))
+    //   · MetalRough(t2) 선언 제거 — 원본이 읽지 않는다
+    //   · direction을 상수로 받되 호출부가 축을 고정한다(원본과 같은 동작)
+    constexpr const char* kSSSShader = R"(
+Texture2D    gDepth   : register(t0);
+Texture2D    gColor   : register(t1);
+SamplerState gSampler : register(s0);
+
+cbuffer SSSConstants : register(b0)
+{
+    float2 gDirection;
+    float  gStrength;
+    float  gWidth;
+    float  gCameraFov;
+    float3 gPadding;
+};
+
+struct VSOut
+{
+    float4 position : SV_POSITION;
+    float2 texCoord : TEXCOORD0;
+};
+
+VSOut VSMain(uint id : SV_VertexID)
+{
+    VSOut output;
+    output.texCoord = float2((id << 1) & 2, id & 2);
+    output.position = float4(output.texCoord * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f),
+        0.0f, 1.0f);
+    return output;
+}
+
+static const int NUM_SAMPLES = 25;
+
+static const float4 kernel[NUM_SAMPLES] =
+{
+    float4(0.530605,    0.613514,       0.739601,        0),
+    float4(0.000973794, 1.11862e-005,   9.43437e-007,   -3),
+    float4(0.00333804,  7.85443e-005,   1.2945e-005,    -2.52083),
+    float4(0.00500364,  0.00020094,     5.28848e-005,   -2.08333),
+    float4(0.00700976,  0.00049366,     0.000151938,    -1.6875),
+    float4(0.0094389,   0.00139119,     0.000416598,    -1.33333),
+    float4(0.0128496,   0.00356329,     0.00132016,     -1.02083),
+    float4(0.017924,    0.00711691,     0.00347194,     -0.75),
+    float4(0.0263642,   0.0119715,      0.00684598,     -0.520833),
+    float4(0.0410172,   0.0199899,      0.0118481,      -0.333333),
+    float4(0.0493588,   0.0367726,      0.0219485,      -0.1875),
+    float4(0.0402784,   0.0657244,      0.04631,        -0.0833333),
+    float4(0.0211412,   0.0459286,      0.0378196,      -0.0208333),
+    float4(0.0211412,   0.0459286,      0.0378196,       0.0208333),
+    float4(0.0402784,   0.0657244,      0.04631,         0.0833333),
+    float4(0.0493588,   0.0367726,      0.0219485,       0.1875),
+    float4(0.0410172,   0.0199899,      0.0118481,       0.333333),
+    float4(0.0263642,   0.0119715,      0.00684598,      0.520833),
+    float4(0.017924,    0.00711691,     0.00347194,      0.75),
+    float4(0.0128496,   0.00356329,     0.00132016,      1.02083),
+    float4(0.0094389,   0.00139119,     0.000416598,     1.33333),
+    float4(0.00700976,  0.00049366,     0.000151938,     1.6875),
+    float4(0.00500364,  0.00020094,     5.28848e-005,    2.08333),
+    float4(0.00333804,  7.85443e-005,   1.2945e-005,     2.52083),
+    float4(0.000973794, 1.11862e-005,   9.43437e-007,    3)
+};
+
+float4 PSMain(VSOut input) : SV_TARGET
+{
+    const float4 colorM = gColor.SampleLevel(gSampler, input.texCoord, 0);
+    const float  depthM = gDepth.SampleLevel(gSampler, input.texCoord, 0).r;
+
+    // 투영창까지의 거리. FOV를 도(degree)로 받는 것까지 원본 그대로다.
+    const float distanceToProjectionWindow = 1.0f / tan(0.5f * gCameraFov * 3.141592f / 180.0f);
+    const float scale = distanceToProjectionWindow / depthM;
+
+    float2 finalStep = gWidth * scale * gDirection;
+    finalStep *= gStrength;
+    finalStep *= 0.333f;   // 커널이 -3~3이라 3으로 나눈다
+
+    float4 colorBlurred = colorM;
+    colorBlurred.rgb *= kernel[0].rgb;
+
+    [unroll]
+    for (int i = 1; i < NUM_SAMPLES; i++)
+    {
+        const float2 offset = input.texCoord + kernel[i].a * finalStep;
+        float4 color = gColor.SampleLevel(gSampler, offset, 0);
+
+        // 표면 추종 — 깊이가 크게 다르면 중심 색으로 되돌린다. 이것이 없으면
+        // 실루엣 밖으로 피부색이 번진다.
+        {
+            const float depth = gDepth.SampleLevel(gSampler, offset, 0).r;
+            const float s = saturate(300.0f * distanceToProjectionWindow * gWidth
+                * abs(depthM - depth));
+            color.rgb = lerp(color.rgb, colorM.rgb, s);
+        }
+
+        colorBlurred.rgb += kernel[i].rgb * color.rgb;
+    }
+
+    return colorBlurred;
+}
+)";
+
+    struct SSSConstants
+    {
+        float direction[2]{};
+        float strength{ 0.f };
+        float width{ 0.f };
+        float cameraFov{ 0.f };
+        float padding[3]{};
+    };
+
+    bool CompileSSSShader(const char* entry, const char* target,
+        Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
+    {
+        Microsoft::WRL::ComPtr<ID3DBlob> errors;
+        const HRESULT hr = D3DCompile(kSSSShader, strlen(kSSSShader), nullptr, nullptr,
+            nullptr, entry, target, 0, 0, &outBlob, &errors);
+        if (FAILED(hr))
+        {
+            outError = std::string("SSS 셰이더 컴파일 실패(") + entry + "): ";
+            if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
+            else        outError += SssHrToString(hr);
+            return false;
+        }
+        return true;
+    }
+}
+
+bool EnhancedSSSPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
+{
+    if (nullptr == context.resources || nullptr == context.psoManager ||
+        nullptr == context.rootSignatures)
+    {
+        outError = "SSS 패스 컨텍스트가 불완전하다";
+        return false;
+    }
+
+    return CreatePipelines(context, outError);
+}
+
+bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
+{
+    // b0 상수 · t0~t1 테이블(깊이·색) · s0 선형 클램프.
+    //
+    // 클램프가 중요하다 — 커널이 화면 밖을 짚을 때 WRAP이면 반대편 색이
+    // 딸려 와 가장자리에 엉뚱한 번짐이 생긴다.
+    D3D12_DESCRIPTOR_RANGE srvRange{};
+    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    srvRange.NumDescriptors = 2;
+    srvRange.BaseShaderRegister = 0;
+
+    D3D12_ROOT_PARAMETER params[2]{};
+    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[0].Descriptor.ShaderRegister = 0;
+    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[1].DescriptorTable.NumDescriptorRanges = 1;
+    params[1].DescriptorTable.pDescriptorRanges = &srvRange;
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_STATIC_SAMPLER_DESC sampler{};
+    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    sampler.ShaderRegister = 0;
+    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_ROOT_SIGNATURE_DESC rootDesc{};
+    rootDesc.NumParameters = _countof(params);
+    rootDesc.pParameters = params;
+    rootDesc.NumStaticSamplers = 1;
+    rootDesc.pStaticSamplers = &sampler;
+
+    const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
+    if (!root.IsValid()) return false;
+    m_rootSignature = root.signature;
+
+    ComPtr<ID3DBlob> vsBlob;
+    ComPtr<ID3DBlob> psBlob;
+    if (!CompileSSSShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
+    if (!CompileSSSShader("PSMain", "ps_5_0", psBlob, outError)) return false;
+
+    DX12GraphicsPipelineDesc desc{};
+    desc.vsBytecode = vsBlob->GetBufferPointer();
+    desc.vsSize = vsBlob->GetBufferSize();
+    desc.psBytecode = psBlob->GetBufferPointer();
+    desc.psSize = psBlob->GetBufferSize();
+    desc.rootSignature = root.signature;
+    desc.rootSignatureId = root.id;
+    desc.inputElements = nullptr;
+    desc.inputElementCount = 0;
+    desc.topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+    // ★ 숨어 있던 암묵 상태를 명시한다.
+    //
+    // DX11은 이 패스에서 블렌드·깊이 상태를 세우지 않고 앞 패스가 남긴
+    // 것에 얹혀 갔다. DX12는 PSO에 박아야 하므로 결정해야 하고, 블러
+    // 결과는 덮어쓰는 것이 맞다(깊이도 안 본다 — 풀스크린이다).
+    desc.depthEnable = false;
+    desc.blendEnable = false;
+    desc.cullMode = D3D12_CULL_MODE_NONE;
+    desc.numRenderTargets = 1;
+    desc.rtvFormats[0] = kOutputFormat;
+
+    m_pso = context.psoManager->GetOrCreate(desc, outError);
+    if (nullptr == m_pso) return false;
+
+    // 블러 두 축이 각자 타깃을 쓴다.
+    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    rtvHeapDesc.NumDescriptors = 2;
+    const HRESULT hr = context.resources->GetDevice()->CreateDescriptorHeap(
+        &rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
+    if (FAILED(hr))
+    {
+        outError = "SSS RTV 힙 생성 실패: " + SssHrToString(hr);
+        return false;
+    }
+    m_rtvIncrement = context.resources->GetDevice()->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    return true;
+}
+
+bool EnhancedSSSPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
+{
+    (void)outError;
+
+    m_width = context.width;
+    m_height = context.height;
+
+    // FOV는 도로 넘긴다 — 셰이더가 그렇게 받는다(원본 그대로).
+    m_cameraFov = (nullptr != context.camera)
+        ? XMConvertToDegrees(context.camera->fov) : 60.f;
+
+    return true;
+}
+
+void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
+{
+    m_output = RGHandle{};
+    m_horizontal = RGHandle{};
+
+    if (nullptr == m_pso || nullptr == m_rtvHeap || 0 == m_width || 0 == m_height) return;
+    if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid()) return;
+
+    // ★ 복사가 사라진 자리.
+    //
+    // DX11은 읽으면서 쓸 수 없어 매 축마다 씬 컬러를 통째로 복사했다
+    // (화면 크기 CopyResource 2회). 여기서는 가로 블러가 transient에 쓰고
+    // 세로 블러가 그것을 읽으므로 복사가 필요 없다.
+    RGTextureDesc desc{};
+    desc.width = m_width;
+    desc.height = m_height;
+    desc.format = kOutputFormat;
+    desc.allowRenderTarget = true;
+
+    desc.name = "SSS.Horizontal";
+    m_horizontal = graph.CreateTexture(desc);
+
+    desc.name = "SSS.Output";
+    m_output = graph.CreateTexture(desc);
+
+    // 두 축을 각각 선언한다. 그래프가 사이의 전이 배리어를 만들어 준다 —
+    // 가로가 쓴 것을 세로가 읽으므로 RENDER_TARGET → SHADER_RESOURCE다.
+    const auto declareAxis = [&](RGHandle source, RGHandle target,
+        uint32_t rtvIndex, float dirX, float dirY, const char* name)
+    {
+        const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
+            { source,         RGResourceState::ShaderResource },
+            { m_inputs.depth, RGResourceState::ShaderResource },
+            { target,         RGResourceState::RenderTarget },
+        };
+
+        graph.AddPass(name, usages,
+            [this, &context, source, target, rtvIndex, dirX, dirY](
+                const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                auto* commandList = executeContext.commandList;
+                auto* device = context.resources->GetDevice();
+
+                auto rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+                rtvHandle.ptr += static_cast<SIZE_T>(rtvIndex) * m_rtvIncrement;
+                device->CreateRenderTargetView(executeContext.Resolve(target), nullptr, rtvHandle);
+
+                const D3D12_VIEWPORT viewport{ 0.f, 0.f,
+                    static_cast<float>(m_width), static_cast<float>(m_height), 0.f, 1.f };
+                const D3D12_RECT scissor{ 0, 0,
+                    static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
+                commandList->RSSetViewports(1, &viewport);
+                commandList->RSSetScissorRects(1, &scissor);
+                commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+                // SRV 둘을 연속으로 자른다 — 테이블은 연속이어야 한다.
+                const auto srvRange = context.resources->GetDescriptorRing().Allocate(2);
+                if (!srvRange.IsValid()) return;
+
+                // 깊이는 포맷을 바꿔 봐야 한다. D32_FLOAT 리소스를 SRV로
+                // 읽으려면 명시해야 하고, nullptr 설명으로는 실패한다.
+                D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
+                depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
+                depthSrv.Texture2D.MipLevels = 1;
+                device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
+                    &depthSrv, srvRange.CpuAt(0));
+
+                device->CreateShaderResourceView(executeContext.Resolve(source), nullptr,
+                    srvRange.CpuAt(1));
+
+                SSSConstants constants{};
+                constants.direction[0] = dirX;
+                constants.direction[1] = dirY;
+                constants.strength = m_tuning.strength;
+                constants.width = m_tuning.width;
+                constants.cameraFov = m_cameraFov;
+
+                const auto cb = context.resources->GetUploadRing().Allocate(
+                    sizeof(SSSConstants), DX12UploadRing::kConstantBufferAlignment);
+                if (!cb.IsValid()) return;
+                memcpy(cb.cpuAddress, &constants, sizeof(constants));
+
+                ID3D12DescriptorHeap* heaps[] = {
+                    context.resources->GetDescriptorRing().GetHeap() };
+                commandList->SetDescriptorHeaps(1, heaps);
+
+                commandList->SetGraphicsRootSignature(m_rootSignature);
+                commandList->SetPipelineState(m_pso);
+                commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+                commandList->SetGraphicsRootDescriptorTable(1, srvRange.gpu);
+
+                commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                commandList->DrawInstanced(3, 1, 0, 0);
+            },
+            // 가로는 세로가 읽으므로 뿌리가 아니어도 살아남는다. 세로는
+            // 소비자가 붙기 전까지 호출부가 정한다.
+            (0 == rtvIndex) ? false : m_keepAlive);
+    };
+
+    // 축은 고정이다. DX11의 direction 슬라이더는 코드가 항상 덮어써
+    // 죽어 있었고, 분리 블러는 축이 고정이어야 맞다.
+    declareAxis(m_inputs.color, m_horizontal, 0, 1.f, 0.f, "SSS.Horizontal");
+    declareAxis(m_horizontal, m_output, 1, 0.f, 1.f, "SSS.Vertical");
+}
+
+void EnhancedSSSPass::Shutdown()
+{
+    m_width = 0;
+    m_height = 0;
+    m_rtvHeap.Reset();
+    m_rtvIncrement = 0;
+    m_pso = nullptr;
+    m_rootSignature = nullptr;
+}
+
+#endif
