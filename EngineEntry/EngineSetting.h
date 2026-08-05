@@ -103,7 +103,11 @@ public:
 	Fence RHICommandFence;
 	TerrainBrush* terrainBrush = nullptr;
 	float m_imguiScale{ 0.8f };
-	bool m_useDx12Backend{ false };   // 3-9 승격 판정 전까지 기본은 DX11
+	// 3-9 승격(2026-08-06, 사용자 결정): 기본값 DX12. 판정 기준 ①~③은 수치로
+	// 충족했고 ④(에디터 기즈모·UI 표시)는 미배선 상태를 알고 승격한다 —
+	// ImGui 백엔드 DX12 전환(PHASE 8-2 선취)과 기즈모 체인 배선이 후속이다.
+	// DX11 폴백은 render.backend dx11로 즉시 복귀 가능(한 릴리스 주기 유지).
+	bool m_useDx12Backend{ true };
 
 private:
     std::atomic_bool m_isGameView{ false };
