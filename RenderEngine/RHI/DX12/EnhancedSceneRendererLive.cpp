@@ -111,6 +111,10 @@ namespace
         // (0x887A0005, Shadow.Cascades)로 죽으며 이 규칙을 재확인시켰다.
         // 펜스 완료(승격) 때 놓는다.
         std::unique_ptr<EnhancedRenderGraph> inFlightGraph;
+
+        // transient 풀 — 프레임당 CreateCommittedResource ~35건을 없앤다.
+        // 그래프 소멸(펜스 완료 후)이 반납하므로 GPU 사용 중 재배포가 없다.
+        RGTransientPool transientPool;
     };
 
     struct LiveState
@@ -452,6 +456,7 @@ namespace
             p.inFlightGraph = std::make_unique<EnhancedRenderGraph>();
             EnhancedRenderGraph& graph = *p.inFlightGraph;
             graph.SetProfiler(&p.profiler);
+            graph.SetTransientPool(&p.transientPool);
 
             p.shadow.Declare(graph, p.frameContext);
 

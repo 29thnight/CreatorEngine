@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <functional>
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -103,6 +104,25 @@ struct RGTextureDesc
     bool        allowDepthStencil{ false };
     bool        allowUnorderedAccess{ false };
     std::string name;
+};
+
+// transient 리소스 풀 (PHASE 3-9, 상시 러너의 프레임당 생성 비용 제거).
+//
+// 그래프는 프레임마다 새로 만들어지는데 transient도 매번 CreateCommittedResource로
+// 만들면 상시 실행에서 그 비용이 프레임당 수십 ms로 쌓인다(실측 — 테스트는
+// 몇 프레임뿐이라 안 보였다). 풀은 desc 해시 키로 (리소스, 마지막 상태)를
+// 보관하고, 그래프가 소멸할 때(호출부가 GPU 완료를 보장한 뒤) 반납받는다.
+// 상태를 함께 보관하는 이유: 재사용 리소스는 COMMON이 아니라 지난 프레임의
+// 마지막 상태로 시작하고, 배리어 계획이 그 상태에서 출발해야 맞는다.
+class RGTransientPool
+{
+public:
+    struct Entry
+    {
+        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+        RGResourceState state{ RGResourceState::Common };
+    };
+    std::unordered_map<uint64_t, std::vector<Entry>> freeList;
 };
 
 class EnhancedRenderGraph
@@ -215,6 +235,13 @@ public:
     // 한 번 더 전이시키면 그 값이 어긋나고, 다음 프레임의 첫 배리어가
     // 틀린 before 상태로 나간다(실제로 리드백 패스가 그렇게 잡혔다).
     // 상태를 아는 것은 그래프뿐이므로 그래프가 알려 준다.
+    /// transient 풀 연결(선택). 있으면 Compile이 생성 대신 재사용을 시도하고,
+    /// 소멸자가 반납한다 — 호출부는 소멸 시점에 GPU 완료를 보장해야 한다
+    /// (그래프 수명 규칙과 같은 계약).
+    void SetTransientPool(RGTransientPool* pool) { m_transientPool = pool; }
+
+    ~EnhancedRenderGraph();
+
     RGHandle ImportTexture(ID3D12Resource* resource, RGResourceState currentState,
         const std::string& name, RGResourceState* stateWriteback = nullptr);
 
@@ -313,6 +340,7 @@ private:
         RGTextureDesc   desc;
         ID3D12Resource* external{ nullptr };
         Microsoft::WRL::ComPtr<ID3D12Resource> owned;   // transient
+        uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RGResourceState state{ RGResourceState::Common };
         RGResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
@@ -341,6 +369,7 @@ private:
     void PlanBarriers();
 
     std::vector<Resource> m_resources;
+    RGTransientPool* m_transientPool{ nullptr };
     std::vector<Pass>     m_passes;
     std::vector<uint16_t> m_executeOrder;
     DX12GpuProfiler*      m_profiler{ nullptr };

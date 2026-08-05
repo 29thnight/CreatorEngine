@@ -299,6 +299,44 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
     {
         if (resource.imported || !resource.used || resource.owned) continue;
 
+        // 풀 키 — 재사용 호환성을 정하는 것 전부를 섞는다(크기·포맷·플래그·
+        // 클리어 값). 이름은 넣지 않는다: 같은 모양이면 다른 패스끼리도
+        // 재사용해야 풀이 작게 유지된다.
+        {
+            uint64_t key = 1469598103934665603ull;
+            const auto mix = [&key](uint64_t value)
+            { key ^= value; key *= 1099511628211ull; };
+            mix(resource.desc.width);
+            mix(resource.desc.height);
+            mix((std::max)(1u, resource.desc.arraySize));
+            mix(static_cast<uint64_t>(resource.desc.format));
+            mix((resource.desc.allowRenderTarget ? 1u : 0u)
+                | (resource.desc.allowDepthStencil ? 2u : 0u)
+                | (resource.desc.allowUnorderedAccess ? 4u : 0u));
+            for (int i = 0; i < 4; ++i)
+            {
+                uint32_t bits = 0;
+                memcpy(&bits, &resource.desc.clearColor[i], sizeof(bits));
+                mix(bits);
+            }
+            resource.poolKey = key;
+        }
+
+        if (nullptr != m_transientPool)
+        {
+            auto found = m_transientPool->freeList.find(resource.poolKey);
+            if (found != m_transientPool->freeList.end() && !found->second.empty())
+            {
+                RGTransientPool::Entry entry = std::move(found->second.back());
+                found->second.pop_back();
+                resource.owned = std::move(entry.resource);
+                // 지난 프레임의 마지막 상태에서 출발한다 — COMMON으로 두면
+                // 배리어 계획이 실제 상태와 어긋나 검증 레이어가 운다.
+                resource.state = entry.state;
+                continue;
+            }
+        }
+
         D3D12_HEAP_PROPERTIES heap{};
         heap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
@@ -347,6 +385,20 @@ bool EnhancedRenderGraph::CreateTransients(ID3D12Device* device, std::string& ou
     }
 
     return true;
+}
+
+EnhancedRenderGraph::~EnhancedRenderGraph()
+{
+    // transient를 풀에 반납한다. 호출부가 소멸 시점에 GPU 완료를 보장하는
+    // 것이 계약이다(그래프 수명 규칙) — 그래서 여기서 펜스를 보지 않는다.
+    if (nullptr == m_transientPool) return;
+
+    for (auto& resource : m_resources)
+    {
+        if (resource.imported || !resource.owned) continue;
+        m_transientPool->freeList[resource.poolKey].push_back(
+            { std::move(resource.owned), resource.state });
+    }
 }
 
 void EnhancedRenderGraph::PlanBarriers()
