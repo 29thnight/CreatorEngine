@@ -24,6 +24,7 @@
 #include <ppl.h>
 #include "InputActionManager.h"
 #include "EngineBootstrap.h"
+#include "BootProgress.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -39,7 +40,8 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
     g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
-    g_progressWindow->SetStatusText(L"Initializing Core...");
+    BootProgress::Begin(BootProgress::kEditorBootSteps);
+    BootProgress::Step(L"Initializing Core...");
 
 	CoreWindow coreWindow(hInstance, title, width, height);
 	// 덤프 종류 지정과 기록자 등록은 EngineBootstrap::InitializeRuntime이 이미 했다.
@@ -47,17 +49,12 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	// 오해를 남긴다 — 그 오해 때문에 부팅 전반이 덤프 사각지대였다.
     m_hWnd = coreWindow.GetHandle();
 
-    g_progressWindow->SetProgress(10);
-
-    g_progressWindow->SetStatusText(L"Initializing Dx11 Device...");
+    BootProgress::Step(L"Initializing Dx11 Device...");
 	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
-    g_progressWindow->SetProgress(20);
 
-    g_progressWindow->SetStatusText(L"Initializing Windows API...");
+    BootProgress::Step(L"Initializing Windows API...");
 	SetWindow(coreWindow);
-    g_progressWindow->SetProgress(30);
     RegisterHandler(coreWindow);
-    g_progressWindow->SetProgress(40);
 	Load();
 	Run();
 }
@@ -116,12 +113,16 @@ void Core::App::Run()
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
 		m_main->Initialize();
-		g_progressWindow->SetStatusText(L"Initializing Input...");
+		BootProgress::Step(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
 		//InputActionManagers->LoadManager();
-		g_progressWindow->SetProgress(100);
+		BootProgress::Complete();
 
+		// 로딩창을 완전히 닫은 뒤(스레드 join까지) 에디터 창을 보여준다.
+		// 반대 순서로 하면 서로 다른 스레드의 두 창 사이에서 활성화 전환이
+		// 일어나며 동기 SendMessage 교착이 비결정적으로 발생했다.
 		g_progressWindow->Close();
+		CoreWindow::GetForCurrentInstance()->Show();
 
 		// 초기화가 끝난 뒤 CLI를 연다. 그래야 명령이 완성된 엔진 위에서 실행된다.
 		ConsoleCommandSystem::Get().InitializeFromCommandLine();
@@ -136,6 +137,7 @@ void Core::App::Run()
 		cli.Pump();
 		if (cli.IsQuitRequested())
 		{
+			Debug->LogDebug("[SHUTDOWN] CLI quit 요청 — 종료 시작");
 			m_windowClosed = true;
 			PostQuitMessage(0);
 		}
@@ -144,6 +146,9 @@ void Core::App::Run()
 
 LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
+	// 종료의 발원지를 로그에 남긴다. 부팅 리팩토링 검증 중 "누가 종료를
+	// 시작했나"를 몰라 한참 헤맸다 — WM_CLOSE 수신과 CLI quit을 구분한다.
+	Debug->LogDebug("[SHUTDOWN] WM_CLOSE 수신 — 종료 시작");
 	m_windowClosed = true;
 	PostQuitMessage(0);
 	return 0;

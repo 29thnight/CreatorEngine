@@ -104,6 +104,9 @@
     <ClInclude Include="EngineEntry\ProgressWindow.h">
       <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\BootProgress.h">
+      <Filter>Window\ProgressWindow</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\EngineSetting.h">
       <Filter>Settings\EngineSetting</Filter>
     </ClInclude>

@@ -190,6 +190,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
 </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h" />
+    <ClInclude Include="EngineEntry\BootProgress.h" />
     <ClInclude Include="EngineEntry\Dx11Main.h" />
     <ClInclude Include="EngineEntry\EngineSetting.h" />
     <ClInclude Include="EngineEntry\EngineVersion.h" />

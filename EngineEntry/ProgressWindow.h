@@ -25,6 +25,15 @@ public:
         m_style = style;
         m_imagePath = imagePath;
         InitCommonControls();
+
+        // 창 생성 완료를 이벤트로 기다린다. 예전의 sleep(300)은 느린 디스크에서
+        // 창이 채 만들어지기 전에 SetProgress가 null 핸들로 들어가는 경합이 있었다.
+        // 이벤트는 스레드가 살아 있는 동안 닫지 않는다 — Close가 join 후에 닫는다.
+        if (m_hReadyEvent)
+            ResetEvent(m_hReadyEvent);
+        else
+            m_hReadyEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+
         m_hThread = CreateThread(nullptr, 0, ThreadProc, this, 0, nullptr);
 
 		if (m_hThread == nullptr)
@@ -33,7 +42,11 @@ public:
 			return;
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		if (m_hReadyEvent)
+		{
+			constexpr DWORD kReadyTimeoutMs = 3000;
+			WaitForSingleObject(m_hReadyEvent, kReadyTimeoutMs);
+		}
     }
 
 	void SetTitle(const std::wstring& title)
@@ -56,22 +69,47 @@ public:
 
     void Close()
     {
+		// 100%가 표시된 것을 사용자가 볼 시간을 준다.
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
+		// 창 파괴는 만든 스레드(ThreadProc)만 할 수 있다. 여기서 DestroyWindow를
+		// 직접 부르면 조용히 실패한다 — WM_CLOSE를 보내 그쪽에서 파괴하게 한다.
         if (m_hWnd)
             PostMessage(m_hWnd, WM_CLOSE, 0, 0);
 
-		if (m_hWnd && IsWindow(m_hWnd))
-		{
-			DestroyWindow(m_hWnd);
-			m_hWnd = nullptr;
-		}
-
         if (m_hThread)
         {
-            WaitForSingleObject(m_hThread, INFINITE);
+            // WaitForSingleObject로 그냥 자면 교착 위험이 있다: 로딩창이
+            // 포그라운드인 채 파괴되면 활성화가 호출 스레드의 창으로 넘어오며
+            // 동기 SendMessage가 날아오는데, 이 스레드가 펌프를 멈춘 채
+            // 대기하면 양쪽 다 영원히 기다린다. 대기 중에도 메시지를 펌프한다.
+            while (true)
+            {
+                DWORD wait = MsgWaitForMultipleObjects(1, &m_hThread, FALSE, INFINITE, QS_ALLINPUT);
+                if (wait != WAIT_OBJECT_0 + 1)
+                    break;
+
+                MSG msg;
+                while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
+            }
             CloseHandle(m_hThread);
             m_hThread = nullptr;
+        }
+
+        // 스레드가 끝났으니 창 핸들은 전부 죽었다. 다음 Launch(스크립트 핫리로드,
+        // 라이트맵 베이킹)가 죽은 핸들에 SendMessage 하지 않도록 비워 둔다.
+        m_hWnd = nullptr;
+        m_hProgress = nullptr;
+        m_hText = nullptr;
+
+        if (m_hReadyEvent)
+        {
+            CloseHandle(m_hReadyEvent);
+            m_hReadyEvent = nullptr;
         }
         if (m_hBitmap)
         {
@@ -104,6 +142,10 @@ private:
         {
             self->CreateInitUI();
         }
+
+        // 창과 컨트롤이 전부 준비됐다 — Launch를 깨운다.
+        if (self->m_hReadyEvent)
+            SetEvent(self->m_hReadyEvent);
 
         MSG msg;
         while (GetMessage(&msg, nullptr, 0, 0))
@@ -209,6 +251,15 @@ private:
             }
             break;
         }
+        case WM_NCHITTEST:
+        {
+            // InitStyle은 WS_POPUP이라 캡션이 없다. 클라이언트 영역 히트를
+            // HTCAPTION으로 돌려주면 배경 아무 곳이나 잡고 드래그할 수 있다.
+            LRESULT hit = DefWindowProc(hwnd, msg, wParam, lParam);
+            if (hit == HTCLIENT && self && self->m_style == ProgressWindowStyle::InitStyle)
+                return HTCAPTION;
+            return hit;
+        }
         case WM_PAINT:
         {
             if (self && self->m_style == ProgressWindowStyle::InitStyle && self->m_hBitmap)
@@ -250,6 +301,7 @@ private:
     HBITMAP m_hBitmap = nullptr;
     HFONT m_hFont = nullptr;
     HANDLE m_hThread = nullptr;
+    HANDLE m_hReadyEvent = nullptr;
 	std::wstring m_title = L"Initializing...";
 };
 

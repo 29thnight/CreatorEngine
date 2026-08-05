@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Dx11Main.h"
 #include "CoreWindow.h"
+#include "BootProgress.h"
 #include "RHI/RHI.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
@@ -48,7 +49,7 @@ void DirectX11::Dx11Main::Initialize()
     PROFILER_INITIALIZE(5, 1024);
     PROFILE_REGISTER_THREAD("[GameThread]");
 
-    g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
+    BootProgress::Step(L"Initializing RenderEngine...");
     m_deviceResources->RegisterDeviceNotify(this);
 
     //XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
@@ -71,10 +72,9 @@ void DirectX11::Dx11Main::Initialize()
 	CullingManagers->Initialize(worldTight, cfg);
     TagManagers->Initialize();
 
-    g_progressWindow->SetProgress(50);
+    BootProgress::Step(L"Creating Renderers...");
     m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
     m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
-    g_progressWindow->SetProgress(55);
 #ifdef EDITOR
     m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
     m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
@@ -85,26 +85,22 @@ void DirectX11::Dx11Main::Initialize()
     m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
     m_projectWindow = std::make_unique<AssetBundleWindow>();
     m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>(m_sceneRenderer.get());
-    g_progressWindow->SetProgress(60);
 #endif // !EDITOR
 
-    g_progressWindow->SetStatusText(L"Script Building...");
+    BootProgress::Step(L"Script Building...");
     ScriptManager->Initialize();
-    g_progressWindow->SetProgress(65);
 
-    g_progressWindow->SetStatusText(L"Initializing SoundManager...");
+    BootProgress::Step(L"Initializing SoundManager...");
     Sound->initialize(128);
-    g_progressWindow->SetProgress(70);
 
-    g_progressWindow->SetStatusText(L"Loading Assets...");
+    BootProgress::Step(L"Loading Assets...");
     DataSystems->Initialize();
     ShaderSystem->SetPSOs_GUID();
-    g_progressWindow->SetProgress(75);
     //CreateScene
-    g_progressWindow->SetStatusText(L"Loading Project...");
+    BootProgress::Step(L"Loading Project...");
     SceneManagers->CreateScene();
-    g_progressWindow->SetProgress(80);
 
+    BootProgress::Step(L"Registering Frame Events...");
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
     {
 #ifdef EDITOR
@@ -122,20 +118,17 @@ void DirectX11::Dx11Main::Initialize()
         UIManagers->Update();
         Sound->update();
     });
-    g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
     {
         m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
         m_sceneRenderer->SceneRendering();
     });
 
-    g_progressWindow->SetProgress(82);
     m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
     {
         m_gizmoRenderer->OnDrawGizmos();
     });
 
-    g_progressWindow->SetProgress(83);
     m_GUIRenderingEventHandle = GUIRenderingEvent.AddLambda([&]()
     {
         OnGui();
@@ -146,9 +139,8 @@ void DirectX11::Dx11Main::Initialize()
         m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
     });
 
-    g_progressWindow->SetProgress(85);
+    BootProgress::Step(L"Initializing Managers...");
     SceneManagers->ManagerInitialize();
-    g_progressWindow->SetProgress(90);
     PhysicsManagers->Initialize();
 
     // CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.

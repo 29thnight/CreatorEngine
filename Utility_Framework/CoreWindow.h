@@ -152,6 +152,18 @@ public:
         PruneOldDumpFiles();
     }
 
+    /// 숨겨 둔 창을 표시한다. 에디터 부팅이 끝난 뒤 한 번 부르는 계약이다.
+    /// (게임 빌드는 CreateAppWindow가 즉시 표시하므로 다시 불러도 무해하다.)
+    void Show()
+    {
+        if (m_hWnd && !IsWindowVisible(m_hWnd))
+        {
+            ShowWindow(m_hWnd, SW_SHOWNORMAL);
+            UpdateWindow(m_hWnd);
+            SetForegroundWindow(m_hWnd);
+        }
+    }
+
     HWND GetHandle() const { return m_hWnd; }
     int GetWidth() const { return m_width; }
     int GetHeight() const { return m_height; }
@@ -232,8 +244,9 @@ private:
         if (m_hWnd)
         {
             DragAcceptFiles(m_hWnd, TRUE);
-            ShowWindow(m_hWnd, SW_SHOWNORMAL);
-            UpdateWindow(m_hWnd);
+            // 에디터는 여기서 창을 보여주지 않는다. 초기화가 메인 스레드를
+            // 점유하는 동안 응답 없는 빈 창이 로딩창과 같이 떠 있었다.
+            // 초기화 완료 지점에서 Show()를 부른다.
         }
 #else
         // 1) 보더리스 창 생성 (임시 크기)
