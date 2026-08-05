@@ -474,6 +474,16 @@ float4 PSMain(VSOut input) : SV_TARGET
         }
     };
 
+    // DX12 기록 패턴 세 가지. '기록 경로 최적화'의 후보들이고, 벤치가 승자를
+    // 실측으로 가른다:
+    //   PerDrawAlloc  드로우마다 링에서 잘라 루트 CBV — 1차 측정의 기준 경로.
+    //                 드로우마다 CAS(compare_exchange) 한 번이 붙는다.
+    //   BulkAlloc     프레임(또는 워커 조각)당 블록 하나를 잘라 256B 보폭으로
+    //                 나눠 쓴다 — CAS가 드로우 수와 무관해진다.
+    //   RootConstants 링을 아예 안 거치고 페이로드 20 DWORD를 커맨드 리스트에
+    //                 직접 싣는다 — 복사가 드라이버 몫이 된다.
+    enum class Dx12RecordMode { PerDrawAlloc, BulkAlloc, RootConstants };
+
     // ── DX12 쪽 ──────────────────────────────────────────────────────────
     struct Dx12Bench
     {
@@ -483,6 +493,8 @@ float4 PSMain(VSOut input) : SV_TARGET
 
         ComPtr<ID3D12RootSignature>  rootSignature;
         ComPtr<ID3D12PipelineState>  pso;
+        ComPtr<ID3D12RootSignature>  rootSignatureRC;   // 루트 상수 변형용
+        ComPtr<ID3D12PipelineState>  psoRC;
         ComPtr<ID3D12Resource>       renderTarget;
         ComPtr<ID3D12DescriptorHeap> rtvHeap;
         ComPtr<ID3D12Resource>       vertexBuffer;
@@ -557,6 +569,37 @@ float4 PSMain(VSOut input) : SV_TARGET
                 if (FAILED(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso))))
                 {
                     outLog += "DX12 PSO 생성 실패\n";
+                    return false;
+                }
+
+                // 루트 상수 변형. 같은 셰이더(b0 cbuffer)를 쓰되 바인딩만
+                // 32비트 상수 20개(= PerDraw 80바이트)로 바꾼다.
+                D3D12_ROOT_PARAMETER rcParam{};
+                rcParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+                rcParam.Constants.ShaderRegister = 0;
+                rcParam.Constants.Num32BitValues = sizeof(PerDraw) / 4;
+                rcParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+                D3D12_ROOT_SIGNATURE_DESC rcDesc{};
+                rcDesc.NumParameters = 1;
+                rcDesc.pParameters = &rcParam;
+                rcDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+                ComPtr<ID3DBlob> rcBlob;
+                ComPtr<ID3DBlob> rcErrors;
+                if (FAILED(D3D12SerializeRootSignature(&rcDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+                        &rcBlob, &rcErrors)) ||
+                    FAILED(device->CreateRootSignature(0, rcBlob->GetBufferPointer(),
+                        rcBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureRC))))
+                {
+                    outLog += "DX12 루트 상수 시그니처 생성 실패\n";
+                    return false;
+                }
+
+                desc.pRootSignature = rootSignatureRC.Get();
+                if (FAILED(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&psoRC))))
+                {
+                    outLog += "DX12 루트 상수 PSO 생성 실패\n";
                     return false;
                 }
             }
@@ -713,10 +756,18 @@ float4 PSMain(VSOut input) : SV_TARGET
             return true;
         }
 
-        void BindState(ID3D12GraphicsCommandList* commandList) const
+        void BindState(ID3D12GraphicsCommandList* commandList, Dx12RecordMode mode) const
         {
-            commandList->SetGraphicsRootSignature(rootSignature.Get());
-            commandList->SetPipelineState(pso.Get());
+            if (Dx12RecordMode::RootConstants == mode)
+            {
+                commandList->SetGraphicsRootSignature(rootSignatureRC.Get());
+                commandList->SetPipelineState(psoRC.Get());
+            }
+            else
+            {
+                commandList->SetGraphicsRootSignature(rootSignature.Get());
+                commandList->SetPipelineState(pso.Get());
+            }
             D3D12_VIEWPORT viewport{ 0.f, 0.f,
                 static_cast<float>(kBenchWidth), static_cast<float>(kBenchHeight), 0.f, 1.f };
             D3D12_RECT scissor{ 0, 0, kBenchWidth, kBenchHeight };
@@ -729,23 +780,58 @@ float4 PSMain(VSOut input) : SV_TARGET
             commandList->IASetIndexBuffer(&ibView);
         }
 
-        void RecordDraws(ID3D12GraphicsCommandList* commandList,
+        void RecordDraws(ID3D12GraphicsCommandList* commandList, Dx12RecordMode mode,
             const std::vector<PerDraw>& payloads, uint32_t begin, uint32_t end)
         {
             auto& ring = resources->GetUploadRing();
-            for (uint32_t i = begin; i < end; ++i)
+
+            switch (mode)
             {
-                const auto allocation = ring.Allocate(sizeof(PerDraw),
-                    DX12UploadRing::kConstantBufferAlignment);
-                if (!allocation.IsValid()) return;   // 넘침은 호출부가 통계로 잡는다
-                memcpy(allocation.cpuAddress, &payloads[i], sizeof(PerDraw));
-                commandList->SetGraphicsRootConstantBufferView(0, allocation.gpuAddress);
-                commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+            case Dx12RecordMode::PerDrawAlloc:
+                for (uint32_t i = begin; i < end; ++i)
+                {
+                    const auto allocation = ring.Allocate(sizeof(PerDraw),
+                        DX12UploadRing::kConstantBufferAlignment);
+                    if (!allocation.IsValid()) return;   // 넘침은 호출부가 통계로 잡는다
+                    memcpy(allocation.cpuAddress, &payloads[i], sizeof(PerDraw));
+                    commandList->SetGraphicsRootConstantBufferView(0, allocation.gpuAddress);
+                    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+                }
+                break;
+
+            case Dx12RecordMode::BulkAlloc:
+            {
+                // 구간 전체를 블록 하나로 잘라 256B 보폭으로 나눠 쓴다.
+                // CAS가 드로우 수와 무관하게 한 번이 된다 — 이것이 이 변형의 전부다.
+                constexpr uint64_t kStride = DX12UploadRing::kConstantBufferAlignment;
+                const uint32_t count = end - begin;
+                const auto block = ring.Allocate(kStride * count, kStride);
+                if (!block.IsValid()) return;
+
+                auto* cpuBase = static_cast<uint8_t*>(block.cpuAddress);
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    memcpy(cpuBase + kStride * i, &payloads[begin + i], sizeof(PerDraw));
+                    commandList->SetGraphicsRootConstantBufferView(0,
+                        block.gpuAddress + kStride * i);
+                    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+                }
+                break;
+            }
+
+            case Dx12RecordMode::RootConstants:
+                for (uint32_t i = begin; i < end; ++i)
+                {
+                    commandList->SetGraphicsRoot32BitConstants(0,
+                        sizeof(PerDraw) / 4, &payloads[i], 0);
+                    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+                }
+                break;
             }
         }
 
         // 순차 기록 한 프레임.
-        bool RenderFrameSequential(const std::vector<PerDraw>& payloads,
+        bool RenderFrameSequential(Dx12RecordMode mode, const std::vector<PerDraw>& payloads,
             uint32_t drawCount, Sample& outSample, std::string& outLog)
         {
             std::string error;
@@ -765,8 +851,8 @@ float4 PSMain(VSOut input) : SV_TARGET
             const float clearColor[4] = { 0.f, 0.f, 0.f, 1.f };
             commandList->ClearRenderTargetView(
                 rtvHeap->GetCPUDescriptorHandleForHeapStart(), clearColor, 0, nullptr);
-            BindState(commandList);
-            RecordDraws(commandList, payloads, 0, drawCount);
+            BindState(commandList, mode);
+            RecordDraws(commandList, mode, payloads, 0, drawCount);
             profiler->EndPass(commandList, slot);
             profiler->ResolveFrame(commandList);
 
@@ -839,8 +925,11 @@ float4 PSMain(VSOut input) : SV_TARGET
 
                 const uint32_t slot = profiler->BeginPass(list,
                     "W" + std::to_string(worker));
-                BindState(list);
-                RecordDraws(list, payloads, begin, end);
+                // 병렬은 일괄 할당으로 기록한다 — 워커당 CAS 한 번. 드로우당
+                // 할당이면 워커들이 같은 원자 커서를 두고 경합해 병렬의 이득을
+                // 자기 손으로 깎는다.
+                BindState(list, Dx12RecordMode::BulkAlloc);
+                RecordDraws(list, Dx12RecordMode::BulkAlloc, payloads, begin, end);
                 profiler->EndPass(list, slot);
             }, kParallelWorkers);
 
@@ -1011,10 +1100,42 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
     {
         uint32_t drawCount{ 0 };
         Sample dx11Median{};
-        Sample dx12SeqMedian{};
-        Sample dx12ParMedian{};
+        Sample dx12PerDraw{};   // 드로우당 링 할당(1차 측정의 기준 경로)
+        Sample dx12Bulk{};      // 일괄 블록 할당 — 기록 경로 최적화 후보 1
+        Sample dx12Rc{};        // 루트 상수 — 기록 경로 최적화 후보 2
+        Sample dx12Par{};       // 병렬 4워커 + 일괄 할당
     };
     std::vector<ResultRow> rows;
+
+    // 워밍업을 버리고 중앙값을 채우는 공통 절차. 변형마다 절차가 갈리면
+    // 그 차이가 결과에 섞인다.
+    const auto measureMedian = [&](const auto& renderOnce, Sample& outMedian) -> bool
+    {
+        std::vector<double> record;
+        std::vector<double> submit;
+        std::vector<double> gpu;
+        for (uint32_t i = 0; i < kBenchWarmupFrames + kBenchMeasureFrames; ++i)
+        {
+            Sample sample{};
+            bool valid = true;
+            if (!renderOnce(sample, valid)) return false;
+            if (i >= kBenchWarmupFrames && valid)
+            {
+                record.push_back(sample.recordMs);
+                submit.push_back(sample.submitMs);
+                gpu.push_back(sample.gpuMs);
+            }
+        }
+        if (record.empty())
+        {
+            outLog += "유효 표본 0건 — 측정 불능\n";
+            return false;
+        }
+        outMedian.recordMs = BenchMedian(record);
+        outMedian.submitMs = BenchMedian(submit);
+        outMedian.gpuMs = BenchMedian(gpu);
+        return true;
+    };
 
     for (const uint32_t drawCount : kDrawCounts)
     {
@@ -1024,119 +1145,57 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
         row.drawCount = drawCount;
 
         // ── DX11 ──
-        {
-            std::vector<double> record;
-            std::vector<double> submit;
-            std::vector<double> gpu;
-            for (uint32_t i = 0; i < kBenchWarmupFrames + kBenchMeasureFrames && passed; ++i)
-            {
-                Sample sample{};
-                bool valid = true;
-                if (!dx11.RenderFrame(payloads, drawCount, sample, valid, outLog))
-                {
-                    passed = false;
-                    break;
-                }
-                if (i >= kBenchWarmupFrames && valid)
-                {
-                    record.push_back(sample.recordMs);
-                    submit.push_back(sample.submitMs);
-                    gpu.push_back(sample.gpuMs);
-                }
-            }
-            if (!passed) break;
-            if (record.empty())
-            {
-                outLog += "DX11 유효 표본 0건(disjoint 연발) — 측정 불능\n";
-                passed = false;
-                break;
-            }
-            row.dx11Median.recordMs = BenchMedian(record);
-            row.dx11Median.submitMs = BenchMedian(submit);
-            row.dx11Median.gpuMs = BenchMedian(gpu);
-            if (!dx11.ReadCoverage(row.dx11Median.coverage, outLog))
-            {
-                passed = false;
-                break;
-            }
-        }
+        passed = measureMedian([&](Sample& sample, bool& valid)
+            { return dx11.RenderFrame(payloads, drawCount, sample, valid, outLog); },
+            row.dx11Median)
+            && dx11.ReadCoverage(row.dx11Median.coverage, outLog);
+        if (!passed) break;
 
-        // ── DX12 순차 ──
+        // ── DX12 순차 변형 셋 ──
+        const struct { Dx12RecordMode mode; Sample* median; } sequentialVariants[] = {
+            { Dx12RecordMode::PerDrawAlloc, &row.dx12PerDraw },
+            { Dx12RecordMode::BulkAlloc,    &row.dx12Bulk },
+            { Dx12RecordMode::RootConstants,&row.dx12Rc },
+        };
+        for (const auto& variant : sequentialVariants)
         {
-            std::vector<double> record;
-            std::vector<double> submit;
-            std::vector<double> gpu;
-            for (uint32_t i = 0; i < kBenchWarmupFrames + kBenchMeasureFrames && passed; ++i)
-            {
-                Sample sample{};
-                if (!dx12.RenderFrameSequential(payloads, drawCount, sample, outLog))
+            passed = measureMedian([&](Sample& sample, bool& valid)
                 {
-                    passed = false;
-                    break;
-                }
-                if (i >= kBenchWarmupFrames)
-                {
-                    record.push_back(sample.recordMs);
-                    submit.push_back(sample.submitMs);
-                    gpu.push_back(sample.gpuMs);
-                }
-            }
+                    valid = true;
+                    return dx12.RenderFrameSequential(variant.mode, payloads,
+                        drawCount, sample, outLog);
+                }, *variant.median)
+                && dx12.ReadCoverage(variant.median->coverage, outLog);
             if (!passed) break;
-            row.dx12SeqMedian.recordMs = BenchMedian(record);
-            row.dx12SeqMedian.submitMs = BenchMedian(submit);
-            row.dx12SeqMedian.gpuMs = BenchMedian(gpu);
-            if (!dx12.ReadCoverage(row.dx12SeqMedian.coverage, outLog))
-            {
-                passed = false;
-                break;
-            }
         }
+        if (!passed) break;
 
-        // ── DX12 병렬 ──
-        {
-            std::vector<double> record;
-            std::vector<double> submit;
-            std::vector<double> gpu;
-            for (uint32_t i = 0; i < kBenchWarmupFrames + kBenchMeasureFrames && passed; ++i)
+        // ── DX12 병렬(일괄) ──
+        passed = measureMedian([&](Sample& sample, bool& valid)
             {
-                Sample sample{};
-                if (!dx12.RenderFrameParallel(payloads, drawCount, sample, outLog))
-                {
-                    passed = false;
-                    break;
-                }
-                if (i >= kBenchWarmupFrames)
-                {
-                    record.push_back(sample.recordMs);
-                    submit.push_back(sample.submitMs);
-                    gpu.push_back(sample.gpuMs);
-                }
-            }
-            if (!passed) break;
-            row.dx12ParMedian.recordMs = BenchMedian(record);
-            row.dx12ParMedian.submitMs = BenchMedian(submit);
-            row.dx12ParMedian.gpuMs = BenchMedian(gpu);
-            if (!dx12.ReadCoverage(row.dx12ParMedian.coverage, outLog))
-            {
-                passed = false;
-                break;
-            }
-        }
+                valid = true;
+                return dx12.RenderFrameParallel(payloads, drawCount, sample, outLog);
+            }, row.dx12Par)
+            && dx12.ReadCoverage(row.dx12Par.coverage, outLog);
+        if (!passed) break;
 
         // ── 커버리지 대조 — '빨라진 것'과 '덜 그린 것'을 가르는 자물쇠 ──
         //
-        // 세 경로가 같은 픽셀 수를 그렸어야 시간 비교가 성립한다. 하나라도
+        // 다섯 경로가 같은 픽셀 수를 그렸어야 시간 비교가 성립한다. 하나라도
         // 어긋나면 그 시간은 다른 일을 한 시간이다.
-        if (row.dx11Median.coverage != row.dx12SeqMedian.coverage ||
-            row.dx11Median.coverage != row.dx12ParMedian.coverage ||
-            0 == row.dx11Median.coverage)
+        const uint32_t expected = row.dx11Median.coverage;
+        if (0 == expected ||
+            expected != row.dx12PerDraw.coverage ||
+            expected != row.dx12Bulk.coverage ||
+            expected != row.dx12Rc.coverage ||
+            expected != row.dx12Par.coverage)
         {
-            char line[224]{};
+            char line[288]{};
             std::snprintf(line, sizeof(line),
-                "커버리지 불일치 — DX11 %u · DX12 순차 %u · DX12 병렬 %u "
-                "(드로우 %u): 시간 비교가 성립하지 않는다\n",
-                row.dx11Median.coverage, row.dx12SeqMedian.coverage,
-                row.dx12ParMedian.coverage, row.drawCount);
+                "커버리지 불일치 — DX11 %u · 할당/드로우 %u · 일괄 %u · 루트상수 %u"
+                " · 병렬 %u (드로우 %u): 시간 비교가 성립하지 않는다\n",
+                expected, row.dx12PerDraw.coverage, row.dx12Bulk.coverage,
+                row.dx12Rc.coverage, row.dx12Par.coverage, row.drawCount);
             outLog += line;
             passed = false;
             break;
@@ -1146,7 +1205,7 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
 
         char header[64]{};
         std::snprintf(header, sizeof(header),
-            "드로우 %5u (커버리지 %u px)\n", row.drawCount, row.dx11Median.coverage);
+            "드로우 %5u (커버리지 %u px)\n", row.drawCount, expected);
         outLog += header;
 
         const auto appendLine = [&outLog](const char* name, const Sample& sample,
@@ -1157,14 +1216,14 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
             if (baselineCpu > 0.0)
             {
                 std::snprintf(line, sizeof(line),
-                    "  %-9s 기록 %7.3f + 제출 %7.3f = CPU %7.3f ms (%4.2f배) · GPU %7.3f ms\n",
+                    "  %-16s 기록 %7.3f + 제출 %7.3f = CPU %7.3f ms (%4.2f배) · GPU %7.3f ms\n",
                     name, sample.recordMs, sample.submitMs, totalCpu,
                     baselineCpu / totalCpu, sample.gpuMs);
             }
             else
             {
                 std::snprintf(line, sizeof(line),
-                    "  %-9s 기록 %7.3f + 제출 %7.3f = CPU %7.3f ms · GPU %7.3f ms\n",
+                    "  %-16s 기록 %7.3f + 제출 %7.3f = CPU %7.3f ms · GPU %7.3f ms\n",
                     name, sample.recordMs, sample.submitMs, totalCpu, sample.gpuMs);
             }
             outLog += line;
@@ -1172,8 +1231,10 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
 
         const double dx11Cpu = row.dx11Median.recordMs + row.dx11Median.submitMs;
         appendLine("DX11", row.dx11Median, 0.0);
-        appendLine("DX12 순차", row.dx12SeqMedian, dx11Cpu);
-        appendLine("DX12 병렬", row.dx12ParMedian, dx11Cpu);
+        appendLine("DX12 할당/드로우", row.dx12PerDraw, dx11Cpu);
+        appendLine("DX12 일괄", row.dx12Bulk, dx11Cpu);
+        appendLine("DX12 루트상수", row.dx12Rc, dx11Cpu);
+        appendLine("DX12 병렬(일괄)", row.dx12Par, dx11Cpu);
     }
 
     // ── 전제 판정 ──
@@ -1203,40 +1264,56 @@ bool EnhancedSceneRenderer::RunApiOverheadBench(std::string& outLog)
             }
             return crossover;
         };
-        const uint32_t seqCrossover = suffixCrossover([](const ResultRow& row)
-            { return row.dx12SeqMedian.recordMs + row.dx12SeqMedian.submitMs; });
-        const uint32_t parCrossover = suffixCrossover([](const ResultRow& row)
-            { return row.dx12ParMedian.recordMs + row.dx12ParMedian.submitMs; });
+        const struct
+        {
+            const char* name;
+            Sample ResultRow::* median;
+        } variants[] = {
+            { "할당/드로우", &ResultRow::dx12PerDraw },
+            { "일괄",        &ResultRow::dx12Bulk },
+            { "루트상수",    &ResultRow::dx12Rc },
+            { "병렬(일괄)",  &ResultRow::dx12Par },
+        };
+        for (const auto& variant : variants)
+        {
+            const uint32_t crossover = suffixCrossover([&](const ResultRow& row)
+            {
+                const Sample& sample = row.*(variant.median);
+                return sample.recordMs + sample.submitMs;
+            });
+            if (0 != crossover)
+            {
+                outLog += std::string("CPU(") + variant.name + "): 드로우 "
+                    + std::to_string(crossover) + "건부터 끝까지 DX11보다 싸다\n";
+            }
+            else
+            {
+                outLog += std::string("CPU(") + variant.name
+                    + "): DX11을 지속적으로 이기지 못했다(위 표의 배율 참조)\n";
+            }
+        }
 
-        if (0 != seqCrossover)
-        {
-            outLog += "CPU(순차): 드로우 " + std::to_string(seqCrossover)
-                + "건부터 끝까지 DX12가 DX11보다 싸다\n";
-        }
-        else
-        {
-            outLog += "CPU(순차): DX12 순차 기록이 DX11을 지속적으로 이기지 못했다"
-                      "(위 표의 배율 참조)\n";
-        }
-        if (0 != parCrossover)
-        {
-            outLog += "CPU(병렬): 드로우 " + std::to_string(parCrossover)
-                + "건부터 끝까지 DX12 병렬 기록(워커 "
-                + std::to_string(kParallelWorkers) + ")이 DX11보다 싸다\n";
-        }
-        else
-        {
-            outLog += "CPU(병렬): DX12 병렬 기록이 DX11을 지속적으로 이기지 못했다"
-                      "(위 표의 배율 참조)\n";
-        }
-
+        // 기록 경로 최적화의 판정: 가장 큰 N에서 기준 경로(할당/드로우) 대비
+        // 각 후보가 얼마나 줄였는가.
         const ResultRow& last = rows.back();
+        {
+            const double base = last.dx12PerDraw.recordMs;
+            char line[288]{};
+            std::snprintf(line, sizeof(line),
+                "기록 경로(드로우 %u, 기록만): 할당/드로우 %.3f → 일괄 %.3f(%4.2f배)"
+                " · 루트상수 %.3f(%4.2f배) · 병렬일괄 %.3f(%4.2f배)\n",
+                last.drawCount, base,
+                last.dx12Bulk.recordMs, base / last.dx12Bulk.recordMs,
+                last.dx12Rc.recordMs, base / last.dx12Rc.recordMs,
+                last.dx12Par.recordMs, base / last.dx12Par.recordMs);
+            outLog += line;
+        }
         {
             char line[224]{};
             std::snprintf(line, sizeof(line),
                 "GPU(드로우 %u): DX11 %.3f ms · DX12 %.3f ms — GPU는 같은 하드웨어라 "
                 "큰 차이가 없어야 정상이고, 전제의 본체는 CPU 쪽 수다\n",
-                last.drawCount, last.dx11Median.gpuMs, last.dx12SeqMedian.gpuMs);
+                last.drawCount, last.dx11Median.gpuMs, last.dx12PerDraw.gpuMs);
             outLog += line;
         }
 

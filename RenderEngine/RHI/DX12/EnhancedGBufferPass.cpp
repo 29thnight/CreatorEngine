@@ -759,6 +759,29 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const size_t batchCount = m_batches.size();
             const size_t sliceBegin = batchCount * slice / sliceCount;
             const size_t sliceEnd = batchCount * (slice + 1) / sliceCount;
+            if (sliceBegin >= sliceEnd) return;
+
+            // ── 조각의 인스턴스를 블록 하나로 올린다 (일괄 할당) ──
+            //
+            // 예전에는 배치마다 링에서 잘랐다. dx12.bench11 실측이 그 비용을
+            // 정확히 보여 줬다 — Allocate 한 번이 원자 연산 몇 개를 지나며
+            // 호출당 ~175ns, 드로우당 할당 3.568ms가 일괄 5.25배(0.679ms)로
+            // 줄었다. 배치들의 인스턴스는 m_instances에 배치 순서로 연속이라
+            // (PrepareFrame의 계약), 조각 구간 전체가 한 번의 memcpy로 올라간다.
+            // 배치마다 갈리는 것은 루트 SRV 주소 하나다.
+            const uint32_t sliceFirstInstance = m_batches[sliceBegin].firstInstance;
+            const DrawBatch& sliceLastBatch = m_batches[sliceEnd - 1];
+            const uint32_t sliceInstanceEnd =
+                sliceLastBatch.firstInstance + sliceLastBatch.instanceCount;
+            if (sliceInstanceEnd <= sliceFirstInstance) return;
+
+            const uint64_t sliceInstanceBytes = sizeof(InstanceData)
+                * static_cast<uint64_t>(sliceInstanceEnd - sliceFirstInstance);
+            const auto instanceBlock = context.resources->GetUploadRing().Allocate(
+                sliceInstanceBytes, sizeof(InstanceData));
+            if (!instanceBlock.IsValid()) return;   // 구간이 찼다 — 이 조각은 다음 프레임
+            memcpy(instanceBlock.cpuAddress, &m_instances[sliceFirstInstance],
+                static_cast<size_t>(sliceInstanceBytes));
 
             for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
             {
@@ -768,16 +791,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 const auto mesh = m_drawGeometry.find(batch.mesh);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
-                // 이 배치의 인스턴스를 업로드 링에 연속으로 올린다.
-                const uint64_t instanceBytes =
-                    sizeof(InstanceData) * static_cast<uint64_t>(batch.instanceCount);
-                const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
-                    instanceBytes, sizeof(InstanceData));
-                if (!instanceBuffer.IsValid()) break;   // 구간이 찼다 — 남은 배치는 다음 프레임
-
-                memcpy(instanceBuffer.cpuAddress, &m_instances[batch.firstInstance],
-                    static_cast<size_t>(instanceBytes));
-                commandList->SetGraphicsRootShaderResourceView(1, instanceBuffer.gpuAddress);
+                commandList->SetGraphicsRootShaderResourceView(1,
+                    instanceBlock.gpuAddress + sizeof(InstanceData)
+                        * static_cast<uint64_t>(batch.firstInstance - sliceFirstInstance));
 
                 // 재질 텍스처 넷을 연속으로 잘라 테이블 하나로 묶는다.
                 // PrepareFrame이 올려 둔 것을 쓴다 — 기록 중에는 만들지 않는다.

@@ -627,6 +627,13 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     const auto found = m_drawGeometry.find(batchMesh);
                     if (found != m_drawGeometry.end() && found->second.entry.IsValid())
                     {
+                        // 배치마다 링에서 자른다. dx12.bench11 실측으로 Allocate
+                        // 호출당 ~175ns가 붙는 것을 알지만(GBuffer는 그래서 조각당
+                        // 블록 하나로 바꿨다), 여기는 그대로 둔다 — 배치가 컬링
+                        // 결과에 따라 즉석에서 만들어져 크기를 미리 모르고, 상한
+                        // (조각의 후보 전부)으로 잡으면 컬링이 잘 될수록 링을
+                        // 낭비한다. 배치 수가 고유 메시 수 × 캐스케이드로 묶여
+                        // 있어 호출 수 자체가 작다는 것이 근거다.
                         const uint64_t instanceBytes =
                             sizeof(ShadowInstance) * static_cast<uint64_t>(instances.size());
                         const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
