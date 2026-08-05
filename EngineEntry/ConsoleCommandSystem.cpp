@@ -22,6 +22,7 @@
 #include "PathFinder.h"
 #include "CoreWindow.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "SceneRenderer.h"
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
 
@@ -1650,6 +1651,35 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
     }
+    else if (cmd == "render.backend")
+    {
+        // 렌더러 교체 스위치(3-9). dx12를 고르면 DX12 상시 러너가 씬을 그리고
+        // DX11 씬 패스(CE의 병목 단계)는 쉰다. dx11이면 원상 복구. 프레임
+        // 경계(Pump)에서 실행되므로 CE가 루프 중간에 전환을 보지 않는다.
+        const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
+        auto* dx11Renderer = SceneRenderer::GetActive();
+
+        if (backend == "dx12" && nullptr != dx11Renderer)
+        {
+            EnhancedSceneRenderer::EnableLive();
+            dx11Renderer->SetScenePassesSuspended(true);
+            std::printf("[CLI] render.backend dx12 — DX11 씬 패스 중단, DX12가 그린다\n");
+        }
+        else if (backend == "dx11" && nullptr != dx11Renderer)
+        {
+            dx11Renderer->SetScenePassesSuspended(false);
+            EnhancedSceneRenderer::DisableLive();
+            std::printf("[CLI] render.backend dx11 — DX11 씬 패스 재개\n");
+        }
+        else
+        {
+            const bool suspended = (nullptr != dx11Renderer)
+                && dx11Renderer->IsScenePassesSuspended();
+            std::printf("[CLI] render.backend — 활성: %s\n",
+                suspended ? "dx12(DX11 씬 패스 중단)" : "dx11");
+            std::printf("%s\n", EnhancedSceneRenderer::GetLiveStatus().c_str());
+        }
+    }
     else if (cmd == "dx12.live")
     {
         // 렌더러 스위치(병존기). 씬 뷰·게임 뷰의 표시 텍스처 공급자를
@@ -2721,7 +2751,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
         "  dx12.fog             볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)\n"
         "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
-        "  dx12.live on|off|status  렌더러 스위치 — 씬 뷰 표시를 DX12 상시 러너로 전환\n"
+        "  dx12.live on|off|status  표시 공급자 스위치 — 씬 뷰 표시만 DX12로(DX11은 계속 그림)\n"
+        "  render.backend dx11|dx12|status  렌더러 교체 스위치(3-9) — dx12면 DX11 씬 패스 중단\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

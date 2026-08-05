@@ -158,6 +158,18 @@ public:
 	// 자기 자신일 때만 지운다.
 	static SceneRenderer* GetActive() { return s_active; }
 
+	// ── 렌더러 교체 스위치(3-9)의 DX11 쪽 절반 ──
+	//
+	// 참이면 CE 스레드의 씬 패스 실행(SceneRendering의 카메라 루프)을 건너뛴다.
+	// CB 스레드(CreateCommandListPass)는 그대로 돈다 — 스냅샷 래치와 렌더 큐
+	// 적재가 거기 있고, DX12 상시 러너가 바로 그것을 입력으로 읽기 때문이다.
+	// 3-2 실측에서 병목은 CE 단계 하나였으므로(95% 프레임에서 마지막 도착자),
+	// 이 절반만으로도 교체의 성능 회수분이 열린다. 게임 스레드의 프레임 경계
+	// (ConsoleCommandSystem::Pump 자리)에서만 바꾼다 — CE가 루프 중간에 값이
+	// 바뀌는 것을 보지 않게 하기 위해서다.
+	void SetScenePassesSuspended(bool suspended) { m_scenePassesSuspended = suspended; }
+	bool IsScenePassesSuspended() const { return m_scenePassesSuspended; }
+
 	// DX12 이식의 정확성 대조용(PHASE 3-6). DX11이 그린 GBuffer를 밖에서
 	// 읽을 수 있어야 '같은 씬을 같은 그림으로 그리는가'를 물을 수 있다.
 	//
@@ -237,6 +249,9 @@ private:
 	bool										m_bShowGridSettings	{ false };
 
 	static SceneRenderer* s_active;
+
+	// 3-9 교체 스위치. CE가 읽고 게임 스레드가 프레임 경계에서만 쓴다.
+	bool m_scenePassesSuspended{ false };
 
 	// GBuffer 캡처 상태. 렌더 스레드가 쓰고 게임 스레드가 읽는다.
 	void ProcessGBufferCapture();

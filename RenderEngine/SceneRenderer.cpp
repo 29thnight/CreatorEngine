@@ -789,6 +789,12 @@ void SceneRenderer::SceneRendering()
 	m_EffectEditor->Update(deltaTime);
 	EffectManagers->Update(deltaTime);
 
+	// 렌더러 교체 스위치(3-9). DX12가 씬을 그리는 동안 DX11 씬 패스를 쉬게
+	// 한다 — 여기(CE)가 3-2 실측의 병목이라 이 절반이 곧 성능 회수분이다.
+	// 이펙트 갱신·GUI·Present는 그대로 돈다. GBuffer 캡처(ProcessGBufferCapture)
+	// 도 건너뛴다 — 쉬는 동안의 캡처는 지난 그림이라 대조를 오염시킨다.
+	if (m_scenePassesSuspended) return;
+
 	for (auto& camera : CameraManagement->GetCameras())
 	{
 		if (!RenderPassData::VaildCheck(camera.get())) continue;
