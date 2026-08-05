@@ -39,7 +39,12 @@ foreach ($case in $cases) {
     # wait는 프레임 단위다. 씬 로드가 끝나고 나서 죽여야 의미가 있다.
     "wait 60`ncrash.status`ncrash.test $kind`n" | Set-Content -Path $script -Encoding UTF8
 
-    $before = @(Get-ChildItem (Join-Path $dumpDir "*.dmp") -ErrorAction SilentlyContinue).Count
+    # ★ 개수 비교로 판정하면 안 된다. 엔진이 시작 시 오래된 덤프를 지우므로
+    #   (kMaxRetainedDumpFiles=5) 폴더가 상한에 닿으면 '프룬 -1 + 크래시 +1'로
+    #   개수가 그대로다 — 실패 잔해가 6개를 채운 순간부터 모든 실행이
+    #   '생기지 않았다'로 위음성이 났다(2026-08-05 실측). 실행 시각 이후에
+    #   생긴 파일을 찾는다.
+    $launchTime = Get-Date
 
     $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
         -WorkingDirectory $exeDir `
@@ -48,14 +53,14 @@ foreach ($case in $cases) {
     $proc.WaitForExit(300000) | Out-Null
     if (-not $proc.HasExited) { $proc.Kill(); $failures += "${kind}: 타임아웃"; continue }
 
-    # 1. 덤프가 새로 생겼는가
-    $after = @(Get-ChildItem (Join-Path $dumpDir "*.dmp") -ErrorAction SilentlyContinue).Count
-    if ($after -le $before) {
-        $failures += "${kind}: .dmp가 생기지 않았다 ($before -> $after)"
+    # 1. 덤프가 새로 생겼는가 — 이 실행이 시작된 뒤에 쓰인 파일만 센다.
+    $dump = Get-ChildItem (Join-Path $dumpDir "*.dmp") -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -gt $launchTime } |
+            Sort-Object LastWriteTime | Select-Object -Last 1
+    if ($null -eq $dump) {
+        $failures += "${kind}: .dmp가 생기지 않았다 (실행 후 새 파일 없음)"
         continue
     }
-
-    $dump = Get-ChildItem (Join-Path $dumpDir "*.dmp") | Sort-Object LastWriteTime | Select-Object -Last 1
 
     # 0바이트 껍데기는 '덤프는 있는데 안 열린다'로 이어지므로 크기도 본다.
     if ($dump.Length -lt 1024) {
