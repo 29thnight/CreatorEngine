@@ -211,9 +211,15 @@ public:
 	/// (실측: 포인터만 나르던 동안 겹침 0.70에 머물렀고, 값 복사로 바뀐 뒤
 	///  포즈가 일치했다.)
 	using CapturePalettes = std::unordered_map<size_t, std::vector<Mathf::xMatrix>>;
-	const CapturePalettes& GetCapturePalettes() const { return m_capturePalettes; }
 
-	const std::vector<GBufferCaptureDraw>& GetCaptureDraws() const { return m_captureDraws; }
+	/// 캡처된 드로우와 본 팔레트의 소유권을 넘긴다.
+	///
+	/// ★ 참조로 노출하면 안 된다. 이 둘은 렌더 스레드가 CaptureDrawSnapshot에서
+	/// 채우고 지우는데, 게임 스레드가 그 참조(특히 팔레트 원소의 주소)를 들고
+	/// 있는 동안 렌더가 clear/재할당하면 죽은 메모리를 읽는다 — 실제로 힙
+	/// 손상으로 드러났다. 소비 시점에 통째로 옮겨 게임 스레드 소유로 만든다.
+	void ConsumeCaptureDraws(std::vector<GBufferCaptureDraw>& outDraws,
+		std::unordered_map<size_t, std::vector<Mathf::xMatrix>>& outPalettes);
 
 	/// 준비돼 있으면 결과를 옮겨 담고 true. 아직이면 false — 호출부가 몇 프레임
 	/// 기다렸다 다시 물어야 한다.

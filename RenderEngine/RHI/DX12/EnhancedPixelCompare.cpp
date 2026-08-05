@@ -13,6 +13,7 @@
 #include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
 #include "../../Skeleton.h"
+#include "../../Mesh.h"
 
 #include <algorithm>
 #include <cmath>
@@ -396,8 +397,14 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     //
     // 부수 효과로 정확성도 올라간다. 스냅샷은 DX11이 그 픽셀을 그릴 때 쓴
     // 바로 그 목록이므로, 지금 큐를 읽는 것보다 대조의 전제에 더 맞다.
+    // 캡처된 드로우와 팔레트의 소유권을 통째로 넘겨받는다. 참조로 들면
+    // 렌더 스레드가 다음 캡처에서 지우는 것과 겹친다(힙 손상으로 드러났다).
+    std::vector<SceneRenderer::GBufferCaptureDraw> capturedDraws;
+    SceneRenderer::CapturePalettes capturedPalettes;
+    dx11Renderer->ConsumeCaptureDraws(capturedDraws, capturedPalettes);
+
     std::vector<EnhancedDrawItem> draws;
-    for (const auto& captured : dx11Renderer->GetCaptureDraws())
+    for (const auto& captured : capturedDraws)
     {
         EnhancedDrawItem item{};
         item.mesh = captured.mesh;
@@ -413,7 +420,7 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         // 애니메이션이 갱신되어 DX11이 그릴 때와 다른 포즈를 읽는다.
         if (captured.hasSkinning)
         {
-            const auto& palettes = dx11Renderer->GetCapturePalettes();
+            const auto& palettes = capturedPalettes;
             const auto found = palettes.find(captured.animatorKey);
             if (found != palettes.end() && !found->second.empty())
             {
@@ -455,7 +462,7 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             ++skinnedDraws;
         }
 
-        for (const auto& entry : dx11Renderer->GetCapturePalettes())
+        for (const auto& entry : capturedPalettes)
         {
             for (const auto& matrix : entry.second)
             {
@@ -469,7 +476,7 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         std::snprintf(line, sizeof(line),
             "        스키닝 원천 — 캡처 드로우 %zu · 스킨드 %zu · 팔레트 %zu · 비항등 본 %zu\n",
             draws.size(), skinnedDraws,
-            dx11Renderer->GetCapturePalettes().size(), nonIdentityBones);
+            capturedPalettes.size(), nonIdentityBones);
         outLog += line;
     }
 
@@ -710,6 +717,78 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             gbuffer.GetLastDrawCount(), gbuffer.GetLastBatchCount(),
             gbuffer.GetLastSkinnedCount(), gbuffer.GetLastBonePaletteCount());
         outLog += line;
+    }
+
+    // ── 드로우별 단독 렌더 ──
+    //
+    // 총합만 보면 '어느 드로우가 어긋났는지'를 알 수 없다. DX11 bitmask는
+    // 값이 전부 같아(256) 그쪽으로도 못 가른다 — 드로우를 하나씩 따로 그려
+    // 각각이 DX11 커버리지 안에 얼마나 들어가는지 본다.
+    //
+    // 잘 맞는 드로우와 안 맞는 드로우가 갈리면 범인이 지목되고, 전부 고르게
+    // 안 맞으면 개별 드로우가 아니라 공통 변환·카메라 문제다.
+    if (draws.size() <= 8)   // 드로우가 많으면 이 진단 자체가 비싸다
+    {
+        std::string report = "        드로우별 단독 — ";
+        for (size_t i = 0; i < draws.size(); ++i)
+        {
+            std::vector<EnhancedDrawItem> soloDraw{ draws[i] };
+            std::vector<bool> soloCoverage;
+            if (!renderCoverage(soloDraw, soloCoverage))
+            {
+                report += std::to_string(i) + ":실패 ";
+                continue;
+            }
+
+            size_t soloCovered = 0, soloInsideDX11 = 0;
+            for (size_t index = 0; index < soloCoverage.size(); ++index)
+            {
+                if (!soloCoverage[index]) continue;
+                ++soloCovered;
+                if (dx11Coverage[index]) ++soloInsideDX11;
+            }
+
+            // 0픽셀이면 메시 자체를 봐야 한다 — 빈 메시인지, 화면 밖인지,
+            // 스키닝이 날려 버린 것인지가 갈린다. 셋은 고칠 곳이 전혀 다르다.
+            const auto* mesh = draws[i].mesh;
+            const size_t vertexCount = (nullptr != mesh) ? mesh->GetVertices().size() : 0;
+            const float boundRadius = (nullptr != mesh) ? mesh->GetBoundingSphere().Radius : 0.f;
+
+            // 본 인덱스가 팔레트 범위를 넘으면 쓰레기 행렬을 읽어 정점이
+            // 무한대로 날아간다 — 화면에서 통째로 사라지는 전형적 원인이다.
+            float maxBoneIndex = -1.f;
+            float minWeightSum = 1e9f;
+            if (nullptr != mesh && 0 != draws[i].boneCount)
+            {
+                for (const auto& vertex : mesh->GetVertices())
+                {
+                    maxBoneIndex = (std::max)({ maxBoneIndex,
+                        vertex.boneIndices.x, vertex.boneIndices.y,
+                        vertex.boneIndices.z, vertex.boneIndices.w });
+
+                    const float sum = vertex.boneWeights.x + vertex.boneWeights.y
+                        + vertex.boneWeights.z + vertex.boneWeights.w;
+                    minWeightSum = (std::min)(minWeightSum, sum);
+                }
+            }
+
+            char entry[288]{};
+            std::snprintf(entry, sizeof(entry),
+                "%zu:%zu픽셀(DX11 안 %.1f%% · 정점 %zu · 반경 %.1f · 본 최대 %.0f/%u"
+                " · 최소 가중합 %.3f) ",
+                i, soloCovered,
+                (0 != soloCovered)
+                    ? 100.0 * static_cast<double>(soloInsideDX11)
+                        / static_cast<double>(soloCovered)
+                    : 0.0,
+                vertexCount, boundRadius, maxBoneIndex, draws[i].boneCount,
+                (minWeightSum > 1e8f) ? 0.f : minWeightSum);
+            report += entry;
+        }
+        outLog += report + "\n";
+
+        // 전체 드로우로 되돌린다 — 뒤의 진단이 이 목록을 본다.
+        frameContext.draws = &draws;
     }
 
     // ── [3/3] 대조 ──

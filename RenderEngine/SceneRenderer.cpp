@@ -352,6 +352,10 @@ void SceneRenderer::CaptureDrawSnapshot(RenderPassData* data)
 		+ " · foliage " + std::to_string(data->m_foliageQueue.size())
 		+ " · forward " + std::to_string(data->m_forwardQueue.size()));
 
+	// 소비(ConsumeCaptureDraws)와 같은 뮤텍스로 묶는다 — 게임 스레드가 옮겨
+	// 가는 중에 여기서 지우면 그 자리가 손상된다.
+	std::lock_guard<std::mutex> guard(m_captureMutex);
+
 	m_captureDraws.clear();
 	m_capturePalettes.clear();
 	m_captureDraws.reserve(data->m_deferredQueue.size());
@@ -460,6 +464,18 @@ bool SceneRenderer::ConsumeGBufferCapture(std::vector<uint8_t>& outBytes, uint32
 	m_captureBytes.clear();
 	m_captureReady.store(false, std::memory_order_release);
 	return true;
+}
+
+void SceneRenderer::ConsumeCaptureDraws(std::vector<GBufferCaptureDraw>& outDraws,
+	std::unordered_map<size_t, std::vector<Mathf::xMatrix>>& outPalettes)
+{
+	// 같은 뮤텍스로 묶는다. 렌더 스레드의 CaptureDrawSnapshot과 이 소비가
+	// 겹치면 게임 스레드가 재할당 중인 컨테이너를 읽게 된다.
+	std::lock_guard<std::mutex> guard(m_captureMutex);
+	outDraws = std::move(m_captureDraws);
+	outPalettes = std::move(m_capturePalettes);
+	m_captureDraws.clear();
+	m_capturePalettes.clear();
 }
 
 #ifndef DYNAMICCPP_EXPORTS
