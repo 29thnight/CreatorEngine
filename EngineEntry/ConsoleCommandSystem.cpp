@@ -1663,12 +1663,15 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         {
             EnhancedSceneRenderer::EnableLive();
             dx11Renderer->SetScenePassesSuspended(true);
+            // 다음 부팅의 기본값으로도 기록한다(SaveSettings가 종료 때 영속화).
+            EngineSettingInstance->SetDx12BackendPreferred(true);
             std::printf("[CLI] render.backend dx12 — DX11 씬 패스 중단, DX12가 그린다\n");
         }
         else if (backend == "dx11" && nullptr != dx11Renderer)
         {
             dx11Renderer->SetScenePassesSuspended(false);
             EnhancedSceneRenderer::DisableLive();
+            EngineSettingInstance->SetDx12BackendPreferred(false);
             std::printf("[CLI] render.backend dx11 — DX11 씬 패스 재개\n");
         }
         else

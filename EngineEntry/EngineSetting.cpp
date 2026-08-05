@@ -70,6 +70,7 @@ bool EngineSetting::SaveSettings()
 	rootNode["buildGameName"] = buildGameProjectName.string();
 	rootNode["startupSceneName"] = startupSceneName.string();
 	rootNode["imguiScale"] = m_imguiScale;
+	rootNode["renderBackendDx12"] = m_useDx12Backend;
 
 	settingsFile << rootNode;
 
@@ -100,6 +101,9 @@ bool EngineSetting::LoadSettings()
 
 	if (rootNode["renderPassSettings"])
 		Meta::Deserialize(&m_renderPassSettings, rootNode["renderPassSettings"]);
+
+	if (rootNode["renderBackendDx12"])
+		m_useDx12Backend = rootNode["renderBackendDx12"].as<bool>();
 
 	if (rootNode["m_contentsBrowserStyle"])
 	{

@@ -125,6 +125,19 @@ void Core::App::Run()
 		g_progressWindow->Close();
 		CoreWindow::GetForCurrentInstance()->Show();
 
+		// 저장된 렌더 백엔드 적용(3-9). 스위치 명령을 큐로 태운다(Enqueue →
+		// 첫 Pump가 프레임 경계에서 실행) — 부팅 경로가 수동 전환과 다른
+		// 코드를 타면 한쪽만 고치는 버그가 생기고, 프레임 경계 규약도
+		// 공짜로 지켜진다.
+		//
+		// ★ CLI 초기화보다 먼저 넣는다. 뒤에 넣으면 --script가 적재한 명령들
+		//   뒤에 줄서고, 스크립트가 quit으로 끝나면 영영 실행되지 않는다 —
+		//   실제로 그렇게 검증이 한 번 헛돌았다.
+		if (EngineSettingInstance->IsDx12BackendPreferred())
+		{
+			ConsoleCommandSystem::Get().Enqueue("render.backend dx12");
+		}
+
 		// 초기화가 끝난 뒤 CLI를 연다. 그래야 명령이 완성된 엔진 위에서 실행된다.
 		ConsoleCommandSystem::Get().InitializeFromCommandLine();
 	})

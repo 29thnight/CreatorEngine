@@ -67,6 +67,11 @@ public:
 	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_contentsBrowserStyle = style; }
 	float GetImGuiScale() { return m_imguiScale; }
 
+	// 렌더러 교체 스위치(3-9)의 부팅 기본값. render.backend가 기록하고
+	// SaveSettings가 영속화하며, App::Run 초기화 끝에 적용된다.
+	bool IsDx12BackendPreferred() const { return m_useDx12Backend; }
+	void SetDx12BackendPreferred(bool preferred) { m_useDx12Backend = preferred; }
+
 	void SetImGuiInitialized(bool isInitialized)
 	{
 		m_isImGuiInitialized = isInitialized;
@@ -98,6 +103,7 @@ public:
 	Fence RHICommandFence;
 	TerrainBrush* terrainBrush = nullptr;
 	float m_imguiScale{ 0.8f };
+	bool m_useDx12Backend{ false };   // 3-9 승격 판정 전까지 기본은 DX11
 
 private:
     std::atomic_bool m_isGameView{ false };
