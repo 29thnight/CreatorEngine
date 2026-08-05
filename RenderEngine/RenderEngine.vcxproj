@@ -321,6 +321,8 @@
     <ClCompile Include="RHI\DX12\EnhancedSkinningTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedDecalPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedDecalTest.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedVolumetricFogPass.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedVolumetricFogTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSRPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSRTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSSPass.cpp" />

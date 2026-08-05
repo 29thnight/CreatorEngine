@@ -203,8 +203,20 @@ public:
     void Reset();
 
     // 외부 리소스를 그래프에 들인다. 현재 상태를 알려 줘야 첫 전이를 맞게 만든다.
+    //
+    // stateWriteback — 프레임이 끝났을 때 이 리소스가 어느 상태로 남는지를
+    // Compile이 여기에 적어 준다(널이면 적지 않는다).
+    //
+    // ★ 프레임을 넘겨 사는 리소스에 필요하다. 그래프는 프레임마다 새로
+    // 세워지므로 transient가 될 수 없는 것들(볼류메트릭 포그의 프록셀 격자
+    // 같은 시간축 히스토리)은 패스가 들고 매 프레임 다시 Import하는데,
+    // 그때 알려 줄 '현재 상태'를 패스가 스스로 알 방법이 없다. 자기 패스가
+    // 마지막으로 쓴 상태를 적어 두는 것으로는 모자란다 — 뒤에 붙은 소비자가
+    // 한 번 더 전이시키면 그 값이 어긋나고, 다음 프레임의 첫 배리어가
+    // 틀린 before 상태로 나간다(실제로 리드백 패스가 그렇게 잡혔다).
+    // 상태를 아는 것은 그래프뿐이므로 그래프가 알려 준다.
     RGHandle ImportTexture(ID3D12Resource* resource, RGResourceState currentState,
-        const std::string& name);
+        const std::string& name, RGResourceState* stateWriteback = nullptr);
 
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
@@ -302,6 +314,7 @@ private:
         ID3D12Resource* external{ nullptr };
         Microsoft::WRL::ComPtr<ID3D12Resource> owned;   // transient
         RGResourceState state{ RGResourceState::Common };
+        RGResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
         uint32_t firstUse{ 0xFFFFFFFF };

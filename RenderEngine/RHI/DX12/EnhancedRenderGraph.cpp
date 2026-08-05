@@ -72,7 +72,8 @@ void EnhancedRenderGraph::Reset()
 }
 
 RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
-    RGResourceState currentState, const std::string& name)
+    RGResourceState currentState, const std::string& name,
+    RGResourceState* stateWriteback)
 {
     RGHandle handle{};
     if (nullptr == resource) return handle;
@@ -80,6 +81,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(ID3D12Resource* resource,
     Resource entry{};
     entry.external = resource;
     entry.state = currentState;
+    entry.writeback = stateWriteback;
     entry.imported = true;
     entry.name = name;
 
@@ -393,6 +395,13 @@ void EnhancedRenderGraph::PlanBarriers()
 
         m_stats.barriersEmitted += static_cast<uint32_t>(pass.barriers.size());
         if (!pass.barriers.empty()) ++m_stats.barrierBatches;
+    }
+
+    // 프레임을 넘겨 사는 리소스에 최종 상태를 돌려준다. 다음 프레임의
+    // Import가 이 값을 '현재 상태'로 알려 줘야 첫 배리어가 맞는다.
+    for (auto& resource : m_resources)
+    {
+        if (nullptr != resource.writeback) *resource.writeback = resource.state;
     }
 }
 

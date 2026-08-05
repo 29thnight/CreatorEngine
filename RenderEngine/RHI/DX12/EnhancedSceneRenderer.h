@@ -337,6 +337,9 @@ public:
 
     /// SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
     bool RunSSRTest(std::string& outLog);
+
+    /// 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
+    bool RunVolumetricFogTest(std::string& outLog);
 };
 
 #endif
