@@ -1591,6 +1591,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.decal] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.decal %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.ssr")
+    {
+        // SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunSSRTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ssr] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ssr %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.skinning")
     {
         // GBuffer 스키닝 검증(PHASE 3-6).
@@ -2658,6 +2670,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.skinning        GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)\n"
         "  dx12.sss             SSS 패스 검증(번짐·축 분리·표면 추종·에너지)\n"
         "  dx12.decal           데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)\n"
+        "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

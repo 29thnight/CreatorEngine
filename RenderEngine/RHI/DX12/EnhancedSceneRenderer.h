@@ -334,6 +334,9 @@ public:
 
     /// 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
     bool RunDecalTest(std::string& outLog);
+
+    /// SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
+    bool RunSSRTest(std::string& outLog);
 };
 
 #endif

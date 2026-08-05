@@ -7,6 +7,9 @@
 #include "EnhancedRenderGraph.h"
 #include "EnhancedSceneRenderer.h"
 #include "../../Texture.h"
+// DirectX11::DeviceStates — 데칼 텍스처를 DX11로 만들어 캐시에 태운다.
+// 이웃 파일에서 딸려 오던 것이라 유니티 묶음이 바뀌면 끊긴다. 직접 든다.
+#include "../../DeviceState.h"
 
 #include <algorithm>
 #include <cmath>
