@@ -64,6 +64,15 @@ public:
     /// 잘 된 것이다 — 이 둘이 늘 같으면 인스턴싱이 죽은 것이다.
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
+    /// 스킨드 드로우 수와 올린 팔레트 종류. 팔레트 수가 스킨드 드로우 수와
+    /// 늘 같으면 애니메이터 중복 제거가 죽은 것이다(한 캐릭터의 메시 여럿이
+    /// 같은 팔레트를 공유해야 한다).
+    uint32_t GetLastSkinnedCount() const { return m_lastSkinnedCount; }
+    uint32_t GetLastBonePaletteCount() const
+    {
+        return static_cast<uint32_t>(m_boneOffsets.size());
+    }
+
     /// 이 패스를 컬링 뿌리로 표시할지.
     ///
     /// 소비자(Deferred)가 붙기 전에는 GBuffer 출력을 읽는 패스가 없어서 컬링에
@@ -102,8 +111,14 @@ private:
         float         metallic{ 0.f };
         float         roughness{ 1.f };
         uint32_t      useNormalMap{ 0 };
-        uint32_t      padding{ 0 };
+
+        /// 이 인스턴스의 본 팔레트 시작 위치. kNoSkinning이면 스키닝 없음.
+        /// 팔레트를 인스턴스별 오프셋으로 두는 것이 DX11과 갈리는 지점이다 —
+        /// 애니메이터가 달라도 같은 (메시·재질) 배치에 남는다.
+        uint32_t      boneOffset{ kNoSkinning };
     };
+
+    static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
 
     // 한 번의 DrawIndexedInstanced로 그릴 묶음.
     //
@@ -150,6 +165,11 @@ private:
     // 연속이라, 배치 하나가 [firstInstance, +instanceCount) 구간을 가리킨다.
     std::vector<InstanceData> m_instances;
     std::vector<DrawBatch>    m_batches;
+
+    // 프레임의 모든 본 팔레트를 이어 붙인 것. 애니메이터별로 한 번씩만 담기고,
+    // 인스턴스의 boneOffset이 자기 구간의 시작을 가리킨다.
+    std::vector<Mathf::Matrix>            m_bonePalettes;
+    std::unordered_map<uint64_t, uint32_t> m_boneOffsets;   // 애니메이터 키 → 오프셋
     D3D12_GPU_DESCRIPTOR_HANDLE                     m_sampler{};
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
@@ -159,6 +179,7 @@ private:
     uint32_t m_lastMeshCount{ 0 };
     uint32_t m_lastMaterialCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };
+    uint32_t m_lastSkinnedCount{ 0 };
     bool     m_keepAlive{ true };
 
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —

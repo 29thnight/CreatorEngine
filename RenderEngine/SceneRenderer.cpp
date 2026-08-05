@@ -1,5 +1,6 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
+#include "Skeleton.h"
 #include "RHI/DX11RHI.h"
 #include "EngineSetting.h"
 #include "ShaderSystem.h"
@@ -352,6 +353,7 @@ void SceneRenderer::CaptureDrawSnapshot(RenderPassData* data)
 		+ " · forward " + std::to_string(data->m_forwardQueue.size()));
 
 	m_captureDraws.clear();
+	m_capturePalettes.clear();
 	m_captureDraws.reserve(data->m_deferredQueue.size());
 
 	for (auto* proxy : data->m_deferredQueue)
@@ -361,6 +363,20 @@ void SceneRenderer::CaptureDrawSnapshot(RenderPassData* data)
 		GBufferCaptureDraw draw{};
 		draw.mesh = proxy->m_Mesh.get();
 		draw.worldMatrix = proxy->m_worldMatrix;
+		draw.animatorKey = proxy->m_animatorGuid;
+
+		// 본 팔레트를 값으로 복사한다. 애니메이터당 한 번이면 된다 —
+		// 한 캐릭터의 메시 여럿이 같은 팔레트를 공유한다.
+		if (proxy->m_finalTransforms)
+		{
+			draw.hasSkinning = true;
+			if (m_capturePalettes.find(draw.animatorKey) == m_capturePalettes.end())
+			{
+				const Mathf::xMatrix* source = proxy->m_finalTransforms.get();
+				m_capturePalettes.emplace(draw.animatorKey,
+					std::vector<Mathf::xMatrix>(source, source + Skeleton::MAX_BONES));
+			}
+		}
 
 		if (auto* material = proxy->m_Material.get())
 		{

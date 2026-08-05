@@ -25,6 +25,7 @@
 #include "../../Texture.h"
 #include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
+#include "../../Skeleton.h"
 
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
@@ -2291,6 +2292,17 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
             EnhancedDrawItem item{};
             item.mesh = proxy->m_Mesh.get();
             item.worldMatrix = proxy->m_worldMatrix;
+
+            // 본 팔레트. 포인터만 나르고 복사는 패스가 PrepareFrame에서 한다 —
+            // 512행렬(32KB)을 여기서 복사하면 프록시마다 그만큼 든다.
+            // 팔레트 버퍼는 프록시가 shared_ptr로 붙들고 있어 이 프레임 동안
+            // 살아 있다(MeshRendererProxy의 수명 계약).
+            if (proxy->m_finalTransforms)
+            {
+                item.bonePalette = proxy->m_finalTransforms.get();
+                item.boneCount = Skeleton::MAX_BONES;
+                item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
+            }
 
             // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
             if (auto* material = proxy->m_Material.get())

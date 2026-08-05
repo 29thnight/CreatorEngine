@@ -12,6 +12,7 @@
 #include "../../Texture.h"
 #include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
+#include "../../Skeleton.h"
 
 #include <algorithm>
 #include <cmath>
@@ -402,6 +403,26 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         item.mesh = captured.mesh;
         item.worldMatrix = captured.worldMatrix;
 
+        // 본 팔레트는 반대로 반드시 나른다.
+        //
+        // 재질과 달리 스키닝은 커버리지를 바꾼다 — 바인드 포즈와 애니메이션
+        // 포즈는 실루엣이 다르다. 이것이 빠져 있던 동안 스킨드 메시가 대조
+        // 차이의 큰 몫이었고, 그래서 판정 기준을 조일 수 없었다.
+        //
+        // 캡처가 값으로 복사해 둔 사본을 쓴다 — 포인터를 나르면 그 사이
+        // 애니메이션이 갱신되어 DX11이 그릴 때와 다른 포즈를 읽는다.
+        if (captured.hasSkinning)
+        {
+            const auto& palettes = dx11Renderer->GetCapturePalettes();
+            const auto found = palettes.find(captured.animatorKey);
+            if (found != palettes.end() && !found->second.empty())
+            {
+                item.bonePalette = found->second.data();
+                item.boneCount = static_cast<uint32_t>(found->second.size());
+                item.animatorKey = static_cast<uint64_t>(captured.animatorKey);
+            }
+        }
+
         // ★ 재질은 일부러 비운다.
         //
         // 커버리지는 재질과 무관하다 — 어느 픽셀이 그려지는지는 기하와 변환이
@@ -419,6 +440,37 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     {
         outLog += "[2/3] 캡처된 드로우가 없다\n";
         return false;
+    }
+
+    // ── 스키닝 원천 진단 ──
+    //
+    // 겹침이 낮을 때 '스키닝이 안 걸렸다'와 '걸렸는데 포즈가 다르다'와
+    // '애초에 스킨드가 아니다'는 고칠 곳이 전혀 다르다. 수치로 가른다.
+    {
+        size_t skinnedDraws = 0;
+        size_t nonIdentityBones = 0;
+        for (const auto& item : draws)
+        {
+            if (nullptr == item.bonePalette || 0 == item.boneCount) continue;
+            ++skinnedDraws;
+        }
+
+        for (const auto& entry : dx11Renderer->GetCapturePalettes())
+        {
+            for (const auto& matrix : entry.second)
+            {
+                // 항등이 아닌 행렬 수 = 실제 포즈가 실린 본 수. 전부 항등이면
+                // 애니메이터가 안 돌고 있다는 뜻이라 스키닝은 차이의 원인이 아니다.
+                if (!XMMatrixIsIdentity(matrix)) ++nonIdentityBones;
+            }
+        }
+
+        char line[224]{};
+        std::snprintf(line, sizeof(line),
+            "        스키닝 원천 — 캡처 드로우 %zu · 스킨드 %zu · 팔레트 %zu · 비항등 본 %zu\n",
+            draws.size(), skinnedDraws,
+            dx11Renderer->GetCapturePalettes().size(), nonIdentityBones);
+        outLog += line;
     }
 
     PixelCompareTrace("DX12 초기화 진입");
@@ -650,11 +702,13 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     for (const bool covered : dx12Coverage) { if (covered) ++dx12Covered; }
 
     {
-        char line[192]{};
+        char line[256]{};
         std::snprintf(line, sizeof(line),
-            "[2/3] DX12 GBuffer — %ux%u · 그려진 픽셀 %zu/%zu · 드로우 %u(배치 %u)\n",
+            "[2/3] DX12 GBuffer — %ux%u · 그려진 픽셀 %zu/%zu · 드로우 %u(배치 %u)"
+            " · 적용 스킨드 %u(팔레트 %u)\n",
             compareWidth, compareHeight, dx12Covered, dx12Coverage.size(),
-            gbuffer.GetLastDrawCount(), gbuffer.GetLastBatchCount());
+            gbuffer.GetLastDrawCount(), gbuffer.GetLastBatchCount(),
+            gbuffer.GetLastSkinnedCount(), gbuffer.GetLastBonePaletteCount());
         outLog += line;
     }
 

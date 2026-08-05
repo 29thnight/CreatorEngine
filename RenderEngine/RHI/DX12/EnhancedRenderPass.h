@@ -52,6 +52,19 @@ struct EnhancedDrawItem
     float          metallic{ 0.f };
     float          roughness{ 1.f };
     uint32_t       useNormalMap{ 0 };
+
+    // ── 스키닝 ──
+    //
+    // 본 팔레트는 렌더 전용 버퍼(RenderScene::AnimationPalette)를 가리킨다.
+    // mesh·Texture와 같은 계약이다 — 포인터의 수명은 draws 목록을 만든
+    // 호출부가 보장하고, 패스는 PrepareFrame에서 GPU로 복사한 뒤로는
+    // 이 포인터를 보지 않는다.
+    //
+    // animatorKey는 중복 제거용이다. 한 애니메이터를 여러 프록시가 공유하면
+    // (한 캐릭터의 메시 여럿) 팔레트를 한 번만 올린다.
+    const Mathf::xMatrix* bonePalette{ nullptr };
+    uint64_t              animatorKey{ 0 };
+    uint32_t              boneCount{ 0 };
 };
 
 // 셰이더가 읽는 형태의 광원 하나.

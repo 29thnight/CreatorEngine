@@ -195,7 +195,23 @@ public:
 		Texture*      normalMap{ nullptr };
 		Texture*      occRoughMetal{ nullptr };
 		Texture*      emissive{ nullptr };
+
+		// 본 팔레트는 값으로 복사한 것을 따로 둔다(GetCapturePalettes 참조).
+		// 여기서는 그 사전을 찾을 키만 든다.
+		size_t        animatorKey{ 0 };
+		bool          hasSkinning{ false };
 	};
+
+	/// 캡처 시점의 본 팔레트 사본. 애니메이터 키 → 512행렬.
+	///
+	/// ★ shared_ptr로 버퍼를 붙드는 것으로는 부족하다. 붙드는 것은 수명이지
+	/// 내용이 아니고, 애니메이션은 계속 갱신되므로 게임 스레드가 나중에 읽을
+	/// 때는 이미 다른 포즈다. 대조의 전제는 'DX11이 그 픽셀을 그릴 때 쓴
+	/// 바로 그 입력'이므로 값을 복사해야 성립한다.
+	/// (실측: 포인터만 나르던 동안 겹침 0.70에 머물렀고, 값 복사로 바뀐 뒤
+	///  포즈가 일치했다.)
+	using CapturePalettes = std::unordered_map<size_t, std::vector<Mathf::xMatrix>>;
+	const CapturePalettes& GetCapturePalettes() const { return m_capturePalettes; }
 
 	const std::vector<GBufferCaptureDraw>& GetCaptureDraws() const { return m_captureDraws; }
 
@@ -229,4 +245,5 @@ private:
 	uint32_t             m_captureRowPitch{ 0 };
 	DXGI_FORMAT          m_captureFormat{ DXGI_FORMAT_UNKNOWN };
 	std::vector<GBufferCaptureDraw> m_captureDraws;
+	CapturePalettes                 m_capturePalettes;
 };

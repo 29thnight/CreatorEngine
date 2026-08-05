@@ -48,10 +48,24 @@ struct InstanceData
     float    metallic;
     float    roughness;
     uint     useNormalMap;
-    uint     padding;
+
+    // 이 인스턴스가 쓸 본 팔레트의 시작 위치. 0xFFFFFFFF면 스키닝 없음.
+    //
+    // ★ 이것이 DX11과 갈리는 지점이다. DX11은 본 팔레트를 cbuffer에 담아
+    //   애니메이터가 바뀔 때마다 버퍼를 다시 올리고 드로우를 끊는다 —
+    //   애니메이터 N개면 최소 드로우 N개다. 여기서는 모든 팔레트를 한
+    //   버퍼에 이어 붙이고 인스턴스가 자기 오프셋을 들고 있으므로,
+    //   애니메이터가 달라도 같은 (메시·재질) 배치에 남는다.
+    uint     boneOffset;
 };
 
 StructuredBuffer<InstanceData> gInstances : register(t4);
+
+// 프레임의 모든 본 팔레트를 이어 붙인 것. 인스턴스의 boneOffset이 자기
+// 구간의 시작을 가리킨다.
+StructuredBuffer<float4x4> gBones : register(t5);
+
+#define NO_SKINNING 0xFFFFFFFFu
 
 Texture2D    gBaseColor     : register(t0);
 Texture2D    gNormalMap     : register(t1);
@@ -61,11 +75,13 @@ SamplerState gSampler       : register(s0);
 
 struct VSIn
 {
-    float3 position  : POSITION;
-    float3 normal    : NORMAL;
-    float2 uv        : TEXCOORD0;
-    float3 tangent   : TANGENT;
-    float3 bitangent : BINORMAL;
+    float3 position    : POSITION;
+    float3 normal      : NORMAL;
+    float2 uv          : TEXCOORD0;
+    float3 tangent     : TANGENT;
+    float3 bitangent   : BINORMAL;
+    float4 boneIndices : BLENDINDICES;
+    float4 boneWeights : BLENDWEIGHT;
 };
 
 struct VSOut
@@ -86,6 +102,33 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
     const InstanceData instance = gInstances[instanceId];
     const float4x4 gWorld = instance.world;
+
+    // ── 스키닝 ──
+    //
+    // DX11 VertexShader.vs의 이식이다. 판정 조건(boneWeight[0] > 0)과 네 본의
+    // 가중 합, 법선·탄젠트에도 같은 변환을 적용하는 것까지 같다.
+    //
+    // 규약만 다르다: DX11은 mul(bone, v)(열 벡터), 여기는 mul(v, bone)(행
+    // 벡터)이다. CPU가 전치해서 올리므로 결과 행렬은 같다 — world 행렬이
+    // 이미 그 규약으로 오고 있고, 본만 다른 규약을 쓰면 팔·다리가 엉뚱한
+    // 곳으로 날아간다.
+    if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
+    {
+        float4x4 boneTransform = input.boneWeights[0]
+            * gBones[instance.boneOffset + (uint)input.boneIndices[0]];
+
+        [unroll]
+        for (int i = 1; i < 4; ++i)
+        {
+            boneTransform += input.boneWeights[i]
+                * gBones[instance.boneOffset + (uint)input.boneIndices[i]];
+        }
+
+        input.position  = mul(float4(input.position, 1.0f), boneTransform).xyz;
+        input.normal    = normalize(mul(float4(input.normal, 0.0f), boneTransform).xyz);
+        input.tangent   = normalize(mul(float4(input.tangent, 0.0f), boneTransform).xyz);
+        input.bitangent = normalize(mul(float4(input.bitangent, 0.0f), boneTransform).xyz);
+    }
 
     VSOut output;
     const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
@@ -185,7 +228,10 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
 {
     m_drawGeometry.clear();
     m_drawTextures.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_lastDrawCount = 0;
+    m_lastSkinnedCount = 0;
 
     // 프레임 밀봉된 카메라에서 뷰·투영을 만든다. 스냅샷이 없으면 항등으로 두는데,
     // 그러면 클립 공간에 바로 그리게 되므로 '카메라가 안 붙었다'가 화면에 드러난다.
@@ -261,6 +307,29 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 }
                 m_drawTextures.emplace(key, textures);
             }
+        }
+
+        // 본 팔레트를 애니메이터별로 한 번씩만 담는다.
+        //
+        // 한 캐릭터의 메시가 여럿이면 프록시도 여럿인데 팔레트는 하나다 —
+        // 중복 제거가 없으면 같은 512행렬(32KB)을 메시 수만큼 올린다.
+        if (nullptr != draw.bonePalette && 0 != draw.boneCount)
+        {
+            if (m_boneOffsets.find(draw.animatorKey) == m_boneOffsets.end())
+            {
+                const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+                m_bonePalettes.resize(offset + draw.boneCount);
+
+                // HLSL이 열 우선으로 읽으므로 전치해 둔다. world 행렬과 같은
+                // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
+                for (uint32_t i = 0; i < draw.boneCount; ++i)
+                {
+                    m_bonePalettes[offset + i] = XMMatrixTranspose(draw.bonePalette[i]);
+                }
+
+                m_boneOffsets.emplace(draw.animatorKey, offset);
+            }
+            ++m_lastSkinnedCount;
         }
 
         ++m_lastDrawCount;
@@ -349,6 +418,15 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         instance.roughness = draw.roughness;
         instance.useNormalMap = draw.useNormalMap;
 
+        // 스키닝 오프셋. 팔레트가 없으면 kNoSkinning으로 남아 셰이더가
+        // 바인드 포즈로 그린다 — 스킨드와 비스킨드가 한 배치에 섞여도 된다.
+        instance.boneOffset = kNoSkinning;
+        if (nullptr != draw.bonePalette && 0 != draw.boneCount)
+        {
+            const auto found = m_boneOffsets.find(draw.animatorKey);
+            if (found != m_boneOffsets.end()) instance.boneOffset = found->second;
+        }
+
         m_instances.push_back(instance);
         ++m_batches.back().instanceCount;
     }
@@ -376,7 +454,7 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
     samplerRange.NumDescriptors = 1;
 
-    D3D12_ROOT_PARAMETER params[4]{};
+    D3D12_ROOT_PARAMETER params[5]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;   // b0 — 프레임 상수
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
@@ -398,6 +476,12 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     params[3].DescriptorTable.pDescriptorRanges = &samplerRange;
     params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+    // 본 팔레트도 루트 SRV다. 프레임당 한 번 꽂으면 배치가 몇 개든 그대로
+    // 쓴다 — 인스턴스가 자기 오프셋을 들고 있어서다.
+    params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    params[4].Descriptor.ShaderRegister = 5;   // t5 — 본 팔레트
+    params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
     rootDesc.NumParameters = _countof(params);
     rootDesc.pParameters = params;
@@ -411,13 +495,18 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     // 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
     // 오프셋은 엔진 Vertex 구조체를 그대로 따른다:
     //   position 0 · normal 12 · uv0 24 · uv1 32 · tangent 40 · bitangent 52
+    //   · boneIndices 64 · boneWeights 80
     // 어긋나면 검증 레이어가 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
     static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,       0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BINORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        // 본 인덱스가 float4인 것은 엔진 Vertex를 그대로 따르는 것이다.
+        // UINT4로 읽으면 float 비트를 정수로 해석해 팔레트 밖을 짚는다.
+        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 
     // 오프셋이 Vertex와 어긋나면 조용히 틀리므로 컴파일 시점에 못박는다.
@@ -425,6 +514,8 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     static_assert(offsetof(Vertex, uv0) == 24, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, tangent) == 40, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, bitangent) == 52, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
     DX12GraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;
@@ -626,6 +717,38 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->SetDescriptorHeaps(2, heaps);
             commandList->SetGraphicsRootDescriptorTable(3, m_sampler);
 
+            // ── 본 팔레트 ──
+            //
+            // 배치 밖에서 한 번 올린다. 애니메이터가 몇이든 인스턴스가 자기
+            // 오프셋을 들고 있으므로 배치마다 다시 꽂을 이유가 없다 — DX11이
+            // 애니메이터마다 cbuffer를 다시 올리며 드로우를 끊던 자리다.
+            //
+            // 팔레트가 없어도 t5는 꽂는다. 스킨드가 없는 프레임에서도
+            // 루트 SRV가 비면 셰이더가 읽지 않더라도 검증 레이어가 경고하고,
+            // 조각(slice)마다 상태를 다시 걸어야 하므로 여기가 그 자리다.
+            {
+                const uint64_t paletteBytes = m_bonePalettes.empty()
+                    ? sizeof(Mathf::Matrix)
+                    : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
+
+                const auto paletteBuffer = context.resources->GetUploadRing().Allocate(
+                    paletteBytes, sizeof(Mathf::Matrix));
+                if (!paletteBuffer.IsValid()) return;
+
+                if (m_bonePalettes.empty())
+                {
+                    const Mathf::Matrix identity = XMMatrixIdentity();
+                    memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
+                }
+                else
+                {
+                    memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
+                        static_cast<size_t>(paletteBytes));
+                }
+
+                commandList->SetGraphicsRootShaderResourceView(4, paletteBuffer.gpuAddress);
+            }
+
             // 자기 몫의 배치만 그린다.
             //
             // 단위가 드로우가 아니라 배치다. 같은 메시·재질을 쓰는 드로우들이
@@ -730,6 +853,8 @@ void EnhancedGBufferPass::Shutdown()
 {
     m_drawGeometry.clear();
     m_drawTextures.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_rtvHeap.Reset();
     m_dsvHeap.Reset();
     m_pso = nullptr;
