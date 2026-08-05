@@ -100,17 +100,20 @@ namespace
             ComPtr<ID3D11Texture2D>          openedTexture;
             ComPtr<ID3D11ShaderResourceView> openedSrv;
             uint64_t                         fenceValue{ 0 };
-        };
-        DisplaySlot slots[2];
-        int displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
-        int pendingSlot{ -1 };   // DX12가 그렸고 펜스 완료를 기다리는 슬롯
 
-        // 인플라이트 그래프. 규칙(dx12.compare 크래시의 교훈): 그래프의 수명은
-        // 그 커맨드를 GPU가 끝낼 때까지다 — transient 리소스를 그래프가 들고
-        // 있다. WaitForGpu를 없앤 첫 실행이 3프레임 만에 DEVICE_REMOVED
-        // (0x887A0005, Shadow.Cascades)로 죽으며 이 규칙을 재확인시켰다.
-        // 펜스 완료(승격) 때 놓는다.
-        std::unique_ptr<EnhancedRenderGraph> inFlightGraph;
+            // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
+            // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
+            // 그래프가 들고 있다. 승격(펜스 완료) 때 놓으면 풀로 반납된다.
+            std::unique_ptr<EnhancedRenderGraph> graph;
+        };
+        // 슬롯 셋 = 표시 1 + 인플라이트 최대 2. 인플라이트 1개로는 GPU 완료
+        // 신호 지연(제출→관측 ~1ms대)이 2ms 틱을 넘겨 틱의 38%가 제출을
+        // 쉬었다(실측 81/214) — 표시 프레임률이 절반이 된다. 2개를 겹치면
+        // 매 틱 제출이 성립한다. 얼로케이터·링은 kFrameCount=3 회전이라
+        // 인플라이트 2는 안전 거리 안이다.
+        DisplaySlot slots[3];
+        int displaySlot{ -1 };            // DX11이 표시 중인 슬롯(-1 = 아직 없음)
+        std::vector<int> pendingQueue;    // 제출 순서의 인플라이트 슬롯들(≤2)
 
         // transient 풀 — 프레임당 CreateCommittedResource ~35건을 없앤다.
         // 그래프 소멸(펜스 완료 후)이 반납하므로 GPU 사용 중 재배포가 없다.
@@ -148,7 +151,6 @@ namespace
         };
         std::vector<Grave> graveyard;
 
-        int pendingSlot() const { return pipeline ? pipeline->pendingSlot : -1; }
 
         uint32_t ssaoFrameIndex{ 0 };
         uint32_t frameCounter{ 0 };
@@ -294,7 +296,8 @@ namespace
             LivePipeline& p = *pipeline;
 
             if (p.resources.IsInitialized()) p.resources.WaitForGpu();
-            p.inFlightGraph.reset();
+            for (LivePipeline::DisplaySlot& slot : p.slots) slot.graph.reset();
+            p.pendingQueue.clear();
 
             for (LivePipeline::DisplaySlot& slot : p.slots)
             {
@@ -453,8 +456,8 @@ namespace
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
 
-            p.inFlightGraph = std::make_unique<EnhancedRenderGraph>();
-            EnhancedRenderGraph& graph = *p.inFlightGraph;
+            slot.graph = std::make_unique<EnhancedRenderGraph>();
+            EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(&p.profiler);
             graph.SetTransientPool(&p.transientPool);
 
@@ -550,7 +553,7 @@ namespace
             // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
             // 여기서 없앤다.
             slot.fenceValue = p.resources.GetLastSignaledFenceValue();
-            p.pendingSlot = slotIndex;
+            p.pendingQueue.push_back(slotIndex);
             return true;
         }
     };
@@ -586,17 +589,20 @@ void EnhancedSceneRenderer::TickLive()
     LiveState& state = GetLiveState();
     if (!state.enabled) return;
 
-    // 지난 프레임 제출분의 완료 확인(논블로킹). 완료됐으면 표시로 승격한다 —
-    // DX11이 읽는 슬롯은 항상 '펜스가 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
-    if (nullptr != state.pipeline && state.pendingSlot() >= 0)
+    // 인플라이트 제출분의 완료 확인(논블로킹). 제출 순서대로, 완료된 것을
+    // 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가 끝난' 슬롯뿐이라는
+    // 것이 비동기의 계약이다.
+    if (nullptr != state.pipeline)
     {
         LivePipeline& p = *state.pipeline;
-        if (p.resources.GetCompletedFenceValue()
-            >= p.slots[p.pendingSlot].fenceValue)
+        while (!p.pendingQueue.empty())
         {
-            p.displaySlot = p.pendingSlot;
-            p.pendingSlot = -1;
-            p.inFlightGraph.reset();   // GPU가 끝났다 — 이제 transient를 놓아도 된다
+            const int slotIndex = p.pendingQueue.front();
+            if (p.resources.GetCompletedFenceValue() < p.slots[slotIndex].fenceValue) break;
+
+            p.displaySlot = slotIndex;
+            p.pendingQueue.erase(p.pendingQueue.begin());
+            p.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
 
             std::vector<DX12GpuProfiler::PassTiming> timings;
             std::string collectError;
@@ -606,10 +612,11 @@ void EnhancedSceneRenderer::TickLive()
             }
             ++state.framesRendered;
         }
-        else
+
+        // 인플라이트가 꽉 찼으면 이번 틱은 제출을 쉰다(둘이면 충분하다 —
+        // 셋부터는 표시 지연만 는다).
+        if (p.pendingQueue.size() >= 2)
         {
-            // GPU가 아직이다. 이번 틱은 새 프레임을 내지 않는다 — 인플라이트를
-            // 하나로 묶어 두면 링·얼로케이터 회전이 항상 안전 거리 안에 있다.
             ++state.framesInFlight;
             return;
         }
@@ -648,8 +655,19 @@ void EnhancedSceneRenderer::TickLive()
     LiveStopwatch watch;
     watch.Start();
 
-    // 표시 중이 아닌 슬롯에 그린다. 첫 프레임(-1)은 0번부터.
-    const int renderSlot = (0 == state.pipeline->displaySlot) ? 1 : 0;
+    // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
+    int renderSlot = -1;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (i == state.pipeline->displaySlot) continue;
+        bool pending = false;
+        for (const int pendingIndex : state.pipeline->pendingQueue)
+        {
+            if (pendingIndex == i) { pending = true; break; }
+        }
+        if (!pending) { renderSlot = i; break; }
+    }
+    if (renderSlot < 0) { ++state.framesInFlight; return; }
 
     std::string error;
     if (!state.RenderOnce(renderSlot, error))
