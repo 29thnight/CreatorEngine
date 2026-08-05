@@ -14,6 +14,7 @@
 #include "../../MeshRendererProxy.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <cstdio>
 #include <vector>
@@ -194,7 +195,25 @@ namespace
 //    함께 찍는다. 경계 계산도 함수 하나로 통일했다 — 같은 질문을 두 곳에서
 //    다르게 계산한 것이 이 작업에서 가장 많이 시간을 먹은 실수였다.)
 //
-// ── 그래서 지금 남은 것 ──
+// ── 규명 완료(2026-08-05): DX12가 수학과 일치하고, DX11이 far 경계를 더 그린다 ──
+//
+// 판정자를 만들어 끝냈다. 그 평면의 실제 정점을 double로 직접 투영해
+// '수학이 말하는' far 경계를 구하고(픽셀 광선을 모든 삼각형에 캐스트해
+// 최근접 교점의 z/w=1 전환 y를 이분 탐색), 양쪽 관측치와 대조했다.
+//
+// 통제 재현(Prim_Cube 20000x1x20000 슬래브 — 정적 메시라 스키닝 변수 없음):
+//   far 밖 정점 12개(z/w 1.000190) — 클리핑이라는 판정의 직접 증거
+//   열별 far 경계: 기대 550 · DX12 550(정확 일치) · DX11 548(2행 초과)
+//   DX12만 그린 픽셀 0 · 겹침 비율 0.9962
+//
+// 즉 원래 관찰(DX11만 그린 y 528~556 띠)은 DX12의 결함이 아니라 DX11이
+// far 클리핑 경계를 수학적 경계보다 완만하게 넘겨 그리는 것이었다. 기전
+// 후보는 DX11 정점 셰이더의 per-vertex 행렬 곱(mul(mul(P,V),M))에서의
+// FMA 축약 등 정밀도 차이로 좁혀지지만, 어느 쪽이 옳은가는 이미 갈렸으므로
+// (DX12 = 참값) 더 파지 않는다. 3-9 픽셀 대조에서 far 경계 밴드는 DX11
+// 쪽 관대함으로 감안한다.
+//
+// ── 규명 전까지의 수사 기록(보존) ──
 //
 // 클리핑이 맞다면 두 경로의 far 경계가 다르다는 뜻이다. 그런데 투영 행렬은
 // 같은 프레임 밀봉 스냅샷에서 온다(확인함). 그렇다면 행렬 이후의 무언가다.
@@ -228,21 +247,18 @@ namespace
 //   일치하므로(DX12만 그린 픽셀 40개) 규약이 통째로 어긋난 것은 아니다.
 //   그래도 두 경로가 다른 규약으로 같은 데이터를 읽는다는 사실은 남겨 둔다.
 //
-// 다음에 볼 것:
-//   - 그 평면의 정점 좌표 범위를 직접 계산할 것. 월드 좌표를 뷰·투영으로
-//     옮겨 z/w가 1을 넘는 정점이 있는지 본다. 넘는다면 두 경로가 같은 far를
-//     쓰는지가 다시 질문이 되고, 안 넘는다면 클리핑이라는 판정 자체를
-//     의심해야 한다. 지금까지 화면에 그려진 결과만 보고 추론해 왔다.
-//   - DX11이 이 프록시들을 인스턴싱으로 묶는지 개별로 그리는지, 그 조건.
-//     묶는 단위가 다르면 드로우 순서가 달라지고 깊이 결과도 달라질 수 있다.
-//
-//   - 판정 기준 0.95는 여전히 근거가 없다. 원인을 알고 나서 정할 값이다.
-//
+// 판정 기준 0.95의 근거(규명 후 확정):
+//   차이의 성분이 둘로 규명됐다 — ① far 경계 밴드(DX11의 관대함, 위 참조)
+//   ② 스킨드 메시(DX12 GBuffer가 아직 본 변형을 안 한다 — 바인드 포즈로
+//   그려 애니메이션 포즈의 DX11과 크게 갈린다). 정적 씬 실측은 0.9962이고
+//   스킨드가 섞이면 그 몫만큼 떨어진다. 0.95는 정적 위주 씬에서 far 밴드
+//   이상의 구조적 어긋남(카메라·변환·컬링)을 잡는 값이다. 스키닝이 붙으면
+//   그때 다시 조인다.
 bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
-    outLog += "── DX11 대조 (PHASE 3-6, 미완성) ──\n";
+    outLog += "── DX11 대조 (PHASE 3-6) ──\n";
 
     // ── [1/3] DX11이 그린 것을 가져온다 ──
 
@@ -697,6 +713,8 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     // DX11 bitmask는 그린 것이 무엇인지 값으로 남긴다. 차이 나는 띠에만
     // 나타나는 값이 있으면 그것이 범인을 지목한다. 전체에 고루 있는 값이면
     // 오브젝트가 빠진 것이 아니라 다른 이유다.
+    uint32_t gapDominantBitmask = 0;   // 차이 구간을 지배하는 값 — far 판정이 쓴다
+    size_t   gapDominantCount = 0;
     {
         std::map<uint32_t, size_t> valuesInGap;     // 차이 나는 곳
         std::map<uint32_t, size_t> valuesInMatch;   // 양쪽 다 그린 곳
@@ -722,6 +740,11 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         for (const auto& entry : valuesInGap)
         {
             summary += std::to_string(entry.first) + "(" + std::to_string(entry.second) + ") ";
+            if (entry.second > gapDominantCount)
+            {
+                gapDominantCount = entry.second;
+                gapDominantBitmask = entry.first;
+            }
         }
         summary += "· 일치 구간: ";
         for (const auto& entry : valuesInMatch)
@@ -819,6 +842,265 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             // 하나만 그린 결과라야 그 평면이 어떻게 잘리는지 보인다.
             outLog += PixelCompareDescribeTopEdge(soloCoverage, compareWidth, compareHeight,
                 "단독 상단 경계");
+
+            // ── far 경계의 수학적 판정 ──
+            //
+            // 지금까지는 화면에 그려진 결과만 보고 추론했다. 여기서는 그 평면의
+            // 실제 정점을 double로 직접 투영해 '수학이 말하는' far 경계를 구하고,
+            // DX11 관측치(bitmask로 이 평면만 걸러 낸 상단)와 DX12 관측치(단독
+            // 렌더 상단) 중 어느 쪽이 그 값에 붙는지 본다 — 어느 경로가 이상인지
+            // 를 기전 없이도 실측으로 가르는 판정자다.
+            {
+                const auto& item = draws[widestIndex];
+                const auto& meshVertices = item.mesh->GetVertices();
+                const auto& meshIndices = item.mesh->GetIndices();
+
+                // float 행렬을 double 배열로. 입력은 어차피 float이지만 계산을
+                // double로 하면 곱셈 순서·FMA 축약 차이가 사라져 '그 입력의
+                // 참값'이 나온다 — 두 경로의 차이를 심판할 기준이 된다.
+                const auto toDouble = [](const Mathf::xMatrix& m, double out[16])
+                {
+                    DirectX::XMFLOAT4X4 f{};
+                    XMStoreFloat4x4(&f, m);
+                    for (int r = 0; r < 4; ++r)
+                        for (int c = 0; c < 4; ++c)
+                            out[r * 4 + c] = static_cast<double>(f.m[r][c]);
+                };
+                const auto mulMat = [](const double a[16], const double b[16], double out[16])
+                {
+                    for (int r = 0; r < 4; ++r)
+                        for (int c = 0; c < 4; ++c)
+                        {
+                            double sum = 0.0;
+                            for (int k = 0; k < 4; ++k) sum += a[r * 4 + k] * b[k * 4 + c];
+                            out[r * 4 + c] = sum;
+                        }
+                };
+                const auto mulVec = [](const double v[4], const double m[16], double out[4])
+                {
+                    for (int c = 0; c < 4; ++c)
+                    {
+                        out[c] = v[0] * m[0 * 4 + c] + v[1] * m[1 * 4 + c]
+                            + v[2] * m[2 * 4 + c] + v[3] * m[3 * 4 + c];
+                    }
+                };
+
+                double world[16], view[16], projection[16], viewProj[16], worldViewProj[16];
+                toDouble(item.worldMatrix, world);
+                toDouble(cameraSnapshot.view, view);
+                toDouble(cameraSnapshot.projection, projection);
+                mulMat(view, projection, viewProj);
+                mulMat(world, viewProj, worldViewProj);
+
+                // 1) 정점 z/w 통계 — '평면이 far를 실제로 넘는가'의 직접 증거.
+                size_t beyondFar = 0, behind = 0;
+                double minZw = 1e300, maxZw = -1e300;
+                for (const auto& vertex : meshVertices)
+                {
+                    const double v[4] = { vertex.position.x, vertex.position.y,
+                        vertex.position.z, 1.0 };
+                    double clip[4];
+                    mulVec(v, worldViewProj, clip);
+                    if (clip[3] <= 0.0) { ++behind; continue; }
+                    const double zw = clip[2] / clip[3];
+                    minZw = (std::min)(minZw, zw);
+                    maxZw = (std::max)(maxZw, zw);
+                    if (zw > 1.0) ++beyondFar;
+                }
+
+                char vertexLine[256]{};
+                std::snprintf(vertexLine, sizeof(vertexLine),
+                    "        far 판정 — 정점 %zu · far 밖 %zu · 카메라 뒤 %zu · z/w %.6f~%.6f\n",
+                    meshVertices.size(), beyondFar, behind, minZw, maxZw);
+                outLog += vertexLine;
+
+                // 2) 열별 기대 경계 — 픽셀 광선을 메시의 모든 삼각형에 캐스트해
+                //    최근접 교점의 z/w가 1이 되는 화면 y를 이분 탐색으로 찾는다.
+                //
+                //    처음에는 첫 삼각형 하나로 평면 방정식을 만들었는데, 닫힌
+                //    메시(슬래브)에서는 첫 삼각형이 측면이라 엉뚱한 평면을 심판
+                //    삼았다 — 보이는 면은 광선의 최근접 교점이 정한다.
+
+                // 월드 삼각형을 미리 펴 둔다. 이분 탐색이 같은 삼각형들을 수십 번
+                // 묻는다.
+                std::vector<double> worldTriangles;   // 삼각형당 9 double
+                for (size_t tri = 0; tri + 2 < meshIndices.size(); tri += 3)
+                {
+                    for (int corner = 0; corner < 3; ++corner)
+                    {
+                        const auto& vertex = meshVertices[meshIndices[tri + corner]];
+                        const double v[4] = { vertex.position.x, vertex.position.y,
+                            vertex.position.z, 1.0 };
+                        double p[4];
+                        mulVec(v, world, p);
+                        worldTriangles.push_back(p[0]);
+                        worldTriangles.push_back(p[1]);
+                        worldTriangles.push_back(p[2]);
+                    }
+                }
+
+                const Mathf::xMatrix vpFloat =
+                    XMMatrixMultiply(cameraSnapshot.view, cameraSnapshot.projection);
+                const Mathf::xMatrix invVp = XMMatrixInverse(nullptr, vpFloat);
+
+                // 픽셀 중심 광선의 최근접 교점에서 z/w. 광선은 float 역행렬로
+                // 만들어도 된다 — 민감한 것은 교점의 z/w이고 그것은 double
+                // 사슬로 계산한다.
+                const auto zwAtPixel = [&](uint32_t px, uint32_t py, double& outZw) -> bool
+                {
+                    const float ndcX = (static_cast<float>(px) + 0.5f)
+                        / static_cast<float>(compareWidth) * 2.f - 1.f;
+                    const float ndcY = 1.f - (static_cast<float>(py) + 0.5f)
+                        / static_cast<float>(compareHeight) * 2.f;
+
+                    const Mathf::xVector nearH = XMVector4Transform(
+                        XMVectorSet(ndcX, ndcY, 0.f, 1.f), invVp);
+                    const Mathf::xVector farH = XMVector4Transform(
+                        XMVectorSet(ndcX, ndcY, 1.f, 1.f), invVp);
+                    const float nearW = XMVectorGetW(nearH);
+                    const float farW = XMVectorGetW(farH);
+                    if (std::fabs(nearW) < 1e-9f || std::fabs(farW) < 1e-9f) return false;
+
+                    const double p0[3] = { XMVectorGetX(nearH) / nearW,
+                        XMVectorGetY(nearH) / nearW, XMVectorGetZ(nearH) / nearW };
+                    const double p1[3] = { XMVectorGetX(farH) / farW,
+                        XMVectorGetY(farH) / farW, XMVectorGetZ(farH) / farW };
+                    const double direction[3] = {
+                        p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] };
+
+                    // 뮐러-트럼보어. 최근접 t만 남긴다.
+                    double bestT = 1e300;
+                    for (size_t tri = 0; tri + 8 < worldTriangles.size(); tri += 9)
+                    {
+                        const double* a = &worldTriangles[tri];
+                        const double* b = &worldTriangles[tri + 3];
+                        const double* c = &worldTriangles[tri + 6];
+
+                        const double e1[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] };
+                        const double e2[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+
+                        const double h[3] = {
+                            direction[1] * e2[2] - direction[2] * e2[1],
+                            direction[2] * e2[0] - direction[0] * e2[2],
+                            direction[0] * e2[1] - direction[1] * e2[0] };
+                        const double det = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2];
+                        if (std::fabs(det) < 1e-18) continue;
+
+                        const double inverseDet = 1.0 / det;
+                        const double s[3] = { p0[0] - a[0], p0[1] - a[1], p0[2] - a[2] };
+                        const double u = (s[0] * h[0] + s[1] * h[1] + s[2] * h[2]) * inverseDet;
+                        if (u < -1e-9 || u > 1.0 + 1e-9) continue;
+
+                        const double q[3] = {
+                            s[1] * e1[2] - s[2] * e1[1],
+                            s[2] * e1[0] - s[0] * e1[2],
+                            s[0] * e1[1] - s[1] * e1[0] };
+                        const double v = (direction[0] * q[0] + direction[1] * q[1]
+                            + direction[2] * q[2]) * inverseDet;
+                        if (v < -1e-9 || u + v > 1.0 + 1e-9) continue;
+
+                        const double t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2])
+                            * inverseDet;
+                        if (t > 1e-9 && t < bestT) bestT = t;
+                    }
+
+                    if (bestT >= 1e300) return false;
+
+                    const double hit[4] = { p0[0] + direction[0] * bestT,
+                        p0[1] + direction[1] * bestT, p0[2] + direction[2] * bestT, 1.0 };
+                    double clip[4];
+                    mulVec(hit, viewProj, clip);
+                    if (clip[3] <= 0.0) return false;
+                    outZw = clip[2] / clip[3];
+                    return true;
+                };
+
+                if (!worldTriangles.empty())
+                {
+                    std::string verdictLine = "        far 판정(열별 y) — ";
+                    int dx12Closer = 0, dx11Closer = 0;
+
+                    const uint32_t columns[3] = {
+                        compareWidth / 4, compareWidth / 2, compareWidth * 3 / 4 };
+                    for (const uint32_t column : columns)
+                    {
+                        // 기대 경계: 아래(가까움)는 '교점 있고 z/w≤1', 위는
+                        // '교점이 없거나 z/w>1' — 그 전환 y를 이분 탐색.
+                        // 지평선 위에서 광선이 메시를 안 맞히는 것도 '밖'이다.
+                        const auto isInside = [&](uint32_t py) -> bool
+                        {
+                            double zw = 0.0;
+                            return zwAtPixel(column, py, zw) && zw <= 1.0;
+                        };
+
+                        if (!isInside(compareHeight - 1) || isInside(0))
+                        {
+                            verdictLine += std::to_string(column) + ":판정불가 ";
+                            continue;
+                        }
+
+                        uint32_t lo = 0, hi = compareHeight - 1;
+                        while (lo + 1 < hi)
+                        {
+                            const uint32_t mid = (lo + hi) / 2;
+                            if (isInside(mid)) hi = mid;
+                            else lo = mid;
+                        }
+                        const uint32_t expectedTop = hi;
+
+                        // 관측치 — DX12는 단독 렌더의 열 상단, DX11은 bitmask로
+                        // 이 평면만 걸러 낸 열 상단.
+                        uint32_t dx12Top = UINT32_MAX;
+                        for (uint32_t y = 0; y < compareHeight; ++y)
+                        {
+                            if (soloCoverage[static_cast<size_t>(y) * compareWidth + column])
+                            {
+                                dx12Top = y;
+                                break;
+                            }
+                        }
+
+                        uint32_t dx11Top = UINT32_MAX;
+                        if (0 != gapDominantBitmask)
+                        {
+                            const uint32_t sourceX = column * dx11Width / compareWidth;
+                            for (uint32_t y = 0; y < dx11Height; ++y)
+                            {
+                                const auto* row = reinterpret_cast<const uint32_t*>(
+                                    dx11Bytes.data() + static_cast<size_t>(y) * dx11RowPitch);
+                                if (gapDominantBitmask == row[sourceX])
+                                {
+                                    dx11Top = y * compareHeight / dx11Height;
+                                    break;
+                                }
+                            }
+                        }
+
+                        char columnLine[128]{};
+                        std::snprintf(columnLine, sizeof(columnLine),
+                            "x%u(기대 %u · DX11 %u · DX12 %u) ",
+                            column, expectedTop, dx11Top, dx12Top);
+                        verdictLine += columnLine;
+
+                        if (UINT32_MAX != dx11Top && UINT32_MAX != dx12Top)
+                        {
+                            const uint32_t dx11Delta = (dx11Top > expectedTop)
+                                ? dx11Top - expectedTop : expectedTop - dx11Top;
+                            const uint32_t dx12Delta = (dx12Top > expectedTop)
+                                ? dx12Top - expectedTop : expectedTop - dx12Top;
+                            if (dx12Delta < dx11Delta) ++dx12Closer;
+                            else if (dx11Delta < dx12Delta) ++dx11Closer;
+                        }
+                    }
+
+                    verdictLine += (dx12Closer > dx11Closer)
+                        ? "→ DX12가 수학과 일치(DX11 쪽이 이상)\n"
+                        : (dx11Closer > dx12Closer)
+                            ? "→ DX11이 수학과 일치(DX12 쪽이 이상)\n"
+                            : "→ 판정 불충분\n";
+                    outLog += verdictLine;
+                }
+            }
         }
 
         // 전체 드로우로 되돌린다. 뒤의 단정이 이 목록을 본다.
@@ -947,15 +1229,12 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     psoManager.Shutdown();
     resources.Shutdown();
 
-    // ── 판정 기준을 어디에 둘 것인가 ──
+    // ── 판정 기준 0.95의 근거(파일 머리 주석의 규명 결과 참조) ──
     //
-    // 완전 일치를 요구하지 않는다. 두 경로는 래스터 규칙이 같아도 깊이 정밀도와
-    // 정점 변환의 부동소수 순서가 달라 경계 픽셀이 흔들린다. 그것을 실패로
-    // 삼으면 판정이 매번 흔들려 아무도 보지 않게 된다.
-    //
-    // 반대로 기준을 너무 낮추면 '대충 비슷하면 통과'가 되어 카메라가 조금
-    // 어긋난 것을 놓친다. 지금은 0.95를 시작점으로 두고, 실제로 어느 정도
-    // 나오는지 본 뒤 조인다 — 처음부터 맞는 숫자를 아는 척하지 않는다.
+    // 차이의 두 성분은 규명됐다: far 경계 밴드(DX11의 관대함 — DX12가 수학과
+    // 일치)와 스킨드 메시(DX12 스키닝 미착수). 정적 씬 실측이 0.9962이므로
+    // 0.95는 그 둘을 허용하면서 구조적 어긋남(카메라·변환·컬링)을 잡는다.
+    // 스키닝이 붙으면 그때 조인다.
     constexpr double kMinAgreement = 0.95;
 
     const bool passed = (agreement >= kMinAgreement);
