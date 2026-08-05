@@ -27,8 +27,20 @@
 //   메시는 DX12MeshCache를 그대로 쓴다 — GBuffer가 올린 메시면 업로드
 //   0회로 재사용된다(캐시를 나누면 같은 메시가 두 번 올라간다).
 //
-//   스키닝(본 변형)은 이 슬라이스에 없다. EnhancedDrawItem이 본 행렬을
-//   아직 나르지 않는다 — GBuffer 애니메이티드 경로와 함께 붙일 영역이다.
+// ── 스키닝(PHASE 3-6 잔여 정리에서 추가) ──
+//
+//   DX11 WireFrame.vs는 본 스키닝을 한다(boneWeight[0] > 0이면 네 본의
+//   가중 합). 이 패스를 처음 쓸 때는 EnhancedDrawItem이 본 행렬을 나르지
+//   않아 빼 두었고, GBuffer 스키닝 슬라이스에서 그 통로가 생겼다.
+//   빠진 채로 두면 애니메이션 중인 캐릭터의 와이어프레임만 바인드 포즈에
+//   멈춰 있게 된다 — 디버그 오버레이가 실제 그림과 어긋나는 셈이다.
+//
+//   GBuffer와 같은 규약을 쓴다: 팔레트를 애니메이터별로 한 번만 올리고
+//   인스턴스마다 시작 오프셋(boneOffset)을 들려 보낸다. 그래서 애니메이터가
+//   달라도 같은 메시면 한 배치에 남는다.
+//
+//   PSO는 하나다. 그림자 패스는 스킨드/비스킨드를 매크로로 갈라 둘을
+//   두었지만, 여기는 디버그 오버레이라 분기 하나가 PSO를 늘리는 것보다 싸다.
 class EnhancedWireFramePass : public EnhancedRenderPass
 {
 public:
@@ -62,6 +74,17 @@ public:
     uint32_t GetLastDrawItemCount() const { return m_lastDrawItemCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
+    /// 스킨드 드로우 수와 올린 팔레트 종류.
+    ///
+    /// 팔레트 수가 스킨드 드로우 수와 늘 같으면 애니메이터 중복 제거가
+    /// 죽은 것이다 — 한 캐릭터의 메시 여럿이 같은 팔레트를 공유해야 한다.
+    /// 그림만 봐서는 512행렬을 몇 번 올렸는지 알 길이 없다.
+    uint32_t GetLastSkinnedCount() const { return m_lastSkinnedCount; }
+    uint32_t GetLastBonePaletteCount() const
+    {
+        return static_cast<uint32_t>(m_boneOffsets.size());
+    }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -75,14 +98,31 @@ private:
         uint32_t count{ 0 };
     };
 
+    static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
+
+    /// 인스턴스 하나. HLSL의 StructuredBuffer 원소와 배치가 같아야 한다 —
+    /// 어긋나면 값이 조용히 밀려 '와이어프레임이 엉뚱한 곳에 있다'로만 드러난다.
+    struct InstanceData
+    {
+        Mathf::Matrix world{};
+
+        /// 이 인스턴스의 본 팔레트 시작 위치. kNoSkinning이면 스키닝 없음.
+        uint32_t boneOffset{ kNoSkinning };
+        uint32_t padding[3]{};
+    };
+
     Inputs   m_inputs{};
     RGHandle m_output;
     RGHandle m_depth;
     bool     m_keepAlive{ false };
 
     // 메시별 인스턴스 수집(프레임마다 다시 만든다).
-    std::vector<Batch>         m_batches;
-    std::vector<Mathf::Matrix> m_instanceWorlds;   // 전치된 월드, 배치 순서로 연속
+    std::vector<Batch>        m_batches;
+    std::vector<InstanceData> m_instances;   // 배치 순서로 연속
+
+    // 본 팔레트. 애니메이터별로 한 번만 담고 인스턴스가 오프셋으로 가리킨다.
+    std::vector<Mathf::Matrix>              m_bonePalettes;
+    std::unordered_map<uint64_t, uint32_t>  m_boneOffsets;
 
     std::unordered_map<Mesh*, DX12MeshCache::Entry> m_geometry;
 
@@ -91,6 +131,7 @@ private:
 
     uint32_t m_lastDrawItemCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };
+    uint32_t m_lastSkinnedCount{ 0 };
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

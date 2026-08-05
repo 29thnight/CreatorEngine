@@ -24,10 +24,16 @@ namespace
         return oss.str();
     }
 
-    // DX11 WireFrame.vs/ps의 이식. 원본 VS는 본 스키닝·카메라 방향까지
-    // 계산하지만 PS가 실제로 쓰는 것은 상수 색 하나다 — 위치만 남긴다.
-    // 색 (0,1,0,1)은 원본 그대로. 스키닝은 EnhancedDrawItem이 본 행렬을
-    // 나르게 될 때 GBuffer 애니메이티드 경로와 함께 붙는다.
+    // DX11 WireFrame.vs/ps의 이식. 원본 VS는 카메라 방향과 법선까지
+    // 계산하지만 PS가 실제로 쓰는 것은 상수 색 하나다 — 그 둘은 뺀다.
+    // 색 (0,1,0,1)은 원본 그대로.
+    //
+    // 스키닝은 원본에 있는 것이라 그대로 옮긴다. 판정 조건(boneWeight[0] > 0)과
+    // 네 본의 가중 합이 같고, 규약만 다르다: DX11은 mul(bone, v)(열 벡터),
+    // 여기는 mul(v, bone)(행 벡터)이다. CPU가 전치해서 올리므로 결과는 같다.
+    //
+    // 원본과 갈리는 점 하나: 원본은 위치에만 본을 먹인다(법선은 안 쓴다).
+    // 여기도 위치만 변형한다 — 와이어프레임은 법선을 보지 않는다.
     constexpr const char* kWireFrameShader = R"(
 cbuffer WireFrameFrame : register(b0)
 {
@@ -37,18 +43,48 @@ cbuffer WireFrameFrame : register(b0)
 struct WireInstance
 {
     float4x4 world;
+    uint     boneOffset;
+    uint3    padding;
 };
 
 StructuredBuffer<WireInstance> gInstances : register(t0);
+StructuredBuffer<float4x4>     gBones     : register(t1);
+
+#define NO_SKINNING 0xFFFFFFFFu
+
+struct VSIn
+{
+    float3 position    : POSITION;
+    float4 boneIndices : BLENDINDICES;
+    float4 boneWeights : BLENDWEIGHT;
+};
 
 struct VSOut
 {
     float4 position : SV_POSITION;
 };
 
-VSOut VSMain(float3 position : POSITION, uint instanceId : SV_InstanceID)
+VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
-    const float4 worldPosition = mul(float4(position, 1.0f), gInstances[instanceId].world);
+    const WireInstance instance = gInstances[instanceId];
+
+    float3 position = input.position;
+    if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
+    {
+        float4x4 boneTransform = input.boneWeights[0]
+            * gBones[instance.boneOffset + (uint)input.boneIndices[0]];
+
+        [unroll]
+        for (int i = 1; i < 4; ++i)
+        {
+            boneTransform += input.boneWeights[i]
+                * gBones[instance.boneOffset + (uint)input.boneIndices[i]];
+        }
+
+        position = mul(float4(position, 1.0f), boneTransform).xyz;
+    }
+
+    const float4 worldPosition = mul(float4(position, 1.0f), instance.world);
 
     VSOut output;
     output.position = mul(worldPosition, gViewProjection);
@@ -99,12 +135,15 @@ bool EnhancedWireFramePass::Initialize(const EnhancedFrameContext& context,
 bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     std::string& outError)
 {
-    // b0 상수(뷰투영) · t0 인스턴스 월드(루트 SRV). 텍스처가 없다.
-    D3D12_ROOT_PARAMETER params[2]{};
+    // b0 상수(뷰투영) · t0 인스턴스 · t1 본 팔레트(둘 다 루트 SRV).
+    // 텍스처가 없어 디스크립터 테이블도 없다.
+    D3D12_ROOT_PARAMETER params[3]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;
     params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
     params[1].Descriptor.ShaderRegister = 0;
+    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    params[2].Descriptor.ShaderRegister = 1;
 
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
     rootDesc.NumParameters = _countof(params);
@@ -120,13 +159,19 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     if (!CompileWireFrameShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
     if (!CompileWireFrameShader("PSMain", "ps_5_0", psBlob, outError)) return false;
 
-    // 엔진 Vertex에서 위치만 읽는다. 스트라이드는 정점 버퍼 뷰가 정하므로
-    // 요소를 다 선언할 필요가 없다(GBuffer도 부분 선언이다).
+    // 엔진 Vertex에서 위치와 본 가중만 읽는다. 스트라이드는 정점 버퍼 뷰가
+    // 정하므로 요소를 다 선언할 필요가 없다(GBuffer도 부분 선언이다).
     static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
           D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64,
+          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80,
+          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
     static_assert(offsetof(Vertex, position) == 0, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
     DX12GraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob->GetBufferPointer();
@@ -201,6 +246,29 @@ void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* dr
             batch = &m_batches.back();
         }
         ++batch->count;
+
+        // 본 팔레트를 애니메이터별로 한 번씩만 담는다(GBuffer와 같은 규약).
+        //
+        // 한 캐릭터의 메시가 여럿이면 드로우도 여럿인데 팔레트는 하나다 —
+        // 중복 제거가 없으면 같은 512행렬을 메시 수만큼 올린다.
+        if (nullptr != draw.bonePalette && 0 != draw.boneCount)
+        {
+            if (m_boneOffsets.find(draw.animatorKey) == m_boneOffsets.end())
+            {
+                const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+                m_bonePalettes.resize(offset + draw.boneCount);
+
+                // HLSL이 열 우선으로 읽으므로 전치해 둔다. world 행렬과 같은
+                // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
+                for (uint32_t i = 0; i < draw.boneCount; ++i)
+                {
+                    m_bonePalettes[offset + i] = XMMatrixTranspose(draw.bonePalette[i]);
+                }
+
+                m_boneOffsets.emplace(draw.animatorKey, offset);
+            }
+            ++m_lastSkinnedCount;
+        }
     }
 }
 
@@ -211,10 +279,13 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
     m_height = context.height;
 
     m_batches.clear();
-    m_instanceWorlds.clear();
+    m_instances.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_geometry.clear();
     m_lastDrawItemCount = 0;
     m_lastBatchCount = 0;
+    m_lastSkinnedCount = 0;
 
     if (nullptr != context.camera)
     {
@@ -239,7 +310,7 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
         offset += batch.count;
         batch.count = 0;   // 아래 채우기에서 다시 센다
     }
-    m_instanceWorlds.resize(offset);
+    m_instances.resize(offset);
 
     const auto place = [&](const std::vector<EnhancedDrawItem>* draws)
     {
@@ -250,8 +321,18 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
             for (Batch& batch : m_batches)
             {
                 if (batch.mesh != draw.mesh) continue;
-                m_instanceWorlds[batch.first + batch.count] =
-                    XMMatrixTranspose(draw.worldMatrix);
+
+                InstanceData& instance = m_instances[batch.first + batch.count];
+                instance.world = XMMatrixTranspose(draw.worldMatrix);
+
+                // 팔레트가 없으면 kNoSkinning으로 남아 셰이더가 건너뛴다.
+                instance.boneOffset = kNoSkinning;
+                if (nullptr != draw.bonePalette && 0 != draw.boneCount)
+                {
+                    const auto found = m_boneOffsets.find(draw.animatorKey);
+                    if (found != m_boneOffsets.end()) instance.boneOffset = found->second;
+                }
+
                 ++batch.count;
                 break;
             }
@@ -366,7 +447,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
                     D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
             }
 
-            if (m_batches.empty() || m_instanceWorlds.empty()) return;
+            if (m_batches.empty() || m_instances.empty()) return;
 
             WireFrameConstants constants{};
             constants.viewProjection = XMMatrixTranspose(m_viewProjection);
@@ -377,17 +458,39 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
             const uint64_t instanceBytes =
-                sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_instanceWorlds.size());
+                sizeof(InstanceData) * static_cast<uint64_t>(m_instances.size());
             const auto instanceUpload = context.resources->GetUploadRing().Allocate(
-                instanceBytes, sizeof(Mathf::Matrix));
+                instanceBytes, sizeof(InstanceData));
             if (!instanceUpload.IsValid()) return;
-            memcpy(instanceUpload.cpuAddress, m_instanceWorlds.data(),
+            memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));
+
+            // 팔레트가 없어도 t1은 꽂는다. 스킨드가 없는 프레임에서도 루트
+            // SRV가 비면 검증 레이어가 잡는다(GBuffer에서 겪은 것과 같다).
+            const uint64_t paletteBytes = m_bonePalettes.empty()
+                ? sizeof(Mathf::Matrix)
+                : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
+
+            const auto paletteUpload = context.resources->GetUploadRing().Allocate(
+                paletteBytes, sizeof(Mathf::Matrix));
+            if (!paletteUpload.IsValid()) return;
+
+            if (m_bonePalettes.empty())
+            {
+                const Mathf::Matrix identity = XMMatrixIdentity();
+                memcpy(paletteUpload.cpuAddress, &identity, sizeof(identity));
+            }
+            else
+            {
+                memcpy(paletteUpload.cpuAddress, m_bonePalettes.data(),
+                    static_cast<size_t>(paletteBytes));
+            }
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
+            commandList->SetGraphicsRootShaderResourceView(2, paletteUpload.gpuAddress);
 
             for (const Batch& batch : m_batches)
             {
@@ -396,7 +499,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
                 commandList->SetGraphicsRootShaderResourceView(1,
                     instanceUpload.gpuAddress
-                    + static_cast<uint64_t>(batch.first) * sizeof(Mathf::Matrix));
+                    + static_cast<uint64_t>(batch.first) * sizeof(InstanceData));
 
                 commandList->IASetVertexBuffers(0, 1, &geometry->second.vertexView);
                 commandList->IASetIndexBuffer(&geometry->second.indexView);
@@ -410,12 +513,16 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 void EnhancedWireFramePass::Shutdown()
 {
     m_batches.clear();
-    m_instanceWorlds.clear();
+    m_instances.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_geometry.clear();
     m_lastDrawItemCount = 0;
     m_lastBatchCount = 0;
+    m_lastSkinnedCount = 0;
     m_width = 0;
     m_height = 0;
+    m_viewProjection = XMMatrixIdentity();
 
     m_rtvHeap.Reset();
     m_dsvHeap.Reset();
