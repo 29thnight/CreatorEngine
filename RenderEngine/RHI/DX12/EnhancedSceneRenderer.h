@@ -340,6 +340,19 @@ public:
 
     /// 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
     bool RunVolumetricFogTest(std::string& outLog);
+
+    /// DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제("DX12가 실제로
+    /// 빠른가")의 검증.
+    ///
+    /// Scale 테스트들의 "DX11과 직접 재지 않는다" 원칙과 정반대인 이유:
+    /// 거기서는 API 차이가 잡음이었지만, 여기서는 그것이 측정 대상이다.
+    /// 같은 어댑터·같은 기하·같은 셰이더·같은 드로우당 페이로드로 맞추고
+    /// 드로우당 상수 갱신 경로만 각 엔진의 실제 패턴(DX11 Map/DISCARD vs
+    /// DX12 업로드 링 + 루트 CBV)을 따른다. 드로우 수 스윕으로 기록 CPU ·
+    /// 제출 CPU · GPU 시간을 중앙값으로 내고, 커버리지 픽셀 수 대조로
+    /// '빨라진 것'과 '덜 그린 것'을 가른다. Release 전용 — Debug는 DX12만
+    /// 검증 레이어 비용을 내서 비교가 성립하지 않는다.
+    bool RunApiOverheadBench(std::string& outLog);
 };
 
 #endif

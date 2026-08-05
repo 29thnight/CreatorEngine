@@ -1650,6 +1650,19 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.bench11")
+    {
+        // DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제 검증.
+        // 전용 디바이스 둘을 새로 세우므로 에디터 씬과 무관하게 언제든 돈다.
+        EnhancedSceneRenderer renderer;
+        std::string log;
+        const bool passed = renderer.RunApiOverheadBench(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.bench11] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.bench11 %s\n", verdict.c_str());
+    }
     else if (cmd == "dx12.compare")
     {
         // DX11과의 픽셀 대조(PHASE 3-6). 에디터가 한 프레임 이상 그린 뒤에만
@@ -2684,6 +2697,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.decal           데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)\n"
         "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
         "  dx12.fog             볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)\n"
+        "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"
