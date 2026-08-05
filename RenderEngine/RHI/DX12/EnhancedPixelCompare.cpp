@@ -249,13 +249,15 @@ namespace
 //   일치하므로(DX12만 그린 픽셀 40개) 규약이 통째로 어긋난 것은 아니다.
 //   그래도 두 경로가 다른 규약으로 같은 데이터를 읽는다는 사실은 남겨 둔다.
 //
-// 판정 기준 0.95의 근거(규명 후 확정):
+// 판정 기준 0.95의 근거(규명 후 확정, 재분류 도입으로 갱신):
 //   차이의 성분이 둘로 규명됐다 — ① far 경계 밴드(DX11의 관대함, 위 참조)
-//   ② 스킨드 메시(DX12 GBuffer가 아직 본 변형을 안 한다 — 바인드 포즈로
-//   그려 애니메이션 포즈의 DX11과 크게 갈린다). 정적 씬 실측은 0.9962이고
-//   스킨드가 섞이면 그 몫만큼 떨어진다. 0.95는 정적 위주 씬에서 far 밴드
-//   이상의 구조적 어긋남(카메라·변환·컬링)을 잡는 값이다. 스키닝이 붙으면
-//   그때 다시 조인다.
+//   ② 스킨드 메시(당시 DX12 GBuffer가 본 변형 미착수 — 이후 스키닝이
+//   붙었다, dx12.skinning 참조). ①은 처음에 기준의 여유(0.95)로 흡수했는데,
+//   FT_Primitives에서 far에 스치는 바닥 쿼드 하나가 밴드로 8.2%를 먹어
+//   0.8534가 나왔다 — 여유로 덮을 수 있는 크기가 아니다. 그래서 집계 직전에
+//   재분류를 넣었다: 해석기하 판정이 'DX12가 수학과 일치'로 선 프레임에
+//   한해, 범인 드로우 bitmask이면서 단독 렌더 경계보다 위인 픽셀만 어긋남에서
+//   뺀다. 0.95는 그 뒤에 남는 구조적 어긋남에 적용된다.
 bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
@@ -909,6 +911,11 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         outLog += summary + "\n";
     }
 
+    // far 밴드 재분류의 재료. 단독 실험 블록이 채우고, 최종 집계가 쓴다 —
+    // 판정(DX12가 수학과 일치)이 선 프레임에서만 채워진다.
+    bool farBandDx12MatchesMath = false;
+    std::vector<bool> farBandSoloCoverage;
+
     // ── z-fighting 가설의 결정적 실험 ──
     //
     // 가설: 그 평면이 다른 면과 같은 깊이에 겹쳐 있고, 두 경로의 부동소수
@@ -922,6 +929,25 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     {
         size_t widestIndex = 0;
         float widestSpan = -1.f;
+
+        // 차이 구간의 y 범위. 예전에는 그때 조사하던 씬의 값(528~556)이 상수로
+        // 박혀 있었다 — 다른 씬에서는 그 띠에 안 걸치는 범인을 놓치거나 엉뚱한
+        // 드로우를 집는다(FT_Primitives의 띠는 460~587이었다). 필터는 지금
+        // 화면의 차이 구간에서 와야 한다.
+        uint32_t gapBandMinY = UINT32_MAX, gapBandMaxY = 0;
+        for (size_t index = 0; index < dx11Coverage.size(); ++index)
+        {
+            if (dx11Coverage[index] && !dx12Coverage[index])
+            {
+                const uint32_t y = static_cast<uint32_t>(index / compareWidth);
+                gapBandMinY = (std::min)(gapBandMinY, y);
+                gapBandMaxY = (std::max)(gapBandMaxY, y);
+            }
+        }
+        const float gapBandTop = (UINT32_MAX == gapBandMinY)
+            ? 0.f : static_cast<float>(gapBandMinY);
+        const float gapBandBottom = (UINT32_MAX == gapBandMinY)
+            ? static_cast<float>(compareHeight) : static_cast<float>(gapBandMaxY);
 
         const Mathf::xMatrix viewProjection =
             XMMatrixMultiply(cameraSnapshot.view, cameraSnapshot.projection);
@@ -953,11 +979,11 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
             const float screenR = (sphere.Radius * scale) / w
                 * 0.5f * static_cast<float>(compareHeight);
 
-            // 차이 구간의 위쪽(DX12가 안 그린 y 528~556)을 덮을 수 있는
-            // 드로우여야 한다. 그중 화면에서 가장 넓게 걸치는 것을 고른다.
+            // 차이 구간을 덮을 수 있는 드로우여야 한다. 그중 화면에서 가장
+            // 넓게 걸치는 것을 고른다.
             const float top = screenY - screenR;
             const float bottom = screenY + screenR;
-            if (bottom < 528.f || top > 556.f) continue;
+            if (bottom < gapBandTop || top > gapBandBottom) continue;
 
             const float span = bottom - top;
             if (span > widestSpan) { widestSpan = span; widestIndex = i; }
@@ -1254,6 +1280,12 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
                             ? "→ DX11이 수학과 일치(DX12 쪽이 이상)\n"
                             : "→ 판정 불충분\n";
                     outLog += verdictLine;
+
+                    // 판정이 DX12 승리로 선 프레임에서만 재분류 재료를 넘긴다.
+                    // '판정 불충분'은 넘기지 않는다 — 근거 없는 면제는 진짜
+                    // 회귀를 삼키는 문이 된다.
+                    farBandDx12MatchesMath = (dx12Closer > dx11Closer);
+                    if (farBandDx12MatchesMath) farBandSoloCoverage = soloCoverage;
                 }
             }
         }
@@ -1365,15 +1397,74 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
         outLog += line;
     }
 
-    const size_t unionCount = both + onlyDX11 + onlyDX12;
+    // ── far 밴드 재분류 ──
+    //
+    // 파일 머리 '규명 완료' 절의 결론을 집계에 반영하는 자리다. DX11은 far
+    // 클리핑 경계를 수학적 경계보다 관대하게 넘겨 그린다(정밀도 기전, DX12가
+    // 참값). 그 밴드는 이식 오류가 아니므로 어긋남에서 뺀다 — 규명만 해 두고
+    // 집계에 안 옮긴 탓에, 완전히 옳은 DX12 렌더가 far에 스치는 바닥 쿼드
+    // 하나로 0.8534까지 떨어져 실패했다(FT_Primitives 실측).
+    //
+    // 제외 조건 셋을 전부 요구한다 — 하나라도 빠지면 진짜 회귀를 삼킨다:
+    //   ① 해석기하 판정이 그 프레임에서 'DX12가 수학과 일치'로 섰다
+    //   ② 픽셀의 DX11 bitmask가 범인 드로우의 값이다(다른 드로우 보호)
+    //   ③ 픽셀이 그 열의 단독 렌더 상단보다 위다(수학적 경계 바깥쪽만)
+    size_t farBandForgiven = 0;
+    if (farBandDx12MatchesMath && 0 != gapDominantBitmask
+        && !farBandSoloCoverage.empty())
+    {
+        std::vector<uint32_t> soloTops(compareWidth, 0);
+        for (uint32_t x = 0; x < compareWidth; ++x)
+        {
+            for (uint32_t y = 0; y < compareHeight; ++y)
+            {
+                if (farBandSoloCoverage[static_cast<size_t>(y) * compareWidth + x])
+                {
+                    soloTops[x] = y;
+                    break;
+                }
+            }
+            // 단독 렌더가 그 열을 아예 안 덮으면 0으로 남고, y < 0인 픽셀은
+            // 없으므로 그 열에서는 아무것도 면제되지 않는다 — 보수적인 쪽이다.
+        }
+
+        const uint32_t rows = (std::min)(compareHeight, dx11Height);
+        const uint32_t cols = (std::min)(compareWidth, dx11Width);
+        for (uint32_t y = 0; y < rows; ++y)
+        {
+            const auto* row = reinterpret_cast<const uint32_t*>(dx11Bytes.data()
+                + static_cast<size_t>(y) * dx11RowPitch);
+            for (uint32_t x = 0; x < cols; ++x)
+            {
+                if (y >= soloTops[x]) continue;
+                const size_t index = static_cast<size_t>(y) * compareWidth + x;
+                if (!dx11Coverage[index] || dx12Coverage[index]) continue;
+                if (gapDominantBitmask != row[x]) continue;
+                ++farBandForgiven;
+            }
+        }
+
+        if (0 != farBandForgiven)
+        {
+            char line[256]{};
+            std::snprintf(line, sizeof(line),
+                "        far 밴드 재분류 — DX11만 %zu픽셀을 어긋남에서 뺐다"
+                "(근거: 해석기하 판정 DX12 승 · bitmask %u · 단독 경계 위)\n",
+                farBandForgiven, gapDominantBitmask);
+            outLog += line;
+        }
+    }
+
+    const size_t structuralOnlyDX11 = onlyDX11 - farBandForgiven;
+    const size_t unionCount = both + structuralOnlyDX11 + onlyDX12;
     const double agreement = (0 != unionCount)
         ? (static_cast<double>(both) / static_cast<double>(unionCount)) : 0.0;
 
     {
-        char line[224]{};
+        char line[256]{};
         std::snprintf(line, sizeof(line),
-            "[3/3] 일치 %zu · DX11만 %zu · DX12만 %zu · 겹침 비율 %.4f\n",
-            both, onlyDX11, onlyDX12, agreement);
+            "[3/3] 일치 %zu · DX11만 %zu(구조적 %zu) · DX12만 %zu · 겹침 비율 %.4f\n",
+            both, onlyDX11, structuralOnlyDX11, onlyDX12, agreement);
         outLog += line;
     }
 
@@ -1386,10 +1477,12 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
 
     // ── 판정 기준 0.95의 근거(파일 머리 주석의 규명 결과 참조) ──
     //
-    // 차이의 두 성분은 규명됐다: far 경계 밴드(DX11의 관대함 — DX12가 수학과
-    // 일치)와 스킨드 메시(DX12 스키닝 미착수). 정적 씬 실측이 0.9962이므로
-    // 0.95는 그 둘을 허용하면서 구조적 어긋남(카메라·변환·컬링)을 잡는다.
-    // 스키닝이 붙으면 그때 조인다.
+    // far 경계 밴드는 이제 기준의 여유로 흡수하지 않는다 — 위의 재분류가
+    // 근거(해석기하 판정)를 확인하고 명시적으로 뺀다. 기준을 여유로 두는
+    // 이유였던 밴드가 씬에 따라 8%를 넘을 수 있음이 실측됐기 때문이다
+    // (FT_Primitives 0.8534 — far에 스치는 바닥 쿼드 하나로 그렇게 된다).
+    // 0.95는 이제 재분류 뒤의 '구조적' 어긋남(카메라·변환·컬링·스키닝)에만
+    // 적용된다. 여러 씬의 실측이 쌓이면 그때 조인다.
     constexpr double kMinAgreement = 0.95;
 
     const bool passed = (agreement >= kMinAgreement);
