@@ -170,7 +170,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -194,7 +194,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -220,7 +220,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -242,38 +242,18 @@
     <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="BitMaskPass.cpp" />
     <ClCompile Include="ColorGradingPass.cpp" />
-    <ClCompile Include="ColorModuleCS.cpp" />
     <ClCompile Include="CullingManager.cpp" />
-    <ClCompile Include="BillboardModuleGPU.cpp" />
     <ClCompile Include="DecalPass.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
-    <ClCompile Include="EffectBase.cpp" />
-    <ClCompile Include="EffectEditor.cpp" />
-    <ClCompile Include="EffectManager.cpp" />
-    <ClCompile Include="EffectProxyController.cpp" />
-    <ClCompile Include="EffectSerializer.cpp" />
-    <ClCompile Include="LineModuleCS.cpp" />
-    <ClCompile Include="MeshColorModuleCS.cpp" />
-    <ClCompile Include="MeshModuleGPU.cpp" />
-    <ClCompile Include="MeshMovementModuleCS.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
-    <ClCompile Include="MeshSizeModuleCS.cpp" />
-    <ClCompile Include="MeshSpawnModuleCS.cpp" />
-    <ClCompile Include="MovementModuleCS.cpp" />
-    <ClCompile Include="ParticleModule.cpp" />
-    <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderGraphBuilder.cpp" />
-    <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
-    <ClCompile Include="TrailModuleCS.cpp" />
     <ClCompile Include="VisualShaderDSL.cpp" />
     <ClCompile Include="VisualShaderPSO.cpp" />
     <ClCompile Include="ShaderPSO.cpp" />
-    <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
-    <ClCompile Include="SpawnModuleCS.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
     <ClCompile Include="GizmoLinePass.cpp" />
     <ClCompile Include="GizmoPass.cpp" />
@@ -345,8 +325,6 @@
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
-    <ClCompile Include="TrailGenerateModule.cpp" />
-    <ClCompile Include="TrailRenderModule.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
@@ -390,61 +368,35 @@
     <ClInclude Include="AssetJob.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
-    <ClInclude Include="BeamModule.h" />
     <ClInclude Include="BillboardType.h" />
     <ClInclude Include="BitMaskPass.h" />
     <ClInclude Include="BitMaskPassSetting.h" />
     <ClInclude Include="BloomSetting.h" />
     <ClInclude Include="ColorGradingPass.h" />
     <ClInclude Include="ColorGradingPassSetting.h" />
-    <ClInclude Include="ColorModuleCS.h" />
     <ClInclude Include="CullingManager.h" />
-    <ClInclude Include="BaseEffectStruct.h" />
-    <ClInclude Include="BillboardModuleGPU.h" />
     <ClInclude Include="DecalPass.h" />
     <ClInclude Include="DeferredPassSetting.h" />
     <ClInclude Include="EaseInOut.h" />
-    <ClInclude Include="EffectBase.h" />
-    <ClInclude Include="EffectCommandType.h" />
-    <ClInclude Include="EffectEditor.h" />
-    <ClInclude Include="EffectManager.h" />
-    <ClInclude Include="EffectManagerProxy.h" />
-    <ClInclude Include="EffectProxyController.h" />
-    <ClInclude Include="EffectRenderProxy.h" />
-    <ClInclude Include="EffectSerializer.h" />
     <ClInclude Include="ICustomEditor.h" />
     <ClInclude Include="KeyFrameEvent.h" />
-    <ClInclude Include="LineModuleCS.h" />
     <ClInclude Include="MaterialFlowInformation.h" />
-    <ClInclude Include="MeshColorModuleCS.h" />
-    <ClInclude Include="MeshModuleGPU.h" />
-    <ClInclude Include="MeshMovementModuleCS.h" />
     <ClInclude Include="MeshOptimizer.h" />
-    <ClInclude Include="MeshSizeModuleCS.h" />
-    <ClInclude Include="MeshSpawnModuleCS.h" />
-    <ClInclude Include="MovementModuleCS.h" />
-    <ClInclude Include="ParticleModule.h" />
-    <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="RenderGraphBuilder.h" />
-    <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ShaderDSL.h" />
-    <ClInclude Include="TrailModuleCS.h" />
     <ClInclude Include="VisualShaderDSL.h" />
     <ClInclude Include="VisualShaderPSO.h" />
     <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="ShadowMapPassSetting.h" />
-    <ClInclude Include="SizeModuleCS.h" />
     <ClInclude Include="Socket.h" />
-    <ClInclude Include="SpawnModuleCS.h" />
     <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoLinePass.h" />
     <ClInclude Include="GizmoPass.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
-    <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
     <ClInclude Include="MeshRendererProxy.h" />
     <ClInclude Include="RenderJob.h" />
@@ -476,8 +428,6 @@
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="ToneMapPassSetting.h" />
-    <ClInclude Include="TrailGenerateModule.h" />
-    <ClInclude Include="TrailRenderModule.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />

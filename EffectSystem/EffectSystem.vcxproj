@@ -26,107 +26,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="BaseTypeDef.h" />
-    <ClInclude Include="Benchmark.hpp" />
-    <ClInclude Include="BitFlag.h" />
-    <ClInclude Include="CircleQueue.hpp" />
-    <ClInclude Include="ClassProperty.h" />
-    <ClInclude Include="Core.Assert.hpp" />
-    <ClInclude Include="Core.Barrier.h" />
-    <ClInclude Include="Octree.h" />
-    <ClInclude Include="PakHelper.h" />
-    <ClInclude Include="plf_colony.h" />
-    <ClInclude Include="Core.Coroutine.h" />
-    <ClInclude Include="Core.CountingSemaphore.h" />
-    <ClInclude Include="Core.Definition.h" />
-    <ClInclude Include="Core.Fence.h" />
-    <ClInclude Include="Core.FenceFlag.h" />
-    <ClInclude Include="Core.Mathf.h" />
-    <ClInclude Include="Core.Memory.hpp" />
-    <ClInclude Include="Core.Minimal.h" />
-    <ClInclude Include="Core.OctreeNode.h" />
-    <ClInclude Include="Core.Property.h" />
-    <ClInclude Include="Core.Random.h" />
-    <ClInclude Include="Core.Runtime.h" />
-    <ClInclude Include="Core.Thread.h" />
-    <ClInclude Include="Core.Thread.hpp" />
-    <ClInclude Include="Core.ThreadPool.h" />
-    <ClInclude Include="CoreWindow.h" />
-    <ClInclude Include="CoroutineHelper.h" />
-    <ClInclude Include="CSVLoader.h" />
-    <ClInclude Include="CSVLoaderHelper.h" />
-    <ClInclude Include="DebugStreamBuf.h" />
-    <ClInclude Include="Delegate.h" />
-    <ClInclude Include="DeviceResources.h" />
-    <ClInclude Include="DirectXHelper.h" />
-    <ClInclude Include="DLLRefHelper.h" />
-    <ClInclude Include="DumpHandler.h" />
-    <ClInclude Include="EngineBootstrap.h" />
-    <ClInclude Include="FileDialog.h" />
-    <ClInclude Include="FileIO.h" />
-    <ClInclude Include="GlobalImGuiContext.h" />
-    <ClInclude Include="HashingString.h" />
-    <ClInclude Include="HLSLCompiler.h" />
-    <ClInclude Include="Paklib.hpp" />
-    <ClInclude Include="ReflectionYamlTemplete.h" />
-    <ClInclude Include="TypeIO.h" />
-    <ClInclude Include="LinkedListLib.hpp" />
-    <ClInclude Include="LogEntry.h" />
-    <ClInclude Include="HtmlFileSink.h" />
-    <ClInclude Include="LogSink.h" />
-    <ClInclude Include="LogSystem.h" />
-    <ClInclude Include="MemoryPool.h" />
-    <ClInclude Include="MetaAlias.h" />
-    <ClInclude Include="MetaStateCommand.h" />
-    <ClInclude Include="MetaUtility.h" />
-    <ClInclude Include="PathFinder.h" />
-    <ClInclude Include="QuadTree.h" />
-    <ClInclude Include="Reflection.hpp" />
-    <ClInclude Include="ReflectionFunction.h" />
-    <ClInclude Include="ReflectionImGuiHelper.h" />
-    <ClInclude Include="ReflectionMecro.h" />
-    <ClInclude Include="ReflectionRegister.h" />
-    <ClInclude Include="ReflectionType.h" />
-    <ClInclude Include="ReflectionVectorFactory.h" />
-    <ClInclude Include="ReflectionVectorInvoker.h" />
-    <ClInclude Include="ReflectionVectorMapper.h" />
-    <ClInclude Include="ReflectionYml.h" />
-    <ClInclude Include="RingBuffer.h" />
-    <ClInclude Include="SimpleIniFile.h" />
-    <ClInclude Include="SpinLock.h" />
-    <ClInclude Include="StringHelper.h" />
-    <ClInclude Include="TimeSystem.h" />
-    <ClInclude Include="Trim.h" />
-    <ClInclude Include="TypeDefinition.h" />
-    <ClInclude Include="TypeTrait.h" />
-    <ClInclude Include="WinProcProxy.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Core.Coroutine.cpp" />
-    <ClCompile Include="CoreWindow.cpp" />
-    <ClCompile Include="Octree.cpp" />
-    <ClCompile Include="DeviceResources.cpp" />
-    <ClCompile Include="HLSLCompiler.cpp" />
-    <ClCompile Include="LogSystem.cpp" />
-    <ClCompile Include="QuadTree.cpp" />
-    <ClCompile Include="TimeSystem.cpp" />
-    <ClCompile Include="WinProcProxy.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Delegate.inl" />
-    <None Include="MemoryPool.inl" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\ManagedHeap\ManagedHeap\ManagedHeap.vcxproj">
-      <Project>{c4628f56-6af1-4c05-8ac8-76f039c059f9}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</ProjectGuid>
-    <RootNamespace>UtilityFramework</RootNamespace>
+    <ProjectGuid>{548D5655-95B1-5560-A5D9-9F2134C53A84}</ProjectGuid>
+    <RootNamespace>EffectSystem</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -210,8 +114,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -227,8 +130,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -246,8 +148,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -264,23 +165,19 @@
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\;$(SolutionDir)RenderEngine\RHI\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
-      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <MinFilesInUnityFile>15</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <PreBuildEvent>
-      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -291,14 +188,13 @@
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\;$(SolutionDir)RenderEngine\RHI\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
-      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <MinFilesInUnityFile>15</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -307,9 +203,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <PreBuildEvent>
-      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">
     <ClCompile>
@@ -320,13 +213,12 @@
       <PreprocessorDefinitions>BUILD_FLAG;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\;$(SolutionDir)RenderEngine\RHI\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)EngineEntry\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)ScriptBinder\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
@@ -336,10 +228,72 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <PreBuildEvent>
-      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
+      <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ScriptBinder\ScriptBinder.vcxproj">
+      <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
+      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BillboardModuleGPU.cpp" />
+    <ClCompile Include="ColorModuleCS.cpp" />
+    <ClCompile Include="EffectBase.cpp" />
+    <ClCompile Include="EffectEditor.cpp" />
+    <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="EffectProxyController.cpp" />
+    <ClCompile Include="EffectSerializer.cpp" />
+    <ClCompile Include="LineModuleCS.cpp" />
+    <ClCompile Include="MeshColorModuleCS.cpp" />
+    <ClCompile Include="MeshModuleGPU.cpp" />
+    <ClCompile Include="MeshMovementModuleCS.cpp" />
+    <ClCompile Include="MeshSizeModuleCS.cpp" />
+    <ClCompile Include="MeshSpawnModuleCS.cpp" />
+    <ClCompile Include="MovementModuleCS.cpp" />
+    <ClCompile Include="ParticleModule.cpp" />
+    <ClCompile Include="ParticleSystem.cpp" />
+    <ClCompile Include="RenderModules.cpp" />
+    <ClCompile Include="SizeModuleCS.cpp" />
+    <ClCompile Include="SpawnModuleCS.cpp" />
+    <ClCompile Include="TrailGenerateModule.cpp" />
+    <ClCompile Include="TrailModuleCS.cpp" />
+    <ClCompile Include="TrailRenderModule.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BaseEffectStruct.h" />
+    <ClInclude Include="BeamModule.h" />
+    <ClInclude Include="BillboardModuleGPU.h" />
+    <ClInclude Include="ColorModuleCS.h" />
+    <ClInclude Include="EffectBase.h" />
+    <ClInclude Include="EffectCommandType.h" />
+    <ClInclude Include="EffectEditor.h" />
+    <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="EffectManagerProxy.h" />
+    <ClInclude Include="EffectProxyController.h" />
+    <ClInclude Include="EffectRenderProxy.h" />
+    <ClInclude Include="EffectSerializer.h" />
+    <ClInclude Include="LineModuleCS.h" />
+    <ClInclude Include="MeshColorModuleCS.h" />
+    <ClInclude Include="MeshModuleGPU.h" />
+    <ClInclude Include="MeshMovementModuleCS.h" />
+    <ClInclude Include="MeshSizeModuleCS.h" />
+    <ClInclude Include="MeshSpawnModuleCS.h" />
+    <ClInclude Include="ModuleLink.h" />
+    <ClInclude Include="MovementModuleCS.h" />
+    <ClInclude Include="ParticleModule.h" />
+    <ClInclude Include="ParticleSystem.h" />
+    <ClInclude Include="RenderModules.h" />
+    <ClInclude Include="SizeModuleCS.h" />
+    <ClInclude Include="SpawnModuleCS.h" />
+    <ClInclude Include="TrailGenerateModule.h" />
+    <ClInclude Include="TrailModuleCS.h" />
+    <ClInclude Include="TrailRenderModule.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
