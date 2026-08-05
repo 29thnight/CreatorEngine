@@ -72,6 +72,17 @@ public:
     // GBuffer에서 배치 수를 안 찍었다가 병합이 통째로 죽어 있는 것을 놓칠 뻔했다.
     uint32_t GetLastBatchCount() const { return m_lastBatchCount.load(std::memory_order_relaxed); }
 
+    /// 스킨드 캐스터로 그린 인스턴스 수. 0인데 씬에 스킨드가 있으면 그림자가
+    /// 바인드 포즈로 나오고 있다는 뜻이다.
+    uint32_t GetLastSkinnedDrawCount() const
+    {
+        return m_lastSkinnedDrawCount.load(std::memory_order_relaxed);
+    }
+    uint32_t GetLastBonePaletteCount() const
+    {
+        return static_cast<uint32_t>(m_boneOffsets.size());
+    }
+
     // 기본 편향. 캐스케이드별로는 반지름 비만큼 키워 쓴다.
     void SetBias(float bias) { m_baseBias = bias; }
 
@@ -91,6 +102,17 @@ private:
     {
         Mathf::Matrix lightViewProjection{};
     };
+
+    /// 인스턴스 하나. HLSL의 ShadowInstance와 배치가 같아야 한다.
+    /// 정적 경로도 같은 구조를 읽는다(boneOffset을 무시할 뿐).
+    struct ShadowInstance
+    {
+        Mathf::Matrix world{};
+        uint32_t      boneOffset{ kNoSkinning };
+        uint32_t      padding[3]{};
+    };
+
+    static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
 
     // 한 캐스케이드가 덮는 범위. 컬링 판정에 중심과 반지름이 필요해서 행렬만
     // 들고 있지 않는다.
@@ -137,6 +159,7 @@ private:
     std::atomic<uint32_t> m_lastDrawCount{ 0 };
     std::atomic<uint32_t> m_lastCulledCount{ 0 };
     std::atomic<uint32_t> m_lastBatchCount{ 0 };
+    std::atomic<uint32_t> m_lastSkinnedDrawCount{ 0 };
 
     // 메시 기준으로 정렬한 드로우 인덱스. 원본을 건드리지 않으려고 인덱스만 든다.
     std::vector<size_t> m_sortedDraws;
@@ -144,7 +167,12 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     uint32_t                     m_dsvIncrement{ 0 };
 
+    // 프레임의 본 팔레트(GBuffer와 같은 수집 규칙). 스킨드 캐스터가 없으면 빈다.
+    std::vector<Mathf::Matrix>             m_bonePalettes;
+    std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
+
     ID3D12PipelineState* m_pso{ nullptr };
+    ID3D12PipelineState* m_skinnedPso{ nullptr };
     ID3D12RootSignature* m_rootSignature{ nullptr };
 };
 

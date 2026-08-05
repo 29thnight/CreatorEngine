@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "EnhancedGBufferPass.h"
+#include "EnhancedShadowPass.h"
 #include "DX12DeviceResources.h"
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
@@ -102,6 +103,11 @@ namespace
     /// 이 경계가 없으면 서로의 측정을 오염시킨다.
     constexpr uint32_t kSkinnedRegionLimit = kSkinWidth * 3 / 4;
 
+    /// 그림자 맵 리드백의 행 간격. 깊이는 R32_FLOAT로 읽는다.
+    constexpr uint32_t kShadowRowPitch =
+        ((2048u * 4u) + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
+        & ~static_cast<uint32_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
+
     // 세로로 선 띠. 아래 절반은 본 0, 위 절반은 본 1, 가운데 행은 0.5/0.5.
     //
     // 정점을 세 층으로 둔다(y = -1, 0, +1). 가운데 층의 가중치를 반씩
@@ -174,14 +180,14 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
-    outLog += "── GBuffer 스키닝 검증 (PHASE 3-6) ──\n";
+    outLog += "── 스키닝 검증 (GBuffer · 그림자, PHASE 3-6) ──\n";
 
     std::string error;
 
     DX12DeviceResources resources;
     if (!resources.Initialize(kSkinWidth, kSkinHeight, error))
     {
-        outLog += "[1/4] DX12 초기화 실패: " + error + "\n";
+        outLog += "[1/5] DX12 초기화 실패: " + error + "\n";
         return false;
     }
 
@@ -195,7 +201,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
         !textureCache.Initialize(&resources, DirectX11::DeviceStates->g_pDevice,
             DirectX11::DeviceStates->g_pDeviceContext, error))
     {
-        outLog += "[1/4] 캐시 초기화 실패: " + error + "\n";
+        outLog += "[1/5] 캐시 초기화 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
@@ -212,11 +218,11 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     EnhancedGBufferPass gbuffer;
     if (!gbuffer.Initialize(frameContext, error))
     {
-        outLog += "[1/4] GBuffer 초기화 실패: " + error + "\n";
+        outLog += "[1/5] GBuffer 초기화 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
-    outLog += "[1/4] 셰이더 컴파일·PSO 생성 통과(BLENDINDICES·BLENDWEIGHT 포함)\n";
+    outLog += "[1/5] 셰이더 컴파일·PSO 생성 통과(BLENDINDICES·BLENDWEIGHT 포함)\n";
 
     // ── 합성 메시 ──
     std::vector<Vertex> skinnedVertices;
@@ -274,7 +280,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
             D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr, IID_PPV_ARGS(&readback))))
         {
-            outLog += "[1/4] 리드백 생성 실패\n";
+            outLog += "[1/5] 리드백 생성 실패\n";
             resources.Shutdown();
             return false;
         }
@@ -373,7 +379,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     draws[1].worldMatrix = XMMatrixIdentity();
     // 비스킨드 — 팔레트를 주지 않는다.
 
-    // ── [2/4] 항등 팔레트 = 바인드 포즈 ──
+    // ── [2/5] 항등 팔레트 = 바인드 포즈 ──
     SkinCapture identityCapture{};
     if (passed)
     {
@@ -385,7 +391,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
         {
             char line[224]{};
             std::snprintf(line, sizeof(line),
-                "[2/4] 항등 팔레트 — 커버 %u · 드로우 %u · 배치 %u · 스킨드 %u · 팔레트 %u\n",
+                "[2/5] 항등 팔레트 — 커버 %u · 드로우 %u · 배치 %u · 스킨드 %u · 팔레트 %u\n",
                 identityCapture.CountCovered(), gbuffer.GetLastDrawCount(),
                 gbuffer.GetLastBatchCount(), gbuffer.GetLastSkinnedCount(),
                 gbuffer.GetLastBonePaletteCount());
@@ -445,7 +451,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
 
             char line[288]{};
             std::snprintf(line, sizeof(line),
-                "[3/4] 본 1 +x 이동 — 오른쪽 끝 변화: 위 %+d · 가운데 %+d · 아래 %+d (px)"
+                "[3/5] 본 1 +x 이동 — 오른쪽 끝 변화: 위 %+d · 가운데 %+d · 아래 %+d (px)"
                 " · 표본 행 %u/%u/%u(띠 %u~%u)\n",
                 topDelta, middleDelta, bottomDelta,
                 kTopRow, kMiddleRow, kBottomRow, top, bottom);
@@ -508,7 +514,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
 
             char line[192]{};
             std::snprintf(line, sizeof(line),
-                "[4/4] 비스킨드 사각형(화면 오른쪽 1/4) — 항등 %u · 본 흔든 뒤 %u\n",
+                "[4/5] 비스킨드 사각형(화면 오른쪽 1/4) — 항등 %u · 본 흔든 뒤 %u\n",
                 staticBefore, staticAfter);
             outLog += line;
 
@@ -522,6 +528,174 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
                 outLog += "비스킨드가 본을 따라 움직였다 — 스키닝 분기가 새고 있다\n";
                 passed = false;
             }
+        }
+    }
+
+    // ── [5/5] 그림자 패스도 같은 팔레트를 따라가는가 ──
+    //
+    // GBuffer만 스키닝하면 캐릭터는 움직이는데 그림자는 바인드 포즈로 남는다.
+    // 그 증상은 '그림자가 좀 이상하다'로만 보여서 오래 방치되기 쉽다.
+    //
+    // 그림자 맵을 직접 읽는 대신 캐스터 통계로 본다 — 스킨드 PSO로 그린
+    // 인스턴스가 실제로 있어야 하고, 팔레트도 올라가 있어야 한다.
+    if (passed)
+    {
+        ComPtr<ID3D12Resource> shadowReadback;
+        {
+            D3D12_HEAP_PROPERTIES readbackHeap{};
+            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+            D3D12_RESOURCE_DESC desc{};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            desc.Width = static_cast<uint64_t>(kShadowRowPitch)
+                * EnhancedShadowPass::kShadowMapSize;
+            desc.Height = 1;
+            desc.DepthOrArraySize = 1;
+            desc.MipLevels = 1;
+            desc.SampleDesc.Count = 1;
+            desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+            if (FAILED(resources.GetDevice()->CreateCommittedResource(&readbackHeap,
+                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr, IID_PPV_ARGS(&shadowReadback))))
+            {
+                outLog += "[5/5] 그림자 리드백 생성 실패\n";
+                passed = false;
+            }
+        }
+
+        EnhancedShadowPass shadow;
+        if (!passed)
+        {
+            // 리드백 생성이 실패했으면 아래를 돌릴 이유가 없다.
+        }
+        else if (!shadow.Initialize(frameContext, error))
+        {
+            outLog += "[5/5] 그림자 초기화 실패: " + error + "\n";
+            passed = false;
+        }
+        else
+        {
+            // 방향광이 있어야 캐스케이드가 선다.
+            std::vector<EnhancedLight> lights(1);
+            lights[0].position = Mathf::Vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
+            lights[0].direction = Mathf::Vector4(
+                Mathf::Vector3(XMVector3Normalize(XMVectorSet(0.3f, -1.f, 0.4f, 0.f))));
+            lights[0].color = Mathf::Color4(1.f, 1.f, 1.f, 1.f);
+            frameContext.lights = &lights;
+            frameContext.draws = &draws;
+
+            if (!resources.BeginFrame(error) ||
+                !shadow.PrepareFrame(frameContext, error))
+            {
+                outLog += "[5/5] 그림자 준비 실패: " + error + "\n";
+                passed = false;
+            }
+            else
+            {
+                // ★ 그래프는 제출 이후까지 살아 있어야 한다.
+                EnhancedRenderGraph graph;
+                shadow.Declare(graph, frameContext);
+
+                // ★ 소비자를 붙여야 한다.
+                //
+                // 그림자 패스는 hasSideEffect=false로 선언된다 — 실전에서는
+                // Deferred가 읽으므로 역방향 도달로 살아남지만, 여기에는 그
+                // 소비자가 없어 그래프가 통째로 걷어낸다. 실제로 첫 실행이
+                // '드로우 0 · 컬링 0'으로 그 사실을 알려 줬다(컬링 0이 결정적
+                // 단서다 — 판정까지 갔으면 컬린 수라도 셌을 것이다).
+                //
+                // 리드백을 붙이면 소비자가 생기는 동시에 '그림자 맵에 실제로
+                // 깊이가 남았는가'도 볼 수 있다.
+                const RGHandle shadowMap = shadow.GetShadowMap();
+                graph.AddPass("Skinning.ShadowReadback",
+                    { { shadowMap, RGResourceState::CopySource } },
+                    [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+                    {
+                        D3D12_TEXTURE_COPY_LOCATION src{};
+                        src.pResource = executeContext.Resolve(shadowMap);
+                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                        src.SubresourceIndex = 0;   // 첫 캐스케이드만
+
+                        D3D12_TEXTURE_COPY_LOCATION dst{};
+                        dst.pResource = shadowReadback.Get();
+                        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                        dst.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_FLOAT;
+                        dst.PlacedFootprint.Footprint.Width = EnhancedShadowPass::kShadowMapSize;
+                        dst.PlacedFootprint.Footprint.Height = EnhancedShadowPass::kShadowMapSize;
+                        dst.PlacedFootprint.Footprint.Depth = 1;
+                        dst.PlacedFootprint.Footprint.RowPitch = kShadowRowPitch;
+
+                        executeContext.commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                    }, true);
+
+                if (!graph.Compile(resources.GetDevice(), error) ||
+                    !graph.Execute(resources.GetCommandList(), error))
+                {
+                    outLog += "[5/5] 그림자 실행 실패: " + error + "\n";
+                    passed = false;
+                }
+
+                if (!resources.EndFrame(error))
+                {
+                    outLog += "[5/5] EndFrame 실패: " + error + "\n";
+                    passed = false;
+                }
+                resources.WaitForGpu();
+
+                // 그림자 맵에 실제로 깊이가 남았는지 — 클리어 값(1.0)이 아닌
+                // 텍셀 수. 통계만 보면 '드로우는 냈는데 아무것도 안 그려진'
+                // 경우를 통과시킨다.
+                uint32_t shadowTexels = 0;
+                {
+                    void* mapped = nullptr;
+                    const SIZE_T bytes = static_cast<SIZE_T>(kShadowRowPitch)
+                        * EnhancedShadowPass::kShadowMapSize;
+                    D3D12_RANGE range{ 0, bytes };
+                    if (SUCCEEDED(shadowReadback->Map(0, &range, &mapped)))
+                    {
+                        const auto* base = static_cast<const uint8_t*>(mapped);
+                        for (uint32_t y = 0; y < EnhancedShadowPass::kShadowMapSize; ++y)
+                        {
+                            const auto* row = reinterpret_cast<const float*>(
+                                base + static_cast<size_t>(y) * kShadowRowPitch);
+                            for (uint32_t x = 0; x < EnhancedShadowPass::kShadowMapSize; ++x)
+                            {
+                                if (row[x] < 0.999f) ++shadowTexels;
+                            }
+                        }
+                        shadowReadback->Unmap(0, nullptr);
+                    }
+                }
+
+                char line[256]{};
+                std::snprintf(line, sizeof(line),
+                    "[5/5] 그림자 캐스터 — 드로우 %u · 스킨드 %u · 팔레트 %u · 컬링 %u"
+                    " · 맵 텍셀 %u\n",
+                    shadow.GetLastDrawCount(), shadow.GetLastSkinnedDrawCount(),
+                    shadow.GetLastBonePaletteCount(), shadow.GetLastCulledCount(),
+                    shadowTexels);
+                outLog += line;
+
+                if (0 == shadowTexels)
+                {
+                    outLog += "그림자 맵이 비었다 — 드로우는 났는데 깊이가 안 남았다\n";
+                    passed = false;
+                }
+
+                if (0 == shadow.GetLastSkinnedDrawCount())
+                {
+                    outLog += "그림자에 스킨드 캐스터가 없다 — 그림자만 바인드 포즈로 남는다\n";
+                    passed = false;
+                }
+                if (1 != shadow.GetLastBonePaletteCount())
+                {
+                    outLog += "그림자 팔레트 수가 1이 아니다 — 수집이 GBuffer와 다르다\n";
+                    passed = false;
+                }
+            }
+
+            shadow.Shutdown();
         }
     }
 
@@ -540,7 +714,7 @@ bool EnhancedSceneRenderer::RunSkinningTest(std::string& outLog)
     psoManager.Shutdown();
     resources.Shutdown();
 
-    outLog += passed ? "GBuffer 스키닝 검증 통과\n" : "GBuffer 스키닝 검증 실패\n";
+    outLog += passed ? "스키닝 검증 통과(GBuffer·그림자)\n" : "스키닝 검증 실패\n";
     return passed;
 }
 

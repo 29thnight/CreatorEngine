@@ -18,45 +18,92 @@
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
+    //
+    // 셰이더는 하나이고 SHADOW_SKINNING 매크로로 두 벌을 만든다.
+    //
+    // ★ 왜 한 벌로 안 두는가: 그림자 패스는 "위치만 읽는다"가 설계다.
+    //   캐스케이드 셋을 전부 다시 그리므로 정점 대역폭이 세 배로 얹히고,
+    //   정적 메시가 대부분인 씬에서 본 인덱스·가중치 32바이트를 읽고 버리는
+    //   것은 그 설계를 무르는 일이다. 입력 레이아웃과 PSO를 갈라, 스킨드
+    //   배치에서만 그 32바이트를 읽는다.
     constexpr const char* kShadowShader = R"(
 cbuffer ShadowConstants : register(b0)
 {
     float4x4 gLightViewProjection;
 };
 
-// 드로우마다 바뀌는 것은 월드 행렬 하나뿐이다. GBuffer처럼 재질까지 실을
-// 필요가 없어 인스턴스 구조체가 행렬 하나로 끝난다.
+// 드로우마다 바뀌는 것은 월드 행렬과 본 오프셋뿐이다. GBuffer처럼 재질까지
+// 실을 필요가 없다.
+//
+// 정적 경로도 같은 구조를 읽는다(boneOffset을 무시할 뿐). 구조를 갈라 두면
+// 배치 코드가 두 벌이 되고 그쪽이 훨씬 비싸다.
 struct ShadowInstance
 {
     float4x4 world;
+    uint     boneOffset;
+    uint3    padding;
 };
 
 StructuredBuffer<ShadowInstance> gInstances : register(t0);
 
+#ifdef SHADOW_SKINNING
+StructuredBuffer<float4x4> gBones : register(t1);
+#define NO_SKINNING 0xFFFFFFFFu
+#endif
+
 struct VSIn
 {
     float3 position : POSITION;
+#ifdef SHADOW_SKINNING
+    float4 boneIndices : BLENDINDICES;
+    float4 boneWeights : BLENDWEIGHT;
+#endif
 };
 
 // 깊이만 쓰므로 픽셀 셰이더가 없다. 위치 외에는 아무것도 보간하지 않는다 —
 // 그림자 패스는 드로우 수가 많아 정점 처리 비용이 그대로 프레임에 얹힌다.
 float4 VSMain(VSIn input, uint instanceId : SV_InstanceID) : SV_POSITION
 {
-    const float4x4 gWorld = gInstances[instanceId].world;
-    const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
+    const ShadowInstance instance = gInstances[instanceId];
+
+#ifdef SHADOW_SKINNING
+    // GBuffer와 같은 수식·같은 규약이다. 둘이 갈리면 캐릭터의 그림자가 몸과
+    // 다른 포즈로 나오는데, 그 증상은 '그림자가 좀 이상하다'로만 보인다.
+    if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
+    {
+        float4x4 boneTransform = input.boneWeights[0]
+            * gBones[instance.boneOffset + (uint)input.boneIndices[0]];
+
+        [unroll]
+        for (int i = 1; i < 4; ++i)
+        {
+            boneTransform += input.boneWeights[i]
+                * gBones[instance.boneOffset + (uint)input.boneIndices[i]];
+        }
+
+        input.position = mul(float4(input.position, 1.0f), boneTransform).xyz;
+    }
+#endif
+
+    const float4 worldPosition = mul(float4(input.position, 1.0f), instance.world);
     return mul(worldPosition, gLightViewProjection);
 }
 )";
 
-    bool CompileShadowShader(const char* entry, const char* target,
+    bool CompileShadowShader(const char* entry, const char* target, bool skinning,
         Microsoft::WRL::ComPtr<ID3DBlob>& outBlob, std::string& outError)
     {
+        const D3D_SHADER_MACRO skinningMacros[] = {
+            { "SHADOW_SKINNING", "1" }, { nullptr, nullptr } };
+
         Microsoft::WRL::ComPtr<ID3DBlob> errors;
-        const HRESULT hr = D3DCompile(kShadowShader, strlen(kShadowShader), nullptr,
-            nullptr, nullptr, entry, target, 0, 0, &outBlob, &errors);
+        const HRESULT hr = D3DCompile(kShadowShader, strlen(kShadowShader),
+            nullptr, skinning ? skinningMacros : nullptr,
+            nullptr, entry, target, 0, 0, &outBlob, &errors);
         if (FAILED(hr))
         {
-            outError = std::string("그림자 셰이더 컴파일 실패(") + entry + "): ";
+            outError = std::string("그림자 셰이더 컴파일 실패(") + entry
+                + (skinning ? " · 스키닝" : " · 정적") + "): ";
             if (errors) outError += static_cast<const char*>(errors->GetBufferPointer());
             return false;
         }
@@ -67,9 +114,11 @@ float4 VSMain(VSIn input, uint instanceId : SV_InstanceID) : SV_POSITION
 bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
 {
     ComPtr<ID3DBlob> vsBlob;
-    if (!CompileShadowShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
+    ComPtr<ID3DBlob> skinnedVsBlob;
+    if (!CompileShadowShader("VSMain", "vs_5_0", false, vsBlob, outError)) return false;
+    if (!CompileShadowShader("VSMain", "vs_5_0", true, skinnedVsBlob, outError)) return false;
 
-    D3D12_ROOT_PARAMETER params[2]{};
+    D3D12_ROOT_PARAMETER params[3]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
@@ -80,6 +129,13 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
     params[1].Descriptor.ShaderRegister = 0;
     params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    // 본 팔레트. 정적 PSO는 이 슬롯을 읽지 않지만 루트 시그니처는 하나로
+    // 둔다 — 둘로 나누면 PSO 전환마다 루트까지 갈아야 하고, 그건 이 패스가
+    // 아끼려는 상태 변경을 도로 늘리는 일이다.
+    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    params[2].Descriptor.ShaderRegister = 1;
+    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     D3D12_ROOT_SIGNATURE_DESC rootDesc{};
     rootDesc.NumParameters = _countof(params);
@@ -96,6 +152,18 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
           D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
+
+    // 스킨드 경로만 본 인덱스·가중치를 읽는다. 오프셋은 엔진 Vertex를 따른다.
+    static const D3D12_INPUT_ELEMENT_DESC kSkinnedInputElements[] = {
+        { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0,
+          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64,
+          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80,
+          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+    static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
+    static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
     DX12GraphicsPipelineDesc desc{};
     desc.inputElements = kInputElements;
@@ -115,7 +183,16 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     desc.dsvFormat = kShadowFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    return nullptr != m_pso;
+    if (nullptr == m_pso) return false;
+
+    // 스킨드 변형 — 입력 레이아웃과 정점 셰이더만 다르고 나머지는 같다.
+    desc.inputElements = kSkinnedInputElements;
+    desc.inputElementCount = _countof(kSkinnedInputElements);
+    desc.vsBytecode = skinnedVsBlob->GetBufferPointer();
+    desc.vsSize = skinnedVsBlob->GetBufferSize();
+
+    m_skinnedPso = context.psoManager->GetOrCreate(desc, outError);
+    return nullptr != m_skinnedPso;
 }
 
 bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
@@ -301,9 +378,12 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
 {
     m_drawGeometry.clear();
     m_sortedDraws.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_lastDrawCount.store(0, std::memory_order_relaxed);
     m_lastCulledCount.store(0, std::memory_order_relaxed);
     m_lastBatchCount.store(0, std::memory_order_relaxed);
+    m_lastSkinnedDrawCount.store(0, std::memory_order_relaxed);
 
     ComputeCascades(context);
 
@@ -330,6 +410,26 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         m_drawGeometry.emplace(draw.mesh, geometry);
     }
 
+    // 본 팔레트를 애니메이터별로 한 번씩 모은다(GBuffer와 같은 규칙).
+    //
+    // 두 패스가 각자 모으는 것이 낭비로 보이지만, 공유하려면 패스 사이에
+    // 소유자를 두어야 하고 그건 실행 순서에 대한 가정을 하나 더 만든다.
+    // 팔레트 복사는 애니메이터당 한 번이라 실측으로도 문제가 안 된다.
+    for (const auto& draw : *context.draws)
+    {
+        if (nullptr == draw.mesh) continue;
+        if (nullptr == draw.bonePalette || 0 == draw.boneCount) continue;
+        if (m_boneOffsets.find(draw.animatorKey) != m_boneOffsets.end()) continue;
+
+        const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+        m_bonePalettes.resize(offset + draw.boneCount);
+        for (uint32_t i = 0; i < draw.boneCount; ++i)
+        {
+            m_bonePalettes[offset + i] = XMMatrixTranspose(draw.bonePalette[i]);
+        }
+        m_boneOffsets.emplace(draw.animatorKey, offset);
+    }
+
     // 메시 기준으로 정렬해 둔다. 같은 메시가 붙어 있어야 Record에서 한 번의
     // 드로우로 묶인다.
     //
@@ -346,10 +446,20 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         if (nullptr != (*context.draws)[index].mesh) m_sortedDraws.push_back(index);
     }
 
+    // 스킨드 여부를 첫 키로 둔다. PSO가 둘이므로 섞여 있으면 배치마다
+    // 파이프라인을 갈아야 하고, 그것이 이 패스가 아끼려는 상태 변경이다.
+    // 뭉쳐 두면 전환이 그룹 경계 한 번뿐이다.
     std::stable_sort(m_sortedDraws.begin(), m_sortedDraws.end(),
         [&](size_t a, size_t b)
         {
-            return (*context.draws)[a].mesh < (*context.draws)[b].mesh;
+            const auto& drawA = (*context.draws)[a];
+            const auto& drawB = (*context.draws)[b];
+
+            const bool skinnedA = (nullptr != drawA.bonePalette) && (0 != drawA.boneCount);
+            const bool skinnedB = (nullptr != drawB.bonePalette) && (0 != drawB.boneCount);
+            if (skinnedA != skinnedB) return skinnedA < skinnedB;
+
+            return drawA.mesh < drawB.mesh;
         });
 
     // 조각 수를 정하는 근거. 컬링 전 후보라 상한이지만, '몇 조각으로 나눌까'에는
@@ -398,11 +508,36 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
             const bool draws = m_hasDirectionalLight && nullptr != context.draws;
             if (draws)
             {
-                // 캐스케이드마다 상태를 다시 걸지 않는다. PSO와 루트 시그니처는
-                // 셋이 같으므로 바깥에서 한 번이면 된다.
+                // 캐스케이드마다 상태를 다시 걸지 않는다. 루트 시그니처는 셋이
+                // 같으므로 바깥에서 한 번이면 된다.
+                //
+                // PSO는 배치가 스킨드인지에 따라 갈리므로 여기서 걸지 않는다 —
+                // 아래 flushBatch가 필요할 때만 바꾼다.
                 commandList->SetGraphicsRootSignature(m_rootSignature);
-                commandList->SetPipelineState(m_pso);
                 commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+                // 본 팔레트는 조각당 한 번. 스킨드가 없어도 꽂는다 — 루트에
+                // 선언된 슬롯을 비워 두면 검증 레이어가 경고한다.
+                const uint64_t paletteBytes = m_bonePalettes.empty()
+                    ? sizeof(Mathf::Matrix)
+                    : sizeof(Mathf::Matrix) * static_cast<uint64_t>(m_bonePalettes.size());
+
+                const auto paletteBuffer = context.resources->GetUploadRing().Allocate(
+                    paletteBytes, sizeof(Mathf::Matrix));
+                if (paletteBuffer.IsValid())
+                {
+                    if (m_bonePalettes.empty())
+                    {
+                        const Mathf::Matrix identity = XMMatrixIdentity();
+                        memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
+                    }
+                    else
+                    {
+                        memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
+                            static_cast<size_t>(paletteBytes));
+                    }
+                    commandList->SetGraphicsRootShaderResourceView(2, paletteBuffer.gpuAddress);
+                }
             }
 
             // 조각 하나가 (캐스케이드, 드로우 범위) 하나를 맡는다.
@@ -474,10 +609,15 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 //
                 // 그래서 조각 안에서 모은다. 지역 변수인 것이 중요하다 —
                 // 워커들이 동시에 도는 자리라 멤버에 모으면 서로 덮어쓴다.
-                std::vector<Mathf::Matrix> instances;
+                std::vector<ShadowInstance> instances;
                 instances.reserve(drawEnd - drawBegin);
 
                 Mesh* batchMesh = nullptr;
+                bool  batchSkinned = false;
+
+                // 지금 걸려 있는 PSO. 조각마다 상태를 새로 걸어야 하므로
+                // 처음에는 아무것도 안 걸린 것으로 둔다.
+                ID3D12PipelineState* boundPso = nullptr;
 
                 // 모아 둔 인스턴스를 드로우 하나로 낸다.
                 const auto flushBatch = [&]()
@@ -488,12 +628,22 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     if (found != m_drawGeometry.end() && found->second.entry.IsValid())
                     {
                         const uint64_t instanceBytes =
-                            sizeof(Mathf::Matrix) * static_cast<uint64_t>(instances.size());
+                            sizeof(ShadowInstance) * static_cast<uint64_t>(instances.size());
                         const auto instanceBuffer = context.resources->GetUploadRing().Allocate(
-                            instanceBytes, sizeof(Mathf::Matrix));
+                            instanceBytes, sizeof(ShadowInstance));
 
                         if (instanceBuffer.IsValid())
                         {
+                            // 스킨드 배치만 스킨드 PSO로 바꾼다. 정렬이 스킨드를
+                            // 뭉쳐 두었으므로 전환은 그룹 경계에서 한 번뿐이다.
+                            ID3D12PipelineState* const wanted =
+                                batchSkinned ? m_skinnedPso : m_pso;
+                            if (wanted != boundPso)
+                            {
+                                commandList->SetPipelineState(wanted);
+                                boundPso = wanted;
+                            }
+
                             memcpy(instanceBuffer.cpuAddress, instances.data(),
                                 static_cast<size_t>(instanceBytes));
                             commandList->SetGraphicsRootShaderResourceView(
@@ -509,6 +659,13 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                             m_lastDrawCount.fetch_add(
                                 static_cast<uint32_t>(instances.size()), std::memory_order_relaxed);
                             m_lastBatchCount.fetch_add(1, std::memory_order_relaxed);
+
+                            if (batchSkinned)
+                            {
+                                m_lastSkinnedDrawCount.fetch_add(
+                                    static_cast<uint32_t>(instances.size()),
+                                    std::memory_order_relaxed);
+                            }
                         }
                     }
 
@@ -538,15 +695,28 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         continue;
                     }
 
-                    // 메시가 바뀌면 지금까지 모은 것을 낸다. 정렬해 두었으므로
-                    // 같은 메시는 이미 붙어 있다.
-                    if (draw.mesh != batchMesh)
+                    const bool skinned =
+                        (nullptr != draw.bonePalette) && (0 != draw.boneCount);
+
+                    // 메시나 스킨드 여부가 바뀌면 지금까지 모은 것을 낸다.
+                    // 정렬해 두었으므로 같은 것끼리는 이미 붙어 있다.
+                    if (draw.mesh != batchMesh || skinned != batchSkinned)
                     {
                         flushBatch();
                         batchMesh = draw.mesh;
+                        batchSkinned = skinned;
                     }
 
-                    instances.push_back(XMMatrixTranspose(draw.worldMatrix));
+                    ShadowInstance instance{};
+                    instance.world = XMMatrixTranspose(draw.worldMatrix);
+                    instance.boneOffset = kNoSkinning;
+                    if (skinned)
+                    {
+                        const auto offset = m_boneOffsets.find(draw.animatorKey);
+                        if (offset != m_boneOffsets.end()) instance.boneOffset = offset->second;
+                    }
+
+                    instances.push_back(instance);
                 }
 
                 flushBatch();
@@ -598,9 +768,12 @@ uint32_t EnhancedShadowPass::ComputeSliceCount() const
 void EnhancedShadowPass::Shutdown()
 {
     m_drawGeometry.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_dsvHeap.Reset();
     m_dsvIncrement = 0;
     m_pso = nullptr;
+    m_skinnedPso = nullptr;
     m_rootSignature = nullptr;
 }
 
