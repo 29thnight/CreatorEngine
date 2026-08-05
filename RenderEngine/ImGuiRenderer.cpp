@@ -1,6 +1,8 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRenderer.h"
 #include "CoreWindow.h"
+#include "RHI/DX12/ImGuiDx12Shell.h"
+#include <imgui_impl_dx12.h>
 #include "DeviceState.h"
 #include "DataSystem.h"
 #include "Profiler.h"
@@ -100,10 +102,41 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
     // Setup Platform/Renderer backends
 	auto deviceResource = m_deviceResources.lock();
-	ImGui_ImplWin32_Init(deviceResource->GetWindow()->GetHandle());
-    ID3D11Device* device = deviceResource->GetD3DDevice();
-    ID3D11DeviceContext* deviceContext = deviceResource->GetD3DDeviceContext();
-    ImGui_ImplDX11_Init(device, deviceContext);
+	HWND windowHandle = deviceResource->GetWindow()->GetHandle();
+	ImGui_ImplWin32_Init(windowHandle);
+
+	// ── 렌더 백엔드 분기(3-9 임시 승격) ──
+	//
+	// 부팅 설정이 DX12면 ImGui도 DX12 셸(자체 스왑체인)로 출력한다. 백엔드는
+	// 여기서 고정된다 — ImGui 백엔드는 런타임 핫스왑이 성립하지 않으므로,
+	// 셸을 끄려면 설정을 되돌리고 재시작한다. 셸 초기화가 실패하면 DX11로
+	// 폴백한다(빈 화면보다 낫다).
+	bool dx12ShellActive = false;
+	if (EngineSettingInstance->IsDx12BackendPreferred())
+	{
+		RECT clientRect{};
+		GetClientRect(windowHandle, &clientRect);
+		const uint32_t clientWidth =
+			static_cast<uint32_t>(clientRect.right - clientRect.left);
+		const uint32_t clientHeight =
+			static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+
+		std::string shellError;
+		dx12ShellActive = ImGuiDx12Shell::Get().Initialize(
+			windowHandle, clientWidth, clientHeight, shellError);
+		if (!dx12ShellActive)
+		{
+			std::printf("[ImGui] DX12 셸 초기화 실패 - DX11 폴백: %s\n",
+				shellError.c_str());
+		}
+	}
+
+	if (!dx12ShellActive)
+	{
+		ID3D11Device* device = deviceResource->GetD3DDevice();
+		ID3D11DeviceContext* deviceContext = deviceResource->GetD3DDeviceContext();
+		ImGui_ImplDX11_Init(device, deviceContext);
+	}
 
 	//RegisterDisplaySizeHandler();
 	//ImGui::LoadIniSettingsFromDisk(io.IniFilename);
@@ -145,9 +178,16 @@ void ApplyImGuiScaleDynamically(float newScale, bool rebuildFonts = false)
 		io.Fonts->Build();
 
 		// 백엔드에 따라 디바이스 오브젝트 무효화/재생성
-		// (DX11 + Win32 예시)
-		ImGui_ImplDX11_InvalidateDeviceObjects();
-		ImGui_ImplDX11_CreateDeviceObjects();
+		if (ImGuiDx12Shell::Get().IsActive())
+		{
+			ImGui_ImplDX12_InvalidateDeviceObjects();
+			ImGui_ImplDX12_CreateDeviceObjects();
+		}
+		else
+		{
+			ImGui_ImplDX11_InvalidateDeviceObjects();
+			ImGui_ImplDX11_CreateDeviceObjects();
+		}
 	}
 }
 
@@ -157,7 +197,11 @@ void ImGuiRenderer::BeginRender()
     static bool firstLoop = true;
 	ImGuiIO& io = ImGui::GetIO();
 
-	DirectX11::OMSetRenderTargets(1, &DirectX11::DeviceStates->g_backBufferRTV, nullptr);
+	// DX12 셸 모드에서는 DX11 백버퍼에 그리지 않는다 — 출력은 셸 스왑체인이다.
+	if (!ImGuiDx12Shell::Get().IsActive())
+	{
+		DirectX11::OMSetRenderTargets(1, &DirectX11::DeviceStates->g_backBufferRTV, nullptr);
+	}
 	
 	RECT rect;
 	HWND hWnd = m_deviceResources.lock()->GetWindow()->GetHandle();
@@ -188,7 +232,16 @@ void ImGuiRenderer::BeginRender()
 		lastRequested = targetScale;
 	}
 	
-	ImGui_ImplDX11_NewFrame();
+	if (ImGuiDx12Shell::Get().IsActive())
+	{
+		ImGuiDx12Shell::Get().Resize(static_cast<uint32_t>(newSize.x),
+			static_cast<uint32_t>(newSize.y));
+		ImGuiDx12Shell::Get().NewFrame();
+	}
+	else
+	{
+		ImGui_ImplDX11_NewFrame();
+	}
 	ImGui_ImplWin32_NewFrame();
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
@@ -318,7 +371,18 @@ void ImGuiRenderer::EndRender()
 {
 	PROFILE_CPU_BEGIN("ImGuiEndRender");
 	ImGui::Render();
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+	if (ImGuiDx12Shell::Get().IsActive())
+	{
+		std::string presentError;
+		if (!ImGuiDx12Shell::Get().RenderAndPresent(presentError))
+		{
+			std::printf("[ImGui] DX12 셸 렌더 실패: %s\n", presentError.c_str());
+		}
+	}
+	else
+	{
+		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+	}
 
 	ImGuiIO& io = ImGui::GetIO();
 
@@ -332,7 +396,14 @@ void ImGuiRenderer::EndRender()
 
 void ImGuiRenderer::Shutdown()
 {
-    ImGui_ImplDX11_Shutdown();
+    if (ImGuiDx12Shell::Get().IsActive())
+    {
+        ImGuiDx12Shell::Get().Shutdown();
+    }
+    else
+    {
+        ImGui_ImplDX11_Shutdown();
+    }
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 

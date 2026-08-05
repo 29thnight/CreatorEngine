@@ -1,4 +1,5 @@
 #include "ShadowMapPass.h"
+#include "EditorImGuiTexture.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
@@ -155,7 +156,7 @@ void ShadowMapPass::ControlPanel()
 
 	for (int i = 0; i < cascadeCount; ++i)
 	{
-		ImGui::Image((ImTextureID)selectedData->sliceSRV[i], ImVec2(256, 256));
+		ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(selectedData->sliceSRV[i]), ImVec2(256, 256));
 	}
 
     if (ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f))

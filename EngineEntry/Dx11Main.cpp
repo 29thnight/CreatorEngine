@@ -4,6 +4,7 @@
 #include "BootProgress.h"
 #include "RHI/RHI.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "RHI/DX12/ImGuiDx12Shell.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -547,7 +548,12 @@ void DirectX11::Dx11Main::CommandExecuteThread()
 	if (ExecuteRenderPass())
 	{
         PROFILE_CPU_BEGIN("Present");
-		m_deviceResources->Present();
+		// DX12 셸 모드면 Present는 셸(ImGui EndRender)이 이미 했다 —
+		// DX11 스왑체인까지 제시하면 빈 백버퍼가 화면을 덮는다.
+		if (!ImGuiDx12Shell::Get().IsActive())
+		{
+			m_deviceResources->Present();
+		}
         PROFILE_CPU_END();
 	}
     //RHICommandFence.Signal();

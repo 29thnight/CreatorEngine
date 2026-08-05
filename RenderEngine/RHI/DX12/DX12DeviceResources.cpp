@@ -251,6 +251,11 @@ void DX12DeviceResources::Shutdown()
         WaitForGpu();
     }
 
+    // 스왑체인은 백버퍼 참조를 먼저 놓아야 곱게 죽는다(GPU 완주는 위에서 확인).
+    for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
+    m_backBufferRtvHeap.Reset();
+    m_swapChain.Reset();
+
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadRing.Shutdown();
     m_descriptorRing.Shutdown();
@@ -383,6 +388,134 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
 #else
     return 0;
 #endif
+}
+
+bool DX12DeviceResources::AttachSwapChain(HWND hwnd, uint32_t width, uint32_t height,
+    std::string& outError)
+{
+    if (nullptr == m_device.Get() || nullptr == m_queue.Get())
+    {
+        outError = "스왑체인 부착 전에 Initialize가 필요하다";
+        return false;
+    }
+    if (m_swapChain)
+    {
+        outError = "스왑체인이 이미 있다";
+        return false;
+    }
+
+    DXGI_SWAP_CHAIN_DESC1 desc{};
+    desc.Width = width;
+    desc.Height = height;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    desc.BufferCount = kFrameCount;
+    desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+
+    ComPtr<IDXGISwapChain1> swapChain1;
+    HRESULT hr = m_factory->CreateSwapChainForHwnd(m_queue.Get(), hwnd, &desc,
+        nullptr, nullptr, &swapChain1);
+    if (FAILED(hr))
+    {
+        outError = "CreateSwapChainForHwnd 실패 " + HrToString(hr);
+        return false;
+    }
+    if (FAILED(swapChain1.As(&m_swapChain)))
+    {
+        outError = "IDXGISwapChain3 질의 실패";
+        return false;
+    }
+    // 전체 화면 전환은 셸(창 계층)이 관리한다 — DXGI의 암묵 Alt+Enter를 끈다.
+    m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    heapDesc.NumDescriptors = kFrameCount;
+    if (FAILED(m_device->CreateDescriptorHeap(&heapDesc,
+        IID_PPV_ARGS(&m_backBufferRtvHeap))))
+    {
+        outError = "백버퍼 RTV 힙 생성 실패";
+        return false;
+    }
+    m_backBufferRtvSize = m_device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    for (uint32_t i = 0; i < kFrameCount; ++i)
+    {
+        if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]))))
+        {
+            outError = "백버퍼 " + std::to_string(i) + " 획득 실패";
+            return false;
+        }
+        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr,
+            GetBackBufferRtv(i));
+    }
+    return true;
+}
+
+bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
+    std::string& outError)
+{
+    if (!m_swapChain)
+    {
+        outError = "스왑체인이 없다";
+        return false;
+    }
+
+    // ResizeBuffers는 백버퍼 참조가 전부 풀린 상태를 요구한다 — GPU 완주
+    // 대기 후 RTV만 남기고 놓는다.
+    WaitForGpu();
+    for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
+
+    const HRESULT hr = m_swapChain->ResizeBuffers(kFrameCount, width, height,
+        DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+    if (FAILED(hr))
+    {
+        outError = "ResizeBuffers 실패 " + HrToString(hr);
+        return false;
+    }
+
+    for (uint32_t i = 0; i < kFrameCount; ++i)
+    {
+        if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]))))
+        {
+            outError = "리사이즈 후 백버퍼 획득 실패";
+            return false;
+        }
+        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr,
+            GetBackBufferRtv(i));
+    }
+    return true;
+}
+
+bool DX12DeviceResources::Present(std::string& outError)
+{
+    if (!m_swapChain)
+    {
+        outError = "스왑체인이 없다";
+        return false;
+    }
+    const HRESULT hr = m_swapChain->Present(0, 0);
+    if (FAILED(hr))
+    {
+        outError = "Present 실패 " + HrToString(hr);
+        return false;
+    }
+    return true;
+}
+
+uint32_t DX12DeviceResources::GetBackBufferIndex() const
+{
+    return m_swapChain ? m_swapChain->GetCurrentBackBufferIndex() : 0;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::GetBackBufferRtv(uint32_t index) const
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE handle =
+        m_backBufferRtvHeap->GetCPUDescriptorHandleForHeapStart();
+    handle.ptr += static_cast<SIZE_T>(index) * m_backBufferRtvSize;
+    return handle;
 }
 
 #endif

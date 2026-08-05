@@ -2,6 +2,7 @@
 #include "GameViewWindow.h"
 #include "SceneRenderer.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "EditorImGuiTexture.h"
 #include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "SceneManager.h"
@@ -53,8 +54,14 @@ void GameViewWindow::RenderGameViewWindow()
 			auto renderData = RenderPassData::GetData(camera.get());
 
 			// 렌더러 스위치(dx12.live) — SceneViewWindow와 같은 분기·같은 폴백.
-			ImTextureID displayed = (ImTextureID)renderData->m_renderTarget->m_pSRV;
-			if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(camera.get()))
+			ImTextureID displayed = (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(
+				renderData->m_renderTarget->m_pSRV);
+			if (const uint64_t liveTextureId =
+				EnhancedSceneRenderer::GetLiveDisplayImTextureId(camera.get()))
+			{
+				displayed = (ImTextureID)liveTextureId;
+			}
+			else if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(camera.get()))
 			{
 				displayed = (ImTextureID)liveSrv;
 			}

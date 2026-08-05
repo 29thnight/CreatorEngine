@@ -318,6 +318,8 @@
     <ClCompile Include="RHI\DX12\EnhancedPixelCompare.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSGIPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedApiOverheadBench.cpp" />
+    <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp" />
+    <ClCompile Include="EditorImGuiTexture.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLive.cpp" />
     <ClCompile Include="Camera.cpp" />

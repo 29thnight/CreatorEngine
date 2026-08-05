@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "EditorImGuiTexture.h"
 #include "ReflectionImGuiHelper.h"
 #include "DataSystem.h"
 #include "Model.h"
@@ -422,7 +423,7 @@ void TextureDropTarget(Material* mat)
 	ImGui::PushID(mat);
 	{
 		if (mat->m_pBaseColor) {
-			ImGui::Image((ImTextureID)mat->m_pBaseColor->m_pSRV, ImVec2(30, 30));
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(mat->m_pBaseColor), ImVec2(30, 30));
 			minRect = ImGui::GetItemRectMin();
 			maxRect = ImGui::GetItemRectMax();
 
@@ -464,7 +465,7 @@ void TextureDropTarget(Material* mat)
 
 	{
 		if (mat->m_pNormal) {
-			ImGui::Image((ImTextureID)mat->m_pNormal->m_pSRV, ImVec2(30, 30));
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(mat->m_pNormal), ImVec2(30, 30));
 
 			minRect = ImGui::GetItemRectMin();
 			maxRect = ImGui::GetItemRectMax();
@@ -506,7 +507,7 @@ void TextureDropTarget(Material* mat)
 	}
 	{
 		if (mat->m_pOccRoughMetal) {
-			ImGui::Image((ImTextureID)mat->m_pOccRoughMetal->m_pSRV, ImVec2(30, 30));
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(mat->m_pOccRoughMetal), ImVec2(30, 30));
 
 			minRect = ImGui::GetItemRectMin();
 			maxRect = ImGui::GetItemRectMax();

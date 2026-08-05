@@ -2,6 +2,7 @@
 #include "SceneViewWindow.h"
 #include "SceneRenderer.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
+#include "EditorImGuiTexture.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "IconsFontAwesome6.h"
@@ -195,10 +196,16 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		// 렌더러 스위치(dx12.live). DX12 상시 러너가 이 카메라의 그림을 방금
 		// 그렸으면 그것을, 아니면 DX11 결과를 표시한다 — nullptr 폴백이 항상
 		// 있어 DX12 쪽 실패가 빈 화면으로 번지지 않는다.
-		ImTextureID displayed = (ImTextureID)renderData->m_renderTarget->m_pSRV;
-		if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(cam))
+		ImTextureID displayed = (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(
+			renderData->m_renderTarget->m_pSRV);
+		if (const uint64_t liveTextureId =
+			EnhancedSceneRenderer::GetLiveDisplayImTextureId(cam))
 		{
-			displayed = (ImTextureID)liveSrv;
+			displayed = (ImTextureID)liveTextureId;   // DX12 셸 — 공유 텍스처 직결
+		}
+		else if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(cam))
+		{
+			displayed = (ImTextureID)liveSrv;         // DX11 백엔드 표시
 		}
 		ImGui::Image(displayed, ImVec2(x, y));
 		imageMin = ImGui::GetItemRectMin();

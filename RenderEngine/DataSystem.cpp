@@ -1,4 +1,5 @@
 #include "DataSystem.h"
+#include "EditorImGuiTexture.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
 #include "PrefabEditor.h"
@@ -155,23 +156,23 @@ void DataSystem::Initialize()
 
 	kExtensionMap =
 	{
-		{ ".fbx",	 { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
-		{ ".gltf",   { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
-		{ ".obj",    { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
-		{ ".glb",    { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
-		{ ".png",    { FileType::Texture,		(ImTextureID)TextureIcon->m_pSRV }	},
-		{ ".dds",    { FileType::Texture,		(ImTextureID)TextureIcon->m_pSRV }	},
-		{ ".hdr",    { FileType::HDR,			(ImTextureID)TextureIcon->m_pSRV }	},
-		{ ".hlsl",   { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
-		{ ".shader", { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
-		{ ".cpp",    { FileType::CppScript,		(ImTextureID)CodeIcon->m_pSRV }		},
-		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)CodeIcon->m_pSRV }		},
-		{ ".wav",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
-		{ ".mp3",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
-		{ ".terrain",{ FileType::TerrainTexture, (ImTextureID)TextureIcon->m_pSRV } },
-		{ ".prefab", { FileType::Prefab,		(ImTextureID)AssetsIcon->m_pSRV }	},
-		{ ".volume", { FileType::VolumeProfile,	(ImTextureID)AssetsIcon->m_pSRV }	},
-		{ ".spritefont",{ FileType::Font,		(ImTextureID)AssetsIcon->m_pSRV }   }
+		{ ".fbx",	 { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
+		{ ".gltf",   { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
+		{ ".obj",    { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
+		{ ".glb",    { FileType::Model,			(ImTextureID)EditorImGuiTexture::From(ModelIcon) }	},
+		{ ".png",    { FileType::Texture,		(ImTextureID)EditorImGuiTexture::From(TextureIcon) }	},
+		{ ".dds",    { FileType::Texture,		(ImTextureID)EditorImGuiTexture::From(TextureIcon) }	},
+		{ ".hdr",    { FileType::HDR,			(ImTextureID)EditorImGuiTexture::From(TextureIcon) }	},
+		{ ".hlsl",   { FileType::Shader,		(ImTextureID)EditorImGuiTexture::From(ShaderIcon) }	},
+		{ ".shader", { FileType::Shader,		(ImTextureID)EditorImGuiTexture::From(ShaderIcon) }	},
+		{ ".cpp",    { FileType::CppScript,		(ImTextureID)EditorImGuiTexture::From(CodeIcon) }		},
+		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)EditorImGuiTexture::From(CodeIcon) }		},
+		{ ".wav",    { FileType::Sound,			(ImTextureID)EditorImGuiTexture::From(UnknownIcon) }	},
+		{ ".mp3",    { FileType::Sound,			(ImTextureID)EditorImGuiTexture::From(UnknownIcon) }	},
+		{ ".terrain",{ FileType::TerrainTexture, (ImTextureID)EditorImGuiTexture::From(TextureIcon) } },
+		{ ".prefab", { FileType::Prefab,		(ImTextureID)EditorImGuiTexture::From(AssetsIcon) }	},
+		{ ".volume", { FileType::VolumeProfile,	(ImTextureID)EditorImGuiTexture::From(AssetsIcon) }	},
+		{ ".spritefont",{ FileType::Font,		(ImTextureID)EditorImGuiTexture::From(AssetsIcon) }   }
 	};
 
 	RenderForEditer();
@@ -229,7 +230,7 @@ void DataSystem::RenderForEditer()
 
 		searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
 
-		ImTextureID iconTexture = (ImTextureID)ModelIcon->m_pSRV;
+		ImTextureID iconTexture = (ImTextureID)EditorImGuiTexture::From(ModelIcon);
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), false, ImGuiWindowFlags_AlwaysUseWindowPadding))
 		{

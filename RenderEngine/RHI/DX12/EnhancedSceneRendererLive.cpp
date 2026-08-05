@@ -16,6 +16,7 @@
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
 #include "EnhancedPostChainPass.h"
+#include "ImGuiDx12Shell.h"
 
 #include "../../Camera.h"
 #include "../../Material.h"
@@ -689,6 +690,22 @@ ID3D11ShaderResourceView* EnhancedSceneRenderer::GetLiveDisplaySrv(const Camera*
     if (nullptr == camera || camera != state.boundCamera) return nullptr;
     if (state.pipeline->displaySlot < 0) return nullptr;
     return state.pipeline->slots[state.pipeline->displaySlot].openedSrv.Get();
+}
+
+uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(const Camera* camera)
+{
+    // CE 스레드(ImGui 빌드)에서 불리고 게임 스레드가 슬롯을 갱신한다 —
+    // GetLiveDisplaySrv와 같은 무해한 경합이다: 한 프레임 이전 슬롯을 읽어도
+    // 그 슬롯 역시 펜스가 끝난 그림이고, 핸들은 파이프라인 수명 동안 불변이다.
+    const LiveState& state = GetLiveState();
+    if (!ImGuiDx12Shell::Get().IsActive()) return 0;
+    if (!state.enabled || nullptr == state.pipeline) return 0;
+    if (nullptr == camera || camera != state.boundCamera) return 0;
+    if (state.pipeline->displaySlot < 0) return 0;
+
+    const HANDLE sharedHandle =
+        state.pipeline->slots[state.pipeline->displaySlot].sharedHandle;
+    return ImGuiDx12Shell::Get().OpenSharedTexture(sharedHandle);
 }
 
 std::string EnhancedSceneRenderer::GetLiveStatus()

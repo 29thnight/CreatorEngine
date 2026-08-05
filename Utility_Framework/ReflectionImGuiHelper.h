@@ -1,4 +1,10 @@
 ﻿#pragma once
+
+// 백엔드 중립 ImTextureID 변환(구현은 RenderEngine/EditorImGuiTexture.cpp).
+// 이 헤더는 Utility_Framework 소속이라 RenderEngine 헤더를 못 끌어온다 —
+// 전방 선언으로 계층을 지키고 링크가 잇는다.
+class Texture;
+namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
 #include "ReflectionFunction.h"
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
@@ -754,7 +760,7 @@ namespace Meta
 
                         if (texture) {
                             if (texture->m_pSRV)
-                                ImGui::Image((ImTextureID)texture->m_pSRV, ImVec2(30, 30));
+                                ImGui::Image((ImTextureID)EditorImGuiTexture::From(texture), ImVec2(30, 30));
                             else {
                                 ImGui::Button("None Texture", ImVec2(150, 20));
                             }

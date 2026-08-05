@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "InspectorWindow.h"
+#include "EditorImGuiTexture.h"
 #include "SceneRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -1318,7 +1319,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	if (decalComponent->GetDecalTexture() == nullptr)
 		ImGui::Button("None Diffuse Texture", ImVec2(150, 20));
 	else
-		ImGui::Image((ImTextureID)decalComponent->GetDecalTexture()->m_pSRV, ImVec2(30, 30));
+		ImGui::Image((ImTextureID)EditorImGuiTexture::From(decalComponent->GetDecalTexture()), ImVec2(30, 30));
 	ImVec2 minRect = ImGui::GetItemRectMin();
 	ImVec2 maxRect = ImGui::GetItemRectMax();
 	ImRect bb(minRect, maxRect);
@@ -1341,7 +1342,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	if (decalComponent->GetNormalTexture() == nullptr)
 		ImGui::Button("None Normal Texture", ImVec2(150, 20));
 	else
-		ImGui::Image((ImTextureID)decalComponent->GetNormalTexture()->m_pSRV, ImVec2(30, 30));
+		ImGui::Image((ImTextureID)EditorImGuiTexture::From(decalComponent->GetNormalTexture()), ImVec2(30, 30));
 	minRect = ImGui::GetItemRectMin();
 	maxRect = ImGui::GetItemRectMax();
 	bb = { minRect, maxRect };
@@ -1364,7 +1365,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	if (decalComponent->GetORMTexture() == nullptr)
 		ImGui::Button("None OccluRoughMetal Texture", ImVec2(150, 20));
 	else
-		ImGui::Image((ImTextureID)decalComponent->GetORMTexture()->m_pSRV, ImVec2(30, 30));
+		ImGui::Image((ImTextureID)EditorImGuiTexture::From(decalComponent->GetORMTexture()), ImVec2(30, 30));
 	minRect = ImGui::GetItemRectMin();
 	maxRect = ImGui::GetItemRectMax();
 	bb = { minRect, maxRect };
@@ -1627,7 +1628,7 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	if (spriteRenderer->GetSprite() == nullptr)
 		ImGui::Button("None Sprite", ImVec2(150, 20));
 	else
-		ImGui::Image((ImTextureID)spriteRenderer->GetSprite()->m_pSRV, ImVec2(30, 30));
+		ImGui::Image((ImTextureID)EditorImGuiTexture::From(spriteRenderer->GetSprite()), ImVec2(30, 30));
 	ImVec2 minRect = ImGui::GetItemRectMin();
 	ImVec2 maxRect = ImGui::GetItemRectMax();
 	ImRect bb(minRect, maxRect);

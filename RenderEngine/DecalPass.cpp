@@ -1,4 +1,5 @@
 #include "DecalPass.h"
+#include "EditorImGuiTexture.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
@@ -319,7 +320,7 @@ void DecalPass::ControlPanel()
 {
 	ImGui::PushID(this);
 	if (TestTexture) {
-		ImGui::Image((ImTextureID)TestTexture->m_pSRV, ImVec2(30, 30));
+		ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(TestTexture->m_pSRV), ImVec2(30, 30));
 	}
 	else {
 		ImGui::Button("No texture");

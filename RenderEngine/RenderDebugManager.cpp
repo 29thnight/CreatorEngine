@@ -1,4 +1,5 @@
 #include "RenderDebugManager.h"
+#include "EditorImGuiTexture.h"
 #include <imgui.h>
 
 void RenderDebugManager::Capture(ID3D11DeviceContext* deferredContext, ID3D11Texture2D* src,
@@ -163,7 +164,7 @@ void RenderDebugManager::RenderCaptureCallImGui()
                 ImGui::PushID(&call);
                 ImGui::Text("Call: %s", call.functionName.c_str());
                 ImGui::Text("Vertices: %u", call.vertexCount);
-                ImGui::Image((ImTextureID)call.srv.Get(), ImVec2{ 200.f, 200.f });
+                ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(call.srv.Get()), ImVec2{ 200.f, 200.f });
                 ImGui::PopID();
             }
 		}
@@ -183,7 +184,7 @@ void RenderDebugManager::RenderCaptureResultImGui()
         if (ImGui::CollapsingHeader(passName.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
             size_t prevIndex = (m_currentIndex.load(std::memory_order_relaxed) + 1) % 3;
-            ImGui::Image((ImTextureID)call[prevIndex].srv.Get(), ImVec2{ 350.f, 350.f });
+            ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(call[prevIndex].srv.Get()), ImVec2{ 350.f, 350.f });
         }
         ImGui::PopID();
     }

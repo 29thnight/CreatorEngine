@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ImGui.h"
+#include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
 #include "SceneRenderer.h"
 #include "SceneManager.h"
@@ -133,26 +134,26 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
             {
                 ImGui::Text("LightMaps");
                 for (int i = 0; i < lightMap.lightmaps.size(); i++) {
-                    if (ImGui::ImageButton("##LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
-                        //ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
+                    if (ImGui::ImageButton("##LightMap", (ImTextureID)EditorImGuiTexture::From(lightMap.lightmaps[i]), ImVec2(300, 300))) {
+                        //ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.lightmaps[i]), ImVec2(512, 512));
                     }
                 }
                 //ImGui::Text("indirectMaps");
                 //for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
-                //	if (ImGui::ImageButton("##IndirectMap", (ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(300, 300))) {
-                //		//ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
+                //	if (ImGui::ImageButton("##IndirectMap", (ImTextureID)EditorImGuiTexture::From(lightMap.indirectMaps[i]), ImVec2(300, 300))) {
+                //		//ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.indirectMaps[i]), ImVec2(512, 512));
                 //	}
                 //}
                 ImGui::Text("environmentMaps");
                 for (int i = 0; i < lightMap.environmentMaps.size(); i++) {
-                    if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(300, 300))) {
-                        //ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
+                    if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)EditorImGuiTexture::From(lightMap.environmentMaps[i]), ImVec2(300, 300))) {
+                        //ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.environmentMaps[i]), ImVec2(512, 512));
                     }
                 }
                 ImGui::Text("directionalMaps");
                 for (int i = 0; i < lightMap.directionalMaps.size(); i++) {
-                    if (ImGui::ImageButton("##DirectionalMap", (ImTextureID)lightMap.directionalMaps[i]->m_pSRV, ImVec2(300, 300))) {
-                        //ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
+                    if (ImGui::ImageButton("##DirectionalMap", (ImTextureID)EditorImGuiTexture::From(lightMap.directionalMaps[i]), ImVec2(300, 300))) {
+                        //ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.environmentMaps[i]), ImVec2(512, 512));
                     }
                 }
             }

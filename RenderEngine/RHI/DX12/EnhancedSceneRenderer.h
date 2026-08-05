@@ -381,6 +381,11 @@ public:
     /// 돌려준다 — nullptr이면 호출부는 기존 DX11 SRV를 쓴다(폴백 한 줄).
     static ID3D11ShaderResourceView* GetLiveDisplaySrv(const Camera* camera);
 
+    /// ImGui DX12 셸 모드용 표시 경로. 표시 슬롯의 공유 핸들을 셸 디바이스가
+    /// 열어(OpenSharedHandle — DX11이 하던 일을 DX12가 이어받는다) ImTextureID
+    /// 호환 64비트를 돌려준다. 셸이 없거나 표시할 것이 없으면 0.
+    static uint64_t GetLiveDisplayImTextureId(const Camera* camera);
+
     /// 상태 한 줄 요약(dx12.live status).
     static std::string GetLiveStatus();
 

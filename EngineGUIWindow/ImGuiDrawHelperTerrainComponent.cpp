@@ -1,4 +1,5 @@
 #include "ExternUI.h"
+#include "EditorImGuiTexture.h"
 #include "DeviceState.h"
 #include "Terrain.h"
 #include "TableAPIHelper.h"
@@ -158,7 +159,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							// 텍스처 썸네일 표시
 							if (selectedLayer->diffuseTexture && selectedLayer->diffuseTexture->m_pSRV)
 							{
-								ImGui::Image((ImTextureID)selectedLayer->diffuseTexture->m_pSRV, ImVec2(64, 64));
+								ImGui::Image((ImTextureID)EditorImGuiTexture::From(selectedLayer->diffuseTexture), ImVec2(64, 64));
 								ImGui::SameLine();
 							}
 							
@@ -199,7 +200,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					int maskIndex = 0;
 					for (const auto& mask : g_CurrentBrush->m_masks)
 					{
-						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f)))
+						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV), ImVec2((float)100.0f, (float)100.0f)))
 						{
 							if (selectedMaskIndex != maskIndex)
 							{
@@ -215,7 +216,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							}
 						}
 						maskIndex++;
-						/*ImGui::Image((ImTextureID)mask.m_maskSRV,
+						/*ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV),
 							ImVec2((float)100.0f, (float)100.0f));*/
 					}
 				}
@@ -330,7 +331,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					int maskIndex = 0;
 					for (const auto& mask : g_CurrentBrush->m_masks)
 					{
-						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f)))
+						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV), ImVec2((float)100.0f, (float)100.0f)))
 						{
 							if (selectedMaskIndex != maskIndex)
 							{
@@ -346,7 +347,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							}
 						}
 						maskIndex++;
-						/*ImGui::Image((ImTextureID)mask.m_maskSRV,
+						/*ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV),
 							ImVec2((float)100.0f, (float)100.0f));*/
 					}
 				}

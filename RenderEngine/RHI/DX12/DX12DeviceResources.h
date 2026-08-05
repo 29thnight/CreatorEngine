@@ -87,6 +87,26 @@ public:
         return m_fence ? m_fence->GetCompletedValue() : 0;
     }
 
+    // ── 스왑체인 (3-9 교체 — ImGui/셸이 DX12로 출력하는 경로) ──
+    //
+    // 브링업의 '스왑체인 없음' 원칙은 오프스크린 검증용이었고, 여기서 그
+    // 결정(3-9)이 내려졌다: 셸이 스왑체인을 갖는다. Initialize 뒤에 한 번
+    // 부른다. 백버퍼는 kFrameCount장, FLIP_DISCARD — DX11 쪽의 DISCARD와
+    // 달리 FLIP 계열이 DX12의 유일한 선택지다.
+    //
+    // 백버퍼 상태 전이(PRESENT ↔ RENDER_TARGET)는 호출부 책임이다 —
+    // 프레임 구조(어디서 그리고 어디서 제출하는가)를 여기가 모른다.
+    bool AttachSwapChain(HWND hwnd, uint32_t width, uint32_t height, std::string& outError);
+    bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError);
+    bool Present(std::string& outError);
+    bool HasSwapChain() const { return nullptr != m_swapChain.Get(); }
+    uint32_t GetBackBufferIndex() const;
+    ID3D12Resource* GetBackBuffer(uint32_t index) const
+    {
+        return (index < kFrameCount) ? m_backBuffers[index].Get() : nullptr;
+    }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRtv(uint32_t index) const;
+
     // 검증 레이어 메시지를 비우고, 그중 '실제 문제'(WARNING 이상)의 수를 돌려준다.
     //
     // INFO/MESSAGE 등급은 세지 않는다 — 파이프라인 라이브러리의 첫 조회 실패
@@ -147,6 +167,12 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE        m_rtvHandle{};
     ComPtr<ID3D12Resource>             m_renderTarget;
     ComPtr<ID3D12Resource>             m_readback;
+
+    // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
+    ComPtr<IDXGISwapChain3>            m_swapChain;
+    std::array<ComPtr<ID3D12Resource>, kFrameCount> m_backBuffers;
+    ComPtr<ID3D12DescriptorHeap>       m_backBufferRtvHeap;
+    uint32_t                           m_backBufferRtvSize{ 0 };
 
     DX12UploadRing                     m_uploadRing;
     DX12DescriptorRing                 m_descriptorRing;
