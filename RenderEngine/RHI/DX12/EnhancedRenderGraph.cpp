@@ -43,6 +43,8 @@ D3D12_RESOURCE_STATES EnhancedRenderGraph::ToD3D12(RGResourceState state)
     case RGResourceState::DepthWrite:      return D3D12_RESOURCE_STATE_DEPTH_WRITE;
     case RGResourceState::DepthRead:       return D3D12_RESOURCE_STATE_DEPTH_READ;
     case RGResourceState::ShaderResource:  return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    case RGResourceState::DepthReadShaderResource:
+        return D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     case RGResourceState::UnorderedAccess: return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     case RGResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
     case RGResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;

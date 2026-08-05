@@ -50,6 +50,18 @@ enum class RGResourceState
     DepthWrite,
     DepthRead,
     ShaderResource,   // 픽셀 셰이더에서 읽기
+
+    // 깊이를 DSV로 걸어 두고 같은 프레임에 셰이더로도 읽는다.
+    //
+    // 데칼처럼 '깊이 테스트는 하되 쓰지는 않고, 그 깊이로 월드 좌표를
+    // 복원하는' 패스가 이것을 쓴다. DX11은 읽기 전용 DSV라는 개념을 이렇게
+    // 쓰지 않고 깊이를 통째로 복사했는데(DecalPass), D3D12는 두 용도를
+    // 동시에 허용하므로 화면 크기 복사가 통째로 사라진다.
+    //
+    // 쓰는 쪽의 계약: DSV를 D3D12_DSV_FLAG_READ_ONLY_DEPTH로 만들어야 한다.
+    // 읽기 전용이 아닌 DSV로 이 상태의 리소스를 걸면 검증 레이어가 잡는다.
+    DepthReadShaderResource,
+
     UnorderedAccess,
     CopySource,
     CopyDest,

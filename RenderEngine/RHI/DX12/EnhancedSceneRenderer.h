@@ -331,6 +331,9 @@ public:
     /// 세로로 안 퍼져야 한다), 표면 추종(계단 너머로 안 새야 한다 — 이것이
     /// 단순 블러와 SSS를 가른다), 에너지 보존.
     bool RunSSSTest(std::string& outLog);
+
+    /// 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
+    bool RunDecalTest(std::string& outLog);
 };
 
 #endif

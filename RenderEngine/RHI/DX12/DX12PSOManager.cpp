@@ -98,6 +98,21 @@ uint64_t DX12GraphicsPipelineDesc::ComputeHash() const
     hash = HashValue(cullMode, hash);
     hash = HashValue(depthEnable, hash);
     hash = HashValue(blendEnable, hash);
+
+    // 파이프라인을 실제로 가르는 값은 전부 해시에 들어가야 한다. 빠뜨리면
+    // 서로 다른 PSO가 같은 키를 갖게 되고, 먼저 만들어진 쪽이 조용히
+    // 재사용된다 — '블렌드가 가끔 이상하다'로만 드러나는 종류의 버그다.
+    hash = HashValue(depthWriteMask, hash);
+    hash = HashValue(depthFunc, hash);
+    hash = HashValue(independentBlend, hash);
+    if (independentBlend)
+    {
+        for (uint32_t i = 0; i < numRenderTargets && i < 8; ++i)
+        {
+            hash = HashBytes(&renderTargetBlend[i], sizeof(renderTargetBlend[i]), hash);
+        }
+    }
+
     hash = HashValue(topologyType, hash);
     hash = HashValue(numRenderTargets, hash);
     for (uint32_t i = 0; i < numRenderTargets && i < 8; ++i)
@@ -263,17 +278,31 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     // 경계가 완전한 직선(계단 0곳)이라 클리핑이 의심됐고, 클리핑 관련 설정
     // 중 두 경로가 갈리는 것이 이것뿐이었다.
     d3dDesc.RasterizerState.DepthClipEnable = TRUE;
-    d3dDesc.BlendState.RenderTarget[0].BlendEnable = desc.blendEnable ? TRUE : FALSE;
-    d3dDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-    d3dDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-    d3dDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-    d3dDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-    d3dDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-    d3dDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-    d3dDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    if (desc.independentBlend)
+    {
+        // 호출부가 타깃마다 정한 것을 그대로 쓴다. IndependentBlendEnable을
+        // 켜야 RenderTarget[1..7]이 읽히고, 끄면 D3D12가 [0]만 보고 나머지를
+        // 무시한다 — 켜는 것을 잊으면 채널별 마스크가 조용히 사라진다.
+        d3dDesc.BlendState.IndependentBlendEnable = TRUE;
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            d3dDesc.BlendState.RenderTarget[i] = desc.renderTargetBlend[i];
+        }
+    }
+    else
+    {
+        d3dDesc.BlendState.RenderTarget[0].BlendEnable = desc.blendEnable ? TRUE : FALSE;
+        d3dDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        d3dDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        d3dDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        d3dDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+        d3dDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+        d3dDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        d3dDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    }
     d3dDesc.DepthStencilState.DepthEnable = desc.depthEnable ? TRUE : FALSE;
-    d3dDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    d3dDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    d3dDesc.DepthStencilState.DepthWriteMask = desc.depthWriteMask;
+    d3dDesc.DepthStencilState.DepthFunc = desc.depthFunc;
     d3dDesc.SampleMask = UINT_MAX;
     d3dDesc.InputLayout = { desc.inputElements, desc.inputElementCount };
     d3dDesc.PrimitiveTopologyType = desc.topologyType;

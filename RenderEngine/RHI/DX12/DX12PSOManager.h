@@ -41,6 +41,28 @@ struct DX12GraphicsPipelineDesc
     bool            depthEnable{ false };
     bool            blendEnable{ false };
 
+    // 깊이 쓰기와 비교 함수. 기본값은 이 필드가 생기기 전에 박혀 있던 값
+    // 그대로라(ALL·LESS) 기존 패스는 영향을 받지 않는다.
+    //
+    // 나눠 둔 이유: 데칼처럼 깊이를 '보되 쓰지 않는' 패스가 있다. depthEnable
+    // 하나로는 그 구분이 안 되고, 쓰기를 못 막으면 데칼 상자가 깊이 버퍼를
+    // 덮어써 뒤따르는 패스가 엉뚱한 깊이를 읽는다.
+    D3D12_DEPTH_WRITE_MASK depthWriteMask{ D3D12_DEPTH_WRITE_MASK_ALL };
+    D3D12_COMPARISON_FUNC  depthFunc{ D3D12_COMPARISON_FUNC_LESS };
+
+    // ── 렌더타깃별 독립 블렌드 ──
+    //
+    // 끄면(기본) blendEnable이 RenderTarget[0]의 고정 조합(SRC_ALPHA/
+    // INV_SRC_ALPHA)을 켜고 D3D12가 그것을 모든 타깃에 적용한다 — 이 필드가
+    // 생기기 전의 동작 그대로다.
+    //
+    // 켜면 renderTargetBlend를 그대로 쓴다. MRT의 채널마다 다른 블렌드나 다른
+    // 쓰기 마스크가 필요할 때 쓴다(데칼이 확산·노멀·ORM을 따로 켜고 끈다).
+    // 마스크가 0인 타깃은 바인딩돼 있어도 건드리지 않는다는 뜻이라, 채널을
+    // 끄려고 타깃을 떼었다 붙였다 할 필요가 없다.
+    bool independentBlend{ false };
+    D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlend[8]{};
+
     // 입력 레이아웃. 호출부가 소유하고, 이 구조체는 참조만 든다 —
     // GetOrCreate가 돌아올 때까지만 살아 있으면 된다.
     //

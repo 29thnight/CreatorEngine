@@ -14,8 +14,12 @@ enum DecalChannel : uint32
 	dORM = 1 << 2,
 	Diffuse_Normal = dDiffuse | dNormal,
 	Diffuse_ORM = dDiffuse | dORM,
-	Normal_ORM = Normal | dORM,
-	All = dDiffuse | Normal | dORM,
+	// dNormal이다. 여기 있던 Normal은 IRenderPass.h의 RTV_Type::Normal이었고,
+	// 그 값이 우연히 2(= dNormal)라 결과가 맞아떨어졌을 뿐이다. RTV_Type에
+	// 멤버가 하나 끼어들면 All이 7보다 작아지고 MAX가 줄어, 세 텍스처를 다
+	// 쓰는 데칼이 m_pBlendStates[7]로 배열 밖을 짚는다.
+	Normal_ORM = dNormal | dORM,
+	All = dDiffuse | dNormal | dORM,
 	MAX
 };
 
