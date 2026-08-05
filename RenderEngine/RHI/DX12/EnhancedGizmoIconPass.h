@@ -62,6 +62,14 @@ public:
         RGHandle color;
     };
 
+    /// 출력 색 포맷. Initialize보다 먼저 부른다(PSO가 이 값으로 만들어진다).
+    ///
+    /// 기본값은 HDR이다 — 자가 검증은 자체 transient에 그리기 때문이다.
+    /// 상시 러너는 포스트 체인의 LDR 결과 위에 그리므로 그 포맷을 넘긴다:
+    /// 입력이 있으면 그 텍스처에 직접 그리는 구조라(Declare 참조) PSO의
+    /// RTV 포맷이 입력과 어긋나면 커맨드 리스트가 통째로 무효가 되고,
+    /// 그 증상은 Close 실패(E_INVALIDARG)에 이은 디바이스 제거다(실측).
+    void SetOutputFormat(DXGI_FORMAT format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetIcons(const std::vector<Icon>* icons) { m_icons = icons; }
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
@@ -91,6 +99,7 @@ private:
     };
 
     Inputs   m_inputs{};
+    DXGI_FORMAT m_outputFormat{ kOutputFormat };
     RGHandle m_output;
     bool     m_keepAlive{ false };
 

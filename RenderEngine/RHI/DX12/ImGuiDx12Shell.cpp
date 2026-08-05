@@ -58,6 +58,18 @@ struct ImGuiDx12Shell::Impl
     uint32_t width{ 0 };
     uint32_t height{ 0 };
 
+    // ★ 빈 표시용 폴백 슬롯(null 디스크립터).
+    //
+    //   DX12에서 ImTextureID 0은 '아무것도 아님'이 아니라 '무효 디스크립터'다.
+    //   그대로 SetGraphicsRootDescriptorTable에 들어가면 커맨드 리스트가 그
+    //   지점에서 오염되고, 오염 뒤에 기록된 것이 전부 사라진다 —
+    //   에디터 창이 통째로 안 보이는 증상으로 나타났고(메뉴바만 남았다),
+    //   이어서 Close 실패와 디바이스 제거로 번졌다.
+    //
+    //   리소스 없는 SRV(null 디스크립터)는 D3D12에서 합법이고 0을 읽는다.
+    //   표시할 것이 없을 때는 0이 아니라 이것을 돌려준다.
+    uint64_t fallbackTextureId{ 0 };
+
     bool AllocateSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu)
     {
         if (srvFreeList.empty()) return false;
@@ -74,6 +86,17 @@ struct ImGuiDx12Shell::Impl
     {
         const UINT64 base = srvHeap->GetGPUDescriptorHandleForHeapStart().ptr;
         srvFreeList.push_back(static_cast<uint32_t>((gpu.ptr - base) / srvIncrement));
+    }
+
+    /// 리소스 없는 SRV를 슬롯에 기록한다(빈 표시).
+    void WriteNullSrv(D3D12_CPU_DESCRIPTOR_HANDLE cpu)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.Texture2D.MipLevels = 1;
+        resources.GetDevice()->CreateShaderResourceView(nullptr, &desc, cpu);
     }
 
     uint64_t CreateSrvSlot(ID3D12Resource* resource, DXGI_FORMAT format, uint32_t mipLevels)
@@ -175,6 +198,18 @@ bool ImGuiDx12Shell::Initialize(HWND hwnd, uint32_t width, uint32_t height,
             static_cast<Impl*>(info->UserData)->FreeSlot(gpu);
         };
 
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+        D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
+        if (!impl.AllocateSlot(cpu, gpu))
+        {
+            outError = "폴백 SRV 슬롯 확보 실패";
+            return false;
+        }
+        impl.WriteNullSrv(cpu);
+        impl.fallbackTextureId = gpu.ptr;
+    }
+
     if (!ImGui_ImplDX12_Init(&impl.initInfo))
     {
         outError = "ImGui_ImplDX12_Init 실패";
@@ -185,6 +220,11 @@ bool ImGuiDx12Shell::Initialize(HWND hwnd, uint32_t width, uint32_t height,
     impl.height = height;
     impl.active = true;
     return true;
+}
+
+uint64_t ImGuiDx12Shell::GetFallbackTextureId() const
+{
+    return m_impl->fallbackTextureId;
 }
 
 void ImGuiDx12Shell::NewFrame()
@@ -211,7 +251,8 @@ void ImGuiDx12Shell::Resize(uint32_t width, uint32_t height)
 uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
 {
     Impl& impl = *m_impl;
-    if (!impl.active || nullptr == texture) return 0;
+    if (!impl.active) return 0;
+    if (nullptr == texture) return impl.fallbackTextureId;
 
     const auto found = impl.textureSlots.find(texture);
     if (found != impl.textureSlots.end()) return found->second;
@@ -222,14 +263,8 @@ uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
     // '참조 중 디스크립터 수정' 규칙을 어기지 않는다.
     D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
     D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-    if (!impl.AllocateSlot(cpu, gpu)) return 0;
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
-    nullDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    nullDesc.Texture2D.MipLevels = 1;
-    impl.resources.GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, cpu);
+    if (!impl.AllocateSlot(cpu, gpu)) return impl.fallbackTextureId;   // 힙 소진
+    impl.WriteNullSrv(cpu);
 
     impl.textureSlots.emplace(texture, gpu.ptr);
     impl.pendingUploads.push_back({ texture, cpu });
@@ -244,11 +279,12 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(HANDLE sharedHandle)
     const auto found = impl.sharedTextures.find(sharedHandle);
     if (found != impl.sharedTextures.end()) return found->second.textureId;
 
+
     Impl::SharedEntry entry{};
     if (FAILED(impl.resources.GetDevice()->OpenSharedHandle(sharedHandle,
         IID_PPV_ARGS(&entry.resource))))
     {
-        return 0;
+        return impl.fallbackTextureId;
     }
 
     const D3D12_RESOURCE_DESC desc = entry.resource->GetDesc();

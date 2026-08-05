@@ -16,7 +16,12 @@
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
 #include "EnhancedPostChainPass.h"
+#include "EnhancedGridPass.h"
+#include "EnhancedWireFramePass.h"
+#include "EnhancedGizmoIconPass.h"
+#include "EnhancedGizmoLinePass.h"
 #include "ImGuiDx12Shell.h"
+#include "../../EnhancedGizmoSceneBinding.h"
 
 #include "../../Camera.h"
 #include "../../Material.h"
@@ -88,6 +93,14 @@ namespace
         EnhancedSSAOPass      ssao;
         EnhancedPostChainPass postChain;
 
+        // 기즈모 체인(에디터 보조 표시 — 승격 판정 ④의 블로커였다).
+        // 배선은 dx12.gizmoscene과 같고, 라이브에서는 포스트 체인 LDR 위에
+        // GBuffer 깊이로 가려지며 얹힌다.
+        EnhancedGridPass      grid;
+        EnhancedWireFramePass wireframe;
+        EnhancedGizmoIconPass gizmoIcon;
+        EnhancedGizmoLinePass gizmoLine;
+
         EnhancedFrameContext frameContext{};
 
         // 표시 슬롯 둘 — 비동기의 본체다. DX12가 한 슬롯에 그리는 동안
@@ -140,6 +153,7 @@ namespace
         std::vector<EnhancedDrawItem> draws;
         std::vector<EnhancedDrawItem> forwardDraws;
         std::vector<EnhancedLight>    lights;
+        EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
 
         // 묘지 — DisableLive가 즉시 못 놓는 것들(헤더의 수명 규약 참조).
         // ShutdownLive(렌더 스레드 join 후)가 비운다.
@@ -234,6 +248,20 @@ namespace
             if (!p.forward.Initialize(p.frameContext, outError)) return false;
             if (!p.ssao.Initialize(p.frameContext, outError)) return false;
             if (!p.postChain.Initialize(p.frameContext, outError)) return false;
+            // 기즈모 체인은 포스트 체인의 LDR 결과 위에 직접 그린다 —
+            // 입력 텍스처에 그리는 구조라 PSO의 RTV 포맷을 거기 맞춰야 한다
+            // (어긋나면 커맨드 리스트 무효 → 디바이스 제거, 실측으로 겪었다).
+            // DX11도 기즈모를 최종 표시 타깃에 그린다(GridPass.cpp:128) —
+            // 톤맵 뒤라는 순서 자체는 DX11과 같다.
+            p.grid.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+
+            if (!p.grid.Initialize(p.frameContext, outError)) return false;
+            if (!p.wireframe.Initialize(p.frameContext, outError)) return false;
+            if (!p.gizmoIcon.Initialize(p.frameContext, outError)) return false;
+            if (!p.gizmoLine.Initialize(p.frameContext, outError)) return false;
 
             // ── 공유 텍스처 + DX11 SRV (슬롯 2개) ──
             //
@@ -312,6 +340,10 @@ namespace
                 slot.sharedHandle = nullptr;
             }
 
+            p.gizmoLine.Shutdown();
+            p.gizmoIcon.Shutdown();
+            p.wireframe.Shutdown();
+            p.grid.Shutdown();
             p.postChain.Shutdown();
             p.ssao.Shutdown();
             p.forward.Shutdown();
@@ -449,6 +481,15 @@ namespace
             p.profiler.BeginFrame(frameCounter % DX12DeviceResources::kFrameCount);
             ++frameCounter;
 
+            // 기즈모 씬 수집 — 파이프라인이 있어야 라인 패스에 쌓을 수 있어
+            // CaptureScene이 아니라 여기(게임 스레드, 프레임 시작)에서 한다.
+            // 콜라이더는 DX11과 같은 판정(디버그 모드)을 따른다.
+            p.gizmoLine.ResetLines();
+            gizmoData = {};
+            BuildEnhancedGizmoSceneData(cameraSnapshot,
+                ShouldCollectGizmoColliders(), p.gizmoLine, gizmoData);
+            p.gizmoIcon.SetIcons(&gizmoData.icons);
+
             if (!p.shadow.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.gbuffer.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.deferred.PrepareFrame(p.frameContext, outError)) return false;
@@ -456,6 +497,10 @@ namespace
             if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.grid.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.wireframe.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.gizmoIcon.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.gizmoLine.PrepareFrame(p.frameContext, outError)) return false;
 
             slot.graph = std::make_unique<EnhancedRenderGraph>();
             EnhancedRenderGraph& graph = *slot.graph;
@@ -510,14 +555,51 @@ namespace
             }
             p.postChain.Declare(graph, p.frameContext);
 
-            // ── live_present: LDR 결과 → 공유 텍스처 ──
             if (!p.postChain.GetOutput().IsValid())
             {
                 outError = "포스트 체인 출력이 없다";
                 return false;
             }
+
+            // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
+            // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
+            // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다 — UI/포스트가
+            // 끝난 그림에 에디터 보조 표시만 더하는 것이라 톤맵의 영향을 받지
+            // 않는다.
             {
-                const RGHandle finalHandle = p.postChain.GetOutput();
+                EnhancedGridPass::Inputs gridInputs{};
+                gridInputs.color = p.postChain.GetOutput();
+                gridInputs.depth = outputs.depth;
+                p.grid.SetInputs(gridInputs);
+            }
+            p.grid.Declare(graph, p.frameContext);
+
+            {
+                EnhancedWireFramePass::Inputs wireInputs{};
+                wireInputs.color = p.grid.GetOutput();
+                wireInputs.depth = p.grid.GetDepth();
+                p.wireframe.SetInputs(wireInputs);
+            }
+            p.wireframe.Declare(graph, p.frameContext);
+
+            {
+                EnhancedGizmoIconPass::Inputs iconInputs{};
+                iconInputs.color = p.wireframe.GetOutput();
+                p.gizmoIcon.SetInputs(iconInputs);
+            }
+            p.gizmoIcon.Declare(graph, p.frameContext);
+
+            {
+                EnhancedGizmoLinePass::Inputs lineInputs{};
+                lineInputs.color = p.gizmoIcon.GetOutput();
+                p.gizmoLine.SetInputs(lineInputs);
+            }
+            p.gizmoLine.Declare(graph, p.frameContext);
+
+            // ── live_present: 기즈모까지 얹힌 최종 결과 → 공유 텍스처 ──
+            {
+                const RGHandle finalHandle = p.gizmoLine.GetOutput().IsValid()
+                    ? p.gizmoLine.GetOutput() : p.postChain.GetOutput();
                 const RGHandle sharedHandleRG = graph.ImportTexture(slot.sharedTexture.Get(),
                     RGResourceState::CopyDest, "Live.Shared");
 

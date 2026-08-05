@@ -204,7 +204,7 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     desc.blendEnable = true;
     desc.cullMode = D3D12_CULL_MODE_NONE;   // DX11도 CULL_NONE이다(아래에서 봐도 그린다)
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
+    desc.rtvFormats[0] = m_outputFormat;
     desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
@@ -278,7 +278,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kOutputFormat;
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "Grid.Output";
         m_output = graph.CreateTexture(desc);

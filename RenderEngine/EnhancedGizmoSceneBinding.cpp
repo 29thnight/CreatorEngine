@@ -3,6 +3,7 @@
 #include "RenderPassData.h"
 #include "RenderScene.h"
 #include "DataSystem.h"
+#include "EngineSetting.h"
 #include "Scene.h"
 #include "GameObject.h"
 #include "CameraComponent.h"
@@ -217,3 +218,10 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 }
 
 #endif
+
+bool ShouldCollectGizmoColliders()
+{
+    // DX11 GizmoLinePass.cpp:86과 같은 판정 — 두 경로가 같은 조건에서
+    // 같은 것을 그려야 대조가 성립한다.
+    return EngineSettingInstance->IsDebugMode();
+}

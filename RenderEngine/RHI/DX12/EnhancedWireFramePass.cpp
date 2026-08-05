@@ -192,7 +192,7 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.blendEnable = false;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
+    desc.rtvFormats[0] = m_outputFormat;
     desc.dsvFormat = kDepthFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
@@ -383,7 +383,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kOutputFormat;
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "WireFrame.Output";
         m_output = graph.CreateTexture(desc);

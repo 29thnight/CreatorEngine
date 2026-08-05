@@ -64,6 +64,13 @@ public:
     /// 라이브 러너의 공유 텍스처(NT 핸들)를 열어 ImTextureID로. 핸들별 캐시.
     uint64_t OpenSharedTexture(HANDLE sharedHandle);
 
+    /// 표시할 것이 없을 때 쓰는 폴백(null 디스크립터 — 0을 읽는 합법 SRV).
+    ///
+    /// ★ 0을 돌려주면 안 된다. DX12에서 ImTextureID 0은 무효 디스크립터라
+    ///   커맨드 리스트를 그 자리에서 오염시키고, 그 뒤 기록이 전부 사라진다
+    ///   (에디터 창이 통째로 안 보이는 증상으로 겪었다).
+    uint64_t GetFallbackTextureId() const;
+
     /// 최종 정리. CE 스레드가 멈춘 뒤(Dx11Main::Finalize)에만 부른다.
     void Shutdown();
 

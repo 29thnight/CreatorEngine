@@ -7,17 +7,23 @@ namespace EditorImGuiTexture
 {
     uint64_t From(Texture* texture)
     {
-        if (nullptr == texture) return 0;
         if (ImGuiDx12Shell::Get().IsActive())
         {
+            // 널이어도 0을 돌려주지 않는다 — 헤더의 폴백 주석 참조.
             return ImGuiDx12Shell::Get().RegisterTexture(texture);
         }
-        return reinterpret_cast<uint64_t>(texture->m_pSRV);
+        return (nullptr != texture) ? reinterpret_cast<uint64_t>(texture->m_pSRV) : 0;
     }
 
     uint64_t FromRawDx11Srv(ID3D11ShaderResourceView* srv)
     {
-        if (ImGuiDx12Shell::Get().IsActive()) return 0;
+        // DX12 셸에서는 DX11 SRV를 표시할 방법이 없다. 그렇다고 0을 돌려주면
+        // 커맨드 리스트가 죽으므로 폴백(빈 그림)을 돌려준다 — 임시 승격의
+        // 알려진 한계이고, 완전 통합에서 해소된다.
+        if (ImGuiDx12Shell::Get().IsActive())
+        {
+            return ImGuiDx12Shell::Get().GetFallbackTextureId();
+        }
         return reinterpret_cast<uint64_t>(srv);
     }
 }

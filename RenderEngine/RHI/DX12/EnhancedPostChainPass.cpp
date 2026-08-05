@@ -368,6 +368,15 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     ldrDesc.height = m_height;
     ldrDesc.format = kLDRFormat;
     ldrDesc.allowUnorderedAccess = true;
+    // ★ 렌더 타깃 자격도 준다.
+    //
+    //   체인 자체는 컴퓨트로 쓰므로 UAV만 있으면 되지만, 이 결과가 최종
+    //   그림이라 그 위에 무언가 더 그리는 소비자가 생긴다 — 상시 러너의
+    //   기즈모 체인이 그렇다. 플래그가 없으면 RTV 생성 자체가 불법이라
+    //   커맨드 리스트가 그 자리에서 무효가 되고, 증상은 Close 실패
+    //   (E_INVALIDARG)에 이은 디바이스 제거다(실측으로 겪었다 — 포맷을
+    //   맞춰도 용도가 없으면 같은 결과다).
+    ldrDesc.allowRenderTarget = true;
     ldrDesc.name = "PostChain.ToneMapped";
     m_toneMapped = graph.CreateTexture(ldrDesc);
 

@@ -46,4 +46,12 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders, EnhancedGizmoLinePass& linePass,
     EnhancedGizmoSceneData& out);
 
+/// 콜라이더 와이어를 수집할지의 엔진 판정(DX11 GizmoLinePass와 같은 기준).
+///
+/// 이 함수가 있는 이유는 계층이다: EngineSetting은 EngineEntry 소속이라
+/// RHI/DX12의 cpp가 직접 인클루드하면 그쪽 헤더 스택(RenderPassSettings 등)이
+/// 풀리지 않는다. 루트의 이 번역 단위는 이미 컴포넌트·설정 계층을 여는
+/// 자리이므로(위 ★ 주석), 판정도 여기서 내려 준다.
+bool ShouldCollectGizmoColliders();
+
 #endif

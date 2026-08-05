@@ -323,7 +323,7 @@ bool EnhancedGizmoLinePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.blendEnable = true;
     desc.cullMode = D3D12_CULL_MODE_NONE;
     desc.numRenderTargets = 1;
-    desc.rtvFormats[0] = kOutputFormat;
+    desc.rtvFormats[0] = m_outputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
@@ -383,7 +383,7 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
         RGTextureDesc desc{};
         desc.width = m_width;
         desc.height = m_height;
-        desc.format = kOutputFormat;
+        desc.format = m_outputFormat;
         desc.allowRenderTarget = true;
         desc.name = "GizmoLine.Output";
         m_output = graph.CreateTexture(desc);
