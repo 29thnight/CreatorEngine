@@ -37,7 +37,7 @@ cbuffer LightingConstants : register(b0)
     uint          gLightCount;
     uint          gHasShadow;
     float         gCascadeBlendBand; // 경계 블렌딩 폭(분할 깊이 비율) · 0이면 하드 스위치
-    uint          gPadding;
+    uint          gHasIbl;
     DeferredLight gLights[MAX_DEFERRED_LIGHTS];
 };
 
@@ -47,7 +47,21 @@ Texture2D    gNormal     : register(t2);
 Texture2D    gEmissive   : register(t3);
 Texture2D    gDepth      : register(t4);
 Texture2DArray gShadowMap : register(t5);
+
+// IBL 산출물(3-6 IBL 소비). 조도는 법선으로, 프리필터는 반사 방향 + 거칠기
+// 밉으로, LUT는 (NdotV, 거칠기)로 읽는다 — split-sum 관행 그대로다.
+TextureCube  gIrradiance  : register(t6);
+TextureCube  gPrefiltered : register(t7);
+Texture2D    gBrdfLut     : register(t8);
+
+// 생성기(EnhancedIBLGenerator::kPrefilterMips)와 같아야 한다.
+#define IBL_PREFILTER_MIPS 6
+
 SamplerState gSampler    : register(s0);
+
+// IBL 전용 선형 샘플러. GBuffer 읽기는 포인트(화면 픽셀 1:1)가 맞지만
+// 큐브맵·LUT는 보간 없이 읽으면 밴딩이 그대로 드러난다.
+SamplerState gIblSampler : register(s2);
 
 // 비교 샘플러. 하드웨어가 이웃 텍셀 넷을 비교하고 평균내 준다(2x2 PCF) —
 // 직접 네 번 읽는 것보다 싸고, 가장자리가 부드러워진다.
@@ -248,7 +262,29 @@ float4 PSMain(VSOut input) : SV_TARGET
         lit += (kd * diffuseAlbedo + specular) * radiance;
     }
 
-    return float4(lit + emissive, 1.0f);
+    // ── IBL 앰비언트 (split-sum) ──
+    //
+    // 확산은 법선 방향 조도, 정반사는 반사 방향 프리필터 x LUT의 (scale, bias).
+    // IBL이 없으면 0 — 기존 동작(앰비언트 없음) 그대로다.
+    float3 ambient = 0.0f;
+    if (gHasIbl != 0)
+    {
+        const float3 irradiance = gIrradiance.SampleLevel(gIblSampler, normal, 0.0f).rgb;
+
+        const float3 reflection = reflect(-viewDirection, normal);
+        const float3 prefiltered = gPrefiltered.SampleLevel(gIblSampler,
+            reflection, rough * (IBL_PREFILTER_MIPS - 1)).rgb;
+        const float2 environmentBrdf = gBrdfLut.SampleLevel(gIblSampler,
+            float2(ndotv, rough), 0.0f).rg;
+
+        const float3 fresnelAmbient = FresnelSchlick(f0, ndotv);
+        const float3 kdAmbient = (1.0f - fresnelAmbient) * (1.0f - metallic);
+
+        ambient = kdAmbient * irradiance * albedo
+            + prefiltered * (f0 * environmentBrdf.x + environmentBrdf.y);
+    }
+
+    return float4(lit + ambient + emissive, 1.0f);
 }
 )";
 
@@ -297,11 +333,13 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     // 테이블 하나면 충분하고, 바인딩 호출도 한 번이다(상태 변경 최소화).
     D3D12_DESCRIPTOR_RANGE srvRange{};
     srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = 6;   // diffuse · metalRough · normal · emissive · depth · shadow
+    // diffuse · metalRough · normal · emissive · depth · shadow
+    // + IBL 셋(조도 · 프리필터 · LUT)
+    srvRange.NumDescriptors = 9;
 
     D3D12_DESCRIPTOR_RANGE samplerRange{};
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 2;   // 일반 · 비교(그림자)
+    samplerRange.NumDescriptors = 3;   // 일반 · 비교(그림자) · IBL 선형
 
     D3D12_ROOT_PARAMETER params[3]{};
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -341,9 +379,9 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     m_pso = context.psoManager->GetOrCreate(desc, outError);
     if (nullptr == m_pso) return false;
 
-    // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
+    // 샘플러들을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다.
-    D3D12_SAMPLER_DESC samplers[2]{};
+    D3D12_SAMPLER_DESC samplers[3]{};
 
     samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
     samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -363,7 +401,15 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     samplers[1].BorderColor[3] = 1.f;
     samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
 
-    m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 2);
+    // IBL용 선형 클램프. 프리필터 밉 사이 보간(TRILINEAR)까지 필요하다 —
+    // 거칠기가 밉 좌표라서 포인트로 읽으면 거칠기 단차가 띠로 보인다.
+    samplers[2].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samplers[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplers[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplers[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplers[2].MaxLOD = D3D12_FLOAT32_MAX;
+
+    m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 3);
     if (0 == m_sampler.ptr)
     {
         outError = "Deferred 샘플러 생성 실패";
@@ -450,8 +496,8 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             const auto rtv = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
             device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtv);
 
-            // SRV 여섯을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
-            const auto srvRange = context.resources->GetDescriptorRing().Allocate(6);
+            // SRV 아홉을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
+            const auto srvRange = context.resources->GetDescriptorRing().Allocate(9);
             if (!srvRange.IsValid()) return;
 
             const RGHandle sources[4] = {
@@ -482,6 +528,32 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             device->CreateShaderResourceView(executeContext.Resolve(m_shadowMap),
                 &shadowSrv, srvRange.CpuAt(5));
 
+            // IBL 셋(t6~t8). 없으면 널 디스크립터를 깐다 — 링에서 잘라 온 자리는
+            // 초기화되지 않은 쓰레기라, 셰이더가 분기로 안 읽더라도 유효한
+            // 디스크립터가 있어야 한다(SSGI에서 쓰레기 디스크립터로 GPU가 죽었다).
+            const bool hasIbl = (nullptr != m_iblIrradiance)
+                && (nullptr != m_iblPrefiltered) && (nullptr != m_iblBrdfLut);
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC cubeSrv{};
+            cubeSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            cubeSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            cubeSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            cubeSrv.TextureCube.MipLevels = 1;
+            device->CreateShaderResourceView(
+                hasIbl ? m_iblIrradiance : nullptr, &cubeSrv, srvRange.CpuAt(6));
+
+            cubeSrv.TextureCube.MipLevels = hasIbl ? m_iblPrefilterMips : 1;
+            device->CreateShaderResourceView(
+                hasIbl ? m_iblPrefiltered : nullptr, &cubeSrv, srvRange.CpuAt(7));
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC lutSrv{};
+            lutSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            lutSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            lutSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            lutSrv.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(
+                hasIbl ? m_iblBrdfLut : nullptr, &lutSrv, srvRange.CpuAt(8));
+
             // 광원 상수를 업로드 링에 올린다.
             LightingConstants constants{};
             constants.inverseViewProjection = m_inverseViewProjection;
@@ -497,6 +569,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             constants.lightCount = static_cast<uint32_t>(m_frameLights.size());
             constants.hasShadow = m_shadowData.enabled ? 1u : 0u;
             constants.cascadeBlendBand = m_shadowData.cascadeBlendBand;
+            constants.hasIbl = hasIbl ? 1u : 0u;
             for (size_t i = 0; i < m_frameLights.size(); ++i)
             {
                 constants.lights[i] = m_frameLights[i];
@@ -539,6 +612,10 @@ void EnhancedDeferredPass::Shutdown()
     m_rtvHeap.Reset();
     m_pso = nullptr;
     m_rootSignature = nullptr;
+    m_iblIrradiance = nullptr;
+    m_iblPrefiltered = nullptr;
+    m_iblBrdfLut = nullptr;
+    m_iblPrefilterMips = 1;
 }
 
 #endif

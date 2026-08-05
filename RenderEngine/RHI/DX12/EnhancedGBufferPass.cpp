@@ -223,8 +223,12 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             continue;
         }
 
-        // 재질 텍스처. 없는 슬롯은 캐시가 흰색을 돌려주므로 항상 넷이 채워지고,
-        // 셰이더에 분기가 필요 없다.
+        // 재질 텍스처. 없는 슬롯은 폴백이 채워 항상 넷이 채워지고, 셰이더에
+        // 분기가 필요 없다.
+        //
+        // ★ 폴백은 슬롯 의미를 따라간다. 흰색 하나로 전부 때우면 emissive는
+        //   전부 자체발광이 되고, ORM은 B(금속)가 1이라 확산이 통째로 죽는다 —
+        //   IBL 소비 검증의 '끔=검정' 대조군이 실측으로 잡았다.
         if (nullptr != context.textureCache)
         {
             const MaterialKey key{
@@ -236,7 +240,19 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 for (uint32_t i = 0; i < 4; ++i)
                 {
                     std::string textureError;
-                    const auto uploaded = context.textureCache->GetOrUpload(key[i], textureError);
+                    DX12TextureCache::Entry uploaded{};
+                    if (nullptr == key[i] && 2 == i)
+                    {
+                        uploaded = context.textureCache->GetOrmNeutralTexture(textureError);
+                    }
+                    else if (nullptr == key[i] && 3 == i)
+                    {
+                        uploaded = context.textureCache->GetBlackTexture(textureError);
+                    }
+                    else
+                    {
+                        uploaded = context.textureCache->GetOrUpload(key[i], textureError);
+                    }
                     textures.resources[i] = uploaded.resource;
                     textures.formats[i] = uploaded.format;
                     textures.mipLevels[i] = uploaded.mipLevels;

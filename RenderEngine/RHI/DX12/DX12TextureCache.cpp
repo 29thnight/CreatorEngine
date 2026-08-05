@@ -48,12 +48,17 @@ void DX12TextureCache::Shutdown()
     m_dedicatedStaging.clear();
     m_whiteResource.Reset();
     m_white = Entry{};
+    m_blackResource.Reset();
+    m_black = Entry{};
+    m_ormNeutralResource.Reset();
+    m_ormNeutral = Entry{};
     m_resources = nullptr;
     m_dx11Device = nullptr;
     m_dx11Context = nullptr;
 }
 
-bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
+bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
+    ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError)
 {
     auto* device = m_resources->GetDevice();
 
@@ -70,15 +75,14 @@ bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
     desc.SampleDesc.Count = 1;
 
     HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_whiteResource));
+        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&outResource));
     if (FAILED(hr))
     {
-        outError = "기본 흰색 텍스처 생성 실패 " + TextureCacheHrToString(hr);
+        outError = "기본 텍스처 생성 실패 " + TextureCacheHrToString(hr);
         return false;
     }
-    m_whiteResource->SetName(L"DX12DefaultWhite");
+    outResource->SetName(name);
 
-    const uint8_t white[4] = { 255, 255, 255, 255 };
     const auto staging = m_resources->GetUploadRing().Allocate(
         D3D12_TEXTURE_DATA_PITCH_ALIGNMENT, DX12UploadRing::kTexturePlacementAlignment);
     if (!staging.IsValid())
@@ -86,12 +90,12 @@ bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
         outError = "기본 텍스처 업로드 링 할당 실패";
         return false;
     }
-    memcpy(staging.cpuAddress, white, sizeof(white));
+    memcpy(staging.cpuAddress, rgba, 4);
 
     auto* commandList = m_resources->GetCommandList();
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = m_whiteResource.Get();
+    dst.pResource = outResource.Get();
     dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
     D3D12_TEXTURE_COPY_LOCATION src{};
@@ -108,18 +112,57 @@ bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = m_whiteResource.Get();
+    barrier.Transition.pResource = outResource.Get();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
 
-    m_white.resource = m_whiteResource.Get();
-    m_white.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    m_white.width = 1;
-    m_white.height = 1;
-    m_white.mipLevels = 1;
+    outEntry = Entry{};
+    outEntry.resource = outResource.Get();
+    outEntry.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    outEntry.width = 1;
+    outEntry.height = 1;
+    outEntry.mipLevels = 1;
     return true;
+}
+
+bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
+{
+    const uint8_t white[4] = { 255, 255, 255, 255 };
+    return CreateSolidTexture(white, L"DX12DefaultWhite", m_whiteResource, m_white, outError);
+}
+
+DX12TextureCache::Entry DX12TextureCache::GetBlackTexture(std::string& outError)
+{
+    if (nullptr == m_resources) return Entry{};
+    if (!m_black.IsValid())
+    {
+        const uint8_t black[4] = { 0, 0, 0, 255 };
+        if (!CreateSolidTexture(black, L"DX12DefaultBlack",
+            m_blackResource, m_black, outError))
+        {
+            return Entry{};
+        }
+    }
+    return m_black;
+}
+
+DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outError)
+{
+    if (nullptr == m_resources) return Entry{};
+    if (!m_ormNeutral.IsValid())
+    {
+        // R 오클루전 1 · G 거칠기 1 · B 금속 0 — 팩터가 곱해지고 더해지는
+        // 슬롯이라 이 조합이라야 팩터 값이 그대로 살아남는다.
+        const uint8_t ormNeutral[4] = { 255, 255, 0, 255 };
+        if (!CreateSolidTexture(ormNeutral, L"DX12DefaultOrmNeutral",
+            m_ormNeutralResource, m_ormNeutral, outError))
+        {
+            return Entry{};
+        }
+    }
+    return m_ormNeutral;
 }
 
 bool DX12TextureCache::UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTURE2D_DESC& sourceDesc,

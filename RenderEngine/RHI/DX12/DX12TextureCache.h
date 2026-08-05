@@ -71,6 +71,13 @@ public:
     /// 있게 해 준다 — 셰이더에서 "텍스처가 있으면" 분기를 없애는 쪽이 빠르다.
     Entry GetWhiteTexture() const { return m_white; }
 
+    /// 슬롯 의미를 아는 폴백들. 흰색 하나로 전부 때우면 슬롯에 따라 뜻이
+    /// 뒤집힌다 — emissive에 흰색이면 텍스처 없는 재질이 전부 자체발광이고,
+    /// ORM에 흰색이면 B(금속)가 1이라 확산이 통째로 죽는다(IBL 소비 검증이
+    /// '끔=검정' 대조군으로 잡았다). 프레임이 열려 있어야 한다(첫 호출 생성).
+    Entry GetBlackTexture(std::string& outError);
+    Entry GetOrmNeutralTexture(std::string& outError);   // (occ 1 · rough 1 · metal 0)
+
     /// 대형 텍스처용 전용 스테이징을 비운다. 링 용량을 넘는 텍스처(4K HDR
     /// equirect 128MB 실측)는 1회용 업로드 버퍼로 나르는데, GPU가 복사를
     /// 끝내기 전에 파괴하면 안 되므로 캐시가 들고 있는다 — GPU 유휴가
@@ -85,6 +92,8 @@ private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool CreateWhiteTexture(std::string& outError);
+    bool CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
+        ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
     bool UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTURE2D_DESC& desc,
         ComPtr<ID3D12Resource>& outResource, std::string& outError);
 
@@ -97,6 +106,10 @@ private:
 
     ComPtr<ID3D12Resource> m_whiteResource;
     Entry m_white;
+    ComPtr<ID3D12Resource> m_blackResource;
+    Entry m_black;
+    ComPtr<ID3D12Resource> m_ormNeutralResource;
+    Entry m_ormNeutral;
 
     // 링 대신 쓴 1회용 업로드 버퍼들. GPU 소비가 끝날 때까지 살아 있어야 한다.
     std::vector<ComPtr<ID3D12Resource>> m_dedicatedStaging;

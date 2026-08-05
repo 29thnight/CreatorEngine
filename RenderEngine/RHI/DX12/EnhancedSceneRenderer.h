@@ -309,6 +309,13 @@ public:
     /// isCube·arraySize가 이번 확장의 본체), 실물로 3방향을 그리고,
     /// equirect 원본이 있으면 IBL 생성 체인까지 태운다. 에디터 전용.
     bool RunSkySceneTest(std::string& outLog);
+
+    /// IBL 앰비언트 소비 검증 (PHASE 3-6).
+    ///
+    /// 광원 0개 씬에서 출력 = 앰비언트뿐으로 만들어 셋을 단정한다:
+    /// 끔 = 검정(기존 동작 보존), 반구 IBL의 법선 방향성(바닥 빨강·천장
+    /// 초록 — 뒤집히면 색이 맞바뀐다), 매끈 금속의 스플릿섬 정반사.
+    bool RunIBLShadeTest(std::string& outLog);
 };
 
 #endif

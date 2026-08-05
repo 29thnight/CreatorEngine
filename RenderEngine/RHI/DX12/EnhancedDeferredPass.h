@@ -46,6 +46,19 @@ public:
         m_shadowData = data;
     }
 
+    /// IBL 산출물 셋(조도 큐브·프리필터 큐브·BRDF LUT). 그래프 밖 리소스라
+    /// 핸들이 아니라 포인터로 받고, PIXEL_SHADER_RESOURCE 상태가 계약이다.
+    /// 안 넣으면 앰비언트 없이 돈다(기존 동작) — 생성기(EnhancedIBLGenerator)의
+    /// 산출물을 그대로 꽂는 것이 정상 경로다.
+    void SetIBL(ID3D12Resource* irradiance, ID3D12Resource* prefiltered,
+        uint32_t prefilterMips, ID3D12Resource* brdfLut)
+    {
+        m_iblIrradiance = irradiance;
+        m_iblPrefiltered = prefiltered;
+        m_iblPrefilterMips = prefilterMips;
+        m_iblBrdfLut = brdfLut;
+    }
+
     RGHandle GetOutput() const { return m_output; }
 
     static constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -65,7 +78,7 @@ private:
         uint32_t       lightCount{ 0 };
         uint32_t       hasShadow{ 0 };
         float          cascadeBlendBand{ 0.f };
-        uint32_t       padding{ 0 };
+        uint32_t       hasIbl{ 0 };
         EnhancedLight  lights[kMaxLights]{};
     };
 
@@ -79,6 +92,11 @@ private:
 
     RGHandle           m_shadowMap;
     EnhancedShadowData m_shadowData{};
+
+    ID3D12Resource* m_iblIrradiance{ nullptr };
+    ID3D12Resource* m_iblPrefiltered{ nullptr };
+    ID3D12Resource* m_iblBrdfLut{ nullptr };
+    uint32_t        m_iblPrefilterMips{ 1 };
 
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 
