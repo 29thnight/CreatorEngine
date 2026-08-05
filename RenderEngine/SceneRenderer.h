@@ -73,6 +73,9 @@ public:
 	// 진단/계측용 읽기 전용 접근자.
 	// 소유권을 넘기지 않으므로 friend 선언보다 결합이 약하다.
 	RenderScene* GetRenderScene() const { return m_renderScene.get(); }
+#ifndef DYNAMICCPP_EXPORTS
+	SkyBoxPass* GetSkyBoxPass() const;
+#endif
 
 private:
 	void InitializeDeviceState();

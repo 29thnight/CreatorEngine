@@ -446,6 +446,13 @@ bool SceneRenderer::ConsumeGBufferCapture(std::vector<uint8_t>& outBytes, uint32
 	return true;
 }
 
+#ifndef DYNAMICCPP_EXPORTS
+SkyBoxPass* SceneRenderer::GetSkyBoxPass() const
+{
+	return m_pSkyBoxPass.get();
+}
+#endif
+
 void SceneRenderer::Finalize()
 {
 	// 등록의 역순 — 패스들이 아직 살아 있는 동안에는 RHI가 유효해야 한다.

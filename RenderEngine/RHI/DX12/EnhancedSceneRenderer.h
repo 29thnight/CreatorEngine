@@ -302,6 +302,13 @@ public:
     /// 극한(매끈 모서리 = (1,0))을 단정한다. 절대값 단정은 피한다 —
     /// 원본의 톤 정책(로그 평균·NoL 이중 가중)에 묶여 있기 때문이다.
     bool RunIBLTest(std::string& outLog);
+
+    /// 엔진 스카이박스 텍스처의 DX12 운반 검증 (PHASE 3-6).
+    ///
+    /// 살아 있는 SceneRenderer의 큐브맵을 텍스처 캐시로 나르고(Entry의
+    /// isCube·arraySize가 이번 확장의 본체), 실물로 3방향을 그리고,
+    /// equirect 원본이 있으면 IBL 생성 체인까지 태운다. 에디터 전용.
+    bool RunSkySceneTest(std::string& outLog);
 };
 
 #endif

@@ -26,6 +26,12 @@ public:
 
 	file::path CurrentSkyBoxTextureName() const { return m_fileName; }
 
+	// DX12 운반용 읽기 전용 접근자(병존 기간 — 교체 후에는 DX12가 직접 로드한다).
+	// 큐브맵은 DDS 직로드든 rect→cube 생성이든 항상 있고, equirect 원본은
+	// HDR 로드 경로에서만 있다.
+	Texture* GetCubeMapTexture() const { return m_skyBoxCubeMap.get(); }
+	Texture* GetEquirectTexture() const { return m_skyBoxTexture.get(); }
+
 public:
 	Managed::SharedPtr<Texture> m_EnvironmentMap;
 	Managed::SharedPtr<Texture> m_SpecularMap;

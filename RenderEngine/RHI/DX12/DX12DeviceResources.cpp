@@ -191,9 +191,12 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 크기에 딸린 것은 한 곳에 모은다 — 리사이즈가 같은 코드를 다시 탄다.
     if (!CreateSizeDependentResources(width, height, outError)) return false;
 
-    // 프레임 업로드 링. 구간 크기는 브링업 단계의 잠정치다 — 실제 씬을 이식하면
-    // GetStats().peakFrameBytes가 필요한 값을 알려 준다(추정하지 말고 재서 정한다).
-    constexpr uint64_t kUploadBytesPerFrame = 8ull * 1024 * 1024;
+    // 프레임 업로드 링. 첫 잠정치는 8MB였고, 실측이 한도를 알려 줬다 —
+    // 엔진 스카이박스 큐브맵(512² x 6면 RGBA16F)이 12.6MB라 텍스처 캐시
+    // 운반이 8MB에서 거절됐다. 16MB로 올린다. 이보다 큰 단일 텍스처
+    // (예: 2048x1024 초과 HDR equirect ≈ 16.7MB+)는 여전히 거절되며,
+    // 그때는 서브리소스 분할 업로드가 필요하다(운반 검증이 스킵으로 알린다).
+    constexpr uint64_t kUploadBytesPerFrame = 16ull * 1024 * 1024;
     if (!m_uploadRing.Initialize(m_device.Get(), kUploadBytesPerFrame, kFrameCount, outError))
     {
         return false;

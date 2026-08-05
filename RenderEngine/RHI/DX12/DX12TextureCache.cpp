@@ -319,6 +319,8 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     entry.width = sourceDesc.Width;
     entry.height = sourceDesc.Height;
     entry.mipLevels = sourceDesc.MipLevels;
+    entry.arraySize = sourceDesc.ArraySize;
+    entry.isCube = 0 != (sourceDesc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE);
 
     ++m_stats.uploads;
     m_entries.emplace(texture, std::move(resource));

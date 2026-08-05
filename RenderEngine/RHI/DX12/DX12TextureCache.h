@@ -39,6 +39,12 @@ public:
         uint32_t        height{ 0 };
         uint32_t        mipLevels{ 0 };
 
+        // 업로드 경로는 처음부터 배열 전체를 옮겼는데(GetCopyableFootprints가
+        // 밉 x 슬라이스를 다 안다) Entry가 그 사실을 알리지 않아 소비자가
+        // 큐브맵을 2D로 볼 수밖에 없었다 — 스카이박스 운반(28차 이후)에서 추가.
+        uint32_t        arraySize{ 1 };
+        bool            isCube{ false };
+
         bool IsValid() const { return nullptr != resource; }
     };
 
