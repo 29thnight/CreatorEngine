@@ -89,11 +89,28 @@ namespace
 
         EnhancedFrameContext frameContext{};
 
-        // DX12가 그리는 공유 텍스처와, DX11이 그것을 연 것.
-        ComPtr<ID3D12Resource>           sharedTexture;
-        HANDLE                           sharedHandle{ nullptr };
-        ComPtr<ID3D11Texture2D>          openedTexture;
-        ComPtr<ID3D11ShaderResourceView> openedSrv;
+        // 표시 슬롯 둘 — 비동기의 본체다. DX12가 한 슬롯에 그리는 동안
+        // DX11은 다른 슬롯을 표시한다. 슬롯은 펜스 값이 완료된 뒤에만
+        // 표시로 승격되므로(TickLive), DX11이 쓰기 중인 텍스처를 읽는
+        // 일이 구조적으로 없다 — WaitForGpu가 필요 없어지는 이유다.
+        struct DisplaySlot
+        {
+            ComPtr<ID3D12Resource>           sharedTexture;
+            HANDLE                           sharedHandle{ nullptr };
+            ComPtr<ID3D11Texture2D>          openedTexture;
+            ComPtr<ID3D11ShaderResourceView> openedSrv;
+            uint64_t                         fenceValue{ 0 };
+        };
+        DisplaySlot slots[2];
+        int displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
+        int pendingSlot{ -1 };   // DX12가 그렸고 펜스 완료를 기다리는 슬롯
+
+        // 인플라이트 그래프. 규칙(dx12.compare 크래시의 교훈): 그래프의 수명은
+        // 그 커맨드를 GPU가 끝낼 때까지다 — transient 리소스를 그래프가 들고
+        // 있다. WaitForGpu를 없앤 첫 실행이 3프레임 만에 DEVICE_REMOVED
+        // (0x887A0005, Shadow.Cascades)로 죽으며 이 규칙을 재확인시켰다.
+        // 펜스 완료(승격) 때 놓는다.
+        std::unique_ptr<EnhancedRenderGraph> inFlightGraph;
     };
 
     struct LiveState
@@ -127,10 +144,13 @@ namespace
         };
         std::vector<Grave> graveyard;
 
+        int pendingSlot() const { return pipeline ? pipeline->pendingSlot : -1; }
+
         uint32_t ssaoFrameIndex{ 0 };
         uint32_t frameCounter{ 0 };
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
+        uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         std::string lastError;
@@ -208,10 +228,11 @@ namespace
             if (!p.ssao.Initialize(p.frameContext, outError)) return false;
             if (!p.postChain.Initialize(p.frameContext, outError)) return false;
 
-            // ── 공유 텍스처 + DX11 SRV ──
+            // ── 공유 텍스처 + DX11 SRV (슬롯 2개) ──
             //
             // 포스트 체인의 LDR 출력과 같은 RGBA8이라야 CopyTextureRegion이
             // 성립한다.
+            for (LivePipeline::DisplaySlot& slot : p.slots)
             {
                 D3D12_HEAP_PROPERTIES heap{};
                 heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -228,15 +249,15 @@ namespace
 
                 if (FAILED(p.resources.GetDevice()->CreateCommittedResource(&heap,
                     D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                    nullptr, IID_PPV_ARGS(&p.sharedTexture))))
+                    nullptr, IID_PPV_ARGS(&slot.sharedTexture))))
                 {
                     outError = "공유 텍스처 생성 실패";
                     return false;
                 }
 
-                if (FAILED(p.resources.GetDevice()->CreateSharedHandle(p.sharedTexture.Get(),
-                        nullptr, GENERIC_ALL, nullptr, &p.sharedHandle)) ||
-                    nullptr == p.sharedHandle)
+                if (FAILED(p.resources.GetDevice()->CreateSharedHandle(slot.sharedTexture.Get(),
+                        nullptr, GENERIC_ALL, nullptr, &slot.sharedHandle)) ||
+                    nullptr == slot.sharedHandle)
                 {
                     outError = "공유 핸들 생성 실패";
                     return false;
@@ -244,15 +265,15 @@ namespace
 
                 ComPtr<ID3D11Device1> device1;
                 if (FAILED(dx11Device->QueryInterface(IID_PPV_ARGS(&device1))) ||
-                    FAILED(device1->OpenSharedResource1(p.sharedHandle,
-                        IID_PPV_ARGS(&p.openedTexture))))
+                    FAILED(device1->OpenSharedResource1(slot.sharedHandle,
+                        IID_PPV_ARGS(&slot.openedTexture))))
                 {
                     outError = "DX11에서 공유 텍스처 열기 실패";
                     return false;
                 }
 
-                if (FAILED(dx11Device->CreateShaderResourceView(p.openedTexture.Get(),
-                    nullptr, &p.openedSrv)))
+                if (FAILED(dx11Device->CreateShaderResourceView(slot.openedTexture.Get(),
+                    nullptr, &slot.openedSrv)))
                 {
                     outError = "DX11 SRV 생성 실패";
                     return false;
@@ -269,16 +290,18 @@ namespace
             LivePipeline& p = *pipeline;
 
             if (p.resources.IsInitialized()) p.resources.WaitForGpu();
+            p.inFlightGraph.reset();
 
-            if (p.sharedTexture || p.openedSrv)
+            for (LivePipeline::DisplaySlot& slot : p.slots)
             {
+                if (!slot.sharedTexture && !slot.openedSrv) continue;
                 Grave grave;
-                grave.sharedTexture = std::move(p.sharedTexture);
-                grave.sharedHandle = p.sharedHandle;
-                grave.openedTexture = std::move(p.openedTexture);
-                grave.openedSrv = std::move(p.openedSrv);
+                grave.sharedTexture = std::move(slot.sharedTexture);
+                grave.sharedHandle = slot.sharedHandle;
+                grave.openedTexture = std::move(slot.openedTexture);
+                grave.openedSrv = std::move(slot.openedSrv);
                 graveyard.push_back(std::move(grave));
-                p.sharedHandle = nullptr;
+                slot.sharedHandle = nullptr;
             }
 
             p.postChain.Shutdown();
@@ -409,9 +432,10 @@ namespace
         // 마지막의 live_present가 이 러너의 고유 조각이다 — 포스트 체인 결과를
         // 공유 텍스처로 복사한다. 그 소비 선언이 있어야 그래프가 체인을
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
-        bool RenderOnce(std::string& outError)
+        bool RenderOnce(int slotIndex, std::string& outError)
         {
             LivePipeline& p = *pipeline;
+            LivePipeline::DisplaySlot& slot = p.slots[slotIndex];
 
             if (!p.resources.BeginFrame(outError)) return false;
             p.profiler.BeginFrame(frameCounter % DX12DeviceResources::kFrameCount);
@@ -425,7 +449,8 @@ namespace
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
 
-            EnhancedRenderGraph graph;
+            p.inFlightGraph = std::make_unique<EnhancedRenderGraph>();
+            EnhancedRenderGraph& graph = *p.inFlightGraph;
             graph.SetProfiler(&p.profiler);
 
             p.shadow.Declare(graph, p.frameContext);
@@ -484,10 +509,10 @@ namespace
             }
             {
                 const RGHandle finalHandle = p.postChain.GetOutput();
-                const RGHandle sharedHandleRG = graph.ImportTexture(p.sharedTexture.Get(),
+                const RGHandle sharedHandleRG = graph.ImportTexture(slot.sharedTexture.Get(),
                     RGResourceState::CopyDest, "Live.Shared");
 
-                ID3D12Resource* const sharedResource = p.sharedTexture.Get();
+                ID3D12Resource* const sharedResource = slot.sharedTexture.Get();
                 graph.AddPass("live_present",
                     { { finalHandle, RGResourceState::CopySource },
                       { sharedHandleRG, RGResourceState::CopyDest } },
@@ -513,18 +538,14 @@ namespace
 
             if (!p.resources.EndFrame(outError)) return false;
 
-            // 프레임마다 끝까지 기다린다. 공유 텍스처에 펜스 공유·키드 뮤텍스를
-            // 아직 안 붙였으므로, DX11이 읽기 전에 DX12 쓰기가 끝났음을 보장하는
-            // 수단이 이 동기 대기뿐이다. 병존기의 브링업 품질이고, 3-9에서
-            // 스왑체인과 함께 비동기화한다.
-            p.resources.WaitForGpu();
-
-            std::vector<DX12GpuProfiler::PassTiming> timings;
-            std::string collectError;
-            if (p.profiler.Collect(timings, collectError))
-            {
-                lastGpuMs = p.profiler.GetLastTotalMilliseconds();
-            }
+            // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
+            // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
+            // 프레임들에서 완료를 논블로킹으로 확인해 표시로 승격한다.
+            // 1차 실측에서 게임 스레드의 동기 WaitForGpu가 프레임당 33ms를
+            // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
+            // 여기서 없앤다.
+            slot.fenceValue = p.resources.GetLastSignaledFenceValue();
+            p.pendingSlot = slotIndex;
             return true;
         }
     };
@@ -560,6 +581,35 @@ void EnhancedSceneRenderer::TickLive()
     LiveState& state = GetLiveState();
     if (!state.enabled) return;
 
+    // 지난 프레임 제출분의 완료 확인(논블로킹). 완료됐으면 표시로 승격한다 —
+    // DX11이 읽는 슬롯은 항상 '펜스가 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
+    if (nullptr != state.pipeline && state.pendingSlot() >= 0)
+    {
+        LivePipeline& p = *state.pipeline;
+        if (p.resources.GetCompletedFenceValue()
+            >= p.slots[p.pendingSlot].fenceValue)
+        {
+            p.displaySlot = p.pendingSlot;
+            p.pendingSlot = -1;
+            p.inFlightGraph.reset();   // GPU가 끝났다 — 이제 transient를 놓아도 된다
+
+            std::vector<DX12GpuProfiler::PassTiming> timings;
+            std::string collectError;
+            if (p.profiler.Collect(timings, collectError))
+            {
+                state.lastGpuMs = p.profiler.GetLastTotalMilliseconds();
+            }
+            ++state.framesRendered;
+        }
+        else
+        {
+            // GPU가 아직이다. 이번 틱은 새 프레임을 내지 않는다 — 인플라이트를
+            // 하나로 묶어 두면 링·얼로케이터 회전이 항상 안전 거리 안에 있다.
+            ++state.framesInFlight;
+            return;
+        }
+    }
+
     const Camera* sceneCamera = nullptr;
     uint32_t rtWidth = 0;
     uint32_t rtHeight = 0;
@@ -593,8 +643,11 @@ void EnhancedSceneRenderer::TickLive()
     LiveStopwatch watch;
     watch.Start();
 
+    // 표시 중이 아닌 슬롯에 그린다. 첫 프레임(-1)은 0번부터.
+    const int renderSlot = (0 == state.pipeline->displaySlot) ? 1 : 0;
+
     std::string error;
-    if (!state.RenderOnce(error))
+    if (!state.RenderOnce(renderSlot, error))
     {
         state.lastError = "프레임 실패: " + error;
         state.TeardownPipeline();
@@ -604,7 +657,6 @@ void EnhancedSceneRenderer::TickLive()
 
     state.lastCpuMs = watch.ElapsedMs();
     state.boundCamera = sceneCamera;
-    ++state.framesRendered;
 }
 
 ID3D11ShaderResourceView* EnhancedSceneRenderer::GetLiveDisplaySrv(const Camera* camera)
@@ -612,8 +664,8 @@ ID3D11ShaderResourceView* EnhancedSceneRenderer::GetLiveDisplaySrv(const Camera*
     const LiveState& state = GetLiveState();
     if (!state.enabled || nullptr == state.pipeline) return nullptr;
     if (nullptr == camera || camera != state.boundCamera) return nullptr;
-    if (0 == state.framesRendered) return nullptr;
-    return state.pipeline->openedSrv.Get();
+    if (state.pipeline->displaySlot < 0) return nullptr;
+    return state.pipeline->slots[state.pipeline->displaySlot].openedSrv.Get();
 }
 
 std::string EnhancedSceneRenderer::GetLiveStatus()
@@ -623,13 +675,14 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     char line[384]{};
     std::snprintf(line, sizeof(line),
         "dx12.live — %s · 파이프라인 %s · %ux%u · 렌더 %llu프레임(대기 %llu)"
-        " · CPU %.2f ms · GPU %.2f ms · 묘지 %zu",
+        " · 인플라이트 스킵 %llu · CPU %.2f ms · GPU %.2f ms · 묘지 %zu",
         state.enabled ? "켜짐" : "꺼짐",
         state.pipeline ? "준비됨" : "없음",
         state.pipeline ? state.pipeline->width : 0u,
         state.pipeline ? state.pipeline->height : 0u,
         static_cast<unsigned long long>(state.framesRendered),
         static_cast<unsigned long long>(state.framesIdle),
+        static_cast<unsigned long long>(state.framesInFlight),
         state.lastCpuMs, state.lastGpuMs,
         state.graveyard.size());
 

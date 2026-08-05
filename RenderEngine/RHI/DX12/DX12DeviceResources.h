@@ -78,6 +78,15 @@ public:
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
     void WaitForGpu();
 
+    /// 마지막으로 EndFrame이 서명한 펜스 값. 상시 러너의 비동기 표시가
+    /// '이 프레임이 끝났는가'를 논블로킹으로 물을 때 GetCompletedFenceValue와
+    /// 짝으로 쓴다 — 완료 확인이 CPU 대기 없이 되므로 WaitForGpu가 필요 없다.
+    uint64_t GetLastSignaledFenceValue() const { return m_nextFenceValue - 1; }
+    uint64_t GetCompletedFenceValue() const
+    {
+        return m_fence ? m_fence->GetCompletedValue() : 0;
+    }
+
     // 검증 레이어 메시지를 비우고, 그중 '실제 문제'(WARNING 이상)의 수를 돌려준다.
     //
     // INFO/MESSAGE 등급은 세지 않는다 — 파이프라인 라이브러리의 첫 조회 실패
