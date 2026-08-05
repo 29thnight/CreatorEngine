@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <string>
 
+struct ID3D11ShaderResourceView;
+class Camera;
+
 // DX12 렌더러(PHASE 3-3). 기존 SceneRenderer(DX11)와 병존하다가 3-9에서 교체된다.
 //
 // 지금은 브링업 골격이다: 자체 디바이스·큐·펜스·PSO로 프레임을 그려 파일로
@@ -340,6 +343,49 @@ public:
 
     /// 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
     bool RunVolumetricFogTest(std::string& outLog);
+
+    // ── 상시 러너 — 렌더러 스위치의 병존기 구현 (PHASE 3-9 전 단계) ──
+    //
+    // 위의 Run* 검증들과 달리 이쪽은 상태를 가진다: 켜 두면 매 프레임 활성
+    // 씬을 DX12로 그려 공유 텍스처에 담고, 에디터의 씬 뷰·게임 뷰가 그것을
+    // DX11 SRV로 표시한다(RunSharedTextureTest가 증명한 경로). 인스턴스
+    // 멤버가 아니라 정적인 이유: 이 클래스의 인스턴스는 콘솔 명령마다 스택에
+    // 만들어지는 검증용이고, 상시 상태는 프로세스에 하나뿐이어야 한다.
+    // 상태는 구현 파일(EnhancedSceneRendererLive.cpp) 내부에 숨겼고,
+    // 교체(3-9) 때 이 API가 본체 인스턴스로 흡수된다.
+    //
+    // 교체가 아니라 병존이다. DX11 SceneRenderer는 여전히 프레임 루프를
+    // 소유하고 매 프레임 그린다 — 이 러너는 표시 텍스처의 공급자만 바꾼다.
+    // 그래서 끄면 즉시 DX11 그림으로 돌아가고, DX12 쪽 실패는 표시 폴백으로
+    // 흡수된다.
+    //
+    // 스레드·수명 규약: TickLive/GetLiveDisplaySrv는 게임 스레드의 프레임
+    // 경계에서만 부른다. 렌더 스레드(CE)가 이전 프레임의 ImGui 드로우
+    // 데이터로 SRV를 읽는 중일 수 있으므로, DisableLive는 DX11에 보이는
+    // 객체를 즉시 해제하지 않고 묘지에 보관한다 — 최종 해제는 렌더 스레드
+    // join 이후의 ShutdownLive(Dx11Main::Finalize)에서만 한다.
+
+    /// 켠다. 무겁게 시작하지 않는다 — 파이프라인은 첫 TickLive에서 유효한
+    /// 카메라와 렌더 타깃 크기를 보고 세운다(씬 로딩 전에 켜도 안전).
+    static void EnableLive();
+
+    /// 끈다. 표시가 즉시 DX11로 돌아가고 DX12 파이프라인은 해체된다.
+    static void DisableLive();
+
+    static bool IsLiveEnabled();
+
+    /// 프레임 경계(게임 스레드)에서 매 프레임 부른다.
+    static void TickLive();
+
+    /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를, 아니면 nullptr를
+    /// 돌려준다 — nullptr이면 호출부는 기존 DX11 SRV를 쓴다(폴백 한 줄).
+    static ID3D11ShaderResourceView* GetLiveDisplaySrv(const Camera* camera);
+
+    /// 상태 한 줄 요약(dx12.live status).
+    static std::string GetLiveStatus();
+
+    /// 최종 정리. 렌더 스레드 join 이후에만 부른다.
+    static void ShutdownLive();
 
     /// DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제("DX12가 실제로
     /// 빠른가")의 검증.

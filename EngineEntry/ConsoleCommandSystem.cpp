@@ -1650,6 +1650,29 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
     }
+    else if (cmd == "dx12.live")
+    {
+        // 렌더러 스위치(병존기). 씬 뷰·게임 뷰의 표시 텍스처 공급자를
+        // DX12 상시 러너로 바꾼다 — DX11 프레임 루프는 그대로 돈다.
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+
+        if (mode == "on")
+        {
+            EnhancedSceneRenderer::EnableLive();
+            std::printf("[CLI] dx12.live 켜짐 — 다음 프레임부터 DX12가 그린다\n");
+        }
+        else if (mode == "off")
+        {
+            EnhancedSceneRenderer::DisableLive();
+            std::printf("[CLI] dx12.live 꺼짐 — 표시가 DX11로 돌아갔다\n");
+        }
+        else
+        {
+            const std::string status = EnhancedSceneRenderer::GetLiveStatus();
+            std::printf("%s\n", status.c_str());
+            Debug->LogWarning("[dx12.live] " + status);
+        }
+    }
     else if (cmd == "dx12.bench11")
     {
         // DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제 검증.
@@ -2698,6 +2721,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
         "  dx12.fog             볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)\n"
         "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
+        "  dx12.live on|off|status  렌더러 스위치 — 씬 뷰 표시를 DX12 상시 러너로 전환\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

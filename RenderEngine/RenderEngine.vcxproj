@@ -319,6 +319,7 @@
     <ClCompile Include="RHI\DX12\EnhancedSSGIPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedApiOverheadBench.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRenderer.cpp" />
+    <ClCompile Include="RHI\DX12\EnhancedSceneRendererLive.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />
     <ClCompile Include="PositionMapPass.cpp" />

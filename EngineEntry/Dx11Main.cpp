@@ -3,6 +3,7 @@
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "RHI/RHI.h"
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
 #include "ImGuiRegister.h"
@@ -272,6 +273,12 @@ void DirectX11::Dx11Main::Finalize()
 
     EngineSettingInstance->SaveSettings();
     std::printf("[SHUTDOWN] SaveSettings 반환\n");
+
+    // DX12 상시 러너의 최종 정리. 렌더 스레드 join 후·DX11 디바이스 해체 전 —
+    // 묘지의 DX11 SRV/공유 텍스처를 놓을 수 있는 유일하게 안전한 자리다
+    // (EnhancedSceneRenderer.h의 Live 수명 규약 참조).
+    EnhancedSceneRenderer::ShutdownLive();
+    std::printf("[SHUTDOWN] DX12 LiveRenderer 반환\n");
 
     m_sceneRenderer->Finalize();
     std::printf("[SHUTDOWN] SceneRenderer 반환\n");

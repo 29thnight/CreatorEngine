@@ -25,6 +25,7 @@
 #include "InputActionManager.h"
 #include "EngineBootstrap.h"
 #include "BootProgress.h"
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -135,6 +136,12 @@ void Core::App::Run()
 		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
 		auto& cli = ConsoleCommandSystem::Get();
 		cli.Pump();
+
+		// DX12 상시 러너(렌더러 스위치). 같은 자리인 이유: dx12.scene이 이
+		// 프레임 경계에서 씬 스냅샷을 안전하게 읽는 것을 이미 증명했고,
+		// 이 러너는 그 경로의 상시판이다. 꺼져 있으면 아무 일도 안 한다.
+		EnhancedSceneRenderer::TickLive();
+
 		if (cli.IsQuitRequested())
 		{
 			Debug->LogDebug("[SHUTDOWN] CLI quit 요청 — 종료 시작");

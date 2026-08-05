@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
 #include "SceneRenderer.h"
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "SceneManager.h"
@@ -50,7 +51,14 @@ void GameViewWindow::RenderGameViewWindow()
 		else
 		{
 			auto renderData = RenderPassData::GetData(camera.get());
-			ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, imageSize);
+
+			// 렌더러 스위치(dx12.live) — SceneViewWindow와 같은 분기·같은 폴백.
+			ImTextureID displayed = (ImTextureID)renderData->m_renderTarget->m_pSRV;
+			if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(camera.get()))
+			{
+				displayed = (ImTextureID)liveSrv;
+			}
+			ImGui::Image(displayed, imageSize);
 		}
 	}
 	ImGui::End();

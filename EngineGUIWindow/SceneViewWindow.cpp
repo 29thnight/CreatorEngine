@@ -1,6 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
 #include "SceneRenderer.h"
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "IconsFontAwesome6.h"
@@ -191,7 +192,15 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		auto renderData = RenderPassData::GetData(cam);
 
-		ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, ImVec2(x, y));
+		// 렌더러 스위치(dx12.live). DX12 상시 러너가 이 카메라의 그림을 방금
+		// 그렸으면 그것을, 아니면 DX11 결과를 표시한다 — nullptr 폴백이 항상
+		// 있어 DX12 쪽 실패가 빈 화면으로 번지지 않는다.
+		ImTextureID displayed = (ImTextureID)renderData->m_renderTarget->m_pSRV;
+		if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(cam))
+		{
+			displayed = (ImTextureID)liveSrv;
+		}
+		ImGui::Image(displayed, ImVec2(x, y));
 		imageMin = ImGui::GetItemRectMin();
 		imageMax = ImGui::GetItemRectMax();
 
