@@ -373,12 +373,19 @@ bool EnhancedSceneRenderer::RunPixelCompareTest(std::string& outLog)
     // 맞춰야 할 것은 해상도뿐이다.
 
     Camera* sceneCamera = nullptr;
+    // ★ 마지막 유효 카메라를 집는다(break 없음).
+    //
+    // DX11의 GBuffer 타깃은 카메라들이 공유하고, SceneRendering이 유효
+    // 카메라를 순서대로 같은 타깃에 그리므로 캡처에 남는 것은 '마지막'
+    // 카메라의 그림이다. 예전처럼 첫 카메라를 집으면 카메라가 둘인 게임
+    // 씬(에디터+게임)에서 DX12가 다른 시점으로 그려 일치 0이 나온다 —
+    // Test1이 정확히 그렇게 죽었다(스킨드 문제로 보였지만 카메라였다).
+    // FT_* 씬은 유효 카메라가 하나라 첫/마지막이 같아 통과했던 것이다.
     for (auto& camera : CameraManagement->GetCameras())
     {
         if (camera && RenderPassData::VaildCheck(camera.get()))
         {
             sceneCamera = camera.get();
-            break;
         }
     }
 
