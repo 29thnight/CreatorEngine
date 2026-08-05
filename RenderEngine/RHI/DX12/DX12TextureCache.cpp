@@ -45,6 +45,7 @@ void DX12TextureCache::Shutdown()
 {
     m_entries.clear();
     m_descriptions.clear();
+    m_dedicatedStaging.clear();
     m_whiteResource.Reset();
     m_white = Entry{};
     m_resources = nullptr;
@@ -176,17 +177,68 @@ bool DX12TextureCache::UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTU
     device->GetCopyableFootprints(&desc, 0, subresourceCount, 0,
         footprints.data(), rowCounts.data(), rowSizes.data(), &totalBytes);
 
-    const auto stagingAllocation = m_resources->GetUploadRing().Allocate(
-        totalBytes, DX12UploadRing::kTexturePlacementAlignment);
-    if (!stagingAllocation.IsValid())
+    // 스테이징 선택 — 링에 들어가면 링, 아니면 1회용 업로드 버퍼.
+    //
+    // 링 용량(프레임당 16MB)을 넘는 텍스처가 실재한다 — 4K HDR equirect가
+    // 128MB다(실측). 그때는 전용 버퍼를 만들어 나르고, GPU가 복사를 끝낼
+    // 때까지 캐시가 붙들고 있는다(ReleaseStagingBuffers 참고). 링이 그
+    // 프레임의 다른 업로드로 붐벼 거절한 경우도 같은 경로가 받아 낸다.
+    DX12UploadRing::Allocation ringAllocation{};
+    ComPtr<ID3D12Resource> dedicatedStaging;
+    uint8_t* destinationBase = nullptr;
+    ID3D12Resource* stagingResource = nullptr;
+    uint64_t stagingBaseOffset = 0;
+
+    if (totalBytes <= m_resources->GetUploadRing().GetBytesPerFrame())
     {
-        outError = "텍스처 업로드 링 할당 실패 (" + std::to_string(totalBytes)
-            + "바이트) — kUploadBytesPerFrame을 늘리거나 텍스처를 나눠 올려야 한다";
-        return false;
+        ringAllocation = m_resources->GetUploadRing().Allocate(
+            totalBytes, DX12UploadRing::kTexturePlacementAlignment);
+    }
+
+    if (ringAllocation.IsValid())
+    {
+        destinationBase = static_cast<uint8_t*>(ringAllocation.cpuAddress);
+        stagingResource = ringAllocation.resource;
+        stagingBaseOffset = ringAllocation.offset;
+    }
+    else
+    {
+        D3D12_HEAP_PROPERTIES uploadHeap{};
+        uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC bufferDesc{};
+        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        bufferDesc.Width = totalBytes;
+        bufferDesc.Height = 1;
+        bufferDesc.DepthOrArraySize = 1;
+        bufferDesc.MipLevels = 1;
+        bufferDesc.SampleDesc.Count = 1;
+        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        hr = device->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE,
+            &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+            IID_PPV_ARGS(&dedicatedStaging));
+        if (FAILED(hr))
+        {
+            outError = "대형 텍스처 스테이징 생성 실패 (" + std::to_string(totalBytes)
+                + "바이트) " + TextureCacheHrToString(hr);
+            return false;
+        }
+        dedicatedStaging->SetName(L"DX12TextureCache.DedicatedStaging");
+
+        void* mapped = nullptr;
+        hr = dedicatedStaging->Map(0, nullptr, &mapped);
+        if (FAILED(hr))
+        {
+            outError = "대형 텍스처 스테이징 Map 실패 " + TextureCacheHrToString(hr);
+            return false;
+        }
+        destinationBase = static_cast<uint8_t*>(mapped);
+        stagingResource = dedicatedStaging.Get();
+        stagingBaseOffset = 0;
     }
 
     auto* commandList = m_resources->GetCommandList();
-    auto* destinationBase = static_cast<uint8_t*>(stagingAllocation.cpuAddress);
 
     for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
     {
@@ -221,12 +273,18 @@ bool DX12TextureCache::UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTU
         dst.SubresourceIndex = subresource;
 
         D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = stagingAllocation.resource;
+        src.pResource = stagingResource;
         src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         src.PlacedFootprint = footprint;
-        src.PlacedFootprint.Offset += stagingAllocation.offset;
+        src.PlacedFootprint.Offset += stagingBaseOffset;
 
         commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    }
+
+    if (dedicatedStaging)
+    {
+        dedicatedStaging->Unmap(0, nullptr);
+        m_dedicatedStaging.push_back(std::move(dedicatedStaging));
     }
 
     D3D12_RESOURCE_BARRIER barrier{};

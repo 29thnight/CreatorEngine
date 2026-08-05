@@ -407,6 +407,8 @@ bool EnhancedSceneRenderer::RunSkySceneTest(std::string& outLog)
                 {
                     equirectEntry = textureCache.GetOrUpload(engineEquirect, error);
 
+                    // 대형 HDR(4K equirect 128MB 실측)도 전용 스테이징 경로가
+                    // 받아 낸다 — 여기서부터는 운반 실패가 곧 검증 실패다.
                     if (equirectEntry.IsValid() &&
                         equirectEntry.resource != textureCache.GetWhiteTexture().resource)
                     {
@@ -420,11 +422,8 @@ bool EnhancedSceneRenderer::RunSkySceneTest(std::string& outLog)
                     }
                     else
                     {
-                        // 링 한도(프레임당 16MB)를 넘는 대형 HDR은 아직 못 나른다 —
-                        // 서브리소스 분할 업로드가 후속 과제라는 것을 알리고 넘어간다.
-                        outLog += "[3/4] equirect 운반 불가(" + error
-                            + ") — 분할 업로드가 붙기 전까지의 알려진 한계\n";
-                        error.clear();
+                        outLog += "[3/4] equirect 운반 실패: " + error + "\n";
+                        passed = false;
                     }
 
                     if (!resources.EndFrame(error))
@@ -433,14 +432,19 @@ bool EnhancedSceneRenderer::RunSkySceneTest(std::string& outLog)
                         passed = false;
                     }
                     resources.WaitForGpu();
+
+                    // 전용 스테이징은 GPU가 다 읽은 지금이 돌려줄 자리다.
+                    textureCache.ReleaseStagingBuffers();
                 }
 
                 if (passed && generated)
                 {
-                    char line[192]{};
+                    char line[224]{};
                     std::snprintf(line, sizeof(line),
-                        "[3/4] IBL 생성 — equirect %ux%u → 큐브 128 · 조도 · 프리필터 6밉 · LUT 64\n",
-                        equirectEntry.width, equirectEntry.height);
+                        "[3/4] IBL 생성 — equirect %ux%u(%.0fMB 운반) → 큐브 128 · 조도 · 프리필터 6밉 · LUT 64\n",
+                        equirectEntry.width, equirectEntry.height,
+                        static_cast<double>(textureCache.GetStats().bytesUploaded)
+                            / (1024.0 * 1024.0));
                     outLog += line;
                 }
 

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>
 #include <d3d11.h>
@@ -70,6 +71,13 @@ public:
     /// 있게 해 준다 — 셰이더에서 "텍스처가 있으면" 분기를 없애는 쪽이 빠르다.
     Entry GetWhiteTexture() const { return m_white; }
 
+    /// 대형 텍스처용 전용 스테이징을 비운다. 링 용량을 넘는 텍스처(4K HDR
+    /// equirect 128MB 실측)는 1회용 업로드 버퍼로 나르는데, GPU가 복사를
+    /// 끝내기 전에 파괴하면 안 되므로 캐시가 들고 있는다 — GPU 유휴가
+    /// 보장된 시점(WaitForGpu 뒤)에 이걸 불러 돌려준다. 안 부르면 Shutdown이
+    /// 비운다(그때도 GPU 유휴가 계약이다).
+    void ReleaseStagingBuffers() { m_dedicatedStaging.clear(); }
+
     Stats  GetStats() const { return m_stats; }
     size_t GetCachedCount() const { return m_entries.size(); }
 
@@ -89,6 +97,9 @@ private:
 
     ComPtr<ID3D12Resource> m_whiteResource;
     Entry m_white;
+
+    // 링 대신 쓴 1회용 업로드 버퍼들. GPU 소비가 끝날 때까지 살아 있어야 한다.
+    std::vector<ComPtr<ID3D12Resource>> m_dedicatedStaging;
 
     Stats m_stats;
 };
