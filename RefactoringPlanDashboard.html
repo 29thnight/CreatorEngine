@@ -235,6 +235,12 @@
       <div class="rm-t">생명주기 재설계</div>
       <div class="rm-d">델리게이트 프레임 루프 은퇴 · 지연 파괴</div>
     </div>
+    <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--text-dim)">
+      <div class="rm-p" style="color:var(--text-dim)">PHASE 10</div>
+      <div class="rm-t">파티클·이펙트</div>
+      <div class="rm-d">DX12 재설계 · 패키지화 (최후순위)</div>
+    </div>
   </div>
   <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3·4는 2 완료 후 병행 가능. Phase 5는 각 페이즈 종료마다 부분 수행 후 마지막에 총정리.
   Phase 6은 Phase 2~4와 독립적이라 Phase 1 이후 언제든 병행 가능(스크립트 API 검증 인프라가 있는 지금이 적기).</div>
@@ -907,7 +913,7 @@ const TASKS = [
     refs: "LifecycleRedesignPlan §07 A-1", priority: "P1", days: 0.25, status: "todo", note: "" },
   { phase: 9, id: "9-7", title: "GC 계측 — 리소스 HUD 편입 (A-2)",
     detail: "GC.GetGCMemoryInfo()·CollectionCount(0/1/2)를 틱당 1회 blittable로 경계 너머로 수출, 리소스 카운터 HUD(0-2)에 gen0/1/2 수집 횟수·관리 힙 크기 표시. 2-9 '메모리 평탄성 검증'의 판정 기준을 '네이티브·관리 힙 모두 기준선 복귀'로 확장.",
-    refs: "LifecycleRedesignPlan §07 A-2 · 2-9", priority: "P1", days: 0.25, status: "todo", note: "" },,
+    refs: "LifecycleRedesignPlan §07 A-2 · 2-9", priority: "P1", days: 0.25, status: "todo", note: "" },
 
   // ---------- PHASE 10: 파티클·이펙트 DX12 재설계와 패키지화 (최후순위) ----------
   { phase: 10, id: "10-1", title: "파티클 GPU 버퍼 토대와 시뮬레이션 체인",
