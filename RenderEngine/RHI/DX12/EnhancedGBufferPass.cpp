@@ -159,9 +159,10 @@ struct PSOut
 
 PSOut PSMain(VSOut input)
 {
-    // 텍스처가 없는 슬롯에는 1x1 흰색이 묶여 있다. 그래서 "텍스처가 있으면"
-    // 분기가 필요 없다 — 분기 없는 쪽이 셰이더에서 빠르고, 재질마다 다른
-    // 셰이더 변형을 만들지 않아도 된다.
+    // 텍스처가 없는 슬롯에는 슬롯 의미에 맞는 1x1 폴백이 묶여 있다(베이스는
+    // 흰색, ORM은 중립 (1,1,0), emissive는 검정 — PrepareFrame 참조). 그래서
+    // "텍스처가 있으면" 분기가 필요 없다 — 분기 없는 쪽이 셰이더에서 빠르고,
+    // 재질마다 다른 셰이더 변형을 만들지 않아도 된다.
     const float4 albedo = gBaseColor.Sample(gSampler, input.uv) * input.baseColorFactor;
 
     // occlusion/roughness/metallic은 glTF 규약대로 G에 거칠기, B에 금속성이다.

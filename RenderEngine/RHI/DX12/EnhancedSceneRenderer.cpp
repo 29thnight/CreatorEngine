@@ -2186,18 +2186,25 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
             std::snprintf(buffer, sizeof(buffer), "(%.3f %.3f %.3f)", r, g, b);
             got = buffer;
 
-            // ★ 기대값은 지금 셰이더가 쓰는 것이다.
+            // ★ 기대값은 지금 셰이더와 지금 폴백이 쓰는 것이다.
             //
-            // 예전 값(Diffuse=uv, MetalRough=(0.25,0.75,0), Emissive=(0,0.5,1))은
-            // 내장 삼각형 시절 셰이더가 상수로 쓰던 것이라 이미 맞지 않는다.
-            // 지금은 재질에서 온다. 텍스처를 안 준 슬롯에는 1x1 흰색이 묶이므로:
+            // 이 기대값은 두 번 낡았다. 처음에는 내장 삼각형 시절 상수
+            // (Diffuse=uv, MetalRough=(0.25,0.75,0), Emissive=(0,0.5,1))였고,
+            // 다음에는 '모든 슬롯 흰색 폴백' 시절 값(MetalRough b=1.25,
+            // Emissive=흰색)이었다. IBL 소비 검증이 흰색 일괄 폴백의 문제
+            // (전부 자체발광·확산 사망)를 잡으면서 폴백이 슬롯 의미별로
+            // 바뀌었다 — ORM 중립 (1,1,0) · emissive 검정. 그래서:
             //
             //   Diffuse    = 흰색 x baseColorFactor      = (0.2, 0.4, 0.6)
             //   MetalRough = (orm.r, orm.g x roughness, orm.b + metallic)
-            //              = (1, 0.75, 1.25)
+            //              = (1, 1 x 0.75, 0 + 0.25)     = (1, 0.75, 0.25)
             //   Normal     = (0,0,-1) x 0.5 + 0.5        = (0.5, 0.5, 0)
-            //   Emissive   = 흰색                        = (1, 1, 1)
+            //   Emissive   = 검정 폴백                   = (0, 0, 0)
             //   Bitmask    = 0xABCD
+            //
+            // Emissive의 0 단정이 미덥지 않으면 '안 그려진 것과 구분되는가'를
+            // 물어야 한다 — 그 구분은 Diffuse·Bitmask가 같은 픽셀에서 0이
+            // 아닌 것으로 이미 잡혀 있다(다섯 타깃을 따로 보는 이유가 이것이다).
             constexpr float kEpsilon = 0.01f;
             switch (i)
             {
@@ -2205,15 +2212,16 @@ bool EnhancedSceneRenderer::RunGBufferTest(std::string& outLog)
                 ok = std::fabs(r - 0.2f) < kEpsilon && std::fabs(g - 0.4f) < kEpsilon
                     && std::fabs(b - 0.6f) < kEpsilon;
                 break;
-            case 1: // MetalRough = (1, roughness, 1 + metallic)
-                ok = std::fabs(g - 0.75f) < kEpsilon && std::fabs(b - 1.25f) < kEpsilon;
+            case 1: // MetalRough = (1, 1 x roughness, 0 + metallic)
+                ok = std::fabs(r - 1.f) < kEpsilon && std::fabs(g - 0.75f) < kEpsilon
+                    && std::fabs(b - 0.25f) < kEpsilon;
                 break;
             case 2: // Normal = (0,0,-1) 인코딩 → (0.5, 0.5, 0)
                 ok = std::fabs(r - 0.5f) < kEpsilon && std::fabs(b - 0.f) < kEpsilon;
                 break;
-            case 3: // Emissive = 흰색 폴백
-                ok = std::fabs(r - 1.f) < kEpsilon && std::fabs(g - 1.f) < kEpsilon
-                    && std::fabs(b - 1.f) < kEpsilon;
+            case 3: // Emissive = 검정 폴백(자체발광 없음이 기본값이라는 뜻)
+                ok = std::fabs(r - 0.f) < kEpsilon && std::fabs(g - 0.f) < kEpsilon
+                    && std::fabs(b - 0.f) < kEpsilon;
                 break;
             default:
                 break;
