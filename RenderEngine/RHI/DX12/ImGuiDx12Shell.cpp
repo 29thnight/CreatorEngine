@@ -11,6 +11,7 @@
 #include <wrl/client.h>
 #include <unordered_map>
 #include <vector>
+#include <unordered_set>
 
 // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 namespace
@@ -69,6 +70,9 @@ struct ImGuiDx12Shell::Impl
     //   리소스 없는 SRV(null 디스크립터)는 D3D12에서 합법이고 0을 읽는다.
     //   표시할 것이 없을 때는 0이 아니라 이것을 돌려준다.
     uint64_t fallbackTextureId{ 0 };
+
+    // 검증 레이어 메시지(Debug 전용, 처음 본 것만 보고).
+    std::unordered_set<std::string> reportedValidation;
 
     bool AllocateSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu)
     {
@@ -357,6 +361,20 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
     commandList->ResourceBarrier(1, &toPresent);
 
     if (!impl.resources.EndFrame(outError)) return false;
+
+#if defined(_DEBUG)
+    {
+        std::string validation;
+        if (0 != impl.resources.DrainDebugMessages(validation) && !validation.empty())
+        {
+            if (impl.reportedValidation.insert(validation).second)
+            {
+                std::printf("[ImGui 셸 검증] %s\n", validation.c_str());
+            }
+        }
+    }
+#endif
+
     return impl.resources.Present(outError);
 }
 

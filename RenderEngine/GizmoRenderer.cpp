@@ -5,6 +5,8 @@
 #include "RenderState.h"
 #include "Profiler.h"
 
+GizmoRenderer* GizmoRenderer::s_active = nullptr;
+
 GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 	m_pRenderer(pRenderer),
 	m_renderScene(pRenderer->m_renderScene.get()),
@@ -16,10 +18,13 @@ GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 	m_pGizmoPass = std::make_unique<GizmoPass>();
 	m_pGizmoLinePass = std::make_unique<GizmoLinePass>();
 #endif // !BUILD_FLAG
+	s_active = this;
 }
 
 GizmoRenderer::~GizmoRenderer()
 {
+	if (this == s_active) s_active = nullptr;
+
 	m_pGridPass.reset();
 	m_pWireFramePass.reset();
 	m_pGizmoPass.reset();

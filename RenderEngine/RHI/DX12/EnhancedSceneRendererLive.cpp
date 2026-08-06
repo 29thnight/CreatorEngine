@@ -22,6 +22,7 @@
 #include "EnhancedGizmoLinePass.h"
 #include "ImGuiDx12Shell.h"
 #include "../../EnhancedGizmoSceneBinding.h"
+#include "../../GizmoRenderer.h"
 
 #include "../../Camera.h"
 #include "../../Material.h"
@@ -37,6 +38,7 @@
 #include <wrl/client.h>
 #include <cstdio>
 #include <vector>
+#include <unordered_set>
 
 // EnhancedSceneRenderer의 상시 러너(렌더러 스위치, 병존기) 구현.
 //
@@ -178,6 +180,11 @@ namespace
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
+        // 검증 레이어 메시지. Debug에서만 쌓이고, 같은 문장이 매 프레임
+        // 반복되므로 처음 본 것만 찍는다 — 안 그러면 콘솔이 도배돼 정작
+        // 첫 원인을 못 본다.
+        std::unordered_set<std::string> reportedValidation;
+
         uint32_t lastDrawCount{ 0 };    // 이번 프레임 GBuffer 드로우(0이면 빈 화면이다)
         uint32_t lastBatchCount{ 0 };
         double   lastGpuMs{ 0.0 };
@@ -590,11 +597,19 @@ namespace
                 wireInputs.depth = p.grid.GetDepth();
                 p.wireframe.SetInputs(wireInputs);
             }
-            p.wireframe.Declare(graph, p.frameContext);
+            // ★ 와이어프레임은 모드일 때만 그린다(DX11 GizmoRenderer.cpp:67의
+            //   if (m_buseWireFrame)와 같은 조건). 무조건 그렸더니 초록
+            //   와이어가 씬 전체를 덮었다 — 에디터 오버레이는 '언제 그리는가'가
+            //   패스의 일부다.
+            const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
+            const bool wireFrameEnabled =
+                (nullptr != gizmoRenderer) && gizmoRenderer->IsWireFrameEnabled();
+            if (wireFrameEnabled) p.wireframe.Declare(graph, p.frameContext);
 
             {
                 EnhancedGizmoIconPass::Inputs iconInputs{};
-                iconInputs.color = p.wireframe.GetOutput();
+                iconInputs.color = wireFrameEnabled
+                    ? p.wireframe.GetOutput() : p.grid.GetOutput();
                 p.gizmoIcon.SetInputs(iconInputs);
             }
             p.gizmoIcon.Declare(graph, p.frameContext);
@@ -703,6 +718,22 @@ void EnhancedSceneRenderer::TickLive()
             p.displaySlot = slotIndex;
             p.pendingQueue.erase(p.pendingQueue.begin());
             p.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
+
+#if defined(_DEBUG)
+            // ★ 검증 레이어를 읽는다. Debug 빌드에서 배선 오류(포맷·상태·
+            //   디스크립터)는 여기에만 남는데 아무도 안 읽으면 증상만 보고
+            //   추측하게 된다 — 실제로 그 상태로 며칠을 쫓았다.
+            {
+                std::string validation;
+                if (0 != p.resources.DrainDebugMessages(validation) && !validation.empty())
+                {
+                    if (state.reportedValidation.insert(validation).second)
+                    {
+                        std::printf("[dx12.live 검증] %s\n", validation.c_str());
+                    }
+                }
+            }
+#endif
 
             std::vector<DX12GpuProfiler::PassTiming> timings;
             std::string collectError;
