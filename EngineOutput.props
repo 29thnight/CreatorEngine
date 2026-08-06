@@ -28,7 +28,7 @@
     <EngineOutDir Condition="'$(Configuration)' == 'Release'">$(MSBuildThisFileDirectory)Bin\Editor\</EngineOutDir>
     <EngineOutDir Condition="'$(EngineOutDir)' == ''">$(MSBuildThisFileDirectory)x64\$(Configuration)\</EngineOutDir>
 
-    <DotNetHostPackVersion>10.0.8</DotNetHostPackVersion>
+    <DotNetHostPackVersion>10.0.10</DotNetHostPackVersion>
     <DotNetHostPackDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\$(DotNetHostPackVersion)\runtimes\win-x64\native\</DotNetHostPackDir>
   </PropertyGroup>
 </Project>
