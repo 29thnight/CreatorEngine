@@ -41,14 +41,9 @@ RenderEngine/LightMap.cpp -> GameObject.h
 RenderEngine/LightMap.cpp -> MeshRenderer.h
 RenderEngine/LightMap.cpp -> Scene.h
 RenderEngine/LightMap.cpp -> SceneManager.h
+RenderEngine/LightMapPass.cpp -> Animator.h
 RenderEngine/LightMapPass.cpp -> GameObject.h
 RenderEngine/LightMapPass.cpp -> Scene.h
-RenderEngine/MeshRendererProxy.cpp -> Animator.h
-RenderEngine/MeshRendererProxy.cpp -> DecalComponent.h
-RenderEngine/MeshRendererProxy.cpp -> FoliageComponent.h
-RenderEngine/MeshRendererProxy.cpp -> MeshRenderer.h
-RenderEngine/MeshRendererProxy.cpp -> SpriteRenderer.h
-RenderEngine/MeshRendererProxy.cpp -> Terrain.h
 RenderEngine/MeshRendererProxy.h -> Transform.h
 RenderEngine/Model.cpp -> SceneManager.h
 RenderEngine/Model.h -> GameObject.h

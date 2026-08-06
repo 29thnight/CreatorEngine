@@ -246,6 +246,7 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="PrimitiveProxyBridge.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="AIManager.cpp" />
     <ClCompile Include="AnimationController.cpp" />

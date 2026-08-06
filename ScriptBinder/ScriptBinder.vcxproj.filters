@@ -197,6 +197,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="PrimitiveProxyBridge.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>

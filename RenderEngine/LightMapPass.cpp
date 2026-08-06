@@ -1,4 +1,5 @@
 #include "LightMapPass.h"
+#include "Animator.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "Material.h"
