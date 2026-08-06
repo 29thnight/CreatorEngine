@@ -128,6 +128,7 @@ void DirectX11::Dx11Main::Initialize()
     m_inspectorWindow = std::make_unique<InspectorWindow>();
     m_projectWindow = std::make_unique<AssetBundleWindow>();
     m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>();
+    m_renderDebugWindow = std::make_unique<EnhancedRenderDebugWindow>();
 #endif // !EDITOR
 
     BootProgress::Step(L"Script Building...");

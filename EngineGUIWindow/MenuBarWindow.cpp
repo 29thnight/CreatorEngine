@@ -20,7 +20,6 @@
 #include "EngineSetting.h"
 #include "ToggleUI.h"
 #include "GameBuilderSystem.h"
-#include "RenderDebugManager.h"
 
 constexpr int MAX_LAYER_SIZE = 32;
 
@@ -2632,10 +2631,30 @@ void MenuBarWindow::ShowRenderDebugWindow()
     {
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
         ImGui::Begin("RenderPass Debug", &m_bShowRenderDebugWindow);
-        // Render Debug Options
-        RenderDebugManager::GetInstance()->RenderCaptureResultImGui();
 
-        // Add more debug options as needed
+        // RenderDebugManager는 ID3D11DeviceContext로 패스 결과를 복사해 두는
+        // DX11 전용 장치이고, 그것을 채우던 GBuffer/Deferred/Forward 패스는
+        // SceneRenderer와 함께 메인 배선에서 빠졌다. 그래서 이 창은 열려도
+        // 언제나 비어 있었다 — 빈 창은 "캡처가 없다"와 "경로가 죽었다"를
+        // 구분해 주지 않으므로, 살아 있는 DX12 표면으로 안내한다.
+        // 기본 폰트는 라틴 전용이라 여기 문자열은 영문으로 쓴다(한글은 ??로 나온다).
+        ImGui::TextUnformatted("The DX11 pass capture viewer does not work in Enhanced-only mode.");
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Per-pass GPU timings and validation messages for");
+        ImGui::TextUnformatted("EnhancedRenderer (DX12) live in Settings > Pipeline Setting.");
+        ImGui::Spacing();
+        if (ImGui::Button("Open Pipeline Setting"))
+        {
+            if (!ImGui::GetContext("RenderPass").IsOpened())
+            {
+                ImGui::GetContext("RenderPass").Open();
+            }
+            m_bShowRenderDebugWindow = false;
+        }
+        ImGui::Spacing();
+        ImGui::TextUnformatted("For per-pass resource contents, take a PIX capture:");
+        ImGui::TextUnformatted("  Tools\\dx12-validation\\Invoke-DX12Validation.ps1 -Action PixCapture");
+
         ImGui::End();
 	}
 }

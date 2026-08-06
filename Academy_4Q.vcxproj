@@ -203,6 +203,7 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineEntry\Resource.h" />
     <ClInclude Include="EngineEntry\targetver.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
+    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
     <ClInclude Include="EngineGUIWindow\ExternUI.h" />
@@ -222,6 +223,16 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
+      <!--
+        유니티 묶음에서 뺀다. 이 파일을 묶음에 넣으면 묶음 구성이 재편되면서
+        Scene.h가 GameObject 완전 정의 없이 먼저 들어가 깨진다(Scene.h는
+        GameObject를 전방선언만 하고 쓰는데, 지금까지는 묶음 순서가 그것을
+        가려 주고 있었다). 상수 이름 충돌도 같은 뿌리다. 그 구조적 의존을
+        고치는 것은 이 창과 무관한 별도 변경이므로 여기서는 격리만 한다.
+      -->
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
     <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">

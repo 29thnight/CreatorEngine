@@ -44,6 +44,7 @@
 #include <cmath>
 #include <vector>
 #include <unordered_set>
+#include <mutex>
 
 // EnhancedSceneRenderer의 단독 메인 런타임 구현.
 //
@@ -241,6 +242,73 @@ namespace
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         std::string lastError;
+
+        // 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 수집은 매
+        // 프레임 되지 않으므로(리드백이 준비된 프레임에만) 마지막 성공분을
+        // 유지한다 — 비우면 창이 깜빡인다.
+        std::vector<DX12GpuProfiler::PassTiming> lastPassTimings;
+
+        // 렌더 디버그 창에 건네는 완성본. 창은 CE 렌더 스레드에서 그려지고
+        // 위의 상태는 전부 게임 스레드가 고치므로, 창이 상태를 직접 순회하면
+        // 재할당 중인 벡터·셋을 읽는다. 게임 스레드가 여기까지 완성해 두고
+        // 창은 락을 잡아 복사만 한다.
+        std::mutex                debugMutex;
+        EnhancedLiveDebugSnapshot debugSnapshot;
+
+        // 파이프라인 설정 창과 주고받는 패스 파라미터. debugSnapshot과 같은
+        // 뮤텍스로 보호한다 — 둘 다 같은 창이 같은 프레임에 만지므로 락을
+        // 나눌 이유가 없고, 나누면 순서 규칙만 하나 더 생긴다.
+        EnhancedLiveTuning        tuningMirror;     // 게임 스레드가 채우는 현재값
+        EnhancedLiveTuning        pendingTuning;    // 창이 넣는 변경 요청
+        bool                      hasPendingTuning{ false };
+
+        /// 게임 스레드에서만 부른다. 창이 넣어 둔 변경을 실제 패스에 적용하고,
+        /// 적용 후의 값을 미러에 되싣는다.
+        void ApplyAndPublishTuning();
+
+        /// 게임 스레드에서만 부른다. 위 상태를 debugSnapshot으로 옮긴다.
+        void PublishDebugSnapshot()
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+
+            debugSnapshot.enabled = enabled;
+            debugSnapshot.pipelineReady = (nullptr != pipeline);
+            debugSnapshot.width = pipeline ? pipeline->width : 0u;
+            debugSnapshot.height = pipeline ? pipeline->height : 0u;
+            debugSnapshot.framesRendered = framesRendered;
+            debugSnapshot.framesIdle = framesIdle;
+            debugSnapshot.framesInFlight = framesInFlight;
+            debugSnapshot.drawCount = lastDrawCount;
+            debugSnapshot.batchCount = lastBatchCount;
+            debugSnapshot.cpuMs = lastCpuMs;
+            debugSnapshot.gpuMs = lastGpuMs;
+            debugSnapshot.graveyardCount = graveyard.size();
+            debugSnapshot.lastError = lastError;
+
+            // 패스 목록은 크기가 같으면 이름이 그대로다(그래프 선언 순서가
+            // 프레임마다 바뀌지 않는다). 문자열 재할당을 피해 값만 갱신한다.
+            const size_t passCount = lastPassTimings.size();
+            if (debugSnapshot.passTimings.size() != passCount)
+            {
+                debugSnapshot.passTimings.assign(passCount, EnhancedLivePassTiming{});
+            }
+            for (size_t i = 0; i < passCount; ++i)
+            {
+                EnhancedLivePassTiming& target = debugSnapshot.passTimings[i];
+                if (target.name != lastPassTimings[i].name)
+                {
+                    target.name = lastPassTimings[i].name;
+                }
+                target.milliseconds = lastPassTimings[i].milliseconds;
+            }
+
+            // 검증 메시지는 처음 관측한 것만 쌓이므로 개수가 늘 때만 다시 만든다.
+            if (debugSnapshot.validationMessages.size() != reportedValidation.size())
+            {
+                debugSnapshot.validationMessages.assign(
+                    reportedValidation.begin(), reportedValidation.end());
+            }
+        }
 
         // ── 파이프라인 구축/해체 ──
 
@@ -831,6 +899,106 @@ namespace
         }
     };
 
+    void LiveState::ApplyAndPublishTuning()
+    {
+        // 파이프라인이 없으면 적용할 대상이 없다. 요청은 그대로 들고 있는다 —
+        // 리사이즈로 파이프라인이 재구축되는 사이에 들어온 변경을 버리면
+        // 사용자가 방금 움직인 슬라이더가 조용히 되돌아간다.
+        if (nullptr == pipeline) return;
+
+        LivePipeline& p = *pipeline;
+        std::lock_guard<std::mutex> lock(debugMutex);
+
+        if (hasPendingTuning)
+        {
+            {
+                EnhancedSSAOPass::Tuning tuning = p.ssao.GetTuning();
+                tuning.radius = pendingTuning.ssao.radius;
+                tuning.thickness = pendingTuning.ssao.thickness;
+                tuning.intensity = pendingTuning.ssao.intensity;
+                tuning.filterDepthSigma = pendingTuning.ssao.filterDepthSigma;
+                p.ssao.SetTuning(tuning);
+            }
+            {
+                EnhancedSSGIPass::Tuning tuning = p.ssgi.GetTuning();
+                tuning.traceDistance = pendingTuning.ssgi.traceDistance;
+                tuning.traceThickness = pendingTuning.ssgi.traceThickness;
+                tuning.accumDepthTolerance = pendingTuning.ssgi.accumDepthTolerance;
+                tuning.filterDepthSigma = pendingTuning.ssgi.filterDepthSigma;
+                tuning.filterNormalPower = pendingTuning.ssgi.filterNormalPower;
+                tuning.compositeDepthSigma = pendingTuning.ssgi.compositeDepthSigma;
+                tuning.intensity = pendingTuning.ssgi.intensity;
+                p.ssgi.SetTuning(tuning);
+            }
+            {
+                EnhancedPostChainPass::Tuning tuning = p.postChain.GetTuning();
+                tuning.bloomEnabled = pendingTuning.postChain.bloomEnabled;
+                tuning.bloomThreshold = pendingTuning.postChain.bloomThreshold;
+                tuning.bloomKnee = pendingTuning.postChain.bloomKnee;
+                tuning.bloomIntensity = pendingTuning.postChain.bloomIntensity;
+                tuning.toneMapEnabled = pendingTuning.postChain.toneMapEnabled;
+                tuning.toneMapper = (0 == pendingTuning.postChain.toneMapper)
+                    ? EnhancedPostChainPass::ToneMapper::ACES
+                    : EnhancedPostChainPass::ToneMapper::AgX;
+                tuning.exposure = pendingTuning.postChain.exposure;
+                tuning.vignetteEnabled = pendingTuning.postChain.vignetteEnabled;
+                tuning.vignetteRadius = pendingTuning.postChain.vignetteRadius;
+                tuning.vignetteSoftness = pendingTuning.postChain.vignetteSoftness;
+                tuning.gradingEnabled = pendingTuning.postChain.gradingEnabled;
+                tuning.saturation = pendingTuning.postChain.saturation;
+                tuning.contrast = pendingTuning.postChain.contrast;
+                tuning.fxaaEnabled = pendingTuning.postChain.fxaaEnabled;
+                tuning.fxaaBias = pendingTuning.postChain.fxaaBias;
+                tuning.fxaaBiasMin = pendingTuning.postChain.fxaaBiasMin;
+                tuning.fxaaSpanMax = pendingTuning.postChain.fxaaSpanMax;
+                p.postChain.SetTuning(tuning);
+            }
+            hasPendingTuning = false;
+        }
+
+        // 적용 후의 실제 값을 미러에 싣는다. 패스가 값을 보정하거나 다른
+        // 경로(환경변수 초기화 등)가 바꿨을 수 있으므로 요청값이 아니라
+        // 패스에서 되읽는다 — 창이 거짓 값을 보여주지 않게 하는 유일한 방법이다.
+        {
+            const EnhancedSSAOPass::Tuning& tuning = p.ssao.GetTuning();
+            tuningMirror.ssao.radius = tuning.radius;
+            tuningMirror.ssao.thickness = tuning.thickness;
+            tuningMirror.ssao.intensity = tuning.intensity;
+            tuningMirror.ssao.filterDepthSigma = tuning.filterDepthSigma;
+        }
+        {
+            const EnhancedSSGIPass::Tuning& tuning = p.ssgi.GetTuning();
+            tuningMirror.ssgi.traceDistance = tuning.traceDistance;
+            tuningMirror.ssgi.traceThickness = tuning.traceThickness;
+            tuningMirror.ssgi.accumDepthTolerance = tuning.accumDepthTolerance;
+            tuningMirror.ssgi.filterDepthSigma = tuning.filterDepthSigma;
+            tuningMirror.ssgi.filterNormalPower = tuning.filterNormalPower;
+            tuningMirror.ssgi.compositeDepthSigma = tuning.compositeDepthSigma;
+            tuningMirror.ssgi.intensity = tuning.intensity;
+        }
+        {
+            const EnhancedPostChainPass::Tuning& tuning = p.postChain.GetTuning();
+            tuningMirror.postChain.bloomEnabled = tuning.bloomEnabled;
+            tuningMirror.postChain.bloomThreshold = tuning.bloomThreshold;
+            tuningMirror.postChain.bloomKnee = tuning.bloomKnee;
+            tuningMirror.postChain.bloomIntensity = tuning.bloomIntensity;
+            tuningMirror.postChain.toneMapEnabled = tuning.toneMapEnabled;
+            tuningMirror.postChain.toneMapper =
+                (EnhancedPostChainPass::ToneMapper::ACES == tuning.toneMapper) ? 0 : 1;
+            tuningMirror.postChain.exposure = tuning.exposure;
+            tuningMirror.postChain.vignetteEnabled = tuning.vignetteEnabled;
+            tuningMirror.postChain.vignetteRadius = tuning.vignetteRadius;
+            tuningMirror.postChain.vignetteSoftness = tuning.vignetteSoftness;
+            tuningMirror.postChain.gradingEnabled = tuning.gradingEnabled;
+            tuningMirror.postChain.saturation = tuning.saturation;
+            tuningMirror.postChain.contrast = tuning.contrast;
+            tuningMirror.postChain.fxaaEnabled = tuning.fxaaEnabled;
+            tuningMirror.postChain.fxaaBias = tuning.fxaaBias;
+            tuningMirror.postChain.fxaaBiasMin = tuning.fxaaBiasMin;
+            tuningMirror.postChain.fxaaSpanMax = tuning.fxaaSpanMax;
+        }
+    }
+
     LiveState& GetLiveState()
     {
         static LiveState state;
@@ -981,6 +1149,17 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* renderCamera,
     bool sceneLoading)
 {
     LiveState& state = GetLiveState();
+
+    // 렌더 디버그 창이 읽을 값을 여기서 확정한다. 창은 CE 렌더 스레드에서
+    // 그려지므로 상태를 직접 순회하게 두면 이 함수가 고치는 중인 벡터를
+    // 읽는다. enabled 검사보다 앞에 두어 러너가 꺼져 있어도 창이 그 사실을
+    // 볼 수 있게 한다.
+    state.PublishDebugSnapshot();
+
+    // 창이 넣어 둔 패스 파라미터 변경을 여기서 적용한다. 프레임 입력을
+    // 밀봉하기 전이어야 이번 프레임부터 반영된다.
+    state.ApplyAndPublishTuning();
+
     if (!state.enabled) return;
 
     // SceneRenderer::CreateCommandListPass/EndOfFrame에서 이관한 프레임 입력
@@ -1031,6 +1210,10 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* renderCamera,
             if (p.profiler.Collect(timings, collectError))
             {
                 state.lastGpuMs = p.profiler.GetLastTotalMilliseconds();
+                // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
+                // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
+                // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
+                state.lastPassTimings = std::move(timings);
             }
             ++state.framesRendered;
         }
@@ -1155,6 +1338,30 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     std::string status = line;
     if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
     return status;
+}
+
+EnhancedLiveDebugSnapshot EnhancedSceneRenderer::GetLiveDebugSnapshot()
+{
+    // CE 렌더 스레드에서 불린다(헤더의 스레드 규약 참조). 상태를 직접 읽지
+    // 않고 게임 스레드가 완성해 둔 것을 락으로 복사만 한다.
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    return state.debugSnapshot;
+}
+
+EnhancedLiveTuning EnhancedSceneRenderer::GetLiveTuning()
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    return state.tuningMirror;
+}
+
+void EnhancedSceneRenderer::SetLiveTuning(const EnhancedLiveTuning& tuning)
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    state.pendingTuning = tuning;
+    state.hasPendingTuning = true;
 }
 
 void EnhancedSceneRenderer::ShutdownLive()

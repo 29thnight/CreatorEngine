@@ -17,6 +17,7 @@
 #include "ProgressWindow.h"
 #include "AssetBundleWindow.h"
 #include "ResourceCounterWindow.h"
+#include "EnhancedRenderDebugWindow.h"
 
 #include <memory>
 #include <future>
@@ -64,6 +65,9 @@ namespace DirectX11
 		std::unique_ptr<InspectorWindow> m_inspectorWindow;
 		std::unique_ptr<AssetBundleWindow> m_projectWindow;
 		std::unique_ptr<ResourceCounterWindow> m_resourceCounterWindow;
+		// "RenderPass" 컨텍스트의 소유자. 이 객체가 없으면 Settings >
+		// Pipeline Setting이 등록되지 않은 이름을 열어 아무 창도 뜨지 않는다.
+		std::unique_ptr<EnhancedRenderDebugWindow> m_renderDebugWindow;
 		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
         Core::DelegateHandle m_newSceneCreatedHandle;

@@ -3,11 +3,111 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 struct ID3D11ShaderResourceView;
 class Camera;
 class RenderScene;
 class Scene;
+
+/// 패스 하나의 GPU 시간. DX12GpuProfiler::PassTiming을 에디터로 옮기는 값
+/// 타입이다 — 그 헤더는 d3d12.h를 끌고 오므로 UI 계층에 노출하지 않는다.
+struct EnhancedLivePassTiming
+{
+    std::string name;
+    double      milliseconds{ 0.0 };
+};
+
+/// 파이프라인 설정 창이 조작하는 패스 파라미터의 미러.
+///
+/// 패스의 Tuning 구조체를 그대로 노출하지 않는 이유는 두 가지다. 그 헤더는
+/// d3d12.h를 끌고 오므로 에디터 계층에 새면 안 되고, 패스 인스턴스는
+/// LivePipeline이 소유해 게임 스레드가 매 프레임 만진다 — 창은 CE 렌더
+/// 스레드에서 그려지므로 직접 쓰면 경합이다.
+///
+/// 그래서 창은 이 값 타입으로 읽고 쓰고, 실제 SetTuning은 게임 스레드가
+/// TickLive에서 수행한다. 필드가 패스 Tuning과 중복되는 비용은 있지만,
+/// 그 대가로 스레드 경계가 한 곳(뮤텍스)에 모인다.
+///
+/// 여기 없는 패스는 조정 파라미터 자체가 없거나(GBuffer·Deferred·Shadow·
+/// SkyBox·Forward·Grid·Gizmo 계열) 아직 라이브 그래프에 배선되지 않은
+/// 것이다(SSR·VolumetricFog·SSS — Tuning은 있으나 LivePipeline이 들지 않는다).
+struct EnhancedLiveTuning
+{
+    struct Ssao
+    {
+        float radius{ 0.5f };
+        float thickness{ 0.25f };
+        float intensity{ 1.f };
+        float filterDepthSigma{ 0.05f };
+    } ssao;
+
+    struct Ssgi
+    {
+        float traceDistance{ 8.f };
+        float traceThickness{ 0.5f };
+        float accumDepthTolerance{ 0.01f };
+        float filterDepthSigma{ 0.01f };
+        float filterNormalPower{ 16.f };
+        float compositeDepthSigma{ 0.01f };
+        float intensity{ 1.f };
+    } ssgi;
+
+    struct PostChain
+    {
+        bool  bloomEnabled{ true };
+        float bloomThreshold{ 1.f };
+        float bloomKnee{ 0.5f };
+        float bloomIntensity{ 0.05f };
+
+        bool  toneMapEnabled{ true };
+        /// EnhancedPostChainPass::ToneMapper와 같은 값(0=ACES, 1=AgX).
+        int   toneMapper{ 1 };
+        float exposure{ 1.f };
+
+        bool  vignetteEnabled{ true };
+        float vignetteRadius{ 0.75f };
+        float vignetteSoftness{ 0.5f };
+
+        bool  gradingEnabled{ true };
+        float saturation{ 1.f };
+        float contrast{ 1.f };
+
+        bool  fxaaEnabled{ true };
+        float fxaaBias{ 0.688f };
+        float fxaaBiasMin{ 0.021f };
+        float fxaaSpanMax{ 8.f };
+    } postChain;
+};
+
+/// 렌더 디버그 창이 읽는 상시 러너의 한 시점 스냅샷.
+///
+/// 포인터가 아니라 값으로 옮기는 이유: 창은 내부 상태의 수명이나 갱신
+/// 시점을 모른다. 파이프라인은 리사이즈마다 통째로 다시 서고 패스 타이밍
+/// 벡터는 프레임마다 교체되므로, 내부를 가리키게 하면 창이 언제든 사라진
+/// 것을 읽게 된다.
+struct EnhancedLiveDebugSnapshot
+{
+    bool     enabled{ false };
+    bool     pipelineReady{ false };
+    uint32_t width{ 0 };
+    uint32_t height{ 0 };
+    uint64_t framesRendered{ 0 };
+    uint64_t framesIdle{ 0 };
+    uint64_t framesInFlight{ 0 };
+    uint32_t drawCount{ 0 };
+    uint32_t batchCount{ 0 };
+    double   cpuMs{ 0.0 };
+    double   gpuMs{ 0.0 };
+    size_t   graveyardCount{ 0 };
+    std::string lastError;
+
+    /// 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 선언 순서 그대로다.
+    std::vector<EnhancedLivePassTiming> passTimings;
+
+    /// 지금까지 처음 관측한 D3D12 검증 레이어 메시지(Debug 빌드에서만 쌓인다).
+    std::vector<std::string> validationMessages;
+};
 
 // CreatorEngine의 단독 DX12 씬 렌더러. Run* 진단 표면과 메인 런타임을 함께
 // 제공하며, 기존 SceneRenderer(DX11)는 메인 배선에서 제거된 dead code다.
@@ -408,6 +508,30 @@ public:
 
     /// 상태 한 줄 요약(dx12.live status).
     static std::string GetLiveStatus();
+
+    /// 렌더 디버그 창용 스냅샷. GetLiveStatus가 콘솔 한 줄로 뭉개는 것을
+    /// 항목별로 돌려주고, 패스별 GPU 시간과 검증 메시지를 함께 싣는다.
+    ///
+    /// 이 함수만은 다른 Live API와 스레드 규약이 다르다 — ImGui 그리기는
+    /// 게임 스레드가 아니라 CE 렌더 스레드에서 돌기 때문이다(Dx11Main의
+    /// ExecuteRenderPass → GUIRendering). GetLiveDisplaySrv가 그 자리에서
+    /// 안전한 것은 포인터 하나를 읽어 찢어질 것이 없어서이고, 상태의 벡터와
+    /// 셋을 순회하는 것은 전혀 다른 문제다 — 게임 스레드가 그것들을 매
+    /// 프레임 교체하므로 순회 중 재할당을 만나면 해제된 메모리를 읽는다.
+    ///
+    /// 그래서 스냅샷은 게임 스레드가 TickLive에서 미리 완성해 두고, 이
+    /// 함수는 락을 잡고 그 완성본을 복사만 한다. 값은 한 프레임 늦을 수
+    /// 있지만 디버그 HUD에는 문제되지 않는다.
+    static EnhancedLiveDebugSnapshot GetLiveDebugSnapshot();
+
+    /// 현재 패스 파라미터. 파이프라인이 아직 없으면 기본값을 돌려준다.
+    /// GetLiveDebugSnapshot과 같은 스레드 규약(락으로 복사)이다.
+    static EnhancedLiveTuning GetLiveTuning();
+
+    /// 패스 파라미터 변경을 요청한다. 실제 SetTuning은 다음 TickLive에서
+    /// 게임 스레드가 수행한다 — 창이 패스를 직접 만지지 않는 이유는
+    /// EnhancedLiveTuning 주석 참조.
+    static void SetLiveTuning(const EnhancedLiveTuning& tuning);
 
     /// 최종 정리. 렌더 스레드 join 이후에만 부른다.
     static void ShutdownLive();

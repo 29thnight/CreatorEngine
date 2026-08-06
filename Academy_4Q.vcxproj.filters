@@ -137,6 +137,9 @@
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
@@ -197,6 +200,7 @@
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EngineEntry\Academy_4Q.rc">
