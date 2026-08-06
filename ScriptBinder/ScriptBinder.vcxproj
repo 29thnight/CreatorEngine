@@ -246,6 +246,8 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="RenderSceneBridge.cpp" />
+    <ClCompile Include="UIProxyBridge.cpp" />
     <ClCompile Include="PrimitiveProxyBridge.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="AIManager.cpp" />

@@ -197,6 +197,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="RenderSceneBridge.cpp" />
+    <ClCompile Include="UIProxyBridge.cpp" />
     <ClCompile Include="PrimitiveProxyBridge.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="Scene.cpp">

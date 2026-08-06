@@ -1,4 +1,6 @@
 #include "WireFramePass.h"
+#include "Animator.h"
+#include "MeshRenderer.h"
 #include "RHI/RHI.h"
 #include "GameObject.h"
 #include "Scene.h"
