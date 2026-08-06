@@ -63,11 +63,13 @@ struct EnhancedLiveTuning
         bool  toneMapEnabled{ true };
         /// EnhancedPostChainPass::ToneMapper와 같은 값(0=ACES, 1=AgX).
         int   toneMapper{ 1 };
-        float exposure{ 1.f };
+        float exposure{ 0.7f };
 
         bool  vignetteEnabled{ true };
         float vignetteRadius{ 0.75f };
         float vignetteSoftness{ 0.5f };
+        /// 감광 상한(0=무효과, 1=완전 감광). 기본은 코너 30% 감광.
+        float vignetteIntensity{ 0.3f };
 
         bool  gradingEnabled{ true };
         float saturation{ 1.f };

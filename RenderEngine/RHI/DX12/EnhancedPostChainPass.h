@@ -143,12 +143,19 @@ public:
         ToneMapper toneMapper{ ToneMapper::AgX };
         /// 노출. 기존은 조리개·셔터·ISO로 계산하는데, 그 세 값이 하는 일은
         /// 결국 이 배율 하나다. 자동 노출이 붙기 전까지는 이것만 둔다.
-        float exposure{ 1.f };
+        /// 기본 0.7 — 1.0은 puresky 계열 HDR에서 하늘이 통째로 날아갔다
+        /// (2026-08-07 그림 비교로 정함).
+        float exposure{ 0.7f };
 
         // ── 비네트 ──
         bool  vignetteEnabled{ true };
         float vignetteRadius{ 0.75f };
         float vignetteSoftness{ 0.5f };
+        /// 감광의 상한. smoothstep 결과 v가 0(완전 검정)까지 떨어져도
+        /// 실제 감광은 lerp(1, v, intensity)로 묶인다 — 0.3이면 코너가
+        /// 최대 30% 어두워진다. 기존(=1.0 상당)은 가장자리 중간에서 이미
+        /// 84% 감광이라 터널처럼 보였다(2026-08-07 그림 비교로 정함).
+        float vignetteIntensity{ 0.3f };
 
         // ── 컬러 그레이딩 ──
         /// LUT 텍스처가 붙기 전까지는 채도·대비만 둔다. LUT는 텍스처

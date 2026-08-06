@@ -959,6 +959,7 @@ namespace
                 tuning.vignetteEnabled = pendingTuning.postChain.vignetteEnabled;
                 tuning.vignetteRadius = pendingTuning.postChain.vignetteRadius;
                 tuning.vignetteSoftness = pendingTuning.postChain.vignetteSoftness;
+                tuning.vignetteIntensity = pendingTuning.postChain.vignetteIntensity;
                 tuning.gradingEnabled = pendingTuning.postChain.gradingEnabled;
                 tuning.saturation = pendingTuning.postChain.saturation;
                 tuning.contrast = pendingTuning.postChain.contrast;
@@ -1004,6 +1005,7 @@ namespace
             tuningMirror.postChain.vignetteEnabled = tuning.vignetteEnabled;
             tuningMirror.postChain.vignetteRadius = tuning.vignetteRadius;
             tuningMirror.postChain.vignetteSoftness = tuning.vignetteSoftness;
+            tuningMirror.postChain.vignetteIntensity = tuning.vignetteIntensity;
             tuningMirror.postChain.gradingEnabled = tuning.gradingEnabled;
             tuningMirror.postChain.saturation = tuning.saturation;
             tuningMirror.postChain.contrast = tuning.contrast;
@@ -1059,7 +1061,7 @@ bool EnhancedSceneRenderer::InitializeRuntime(std::string& outError)
         desc.m_textureHeight = 2048;
 
         state.skyBoxPath =
-            PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string();
+            PathFinder::Relative("HDR\\kloofendal_43d_clear_puresky_4k.hdr").string();
         state.skyEquirect.reset();
         state.skyBoxDirty = true;
         state.runtimeInitialized = true;

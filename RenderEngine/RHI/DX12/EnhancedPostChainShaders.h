@@ -30,6 +30,9 @@ cbuffer PostParams : register(b0)
     float  gFxaaBiasMin;
     float  gFxaaSpanMax;
     uint   gFlags;        // 1 블룸 · 2 톤맵 · 4 비네트 · 8 그레이딩
+
+    float  gVignetteIntensity;   // 감광 상한(0=무효과, 1=기존 완전 감광)
+    float3 gPostPadding;         // CPU PostParams 꼬리 패딩과 짝
 };
 
 // 선형 샘플러. FXAA가 소수 좌표를 읽어야 해서 필요하다 —
@@ -300,13 +303,17 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     }
 
     // ③ 비네트 — 화면 중심에서 멀수록 어둡게.
+    //
+    // v는 radius+softness에서 0(완전 검정)까지 떨어지므로 그대로 곱하면
+    // 코너가 반드시 검게 죽는다. intensity로 감광의 바닥을 들어 올린다 —
+    // 0.3이면 v=0인 코너도 70% 밝기를 유지한다.
     if (0 != (gFlags & kFlagVignette))
     {
         const float2 uv = (float2(id.xy) + 0.5f) / float2(gDstSize);
         const float dist = length(uv - 0.5f) * 2.0f;
         const float v = smoothstep(gVignetteRadius + gVignetteSoftness,
             gVignetteRadius - gVignetteSoftness, dist);
-        color *= v;
+        color *= lerp(1.0f, v, gVignetteIntensity);
     }
 
     // ④ 그레이딩 — 채도·대비.

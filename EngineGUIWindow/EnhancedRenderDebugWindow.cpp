@@ -289,6 +289,7 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 			changed |= ImGui::Checkbox("Enabled##vignette", &post.vignetteEnabled);
 			changed |= ImGui::SliderFloat("Radius##vignette", &post.vignetteRadius, 0.f, 2.f);
 			changed |= ImGui::SliderFloat("Softness##vignette", &post.vignetteSoftness, 0.f, 2.f);
+			changed |= ImGui::SliderFloat("Intensity##vignette", &post.vignetteIntensity, 0.f, 1.f);
 			ImGui::TreePop();
 		}
 

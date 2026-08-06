@@ -58,6 +58,13 @@ namespace
         float    fxaaBiasMin{ 0.f };
         float    fxaaSpanMax{ 0.f };
         uint32_t flags{ 0 };
+
+        // 뒤에 붙인 이유: 중간에 끼우면 HLSL cbuffer의 레지스터 배치가
+        // 전부 밀린다. 추가는 항상 꼬리에, 16바이트 정렬을 채워서.
+        float vignetteIntensity{ 0.f };
+        float padding0{ 0.f };
+        float padding1{ 0.f };
+        float padding2{ 0.f };
     };
 
     constexpr uint32_t kFlagBloom = 1u;
@@ -226,6 +233,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         params.exposure = m_tuning.exposure;
         params.vignetteRadius = m_tuning.vignetteRadius;
         params.vignetteSoftness = m_tuning.vignetteSoftness;
+        params.vignetteIntensity = m_tuning.vignetteIntensity;
         params.saturation = m_tuning.saturation;
         params.contrast = m_tuning.contrast;
         params.fxaaBias = m_tuning.fxaaBias;

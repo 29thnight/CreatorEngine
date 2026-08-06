@@ -41,7 +41,7 @@ struct RenderPassSettings
     [[Property]]
     BitMaskPassSetting      bitMask{};
     [[Property]]
-    std::string             skyboxTextureName{ "rosendal_park_sunset_puresky_4k.hdr" };
+    std::string             skyboxTextureName{ "kloofendal_43d_clear_puresky_4k.hdr" };
     [[Property]]
 	bool                    m_isSkyboxEnabled{ true };
     [[Property]]
