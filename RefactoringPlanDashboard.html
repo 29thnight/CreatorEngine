@@ -764,7 +764,7 @@ const TASKS = [
   // ---------- PHASE 4: 구조적 커플링 제거 ----------
   { phase: 4, id: "4-1", title: "렌더-게임플레이 인터페이스 계층 설계",
     detail: "RenderEngine이 필요로 하는 ScriptBinder 개념(GameObject/컴포넌트 데이터)을 순수 인터페이스/POD 스냅샷으로 추출 — 프록시 계층이 이미 존재하므로 이를 공식 경계로 승격.",
-    refs: "3장 커플링", priority: "P1", days: 3, status: "todo", note: "" },
+    refs: "3장 커플링", priority: "P1", days: 3, status: "done", note: "실측 기반 설계 확정(Phase4CouplingPlan.md): 경계 원칙 = RenderEngine→ScriptBinder 금지 · 역방향 허용(당분간) · 공식 데이터 경계는 프록시/스냅샷(3-9의 CaptureLiveFrame이 증명). 실측 55파일·154간선을 4카테고리로 분류 — A 죽은 include(32간선+고아 2파일: Transform.cpp는 어느 vcxproj에도 안 물린 낡은 사본, PremitiveRenderProxy.h는 아무도 include 안 함) · B 렌더 데이터 헤더 소속 정정(LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType → RenderEngine/Interfaces/, vcxproj에 경로 기등록돼 있던 자리) · C 행위 커플링(프록시 생성 지점→게임플레이 측 어댑터로, 씬 질의→스냅샷 뒤로, 애니메이션 잡→게임플레이로, ModelLoader 물리 부착→콜백 역전) · D 검증 절차. MetaGenerator는 리포 전체 재귀 스캔이라 헤더 이동에 안전함을 확인." },
   { phase: 4, id: "4-2", title: "RenderEngine → ScriptBinder include 절단",
     detail: "RenderScene 등 ScriptBinder 헤더 직접 include 지점을 인터페이스 참조로 교체. include 그래프 검사 스크립트 작성 → CI 게이트 등록.",
     refs: "3장 커플링", priority: "P1", days: 5, status: "todo", note: "" },

@@ -27,6 +27,22 @@ concurrency:
 
 jobs:
   # vcpkg가 필요 없는 빠른 검증. 몇 분 안에 피드백을 준다.
+  include-boundary:
+    name: include 경계 검사 (PHASE 4-2)
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: RenderEngine -> ScriptBinder 경계 검사
+        shell: pwsh
+        run: |
+          # 허용 목록(래칫)에 없는 새 include 간선이 생기면 실패한다.
+          python scripts/check_include_boundary.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "include 경계 위반 (exit code $LASTEXITCODE)"
+          }
+
   codegen:
     name: 리플렉션 코드 생성 검증
     runs-on: windows-2022
