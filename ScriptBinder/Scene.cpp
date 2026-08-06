@@ -467,10 +467,60 @@ void Scene::CullMeshData()
 
     auto renderScene = SceneManagers->GetRenderScene();
 
+    // ── 1단계: 렌더 프록시 갱신 (카메라와 무관) ──
+    //
+    // UpdateCommand는 카메라를 보지 않는다. 그런데 예전에는 이 호출들이 아래
+    // 카메라 루프 안에 있어서 두 가지가 어긋나 있었다.
+    //
+    //   · 카메라가 N개면 같은 프록시를 N번 갱신했다.
+    //   · 더 심각하게, 루프 머리의 RenderPassData 검사가 실패하면 continue가
+    //     아니라 return이라 함수를 통째로 빠져나갔다. RenderPassData는 DX11
+    //     SceneRenderer가 카메라마다 만들던 것이어서 DX12 단독 전환 뒤로는 늘
+    //     비어 있었고, 그래서 갱신이 한 번도 실행되지 않았다 — 본 팔레트와
+    //     월드 행렬이 프록시에 영영 도달하지 못해 스키닝 모델이 첫 포즈로
+    //     굳었던 원인이다.
+    //
+    // 카메라와 무관한 일이므로 루프 밖에서 한 번만 돈다.
+    //
+    // 스레드풀에 넣지 않는다. ProxyCommand 생성자들이 RenderScene의 프록시·
+    // 애니메이터 맵을 만지는데 그 락 규약은 아직 전수 검증되지 않았다(구조
+    // 분석의 CRITICAL ①). 병렬화는 프로파일이 요구할 때 별도로 다룬다.
+    if (nullptr != renderScene)
+    {
+        const auto updateProxies = [&](auto& components, const char* label)
+        {
+            for (auto* component : components)
+            {
+                if (nullptr == component) continue;
+                try
+                {
+                    renderScene->UpdateCommand(component);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Error updating " << label << " command: " << e.what() << '\n';
+                }
+            }
+        };
+
+        updateProxies(allMeshes, "mesh");
+        updateProxies(terrainComponents, "terrain");
+        updateProxies(foliageComponents, "foliage");
+        updateProxies(decalComponents, "decal");
+        updateProxies(spriteRenderers, "sprite");
+        updateProxies(imageComponents, "image");
+        updateProxies(textComponents, "text");
+        updateProxies(spriteSheetComponents, "spriteSheet");
+    }
+
+    // ── 2단계: 카메라별 컬링 / 렌더패스 데이터 ──
+    //
+    // 여기서는 continue를 쓴다. 카메라 하나에 RenderPassData가 없다고 나머지
+    // 카메라까지 건너뛸 이유가 없다.
     for (auto camera : CameraManagement->GetCameras())
     {
-        if (!camera) return;
-        if (!RenderPassData::VaildCheck(camera.get())) return;
+        if (!camera) continue;
+        if (!RenderPassData::VaildCheck(camera.get())) continue;
         auto data = RenderPassData::GetData(camera.get());
 
         std::vector<std::shared_ptr<MeshRenderer>> visibleMeshes;
@@ -489,14 +539,6 @@ void Scene::CullMeshData()
             for (auto& mesh : allMeshes)
             {
                 if (!mesh) continue;
-                try
-                {
-                    renderScene->UpdateCommand(mesh);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating mesh command: " << e.what() << '\n';
-                }
 
                 if (mesh->IsDestroyMark() ||
                     false == mesh->IsEnabled() ||
@@ -537,15 +579,6 @@ void Scene::CullMeshData()
         {
             for (auto& terrainComponent : terrainComponents)
             {
-                try
-                {
-                    renderScene->UpdateCommand(terrainComponent);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating terrain command: " << e.what() << std::endl;
-                }
-
                 if (false == terrainComponent->IsEnabled() || false == terrainComponent->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(terrainComponent->GetInstanceID());
@@ -556,15 +589,6 @@ void Scene::CullMeshData()
         {
             for (auto& foliageComponent : foliageComponents)
             {
-                try
-                {
-                    renderScene->UpdateCommand(foliageComponent);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating foliage command: " << e.what() << std::endl;
-                }
-
                 if (false == foliageComponent->IsEnabled() || false == foliageComponent->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(foliageComponent->GetInstanceID());
@@ -575,15 +599,6 @@ void Scene::CullMeshData()
         {
             for (auto& decalComponent : decalComponents)
             {
-                try
-                {
-                    renderScene->UpdateCommand(decalComponent);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating decal command: " << e.what() << std::endl;
-                }
-
                 if (false == decalComponent->IsEnabled() || false == decalComponent->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(decalComponent->GetInstanceID());
@@ -594,15 +609,6 @@ void Scene::CullMeshData()
         {
             for (auto& sprite : spriteRenderers)
             {
-                try
-                {
-                    renderScene->UpdateCommand(sprite);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating sprite command: " << e.what() << std::endl;
-                }
-
                 if (false == sprite->IsEnabled() || false == sprite->GetOwner()->IsEnabled()) continue;
 
                 data->PushCullData(sprite->GetInstanceID());
@@ -614,15 +620,6 @@ void Scene::CullMeshData()
         {
             for (auto& image : imageComponents)
             {
-                try
-                {
-                    renderScene->UpdateCommand(image);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating image command: " << e.what() << std::endl;
-                }
-
                 if (false == image->IsEnabled() || false == image->GetOwner()->IsEnabled()) continue;
 
                 auto owner = image->GetOwner();
@@ -645,15 +642,6 @@ void Scene::CullMeshData()
         {
             for (auto& text : textComponents)
             {
-                try
-                {
-                    renderScene->UpdateCommand(text);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating text command: " << e.what() << std::endl;
-                }
-
                 if (false == text->IsEnabled() || false == text->GetOwner()->IsEnabled()) continue;
 
                 auto owner = text->GetOwner();
@@ -673,15 +661,6 @@ void Scene::CullMeshData()
         {
             for (auto& spriteSheet : spriteSheetComponents)
             {
-                try
-                {
-                    renderScene->UpdateCommand(spriteSheet);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << "Error updating sprite command: " << e.what() << std::endl;
-                }
-
                 if (spriteSheet->IsDestroyMark() || false == spriteSheet->IsEnabled() || false == spriteSheet->GetOwner()->IsEnabled()) continue;
                 auto owner = spriteSheet->GetOwner();
                 if (nullptr == owner) continue;
