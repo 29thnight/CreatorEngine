@@ -103,8 +103,8 @@ bool EngineSetting::LoadSettings()
 	if (rootNode["renderPassSettings"])
 		Meta::Deserialize(&m_renderPassSettings, rootNode["renderPassSettings"]);
 
-	if (rootNode["renderBackendDx12"])
-		m_useDx12Backend = rootNode["renderBackendDx12"].as<bool>();
+	// 구 설정의 false는 더 이상 백엔드 선택 의미가 없다.
+	m_useDx12Backend = true;
 
 	if (rootNode["imguiBackendDx12"])
 		m_useDx12ImGuiShell = rootNode["imguiBackendDx12"].as<bool>();

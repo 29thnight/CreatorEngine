@@ -1,5 +1,4 @@
 #include "HierarchyWindow.h"
-#include "SceneRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
@@ -7,6 +6,7 @@
 #include "Model.h"
 #include "LightComponent.h"
 #include "ImageComponent.h"
+#include "TextComponent.h"
 #include "CameraComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
@@ -21,8 +21,7 @@
 #include "MetaStateCommand.h"
 #include "ReflectionRegister.h"
 
-HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
-	m_sceneRenderer(ptr)
+HierarchyWindow::HierarchyWindow()
 {
 	ImGui::ContextRegister(ICON_FA_BARS_STAGGERED "  Hierarchy", [&]()
 		{
@@ -48,10 +47,10 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				return;
 			}
 
-			if (m_sceneRenderer)
+			scene = SceneManagers->GetActiveScene();
+			renderScene = SceneManagers->GetRenderScene();
+			if (scene && renderScene)
 			{
-				scene = SceneManagers->GetActiveScene();
-				renderScene = m_sceneRenderer->m_renderScene.get();
 				selectedSceneObject = scene->m_selectedSceneObject;
 
 				if (ImGui::IsWindowFocused())
@@ -356,7 +355,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				ImGui::EndDragDropTarget();
 			}
 
-			if (m_sceneRenderer)
+			if (scene && renderScene)
 			{
 				std::string SceneIcon{};
 				if (0 != scene->m_SceneObjects.size())

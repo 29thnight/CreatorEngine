@@ -1,4 +1,7 @@
 #pragma once
+// LEGACY DEAD CODE: Academy_4Q 메인 런타임은 이 DX11 씬 렌더러를 생성하거나
+// 호출하지 않는다. 이 파일은 과거 구현과 격리된 진단 코드의 빌드 호환용이다.
+// 신규 런타임 기능은 RHI/DX12/EnhancedSceneRenderer에 구현한다.
 #include "Core.Minimal.h"
 #ifndef DYNAMICCPP_EXPORTS //PassData
 #include "DeviceResources.h"

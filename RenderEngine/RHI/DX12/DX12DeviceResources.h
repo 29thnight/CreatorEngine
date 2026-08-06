@@ -115,6 +115,10 @@ public:
     // 대신 outMessages에는 등급을 붙여 전부 담는다 — 세지 않는 것과 감추는 것은 다르다.
     uint32_t DrainDebugMessages(std::string& outMessages);
 
+    /// 장치 제거가 감지되었을 때 DRED breadcrumb와 page-fault 정보를 붙인다.
+    /// operationResult가 일반 실패이고 장치는 살아 있으면 아무것도 추가하지 않는다.
+    void AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const;
+
     ID3D12Device* GetDevice() const { return m_device.Get(); }
 
     // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).

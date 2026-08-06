@@ -3,6 +3,7 @@
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "RHI/RHI.h"
+#include "RHI/DX11RHI.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "RHI/DX12/ImGuiDx12Shell.h"
 #include "RHI/ScreenSizedResource.h"
@@ -26,6 +27,11 @@
 #include "TagManager.h"
 #include "AIManager.h"
 #include "EffectProxyController.h"
+#include "DeviceState.h"
+#include "GameObject.h"
+#include "Scene.h"
+#include "CameraComponent.h"
+#include "LightComponent.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
@@ -75,18 +81,53 @@ void DirectX11::Dx11Main::Initialize()
     TagManagers->Initialize();
 
     BootProgress::Step(L"Creating Renderers...");
-    m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
+    InitializeDeviceState();
+    ShaderSystem->Initialize();
+
+    std::string enhancedError;
+    if (!EnhancedSceneRenderer::InitializeRuntime(enhancedError))
+    {
+        throw std::runtime_error(enhancedError);
+    }
+    SceneManagers->SetRenderScene(EnhancedSceneRenderer::GetRenderScene());
+    EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
+
+    // 기본 씬 저작 정책은 렌더 패스 소유권과 분리해 엔트리 계층에 둔다.
+    // EnhancedRenderer의 이벤트는 같은 시점에 RenderScene만 갱신한다.
+    m_newSceneCreatedHandle = newSceneCreatedEvent.AddLambda([]()
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene) return;
+
+        EnhancedSceneRenderer::SetActiveScene(scene);
+
+        scene->CreateGameObject("Main Camera", GameObjectType::Camera)
+            ->AddComponent<CameraComponent>();
+        auto lightObject =
+            scene->CreateGameObject("Directional Light", GameObjectType::Light);
+        lightObject->SetTag("MainCamera");
+        auto light = lightObject->AddComponent<LightComponent>();
+        light->m_lightStatus = LightStatus::StaticShadows;
+    });
+    m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda([]()
+    {
+        EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
+    });
+
+    EffectManagers->Initialize();
+
     m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 #ifdef EDITOR
-    m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
-    m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-    m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-    m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
-    m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
-    m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
-    m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
+    m_gizmoRenderer = std::make_shared<GizmoRenderer>(
+        EnhancedSceneRenderer::GetRenderScene(), EnhancedSceneRenderer::GetEditorCamera());
+    m_sceneViewWindow = std::make_unique<SceneViewWindow>(
+        EnhancedSceneRenderer::GetEditorCamera(), m_gizmoRenderer.get());
+    m_menuBarWindow = std::make_unique<MenuBarWindow>();
+    m_gameViewWindow = std::make_unique<GameViewWindow>();
+    m_hierarchyWindow = std::make_unique<HierarchyWindow>();
+    m_inspectorWindow = std::make_unique<InspectorWindow>();
     m_projectWindow = std::make_unique<AssetBundleWindow>();
-    m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>(m_sceneRenderer.get());
+    m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>();
 #endif // !EDITOR
 
     BootProgress::Step(L"Script Building...");
@@ -120,25 +161,9 @@ void DirectX11::Dx11Main::Initialize()
         UIManagers->Update();
         Sound->update();
     });
-    m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
-    {
-        m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
-        m_sceneRenderer->SceneRendering();
-    });
-
-    m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
-    {
-        m_gizmoRenderer->OnDrawGizmos();
-    });
-
     m_GUIRenderingEventHandle = GUIRenderingEvent.AddLambda([&]()
     {
         OnGui();
-    });
-
-    m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]()
-    {
-        m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
     });
 
     BootProgress::Step(L"Initializing Managers...");
@@ -275,17 +300,15 @@ void DirectX11::Dx11Main::Finalize()
     EngineSettingInstance->SaveSettings();
     std::printf("[SHUTDOWN] SaveSettings 반환\n");
 
-    // DX12 상시 러너의 최종 정리. 렌더 스레드 join 후·DX11 디바이스 해체 전 —
-    // 묘지의 DX11 SRV/공유 텍스처를 놓을 수 있는 유일하게 안전한 자리다
-    // (EnhancedSceneRenderer.h의 Live 수명 규약 참조).
+    // 메인 DX12 렌더러의 최종 정리. 렌더 스레드 join 후·DX11 셸 디바이스
+    // 해체 전이어야 공유 SRV와 런타임 RenderScene을 안전하게 놓을 수 있다.
     EnhancedSceneRenderer::ShutdownLive();
-    std::printf("[SHUTDOWN] DX12 LiveRenderer 반환\n");
-
-    m_sceneRenderer->Finalize();
-    std::printf("[SHUTDOWN] SceneRenderer 반환\n");
+    SceneManagers->SetRenderScene(nullptr);
+    std::printf("[SHUTDOWN] EnhancedRenderer 반환\n");
 
     ShaderSystem->Finalize();
     std::printf("[SHUTDOWN] ShaderSystem 반환\n");
+    ShutdownDeviceState();
     OnResizeReleaseEvent.Clear();
 	OnResizeEvent.Clear();
     m_deviceResources->RegisterDeviceNotify(nullptr);
@@ -320,7 +343,6 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
     ScreenResizeBus::Get().BroadcastResize(
         static_cast<uint32_t>(size.width), static_cast<uint32_t>(size.height));
 
-    m_sceneRenderer->ReApplyCurrCubeMap();
 }
  
 void DirectX11::Dx11Main::TickScripts(float deltaTime)
@@ -411,11 +433,6 @@ void DirectX11::Dx11Main::Update()
         m_gizmoRenderer->SetWireFrame();
 	}
 
-	if (InputManagement->IsKeyDown(VK_F10))
-    {
-		m_sceneRenderer->SetLightmapPass();
-	}
- 
 	if (InputManagement->IsKeyReleased(VK_F9)) 
 	{
 		Physics->ConnectPVD();
@@ -486,7 +503,7 @@ void DirectX11::Dx11Main::InfoWindow()
         << L" FrameCount: "
         << Time->GetFrameCount()
         // 활성 백엔드 이름 — 교체 스위치(3-9)가 생기면 이 표기가 곧 확인 수단이 된다.
-        << "<" << (RHI::IsInitialized() ? RHI::Device().GetName() : "??") << ">";
+        << "<EnhancedRenderer/DX12>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 }
@@ -534,8 +551,8 @@ void DirectX11::Dx11Main::CommandBuildThread()
         return;
     }
 
-    //RHICommandFence.Begin();
-    m_sceneRenderer->CreateCommandListPass();
+    // SceneRenderer(DX11)의 커맨드 빌드는 제거됐다. 이 스레드는 기존
+    // 3자 렌더 배리어의 참가자 수를 유지하는 동기화 역할만 한다.
     PROFILE_CPU_END();
     //RHICommandFence.Wait();
     //RenderCommandFence.Signal();
@@ -559,6 +576,76 @@ void DirectX11::Dx11Main::CommandExecuteThread()
     //RHICommandFence.Signal();
     EngineSettingInstance->renderBarrier.ArriveAndWait(0, BarrierRole::CommandExecute);
     EngineSettingInstance->renderBarrier.ArriveAndWait(1, BarrierRole::CommandExecute);
+}
+
+void DirectX11::Dx11Main::InitializeDeviceState()
+{
+    // DX11 디바이스는 씬 렌더러가 아니라 에디터 ImGui 셸과 기존 Texture
+    // 자산의 호환 브리지다. 전역 상태 설정을 SceneRenderer에서 부트스트랩으로
+    // 옮겨 그 객체를 생성하지 않아도 셸이 정상 동작하게 한다.
+    if (!RHI::IsInitialized())
+    {
+        RHI::Initialize(std::make_unique<DX11RHIDevice>());
+    }
+
+    const auto refresh = [this]()
+    {
+        DirectX11::DeviceStates->g_pDevice = m_deviceResources->GetD3DDevice();
+        DirectX11::DeviceStates->g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
+        DirectX11::DeviceStates->g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
+        DirectX11::DeviceStates->g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
+        DirectX11::DeviceStates->g_pRasterizerState = m_deviceResources->GetRasterizerState();
+        DirectX11::DeviceStates->g_pBlendState = m_deviceResources->GetBlendState();
+        DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
+        DirectX11::DeviceStates->g_fullsizeViewport = m_deviceResources->GetScreenViewport();
+        DirectX11::DeviceStates->g_backBufferRTV =
+            m_deviceResources->GetBackBufferRenderTargetView();
+        DirectX11::DeviceStates->g_depthStancilSRV =
+            m_deviceResources->GetDepthStencilViewSRV();
+        DirectX11::DeviceStates->g_ClientRect = m_deviceResources->GetOutputSize();
+        DirectX11::DeviceStates->g_aspectRatio = m_deviceResources->GetAspectRatio();
+        DirectX11::DeviceStates->g_annotation = m_deviceResources->GetAnnotation();
+    };
+
+    refresh();
+    ScreenResizeBus::Get().SetSize(
+        static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.width),
+        static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.height));
+
+    m_resizeEventHandle = OnResizeEvent.AddLambda([this](uint32_t, uint32_t)
+    {
+        DirectX11::DeviceStates->g_pDevice = m_deviceResources->GetD3DDevice();
+        DirectX11::DeviceStates->g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
+        DirectX11::DeviceStates->g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
+        DirectX11::DeviceStates->g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
+        DirectX11::DeviceStates->g_pRasterizerState = m_deviceResources->GetRasterizerState();
+        DirectX11::DeviceStates->g_pBlendState = m_deviceResources->GetBlendState();
+        DirectX11::DeviceStates->g_Viewport = m_deviceResources->GetScreenViewport();
+        DirectX11::DeviceStates->g_fullsizeViewport = m_deviceResources->GetScreenViewport();
+        DirectX11::DeviceStates->g_backBufferRTV =
+            m_deviceResources->GetBackBufferRenderTargetView();
+        DirectX11::DeviceStates->g_depthStancilSRV =
+            m_deviceResources->GetDepthStencilViewSRV();
+        DirectX11::DeviceStates->g_ClientRect = m_deviceResources->GetOutputSize();
+        DirectX11::DeviceStates->g_aspectRatio = m_deviceResources->GetAspectRatio();
+        DirectX11::DeviceStates->g_annotation = m_deviceResources->GetAnnotation();
+    });
+}
+
+void DirectX11::Dx11Main::ShutdownDeviceState()
+{
+    OnResizeEvent -= m_resizeEventHandle;
+    RHI::Shutdown();
+
+    DirectX11::DeviceStates->g_pDevice = nullptr;
+    DirectX11::DeviceStates->g_pDeviceContext = nullptr;
+    DirectX11::DeviceStates->g_pDepthStencilView = nullptr;
+    DirectX11::DeviceStates->g_pDepthStencilState = nullptr;
+    DirectX11::DeviceStates->g_pRasterizerState = nullptr;
+    DirectX11::DeviceStates->g_pBlendState = nullptr;
+    DirectX11::DeviceStates->g_backBufferRTV = nullptr;
+    DirectX11::DeviceStates->g_depthStancilSRV = nullptr;
+    DirectX11::DeviceStates->g_annotation = nullptr;
 }
 
 void DirectX11::Dx11Main::InvokeResizeFlag()

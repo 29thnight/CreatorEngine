@@ -67,10 +67,10 @@ public:
 	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_contentsBrowserStyle = style; }
 	float GetImGuiScale() { return m_imguiScale; }
 
-	// 렌더러 교체 스위치(3-9)의 부팅 기본값. render.backend가 기록하고
-	// SaveSettings가 영속화하며, App::Run 초기화 끝에 적용된다.
-	bool IsDx12BackendPreferred() const { return m_useDx12Backend; }
-	void SetDx12BackendPreferred(bool preferred) { m_useDx12Backend = preferred; }
+	// PHASE 3-9 승격 완료: EnhancedRenderer/DX12가 유일한 씬 백엔드다.
+	// 직렬화 필드는 구 설정 파일 호환용으로 남기되 false 전환은 허용하지 않는다.
+	bool IsDx12BackendPreferred() const { return true; }
+	void SetDx12BackendPreferred(bool) { m_useDx12Backend = true; }
 
 	// ── ImGui 백엔드는 씬 백엔드와 별개의 결정이다 ──
 	//
@@ -115,10 +115,7 @@ public:
 	Fence RHICommandFence;
 	TerrainBrush* terrainBrush = nullptr;
 	float m_imguiScale{ 0.8f };
-	// 3-9 승격(2026-08-06, 사용자 결정): 기본값 DX12. 판정 기준 ①~③은 수치로
-	// 충족했고 ④(에디터 기즈모·UI 표시)는 미배선 상태를 알고 승격한다 —
-	// ImGui 백엔드 DX12 전환(PHASE 8-2 선취)과 기즈모 체인 배선이 후속이다.
-	// DX11 폴백은 render.backend dx11로 즉시 복귀 가능(한 릴리스 주기 유지).
+	// 구 설정 파일과 도구가 필드 이름을 참조하므로 직렬화 표면만 유지한다.
 	bool m_useDx12Backend{ true };
 	bool m_useDx12ImGuiShell{ false };   // 스왑체인 소유권 이관 전까지 꺼짐
 

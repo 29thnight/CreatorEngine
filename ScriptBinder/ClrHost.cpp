@@ -33,9 +33,8 @@
 #include <cstring>
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
-// SDK 설치 경로가 머신마다 다르므로 프로젝트 설정 대신 여기서 직접 지정한다.
-// (버전을 올릴 때 이 줄과 vcxproj의 인클루드 경로를 함께 고쳐야 한다)
-#pragma comment(lib, "C:\\Program Files\\dotnet\\packs\\Microsoft.NETCore.App.Host.win-x64\\10.0.10\\runtimes\\win-x64\\native\\nethost.lib")
+// 실제 팩 경로는 EngineOutput.props의 DotNetHostPackDir 한 곳에서 관리한다.
+#pragma comment(lib, "nethost.lib")
 
 namespace
 {

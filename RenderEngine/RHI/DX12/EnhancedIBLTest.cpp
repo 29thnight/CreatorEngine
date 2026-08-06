@@ -27,12 +27,11 @@ namespace
     constexpr uint32_t kIblCubeSize = 64;
     constexpr uint32_t kIblBrdfSize = 64;
 
-    // ★ equirect가 낮으면 극점 검증이 무너진다. +Y 면 중심은 uv.y ≈ 0.007로
-    //   투영되는데, 8행짜리에서는 그 자리가 첫 텍셀 중심보다 위라 WRAP
-    //   샘플러가 반대쪽 행을 44% 섞는다(실측 0.55/0.45 — 계산과 일치).
-    //   128행이면 극점이 첫 텍셀 안쪽(0.4텍셀)에 들어와 순색이 나온다.
+    // 극점은 V CLAMP여야 반대편 위도 행이 섞이지 않는다. 일부러 낮은 8행을
+    // 써서 +Y 면 중심이 첫 텍셀 중심 바깥을 샘플하게 만든다. V가 WRAP으로
+    // 회귀하면 반대쪽 행이 약 44% 섞여 [3/5] 순색 단정이 즉시 실패한다.
     constexpr uint32_t kIblEquirectWidth = 256;
-    constexpr uint32_t kIblEquirectHeight = 128;
+    constexpr uint32_t kIblEquirectHeight = 8;
 
     constexpr uint16_t kIblHalfOne = 0x3C00;
 

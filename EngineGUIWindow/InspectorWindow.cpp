@@ -1,7 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "InspectorWindow.h"
 #include "EditorImGuiTexture.h"
-#include "SceneRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
@@ -58,8 +57,7 @@ ed::EditorContext* s_BTEditorContext{ nullptr };
 constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
 constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
-InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
-	m_sceneRenderer(ptr)
+InspectorWindow::InspectorWindow()
 {
 	ImGui::ContextRegister(ICON_FA_CIRCLE_INFO "  Inspector", [&]()
 	{
@@ -83,10 +81,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			return;
 		}
 
-		if (m_sceneRenderer)
+		scene = SceneManagers->GetActiveScene();
+		renderScene = SceneManagers->GetRenderScene();
+		if (scene && renderScene)
 		{
-			scene = SceneManagers->GetActiveScene();
-			renderScene = m_sceneRenderer->m_renderScene.get();
 			selectedSceneObject = scene->m_selectedSceneObject;
 
 			if (!scene && !renderScene)

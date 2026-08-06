@@ -22,11 +22,13 @@
 #include "PathFinder.h"
 #include "CoreWindow.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
-#include "SceneRenderer.h"
 #include "RenderPassData.h"
 #include "RHI/ScreenSizedResource.h"
 
 #include <Windows.h>
+#include <DXProgrammableCapture.h>
+#include <dxgidebug.h>
+#include <wrl/client.h>
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -40,6 +42,10 @@
 
 namespace
 {
+    // PIX가 주입된 실행에서만 DXGIGetDebugInterface1로 얻어진다. Begin/End는
+    // DX12 커맨드 스트림에 원시 이벤트 payload를 쓰지 않는 정식 캡처 경계다.
+    Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> g_pixGraphicsAnalysis;
+
     // 앞뒤 공백 제거
     std::string TrimLine(const std::string& s)
     {
@@ -1329,6 +1335,53 @@ void ConsoleCommandSystem::Execute(const std::string& line)
 
         if (0 == reported) std::printf("[CLI] 버튼 없음\n");
     }
+    else if (cmd == "pix.capture")
+    {
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+        if (mode == "begin")
+        {
+            if (g_pixGraphicsAnalysis)
+            {
+                std::printf("[CLI] pix.capture — 이미 캡처 중\n");
+            }
+            else
+            {
+                Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> analysis;
+                const HRESULT hr = DXGIGetDebugInterface1(0, IID_PPV_ARGS(&analysis));
+                if (FAILED(hr))
+                {
+                    std::printf("[CLI] pix.capture begin 실패 0x%08X — PIX/pixtool로 실행했는지 확인\n",
+                        static_cast<unsigned>(hr));
+                }
+                else
+                {
+                    analysis->BeginCapture();
+                    g_pixGraphicsAnalysis = std::move(analysis);
+                    std::printf("[CLI] pix.capture begin\n");
+                }
+            }
+        }
+        else if (mode == "end")
+        {
+            if (!g_pixGraphicsAnalysis)
+            {
+                std::printf("[CLI] pix.capture end — 진행 중인 캡처 없음\n");
+            }
+            else
+            {
+                // PIX는 EndCapture 전에 캡처 범위의 GPU 작업 완료를 권장한다.
+                EnhancedSceneRenderer::WaitForLiveGpu();
+                g_pixGraphicsAnalysis->EndCapture();
+                g_pixGraphicsAnalysis.Reset();
+                std::printf("[CLI] pix.capture end\n");
+            }
+        }
+        else
+        {
+            std::printf("[CLI] pix.capture — %s\n",
+                g_pixGraphicsAnalysis ? "캡처 중" : "대기");
+        }
+    }
     else if (cmd == "dx12.selftest")
     {
         // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
@@ -1558,15 +1611,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "dx12.skyscene")
     {
-        // 엔진 스카이박스 텍스처의 DX12 운반 검증(PHASE 3-6).
-        EnhancedSceneRenderer renderer;
-        std::string log;
-        const bool passed = renderer.RunSkySceneTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.skyscene] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.skyscene %s\n", verdict.c_str());
+        // 이 테스트는 SceneRenderer의 DX11 SkyBoxPass 결과를 가져오는 이관기
+        // 전용이었다. 메인 런타임에서 SceneRenderer를 제거한 뒤에는 호출 자체가
+        // 잘못된 계약이므로 실행하지 않는다. 독립 생성 체인은 dx12.ibl, 실제
+        // 씬 소비는 LiveSmoke/PIX로 검증한다.
+        std::printf("[CLI] dx12.skyscene — 레거시 이관 테스트라 비활성화됨; dx12.ibl과 PIX를 사용한다\n");
     }
     else if (cmd == "dx12.sss")
     {
@@ -1653,51 +1702,35 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "render.backend")
     {
-        // 렌더러 교체 스위치(3-9). dx12를 고르면 DX12 상시 러너가 씬을 그리고
-        // DX11 씬 패스(CE의 병목 단계)는 쉰다. dx11이면 원상 복구. 프레임
-        // 경계(Pump)에서 실행되므로 CE가 루프 중간에 전환을 보지 않는다.
         const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
-        auto* dx11Renderer = SceneRenderer::GetActive();
-
-        if (backend == "dx12" && nullptr != dx11Renderer)
+        if (backend == "dx12" || backend == "enhanced")
         {
             EnhancedSceneRenderer::EnableLive();
-            dx11Renderer->SetScenePassesSuspended(true);
-            // 다음 부팅의 기본값으로도 기록한다(SaveSettings가 종료 때 영속화).
             EngineSettingInstance->SetDx12BackendPreferred(true);
-            std::printf("[CLI] render.backend dx12 — DX11 씬 패스 중단, DX12가 그린다\n");
+            std::printf("[CLI] render.backend — EnhancedRenderer/DX12 단독 운용\n");
         }
-        else if (backend == "dx11" && nullptr != dx11Renderer)
+        else if (backend == "dx11")
         {
-            dx11Renderer->SetScenePassesSuspended(false);
-            EnhancedSceneRenderer::DisableLive();
-            EngineSettingInstance->SetDx12BackendPreferred(false);
-            std::printf("[CLI] render.backend dx11 — DX11 씬 패스 재개\n");
+            std::printf("[CLI] render.backend dx11 — 지원하지 않음: SceneRenderer는 dead code다\n");
         }
         else
         {
-            const bool suspended = (nullptr != dx11Renderer)
-                && dx11Renderer->IsScenePassesSuspended();
-            std::printf("[CLI] render.backend — 활성: %s\n",
-                suspended ? "dx12(DX11 씬 패스 중단)" : "dx11");
+            std::printf("[CLI] render.backend — 활성: enhanced-dx12 (단독)\n");
             std::printf("%s\n", EnhancedSceneRenderer::GetLiveStatus().c_str());
         }
     }
     else if (cmd == "dx12.live")
     {
-        // 렌더러 스위치(병존기). 씬 뷰·게임 뷰의 표시 텍스처 공급자를
-        // DX12 상시 러너로 바꾼다 — DX11 프레임 루프는 그대로 돈다.
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
 
         if (mode == "on")
         {
             EnhancedSceneRenderer::EnableLive();
-            std::printf("[CLI] dx12.live 켜짐 — 다음 프레임부터 DX12가 그린다\n");
+            std::printf("[CLI] dx12.live 켜짐 — EnhancedRenderer가 메인 렌더러다\n");
         }
         else if (mode == "off")
         {
-            EnhancedSceneRenderer::DisableLive();
-            std::printf("[CLI] dx12.live 꺼짐 — 표시가 DX11로 돌아갔다\n");
+            std::printf("[CLI] dx12.live off — 지원하지 않음: 단독 메인 렌더러는 끌 수 없다\n");
         }
         else
         {
@@ -1721,16 +1754,10 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "dx12.compare")
     {
-        // DX11과의 픽셀 대조(PHASE 3-6). 에디터가 한 프레임 이상 그린 뒤에만
-        // 의미가 있다 — DX11 GBuffer에 남아 있는 결과를 읽기 때문이다.
-        EnhancedSceneRenderer renderer;
-        std::string log;
-        const bool passed = renderer.RunPixelCompareTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.compare] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.compare %s\n", verdict.c_str());
+        // SceneRenderer의 GBuffer를 읽는 마이그레이션 비교기는 더 이상 메인
+        // 런타임 계약이 아니다. 파일은 역사적 진단 코드로 남기되 실행 표면에서
+        // 차단해 SceneRenderer가 수동 명령으로 되살아나는 여지를 없앤다.
+        std::printf("[CLI] dx12.compare — 비활성화됨: SceneRenderer는 dead code다\n");
     }
     else if (cmd == "dx12.scene")
     {
@@ -1841,66 +1868,17 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "render.post")
     {
-        // 포스트 패스를 런타임에 껐다 켠다.
-        //
-        // 프로젝트 설정 파일(EngineSettings.asset)을 건드리지 않는다. 그쪽은
-        // 저작물이고, 확인하려고 잠깐 끈 것이 저장돼 남으면 다음 사람이 왜
-        // 룩이 달라졌는지 모른다. 메모리 설정만 바꾸고 재적용 플래그를 세운다.
-        if (parts.size() < 3)
-        {
-            std::printf("[CLI] 사용법: render.post <fog|bloom|ssgi|vignette|colorgrading> <on|off>\n");
-            return;
-        }
-
-        const std::string target = parts[1];
-        const bool enable = (parts[2] == "on" || parts[2] == "1" || parts[2] == "true");
-
-        auto& settings = EngineSettingInstance->GetRenderPassSettingsRW();
-
-        bool known = true;
-        if (target == "fog")               settings.volumetricFog.isOn = enable;
-        else if (target == "bloom")        settings.bloom.applyBloom = enable;
-        else if (target == "ssgi")         settings.ssgi.isOn = enable;
-        else if (target == "vignette")     settings.vignette.isOn = enable;
-        else if (target == "colorgrading") settings.colorGrading.isOn = enable;
-        else known = false;
-
-        if (!known)
-        {
-            Debug->LogError("[CLI] 알 수 없는 포스트 패스: " + target);
-            std::printf("[CLI] 알 수 없는 포스트 패스: %s\n", target.c_str());
-            return;
-        }
-
-        // 다음 프레임의 안전 지점에서 SceneRenderer::ApplyVolumeProfile이 돈다.
-        SceneManagers->VolumeProfileApply();
-
-        Debug->LogWarning("[CLI] 포스트 패스 " + target + " " + (enable ? "켬" : "끔"));
-        std::printf("[CLI] 포스트 패스 %s %s\n", target.c_str(), enable ? "켬" : "끔");
+        // 기존 명령은 DX11 SceneRenderer가 소비하는 EngineSetting만 바꿨다.
+        // EnhancedRenderer에는 전달되지 않아 성공처럼 출력되는 무효 명령이므로
+        // 새 DX12 런타임 튜닝 API가 생기기 전까지 명시적으로 차단한다.
+        std::printf("[CLI] render.post — DX11 레거시 제어는 비활성화됨; Enhanced PostChain 튜닝 API가 필요하다\n");
     }
     else if (cmd == "render.exposure")
     {
-        // 자동 노출이 무엇을 보고 무엇을 결정했는지.
-        //
-        // 화면이 어두울 때 원인이 셋으로 갈린다 — 조명이 안 닿거나, 측광이
-        // 엉뚱한 것을 재거나, 노출 계산이 틀렸거나. 결과만 보면 셋이 같아 보인다.
-        const auto& diag = ToneMapPass::GetExposureDiagnostics();
-
-        char buffer[640]{};
-        std::snprintf(buffer, sizeof(buffer),
-            "자동 노출 %s · 이번 프레임 측광 %s\n"
-            "  측정 휘도      %.6f\n"
-            "  수동 노출      %.6f  (f/%.2f · 셔터 %.4f · ISO %.0f)\n"
-            "  자동 배수      %.6f  (기준 0.5 / 측정 휘도)\n"
-            "  최종 목표      %.6f\n"
-            "  적용 중인 노출 %.6f\n",
-            diag.autoEnabled ? "켬" : "끔", diag.sampled ? "있음" : "없음",
-            diag.measuredLuminance,
-            diag.exposureManual, diag.fNumber, diag.shutterTime, diag.iso,
-            diag.exposureAuto, diag.exposureFinal, diag.currentExposure);
-
-        Debug->LogWarning(std::string("[노출]\n") + buffer);
-        std::printf("[CLI] 노출\n%s", buffer);
+        // 기존 구현은 SceneRenderer가 갱신하는 DX11 ToneMapPass의 정적 값을
+        // 읽었다. 단독 모드에서 그 값을 출력하면 정상처럼 보이는 오래된 0값을
+        // 진단값으로 오인하게 되므로 새 DX12 계측이 붙기 전까지 차단한다.
+        std::printf("[CLI] render.exposure — DX11 레거시 진단은 비활성화됨; PIX의 Enhanced PostChain을 확인한다\n");
     }
     else if (cmd == "dx12.resize")
     {
@@ -2735,7 +2713,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
         "  dx12.parallel        커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)\n"
         "  render.exposure      자동 노출이 무엇을 재고 무엇을 결정했는지\n"
-        "  render.post <이름> <on|off>  포스트 패스 토글(fog·bloom·ssgi·vignette·colorgrading)\n"
+        "  render.post           비활성 레거시 명령(DX11 포스트 설정)\n"
         "  render.rtinfo        창·뷰포트·추종 텍스처 크기를 나란히 찍는다\n"
         "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
         "  dx12.grid            그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)\n"
@@ -2746,7 +2724,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.shadowquality   그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)\n"
         "  dx12.skybox          스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)\n"
         "  dx12.ibl             IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)\n"
-        "  dx12.skyscene        엔진 스카이박스 DX12 운반 검증(큐브 인식·실물 렌더·IBL)\n"
+        "  dx12.skyscene        비활성 레거시 명령(SceneRenderer 이관 테스트)\n"
         "  dx12.iblshade        IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)\n"
         "  dx12.skinning        GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)\n"
         "  dx12.sss             SSS 패스 검증(번짐·축 분리·표면 추종·에너지)\n"
@@ -2754,8 +2732,9 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
         "  dx12.fog             볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)\n"
         "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
-        "  dx12.live on|off|status  표시 공급자 스위치 — 씬 뷰 표시만 DX12로(DX11은 계속 그림)\n"
-        "  render.backend dx11|dx12|status  렌더러 교체 스위치(3-9) — dx12면 DX11 씬 패스 중단\n"
+        "  dx12.live on|status      EnhancedRenderer 메인 런타임 상태\n"
+        "  render.backend dx12|status  고정 백엔드 확인(dx11은 dead code)\n"
+        "  pix.capture begin|end|status  PIX 주입 실행의 명시적 GPU 캡처 경계\n"
         "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
         "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
         "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"

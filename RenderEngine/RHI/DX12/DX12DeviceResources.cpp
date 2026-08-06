@@ -1,6 +1,9 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DX12DeviceResources.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
 #include <sstream>
 
 #pragma comment(lib, "d3d12.lib")
@@ -8,6 +11,71 @@
 
 namespace
 {
+    enum class ValidationMode
+    {
+        Off,
+        Basic,
+        Gpu
+    };
+
+    std::string ReadEnvironment(const char* name)
+    {
+        const DWORD length = GetEnvironmentVariableA(name, nullptr, 0);
+        if (0 == length) return {};
+
+        std::string value(length, '\0');
+        GetEnvironmentVariableA(name, value.data(), length);
+        value.resize(length - 1);
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    bool ReadEnvironmentFlag(const char* name, bool fallback)
+    {
+        const std::string value = ReadEnvironment(name);
+        if (value.empty()) return fallback;
+        if (value == "1" || value == "true" || value == "on" || value == "yes") return true;
+        if (value == "0" || value == "false" || value == "off" || value == "no") return false;
+        return fallback;
+    }
+
+    ValidationMode ReadValidationMode()
+    {
+#if defined(_DEBUG)
+        constexpr ValidationMode fallback = ValidationMode::Basic;
+#else
+        constexpr ValidationMode fallback = ValidationMode::Off;
+#endif
+        const std::string value = ReadEnvironment("CREATOR_DX12_VALIDATION");
+        if (value.empty()) return fallback;
+        if (value == "off" || value == "0" || value == "false") return ValidationMode::Off;
+        if (value == "gpu" || value == "full" || value == "2") return ValidationMode::Gpu;
+        if (value == "basic" || value == "standard" || value == "1" || value == "true")
+        {
+            return ValidationMode::Basic;
+        }
+        return fallback;
+    }
+
+    std::string WideToUtf8(const wchar_t* value)
+    {
+        if (nullptr == value || L'\0' == *value) return {};
+        const int bytes = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
+        if (bytes <= 1) return {};
+        std::string result(static_cast<size_t>(bytes), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value, -1, result.data(), bytes, nullptr, nullptr);
+        result.resize(static_cast<size_t>(bytes - 1));
+        return result;
+    }
+
+    std::string DebugName(const char* narrow, const wchar_t* wide)
+    {
+        if (nullptr != narrow && '\0' != *narrow) return narrow;
+        const std::string converted = WideToUtf8(wide);
+        return converted.empty() ? "<unnamed>" : converted;
+    }
+
     std::string HrToString(HRESULT hr)
     {
         std::ostringstream oss;
@@ -97,19 +165,61 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     m_width = width;
     m_height = height;
 
-#if defined(_DEBUG)
+    const ValidationMode validationMode = ReadValidationMode();
+    const bool debugLayerEnabled = ValidationMode::Off != validationMode;
+    const bool gpuValidationEnabled = ValidationMode::Gpu == validationMode;
+    const bool dredEnabled = ReadEnvironmentFlag("CREATOR_DX12_DRED", debugLayerEnabled);
+    const bool breakOnError = ReadEnvironmentFlag("CREATOR_DX12_BREAK_ON_ERROR", false);
+
     // 검증 레이어는 디바이스 생성 전에 켜야 한다. 브링업 단계에서는 이 레이어가
     // 곧 테스트 하네스다 — 메시지 0건이 통과 조건.
+    // CREATOR_DX12_VALIDATION=off|basic|gpu로 선택한다. Debug 기본은 basic이고,
+    // Release 기본은 off라 배포 실행의 성능을 바꾸지 않는다.
+    if (debugLayerEnabled)
     {
         Microsoft::WRL::ComPtr<ID3D12Debug> debug;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
         {
             debug->EnableDebugLayer();
+
+            if (gpuValidationEnabled)
+            {
+                Microsoft::WRL::ComPtr<ID3D12Debug1> debug1;
+                if (SUCCEEDED(debug.As(&debug1)))
+                {
+                    debug1->SetEnableGPUBasedValidation(TRUE);
+                    debug1->SetEnableSynchronizedCommandQueueValidation(TRUE);
+                }
+            }
+        }
+        else
+        {
+            outError = "D3D12 Debug Layer를 열 수 없다. Windows Graphics Tools 설치를 확인한다";
+            return false;
         }
     }
-#endif
 
-    HRESULT hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&m_factory));
+    // DRED 설정 역시 디바이스 생성 전에 해야 한다. 장치 제거 뒤에 켜려 하면 이미
+    // 필요한 breadcrumb와 page-fault 기록이 사라진 뒤다.
+    if (dredEnabled)
+    {
+        Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings))))
+        {
+            dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+            dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+            dredSettings->SetBreadcrumbContextEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        }
+    }
+
+    std::printf("[DX12 검증] DebugLayer=%s GPUValidation=%s DRED=%s BreakOnError=%s\n",
+        debugLayerEnabled ? "on" : "off",
+        gpuValidationEnabled ? "on" : "off",
+        dredEnabled ? "on" : "off",
+        breakOnError ? "on" : "off");
+
+    const UINT factoryFlags = debugLayerEnabled ? DXGI_CREATE_FACTORY_DEBUG : 0;
+    HRESULT hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&m_factory));
     if (FAILED(hr)) { outError = "DXGI 팩토리 생성 실패 " + HrToString(hr); return false; }
 
     // 어댑터 선택.
@@ -136,7 +246,6 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }
 
-#if defined(_DEBUG)
     // 알려진 정상 경로 메시지를 억제한다.
     //
     // LOADPIPELINE_NAMENOTFOUND는 파이프라인 라이브러리의 '첫 조회 실패'이고,
@@ -149,6 +258,12 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(m_device.As(&infoQueue)))
         {
+            if (breakOnError)
+            {
+                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+            }
+
             D3D12_MESSAGE_ID denied[] = { D3D12_MESSAGE_ID_LOADPIPELINE_NAMENOTFOUND };
             D3D12_INFO_QUEUE_FILTER filter{};
             filter.DenyList.NumIDs = _countof(denied);
@@ -156,7 +271,6 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
             infoQueue->AddStorageFilterEntries(&filter);
         }
     }
-#endif
 
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -278,15 +392,15 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     if (completed < m_frameFenceValues[m_frameIndex])
     {
         HRESULT hr = m_fence->SetEventOnCompletion(m_frameFenceValues[m_frameIndex], m_fenceEvent);
-        if (FAILED(hr)) { outError = "펜스 대기 설정 실패 " + HrToString(hr); return false; }
+        if (FAILED(hr)) { outError = "펜스 대기 설정 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
     HRESULT hr = allocator->Reset();
-    if (FAILED(hr)) { outError = "얼로케이터 Reset 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr)) { outError = "얼로케이터 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     hr = m_commandList->Reset(allocator.Get(), nullptr);
-    if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     // 업로드 링 되감기는 반드시 위 펜스 대기 뒤여야 한다. GPU가 이 슬롯의
     // 프레임을 끝냈다는 사실이 곧 그 구간을 다시 써도 된다는 근거다.
@@ -299,7 +413,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
 bool DX12DeviceResources::FlushCommandList(std::string& outError)
 {
     HRESULT hr = m_commandList->Close();
-    if (FAILED(hr)) { outError = "중간 제출 Close 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr)) { outError = "중간 제출 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     ID3D12CommandList* lists[] = { m_commandList.Get() };
     m_queue->ExecuteCommandLists(1, lists);
@@ -307,7 +421,7 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
     // 얼로케이터는 그대로 둔다. 리스트만 다시 여는 것은 제출 직후에도 된다 —
     // 얼로케이터를 되돌리면 GPU가 읽는 중인 메모리를 재사용하게 된다.
     hr = m_commandList->Reset(m_allocators[m_frameIndex].Get(), nullptr);
-    if (FAILED(hr)) { outError = "중간 제출 Reset 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr)) { outError = "중간 제출 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     return true;
 }
@@ -315,14 +429,14 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
 bool DX12DeviceResources::EndFrame(std::string& outError)
 {
     HRESULT hr = m_commandList->Close();
-    if (FAILED(hr)) { outError = "커맨드 리스트 Close 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr)) { outError = "커맨드 리스트 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     ID3D12CommandList* lists[] = { m_commandList.Get() };
     m_queue->ExecuteCommandLists(1, lists);
 
     const uint64_t fenceValue = m_nextFenceValue++;
     hr = m_queue->Signal(m_fence.Get(), fenceValue);
-    if (FAILED(hr)) { outError = "펜스 Signal 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr)) { outError = "펜스 Signal 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
 
     m_frameFenceValues[m_frameIndex] = fenceValue;
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;
@@ -388,6 +502,101 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
 #else
     return 0;
 #endif
+}
+
+void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult,
+    std::string& outError) const
+{
+    if (!m_device) return;
+
+    HRESULT reason = m_device->GetDeviceRemovedReason();
+    const bool operationIndicatesRemoval =
+        DXGI_ERROR_DEVICE_REMOVED == operationResult ||
+        DXGI_ERROR_DEVICE_RESET == operationResult ||
+        DXGI_ERROR_DEVICE_HUNG == operationResult ||
+        DXGI_ERROR_DRIVER_INTERNAL_ERROR == operationResult;
+
+    // GetDeviceRemovedReason은 살아 있는 장치에서 S_OK다. 일반 API 실패마다 DRED
+    // 빈 보고서를 붙이면 최초 오류가 묻히므로 장치 제거일 때만 확장한다.
+    if (SUCCEEDED(reason) && !operationIndicatesRemoval) return;
+    if (SUCCEEDED(reason)) reason = operationResult;
+
+    std::ostringstream report;
+    report << "\n[DRED] deviceRemovedReason=" << HrToString(reason);
+
+    Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedData1> dred;
+    if (FAILED(m_device.As(&dred)))
+    {
+        report << " (ID3D12DeviceRemovedExtendedData1 unavailable)";
+        outError += report.str();
+        return;
+    }
+
+    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumbs{};
+    if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput1(&breadcrumbs)))
+    {
+        uint32_t nodeCount = 0;
+        for (const D3D12_AUTO_BREADCRUMB_NODE1* node = breadcrumbs.pHeadAutoBreadcrumbNode;
+            nullptr != node && nodeCount < 64; node = node->pNext, ++nodeCount)
+        {
+            const UINT completed = (nullptr != node->pLastBreadcrumbValue)
+                ? *node->pLastBreadcrumbValue : 0;
+            report << "\n[DRED] queue="
+                << DebugName(node->pCommandQueueDebugNameA, node->pCommandQueueDebugNameW)
+                << " commandList="
+                << DebugName(node->pCommandListDebugNameA, node->pCommandListDebugNameW)
+                << " completed=" << completed << '/' << node->BreadcrumbCount;
+
+            if (nullptr != node->pCommandHistory && completed < node->BreadcrumbCount)
+            {
+                report << " nextOp=" << static_cast<unsigned>(node->pCommandHistory[completed]);
+            }
+
+            // 마지막으로 통과한 사용자 context를 붙인다. 원시 PIX 이벤트를 직접
+            // 기록하지 않아도 SetMarker/BeginEvent를 정상 API로 넣은 경우 위치가 나온다.
+            const D3D12_DRED_BREADCRUMB_CONTEXT* lastContext = nullptr;
+            for (UINT i = 0; i < node->BreadcrumbContextsCount; ++i)
+            {
+                const auto& context = node->pBreadcrumbContexts[i];
+                if (context.BreadcrumbIndex <= completed &&
+                    (nullptr == lastContext || context.BreadcrumbIndex >= lastContext->BreadcrumbIndex))
+                {
+                    lastContext = &context;
+                }
+            }
+            if (nullptr != lastContext)
+            {
+                report << " context=" << WideToUtf8(lastContext->pContextString);
+            }
+        }
+        if (nodeCount == 64) report << "\n[DRED] breadcrumb list truncated at 64 nodes";
+    }
+
+    D3D12_DRED_PAGE_FAULT_OUTPUT1 pageFault{};
+    if (SUCCEEDED(dred->GetPageFaultAllocationOutput1(&pageFault)) &&
+        0 != pageFault.PageFaultVA)
+    {
+        report << "\n[DRED] pageFaultVA=0x" << std::hex << pageFault.PageFaultVA << std::dec;
+
+        const auto appendAllocations = [&report](const char* label,
+            const D3D12_DRED_ALLOCATION_NODE1* head)
+        {
+            uint32_t count = 0;
+            for (const D3D12_DRED_ALLOCATION_NODE1* node = head;
+                nullptr != node && count < 32; node = node->pNext, ++count)
+            {
+                report << "\n[DRED] " << label << " name="
+                    << DebugName(node->ObjectNameA, node->ObjectNameW)
+                    << " type=" << static_cast<unsigned>(node->AllocationType);
+            }
+            if (count == 32) report << "\n[DRED] " << label << " list truncated at 32 nodes";
+        };
+
+        appendAllocations("existing", pageFault.pHeadExistingAllocationNode);
+        appendAllocations("recentlyFreed", pageFault.pHeadRecentFreedAllocationNode);
+    }
+
+    outError += report.str();
 }
 
 bool DX12DeviceResources::AttachSwapChain(HWND hwnd, uint32_t width, uint32_t height,
@@ -500,6 +709,7 @@ bool DX12DeviceResources::Present(std::string& outError)
     if (FAILED(hr))
     {
         outError = "Present 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
         return false;
     }
     return true;

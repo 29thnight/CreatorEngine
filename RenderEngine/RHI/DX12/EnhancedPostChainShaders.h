@@ -257,13 +257,17 @@ float3 ToneMapAgX(float3 x)
     // ★ 0과 음수를 먼저 막는다. log2(0)은 -inf, log2(음수)는 NaN이고,
     //   NaN은 clamp를 그대로 통과해 화면에 검은 점으로 남는다 —
     //   그 증상은 '가끔 픽셀이 튄다'로만 보여 원인을 짚기 어렵다.
-    float3 v = mul(kAgxMat, max(x, 1e-10f));
+    // 이 상수는 GLSL mat3의 열 기준 순서로 공개된 AgX 행렬이다. HLSL의
+    // float3x3 생성자는 같은 나열을 행으로 채우므로 벡터를 왼쪽에 둬야
+    // 원래 변환과 같다. 반대로 mul(matrix, vector)를 쓰면 행렬이 전치되어
+    // 중성 회색까지 붉게 밀린다.
+    float3 v = mul(max(x, 1e-10f), kAgxMat);
 
     v = clamp(log2(v), minEv, maxEv);
     v = (v - minEv) / (maxEv - minEv);
     v = AgxContrast(v);
 
-    return saturate(mul(kAgxMatInv, v));
+    return saturate(mul(v, kAgxMatInv));
 }
 
 [numthreads(8, 8, 1)]

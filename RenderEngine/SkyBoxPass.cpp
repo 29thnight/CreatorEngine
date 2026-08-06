@@ -64,7 +64,13 @@ SkyBoxPass::SkyBoxPass()
         )
     );
 
-	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	// Equirectangular HDR은 경도(U) 이음매만 순환한다. 위도(V)를 WRAP하면
+	// 북극/남극의 선형 필터가 반대편 행을 섞어 큐브의 +Y/-Y 면을 오염시킨다.
+	auto linearSampler = std::make_shared<Sampler>(
+		D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+		D3D11_TEXTURE_ADDRESS_WRAP,
+		D3D11_TEXTURE_ADDRESS_CLAMP,
+		D3D11_TEXTURE_ADDRESS_CLAMP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 	auto clampSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
 
@@ -186,6 +192,10 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
 	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 	DirectX11::PSSetShader(m_rectToCubeMapPS->GetShader(), nullptr, 0);
 	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxTexture->m_pSRV);
+	// 생성 패스는 m_pso->Apply()를 거치지 않으므로 필요한 샘플러를 직접
+	// 바인딩한다. 이전 패스가 s0에 남긴 상태에 의존하면 첫 씬 로드에서
+	// 샘플러가 비어 HDR→cube 결과가 검정이 될 수 있다.
+	m_pso->m_samplers[0]->Use(0);
 	scene.UseModel();
 
     for (int i = 0; i < 6; ++i)
@@ -256,7 +266,9 @@ Managed::SharedPtr<Texture> SkyBoxPass::GenerateEnvironmentMap(RenderScene& scen
 	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 	DirectX11::PSSetShader(m_irradiancePS->GetShader(), nullptr, 0);
 	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
-	deviceContext->PSSetSamplers(2, 1, &m_pso->m_samplers[2]->m_SamplerState);
+	// IrradianceMap.ps는 LinearSampler(s0)를 읽는다. 종전의 s2 바인딩은
+	// 셰이더에서 사용되지 않아 이 단계 역시 이전 컨텍스트 상태에 의존했다.
+	m_pso->m_samplers[0]->Use(0);
 	scene.UseModel();
 
 	for (int i = 0; i < 6; ++i)
@@ -307,6 +319,7 @@ Managed::SharedPtr<Texture> SkyBoxPass::GeneratePrefilteredMap(RenderScene& scen
 	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 	DirectX11::PSSetShader(m_prefilterPS->GetShader(), nullptr, 0);
 	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
+	m_pso->m_samplers[0]->Use(0);
 	scene.UseModel();
 
 	for (int i = 0; i < 6; ++i)

@@ -50,7 +50,10 @@ enum class RGResourceState
     RenderTarget,
     DepthWrite,
     DepthRead,
-    ShaderResource,   // 픽셀 셰이더에서 읽기
+    // 그래픽·컴퓨트 패스가 공통으로 쓰는 SRV 상태. 호출부가 셰이더 단계를
+    // 따로 선언하지 않으므로 PIXEL 전용으로 좁히면 SSAO/SSGI 같은 compute
+    // 패스가 같은 리소스를 읽는 순간 GPU Validation 오류가 된다.
+    ShaderResource,
 
     // 깊이를 DSV로 걸어 두고 같은 프레임에 셰이더로도 읽는다.
     //

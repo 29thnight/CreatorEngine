@@ -2,15 +2,13 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DeviceResources.h"
 #include "TimeSystem.h"
+#include "GameObject.h"
 #include "DataSystem.h"
-#include "SceneRenderer.h"
 #include "GizmoRenderer.h"
-#include "Scene.h"
 #include "ImGuiRenderer.h"
 #include "Model.h"
 #include "Delegate.h"
 
-#include "RenderPassWindow.h"
 #include "SceneViewWindow.h"
 #include "GameViewWindow.h"
 #include "MenuBarWindow.h"
@@ -54,12 +52,11 @@ namespace DirectX11
 		//Dx11 Helper
 		std::shared_ptr<DeviceResources> m_deviceResources;
 		//TimeSystem m_timeSystem;
-		//Renderer
-		std::shared_ptr<SceneRenderer> m_sceneRenderer;
+		// DX11은 에디터 셸/자산 브리지로만 유지한다. 씬 렌더러는
+		// EnhancedSceneRenderer 하나다.
 		std::shared_ptr<GizmoRenderer> m_gizmoRenderer;
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
 		//Engine GUI
-		std::unique_ptr<RenderPassWindow> m_renderPassWindow;
 		std::unique_ptr<SceneViewWindow> m_sceneViewWindow;
 		std::unique_ptr<GameViewWindow> m_gameViewWindow;
 		std::unique_ptr<MenuBarWindow> m_menuBarWindow;
@@ -69,10 +66,10 @@ namespace DirectX11
 		std::unique_ptr<ResourceCounterWindow> m_resourceCounterWindow;
 		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
-        Core::DelegateHandle m_SceneRenderingEventHandle;
-		Core::DelegateHandle m_OnGizmoEventHandle;
+        Core::DelegateHandle m_newSceneCreatedHandle;
+        Core::DelegateHandle m_activeSceneChangedHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;
-		Core::DelegateHandle m_EndOfFrameEventHandle;
+		Core::DelegateHandle m_resizeEventHandle;
 		//RenderPipeLine Thread
 		std::thread m_CB_Thread;
 		std::thread m_CE_Thread;
@@ -81,6 +78,9 @@ namespace DirectX11
 		std::atomic_bool m_isLoading = false;
 		std::atomic_bool m_isChangeScene = false;
 		std::atomic_bool m_isInvokeResize = false;
+
+		void InitializeDeviceState();
+		void ShutdownDeviceState();
 
 	};
 }

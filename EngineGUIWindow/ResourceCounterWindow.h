@@ -4,8 +4,6 @@
 #include "EngineResourceCensus.h"
 #include <cstdint>
 
-class SceneRenderer;
-
 // 리소스 카운터 HUD.
 //
 // 에셋 캐시 / 렌더 프록시 / GPU 객체 수를 한 화면에 모아 보여준다.
@@ -15,7 +13,7 @@ class SceneRenderer;
 class ResourceCounterWindow
 {
 public:
-	explicit ResourceCounterWindow(SceneRenderer* sceneRenderer);
+	ResourceCounterWindow();
 	~ResourceCounterWindow() = default;
 
 private:
@@ -53,7 +51,6 @@ private:
 	Snapshot Capture(bool includeGpuObjects) const;
 	void DrawCountRow(const char* label, size_t current, size_t baseline) const;
 
-	SceneRenderer* m_sceneRenderer{ nullptr };
 	Snapshot m_baseline{};
 	Snapshot m_lastGpuCensus{};   // 무거운 GPU 집계는 요청 시에만 갱신해 보관
 };

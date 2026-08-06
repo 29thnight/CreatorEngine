@@ -1,4 +1,5 @@
 ﻿assimp:x64-windows
+bdwgc:x64-windows
 boost-assert:x64-windows
 boost-cmake:x64-windows
 boost-config:x64-windows
@@ -17,7 +18,7 @@ directxtk:x64-windows
 draco:x64-windows
 efsw:x64-windows
 fmt:x64-windows
-imgui:x64-windows
+imgui[docking-experimental,dx11-binding,dx12-binding,win32-binding]:x64-windows
 imgui-node-editor:x64-windows
 imguizmo:x64-windows
 jhasse-poly2tri:x64-windows
@@ -27,6 +28,7 @@ lz4:x64-windows
 magic-enum:x64-windows
 meshoptimizer:x64-windows
 mimalloc:x64-windows
+mimalloc:x64-windows-static-md
 minizip:x64-windows
 nlohmann-json:x64-windows
 physx:x64-windows

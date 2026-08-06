@@ -1,7 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "ResourceCounterWindow.h"
-#include "SceneRenderer.h"
 #include "RenderScene.h"
+#include "SceneManager.h"
 #include "DataSystem.h"
 #include "DeviceResources.h"
 #include "IconsFontAwesome6.h"
@@ -18,8 +18,7 @@ namespace
 	constexpr ImVec4 kDimColor{ 0.55f, 0.58f, 0.65f, 1.0f };
 }
 
-ResourceCounterWindow::ResourceCounterWindow(SceneRenderer* sceneRenderer)
-	: m_sceneRenderer(sceneRenderer)
+ResourceCounterWindow::ResourceCounterWindow()
 {
 	ImGui::ContextRegister("Resource Counter", true, [&]()
 	{
@@ -222,7 +221,7 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 	}
 
 	// --- 렌더 프록시 ---
-	RenderScene* renderScene = (m_sceneRenderer != nullptr) ? m_sceneRenderer->GetRenderScene() : nullptr;
+	RenderScene* renderScene = SceneManagers->GetRenderScene();
 	if (renderScene != nullptr)
 	{
 		const RenderScene::ResourceCounts counts = renderScene->GetResourceCounts();

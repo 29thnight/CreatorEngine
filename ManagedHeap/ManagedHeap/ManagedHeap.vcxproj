@@ -98,11 +98,19 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <MimallocStaticLibrary>$(VcpkgRoot)\installed\x64-windows-static-md\debug\lib\mimalloc-static-debug.lib</MimallocStaticLibrary>
+    <MimallocStaticLibrary Condition="!Exists('$(MimallocStaticLibrary)')">$(VcpkgRoot)\installed\x64-windows-static-md\debug\lib\mimalloc-debug.lib</MimallocStaticLibrary>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
+    <MimallocStaticLibrary>$(VcpkgRoot)\installed\x64-windows-static-md\lib\mimalloc-static.lib</MimallocStaticLibrary>
+    <MimallocStaticLibrary Condition="!Exists('$(MimallocStaticLibrary)')">$(VcpkgRoot)\installed\x64-windows-static-md\lib\mimalloc.lib</MimallocStaticLibrary>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">
     <OutDir>$(SolutionDir)$(Platform)\GameBuild\</OutDir>
+    <MimallocStaticLibrary>$(VcpkgRoot)\installed\x64-windows-static-md\lib\mimalloc-static.lib</MimallocStaticLibrary>
+    <MimallocStaticLibrary Condition="!Exists('$(MimallocStaticLibrary)')">$(VcpkgRoot)\installed\x64-windows-static-md\lib\mimalloc.lib</MimallocStaticLibrary>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -174,7 +182,7 @@
            후킹하는 override 빌드라, 이 DLL이 의존성으로 로드될 때 로더 초기화와 경합해
            간헐적으로 DllMain이 실패한다(ERROR_DLL_INIT_FAILED).
            정적 링크는 redirect가 개입하지 않아 그 경합 자체가 없다. -->
-      <AdditionalDependencies>$(VcpkgRoot)\installed\x64-windows-static-md\debug\lib\mimalloc-static-debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(MimallocStaticLibrary);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -200,7 +208,7 @@
            후킹하는 override 빌드라, 이 DLL이 의존성으로 로드될 때 로더 초기화와 경합해
            간헐적으로 DllMain이 실패한다(ERROR_DLL_INIT_FAILED).
            정적 링크는 redirect가 개입하지 않아 그 경합 자체가 없다. -->
-      <AdditionalDependencies>$(VcpkgRoot)\installed\x64-windows-static-md\lib\mimalloc-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(MimallocStaticLibrary);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">
@@ -226,7 +234,7 @@
            후킹하는 override 빌드라, 이 DLL이 의존성으로 로드될 때 로더 초기화와 경합해
            간헐적으로 DllMain이 실패한다(ERROR_DLL_INIT_FAILED).
            정적 링크는 redirect가 개입하지 않아 그 경합 자체가 없다. -->
-      <AdditionalDependencies>$(VcpkgRoot)\installed\x64-windows-static-md\lib\mimalloc-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(MimallocStaticLibrary);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

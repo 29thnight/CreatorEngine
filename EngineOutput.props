@@ -20,15 +20,15 @@
   즉 새로 받은 사람은 Debug조차 스크립트 없이 돌았고, 아무도 그것을 알리는
   장치가 없었다. 빌드가 직접 배치하게 한다.
 
-  버전은 ClrHost.cpp가 nethost.lib를 링크할 때 박아 둔 것과 같아야 한다.
-  둘이 어긋나면 링크는 되고 실행에서만 틀어진다.
+  헤더·링크·DLL 배치가 모두 이 속성을 참조한다. 버전을 여러 파일에 직접
+  박아 두면 한쪽만 갱신되어 링크 또는 실행 단계에서 뒤늦게 실패한다.
 -->
 <Project>
   <PropertyGroup>
     <EngineOutDir Condition="'$(Configuration)' == 'Release'">$(MSBuildThisFileDirectory)Bin\Editor\</EngineOutDir>
     <EngineOutDir Condition="'$(EngineOutDir)' == ''">$(MSBuildThisFileDirectory)x64\$(Configuration)\</EngineOutDir>
 
-    <DotNetHostPackVersion>10.0.10</DotNetHostPackVersion>
+    <DotNetHostPackVersion>10.0.8</DotNetHostPackVersion>
     <DotNetHostPackDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\$(DotNetHostPackVersion)\runtimes\win-x64\native\</DotNetHostPackDir>
   </PropertyGroup>
 </Project>

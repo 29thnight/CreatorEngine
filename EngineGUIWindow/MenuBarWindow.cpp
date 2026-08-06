@@ -2,7 +2,7 @@
 #include "ImGui.h"
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
-#include "SceneRenderer.h"
+#include "DeviceResources.h"
 #include "SceneManager.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
@@ -71,8 +71,7 @@ std::string WordWrapText(const std::string& input, size_t maxLineLength)
     return oss.str();
 }
 
-MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
-    m_sceneRenderer(ptr)
+MenuBarWindow::MenuBarWindow()
 {
     ImGuiIO& io = ImGui::GetIO();
     static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
@@ -84,87 +83,8 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
     io.Fonts->Build();
 
     ImGui::ContextRegister("LightMap", true, [&]() {
-        auto& useTestLightmap = m_sceneRenderer->useTestLightmap;
-        auto& m_pPositionMapPass = m_sceneRenderer->m_pPositionMapPass;
-        auto& lightMap = m_sceneRenderer->lightMap;
-        auto& m_renderScene = m_sceneRenderer->m_renderScene;
-        auto& m_pLightMapPass = m_sceneRenderer->m_pLightMapPass;
-        static bool isLightMapSwitch{ useTestLightmap.load() };
-
-        ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
-        ImGui::Text("LightMap");
-        if (ImGui::CollapsingHeader("Settings")) {
-
-            ImGui::Checkbox("LightmapPass On/Off", &isLightMapSwitch);
-
-            ImGui::Text("Position and NormalMap Settings");
-            ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
-            if (ImGui::Button("Clear position normal maps")) {
-                m_pPositionMapPass->ClearTextures();
-            }
-            ImGui::Checkbox("IsPositionMapDilateOn", &m_pPositionMapPass->isDilateOn);
-            ImGui::DragInt("PosNorm Dilate Count", &m_pPositionMapPass->posNormDilateCount, 1, 0, 16);
-            ImGui::Text("LightMap Bake Settings");
-            ImGui::DragInt("LightMap Size", &lightMap.canvasSize, 128, 512, 8192);
-            ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
-            ImGui::DragInt("Padding", &lightMap.padding);
-            ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
-            ImGui::DragInt("LeafCount", &lightMap.leafCount, 1, 0, 1024);
-            ImGui::DragInt("Indirect Count", &lightMap.indirectCount, 1, 0, 128);
-            ImGui::DragInt("Indirect Sample Count", &lightMap.indirectSampleCount, 1, 0, 512);
-            //ImGui::DragInt("Dilate Count", &lightMap.dilateCount, 1, 0, 16);
-            ImGui::DragInt("Direct MSAA Count", &lightMap.directMSAACount, 1, 0, 16);
-            ImGui::DragInt("Indirect MSAA Count", &lightMap.indirectMSAACount, 1, 0, 16);
-            ImGui::Checkbox("Use Environment Map", &lightMap.useEnvironmentMap);
-        }
-
-        if (ImGui::Button("Generate LightMap"))
-        {
-            Camera c{};
-            // 메쉬별로 positionMap 생성
-            m_pPositionMapPass->Execute(*m_renderScene, c);
-            // lightMap 생성
-            lightMap.GenerateLightMap(m_renderScene.get(), m_pPositionMapPass, m_pLightMapPass);
-
-            //m_pLightMapPass->Initialize(lightMap.lightmaps);
-        }
-
-        if (ImGui::CollapsingHeader("Baked Maps")) {
-            if (lightMap.imgSRV)
-            {
-                ImGui::Text("LightMaps");
-                for (int i = 0; i < lightMap.lightmaps.size(); i++) {
-                    if (ImGui::ImageButton("##LightMap", (ImTextureID)EditorImGuiTexture::From(lightMap.lightmaps[i]), ImVec2(300, 300))) {
-                        //ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.lightmaps[i]), ImVec2(512, 512));
-                    }
-                }
-                //ImGui::Text("indirectMaps");
-                //for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
-                //	if (ImGui::ImageButton("##IndirectMap", (ImTextureID)EditorImGuiTexture::From(lightMap.indirectMaps[i]), ImVec2(300, 300))) {
-                //		//ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.indirectMaps[i]), ImVec2(512, 512));
-                //	}
-                //}
-                ImGui::Text("environmentMaps");
-                for (int i = 0; i < lightMap.environmentMaps.size(); i++) {
-                    if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)EditorImGuiTexture::From(lightMap.environmentMaps[i]), ImVec2(300, 300))) {
-                        //ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.environmentMaps[i]), ImVec2(512, 512));
-                    }
-                }
-                ImGui::Text("directionalMaps");
-                for (int i = 0; i < lightMap.directionalMaps.size(); i++) {
-                    if (ImGui::ImageButton("##DirectionalMap", (ImTextureID)EditorImGuiTexture::From(lightMap.directionalMaps[i]), ImVec2(300, 300))) {
-                        //ImGui::Image((ImTextureID)EditorImGuiTexture::From(lightMap.environmentMaps[i]), ImVec2(512, 512));
-                    }
-                }
-            }
-            else {
-                ImGui::Text("No LightMap");
-            }
-        }
-
-        ImGui::EndChild();
-
-        useTestLightmap.store(isLightMapSwitch);
+        ImGui::TextUnformatted("Legacy DX11 LightMap editor is unavailable in Enhanced-only mode.");
+        ImGui::TextUnformatted("A DX12 bake path must be wired before this tool is re-enabled.");
     });
 
     ImGui::GetContext("LightMap").Close();
@@ -384,8 +304,10 @@ void MenuBarWindow::RenderMenuBar()
                 if (ImGui::MenuItem("Exit"))
                 {
                     // Exit action
-					HWND handle = m_sceneRenderer->m_deviceResources->GetWindow()->GetHandle();
-                    PostMessage(handle, WM_CLOSE, 0, 0);
+					if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
+					{
+						PostMessage(deviceResources->GetWindow()->GetHandle(), WM_CLOSE, 0, 0);
+					}
                 }
                 ImGui::PopStyleColor();
                 ImGui::EndMenu();
@@ -718,8 +640,11 @@ void MenuBarWindow::RenderMenuBar()
             // 아래쪽: VRAM 그래프
             ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
             {
-                auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
-                ShowVRAMBarGraph(info.CurrentUsage, info.Budget); // 가로 막대 그래프
+                if (auto* deviceResources = DirectX11::DeviceResources::GetActive())
+                {
+                    auto info = deviceResources->GetVideoMemoryInfo();
+                    ShowVRAMBarGraph(info.CurrentUsage, info.Budget); // 가로 막대 그래프
+                }
             }
             ImGui::EndChild();
         }

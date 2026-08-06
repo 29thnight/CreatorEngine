@@ -3,7 +3,6 @@
 #include "Core.Mathf.h"
 #include "ImGuiRegister.h"
 
-class SceneRenderer;
 class GizmoRenderer;
 class GameObject;
 class Camera;
@@ -17,7 +16,7 @@ struct RayHitResult
 class SceneViewWindow
 {
 public:
-	SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr);
+	SceneViewWindow(Camera* editorCamera, GizmoRenderer* gizmo_ptr);
 	~SceneViewWindow() = default;
 
 	void RenderSceneViewWindow();
@@ -31,7 +30,7 @@ private:
 	std::vector<RayHitResult> PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects);
 	
 private:
-	SceneRenderer* m_sceneRenderer{ nullptr };
+	Camera* m_editorCamera{ nullptr };
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 
 	std::vector<RayHitResult> m_hitResults;

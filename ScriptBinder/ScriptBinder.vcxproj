@@ -102,6 +102,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <Import Project="$(SolutionDir)EngineOutput.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
   </PropertyGroup>
@@ -170,7 +171,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\10.0.10\runtimes\win-x64\native\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -197,7 +198,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\10.0.10\runtimes\win-x64\native\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -226,7 +227,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\10.0.10\runtimes\win-x64\native\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>

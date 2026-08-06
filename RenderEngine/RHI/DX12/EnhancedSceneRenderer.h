@@ -1,16 +1,16 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
+#include <memory>
 #include <string>
 
 struct ID3D11ShaderResourceView;
 class Camera;
+class RenderScene;
+class Scene;
 
-// DX12 렌더러(PHASE 3-3). 기존 SceneRenderer(DX11)와 병존하다가 3-9에서 교체된다.
-//
-// 지금은 브링업 골격이다: 자체 디바이스·큐·펜스·PSO로 프레임을 그려 파일로
-// 증명하는 자가 검증만 가진다. 씬 통합(렌더그래프 실행)은 3-5/3-6에서 이 위에
-// 얹힌다 — 골격이 검증되기 전에 씬을 태우면 실패의 원인 분리가 안 된다.
+// CreatorEngine의 단독 DX12 씬 렌더러. Run* 진단 표면과 메인 런타임을 함께
+// 제공하며, 기존 SceneRenderer(DX11)는 메인 배선에서 제거된 dead code다.
 class EnhancedSceneRenderer
 {
 public:
@@ -119,7 +119,8 @@ public:
     /// RenderPassData에서 스냅샷과 deferredQueue를 읽는다. 남은 변수는
     /// 해상도뿐이라, DX11 GBuffer 텍스처 크기에 맞춰 DX12를 그린다.
     ///
-    /// 에디터가 떠서 DX11이 한 프레임 이상 그린 뒤에만 의미가 있다.
+    /// LEGACY DEAD DIAGNOSTIC. SceneRenderer 단독 운용 제거 뒤 호출 지점이
+    /// 없으며 콘솔에서도 차단한다. 과거 이관 근거 보존용이다.
     bool RunPixelCompareTest(std::string& outLog);
 
     /// 크기 추종 검증 (해상도 슬라이스).
@@ -306,11 +307,12 @@ public:
     /// 원본의 톤 정책(로그 평균·NoL 이중 가중)에 묶여 있기 때문이다.
     bool RunIBLTest(std::string& outLog);
 
-    /// 엔진 스카이박스 텍스처의 DX12 운반 검증 (PHASE 3-6).
+    /// LEGACY DEAD DIAGNOSTIC: 엔진 스카이박스 텍스처의 DX12 운반 검증.
     ///
     /// 살아 있는 SceneRenderer의 큐브맵을 텍스처 캐시로 나르고(Entry의
     /// isCube·arraySize가 이번 확장의 본체), 실물로 3방향을 그리고,
-    /// equirect 원본이 있으면 IBL 생성 체인까지 태운다. 에디터 전용.
+    /// equirect 원본이 있으면 IBL 생성 체인까지 태웠다. SceneRenderer 제거 뒤
+    /// 호출 지점이 없으며 콘솔에서도 차단한다. 새 경로는 dx12.ibl + PIX로 본다.
     bool RunSkySceneTest(std::string& outLog);
 
     /// IBL 앰비언트 소비 검증 (PHASE 3-6).
@@ -344,7 +346,7 @@ public:
     /// 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
     bool RunVolumetricFogTest(std::string& outLog);
 
-    // ── 상시 러너 — 렌더러 스위치의 병존기 구현 (PHASE 3-9 전 단계) ──
+    // ── 메인 런타임 렌더러 (PHASE 3-9 승격) ──
     //
     // 위의 Run* 검증들과 달리 이쪽은 상태를 가진다: 켜 두면 매 프레임 활성
     // 씬을 DX12로 그려 공유 텍스처에 담고, 에디터의 씬 뷰·게임 뷰가 그것을
@@ -354,10 +356,10 @@ public:
     // 상태는 구현 파일(EnhancedSceneRendererLive.cpp) 내부에 숨겼고,
     // 교체(3-9) 때 이 API가 본체 인스턴스로 흡수된다.
     //
-    // 교체가 아니라 병존이다. DX11 SceneRenderer는 여전히 프레임 루프를
-    // 소유하고 매 프레임 그린다 — 이 러너는 표시 텍스처의 공급자만 바꾼다.
-    // 그래서 끄면 즉시 DX11 그림으로 돌아가고, DX12 쪽 실패는 표시 폴백으로
-    // 흡수된다.
+    // SceneRenderer(DX11)는 메인 런타임에서 생성하지 않는다. 이 클래스가
+    // RenderScene·에디터 카메라·프록시 입력·Sky/IBL을 직접 소유하고 유일한
+    // 씬 렌더러로 동작한다. DX11은 에디터 ImGui 셸과 기존 Texture 자산을
+    // DX12로 올리는 브리지에만 남는다.
     //
     // 스레드·수명 규약: TickLive/GetLiveDisplaySrv는 게임 스레드의 프레임
     // 경계에서만 부른다. 렌더 스레드(CE)가 이전 프레임의 ImGui 드로우
@@ -365,34 +367,38 @@ public:
     // 객체를 즉시 해제하지 않고 묘지에 보관한다 — 최종 해제는 렌더 스레드
     // join 이후의 ShutdownLive(Dx11Main::Finalize)에서만 한다.
 
-    /// 켠다. 무겁게 시작하지 않는다 — 파이프라인은 첫 TickLive에서 유효한
-    /// 카메라와 렌더 타깃 크기를 보고 세운다(씬 로딩 전에 켜도 안전).
+    /// SceneRenderer가 예전에 소유하던 런타임 상태를 만든다.
+    static bool InitializeRuntime(std::string& outError);
+
+    static Camera* GetEditorCamera();
+    static RenderScene* GetRenderScene();
+    static void SetActiveScene(Scene* scene);
+
+    /// equirect HDR를 교체한다. 다음 프레임 시작에서 큐브맵과 IBL을 재생성한다.
+    static bool SetSkyBoxPath(const std::string& path, std::string& outError);
+
+    /// 켠다. Enhanced-only 런타임에서는 초기화가 이 상태를 유지한다.
     static void EnableLive();
 
-    /// 끈다. 표시가 즉시 DX11로 돌아가고 DX12 파이프라인은 해체된다.
+    /// 호환 API. 단독 운용 중에는 끌 수 없다.
     static void DisableLive();
 
     static bool IsLiveEnabled();
 
-    /// 프레임 경계(게임 스레드)에서 매 프레임 부른다.
-    static void TickLive();
+    /// PIX programmatic capture 종료 직전에 상시 러너가 제출한 GPU 작업을 모두
+    /// 완료시킨다. 캡처 외의 정상 프레임 경로에서는 호출하지 않는다.
+    static void WaitForLiveGpu();
 
-    /// 이 프레임의 씬 입력을 밀봉한다. 커맨드 빌드(CB) 스레드가
-    /// CreateCommandListPass의 큐가 살아 있는 자리에서 부른다.
-    ///
-    /// ★ 게임 스레드에서 큐를 읽으면 안 된다. 렌더 큐는 CB가 채우고 같은
-    ///   함수 끝의 ClearRenderQueue가 비운다 — 다른 스레드에서 읽는 것은
-    ///   경합이고, 실제로 드로우가 0건이 되어 씬 뷰가 통째로 비었다
-    ///   (CB의 죽은 빌드를 걷어내며 '채움→비움' 창이 거의 0이 된 뒤로
-    ///   거의 항상 졌다). 밀봉은 데이터가 유효한 자리에서 한다.
-    ///
-    /// 넘겨받은 것과 TickLive의 렌더 사이는 렌더 배리어 두 랑데뷰가
-    /// 가른다(CB의 패스는 Update가 돌아오기 전에 끝난다) — 그래서 추가
-    /// 동기화 없이 성립한다.
+    /// 프레임 경계(게임 스레드)에서 매 프레임 부른다. 엔트리 계층이 씬
+    /// 전환 상태와 이번 프레임 카메라를 밀봉해 넘기므로 DX12 구현이
+    /// SceneManager/EngineSetting에 역의존하지 않는다.
+    static void TickLive(float deltaSeconds, Camera* renderCamera, bool sceneLoading);
+
+    /// 진단용 호환 진입점. 메인 런타임은 TickLive에서 자체 상태를 밀봉한다.
     static void CaptureLiveFrame(const Camera* camera);
 
-    /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를, 아니면 nullptr를
-    /// 돌려준다 — nullptr이면 호출부는 기존 DX11 SRV를 쓴다(폴백 한 줄).
+    /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를 돌려준다.
+    /// nullptr는 아직 첫 프레임이 준비되지 않았거나 다른 카메라라는 뜻이다.
     static ID3D11ShaderResourceView* GetLiveDisplaySrv(const Camera* camera);
 
     /// ImGui DX12 셸 모드용 표시 경로. 표시 슬롯의 공유 핸들을 셸 디바이스가

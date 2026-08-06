@@ -1,8 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
-#include "SceneRenderer.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
-#include "EditorImGuiTexture.h"
 #include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "SceneManager.h"
@@ -51,11 +49,7 @@ void GameViewWindow::RenderGameViewWindow()
 		}
 		else
 		{
-			auto renderData = RenderPassData::GetData(camera.get());
-
-			// 렌더러 스위치(dx12.live) — SceneViewWindow와 같은 분기·같은 폴백.
-			ImTextureID displayed = (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(
-				renderData->m_renderTarget->m_pSRV);
+			ImTextureID displayed = 0;
 			if (const uint64_t liveTextureId =
 				EnhancedSceneRenderer::GetLiveDisplayImTextureId(camera.get()))
 			{
@@ -65,7 +59,18 @@ void GameViewWindow::RenderGameViewWindow()
 			{
 				displayed = (ImTextureID)liveSrv;
 			}
-			ImGui::Image(displayed, imageSize);
+			if (displayed != 0)
+			{
+				ImGui::Image(displayed, imageSize);
+			}
+			else
+			{
+				const ImVec2 rectMin = ImGui::GetCursorScreenPos();
+				const ImVec2 rectMax{ rectMin.x + imageSize.x, rectMin.y + imageSize.y };
+				ImGui::InvisibleButton("##EnhancedGameViewPending", imageSize);
+				ImGui::GetWindowDrawList()->AddRectFilled(rectMin, rectMax,
+					ImGui::GetColorU32(ImVec4(0.08f, 0.08f, 0.09f, 1.f)));
+			}
 		}
 	}
 	ImGui::End();

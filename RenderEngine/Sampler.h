@@ -6,6 +6,10 @@ class Sampler
 {
 public:
 	Sampler(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE addressMode);
+	Sampler(D3D11_FILTER filter,
+		D3D11_TEXTURE_ADDRESS_MODE addressU,
+		D3D11_TEXTURE_ADDRESS_MODE addressV,
+		D3D11_TEXTURE_ADDRESS_MODE addressW);
 	~Sampler();
 
 	void Use(uint32_t slot);

@@ -46,6 +46,7 @@ class RenderScene
 public:
 	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
+	using ProxySnapshot			= std::vector<std::shared_ptr<PrimitiveRenderProxy>>;
 	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, std::shared_ptr<Animator>>;
 	// 본 팔레트 버퍼는 소유권을 공유한다.
@@ -136,6 +137,10 @@ public:
 
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	UIRenderProxy* FindUIProxy(size_t guid);
+	// EnhancedRenderer는 DX11 RenderPassData의 카메라별 큐를 거치지 않는다.
+	// 프레임 경계에서 프록시의 shared_ptr을 복사해 수명을 밀봉한 뒤, 필요한
+	// 렌더 입력만 자체 드로우 목록으로 옮긴다.
+	ProxySnapshot GetPrimitiveProxySnapshot();
 	Scene* GetScene() { return m_currentScene; }
 
 	void OnProxyDestroy();

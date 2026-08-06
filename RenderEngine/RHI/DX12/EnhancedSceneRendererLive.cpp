@@ -15,6 +15,8 @@
 #include "EnhancedSSGIPass.h"
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
+#include "EnhancedSkyBoxPass.h"
+#include "EnhancedIBLGenerator.h"
 #include "EnhancedPostChainPass.h"
 #include "EnhancedGridPass.h"
 #include "EnhancedWireFramePass.h"
@@ -29,18 +31,21 @@
 #include "../../RenderScene.h"
 #include "../../LightController.h"
 #include "../../Texture.h"
-#include "../../RenderPassData.h"
 #include "../../MeshRendererProxy.h"
 #include "../../Skeleton.h"
 #include "../../Mesh.h"
+#include "../../RenderState.h"
+#include "../../../Utility_Framework/PathFinder.h"
 
 #include <d3d11_1.h>
 #include <wrl/client.h>
+#include <cstdlib>
 #include <cstdio>
+#include <cmath>
 #include <vector>
 #include <unordered_set>
 
-// EnhancedSceneRenderer의 상시 러너(렌더러 스위치, 병존기) 구현.
+// EnhancedSceneRenderer의 단독 메인 런타임 구현.
 //
 // 공개 표면은 EnhancedSceneRenderer의 정적 Live API다(헤더의 규약 주석 참조).
 // 상태를 이 파일 안의 싱글턴에 숨긴 이유: EnhancedSceneRenderer 인스턴스는
@@ -50,6 +55,37 @@
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
+
+    std::string ReadLivePostEnvironment(const char* name)
+    {
+        const DWORD length = GetEnvironmentVariableA(name, nullptr, 0);
+        if (0 == length) return {};
+
+        std::string value(length, '\0');
+        GetEnvironmentVariableA(name, value.data(), length);
+        value.resize(length - 1);
+        return value;
+    }
+
+    bool ReadLivePostFlag(const char* name, bool fallback)
+    {
+        const std::string value = ReadLivePostEnvironment(name);
+        if (value.empty()) return fallback;
+        if (value == "1" || value == "true" || value == "on") return true;
+        if (value == "0" || value == "false" || value == "off") return false;
+        return fallback;
+    }
+
+    float ReadLivePostFloat(const char* name, float fallback)
+    {
+        const std::string value = ReadLivePostEnvironment(name);
+        if (value.empty()) return fallback;
+
+        char* end = nullptr;
+        const float parsed = std::strtof(value.c_str(), &end);
+        return (end != value.c_str() && '\0' == *end && std::isfinite(parsed))
+            ? parsed : fallback;
+    }
 
     struct LiveStopwatch
     {
@@ -93,7 +129,10 @@ namespace
         EnhancedSSGIPass      ssgi;
         EnhancedForwardPass   forward;
         EnhancedSSAOPass      ssao;
+        EnhancedSkyBoxPass    skyBox;
+        EnhancedIBLGenerator  ibl;
         EnhancedPostChainPass postChain;
+        bool                  iblGenerated{ false };
 
         // 기즈모 체인(에디터 보조 표시 — 승격 판정 ④의 블로커였다).
         // 배선은 dx12.gizmoscene과 같고, 라이브에서는 포스트 체인 LDR 위에
@@ -141,6 +180,18 @@ namespace
         template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
         bool enabled{ false };
+        bool runtimeInitialized{ false };
+
+        // SceneRenderer(DX11)에서 이관한 메인 런타임 소유권.
+        std::shared_ptr<RenderScene> renderScene;
+        std::shared_ptr<Camera>      editorCamera;
+
+        // 원본 HDR는 기존 자산 로더가 만든 DX11 Texture지만 소유자는 이쪽이다.
+        // DX12TextureCache가 프레임 시작에 같은 어댑터의 리소스로 올린 뒤 IBL
+        // 생성기가 큐브맵·조도·프리필터·BRDF LUT를 만든다.
+        std::string                 skyBoxPath;
+        Managed::UniquePtr<Texture> skyEquirect;
+        bool                        skyBoxDirty{ true };
 
         // 지금 표시 중인 그림의 원천 카메라. GetLiveDisplaySrv가 이 포인터와
         // 대조해 '그 카메라의 창'만 교체 표시한다 — 다른 카메라의 창이 엉뚱한
@@ -262,7 +313,33 @@ namespace
             if (!p.ssgi.Initialize(p.frameContext, outError)) return false;
             if (!p.forward.Initialize(p.frameContext, outError)) return false;
             if (!p.ssao.Initialize(p.frameContext, outError)) return false;
+            if (!p.skyBox.Initialize(p.frameContext, outError)) return false;
+            if (!p.ibl.Initialize(p.frameContext, outError)) return false;
             if (!p.postChain.Initialize(p.frameContext, outError)) return false;
+
+            // 저장 씬·카메라·조명을 고정한 채 후처리 한 요소만 끄는 PIX 검증용.
+            // 환경변수가 없으면 Tuning 기본값을 그대로 사용하므로 제품 실행에는
+            // 영향이 없다.
+            {
+                EnhancedPostChainPass::Tuning tuning = p.postChain.GetTuning();
+                tuning.bloomEnabled = ReadLivePostFlag(
+                    "CREATOR_DX12_POST_BLOOM", tuning.bloomEnabled);
+                tuning.toneMapEnabled = ReadLivePostFlag(
+                    "CREATOR_DX12_POST_TONEMAP", tuning.toneMapEnabled);
+                const std::string toneMapper = ReadLivePostEnvironment(
+                    "CREATOR_DX12_POST_TONEMAPPER");
+                if (toneMapper == "aces" || toneMapper == "0")
+                {
+                    tuning.toneMapper = EnhancedPostChainPass::ToneMapper::ACES;
+                }
+                else if (toneMapper == "agx" || toneMapper == "1")
+                {
+                    tuning.toneMapper = EnhancedPostChainPass::ToneMapper::AgX;
+                }
+                tuning.exposure = ReadLivePostFloat(
+                    "CREATOR_DX12_POST_EXPOSURE", tuning.exposure);
+                p.postChain.SetTuning(tuning);
+            }
             // 기즈모 체인은 포스트 체인의 LDR 결과 위에 직접 그린다 —
             // 입력 텍스처에 그리는 구조라 PSO의 RTV 포맷을 거기 맞춰야 한다
             // (어긋나면 커맨드 리스트 무효 → 디바이스 제거, 실측으로 겪었다).
@@ -360,6 +437,8 @@ namespace
             p.wireframe.Shutdown();
             p.grid.Shutdown();
             p.postChain.Shutdown();
+            p.ibl.Shutdown();
+            p.skyBox.Shutdown();
             p.ssao.Shutdown();
             p.forward.Shutdown();
             p.ssgi.Shutdown();
@@ -384,96 +463,119 @@ namespace
         // 들지 않고 필요한 것만 복사한다. 거기와 여기가 갈리면 dx12.scene은
         // 통과하는데 라이브만 틀리는 상태가 되므로, 규칙을 바꿀 때는 두 곳을
         // 함께 바꿀 것.
-        /// CB 스레드가 부른다 — 큐가 살아 있는 자리에서의 밀봉.
+        /// 프레임 경계에서 자체 RenderScene을 밀봉한다. DX11 RenderPassData와
+        /// 카메라별 culling queue는 SceneRenderer와 함께 런타임 경로에서 빠졌다.
         bool CaptureFromCamera(const Camera* sceneCamera)
         {
-            if (nullptr == sceneCamera) return false;
-            if (!RenderPassData::VaildCheck(const_cast<Camera*>(sceneCamera))) return false;
+            if (nullptr == sceneCamera || nullptr == renderScene) return false;
 
-            const RenderPassData* renderData =
-                RenderPassData::GetData(const_cast<Camera*>(sceneCamera));
-            if (nullptr == renderData || nullptr == renderData->m_renderTarget.get())
-            {
-                return false;
-            }
-
-            const uint32_t rtWidth =
-                static_cast<uint32_t>(renderData->m_renderTarget->GetWidth());
-            const uint32_t rtHeight =
-                static_cast<uint32_t>(renderData->m_renderTarget->GetHeight());
+            const uint32_t rtWidth = static_cast<uint32_t>(
+                DirectX11::DeviceStates->g_Viewport.Width);
+            const uint32_t rtHeight = static_cast<uint32_t>(
+                DirectX11::DeviceStates->g_Viewport.Height);
             if (0 == rtWidth || 0 == rtHeight) return false;
 
             capturedCamera = sceneCamera;
             capturedWidth = rtWidth;
             capturedHeight = rtHeight;
 
-            cameraSnapshot = renderData->GetFrameSnapshot();
+            cameraSnapshot.view = sceneCamera->CalculateView();
+            cameraSnapshot.projection =
+                const_cast<Camera*>(sceneCamera)->CalculateProjection();
+            cameraSnapshot.inverseView = XMMatrixInverse(nullptr, cameraSnapshot.view);
+            cameraSnapshot.inverseProjection =
+                XMMatrixInverse(nullptr, cameraSnapshot.projection);
+            cameraSnapshot.eyePosition = sceneCamera->m_eyePosition;
+            cameraSnapshot.forward = sceneCamera->m_forward;
+            cameraSnapshot.right = sceneCamera->m_right;
+            cameraSnapshot.up = sceneCamera->m_up;
+            cameraSnapshot.fov = sceneCamera->m_fov;
+            cameraSnapshot.nearPlane = sceneCamera->m_nearPlane;
+            cameraSnapshot.farPlane = sceneCamera->m_farPlane;
+            cameraSnapshot.isOrthographic = sceneCamera->m_isOrthographic;
 
             draws.clear();
             forwardDraws.clear();
             lights.clear();
 
-            const auto copyQueue = [](const auto& queue, std::vector<EnhancedDrawItem>& out)
+            const auto copyProxy = [](const PrimitiveRenderProxy* proxy,
+                std::vector<EnhancedDrawItem>& out)
             {
-                for (auto* proxy : queue)
+                if (nullptr == proxy ||
+                    PrimitiveProxyType::MeshRenderer != proxy->m_proxyType ||
+                    nullptr == proxy->m_Mesh)
                 {
-                    if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
-
-                    EnhancedDrawItem item{};
-                    item.mesh = proxy->m_Mesh.get();
-                    item.worldMatrix = proxy->m_worldMatrix;
-
-                    if (proxy->m_isAnimationEnabled
-                        && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
-                        && proxy->m_finalTransforms)
-                    {
-                        item.bonePalette = proxy->m_finalTransforms.get();
-                        item.boneCount = Skeleton::MAX_BONES;
-                        item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
-                    }
-
-                    if (auto* material = proxy->m_Material.get())
-                    {
-                        item.baseColor = material->m_pBaseColor;
-                        item.normalMap = material->m_pNormal;
-                        item.occRoughMetal = material->m_pOccRoughMetal;
-                        item.emissive = material->m_pEmissive;
-
-                        item.baseColorFactor = material->m_materialInfo.m_baseColor;
-                        item.metallic = material->m_materialInfo.m_metallic;
-                        item.roughness = material->m_materialInfo.m_roughness;
-                        item.useNormalMap =
-                            (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
-                    }
-
-                    out.push_back(item);
+                    return;
                 }
-            };
-            copyQueue(renderData->m_deferredQueue, draws);
-            copyQueue(renderData->m_forwardQueue, forwardDraws);
 
-            if (auto* renderScene = RenderPassData::GetActiveRenderScene())
-            {
-                auto* lightController = renderScene->m_LightController;
-                if (nullptr != lightController)
+                EnhancedDrawItem item{};
+                item.mesh = proxy->m_Mesh.get();
+                item.worldMatrix = proxy->m_worldMatrix;
+
+                if (proxy->m_isAnimationEnabled
+                    && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
+                    && proxy->m_finalTransforms)
                 {
-                    for (uint32 i = 0; i < lightController->m_lightCount; ++i)
-                    {
-                        const Light& source = lightController->GetLight(i);
+                    item.bonePalette = proxy->m_finalTransforms.get();
+                    item.boneCount = Skeleton::MAX_BONES;
+                    item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
+                }
 
-                        EnhancedLight light{};
-                        light.position = source.m_position;
-                        light.position.w = static_cast<float>(source.m_lightType);
-                        light.direction = source.m_direction;
-                        light.direction.w = XMConvertToRadians(source.m_spotLightAngle);
-                        light.color = source.m_color;
-                        light.color.w = source.m_intencity;
-                        light.attenuation = Mathf::Vector4{
-                            source.m_constantAttenuation, source.m_linearAttenuation,
-                            source.m_quadraticAttenuation, source.m_range };
+                if (auto* material = proxy->m_Material.get())
+                {
+                    item.baseColor = material->m_pBaseColor;
+                    item.normalMap = material->m_pNormal;
+                    item.occRoughMetal = material->m_pOccRoughMetal;
+                    item.emissive = material->m_pEmissive;
 
-                        lights.push_back(light);
-                    }
+                    item.baseColorFactor = material->m_materialInfo.m_baseColor;
+                    item.metallic = material->m_materialInfo.m_metallic;
+                    item.roughness = material->m_materialInfo.m_roughness;
+                    item.useNormalMap =
+                        (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+                }
+
+                out.push_back(item);
+            };
+
+            // shared_ptr 스냅샷이 이 함수가 재질·메시를 복사하는 동안 프록시를
+            // 살려 둔다. 카메라별 큐를 거치지 않으므로 모든 MeshRenderer를
+            // 수집하고 재질 모드로 deferred/forward를 직접 분류한다.
+            const RenderScene::ProxySnapshot proxies =
+                renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& proxy : proxies)
+            {
+                const Material* material = proxy ? proxy->m_Material.get() : nullptr;
+                if (nullptr != material &&
+                    MaterialRenderingMode::Transparent == material->m_renderingMode)
+                {
+                    copyProxy(proxy.get(), forwardDraws);
+                }
+                else
+                {
+                    copyProxy(proxy.get(), draws);
+                }
+            }
+
+            auto* lightController = renderScene->m_LightController;
+            if (nullptr != lightController)
+            {
+                for (uint32 i = 0; i < lightController->m_lightCount; ++i)
+                {
+                    const Light& source = lightController->GetLight(i);
+
+                    EnhancedLight light{};
+                    light.position = source.m_position;
+                    light.position.w = static_cast<float>(source.m_lightType);
+                    light.direction = source.m_direction;
+                    light.direction.w = XMConvertToRadians(source.m_spotLightAngle);
+                    light.color = source.m_color;
+                    light.color.w = source.m_intencity;
+                    light.attenuation = Mathf::Vector4{
+                        source.m_constantAttenuation, source.m_linearAttenuation,
+                        source.m_quadraticAttenuation, source.m_range };
+
+                    lights.push_back(light);
                 }
             }
 
@@ -496,6 +598,55 @@ namespace
             p.profiler.BeginFrame(frameCounter % DX12DeviceResources::kFrameCount);
             ++frameCounter;
 
+            // HDR 원본과 생성물의 소유권은 EnhancedRenderer에 있다. 예전처럼
+            // SceneRenderer의 DX11 SkyBoxPass가 만든 큐브맵을 다시 운반하지
+            // 않는다. 원본 equirect를 한 번 올린 뒤 같은 DX12 커맨드 리스트에서
+            // cube/irradiance/prefilter/BRDF LUT를 생성하고 실제 소비 패스에 묶는다.
+            if (!p.iblGenerated || skyBoxDirty)
+            {
+                if (!skyEquirect)
+                {
+                    try
+                    {
+                        skyEquirect = Texture::LoadManagedFromPath(file::path(skyBoxPath));
+                    }
+                    catch (const std::exception& exception)
+                    {
+                        outError = "HDR 로드 실패: " + std::string(exception.what());
+                        return false;
+                    }
+                }
+
+                if (!skyEquirect)
+                {
+                    outError = "HDR 로드 실패: " + skyBoxPath;
+                    return false;
+                }
+
+                std::string skyUploadError;
+                const DX12TextureCache::Entry skyEntry =
+                    p.textureCache.GetOrUpload(skyEquirect.get(), skyUploadError);
+                if (!skyEntry.IsValid() || skyEntry.isCube)
+                {
+                    outError = "equirect HDR 운반 실패";
+                    if (!skyUploadError.empty()) outError += ": " + skyUploadError;
+                    return false;
+                }
+
+                if (!p.ibl.Generate(p.frameContext, skyEntry.resource, skyEntry.format,
+                    512, 512, outError))
+                {
+                    outError = "HDR→Cube/IBL 생성 실패: " + outError;
+                    return false;
+                }
+
+                p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
+                p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
+                    EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
+                p.iblGenerated = true;
+                skyBoxDirty = false;
+            }
+
             // 기즈모 씬 수집 — 파이프라인이 있어야 라인 패스에 쌓을 수 있어
             // CaptureScene이 아니라 여기(게임 스레드, 프레임 시작)에서 한다.
             // 콜라이더는 DX11과 같은 판정(디버그 모드)을 따른다.
@@ -511,6 +662,7 @@ namespace
             if (!p.ssgi.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.skyBox.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
             lastDrawCount = p.gbuffer.GetLastDrawCount();
             lastBatchCount = p.gbuffer.GetLastBatchCount();
@@ -543,13 +695,26 @@ namespace
 
             p.deferred.Declare(graph, p.frameContext);
 
+            // 하늘은 HDR 조명 타깃에, SSGI보다 먼저 합성한다. Deferred 출력은
+            // RTV 사용이 가능하지만 SSGI 출력은 UAV 전용이므로, SSGI 뒤에
+            // 붙이면 RTV 생성부터 잘못된다. 깊이 테스트가 기하가 없는 픽셀에만
+            // 큐브맵을 남기고 SSGI/포스트 체인이 그 결과를 그대로 소비한다.
+            {
+                EnhancedSkyBoxPass::Inputs skyInputs{};
+                skyInputs.color = p.deferred.GetOutput();
+                skyInputs.depth = outputs.depth;
+                p.skyBox.SetInputs(skyInputs);
+            }
+            p.skyBox.Declare(graph, p.frameContext);
+
             {
                 EnhancedSSGIPass::Inputs ssgiInputs{};
                 ssgiInputs.depth = outputs.depth;
                 ssgiInputs.normal = outputs.normal;
                 ssgiInputs.diffuse = outputs.diffuse;
                 ssgiInputs.metalRough = outputs.metalRough;
-                ssgiInputs.lighting = p.deferred.GetOutput();
+                ssgiInputs.lighting = p.skyBox.GetOutput().IsValid()
+                    ? p.skyBox.GetOutput() : p.deferred.GetOutput();
                 ssgiInputs.ambientOcclusion = p.ssao.GetOutput();
                 p.ssgi.SetInputs(ssgiInputs);
             }
@@ -673,6 +838,105 @@ namespace
     }
 }
 
+bool EnhancedSceneRenderer::InitializeRuntime(std::string& outError)
+{
+    LiveState& state = GetLiveState();
+    if (state.runtimeInitialized)
+    {
+        state.enabled = true;
+        return true;
+    }
+
+    if (nullptr == DirectX11::DeviceStates->g_pDevice)
+    {
+        outError = "DX11 에디터 셸 디바이스 상태가 초기화되지 않았다";
+        return false;
+    }
+
+    try
+    {
+        state.renderScene = std::make_shared<RenderScene>();
+        state.renderScene->Initialize();
+
+        // 카메라는 에디터 도구와 EnhancedRenderer의 프레임 입력 객체다.
+        // SceneRenderer의 카메라별 RenderPassData를 생성하거나 읽지 않는다.
+        state.editorCamera = std::make_shared<Camera>();
+        state.editorCamera->RegisterContainer();
+        state.editorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
+        state.editorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
+
+        ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
+        desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
+        desc.m_eyePosition = Mathf::Vector4{ -1, -1, 1, 0 } * -50.f;
+        desc.m_viewWidth = 100.f;
+        desc.m_viewHeight = 100.f;
+        desc.m_nearPlane = 0.1f;
+        desc.m_farPlane = 1000.f;
+        desc.m_textureWidth = 2048;
+        desc.m_textureHeight = 2048;
+
+        state.skyBoxPath =
+            PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string();
+        state.skyEquirect.reset();
+        state.skyBoxDirty = true;
+        state.runtimeInitialized = true;
+        state.enabled = true;
+        state.lastError.clear();
+
+        return true;
+    }
+    catch (const std::exception& exception)
+    {
+        outError = "EnhancedRenderer 런타임 초기화 실패: " +
+            std::string(exception.what());
+        state.lastError = outError;
+        state.enabled = false;
+        return false;
+    }
+}
+
+Camera* EnhancedSceneRenderer::GetEditorCamera()
+{
+    return GetLiveState().editorCamera.get();
+}
+
+RenderScene* EnhancedSceneRenderer::GetRenderScene()
+{
+    return GetLiveState().renderScene.get();
+}
+
+void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
+{
+    LiveState& state = GetLiveState();
+    if (state.renderScene)
+    {
+        state.renderScene->SetScene(scene);
+        state.renderScene->Update(0.f);
+    }
+}
+
+bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& outError)
+{
+    LiveState& state = GetLiveState();
+    if (!state.runtimeInitialized)
+    {
+        outError = "EnhancedRenderer 런타임이 초기화되지 않았다";
+        return false;
+    }
+    if (path.empty())
+    {
+        outError = "HDR 경로가 비어 있다";
+        return false;
+    }
+
+    state.skyBoxPath = path;
+    state.skyEquirect.reset();
+    state.skyBoxDirty = true;
+    if (state.pipeline) state.pipeline->iblGenerated = false;
+    state.lastError.clear();
+    return true;
+}
+
 void EnhancedSceneRenderer::EnableLive()
 {
     LiveState& state = GetLiveState();
@@ -683,6 +947,11 @@ void EnhancedSceneRenderer::EnableLive()
 void EnhancedSceneRenderer::DisableLive()
 {
     LiveState& state = GetLiveState();
+    if (state.runtimeInitialized)
+    {
+        state.lastError = "Enhanced-only 모드에서는 메인 렌더러를 끌 수 없다";
+        return;
+    }
     state.enabled = false;
     state.TeardownPipeline();
 }
@@ -692,6 +961,15 @@ bool EnhancedSceneRenderer::IsLiveEnabled()
     return GetLiveState().enabled;
 }
 
+void EnhancedSceneRenderer::WaitForLiveGpu()
+{
+    LiveState& state = GetLiveState();
+    if (nullptr != state.pipeline && state.pipeline->resources.IsInitialized())
+    {
+        state.pipeline->resources.WaitForGpu();
+    }
+}
+
 void EnhancedSceneRenderer::CaptureLiveFrame(const Camera* camera)
 {
     LiveState& state = GetLiveState();
@@ -699,10 +977,23 @@ void EnhancedSceneRenderer::CaptureLiveFrame(const Camera* camera)
     state.CaptureFromCamera(camera);
 }
 
-void EnhancedSceneRenderer::TickLive()
+void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* renderCamera,
+    bool sceneLoading)
 {
     LiveState& state = GetLiveState();
     if (!state.enabled) return;
+
+    // SceneRenderer::CreateCommandListPass/EndOfFrame에서 이관한 프레임 입력
+    // 단계. App이 두 렌더 배리어를 모두 지난 뒤 호출하므로 씬 구조 변경과
+    // 에디터 카메라 조작이 끝난 안정된 프레임 경계다.
+    if (state.runtimeInitialized && state.renderScene && !sceneLoading)
+    {
+        ProxyCommandQueue->Execute();
+        state.renderScene->EraseRenderPassData();
+        state.renderScene->Update(deltaSeconds);
+        state.renderScene->OnProxyDestroy();
+        state.CaptureFromCamera(renderCamera ? renderCamera : state.editorCamera.get());
+    }
 
     // 인플라이트 제출분의 완료 확인(논블로킹). 제출 순서대로, 완료된 것을
     // 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가 끝난' 슬롯뿐이라는
@@ -847,7 +1138,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
 
     char line[384]{};
     std::snprintf(line, sizeof(line),
-        "dx12.live — %s · 파이프라인 %s · %ux%u · 렌더 %llu프레임(대기 %llu)"
+        "EnhancedRenderer(DX12) — %s · 파이프라인 %s · %ux%u · 렌더 %llu프레임(대기 %llu)"
         " · 인플라이트 스킵 %llu · 드로우 %u(배치 %u) · CPU %.2f ms · GPU %.2f ms"
         " · 묘지 %zu",
         state.enabled ? "켜짐" : "꺼짐",
@@ -880,6 +1171,26 @@ void EnhancedSceneRenderer::ShutdownLive()
         grave.sharedTexture.Reset();
     }
     state.graveyard.clear();
+
+    if (state.runtimeInitialized)
+    {
+        // 카메라 관리 컨테이너는 RenderScene보다 먼저 내린다.
+        if (state.editorCamera)
+        {
+            CameraManagement->DeleteCamera(state.editorCamera->m_cameraIndex);
+            state.editorCamera.reset();
+        }
+        CameraManagement->Finalize();
+
+        state.skyEquirect.reset();
+        if (state.renderScene)
+        {
+            // SceneManager::Decommissioning이 활성 RenderScene을 먼저 Finalize한다.
+            // 여기서 다시 부르면 LightController/컨테이너를 이중 정리한다.
+            state.renderScene.reset();
+        }
+        state.runtimeInitialized = false;
+    }
 }
 
 #endif

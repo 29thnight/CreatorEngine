@@ -5,16 +5,14 @@
 #include <imgui_internal.h>
 #include "CurvePoint.h"
 
-class SceneRenderer;
 class GameObject;
 class InspectorWindow
 {
 public:
-	InspectorWindow(SceneRenderer* ptr);
+	InspectorWindow();
 	~InspectorWindow() = default;
 
 private:
-	SceneRenderer* m_sceneRenderer{ nullptr };
 	bool m_openScriptPopup{ false };
 	bool m_openNewScriptPopup{ false };
 	bool m_openNewTagPopup{ false };

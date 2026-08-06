@@ -114,15 +114,8 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 		ImGui::Separator();
 		if (ImGui::CollapsingHeader("EditorPass"))
 		{
-			if (ImGui::CollapsingHeader("GizmoPass"))
-			{
-				m_gizmoRenderer->m_pGizmoPass->ControlPanel();
-			}
-
-			if (ImGui::CollapsingHeader("GridPass"))
-			{
-				m_gizmoRenderer->m_pGridPass->ControlPanel();
-			}
+			ImGui::TextUnformatted(
+				"DX11 editor passes are dead code; use EnhancedRenderer controls.");
 		}
 	}, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 

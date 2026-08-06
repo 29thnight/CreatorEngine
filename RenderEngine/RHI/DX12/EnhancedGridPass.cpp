@@ -118,6 +118,9 @@ float4 PSMain(VSOut input) : SV_TARGET
 
     const float3 color = lerp(gCheckerColor.rgb, gGridColor.rgb, lineMask);
 
+    // 완전히 투명한 셀 내부는 색뿐 아니라 깊이도 건드리면 안 된다. 알파 0을
+    // 반환하는 것만으로는 early/late depth write가 남아 뒤의 기즈모를 가린다.
+    clip(alpha - 1e-4f);
     return float4(color, alpha);
 }
 )";
@@ -201,7 +204,24 @@ bool EnhancedGridPass::CreatePipelines(const EnhancedFrameContext& context, std:
     desc.depthEnable = true;
 
     // 선 사이가 투명해야 아래 그림이 비친다 — 알파 블렌딩이 그리드의 본질이다.
-    desc.blendEnable = true;
+    //
+    // 공용 blendEnable 경로의 알파식은 ONE/ZERO라서 destination alpha를
+    // source alpha로 교체한다. 그리드 셀 내부의 source alpha는 0이므로,
+    // 포스트 체인의 불투명 출력까지 투명해져 최종 합성에서 검게 보인다.
+    // RGB는 기존 SRC_ALPHA/INV_SRC_ALPHA를 유지하고, 알파만 straight-alpha
+    // 누적식 As + Ad*(1-As)을 써서 불투명 배경은 1로 보존한다.
+    desc.independentBlend = true;
+    auto& blend = desc.renderTargetBlend[0];
+    blend.BlendEnable = TRUE;
+    blend.LogicOpEnable = FALSE;
+    blend.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    blend.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    blend.BlendOp = D3D12_BLEND_OP_ADD;
+    blend.SrcBlendAlpha = D3D12_BLEND_ONE;
+    blend.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+    blend.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    blend.LogicOp = D3D12_LOGIC_OP_NOOP;
+    blend.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     desc.cullMode = D3D12_CULL_MODE_NONE;   // DX11도 CULL_NONE이다(아래에서 봐도 그린다)
     desc.numRenderTargets = 1;
     desc.rtvFormats[0] = m_outputFormat;

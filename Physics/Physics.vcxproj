@@ -34,6 +34,18 @@
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <CudaToolkitCustomDir>
     </CudaToolkitCustomDir>
+    <!--
+      CUDA 12.8 설치 관리자는 알려진 Visual Studio 버전에만 BuildCustomizations를
+      복사한다. 더 새 Visual Studio에서는 툴킷은 설치되어 있어도 v180 폴더에
+      props/targets가 없어 프로젝트 로드부터 실패한다. 먼저 VS 통합 폴더를 쓰고,
+      없으면 CUDA 자체가 제공하는 원본 MSBuildExtensions로 내려간다.
+    -->
+    <CudaBuildCustomizationsDir Condition="'$(CudaBuildCustomizationsDir)' == ''">$(VCTargetsPath)\BuildCustomizations</CudaBuildCustomizationsDir>
+    <CudaToolkitInstallDir Condition="'$(CUDA_PATH_V12_8)' != ''">$(CUDA_PATH_V12_8)</CudaToolkitInstallDir>
+    <CudaToolkitInstallDir Condition="'$(CudaToolkitInstallDir)' == '' and Exists('$(ProgramW6432)\NVIDIA GPU Computing Toolkit\CUDA\v12.8')">$(ProgramW6432)\NVIDIA GPU Computing Toolkit\CUDA\v12.8</CudaToolkitInstallDir>
+    <CudaToolkitCustomDir Condition="'$(CudaToolkitCustomDir)' == ''">$(CudaToolkitInstallDir)</CudaToolkitCustomDir>
+    <CudaToolkitIncludeDir Condition="'$(CudaToolkitIncludeDir)' == ''">$(CudaToolkitInstallDir)\include</CudaToolkitIncludeDir>
+    <CudaBuildCustomizationsDir Condition="!Exists('$(CudaBuildCustomizationsDir)\CUDA 12.8.props') and Exists('$(CudaToolkitInstallDir)\extras\visual_studio_integration\MSBuildExtensions\CUDA 12.8.props')">$(CudaToolkitInstallDir)\extras\visual_studio_integration\MSBuildExtensions</CudaBuildCustomizationsDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -82,7 +94,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.props" />
+    <Import Project="$(CudaBuildCustomizationsDir)\CUDA 12.8.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -180,7 +192,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
@@ -218,7 +230,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
@@ -243,7 +255,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(CudaToolkitIncludeDir);$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
@@ -316,6 +328,6 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.targets" />
+    <Import Project="$(CudaBuildCustomizationsDir)\CUDA 12.8.targets" />
   </ImportGroup>
 </Project>

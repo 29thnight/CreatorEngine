@@ -3,12 +3,20 @@
 #include "Core.Memory.hpp"
 
 Sampler::Sampler(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE addressMode)
+	: Sampler(filter, addressMode, addressMode, addressMode)
+{
+}
+
+Sampler::Sampler(D3D11_FILTER filter,
+	D3D11_TEXTURE_ADDRESS_MODE addressU,
+	D3D11_TEXTURE_ADDRESS_MODE addressV,
+	D3D11_TEXTURE_ADDRESS_MODE addressW)
 {
 	CD3D11_SAMPLER_DESC samplerDesc{ CD3D11_DEFAULT() };
 	samplerDesc.Filter = filter;
-	samplerDesc.AddressU = addressMode;
-	samplerDesc.AddressV = addressMode;
-	samplerDesc.AddressW = addressMode;
+	samplerDesc.AddressU = addressU;
+	samplerDesc.AddressV = addressV;
+	samplerDesc.AddressW = addressW;
 	samplerDesc.MaxAnisotropy = 16u;
 
 	DirectX11::CreateSamplerState(&samplerDesc,	&m_SamplerState);

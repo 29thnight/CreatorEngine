@@ -1,8 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
-#include "SceneRenderer.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
-#include "EditorImGuiTexture.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "IconsFontAwesome6.h"
@@ -62,8 +60,8 @@ bool RayIntersectsPlane(const Ray& ray, const Mathf::Vector3& planeNormal, const
 	return true;
 }
 
-SceneViewWindow::SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) : 
-	m_sceneRenderer(ptr),
+SceneViewWindow::SceneViewWindow(Camera* editorCamera, GizmoRenderer* gizmo_ptr) :
+	m_editorCamera(editorCamera),
 	m_gizmoRenderer(gizmo_ptr)
 {
 }
@@ -89,28 +87,28 @@ void SceneViewWindow::RenderSceneViewWindow()
 			XMStoreFloat4x4(&objMat, mat);
 		}
 
-		auto view = m_sceneRenderer->m_pEditorCamera->CalculateView();
+		auto view = m_editorCamera->CalculateView();
 		XMFLOAT4X4 floatMatrix;
 		XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_sceneRenderer->m_pEditorCamera->CalculateProjection();
+		auto proj = m_editorCamera->CalculateProjection();
 		XMFLOAT4X4 projMatrix;
 		XMStoreFloat4x4(&projMatrix, proj);
 
-		RenderSceneView(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_sceneRenderer->m_pEditorCamera.get());
+		RenderSceneView(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_editorCamera);
 
 	}
 	else
 	{
-		auto view = m_sceneRenderer->m_pEditorCamera->CalculateView();
+		auto view = m_editorCamera->CalculateView();
 		XMFLOAT4X4 floatMatrix;
 		XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_sceneRenderer->m_pEditorCamera->CalculateProjection();
+		auto proj = m_editorCamera->CalculateProjection();
 		XMFLOAT4X4 projMatrix;
 		XMStoreFloat4x4(&projMatrix, proj);
 		XMFLOAT4X4 identityMatrix;
 		XMStoreFloat4x4(&identityMatrix, XMMatrixIdentity());
 
-		RenderSceneView(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_sceneRenderer->m_pEditorCamera.get());
+		RenderSceneView(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_editorCamera);
 	}
 }
 
@@ -135,7 +133,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
 
 
-	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
+	ImGuizmo::SetOrthographic(m_editorCamera->m_isOrthographic);
 	ImGuizmo::BeginFrame();
 	bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
 	bool rightMouse = InputManagement->IsMouseButtonPressed(MouseKey::RIGHT) || ImGui::IsMouseDown(ImGuiMouseButton_Right);
@@ -191,13 +189,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		auto scene = SceneManagers->GetRenderScene();
 
-		auto renderData = RenderPassData::GetData(cam);
-
-		// 렌더러 스위치(dx12.live). DX12 상시 러너가 이 카메라의 그림을 방금
-		// 그렸으면 그것을, 아니면 DX11 결과를 표시한다 — nullptr 폴백이 항상
-		// 있어 DX12 쪽 실패가 빈 화면으로 번지지 않는다.
-		ImTextureID displayed = (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(
-			renderData->m_renderTarget->m_pSRV);
+		// EnhancedRenderer가 유일한 표시 공급자다. 첫 GPU 프레임 전에는
+		// 명시적인 준비 배경을 그리며 DX11 RenderPassData로 폴백하지 않는다.
+		ImTextureID displayed = 0;
 		if (const uint64_t liveTextureId =
 			EnhancedSceneRenderer::GetLiveDisplayImTextureId(cam))
 		{
@@ -207,7 +201,18 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		{
 			displayed = (ImTextureID)liveSrv;         // DX11 백엔드 표시
 		}
-		ImGui::Image(displayed, ImVec2(x, y));
+		if (displayed != 0)
+		{
+			ImGui::Image(displayed, ImVec2(x, y));
+		}
+		else
+		{
+			const ImVec2 min = ImGui::GetCursorScreenPos();
+			const ImVec2 max{ min.x + x, min.y + y };
+			ImGui::InvisibleButton("##EnhancedRendererPending", ImVec2(x, y));
+			ImGui::GetWindowDrawList()->AddRectFilled(min, max,
+				ImGui::GetColorU32(ImVec4(0.08f, 0.08f, 0.09f, 1.f)));
+		}
 		imageMin = ImGui::GetItemRectMin();
 		imageMax = ImGui::GetItemRectMax();
 
@@ -234,9 +239,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		currentPos = ImGui::GetCursorScreenPos();
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 
-		if (ImGui::Button(m_sceneRenderer->m_pEditorCamera->m_isOrthographic ? ICON_FA_EYE_LOW_VISION " Orthographic" : ICON_FA_ARROWS_TO_EYE " Perspective"))
+		if (ImGui::Button(m_editorCamera->m_isOrthographic ? ICON_FA_EYE_LOW_VISION " Orthographic" : ICON_FA_ARROWS_TO_EYE " Perspective"))
 		{
-			m_sceneRenderer->m_pEditorCamera->m_isOrthographic = !m_sceneRenderer->m_pEditorCamera->m_isOrthographic;
+			m_editorCamera->m_isOrthographic = !m_editorCamera->m_isOrthographic;
 		}
 
 		ImGui::SameLine();
@@ -823,7 +828,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
 				EngineSettingInstance->GetRenderPassSettingsRW().skyboxTextureName = filepath.string();
-				m_sceneRenderer->ApplyNewCubeMap(filepath.string());
+				std::string skyError;
+				if (!EnhancedSceneRenderer::SetSkyBoxPath(filepath.string(), skyError))
+				{
+					Debug->LogError("SkyBox 변경 실패: " + skyError);
+				}
 			}
 
 			if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))

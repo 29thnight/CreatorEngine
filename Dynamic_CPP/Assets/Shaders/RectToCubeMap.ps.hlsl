@@ -8,7 +8,9 @@ struct PixelShaderInput
     float3 texCoord : TEXCOORD;
 };
 
-static const float2 invAtan = float2(0.1591, 0.3183);
+// 1/(2*pi), 1/pi. 4자리 근삿값은 4K HDR에서 U를 최대 약 0.7 texel
+// 이동시키므로 충분한 정밀도로 고정한다.
+static const float2 invAtan = float2(0.15915494309189535, 0.3183098861837907);
 float2 SampleSphericalMap(float3 v)
 {
     float2 uv = float2(atan2(v.z, v.x), -asin(v.y));

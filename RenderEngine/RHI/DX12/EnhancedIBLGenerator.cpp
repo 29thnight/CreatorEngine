@@ -106,7 +106,7 @@ struct VSOut
     float3 texCoord : TEXCOORD0;
 };
 
-static const float2 invAtan = float2(0.1591, 0.3183);
+static const float2 invAtan = float2(0.15915494309189535, 0.3183098861837907);
 float2 SampleSphericalMap(float3 v)
 {
     float2 uv = float2(atan2(v.z, v.x), -asin(v.y));
@@ -465,8 +465,9 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
 bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     std::string& outError)
 {
-    // b0 드로우 상수 · t0 소스 텍스처(테이블) · s0 선형 WRAP 샘플러
-    // (DX11 LinearSampler와 동일 — equirect 이음매에서 WRAP이 필요하다).
+    // b0 드로우 상수 · t0 소스 텍스처(테이블) · s0 선형 샘플러.
+    // Equirect는 경도 U만 순환하고 위도 V는 극에서 멈춰야 한다. V까지
+    // WRAP하면 +Y/-Y 극점에서 반대편 행이 선형 필터에 섞인다.
     D3D12_DESCRIPTOR_RANGE sourceRange{};
     sourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     sourceRange.NumDescriptors = 1;
@@ -482,8 +483,8 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     D3D12_STATIC_SAMPLER_DESC sampler{};
     sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     sampler.MaxLOD = D3D12_FLOAT32_MAX;
     sampler.ShaderRegister = 0;
     sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;

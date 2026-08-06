@@ -130,6 +130,22 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 	return counts;
 }
 
+RenderScene::ProxySnapshot RenderScene::GetPrimitiveProxySnapshot()
+{
+	ProxySnapshot snapshot;
+	SpinLock lock(m_proxyMapFlag);
+	snapshot.reserve(m_proxyMap.size());
+	for (const auto& [guid, proxy] : m_proxyMap)
+	{
+		(void)guid;
+		if (proxy != nullptr)
+		{
+			snapshot.push_back(proxy);
+		}
+	}
+	return snapshot;
+}
+
 RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
 {
 	if (m_renderDataMap.empty())
