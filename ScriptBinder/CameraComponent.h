@@ -21,7 +21,7 @@ public:
 
 	void Awake() override
 	{
-		//�� �κ��� ���ϴ� ���� �����ؼ� �ٽ� �ۼ�
+		//�� �κ��� ���ϴ� ���� �����ؼ� �ٽ� �ۼ�
 /*		if (m_cameraIndex != -1)
 		{
 			m_pCamera = CameraManagement->GetCamera(1);
@@ -40,12 +40,12 @@ public:
 				m_pCamera->RegisterContainer();
 			}
 			m_cameraIndex = m_pCamera->m_cameraIndex;
-		}*/		//���� ������ ���� �ּ�
+		}*/		//���� ������ ���� �ּ�
 		auto camera = CameraManagement->GetCamera(1);
 
 		if(m_pCamera != camera)
 		{
-			m_pCamera.swap(camera); //�ӽ÷� 1�� ī�޶� ����
+			m_pCamera.swap(camera); //�ӽ÷� 1�� ī�޶� ����
 			m_Camera = m_pCamera.get();
 		}
 
@@ -79,8 +79,13 @@ public:
 
 	void OnDestroy() override
 	{
-		Scene* scene = SceneManagers->GetActiveScene();
-		if("PlayScene" != scene->m_sceneName.ToString())
+		// 재생 중에는 카메라를 놓지 않는다.
+		//
+		// 예전에는 활성 씬 이름이 "PlayScene"인지로 판정했다. 재생 시작이 그
+		// 이름의 사본 씬을 만들던 시절의 조건인데, 지금은 씬을 복제하지 않고
+		// 같은 씬으로 플레이하므로 이름이 바뀌지 않는다 — 그대로 두면 재생 중
+		// 파괴에서도 카메라를 놓아 화면이 끊긴다.
+		if (!SceneManagers->IsGameStart())
 		{
 			m_pCamera = nullptr;
 			m_cameraIndex = -1;

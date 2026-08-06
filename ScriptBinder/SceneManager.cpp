@@ -19,33 +19,10 @@
 #include "DeviceResources.h"
 #include "ScriptComponent.h"
 
-namespace
-{
-    /// 씬에 붙어 있는 모든 스크립트의 관리 인스턴스를 접는다.
-    ///
-    /// 재생 시작은 에디터 씬을 직렬화해 PlayScene을 새로 만드는 사본 방식이라,
-    /// 원본 씬이 파괴되지 않고 그대로 남는다. 원본의 인스턴스를 그냥 두면
-    /// 사본의 인스턴스와 둘 다 BehaviourRegistry에서 틱을 받아 로직이 두 벌 돈다
-    /// (실측: 활성 스크립트 2개, Update 카운터가 한 프레임 어긋난 두 벌).
-    ///
-    /// 정지해서 에디터 씬으로 돌아오면 Scene::Awake가 매 프레임 도므로
-    /// ScriptComponent::Awake가 저장해 둔 값으로 알아서 되살린다 — 깨우는 쪽은 따로 없다.
-    void SuspendSceneScripts(Scene* scene)
-    {
-        if (nullptr == scene) return;
-
-        for (const auto& object : scene->m_SceneObjects)
-        {
-            if (!object) continue;
-
-            // 한 오브젝트에 스크립트가 여럿 붙을 수 있다.
-            for (ScriptComponent* script : object->GetComponents<ScriptComponent>())
-            {
-                if (nullptr != script) script->SuspendInstance();
-            }
-        }
-    }
-}
+// 예전에는 여기에 SuspendSceneScripts가 있었다. 재생 시작이 에디터 씬을 복제해
+// PlayScene을 만들던 시절, 원본과 사본의 스크립트 인스턴스가 둘 다 틱을 받아
+// 로직이 두 벌 도는 것을 막는 봉합이었다. 씬을 복제하지 않게 되면서 두 벌이
+// 생길 여지 자체가 사라져 걷어냈다.
 #endif
 
 void SceneManager::SetGameStart(bool isStart)
@@ -974,49 +951,33 @@ void SceneManager::VolumeProfileApply()
 
 void SceneManager::CreateEditorOnlyPlayScene()
 {
-    MetaYml::Node sceneNode{};
-
+    // 재생 시작. 씬을 복제하지 않고 지금 씬을 그대로 플레이한다.
+    //
+    // 예전에는 에디터 씬을 직렬화해 PlayScene을 따로 만들고 활성 씬을 그쪽으로
+    // 옮겼다. 그러면 두 씬이 메모리에 공존하는데, 렌더는 RenderScene 하나에
+    // 모든 프록시를 모아 두고 씬 구분 없이 그리므로 에디터 씬 오브젝트가
+    // 플레이 화면에 함께 보였다. 로직 쪽에서도 같은 문제가 먼저 나와
+    // SuspendSceneScripts로 스크립트가 두 벌 도는 것을 막고 있었다.
+    //
+    // 유니티가 쓰는 방식으로 바꾼다 — 씬을 백업해 두고 그 씬 자체로 플레이한 뒤
+    // 정지할 때 백업으로 되돌린다. 씬이 하나뿐이므로 '두 벌' 문제가 계층마다
+    // 반복될 여지가 사라진다. (언리얼은 반대로 PIE 월드를 복제하되 월드마다
+    // FScene을 따로 두는 쪽이다. 어느 한쪽을 온전히 따라야 하고, 지금 구조는
+    // 렌더 씬이 하나이므로 이쪽이 맞다.)
     try
     {
         PROFILE_CPU_BEGIN("UndoCommandManager::ClearGameMode");
         Meta::UndoCommandManager->ClearGameMode();
 		Meta::UndoCommandManager->Clear();
         PROFILE_CPU_END();
-        //resetSelectedObjectEvent.Broadcast();
-
-#ifndef DYNAMICCPP_EXPORTS
-        // 직렬화 전에 재운다. SuspendInstance가 CaptureFields를 먼저 하므로
-        // 편집 중이던 최신 값이 m_fieldData에 담긴 채로 사본에 실린다.
-        SuspendSceneScripts(m_activeScene.load());
-#endif
 
         PROFILE_CPU_BEGIN("Serialize");
-        sceneNode = Meta::Serialize(m_activeScene.load());
+        // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
+        // 이유는 사본이 없어 두 벌이 생기지 않기 때문이다 — 지금 씬의 인스턴스가
+        // 그대로 플레이 인스턴스가 된다.
+        m_editorSceneBackup = Meta::Serialize(m_activeScene.load());
         PROFILE_CPU_END();
         resourceTrimEvent.Broadcast();
-
-        PROFILE_CPU_BEGIN("DesirealizeGameObject");
-		Scene* playScene = Scene::LoadScene("PlayScene");
-        m_scenes.push_back(playScene);
-        m_EditorSceneIndex = m_activeSceneIndex;
-        m_activeSceneIndex = m_scenes.size() - 1;
-        m_activeScene = playScene;
-        for (const auto& objNode : sceneNode["m_SceneObjects"])
-        {
-            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-            if (!type)
-            {
-                Debug->LogError("Failed to extract type from YAML node.");
-                continue;
-            }
-
-            DesirealizeGameObject(type, objNode);
-        }
-        PROFILE_CPU_END();
-        m_activeScene.load()->AllUpdateWorldMatrix();
-
-		activeSceneChangedEvent.Broadcast();
-		sceneLoadedEvent.Broadcast();
     }
     catch (const std::exception& e)
     {
@@ -1027,27 +988,74 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
 void SceneManager::DeleteEditorOnlyPlayScene()
 {
-	if (m_activeScene)
-	{
-        resetSelectedObjectEvent.Broadcast();
-        sceneUnloadedEvent.Broadcast();
-		m_activeScene.load()->AllDestroyMark();
-		m_activeScene.load()->OnDisable();
-		m_activeScene.load()->OnDestroy();
-		m_activeScene = nullptr;
-	}
+    // 재생 정지. 같은 Scene 객체를 비우고 백업으로 되채운다.
+    Scene* scene = m_activeScene.load();
+    if (nullptr == scene)
+    {
+        m_isEditorSceneLoaded = false;
+        return;
+    }
 
-	Scene* swapScene = m_scenes[m_activeSceneIndex];
+    if (!m_editorSceneBackup || !m_editorSceneBackup["m_SceneObjects"])
+    {
+        // 백업이 없으면 되돌릴 기준이 없다. 씬을 비우면 복구 불가능한 손실이
+        // 되므로 그대로 둔다 — 재생 중 상태가 남는 편이 빈 씬보다 낫다.
+        Debug->LogError("[PIE] 에디터 씬 백업이 없어 복원하지 못했다");
+        m_isEditorSceneLoaded = false;
+        return;
+    }
 
-    std::erase_if(m_scenes,
-        [&](const auto& scene) { return scene == swapScene; });
+    resetSelectedObjectEvent.Broadcast();
+    sceneUnloadedEvent.Broadcast();
 
-    delete swapScene;
-	swapScene = nullptr;
+    scene->AllDestroyMark();
+    scene->OnDisable();
+    scene->OnDestroy();
 
-	m_activeSceneIndex = m_EditorSceneIndex;
-	m_activeScene = m_scenes[m_EditorSceneIndex];
-	activeSceneChangedEvent.Broadcast();
+    // 살아남은 오브젝트(DontDestroyOnLoad)는 백업에도 실려 있다. 그대로
+    // 역직렬화하면 같은 객체가 한 벌 더 생기므로 instanceID로 걸러낸다.
+    // DDOL을 파괴하지 않는 것은 현재 엔진의 정책을 그대로 둔 것이다 —
+    // 유니티는 재생 종료 때 DDOL도 버리지만, 그 정책 변경은 이 수정의
+    // 범위 밖이고 회귀 범위가 훨씬 넓다.
+    std::unordered_set<size_t> survivingIds;
+    for (const auto& object : scene->m_SceneObjects)
+    {
+        if (object) survivingIds.insert(object->GetInstanceID());
+    }
+
+    try
+    {
+        PROFILE_CPU_BEGIN("RestoreEditorScene");
+        for (const auto& objNode : m_editorSceneBackup["m_SceneObjects"])
+        {
+            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            if (!type)
+            {
+                Debug->LogError("Failed to extract type from YAML node.");
+                continue;
+            }
+
+            if (objNode["m_instanceID"] &&
+                survivingIds.contains(objNode["m_instanceID"].as<size_t>()))
+            {
+                continue;
+            }
+
+            DesirealizeGameObject(type, objNode);
+        }
+        PROFILE_CPU_END();
+
+        scene->AllUpdateWorldMatrix();
+    }
+    catch (const std::exception& e)
+    {
+        Debug->LogError(e.what());
+    }
+
+    m_editorSceneBackup = MetaYml::Node{};
+
+    activeSceneChangedEvent.Broadcast();
+    sceneLoadedEvent.Broadcast();
 
 	m_isEditorSceneLoaded = false;
 }

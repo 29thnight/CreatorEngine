@@ -128,6 +128,10 @@ private:
 private:
     std::atomic<Scene*>                 m_sceneToActivate{};
     std::vector<Scene*>                 m_scenes{};
+
+    // 재생 시작 직전의 에디터 씬 스냅샷. 정지하면 이 노드로 같은 Scene 객체를
+    // 되채운다(EnterPlayMode/ExitPlayMode 주석 참조).
+    MetaYml::Node                       m_editorSceneBackup{};
     std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};
     AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
     std::atomic<Scene*>                 m_activeScene{};
