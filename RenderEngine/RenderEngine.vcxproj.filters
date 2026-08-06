@@ -458,9 +458,6 @@
     <ClCompile Include="TerrainGizmoPass.cpp">
       <Filter>RenderPass\GizmoPass</Filter>
     </ClCompile>
-    <ClCompile Include="ProxyCommand.cpp">
-      <Filter>ProxyCommandQueue\ProxyCommand</Filter>
-    </ClCompile>
     <ClCompile Include="MeshRendererProxy.cpp">
       <Filter>Objects\MeshRendererProxy</Filter>
     </ClCompile>

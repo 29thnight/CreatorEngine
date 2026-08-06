@@ -59,15 +59,6 @@ RenderEngine/ModelLoader.cpp -> SceneManager.h
 RenderEngine/ModelLoader.h -> Scene.h
 RenderEngine/PositionMapPass.cpp -> GameObject.h
 RenderEngine/PositionMapPass.cpp -> Scene.h
-RenderEngine/ProxyCommand.cpp -> DecalComponent.h
-RenderEngine/ProxyCommand.cpp -> FoliageComponent.h
-RenderEngine/ProxyCommand.cpp -> ImageComponent.h
-RenderEngine/ProxyCommand.cpp -> MeshRenderer.h
-RenderEngine/ProxyCommand.cpp -> SceneManager.h
-RenderEngine/ProxyCommand.cpp -> SpriteRenderer.h
-RenderEngine/ProxyCommand.cpp -> SpriteSheetComponent.h
-RenderEngine/ProxyCommand.cpp -> Terrain.h
-RenderEngine/ProxyCommand.cpp -> TextComponent.h
 RenderEngine/RenderPassData.cpp -> SceneManager.h
 RenderEngine/RenderScene.cpp -> Animator.h
 RenderEngine/RenderScene.cpp -> DecalComponent.h

@@ -1,4 +1,5 @@
 #include "ProxyCommand.h"
+#include "Animator.h"
 #include "MeshRenderer.h"
 #include "Terrain.h"
 #include "FoliageComponent.h"

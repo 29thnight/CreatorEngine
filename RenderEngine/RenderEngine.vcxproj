@@ -246,7 +246,6 @@
     <ClCompile Include="DecalPass.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
-    <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderGraphBuilder.cpp" />
     <ClCompile Include="ShaderDSL.cpp" />
