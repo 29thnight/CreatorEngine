@@ -174,7 +174,7 @@
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 			<CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -202,7 +202,7 @@
 			<PrecompiledHeader>NotUsing</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../Physics\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../Physics\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 			<CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -231,7 +231,7 @@
 			<PrecompiledHeader>NotUsing</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../Physics\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../Physics\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 			<CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>

@@ -362,6 +362,14 @@
     <ClCompile Include="WireFramePass.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Interfaces\LightProperty.h" />
+    <ClInclude Include="Interfaces\TerrainBuffers.h" />
+    <ClInclude Include="Interfaces\LightMapping.h" />
+    <ClInclude Include="Interfaces\FoliageInstance.h" />
+    <ClInclude Include="Interfaces\FoliageType.h" />
+    <ClInclude Include="Interfaces\LightMapping.generated.h" />
+    <ClInclude Include="Interfaces\FoliageInstance.generated.h" />
+    <ClInclude Include="Interfaces\FoliageType.generated.h" />
     <ClInclude Include="AAPassSetting.h" />
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />

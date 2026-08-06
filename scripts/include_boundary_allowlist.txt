@@ -10,7 +10,6 @@ RenderEngine/AnimationJob.cpp -> SceneManager.h
 RenderEngine/Camera.cpp -> InputManager.h
 RenderEngine/Camera.cpp -> MeshRenderer.h
 RenderEngine/Camera.cpp -> SceneManager.h
-RenderEngine/Camera.h -> LightProperty.h
 RenderEngine/DataSystem.cpp -> PrefabEditor.h
 RenderEngine/DataSystem.cpp -> PrefabUtility.h
 RenderEngine/DataSystem.cpp -> SceneManager.h
@@ -39,7 +38,6 @@ RenderEngine/GizmoPass.cpp -> CameraComponent.h
 RenderEngine/GizmoPass.cpp -> LightComponent.h
 RenderEngine/GizmoPass.cpp -> Scene.h
 RenderEngine/LightMap.cpp -> GameObject.h
-RenderEngine/LightMap.cpp -> LightProperty.h
 RenderEngine/LightMap.cpp -> MeshRenderer.h
 RenderEngine/LightMap.cpp -> Scene.h
 RenderEngine/LightMap.cpp -> SceneManager.h
@@ -51,10 +49,6 @@ RenderEngine/MeshRendererProxy.cpp -> FoliageComponent.h
 RenderEngine/MeshRendererProxy.cpp -> MeshRenderer.h
 RenderEngine/MeshRendererProxy.cpp -> SpriteRenderer.h
 RenderEngine/MeshRendererProxy.cpp -> Terrain.h
-RenderEngine/MeshRendererProxy.h -> FoliageInstance.h
-RenderEngine/MeshRendererProxy.h -> FoliageType.h
-RenderEngine/MeshRendererProxy.h -> LightMapping.h
-RenderEngine/MeshRendererProxy.h -> TerrainBuffers.h
 RenderEngine/MeshRendererProxy.h -> Transform.h
 RenderEngine/Model.cpp -> SceneManager.h
 RenderEngine/Model.h -> GameObject.h
@@ -79,7 +73,6 @@ RenderEngine/RenderScene.cpp -> Animator.h
 RenderEngine/RenderScene.cpp -> DecalComponent.h
 RenderEngine/RenderScene.cpp -> FoliageComponent.h
 RenderEngine/RenderScene.cpp -> ImageComponent.h
-RenderEngine/RenderScene.cpp -> LightProperty.h
 RenderEngine/RenderScene.cpp -> MeshRenderer.h
 RenderEngine/RenderScene.cpp -> Scene.h
 RenderEngine/RenderScene.cpp -> SceneManager.h
@@ -115,8 +108,6 @@ RenderEngine/SpriteSheet.h -> Navigation.h
 RenderEngine/TerrainGizmoPass.cpp -> GameObject.h
 RenderEngine/TerrainGizmoPass.cpp -> Scene.h
 RenderEngine/TerrainGizmoPass.cpp -> Terrain.h
-RenderEngine/TerrainGizmoPass.h -> TerrainBuffers.h
-RenderEngine/TerrainMaterial.h -> TerrainBuffers.h
 RenderEngine/UIPass.cpp -> ImageComponent.h
 RenderEngine/UIPass.h -> ImageComponent.h
 RenderEngine/UIRenderProxy.cpp -> ImageComponent.h

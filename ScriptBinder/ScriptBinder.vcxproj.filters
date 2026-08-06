@@ -373,9 +373,6 @@
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
     </ClInclude>
-    <ClInclude Include="LightProperty.h">
-      <Filter>Classes\Resources\Light</Filter>
-    </ClInclude>
     <ClInclude Include="Component.h">
       <Filter>Classes\Components\ComponentBase</Filter>
     </ClInclude>
@@ -514,9 +511,6 @@
     <ClInclude Include="BoneMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="TerrainBuffers.h">
-      <Filter>Classes\Resources\Terrain</Filter>
-    </ClInclude>
     <ClInclude Include="InputAction.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
@@ -595,9 +589,6 @@
     <ClInclude Include="MeshRenderer.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="LightMapping.h">
-      <Filter>Classes\Components\RenderableComponent\Base</Filter>
-    </ClInclude>
     <ClInclude Include="RenderableComponents.h">
       <Filter>Classes\Components\RenderableComponent\Base</Filter>
     </ClInclude>
@@ -607,14 +598,8 @@
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
-    <ClInclude Include="FoliageType.h">
-      <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
-    </ClInclude>
     <ClInclude Include="IRegistableEvent.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
-    <ClInclude Include="FoliageInstance.h">
-      <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
