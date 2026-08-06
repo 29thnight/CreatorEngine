@@ -162,14 +162,32 @@ namespace
             // 그래프가 들고 있다. 승격(펜스 완료) 때 놓으면 풀로 반납된다.
             std::unique_ptr<EnhancedRenderGraph> graph;
         };
+        // 카메라 하나가 쓰는 표시 슬롯 묶음. 씬뷰(에디터 카메라)와 게임뷰
+        // (게임 카메라)가 서로 다른 카메라를 넘기는데, 슬롯이 한 벌이면 한
+        // 프레임에 한 카메라만 그림을 받아 다른 뷰가 검거나 깜빡인다 —
+        // 뷰마다 독립한 슬롯 집합을 굴려 각 뷰가 자기 최신 프레임을 계속
+        // 표시한다(MultiCameraRenderPlan.md).
+        //
         // 슬롯 셋 = 표시 1 + 인플라이트 최대 2. 인플라이트 1개로는 GPU 완료
         // 신호 지연(제출→관측 ~1ms대)이 2ms 틱을 넘겨 틱의 38%가 제출을
         // 쉬었다(실측 81/214) — 표시 프레임률이 절반이 된다. 2개를 겹치면
-        // 매 틱 제출이 성립한다. 얼로케이터·링은 kFrameCount=3 회전이라
-        // 인플라이트 2는 안전 거리 안이다.
-        DisplaySlot slots[3];
-        int displaySlot{ -1 };            // DX11이 표시 중인 슬롯(-1 = 아직 없음)
-        std::vector<int> pendingQueue;    // 제출 순서의 인플라이트 슬롯들(≤2)
+        // 매 틱 제출이 성립한다.
+        //
+        // ★ 단, '인플라이트 2 = 링 3의 안전 거리'라는 실측 근거는 제출
+        //   총량 기준이지 뷰당이 아니다. 뷰마다 2씩 들면 총 4가 되어
+        //   BeginFrame이 얼로케이터 펜스에서 블로킹한다 — TickLive가 뷰
+        //   합산 인플라이트를 2로 묶는 이유다.
+        static constexpr int kSlotsPerView = 3;   // 표시 1 + 인플라이트 2
+        struct CameraView
+        {
+            const Camera*    camera{ nullptr };
+            DisplaySlot      slots[kSlotsPerView];
+            int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
+            std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
+        };
+        static constexpr int kMaxCameraViews =
+            static_cast<int>(EnhancedSceneRenderer::kMaxLiveCameraViews);
+        CameraView views[kMaxCameraViews];
 
         // transient 풀 — 프레임당 CreateCommittedResource ~35건을 없앤다.
         // 그래프 소멸(펜스 완료 후)이 반납하므로 GPU 사용 중 재배포가 없다.
@@ -194,11 +212,9 @@ namespace
         Managed::UniquePtr<Texture> skyEquirect;
         bool                        skyBoxDirty{ true };
 
-        // 지금 표시 중인 그림의 원천 카메라. GetLiveDisplaySrv가 이 포인터와
-        // 대조해 '그 카메라의 창'만 교체 표시한다 — 다른 카메라의 창이 엉뚱한
-        // 그림을 받는 것을 막는다.
-        const Camera* boundCamera{ nullptr };
-
+        // 카메라→뷰 대응은 LivePipeline::views의 camera 포인터가 든다.
+        // GetLiveDisplaySrv가 그 포인터와 대조해 '그 카메라의 뷰'만 교체
+        // 표시한다 — 다른 카메라의 창이 엉뚱한 그림을 받는 것을 막는다.
         std::unique_ptr<LivePipeline> pipeline;
 
         // 프레임 입력. frameContext가 이들의 주소를 들므로 파이프라인과 무관한
@@ -208,12 +224,6 @@ namespace
         std::vector<EnhancedDrawItem> forwardDraws;
         std::vector<EnhancedLight>    lights;
         EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
-
-        // CB가 밀봉해 둔 이번 프레임 입력(헤더의 CaptureLiveFrame 주석 참조).
-        const Camera* capturedCamera{ nullptr };
-        uint32_t      capturedWidth{ 0 };
-        uint32_t      capturedHeight{ 0 };
-        bool          hasCapture{ false };
 
         // 묘지 — DisableLive가 즉시 못 놓는 것들(헤더의 수명 규약 참조).
         // ShutdownLive(렌더 스레드 join 후)가 비운다.
@@ -229,6 +239,10 @@ namespace
 
         uint32_t ssaoFrameIndex{ 0 };
         uint32_t frameCounter{ 0 };
+        // 카메라 순회 시작점 회전. 총 인플라이트 예산이 1만 남는 틱에서
+        // 항상 목록 앞(씬뷰)이 선점하면 게임뷰가 상대적으로 굶는다 —
+        // 큐가 FIFO라 완전한 기아는 없지만 편향 자체를 없앤다.
+        uint32_t viewRotation{ 0 };
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
@@ -423,11 +437,12 @@ namespace
             if (!p.gizmoIcon.Initialize(p.frameContext, outError)) return false;
             if (!p.gizmoLine.Initialize(p.frameContext, outError)) return false;
 
-            // ── 공유 텍스처 + DX11 SRV (슬롯 2개) ──
+            // ── 공유 텍스처 + DX11 SRV (뷰마다 슬롯 셋) ──
             //
             // 포스트 체인의 LDR 출력과 같은 RGBA8이라야 CopyTextureRegion이
-            // 성립한다.
-            for (LivePipeline::DisplaySlot& slot : p.slots)
+            // 성립한다. 뷰 2 × 슬롯 3 = 6장 — 1920x1080 기준 뷰당 약 25MB.
+            for (LivePipeline::CameraView& view : p.views)
+            for (LivePipeline::DisplaySlot& slot : view.slots)
             {
                 D3D12_HEAP_PROPERTIES heap{};
                 heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -485,19 +500,24 @@ namespace
             LivePipeline& p = *pipeline;
 
             if (p.resources.IsInitialized()) p.resources.WaitForGpu();
-            for (LivePipeline::DisplaySlot& slot : p.slots) slot.graph.reset();
-            p.pendingQueue.clear();
-
-            for (LivePipeline::DisplaySlot& slot : p.slots)
+            for (LivePipeline::CameraView& view : p.views)
             {
-                if (!slot.sharedTexture && !slot.openedSrv) continue;
-                Grave grave;
-                grave.sharedTexture = std::move(slot.sharedTexture);
-                grave.sharedHandle = slot.sharedHandle;
-                grave.openedTexture = std::move(slot.openedTexture);
-                grave.openedSrv = std::move(slot.openedSrv);
-                graveyard.push_back(std::move(grave));
-                slot.sharedHandle = nullptr;
+                for (LivePipeline::DisplaySlot& slot : view.slots) slot.graph.reset();
+                view.pendingQueue.clear();
+                view.displaySlot = -1;
+                view.camera = nullptr;
+
+                for (LivePipeline::DisplaySlot& slot : view.slots)
+                {
+                    if (!slot.sharedTexture && !slot.openedSrv) continue;
+                    Grave grave;
+                    grave.sharedTexture = std::move(slot.sharedTexture);
+                    grave.sharedHandle = slot.sharedHandle;
+                    grave.openedTexture = std::move(slot.openedTexture);
+                    grave.openedSrv = std::move(slot.openedSrv);
+                    graveyard.push_back(std::move(grave));
+                    slot.sharedHandle = nullptr;
+                }
             }
 
             p.gizmoLine.Shutdown();
@@ -522,7 +542,6 @@ namespace
             p.resources.Shutdown();
 
             pipeline.reset();
-            boundCamera = nullptr;
         }
 
         // ── 씬 밀봉 복사 ──
@@ -542,10 +561,6 @@ namespace
             const uint32_t rtHeight = static_cast<uint32_t>(
                 DirectX11::DeviceStates->g_Viewport.Height);
             if (0 == rtWidth || 0 == rtHeight) return false;
-
-            capturedCamera = sceneCamera;
-            capturedWidth = rtWidth;
-            capturedHeight = rtHeight;
 
             cameraSnapshot.view = sceneCamera->CalculateView();
             cameraSnapshot.projection =
@@ -647,7 +662,6 @@ namespace
                 }
             }
 
-            hasCapture = true;
             return true;
         }
 
@@ -657,10 +671,11 @@ namespace
         // 마지막의 live_present가 이 러너의 고유 조각이다 — 포스트 체인 결과를
         // 공유 텍스처로 복사한다. 그 소비 선언이 있어야 그래프가 체인을
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
-        bool RenderOnce(int slotIndex, std::string& outError)
+        bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
+            std::string& outError)
         {
             LivePipeline& p = *pipeline;
-            LivePipeline::DisplaySlot& slot = p.slots[slotIndex];
+            LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
 
             if (!p.resources.BeginFrame(outError)) return false;
             p.profiler.BeginFrame(frameCounter % DX12DeviceResources::kFrameCount);
@@ -894,7 +909,7 @@ namespace
             // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
             // 여기서 없앤다.
             slot.fenceValue = p.resources.GetLastSignaledFenceValue();
-            p.pendingQueue.push_back(slotIndex);
+            view.pendingQueue.push_back(slotIndex);
             return true;
         }
     };
@@ -1145,8 +1160,8 @@ void EnhancedSceneRenderer::CaptureLiveFrame(const Camera* camera)
     state.CaptureFromCamera(camera);
 }
 
-void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* renderCamera,
-    bool sceneLoading)
+void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
+    uint32_t cameraCount, bool sceneLoading)
 {
     LiveState& state = GetLiveState();
 
@@ -1162,86 +1177,93 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* renderCamera,
 
     if (!state.enabled) return;
 
+    // ── [프레임당 1회] 씬·프록시 갱신 ──
+    //
     // SceneRenderer::CreateCommandListPass/EndOfFrame에서 이관한 프레임 입력
     // 단계. App이 두 렌더 배리어를 모두 지난 뒤 호출하므로 씬 구조 변경과
-    // 에디터 카메라 조작이 끝난 안정된 프레임 경계다.
+    // 에디터 카메라 조작이 끝난 안정된 프레임 경계다. 카메라 수와 무관하게
+    // 프록시는 한 번만 민다 — 밀봉(CaptureFromCamera)만 카메라별이다.
     if (state.runtimeInitialized && state.renderScene && !sceneLoading)
     {
         ProxyCommandQueue->Execute();
         state.renderScene->EraseRenderPassData();
         state.renderScene->Update(deltaSeconds);
         state.renderScene->OnProxyDestroy();
-        state.CaptureFromCamera(renderCamera ? renderCamera : state.editorCamera.get());
     }
 
-    // 인플라이트 제출분의 완료 확인(논블로킹). 제출 순서대로, 완료된 것을
-    // 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가 끝난' 슬롯뿐이라는
-    // 것이 비동기의 계약이다.
+    // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
+    // 완료된 것을 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가
+    // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
     if (nullptr != state.pipeline)
     {
         LivePipeline& p = *state.pipeline;
-        while (!p.pendingQueue.empty())
+        for (LivePipeline::CameraView& view : p.views)
         {
-            const int slotIndex = p.pendingQueue.front();
-            if (p.resources.GetCompletedFenceValue() < p.slots[slotIndex].fenceValue) break;
+            while (!view.pendingQueue.empty())
+            {
+                const int slotIndex = view.pendingQueue.front();
+                if (p.resources.GetCompletedFenceValue() <
+                    view.slots[slotIndex].fenceValue)
+                {
+                    break;
+                }
 
-            p.displaySlot = slotIndex;
-            p.pendingQueue.erase(p.pendingQueue.begin());
-            p.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
+                view.displaySlot = slotIndex;
+                view.pendingQueue.erase(view.pendingQueue.begin());
+                view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
 
 #if defined(_DEBUG)
-            // ★ 검증 레이어를 읽는다. Debug 빌드에서 배선 오류(포맷·상태·
-            //   디스크립터)는 여기에만 남는데 아무도 안 읽으면 증상만 보고
-            //   추측하게 된다 — 실제로 그 상태로 며칠을 쫓았다.
-            {
-                std::string validation;
-                if (0 != p.resources.DrainDebugMessages(validation) && !validation.empty())
+                // ★ 검증 레이어를 읽는다. Debug 빌드에서 배선 오류(포맷·상태·
+                //   디스크립터)는 여기에만 남는데 아무도 안 읽으면 증상만 보고
+                //   추측하게 된다 — 실제로 그 상태로 며칠을 쫓았다.
                 {
-                    if (state.reportedValidation.insert(validation).second)
+                    std::string validation;
+                    if (0 != p.resources.DrainDebugMessages(validation) && !validation.empty())
                     {
-                        std::printf("[dx12.live 검증] %s\n", validation.c_str());
+                        if (state.reportedValidation.insert(validation).second)
+                        {
+                            std::printf("[dx12.live 검증] %s\n", validation.c_str());
+                        }
                     }
                 }
-            }
 #endif
 
-            std::vector<DX12GpuProfiler::PassTiming> timings;
-            std::string collectError;
-            if (p.profiler.Collect(timings, collectError))
-            {
-                state.lastGpuMs = p.profiler.GetLastTotalMilliseconds();
-                // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
-                // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
-                // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
-                state.lastPassTimings = std::move(timings);
+                std::vector<DX12GpuProfiler::PassTiming> timings;
+                std::string collectError;
+                if (p.profiler.Collect(timings, collectError))
+                {
+                    state.lastGpuMs = p.profiler.GetLastTotalMilliseconds();
+                    // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
+                    // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
+                    // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
+                    state.lastPassTimings = std::move(timings);
+                }
+                ++state.framesRendered;
             }
-            ++state.framesRendered;
-        }
-
-        // 인플라이트가 꽉 찼으면 이번 틱은 제출을 쉰다(둘이면 충분하다 —
-        // 셋부터는 표시 지연만 는다).
-        if (p.pendingQueue.size() >= 2)
-        {
-            ++state.framesInFlight;
-            return;
         }
     }
 
-    // CB가 이번 프레임을 밀봉해 두지 않았으면 그릴 것이 없다(씬 미로드 등).
-    if (!state.hasCapture)
+    if (sceneLoading || 0 == cameraCount || nullptr == cameras)
     {
         ++state.framesIdle;
         return;
     }
-    state.hasCapture = false;
 
-    const Camera* sceneCamera = state.capturedCamera;
-    const uint32_t rtWidth = state.capturedWidth;
-    const uint32_t rtHeight = state.capturedHeight;
-
+    // 해상도는 밀봉이 카메라가 아니라 DeviceStates 뷰포트에서 가져오므로
+    // 모든 뷰가 공유한다 — 재구축 판정도 프레임당 한 번이면 된다.
     // 크기가 바뀌면 통째로 다시 세운다. 패스들이 화면 크기 리소스를
     // Initialize에서 잡으므로 부분 리사이즈보다 재구축이 단순하고,
     // 에디터 뷰 리사이즈는 드문 사건이라 비용이 문제되지 않는다.
+    const uint32_t rtWidth = static_cast<uint32_t>(
+        DirectX11::DeviceStates->g_Viewport.Width);
+    const uint32_t rtHeight = static_cast<uint32_t>(
+        DirectX11::DeviceStates->g_Viewport.Height);
+    if (0 == rtWidth || 0 == rtHeight)
+    {
+        ++state.framesIdle;
+        return;
+    }
+
     if (state.pipeline &&
         (rtWidth != state.pipeline->width || rtHeight != state.pipeline->height))
     {
@@ -1260,43 +1282,128 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* renderCamera,
         }
     }
 
+    LivePipeline& p = *state.pipeline;
+
+    // 뷰 합산 인플라이트. '인플라이트 2 = 링(kFrameCount=3)의 안전 거리'는
+    // 제출 총량 기준의 실측이다 — 뷰당 2씩 총 4를 들면 BeginFrame이
+    // 얼로케이터 펜스에서 블로킹해 비동기 계약이 깨진다.
+    size_t totalPending = 0;
+    for (const LivePipeline::CameraView& view : p.views)
+    {
+        totalPending += view.pendingQueue.size();
+    }
+
     LiveStopwatch watch;
     watch.Start();
+    bool renderedAny = false;
 
-    // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
-    int renderSlot = -1;
-    for (int i = 0; i < 3; ++i)
+    // ── [카메라마다] 뷰 배정 → 밀봉 → 렌더 제출 ──
+    //
+    // frameContext가 draws/lights 벡터의 주소를 들므로 '뷰1 제출 완료 →
+    // 뷰2 밀봉'의 순차 흐름만 성립한다. 밀봉을 몰아서 하고 렌더를 몰아서
+    // 하면 뷰1의 기록 입력이 뷰2 밀봉으로 재구성되어 무효가 된다.
+    const uint32_t startIndex = state.viewRotation++ % cameraCount;
+    for (uint32_t step = 0; step < cameraCount; ++step)
     {
-        if (i == state.pipeline->displaySlot) continue;
-        bool pending = false;
-        for (const int pendingIndex : state.pipeline->pendingQueue)
+        const uint32_t cameraIndex = (startIndex + step) % cameraCount;
+        const Camera* camera = cameras[cameraIndex];
+        if (nullptr == camera) continue;
+
+        if (totalPending >= 2)
         {
-            if (pendingIndex == i) { pending = true; break; }
+            ++state.framesInFlight;
+            continue;
         }
-        if (!pending) { renderSlot = i; break; }
-    }
-    if (renderSlot < 0) { ++state.framesInFlight; return; }
 
-    std::string error;
-    if (!state.RenderOnce(renderSlot, error))
-    {
-        state.lastError = "프레임 실패: " + error;
-        state.TeardownPipeline();
-        state.enabled = false;
-        return;
+        // 뷰 배정: 같은 카메라의 뷰 → 빈 뷰 → 이번 틱 목록에 없는 카메라의
+        // 뷰(교체) 순으로 찾는다. 교체 시 표시 슬롯을 비워 옛 카메라의
+        // 그림이 새 카메라의 창에 남지 않게 한다 — 아직 인플라이트인 옛
+        // 프레임이 한두 틱 승격될 수 있으나 곧 새 프레임이 덮는다.
+        LivePipeline::CameraView* view = nullptr;
+        for (LivePipeline::CameraView& candidate : p.views)
+        {
+            if (candidate.camera == camera) { view = &candidate; break; }
+        }
+        if (nullptr == view)
+        {
+            for (LivePipeline::CameraView& candidate : p.views)
+            {
+                if (nullptr == candidate.camera) { view = &candidate; break; }
+            }
+        }
+        if (nullptr == view)
+        {
+            for (LivePipeline::CameraView& candidate : p.views)
+            {
+                bool inList = false;
+                for (uint32_t j = 0; j < cameraCount; ++j)
+                {
+                    if (candidate.camera == cameras[j]) { inList = true; break; }
+                }
+                if (!inList) { view = &candidate; break; }
+            }
+        }
+        if (nullptr == view) continue;   // 카메라가 kMaxCameraViews를 넘는다
+
+        if (view->camera != camera)
+        {
+            view->camera = camera;
+            view->displaySlot = -1;
+        }
+
+        // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
+        int renderSlot = -1;
+        for (int i = 0; i < LivePipeline::kSlotsPerView; ++i)
+        {
+            if (i == view->displaySlot) continue;
+            bool pending = false;
+            for (const int pendingIndex : view->pendingQueue)
+            {
+                if (pendingIndex == i) { pending = true; break; }
+            }
+            if (!pending) { renderSlot = i; break; }
+        }
+        if (renderSlot < 0)
+        {
+            ++state.framesInFlight;
+            continue;
+        }
+
+        // 밀봉이 cameraSnapshot과 draws를 이 카메라 기준으로 재구성한다.
+        if (!state.CaptureFromCamera(camera))
+        {
+            ++state.framesIdle;
+            continue;
+        }
+
+        std::string error;
+        if (!state.RenderOnce(*view, renderSlot, error))
+        {
+            state.lastError = "프레임 실패: " + error;
+            state.TeardownPipeline();
+            state.enabled = false;
+            return;
+        }
+        ++totalPending;
+        renderedAny = true;
     }
 
-    state.lastCpuMs = watch.ElapsedMs();
-    state.boundCamera = sceneCamera;
+    if (renderedAny) state.lastCpuMs = watch.ElapsedMs();
 }
 
 ID3D11ShaderResourceView* EnhancedSceneRenderer::GetLiveDisplaySrv(const Camera* camera)
 {
     const LiveState& state = GetLiveState();
     if (!state.enabled || nullptr == state.pipeline) return nullptr;
-    if (nullptr == camera || camera != state.boundCamera) return nullptr;
-    if (state.pipeline->displaySlot < 0) return nullptr;
-    return state.pipeline->slots[state.pipeline->displaySlot].openedSrv.Get();
+    if (nullptr == camera) return nullptr;
+
+    for (const LivePipeline::CameraView& view : state.pipeline->views)
+    {
+        if (view.camera != camera) continue;
+        if (view.displaySlot < 0) return nullptr;
+        return view.slots[view.displaySlot].openedSrv.Get();
+    }
+    return nullptr;
 }
 
 uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(const Camera* camera)
@@ -1307,12 +1414,16 @@ uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(const Camera* camera)
     const LiveState& state = GetLiveState();
     if (!ImGuiDx12Shell::Get().IsActive()) return 0;
     if (!state.enabled || nullptr == state.pipeline) return 0;
-    if (nullptr == camera || camera != state.boundCamera) return 0;
-    if (state.pipeline->displaySlot < 0) return 0;
+    if (nullptr == camera) return 0;
 
-    const HANDLE sharedHandle =
-        state.pipeline->slots[state.pipeline->displaySlot].sharedHandle;
-    return ImGuiDx12Shell::Get().OpenSharedTexture(sharedHandle);
+    for (const LivePipeline::CameraView& view : state.pipeline->views)
+    {
+        if (view.camera != camera) continue;
+        if (view.displaySlot < 0) return 0;
+        return ImGuiDx12Shell::Get().OpenSharedTexture(
+            view.slots[view.displaySlot].sharedHandle);
+    }
+    return 0;
 }
 
 std::string EnhancedSceneRenderer::GetLiveStatus()

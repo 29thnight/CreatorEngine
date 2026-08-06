@@ -140,18 +140,24 @@ void Core::App::Run()
 
 		// 유일한 씬 렌더러. Update의 두 배리어를 지난 프레임 경계에서 씬과
 		// 카메라를 밀봉하고 DX12 그래프를 제출한다.
-		Camera* renderCamera = EnhancedSceneRenderer::GetEditorCamera();
-		if (SceneManagers->IsGameStart())
+		//
+		// 재생 여부와 무관하게 에디터·게임 카메라를 둘 다 넘긴다 — 그래야
+		// 재생 전에도 게임뷰가 그려지고, 재생 중에도 씬뷰가 죽지 않는다.
+		// 카메라별 표시 슬롯은 TickLive 쪽이 관리한다(MultiCameraRenderPlan.md).
+		Camera* cameras[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
+		uint32_t cameraCount = 0;
+		if (Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera())
 		{
-			const auto gameCamera = CameraManagement->GetLastCamera();
-			if (gameCamera && gameCamera.get() != renderCamera)
-			{
-				renderCamera = gameCamera.get();
-			}
+			cameras[cameraCount++] = editorCamera;
+		}
+		if (const auto gameCamera = CameraManagement->GetLastCamera();
+			gameCamera && (0 == cameraCount || gameCamera.get() != cameras[0]))
+		{
+			cameras[cameraCount++] = gameCamera.get();
 		}
 		EnhancedSceneRenderer::TickLive(
 			static_cast<float>(EngineSettingInstance->frameDeltaTime),
-			renderCamera, SceneManagers->IsSceneLoading());
+			cameras, cameraCount, SceneManagers->IsSceneLoading());
 
 		if (cli.IsQuitRequested())
 		{

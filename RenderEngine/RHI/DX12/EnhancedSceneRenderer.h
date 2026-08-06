@@ -490,9 +490,16 @@ public:
     static void WaitForLiveGpu();
 
     /// 프레임 경계(게임 스레드)에서 매 프레임 부른다. 엔트리 계층이 씬
-    /// 전환 상태와 이번 프레임 카메라를 밀봉해 넘기므로 DX12 구현이
-    /// SceneManager/EngineSetting에 역의존하지 않는다.
-    static void TickLive(float deltaSeconds, Camera* renderCamera, bool sceneLoading);
+    /// 전환 상태와 이번 프레임에 표시할 카메라들을 밀봉해 넘기므로 DX12
+    /// 구현이 SceneManager/EngineSetting에 역의존하지 않는다.
+    ///
+    /// 카메라마다 독립한 표시 슬롯 집합(CameraView)을 굴려 씬뷰·게임뷰가
+    /// 동시에 그려진다. 최대 kMaxLiveCameraViews개(초과분은 무시). 순서는
+    /// 표시 우선순위가 아니라 제출 순서일 뿐이다 — 각 창은 자기 카메라로
+    /// Get*Display*를 조회한다(MultiCameraRenderPlan.md).
+    static constexpr uint32_t kMaxLiveCameraViews = 2;   // 씬뷰 + 게임뷰
+    static void TickLive(float deltaSeconds, Camera* const* cameras,
+        uint32_t cameraCount, bool sceneLoading);
 
     /// 진단용 호환 진입점. 메인 런타임은 TickLive에서 자체 상태를 밀봉한다.
     static void CaptureLiveFrame(const Camera* camera);
@@ -515,9 +522,10 @@ public:
     /// 이 함수만은 다른 Live API와 스레드 규약이 다르다 — ImGui 그리기는
     /// 게임 스레드가 아니라 CE 렌더 스레드에서 돌기 때문이다(Dx11Main의
     /// ExecuteRenderPass → GUIRendering). GetLiveDisplaySrv가 그 자리에서
-    /// 안전한 것은 포인터 하나를 읽어 찢어질 것이 없어서이고, 상태의 벡터와
-    /// 셋을 순회하는 것은 전혀 다른 문제다 — 게임 스레드가 그것들을 매
-    /// 프레임 교체하므로 순회 중 재할당을 만나면 해제된 메모리를 읽는다.
+    /// 안전한 것은 고정 크기 뷰 배열에서 포인터·정수만 읽어 찢어질 것이
+    /// 없어서이고(재할당 없음), 상태의 벡터와 셋을 순회하는 것은 전혀 다른
+    /// 문제다 — 게임 스레드가 그것들을 매 프레임 교체하므로 순회 중
+    /// 재할당을 만나면 해제된 메모리를 읽는다.
     ///
     /// 그래서 스냅샷은 게임 스레드가 TickLive에서 미리 완성해 두고, 이
     /// 함수는 락을 잡고 그 완성본을 복사만 한다. 값은 한 프레임 늦을 수
