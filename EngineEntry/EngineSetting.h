@@ -72,6 +72,18 @@ public:
 	bool IsDx12BackendPreferred() const { return m_useDx12Backend; }
 	void SetDx12BackendPreferred(bool preferred) { m_useDx12Backend = preferred; }
 
+	// ── ImGui 백엔드는 씬 백엔드와 별개의 결정이다 ──
+	//
+	// 하나로 묶었다가 물렸다. ImGui DX12 셸은 자기 스왑체인을 같은 HWND에
+	// 만드는데, DXGI는 한 HWND에 스왑체인 둘을 지원하지 않는다 — DX11
+	// 스왑체인이 무효화되어 종료가 크래시하고 PIX 캡처가 깨졌다.
+	//
+	// 그래서 기본은 꺼짐이다. 씬은 DX12로 그리면서 셸은 DX11로 두는 조합이
+	// 지금 가장 안정적이고, PIX로 DX12 패스를 보는 데도 그 조합이면 충분하다.
+	// 셸을 켜려면 스왑체인 소유권 이관(DX11이 자기 것을 놓는다)이 먼저다.
+	bool IsDx12ImGuiShellEnabled() const { return m_useDx12ImGuiShell; }
+	void SetDx12ImGuiShellEnabled(bool enabled) { m_useDx12ImGuiShell = enabled; }
+
 	void SetImGuiInitialized(bool isInitialized)
 	{
 		m_isImGuiInitialized = isInitialized;
@@ -108,6 +120,7 @@ public:
 	// ImGui 백엔드 DX12 전환(PHASE 8-2 선취)과 기즈모 체인 배선이 후속이다.
 	// DX11 폴백은 render.backend dx11로 즉시 복귀 가능(한 릴리스 주기 유지).
 	bool m_useDx12Backend{ true };
+	bool m_useDx12ImGuiShell{ false };   // 스왑체인 소유권 이관 전까지 꺼짐
 
 private:
     std::atomic_bool m_isGameView{ false };

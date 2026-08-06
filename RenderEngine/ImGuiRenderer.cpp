@@ -112,7 +112,7 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	// 셸을 끄려면 설정을 되돌리고 재시작한다. 셸 초기화가 실패하면 DX11로
 	// 폴백한다(빈 화면보다 낫다).
 	bool dx12ShellActive = false;
-	if (EngineSettingInstance->IsDx12BackendPreferred())
+	if (EngineSettingInstance->IsDx12ImGuiShellEnabled())
 	{
 		RECT clientRect{};
 		GetClientRect(windowHandle, &clientRect);

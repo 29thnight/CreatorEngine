@@ -53,7 +53,12 @@ DirectX11::DeviceResources::~DeviceResources()
         s_active = nullptr;
     }
 
-    m_swapChain->SetFullscreenState(FALSE, NULL); // 창 모드로
+    // 스왑체인이 없을 수 있다 — HandleDeviceLost가 비운 뒤 재생성이 실패하면
+    // 그대로 남는다. 널 역참조로 종료가 크래시했다(덤프로 잡혔다).
+    if (m_swapChain)
+    {
+        m_swapChain->SetFullscreenState(FALSE, NULL); // 창 모드로
+    }
 }
 
 void DirectX11::DeviceResources::SetWindow(CoreWindow& window)

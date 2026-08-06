@@ -71,6 +71,7 @@ bool EngineSetting::SaveSettings()
 	rootNode["startupSceneName"] = startupSceneName.string();
 	rootNode["imguiScale"] = m_imguiScale;
 	rootNode["renderBackendDx12"] = m_useDx12Backend;
+	rootNode["imguiBackendDx12"] = m_useDx12ImGuiShell;
 
 	settingsFile << rootNode;
 
@@ -104,6 +105,9 @@ bool EngineSetting::LoadSettings()
 
 	if (rootNode["renderBackendDx12"])
 		m_useDx12Backend = rootNode["renderBackendDx12"].as<bool>();
+
+	if (rootNode["imguiBackendDx12"])
+		m_useDx12ImGuiShell = rootNode["imguiBackendDx12"].as<bool>();
 
 	if (rootNode["m_contentsBrowserStyle"])
 	{
