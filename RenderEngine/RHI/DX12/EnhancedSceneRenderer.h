@@ -377,6 +377,20 @@ public:
     /// 프레임 경계(게임 스레드)에서 매 프레임 부른다.
     static void TickLive();
 
+    /// 이 프레임의 씬 입력을 밀봉한다. 커맨드 빌드(CB) 스레드가
+    /// CreateCommandListPass의 큐가 살아 있는 자리에서 부른다.
+    ///
+    /// ★ 게임 스레드에서 큐를 읽으면 안 된다. 렌더 큐는 CB가 채우고 같은
+    ///   함수 끝의 ClearRenderQueue가 비운다 — 다른 스레드에서 읽는 것은
+    ///   경합이고, 실제로 드로우가 0건이 되어 씬 뷰가 통째로 비었다
+    ///   (CB의 죽은 빌드를 걷어내며 '채움→비움' 창이 거의 0이 된 뒤로
+    ///   거의 항상 졌다). 밀봉은 데이터가 유효한 자리에서 한다.
+    ///
+    /// 넘겨받은 것과 TickLive의 렌더 사이는 렌더 배리어 두 랑데뷰가
+    /// 가른다(CB의 패스는 Update가 돌아오기 전에 끝난다) — 그래서 추가
+    /// 동기화 없이 성립한다.
+    static void CaptureLiveFrame(const Camera* camera);
+
     /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를, 아니면 nullptr를
     /// 돌려준다 — nullptr이면 호출부는 기존 DX11 SRV를 쓴다(폴백 한 줄).
     static ID3D11ShaderResourceView* GetLiveDisplaySrv(const Camera* camera);

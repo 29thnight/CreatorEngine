@@ -1,4 +1,5 @@
 #include "SceneRenderer.h"
+#include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "DeviceState.h"
 #include "Skeleton.h"
 #include "RHI/DX11RHI.h"
@@ -1162,6 +1163,22 @@ void SceneRenderer::CreateCommandListPass()
 		data->ClearUIRenderDataBuffer();
 		data->ClearShadowRenderDataBuffer();
 		PROFILE_CPU_END();
+
+		// DX12 상시 러너의 프레임 밀봉(3-9).
+		//
+		// 여기가 렌더 큐가 살아 있는 유일한 자리다 — 이 함수 끝에서 비워지고,
+		// 게임 스레드(TickLive)에서 읽으면 그 비움과 경합한다. 실제로 드로우가
+		// 0건이 되어 씬 뷰가 통째로 비었다.
+		//
+		// 씬 뷰가 표시하는 것은 에디터 카메라의 그림이므로 그것을 밀봉한다 —
+		// 첫 유효 카메라를 집으면 카메라가 둘인 씬에서 엉뚱한 시점이 나온다
+		// (dx12.compare가 같은 실수로 물렸다).
+#ifndef BUILD_FLAG
+		if (camera.get() == m_pEditorCamera.get())
+#endif
+		{
+			EnhancedSceneRenderer::CaptureLiveFrame(camera.get());
+		}
 
 		// 렌더러 교체 스위치(3-9). DX12 모드에서는 아무도 실행하지 않을 DX11
 		// 커맨드 리스트를 만들 이유가 없다 — 실측에서 병목이 CE에서 CB로

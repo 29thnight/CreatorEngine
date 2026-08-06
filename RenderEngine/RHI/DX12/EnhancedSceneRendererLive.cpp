@@ -155,6 +155,12 @@ namespace
         std::vector<EnhancedLight>    lights;
         EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
 
+        // CB가 밀봉해 둔 이번 프레임 입력(헤더의 CaptureLiveFrame 주석 참조).
+        const Camera* capturedCamera{ nullptr };
+        uint32_t      capturedWidth{ 0 };
+        uint32_t      capturedHeight{ 0 };
+        bool          hasCapture{ false };
+
         // 묘지 — DisableLive가 즉시 못 놓는 것들(헤더의 수명 규약 참조).
         // ShutdownLive(렌더 스레드 join 후)가 비운다.
         struct Grave
@@ -172,6 +178,8 @@ namespace
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
+        uint32_t lastDrawCount{ 0 };    // 이번 프레임 GBuffer 드로우(0이면 빈 화면이다)
+        uint32_t lastBatchCount{ 0 };
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         std::string lastError;
@@ -369,30 +377,28 @@ namespace
         // 들지 않고 필요한 것만 복사한다. 거기와 여기가 갈리면 dx12.scene은
         // 통과하는데 라이브만 틀리는 상태가 되므로, 규칙을 바꿀 때는 두 곳을
         // 함께 바꿀 것.
-        bool CaptureScene(const Camera*& outCamera,
-            uint32_t& outRtWidth, uint32_t& outRtHeight)
+        /// CB 스레드가 부른다 — 큐가 살아 있는 자리에서의 밀봉.
+        bool CaptureFromCamera(const Camera* sceneCamera)
         {
-            Camera* sceneCamera = nullptr;
-            for (auto& camera : CameraManagement->GetCameras())
-            {
-                if (camera && RenderPassData::VaildCheck(camera.get()))
-                {
-                    sceneCamera = camera.get();
-                    break;
-                }
-            }
             if (nullptr == sceneCamera) return false;
+            if (!RenderPassData::VaildCheck(const_cast<Camera*>(sceneCamera))) return false;
 
-            const RenderPassData* renderData = RenderPassData::GetData(sceneCamera);
+            const RenderPassData* renderData =
+                RenderPassData::GetData(const_cast<Camera*>(sceneCamera));
             if (nullptr == renderData || nullptr == renderData->m_renderTarget.get())
             {
                 return false;
             }
 
-            outCamera = sceneCamera;
-            outRtWidth = static_cast<uint32_t>(renderData->m_renderTarget->GetWidth());
-            outRtHeight = static_cast<uint32_t>(renderData->m_renderTarget->GetHeight());
-            if (0 == outRtWidth || 0 == outRtHeight) return false;
+            const uint32_t rtWidth =
+                static_cast<uint32_t>(renderData->m_renderTarget->GetWidth());
+            const uint32_t rtHeight =
+                static_cast<uint32_t>(renderData->m_renderTarget->GetHeight());
+            if (0 == rtWidth || 0 == rtHeight) return false;
+
+            capturedCamera = sceneCamera;
+            capturedWidth = rtWidth;
+            capturedHeight = rtHeight;
 
             cameraSnapshot = renderData->GetFrameSnapshot();
 
@@ -463,6 +469,8 @@ namespace
                     }
                 }
             }
+
+            hasCapture = true;
             return true;
         }
 
@@ -497,6 +505,8 @@ namespace
             if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
+            lastDrawCount = p.gbuffer.GetLastDrawCount();
+            lastBatchCount = p.gbuffer.GetLastBatchCount();
             if (!p.grid.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.wireframe.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.gizmoIcon.PrepareFrame(p.frameContext, outError)) return false;
@@ -667,6 +677,13 @@ bool EnhancedSceneRenderer::IsLiveEnabled()
     return GetLiveState().enabled;
 }
 
+void EnhancedSceneRenderer::CaptureLiveFrame(const Camera* camera)
+{
+    LiveState& state = GetLiveState();
+    if (!state.enabled) return;
+    state.CaptureFromCamera(camera);
+}
+
 void EnhancedSceneRenderer::TickLive()
 {
     LiveState& state = GetLiveState();
@@ -705,14 +722,17 @@ void EnhancedSceneRenderer::TickLive()
         }
     }
 
-    const Camera* sceneCamera = nullptr;
-    uint32_t rtWidth = 0;
-    uint32_t rtHeight = 0;
-    if (!state.CaptureScene(sceneCamera, rtWidth, rtHeight))
+    // CB가 이번 프레임을 밀봉해 두지 않았으면 그릴 것이 없다(씬 미로드 등).
+    if (!state.hasCapture)
     {
         ++state.framesIdle;
         return;
     }
+    state.hasCapture = false;
+
+    const Camera* sceneCamera = state.capturedCamera;
+    const uint32_t rtWidth = state.capturedWidth;
+    const uint32_t rtHeight = state.capturedHeight;
 
     // 크기가 바뀌면 통째로 다시 세운다. 패스들이 화면 크기 리소스를
     // Initialize에서 잡으므로 부분 리사이즈보다 재구축이 단순하고,
@@ -797,7 +817,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     char line[384]{};
     std::snprintf(line, sizeof(line),
         "dx12.live — %s · 파이프라인 %s · %ux%u · 렌더 %llu프레임(대기 %llu)"
-        " · 인플라이트 스킵 %llu · CPU %.2f ms · GPU %.2f ms · 묘지 %zu",
+        " · 인플라이트 스킵 %llu · 드로우 %u(배치 %u) · CPU %.2f ms · GPU %.2f ms"
+        " · 묘지 %zu",
         state.enabled ? "켜짐" : "꺼짐",
         state.pipeline ? "준비됨" : "없음",
         state.pipeline ? state.pipeline->width : 0u,
@@ -805,6 +826,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         static_cast<unsigned long long>(state.framesRendered),
         static_cast<unsigned long long>(state.framesIdle),
         static_cast<unsigned long long>(state.framesInFlight),
+        state.lastDrawCount, state.lastBatchCount,
         state.lastCpuMs, state.lastGpuMs,
         state.graveyard.size());
 
