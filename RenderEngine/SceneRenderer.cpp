@@ -9,12 +9,11 @@
 #include "Benchmark.hpp"
 #include "RenderScene.h"
 #include "SceneManager.h"
+#include "GameObject.h"
 #include "Scene.h"
-#include "RenderableComponents.h"
 #include "ImageComponent.h"
 #include "SpriteSheetComponent.h"
 #include "UIManager.h"
-#include "UIButton.h"
 #include "TextComponent.h"
 #include "DataSystem.h"
 #include "RenderState.h"
@@ -38,7 +37,6 @@
 #include <regex>
 
 #include "Animator.h"
-#include "EffectComponent.h"
 #include "EffectProxyController.h"
 
 using namespace lm;

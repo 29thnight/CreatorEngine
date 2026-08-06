@@ -1,4 +1,5 @@
 #include "HierarchyWindow.h"
+#include "SpriteRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"

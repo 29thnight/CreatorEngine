@@ -3,11 +3,10 @@
 #include "ShaderSystem.h"
 #include "Material.h"
 #include "Skeleton.h"
+#include "GameObject.h"
 #include "Scene.h"
-#include "RenderableComponents.h"
 #include "Mesh.h"
 #include "LightController.h"
-#include "LightProperty.h"
 
 struct alignas(16) CB {
 	XMFLOAT2 offset{ 0,0 };

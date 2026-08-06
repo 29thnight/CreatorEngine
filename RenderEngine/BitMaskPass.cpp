@@ -1,7 +1,6 @@
 #include "BitMaskPass.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
-#include "Scene.h"
 #include "BitMaskPassSetting.h"
 
 cbuffer EdgefilterBuffer

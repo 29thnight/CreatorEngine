@@ -3,7 +3,6 @@
 #include "RenderScene.h"
 #include "Skeleton.h"
 #include "SceneManager.h"
-#include "RenderableComponents.h"
 #include "Scene.h"
 #include "Benchmark.hpp"
 #include "AnimationController.h"

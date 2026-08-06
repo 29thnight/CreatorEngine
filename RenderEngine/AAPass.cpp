@@ -3,7 +3,6 @@
 #include "../EngineEntry/RenderPassSettings.h"
 #include "Material.h"
 #include "Skeleton.h"
-#include "Scene.h"
 #include "Mesh.h"
 #include "ImGuiRegister.h"
 

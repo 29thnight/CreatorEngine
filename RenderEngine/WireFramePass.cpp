@@ -1,11 +1,11 @@
 #include "WireFramePass.h"
 #include "RHI/RHI.h"
+#include "GameObject.h"
 #include "Scene.h"
 #include "Camera.h"
 #include "Mesh.h"
 #include "Skeleton.h"
 #include "ShaderSystem.h"
-#include "RenderableComponents.h"
 
 WireFramePass::WireFramePass()
 {

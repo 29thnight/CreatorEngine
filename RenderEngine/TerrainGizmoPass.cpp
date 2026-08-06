@@ -1,6 +1,7 @@
 #include "TerrainGizmoPass.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
+#include "GameObject.h"
 #include "Scene.h"
 #include "Terrain.h"
 

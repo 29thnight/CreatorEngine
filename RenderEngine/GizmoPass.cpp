@@ -1,7 +1,6 @@
 #include "GizmoPass.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
-#include "RenderableComponents.h"
 #include "CameraComponent.h"
 #include "LightComponent.h"
 #include "Scene.h"

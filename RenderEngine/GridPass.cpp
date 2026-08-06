@@ -1,7 +1,6 @@
 #include "GridPass.h"
 #include "ShaderSystem.h"
 #include "DeviceState.h"
-#include "Scene.h"
 #include "ImGuiRegister.h"
 
 GridVertex vertices[] =

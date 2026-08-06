@@ -1,7 +1,6 @@
 #pragma once
 #include "IRenderPass.h"
 #include "../ScriptBinder/ImageComponent.h"
-#include "../ScriptBinder/TextComponent.h"
 #include "directxtk/CommonStates.h"
 
 namespace DirectX

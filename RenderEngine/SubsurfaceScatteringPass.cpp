@@ -1,7 +1,6 @@
 #include "SubsurfaceScatteringPass.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
-#include "Scene.h"
 #include "RenderScene.h"
 #include "LightController.h"
 #include "TimeSystem.h"

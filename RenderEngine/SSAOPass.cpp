@@ -2,7 +2,6 @@
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
-#include "Scene.h"
 #include <random>
 #include "RenderDebugManager.h"
 

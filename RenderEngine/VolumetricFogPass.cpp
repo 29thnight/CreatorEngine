@@ -6,7 +6,6 @@
 #include "ShadowMapPass.h"
 #include "TimeSystem.h"
 
-#include "LightProperty.h"
 #include "VolumetricFogPassSetting.h"
 
 #define MAX_LIGHT 20

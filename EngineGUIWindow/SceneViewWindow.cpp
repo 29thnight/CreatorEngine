@@ -1,5 +1,6 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
+#include "MeshRenderer.h"
 #include "RHI/DX12/EnhancedSceneRenderer.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"

@@ -1,11 +1,12 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "LightMap.h"
+#include "MeshRenderer.h"
 #include "ShaderSystem.h"
+#include "GameObject.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "LightProperty.h"
 #include "LightController.h"
-#include "RenderableComponents.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "Material.h"

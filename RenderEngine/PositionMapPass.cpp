@@ -1,9 +1,9 @@
 #include "PositionMapPass.h"
 #include "ShaderSystem.h"
+#include "GameObject.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
-#include "RenderableComponents.h"
 
 struct alignas(16) PositionMapBuffer
 {

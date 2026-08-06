@@ -1,4 +1,5 @@
 #include "MeshRendererProxy.h"
+#include "Animator.h"
 #include "MeshRenderer.h"
 #include "Mesh.h"
 #include "RenderScene.h"

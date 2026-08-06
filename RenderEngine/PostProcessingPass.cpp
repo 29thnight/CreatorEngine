@@ -1,7 +1,6 @@
 #include "PostProcessingPass.h"
 #include "ShaderSystem.h"
 #include "BloomSetting.h"
-#include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
 

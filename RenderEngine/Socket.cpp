@@ -53,11 +53,11 @@ void Socket::Update()
 
 	XMMATRIX mat = transform.GetLocalMatrix();
 
-	// À§Ä¡ ÃßÃâ (Çà·ÄÀÇ 4¹øÂ° ¿­)
+	// ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ 4ï¿½ï¿½Â° ï¿½ï¿½)
 	XMVECTOR pos = mat.r[3]; // XMVECTOR(x, y, z, 1)
 
-	// ½ºÄÉÀÏ Á¦°ÅµÈ È¸Àü Çà·Ä¸¸ ÃßÃâ
-	// È¸Àü Çà·ÄÀº 3x3 ºÎºÐÀÎµ¥, °¢ Ãà º¤ÅÍ¸¦ Á¤±ÔÈ­ÇÏ¸é ½ºÄÉÀÏ Á¦°Å °¡´É
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Åµï¿½ È¸ï¿½ï¿½ ï¿½ï¿½Ä¸ï¿½ ï¿½ï¿½ï¿½ï¿½
+	// È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ 3x3 ï¿½Îºï¿½ï¿½Îµï¿½, ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	XMVECTOR right = XMVector3Normalize(mat.r[0]);
 	XMVECTOR up = XMVector3Normalize(mat.r[1]);
 	XMVECTOR forward = XMVector3Normalize(mat.r[2]);
@@ -70,9 +70,9 @@ void Socket::Update()
 		XMVectorSet(0, 0, 0, 1) // No translation yet
 	};
 
-	// ÃÖÁ¾ Çà·Ä: È¸Àü + À§Ä¡
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½: È¸ï¿½ï¿½ + ï¿½ï¿½Ä¡
 	XMMATRIX finalMat = rotOnly;
-	finalMat.r[3] = pos; // À§Ä¡ Àû¿ë
+	finalMat.r[3] = pos; // ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
 	for (auto& obj : AttachObjects)
 	{
 		DirectX::XMVECTOR scaleVec = obj->m_transform.GetWorldScale(); 

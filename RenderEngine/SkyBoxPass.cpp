@@ -1,7 +1,6 @@
 #include "SkyBoxPass.h"
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
-#include "Scene.h"
 #include "Camera.h"
 #include "ImGuiRegister.h"
 

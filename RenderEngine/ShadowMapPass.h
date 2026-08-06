@@ -1,7 +1,6 @@
 #pragma once
 #include "IRenderPass.h"
 #include "Texture.h"
-#include "LightProperty.h"
 
 constexpr int cascadeCount = 3;
 

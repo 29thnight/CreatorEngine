@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "Transform.h"
 #include "LightMapping.h"
-#include "Animator.h"
 #include "BillboardType.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"

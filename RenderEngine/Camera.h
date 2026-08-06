@@ -1,7 +1,7 @@
 #pragma once
 #include "ProjectionType.h"
-#include "LightProperty.h"
 #include "DeviceResources.h"
+#include "LightProperty.h"
 #include "Texture.h"
 #include "Camera.generated.h"
 #include "BitFlag.h"

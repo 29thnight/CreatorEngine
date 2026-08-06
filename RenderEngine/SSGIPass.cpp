@@ -2,7 +2,6 @@
 #include "RHI/RHI.h"
 #include "ShaderSystem.h"
 #include "../EngineEntry/RenderPassSettings.h"
-#include "Scene.h"
 
 //#define SSGI_Ratio 1
 //#define SSGI_NumThreads SSGI_Ratio * 16

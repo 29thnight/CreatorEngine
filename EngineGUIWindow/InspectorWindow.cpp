@@ -1,5 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "InspectorWindow.h"
+#include "Animator.h"
+#include "MeshRenderer.h"
 #include "EditorImGuiTexture.h"
 #include "RenderScene.h"
 #include "Scene.h"

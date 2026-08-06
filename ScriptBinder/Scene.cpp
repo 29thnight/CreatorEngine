@@ -5,6 +5,7 @@
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
+#include "SpriteRenderer.h"
 #include "Terrain.h"
 #include "Animator.h"
 #include "Skeleton.h"

@@ -10,7 +10,6 @@ class Mesh;
 class Material;
 class Animator;
 class Camera;
-class OctreeNode;
 class MeshRenderer : public Component, public RegistableEvent<MeshRenderer>, public std::enable_shared_from_this<MeshRenderer>
 {
 public:
@@ -49,7 +48,6 @@ public:
     uint32 m_bitflag{ 0 };
 
 private:
-	std::unordered_set<OctreeNode*> m_OctreeNodes;
 	bool m_isNeedUpdateCulling{ false };
 
 public: 

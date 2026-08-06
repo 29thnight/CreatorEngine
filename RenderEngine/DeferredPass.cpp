@@ -1,6 +1,5 @@
 #include "DeferredPass.h"
 #include "RHI/RHI.h"
-#include "Scene.h"
 #include "../EngineEntry/RenderPassSettings.h"
 #include "LightController.h"
 #include "ShaderSystem.h"
