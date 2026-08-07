@@ -428,6 +428,41 @@ Server GC 전환은 하지 않는다 — 관리 코드가 게임 스레드 하�
 L-3의 씬 전환 churn 벤치가 "델리게이트 철거 전/후 비교"를 할 때 관리 힙 지표까지 같은 그래프에서 읽을 수 있어야
 재설계 효과와 GC 효과를 분리해 판정할 수 있기 때문이다.</p>
 </div>
+
+<h3>A-3. 구현 노트 (2026-08-07 · 9-6·9-7 반영)</h3>
+<p>진입점을 <code>Bootstrap</code>이 아니라 <strong>새 <code>GcControl</code> 타입</strong>에 뒀다.
+성격이 스크립트 수명이 아니라 런타임 정책이고, <code>Bootstrap</code>은 이미 40개가 넘는 진입점을 담고 있어
+"경계의 전부"라는 그 문서의 주장이 읽기 어려워지고 있었다. 바인딩은 <strong>선택 바인딩</strong>이다 —
+이 타입이 없는 구 어셈블리에서는 GC 연동만 조용히 꺼지고 엔진은 그대로 뜬다.</p>
+<table>
+<tr><th>지점</th><th>무엇</th><th>왜 그 자리인가</th></tr>
+<tr>
+  <td class="fileref">SceneManager.cpp<br>(UnloadUnusedAssets 직후)</td>
+  <td><code>ClrHost::CollectManagedHeap()</code></td>
+  <td>새 씬의 RetainAssets 갱신과 네이티브 캐시 정리가 끝난 뒤라 아무도 참조하지 않는 것이 확정된 상태다.
+  앞에서 부르면 곧 버려질 참조가 아직 살아 있어 회수되지 않는다</td>
+</tr>
+<tr>
+  <td class="fileref">SceneManager::SetGameStart</td>
+  <td><code>SetManagedLatencyMode(isStart)</code></td>
+  <td>편집 중과 재생 중은 원하는 것이 반대다 — 편집 중에는 메모리 회수, 재생 중에는 프레임 예산.
+  다만 <strong>보장이 아니라 요청</strong>이므로 A-2 계측으로 gen2 횟수가 실제로 줄었는지 확인한 뒤 판단한다</td>
+</tr>
+<tr>
+  <td class="fileref">ResourceCounterWindow<br>Capture / Draw</td>
+  <td>"관리 힙 (.NET GC)" 섹션</td>
+  <td>HUD는 게임 스레드의 ImGui 패스에서 그려지므로 경계 규약을 지킨다. 갱신 주기가 0.5초라 틱마다 넘지도 않는다</td>
+</tr>
+<tr>
+  <td class="fileref">scene_churn_benchmark.txt<br>lifecycle_baseline.txt</td>
+  <td><code>gc.delta</code> / <code>gc.stats</code></td>
+  <td>2-9 "메모리 평탄성 검증"의 판정 기준을 <strong>네이티브·관리 양쪽 모두 기준선 복귀</strong>로 넓힌다.
+  씬 전환이 CollectManagedHeap을 자동으로 부르므로, 그러고도 남는 것이 진짜 참조 누수다</td>
+</tr>
+</table>
+<p class="small">CLI: <code>gc.stats</code> · <code>gc.delta [라벨]</code> · <code>gc.collect</code>.
+<code>gc.delta</code>는 기준선이 없으면 조용히 0을 찍는 대신 집계로 남기고 기준선을 세운다 —
+0을 "변화 없음"으로 오독하는 것을 막는다.</p>
 </section>
 
 <footer class="small" style="border-top:1px solid var(--border);padding-top:20px">

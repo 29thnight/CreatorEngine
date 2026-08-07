@@ -50,5 +50,8 @@ lifecycle.trace off
 lifecycle.dump lifecycle_trace.tsv
 scene.dump lifecycle-baseline-final
 gpu.census lifecycle-baseline-final
+# 관리 힙도 함께 남긴다(9-7). 9-3의 전/후 비교에서 재설계 효과와 GC 효과를
+# 분리 판정하려면 두 수치가 같은 실행에 있어야 한다.
+gc.stats lifecycle-baseline-final
 log.flush
 quit

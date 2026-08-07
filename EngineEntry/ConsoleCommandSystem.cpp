@@ -2608,6 +2608,61 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         DataSystems->UnloadUnusedAssets();
         std::printf("[CLI] 사용하지 않는 에셋 정리 요청\n");
     }
+    else if (cmd == "gc.stats" || cmd == "gc.delta")
+    {
+        // 관리 힙 지표(PHASE 9-7). 씬 churn 벤치의 판정 기준을 네이티브에서
+        // "네이티브·관리 양쪽 모두 기준선 복귀"로 넓히기 위한 것이다 —
+        // gpu.delta만 보면 평탄성의 절반만 본다.
+        static ClrHost::ScriptGcStats s_baseline{};
+        static bool s_hasBaseline = false;
+
+        ClrHost::ScriptGcStats gc{};
+        if (!ClrHost::Get().GetManagedGcStats(gc))
+        {
+            std::printf("[CLI] 관리 힙 지표 없음 — 스크립트 계층 비활성\n");
+            return;
+        }
+
+        const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
+        constexpr double kBytesPerMB = 1024.0 * 1024.0;
+
+        char line[512]{};
+        if (cmd == "gc.delta" && s_hasBaseline)
+        {
+            std::snprintf(line, sizeof(line),
+                "[gc.delta] %s — gen0 %+d · gen1 %+d · gen2 %+d · 힙 %+.1f MB (현재 %.1f MB)",
+                label.c_str(),
+                gc.gen0Collections - s_baseline.gen0Collections,
+                gc.gen1Collections - s_baseline.gen1Collections,
+                gc.gen2Collections - s_baseline.gen2Collections,
+                (gc.heapSizeBytes - s_baseline.heapSizeBytes) / kBytesPerMB,
+                gc.heapSizeBytes / kBytesPerMB);
+        }
+        else
+        {
+            // 기준선이 없으면 delta 요청이어도 집계로 남기고 기준선을 세운다.
+            // 조용히 0을 찍으면 "변화 없음"으로 오독된다.
+            s_baseline = gc;
+            s_hasBaseline = true;
+            std::snprintf(line, sizeof(line),
+                "[gc.stats] %s — gen0 %d · gen1 %d · gen2 %d · 힙 %.1f MB · 단편화 %.1f MB · GC 점유 %.2f%%",
+                label.c_str(),
+                gc.gen0Collections, gc.gen1Collections, gc.gen2Collections,
+                gc.heapSizeBytes / kBytesPerMB,
+                gc.fragmentedBytes / kBytesPerMB,
+                gc.pauseTimePercentageX100 / 100.0);
+        }
+
+        std::printf("[CLI] %s\n", line);
+        Debug->LogWarning(line);
+    }
+    else if (cmd == "gc.collect")
+    {
+        // 씬 전환이 자동으로 부르는 것과 같은 경로를 손으로 부른다.
+        // 벤치에서 "전환 없이도 회수되는가"를 가르는 데 쓴다.
+        ClrHost::Get().CollectManagedHeap();
+        std::printf("[CLI] 관리 힙 확정 수집 요청\n");
+    }
     else if (cmd == "log.flush")
     {
         Log::FlushNow();
@@ -2934,6 +2989,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"
         "  lifecycle.dump [파일]  기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)\n"
         "  lifecycle.stress destroy|churn [개수]  파괴·생성을 몰아쳐 수명 경로를 흔든다\n"
+        "  gc.stats|gc.delta [라벨]  관리 힙 지표(수집 횟수·힙 크기). delta는 첫 호출을 기준선으로\n"
+        "  gc.collect           관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"

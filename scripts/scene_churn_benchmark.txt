@@ -4,9 +4,16 @@
 #   Academy_4Q.exe --script ..\..\scripts\scene_churn_benchmark.txt
 #
 # 목적:
-#   같은 씬을 오갔을 때 라이브 GPU 객체와 VRAM이 제자리로 돌아오는지 본다.
-#   사이클마다 수치가 계단식으로 올라가면 회수되지 않는 리소스가 있다는 뜻이고,
-#   그 증가량이 곧 사이클당 누수율이다.
+#   같은 씬을 오갔을 때 라이브 GPU 객체와 VRAM, 그리고 관리 힙이 제자리로
+#   돌아오는지 본다. 사이클마다 수치가 계단식으로 올라가면 회수되지 않는 리소스가
+#   있다는 뜻이고, 그 증가량이 곧 사이클당 누수율이다.
+#
+#   관리 힙을 함께 재는 이유(PHASE 9-7로 확장):
+#   스크립트가 C#으로 간 뒤로 씬이 붙들고 있던 것의 상당수가 관리 힙에 있다.
+#   gpu.delta만 보면 평탄성의 절반만 보는 것이고, 네이티브가 제자리여도
+#   관리 힙이 자라면 프로세스는 계속 커진다.
+#   씬 전환은 CollectManagedHeap을 자동으로 부르므로(9-6), 그러고도 남는 것이
+#   진짜 참조 누수다.
 #
 # 주의:
 #   아래 씬 경로는 실제 프로젝트 경로로 바꿔야 한다.
@@ -17,6 +24,7 @@
 scene.switch Assets/Scenes/SceneA.scene
 wait 120
 gpu.delta baseline
+gc.delta baseline
 
 # --- 사이클 1 ---
 scene.switch Assets/Scenes/SceneB.scene
@@ -24,6 +32,7 @@ wait 120
 scene.switch Assets/Scenes/SceneA.scene
 wait 120
 gpu.delta cycle-1
+gc.delta cycle-1
 
 # --- 사이클 2 ---
 scene.switch Assets/Scenes/SceneB.scene
@@ -31,6 +40,7 @@ wait 120
 scene.switch Assets/Scenes/SceneA.scene
 wait 120
 gpu.delta cycle-2
+gc.delta cycle-2
 
 # --- 사이클 3 ---
 scene.switch Assets/Scenes/SceneB.scene
@@ -38,8 +48,10 @@ wait 120
 scene.switch Assets/Scenes/SceneA.scene
 wait 120
 gpu.delta cycle-3
+gc.delta cycle-3
 
 # --- 마무리 ---
 gpu.census final
+gc.stats final
 log.flush
 quit

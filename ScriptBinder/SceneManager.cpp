@@ -18,6 +18,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "DeviceResources.h"
 #include "ScriptComponent.h"
+#include "ClrHost.h"
 
 // 예전에는 여기에 SuspendSceneScripts가 있었다. 재생 시작이 에디터 씬을 복제해
 // PlayScene을 만들던 시절, 원본과 사본의 스크립트 인스턴스가 둘 다 틱을 받아
@@ -33,6 +34,19 @@ void SceneManager::SetGameStart(bool isStart)
     }
 
     m_isGameStart = isStart;
+
+#ifndef DYNAMICCPP_EXPORTS
+    // 재생 중에는 gen2 블로킹 수집을 억제한다(PHASE 9-6).
+    //
+    // 편집 중과 재생 중은 원하는 것이 반대다. 편집 중에는 메모리를 제때 돌려받는 편이
+    // 낫고(에셋을 계속 갈아 끼운다), 재생 중에는 프레임 예산이 우선이다 — 블로킹
+    // 수집 한 번이 프레임을 통째로 삼키면 그게 곧 히칭이다.
+    //
+    // 보장이 아니라 요청이라는 점은 알고 쓴다. 메모리 압박이 크면 런타임이 무시하고
+    // 수집한다. 그래서 이것만으로 히칭이 사라진다고 기대하지 않고, 9-7의 계측으로
+    // 실제 gen2 횟수가 줄었는지 확인한 뒤에 판단한다.
+    ClrHost::Get().SetManagedLatencyMode(isStart);
+#endif
 }
 
 void SceneManager::SetGamePaused(bool isPaused)
@@ -849,6 +863,19 @@ void SceneManager::BeforeAwakeSceneLoad()
         DataSystems->UnloadUnusedAssets();
 
 #ifndef DYNAMICCPP_EXPORTS
+        // 관리 힙도 같은 경계에서 정리한다(PHASE 9-6).
+        //
+        // 네이티브 캐시만 비우면 반쪽이다 — 파괴된 씬의 Behaviour와 그 필드가 잡고
+        // 있던 관리 객체는 GC가 돌아야 사라지고, 그 시점을 런타임에 맡기면 다음 씬
+        // 한복판에서 일어난다. 그러면 프레임이 튀고, 그 튐이 재설계 탓인지 GC 탓인지
+        // 구분되지 않는다. 두 힙을 같은 지점에서 평탄하게 만들어야 씬 churn 벤치의
+        // "제자리로 돌아왔는가"가 성립한다(2-9 판정 기준 확장).
+        //
+        // 이 자리인 이유: 새 씬의 RetainAssets 갱신과 UnloadUnusedAssets가 끝난 뒤라
+        // 이제 아무도 참조하지 않는 것이 확정된 상태다. 앞에서 부르면 곧 버려질
+        // 참조가 아직 살아 있어 회수되지 않는다.
+        ClrHost::Get().CollectManagedHeap();
+
         // 씬 전환마다 GPU 객체/VRAM 증감을 남긴다.
         // 같은 씬을 오가며 이 값이 계속 증가하면 회수되지 않는 리소스가 있다는 뜻이다.
         // 실행 중에는 VRAM 증감만 남는다(타입별 집계는 디버그 레이어를 망가뜨린다).

@@ -4,6 +4,7 @@
 #include "SceneManager.h"
 #include "DataSystem.h"
 #include "DeviceResources.h"
+#include "ClrHost.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -153,6 +154,50 @@ ResourceCounterWindow::ResourceCounterWindow()
 
 			ImGui::TextColored(kDimColor, "D3D 객체 전수 집계는 종료 리포트(로그)에서 확인");
 		}
+
+		// --- 관리 힙 (.NET GC) --- PHASE 9-7
+		//
+		// 네이티브 카운터만 보면 평탄성의 절반만 보는 것이다. 스크립트가 C#으로 간
+		// 뒤로는 씬이 잡고 있던 것의 상당수가 관리 힙에 있고, 그쪽이 자라면
+		// 네이티브 수치가 아무리 제자리여도 프로세스는 커진다.
+		if (ImGui::CollapsingHeader("관리 힙 (.NET GC)", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (!displayed.gcValid)
+			{
+				ImGui::TextColored(kDimColor, "스크립트 계층 비활성 — 관리 힙 지표 없음");
+			}
+			else
+			{
+				auto drawDelta = [&](int64_t current, int64_t baseline, const char* suffix)
+				{
+					if (!m_baseline.valid || !m_baseline.gcValid) return;
+					const int64_t delta = current - baseline;
+					if (0 == delta) return;
+					ImGui::SameLine();
+					ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor,
+						"(%+lld%s)", static_cast<long long>(delta), suffix);
+				};
+
+				// 수집 횟수는 단조 증가라 증감의 뜻이 다르다 — 여기서는 '기준선 이후
+				// 몇 번 돌았나'이고, 씬 전환마다 gen2가 정확히 늘어나는지가 9-6의 확인점이다.
+				ImGui::Text("수집 횟수  gen0 %d", displayed.gcGen0);
+				drawDelta(displayed.gcGen0, m_baseline.gcGen0, "");
+				ImGui::SameLine(); ImGui::Text(" · gen1 %d", displayed.gcGen1);
+				drawDelta(displayed.gcGen1, m_baseline.gcGen1, "");
+				ImGui::SameLine(); ImGui::Text(" · gen2 %d", displayed.gcGen2);
+				drawDelta(displayed.gcGen2, m_baseline.gcGen2, "");
+
+				constexpr double kBytesPerMB = 1024.0 * 1024.0;
+				ImGui::Text("힙 크기    %.1f MB", displayed.gcHeapBytes / kBytesPerMB);
+				drawDelta((displayed.gcHeapBytes - m_baseline.gcHeapBytes) / 1048576, 0, " MB");
+
+				ImGui::Text("단편화     %.1f MB", displayed.gcFragmentedBytes / kBytesPerMB);
+				ImGui::Text("GC 점유    %.2f %%", displayed.gcPausePercentX100 / 100.0);
+
+				ImGui::TextColored(kDimColor,
+					"씬을 오간 뒤 힙 크기가 기준선으로 돌아와야 한다. 계속 자라면 관리 측 참조가 남은 것이다.");
+			}
+		}
 	}, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
 	ImGui::GetContext("Resource Counter").Close();
@@ -254,6 +299,25 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 			constexpr uint64_t megabyte = 1024ull * 1024ull;
 			snapshot.vramUsedMB = memory.CurrentUsage / megabyte;
 			snapshot.vramBudgetMB = memory.Budget / megabyte;
+		}
+	}
+
+	// --- 관리 힙 (PHASE 9-7) ---
+	//
+	// HUD는 게임 스레드의 ImGui 패스에서 그려지므로 여기서 경계를 넘어도 규약을 지킨다
+	// (관리 코드 호출은 게임 스레드 전용). 하는 일은 카운터 읽기뿐이고 HUD 자체가
+	// 0.5초 주기라 틱마다 넘지도 않는다.
+	{
+		ClrHost::ScriptGcStats gc{};
+		if (ClrHost::Get().GetManagedGcStats(gc))
+		{
+			snapshot.gcValid = true;
+			snapshot.gcGen0 = gc.gen0Collections;
+			snapshot.gcGen1 = gc.gen1Collections;
+			snapshot.gcGen2 = gc.gen2Collections;
+			snapshot.gcHeapBytes = gc.heapSizeBytes;
+			snapshot.gcFragmentedBytes = gc.fragmentedBytes;
+			snapshot.gcPausePercentX100 = gc.pauseTimePercentageX100;
 		}
 	}
 

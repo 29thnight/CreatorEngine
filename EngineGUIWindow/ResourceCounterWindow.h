@@ -46,6 +46,17 @@ private:
 
 		// 엔진이 직접 센 에셋 인스턴스 수. 원자적 읽기뿐이라 매 프레임 갱신해도 된다.
 		Diagnostics::ResourceSnapshot engineResources{};
+
+		// 관리 힙 (.NET GC) — PHASE 9-7.
+		// CoreCLR 도입으로 힙이 둘이 됐다. 네이티브만 보면 "씬을 오갔을 때 제자리로
+		// 돌아왔는가"의 절반만 보는 것이다.
+		bool     gcValid{ false };
+		int32_t  gcGen0{ 0 };
+		int32_t  gcGen1{ 0 };
+		int32_t  gcGen2{ 0 };
+		int64_t  gcHeapBytes{ 0 };
+		int64_t  gcFragmentedBytes{ 0 };
+		int64_t  gcPausePercentX100{ 0 };
 	};
 
 	Snapshot Capture(bool includeGpuObjects) const;

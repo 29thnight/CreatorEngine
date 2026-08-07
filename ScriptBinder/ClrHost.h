@@ -132,6 +132,42 @@ public:
 	// 마지막 틱에서 관리 측이 보고한 활성 스크립트 수(경계 로그·진단용).
 	int LastActiveCount() const { return m_lastActiveCount; }
 
+	// ── 관리 힙 (PHASE 9-6·9-7) ──
+	//
+	// CoreCLR이 들어오면서 힙이 둘이 됐다. 원칙은 "GC에 수명을 맡기지 않는다,
+	// 대신 GC가 도는 시점을 엔진이 쥔다"이다 — 세대 핸들이 수명의 진실이고
+	// GC가 관여하는 것은 언제 도는가뿐이다.
+	//
+	// 전부 게임 스레드 전용이다(위 틱 진입점과 같은 규약).
+
+	// 관리 측 GcStats와 배치가 같아야 한다.
+	struct ScriptGcStats
+	{
+		int32_t gen0Collections{ 0 };
+		int32_t gen1Collections{ 0 };
+		int32_t gen2Collections{ 0 };
+		int64_t heapSizeBytes{ 0 };
+		int64_t totalAllocatedBytes{ 0 };
+		int64_t fragmentedBytes{ 0 };
+		int64_t pauseTimePercentageX100{ 0 };
+	};
+
+	// 배치가 어긋나면 경고 없이 쓰레기 값이 넘어온다 — 지표가 틀렸다는 것을
+	// 눈으로 알아채기 어려운 종류라(그럴듯한 숫자가 나온다) 여기서 못 박는다.
+	// int32 셋(12) + 정렬 패딩(4) + int64 넷(32) = 48.
+	static_assert(sizeof(ScriptGcStats) == 48,
+		"ScriptGcStats 배치가 관리 측 GcStats와 어긋났다 (ScriptCore/GcControl.cs)");
+
+	// 씬 경계에서 확정 수집한다. 비싸다(수십 ms) — 씬 전환에서만 부른다.
+	// 프레임 루프에서 부르면 그 프레임이 통째로 GC에 묶인다.
+	void CollectManagedHeap();
+
+	// 재생 중에는 gen2 블로킹 수집을 억제한다(요청이지 보장은 아니다).
+	void SetManagedLatencyMode(bool lowLatency);
+
+	// 지표를 읽는다. 스크립트 계층이 비활성이거나 구 어셈블리면 false.
+	bool GetManagedGcStats(ScriptGcStats& outStats);
+
 	// ── 노출 필드 ──
 	// 소스 제너레이터가 만든 접근자를 통해 인스펙터·직렬화가 값을 주고받는다.
 	// 관리 객체의 필드 주소를 직접 잡지 않는 이유는 ScriptCore의 Behaviour 주석 참고.
@@ -212,6 +248,13 @@ private:
 	TickFn       m_fnLateUpdate{ nullptr };
 	AwakeFn      m_fnSceneUnload{ nullptr };
 	AwakeFn      m_fnFlushPendingAwake{ nullptr };
+
+	// 관리 힙 제어·계측(9-6·9-7). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남는다.
+	using GcStatsFn   = int(__stdcall*)(ScriptGcStats*);
+	using GcLatencyFn = int(__stdcall*)(int);
+	AwakeFn      m_fnGcCollectNow{ nullptr };
+	GcLatencyFn  m_fnGcSetLatencyMode{ nullptr };
+	GcStatsFn    m_fnGcGetStats{ nullptr };
 
 	using FlushPhysicsFn = int(__stdcall*)(const ScriptPhysicsEvent*, int);
 	using HasAniFn       = int(__stdcall*)(const char*);

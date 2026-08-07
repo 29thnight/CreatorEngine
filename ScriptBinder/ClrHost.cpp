@@ -2366,11 +2366,11 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	const std::wstring assembly = assemblyPath.wstring();
 	const wchar_t* typeName = L"CreatorEngine.Bootstrap, ScriptCore";
 
-	auto bind = [&](const wchar_t* method, void** out) -> bool
+	auto bindFrom = [&](const wchar_t* owningType, const wchar_t* method, void** out) -> bool
 	{
 		// UNMANAGEDCALLERSONLY_METHOD를 주면 델리게이트 마샬링 없이
 		// 관리 메서드를 직접 가리키는 함수 포인터를 받는다.
-		const int rc = g_loadAssembly(assembly.c_str(), typeName, method,
+		const int rc = g_loadAssembly(assembly.c_str(), owningType, method,
 			UNMANAGEDCALLERSONLY_METHOD, nullptr, out);
 
 		if (0 != rc || nullptr == *out)
@@ -2381,6 +2381,11 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 			return false;
 		}
 		return true;
+	};
+
+	auto bind = [&](const wchar_t* method, void** out) -> bool
+	{
+		return bindFrom(typeName, method, out);
 	};
 
 	void* fn = nullptr;
@@ -2400,6 +2405,16 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (bind(L"GetBehaviourTypeNames", &fn))    m_fnGetBehaviourTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
 	if (bind(L"GetAniBehaviourTypeNames", &fn)) m_fnGetAniBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
 	if (bind(L"FlushScriptMessages", &fn))      m_fnFlushScriptMessages      = reinterpret_cast<FlushMessageFn>(fn);
+
+	// 관리 힙 제어·계측(9-6·9-7). Bootstrap이 아니라 GcControl에 있다 —
+	// 성격이 스크립트 수명이 아니라 런타임 정책이라 진입점 묶음을 나눴다.
+	// 선택 바인딩이라 이것이 없는 어셈블리에서는 GC 연동만 조용히 꺼진다.
+	{
+		const wchar_t* gcType = L"CreatorEngine.GcControl, ScriptCore";
+		if (bindFrom(gcType, L"CollectNow", &fn))     m_fnGcCollectNow     = reinterpret_cast<AwakeFn>(fn);
+		if (bindFrom(gcType, L"SetLatencyMode", &fn)) m_fnGcSetLatencyMode = reinterpret_cast<GcLatencyFn>(fn);
+		if (bindFrom(gcType, L"GetStats", &fn))       m_fnGcGetStats       = reinterpret_cast<GcStatsFn>(fn);
+	}
 
 	// 애니메이션 상태 스크립트
 	if (!bind(L"HasAniBehaviour", &fn))     return false;  m_fnHasAniBehaviour     = reinterpret_cast<HasAniFn>(fn);
@@ -2663,6 +2678,29 @@ void ClrHost::NotifySceneUnload()
 	if (m_ready && nullptr != m_fnSceneUnload) m_fnSceneUnload();
 
 	ScriptObjectRegistry::Get().Clear();
+}
+
+void ClrHost::CollectManagedHeap()
+{
+	// 씬 경계 전용이다. 프레임 루프에서 부르면 그 프레임이 통째로 GC에 묶인다 —
+	// CoreCLR의 블로킹 수집은 관리 스레드를 전부 세운다.
+	if (!m_ready || nullptr == m_fnGcCollectNow) return;
+
+	m_fnGcCollectNow();
+}
+
+void ClrHost::SetManagedLatencyMode(bool lowLatency)
+{
+	if (!m_ready || nullptr == m_fnGcSetLatencyMode) return;
+
+	m_fnGcSetLatencyMode(lowLatency ? 1 : 0);
+}
+
+bool ClrHost::GetManagedGcStats(ScriptGcStats& outStats)
+{
+	if (!m_ready || nullptr == m_fnGcGetStats) return false;
+
+	return 0 == m_fnGcGetStats(&outStats);
 }
 
 int ClrHost::CreateBehaviour(GameObject* owner, std::string_view typeName)
