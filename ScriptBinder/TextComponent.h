@@ -9,7 +9,7 @@
 #include "UIComponent.h"
 #include "TextComponent.generated.h"
 
-class TextComponent : public UIComponent, public RegistableEvent<TextComponent>
+class TextComponent : public UIComponent
 {
 public:
    ReflectTextComponent

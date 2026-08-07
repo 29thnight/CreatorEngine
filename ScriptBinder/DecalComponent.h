@@ -5,7 +5,7 @@
 #include "DecalComponent.generated.h"
 
 class Texture;
-class DecalComponent : public Component, public RegistableEvent<DecalComponent>
+class DecalComponent : public Component
 {
 public:
    ReflectDecalComponent

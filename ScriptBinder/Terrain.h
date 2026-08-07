@@ -16,7 +16,7 @@
 //-----------------------------------------------------------------------------
 class ComponentFactory;
 class ProxyCommand;
-class TerrainComponent : public Component, public RegistableEvent<TerrainComponent>
+class TerrainComponent : public Component
 {
 public:
     ReflectTerrainComponent

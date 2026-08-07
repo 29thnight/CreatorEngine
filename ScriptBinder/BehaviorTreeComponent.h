@@ -10,7 +10,7 @@
 using namespace BT;
 
 class BehaviorTreeComponent : 
-	public Component, public IAIComponent, public RegistableEvent<BehaviorTreeComponent>
+	public Component, public IAIComponent
 {
 public:
    ReflectBehaviorTreeComponent

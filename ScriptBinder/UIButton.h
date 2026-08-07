@@ -15,7 +15,7 @@ enum class UIColliderType : uint8_t
 };
 AUTO_REGISTER_ENUM(UIColliderType);
 
-class UIButton : public UIComponent, public RegistableEvent<UIButton>
+class UIButton : public UIComponent
 {
 public:
    ReflectUIButton

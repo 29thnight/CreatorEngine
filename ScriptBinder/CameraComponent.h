@@ -7,7 +7,7 @@
 #include "CameraComponent.generated.h"
 #include "SceneManager.h"
 
-class CameraComponent : public Component, public RegistableEvent<CameraComponent>
+class CameraComponent : public Component
 {
 public:
    ReflectCameraComponent

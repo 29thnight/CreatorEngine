@@ -2515,12 +2515,22 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         // 만들지 않기 위해서다. 같은 실행에서 양쪽을 번갈아 돌려 9-0 기준선과 대조할 수도 있다.
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
 
-        if (mode == "on" || mode == "off")
+        if (mode == "off")
         {
-            const bool enable = (mode == "on");
+            // 9-2에서 26종이 레지스트리로 옮겨 가며 델리게이트 경로의 구독자가 0이 됐다.
+            // 지금 끄면 아무 단계도 돌지 않는데, 그 모습이 '조용히 멈춘 게임'이라
+            // 원인을 짚기 어렵다. 되돌릴 수 없는 상태라는 것을 말로 알린다.
+            std::printf("[CLI] lifecycle.registry off — 거부. 9-2 이후 델리게이트 경로에는\n"
+                        "      구독자가 없어 끄면 어떤 생명주기도 돌지 않는다.\n");
+            return;
+        }
+
+        if (mode == "on")
+        {
+            const bool enable = true;
             if (enable == Scene::UseRegistry())
             {
-                std::printf("[CLI] lifecycle.registry — 이미 %s\n", enable ? "켜짐" : "꺼짐");
+                std::printf("[CLI] lifecycle.registry — 이미 켜짐(9-2 이후 기본값)\n");
                 return;
             }
 

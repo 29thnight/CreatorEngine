@@ -10,7 +10,7 @@ class Mesh;
 class Material;
 class Animator;
 class Camera;
-class MeshRenderer : public Component, public RegistableEvent<MeshRenderer>, public std::enable_shared_from_this<MeshRenderer>
+class MeshRenderer : public Component, public std::enable_shared_from_this<MeshRenderer>
 {
 public:
    ReflectMeshRenderer

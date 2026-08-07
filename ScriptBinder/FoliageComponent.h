@@ -8,7 +8,7 @@
 
 class Camera;
 class TerrainComponent;
-class FoliageComponent : public Component, public RegistableEvent<FoliageComponent>
+class FoliageComponent : public Component
 {
 public:
     ReflectFoliageComponent

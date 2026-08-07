@@ -7,7 +7,7 @@
 #include "../Physics/ICollider.h"
 #include "CapsuleColliderComponent.generated.h"
 
-class CapsuleColliderComponent : public Component, public ICollider, public RegistableEvent<CapsuleColliderComponent>
+class CapsuleColliderComponent : public Component, public ICollider
 {
 public:
    ReflectCapsuleColliderComponent

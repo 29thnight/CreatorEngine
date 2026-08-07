@@ -11,7 +11,7 @@
 class Texture;
 class UIMesh;
 class Canvas;
-class SpriteSheetComponent : public UIComponent, public RegistableEvent<SpriteSheetComponent>
+class SpriteSheetComponent : public UIComponent
 {
 public:
    ReflectSpriteSheetComponent

@@ -7,7 +7,7 @@
 #include "EForceMode.h"
 #include "../physics/PhysicsCommon.h"  
 
-class RigidBodyComponent : public Component, public RegistableEvent<RigidBodyComponent>
+class RigidBodyComponent : public Component
 {
 public:
    ReflectRigidBodyComponent

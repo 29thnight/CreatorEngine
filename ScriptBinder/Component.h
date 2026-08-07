@@ -54,6 +54,25 @@ public:
 	bool HasLifecycleState(uint8_t bit) const noexcept { return 0 != (m_lifecycleState & bit); }
 	void MarkLifecycleState(uint8_t bit) noexcept { m_lifecycleState |= bit; }
 
+	// 활성 전이에서 OnEnable/OnDisable을 부른다 (PHASE 9-2).
+	//
+	// 예전에는 Scene이 매 프레임 OnEnableEvent/OnDisableEvent를 브로드캐스트하고,
+	// 구독한 람다가 "이전 상태와 달라졌나"를 각자 검사했다. 즉 상태가 안 바뀐
+	// 프레임에도 전체를 훑었다 — 그런데 이 훅을 구현한 네이티브 컴포넌트는 0개라
+	// 그 스캔은 매 프레임 아무 일도 하지 않고 돌기만 했다.
+	//
+	// 전이는 SetEnabled에서만 일어난다. 그 자리에서 직접 부르면 스캔이 통째로 사라지고,
+	// 호출 시점도 '다음 브로드캐스트'가 아니라 '바뀐 그 순간'으로 명확해진다.
+	void SetEnabled(bool able) override
+	{
+		const bool wasEnabled = IsEnabled();
+		Object::SetEnabled(able);
+		if (wasEnabled == able) return;
+
+		if (able) OnEnable();
+		else      OnDisable();
+	}
+
 	//template<typename T>
 	//T& GetComponent();
 

@@ -5,7 +5,7 @@
 #include "KeyState.h"
 #include "PlayerInputComponent.generated.h"
 class ActionMap;
-class PlayerInputComponent : public Component, public RegistableEvent<PlayerInputComponent>
+class PlayerInputComponent : public Component
 {
 public:
    ReflectPlayerInputComponent

@@ -6,7 +6,7 @@
 #include "Canvas.generated.h"
 #include "IRegistableEvent.h"
 
-class Canvas : public Component, public RegistableEvent<Canvas>
+class Canvas : public Component
 {
 public:
    ReflectCanvas

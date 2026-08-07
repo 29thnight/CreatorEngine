@@ -29,8 +29,8 @@ param(
     # 오가면 컴포넌트 구성이 비슷해 파괴·초기화 순서의 차이가 드러나지 않는다.
     [string]$SceneA = "FT_Material",
     [string]$SceneB = "UITestScene",
-    # 새 레지스트리 경로로 돌린다(PHASE 9-1). 기준선은 델리게이트 경로로 떴으므로,
-    # 이것을 켜고 통과하면 두 경로가 같은 순서를 낸다는 뜻이다 — 그것이 9-1의 완료 조건이다.
+    # 잔재 스위치. 9-2에서 레지스트리가 유일한 경로가 되어 아무 효과가 없다.
+    # 9-3에서 델리게이트 기계가 철거될 때 함께 지운다.
     [switch]$Registry
 )
 
@@ -84,22 +84,15 @@ $scenario = Join-Path $Work "lifecycle_baseline_resolved.txt"
 $exeArgs = @("--script", $scenario)
 if ($Registry) { $exeArgs = @("--lifecycle-registry") + $exeArgs }
 
-if ($Registry) { "경로: 레지스트리 (PHASE 9-1)" } else { "경로: 델리게이트 (기존)" }
+# 경로는 이제 하나다(9-2). 인자는 남아 있어도 동작을 바꾸지 않는다.
 
-# 기준선은 경로마다 따로 둔다.
+# 기준선은 하나다.
 #
-# 두 경로는 같은 사건을 내지만 단계 안의 순서가 다르다. 델리게이트 쪽은 우선순위
-# 정렬 삽입(lower_bound + '>' 비교자)이 같은 우선순위에서 항상 맨 앞에 꽂아
-# **등록 역순**으로 돌았다 — 설계된 계약이 아니라 자료구조에서 나온 부수 효과다.
-# 레지스트리는 등록 순서로 돈다.
-#
-# 하나의 기준선으로 둘을 재면 어느 쪽을 고쳐도 나머지가 깨져 결국 무시된다.
-# 경로별로 두면 각각이 자기 회귀를 지킨다.
-$baselineFile = if ($Registry) {
-    Join-Path $PSScriptRoot "lifecycle_baseline_registry.tsv"
-} else {
-    Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
-}
+# 9-1 동안에는 경로가 둘이라 파일도 둘이었다(두 경로가 같은 사건을 내지만 단계 안의
+# 순서가 달랐다 — 델리게이트 쪽 우선순위 정렬 삽입이 등록 역순을 만들었다).
+# 9-2에서 26종이 레지스트리로 옮겨 가며 델리게이트 경로에 구독자가 0이 됐으므로,
+# 레지스트리 기준선이 곧 엔진의 기준선이다.
+$baselineFile = Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
 # lifecycle.dump 는 상대 경로를 프로세스 작업 디렉터리 기준으로 푼다.
 $producedFile = Join-Path $exeDir "lifecycle_trace.tsv"
 

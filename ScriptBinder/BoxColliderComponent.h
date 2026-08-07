@@ -6,7 +6,7 @@
 #include "../Physics/ICollider.h"
 #include "BoxColliderComponent.generated.h"
 
-class BoxColliderComponent : public Component, public ICollider, public RegistableEvent<BoxColliderComponent>
+class BoxColliderComponent : public Component, public ICollider
 {  
 public:  
    ReflectBoxColliderComponent

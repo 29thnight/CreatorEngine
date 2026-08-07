@@ -749,11 +749,12 @@ void Scene::Reset()
 // ─────────────────────────────────────────────────────────────────────────────
 namespace
 {
-    // 전환 스위치. 기본은 꺼짐 — 기존 델리게이트 경로가 그대로 돈다.
+    // 기본이 레지스트리다 (PHASE 9-2에서 뒤집었다).
     //
-    // 전역인 이유: 씬마다 다른 경로를 쓰면 씬 전환 지점에서 두 규약이 만나고,
-    // 그때 어느 쪽이 파괴를 책임지는지가 모호해진다. 경로 선택은 엔진 전체의 성질이다.
-    bool g_useLifecycleRegistry = false;
+    // 9-2가 26종에서 RegistableEvent 상속을 걷어냈으므로 델리게이트 경로에는 이제
+    // 구독자가 하나도 없다 — 끄면 아무것도 안 돈다. 스위치가 남아 있는 것은 9-3이
+    // 델리게이트 기계를 실제로 철거할 때까지의 잔재이고, 그때 이 변수도 사라진다.
+    bool g_useLifecycleRegistry = true;
 
     // swap-and-pop 제거. 순서를 보존하지 않는 것이 의도다 —
     // 보존해야 하는 것은 단계 사이의 순서이지 같은 단계 안의 순서가 아니고,
@@ -1003,6 +1004,13 @@ void Scene::Awake()
 
 void Scene::OnEnable()
 {
+    // 레지스트리 경로에서는 할 일이 없다(PHASE 9-2).
+    //
+    // 활성 전이는 Component::SetEnabled가 그 자리에서 처리한다. 매 프레임 전체를
+    // 훑으며 '바뀐 게 있나' 묻던 스캔이 사라진 것이고, 그 스캔은 이 훅을 구현한
+    // 네이티브 컴포넌트가 0개라 실제로 아무 일도 하지 않고 돌기만 했다.
+    if (UseRegistry()) return;
+
     OnEnableEvent.Broadcast();
 }
 
@@ -1133,7 +1141,8 @@ void Scene::LateUpdate(float deltaSecond)
 void Scene::OnDisable()
 {
     PROFILE_CPU_BEGIN("OnDisable");
-    OnDisableEvent.Broadcast();
+    // OnEnable과 같은 이유로 레지스트리 경로에서는 비어 있다 — SetEnabled가 처리한다.
+    if (!UseRegistry()) OnDisableEvent.Broadcast();
     PROFILE_CPU_END();
 }
 

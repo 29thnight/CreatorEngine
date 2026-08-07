@@ -10,7 +10,7 @@
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
 
-class LightComponent : public Component, public RegistableEvent<LightComponent>
+class LightComponent : public Component
 {
 public:
     ReflectLightComponent

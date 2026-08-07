@@ -3,7 +3,7 @@
 #include "EffectComponent.generated.h"
 #include "IRegistableEvent.h"
 
-class EffectComponent : public Component, public RegistableEvent<EffectComponent>, public System::IInitializable, public std::enable_shared_from_this<EffectComponent>
+class EffectComponent : public Component, public System::IInitializable, public std::enable_shared_from_this<EffectComponent>
 {
 public:
     ReflectEffectComponent

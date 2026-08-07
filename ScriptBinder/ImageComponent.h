@@ -10,7 +10,7 @@
 class Texture;
 class UIMesh;
 class Canvas;
-class ImageComponent : public UIComponent, public RegistableEvent<ImageComponent>
+class ImageComponent : public UIComponent
 {
 public:
    ReflectImageComponent

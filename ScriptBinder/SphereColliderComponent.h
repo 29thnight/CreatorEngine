@@ -5,7 +5,7 @@
 #include "../Physics/ICollider.h"
 #include "SphereColliderComponent.generated.h"
 
-class SphereColliderComponent : public Component, public ICollider, public RegistableEvent<SphereColliderComponent>
+class SphereColliderComponent : public Component, public ICollider
 {
 public:
    ReflectSphereColliderComponent

@@ -5,7 +5,7 @@
 #include "../Physics/ICollider.h"
 #include "MeshColliderComponent.generated.h"
 
-class MeshColliderComponent : public Component, public ICollider, public RegistableEvent<MeshColliderComponent>
+class MeshColliderComponent : public Component, public ICollider
 {
 public:
    ReflectMeshColliderComponent

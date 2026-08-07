@@ -7,7 +7,7 @@
 #include "SpriteRenderer.generated.h"
 #include "Texture.h"
 
-class SpriteRenderer : public Component, public RegistableEvent<SpriteRenderer>
+class SpriteRenderer : public Component
 {
 public:
    ReflectSpriteRenderer

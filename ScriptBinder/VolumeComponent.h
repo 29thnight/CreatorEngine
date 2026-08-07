@@ -5,7 +5,7 @@
 #include "IRegistableEvent.h"
 #include "VolumeComponent.generated.h"
 
-class VolumeComponent : public Component, public RegistableEvent<VolumeComponent>
+class VolumeComponent : public Component
 {
 public:
     ReflectVolumeComponent

@@ -6,7 +6,7 @@
 #include "../Physics/ICollider.h"
 #include "TerrainColliderComponent.generated.h"
 
-class TerrainColliderComponent : public Component, public ICollider, public RegistableEvent<TerrainColliderComponent>
+class TerrainColliderComponent : public Component, public ICollider
 {
 public:
    ReflectTerrainColliderComponent

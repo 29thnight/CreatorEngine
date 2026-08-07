@@ -10,7 +10,7 @@ namespace FMOD
 	class Channel;
 }
 
-class SoundComponent : public Component, public RegistableEvent<SoundComponent>
+class SoundComponent : public Component
 {
 public:
    ReflectSoundComponent

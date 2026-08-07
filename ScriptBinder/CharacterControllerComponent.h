@@ -12,7 +12,7 @@
 #include "Scene.h"
 #include "CharacterControllerComponent.generated.h"
 
-class CharacterControllerComponent : public Component, public ICollider, public RegistableEvent<CharacterControllerComponent>
+class CharacterControllerComponent : public Component, public ICollider
 {
 public:
    ReflectCharacterControllerComponent
