@@ -232,6 +232,30 @@ internal static class BehaviourRegistry
         }
     }
 
+    /// <summary>
+    /// 이름으로 부르는 콜백을 전달한다(애니메이션 키프레임 이벤트·입력 액션).
+    ///
+    /// 물리 콜백과 같은 격리 규약을 쓴다 — 하나가 던진 예외로 프레임이 죽지 않도록
+    /// 해당 스크립트만 끈다. 다만 이름이 안 맞아 못 찾은 것은 예외가 아니라
+    /// 데이터와 코드가 어긋난 것이므로 경고만 남기고 넘어간다.
+    /// </summary>
+    public static void DispatchMessage(Behaviour target, string message)
+    {
+        try
+        {
+            if (!target.InvokeMessage(message))
+            {
+                Native.Log(2, $"[{target.GetType().Name}] '{message}' 메서드를 찾지 못했습니다 " +
+                              "(public 무인자 void 메서드여야 합니다).");
+            }
+        }
+        catch (Exception ex)
+        {
+            Native.Log(3, $"[{target.GetType().Name}] '{message}' 예외 — 이 스크립트를 비활성화합니다.\n{ex}");
+            target.Enabled = false;
+        }
+    }
+
     /// <summary>씬 언로드 — 전부 정리한다.</summary>
     public static void Clear()
     {

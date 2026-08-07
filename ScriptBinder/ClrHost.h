@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
+#include "SpinLock.h"
 #include "ScriptObjectRegistry.h"
 
 // CoreCLR 호스팅.
@@ -91,6 +92,32 @@ public:
 	void DestroyAniBehaviour(int instanceId);
 	void QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, GameObject* owner);
 	void FlushAniEvents();
+
+	// 등록된 애니메이션 상태 스크립트 이름 목록 — 애니메이터 편집기의 선택 목록용.
+	std::vector<std::string> GetAniBehaviourTypeNames();
+
+	// ── 이름으로 부르는 콜백 ──
+	//
+	// 애니메이션 키프레임 이벤트와 입력 액션이 이 통로를 함께 쓴다. 둘 다 에셋에
+	// "메서드 이름"이 저장돼 있고(구 C++ 경로가 리플렉션으로 부르던 그 이름),
+	// 관리 측은 생성기가 만든 이름→직접 호출 표로 받는다.
+	//
+	// 물리·애니메이션 이벤트와 같은 규약이다: 발생 시점에 넘기지 않고 큐에 모았다가
+	// 틱 경계에서 한 번에 전달한다. 입력과 키프레임은 프레임마다 여러 건이 몰린다.
+	static constexpr int kScriptMessageNameCapacity = 64;
+
+	// 관리 측 ScriptMessage와 배치가 같아야 한다.
+	struct ScriptMessage
+	{
+		int  instanceId;
+		char name[kScriptMessageNameCapacity];
+	};
+
+	// 주의: 큐에 담는 쪽은 스레드 안전하다. 애니메이션 갱신이 잡 스레드에서 돌고
+	// 거기서 키프레임 이벤트가 발생하기 때문이다(AnimationJob의 스레드 풀 람다).
+	// 반대로 Flush는 게임 스레드 전용이다 — 관리 측 호출은 GC 때문에 그래야 한다.
+	void QueueScriptMessage(int instanceId, std::string_view methodName);
+	void FlushScriptMessages();
 
 	// ── 인스턴스 ──
 	// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
@@ -191,15 +218,20 @@ private:
 	using CreateAniFn    = int(__stdcall*)(const char*);
 	using DestroyAniFn   = int(__stdcall*)(int);
 	using FlushAniFn     = int(__stdcall*)(const ScriptAniEvent*, int);
+	using FlushMessageFn = int(__stdcall*)(const ScriptMessage*, int);
 	FlushPhysicsFn m_fnFlushPhysicsEvents{ nullptr };
 	HasAniFn       m_fnHasAniBehaviour{ nullptr };
 	CreateAniFn    m_fnCreateAniBehaviour{ nullptr };
 	DestroyAniFn   m_fnDestroyAniBehaviour{ nullptr };
 	FlushAniFn     m_fnFlushAniEvents{ nullptr };
+	FlushMessageFn m_fnFlushScriptMessages{ nullptr };
+	TypeNamesFn    m_fnGetAniBehaviourTypeNames{ nullptr };
 
 	// 한 프레임에 모이는 충돌 이벤트. 매 프레임 clear 하되 용량은 유지한다.
 	std::vector<ScriptPhysicsEvent> m_physicsEvents;
 	std::vector<ScriptAniEvent> m_aniEvents;
+	std::vector<ScriptMessage> m_scriptMessages;
+	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
 	CreateFn     m_fnCreateBehaviour{ nullptr };
 	DestroyFn    m_fnDestroyBehaviour{ nullptr };
 	TypeNamesFn  m_fnGetBehaviourTypeNames{ nullptr };

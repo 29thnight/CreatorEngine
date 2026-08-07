@@ -70,6 +70,16 @@ public abstract class Behaviour : Component
     // 물리 콜백. 발생 시점에 바로 불리지 않고 틱 경계에서 일괄 전달된다 —
     // 충돌마다 경계를 넘으면 "틱당 1회" 원칙이 무너지기 때문이다(설계 문서 02절).
     // 따라서 이 안에서 본 상태는 물리 시뮬레이션 시점이 아니라 틱 경계의 상태다.
+    /// <summary>
+    /// 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션)의 진입점.
+    ///
+    /// 구현은 BehaviourGenerator가 만든다 — 스크립트의 public 무인자 void 메서드를
+    /// 이름으로 찾아 직접 호출하는 switch다. 리플렉션을 쓰지 않으므로 AOT에서도 동작한다.
+    /// 에셋에 저장된 메서드 이름 데이터가 그대로 유효한 것도 이 구조 덕분이다.
+    /// </summary>
+    /// <returns>해당 이름의 메서드를 찾아 불렀으면 true.</returns>
+    public virtual bool InvokeMessage(string message) => false;
+
     public virtual void OnTriggerEnter(in Collision collision) { }
     public virtual void OnTriggerStay(in Collision collision) { }
     public virtual void OnTriggerExit(in Collision collision) { }

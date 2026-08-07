@@ -360,6 +360,11 @@ void DirectX11::Dx11Main::TickScripts(float deltaTime)
     // Enter/Update/Exit를 발생 순서 그대로 넘긴다.
     clr.FlushAniEvents();
 
+    // 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션).
+    // Update 전에 흘려보내는 이유는 물리와 같다 — 스크립트가 이번 프레임 Update에서
+    // 그 결과를 보고 판단할 수 있어야 한다.
+    clr.FlushScriptMessages();
+
     clr.TickUpdate(deltaTime);
     clr.TickLateUpdate(deltaTime);
 }

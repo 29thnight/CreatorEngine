@@ -20,6 +20,9 @@ internal static class AniBehaviourFactory
 
     public static int RegisteredCount => _creators.Count;
 
+    /// <summary>등록된 애니메이션 상태 스크립트 이름들 — 에디터의 선택 목록이 쓴다.</summary>
+    public static IReadOnlyCollection<string> RegisteredTypeNames => _creators.Keys;
+
     /// <summary>
     /// 어셈블리를 내릴 때 등록과 인스턴스를 모두 비운다.
     /// 인스턴스를 빠뜨리면 컬렉터블 컨텍스트가 언로드되지 않는다(ScriptFactory에서 겪은 문제).

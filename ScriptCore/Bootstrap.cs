@@ -103,6 +103,31 @@ public static class Bootstrap
         catch (Exception ex) { Report(ex, nameof(FlushPhysicsEvents)); return -1; }
     }
 
+    /// <summary>
+    /// 이름으로 부르는 콜백 배치를 전달한다(애니메이션 키프레임 이벤트·입력 액션).
+    /// 물리 이벤트와 같은 규약 — 발생 시점이 아니라 틱 경계에서 한 번에 넘어온다.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    internal static unsafe int FlushScriptMessages(ScriptMessage* messages, int count)
+    {
+        try
+        {
+            if (messages == null || count <= 0) return 0;
+
+            for (int i = 0; i < count; ++i)
+            {
+                ScriptMessage* message = &messages[i];
+
+                Behaviour? target = ScriptFactory.Find(message->InstanceId);
+                if (target is null || !target.IsAlive || !target.Enabled) continue;
+
+                BehaviourRegistry.DispatchMessage(target, ScriptMessage.ReadName(message));
+            }
+            return count;
+        }
+        catch (Exception ex) { Report(ex, nameof(FlushScriptMessages)); return -1; }
+    }
+
     // ── 애니메이션 상태 스크립트 ──
     //
     // 상태 머신이 수명을 쥐고 있으므로 생성·파괴를 네이티브가 직접 요청한다.
@@ -291,6 +316,22 @@ public static class Bootstrap
             if (buffer == null || capacity <= 0) return 0;
 
             string joined = string.Join('\n', ScriptFactory.RegisteredTypeNames);
+            if (joined.Length == 0) return 0;
+
+            return System.Text.Encoding.UTF8.GetBytes(joined, new Span<byte>(buffer, capacity));
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>등록된 애니메이션 상태 스크립트 이름 목록. 애니메이터 편집기가 쓴다.</summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int GetAniBehaviourTypeNames(byte* buffer, int capacity)
+    {
+        try
+        {
+            if (buffer == null || capacity <= 0) return 0;
+
+            string joined = string.Join('\n', AniBehaviourFactory.RegisteredTypeNames);
             if (joined.Length == 0) return 0;
 
             return System.Text.Encoding.UTF8.GetBytes(joined, new Span<byte>(buffer, capacity));

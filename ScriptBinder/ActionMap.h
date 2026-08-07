@@ -18,9 +18,13 @@ public:
 	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(float)> _action);
 	void CheckAction();
 
-	void CheckAction(int playerIndex,void* instance, const Meta::Type* type);
-
-	void InvokeAction(void* instance, const Meta::Type* type, const std::string& methodName, const std::vector<std::any>& args);
+	// 이번 프레임에 발동한 액션의 함수 이름을 콜백으로 알린다.
+	//
+	// 예전에는 여기서 리플렉션으로 C++ 스크립트의 메서드를 직접 불렀다. 호출 주체를
+	// 콜백으로 빼면 액션 판정(입력 상태 읽기)과 전달 방식이 분리되어, 관리 스크립트든
+	// 네이티브든 같은 판정을 쓸 수 있다.
+	void CheckAction(int playerIndex, std::string_view scriptName,
+		const std::function<void(const std::string&)>& onFired);
 	void DeleteAction(const std::string& name);
 	InputAction* FindAction(const std::string& name);
 	[[Property]]

@@ -63,6 +63,28 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
             fields.Add(new FieldInfo(field.Name, kind, GetDisplayName(field)));
         }
 
+        // 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션)의 디스패치 표.
+        //
+        // 구 C++ 경로는 리플렉션으로 메서드 이름을 찾아 불렀다. 관리 측은 Native AOT라
+        // 그 방법을 쓸 수 없으므로, 여기서 이름→직접 호출 switch를 만들어 둔다.
+        // 덕분에 에셋에 저장된 "메서드 이름" 데이터를 그대로 쓸 수 있다.
+        var messages = new List<string>();
+        if (!isAni)
+        {
+            foreach (ISymbol member in symbol.GetMembers())
+            {
+                if (member is not IMethodSymbol method) continue;
+                if (method.IsStatic || method.MethodKind != MethodKind.Ordinary) continue;
+                if (method.DeclaredAccessibility != Accessibility.Public) continue;
+                if (!method.ReturnsVoid || method.Parameters.Length != 0) continue;
+
+                // 생명주기 메서드는 엔진이 직접 부른다 — 여기에 넣으면 두 번 불릴 수 있다.
+                if (LifecycleMethods.Contains(method.Name)) continue;
+
+                if (!messages.Contains(method.Name)) messages.Add(method.Name);
+            }
+        }
+
         bool isPartial = declaration.Modifiers.Any(m => m.ValueText == "partial");
 
         return new BehaviourInfo(
@@ -71,8 +93,15 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
             FullName: symbol.ToDisplayString(),
             IsPartial: isPartial,
             IsAni: isAni,
-            Fields: fields.ToImmutableArray());
+            Fields: fields.ToImmutableArray(),
+            Messages: messages.ToImmutableArray());
     }
+
+    private static readonly ImmutableHashSet<string> LifecycleMethods = ImmutableHashSet.Create(
+        "Awake", "OnEnable", "Start", "FixedUpdate", "Update", "LateUpdate",
+        "OnDisable", "OnDestroy",
+        "OnTriggerEnter", "OnTriggerStay", "OnTriggerExit",
+        "OnCollisionEnter", "OnCollisionStay", "OnCollisionExit");
 
     private static bool InheritsFrom(INamedTypeSymbol symbol, string baseFullName)
     {
@@ -123,17 +152,17 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
         foreach (BehaviourInfo info in behaviours)
         {
-            // partial이 아니면 부분 클래스를 덧붙일 수 없다. 필드가 없으면 알릴 필요도 없다.
+            // partial이 아니면 부분 클래스를 덧붙일 수 없다. 생성할 것이 없으면 알릴 필요도 없다.
             if (!info.IsPartial)
             {
-                if (info.Fields.Length > 0)
+                if (info.Fields.Length > 0 || info.Messages.Length > 0)
                 {
                     context.ReportDiagnostic(Diagnostic.Create(NotPartialRule, Location.None, info.TypeName));
                 }
                 continue;
             }
 
-            if (info.Fields.Length > 0)
+            if (info.Fields.Length > 0 || info.Messages.Length > 0)
             {
                 context.AddSource($"{info.TypeName}.Fields.g.cs", SourceText.From(EmitAccessors(info), Encoding.UTF8));
             }
@@ -158,6 +187,15 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
         sb.AppendLine($"partial class {info.TypeName}");
         sb.AppendLine("{");
+
+        EmitMessageDispatch(sb, info);
+
+        if (info.Fields.Length == 0)
+        {
+            sb.AppendLine("}");
+            return sb.ToString();
+        }
+
         sb.AppendLine($"    public override int FieldCount => {info.Fields.Length};");
         sb.AppendLine();
 
@@ -195,6 +233,25 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
         sb.AppendLine("}");
         return sb.ToString();
+    }
+
+    /// <summary>이름 → 메서드 직접 호출 switch. 리플렉션 없이 AOT에서 동작한다.</summary>
+    private static void EmitMessageDispatch(StringBuilder sb, BehaviourInfo info)
+    {
+        if (info.Messages.Length == 0) return;
+
+        sb.AppendLine("    public override bool InvokeMessage(string message)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        switch (message)");
+        sb.AppendLine("        {");
+        foreach (string name in info.Messages)
+        {
+            sb.AppendLine($"            case \"{name}\": {name}(); return true;");
+        }
+        sb.AppendLine("            default: return base.InvokeMessage(message);");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+        sb.AppendLine();
     }
 
     private static void EmitTypedAccessor(StringBuilder sb, BehaviourInfo info, FieldKind kind,
@@ -312,7 +369,8 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         string FullName,
         bool IsPartial,
         bool IsAni,
-        ImmutableArray<FieldInfo> Fields);
+        ImmutableArray<FieldInfo> Fields,
+        ImmutableArray<string> Messages);
 }
 
 

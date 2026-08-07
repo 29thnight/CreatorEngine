@@ -1,6 +1,8 @@
 #include "Animation.h"
 #include "GameObject.h"
 #include "Animator.h"
+#include "ScriptComponent.h"
+#include "ClrHost.h"
 void Animation::InvokeEvent()
 {
 	/*
@@ -29,10 +31,51 @@ void Animation::InvokeEvent()
 
 void Animation::InvokeEvent(Animator* _ownerAnimator, float _curAnimatonProgress, float _preAnimationProgress)
 {
-	// C++ 스크립트 은퇴(9-4): 수신자였던 ModuleBehavior가 사라져 키프레임 이벤트는
-	// 현재 전달 대상이 없다. C#(ScriptComponent) 전달 경로는 ClrHost에 아직 없어
-	// 후속 과제 — 그때까지 이벤트 데이터(m_keyFrameEvent)는 보존만 한다.
-	(void)_ownerAnimator; (void)_curAnimatonProgress; (void)_preAnimationProgress;
+	if (m_keyFrameEvent.empty() || nullptr == _ownerAnimator) return;
+
+	// 이벤트를 받을 오브젝트: 애니메이터가 붙은 것이 자식이면 부모로 올라간다.
+	// (구 C++ 경로와 같은 규칙 — 스크립트는 보통 캐릭터 루트에 붙는다)
+	GameObject* owner = _ownerAnimator->GetOwner();
+	if (nullptr == owner) return;
+	if (owner->m_parentIndex != 0)
+	{
+		GameObject* parent = GameObject::FindIndex(owner->m_parentIndex);
+		if (nullptr != parent) owner = parent;
+	}
+
+	// 붙어 있는 C# 스크립트를 미리 모아 둔다. 이벤트가 여러 건이어도 순회는 한 번이면 된다.
+	auto scripts = owner->GetComponents<ScriptComponent>();
+	if (scripts.empty()) return;
+
+	auto& clr = ClrHost::Get();
+	if (!clr.IsReady()) return;
+
+	for (const auto& event : m_keyFrameEvent)
+	{
+		bool shouldTrigger = false;
+
+		if (_curAnimatonProgress > _preAnimationProgress)
+		{
+			// 일반 진행
+			shouldTrigger = (_preAnimationProgress < event.key && event.key <= _curAnimatonProgress);
+		}
+		else if (m_isLoop)
+		{
+			// 되감긴 경우 — 구간이 끝과 처음으로 갈라진다
+			shouldTrigger = (event.key > _preAnimationProgress && event.key <= 1.0f)
+				|| (event.key >= 0.0f && event.key <= _curAnimatonProgress);
+		}
+
+		if (!shouldTrigger) continue;
+
+		// 발생 시점에 바로 부르지 않고 큐에 담는다 — 애니메이션 갱신은 잡 스레드에서도
+		// 돌고, 경계는 틱당 한 번만 넘는다는 규약이 있다(설계 문서 02절).
+		for (auto* script : scripts)
+		{
+			if (nullptr == script || !script->HasInstance()) continue;
+			clr.QueueScriptMessage(script->GetInstanceId(), event.m_funName);
+		}
+	}
 }
 
 void Animation::AddEvent()
@@ -41,7 +84,7 @@ void Animation::AddEvent()
 	std::string baseName = "newEvent";
 	std::string realName = baseName;
 	int index = 1;
-	// �ߺ� �̸��� �����ϸ� ���� ���̱�
+	// �ߺ� �̸��� �����ϸ� ���� ���̱�
 	while (FindEventName(realName))
 	{
 		realName = baseName + "(" + std::to_string(index) + ")";

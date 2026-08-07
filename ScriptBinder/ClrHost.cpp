@@ -2396,8 +2396,10 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"CreateBehaviour", &fn))  return false;  m_fnCreateBehaviour = reinterpret_cast<CreateFn>(fn);
 
 	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
-	// (에디터의 스크립트 목록 UI만 빈 목록이 된다).
-	if (bind(L"GetBehaviourTypeNames", &fn)) m_fnGetBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
+	// (해당 기능만 조용히 꺼진다: 목록 UI는 빈 목록, 메시지는 전달되지 않음).
+	if (bind(L"GetBehaviourTypeNames", &fn))    m_fnGetBehaviourTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
+	if (bind(L"GetAniBehaviourTypeNames", &fn)) m_fnGetAniBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
+	if (bind(L"FlushScriptMessages", &fn))      m_fnFlushScriptMessages      = reinterpret_cast<FlushMessageFn>(fn);
 
 	// 애니메이션 상태 스크립트
 	if (!bind(L"HasAniBehaviour", &fn))     return false;  m_fnHasAniBehaviour     = reinterpret_cast<HasAniFn>(fn);
@@ -2678,26 +2680,78 @@ bool ClrHost::DestroyBehaviour(int instanceId)
 	return 0 == m_fnDestroyBehaviour(instanceId);
 }
 
+namespace
+{
+	// 관리 측은 타입 이름을 '\n'으로 이어 한 번에 준다 — 이름마다 경계를 넘지 않기 위해서다.
+	std::vector<std::string> ReadTypeNameList(int(__stdcall* fn)(char*, int))
+	{
+		if (nullptr == fn) return {};
+
+		// 스크립트 수백 개 규모까지 여유 있는 크기.
+		std::vector<char> buffer(16 * 1024, '\0');
+		const int length = fn(buffer.data(), static_cast<int>(buffer.size()));
+		if (length <= 0) return {};
+
+		std::vector<std::string> names;
+		const std::string joined(buffer.data(), static_cast<size_t>(length));
+		size_t begin = 0;
+		while (begin < joined.size())
+		{
+			size_t end = joined.find('\n', begin);
+			if (end == std::string::npos) end = joined.size();
+			if (end > begin) names.emplace_back(joined.substr(begin, end - begin));
+			begin = end + 1;
+		}
+		return names;
+	}
+}
+
 std::vector<std::string> ClrHost::GetBehaviourTypeNames()
 {
-	if (!m_ready || nullptr == m_fnGetBehaviourTypeNames) return {};
+	return m_ready ? ReadTypeNameList(m_fnGetBehaviourTypeNames) : std::vector<std::string>{};
+}
 
-	// 타입 이름은 '\n' 구분으로 온다. 스크립트 수백 개 규모까지 여유 있는 크기.
-	std::vector<char> buffer(16 * 1024, '\0');
-	const int length = m_fnGetBehaviourTypeNames(buffer.data(), static_cast<int>(buffer.size()));
-	if (length <= 0) return {};
+std::vector<std::string> ClrHost::GetAniBehaviourTypeNames()
+{
+	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviourTypeNames) : std::vector<std::string>{};
+}
 
-	std::vector<std::string> names;
-	const std::string joined(buffer.data(), static_cast<size_t>(length));
-	size_t begin = 0;
-	while (begin < joined.size())
+void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)
+{
+	if (!m_ready || instanceId < 0 || methodName.empty()) return;
+
+	// 이름이 버퍼를 넘으면 잘라 보내는 대신 버린다 — 잘린 이름은 관리 측에서
+	// 엉뚱한 메서드를 부르거나(접두사 충돌) 조용히 실패한다. 둘 다 추적하기 어렵다.
+	if (methodName.size() >= kScriptMessageNameCapacity)
 	{
-		size_t end = joined.find('\n', begin);
-		if (end == std::string::npos) end = joined.size();
-		if (end > begin) names.emplace_back(joined.substr(begin, end - begin));
-		begin = end + 1;
+		Debug->LogWarning("[스크립트] 콜백 이름이 너무 깁니다: " + std::string(methodName));
+		return;
 	}
-	return names;
+
+	ScriptMessage message{};
+	message.instanceId = instanceId;
+	std::memcpy(message.name, methodName.data(), methodName.size());
+	message.name[methodName.size()] = '\0';
+
+	// 애니메이션 잡이 스레드 풀에서 키프레임 이벤트를 쏟아내므로 담는 쪽은 보호한다.
+	SpinLock lock(m_scriptMessageFlag);
+	m_scriptMessages.push_back(message);
+}
+
+void ClrHost::FlushScriptMessages()
+{
+	// 전달 도중 새 메시지가 쌓일 수 있으므로 비운 뒤 넘긴다(AniEvent와 같은 규약).
+	// 스왑 구간만 잠근다 — 관리 측 호출까지 잠그면 잡 스레드가 그동안 막힌다.
+	std::vector<ScriptMessage> batch;
+	{
+		SpinLock lock(m_scriptMessageFlag);
+		batch.swap(m_scriptMessages);
+	}
+
+	if (batch.empty()) return;
+	if (!m_ready || nullptr == m_fnFlushScriptMessages) return;
+
+	m_fnFlushScriptMessages(batch.data(), static_cast<int>(batch.size()));
 }
 
 int ClrHost::GetFieldCount(int instanceId)

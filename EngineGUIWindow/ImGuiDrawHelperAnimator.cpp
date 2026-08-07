@@ -1,4 +1,5 @@
 #include "ReflectionImGuiHelper.h"
+#include "ClrHost.h"
 #include "Animation.h"
 #include "Animator.h"
 #include "Skeleton.h"
@@ -1079,33 +1080,28 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 					float availableWidth = ImGui::GetContentRegionAvail().x;
 					searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-					// C++ 핫리로드 은퇴(9-4): C# AniBehaviour 타입 이름을 직접 입력한다.
-					// (ClrHost에 타입 목록 API가 생기면 목록 선택 UI로 복원할 것)
-					static char aniTypeName[64] = "";
-					ImGui::InputText("Type Name", aniTypeName, sizeof(aniTypeName));
-					ImGui::BeginDisabled(aniTypeName[0] == ' ');
-					if (ImGui::Button("Add") && selectedState)
+
+					// C# 애니메이션 상태 스크립트 목록. 등록된 타입 이름은 ClrHost가 내준다
+					// (구 C++ 팩토리 목록을 대체한다 — 9-4).
+					const auto aniTypeNames = ClrHost::Get().GetAniBehaviourTypeNames();
+					if (aniTypeNames.empty())
 					{
-						selectedState->SetBehaviour(aniTypeName);
-						aniTypeName[0] = ' ';
-						ImGui::CloseCurrentPopup();
+						ImGui::TextDisabled(ClrHost::Get().IsReady()
+							? "등록된 AniBehaviour가 없습니다"
+							: "CLR이 준비되지 않았습니다");
 					}
-					ImGui::EndDisabled();
 
-								selectedState->SetBehaviour(scriptNameStr);
-								scriptNameStr.clear();
-							}
-							else
-							{
-								Debug->LogError("Script name cannot be empty.");
-							}
+					for (const auto& typeName : aniTypeNames)
+					{
+						if (!searchFilter.PassFilter(typeName.c_str()))
+							continue;
+
+						if (ImGui::Selectable(typeName.c_str()) && selectedState)
+						{
+							selectedState->SetBehaviour(typeName);
+							ImGui::CloseCurrentPopup();
 						}
-						ImGui::EndDisabled();
-
-						ImGui::EndPopup();
 					}
-
-
 
 					ImGui::EndPopup();
 				}

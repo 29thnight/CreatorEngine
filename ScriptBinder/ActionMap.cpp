@@ -244,11 +244,14 @@ void ActionMap::CheckAction()
 
 }
 
-void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* type)
+void ActionMap::CheckAction(int playerIndex, std::string_view scriptName,
+	const std::function<void(const std::string&)>& onFired)
 {
 	for (auto& action : m_actions)
 	{
-		if (type->name != action->m_scriptName) return;
+		// 이 스크립트의 액션이 아니면 건너뛴다. 예전에는 return이라 목록 앞쪽에
+		// 다른 스크립트의 액션이 있으면 뒤가 전부 무시됐다.
+		if (scriptName != action->m_scriptName) continue;
 		if (action->actionType == ActionType::Button)
 		{
 			if (action->key.size() == 0) continue;
@@ -259,15 +262,15 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 				{
 				case KeyState::Down:
 					if (InputManagement->IsKeyDown(action->key[0]))
-						InvokeAction(instance, type, action->funName, {});
+						onFired(action->funName);
 					break;
 				case KeyState::Pressed:
 					if (InputManagement->IsKeyPressed(action->key[0]))
-						InvokeAction(instance, type, action->funName, {});
+						onFired(action->funName);
 					break;
 				case KeyState::Released:
 					if (InputManagement->IsKeyReleased(action->key[0]))
-						InvokeAction(instance, type, action->funName, {});
+						onFired(action->funName);
 					break;
 				}
 				break;
@@ -276,15 +279,15 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 				{
 				case KeyState::Down:
 					if (InputManagement->IsControllerButtonDown(playerIndex, static_cast<ControllerButton>(action->key[0])))
-						InvokeAction(instance, type, action->funName, {});
+						onFired(action->funName);
 					break;
 				case KeyState::Pressed:
 					if (InputManagement->IsControllerButtonPressed(playerIndex, static_cast<ControllerButton>(action->key[0])))
-						InvokeAction(instance, type, action->funName, {});
+						onFired(action->funName);
 					break;
 				case KeyState::Released:
 					if (InputManagement->IsControllerButtonReleased(playerIndex, static_cast<ControllerButton>(action->key[0])))
-						InvokeAction(instance, type, action->funName, {});
+						onFired(action->funName);
 					break;
 				}
 				break;
@@ -310,7 +313,7 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 					else if (InputManagement->IsKeyPressed(action->key[3])) action->value.v2Value.y = 1.0f;
 					else action->value.v2Value.y = 0.0f;
 
-					InvokeAction(instance, type, action->funName, { action->value.v2Value });
+					onFired(action->funName);
 					//action->valueAction(action->value.v2Value);
 					break;
 				case InputType::GamePad:
@@ -320,7 +323,7 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 						action->value.v2Value = InputManagement->GetControllerThumbR(playerIndex);
 
 
-					InvokeAction(instance, type, action->funName,{ action->value.v2Value });
+					onFired(action->funName);
 					//action->valueAction(action->value.v2Value);
 					break; //&&&&& ��Ʈ�ѷ� vector2�� �¿� ��ƽ��
 				}
@@ -330,11 +333,6 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 		}
 	}
 
-}
-
-void ActionMap::InvokeAction(void* instance, const Meta::Type* type, const std::string& methodName, const std::vector<std::any>& args)
-{
-	Meta::InvokeMethodByMetaName(instance, *type, methodName, args);
 }
 
 void ActionMap::DeleteAction(const std::string& name)

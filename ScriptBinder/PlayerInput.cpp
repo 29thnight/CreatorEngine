@@ -3,6 +3,10 @@
 #include "InputActionManager.h"
 #include "SceneManager.h"
 #include "InputManager.h"
+#include "GameObject.h"
+#include "ScriptComponent.h"
+#include "ClrHost.h"
+
 void PlayerInputComponent::Update(float tick)
 {
 	if (SceneManagers->m_isGameStart == false) return;
@@ -13,10 +17,25 @@ void PlayerInputComponent::Update(float tick)
 
 	if (m_actionMap == nullptr) return;
 	GameObject* owner = GetOwner();
+	if (nullptr == owner) return;
 
-	// C++ 스크립트 은퇴(9-4): 액션 디스패치 대상이던 ModuleBehavior가 사라졌다.
-	// 입력 액션의 C#(ScriptComponent) 전달 경로는 후속 과제 — 액션맵 상태 갱신은
-	// InputActionManager의 CheckAction() 경로가 그대로 담당한다.
+	auto& clr = ClrHost::Get();
+	if (!clr.IsReady()) return;
+
+	// 액션은 스크립트 타입 이름으로 묶여 있다(InputAction::m_scriptName).
+	// 붙어 있는 C# 스크립트마다 자기 몫의 액션만 판정해 큐에 담는다.
+	for (auto* script : owner->GetComponents<ScriptComponent>())
+	{
+		if (nullptr == script || !script->HasInstance()) continue;
+
+		const int instanceId = script->GetInstanceId();
+		m_actionMap->CheckAction(controllerIndex, script->m_scriptType,
+			[&clr, instanceId](const std::string& functionName)
+			{
+				// 발생 시점에 부르지 않고 큐에 담는다 — 경계는 틱 경계에서 한 번만 넘는다.
+				clr.QueueScriptMessage(instanceId, functionName);
+			});
+	}
 }
 
 void PlayerInputComponent::SetActionMap(std::string mapName)
