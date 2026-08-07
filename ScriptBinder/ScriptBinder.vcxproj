@@ -299,6 +299,7 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
+    <ClInclude Include="GameObjectIndex.h" />
     <ClInclude Include="AnchorPreset.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BillboardType.h" />

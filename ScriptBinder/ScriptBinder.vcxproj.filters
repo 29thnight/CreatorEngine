@@ -368,6 +368,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GameObjectIndex.h" />
     <ClInclude Include="IObject.h">
       <Filter>Interfaces</Filter>
     </ClInclude>

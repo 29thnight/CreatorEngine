@@ -1,5 +1,7 @@
 #pragma once
 #include "LightProperty.h"
+#include "GameObjectType.h"
+#include "GameObjectIndex.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "Scene.generated.h"
@@ -44,18 +46,18 @@ public:
 	std::future<void> m_AIFuture;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
-	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
-	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
-	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
-    std::shared_ptr<GameObject> TryGetGameObject(GameObject::Index index);
+	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
+	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObjectIndex parentIndex = -1);
+	std::shared_ptr<GameObject> GetGameObject(GameObjectIndex index);
+    std::shared_ptr<GameObject> TryGetGameObject(GameObjectIndex index);
     // Detach a GameObject subtree from this scene for DontDestroyOnLoad rebind
     void DetachGameObjectHierarchy(GameObject* root);
     // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
     // 단일 객체를 붙임(부모 인덱스는 이 씬 기준). 유니크 네임/Tag/Layer/루트 children/Transform 부모까지 처리.
-    GameObject::Index AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObject::Index parentIndex);
+    GameObjectIndex AttachExistingGameObject(std::shared_ptr<GameObject> go, GameObjectIndex parentIndex);
     // DDOL 서브트리를 한꺼번에 붙임. parent/child 인덱스는 go들이 원래 갖고 있던 서브트리 상대관계를 따름.
     // 반환: oldIndex -> newIndex 매핑(이 씬 기준)
-    std::unordered_map<GameObject::Index, GameObject::Index>
+    std::unordered_map<GameObjectIndex, GameObjectIndex>
         AttachExistingGameObjectHierarchy(const std::vector<std::shared_ptr<GameObject>>& roots);
     std::shared_ptr<GameObject> GetGameObject(std::string_view name);
     const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
@@ -64,11 +66,11 @@ public:
 	void ClearSelectedSceneObjects();
 	void AddRootGameObject(std::string_view name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
-	void DestroyGameObject(GameObject::Index index);
+	void DestroyGameObject(GameObjectIndex index);
 	void CullMeshData();
 	void InternalPauseUpdateForUI();
 
-    std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = -1);
+    std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObjectIndex parentIndex = -1);
 
 	inline void InsertGameObjects(std::vector<std::shared_ptr<GameObject>>& gameObjects)
 	{
@@ -235,7 +237,7 @@ private:
 	void DestroyComponents();
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
-    void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive = false);
+    void UpdateModelRecursive(GameObjectIndex objIndex, Mathf::xMatrix model, bool recursive = false);
 
 	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을
 	// 계산하고 자식으로 내려간다(PHASE 7-5).

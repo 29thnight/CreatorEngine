@@ -4,6 +4,7 @@
 #include "Component.h"
 #include "Transform.h"
 #include "GameObjectType.h"
+#include "GameObjectIndex.h"
 #include "GameObject.generated.h"
 #include <yaml-cpp/yaml.h>
 
@@ -16,7 +17,7 @@ class Prefab;
 class GameObject : public Object, public std::enable_shared_from_this<GameObject>
 {
 public:
-	using Index = int;
+	using Index = GameObjectIndex;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	enum class Type
 	{
