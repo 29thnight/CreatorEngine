@@ -272,7 +272,6 @@
     <ClCompile Include="DecalComponent.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
-    <ClCompile Include="ModuleBehavior.cpp" />
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
     <ClCompile Include="SoundComponent.cpp" />
@@ -280,7 +279,6 @@
     <ClCompile Include="SpriteSheetComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
     <ClCompile Include="GameObject.cpp" />
-    <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="InputAction.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
@@ -329,7 +327,6 @@
     <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="RectTransform_Binding.h" />
     <ClInclude Include="CurvePoint.h" />
-    <ClInclude Include="ScriptStringModule.h" />
     <ClInclude Include="SoundComponent.h" />
     <ClInclude Include="SoundDefinition.h" />
     <ClInclude Include="SpriteSheetComponent.h" />
@@ -385,7 +382,6 @@
     <ClInclude Include="GameObjectType.h" />
     <ClInclude Include="IAIComponent.h" />
     <ClInclude Include="GameObject.h" />
-    <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="ActionMap.h" />
     <ClInclude Include="InputAction.h" />
     <ClInclude Include="InputActionManager.h" />
@@ -405,7 +401,6 @@
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
-    <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="ClrHost.h" />

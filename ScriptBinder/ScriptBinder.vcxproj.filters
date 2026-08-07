@@ -361,14 +361,8 @@
     <ClCompile Include="SpriteRenderer.cpp">
       <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
     </ClCompile>
-    <ClCompile Include="HotLoadSystem.cpp">
-      <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
-    </ClCompile>
     <ClCompile Include="MonoManager.cpp">
       <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="ModuleBehavior.cpp">
-      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -493,9 +487,6 @@
     <ClInclude Include="KeyState.h">
       <Filter>Managers\InputManager</Filter>
     </ClInclude>
-    <ClInclude Include="ModuleBehavior.h">
-      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
-    </ClInclude>
     <ClInclude Include="ActionMap.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
@@ -619,9 +610,6 @@
     <ClInclude Include="VolumeComponent.h">
       <Filter>Classes\Components\Volume</Filter>
     </ClInclude>
-    <ClInclude Include="ScriptStringModule.h">
-      <Filter>Managers\HotLoadSystem\ScriptStringModule</Filter>
-    </ClInclude>
     <ClInclude Include="AniBehavior.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
@@ -660,9 +648,6 @@
     </ClInclude>
     <ClInclude Include="CurvePoint.h">
       <Filter>Classes\Resources\Sound</Filter>
-    </ClInclude>
-    <ClInclude Include="HotLoadSystem.h">
-      <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
     </ClInclude>
     <ClInclude Include="MSBuildHelper.h">
       <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>

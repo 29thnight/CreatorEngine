@@ -66,7 +66,6 @@
 #include "CurvePoint.h"
 #include "GameObject.h"
 #include "InputAction.h"
-#include "ModuleBehavior.h"
 #include "Navigation.h"
 #include "Object.h"
 #include "RectTransformComponent.h"
@@ -128,7 +127,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Mesh);
     AUTO_REGISTER_CLASS(MeshColliderComponent);
     AUTO_REGISTER_CLASS(MeshRenderer);
-    AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Navigation);
     AUTO_REGISTER_CLASS(Object);
     AUTO_REGISTER_CLASS(PlayerInputComponent);

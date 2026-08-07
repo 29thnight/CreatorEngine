@@ -94,16 +94,6 @@ virtual const Meta::Type& ScriptReflect()\
         m_typeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
     }\
     virtual ~T() = default; \
-// 스크립트용 Reflection Body Macros
-#define MODULE_BEHAVIOR_BODY(T) \
-    T() \
-    { \
-        m_name = #T; \
-        m_typeID = TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); \
-        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
-    }\
-    virtual ~T() = default; \
-
 #define BT_ACTION_BODY(T) \
     T() \
     { \

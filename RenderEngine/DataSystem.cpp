@@ -1308,8 +1308,6 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 				if (file::exists(headerPath))
 				{
 					file::remove(headerPath);
-					std::this_thread::sleep_for(std::chrono::seconds(1));
-					ScriptManager->CompileEvent();
 				}
 			}
 		}
@@ -1385,8 +1383,6 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 				if (file::exists(headerPath))
 				{
 					file::remove(headerPath);
-					std::this_thread::sleep_for(std::chrono::seconds(1));
-					ScriptManager->CompileEvent();
 				}
 			}
 		}
@@ -1634,11 +1630,6 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 				std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			}
 
-			// Visual Studio 종료 감지 완료
-			if (!ScriptManager->IsCompileEventInvoked())
-			{
-				ScriptManager->SetCompileEventInvoked(true);
-			}
 			m_assetMetaRegistry->Clear();
 			m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
 			m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());

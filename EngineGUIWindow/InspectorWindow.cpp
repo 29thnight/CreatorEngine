@@ -150,14 +150,9 @@ InspectorWindow::InspectorWindow()
 					continue;
 
 				const auto& type = Meta::Find(component->ToString());
-				ModuleBehavior* moduleBehavior{ dynamic_cast<ModuleBehavior*>(component.get()) };
-				std::string componentBaseName = component->ToString();
-				if (!type && !moduleBehavior) continue;
 
-				if (nullptr != moduleBehavior)
-				{
-					componentBaseName += " (Script)";
-				}
+				std::string componentBaseName = component->ToString();
+				if (!type) continue;
 
 				bool* isEnabled = &component->m_isEnabled;
 				if (ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, isEnabled))
@@ -181,18 +176,6 @@ InspectorWindow::InspectorWindow()
 						if (nullptr != terrain)
 						{
 							ImGuiDrawHelperTerrainComponent(terrain);
-						}
-					}
-					else if (nullptr != moduleBehavior)
-					{
-						auto customInspector = std::dynamic_pointer_cast<ICustomEditor>(component);
-						if (customInspector)
-						{
-							customInspector->OnInspectorGUI();
-						}
-						else
-						{
-							ImGuiDrawHelperModuleBehavior(moduleBehavior);
 						}
 					}
 					else if (componentTypeID == type_guid(ScriptComponent))
@@ -338,57 +321,14 @@ InspectorWindow::InspectorWindow()
 					}
 				}
 
-				if (ImGui::MenuItem("Scripts"))
-				{
-					m_openScriptPopup = true;
-				}
-
-				if (ImGui::MenuItem("new Script"))
-				{
-					m_openNewScriptPopup = true;
-				}
-
 				ImGui::EndPopup();
 			}
 
 			// ���� �����ӿ��� ����
-			if (m_openScriptPopup)
-			{
-				ImGui::OpenPopup("Scripts");
-				m_openScriptPopup = false;
-			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ���ϴ� ������ ����
-			if (ImGui::BeginPopup("Scripts"))
-			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "ScriptComponent"); // ����� �ؽ�Ʈ
-				ImGui::Separator(); // ���м�
 
-				float availableWidth = ImGui::GetContentRegionAvail().x;
-				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-				for (const auto& type_name : ScriptManager->GetScriptNames())
-				{
-					if (!searchFilter.PassFilter(type_name.c_str()))
-						continue;
-					if (type_name.empty())
-					{
-						const_cast<std::string&>(type_name) = "None";
-					}
 
-					if (ImGui::MenuItem(type_name.c_str()))
-					{
-						selectedSceneObject->AddScriptComponent(type_name);
-					}
-				}
-				ImGui::EndPopup();
-			}
 
-			// ���� �����ӿ��� ����
-			if (m_openNewScriptPopup)
-			{
-				ImGui::OpenPopup("NewScript");
-				m_openNewScriptPopup = false;
-			}
 
 			if (m_openClipPicker) 
 			{
@@ -401,61 +341,7 @@ InspectorWindow::InspectorWindow()
 				isOpen = false;
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ���ϴ� ������ ����
-			if (ImGui::BeginPopup("NewScript"))
-			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "New ScriptComponent"); // ����� �ؽ�Ʈ
-				ImGui::Separator(); // ���м�
 
-				float availableWidth = ImGui::GetContentRegionAvail().x;
-				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-				static char scriptName[64] = "NewBehaviourScript";
-				ImGui::InputText("Name", scriptName, sizeof(scriptName));
-				std::string scriptNameStr(scriptName);
-				auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
-				bool isDisabled = false;
-				if (file::exists(scriptBodyFilePath))
-				{
-					ImGui::Text("Script already exists.");
-					isDisabled = true;
-				}
-				else if (scriptNameStr.empty())
-				{
-					ImGui::Text("Script name cannot be empty.");
-					isDisabled = true;
-				}
-				else if (scriptNameStr.find_first_of("0123456789") == 0)
-				{
-					ImGui::Text("Script name cannot start with a number.");
-					isDisabled = true;
-				}
-				else if (scriptNameStr.find_first_of("!@#$%^&*()_+[]{}|;':\",.<>?`~") != std::string::npos)
-				{
-					ImGui::Text("Script name contains invalid characters.");
-					isDisabled = true;
-				}
-
-				ImGui::BeginDisabled(isDisabled);
-				if (ImGui::Button("Create and Add"))
-				{
-
-					if (!scriptNameStr.empty())
-					{
-						ScriptManager->CreateScriptFile(scriptNameStr);
-						ScriptManager->SetCompileEventInvoked(true);
-						ScriptManager->ReloadDynamicLibrary();
-						selectedSceneObject->AddScriptComponent(scriptNameStr);
-						scriptNameStr.clear();
-					}
-					else
-					{
-						Debug->LogError("Script name cannot be empty.");
-					}
-				}
-				ImGui::EndDisabled();
-
-				ImGui::EndPopup();
-			}
 
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));

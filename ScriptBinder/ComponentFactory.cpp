@@ -68,27 +68,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 {
 	if (itNode["ModuleBehavior"])
 	{
-		std::string scriptName = itNode["m_name"].as<std::string>();
-		if (!ScriptManager->IsScriptExists(scriptName))
-		{
-			auto invalidComponent = obj->AddComponent<InvalidScriptComponent>();
-			return;
-		}
-
-		auto scriptComponent = obj->AddScriptComponent(scriptName);
-		const auto& scriptType = scriptComponent->ScriptReflect();
-		Meta::Deserialize(reinterpret_cast<void*>(scriptComponent), scriptType, itNode);
-
-		if (isEditorToGame)
-		{
-			scriptComponent->MakeInstanceID();
-		}
-
-		if (SceneManagers->m_isGameStart)
-		{
-			ScriptManager->BindScriptEvents(scriptComponent, scriptComponent->m_name.ToString());
-		}
-
+		// C++ 스크립트 은퇴(9-4): 구 포맷의 ModuleBehavior 노드는 더는 복원할 수 없다.
+		// 자리 표시 컴포넌트를 붙여 씬 로드는 계속한다 — C# 스크립트로 교체 대상.
+		obj->AddComponent<InvalidScriptComponent>();
 		return;
 	}
 
@@ -103,7 +85,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     // AddComponent는 타입이 겹치면 새로 만들지 않고 기존 것을 돌려주므로, 스크립트를
     // 둘 이상 붙인 오브젝트는 씬을 다시 읽을 때 두 번째부터 통째로 사라졌다.
     // 재생을 누르면 씬을 직렬화해 사본을 만들기 때문에 여기서 바로 드러난다.
-    // ModuleBehavior가 위쪽에서 AddScriptComponent로 따로 처리하는 것과 같은 이유다.
     const bool allowMultiple = (componentType->typeID == type_guid(ScriptComponent));
 
     auto component = allowMultiple

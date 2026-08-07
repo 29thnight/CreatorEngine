@@ -1,5 +1,4 @@
 #pragma once
-#include "HotLoadSystem.h"
 #include "Object.h"
 #include "Component.h"
 #include "Transform.h"
@@ -12,7 +11,6 @@ class Scene;
 class Bone;
 class RenderScene;
 class ModelLoader;
-class ModuleBehavior;
 class Prefab;
 class GameObject : public Object, public std::enable_shared_from_this<GameObject>
 {
@@ -55,10 +53,8 @@ public:
 	//
 	// 일반 AddComponent는 타입당 하나로 제한하고 기존 것을 돌려준다. 스크립트는 그 규칙을
 	// 따를 수 없다 — 한 오브젝트에 스크립트를 여럿 붙이는 것이 보통이기 때문이다.
-	// (ModuleBehavior가 AddScriptComponent라는 별도 경로를 두고 있는 것과 같은 이유이며,
-	//  관리 스크립트를 담는 ScriptComponent도 이쪽을 쓴다)
+	// (관리 스크립트를 담는 ScriptComponent가 이쪽을 쓴다)
 	std::shared_ptr<Component> AddComponentAllowMultiple(const Meta::Type& type);
-	ModuleBehavior* AddScriptComponent(std::string_view scriptName);
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 	void RefreshComponentIdIndices();
@@ -95,8 +91,6 @@ public:
 
 	void RemoveComponentIndex(uint32 id);
 	void RemoveComponentTypeID(uint32 typeID);
-	void RemoveScriptComponent(std::string_view scriptName);
-	void RemoveScriptComponent(ModuleBehavior* ptr);
 	void RemoveComponent(Meta::Type& type);
 
 	bool IsStatic() const { return m_isStatic; }

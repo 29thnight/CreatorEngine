@@ -13,8 +13,6 @@ public:
 	~InspectorWindow() = default;
 
 private:
-	bool m_openScriptPopup{ false };
-	bool m_openNewScriptPopup{ false };
 	bool m_openNewTagPopup{ false };
 	bool m_openNewLayerPopup{ false };
 	bool m_openFSMPopup{ false };

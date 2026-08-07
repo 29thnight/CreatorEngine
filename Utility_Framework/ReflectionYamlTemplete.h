@@ -3,7 +3,6 @@
 #include "ReflectionRegister.h"
 #include "IObject.h"
 #include "DataSystem.h"
-#include "ModuleBehavior.h"
 #include <yaml-cpp/yaml.h>
 
 namespace MetaYml = YAML;

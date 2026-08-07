@@ -6,7 +6,6 @@
 #include "SoundManager.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
-#include "HotLoadSystem.h"
 #include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "SceneManager.h"
@@ -60,7 +59,6 @@ void DirectX11::GameMain::Initialize()
     m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
     m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
-    ScriptManager->Initialize();
     Sound->initialize(128);
     DataSystems->Initialize();
     SceneManagers->CreateScene();

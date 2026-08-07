@@ -9,7 +9,6 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
-#include "HotLoadSystem.h"
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"

@@ -1,6 +1,5 @@
 #include "PlayerInput.h"
 #include "ActionMap.h"
-#include "ModuleBehavior.h"
 #include "InputActionManager.h"
 #include "SceneManager.h"
 #include "InputManager.h"
@@ -15,27 +14,9 @@ void PlayerInputComponent::Update(float tick)
 	if (m_actionMap == nullptr) return;
 	GameObject* owner = GetOwner();
 
-	std::vector<ModuleBehavior*> scripts{};
-	ModuleBehavior* script = nullptr;
-	for (auto& component : owner->m_components)
-	{
-		if (nullptr == component)
-			continue;
-		script = dynamic_cast<ModuleBehavior*>(component.get());
-		if (script != nullptr)
-		{
-			scripts.push_back(script);
-		};
-	}
-
-	if (scripts.size() == 0) return;
-
-	for (auto& _script : scripts)
-	{
-		auto typeName = Meta::Find(_script->GetHashedName().ToString());
-		void* voidPtr = static_cast<void*>(_script);
-		m_actionMap->CheckAction(controllerIndex, voidPtr, typeName);
-	}
+	// C++ 스크립트 은퇴(9-4): 액션 디스패치 대상이던 ModuleBehavior가 사라졌다.
+	// 입력 액션의 C#(ScriptComponent) 전달 경로는 후속 과제 — 액션맵 상태 갱신은
+	// InputActionManager의 CheckAction() 경로가 그대로 담당한다.
 }
 
 void PlayerInputComponent::SetActionMap(std::string mapName)

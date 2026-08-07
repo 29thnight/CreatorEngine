@@ -23,12 +23,7 @@ void GameBuilderSystem::Initialize()
 			+ L"/m /t:Rebuild /p:Configuration=GameBuild /p:Platform=x64 /nologo"
 			+ L"\"";
 
-		std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
-		m_scriptBuildCommand = std::wstring(L"cmd /c \"")
-			+ L"\"" + m_MSBuildPath + L"\" "
-			+ L"\"" + slnPath + L"\" "
-			+ L"/m /t:Rebuild /p:Configuration=GameBuild /p:Platform=x64 /nologo"
-			+ L"\"";
+		// C++ ìŠ¤í¬ë¦½íŠ¸ ë¹Œë“œ(Dynamic_CPP.sln)ëŠ” ì€í‡´(9-4) â€” ê²Œì„ ìŠ¤í¬ë¦½íŠ¸ëŠ” C# ì–´ì…ˆë¸”ë¦¬ë¡œ ë°°í¬ëœë‹¤.
 
 		m_isInitialized = true;
 	}
@@ -45,7 +40,6 @@ void GameBuilderSystem::BuildGame()
 	// ¿¹: m_buildSlnPath¿Í m_buildCommand¸¦ »ç¿ëÇÏ¿© ºôµå ¼öÇà
 	try
 	{
-		RunMsbuildWithLiveLogAndProgress(m_scriptBuildCommand, L"Script Compile...");
 		RunMsbuildWithLiveLogAndProgress(m_buildCommand);
 
         if (!PackageGameAssets())

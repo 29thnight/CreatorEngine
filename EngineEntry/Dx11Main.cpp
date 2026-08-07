@@ -13,7 +13,6 @@
 #include "SoundManager.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
-#include "HotLoadSystem.h"
 #include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "SceneManager.h"
@@ -130,9 +129,6 @@ void DirectX11::Dx11Main::Initialize()
     m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>();
     m_renderDebugWindow = std::make_unique<EnhancedRenderDebugWindow>();
 #endif // !EDITOR
-
-    BootProgress::Step(L"Script Building...");
-    ScriptManager->Initialize();
 
     BootProgress::Step(L"Initializing SoundManager...");
     Sound->initialize(128);
@@ -422,11 +418,6 @@ void DirectX11::Dx11Main::Update()
 	if (InputManagement->IsKeyReleased(VK_F5))
 	{
         EngineSettingInstance->ToggleGameView();
-	}
-
-	if (InputManagement->IsKeyReleased(VK_F6))
-	{
-		ScriptManager->CompileEvent();
 	}
 
 	if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))

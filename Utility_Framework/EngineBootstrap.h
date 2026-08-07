@@ -8,7 +8,6 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
-#include "HotLoadSystem.h"
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
@@ -106,7 +105,6 @@ namespace EngineBootstrap
         PhysicX::GetInstance();
         PhysicsManager::GetInstance();
         SceneManager::GetInstance();
-        HotLoadSystem::GetInstance();
         ComponentFactory::GetInstance();
         CameraContainer::GetInstance();
         Creator::Culling::CullingManager::GetInstance();
@@ -122,7 +120,6 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(Creator::Culling::CullingManager::Destroy());
         SHUTDOWN_STEP(CameraContainer::Destroy());
         SHUTDOWN_STEP(ComponentFactory::Destroy());
-        SHUTDOWN_STEP(HotLoadSystem::Destroy());
         SHUTDOWN_STEP(SceneManager::Destroy());
         SHUTDOWN_STEP(PhysicsManager::Destroy());
         SHUTDOWN_STEP(PhysicX::Destroy());

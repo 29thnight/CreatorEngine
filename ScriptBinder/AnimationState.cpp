@@ -1,6 +1,5 @@
 #include "AnimationState.h"
 #include "AniBehavior.h"
-#include "HotLoadSystem.h"
 #include "AnimationBehviourFatory.h"
 #include "AnimationController.h"
 #include "Animator.h"
@@ -10,18 +9,15 @@
 #endif
 AnimationState::AnimationState()
 {
-	ScriptManager->CollectAniBehavior(this);
 }
 
 AnimationState::~AnimationState()
 {
 	behaviour.reset();
-	ScriptManager->UnCollectAniBehavior(this);
 }
 
 AnimationState::AnimationState(AnimationController* Owner, std::string name) : m_ownerController(Owner), m_name(name)
 {
-	ScriptManager->CollectAniBehavior(this);
 }
 
 std::vector<AniTransition*> AnimationState::FindTransitions(const std::string& toStateName)
@@ -56,24 +52,9 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 		return;
 	}
 
-	//behaviour = AnimationFactorys->CreateBehaviour(name); //WARN : APP Vrifier - Stop #4
-	behaviour = std::shared_ptr<AniBehavior>(ScriptManager->CreateAniBehavior(behaviourName.c_str()),
-		[](AniBehavior* ptr)
-		{
-			if (ptr)
-			{
-				ScriptManager->DestroyAniBehavior(ptr);
-			}
-		}
-	);
-;
-
 #ifndef DYNAMICCPP_EXPORTS
-	// C++ 팩토리에 없는 이름이면 C# 쪽을 찾아본다.
-	//
-	// 순서를 이렇게 둔 이유: 기존 C++ 애니메이션 스크립트의 동작을 조금도 바꾸지 않기
-	// 위해서다. 이름이 겹치면 지금까지처럼 C++이 이긴다.
-	if (nullptr == behaviour && ClrHost::Get().HasAniBehaviour(behaviourName))
+	// C++ 핫리로드 은퇴(9-4) — 애니메이션 상태 스크립트는 C#(ManagedAniBehavior)만 지원한다.
+	if (ClrHost::Get().HasAniBehaviour(behaviourName))
 	{
 		auto managed = std::make_shared<ManagedAniBehavior>(behaviourName);
 		if (managed->HasInstance())

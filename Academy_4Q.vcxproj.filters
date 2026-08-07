@@ -172,9 +172,6 @@
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperModuleBehavior.cpp">
-      <Filter>Window\InspectorWindow\CustomInspector</Filter>
-    </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>

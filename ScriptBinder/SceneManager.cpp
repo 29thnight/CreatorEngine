@@ -122,7 +122,6 @@ void SceneManager::Editor()
         // Sweep DDOL bucket for destroyed objects
         std::erase_if(m_dontDestroyOnLoadObjects, [](const std::shared_ptr<Object>& o){ return !o || o->IsDestroyMark(); });
 		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
-        ScriptManager->ReloadDynamicLibrary();
         m_isInitialized = false; // Reset initialization state for editor scene
         activeScenePtr->Awake();
 	}

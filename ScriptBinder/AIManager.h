@@ -1,7 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
-#include "HotLoadSystem.h"
 #include "NodeFactory.h"
 #include "IAIComponent.h"
 
@@ -93,7 +92,6 @@ public:
 	}
 
 private:
-	friend class HotLoadSystem;
 
 	std::vector<std::string> m_btActionNodeNames{};
 	std::vector<std::string> m_btConditionNodeNames{};

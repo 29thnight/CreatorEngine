@@ -544,10 +544,10 @@ void MenuBarWindow::RenderMenuBar()
                 }
 
                 // 1) 아이콘 전용 버튼
-                if (ImGui::Button(kIconBtn, iconBtn))
-                {
-                    ScriptManager->CompileEvent();
-                }
+                // C++ 핫리로드 은퇴(9-4): 컴파일 버튼은 자리만 유지한다(비활성 동작 없음).
+                ImGui::BeginDisabled(true);
+                ImGui::Button(kIconBtn, iconBtn);
+                ImGui::EndDisabled();
 
                 if (isGameRunning)
                 {
@@ -1632,37 +1632,12 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
         ed::Suspend();
         if (ImGui::BeginPopup("AddScriptNode"))
         {
-			static char newNodeName[256] = "";
-			static const char* scriptNodeTypes[3] = { "Action", "Condition", "ConditionDecorator" };
-			static int selectedNodeType = 0;
-            ImGui::Text("Select Node Type to Add:");
-            ImGui::Separator();
-			// Show a combo box to select the node type
-			ImGui::Combo("Node Type", 
-                &selectedNodeType, scriptNodeTypes, IM_ARRAYSIZE(scriptNodeTypes));
-			ImGui::SameLine();
-			ImGui::InputText("Node Name", newNodeName, IM_ARRAYSIZE(newNodeName));
-            
-            if (ImGui::Button("Add Script Node"))
-            {
-                switch (selectedNodeType)
-                {
-                case 0:
-                    ScriptManager->CreateActionNodeScript(newNodeName);
-					break;
-                case 1:
-					ScriptManager->CreateConditionNodeScript(newNodeName);
-					break;
-                case 2:
-                    ScriptManager->CreateConditionDecoratorNodeScript(newNodeName);
-                default:
-                    break;
-                }
-
-                memset(newNodeName, 0, sizeof(newNodeName));
-				selectedNodeType = 0; // Reset to the first type
-
-                ImGui::CloseCurrentPopup();
+			// C++ 스크립트 노드 생성은 은퇴(9-4) — BT 노드는 빌트인만 지원한다.
+			ImGui::TextDisabled("C++ script nodes are retired.");
+			if (ImGui::Button("Close"))
+			{
+				ImGui::CloseCurrentPopup();
+			}
             }
 
             ImGui::EndPopup();
@@ -2444,14 +2419,13 @@ void MenuBarWindow::SHowInputActionMap()
 
                     if (ImGui::BeginPopup("selectScript"))
                     {
-                        for (auto& script : ScriptManager->GetScriptNames())
+                        // C++ 스크립트 은퇴(9-4): 이름을 직접 입력한다(C# 전달 경로는 후속).
+                        static char actionScriptName[128] = "";
+                        ImGui::InputText("Script", actionScriptName, sizeof(actionScriptName));
+                        if (ImGui::Button("Set") && actionScriptName[0] != ' ')
                         {
-                         
-                            if (ImGui::MenuItem(script.c_str()))
-                            {
-                                action->m_scriptName = script;
-                            }
-                            
+                            action->m_scriptName = actionScriptName;
+                            ImGui::CloseCurrentPopup();
                         }
                         ImGui::EndPopup();
                     }

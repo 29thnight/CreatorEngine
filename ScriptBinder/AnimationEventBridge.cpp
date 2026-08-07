@@ -1,7 +1,6 @@
 #include "Animation.h"
 #include "GameObject.h"
 #include "Animator.h"
-#include "ModuleBehavior.h"
 void Animation::InvokeEvent()
 {
 	/*
@@ -28,88 +27,13 @@ void Animation::InvokeEvent()
 	}*/
 }
 
-void Animation::InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress, float _preAnimationProgress)
+void Animation::InvokeEvent(Animator* _ownerAnimator, float _curAnimatonProgress, float _preAnimationProgress)
 {
-	if (m_keyFrameEvent.empty())
-		return;
-	GameObject* owner = _ownerAnimator->GetOwner();
-	if (owner->m_parentIndex != 0)
-	{
-		owner = GameObject::FindIndex(owner->m_parentIndex);
-	}
-	std::vector<ModuleBehavior*> scripts{};
-	ModuleBehavior* script = nullptr;
-	for (auto& component : owner->m_components)
-	{
-		if (nullptr == component)
-			continue;
-		script =  dynamic_cast<ModuleBehavior*>(component.get()); 
-		if (script != nullptr) break;
-	}
-
-	if (script == nullptr) return;
-	auto typeName = Meta::Find(script->GetHashedName().ToString());
-	void* voidPtr = static_cast<void*>(script);
-	/*for (auto& event : m_keyFrameEvent)
-	{
-		bool shouldTrigger = false;
-		if (curAnimationProgress >= preAnimationProgress)
-		{
-			if (preAnimationProgress < event.key && event.key <= curAnimationProgress)
-			{
-				shouldTrigger = true;
-			}
-		}
-		else
-		{
-			if ((event.key > preAnimationProgress && event.key <= 1.0f) ||
-				(event.key >= 0.0f && event.key <= curAnimationProgress))
-			{
-				shouldTrigger = true;
-			}
-		}
-
-		if (shouldTrigger)
-		{
-			Meta::InvokeMethodByMetaName(voidPtr, *typeName, event.m_funName, {});
-		}
-	}*/
-
-	for (const auto& event : m_keyFrameEvent)
-	{
-		bool shouldTrigger = false;
-
-		if (_curAnimatonProgress > _preAnimationProgress)
-		{
-			// ¿œπ› ¡¯«‡
-			if (_preAnimationProgress < event.key && event.key <= _curAnimatonProgress)
-			{
-				shouldTrigger = true;
-			}
-		}
-		else if (m_isLoop)
-		{
-			// ∑Á«¡µ» ∞ÊøÏ
-			if ((event.key > _preAnimationProgress && event.key <= 1.0f) ||
-				(event.key >= 0.0f && event.key <= _curAnimatonProgress))
-			{
-				shouldTrigger = true;
-			}
-		}
-		else
-		{
-			// ∑Á«¡ æ∆¥‘ + cur < pre ¥¬ float ø¿¬˜ °Ê π´Ω√
-		}
-
-		if (shouldTrigger)
-		{
-			Meta::InvokeMethodByMetaName(voidPtr, *typeName, event.m_funName, {});
-		}
-	}
-
+	// C++ Ïä§ÌÅ¨Î¶ΩÌä∏ ÏùÄÌá¥(9-4): ÏàòÏã†ÏûêÏòÄÎçò ModuleBehaviorÍ∞Ä ÏÇ¨ÎùºÏ†∏ ÌÇ§ÌîÑÎ†àÏûÑ Ïù¥Î≤§Ìä∏Îäî
+	// ÌòÑÏû¨ Ï†ÑÎã¨ ÎåÄÏÉÅÏù¥ ÏóÜÎã§. C#(ScriptComponent) Ï†ÑÎã¨ Í≤ΩÎ°úÎäî ClrHostÏóê ÏïÑÏßÅ ÏóÜÏñ¥
+	// ÌõÑÏÜç Í≥ºÏ†ú ‚Äî Í∑∏ÎïåÍπåÏßÄ Ïù¥Î≤§Ìä∏ Îç∞Ïù¥ÌÑ∞(m_keyFrameEvent)Îäî Î≥¥Ï°¥Îßå ÌïúÎã§.
+	(void)_ownerAnimator; (void)_curAnimatonProgress; (void)_preAnimationProgress;
 }
-
-
 
 void Animation::AddEvent()
 {

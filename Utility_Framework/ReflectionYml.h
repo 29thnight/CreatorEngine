@@ -63,18 +63,6 @@ namespace Meta
 		{
 			const Type& compRealType = *FindTypeByInstance(instance);
 			node[compRealType.name] = compRealType.typeID.m_ID_Data;
-			if (compRealType.typeID == type_guid(ModuleBehavior))
-			{
-				// ModuleBehavior는 특별히 처리
-				auto* script = static_cast<ModuleBehavior*>(instance);
-				const auto& scriptType = script->ScriptReflect();
-
-				MetaYml::Node scriptNode = Serialize(instance, scriptType);
-				for (const auto& it : scriptNode)
-				{
-					node[it.first.Scalar()] = it.second;
-				}
-			}
 		}
 
 		// 부모 먼저 직렬화

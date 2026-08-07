@@ -1,5 +1,4 @@
 #include "GameObject.h"
-#include "ModuleBehavior.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
@@ -177,37 +176,6 @@ std::shared_ptr<Component> GameObject::AddComponentAllowMultiple(const Meta::Typ
 	return component;
 }
 
-ModuleBehavior* GameObject::AddScriptComponent(std::string_view scriptName)
-{
-    std::shared_ptr<ModuleBehavior> component = std::shared_ptr<ModuleBehavior>(
-		ScriptManager->CreateMonoBehavior(scriptName.data()), 
-		[](ModuleBehavior* ptr) // Custom deleter to ensure proper cleanup
-		{
-			ScriptManager->DestroyMonoBehavior(ptr);
-		}
-	);
-	if (!component)
-	{
-		Debug->LogError("Failed to create script component: " + std::string(scriptName));
-		return nullptr;
-	}
-	component->SetOwner(this);
-
-	std::string scriptFile = std::string(scriptName) + ".cpp";
-
-	component->m_scriptGuid = DataSystems->GetFilenameToGuid(scriptFile);
-
-    auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
-    m_components.push_back(componentPtr);
-    
-	size_t index = m_components.size() - 1;
-	m_componentIds[component->m_scriptTypeID] = index;
-
-    ScriptManager->CollectScriptComponent(this, index, scriptName.data());
-
-    return component.get();
-}
-
 std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
 {
     HashedGuid typeID = type.typeID;
@@ -246,17 +214,7 @@ void GameObject::RefreshComponentIdIndices()
 		if (!component)
 			continue;
 
-		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(m_components[i]);
-		if (scriptComponent)
-		{
-			ScriptManager->UnCollectScriptComponent(this, i, scriptComponent->m_name.ToString());
-			newMap[scriptComponent->m_scriptTypeID] = i;
-			ScriptManager->CollectScriptComponent(this, i, scriptComponent->m_name.ToString());
-		}
-		else
-		{
-			newMap[component->GetTypeID()] = i;
-		}
+		newMap[component->GetTypeID()] = i;
 	}
 
 	m_componentIds = std::move(newMap);
@@ -305,40 +263,6 @@ void GameObject::RemoveComponentTypeID(uint32 typeID)
 			m_components[index]->Destroy();
 		}
 		m_componentIds.erase(iter);
-	}
-}
-
-void GameObject::RemoveScriptComponent(std::string_view scriptName)
-{
-	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
-	if (iter != m_components.end())
-	{
-		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(*iter);
-		if (scriptComponent && scriptComponent->m_name == scriptName)
-		{
-			ScriptManager->UnbindScriptEvents(scriptComponent.get(), scriptName);
-			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->m_scriptTypeID], scriptComponent->m_name.ToString());
-			scriptComponent->Destroy();
-			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
-		}
-	}
-}
-
-void GameObject::RemoveScriptComponent(ModuleBehavior* ptr)
-{
-	auto iter = m_componentIds.find(ptr->m_scriptTypeID);
-	if (iter != m_componentIds.end())
-	{
-		auto scriptComponent = ptr;
-		auto scriptName = scriptComponent->m_name.ToString();
-		if (scriptComponent && iter != m_componentIds.end())
-		{
-			size_t index = iter->second;
-			ScriptManager->UnbindScriptEvents(scriptComponent, scriptName);
-			ScriptManager->UnCollectScriptComponent(this, index, scriptName);
-			scriptComponent->Destroy();
-			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
-		}
 	}
 }
 

@@ -171,72 +171,7 @@ void AIManager::InitalizeBehaviorTreeSystem()
 		return std::make_shared<BT::InverterNode>("Inverter", nullptr);
 	});
 
-	//½ºÅ©¸³Æ®È­ µÈ ³ëµå Å¬·¡½º ÀÌ¸§ ÃßÃâ
-	int actionSize = 0;
-	auto nameArr = ScriptManager->ListBTActionNodeNames(&actionSize);
-
-	for (int i = 0; i < actionSize; ++i)
-	{
-		const std::string& actionName = nameArr[i];
-		m_btActionNodeNames.push_back(actionName);
-	}
-
-	int conditionSize = 0;
-	auto conditionArr = ScriptManager->ListBTConditionNodeNames(&conditionSize);
-
-	for (int i = 0; i < conditionSize; ++i)
-	{
-		const std::string& conditionName = conditionArr[i];
-		m_btConditionNodeNames.push_back(conditionName);
-	}
-
-	int conditionDecoratorSize = 0;
-	auto conditionDecoratorArr = ScriptManager->ListBTConditionDecoratorNodeNames(&conditionDecoratorSize);
-	for (int i = 0; i < conditionDecoratorSize; ++i)
-	{
-		const std::string& conditionDecoratorName = conditionDecoratorArr[i];
-		m_btConditionDecoratorNodeNames.push_back(conditionDecoratorName);
-	}
-
-	// Register the script-based nodes
-	for (const auto& actionName : m_btActionNodeNames)
-	{
-		BTNodeFactory->Register(actionName, [actionName]()
-		{
-			return std::shared_ptr<BT::ActionNode>(
-				ScriptManager->CreateActionNode(actionName.c_str()),
-				[](BT::ActionNode* ptr)
-				{
-					ScriptManager->DestroyActionNode(ptr);
-				});
-		});
-	}
-
-	for (const auto& conditionName : m_btConditionNodeNames)
-	{
-		BTNodeFactory->Register(conditionName, [conditionName]()
-		{
-			return std::shared_ptr<BT::ConditionNode>(
-				ScriptManager->CreateConditionNode(conditionName.c_str()),
-				[](BT::ConditionNode* ptr)
-				{
-					ScriptManager->DestroyConditionNode(ptr);
-				});
-		});
-	}
-
-	for (const auto& conditionDecoratorName : m_btConditionDecoratorNodeNames)
-	{
-		BTNodeFactory->Register(conditionDecoratorName, [conditionDecoratorName]()
-		{
-			return std::shared_ptr<BT::ConditionDecoratorNode>(
-				ScriptManager->CreateConditionDecoratorNode(conditionDecoratorName.c_str()),
-				[](BT::ConditionDecoratorNode* ptr)
-				{
-					ScriptManager->DestroyConditionDecoratorNode(ptr);
-				});
-		});
-	}
+	// C++ ìŠ¤í¬ë¦½íŠ¸ ë…¸ë“œ ì€í‡´(9-4): ë¹ŒíŠ¸ì¸ ë…¸ë“œë§Œ ë“±ë¡í•œë‹¤.
 
 	// m_aiComponentMap ¼øÈ¸ÇÏ¸é¼­ ¸¸·áµÈ GameObject pair Á¤¸®
 	std::erase_if(m_aiComponentMap, [](const auto& pair) noexcept

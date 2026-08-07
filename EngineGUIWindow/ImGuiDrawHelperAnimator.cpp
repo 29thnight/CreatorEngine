@@ -1038,8 +1038,8 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							}
 							else
 							{
-								file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
-								DataSystems->OpenSolutionAndFile(slnPath, scriptFullPath);
+								// C++ ìŠ¤í¬ë¦½íŠ¸ ì†”ë£¨ì…˜ì€ ì€í‡´(9-4) â€” íŒŒì¼ ìœ„ì¹˜ë§Œ ì•Œë ¤ ì¤€ë‹¤.
+								Debug->Log("Behaviour script: " + scriptFullPath.string());
 							}
 						}
 					}
@@ -1079,86 +1079,18 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 					float availableWidth = ImGui::GetContentRegionAvail().x;
 					searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-					// ½ºÅ©¸³Æ® ¸ñ·ÏÀ» Ç¥½Ã
-					auto aniBehaviors = ScriptManager->GetAniBehaviorNames();
-					for (const auto& script : aniBehaviors)
+					// C++ í•«ë¦¬ë¡œë“œ ì€í‡´(9-4): C# AniBehaviour íƒ€ì… ì´ë¦„ì„ ì§ì ‘ ì…ë ¥í•œë‹¤.
+					// (ClrHostì— íƒ€ì… ëª©ë¡ APIê°€ ìƒê¸°ë©´ ëª©ë¡ ì„ íƒ UIë¡œ ë³µì›í•  ê²ƒ)
+					static char aniTypeName[64] = "";
+					ImGui::InputText("Type Name", aniTypeName, sizeof(aniTypeName));
+					ImGui::BeginDisabled(aniTypeName[0] == ' ');
+					if (ImGui::Button("Add") && selectedState)
 					{
-						if (!searchFilter.PassFilter(script.c_str()))
-							continue;
-						if (script.empty())
-						{
-							const_cast<std::string&>(script) = "None";
-						}
-
-						if (ImGui::Selectable(script.c_str()))
-						{
-							if (selectedState)
-							{
-								selectedState->SetBehaviour(script);
-								ImGui::CloseCurrentPopup();
-							}
-						}
+						selectedState->SetBehaviour(aniTypeName);
+						aniTypeName[0] = ' ';
+						ImGui::CloseCurrentPopup();
 					}
-					if (ImGui::Button("Create New AniBehavior"))
-					{
-						ImGui::OpenPopup("New AniBehavior");
-					}
-
-
-					ImVec2 buttonSize = ImVec2(180, 0);              // ¹öÆ° °¡·Î Å©±â (¼¼·Î´Â ÀÚµ¿ °è»êµÊ)
-
-					ImGui::SetNextWindowSize(ImVec2(350, 0)); // ¿øÇÏ´Â »çÀÌÁî ÁöÁ¤
-					if (ImGui::BeginPopup("New AniBehavior"))
-					{
-						float availableWidth = ImGui::GetContentRegionAvail().x;
-						searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-						static char scriptName[64] = "NewAniBehavior";
-						ImGui::InputText("Name", scriptName, sizeof(scriptName));
-
-
-
-						std::string scriptNameStr(scriptName);
-						auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
-						bool isDisabled = false;
-						if (file::exists(scriptBodyFilePath))
-						{
-							ImGui::Text("Script already exists.");
-							isDisabled = true;
-						}
-						else if (scriptNameStr.empty())
-						{
-							ImGui::Text("Script name cannot be empty.");
-							isDisabled = true;
-						}
-						else if (scriptNameStr.find_first_of("0123456789") == 0)
-						{
-							ImGui::Text("Script name cannot start with a number.");
-							isDisabled = true;
-						}
-						else if (scriptNameStr.find_first_of("!@#$%^&*()_+[]{}|;':\",.<>?`~") != std::string::npos)
-						{
-							ImGui::Text("Script name contains invalid characters.");
-							isDisabled = true;
-						}
-
-						ImGui::BeginDisabled(isDisabled);
-						if (ImGui::Button("Create and Add"))
-						{
-							if (!scriptNameStr.empty())
-							{
-								try
-								{
-									ScriptManager->CreateAniBehaviorScript(scriptNameStr);
-									ScriptManager->SetCompileEventInvoked(true);
-									ScriptManager->ReloadDynamicLibrary();
-								}
-								catch (const std::exception& e)
-								{
-									Debug->LogError("Failed to create script: " + std::string(e.what()));
-									ImGui::EndDisabled();
-									ImGui::EndPopup();
-									return;
-								}
+					ImGui::EndDisabled();
 
 								selectedState->SetBehaviour(scriptNameStr);
 								scriptNameStr.clear();
