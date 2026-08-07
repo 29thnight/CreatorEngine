@@ -28,7 +28,7 @@ concurrency:
 jobs:
   # vcpkg가 필요 없는 빠른 검증. 몇 분 안에 피드백을 준다.
   include-boundary:
-    name: include 경계 검사 (PHASE 4-2)
+    name: include 경계 검사 (PHASE 4-2 · 에디터 분리)
     runs-on: windows-2022
     timeout-minutes: 5
     steps:
@@ -41,6 +41,19 @@ jobs:
           python scripts/check_include_boundary.py
           if ($LASTEXITCODE -ne 0) {
             throw "include 경계 위반 (exit code $LASTEXITCODE)"
+          }
+
+      # 두 게이트는 축이 다르다. 위는 렌더 <-> 게임플레이, 아래는 런타임 <-> 에디터.
+      # 앞의 게이트가 도는 동안 ImGui 축은 31커밋에 걸쳐 2,053줄에서 2,055줄로
+      # 제자리였다 - 측정되지 않는 경계는 지켜지지 않는다.
+      - name: 런타임 -> ImGui 경계 검사
+        if: always()
+        shell: pwsh
+        run: |
+          # 허용 목록(래칫)에 없는 새 include 간선이 생기면 실패한다.
+          python scripts/check_imgui_boundary.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "ImGui 경계 위반 (exit code $LASTEXITCODE)"
           }
 
   codegen:
