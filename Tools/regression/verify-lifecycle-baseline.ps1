@@ -24,15 +24,50 @@ param(
     [string]$Exe = "C:\Users\lance\source\CreatorEngine\x64\Debug\Academy_4Q.exe",
     [string]$Work = $env:TEMP,
     [switch]$Baseline,
-    [int]$TimeoutSeconds = 300
+    [int]$TimeoutSeconds = 300,
+    # 왕복에 쓸 두 씬. 구조가 다른 둘을 고르는 것이 요점이다 — 같은 성격의 씬끼리
+    # 오가면 컴포넌트 구성이 비슷해 파괴·초기화 순서의 차이가 드러나지 않는다.
+    [string]$SceneA = "FT_Material",
+    [string]$SceneB = "UITestScene"
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
-$scenario = Join-Path $PSScriptRoot "..\..\scripts\lifecycle_baseline.txt"
-$scenario = [System.IO.Path]::GetFullPath($scenario)
-if (-not (Test-Path $scenario)) { "시나리오가 없다: $scenario"; exit 1 }
+$template = Join-Path $PSScriptRoot "..\..\scripts\lifecycle_baseline.txt"
+$template = [System.IO.Path]::GetFullPath($template)
+if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
+
+# 씬 경로를 실행 직전에 채운다.
+#
+# scene.switch는 절대 경로를 받는데, 절대 경로를 시나리오 파일에 박아 두면
+# 다른 사람의 작업 폴더에서 조용히 실패한다(로드 실패는 종료 코드로 드러나지
+# 않고 '기록 0건'으로만 나타나 원인을 짚기 어렵다). 그래서 여기서 만든다.
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+$sceneDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Scenes"
+
+function Resolve-Scene([string]$name) {
+    # 이름만 줬으면 표준 씬 폴더에서 .creator를 찾고, 경로를 줬으면 그대로 쓴다.
+    $path = if ([System.IO.Path]::IsPathRooted($name)) { $name }
+            else { Join-Path $sceneDir "$name.creator" }
+    if (-not (Test-Path $path)) {
+        "씬이 없다: $path"
+        "사용 가능한 씬:"
+        Get-ChildItem $sceneDir -Filter *.creator -ErrorAction SilentlyContinue |
+            ForEach-Object { "  " + $_.BaseName }
+        exit 1
+    }
+    return ($path -replace '\\', '/')
+}
+
+$pathA = Resolve-Scene $SceneA
+$pathB = Resolve-Scene $SceneB
+
+$scenario = Join-Path $Work "lifecycle_baseline_resolved.txt"
+(Get-Content $template -Raw) `
+    -replace '\{\{SCENE_A\}\}', $pathA `
+    -replace '\{\{SCENE_B\}\}', $pathB |
+    Set-Content $scenario -Encoding UTF8
 
 $baselineFile = Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
 # lifecycle.dump 는 상대 경로를 프로세스 작업 디렉터리 기준으로 푼다.
@@ -79,7 +114,8 @@ function Get-Normalized([string]$path) {
 $produced = @(Get-Normalized $producedFile)
 
 if ($produced.Count -eq 0) {
-    "기록이 비어 있다. 시나리오의 씬 경로가 실제 프로젝트 경로인지 확인할 것."
+    "기록이 비어 있다. 씬은 열렸는데 생명주기가 한 건도 안 불렸다는 뜻이다."
+    "표준 출력에서 scene.switch 결과를 확인할 것: " + (Join-Path $Work "lifecycle_baseline.out")
     exit 1
 }
 

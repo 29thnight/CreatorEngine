@@ -13,20 +13,43 @@
 #   편도만 재면 "새 씬에서 안 불렸다"와 "이전 씬이 정리되지 않았다"를 구분할 수 없다.
 #   씬 전환의 OnDestroy 대칭성은 왕복에서만 드러난다.
 #
-# 주의:
-#   아래 씬 경로는 실제 프로젝트 경로로 바꿔야 한다(scene_churn_benchmark.txt와 같다).
-#   틱 프레임 예산을 3으로 두는 이유는 한 프레임 안의 순서가 알고 싶은 것이지
-#   반복 횟수가 아니기 때문이다. 늘리면 파일만 커지고 diff가 어려워진다.
+# 씬 경로:
+#   {{SCENE_A}} / {{SCENE_B}}는 verify-lifecycle-baseline.ps1이 실행 직전에
+#   절대 경로로 치환한다. scene.switch가 절대 경로를 받기 때문이고, 절대 경로를
+#   여기 박아 두면 다른 사람의 작업 폴더에서 조용히 실패한다.
+#   기본값은 -SceneA/-SceneB로 바꿀 수 있다.
+#
+# 틱 프레임 예산:
+#   3으로 두는 이유는 한 프레임 안의 순서가 알고 싶은 것이지 반복 횟수가
+#   아니기 때문이다. 늘리면 파일만 커지고 diff가 어려워진다.
+
+# --- 기록 시작 ---
+#
+# 첫 씬 로드보다 앞이어야 한다. 로드 뒤에 켜면 그 씬의 Awake가 빠진 채 나중에
+# OnDestroy만 잡혀 두 수가 어긋나고, 그 어긋남이 결함인지 계측 구멍인지
+# 구분되지 않는다.
+#
+# 예산을 0으로 주는 것은 '수명 단계만'이라는 뜻이다. 틱 단계는 재생이 안정된
+# 뒤에 따로 연다 — 아래 주석 참고.
+lifecycle.trace clear
+lifecycle.trace on 0
 
 # --- 로드 ---
-scene.switch Assets/Scenes/SceneA.scene
+scene.switch {{SCENE_A}}
 wait 60
 
-# --- 기록 시작: 재생 진입의 Awake/OnEnable/Start 순서가 여기 담긴다 ---
-lifecycle.trace clear
-lifecycle.trace on 3
+# --- 재생 진입: Awake/OnEnable/Start 순서가 여기 담긴다 ---
 play
 wait 120
+
+# 여기서 틱 예산을 연다.
+#
+# 처음에는 play 앞에서 열었는데, play는 다음 프레임에 처리되므로 예산 3프레임이
+# 에디터 모드 프레임에 그대로 소진됐다 — 재생 중 Update를 한 건도 담지 못한 채
+# 기준선이 떠졌다(실측: 프레임 0·1·2의 LightComponent·CameraComponent뿐).
+# 9-1이 교체하는 것이 바로 그 Update 디스패치라 그 구멍은 대조를 무의미하게 만든다.
+lifecycle.trace on 3
+wait 10
 lifecycle.trace status
 
 # --- 파괴 경로: OnDestroy 순서와 파괴 중 순회 안전성 ---
@@ -36,9 +59,18 @@ lifecycle.stress churn 8
 wait 60
 
 # --- 전환: 이전 씬의 정리와 새 씬의 초기화가 겹치는 구간 ---
-scene.switch Assets/Scenes/SceneB.scene
+scene.switch {{SCENE_B}}
 wait 120
-scene.switch Assets/Scenes/SceneA.scene
+
+# 두 번째 씬에서 틱 예산을 한 번 더 연다.
+#
+# 첫 씬만으로는 Update를 구현한 컴포넌트 13종 중 두 종(Light·Camera)밖에 담기지
+# 않는다 — 3D 씬에 UI가 없기 때문이다. UI 씬에서 Canvas·Image·Text 계열이 함께
+# 잡혀야 9-1이 교체하는 Update 디스패치의 순서 계약을 실제로 대조할 수 있다.
+lifecycle.trace on 3
+wait 10
+
+scene.switch {{SCENE_A}}
 wait 120
 
 # --- 정지 ---
