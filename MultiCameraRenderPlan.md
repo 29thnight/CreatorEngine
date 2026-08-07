@@ -481,8 +481,7 @@ GBuffer는 텍스처 없는 슬롯에 흰색 폴백을 물려 셰이더의 분�
 
 투명이 불투명보다 약간 밝고 대비가 낮다. **Deferred는 SSGI와 캐스케이드
 그림자를 받고 Forward+는 안 받기 때문**이고, 구조에서 오는 차이다.
-투명에 그림자를 걸려면 그림자맵과 캐스케이드 상수를 Forward+에도 넘겨야
-한다 — 별도 과제.
+그림자는 §15에서 닫았고, SSGI가 남는다.
 
 디스크립터 링 소비가 드로우당 1 → 4, 프레임당 +3으로 늘었다. 4096을 전
 패스가 나눠 쓰므로 투명이 많은 씬에서는 `overflows`를 볼 것.
@@ -498,3 +497,56 @@ GBuffer는 텍스처 없는 슬롯에 흰색 폴백을 물려 셰이더의 분�
 - **게임뷰의 에디터 오버레이**: 그리드·기즈모 체인이 두 뷰 모두에 그려진다.
   게임 카메라 뷰에서는 빼는 분기가 필요할 수 있다(그래프 선언 분기 +
   GetOutput 핸들 신선도 주의).
+
+## 15. 투명에 캐스케이드 그림자 (2026-08-07)
+
+§14가 남긴 차이 둘 중 하나를 닫는다. Deferred가 이미 받는 그림자 자원을
+Forward+에도 같은 형태로 넘긴다.
+
+### 배선
+
+- `EnhancedForwardPass::SetShadow(RGHandle, const EnhancedShadowData&)` —
+  Deferred와 같은 서명. 라이브 렌더러가 `p.deferred.SetShadow` 바로 옆에서
+  같은 값을 준다.
+- 셰이더: `Texture2DArray gShadowMap : register(t11)`,
+  `SamplerComparisonState gShadowSampler : register(s2)`,
+  `SampleShadow`/`SampleShadowCascade`는 Deferred에서 그대로 옮겼다.
+  방향광 분기에서만 `falloff`에 곱한다(Deferred와 같은 자리).
+- 루트 시그니처: IBL 테이블(파라미터 6)을 t8~t10 → t8~t11로 넓혀
+  '프레임 내내 같은 텍스처' 하나로 묶었다. 샘플러 범위는 2 → 3.
+- `ShadeParams`가 112 → 368바이트. `static_assert`도 함께 고쳤다.
+
+`m_shadowMap`이 무효면 그래프 사용 선언에서 빠지고 `gHasShadow=0`으로
+돈다 — 자가 검증 경로(그림자 패스 없음)가 그대로 통과하는 이유다.
+
+### 받는 쪽만이다
+
+투명은 그림자 맵에 **그려지지 않는다**(`EnhancedShadowPass`가
+`context.draws`만 래스터한다). 그래서 자기 그림자도, 남에게 드리우는
+그림자도 없다. 유리에 필요한 것은 어차피 다른 계산이므로 그 자리에
+불투명 캐스터를 밀어 넣는 것은 답이 아니다.
+
+### 검증
+
+`FT_Shadow`(불투명 바닥 + 캐스터 다섯)를 복사해 바닥만
+`m_renderingMode: 1`로 바꾼 `FT_TransparentShadow`를 만들고, 태양을
+25도로 낮춘 `*Low` 변형을 함께 썼다(그림자가 옆으로 길게 뻗어 보인다).
+`Assets/Scenes/`는 gitignore라 재생성 절차를 여기 남긴다.
+
+`p.forward.SetShadow`만 껐다 켠 A/B에서 게임 뷰 431880픽셀 중 **2289개
+(0.53%)가 갈렸고**, 차이 이미지가 캐스터 실루엣과 오른쪽으로 뻗은 그림자
+줄기 그대로였다. 불투명 바닥(Deferred)과 그늘 자리도 일치한다.
+
+회귀: `dx12.forward` / `dx12.forwardshade` / `dx12.fog` / `dx12.ssgi` /
+`dx12.selftest` / `dx12.shadowquality` 모두 통과.
+
+### 검증 중에 드러난 것 (이번 범위 밖)
+
+**라이브 경로에서 방향광 세기가 제곱으로 들어간다.**
+`LightComponent::ApplyLightData`가 `light.m_color = m_color * m_intencity`로
+세기를 색에 이미 곱해 넣는데, `EnhancedSceneRendererLive`가
+`light.color.w = source.m_intencity`로 세기를 한 번 더 싣고 두 셰이더
+(Deferred·Forward+)가 `color.rgb * color.a`를 한다. 세기 1.6이면 2.56배다.
+직사광이 날아가 톤맵이 눌러 버리므로 **그림자가 옅은 색조로만 보인다** —
+그림자가 안 걸린 것처럼 보였던 것이 이 때문이다. 고치면 모든 씬의 밝기가
+바뀌므로 따로 판단할 것.

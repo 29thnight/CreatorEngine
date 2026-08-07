@@ -62,6 +62,9 @@ ScriptBinder는 역방향(허용)으로 include한다.
    방향이 우선, 렌더에는 본 팔레트 결과만 전달.
 4. **C4 DataSystem** — `DataSystem.cpp` → PrefabEditor/PrefabUtility/SceneManager 참조는
    4-3(에디터 UI 분리)과 한 몸. 4-3에서 함께 해소.
+   같은 4-3 묶음: `Utility_Framework/ReflectionImGuiHelper.h`(924줄, 에디터 전용인데 코어에 있으며
+   `SceneManager.h`·`InputManager.h`를 역참조) → `EngineGUIWindow`로 이관.
+   근거·범위는 [ReflectionRetentionDecision.md](ReflectionRetentionDecision.md) §4-R1.
 5. **C5 ModelLoader 물리 부착** — MeshCollider/RigidBody 생성은 콜백/팩토리 역전으로 게임플레이
    측에 위임.
 6. **C6 기타** — `Camera.cpp`(InputManager: 에디터 카메라 조작 — 입력 인터페이스 추출),
