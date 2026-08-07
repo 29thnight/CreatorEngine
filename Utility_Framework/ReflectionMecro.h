@@ -93,7 +93,8 @@ virtual const Meta::Type& ScriptReflect()\
         m_name = #T; \
         m_typeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
     }\
-    virtual ~T() = default; \
+    virtual ~T() = default;
+
 #define BT_ACTION_BODY(T) \
     T() \
     { \
