@@ -3,8 +3,8 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Skeleton.h"
-#include "GameObject.h"
-#include "Scene.h"
+class Scene;
+class GameObject;
 #include "Material.h"
 #include "AnimatorData.h"
 #include "ManagedHeapObject.h"

@@ -246,6 +246,7 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ModelSceneBridge.cpp" />
     <ClCompile Include="AnimationEventBridge.cpp" />
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp" />

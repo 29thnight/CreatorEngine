@@ -1,0 +1,338 @@
+// Model/ModelLoader의 씬 인스턴스화 구현 (PHASE 4-2 C5).
+//
+// 모델 파싱(assimp -> Mesh/Material/Skeleton)은 렌더/리소스 도메인이라
+// RenderEngine에 남고, 파싱 결과를 씬에 세우는 일(GameObject 계층 생성,
+// MeshRenderer/Animator/RigidBody/MeshCollider 부착)은 게임플레이 도메인이라
+// 이 파일이 맡는다.
+#include "Model.h"
+#include "ModelLoader.h"
+#include "Scene.h"
+#include "GameObject.h"
+#include "SceneManager.h"
+#include "Animator.h"
+#include "MeshRenderer.h"
+#include "RigidBodyComponent.h"
+#include "MeshCollider.h"
+#include "Skeleton.h"
+
+Model* Model::LoadModelToScene(Model* model, Scene& Scene)
+{
+    if (nullptr == model)
+    {
+        return nullptr;
+    }
+
+    ModelLoader loader = ModelLoader(model, &Scene);
+    file::path path_ = model->path;
+
+	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
+	if (model->m_hasBones)
+	{
+		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+	}
+
+	SceneManagers->m_threadPool->NotifyAllAndWait();
+
+	return model;
+}
+
+GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
+{
+	if (nullptr == model)
+	{
+		return nullptr;
+	}
+
+    ModelLoader loader = ModelLoader(model, &Scene);
+    file::path path_ = model->path;
+
+	auto rootObj = loader.GenerateSceneObjectHierarchyObj(model->m_nodes[0], true, 0);
+	if (model->m_hasBones)
+	{
+		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+	}
+
+	SceneManagers->m_threadPool->NotifyAllAndWait();
+
+	return rootObj;
+}
+void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex)
+{
+	static int modelSeparator = 0;
+	int nextIndex = parentIndex;
+
+	if (true == isRoot)
+	{
+		auto rootObject = m_scene->CreateGameObject(m_model->name, GameObjectType::Mesh, nextIndex);
+		m_gameObjects.push_back(rootObject);
+		nextIndex = rootObject->m_index;
+		m_modelRootIndex = rootObject->m_index;
+
+		if (m_model->m_hasBones)
+		{
+			m_animator = rootObject->AddComponent<Animator>();
+			m_animator->SetEnabled(true);
+			m_animator->m_Motion = m_model->m_animator->m_Motion;
+			m_animator->m_Skeleton = m_model->m_Skeleton;
+			m_isSkinnedMesh = true;
+		}
+		else
+		{
+			m_isSkinnedMesh = false;
+		}
+
+        if (1 == node->m_numMeshes && 0 == node->m_numChildren)
+        {
+            uint32 meshId = node->m_meshes[0];
+            Mesh* mesh = m_model->m_Meshes[meshId].get();
+            Material* material = m_model->m_Materials[mesh->m_materialIndex].get();
+            MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
+
+			if (m_model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = rootObject->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = rootObject->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+            meshRenderer->m_Mesh = m_model->m_Meshes[meshId];
+            meshRenderer->m_Material = m_model->m_Materials[mesh->m_materialIndex];
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+			nextIndex = rootObject->m_index;
+			
+			return;
+		}
+	}
+
+	for (uint32 i = 0; i < node->m_numMeshes; ++i)
+	{
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+
+		uint32 meshId			= node->m_meshes[i];
+		auto mesh				= m_model->m_Meshes[meshId];
+		auto material			= m_model->m_Materials[mesh->m_materialIndex];
+                
+		Mathf::Matrix transform = node->m_transform;
+		Model* model = m_model;
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+
+			if (model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			object->m_transform.SetLocalMatrix(transform);
+		});
+
+		nextIndex = object->m_index;
+		//m_gameObjects.push_back(object);
+	}
+
+	if (false == isRoot && 0 == node->m_numMeshes)
+	{
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		m_gameObjects.push_back(object);
+		object->m_transform.SetLocalMatrix(node->m_transform);
+		nextIndex = object->m_index;
+	}
+
+	for (uint32 i = 0; i < node->m_numChildren; ++i)
+	{
+		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
+	}
+}
+
+void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
+{
+	int nextIndex = parentIndex;
+	static std::shared_ptr<GameObject> rootObject{};
+	if (true == isRoot)
+	{
+		rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		nextIndex = rootObject->m_index;
+	}
+	else
+	{
+		std::shared_ptr<GameObject> boneObject{};
+		auto it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(), [bone](std::shared_ptr<GameObject> shPtr)
+		{
+			std::string name = shPtr->RemoveSuffixNumberTag();
+			return name == bone->m_name;
+		});
+
+		boneObject = (*it);
+		if (nullptr == boneObject)
+		{
+			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
+			//m_gameObjects.push_back(boneObject);
+		}
+		else
+		{
+			boneObject->m_gameObjectType = GameObjectType::Bone;
+		}
+		nextIndex = boneObject->m_index;
+		boneObject->m_rootIndex = m_modelRootIndex;
+	}
+
+	for (uint32 i = 0; i < bone->m_children.size(); ++i)
+	{
+		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
+	}
+}
+
+GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex)
+{
+	static int modelSeparator = 0;
+	int nextIndex = parentIndex;
+	std::shared_ptr<GameObject> rootObject;
+
+	if (true == isRoot)
+	{
+		rootObject = m_scene->CreateGameObject(m_model->name, GameObjectType::Mesh, nextIndex);
+		nextIndex = rootObject->m_index;
+		m_modelRootIndex = rootObject->m_index;
+
+		if (m_model->m_hasBones)
+		{
+			m_animator = rootObject->AddComponent<Animator>();
+			m_animator->m_Motion = m_model->m_animator->m_Motion;
+			m_animator->m_Skeleton = m_model->m_Skeleton;
+			m_isSkinnedMesh = true;
+		}
+		else
+		{
+			m_isSkinnedMesh = false;
+		}
+
+		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
+		{
+			uint32 meshId = node->m_meshes[0];
+			auto mesh = m_model->m_Meshes[meshId];
+			auto material = m_model->m_Materials[meshId];
+
+			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
+
+			if (m_model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = rootObject->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = rootObject->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+
+			nextIndex = rootObject->m_index;
+			return rootObject.get();
+		}
+	}
+
+	for (uint32 i = 0; i < node->m_numMeshes; ++i)
+	{
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+
+		uint32 meshId = node->m_meshes[i];
+		auto mesh = m_model->m_Meshes[meshId];
+		auto material = m_model->m_Materials[mesh->m_materialIndex];
+
+		Mathf::Matrix transform = node->m_transform;
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+
+			if (m_model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			object->m_transform.SetLocalMatrix(transform);
+		});
+
+		nextIndex = object->m_index;
+		//m_gameObjects.push_back(object);
+	}
+
+	if (false == isRoot && 0 == node->m_numMeshes)
+	{
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
+		object->m_transform.SetLocalMatrix(node->m_transform);
+		nextIndex = object->m_index;
+	}
+
+	for (uint32 i = 0; i < node->m_numChildren; ++i)
+	{
+		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
+	}
+
+	return rootObject.get();
+}
+
+GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
+{
+	int nextIndex = parentIndex;
+	std::shared_ptr<GameObject> rootObject;
+	if (true == isRoot)
+	{
+		rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		nextIndex = rootObject->m_index;
+	}
+	else
+	{
+		std::shared_ptr<GameObject> boneObject{};
+		boneObject = m_scene->GetGameObject(bone->m_name);
+		if (nullptr == boneObject)
+		{
+			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
+		}
+		else
+		{
+			boneObject->m_gameObjectType = GameObjectType::Bone;
+		}
+		nextIndex = boneObject->m_index;
+		boneObject->m_rootIndex = m_modelRootIndex;
+	}
+
+	for (uint32 i = 0; i < bone->m_children.size(); ++i)
+	{
+		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
+	}
+
+	return rootObject.get();
+}
+
+// 여러 슬롯을 순서대로 훑어 처음 잡히는 텍스처를 돌려준다.
+//
+// Assimp의 glTF 임포터가 어느 aiTextureType에 넣는지는 버전마다 다르다. 한
+// 슬롯만 보고 없으면 포기하면, 파일에는 텍스처가 있는데 재질이 비어 있는 상태가
+// 되고 화면에서는 '검게 나온다'로만 보인다 — 원인이 임포터라는 것을 알아채기
+// 어렵다. 그래서 후보를 나열하고, 어느 슬롯에서 잡혔는지(또는 전부 비었는지)를
+// 로그에 남긴다.

@@ -1,4 +1,6 @@
 #include "DataSystem.h"
+#include "Scene.h"
+#include "GameObject.h"
 #include "EditorImGuiTexture.h"
 #include "ShaderSystem.h"
 #include "Model.h"	

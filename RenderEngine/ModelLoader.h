@@ -4,7 +4,8 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Model.h"
-#include "Scene.h"
+class Scene;
+class GameObject;
 #include "Skeleton.h"
 #include "SkeletonLoader.h"
 
