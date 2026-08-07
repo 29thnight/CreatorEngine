@@ -318,11 +318,26 @@ R1·R2가 클래스째 소멸한다 — "순회 중인 것이 죽는" 상황 자
 <tr>
   <td><span class="tag p2">L-5</span><br>Delegate 위생</td>
   <td>남는 시스템 이벤트용 Delegate에 한정: <code>isStopped_</code> 락 규약 정리, 예외를 LogSystem으로,
-  <code>Clear()</code> 후 재사용 불가 상태 해소</td>
+  <s><code>Clear()</code> 후 재사용 불가 상태 해소</s> — <strong>세 번째 항목은 전제가 틀렸다(아래 참조)</strong></td>
   <td><span class="fileref">Delegate.inl</span> 소규모 수리 · 기존 구독처 동작 불변</td>
   <td>0.5일</td>
 </tr>
 </table>
+
+<div class="callout red">
+<p><strong>★ 계획이 틀린 것을 실측이 잡았다 — "Clear 후 재사용 불가"는 결함이 아니라 성질이다.</strong></p>
+<p>계획을 세울 때 <code>isStopped_</code>가 한 번 <code>true</code>가 되면 그대로 남는 것을 결함으로 적었다.
+Clear한 델리게이트가 새 구독을 받아도 브로드캐스트가 첫 콜백에서 멈추니 "조용히 아무 일도 안 하는" 상태가 된다는
+이유였다. 그래서 Clear가 플래그를 되돌리게 고쳤다 — 그러자 <strong>종료 순서 회귀가 6회 중 1회 실패</strong>했다
+(그 직전 세 번의 전체 회귀에서는 6/6이었다).</p>
+<p>되짚어 보니 그 래치는 <strong>종료 가드</strong>로 쓰이고 있었다. <code>Broadcast</code>는 콜백 목록을 복사해 두고
+락 밖에서 순회한다. 종료 중에 <code>Clear</code>가 불리면 그 복사본은 여전히 유효하지만 콜백이 가리키는 대상은
+무너지는 중이다. 래치가 서 있어야 다음 반복에서 빠져나온다. 되돌리면 그 창이 나노초로 줄어 순회가 그대로 이어지고,
+파괴 중인 객체를 호출한다.</p>
+<p>그래서 래치를 되살리고, "되돌리지 않는 것이 의도"임을 코드에 남겼다. 실제로 Clear한 델리게이트를 다시 쓰는 곳도
+없다 — 계획서에 적힌 문제는 관찰된 것이 아니라 코드를 읽고 추측한 것이었다.
+확률적 회귀를 6회로만 판정하지 않고 <strong>12회로 재확인</strong>해 통과를 확정했다.</p>
+</div>
 
 <div class="callout warn">
 <p><strong>순서에 대한 주석:</strong> L-1을 병행 구조(플래그 스위치)로 두는 이유는 26종을 한 번에 옮기다
