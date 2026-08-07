@@ -112,7 +112,8 @@ void Core::App::RegisterHandler(CoreWindow& coreWindow)
     coreWindow.RegisterHandler(WM_INPUT,		this, &App::ProcessRawInput);
 	coreWindow.RegisterHandler(WM_SIZE,			this, &App::HandleResizeEvent);
 	coreWindow.RegisterHandler(WM_SYSKEYDOWN,	this, &App::HandleMaximizeEvent);
-    coreWindow.RegisterHandler(WM_KEYDOWN,		this, &App::HandleCharEvent);
+	// WM_KEYDOWN은 더 이상 가로채지 않는다. 문자 입력은 메시지 펌프의
+	// TranslateMessage가 만드는 WM_CHAR로 ImGui 백엔드에 그대로 전달된다.
     coreWindow.RegisterHandler(WM_CLOSE,		this, &App::Shutdown);
     coreWindow.RegisterHandler(WM_DROPFILES,	this, &App::HandleDropFileEvent);
 }
@@ -210,48 +211,16 @@ LRESULT Core::App::ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-LRESULT Core::App::ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-	ImGuiKey key = ImGuiKey(wParam);
-
-	if (key >= 0 && key < ImGuiKey_COUNT)
-	{
-		io.AddKeyEvent(key, true);
-	}
-
-	return 0;
-}
-
-LRESULT Core::App::ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-	ImGuiKey key = ImGuiKey(wParam);
-
-	if (key >= 0 && key < ImGuiKey_COUNT)
-	{
-		io.AddKeyEvent(key, false);
-	}
-
-
-	return 0;
-}
-
-LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-
-	wchar_t wch = 0;
-	static BYTE KeyState[256];
-	GetKeyboardState(KeyState);
-	// Virtual Key를 Unicode 문자로 변환
-	if (ToUnicode((UINT)wParam, (UINT)lParam, KeyState, &wch, 1, 0) > 0)
-	{
-		io.AddInputCharacter(wch);
-	}
-
-	return 0;
-}
+// ImGuiKeyDownHandler / ImGuiKeyUpHandler / HandleCharEvent를 제거했다.
+//
+// 앞의 둘은 어디에도 등록되지 않은 죽은 코드였고, 그나마 Win32 가상 키 코드를
+// ImGuiKey로 그대로 캐스팅하고 있어서 등록됐다면 오히려 오동작했을 코드다.
+//
+// HandleCharEvent는 WM_KEYDOWN에서 ToUnicode로 문자를 손수 만들어 넣는 우회였다.
+// 메시지 펌프에 TranslateMessage가 없어 WM_CHAR가 생성되지 않았기 때문인데,
+// 이 우회는 IME 조합 상태를 알지 못해 한글·일본어·중국어 입력을 통째로 막았고
+// ToUnicode가 커널 데드 키 버퍼를 건드리는 부작용까지 있었다.
+// 펌프를 표준대로 되돌렸으므로(CoreWindow::Then) 이 함수들은 필요 없다.
 
 LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {

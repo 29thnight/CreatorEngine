@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <functional>
 #include <unordered_map>
+#include <stdexcept>
+#include <string>
 #include <directxtk/Keyboard.h>
 #include <imgui_internal.h>
 #include <shellapi.h> // 추가
@@ -29,6 +31,19 @@ public:
         // 덤프 기록자 등록은 SetDumpType에서 한다.
     }
 
+    // 창(HWND)과 디스플레이 모드를 소유하는 클래스다. 복사를 허용하면 사본의
+    // 소멸자가 원본이 아직 쓰고 있는 창을 DestroyWindow 해 버린다.
+    //
+    // 실제로 그렇게 죽고 있었다: InitializeTask가 CoreWindow를 '값으로' 반환해서
+    // `InitializeTask(...).Then(...)` 한 문장이 임시 사본을 만들었고, Then이
+    // 메시지 루프를 다 돌고 반환하는 순간 그 사본이 소멸하며 살아있는 창을
+    // 파괴했다. 그 뒤에 실행되는 App::Finalize와 DeviceResources 정리는
+    // 전부 이미 죽은 HWND 위에서 돌았다.
+    CoreWindow(const CoreWindow&) = delete;
+    CoreWindow& operator=(const CoreWindow&) = delete;
+    CoreWindow(CoreWindow&&) = delete;
+    CoreWindow& operator=(CoreWindow&&) = delete;
+
     ~CoreWindow()
     {
         // ▼ 변경: 정확 원복 함수 사용
@@ -55,8 +70,10 @@ public:
         };
     }
 
+    // 참조를 반환한다. 값으로 반환하면 `.Then(...)` 체이닝이 임시 사본을 만들고,
+    // 그 사본의 소멸자가 문장 끝에서 살아있는 창을 파괴한다(복사 금지 선언 참고).
     template <typename Initializer>
-    CoreWindow InitializeTask(Initializer fn_initializer)
+    CoreWindow& InitializeTask(Initializer fn_initializer)
     {
         fn_initializer();
 
@@ -77,6 +94,13 @@ public:
                 }
                 else
                 {
+                    // TranslateMessage가 없으면 WM_CHAR가 아예 생성되지 않는다.
+                    // 그래서 예전에는 앱 쪽에서 WM_KEYDOWN을 받아 ToUnicode로
+                    // 문자를 직접 만들어 ImGui에 넣었는데(App/GameApp에 같은 코드가
+                    // 두 벌 있었다), 그 우회는 IME 조합 입력을 처리하지 못해
+                    // 한글·일본어·중국어 입력이 통째로 죽어 있었다.
+                    // 표준 펌프로 되돌리고 우회 코드는 제거했다.
+                    TranslateMessage(&msg);
                     DispatchMessage(&msg);
                 }
             }
@@ -174,11 +198,6 @@ public:
     {
         return s_instance;
     }
-    
-	static void RegisterCreateEventHandler(MessageHandler handler)
-	{
-		m_CreateEventHandler = handler;
-	}
 
 private:
     static CoreWindow* s_instance;
@@ -189,7 +208,6 @@ private:
     int m_width = 800;
     int m_height = 600;
     std::unordered_map<UINT, MessageHandler> m_handlers;
-	static MessageHandler m_CreateEventHandler;
 
     // 표시 모드 전환 상태 & 대상 모니터 장치 이름
     bool    m_displayModeChanged = false;
@@ -198,6 +216,28 @@ private:
     // ▼ 추가: 원래 표시 모드 저장용
     DEVMODEW m_originalMode{};
     bool     m_hasOriginalMode = false;
+
+    /// 창 생성 실패를 그 자리에서 터뜨린다.
+    ///
+    /// 예전에는 에디터 경로가 CreateWindowEx 실패를 그냥 흘려보내서, m_hWnd가
+    /// nullptr인 채로 DeviceResources까지 전달되고 한참 뒤 엉뚱한 자리에서 죽었다.
+    /// 생성자에서 던지면 소멸자가 돌지 않으므로 s_instance는 여기서 직접 되돌린다.
+    [[noreturn]] void FailConstruction(const char* what) const
+    {
+        const DWORD lastError = GetLastError();
+        if (s_instance == this) s_instance = nullptr;
+
+        const std::string message = std::string("CoreWindow: ") + what +
+            " (GetLastError=" + std::to_string(lastError) + ")";
+
+        // 예외가 어디서 어떻게 처리되든 사유는 로그에 남긴다. 미처리 예외로
+        // terminate까지 가면 what()이 출력되지 않는 경로가 있다.
+        if (Log::IsAlive() && Debug) Debug->LogCritical(message);
+
+        // 크래시 후크가 이 예외를 받아 덤프를 남기기 전에 로그부터 밀어낸다.
+        Log::FlushNow();
+        throw std::runtime_error(message);
+    }
 
     void RegisterWindowClass() const
     {
@@ -208,7 +248,12 @@ private:
 #ifndef BUILD_FLAG
         wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ACADEMY4Q));      // 큰 아이콘
 #endif // BUILD_FLAG
-        RegisterClass(&wc);
+
+        // 이미 등록된 클래스는 실패가 아니다(같은 클래스로 창을 다시 만드는 경우).
+        if (0 == RegisterClass(&wc) && ERROR_CLASS_ALREADY_EXISTS != GetLastError())
+        {
+            FailConstruction("RegisterClass 실패");
+        }
     }
 
     void CreateAppWindow(const wchar_t* title)
@@ -241,13 +286,15 @@ private:
             m_hInstance,
             this);
 
-        if (m_hWnd)
+        if (!m_hWnd)
         {
-            DragAcceptFiles(m_hWnd, TRUE);
-            // 에디터는 여기서 창을 보여주지 않는다. 초기화가 메인 스레드를
-            // 점유하는 동안 응답 없는 빈 창이 로딩창과 같이 떠 있었다.
-            // 초기화 완료 지점에서 Show()를 부른다.
+            FailConstruction("CreateWindowEx 실패(에디터 창)");
         }
+
+        DragAcceptFiles(m_hWnd, TRUE);
+        // 에디터는 여기서 창을 보여주지 않는다. 초기화가 메인 스레드를
+        // 점유하는 동안 응답 없는 빈 창이 로딩창과 같이 떠 있었다.
+        // 초기화 완료 지점에서 Show()를 부른다.
 #else
         // 1) 보더리스 창 생성 (임시 크기)
         m_hWnd = CreateWindowEx(
@@ -261,7 +308,10 @@ private:
             m_hInstance,
             this);
 
-        if (!m_hWnd) return;
+        if (!m_hWnd)
+        {
+            FailConstruction("CreateWindowEx 실패(게임 창)");
+        }
 
         DragAcceptFiles(m_hWnd, TRUE);
 

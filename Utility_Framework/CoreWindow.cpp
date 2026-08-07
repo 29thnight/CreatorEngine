@@ -2,7 +2,6 @@
 #include "WinProcProxy.h"
 
 CoreWindow* CoreWindow::s_instance = nullptr;
-CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
 DUMP_TYPE CoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
 #ifndef BUILD_FLAG
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -40,10 +39,12 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         self = reinterpret_cast<CoreWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
     }
 
-    if (message == WM_CREATE)
-    {
-        m_CreateEventHandler(hWnd, wParam, lParam);
-    }
+    // WM_CREATE용 정적 콜백 슬롯은 제거했다.
+    //
+    // 널 검사 없이 std::function을 호출하고 있었는데(등록 전에 창을 만들면
+    // WndProc 안에서 bad_function_call이 던져진다), 정작 등록된 유일한 핸들러는
+    // EngineBootstrap의 `return 0;` 하나뿐이었다. 창 생성 시점에 할 일이 다시
+    // 생기면 인스턴스 핸들러(RegisterHandler)로 WM_NCCREATE를 받으면 된다.
 
     if (self)
     {

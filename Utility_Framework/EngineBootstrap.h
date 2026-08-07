@@ -88,11 +88,6 @@ namespace EngineBootstrap
         // (SetDumpType 시점에는 아직 비어 있다 — 덤프를 남기는 능력이 우선이다.)
         CacheCrashGitHash();
 
-        CoreWindow::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT
-        {
-            return 0;
-        });
-
         DirectX11::DeviceResourceManager::GetInstance();
         ShaderResourceSystem::GetInstance();
         EngineSetting::GetInstance();

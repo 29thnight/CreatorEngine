@@ -20,7 +20,6 @@ namespace GameBuilder
 		void Run();
 
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 	private:

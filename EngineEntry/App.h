@@ -24,9 +24,6 @@ namespace Core
 		//Window Event Func
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
-		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleMaximizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);

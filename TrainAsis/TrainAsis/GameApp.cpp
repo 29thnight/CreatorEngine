@@ -62,7 +62,8 @@ void GameBuilder::App::SetWindow(CoreWindow& coreWindow)
 void GameBuilder::App::RegisterHandler(CoreWindow& coreWindow)
 {
 	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
-	coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
+	// WM_KEYDOWN은 더 이상 가로채지 않는다. 문자 입력은 메시지 펌프의
+	// TranslateMessage가 만드는 WM_CHAR로 ImGui 백엔드에 그대로 전달된다.
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
 }
 
@@ -95,21 +96,9 @@ LRESULT GameBuilder::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-LRESULT GameBuilder::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	ImGuiIO& io = ImGui::GetIO();
-
-	wchar_t wch = 0;
-	static BYTE KeyState[256];
-	GetKeyboardState(KeyState);
-	// Virtual Key�� Unicode ���ڷ� ��ȯ
-	if (ToUnicode((UINT)wParam, (UINT)lParam, KeyState, &wch, 1, 0) > 0)
-	{
-		io.AddInputCharacter(wch);
-	}
-
-	return 0;
-}
+// HandleCharEvent를 제거했다. App.cpp에 있던 것과 한 글자도 다르지 않은 사본으로,
+// 메시지 펌프에 TranslateMessage가 없어 WM_CHAR가 생성되지 않던 것을 ToUnicode로
+// 우회하던 코드다. 펌프를 표준대로 되돌렸으므로(CoreWindow::Then) 필요 없다.
 
 LRESULT GameBuilder::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
