@@ -9,6 +9,7 @@
 #include "DX12GpuProfiler.h"
 #include "EnhancedRenderGraph.h"
 #include "EnhancedRenderPass.h"
+#include "EnhancedLivePipelineDesc.h"
 #include "EnhancedGBufferPass.h"
 #include "EnhancedShadowPass.h"
 #include "EnhancedDeferredPass.h"
@@ -61,6 +62,48 @@
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
+
+    // 블랙보드 슬롯 이름. 문자열 오타는 Validate가 세울 때 잡지만(발행 안 된
+    // 슬롯 읽기 = 오류), 상수로 두면 오타 자체가 컴파일 오류가 된다.
+    namespace LiveSlots
+    {
+        constexpr const char* kGBufferDiffuse    = "GBuffer.Diffuse";
+        constexpr const char* kGBufferMetalRough = "GBuffer.MetalRough";
+        constexpr const char* kGBufferNormal     = "GBuffer.Normal";
+        constexpr const char* kGBufferEmissive   = "GBuffer.Emissive";
+        constexpr const char* kGBufferBitmask    = "GBuffer.Bitmask";
+        constexpr const char* kGBufferDepth      = "GBuffer.Depth";
+
+        constexpr const char* kShadowMap         = "Shadow.Map";
+        constexpr const char* kAmbientOcclusion  = "Scene.AmbientOcclusion";
+
+        /// 라이팅 결과. Deferred가 발행하고 SkyBox·SSGI·Forward+·SSS·SSR·Fog가
+        /// 차례로 수정한다 — 지금 코드의 litColor 체인이 이 슬롯 하나다.
+        constexpr const char* kLitColor          = "Scene.LitColor";
+
+        /// 포스트 체인 뒤의 LDR. 기즈모 계열이 이 위에 얹힌다.
+        constexpr const char* kDisplayLdr        = "Display.LDR";
+
+        /// 그리드가 만드는 깊이. 와이어프레임이 같은 깊이로 가려져야 한다.
+        constexpr const char* kGizmoDepth        = "Gizmo.Depth";
+    }
+
+    /// 블랙보드에 흩어져 있는 여섯 슬롯을 GBuffer 출력 구조로 다시 묶는다.
+    ///
+    /// 데칼과 Deferred가 Outputs를 통째로 받기 때문에 필요하다. 슬롯을 낱개로
+    /// 두는 이유는 그것이 실제 의존 관계이기 때문이고(데칼은 셋만 수정한다),
+    /// 묶는 비용은 핸들 여섯 개 복사뿐이다.
+    EnhancedGBufferPass::Outputs GatherGBufferOutputs(const LiveBlackboard& blackboard)
+    {
+        EnhancedGBufferPass::Outputs outputs{};
+        outputs.diffuse    = blackboard.Get(LiveSlots::kGBufferDiffuse);
+        outputs.metalRough = blackboard.Get(LiveSlots::kGBufferMetalRough);
+        outputs.normal     = blackboard.Get(LiveSlots::kGBufferNormal);
+        outputs.emissive   = blackboard.Get(LiveSlots::kGBufferEmissive);
+        outputs.bitmask    = blackboard.Get(LiveSlots::kGBufferBitmask);
+        outputs.depth      = blackboard.Get(LiveSlots::kGBufferDepth);
+        return outputs;
+    }
 
     std::string ReadLivePostEnvironment(const char* name)
     {
@@ -155,6 +198,16 @@ namespace
         EnhancedGizmoLinePass gizmoLine;
 
         EnhancedFrameContext frameContext{};
+
+        // 이 파이프라인의 조립 기술. 파이프라인이 설 때 한 번 짜이고, 노드의
+        // 접착 람다가 이 LivePipeline과 LiveState를 캡처한다 — 그래서 수명이
+        // 파이프라인에 묶여야 하고, 여기 멤버로 두는 것이 그 계약이다.
+        // 파이프라인을 헐면 노드도 함께 사라진다.
+        LivePipelineDesc desc;
+
+        // 프레임마다 비우고 다시 채운다. 뷰가 둘이어도 한 벌로 충분하다 —
+        // 한 프레임의 한 뷰를 그리는 동안에만 살아 있는 값이다.
+        LiveBlackboard blackboard;
 
         // 표시 슬롯 둘 — 비동기의 본체다. DX12가 한 슬롯에 그리는 동안
         // DX11은 다른 슬롯을 표시한다. 슬롯은 펜스 값이 완료된 뒤에만
@@ -471,17 +524,44 @@ namespace
             // 검증이 이 배선의 회귀 감시자다. UI 패스는 아직 안 태운다: UI
             // 출력이 HDR(R16G16B16A16)이라 LDR 공유 텍스처로의 복사가 성립하지
             // 않고, 에디터 씬 뷰의 주 대상은 씬 그림이다. UI 합성은 후속 슬라이스.
-            if (!p.gbuffer.Initialize(p.frameContext, outError)) return false;
+            // ── 패스 초기화는 노드 목록이 정한다(슬라이스 2) ──
+            //
+            // 예전에는 여기에 Initialize 열여섯 줄이 순서대로 적혀 있었고,
+            // 그 순서는 Declare·PrepareFrame·Shutdown 역순에 각각 따로 적힌
+            // 같은 사실의 사본이었다. 이제 순서를 아는 곳은 노드 목록뿐이다.
+            //
+            // 노드보다 먼저 해야 하는 것만 여기 남는다 — 패스를 세우기 전에
+            // 정해져야 하는 값들이다.
+
+            // 기즈모 체인은 포스트 체인의 LDR 결과 위에 직접 그린다 —
+            // 입력 텍스처에 그리는 구조라 PSO의 RTV 포맷을 거기 맞춰야 한다
+            // (어긋나면 커맨드 리스트 무효 → 디바이스 제거, 실측으로 겪었다).
+            // DX11도 기즈모를 최종 표시 타깃에 그린다 — 톤맵 뒤라는 순서
+            // 자체는 DX11과 같다.
+            p.grid.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+            p.gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
+
+            // 조립 기술을 먼저 짜고, 그 목록으로 초기화한다. 슬라이스 1에서는
+            // 패스를 다 세운 뒤에 짰는데 순서가 뒤집혔다 — 노드가 패스를
+            // 참조로만 잡으므로(초기화 여부와 무관) 이 순서가 성립하고,
+            // 그래야 초기화 순서까지 목록이 정할 수 있다.
+            if (!BuildPipelineDesc(outError)) return false;
+
+            if (!p.desc.InitializeAll(p.frameContext,
+                static_cast<uint32_t>(LivePipeline::kMaxCameraViews), outError))
+            {
+                return false;
+            }
+
             p.gbuffer.SetKeepAlive(false);
-            if (!p.shadow.Initialize(p.frameContext, outError)) return false;
-            // 데칼·SSS·SSR은 여기서 함께 세운다. 포그처럼 미루지 않는 이유는
-            // 붙잡는 것이 PSO뿐이라서다 — 뷰를 넘겨 사는 자원이 없고
-            // (전부 프레임 내 완결), 중간 타깃은 그래프의 transient라 꺼져
-            // 있는 동안에는 잡히지 않는다. 포그를 미룬 이유는 프록셀 격자
-            // 42MB/뷰였고 여기에는 그런 것이 없다.
-            if (!p.decal.Initialize(p.frameContext, outError)) return false;
-            if (!p.sss.Initialize(p.frameContext, outError)) return false;
-            if (!p.ssr.Initialize(p.frameContext, outError)) return false;
+
+            // IBL 생성기는 패스가 아니라 생성기다 — 그래프에 선언하지 않고
+            // 프레임 시작에 큐브맵·조도·프리필터를 만들어 소비 패스에 건넨다.
+            // 노드가 될 것이 아니므로 여기 남는다.
+            if (!p.ibl.Initialize(p.frameContext, outError)) return false;
+
             // 기본은 둘 다 꺼짐(EnhancedLiveTuning의 Sss·Ssr 주석 참조).
             //
             // 환경변수로 켤 수 있게 둔 이유는 포스트 체인과 같다 — 창을
@@ -492,17 +572,6 @@ namespace
             // 그대로 보인다.
             p.sss.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSS", false));
             p.ssr.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSR", false));
-            if (!p.deferred.Initialize(p.frameContext, outError)) return false;
-            // SSGI는 뷰마다. 두 번째부터는 PSO 캐시가 받아 컴파일이 없다.
-            for (LivePipeline::CameraView& view : p.views)
-            {
-                if (!view.ssgi.Initialize(p.frameContext, outError)) return false;
-            }
-            if (!p.forward.Initialize(p.frameContext, outError)) return false;
-            if (!p.ssao.Initialize(p.frameContext, outError)) return false;
-            if (!p.skyBox.Initialize(p.frameContext, outError)) return false;
-            if (!p.ibl.Initialize(p.frameContext, outError)) return false;
-            if (!p.postChain.Initialize(p.frameContext, outError)) return false;
 
             // 저장 씬·카메라·조명을 고정한 채 후처리 한 요소만 끄는 PIX 검증용.
             // 환경변수가 없으면 Tuning 기본값을 그대로 사용하므로 제품 실행에는
@@ -527,20 +596,6 @@ namespace
                     "CREATOR_DX12_POST_EXPOSURE", tuning.exposure);
                 p.postChain.SetTuning(tuning);
             }
-            // 기즈모 체인은 포스트 체인의 LDR 결과 위에 직접 그린다 —
-            // 입력 텍스처에 그리는 구조라 PSO의 RTV 포맷을 거기 맞춰야 한다
-            // (어긋나면 커맨드 리스트 무효 → 디바이스 제거, 실측으로 겪었다).
-            // DX11도 기즈모를 최종 표시 타깃에 그린다(GridPass.cpp:128) —
-            // 톤맵 뒤라는 순서 자체는 DX11과 같다.
-            p.grid.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            p.wireframe.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            p.gizmoIcon.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-            p.gizmoLine.SetOutputFormat(EnhancedPostChainPass::kLDRFormat);
-
-            if (!p.grid.Initialize(p.frameContext, outError)) return false;
-            if (!p.wireframe.Initialize(p.frameContext, outError)) return false;
-            if (!p.gizmoIcon.Initialize(p.frameContext, outError)) return false;
-            if (!p.gizmoLine.Initialize(p.frameContext, outError)) return false;
 
             // ── 공유 텍스처 + DX11 SRV (뷰마다 슬롯 셋) ──
             //
@@ -625,33 +680,22 @@ namespace
                 }
             }
 
-            p.gizmoLine.Shutdown();
-            p.gizmoIcon.Shutdown();
-            p.wireframe.Shutdown();
-            p.grid.Shutdown();
-            p.postChain.Shutdown();
+            // 패스 해제는 노드 목록의 역순이다(슬라이스 2). 예전에는 그 역순을
+            // 사람이 두 곳에 나눠 적었고(ssr·sss 자리와 decal 자리가 달랐다),
+            // 틀리면 '가끔 죽는' 종류의 실패였다.
+            p.desc.ShutdownAll(static_cast<uint32_t>(LivePipeline::kMaxCameraViews));
+            p.desc.Clear();
+
+            // IBL은 노드가 아니므로 따로 푼다(초기화도 따로 했다).
             p.ibl.Shutdown();
-            p.skyBox.Shutdown();
-            p.ssr.Shutdown();
-            p.sss.Shutdown();
-            p.ssao.Shutdown();
-            p.forward.Shutdown();
-            for (LivePipeline::CameraView& view : p.views)
-            {
-                view.ssgi.Shutdown();
-                if (view.fogReady) view.fog.Shutdown();
-                view.fogReady = false;
-            }
+
             // 포그 입력은 파이프라인 수명에 묶인다(텍스처 캐시가 함께 죽는다).
             // DX11 원본 Texture는 남겨 두고 다음 파이프라인에서 다시 올린다.
+            // 포그 패스 자체와 fogReady는 그 노드의 shutdown이 이미 처리했다.
             fogCloudNeutral.Reset();
             fogInputsReady = false;
             fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
             fogTeardownPending = false;
-            p.deferred.Shutdown();
-            p.decal.Shutdown();
-            p.shadow.Shutdown();
-            p.gbuffer.Shutdown();
 
             p.profiler.Shutdown();
             p.textureCache.Shutdown();
@@ -796,6 +840,596 @@ namespace
         /// GPU가 아직 격자를 읽는 중일 수 있으므로 완주를 기다린 뒤에 놓는다
         /// (TeardownPipeline과 같은 계약). 끄기는 사람이 누르는 드문 사건이라
         /// 여기서 한 번 멈추는 비용은 문제되지 않는다.
+        // ── 파이프라인 조립 기술 짜기 (PHASE 3-10 슬라이스 1) ──
+        //
+        // 이 함수 하나가 "라이브가 무엇을 어떤 순서로 그리는가"의 단일 출처다.
+        // 예전에는 그 사실이 RenderOnce 안에 200줄로 흩어져 있었고, 패스를
+        // 하나 이으려면 그중 순서를 지켜야 하는 자리 넷을 사람이 찾아 고쳤다.
+        //
+        // 노드 순서 = 실행 순서다(3-5 계약을 위층에서 잇는다). 노드를 옮기는
+        // 것이 곧 파이프라인을 바꾸는 것이고, 그것 말고 순서를 정하는 곳은
+        // 없다.
+        //
+        // ★ 람다가 `p`(자기 소유자)와 `this`(LiveState 싱글턴)를 캡처한다.
+        //   파이프라인을 헐 때 desc도 함께 사라지므로 대롱거리는 참조가
+        //   생기지 않는다 — 파이프라인 생성 순서에 이 함수를 포함시키는 것이
+        //   그 계약이다.
+        //
+        // ★ 패스가 아직 초기화되기 전에 불린다(슬라이스 2). 노드는 패스를
+        //   참조로만 잡으므로 그래도 성립하고, 그래야 초기화 순서까지 이
+        //   목록이 정할 수 있다 — InitializeAll이 이 목록을 읽는다.
+        bool BuildPipelineDesc(std::string& outError)
+        {
+            if (nullptr == pipeline)
+            {
+                outError = "파이프라인이 없다";
+                return false;
+            }
+
+            LivePipeline& p = *pipeline;
+            p.desc.Clear();
+
+            // ── 그림자 ──
+            {
+                LivePassNode node;
+                node.name = "Shadow";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
+                node.writes = { LiveSlots::kShadowMap };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.shadow.Declare(graph, ctx);
+                    bb.Set(LiveSlots::kShadowMap, p.shadow.GetShadowMap());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── GBuffer ──
+            {
+                LivePassNode node;
+                node.name = "GBuffer";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gbuffer; };
+                node.writes = {
+                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
+                    LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth,
+                };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.gbuffer.Declare(graph, ctx);
+                    const auto outputs = p.gbuffer.GetOutputs();
+                    bb.Set(LiveSlots::kGBufferDiffuse,    outputs.diffuse);
+                    bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
+                    bb.Set(LiveSlots::kGBufferNormal,     outputs.normal);
+                    bb.Set(LiveSlots::kGBufferEmissive,   outputs.emissive);
+                    bb.Set(LiveSlots::kGBufferBitmask,    outputs.bitmask);
+                    bb.Set(LiveSlots::kGBufferDepth,      outputs.depth);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 데칼 ──
+            //
+            // GBuffer 바로 뒤, SSAO·Deferred 앞이다(DX11과 같은 자리).
+            // 새 타깃을 만들지 않고 확산·노멀·ORM에 덧칠하므로 핸들이 그대로다 —
+            // 그래서 writes가 아니라 modifies이고, 값이 안 바뀌어도 규약은 같다.
+            // 데칼이 하나도 없으면 패스가 아무것도 선언하지 않는다.
+            {
+                LivePassNode node;
+                node.name = "Decal";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.decal; };
+                // 데칼만 준비가 특별하다 — PrepareFrame이 텍스처를 올리고
+                // 배치를 짜므로 이번 프레임 목록이 그 앞에 들어가야 한다.
+                node.prepare = [this, &p](const EnhancedFrameContext& ctx,
+                    std::string& err, uint32_t) -> bool
+                {
+                    p.decal.SetDecals(decals);
+                    return p.decal.PrepareFrame(ctx, err);
+                };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = {
+                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferNormal,
+                    LiveSlots::kGBufferMetalRough,
+                };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.decal.SetInputs(GatherGBufferOutputs(bb));
+                    p.decal.Declare(graph, ctx);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── SSAO ──
+            {
+                LivePassNode node;
+                node.name = "SSAO";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.ssao; };
+                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kGBufferNormal };
+                node.writes = { LiveSlots::kAmbientOcclusion };
+                node.declare = [this, &p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedSSAOPass::Inputs inputs{};
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
+                    p.ssao.SetInputs(inputs);
+                    p.ssao.SetFrameIndex(ssaoFrameIndex++);
+                    p.ssao.Declare(graph, ctx);
+                    bb.Set(LiveSlots::kAmbientOcclusion, p.ssao.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── Deferred (라이팅 결과의 최초 발행자) ──
+            //
+            // 그림자를 Forward+에도 같이 준다. 한쪽만 받으면 같은 자리에서
+            // 불투명은 그늘인데 투명만 밝은, 물체와 무관한 경계가 생긴다.
+            // 받는 쪽만이다 — 투명은 그림자 맵에 그려지지 않는다.
+            {
+                LivePassNode node;
+                node.name = "Deferred";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.deferred; };
+                node.reads = {
+                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
+                    LiveSlots::kGBufferDepth,   LiveSlots::kShadowMap,
+                };
+                node.writes = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.deferred.SetInputs(GatherGBufferOutputs(bb));
+                    p.deferred.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
+                    p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
+                    p.deferred.Declare(graph, ctx);
+                    bb.Set(LiveSlots::kLitColor, p.deferred.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 스카이박스 ──
+            //
+            // HDR 조명 타깃에, SSGI보다 먼저 합성한다. Deferred 출력은 RTV
+            // 사용이 가능하지만 SSGI 출력은 UAV 전용이므로 SSGI 뒤에 붙이면
+            // RTV 생성부터 잘못된다.
+            {
+                LivePassNode node;
+                node.name = "SkyBox";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.skyBox; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedSkyBoxPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    p.skyBox.SetInputs(inputs);
+                    p.skyBox.Declare(graph, ctx);
+                    if (p.skyBox.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, p.skyBox.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── SSGI (뷰마다 인스턴스) ──
+            {
+                LivePassNode node;
+                node.name = "SSGI";
+                // 뷰마다 인스턴스다 — 프레임을 넘겨 상태를 잇는(히스토리 2장 +
+                // 재투영 행렬) 패스라, 공유하면 각 카메라가 상대의 히스토리를
+                // 읽어 잔상이 남는다(2026-08-07 세 조건 대조로 확정).
+                node.perView = true;
+                node.instance = [&p](uint32_t viewIndex) -> EnhancedRenderPass*
+                {
+                    return &p.views[viewIndex].ssgi;
+                };
+                node.reads = {
+                    LiveSlots::kGBufferDepth, LiveSlots::kGBufferNormal,
+                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kAmbientOcclusion,
+                };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                {
+                    LivePipeline::CameraView& view = p.views[binding.viewIndex];
+
+                    EnhancedSSGIPass::Inputs inputs{};
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
+                    inputs.diffuse = bb.Get(LiveSlots::kGBufferDiffuse);
+                    inputs.metalRough = bb.Get(LiveSlots::kGBufferMetalRough);
+                    inputs.lighting = bb.Get(LiveSlots::kLitColor);
+                    inputs.ambientOcclusion = bb.Get(LiveSlots::kAmbientOcclusion);
+                    view.ssgi.SetInputs(inputs);
+                    view.ssgi.Declare(graph, ctx);
+                    if (view.ssgi.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, view.ssgi.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 투명(Forward+) ──
+            //
+            // 라이팅 결과에 직접 알파 블렌딩으로 얹는다. 별도 타깃에 그려 두고
+            // 나중에 합성하지 않는 이유는 EnhancedForwardPass::Declare의 주석에
+            // 있다(프리멀티플라이드 알파와 겹친 면의 누적 알파).
+            {
+                LivePassNode node;
+                node.name = "Forward+";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.forward; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedForwardPass::Inputs inputs{};
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    inputs.lighting = bb.Get(LiveSlots::kLitColor);
+                    p.forward.SetInputs(inputs);
+                    p.forward.Declare(graph, ctx);
+                    if (p.forward.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, p.forward.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 서브서피스 스캐터링 ──
+            //
+            // 투명 뒤, SSR 앞이다(DX11과 같은 자리 — Forward → SSS → SSR).
+            // 꺼져 있으면 패스가 스스로 입력을 흘리므로 active를 달지 않는다 —
+            // 노드를 건너뛰는 것과 결과가 같고, 패스 하나에 규약을 두는 편이
+            // 자가 검증(dx12.sss)이 보는 것과 어긋나지 않는다.
+            {
+                LivePassNode node;
+                node.name = "SSS";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.sss; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedSSSPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    p.sss.SetInputs(inputs);
+                    p.sss.Declare(graph, ctx);
+                    if (p.sss.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, p.sss.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 스크린 스페이스 반사 ──
+            //
+            // SSS 뒤, 포그 앞이다. 반사색을 뜨는 원본이 곧 반사를 얹을 그림이라
+            // color가 둘 다를 겸한다.
+            {
+                LivePassNode node;
+                node.name = "SSR";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.ssr; };
+                node.reads = {
+                    LiveSlots::kGBufferDepth, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kGBufferNormal, LiveSlots::kGBufferBitmask,
+                };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [this, &p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedSSRPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    inputs.metalRough = bb.Get(LiveSlots::kGBufferMetalRough);
+                    inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
+                    inputs.bitmask = bb.Get(LiveSlots::kGBufferBitmask);
+                    p.ssr.SetInputs(inputs);
+                    // 광선 잡음의 씨앗. DX11이 총 경과 초를 넘긴다.
+                    p.ssr.SetTime(totalSeconds);
+                    p.ssr.Declare(graph, ctx);
+                    if (p.ssr.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, p.ssr.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 볼류메트릭 포그 (뷰마다 인스턴스 · 꺼질 수 있다) ──
+            //
+            // 라이팅 결과 위에, 톤맵 앞에 얹는다(DX11과 같은 자리).
+            // 투명 합성 뒤라 투명에도 포그가 걸린다.
+            //
+            // 꺼져 있으면 노드를 통째로 건너뛴다 — 그러면 LitColor 슬롯이 그대로
+            // 남아 포스트 체인이 이전 값을 받는다. 이것이 modifies 규약이 하는
+            // 일이고, 예전 코드의 `if (fogEnabled && view.fogReady)` 블록과 같다.
+            {
+                LivePassNode node;
+                node.name = "VolumetricFog";
+                node.perView = true;
+                node.instance = [&p](uint32_t viewIndex) -> EnhancedRenderPass*
+                {
+                    return &p.views[viewIndex].fog;
+                };
+
+                // ★ 초기화를 미룬다. 격자가 160x90x128 RGBA16F 셋이라 뷰당
+                //   42MB이고 켤 때 실측 증가가 +127MB다. 기본이 꺼짐인데 미리
+                //   잡으면 안 쓰는 기능이 그만큼을 묶는다 — 빈 람다로 기본
+                //   초기화를 끄고, 처음 켜지는 프레임에 prepare가 세운다.
+                node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t)
+                {
+                    return true;
+                };
+
+                // 자원 확보 실패는 렌더러를 내리지 않고 포그만 끈다. 포그는
+                // 선택 기능이라(기본 꺼짐) 에셋 하나가 없다고 화면 전체를
+                // 잃는 것은 대가가 맞지 않는다.
+                node.prepare = [this, &p](const EnhancedFrameContext& ctx,
+                    std::string& err, uint32_t viewIndex) -> bool
+                {
+                    if (!fogEnabled) return true;
+
+                    LivePipeline::CameraView& view = p.views[viewIndex];
+
+                    std::string fogError;
+                    const bool ready = EnsureFogInputs(fogError) &&
+                        (view.fogReady || view.fog.Initialize(ctx, fogError));
+                    if (!ready)
+                    {
+                        lastError = "볼류메트릭 포그를 끈다: " + fogError;
+                        fogEnabled = false;
+                        fogTeardownPending = true;
+                        return true;
+                    }
+
+                    view.fogReady = true;
+                    return view.fog.PrepareFrame(ctx, err);
+                };
+
+                node.shutdown = [this]()
+                {
+                    if (nullptr == pipeline) return;
+                    for (LivePipeline::CameraView& view : pipeline->views)
+                    {
+                        if (view.fogReady) view.fog.Shutdown();
+                        view.fogReady = false;
+                    }
+                };
+
+                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
+                node.modifies = { LiveSlots::kLitColor };
+                node.active = [this]()
+                {
+                    if (!fogEnabled || nullptr == pipeline) return false;
+                    // 뷰마다 준비 상태가 다를 수 있어 하나라도 서 있으면 활성으로
+                    // 본다. 실제 뷰의 준비 여부는 declare가 다시 확인한다.
+                    for (const LivePipeline::CameraView& view : pipeline->views)
+                    {
+                        if (view.fogReady) return true;
+                    }
+                    return false;
+                };
+                node.declare = [this, &p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+                {
+                    LivePipeline::CameraView& view = p.views[binding.viewIndex];
+                    if (!view.fogReady) return;
+
+                    EnhancedVolumetricFogPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    inputs.shadowMap = bb.Get(LiveSlots::kShadowMap);
+                    inputs.cloudShadow = graph.ImportTexture(fogCloudNeutral.Get(),
+                        RGResourceState::ShaderResource, "Fog.CloudNeutral");
+                    {
+                        std::string noiseError;
+                        const DX12TextureCache::Entry noiseEntry =
+                            p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
+                        if (noiseEntry.IsValid())
+                        {
+                            inputs.blueNoise = graph.ImportTexture(noiseEntry.resource,
+                                RGResourceState::ShaderResource, "Fog.BlueNoise");
+                        }
+                    }
+                    view.fog.SetInputs(inputs);
+                    // 셰이더가 캐스케이드 슬라이스 2를 짚는다 — DX11이 마지막
+                    // 캐스케이드 행렬을 넘기는 것과 짝이다.
+                    view.fog.SetShadowMatrix(p.shadow.GetShadowData()
+                        .lightViewProjection[EnhancedShadowPass::kCascadeCount - 1]);
+                    view.fog.SetFrameIndex(frameCounter);
+                    view.fog.Declare(graph, ctx);
+
+                    if (view.fog.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kLitColor, view.fog.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 포스트 체인 (LDR의 최초 발행자) ──
+            {
+                LivePassNode node;
+                node.name = "PostChain";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.postChain; };
+                node.reads = { LiveSlots::kLitColor };
+                node.writes = { LiveSlots::kDisplayLdr };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedPostChainPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kLitColor);
+                    p.postChain.SetInputs(inputs);
+                    p.postChain.Declare(graph, ctx);
+                    bb.Set(LiveSlots::kDisplayLdr, p.postChain.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
+            // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
+            // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다.
+            {
+                LivePassNode node;
+                node.name = "Grid";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.grid; };
+                node.reads = { LiveSlots::kGBufferDepth };
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.writes = { LiveSlots::kGizmoDepth };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedGridPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    p.grid.SetInputs(inputs);
+                    p.grid.Declare(graph, ctx);
+                    if (p.grid.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kDisplayLdr, p.grid.GetOutput());
+                    }
+                    bb.Set(LiveSlots::kGizmoDepth, p.grid.GetDepth());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ★ 와이어프레임은 모드일 때만 그린다(DX11 GizmoRenderer.cpp:67의
+            //   if (m_buseWireFrame)와 같은 조건). 무조건 그렸더니 초록 와이어가
+            //   씬 전체를 덮었다 — 에디터 오버레이는 '언제 그리는가'가 패스의
+            //   일부다. 꺼지면 LDR 슬롯이 그대로 남아 아이콘이 그리드 결과를
+            //   이어받는다(예전의 삼항 분기가 여기서 사라진다).
+            {
+                LivePassNode node;
+                node.name = "WireFrame";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.wireframe; };
+                node.reads = { LiveSlots::kGizmoDepth };
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.active = []()
+                {
+                    const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
+                    return (nullptr != gizmoRenderer) && gizmoRenderer->IsWireFrameEnabled();
+                };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedWireFramePass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
+                    inputs.depth = bb.Get(LiveSlots::kGizmoDepth);
+                    p.wireframe.SetInputs(inputs);
+                    p.wireframe.Declare(graph, ctx);
+                    if (p.wireframe.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kDisplayLdr, p.wireframe.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            {
+                LivePassNode node;
+                node.name = "GizmoIcon";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gizmoIcon; };
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedGizmoIconPass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
+                    p.gizmoIcon.SetInputs(inputs);
+                    p.gizmoIcon.Declare(graph, ctx);
+                    if (p.gizmoIcon.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kDisplayLdr, p.gizmoIcon.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            {
+                LivePassNode node;
+                node.name = "GizmoLine";
+                node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gizmoLine; };
+                node.modifies = { LiveSlots::kDisplayLdr };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    EnhancedGizmoLinePass::Inputs inputs{};
+                    inputs.color = bb.Get(LiveSlots::kDisplayLdr);
+                    p.gizmoLine.SetInputs(inputs);
+                    p.gizmoLine.Declare(graph, ctx);
+                    if (p.gizmoLine.GetOutput().IsValid())
+                    {
+                        bb.Set(LiveSlots::kDisplayLdr, p.gizmoLine.GetOutput());
+                    }
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // ── live_present: 최종 결과 → 표시 슬롯의 공유 텍스처 ──
+            //
+            // 대상이 프레임마다 회전하므로 캡처가 아니라 binding으로 받는다.
+            {
+                LivePassNode node;
+                node.name = "live_present";
+                node.reads = { LiveSlots::kDisplayLdr };
+                node.declare = [](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding& binding)
+                {
+                    if (nullptr == binding.sharedTarget) return;
+
+                    const RGHandle finalHandle = bb.Get(LiveSlots::kDisplayLdr);
+                    if (!finalHandle.IsValid()) return;
+
+                    const RGHandle sharedHandleRG = graph.ImportTexture(
+                        binding.sharedTarget, RGResourceState::CopyDest, "Live.Shared");
+
+                    ID3D12Resource* const sharedResource = binding.sharedTarget;
+                    graph.AddPass("live_present",
+                        { { finalHandle, RGResourceState::CopySource },
+                          { sharedHandleRG, RGResourceState::CopyDest } },
+                        [sharedResource, finalHandle](
+                            const EnhancedRenderGraph::ExecuteContext& executeContext)
+                        {
+                            D3D12_TEXTURE_COPY_LOCATION src{};
+                            src.pResource = executeContext.Resolve(finalHandle);
+                            src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                            D3D12_TEXTURE_COPY_LOCATION dst{};
+                            dst.pResource = sharedResource;
+                            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                            executeContext.commandList->CopyTextureRegion(
+                                &dst, 0, 0, 0, &src, nullptr);
+                        }, true);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            // 세울 때 한 번 검증한다. 여기서 걸리면 배선이 잘못된 것이고,
+            // 그것은 화면을 보기 전에 알아야 하는 종류다.
+            if (!p.desc.Validate(outError))
+            {
+                outError = "파이프라인 기술 검증 실패: " + outError;
+                return false;
+            }
+
+            return true;
+        }
+
+        /// 켬 → 끔 전환의 자원 해제. 파이프라인은 살아 있고 포그만 내린다 —
+        /// 파이프라인을 통째로 헐 때는 포그 노드의 shutdown이 같은 일을 한다
+        /// (BuildPipelineDesc의 VolumetricFog 노드). 둘을 합치지 않는 이유는
+        /// 여기만 GPU 완주를 기다리고 텍스처 캐시 수명과 얽히기 때문이다.
         void ReleaseFogResources()
         {
             fogTeardownPending = false;
@@ -1100,281 +1734,46 @@ namespace
                 ShouldCollectGizmoColliders(), p.gizmoLine, gizmoData);
             p.gizmoIcon.SetIcons(&gizmoData.icons);
 
-            if (!p.shadow.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.gbuffer.PrepareFrame(p.frameContext, outError)) return false;
-            // 데칼은 PrepareFrame이 텍스처를 올리고 배치를 짜므로 그 앞에
-            // 이번 프레임 목록을 넣어야 한다.
-            p.decal.SetDecals(decals);
-            if (!p.decal.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.deferred.PrepareFrame(p.frameContext, outError)) return false;
-            if (!view.ssgi.PrepareFrame(p.frameContext, outError)) return false;
-
-            // 포그는 켜져 있을 때만 세운다 — 격자가 뷰당 42MB라 꺼진 채로
-            // 잡아 두면 안 쓰는 기능이 메모리를 묶는다.
+            // ── 프레임 준비도 노드 목록 순서다(슬라이스 2) ──
             //
-            // ★ 자원 확보 실패는 렌더러를 내리지 않고 포그만 끈다. 포그는
-            //   선택 기능이라(기본 꺼짐) 에셋 하나가 없다고 화면 전체를
-            //   잃는 것은 대가가 맞지 않는다 — RenderOnce가 false를 돌려주면
-            //   TickLive가 파이프라인을 헐고 러너를 꺼 버린다.
-            if (fogEnabled)
-            {
-                std::string fogError;
-                const bool ready = EnsureFogInputs(fogError) &&
-                    (view.fogReady || view.fog.Initialize(p.frameContext, fogError));
-                if (ready)
-                {
-                    view.fogReady = true;
-                    if (!view.fog.PrepareFrame(p.frameContext, outError)) return false;
-                }
-                else
-                {
-                    lastError = "볼류메트릭 포그를 끈다: " + fogError;
-                    fogEnabled = false;
-                    fogTeardownPending = true;
-                }
-            }
+            // 데칼의 SetDecals 선행과 포그의 지연 초기화는 각 노드의 prepare
+            // 람다로 옮겼다 — 예전에는 그 둘이 이 자리에서 순서 규칙으로
+            // 존재했고, 노드를 옮길 때 함께 옮겨야 한다는 사실이 코드 어디에도
+            // 적혀 있지 않았다.
+            const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
+            if (!p.desc.PrepareAll(p.frameContext, viewIndex, outError)) return false;
 
-            if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.sss.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.ssr.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.skyBox.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
             lastDrawCount = p.gbuffer.GetLastDrawCount();
             lastBatchCount = p.gbuffer.GetLastBatchCount();
             lastDecalCount = p.decal.GetLastDecalCount();
             lastDecalBatchCount = p.decal.GetLastBatchCount();
-            if (!p.grid.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.wireframe.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.gizmoIcon.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.gizmoLine.PrepareFrame(p.frameContext, outError)) return false;
 
             slot.graph = std::make_unique<EnhancedRenderGraph>();
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(&p.profiler);
             graph.SetTransientPool(&p.transientPool);
 
-            p.shadow.Declare(graph, p.frameContext);
-
-            p.gbuffer.Declare(graph, p.frameContext);
-            const auto outputs = p.gbuffer.GetOutputs();
-
-            // ── 데칼 ──
+            // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
-            // GBuffer 바로 뒤, SSAO·Deferred 앞이다(DX11과 같은 자리 —
-            // SceneRenderer.cpp의 GBuffer → Decal → SSAO → Deferred).
-            // 새 타깃을 만들지 않고 GBuffer의 확산·노멀·ORM에 덧칠하므로
-            // 뒤 패스는 핸들을 그대로 쓰고, 순서는 그래프가 잡는다.
+            // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
+            // 지금은 BuildPipelineDesc가 짜 둔 노드 목록을 순서대로 돌 뿐이고,
+            // 패스를 하나 잇는 일은 그 목록에 노드 하나를 넣는 일이 됐다.
             //
-            // 데칼이 하나도 없으면 Declare가 아무것도 선언하지 않는다 —
-            // DX11이 데칼 0개에도 매 프레임 하던 화면 크기 복사 넷이 없다.
-            p.decal.SetInputs(outputs);
-            p.decal.Declare(graph, p.frameContext);
+            // litColor 폴백 체인(`X.GetOutput().IsValid() ? X : 이전값`)이 통째로
+            // 사라진 것에 주목할 것. 그 일은 이제 블랙보드 슬롯이 한다 —
+            // 수정 노드가 꺼지면 슬롯 값이 그대로 남는다.
+            p.blackboard.Reset();
 
-            p.deferred.SetInputs(outputs);
-            p.deferred.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
-            // 투명(Forward+)에도 같은 그림자를 준다. 한쪽만 받으면 같은 자리에서
-            // 불투명은 그늘인데 투명만 밝은, 물체와 무관한 경계가 생긴다.
-            // 받는 쪽만이다 — 투명은 그림자 맵에 그려지지 않으므로 캐스터가
-            // 아니다(그림자 패스가 context.draws만 래스터한다).
-            p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
+            LiveFrameBinding binding{};
+            binding.viewIndex = viewIndex;
+            binding.sharedTarget = slot.sharedTexture.Get();
 
-            {
-                EnhancedSSAOPass::Inputs ssaoInputs{};
-                ssaoInputs.depth = outputs.depth;
-                ssaoInputs.normal = outputs.normal;
-                p.ssao.SetInputs(ssaoInputs);
-            }
-            p.ssao.SetFrameIndex(ssaoFrameIndex++);
-            p.ssao.Declare(graph, p.frameContext);
+            p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
 
-            p.deferred.Declare(graph, p.frameContext);
-
-            // 하늘은 HDR 조명 타깃에, SSGI보다 먼저 합성한다. Deferred 출력은
-            // RTV 사용이 가능하지만 SSGI 출력은 UAV 전용이므로, SSGI 뒤에
-            // 붙이면 RTV 생성부터 잘못된다. 깊이 테스트가 기하가 없는 픽셀에만
-            // 큐브맵을 남기고 SSGI/포스트 체인이 그 결과를 그대로 소비한다.
-            {
-                EnhancedSkyBoxPass::Inputs skyInputs{};
-                skyInputs.color = p.deferred.GetOutput();
-                skyInputs.depth = outputs.depth;
-                p.skyBox.SetInputs(skyInputs);
-            }
-            p.skyBox.Declare(graph, p.frameContext);
-
-            {
-                EnhancedSSGIPass::Inputs ssgiInputs{};
-                ssgiInputs.depth = outputs.depth;
-                ssgiInputs.normal = outputs.normal;
-                ssgiInputs.diffuse = outputs.diffuse;
-                ssgiInputs.metalRough = outputs.metalRough;
-                ssgiInputs.lighting = p.skyBox.GetOutput().IsValid()
-                    ? p.skyBox.GetOutput() : p.deferred.GetOutput();
-                ssgiInputs.ambientOcclusion = p.ssao.GetOutput();
-                view.ssgi.SetInputs(ssgiInputs);
-            }
-            view.ssgi.Declare(graph, p.frameContext);
-
-            // ── 투명(Forward+) ──
-            //
-            // 라이팅 결과에 직접 알파 블렌딩으로 얹는다. 별도 타깃에 그려
-            // 두고 나중에 합성하지 않는 이유는 EnhancedForwardPass::Declare의
-            // 주석에 있다(프리멀티플라이드 알파와 겹친 면의 누적 알파).
-            RGHandle litColor = view.ssgi.GetOutput().IsValid()
-                ? view.ssgi.GetOutput() : p.deferred.GetOutput();
-            {
-                EnhancedForwardPass::Inputs forwardInputs{};
-                forwardInputs.depth = outputs.depth;
-                forwardInputs.lighting = litColor;
-                p.forward.SetInputs(forwardInputs);
-            }
-            p.forward.Declare(graph, p.frameContext);
-            if (p.forward.GetOutput().IsValid()) litColor = p.forward.GetOutput();
-
-            // ── 서브서피스 스캐터링 ──
-            //
-            // 투명 뒤, SSR 앞이다(DX11과 같은 자리 — Forward → SSS → SSR).
-            // 꺼져 있으면 패스가 입력을 그대로 흘리므로 여기에 분기가 없다.
-            {
-                EnhancedSSSPass::Inputs sssInputs{};
-                sssInputs.color = litColor;
-                sssInputs.depth = outputs.depth;
-                p.sss.SetInputs(sssInputs);
-            }
-            p.sss.Declare(graph, p.frameContext);
-            if (p.sss.GetOutput().IsValid()) litColor = p.sss.GetOutput();
-
-            // ── 스크린 스페이스 반사 ──
-            //
-            // SSS 뒤, 포그 앞이다(DX11과 같은 자리). 반사색을 뜨는 원본이
-            // 곧 반사를 얹을 그림이라 color가 둘 다를 겸한다.
-            {
-                EnhancedSSRPass::Inputs ssrInputs{};
-                ssrInputs.color = litColor;
-                ssrInputs.depth = outputs.depth;
-                ssrInputs.metalRough = outputs.metalRough;
-                ssrInputs.normal = outputs.normal;
-                ssrInputs.bitmask = outputs.bitmask;
-                p.ssr.SetInputs(ssrInputs);
-            }
-            // 광선 잡음의 씨앗. DX11이 총 경과 초를 넘긴다(패스 헤더 참조).
-            p.ssr.SetTime(totalSeconds);
-            p.ssr.Declare(graph, p.frameContext);
-            if (p.ssr.GetOutput().IsValid()) litColor = p.ssr.GetOutput();
-
-            // ── 볼류메트릭 포그 ──
-            //
-            // 라이팅 결과 위에, 톤맵 앞에 얹는다(DX11과 같은 자리).
-            // 투명 합성 뒤라 투명에도 포그가 걸린다.
-            if (fogEnabled && view.fogReady)
-            {
-                EnhancedVolumetricFogPass::Inputs fogInputs{};
-                fogInputs.color = litColor;
-                fogInputs.depth = outputs.depth;
-                fogInputs.shadowMap = p.shadow.GetShadowMap();
-                fogInputs.cloudShadow = graph.ImportTexture(fogCloudNeutral.Get(),
-                    RGResourceState::ShaderResource, "Fog.CloudNeutral");
-                {
-                    std::string noiseError;
-                    const DX12TextureCache::Entry noiseEntry =
-                        p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
-                    if (noiseEntry.IsValid())
-                    {
-                        fogInputs.blueNoise = graph.ImportTexture(noiseEntry.resource,
-                            RGResourceState::ShaderResource, "Fog.BlueNoise");
-                    }
-                }
-                view.fog.SetInputs(fogInputs);
-                // 셰이더가 캐스케이드 슬라이스 2를 짚는다 — DX11이 마지막
-                // 캐스케이드 행렬을 넘기는 것과 짝이다.
-                view.fog.SetShadowMatrix(p.shadow.GetShadowData()
-                    .lightViewProjection[EnhancedShadowPass::kCascadeCount - 1]);
-                view.fog.SetFrameIndex(frameCounter);
-                view.fog.Declare(graph, p.frameContext);
-
-                if (view.fog.GetOutput().IsValid()) litColor = view.fog.GetOutput();
-            }
-
-            {
-                EnhancedPostChainPass::Inputs postInputs{};
-                postInputs.color = litColor;
-                p.postChain.SetInputs(postInputs);
-            }
-            p.postChain.Declare(graph, p.frameContext);
-
-            if (!p.postChain.GetOutput().IsValid())
+            if (!p.blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
             {
                 outError = "포스트 체인 출력이 없다";
                 return false;
-            }
-
-            // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
-            // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
-            // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다 — UI/포스트가
-            // 끝난 그림에 에디터 보조 표시만 더하는 것이라 톤맵의 영향을 받지
-            // 않는다.
-            {
-                EnhancedGridPass::Inputs gridInputs{};
-                gridInputs.color = p.postChain.GetOutput();
-                gridInputs.depth = outputs.depth;
-                p.grid.SetInputs(gridInputs);
-            }
-            p.grid.Declare(graph, p.frameContext);
-
-            {
-                EnhancedWireFramePass::Inputs wireInputs{};
-                wireInputs.color = p.grid.GetOutput();
-                wireInputs.depth = p.grid.GetDepth();
-                p.wireframe.SetInputs(wireInputs);
-            }
-            // ★ 와이어프레임은 모드일 때만 그린다(DX11 GizmoRenderer.cpp:67의
-            //   if (m_buseWireFrame)와 같은 조건). 무조건 그렸더니 초록
-            //   와이어가 씬 전체를 덮었다 — 에디터 오버레이는 '언제 그리는가'가
-            //   패스의 일부다.
-            const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
-            const bool wireFrameEnabled =
-                (nullptr != gizmoRenderer) && gizmoRenderer->IsWireFrameEnabled();
-            if (wireFrameEnabled) p.wireframe.Declare(graph, p.frameContext);
-
-            {
-                EnhancedGizmoIconPass::Inputs iconInputs{};
-                iconInputs.color = wireFrameEnabled
-                    ? p.wireframe.GetOutput() : p.grid.GetOutput();
-                p.gizmoIcon.SetInputs(iconInputs);
-            }
-            p.gizmoIcon.Declare(graph, p.frameContext);
-
-            {
-                EnhancedGizmoLinePass::Inputs lineInputs{};
-                lineInputs.color = p.gizmoIcon.GetOutput();
-                p.gizmoLine.SetInputs(lineInputs);
-            }
-            p.gizmoLine.Declare(graph, p.frameContext);
-
-            // ── live_present: 기즈모까지 얹힌 최종 결과 → 공유 텍스처 ──
-            {
-                const RGHandle finalHandle = p.gizmoLine.GetOutput().IsValid()
-                    ? p.gizmoLine.GetOutput() : p.postChain.GetOutput();
-                const RGHandle sharedHandleRG = graph.ImportTexture(slot.sharedTexture.Get(),
-                    RGResourceState::CopyDest, "Live.Shared");
-
-                ID3D12Resource* const sharedResource = slot.sharedTexture.Get();
-                graph.AddPass("live_present",
-                    { { finalHandle, RGResourceState::CopySource },
-                      { sharedHandleRG, RGResourceState::CopyDest } },
-                    [sharedResource, finalHandle](const EnhancedRenderGraph::ExecuteContext& executeContext)
-                    {
-                        D3D12_TEXTURE_COPY_LOCATION src{};
-                        src.pResource = executeContext.Resolve(finalHandle);
-                        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                        D3D12_TEXTURE_COPY_LOCATION dst{};
-                        dst.pResource = sharedResource;
-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-
-                        executeContext.commandList->CopyTextureRegion(
-                            &dst, 0, 0, 0, &src, nullptr);
-                    }, true);
             }
 
             if (!graph.Compile(p.resources.GetDevice(), outError)) return false;
