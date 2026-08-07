@@ -129,6 +129,14 @@ internal static class ScriptAssemblyLoader
             aniMethod.Invoke(null, [registerAni]);
         }
 
+        // 행동 트리의 사용자 노드도 마찬가지 — 구 생성기로 만든 어셈블리에는 없다.
+        MethodInfo? btMethod = registry?.GetMethod("RegisterAllBTNodes", BindingFlags.Public | BindingFlags.Static);
+        if (btMethod is not null)
+        {
+            Action<string, int, Func<BTNode>> registerBT = BTNodeFactory.Register;
+            btMethod.Invoke(null, [registerBT]);
+        }
+
         return true;
     }
 
@@ -144,6 +152,7 @@ internal static class ScriptAssemblyLoader
         BehaviourRegistry.Clear();
         ScriptFactory.ClearRegistrations();
         AniBehaviourFactory.ClearRegistrations();
+        BTNodeFactory.ClearRegistrations();
 
         // 내리는 이 컨텍스트를 추적한다. Load에서 잡으면 안 된다 —
         // 그러면 항상 "현재 살아 있는" 컨텍스트를 보게 되어 판정이 늘 참이 된다.

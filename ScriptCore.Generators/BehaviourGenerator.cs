@@ -22,6 +22,13 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 {
     private const string BehaviourFullName = "CreatorEngine.Behaviour";
     private const string AniBehaviourFullName = "CreatorEngine.AniBehaviour";
+
+    // 행동 트리의 사용자 노드. 세 갈래를 구분해 두는 이유는 에디터가 노드 종류별로
+    // 목록을 따로 보여 주고, 저작 그래프도 Action/Condition/ConditionDecorator를
+    // 다른 타입으로 저장하기 때문이다.
+    private const string BTActionFullName = "CreatorEngine.ActionNode";
+    private const string BTConditionFullName = "CreatorEngine.ConditionNode";
+    private const string BTConditionDecoratorFullName = "CreatorEngine.ConditionDecoratorNode";
     private const string AttributeFullName = "CreatorEngine.SerializeFieldAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -43,9 +50,15 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
         if (symbol.IsAbstract) return null;
 
-        // 두 계열을 한 번에 훑는다. Behaviour는 필드 접근자까지, AniBehaviour는 등록만 생성한다.
+        // 여러 계열을 한 번에 훑는다. Behaviour는 필드 접근자까지, 나머지는 등록만 생성한다.
         bool isAni = InheritsFrom(symbol, AniBehaviourFullName);
-        if (!isAni && !InheritsFrom(symbol, BehaviourFullName)) return null;
+
+        BTNodeKind btKind = BTNodeKind.None;
+        if (InheritsFrom(symbol, BTConditionDecoratorFullName)) btKind = BTNodeKind.ConditionDecorator;
+        else if (InheritsFrom(symbol, BTConditionFullName)) btKind = BTNodeKind.Condition;
+        else if (InheritsFrom(symbol, BTActionFullName)) btKind = BTNodeKind.Action;
+
+        if (!isAni && btKind == BTNodeKind.None && !InheritsFrom(symbol, BehaviourFullName)) return null;
 
         var fields = new List<FieldInfo>();
         foreach (ISymbol member in symbol.GetMembers())
@@ -69,7 +82,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         // 그 방법을 쓸 수 없으므로, 여기서 이름→직접 호출 switch를 만들어 둔다.
         // 덕분에 에셋에 저장된 "메서드 이름" 데이터를 그대로 쓸 수 있다.
         var messages = new List<string>();
-        if (!isAni)
+        if (!isAni && btKind == BTNodeKind.None)
         {
             foreach (ISymbol member in symbol.GetMembers())
             {
@@ -93,6 +106,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
             FullName: symbol.ToDisplayString(),
             IsPartial: isPartial,
             IsAni: isAni,
+            BTKind: btKind,
             Fields: fields.ToImmutableArray(),
             Messages: messages.ToImmutableArray());
     }
@@ -329,6 +343,20 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         }
 
         sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // 행동 트리의 사용자 노드. 종류를 함께 넘겨 에디터가 갈래별 목록을 만들 수 있게 한다.
+        sb.AppendLine("    public static void RegisterAllBTNodes(global::System.Action<string, int, global::System.Func<global::CreatorEngine.BTNode>> register)");
+        sb.AppendLine("    {");
+
+        foreach (BehaviourInfo info in behaviours
+            .Where(b => b.BTKind != BTNodeKind.None)
+            .OrderBy(b => b.TypeName))
+        {
+            sb.AppendLine($"        register(\"{info.TypeName}\", {(int)info.BTKind}, static () => new global::{info.FullName}());");
+        }
+
+        sb.AppendLine("    }");
         sb.AppendLine("}");
         return sb.ToString();
     }
@@ -363,12 +391,15 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
     private sealed record FieldInfo(string Name, FieldKind Kind, string? DisplayName);
 
+    private enum BTNodeKind { None, Action, Condition, ConditionDecorator }
+
     private sealed record BehaviourInfo(
         string? Namespace,
         string TypeName,
         string FullName,
         bool IsPartial,
         bool IsAni,
+        BTNodeKind BTKind,
         ImmutableArray<FieldInfo> Fields,
         ImmutableArray<string> Messages);
 }
