@@ -67,12 +67,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	}
 
 	EngineSettingInstance->terrainBrush->m_isEditMode = false;
-	// ImGui UI ¿¹½Ã (¿¡µðÅÍ Åø ÆÐ³Î ³»ºÎ)
+	// ImGui UI ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ð³ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	if (ImGui::CollapsingHeader("Terrain Editor", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		//inspector°¡ È­¸é¿¡ ¶ß´Â °æ¿ì ºê·¯½Ã°¡ È°¼ºÈ­µÈ »óÅÂ·Î ¼³Á¤
-		EngineSettingInstance->terrainBrush->m_isEditMode = true; // ºê·¯½Ã°¡ È°¼ºÈ­µÈ »óÅÂ·Î ¼³Á¤
-		// ¸ðµå ¼±ÅÃ
+		//inspectorï¿½ï¿½ È­ï¿½é¿¡ ï¿½ß´ï¿½ ï¿½ï¿½ï¿½ ï¿½ê·¯ï¿½Ã°ï¿½ È°ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½
+		EngineSettingInstance->terrainBrush->m_isEditMode = true; // ï¿½ê·¯ï¿½Ã°ï¿½ È°ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½
+		// ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer", "FoliageMode" };
 		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
 		if (ImGui::Combo("Edit Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
@@ -82,25 +82,25 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		{
 			if (ImGui::CollapsingHeader("Paint Terrain", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				// ¹ÝÁö¸§ ½½¶óÀÌ´õ (1 ~ 50 µîÀÇ ¹üÀ§ ¿¹½Ã)
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì´ï¿½ (1 ~ 50 ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
 
-				// ¼¼±â ½½¶óÀÌ´õ
+				// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì´ï¿½
 				ImGui::SliderFloat("Strength", &g_CurrentBrush->m_strength, 0.0f, 1.0f);
 
-				// Flatten ¿É¼ÇÀÏ ¶§¸¸ ¸ñÇ¥ ³ôÀÌ ÀÔ·Â
+				// Flatten ï¿½É¼ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô·ï¿½
 				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
 				{
 					//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
 					ImGui::SliderFloat("FlatHeight", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
 				}
 
-				// [MODIFIED] ÅëÇÕµÈ ·¹ÀÌ¾î °ü¸® UI
+				// [MODIFIED] ï¿½ï¿½ï¿½Õµï¿½ ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ UI
 				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::PaintLayer)
 				{
 					ImGui::SeparatorText("Layers");
 
-					// --- Ãß°¡/»èÁ¦ ¹öÆ° ---
+					// --- ï¿½ß°ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ° ---
 					if (ImGui::Button(ICON_FA_PLUS " Add"))
 					{
 						file::path diffuseFile = ShowOpenFileDialog(L"");
@@ -112,7 +112,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					}
 					ImGui::SameLine();
 
-					// ¼±ÅÃµÈ ·¹ÀÌ¾î°¡ ¾øÀ» °æ¿ì »èÁ¦ ¹öÆ° ºñÈ°¼ºÈ­
+					// ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½Ì¾î°¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ° ï¿½ï¿½È°ï¿½ï¿½È­
 					bool isLayerSelected = terrainComponent->GetSelectedLayerId() != 0xFFFFFFFF;
 					if (!isLayerSelected)
 					{
@@ -123,9 +123,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						if (isLayerSelected)
 						{
 							uint32_t layerToDelete = terrainComponent->GetSelectedLayerId();
-							// »èÁ¦ ÈÄ ¼±ÅÃ ÇØÁ¦
+							// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 							terrainComponent->SetSelectedLayerId(0xFFFFFFFF);
-							g_CurrentBrush->m_layerID = 0; // ºê·¯½Ã Å¸°Ù ÃÊ±âÈ­
+							g_CurrentBrush->m_layerID = 0; // ï¿½ê·¯ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½Ê±ï¿½È­
 							terrainComponent->RemoveLayer(layerToDelete);
 						}
 					}
@@ -134,7 +134,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						ImGui::EndDisabled();
 					}
 
-					// --- ·¹ÀÌ¾î ¸ñ·Ï ¸®½ºÆ® ¹Ú½º ---
+					// --- ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½Ú½ï¿½ ---
 					std::vector<const char*> layerNames = terrainComponent->GetLayerNames();
 					int currentSelection = static_cast<int>(terrainComponent->GetSelectedLayerId());
 
@@ -142,13 +142,13 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					{
 						if (currentSelection >= 0 && currentSelection < layerNames.size())
 						{
-							// °ü¸®¿ë ¼±ÅÃ°ú ºê·¯½Ã ÆäÀÎÆ® Å¸°ÙÀ» µ¿½Ã ¾÷µ¥ÀÌÆ®
+							// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ã°ï¿½ ï¿½ê·¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® Å¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 							terrainComponent->SetSelectedLayerId(static_cast<uint32>(currentSelection));
 							g_CurrentBrush->m_layerID = currentSelection;
 						}
 					}
 
-					// --- ¼±ÅÃµÈ ·¹ÀÌ¾î ¼Ó¼º ÆíÁý ---
+					// --- ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½Ó¼ï¿½ ï¿½ï¿½ï¿½ï¿½ ---
 					if (terrainComponent->GetSelectedLayerId() != 0xFFFFFFFF)
 					{
 						TerrainLayer* selectedLayer = terrainComponent->GetLayerDesc(terrainComponent->GetSelectedLayerId());
@@ -156,8 +156,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						{
 							ImGui::SeparatorText("Properties");
 
-							// ÅØ½ºÃ³ ½æ³×ÀÏ Ç¥½Ã
-							if (selectedLayer->diffuseTexture && selectedLayer->diffuseTexture->m_pSRV)
+							// ï¿½Ø½ï¿½Ã³ ï¿½ï¿½ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½
+							// ë°±ì—”ë“œë¥¼ ë¬»ì§€ ì•ŠëŠ”ë‹¤ â€” Texture::HasImage ì£¼ì„ ì°¸ê³ (T2).
+							if (selectedLayer->diffuseTexture && selectedLayer->diffuseTexture->HasImage())
 							{
 								ImGui::Image((ImTextureID)EditorImGuiTexture::From(selectedLayer->diffuseTexture), ImVec2(64, 64));
 								ImGui::SameLine();
@@ -165,7 +166,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							
 							ImGui::Text("Name: %s", selectedLayer->layerName.c_str());
 
-							// Å¸ÀÏ¸µ ¼öÁ¤
+							// Å¸ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½
 							float tiling = selectedLayer->tilling;
 							if (ImGui::DragFloat("Tiling", &tiling, 0.1f, 0.1f, 4096.0f))
 							{
@@ -180,7 +181,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					terrainComponent->RefreshTexture();
 				}
 
-				// ºê·¯½Ã ¸ð¾ç ¼±ÅÃ
+				// ï¿½ê·¯ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 				if (ImGui::Button("mask texture load"))
 				{
 					file::path maskTexture = ShowOpenFileDialog(L"");
@@ -206,12 +207,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							{
 								selectedMaskIndex = maskIndex;
 								uint32_t id = static_cast<uint32_t>(maskIndex);
-								g_CurrentBrush->SetMaskID(maskIndex); // ¼±ÅÃµÈ ¸¶½ºÅ© ID ¼³Á¤
+								g_CurrentBrush->SetMaskID(maskIndex); // ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½ï¿½Å© ID ï¿½ï¿½ï¿½ï¿½
 							}
 							else
 							{
-								selectedMaskIndex = -1; // ÀÌ¹Ì ¼±ÅÃµÈ ¸¶½ºÅ©¸¦ ´Ù½Ã Å¬¸¯ÇÏ¸é ¼±ÅÃ ÇØÁ¦
-								uint32_t id = 0xFFFFFFFF; // "None" ¼±ÅÃ ½Ã -1·Î ¼³Á¤
+								selectedMaskIndex = -1; // ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½ï¿½Å©ï¿½ï¿½ ï¿½Ù½ï¿½ Å¬ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+								uint32_t id = 0xFFFFFFFF; // "None" ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ -1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 								g_CurrentBrush->SetMaskID(id); // No mask selected
 							}
 						}
@@ -264,9 +265,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					ImGui::Combo("Type", &typeIndex, typeNames.data(), static_cast<int>(typeNames.size()));
 					g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(typeIndex);
 				}
-				// ¹ÝÁö¸§ ½½¶óÀÌ´õ (1 ~ 50 µîÀÇ ¹üÀ§ ¿¹½Ã)
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì´ï¿½ (1 ~ 50 ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
-				// ¼¼±â ½½¶óÀÌ´õ
+				// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì´ï¿½
 				ImGui::InputInt("Density", &g_CurrentBrush->m_foliageDensity);
 
 				ImGui::SeparatorText("Foliage Mesh");
@@ -311,7 +312,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					foliage->SaveFoliageAsset(savePath);
 				}
 
-				// ºê·¯½Ã ¸ð¾ç ¼±ÅÃ
+				// ï¿½ê·¯ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 				if (ImGui::Button("mask texture load"))
 				{
 					file::path maskTexture = ShowOpenFileDialog(L"");
@@ -337,12 +338,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							{
 								selectedMaskIndex = maskIndex;
 								uint32_t id = static_cast<uint32_t>(maskIndex);
-								g_CurrentBrush->SetMaskID(maskIndex); // ¼±ÅÃµÈ ¸¶½ºÅ© ID ¼³Á¤
+								g_CurrentBrush->SetMaskID(maskIndex); // ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½ï¿½Å© ID ï¿½ï¿½ï¿½ï¿½
 							}
 							else
 							{
-								selectedMaskIndex = -1; // ÀÌ¹Ì ¼±ÅÃµÈ ¸¶½ºÅ©¸¦ ´Ù½Ã Å¬¸¯ÇÏ¸é ¼±ÅÃ ÇØÁ¦
-								uint32_t id = 0xFFFFFFFF; // "None" ¼±ÅÃ ½Ã -1·Î ¼³Á¤
+								selectedMaskIndex = -1; // ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½ï¿½Å©ï¿½ï¿½ ï¿½Ù½ï¿½ Å¬ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+								uint32_t id = 0xFFFFFFFF; // "None" ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ -1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 								g_CurrentBrush->SetMaskID(id); // No mask selected
 							}
 						}

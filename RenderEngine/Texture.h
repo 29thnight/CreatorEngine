@@ -292,6 +292,24 @@ public:
 	float GetHeight() const { return m_desc.Height; }
 	float2 GetSize() const { return m_size; }
 
+	/// 화면에 보여 줄 그림이 있는가 (PHASE 3-1 재정의, T2).
+	///
+	/// ★ 이 술어가 없어서 에디터 쪽 가드가 `if (texture->m_pSRV)`를 직접 봤다.
+	///   묻고 싶은 것은 "보여 줄 그림이 있나"인데 물은 것은 "DX11 뷰가 있나"다.
+	///   지금은 답이 같아서 드러나지 않지만, DX12 이관이 끝나 DX11 SRV 생성이
+	///   사라지는 순간 가드가 통째로 거짓이 되어 인스펙터의 썸네일이 조용히
+	///   없어진다 — 컴파일도 되고 경고도 없다. 백엔드를 안 묻는 질문으로 바꾼다.
+	///
+	/// ★ 크기 출처가 둘인 이유: 파일에서 읽은 텍스처는 m_size만 채우고
+	///   (LoadFormPath가 메타데이터에서 넣는다), 렌더 타깃·깊이처럼 코드가
+	///   만든 텍스처는 m_desc만 채운다. 둘 중 하나라도 있으면 그림이 있는
+	///   것이다. 이 어긋남 자체는 T2의 범위가 아니라 여기서 흡수한다.
+	bool HasImage() const
+	{
+		return (0.f < m_size.x && 0.f < m_size.y)
+			|| (0 < m_desc.Width && 0 < m_desc.Height);
+	}
+
 private:
 	float2 m_size{};
 	float2 m_sizeRatio{ 1.f, 1.f };

@@ -763,7 +763,8 @@ namespace Meta
                         auto texture = std::any_cast<Texture*>(prop.getter(instance));
 
                         if (texture) {
-                            if (texture->m_pSRV)
+                            // 백엔드를 묻지 않는다 — Texture::HasImage 주석 참고(T2).
+                            if (texture->HasImage())
                                 ImGui::Image((ImTextureID)EditorImGuiTexture::From(texture), ImVec2(30, 30));
                             else {
                                 ImGui::Button("None Texture", ImVec2(150, 20));
