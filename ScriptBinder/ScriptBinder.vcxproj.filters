@@ -66,12 +66,6 @@
     <Filter Include="Classes\Components\CameraComponent">
       <UniqueIdentifier>{89b93491-3dc7-498f-8fa1-5063dec42141}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\CSharpScriptComponent">
-      <UniqueIdentifier>{e2c6af93-4c68-476b-bf4c-cf8e7a09dddc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Classes\Resources\Mono">
-      <UniqueIdentifier>{f6f85cb4-3a05-4d13-886b-db21e155d7ba}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\InputManager">
       <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
     </Filter>
@@ -180,17 +174,8 @@
     <Filter Include="Classes\Resources\Sound">
       <UniqueIdentifier>{a2c4428d-0d20-4142-846f-1b2cba944fdf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\HotLoadSystem\MonoLibSystem">
-      <UniqueIdentifier>{edff1b14-cef3-4872-bec8-ee09f63a343c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\HotLoadSystem\ModuleHotLoadSystem">
       <UniqueIdentifier>{5d36d20f-4df5-4a91-b22d-c1103736560e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\HotLoadSystem\MonoLibSystem\Test">
-      <UniqueIdentifier>{a8caaf63-9b01-447d-aac7-6b1bc39f4fb8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\HotLoadSystem\MonoLibSystem\FormIntPtr">
-      <UniqueIdentifier>{f59f7b30-929f-4cba-9836-2bb3074eb2ac}</UniqueIdentifier>
     </Filter>
     <Filter Include="Classes\Components\DecalComponent">
       <UniqueIdentifier>{8240d859-d50f-4e50-a493-e2e07d3c4063}</UniqueIdentifier>
@@ -361,9 +346,6 @@
     <ClCompile Include="SpriteRenderer.cpp">
       <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
     </ClCompile>
-    <ClCompile Include="MonoManager.cpp">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameObjectIndex.h" />
@@ -453,12 +435,6 @@
     </ClInclude>
     <ClInclude Include="GameObjectType.h">
       <Filter>Classes\GameObject</Filter>
-    </ClInclude>
-    <ClInclude Include="MonoBehaviorRecord.h">
-      <Filter>Classes\Resources\Mono</Filter>
-    </ClInclude>
-    <ClInclude Include="CSharpScriptComponent.h">
-      <Filter>Classes\Components\CSharpScriptComponent</Filter>
     </ClInclude>
     <ClInclude Include="CapsuleColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
@@ -651,27 +627,6 @@
     </ClInclude>
     <ClInclude Include="MSBuildHelper.h">
       <Filter>Managers\HotLoadSystem\ModuleHotLoadSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="Object_Binding.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
-    </ClInclude>
-    <ClInclude Include="Component_Binding.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
-    </ClInclude>
-    <ClInclude Include="MonoManager.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="FormIntPtr.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem\FormIntPtr</Filter>
-    </ClInclude>
-    <ClInclude Include="GameObject_Binding.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
-    </ClInclude>
-    <ClInclude Include="Transform_Binding.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
-    </ClInclude>
-    <ClInclude Include="RectTransform_Binding.h">
-      <Filter>Managers\HotLoadSystem\MonoLibSystem\Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

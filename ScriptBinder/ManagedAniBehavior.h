@@ -8,8 +8,8 @@ class GameObject;
 /// C#으로 쓴 애니메이션 상태 스크립트를 네이티브 상태 머신에 끼워 넣는 어댑터.
 ///
 /// AnimationState는 AniBehavior* 하나만 알면 되므로, 관리 인스턴스를 감싼 이것을
-/// 대신 돌려주면 상태 머신 쪽은 손댈 필요가 없다(ScriptComponent가 ModuleBehavior
-/// 자리를 대신하는 것과 같은 구조다).
+/// 대신 돌려주면 상태 머신 쪽은 손댈 필요가 없다 — 네이티브 인터페이스는 그대로 두고
+/// 구현만 관리 측으로 옮기는, ScriptComponent와 같은 어댑터 구조다.
 ///
 /// Enter/Update/Exit는 곧바로 경계를 넘지 않고 큐에 쌓는다. 틱 경계에서
 /// ClrHost::FlushAniEvents가 한 번에 넘긴다.

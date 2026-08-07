@@ -171,7 +171,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -198,7 +198,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -227,7 +227,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)RenderEngine\Interfaces\;$(SolutionDir)EffectSystem\;$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;$(DotNetHostPackDir);$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
@@ -272,7 +272,6 @@
     <ClCompile Include="DecalComponent.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
-    <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="RectTransformComponent.cpp" />
     <ClCompile Include="SoundComponent.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
@@ -316,22 +315,15 @@
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EForceMode.h" />
     <ClInclude Include="FoliageComponent.h" />
-    <ClInclude Include="FormIntPtr.h" />
-    <ClInclude Include="GameObject_Binding.h" />
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
-    <ClInclude Include="MonoManager.h" />
     <ClInclude Include="MSBuildHelper.h" />
     <ClInclude Include="Navigation.h" />
-    <ClInclude Include="Object_Binding.h" />
-    <ClInclude Include="Component_Binding.h" />
     <ClInclude Include="RectTransformComponent.h" />
-    <ClInclude Include="RectTransform_Binding.h" />
     <ClInclude Include="CurvePoint.h" />
     <ClInclude Include="SoundComponent.h" />
     <ClInclude Include="SoundDefinition.h" />
     <ClInclude Include="SpriteSheetComponent.h" />
-    <ClInclude Include="Transform_Binding.h" />
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
@@ -378,7 +370,6 @@
     <ClInclude Include="CharacterControllerComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
-    <ClInclude Include="CSharpScriptComponent.h" />
     <ClInclude Include="FSMState.h" />
     <ClInclude Include="GameObjectType.h" />
     <ClInclude Include="IAIComponent.h" />
@@ -397,7 +388,6 @@
     <ClInclude Include="LinkData.h" />
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MeshRenderer.h" />
-    <ClInclude Include="MonoBehaviorRecord.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />

@@ -43,7 +43,7 @@ GameObject* Prefab::Instantiate(std::string_view newName) const
     {
         const MetaYml::Node& gameObjNode = m_prefabData[i];
 
-        // ù ��° GameObject���� overrideName ����
+        // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
 
         GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
@@ -77,7 +77,7 @@ GameObject* Prefab::Instantiate(Scene* targetScene, std::string_view newName) co
     {
         const MetaYml::Node& gameObjNode = m_prefabData[i];
 
-        // ù ��° GameObject���� overrideName ����
+        // ù ��° GameObject���� overrideName ����
         std::string_view nameOverride = (i == 0) ? newName : "";
 
         GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
@@ -214,19 +214,10 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     }
 	std::cout << "Component Load Time: " << bm2.GetElapsedTime() << " ms\n";
 
-    //if(SceneManagers->m_isGameStart)
-    //{
-    //    for (auto& comp : obj->m_components)
-    //    {
-    //        if (!comp) continue;
-
-    //        auto script = std::dynamic_pointer_cast<ModuleBehavior>(comp);
-    //        if (script)
-    //        {
-    //            ScriptManager->BindScriptEvents(script.get(), script->m_name.ToString());
-    //        }
-    //    }
-    //}
+    // 여기에 있던 주석 처리된 블록은 C++ 스크립트가 프리팹 로드 직후 씬 이벤트에
+    // 재구독하던 경로였다. 그 계층이 은퇴하면서(9-4) 대응물이 사라졌다 —
+    // C# 스크립트는 ScriptComponent::Awake가 인스턴스를 만들고 ClrHost가 틱당
+    // 일괄 디스패치하므로, 프리팹 쪽에서 따로 배선할 것이 없다.
 
     if (node["children"])
     {
