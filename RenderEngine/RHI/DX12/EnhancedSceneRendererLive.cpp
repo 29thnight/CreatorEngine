@@ -15,6 +15,7 @@
 #include "EnhancedSSGIPass.h"
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
+#include "EnhancedVolumetricFogPass.h"
 #include "EnhancedSkyBoxPass.h"
 #include "EnhancedIBLGenerator.h"
 #include "EnhancedPostChainPass.h"
@@ -204,6 +205,18 @@ namespace
             //   늘어도 컴파일은 한 번이다. 추가 비용은 히스토리 텍스처뿐 —
             //   GI가 절반 해상도라 1920x1080 기준 뷰당 약 12MB.
             EnhancedSSGIPass ssgi;
+
+            // 포그도 같은 이유로 뷰마다 든다 — 프록셀 격자(m_voxelTemp 둘 +
+            // m_voxelFinal)가 프레임을 넘겨 살고, m_readIndex 핑퐁과
+            // m_previousViewProjection이 SSGI의 히스토리와 똑같은 역할을 한다.
+            //
+            // ★ 다만 Initialize를 미룬다. 격자가 160x90x128 RGBA16F 셋이라
+            //   뷰당 42MB이고, 합성 출력과 힙까지 더한 실측 증가가 켤 때
+            //   +127MB다(Private, 1437→1564). 기본이 꺼짐인데 미리 잡으면
+            //   안 쓰는 기능이 그만큼을 묶는다 — 처음 켜지는 프레임에
+            //   만든다(fogReady). 끈 채로는 증가가 없음을 실측으로 확인했다.
+            EnhancedVolumetricFogPass fog;
+            bool                      fogReady{ false };
         };
         static constexpr int kMaxCameraViews =
             static_cast<int>(EnhancedSceneRenderer::kMaxLiveCameraViews);
@@ -231,6 +244,37 @@ namespace
         std::string                 skyBoxPath;
         Managed::UniquePtr<Texture> skyEquirect;
         bool                        skyBoxDirty{ true };
+
+        // ── 볼류메트릭 포그 입력 ──
+        //
+        // 기본이 꺼짐이라 처음 켜질 때 만든다(EnsureFogInputs).
+        //
+        // ★ 둘 다 포그 전용으로 둔다. textureCache의 흰색 폴백을 그대로 쓰면
+        //   그것은 재질이 텍스처 없을 때 GBuffer가 디스크립터로 직접 묶는
+        //   리소스라, 그래프가 상태를 옮기면 다음 프레임 GBuffer가 어긋난
+        //   상태로 읽는다. 그래프는 임포트한 리소스를 원래 상태로 되돌려
+        //   주지 않는다(stateWriteback은 '어디로 남았는지'만 알려 준다).
+        //
+        // ★ 끝 상태를 ALL_SHADER_RESOURCE로 맞춘다. RGResourceState에는
+        //   PIXEL 전용 값이 없어 ShaderResource가 곧 ALL인데, textureCache는
+        //   업로드를 PIXEL로 끝내므로 그대로 임포트하면 배리어의 before가
+        //   실제와 어긋난다(검증 레이어가 잡는다).
+        Managed::UniquePtr<Texture> fogBlueNoise;
+        ComPtr<ID3D12Resource>      fogCloudNeutral;   // 1x1 흰색 = 구름 없음
+        bool                        fogInputsReady{ false };
+
+        // 블루 노이즈를 PIXEL에서 ALL_SHADER_RESOURCE로 한 번 넓혔는가.
+        // 텍스처 캐시 수명에 묶인다(캐시가 파이프라인과 함께 죽으면 리소스도
+        // 새로 올라가므로 다시 넓혀야 한다). 포그를 껐다 켜는 것으로는
+        // 리셋하지 않는다 — 이미 넓힌 리소스에 또 배리어를 걸면 before가
+        // 실제와 어긋나 검증 레이어가 잡는다.
+        bool                        fogNoiseStateWidened{ false };
+
+        // 창이 넣은 켬/끔. 꺼져 있으면 포그 패스를 아예 세우지 않는다.
+        bool                        fogEnabled{ false };
+
+        // 켬 → 끔 전환을 봤다. 자원 해제는 락 밖(TickLive)에서 한다.
+        bool                        fogTeardownPending{ false };
 
         // 카메라→뷰 대응은 LivePipeline::views의 camera 포인터가 든다.
         // GetLiveDisplaySrv가 그 포인터와 대조해 '그 카메라의 뷰'만 교체
@@ -553,7 +597,18 @@ namespace
             p.skyBox.Shutdown();
             p.ssao.Shutdown();
             p.forward.Shutdown();
-            for (LivePipeline::CameraView& view : p.views) view.ssgi.Shutdown();
+            for (LivePipeline::CameraView& view : p.views)
+            {
+                view.ssgi.Shutdown();
+                if (view.fogReady) view.fog.Shutdown();
+                view.fogReady = false;
+            }
+            // 포그 입력은 파이프라인 수명에 묶인다(텍스처 캐시가 함께 죽는다).
+            // DX11 원본 Texture는 남겨 두고 다음 파이프라인에서 다시 올린다.
+            fogCloudNeutral.Reset();
+            fogInputsReady = false;
+            fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
+            fogTeardownPending = false;
             p.deferred.Shutdown();
             p.shadow.Shutdown();
             p.gbuffer.Shutdown();
@@ -566,6 +621,162 @@ namespace
             p.resources.Shutdown();
 
             pipeline.reset();
+        }
+
+        /// 포그가 처음 켜질 때 부른다. 프레임이 열려 있어야 한다(업로드 링과
+        /// 커맨드 리스트를 쓴다 — textureCache::GetOrUpload와 같은 계약).
+        bool EnsureFogInputs(std::string& outError)
+        {
+            if (fogInputsReady) return true;
+
+            LivePipeline& p = *pipeline;
+            // 이 함수는 실패하면 다음 프레임에 다시 불린다. 이미 만든 것을
+            // 또 만들지 않도록 각 단계를 개별로 잠근다.
+
+            // ── 블루 노이즈 — 프록셀 지터의 씨앗 ──
+            if (!fogBlueNoise)
+            {
+                const file::path path =
+                    PathFinder::Relative("VolumetricFog\\blueNoise.dds");
+                try
+                {
+                    fogBlueNoise = Texture::LoadManagedFromPath(path);
+                }
+                catch (const std::exception& exception)
+                {
+                    outError = "블루 노이즈 로드 실패: " + std::string(exception.what());
+                    return false;
+                }
+            }
+            if (!fogBlueNoise)
+            {
+                outError = "블루 노이즈 로드 실패: VolumetricFog\\blueNoise.dds";
+                return false;
+            }
+
+            const DX12TextureCache::Entry noiseEntry =
+                p.textureCache.GetOrUpload(fogBlueNoise.get(), outError);
+            if (!noiseEntry.IsValid())
+            {
+                outError = "블루 노이즈 운반 실패" +
+                    (outError.empty() ? std::string{} : ": " + outError);
+                return false;
+            }
+
+            // ── 중립 구름 그림자 — 1x1 흰색 ──
+            //
+            // 흰색이어야 하는 이유가 있다. 셰이더가 구름의 켬/끔을 보지 않고
+            // 알파를 그냥 곱하므로(EnhancedVolumetricFogPass.h의 발견 ②),
+            // 검정이나 미바인딩이면 가려짐이 0이 되어 포그가 통째로 사라진다.
+            if (!fogCloudNeutral)
+            {
+                D3D12_HEAP_PROPERTIES heap{};
+                heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+                D3D12_RESOURCE_DESC desc{};
+                desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                desc.Width = 1;
+                desc.Height = 1;
+                desc.DepthOrArraySize = 1;
+                desc.MipLevels = 1;
+                desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                desc.SampleDesc.Count = 1;
+
+                if (FAILED(p.resources.GetDevice()->CreateCommittedResource(&heap,
+                    D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON,
+                    nullptr, IID_PPV_ARGS(&fogCloudNeutral))))
+                {
+                    outError = "포그 중립 구름 텍스처 생성 실패";
+                    return false;
+                }
+                fogCloudNeutral->SetName(L"Fog.CloudNeutral");
+
+                const auto staging = p.resources.GetUploadRing().Allocate(
+                    D3D12_TEXTURE_DATA_PITCH_ALIGNMENT,
+                    DX12UploadRing::kTexturePlacementAlignment);
+                if (!staging.IsValid())
+                {
+                    outError = "포그 중립 구름 업로드 링 할당 실패";
+                    return false;
+                }
+                const uint8_t white[4]{ 255, 255, 255, 255 };
+                memcpy(staging.cpuAddress, white, sizeof(white));
+
+                auto* commandList = p.resources.GetCommandList();
+
+                D3D12_TEXTURE_COPY_LOCATION dst{};
+                dst.pResource = fogCloudNeutral.Get();
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+                D3D12_TEXTURE_COPY_LOCATION src{};
+                src.pResource = staging.resource;
+                src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                src.PlacedFootprint.Offset = staging.offset;
+                src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                src.PlacedFootprint.Footprint.Width = 1;
+                src.PlacedFootprint.Footprint.Height = 1;
+                src.PlacedFootprint.Footprint.Depth = 1;
+                src.PlacedFootprint.Footprint.RowPitch =
+                    D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+
+                commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+                D3D12_RESOURCE_BARRIER barrier{};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = fogCloudNeutral.Get();
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                commandList->ResourceBarrier(1, &barrier);
+            }
+
+            // 블루 노이즈는 캐시가 PIXEL로 끝내 두었다. 그래프가 ShaderResource
+            // (=ALL)로 임포트하므로 여기서 한 번 넓혀 둔다 — ALL은 PIXEL의
+            // 상위집합이라 이 리소스를 픽셀로 읽는 쪽이 생겨도 그대로 맞다.
+            // 두 번 걸면 before가 실제와 어긋나므로 캐시 수명당 한 번만 건다.
+            if (!fogNoiseStateWidened)
+            {
+                D3D12_RESOURCE_BARRIER barrier{};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = noiseEntry.resource;
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                p.resources.GetCommandList()->ResourceBarrier(1, &barrier);
+                fogNoiseStateWidened = true;
+            }
+
+            fogInputsReady = true;
+            return true;
+        }
+
+        /// 포그를 끌 때 격자를 놓는다. 켰다 끄는 것만으로 자원이 남으면
+        /// "끄면 안 잡는다"는 설계가 '한 번도 안 켰을 때만' 성립하게 된다.
+        ///
+        /// GPU가 아직 격자를 읽는 중일 수 있으므로 완주를 기다린 뒤에 놓는다
+        /// (TeardownPipeline과 같은 계약). 끄기는 사람이 누르는 드문 사건이라
+        /// 여기서 한 번 멈추는 비용은 문제되지 않는다.
+        void ReleaseFogResources()
+        {
+            fogTeardownPending = false;
+            if (nullptr == pipeline) return;
+
+            LivePipeline& p = *pipeline;
+            bool anyReady = fogInputsReady;
+            for (const LivePipeline::CameraView& view : p.views)
+            {
+                anyReady = anyReady || view.fogReady;
+            }
+            if (!anyReady) return;
+
+            if (p.resources.IsInitialized()) p.resources.WaitForGpu();
+            for (LivePipeline::CameraView& view : p.views)
+            {
+                if (view.fogReady) view.fog.Shutdown();
+                view.fogReady = false;
+            }
+            fogCloudNeutral.Reset();
+            fogInputsReady = false;
         }
 
         // ── 씬 밀봉 복사 ──
@@ -767,6 +978,32 @@ namespace
             if (!p.gbuffer.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.deferred.PrepareFrame(p.frameContext, outError)) return false;
             if (!view.ssgi.PrepareFrame(p.frameContext, outError)) return false;
+
+            // 포그는 켜져 있을 때만 세운다 — 격자가 뷰당 42MB라 꺼진 채로
+            // 잡아 두면 안 쓰는 기능이 메모리를 묶는다.
+            //
+            // ★ 자원 확보 실패는 렌더러를 내리지 않고 포그만 끈다. 포그는
+            //   선택 기능이라(기본 꺼짐) 에셋 하나가 없다고 화면 전체를
+            //   잃는 것은 대가가 맞지 않는다 — RenderOnce가 false를 돌려주면
+            //   TickLive가 파이프라인을 헐고 러너를 꺼 버린다.
+            if (fogEnabled)
+            {
+                std::string fogError;
+                const bool ready = EnsureFogInputs(fogError) &&
+                    (view.fogReady || view.fog.Initialize(p.frameContext, fogError));
+                if (ready)
+                {
+                    view.fogReady = true;
+                    if (!view.fog.PrepareFrame(p.frameContext, outError)) return false;
+                }
+                else
+                {
+                    lastError = "볼류메트릭 포그를 끈다: " + fogError;
+                    fogEnabled = false;
+                    fogTeardownPending = true;
+                }
+            }
+
             if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.skyBox.PrepareFrame(p.frameContext, outError)) return false;
@@ -836,10 +1073,49 @@ namespace
             }
             p.forward.Declare(graph, p.frameContext);
 
+            // ── 볼류메트릭 포그 ──
+            //
+            // 라이팅 결과 위에, 톤맵 앞에 얹는다(DX11과 같은 자리).
+            //
+            // ★ 이 색에 forward 결과는 안 들어 있다. forward는 자기 타깃을
+            //   새로 만들어 거기 그리는데(EnhancedForwardPass의 m_output)
+            //   라이브 배선이 그것을 아무도 소비하지 않는다 — 투명이 화면에
+            //   안 나오는 기존 결함이고, 포그와는 별개다. 포그를 forward
+            //   뒤에 두는 것은 그 결함이 고쳐지면 자연히 맞기 위해서다.
+            RGHandle litColor = view.ssgi.GetOutput().IsValid()
+                ? view.ssgi.GetOutput() : p.deferred.GetOutput();
+            if (fogEnabled && view.fogReady)
+            {
+                EnhancedVolumetricFogPass::Inputs fogInputs{};
+                fogInputs.color = litColor;
+                fogInputs.depth = outputs.depth;
+                fogInputs.shadowMap = p.shadow.GetShadowMap();
+                fogInputs.cloudShadow = graph.ImportTexture(fogCloudNeutral.Get(),
+                    RGResourceState::ShaderResource, "Fog.CloudNeutral");
+                {
+                    std::string noiseError;
+                    const DX12TextureCache::Entry noiseEntry =
+                        p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
+                    if (noiseEntry.IsValid())
+                    {
+                        fogInputs.blueNoise = graph.ImportTexture(noiseEntry.resource,
+                            RGResourceState::ShaderResource, "Fog.BlueNoise");
+                    }
+                }
+                view.fog.SetInputs(fogInputs);
+                // 셰이더가 캐스케이드 슬라이스 2를 짚는다 — DX11이 마지막
+                // 캐스케이드 행렬을 넘기는 것과 짝이다.
+                view.fog.SetShadowMatrix(p.shadow.GetShadowData()
+                    .lightViewProjection[EnhancedShadowPass::kCascadeCount - 1]);
+                view.fog.SetFrameIndex(frameCounter);
+                view.fog.Declare(graph, p.frameContext);
+
+                if (view.fog.GetOutput().IsValid()) litColor = view.fog.GetOutput();
+            }
+
             {
                 EnhancedPostChainPass::Inputs postInputs{};
-                postInputs.color = view.ssgi.GetOutput().IsValid()
-                    ? view.ssgi.GetOutput() : p.deferred.GetOutput();
+                postInputs.color = litColor;
                 p.postChain.SetInputs(postInputs);
             }
             p.postChain.Declare(graph, p.frameContext);
@@ -972,6 +1248,29 @@ namespace
                 tuning.intensity = pendingTuning.ssgi.intensity;
                 view.ssgi.SetTuning(tuning);
             }
+            // 포그도 뷰마다 인스턴스다 — 같은 이유로 전부에 건다.
+            //
+            // 끄는 전환은 여기서 표시만 하고 실제 해제는 TickLive가 한다 —
+            // 해제가 GPU 완주를 기다리는데, 그 대기를 이 락 안에서 하면
+            // 디버그 스냅샷을 읽는 CE 렌더 스레드가 함께 선다.
+            if (fogEnabled && !pendingTuning.fog.enabled) fogTeardownPending = true;
+            fogEnabled = pendingTuning.fog.enabled;
+            for (LivePipeline::CameraView& view : p.views)
+            {
+                EnhancedVolumetricFogPass::Tuning tuning = view.fog.GetTuning();
+                tuning.anisotropy = pendingTuning.fog.anisotropy;
+                tuning.density = pendingTuning.fog.density;
+                tuning.strength = pendingTuning.fog.strength;
+                tuning.thicknessFactor = pendingTuning.fog.thicknessFactor;
+                tuning.blendingWithSceneColorFactor =
+                    pendingTuning.fog.blendingWithSceneColorFactor;
+                tuning.previousFrameBlendFactor =
+                    pendingTuning.fog.previousFrameBlendFactor;
+                tuning.customNearPlane = pendingTuning.fog.customNearPlane;
+                tuning.customFarPlane = pendingTuning.fog.customFarPlane;
+                view.fog.SetTuning(tuning);
+                view.fog.SetEnabled(fogEnabled);
+            }
             {
                 EnhancedPostChainPass::Tuning tuning = p.postChain.GetTuning();
                 tuning.bloomEnabled = pendingTuning.postChain.bloomEnabled;
@@ -1019,6 +1318,19 @@ namespace
             tuningMirror.ssgi.filterNormalPower = tuning.filterNormalPower;
             tuningMirror.ssgi.compositeDepthSigma = tuning.compositeDepthSigma;
             tuningMirror.ssgi.intensity = tuning.intensity;
+        }
+        {
+            const EnhancedVolumetricFogPass::Tuning& tuning = p.views[0].fog.GetTuning();
+            tuningMirror.fog.enabled = fogEnabled;
+            tuningMirror.fog.anisotropy = tuning.anisotropy;
+            tuningMirror.fog.density = tuning.density;
+            tuningMirror.fog.strength = tuning.strength;
+            tuningMirror.fog.thicknessFactor = tuning.thicknessFactor;
+            tuningMirror.fog.blendingWithSceneColorFactor =
+                tuning.blendingWithSceneColorFactor;
+            tuningMirror.fog.previousFrameBlendFactor = tuning.previousFrameBlendFactor;
+            tuningMirror.fog.customNearPlane = tuning.customNearPlane;
+            tuningMirror.fog.customFarPlane = tuning.customFarPlane;
         }
         {
             const EnhancedPostChainPass::Tuning& tuning = p.postChain.GetTuning();
@@ -1092,6 +1404,12 @@ bool EnhancedSceneRenderer::InitializeRuntime(std::string& outError)
             PathFinder::Relative("HDR\\kloofendal_43d_clear_puresky_4k.hdr").string();
         state.skyEquirect.reset();
         state.skyBoxDirty = true;
+
+        // 포그 초기 켬/끔. 무인 검증이 UI 없이 켤 수 있어야 해서 둔다
+        // (BuildPipeline의 후처리 환경변수와 같은 취지). 한 번만 읽는 이유는
+        // 파이프라인 재구축(리사이즈)이 사용자가 창에서 고른 값을 되돌리면
+        // 안 되기 때문이다.
+        state.fogEnabled = ReadLivePostFlag("CREATOR_DX12_FOG", false);
         state.runtimeInitialized = true;
         state.enabled = true;
         state.lastError.clear();
@@ -1204,6 +1522,10 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     // 창이 넣어 둔 패스 파라미터 변경을 여기서 적용한다. 프레임 입력을
     // 밀봉하기 전이어야 이번 프레임부터 반영된다.
     state.ApplyAndPublishTuning();
+
+    // 포그를 끈 전환의 실제 해제. 위가 락 안에서 표시만 해 둔 것을 여기서
+    // 처리한다 — GPU 완주 대기를 락 안에서 하면 CE 렌더 스레드가 함께 선다.
+    if (state.fogTeardownPending) state.ReleaseFogResources();
 
     if (!state.enabled) return;
 

@@ -260,6 +260,34 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		ImGui::TreePop();
 	}
 
+	if (ImGui::TreeNodeEx("VolumetricFog"))
+	{
+		EnhancedLiveTuning::Fog& fog = m_editing.fog;
+
+		changed |= ImGui::Checkbox("Enabled##fog", &fog.enabled);
+		// 켜는 순간 뷰마다 프록셀 격자를 잡는다. 그 사실을 옆에 적어 두지
+		// 않으면 "왜 켤 때 한 프레임 튀지"를 나중에 다시 쫓게 된다.
+		ImGui::SameLine();
+		ImGui::TextColored(kDimColor, "(first enable allocates ~127MB: proxel grids per view)");
+
+		changed |= ImGui::SliderFloat("Anisotropy##fog", &fog.anisotropy, -0.99f, 0.99f);
+		changed |= ImGui::SliderFloat("Density##fog", &fog.density, 0.f, 1.f, "%.3f");
+		changed |= ImGui::SliderFloat("Strength##fog", &fog.strength, 0.f, 10.f);
+		changed |= ImGui::SliderFloat("Thickness factor##fog",
+			&fog.thicknessFactor, 0.f, 1.f, "%.3f");
+		// DX11에서부터 죽어 있는 튜닝이다(패스 헤더의 발견 ④) — 슬라이더를
+		// 움직여도 그림이 안 바뀐다. 지우지 않는 이유는 기준선이 DX11이라서다.
+		ImGui::SameLine();
+		ImGui::TextColored(kDimColor, "(dead in DX11 too)");
+		changed |= ImGui::SliderFloat("Scene color blend##fog",
+			&fog.blendingWithSceneColorFactor, 0.f, 1.f, "%.3f");
+		changed |= ImGui::SliderFloat("Previous frame blend##fog",
+			&fog.previousFrameBlendFactor, 0.f, 1.f, "%.3f");
+		changed |= ImGui::SliderFloat("Near plane##fog", &fog.customNearPlane, 0.01f, 10.f);
+		changed |= ImGui::SliderFloat("Far plane##fog", &fog.customFarPlane, 10.f, 5000.f);
+		ImGui::TreePop();
+	}
+
 	if (ImGui::TreeNodeEx("PostChain"))
 	{
 		EnhancedLiveTuning::PostChain& post = m_editing.postChain;
@@ -330,8 +358,8 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 	ImGui::TextColored(kDimColor,
 		"  GBuffer, Shadow, Deferred, Forward+, SkyBox, Grid, Gizmo, UI");
 	ImGui::TextColored(kDimColor,
-		"SSR / VolumetricFog / SSS have Tuning but are not wired into the");
+		"SSR / SSS have Tuning but are not wired into the live graph yet,");
 	ImGui::TextColored(kDimColor,
-		"live graph yet, so there is nothing to drive from here.");
+		"so there is nothing to drive from here.");
 }
 #endif // !DYNAMICCPP_EXPORTS

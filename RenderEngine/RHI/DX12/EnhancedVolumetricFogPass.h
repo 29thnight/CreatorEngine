@@ -138,6 +138,8 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetTuning(const Tuning& tuning) { m_tuning = tuning; }
+    // 설정 창이 '적용 후의 실제 값'을 되읽는다 — SSAO/SSGI/PostChain과 같은 규약.
+    const Tuning& GetTuning() const { return m_tuning; }
     void SetCloudShadow(const CloudShadow& cloud) { m_cloud = cloud; }
     void SetEnabled(bool enabled) { m_enabled = enabled; }
 

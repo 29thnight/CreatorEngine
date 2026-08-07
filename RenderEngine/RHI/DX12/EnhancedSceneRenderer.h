@@ -53,6 +53,24 @@ struct EnhancedLiveTuning
         float intensity{ 1.f };
     } ssgi;
 
+    /// 볼류메트릭 포그. 기본이 꺼짐인 이유는 두 가지다 — 켤 때 메모리가
+    /// +127MB 늘고(프록셀 격자가 뷰당 42MB, 실측), 켜면 모든 씬의 그림이
+    /// 달라지므로 저작이 고르는 것이 맞다. 자원은 처음 켜질 때 잡는다.
+    struct Fog
+    {
+        bool  enabled{ false };
+
+        // 아래는 DX11 VolumetricFogPassSetting 기본값 그대로다.
+        float anisotropy{ 0.109f };
+        float density{ 0.101f };
+        float strength{ 2.f };
+        float thicknessFactor{ 0.01f };
+        float blendingWithSceneColorFactor{ 0.851f };
+        float previousFrameBlendFactor{ 0.95f };
+        float customNearPlane{ 0.5f };
+        float customFarPlane{ 1000.f };
+    } fog;
+
     struct PostChain
     {
         bool  bloomEnabled{ true };
