@@ -48,6 +48,26 @@
 
 namespace ed = ax::NodeEditor;
 
+// C# 스크립트 부착: ScriptComponent(다중 허용 경로)를 붙이고 타입을 지정한 뒤
+// 곧바로 관리 인스턴스를 만든다. Awake는 재진입 가드가 있어 직접 불러도 안전하고,
+// CLR 미준비면 타입만 기록돼 재생 진입 시 Awake가 인스턴스를 만든다.
+static void AttachManagedScript(GameObject* obj, const std::string& typeName)
+{
+	const Meta::Type* scriptType = Meta::Find("ScriptComponent");
+	if (nullptr == obj || nullptr == scriptType) return;
+
+	auto component = obj->AddComponentAllowMultiple(*scriptType);
+	auto* script = dynamic_cast<ScriptComponent*>(component.get());
+	if (nullptr == script)
+	{
+		Debug->LogError("[스크립트] ScriptComponent 생성 실패");
+		return;
+	}
+
+	script->m_scriptType = typeName;
+	script->Awake();
+}
+
 ed::EditorContext* m_fsmEditorContext{ nullptr };
 bool			   s_CreatingLink = false;
 ed::PinId		   s_LinkStartPin = 0;
@@ -311,6 +331,11 @@ InspectorWindow::InspectorWindow()
 						const_cast<std::string&>(type_name) = "None";
 					}
 
+					// ScriptComponent는 아래 C# Scripts 섹션이 담당한다 —
+					// 여기(단일 부착 경로)로 붙이면 두 번째 스크립트부터 기존 것이 반환된다.
+					if (type->typeID == type_guid(ScriptComponent))
+						continue;
+
 					if (ImGui::MenuItem(type_name.c_str()))
 					{
 						auto component = selectedSceneObject->AddComponent(*type);
@@ -318,6 +343,30 @@ InspectorWindow::InspectorWindow()
 						{
 							initializable->Initialize();
 						}
+					}
+				}
+
+				// ── C# Scripts ──
+				// ClrHost가 스크립트 어셈블리에 등록된 타입 이름을 내준다.
+				// 스크립트는 한 오브젝트에 여럿 붙으므로 AddComponentAllowMultiple 경로를 탄다.
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.f, 1.f), "C# Scripts");
+
+				const auto managedTypeNames = ClrHost::Get().GetBehaviourTypeNames();
+				if (managedTypeNames.empty())
+				{
+					ImGui::TextDisabled(ClrHost::Get().IsReady()
+						? "등록된 C# 스크립트가 없습니다"
+						: "CLR이 준비되지 않았습니다");
+				}
+				for (const auto& managedName : managedTypeNames)
+				{
+					if (!searchFilter.PassFilter(managedName.c_str()))
+						continue;
+
+					if (ImGui::MenuItem((managedName + " (C#)").c_str()))
+					{
+						AttachManagedScript(selectedSceneObject, managedName);
 					}
 				}
 
@@ -414,9 +463,31 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 
 	auto& clr = ClrHost::Get();
 
+	// 타입 미지정 상태(구 씬에서 온 빈 컴포넌트 등)에서도 여기서 바로 고를 수 있게 한다.
 	if (script->m_scriptType.empty())
 	{
 		ImGui::TextDisabled("스크립트 타입이 지정되지 않았습니다");
+
+		const auto typeNames = clr.GetBehaviourTypeNames();
+		if (typeNames.empty())
+		{
+			ImGui::TextDisabled(clr.IsReady() ? "등록된 C# 스크립트가 없습니다"
+											  : "CLR이 준비되지 않았습니다");
+			return;
+		}
+
+		if (ImGui::BeginCombo("Script Type", "선택..."))
+		{
+			for (const auto& typeName : typeNames)
+			{
+				if (ImGui::Selectable(typeName.c_str()))
+				{
+					script->m_scriptType = typeName;
+					script->Awake();
+				}
+			}
+			ImGui::EndCombo();
+		}
 		return;
 	}
 
@@ -424,6 +495,12 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	{
 		ImGui::TextColored(ImVec4(1.f, 0.6f, 0.2f, 1.f),
 			"'%s' 인스턴스 없음 (등록되지 않은 타입이거나 CLR 미준비)", script->m_scriptType.c_str());
+
+		// CLR이 뒤늦게 준비됐거나 어셈블리를 다시 읽은 경우를 위한 수동 재시도.
+		if (clr.IsReady() && ImGui::Button("인스턴스 다시 만들기"))
+		{
+			script->Awake();
+		}
 		return;
 	}
 

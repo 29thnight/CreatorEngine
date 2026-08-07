@@ -2395,6 +2395,10 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
 	if (!bind(L"CreateBehaviour", &fn))  return false;  m_fnCreateBehaviour = reinterpret_cast<CreateFn>(fn);
 
+	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
+	// (에디터의 스크립트 목록 UI만 빈 목록이 된다).
+	if (bind(L"GetBehaviourTypeNames", &fn)) m_fnGetBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
+
 	// 애니메이션 상태 스크립트
 	if (!bind(L"HasAniBehaviour", &fn))     return false;  m_fnHasAniBehaviour     = reinterpret_cast<HasAniFn>(fn);
 	if (!bind(L"CreateAniBehaviour", &fn))  return false;  m_fnCreateAniBehaviour  = reinterpret_cast<CreateAniFn>(fn);
@@ -2672,6 +2676,28 @@ bool ClrHost::DestroyBehaviour(int instanceId)
 {
 	if (!m_ready || nullptr == m_fnDestroyBehaviour) return false;
 	return 0 == m_fnDestroyBehaviour(instanceId);
+}
+
+std::vector<std::string> ClrHost::GetBehaviourTypeNames()
+{
+	if (!m_ready || nullptr == m_fnGetBehaviourTypeNames) return {};
+
+	// 타입 이름은 '\n' 구분으로 온다. 스크립트 수백 개 규모까지 여유 있는 크기.
+	std::vector<char> buffer(16 * 1024, '\0');
+	const int length = m_fnGetBehaviourTypeNames(buffer.data(), static_cast<int>(buffer.size()));
+	if (length <= 0) return {};
+
+	std::vector<std::string> names;
+	const std::string joined(buffer.data(), static_cast<size_t>(length));
+	size_t begin = 0;
+	while (begin < joined.size())
+	{
+		size_t end = joined.find('\n', begin);
+		if (end == std::string::npos) end = joined.size();
+		if (end > begin) names.emplace_back(joined.substr(begin, end - begin));
+		begin = end + 1;
+	}
+	return names;
 }
 
 int ClrHost::GetFieldCount(int instanceId)

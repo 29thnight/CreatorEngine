@@ -279,6 +279,25 @@ public static class Bootstrap
         catch { return 0; }
     }
 
+    /// <summary>
+    /// 등록된 스크립트 타입 이름을 '\n'으로 이어 buffer에 담는다. 반환값은 기록한 바이트 수.
+    /// 에디터의 컴포넌트 추가 메뉴가 C# 스크립트 목록을 그릴 때 쓴다.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int GetBehaviourTypeNames(byte* buffer, int capacity)
+    {
+        try
+        {
+            if (buffer == null || capacity <= 0) return 0;
+
+            string joined = string.Join('\n', ScriptFactory.RegisteredTypeNames);
+            if (joined.Length == 0) return 0;
+
+            return System.Text.Encoding.UTF8.GetBytes(joined, new Span<byte>(buffer, capacity));
+        }
+        catch { return 0; }
+    }
+
     [UnmanagedCallersOnly]
     public static float GetFieldFloat(int instanceId, int index)
     {

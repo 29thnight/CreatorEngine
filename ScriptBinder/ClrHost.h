@@ -97,6 +97,10 @@ public:
 	int CreateBehaviour(GameObject* owner, std::string_view typeName);
 	bool DestroyBehaviour(int instanceId);
 
+	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
+	// 선택 바인딩이라 구 어셈블리에서는 빈 목록을 돌려줄 수 있다.
+	std::vector<std::string> GetBehaviourTypeNames();
+
 
 	// 마지막 틱에서 관리 측이 보고한 활성 스크립트 수(경계 로그·진단용).
 	int LastActiveCount() const { return m_lastActiveCount; }
@@ -161,6 +165,7 @@ private:
 	using AwakeFn           = int(__stdcall*)();
 	using CreateFn          = int(__stdcall*)(ScriptObjectHandle, const char*);
 	using DestroyFn         = int(__stdcall*)(int);
+	using TypeNamesFn       = int(__stdcall*)(char*, int);
 
 	using LoadScriptsFn  = int(__stdcall*)(const char*);
 	using ReloadFn       = int(__stdcall*)();
@@ -197,6 +202,7 @@ private:
 	std::vector<ScriptAniEvent> m_aniEvents;
 	CreateFn     m_fnCreateBehaviour{ nullptr };
 	DestroyFn    m_fnDestroyBehaviour{ nullptr };
+	TypeNamesFn  m_fnGetBehaviourTypeNames{ nullptr };
 
 	LoadScriptsFn m_fnLoadScripts{ nullptr };
 	ReloadFn      m_fnReloadScripts{ nullptr };

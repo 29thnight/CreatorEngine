@@ -43,6 +43,9 @@ internal static class ScriptFactory
     /// <summary>현재 등록된 스크립트 타입 수(진단용).</summary>
     public static int RegisteredCount => _creators.Count;
 
+    /// <summary>등록된 스크립트 타입 이름들 — 에디터의 스크립트 추가 메뉴가 쓴다.</summary>
+    public static IReadOnlyCollection<string> RegisteredTypeNames => _creators.Keys;
+
     public static int Create(ObjectHandle owner, string typeName)
     {
         if (!_creators.TryGetValue(typeName, out var factory))
