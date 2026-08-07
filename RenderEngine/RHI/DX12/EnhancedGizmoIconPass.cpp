@@ -333,9 +333,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));
 
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
@@ -344,9 +342,6 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 
             for (const Batch& batch : m_batches)
             {
-                const auto textureTable = context.resources->GetDescriptorRing().Allocate(1);
-                if (!textureTable.IsValid()) break;
-
                 ID3D12Resource* resource = nullptr;
                 DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 uint32_t mipLevels = 1;
@@ -367,14 +362,18 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
 
                 // ★ 자원이 없으면 그리지 않는다 — 디스크립터 없이 그리면
                 // 힙의 쓰레기를 읽는다(SSGI에서 그것으로 GPU가 죽었다).
+                //
+                // CreateBindings도 널 리소스에 invalid를 돌려주지만, 여기서
+                // 먼저 끊는 것을 남긴다 — 이쪽은 '이 배치만 건너뛴다'이고
+                // 링 고갈은 '더 그릴 수 없다'라 처리가 다르다.
                 if (nullptr == resource) continue;
 
-                D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvDesc.Format = format;
-                srvDesc.Texture2D.MipLevels = mipLevels;
-                device->CreateShaderResourceView(resource, &srvDesc, textureTable.CpuAt(0));
+                const RHIBindingDesc bindings[] = {
+                    RHIBindingDesc::Srv2D(resource, format, 0, mipLevels),
+                };
+                const RHIBindingTable textureTable =
+                    context.resources->CreateBindings(bindings);
+                if (!textureTable.IsValid()) break;
 
                 commandList->SetGraphicsRootShaderResourceView(1,
                     instanceUpload.gpuAddress

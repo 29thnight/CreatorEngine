@@ -1,5 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "RenderFrameServices.h"
+#include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -21,17 +23,12 @@ class DX12DeviceResources;
 // DEFAULT 힙에 두고 업로드 링을 거쳐 복사한다. 업로드 힙에 두고 그대로 읽는
 // 방법도 있지만(첫 슬라이스의 쿼드가 그랬다) 그건 PCIe를 매 드로우마다 타므로
 // 실제 메시에는 맞지 않는다.
-class DX12MeshCache
+class DX12MeshCache : public IRenderMeshCache
 {
 public:
-    struct Entry
-    {
-        D3D12_VERTEX_BUFFER_VIEW vertexView{};
-        D3D12_INDEX_BUFFER_VIEW  indexView{};
-        uint32_t                 indexCount{ 0 };
-
-        bool IsValid() const { return 0 != indexCount; }
-    };
+    // 정의는 DX12ResourceEntries.h로 옮겼다(인터페이스 순환 회피).
+    // 기존 이름은 별칭으로 남긴다 — 호출부를 건드리지 않는다.
+    using Entry = DX12MeshEntry;
 
     struct Stats
     {
@@ -51,7 +48,7 @@ public:
     /// 업로드는 커맨드 리스트 기록을 동반하므로 프레임이 열려 있어야 한다
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
-    Entry GetOrUpload(Mesh* mesh, std::string& outError);
+    Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
 
     Stats  GetStats() const { return m_stats; }
     size_t GetCachedCount() const { return m_entries.size(); }

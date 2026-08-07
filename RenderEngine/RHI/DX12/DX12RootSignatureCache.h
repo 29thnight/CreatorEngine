@@ -1,5 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "RenderFrameServices.h"
+#include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
 #include <mutex>
@@ -26,16 +28,12 @@
 // 해시는 반드시 '내용'으로 해야 한다. D3D12_ROOT_SIGNATURE_DESC는 파라미터와
 // 정적 샘플러를 포인터로 들고 있어서, 구조체를 통째로 바이트 해시하면 주소를
 // 해시하는 꼴이 된다 — 같은 레이아웃이 매번 다른 키가 되고 캐시가 통째로 논다.
-class DX12RootSignatureCache
+class DX12RootSignatureCache : public IRenderRootSignatureCache
 {
 public:
-    struct Entry
-    {
-        ID3D12RootSignature* signature{ nullptr };
-        uint64_t             id{ 0 };   // 그대로 DX12GraphicsPipelineDesc::rootSignatureId에 넣는다
-
-        bool IsValid() const { return nullptr != signature; }
-    };
+    // 정의는 DX12ResourceEntries.h로 옮겼다(인터페이스 순환 회피).
+    // 기존 이름은 별칭으로 남긴다 — 호출부를 건드리지 않는다.
+    using Entry = DX12RootSignatureEntry;
 
     struct Stats
     {
@@ -50,7 +48,7 @@ public:
     bool IsInitialized() const { return nullptr != m_device.Get(); }
 
     // 같은 레이아웃이면 같은 객체와 같은 id를 돌려준다.
-    Entry GetOrCreate(const D3D12_ROOT_SIGNATURE_DESC& desc, std::string& outError);
+    Entry GetOrCreate(const D3D12_ROOT_SIGNATURE_DESC& desc, std::string& outError) override;
 
     // 설명만으로 식별자를 구한다(생성 없이). 해시가 레이아웃에만 의존하는지
     // 검증할 때 쓴다.

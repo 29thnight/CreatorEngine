@@ -386,27 +386,18 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             commandList->RSSetScissorRects(1, &scissor);
             commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-            // SRV 다섯을 연속으로 자른다 — 테이블은 연속이어야 한다.
-            const auto srvRange = context.resources->GetDescriptorRing().Allocate(5);
-            if (!srvRange.IsValid()) return;
-
-            // 깊이는 D32_FLOAT 리소스일 수 있어 포맷을 명시해야 한다.
-            D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
-            depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            depthSrv.Texture2D.MipLevels = 1;
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
-                &depthSrv, srvRange.CpuAt(0));
-
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.color), nullptr,
-                srvRange.CpuAt(1));
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.metalRough), nullptr,
-                srvRange.CpuAt(2));
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.normal), nullptr,
-                srvRange.CpuAt(3));
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.bitmask), nullptr,
-                srvRange.CpuAt(4));
+            // 테이블 하나로 잘라 받는다(R2). 깊이만 포맷을 명시한다 —
+            // D32_FLOAT 리소스를 SRV로 읽으려면 R32_FLOAT로 봐야 한다.
+            const RHIBindingDesc bindings[] = {
+                RHIBindingDesc::Srv2D(executeContext.Resolve(m_inputs.depth),
+                    DXGI_FORMAT_R32_FLOAT),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.color)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.metalRough)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.bitmask)),
+            };
+            const RHIBindingTable srvTable = context.resources->CreateBindings(bindings);
+            if (!srvTable.IsValid()) return;
 
             SSRConstants constants{};
             constants.inverseProjection = m_inverseProjection;
@@ -424,14 +415,12 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
             commandList->SetGraphicsRootConstantBufferView(0, cb.gpuAddress);
-            commandList->SetGraphicsRootDescriptorTable(1, srvRange.gpu);
+            commandList->SetGraphicsRootDescriptorTable(1, srvTable.gpu);
 
             commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             commandList->DrawInstanced(3, 1, 0, 0);

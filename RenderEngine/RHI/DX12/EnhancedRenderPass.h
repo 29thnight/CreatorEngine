@@ -5,15 +5,26 @@
 #include <vector>
 
 #include "EnhancedRenderGraph.h"
+#include "RenderFrameServices.h"
 #include "../../FrameCameraSnapshot.h"
 
 class Mesh;
 class Texture;
-class DX12DeviceResources;
-class DX12PSOManager;
-class DX12RootSignatureCache;
-class DX12MeshCache;
-class DX12TextureCache;
+
+// 백엔드 서비스는 인터페이스로 받는다(PHASE 3-1 재정의, R1).
+//
+// 예전에는 여기에 구현 클래스 다섯(DX12DeviceResources · DX12PSOManager ·
+// DX12RootSignatureCache · DX12MeshCache · DX12TextureCache)이 전방 선언돼
+// 있었고, 패스가 DX12에 닿는 모든 경로가 아래 EnhancedFrameContext를 지났다 —
+// 그래서 여기가 첫 절단선이 됐다. 메서드 이름을 그대로 둔 덕에 패스 본문
+// 149곳은 한 줄도 바뀌지 않는다(RenderFrameServices.h 주석 참조).
+//
+// ★ 전방 선언이 아니라 include다. 패스 .cpp가 인터페이스의 완전 정의를
+//   보장받아야 하는데, 전방 선언으로 두면 그 .cpp가 구현 헤더를 어쩌다
+//   include했을 때만 컴파일된다 — 유니티 빌드에서는 청크 구성에 따라
+//   우연히 통과했다가 파일 하나를 더하는 순간 깨진다(이 코드베이스가
+//   이미 두 번 겪은 함정이다). 새 의존은 아니다: 이 헤더는 이미
+//   EnhancedRenderGraph.h를 통해 d3d12.h를 들이고 있다.
 
 // EnhancedRenderPass — DX12 렌더 패스의 기반 (PHASE 3-6).
 //
@@ -122,11 +133,11 @@ struct EnhancedShadowData
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
 {
-    DX12DeviceResources*    resources{ nullptr };
-    DX12PSOManager*         psoManager{ nullptr };
-    DX12RootSignatureCache* rootSignatures{ nullptr };
-    DX12MeshCache*          meshCache{ nullptr };
-    DX12TextureCache*       textureCache{ nullptr };
+    IRenderDeviceServices*     resources{ nullptr };
+    IRenderPipelineCache*      psoManager{ nullptr };
+    IRenderRootSignatureCache* rootSignatures{ nullptr };
+    IRenderMeshCache*          meshCache{ nullptr };
+    IRenderTextureCache*       textureCache{ nullptr };
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };

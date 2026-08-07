@@ -728,4 +728,118 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::GetBackBufferRtv(uint32_t index
     return handle;
 }
 
+// ── 바인딩 (PHASE 3-1 재정의, R2) ──
+//
+// 패스마다 흩어져 있던 "링에서 자르고 → 뷰를 만들고 → 테이블을 건다"를 여기
+// 한 곳으로 모은다. 세 가지 실수가 여기서만 일어날 수 있게 되는 것이 요점이다:
+// 링 오버런 검사, 리소스 널 검사, ViewDimension·포맷 지정.
+RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
+{
+    if (descs.empty()) return {};
+
+    // 리소스가 하나라도 비면 테이블을 만들지 않는다.
+    //
+    // ★ 예전에는 이 검사가 없어서, 널 리소스에 뷰를 만들려다 실패한 자리가
+    //   테이블 안에 빈 칸으로 남았다. 검증 레이어가 그것을 잡지만 메시지가
+    //   드로우 시점에 나와서 어느 패스인지 짚기 어려웠다. 여기서 미리 끊으면
+    //   호출부가 invalid 하나만 보고 돌아설 수 있다.
+    for (const RHIBindingDesc& desc : descs)
+    {
+        if (nullptr == desc.resource) return {};
+    }
+
+    const auto range = m_descriptorRing.Allocate(static_cast<uint32_t>(descs.size()));
+    if (!range.IsValid()) return {};
+
+    ID3D12Device* device = m_device.Get();
+    for (uint32_t i = 0; i < descs.size(); ++i)
+    {
+        const RHIBindingDesc& desc = descs[i];
+        const D3D12_CPU_DESCRIPTOR_HANDLE handle = range.CpuAt(i);
+
+        if (RHIBindingDesc::Kind::UnorderedAccess == desc.kind)
+        {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uav{};
+            uav.Format = desc.format;
+            switch (desc.dim)
+            {
+            case RHIBindingDesc::Dim::Texture3D:
+                uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+                uav.Texture3D.WSize = desc.sliceCount;
+                break;
+            case RHIBindingDesc::Dim::Buffer:
+                uav.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                uav.Buffer.FirstElement = desc.firstElement;
+                uav.Buffer.NumElements = desc.numElements;
+                uav.Buffer.StructureByteStride = desc.structureByteStride;
+                break;
+            default:
+                uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                uav.Texture2D.MipSlice = desc.mostDetailedMip;
+                break;
+            }
+            device->CreateUnorderedAccessView(desc.resource, nullptr, &uav, handle);
+            continue;
+        }
+
+        // Default는 리소스가 스스로 아는 대로 본다 — nullptr 설명과 같다.
+        if (RHIBindingDesc::Dim::Default == desc.dim)
+        {
+            device->CreateShaderResourceView(desc.resource, nullptr, handle);
+            continue;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+        srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv.Format = desc.format;
+        switch (desc.dim)
+        {
+        case RHIBindingDesc::Dim::Texture2DArray:
+            srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+            srv.Texture2DArray.MostDetailedMip = desc.mostDetailedMip;
+            srv.Texture2DArray.MipLevels = desc.mipLevels;
+            srv.Texture2DArray.FirstArraySlice = desc.firstSlice;
+            srv.Texture2DArray.ArraySize = desc.sliceCount;
+            break;
+        case RHIBindingDesc::Dim::TextureCube:
+            srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            srv.TextureCube.MostDetailedMip = desc.mostDetailedMip;
+            srv.TextureCube.MipLevels = desc.mipLevels;
+            break;
+        case RHIBindingDesc::Dim::Texture3D:
+            srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+            srv.Texture3D.MostDetailedMip = desc.mostDetailedMip;
+            srv.Texture3D.MipLevels = desc.mipLevels;
+            break;
+        default:
+            srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srv.Texture2D.MostDetailedMip = desc.mostDetailedMip;
+            srv.Texture2D.MipLevels = desc.mipLevels;
+            break;
+        }
+        device->CreateShaderResourceView(desc.resource, &srv, handle);
+    }
+
+    RHIBindingTable table{};
+    table.gpu = range.gpu;
+    table.count = static_cast<uint32_t>(descs.size());
+    return table;
+}
+
+void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
+    bool withSamplers)
+{
+    if (nullptr == commandList) return;
+
+    if (withSamplers)
+    {
+        ID3D12DescriptorHeap* heaps[] = { m_descriptorRing.GetHeap(), m_samplerHeap.GetHeap() };
+        commandList->SetDescriptorHeaps(2, heaps);
+        return;
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorRing.GetHeap() };
+    commandList->SetDescriptorHeaps(1, heaps);
+}
+
 #endif

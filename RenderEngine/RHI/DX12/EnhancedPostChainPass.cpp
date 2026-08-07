@@ -263,8 +263,9 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
             [this, &context, pso, srcA, srcB, dst, params, dispatchW, dispatchH]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
+                // device를 더 들지 않는다 — 뷰 생성이 CreateBindings로 넘어가면서
+                // 이 패스가 디바이스에 닿을 이유가 사라졌다(R2가 노리는 것이 이것이다).
                 auto* commandList = executeContext.commandList;
-                auto* device = context.resources->GetDevice();
 
                 const auto cb = context.resources->GetUploadRing().Allocate(
                     sizeof(PostParams), DX12UploadRing::kConstantBufferAlignment);
@@ -276,34 +277,27 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
                 // 두 번째를 안 쓰는 단계에서도 같은 수를 잡고 첫 번째로
                 // 채운다. 조건에 따라 슬롯 수가 바뀌면 레지스터가 밀리는데,
                 // SSGI에서 그것으로 누적이 조용히 죽은 적이 있다.
-                const auto srvTable = context.resources->GetDescriptorRing().Allocate(2);
-                const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+                auto* resourceA = executeContext.Resolve(srcA);
+                auto* resourceB = executeContext.Resolve(srcB.IsValid() ? srcB : srcA);
+                auto* dstResource = executeContext.Resolve(dst);
+                if (nullptr == resourceA || nullptr == resourceB || nullptr == dstResource) return;
 
-                const auto makeSrv = [&](RGHandle handle, uint32_t slot)
-                {
-                    auto* resource = executeContext.Resolve(handle);
-                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                    srvDesc.Texture2D.MipLevels = 1;
-                    srvDesc.Format = resource->GetDesc().Format;
-                    device->CreateShaderResourceView(resource, &srvDesc, srvTable.CpuAt(slot));
+                // 포맷을 리소스에서 그대로 읽어 명시한다. 이 패스는 밉 하나짜리
+                // 2D만 다루므로 Default(nullptr 설명)로도 같지만, 원래 코드가
+                // 명시하던 것을 그대로 옮긴다 — 기준선은 지금 그림이다.
+                const RHIBindingDesc srvBindings[] = {
+                    RHIBindingDesc::Srv2D(resourceA, resourceA->GetDesc().Format),
+                    RHIBindingDesc::Srv2D(resourceB, resourceB->GetDesc().Format),
+                };
+                const RHIBindingDesc uavBindings[] = {
+                    RHIBindingDesc::Uav2D(dstResource, dstResource->GetDesc().Format),
                 };
 
-                makeSrv(srcA, 0);
-                makeSrv(srcB.IsValid() ? srcB : srcA, 1);
+                const RHIBindingTable srvTable = context.resources->CreateBindings(srvBindings);
+                const RHIBindingTable uavTable = context.resources->CreateBindings(uavBindings);
+                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-                auto* dstResource = executeContext.Resolve(dst);
-                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                uavDesc.Format = dstResource->GetDesc().Format;
-                device->CreateUnorderedAccessView(dstResource, nullptr,
-                    &uavDesc, uavTable.CpuAt(0));
-
-                ID3D12DescriptorHeap* heaps[] = {
-                    context.resources->GetDescriptorRing().GetHeap() };
-                commandList->SetDescriptorHeaps(1, heaps);
+                context.resources->BindDescriptorHeaps(commandList);
 
                 commandList->SetComputeRootSignature(m_rootSignature);
                 commandList->SetPipelineState(pso);

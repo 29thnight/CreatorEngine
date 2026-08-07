@@ -1,5 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "RenderFrameServices.h"
+#include "DX12ResourceEntries.h"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -29,25 +31,12 @@ class DX12DeviceResources;
 // 비용은 명시해 둔다: DX11 스테이징 복사 → Map → 업로드 링 → CopyTextureRegion.
 // 텍스처당 한 번이지만 큰 텍스처는 수십 ms가 들 수 있어 프레임 중에 부르면 안 된다.
 // 로딩 시점이나 첫 프레임에 몰아서 올리는 것이 전제다.
-class DX12TextureCache
+class DX12TextureCache : public IRenderTextureCache
 {
 public:
-    struct Entry
-    {
-        ID3D12Resource* resource{ nullptr };
-        DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
-        uint32_t        width{ 0 };
-        uint32_t        height{ 0 };
-        uint32_t        mipLevels{ 0 };
-
-        // 업로드 경로는 처음부터 배열 전체를 옮겼는데(GetCopyableFootprints가
-        // 밉 x 슬라이스를 다 안다) Entry가 그 사실을 알리지 않아 소비자가
-        // 큐브맵을 2D로 볼 수밖에 없었다 — 스카이박스 운반(28차 이후)에서 추가.
-        uint32_t        arraySize{ 1 };
-        bool            isCube{ false };
-
-        bool IsValid() const { return nullptr != resource; }
-    };
+    // 정의는 DX12ResourceEntries.h로 옮겼다(인터페이스 순환 회피).
+    // 기존 이름은 별칭으로 남긴다 — 호출부를 건드리지 않는다.
+    using Entry = DX12TextureEntry;
 
     struct Stats
     {
@@ -65,7 +54,7 @@ public:
 
     /// 텍스처를 올리고 핸들을 돌려준다. 이미 올라가 있으면 그대로 준다.
     /// 프레임이 열려 있어야 한다(BeginFrame과 EndFrame 사이).
-    Entry GetOrUpload(Texture* texture, std::string& outError);
+    Entry GetOrUpload(Texture* texture, std::string& outError) override;
 
     /// 재질에 텍스처가 없을 때 쓸 1x1 흰색. 분기 없이 항상 뭔가를 바인딩할 수
     /// 있게 해 준다 — 셰이더에서 "텍스처가 있으면" 분기를 없애는 쪽이 빠르다.
@@ -75,8 +64,8 @@ public:
     /// 뒤집힌다 — emissive에 흰색이면 텍스처 없는 재질이 전부 자체발광이고,
     /// ORM에 흰색이면 B(금속)가 1이라 확산이 통째로 죽는다(IBL 소비 검증이
     /// '끔=검정' 대조군으로 잡았다). 프레임이 열려 있어야 한다(첫 호출 생성).
-    Entry GetBlackTexture(std::string& outError);
-    Entry GetOrmNeutralTexture(std::string& outError);   // (occ 1 · rough 1 · metal 0)
+    Entry GetBlackTexture(std::string& outError) override;
+    Entry GetOrmNeutralTexture(std::string& outError) override;   // (occ 1 · rough 1 · metal 0)
 
     /// 대형 텍스처용 전용 스테이징을 비운다. 링 용량을 넘는 텍스처(4K HDR
     /// equirect 128MB 실측)는 1회용 업로드 버퍼로 나르는데, GPU가 복사를

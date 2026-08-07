@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "RenderFrameServices.h"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -93,7 +94,7 @@ struct DX12ComputePipelineDesc
     uint64_t ComputeHash() const;
 };
 
-class DX12PSOManager
+class DX12PSOManager : public IRenderPipelineCache
 {
 public:
     struct Stats
@@ -118,10 +119,10 @@ public:
     void Shutdown();
 
     // 동기 취득 — 미스면 이 자리에서 컴파일한다(로딩 시점용).
-    ID3D12PipelineState* GetOrCreate(const DX12GraphicsPipelineDesc& desc, std::string& outError);
+    ID3D12PipelineState* GetOrCreate(const DX12GraphicsPipelineDesc& desc, std::string& outError) override;
 
     // 컴퓨트 PSO. 같은 캐시 2층을 공유한다.
-    ID3D12PipelineState* GetOrCreateCompute(const DX12ComputePipelineDesc& desc, std::string& outError);
+    ID3D12PipelineState* GetOrCreateCompute(const DX12ComputePipelineDesc& desc, std::string& outError) override;
 
     // 비동기 요청 — 준비됐으면 Ready + 포인터, 아니면 Pending(컴파일은 백그라운드로).
     RequestState Request(const DX12GraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);

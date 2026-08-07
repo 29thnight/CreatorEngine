@@ -1,5 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
+#include "RenderFrameServices.h"
 #include <cstdint>
 #include <string>
 #include <array>
@@ -23,7 +24,7 @@
 //   - 프레임 인플라이트: 얼로케이터 3개를 펜스로 회전(프레임당 하나, GPU가 그
 //     프레임을 끝냈음을 펜스로 확인한 뒤에만 Reset)
 //   - 리소스 상태: RT ↔ COPY_SOURCE 전이를 배리어로 직접 선언
-class DX12DeviceResources
+class DX12DeviceResources : public IRenderDeviceServices
 {
 public:
     static constexpr uint32_t kFrameCount = 3;
@@ -119,11 +120,11 @@ public:
     /// operationResult가 일반 실패이고 장치는 살아 있으면 아무것도 추가하지 않는다.
     void AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const;
 
-    ID3D12Device* GetDevice() const { return m_device.Get(); }
+    ID3D12Device* GetDevice() const override {  return m_device.Get(); }
 
     // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).
     ID3D12CommandQueue* GetCommandQueue() const { return m_queue.Get(); }
-    ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList.Get(); }
+    ID3D12GraphicsCommandList* GetCommandList() const override {  return m_commandList.Get(); }
     ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }
     ID3D12Resource* GetReadbackBuffer() const { return m_readback.Get(); }
@@ -136,16 +137,21 @@ public:
     // 여기 묶어 두는 이유: 링의 반납 규칙이 "BeginFrame이 그 슬롯의 펜스를
     // 기다린 뒤에 되감는다"에 기대고 있다. 링을 따로 들고 다니면 그 계약이
     // 호출부 규율이 되고, 한 곳만 어겨도 GPU가 읽는 중인 데이터를 덮어쓴다.
-    DX12UploadRing& GetUploadRing() { return m_uploadRing; }
+    DX12UploadRing& GetUploadRing() override {  return m_uploadRing; }
     const DX12UploadRing& GetUploadRing() const { return m_uploadRing; }
 
     // 프레임 디스크립터 링. 업로드 링과 같은 이유로 여기 묶는다 — 되감기 시점이
     // 펜스 대기 뒤여야 한다는 계약이 호출부 규율이 되면 언젠가 어긋난다.
-    DX12DescriptorRing& GetDescriptorRing() { return m_descriptorRing; }
+    DX12DescriptorRing& GetDescriptorRing() override {  return m_descriptorRing; }
     const DX12DescriptorRing& GetDescriptorRing() const { return m_descriptorRing; }
 
     // 샘플러 힙은 프레임과 무관하다(설정이 바뀌지 않는다) — 되감지 않는다.
-    DX12SamplerHeap& GetSamplerHeap() { return m_samplerHeap; }
+    DX12SamplerHeap& GetSamplerHeap() override {  return m_samplerHeap; }
+
+    // ── 바인딩(R2) — 구현은 .cpp에 ──
+    RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
+    void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
+        bool withSamplers = false) override;
     const DX12SamplerHeap& GetSamplerHeap() const { return m_samplerHeap; }
 
 private:
