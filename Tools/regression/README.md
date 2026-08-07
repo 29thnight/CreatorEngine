@@ -34,6 +34,28 @@ pwsh Tools/regression/verify-lifecycle-baseline.ps1 -Baseline
 인스턴스 ID와 프레임 번호는 실행마다 달라지므로 비교에서 뺀다 — 남는 것은
 (단계, 타입, 오브젝트 이름)의 **순서**이고, 그것이 생명주기의 계약이다.
 
+## 두 디스패치 경로 (PHASE 9-1)
+
+전환기 동안 생명주기 디스패치 경로가 둘이다. 기준선도 경로마다 따로 둔다.
+
+```powershell
+pwsh Tools/regression/verify-lifecycle-baseline.ps1            # 델리게이트(기존)
+pwsh Tools/regression/verify-lifecycle-baseline.ps1 -Registry  # 레지스트리(신규)
+```
+
+경로 선택은 **기동 인자** `--lifecycle-registry`다. CLI(`lifecycle.registry on`)로도 바꿀 수 있지만,
+CLI는 엔진이 다 선 뒤에 열려서 기본 씬의 `Main Camera`·`Directional Light`가 이미 옛 경로에
+등록된 뒤다. 그 상태로 바꾸면 그 둘만 다른 규약을 따른다 — A/B 대조가 실제로 그 어긋남을
+사건 2건의 차이로 잡아냈다. 그래서 검증 스크립트는 기동 인자를 쓴다.
+
+**두 경로는 같은 사건을 내지만 단계 안의 순서가 다르다.** 델리게이트 쪽은 우선순위 정렬
+삽입(`lower_bound` + `>` 비교자)이 같은 우선순위에서 항상 맨 앞에 꽂아 **등록 역순**으로
+돌았다 — 설계된 계약이 아니라 자료구조에서 나온 부수 효과다. 레지스트리는 등록 순서로 돈다.
+기준선을 하나로 두면 어느 쪽을 고쳐도 나머지가 깨져 결국 무시되므로 파일을 나눴다.
+
+검증 실패 시 출력은 **"사건이 빠졌다"와 "순서만 다르다"를 갈라서** 보고한다. 전자는 결함이고
+후자는 설계 판단이라 성격이 다르다.
+
 ## AddressSanitizer 빌드 (PHASE 9-0 / 0-5)
 
 ```powershell

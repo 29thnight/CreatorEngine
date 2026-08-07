@@ -9,7 +9,14 @@
 #include <unordered_map>
 
 #pragma region forward_decl
+// LifecycleRegistry.h를 여기서 포함하지 않는 이유:
+//   Scene.h → LifecycleRegistry.h → Component.h → Component.inl → GameObject.h
+//   → GameObject.inl → IRegistableEvent.h → Scene.h 로 되돌아온다.
+// Scene.h가 필요한 것은 이름뿐이므로 전방 선언으로 끊고, 구현은 Scene.cpp에서 포함한다.
+// (고정 기반 타입을 준 enum은 전방 선언이 가능하다)
+namespace Lifecycle { enum PhaseBits : uint16_t; }
 struct ICollider;
+class Component;
 class GameObject;
 class RenderScene;
 class SceneManager;
@@ -109,6 +116,58 @@ public:
     //Disable or Enable
     Core::Delegate<void>					OnDisableEvent{};
     Core::Delegate<void>					OnDestroyEvent{};
+
+public:
+    // ── 생명주기 레지스트리 (PHASE 9-1) ──
+    //
+    // 델리게이트 구독을 대신하는 경로다. 전환기 동안 두 경로가 공존하고,
+    // UseRegistry()가 어느 쪽이 실제로 도는지를 정한다.
+    //
+    // 원소가 raw Component*인 것은 소유가 GameObject의 shared_ptr에 있기 때문이다.
+    // 그 포인터가 뜰 수 없는 이유는 파괴가 프레임 끝 한 지점에서만 일어나고, 그때
+    // 리스트에서 먼저 빼기 때문이다 — 순회 중에 리스트가 바뀌는 상황 자체가 없다.
+    // (델리게이트 경로는 순회 중 파괴가 가능했고, 그것이 R1·R2였다)
+
+    /// 전환 스위치. 기본은 꺼짐 — 켜야 새 경로가 돈다.
+    static bool UseRegistry() noexcept;
+    static void SetUseRegistry(bool use) noexcept;
+
+    /// 컴포넌트를 레지스트리에 편입한다. 마스크를 보고 해당 단계 리스트에만 넣는다.
+    /// 등록되지 않은 타입이면 오류로 남기고 편입하지 않는다(조용히 넘어가지 않는다).
+    void RegisterComponent(Component* component);
+    /// 리스트에서 뺀다. swap-and-pop이라 O(1)이고 순서는 보존하지 않는다 —
+    /// 순서를 보존해야 하는 것은 단계 사이지 같은 단계 안이 아니다.
+    void UnregisterComponent(Component* component);
+
+    /// 이미 씬에 있는 컴포넌트 전부를 레지스트리로 인수한다.
+    ///
+    /// 경로를 켜는 시점에 씬이 이미 서 있으면(기동 직후 기본 씬이 그렇다) 그 컴포넌트들은
+    /// 델리게이트 쪽에만 있어, 전환 후 아무 단계도 받지 못한 채 사라진다.
+    /// 실제로 그렇게 OnDestroy 2건이 유실되는 것을 A/B 대조가 잡아냈다.
+    void AdoptExistingComponents();
+
+    /// 프레임 끝의 유일한 파괴 지점. 파괴 표시된 것들의 OnDisable→OnDestroy를 부르고
+    /// 리스트에서 뺀다. 실제 메모리 해제는 기존 DestroyGameObjects가 이어서 한다.
+    void FlushPendingDestroy();
+
+    /// 진단용 — 각 리스트 크기.
+    struct RegistryCounts { size_t pendingAwake, pendingStart, update, lateUpdate, fixedUpdate; };
+    RegistryCounts GetRegistryCounts() const;
+
+private:
+    // 편입 대기. Awake는 등록 순서대로 한 번씩만 불린다.
+    std::vector<Component*> m_pendingAwake;
+    std::vector<Component*> m_pendingStart;
+    // 매 프레임 도는 리스트.
+    std::vector<Component*> m_updateList;
+    std::vector<Component*> m_lateUpdateList;
+    std::vector<Component*> m_fixedUpdateList;
+    // OnDestroy를 받아야 하는 것들(파괴 표시 여부는 프레임 끝에 본다).
+    std::vector<Component*> m_destroyWatchList;
+
+    // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
+    void RegistryDrainAwakeAndStart();
+    void RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits phase, float delta);
 
 public:
     //EventBroadcaster

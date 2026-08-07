@@ -285,6 +285,7 @@
     <ClCompile Include="ActionMap.cpp" />
     <ClCompile Include="InputActionManager.cpp" />
     <ClCompile Include="LifecycleTrace.cpp" />
+    <ClCompile Include="LifecycleRegistry.cpp" />
     <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
@@ -378,6 +379,7 @@
     <ClInclude Include="InputAction.h" />
     <ClInclude Include="InputActionManager.h" />
     <ClInclude Include="LifecycleTrace.h" />
+    <ClInclude Include="LifecycleRegistry.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IProjectSetting.h" />

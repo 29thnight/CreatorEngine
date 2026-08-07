@@ -47,6 +47,13 @@ public:
 
 	virtual void Destroy() override final;
 
+	// 생명주기 배선의 단일 지점 (PHASE 9-1).
+	//
+	// AddComponent 경로가 넷이라(템플릿 2 + 리플렉션 2) 전환 스위치를 각 자리에서
+	// 보면 넷 중 하나를 빠뜨렸을 때 그 경로로 만든 컴포넌트만 조용히 틱을 못 받는다.
+	// 한 곳으로 모아 그 실수를 구조적으로 막는다.
+	void AttachComponentLifecycle(const std::shared_ptr<Component>& component);
+
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 
 	// 같은 타입을 여러 개 붙일 수 있는 형태.

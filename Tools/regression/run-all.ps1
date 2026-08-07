@@ -72,8 +72,16 @@ Run-Step "크래시 덤프 경로" {
 # 기준선이 없는데 실패로 처리하면, 이 항목을 아직 시작하지 않은 사람에게
 # 회귀 세트가 통째로 빨갛게 보인다 — 그러면 세트 전체가 무시되기 시작한다.
 if (Test-Path (Join-Path $PSScriptRoot "lifecycle_baseline.tsv")) {
-    Run-Step "생명주기 순서" {
+    Run-Step "생명주기 순서 (델리게이트)" {
         & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-baseline.ps1") -Exe $Exe -Work $Work
+    }
+
+    # 레지스트리 경로(PHASE 9-1)도 자기 기준선에 대조한다.
+    # 전환기 동안 두 경로가 함께 돌므로 회귀도 둘 다 지켜야 한다.
+    if (Test-Path (Join-Path $PSScriptRoot "lifecycle_baseline_registry.tsv")) {
+        Run-Step "생명주기 순서 (레지스트리)" {
+            & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-baseline.ps1") -Exe $Exe -Work $Work -Registry
+        }
     }
 } else {
     "=== 생명주기 순서 === 건너뜀 (기준선 없음 — verify-lifecycle-baseline.ps1 -Baseline)"

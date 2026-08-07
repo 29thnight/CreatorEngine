@@ -1,4 +1,7 @@
 #include "Scene.h"
+#include "LifecycleRegistry.h"
+#include "LifecycleTrace.h"
+#include "GameObject.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "LightComponent.h"
@@ -741,8 +744,260 @@ void Scene::Reset()
     // 관리 스크립트(ScriptComponent)는 ClrHost가 재부착을 스스로 처리한다.
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 생명주기 레지스트리 (PHASE 9-1)
+// ─────────────────────────────────────────────────────────────────────────────
+namespace
+{
+    // 전환 스위치. 기본은 꺼짐 — 기존 델리게이트 경로가 그대로 돈다.
+    //
+    // 전역인 이유: 씬마다 다른 경로를 쓰면 씬 전환 지점에서 두 규약이 만나고,
+    // 그때 어느 쪽이 파괴를 책임지는지가 모호해진다. 경로 선택은 엔진 전체의 성질이다.
+    bool g_useLifecycleRegistry = false;
+
+    // swap-and-pop 제거. 순서를 보존하지 않는 것이 의도다 —
+    // 보존해야 하는 것은 단계 사이의 순서이지 같은 단계 안의 순서가 아니고,
+    // erase로 앞당기면 제거가 O(n)이 되어 씬 전환마다 수천 번 돈다.
+    bool RemoveFromList(std::vector<Component*>& list, Component* target)
+    {
+        for (size_t i = 0; i < list.size(); ++i)
+        {
+            if (list[i] != target) continue;
+            list[i] = list.back();
+            list.pop_back();
+            return true;
+        }
+        return false;
+    }
+
+    // 기록용 타입 이름.
+    //
+    // 델리게이트 경로는 T를 알아 컴파일 타임 이름을 썼지만, 여기서는 Component*뿐이다.
+    // 리플렉션 레지스트리가 typeID로 이름을 들고 있으므로 그것을 쓴다 —
+    // 두 경로가 **같은 문자열**을 남겨야 9-0 기준선과 대조가 성립한다.
+    // Meta::Type은 T::Reflect()가 돌려주는 정적 객체라 c_str()의 수명이 안전하다.
+    const char* TraceTypeName(Component* component)
+    {
+        const Meta::Type* type = Meta::Find(component->GetTypeID().m_ID_Data);
+        return (nullptr != type) ? type->name.c_str() : "?";
+    }
+}
+
+bool Scene::UseRegistry() noexcept { return g_useLifecycleRegistry; }
+void Scene::SetUseRegistry(bool use) noexcept { g_useLifecycleRegistry = use; }
+
+void Scene::RegisterComponent(Component* component)
+{
+    if (nullptr == component) return;
+
+    // 표가 비어 있으면 여기서 세운다.
+    //
+    // ComponentFactory::Initialize가 세우도록 해 뒀지만, 기동 시 기본 씬의
+    // Main Camera·Directional Light는 그보다 먼저 만들어진다 — 그때 표가 비어 있어
+    // 그 둘만 등록되지 않았고, A/B 대조가 OnDestroy 2건 유실로 잡아냈다.
+    // 초기화 순서에 기대지 않는 편이 낫다.
+    if (0 == Lifecycle::Registry::Count()) Lifecycle::Registry::RegisterAllComponents();
+
+    const uint16_t mask = Lifecycle::Registry::Find(component->GetTypeID().m_ID_Data);
+
+    if (Lifecycle::Registry::kUnregistered == mask)
+    {
+        // 조용히 넘어가지 않는다.
+        //
+        // 예전 CRTP에서는 이 상황("생명주기를 받아야 하는데 판정에서 빠졌다")이
+        // '훅이 하나도 없는 타입'과 구분되지 않아 아무 일도 안 일어난 채 지나갔다.
+        // 컴포넌트를 새로 만들고 LifecycleRegistry.cpp의 목록에 넣는 것을 잊으면
+        // 여기서 이름과 함께 드러난다.
+        Debug->LogError("[Lifecycle] 등록되지 않은 컴포넌트 타입: "
+            + component->ToString() + " — LifecycleRegistry.cpp의 목록에 추가할 것");
+        return;
+    }
+
+    if (Lifecycle::Bit_None == mask) return;  // 훅이 하나도 없는 타입 — 넣을 곳이 없다
+
+    // 이미 Awake를 받은 컴포넌트는 큐에 넣지 않는다.
+    //
+    // 등록은 한 번이 아니다 — DDOL은 씬을 건널 때마다, 경로 전환은 그 시점에
+    // 다시 등록한다. 상태를 보지 않으면 그때마다 Awake가 또 돈다.
+    if ((mask & Lifecycle::Bit_Awake) && !component->HasLifecycleState(Component::State_AwakeCalled))
+    {
+        m_pendingAwake.push_back(component);
+    }
+    else if ((mask & Lifecycle::Bit_Start) && !component->HasLifecycleState(Component::State_StartCalled))
+    {
+        m_pendingStart.push_back(component);
+    }
+
+    if (mask & Lifecycle::Bit_Update)      m_updateList.push_back(component);
+    if (mask & Lifecycle::Bit_LateUpdate)  m_lateUpdateList.push_back(component);
+    if (mask & Lifecycle::Bit_FixedUpdate) m_fixedUpdateList.push_back(component);
+    if (mask & Lifecycle::Bit_OnDestroy)   m_destroyWatchList.push_back(component);
+}
+
+void Scene::UnregisterComponent(Component* component)
+{
+    if (nullptr == component) return;
+
+    RemoveFromList(m_pendingAwake, component);
+    RemoveFromList(m_pendingStart, component);
+    RemoveFromList(m_updateList, component);
+    RemoveFromList(m_lateUpdateList, component);
+    RemoveFromList(m_fixedUpdateList, component);
+    RemoveFromList(m_destroyWatchList, component);
+}
+
+void Scene::AdoptExistingComponents()
+{
+    // 컴포넌트가 이미 Awake를 받았는지는 RegisterComponent가 상태로 판단하므로,
+    // 여기서는 통째로 넣기만 하면 된다 — 살아 있던 것이 다시 깨어나지 않는다.
+    for (const auto& owned : m_SceneObjects)
+    {
+        GameObject* object = owned.get();
+        if (nullptr == object) continue;
+
+        for (const auto& component : object->m_components)
+        {
+            if (!component) continue;
+            RegisterComponent(component.get());
+        }
+    }
+}
+
+Scene::RegistryCounts Scene::GetRegistryCounts() const
+{
+    return RegistryCounts{
+        m_pendingAwake.size(), m_pendingStart.size(),
+        m_updateList.size(), m_lateUpdateList.size(), m_fixedUpdateList.size(),
+    };
+}
+
+void Scene::RegistryDrainAwakeAndStart()
+{
+    // 큐를 통째로 옮겨 놓고 돈다.
+    //
+    // Awake 안에서 AddComponent를 부르면 새 컴포넌트가 m_pendingAwake에 들어오는데,
+    // 원본을 순회 중이면 그 push_back이 순회를 무효화한다. 옮겨 두면 새로 들어온
+    // 것은 이번 바퀴에 끼지 않고 다음 프레임에 처리된다 — 이것이 재진입 안전의
+    // 핵심이고, 델리게이트 경로가 하지 못하던 것이다.
+    std::vector<Component*> awaking;
+    awaking.swap(m_pendingAwake);
+
+    for (Component* component : awaking)
+    {
+        if (nullptr == component) continue;
+        GameObject* owner = component->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!component->IsEnabled()) { m_pendingAwake.push_back(component); continue; }
+
+        component->MarkLifecycleState(Component::State_AwakeCalled);
+        LIFECYCLE_TRACE(Lifecycle::Phase::Awake, TraceTypeName(component),
+            owner->m_name.ToString().c_str(), component->GetInstanceID());
+        component->Awake();
+
+        const uint16_t mask = Lifecycle::Registry::Find(component->GetTypeID().m_ID_Data);
+        if ((mask & Lifecycle::Bit_Start) && !component->HasLifecycleState(Component::State_StartCalled))
+        {
+            m_pendingStart.push_back(component);
+        }
+    }
+
+    std::vector<Component*> starting;
+    starting.swap(m_pendingStart);
+
+    for (Component* component : starting)
+    {
+        if (nullptr == component) continue;
+        GameObject* owner = component->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!component->IsEnabled()) { m_pendingStart.push_back(component); continue; }
+
+        component->MarkLifecycleState(Component::State_StartCalled);
+        LIFECYCLE_TRACE(Lifecycle::Phase::Start, TraceTypeName(component),
+            owner->m_name.ToString().c_str(), component->GetInstanceID());
+        component->Start();
+    }
+}
+
+void Scene::RegistryTick(std::vector<Component*>& list, Lifecycle::PhaseBits phase, float delta)
+{
+    // 인덱스로 돈다. 순회 중 리스트가 커질 수 있기 때문이다(AddComponent는 pending
+    // 큐로 가므로 이 리스트는 안 커지지만, 규약을 코드로 못 박아 두는 편이 낫다).
+    // 리스트가 줄어드는 일은 없다 — 제거는 프레임 끝 한 지점에서만 일어난다.
+    for (size_t i = 0; i < list.size(); ++i)
+    {
+        Component* component = list[i];
+        if (nullptr == component) continue;
+
+        GameObject* owner = component->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) continue;
+        if (!component->IsEnabled()) continue;
+
+        switch (phase)
+        {
+        case Lifecycle::Bit_Update:
+            LIFECYCLE_TRACE(Lifecycle::Phase::Update, TraceTypeName(component),
+                owner->m_name.ToString().c_str(), component->GetInstanceID());
+            component->Update(delta);
+            break;
+        case Lifecycle::Bit_LateUpdate:
+            LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, TraceTypeName(component),
+                owner->m_name.ToString().c_str(), component->GetInstanceID());
+            component->LateUpdate(delta);
+            break;
+        case Lifecycle::Bit_FixedUpdate:
+            LIFECYCLE_TRACE(Lifecycle::Phase::FixedUpdate, TraceTypeName(component),
+                owner->m_name.ToString().c_str(), component->GetInstanceID());
+            component->FixedUpdate(delta);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void Scene::FlushPendingDestroy()
+{
+    // 프레임 끝의 유일한 파괴 지점.
+    //
+    // 여기가 유일하다는 것이 R1(순회 중 UAF)과 R2(즉시 파괴)를 동시에 닫는다 —
+    // 순회하는 동안에는 리스트에서 아무것도 빠지지 않으므로, "순회 중인 것이 죽는"
+    // 상황이 표현 자체가 불가능해진다. 유니티가 Destroy를 프레임 경계로 미루는 이유와 같다.
+    if (m_destroyWatchList.empty()) return;
+
+    std::vector<Component*> doomed;
+    for (Component* component : m_destroyWatchList)
+    {
+        if (nullptr == component) continue;
+        GameObject* owner = component->GetOwner();
+        const bool dying = (nullptr == owner) || owner->IsDestroyMark() || component->IsDestroyMark();
+        if (dying) doomed.push_back(component);
+    }
+
+    for (Component* component : doomed)
+    {
+        GameObject* owner = component->GetOwner();
+
+        // 이름을 값으로 붙든다.
+        //
+        // ToString()은 값을 돌려주므로 그 c_str()을 const char*에 담으면 문장이
+        // 끝나는 순간 뜬다. 실제로 기록에 빈 이름이 찍혀 드러났다 — 크래시가 아니라
+        // '이름만 비는' 모습이라 눈으로는 알아채기 어려운 종류다.
+        const std::string ownerName = (nullptr != owner) ? owner->m_name.ToString() : std::string("?");
+
+        LIFECYCLE_TRACE(Lifecycle::Phase::OnDestroy, TraceTypeName(component), ownerName.c_str(), component->GetInstanceID());
+        component->OnDestroy();
+
+        UnregisterComponent(component);
+    }
+}
+
 void Scene::Awake()
 {
+    if (UseRegistry())
+    {
+        RegistryDrainAwakeAndStart();
+        return;
+    }
     AwakeEvent.Broadcast();
 }
 
@@ -753,6 +1008,11 @@ void Scene::OnEnable()
 
 void Scene::Start()
 {
+    // 레지스트리 경로에서는 Awake 단계가 pendingStart까지 소진한다.
+    // Awake 직후에 Start를 부르는 것이 규약이라 두 단계를 한 지점에서 처리하고,
+    // 여기서 또 부르면 같은 프레임에 Start가 두 번 돈다.
+    if (UseRegistry()) return;
+
     StartEvent.Broadcast();
 }
 
@@ -770,7 +1030,8 @@ void Scene::FixedUpdate(float deltaSecond)
     SetInternalPhysicData();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("fixedBroadcast");
-    FixedUpdateEvent.Broadcast(deltaSecond);
+    if (UseRegistry()) RegistryTick(m_fixedUpdateList, Lifecycle::Bit_FixedUpdate, deltaSecond);
+    else               FixedUpdateEvent.Broadcast(deltaSecond);
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("internalfixedBroadcast");
     InternalPhysicsUpdateEvent.Broadcast(deltaSecond);
@@ -844,7 +1105,8 @@ void Scene::Update(float deltaSecond)
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("UpdateEvent");
-    UpdateEvent.Broadcast(deltaSecond);
+    if (UseRegistry()) RegistryTick(m_updateList, Lifecycle::Bit_Update, deltaSecond);
+    else               UpdateEvent.Broadcast(deltaSecond);
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
@@ -862,7 +1124,8 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
-    LateUpdateEvent.Broadcast(deltaSecond);
+    if (UseRegistry()) RegistryTick(m_lateUpdateList, Lifecycle::Bit_LateUpdate, deltaSecond);
+    else               LateUpdateEvent.Broadcast(deltaSecond);
 
     CullMeshData();
 }
@@ -877,7 +1140,14 @@ void Scene::OnDisable()
 void Scene::OnDestroy()
 {
     PROFILE_CPU_BEGIN("OnDestroyBroadcast");
-    OnDestroyEvent.Broadcast();
+    // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
+    // DestroyGameObjects가 실제 해제를 하므로, 그 직전이 OnDestroy를 부를 마지막 기회다.
+    //
+    // 레지스트리 경로는 여기서만 파괴가 일어난다는 것을 불변식으로 쓴다: 순회하는
+    // 동안에는 리스트에서 아무것도 빠지지 않으므로 '순회 중인 것이 죽는' 상황이
+    // 표현 불가능해진다(R1·R2가 여기서 닫힌다).
+    if (UseRegistry()) FlushPendingDestroy();
+    else               OnDestroyEvent.Broadcast();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("DestroyLight");
     DestroyLight();

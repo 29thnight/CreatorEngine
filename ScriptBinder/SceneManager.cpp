@@ -948,7 +948,11 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
         }
     }
 
-    // 컴포넌트 이벤트 재등록
+    // 컴포넌트 생명주기 재등록.
+    //
+    // DDOL 오브젝트는 씬을 건너 살아남으므로 새 씬의 디스패치 대상에 다시 넣어야 한다.
+    // 이 경로를 빠뜨리면 씬 전환 후 DDOL 오브젝트만 조용히 틱을 못 받는다 —
+    // 증상이 '가끔 안 움직인다'라 원인을 짚기 어려운 종류다.
     for (auto& obj : m_dontDestroyOnLoadObjects)
     {
         auto go = std::dynamic_pointer_cast<GameObject>(obj);
@@ -957,6 +961,13 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
         for (auto& comp : go->m_components)
         {
             if (!comp) continue;
+
+            if (Scene::UseRegistry())
+            {
+                scene->RegisterComponent(comp.get());
+                continue;
+            }
+
             if (auto reg = dynamic_cast<IRegistableEvent*>(comp.get()))
             {
                 reg->RegisterOverriddenEvents(scene);

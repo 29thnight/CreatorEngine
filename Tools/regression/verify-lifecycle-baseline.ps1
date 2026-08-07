@@ -28,7 +28,10 @@ param(
     # 왕복에 쓸 두 씬. 구조가 다른 둘을 고르는 것이 요점이다 — 같은 성격의 씬끼리
     # 오가면 컴포넌트 구성이 비슷해 파괴·초기화 순서의 차이가 드러나지 않는다.
     [string]$SceneA = "FT_Material",
-    [string]$SceneB = "UITestScene"
+    [string]$SceneB = "UITestScene",
+    # 새 레지스트리 경로로 돌린다(PHASE 9-1). 기준선은 델리게이트 경로로 떴으므로,
+    # 이것을 켜고 통과하면 두 경로가 같은 순서를 낸다는 뜻이다 — 그것이 9-1의 완료 조건이다.
+    [switch]$Registry
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -63,19 +66,46 @@ function Resolve-Scene([string]$name) {
 $pathA = Resolve-Scene $SceneA
 $pathB = Resolve-Scene $SceneB
 
+# 경로는 CLI 명령이 아니라 기동 인자로 정한다.
+#
+# CLI는 엔진이 다 선 뒤에 열려서, 기본 씬의 Main Camera·Directional Light가 이미
+# 옛 경로에 등록된 뒤다. 그 상태로 경로를 바꾸면 그 둘만 규약이 달라진다 —
+# A/B 대조가 실제로 그 어긋남을 잡아냈다.
+$registrySetup = "# (경로는 기동 인자로 정한다)"
+
 $scenario = Join-Path $Work "lifecycle_baseline_resolved.txt"
 (Get-Content $template -Raw) `
     -replace '\{\{SCENE_A\}\}', $pathA `
-    -replace '\{\{SCENE_B\}\}', $pathB |
+    -replace '\{\{SCENE_B\}\}', $pathB `
+    -replace '\{\{REGISTRY_SETUP\}\}', $registrySetup |
     Set-Content $scenario -Encoding UTF8
 
-$baselineFile = Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
+# 인자는 시나리오 경로가 정해진 뒤에 만든다.
+$exeArgs = @("--script", $scenario)
+if ($Registry) { $exeArgs = @("--lifecycle-registry") + $exeArgs }
+
+if ($Registry) { "경로: 레지스트리 (PHASE 9-1)" } else { "경로: 델리게이트 (기존)" }
+
+# 기준선은 경로마다 따로 둔다.
+#
+# 두 경로는 같은 사건을 내지만 단계 안의 순서가 다르다. 델리게이트 쪽은 우선순위
+# 정렬 삽입(lower_bound + '>' 비교자)이 같은 우선순위에서 항상 맨 앞에 꽂아
+# **등록 역순**으로 돌았다 — 설계된 계약이 아니라 자료구조에서 나온 부수 효과다.
+# 레지스트리는 등록 순서로 돈다.
+#
+# 하나의 기준선으로 둘을 재면 어느 쪽을 고쳐도 나머지가 깨져 결국 무시된다.
+# 경로별로 두면 각각이 자기 회귀를 지킨다.
+$baselineFile = if ($Registry) {
+    Join-Path $PSScriptRoot "lifecycle_baseline_registry.tsv"
+} else {
+    Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
+}
 # lifecycle.dump 는 상대 경로를 프로세스 작업 디렉터리 기준으로 푼다.
 $producedFile = Join-Path $exeDir "lifecycle_trace.tsv"
 
 if (Test-Path $producedFile) { Remove-Item $producedFile -Force }
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList $exeArgs `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput (Join-Path $Work "lifecycle_baseline.out") `
     -RedirectStandardError  (Join-Path $Work "lifecycle_baseline.err") -PassThru
@@ -139,6 +169,29 @@ $diffs = Compare-Object -ReferenceObject $expected -DifferenceObject $produced -
 if ($null -eq $diffs -or $diffs.Count -eq 0) {
     "전체 통과 ($($produced.Count) 사건 · 순서 동일)"
     exit 0
+}
+
+# 실패했을 때 "무엇이 다른가"를 한 단계 더 갈라 준다.
+#
+# '사건이 빠졌다'와 '사건은 같은데 순서만 다르다'는 성격이 완전히 다르다 —
+# 전자는 결함이고 후자는 설계 판단이다. 둘을 구분하지 않으면 실패 하나를 놓고
+# 매번 손으로 세어 봐야 한다.
+$expectedSorted = @($expected | Sort-Object)
+$producedSorted = @($produced | Sort-Object)
+$setDiff = Compare-Object -ReferenceObject $expectedSorted -DifferenceObject $producedSorted
+
+if ($null -eq $setDiff -or $setDiff.Count -eq 0) {
+    "사건 집합은 동일하고 순서만 다르다 ($($produced.Count) 사건)."
+    "  → 빠지거나 늘어난 호출은 없다. 단계 안의 호출 순서만 바뀌었다."
+    "  → 의도한 변경이면 -Baseline 으로 갱신할 것."
+    ""
+} else {
+    "사건 집합 자체가 다르다 — 빠지거나 늘어난 호출이 있다 (차이 $($setDiff.Count) 건)."
+    $setDiff | Select-Object -First 20 | ForEach-Object {
+        $mark = if ($_.SideIndicator -eq '<=') { "빠짐  " } else { "추가됨" }
+        "  $mark  $($_.InputObject)"
+    }
+    ""
 }
 
 "생명주기 순서가 달라졌다 — 차이 $($diffs.Count) 건 (앞 40건만 표시)"

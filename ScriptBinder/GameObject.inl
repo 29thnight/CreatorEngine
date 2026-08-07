@@ -11,10 +11,7 @@ inline T* GameObject::AddComponent()
     }
 
     std::shared_ptr<T> component = shared_alloc<T>();
-    if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
-    {
-        receiver->RegisterOverriddenEvents(this->GetScene());
-    }
+    AttachComponentLifecycle(component);
 
     m_components.push_back(component);
     component->SetOwner(this);
@@ -37,10 +34,7 @@ inline T* GameObject::AddComponent(Args && ...args)
     }
 
     std::shared_ptr<T> component = shared_alloc<T>(std::forward<Args>(args)...);
-    if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
-    {
-        receiver->RegisterOverriddenEvents(this->GetScene());
-    }
+    AttachComponentLifecycle(component);
 
     m_components.push_back(component);
     component->SetOwner(this);

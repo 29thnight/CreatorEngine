@@ -7,6 +7,7 @@
 #include "PrefabUtility.h"
 #include "ComponentFactory.h"
 #include "LifecycleTrace.h"
+#include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "ConditionParameter.h"
 #include "UIManager.h"
@@ -283,6 +284,31 @@ ConsoleCommandSystem& ConsoleCommandSystem::Get()
 {
     static ConsoleCommandSystem instance;
     return instance;
+}
+
+void ConsoleCommandSystem::ApplyStartupSwitches()
+{
+    // 엔진 초기화보다 **먼저** 처리해야 하는 인자만 여기서 본다(PHASE 9-1).
+    //
+    // InitializeFromCommandLine은 엔진이 다 선 뒤에 열린다 — 그래야 명령이 완성된
+    // 엔진 위에서 돈다. 하지만 생명주기 경로는 그때 정하면 이미 늦다: 기본 씬의
+    // Main Camera·Directional Light가 그 전에 만들어져 옛 경로에 등록되고, 나중에
+    // 경로를 바꾸면 그 둘만 다른 규약을 따르게 된다.
+    // 실제로 A/B 대조가 그 어긋남을 사건 2건의 차이로 잡아냈다.
+    int argc = 0;
+    LPWSTR* argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+    if (!argv) return;
+
+    for (int i = 1; i < argc; ++i)
+    {
+        if (0 == ::wcscmp(argv[i], L"--lifecycle-registry"))
+        {
+            Scene::SetUseRegistry(true);
+            std::printf("[CLI] 생명주기 경로: 레지스트리 (기동 인자)\n");
+        }
+    }
+
+    ::LocalFree(argv);
 }
 
 void ConsoleCommandSystem::InitializeFromCommandLine()
@@ -2481,6 +2507,59 @@ void ConsoleCommandSystem::Execute(const std::string& line)
                 Lifecycle::Trace::RemainingTickFrames());
         }
     }
+    else if (cmd == "lifecycle.registry")
+    {
+        // 전환 스위치(PHASE 9-1). 델리게이트 경로 ↔ 레지스트리 경로.
+        //
+        // 병행으로 둔 이유는 26종을 한 번에 옮기다 중간 상태에서 빌드가 깨지는 기간을
+        // 만들지 않기 위해서다. 같은 실행에서 양쪽을 번갈아 돌려 9-0 기준선과 대조할 수도 있다.
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+
+        if (mode == "on" || mode == "off")
+        {
+            const bool enable = (mode == "on");
+            if (enable == Scene::UseRegistry())
+            {
+                std::printf("[CLI] lifecycle.registry — 이미 %s\n", enable ? "켜짐" : "꺼짐");
+                return;
+            }
+
+            Scene::SetUseRegistry(enable);
+
+            // 켤 때는 이미 서 있는 씬의 컴포넌트를 인수한다.
+            //
+            // 기동 직후 기본 씬(Main Camera·Directional Light)은 이 명령보다 먼저
+            // 만들어져 델리게이트 쪽에만 있다. 인수하지 않으면 그것들만 조용히
+            // 어떤 단계도 받지 못하고 사라진다 — A/B 대조가 OnDestroy 2건 유실로 잡아냈다.
+            Scene* scene = SceneManagers->GetActiveScene();
+            if (enable && nullptr != scene)
+            {
+                scene->AdoptExistingComponents();
+                const auto counts = scene->GetRegistryCounts();
+                std::printf("[CLI] lifecycle.registry on — 기존 컴포넌트 인수(update %zu · lateUpdate %zu · fixedUpdate %zu)\n",
+                    counts.update, counts.lateUpdate, counts.fixedUpdate);
+            }
+            else
+            {
+                std::printf("[CLI] lifecycle.registry %s\n", mode.c_str());
+            }
+        }
+        else
+        {
+            Scene* scene = SceneManagers->GetActiveScene();
+            std::printf("[CLI] lifecycle.registry — %s · 마스크 표 %zu종\n",
+                Scene::UseRegistry() ? "레지스트리 경로" : "델리게이트 경로",
+                Lifecycle::Registry::Count());
+
+            if (nullptr != scene && Scene::UseRegistry())
+            {
+                const auto counts = scene->GetRegistryCounts();
+                std::printf("[CLI]   pendingAwake %zu · pendingStart %zu · update %zu · lateUpdate %zu · fixedUpdate %zu\n",
+                    counts.pendingAwake, counts.pendingStart,
+                    counts.update, counts.lateUpdate, counts.fixedUpdate);
+            }
+        }
+    }
     else if (cmd == "lifecycle.dump")
     {
         const std::string path = (parts.size() >= 2) ? parts[1] : std::string("lifecycle_trace.tsv");
@@ -2987,6 +3066,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
         "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"
+        "  lifecycle.registry on|off|status  생명주기 디스패치 경로 전환(9-1, 씬 재로드 필요)\n"
         "  lifecycle.dump [파일]  기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)\n"
         "  lifecycle.stress destroy|churn [개수]  파괴·생성을 몰아쳐 수명 경로를 흔든다\n"
         "  gc.stats|gc.delta [라벨]  관리 힙 지표(수집 횟수·힙 크기). delta는 첫 호출을 기준선으로\n"

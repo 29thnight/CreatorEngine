@@ -88,6 +88,22 @@ void Core::App::Finalize()
 
 void Core::App::SetWindow(CoreWindow& coreWindow)
 {
+	// ── 프레젠트 소유권을 창을 붙이기 전에 정한다 (PHASE 3-1 재정의, D2) ──
+	//
+	// DXGI는 한 HWND에 스왑체인 둘을 허용하지 않는다. 예전에는 여기서
+	// DX11이 무조건 스왑체인을 만들었고, 나중에 ImGui DX12 셸이 같은 창에
+	// 붙으려다 DX11 것을 무효화해 종료가 크래시했다 — 그래서 셸이 기본
+	// 꺼짐이었다.
+	//
+	// 순서가 핵심이다. SetWindow → CreateWindowSizeDependentResources에서
+	// 스왑체인이 만들어지므로, 그 전에 누가 소유할지 정해져 있어야 한다.
+	// EngineSetting은 EngineBootstrap이 이미 초기화했다.
+	//
+	// 셸 초기화가 실패하면 ImGuiRenderer가 이 결정을 되돌리고 DX11 스왑체인을
+	// 그 자리에서 만든다(빈 화면보다 낫다).
+	m_deviceResources->SetPresentOwnedExternally(
+		EngineSettingInstance->IsDx12ImGuiShellEnabled());
+
 	m_deviceResources->SetWindow(coreWindow);
 }
 
@@ -113,6 +129,9 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
+		// 생명주기 경로는 기본 씬이 만들어지기 전에 정해져야 한다(9-1).
+		ConsoleCommandSystem::ApplyStartupSwitches();
+
 		m_main->Initialize();
 		BootProgress::Step(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);

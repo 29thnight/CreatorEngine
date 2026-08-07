@@ -44,7 +44,7 @@ void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
 	auto& instances = m_instanceMap[prefab->GetFileGuid()];
     if(std::find(instances.begin(), instances.end(), instance) != instances.end())
     {
-        return; // �̹� ��ϵ� �ν��Ͻ��� �ߺ� ������� ����
+        return; // �̹� ��ϵ� �ν��Ͻ��� �ߺ� ������� ����
     }
     else
     {
@@ -80,10 +80,23 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         {
             for (auto& comp : obj->m_components)
             {
+                if (!comp) continue;
+
                 comp->Destroy();
-                auto eventReceiver = std::dynamic_pointer_cast<IRegistableEvent>(comp);
-                if (eventReceiver)
-                    eventReceiver->OnDestroy();
+
+                // 훅이 Component로 온 뒤로 캐스트가 필요 없다(PHASE 9-1).
+                //
+                // 그리고 그 캐스트는 버그였다 — RegistableEvent를 상속하지 않은
+                // 컴포넌트는 여기서 OnDestroy를 받지 못했다. 프리팹을 갱신할 때만
+                // 도는 경로라 드러나기 어려웠다. 이제 전부 받는다.
+                comp->OnDestroy();
+
+                // 레지스트리 경로에서는 아래 clear로 사라질 것들을 디스패치 리스트에서
+                // 먼저 빼야 한다. 남겨 두면 다음 프레임이 죽은 포인터를 순회한다.
+                if (Scene::UseRegistry())
+                {
+                    if (Scene* scene = obj->GetScene()) scene->UnregisterComponent(comp.get());
+                }
             }
             obj->m_components.clear();
             obj->m_componentIds.clear();

@@ -34,6 +34,10 @@
 lifecycle.trace clear
 lifecycle.trace on 0
 
+# 디스패치 경로 선택(PHASE 9-1). 검증 스크립트가 -Registry 여부에 따라 채운다.
+# 첫 scene.switch보다 앞이어야 한다 — 전환은 씬 경계에서만 안전하다.
+{{REGISTRY_SETUP}}
+
 # --- 로드 ---
 scene.switch {{SCENE_A}}
 wait 60

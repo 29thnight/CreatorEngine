@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "Component.h"
 #include "Scene.h"
 #include "LifecycleTrace.h"
 
@@ -15,16 +16,13 @@ class IRegistableEvent
 public:
     virtual ~IRegistableEvent();
 
-    // --- Lifecycle Event Hooks ---
-    // These are meant to be overridden by the final component class.
-    virtual void Awake() {}
-    virtual void Start() {}
-    virtual void Update(float deltaTime) {}
-    virtual void LateUpdate(float deltaTime) {}
-    virtual void FixedUpdate(float timeStep) {}
-    virtual void OnEnable() {}
-    virtual void OnDisable() {}
-    virtual void OnDestroy() {}
+    // 생명주기 훅은 더 이상 여기 없다 — Component로 옮겼다(PHASE 9-1).
+    //
+    // 훅이 이 인터페이스에 있으면 "생명주기를 받으려면 RegistableEvent<T>를 상속해야
+    // 한다"가 되고, 그 상속을 빠뜨린 컴포넌트는 컴파일은 되는데 조용히 안 불린다.
+    // Component가 들고 있으면 컴포넌트인 것만으로 훅을 갖는다.
+    //
+    // 여기 남은 것은 델리게이트 구독 기계뿐이고, 그마저 PHASE 9-3에서 사라진다.
 
     /**
      * @brief Pure virtual function to trigger the event registration process.
@@ -113,7 +111,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
     // This is the core of the optimization: we only generate registration code
     // and subscribe to events if the component has actually implemented the method.
 
-    if constexpr (&T::Awake != &IRegistableEvent::Awake) {
+    if constexpr (&T::Awake != &Component::Awake) {
         //this->m_awakeEventHandle = scene->AwakeEvent.AddLambda([derived_component, &isAwakeCalled]()
         //{ 
         //    //auto sceneObject = derived_component->GetOwner();
@@ -142,7 +140,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
         });
 
     }
-    if constexpr (&T::Start != &IRegistableEvent::Start) {
+    if constexpr (&T::Start != &Component::Start) {
         //this->m_startEventHandle = scene->StartEvent.AddLambda([derived_component, &isStartCalled]()
         //{ 
         //    auto sceneObject = derived_component->GetOwner();
@@ -169,7 +167,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             this->setFlag(FLAG_START_CALLED, true);
         });
     }
-    if constexpr (&T::Update != &IRegistableEvent::Update) {
+    if constexpr (&T::Update != &Component::Update) {
         this->m_updateEventHandle = scene->UpdateEvent.AddLambda([derived_component](float dt) 
         { 
             auto sceneObject = derived_component->GetOwner();
@@ -185,7 +183,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
         });
     }
-    if constexpr (&T::LateUpdate != &IRegistableEvent::LateUpdate) {
+    if constexpr (&T::LateUpdate != &Component::LateUpdate) {
         this->m_lateUpdateEventHandle = scene->LateUpdateEvent.AddLambda([derived_component](float dt)
         { 
             auto sceneObject = derived_component->GetOwner();
@@ -201,7 +199,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
         });
     }
-    if constexpr (&T::FixedUpdate != &IRegistableEvent::FixedUpdate) {
+    if constexpr (&T::FixedUpdate != &Component::FixedUpdate) {
         this->m_fixedUpdateEventHandle = scene->FixedUpdateEvent.AddLambda([derived_component](float ts) 
         { 
             auto sceneObject = derived_component->GetOwner();
@@ -217,7 +215,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
         });
     }
-    if constexpr (&T::OnEnable != &IRegistableEvent::OnEnable) {
+    if constexpr (&T::OnEnable != &Component::OnEnable) {
         //this->m_onEnableEventHandle = scene->OnEnableEvent.AddLambda([derived_component]() 
         //{ 
         //    auto sceneObject = derived_component->GetOwner();
@@ -247,7 +245,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
         });
     }
-    if constexpr (&T::OnDisable != &IRegistableEvent::OnDisable) {
+    if constexpr (&T::OnDisable != &Component::OnDisable) {
         //this->m_onDisableEventHandle = scene->OnDisableEvent.AddLambda([derived_component]() 
         //{ 
         //    auto sceneObject = derived_component->GetOwner();
@@ -277,7 +275,7 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
         });
     }
-    if constexpr (&T::OnDestroy != &IRegistableEvent::OnDestroy) {
+    if constexpr (&T::OnDestroy != &Component::OnDestroy) {
         this->m_onDestroyEventHandle = scene->OnDestroyEvent.AddLambda([derived_component]() 
         { 
             auto sceneObject = derived_component->GetOwner();

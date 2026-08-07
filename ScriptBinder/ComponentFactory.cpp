@@ -1,4 +1,5 @@
 #include "ComponentFactory.h"
+#include "LifecycleRegistry.h"
 #include "GameObject.h"
 #include "RenderableComponents.h"
 #include "LightComponent.h"
@@ -25,6 +26,12 @@
 	
 void ComponentFactory::Initialize()
 {
+   // 생명주기 마스크 표를 먼저 세운다(PHASE 9-1).
+   //
+   // 이 자리인 이유: 컴포넌트 타입을 다루는 초기화가 여기 모여 있고, 첫 씬이
+   // 로드되기 전이라 RegisterComponent가 빈 표를 만나는 일이 없다.
+   Lifecycle::Registry::RegisterAllComponents();
+
    auto& registerMap = Meta::MetaDataRegistry->map;
 
    for (const auto& [name, type] : registerMap)
