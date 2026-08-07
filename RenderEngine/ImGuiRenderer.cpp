@@ -128,6 +128,19 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		{
 			std::printf("[ImGui] DX12 셸 초기화 실패 - DX11 폴백: %s\n",
 				shellError.c_str());
+
+			// ── 소유권을 되돌린다 (D2) ──
+			//
+			// 셸이 창을 가져가기로 했으므로 DX11은 스왑체인을 만들지 않았다
+			// (App::SetWindow). 그 셸이 실패했으니 화면에 내보낼 주체가
+			// 아무도 없는 상태다 — 여기서 되돌리지 않으면 폴백한 DX11
+			// ImGui가 그릴 곳이 없어 창이 검은 채로 남는다.
+			//
+			// 창 크기 의존 리소스를 다시 만들면 그 자리에서 스왑체인이
+			// 생긴다(m_swapChain이 널이라 생성 분기를 탄다).
+			deviceResource->ReclaimPresentOwnership();
+			DirectX11::DeviceStates->g_backBufferRTV =
+				deviceResource->GetBackBufferRenderTargetView();
 		}
 	}
 

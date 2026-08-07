@@ -54,6 +54,39 @@ namespace DirectX11
 		ID3D11DeviceContext3* GetD3DDeviceContext() const { return m_d3dContext.Get(); }
 		IDXGISwapChain3* GetSwapChain() const { return m_swapChain.Get(); }
 		void ReleaseSwapChain() { m_swapChain.Reset(); m_swapChain = nullptr; }
+
+		// ── 프레젠트 소유권 (PHASE 3-1 재정의, D2) ──
+		//
+		// 참이면 이 클래스는 스왑체인을 만들지 않는다. 창에 스왑체인을 붙이는
+		// 것은 다른 쪽(ImGui DX12 셸)이고, 여기는 디바이스·깊이·상태 객체·
+		// 뷰포트만 맡는다.
+		//
+		// ★ 왜 플래그인가: DXGI는 한 HWND에 스왑체인 둘을 허용하지 않는다.
+		//   예전에는 이 클래스가 초기화 때 무조건 만들었고, 나중에 셸이 같은
+		//   창에 붙으려다 DX11 것을 무효화해 종료가 크래시했다. 소유권을
+		//   '먼저 만든 쪽이 이긴다'가 아니라 명시적 결정으로 바꾼다.
+		//
+		// ★ 왜 설정을 직접 읽지 않는가: 이 클래스는 Utility_Framework 소속이라
+		//   EngineSetting(EngineEntry)을 참조하면 계층이 거꾸로 선다. 결정은
+		//   위층이 하고 여기는 주입받는다.
+		//
+		// 초기화(CreateWindowSizeDependentResources) 전에 정해야 한다. 셸
+		// 초기화가 실패해 DX11로 되돌아갈 때는 거짓으로 되돌리고 창 크기
+		// 의존 리소스를 다시 만들면 그 자리에서 스왑체인이 생긴다.
+		void SetPresentOwnedExternally(bool owned) { m_presentOwnedExternally = owned; }
+		bool IsPresentOwnedExternally() const { return m_presentOwnedExternally; }
+
+		/// 소유권을 되찾아 스왑체인을 만든다. 셸 초기화가 실패했을 때만 쓴다.
+		///
+		/// 창 크기 의존 리소스를 다시 만드는 것이 전부다 — m_swapChain이 널이라
+		/// 생성 분기를 타고, 그 자리에서 백버퍼·RTV까지 함께 선다.
+		/// 전용 진입점을 두는 이유는 CreateWindowSizeDependentResources가
+		/// private이기도 하지만, '폴백'이라는 의도가 호출부에 드러나야 해서다.
+		void ReclaimPresentOwnership()
+		{
+			m_presentOwnedExternally = false;
+			CreateWindowSizeDependentResources();
+		}
 		D3D_FEATURE_LEVEL GetDeviceFeatureLevel() const { return m_d3dFeatureLevel; }
 		ID3D11RenderTargetView1* GetBackBufferRenderTargetView() const { return m_d3dRenderTargetView.Get(); }
 		ID3D11Texture2D1* GetBackBuffer() const { return m_backBuffer.Get(); }
@@ -152,6 +185,10 @@ namespace DirectX11
 		float m_dpi;
 		float m_effectiveDpi;
 		bool  m_supportHDR;
+
+		// 스왑체인을 이 클래스가 만들지 않는다(D2). 기본은 거짓 — 지금까지의
+		// 동작을 그대로 유지하고, 켜는 것은 셸 모드를 고른 위층의 결정이다.
+		bool  m_presentOwnedExternally{ false };
 
 		IDeviceNotify* m_deviceNotify;
 	};

@@ -259,6 +259,67 @@ public:
 `DX11RHI.*` 제거. `IRenderPass`는 `EffectManager`가 상속하므로 PHASE 10
 (파티클·이펙트 DX12 재설계)까지 남긴다 — 그때 함께 정리한다.
 
+### 4.2 D축 — 디바이스·프레젠트 (2026-08-07 추가)
+
+★ **이 축이 §4의 R축에 빠져 있었다.** R1~R6은 "패스가 GPU에 말하는 방법"만
+다루고 "디바이스를 누가 소유하고 화면에 누가 내보내는가"를 건드리지 않았다.
+그런데 DX11이 아직 스왑체인을 쥐고 있고, 그것이 ImGui DX12 셸을 막고 있으며,
+나아가 `Utility_Framework/DeviceResources`(DX11) 은퇴의 관문이다.
+
+**측정한 사실:**
+
+| | |
+|---|---|
+| DX11 스왑체인 | `Utility_Framework/DeviceResources`가 생성·소유, `Dx11Main.cpp:569`가 매 프레임 Present |
+| DX12 라이브 렌더러 | 스왑체인 **없음** — 오프스크린 → 공유 텍스처 → ImGui::Image |
+| DX12 셸 | `AttachSwapChain` 보유하나 호출자가 셸 하나뿐, 기본 꺼짐 |
+| 막는 것 | DXGI가 한 HWND에 스왑체인 둘을 불허 — 켜면 DX11 것이 무효화되어 종료 크래시 |
+| DX11 백버퍼 실사용 | **2곳**(`Dx11Main.cpp` 두 곳이 `g_backBufferRTV`에 대입), 그 전역의 실소비는 ImGui가 그리는 한 줄 |
+
+즉 화면 출력 경로가 **ImGui 하나뿐**이라, 이관은 "두 렌더러가 화면을 나눠 갖는
+문제"가 아니라 "ImGui를 누가 Present하느냐" 하나다.
+
+**D1 — `IRHIDeviceResources` 추출. (완료)**
+디바이스 수명·크기·프레임 경계·펜스 질의·프레젠트·진단을 백엔드 중립
+인터페이스로 뺐다(`RHI/IRHIDeviceResources.h`). `DX12DeviceResources`가 구현한다.
+
+★ **DX11을 공통 분모에 넣지 않는다.** 기존 RHI가 죽은 이유가 정확히 그것이었다
+— 즉시 컨텍스트 모델로 인터페이스를 잡으니 DX12가 들어갈 자리가 없었다. 이
+인터페이스는 명시적 API 둘(DX12·Vulkan)만 기준으로 잡는다. 넷이 대응한다:
+BeginFrame/EndFrame ↔ 커맨드 버퍼 begin·end, 펜스 값 ↔ 타임라인 세마포어,
+AttachSwapChain ↔ VkSwapchainKHR, WaitForGpu ↔ vkDeviceWaitIdle.
+
+인터페이스에 넣지 않은 것과 이유: `Initialize`(백엔드마다 인자가 다르다 —
+DX12는 어댑터 LUID·화면 추종, Vulkan은 인스턴스·확장), 디바이스/큐/커맨드
+리스트 핸들(노출하면 인터페이스가 곧 DX12가 된다 — 그쪽은 `IRenderDeviceServices`
+담당), 백버퍼 리소스·RTV(쓰는 것은 셸뿐이고 셸은 백엔드 전용이다).
+
+`AttachSwapChain`의 창 핸들은 `void*`다 — 이 헤더가 플랫폼·그래픽 헤더를
+끌어오지 않기 위해서다(기존 `RHIDefinitions.h`의 규약을 잇는다).
+
+★ **D1에는 인터페이스를 통해 쓰는 소비자가 아직 없다.** 셸이 후보였으나
+`GetDevice`·`GetCommandList` 같은 백엔드 고유 표면도 함께 써서 완전 전환이
+안 된다(억지로 하면 캐스팅만 는다). 지금 계약을 검증하는 것은 컴파일러다
+(`override`). "이 인터페이스가 Vulkan에 충분한가"는 두 번째 구현이 생겨야
+답할 수 있는 질문이고, D1은 그것을 답하지 않는다 — 그 자리를 만들 뿐이다.
+
+**D2 — 스왑체인 소유권 DX11 → DX12.**
+DX11 초기화에서 스왑체인 생성을 건너뛰고(셸 모드일 때), 셸이 `AttachSwapChain`을
+가져간다. `Present`는 이미 셸 모드에서 DX11 것을 건너뛰도록 분기돼 있고
+(`Dx11Main.cpp:567`), `ReleaseSwapChain()`도 이미 있다 — 절반은 준비돼 있다.
+미확인: DX11 스왑체인을 안 만들 때 백버퍼·깊이·뷰포트 초기화가 어디까지
+딸려서 깨지는가. **D1의 소비자가 여기서 생긴다.**
+
+**D3 — ImGui DX12 셸 기본 켜기.** D2가 풀면 설정 기본값을 뒤집는다.
+
+**D4 — `Utility_Framework/DeviceResources` 은퇴.**
+스왑체인만이 아니라 DX11 디바이스를 쥐고 있어서, 그 소비자가 먼저 사라져야
+한다. 실측한 잔량: `Texture.cpp` 23건(T축이 절반 해결, SRV 생성이 남음),
+**EffectSystem 약 50건**(파티클 — PHASE 10), `RenderDebugManager`·
+`TerrainMaterial` 11건. 즉 D4는 T축과 PHASE 10 뒤다.
+
+순서: `D1 → D2 → D3 → (T축·PHASE 10) → D4`
+
 **R6(선택) — 기록 검증용 가짜 백엔드.** §2.1 ②. 인코더 호출을 기록만 하는
 구현으로 패스의 명령 순서를 픽셀 없이 단정한다. 여기까지 오면 두 번째
 백엔드를 붙이는 비용도 드러난다.

@@ -167,6 +167,15 @@ void DirectX11::DeviceResources::Trim()
 
 void DirectX11::DeviceResources::Present()
 {
+    // ★ 프레젠트를 남이 소유하면 여기서 아무것도 하지 않는다 (D2).
+    //
+    // 이 방어가 없으면 위험하다: 아래 줄이 스왑체인이 없을 때
+    // HandleLostSwapChain()으로 새로 만드는데, 셸 모드에서 그것이 돌면
+    // 같은 HWND에 스왑체인이 둘이 되어 셸 것을 무효화한다. 호출부
+    // (Dx11Main)가 이미 걸러 주지만, '한 곳만 어겨도 깨지는' 부류라
+    // 소유자 쪽에서도 막는다.
+    if (m_presentOwnedExternally) return;
+
     if (!m_swapChain) { HandleLostSwapChain(); return; }
 
     // 첫 번째 인수는 DXGI에 VSync까지 차단하도록 지시하여 애플리케이션이
@@ -711,65 +720,79 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainFullscreenDesc.Windowed = FALSE;
 
 
-        ComPtr<IDXGISwapChain1> swapChain;
-        DirectX11::ThrowIfFailed(
-            dxgiFactory->CreateSwapChainForHwnd(
-                m_d3dDevice.Get(),
-                m_window->GetHandle(),
-                &swapChainDesc,
-                nullptr,
-                nullptr,
-                &swapChain
-            )
-        );
+        // ── 스왑체인·백버퍼는 프레젠트를 소유할 때만 만든다 (D2) ──
+        //
+        // DXGI는 한 HWND에 스왑체인 둘을 허용하지 않는다. 셸(ImGui DX12)이
+        // 창을 가져가기로 했으면 여기서 만들지 않아야 하고, 그러지 않으면
+        // 나중에 붙는 쪽이 이쪽을 무효화해 종료가 크래시한다.
+        //
+        // ★ 건너뛰는 것은 스왑체인·백버퍼·RTV 셋뿐이다. 그 아래의 깊이
+        //   스텐실·상태 객체·뷰포트는 창 크기에서 나오는 것이라 프레젠트
+        //   소유와 무관하고, DX12 라이브가 g_Viewport·g_ClientRect를 읽으므로
+        //   함께 건너뛰면 씬 렌더링이 멈춘다.
+        if (!m_presentOwnedExternally)
+        {
+            ComPtr<IDXGISwapChain1> swapChain;
+            DirectX11::ThrowIfFailed(
+                dxgiFactory->CreateSwapChainForHwnd(
+                    m_d3dDevice.Get(),
+                    m_window->GetHandle(),
+                    &swapChainDesc,
+                    nullptr,
+                    nullptr,
+                    &swapChain
+                )
+            );
 
-        //dxgiFactory->MakeWindowAssociation(
-        //    m_window->GetHandle(),
-        //    DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
-        //);
+            //dxgiFactory->MakeWindowAssociation(
+            //    m_window->GetHandle(),
+            //    DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
+            //);
 
-        DirectX11::ThrowIfFailed(
-            swapChain.As(&m_swapChain)
-        );
+            DirectX11::ThrowIfFailed(
+                swapChain.As(&m_swapChain)
+            );
 
-		DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
+            DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
-        m_swapChain->SetColorSpace1(
-            m_supportHDR
-            ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020  // HDR10
-            : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709     // SDR
-        );
+            m_swapChain->SetColorSpace1(
+                m_supportHDR
+                ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020  // HDR10
+                : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709     // SDR
+            );
 
+            ComPtr<ID3D11Texture2D1> backBuffer;
+            DirectX11::ThrowIfFailed(
+                m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer))
+            );
+
+            D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
+            renderTargetViewDesc.Format = swapChainDesc.Format;
+            renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            renderTargetViewDesc.Texture2D.MipSlice = 0;
+
+            DirectX11::ThrowIfFailed(
+                m_d3dDevice->CreateRenderTargetView1(
+                    backBuffer.Get(),
+                    &renderTargetViewDesc,
+                    &m_d3dRenderTargetView
+                )
+            );
+
+            m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), Colors::SlateGray);
+
+            DirectX::SetName(backBuffer.Get(), "BackBuffer");
+            //백버퍼 텍스쳐 받아오기
+            ID3D11Resource* pResource = nullptr;
+            m_d3dRenderTargetView->GetResource(&pResource);
+            DirectX11::ThrowIfFailed(
+                pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
+            );
+        }
+
+        // 프레임 지연은 스왑체인과 무관한 디바이스 설정이라 양쪽 모두 건다.
         DirectX11::ThrowIfFailed(
             m_dxgiDevice->SetMaximumFrameLatency(3)
-        );
-
-        ComPtr<ID3D11Texture2D1> backBuffer;
-        DirectX11::ThrowIfFailed(
-            m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer))
-        );
-
-		D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
-		renderTargetViewDesc.Format = swapChainDesc.Format;
-		renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-		renderTargetViewDesc.Texture2D.MipSlice = 0;
-
-        DirectX11::ThrowIfFailed(
-            m_d3dDevice->CreateRenderTargetView1(
-                backBuffer.Get(),
-                &renderTargetViewDesc,
-                &m_d3dRenderTargetView
-            )
-        );
-
-        m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), Colors::SlateGray);
-
-		DirectX::SetName(backBuffer.Get(), "BackBuffer");
-        //백버퍼 텍스쳐 받아오기
-        ID3D11Resource* pResource = nullptr;
-		m_d3dRenderTargetView->GetResource(&pResource);
-		DirectX11::ThrowIfFailed(
-            pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
         );
 
         // 필요한 경우 3D 렌더링에 사용할 깊이 스텐실 뷰를 만듭니다.
@@ -888,6 +911,10 @@ void DirectX11::DeviceResources::UpdateRenderTargetSize()
 
 void DirectX11::DeviceResources::HandleLostSwapChain()
 {
+    // 소유하지 않으면 되살리지 않는다 (D2). 이 함수는 스왑체인을 새로
+    // 만드는 것이 전부라, 셸 모드에서 돌면 창에 두 번째 스왑체인이 생긴다.
+    if (m_presentOwnedExternally) return;
+
     ComPtr<IDXGIFactory2> dxgiFactory;
     DirectX11::ThrowIfFailed(
         m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
