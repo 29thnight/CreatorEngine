@@ -1,9 +1,6 @@
 # 런타임·플랫폼 계층 -> ImGui include 허용 목록 (에디터 분리 래칫)
 # 이 목록은 줄이기만 한다 - 새 간선 추가 금지.
 # 재생성: python scripts/check_imgui_boundary.py --update
-EffectSystem/EffectManager.cpp -> ImGuiRegister.h
-EffectSystem/EffectManager.cpp -> Profiler.h
-EffectSystem/EffectManager.cpp -> imgui_node_editor.h
 EngineEntry/Dx11Main.cpp -> ImGuiDx12Shell.h
 EngineEntry/Dx11Main.cpp -> ImGuiRegister.h
 EngineEntry/Dx11Main.cpp -> Profiler.h
@@ -26,7 +23,6 @@ RenderEngine/ImGuiRenderer.cpp -> imgui_impl_dx12.h
 RenderEngine/ImGuiRenderer.cpp -> imgui_internal.h
 RenderEngine/ImGuiRenderer.h -> ImGUiRegisterClass.h
 RenderEngine/ImGuiRenderer.h -> ImGuiContext.h
-RenderEngine/RHI/DX12/EnhancedSceneRenderer.cpp -> <심볼-직접사용>
 RenderEngine/RHI/DX12/EnhancedSceneRendererLive.cpp -> ImGuiDx12Shell.h
 RenderEngine/RHI/DX12/ImGuiDx12Shell.cpp -> imgui.h
 RenderEngine/RHI/DX12/ImGuiDx12Shell.cpp -> imgui_impl_dx12.h

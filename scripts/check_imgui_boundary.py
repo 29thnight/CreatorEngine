@@ -54,10 +54,13 @@ RE_SYMBOL = re.compile(
     r'\bImGuiKey\w*|\bImGuiCol\w*|\bImGuiStyle\b|\bImTextureID\b|\bed::'
 )
 
-# 주석 제거용. 주석 처리된 ImGui 호출이 실제로 있어서(SSGIPass 등)
-# 걸러내지 않으면 오탐이 난다.
+# 주석·문자열 제거용. 주석 처리된 ImGui 호출이 실제로 있고(SSGIPass 등),
+# 로그 문자열에 "ImGui::Image에 넘길 수 있다" 같은 설명이 들어 있기도 하다
+# (EnhancedSceneRenderer.cpp). 둘 다 걸러내지 않으면 오탐이 난다.
 RE_BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
 RE_LINE_COMMENT = re.compile(r'//[^\n]*')
+# 이스케이프(\")를 건너뛰며 문자열 리터럴을 지운다.
+RE_STRING = re.compile(r'"(?:\\.|[^"\\])*"', re.S)
 
 # 심볼만 쓰고 include는 하지 않는 파일을 허용 목록에 적을 때 쓰는 표식.
 # 실제 헤더 이름과 충돌하지 않도록 꺾쇠를 쓴다.
@@ -68,9 +71,15 @@ SKIP_PARTS = ('/x64/', '/bin/', '/obj/')
 
 
 def strip_comments(text):
-    """주석을 지운다. 주석 안의 ImGui 호출을 사용으로 세지 않기 위해서다."""
+    """주석과 문자열 리터럴을 지운다.
+
+    주석 안의 ImGui 호출이나 로그 문자열에 적힌 설명을 '사용'으로 세지 않기
+    위해서다. 순서가 중요하다 - 주석을 먼저 지워야 주석 안의 따옴표가 문자열
+    시작으로 오인되지 않는다.
+    """
     text = RE_BLOCK_COMMENT.sub(' ', text)
-    return RE_LINE_COMMENT.sub(' ', text)
+    text = RE_LINE_COMMENT.sub(' ', text)
+    return RE_STRING.sub('""', text)
 
 
 def is_imgui_header(include_path, helper_headers):

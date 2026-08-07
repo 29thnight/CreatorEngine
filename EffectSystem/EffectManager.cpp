@@ -1,11 +1,8 @@
 #include "EffectManager.h"
 #include "../ShaderSystem.h"
-#include "ImGuiRegister.h"
-#include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
 #include "EffectSerializer.h"
 #include "SceneManager.h"
-#include "Profiler.h"
 
 void EffectManager::Initialize()
 {
@@ -15,7 +12,7 @@ void EffectManager::Initialize()
 		EmergencyCleanup();
 	});
 
-	// µð·ºÅä¸® Á¸Àç¿©ºÎ
+	// ï¿½ï¿½ï¿½ä¸® ï¿½ï¿½ï¿½ç¿©ï¿½ï¿½
 	if (!std::filesystem::exists(effectPath) || !std::filesystem::is_directory(effectPath)) {
 		std::cout << "Effect folder does not exist" << '\n';
 		return;
@@ -66,7 +63,7 @@ void EffectManager::Execute(RenderScene& scene, Camera& camera)
 		}
 	}
 
-	// ·»´õ¸µ Àü¿¡ ÇÑ ¹ø¸¸ °øÅë »óÅÂ ¼³Á¤
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (!activeEffectList.empty()) {
 		for (auto* effect : activeEffectList) {
 			effect->Render(scene, camera);
@@ -76,10 +73,10 @@ void EffectManager::Execute(RenderScene& scene, Camera& camera)
 
 void EffectManager::Update(float delta)
 {
-	// Á¤¸® Å¥ Ã³¸® (¸Å ÇÁ·¹ÀÓ¸¶´Ù)
+	// ï¿½ï¿½ï¿½ï¿½ Å¥ Ã³ï¿½ï¿½ (ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ó¸ï¿½ï¿½ï¿½)
 	ProcessCleanupQueue();
 
-	// °­Á¦ Á¤¸® ÇÊ¿äÇÑÁö È®ÀÎ
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
 	if (ShouldForceCleanup()) {
 		ForceCleanupOldEffects();
 	}
@@ -89,7 +86,7 @@ void EffectManager::Update(float delta)
 		auto& effect = it->second;
 		effect->Update(delta);
 
-		// Stop »óÅÂÀÎ ÀÌÆåÆ®¸¸ Á¦°Å
+		// Stop ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		if (effect->GetState() == EffectState::Stopped) {
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
@@ -103,11 +100,11 @@ void EffectManager::Update(float delta)
 
 std::string EffectManager::PlayEffect(const std::string& templateName)
 {
-	// È°¼º ÀÌÆåÆ® °³¼ö Ã¼Å©
+	// È°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ Ã¼Å©
 	if (activeEffects.size() >= MAX_ACTIVE_EFFECTS) {
 		std::cout << "Cannot create effect: Active effect limit reached ("
 			<< MAX_ACTIVE_EFFECTS << ")" << std::endl;
-		return "";  // »ý¼º °ÅºÎ
+		return "";  // ï¿½ï¿½ï¿½ï¿½ ï¿½Åºï¿½
 	}
 
 	auto templateIt = templates.find(templateName);
@@ -123,7 +120,7 @@ std::string EffectManager::PlayEffect(const std::string& templateName)
 
 	ConfigureInstance(instance.get(), templateIt->second);
 
-	// ½º¸¶Æ® ID ÇÒ´ç ½Ã½ºÅÛ »ç¿ë
+	// ï¿½ï¿½ï¿½ï¿½Æ® ID ï¿½Ò´ï¿½ ï¿½Ã½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 	uint32_t currentId = GetSmartAvailableId(templateName);
 	std::string instanceId = templateName + "_" + std::to_string(currentId);
 
@@ -140,7 +137,7 @@ std::string EffectManager::PlayEffectWithCustomId(const std::string& templateNam
 		return "";
 	}
 
-	// ±âÁ¸¿¡ °°Àº ID°¡ ÀÖÀ¸¸é ¸ÕÀú Á¦°Å
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ IDï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	RemoveEffect(customInstanceId);
 
 	auto instance = AcquireFromPool();
@@ -181,7 +178,7 @@ bool EffectManager::RemoveEffect(std::string_view instanceName)
 		auto effectToReturn = std::move(it->second);
 		activeEffects.erase(it);
 
-		// ¼ö¸íÀÌ ¾ø´Â ÀÌÆåÆ®µµ Ç®¿¡ ¹ÝÈ¯ÇÏµµ·Ï ¼öÁ¤
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ Ç®ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ïµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		ReturnToPool(std::move(effectToReturn));
 		return true;
 	}
@@ -194,7 +191,7 @@ bool EffectManager::IsPoolHealthy() const
 
 	bool sizeOk = universalPool.size() <= maxPoolSize;
 	bool activeOk = activeEffects.size() <= MAX_ACTIVE_EFFECTS;
-	bool cleanupOk = cleanupQueue.size() < 50; // Á¤¸® Å¥µµ ³Ê¹« Å©¸é ¾ÈµÊ
+	bool cleanupOk = cleanupQueue.size() < 50; // ï¿½ï¿½ï¿½ï¿½ Å¥ï¿½ï¿½ ï¿½Ê¹ï¿½ Å©ï¿½ï¿½ ï¿½Èµï¿½
 
 	return sizeOk && activeOk && cleanupOk;
 }
@@ -202,7 +199,7 @@ bool EffectManager::IsPoolHealthy() const
 void EffectManager::ForceCleanupOldEffects()
 {
 	if (isCleanupRunning.exchange(true)) {
-		return; // ÀÌ¹Ì Á¤¸® ÁßÀÌ¸é ½ºÅµ
+		return; // ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½ï¿½Åµ
 	}
 
 	std::cout << "Starting force cleanup of old effects..." << std::endl;
@@ -210,7 +207,7 @@ void EffectManager::ForceCleanupOldEffects()
 	auto it = activeEffects.begin();
 	int cleanedCount = 0;
 
-	while (it != activeEffects.end() && cleanedCount < 10) { // ÇÑ ¹ø¿¡ ÃÖ´ë 10°³¸¸
+	while (it != activeEffects.end() && cleanedCount < 10) { // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ 10ï¿½ï¿½ï¿½ï¿½
 		auto& effect = it->second;
 
 		if (effect->GetState() != EffectState::Stopped) {
@@ -247,7 +244,7 @@ void EffectManager::SetMaxPoolSize(int maxSize)
 	int oldSize = maxPoolSize;
 	maxPoolSize = maxSize;
 
-	// ÇöÀç Ç® Å©±â°¡ »õ Á¦ÇÑº¸´Ù Å©¸é Ãà¼Ò
+	// ï¿½ï¿½ï¿½ï¿½ Ç® Å©ï¿½â°¡ ï¿½ï¿½ ï¿½ï¿½ï¿½Ñºï¿½ï¿½ï¿½ Å©ï¿½ï¿½ ï¿½ï¿½ï¿½
 	{
 		std::lock_guard<std::mutex> lock(poolMutex);
 		while (universalPool.size() > maxPoolSize && !universalPool.empty()) {
@@ -264,26 +261,26 @@ size_t EffectManager::GetTotalMemoryUsage() const
 {
 	size_t totalMemory = 0;
 
-	// È°¼º ÀÌÆåÆ® ¸Þ¸ð¸® °è»ê (´ë·«ÀûÀÎ ÃßÁ¤)
+	// È°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½Þ¸ï¿½ ï¿½ï¿½ï¿½ (ï¿½ë·«ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	totalMemory += activeEffects.size() * sizeof(EffectBase);
 
-	// °¢ ÀÌÆåÆ®ÀÇ ÆÄÆ¼Å¬ ½Ã½ºÅÛ ¸Þ¸ð¸® °è»ê
+	// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½Æ¼Å¬ ï¿½Ã½ï¿½ï¿½ï¿½ ï¿½Þ¸ï¿½ ï¿½ï¿½ï¿½
 	for (const auto& [id, effect] : activeEffects) {
 		const auto& particleSystems = effect->GetAllParticleSystems();
 		for (const auto& ps : particleSystems) {
-			// ÆÄÆ¼Å¬ ½Ã½ºÅÛ´ç ´ë·«ÀûÀÎ ¸Þ¸ð¸® »ç¿ë·®
-			totalMemory += ps->GetMaxParticles() * 256; // ÆÄÆ¼Å¬´ç ´ë·« 256¹ÙÀÌÆ® ÃßÁ¤
+			// ï¿½ï¿½Æ¼Å¬ ï¿½Ã½ï¿½ï¿½Û´ï¿½ ï¿½ë·«ï¿½ï¿½ï¿½ï¿½ ï¿½Þ¸ï¿½ ï¿½ï¿½ë·®
+			totalMemory += ps->GetMaxParticles() * 256; // ï¿½ï¿½Æ¼Å¬ï¿½ï¿½ ï¿½ë·« 256ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 		}
 	}
 
-	// Ç® ¸Þ¸ð¸® °è»ê
+	// Ç® ï¿½Þ¸ï¿½ ï¿½ï¿½ï¿½
 	{
 		std::lock_guard<std::mutex> lock(poolMutex);
 		totalMemory += universalPool.size() * sizeof(EffectBase);
-		totalMemory += universalPool.size() * MAX_PARTICLES_PER_SYSTEM * 256; // Ç®ÀÇ °¢ ÀÌÆåÆ®
+		totalMemory += universalPool.size() * MAX_PARTICLES_PER_SYSTEM * 256; // Ç®ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®
 	}
 
-	// Á¤¸® Å¥ ¸Þ¸ð¸®
+	// ï¿½ï¿½ï¿½ï¿½ Å¥ ï¿½Þ¸ï¿½
 	{
 		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
 		totalMemory += cleanupQueue.size() * sizeof(EffectBase);
@@ -321,22 +318,22 @@ std::string EffectManager::ReplaceEffect(const std::string& instanceId, const st
 
 	auto it = activeEffects.find(instanceId);
 	if (it != activeEffects.end()) {
-		// ±âÁ¸ ÀÎ½ºÅÏ½º¸¦ Àç¼³Á¤ (»èÁ¦/»ý¼º ¾øÀ½)
+		// ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ï¿½ï¿½ ï¿½ç¼³ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 		auto& effect = it->second;
 
-		// ÀÌÆåÆ® Á¤Áö
+		// ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 		effect->Stop();
 
-		// »õ ÅÛÇÃ¸´ ¼³Á¤ Àû¿ë
+		// ï¿½ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		ConfigureInstance(effect.get(), templateIt->second);
 
-		// Àç»ý ½ÃÀÛ
+		// ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		effect->Play();
 
-		return instanceId; // °°Àº ID ¹ÝÈ¯
+		return instanceId; // ï¿½ï¿½ï¿½ï¿½ ID ï¿½ï¿½È¯
 	}
 
-	// ±âÁ¸ ÀÎ½ºÅÏ½º°¡ ¾øÀ¸¸é »õ·Î »ý¼º
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	return PlayEffectWithCustomId(newTemplateName, instanceId);
 }
 
@@ -344,7 +341,7 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 {
 	std::lock_guard<std::mutex> lock(smartIdMutex);
 
-	// ÇöÀç È°¼ºÈ­µÈ ÀÌÆåÆ®µé¿¡¼­ »ç¿ë ÁßÀÎ ID ¼öÁý
+	// ï¿½ï¿½ï¿½ï¿½ È°ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½é¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ID ï¿½ï¿½ï¿½ï¿½
 	std::set<uint32_t> usedIds;
 
 	for (const auto& [instanceName, effect] : activeEffects) {
@@ -355,12 +352,12 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 				usedIds.insert(id);
 			}
 			catch (const std::exception&) {
-				// ÆÄ½Ì ½ÇÆÐ½Ã ¹«½Ã
+				// ï¿½Ä½ï¿½ ï¿½ï¿½ï¿½Ð½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			}
 		}
 	}
 
-	// °¡Àå ÀÛÀº »ç¿ë °¡´ÉÇÑ ID Ã£±â
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ID Ã£ï¿½ï¿½
 	uint32_t availableId = 1;
 	while (usedIds.find(availableId) != usedIds.end()) {
 		availableId++;
@@ -370,7 +367,7 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 	return availableId;
 }
 
-// Ç® °ü·Ã **************************************************************************************************************************************************
+// Ç® ï¿½ï¿½ï¿½ï¿½ **************************************************************************************************************************************************
 
 void EffectManager::InitializeUniversalPool()
 {
@@ -388,7 +385,7 @@ std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 {
 	std::lock_guard<std::mutex> lock(poolMutex);
 
-	// Ç®ÀÌ ºñ¾îÀÖÀ¸¸é »õ·Î »ý¼º
+	// Ç®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (universalPool.empty()) {
 		std::cout << "Pool empty, creating new effect instance" << std::endl;
 		totalCreatedEffects++;
@@ -402,12 +399,12 @@ std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 	auto instance = std::move(universalPool.front());
 	universalPool.pop();
 
-	if (universalPool.size() < DEFAULT_POOL_SIZE * 0.3f) { // 30% ÀÌÇÏ·Î ¶³¾îÁö¸é
+	if (universalPool.size() < DEFAULT_POOL_SIZE * 0.3f) { // 30% ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		std::cout << "Pool running low (" << universalPool.size() << "), refilling..." << std::endl;
 		RefillPoolAsync();
 	}
 
-	// Àç»ç¿ë ÁØºñ »óÅÂ È®ÀÎ
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½Øºï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
 	if (!instance->IsReadyForReuse()) {
 		std::cerr << "Warning: Pool instance not ready for reuse!" << std::endl;
 		QueueForCleanup(std::move(instance));
@@ -423,24 +420,24 @@ void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 {
 	if (!effect) return;
 
-	// 1. ³í¸®Àû Á¤¸®
+	// 1. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (effect->GetState() != EffectState::Stopped) {
 		effect->Stop();
 	}
 
-	// 2. ³í¸®Àû ¸®¼Â
+	// 2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	effect->ResetForReuse();
 
 	std::lock_guard<std::mutex> lock(poolMutex);
 
-	// 3. Ç® Å©±â Á¦ÇÑ È®ÀÎ
+	// 3. Ç® Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
 	if (universalPool.size() >= maxPoolSize) {
 		std::cout << "Pool full (" << maxPoolSize << "), destroying effect instance" << std::endl;
 		totalDestroyedEffects++;
-		return; // effect´Â ÀÚµ¿À¸·Î ¼Ò¸êµÊ
+		return; // effectï¿½ï¿½ ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ò¸ï¿½ï¿½
 	}
 
-	// 4. Ç®¿¡ ¹ÝÈ¯
+	// 4. Ç®ï¿½ï¿½ ï¿½ï¿½È¯
 	if (effect->IsReadyForReuse()) {
 		universalPool.push(std::move(effect));
 		std::cout << "Effect returned to pool. Pool size: " << universalPool.size() << std::endl;
@@ -512,27 +509,27 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 {
 	auto effect = std::make_unique<EffectBase>();
 
-	// ParticleSystem »ý¼º (ÃÖ´ë ±¸¼º)
+	// ParticleSystem ï¿½ï¿½ï¿½ï¿½ (ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	auto particleSystem = std::make_shared<ParticleSystem>(
 		1,
 		ParticleDataType::Mesh
 	);
 
-	// ¸ðµç ParticleModule Ãß°¡ ¹× ÃÊ±âÈ­
+	// ï¿½ï¿½ï¿½ ParticleModule ï¿½ß°ï¿½ ï¿½ï¿½ ï¿½Ê±ï¿½È­
 	auto spawnModule = particleSystem->AddModule<SpawnModuleCS>();
-	spawnModule->Initialize(); // PSO »ý¼º
-	spawnModule->SetEnabled(false); // ºñÈ°¼ºÈ­
+	spawnModule->Initialize(); // PSO ï¿½ï¿½ï¿½ï¿½
+	spawnModule->SetEnabled(false); // ï¿½ï¿½È°ï¿½ï¿½È­
 
 	auto colorModule = particleSystem->AddModule<ColorModuleCS>();
-	colorModule->Initialize(); // PSO »ý¼º
+	colorModule->Initialize(); // PSO ï¿½ï¿½ï¿½ï¿½
 	colorModule->SetEnabled(false);
 
 	auto movementModule = particleSystem->AddModule<MovementModuleCS>();
-	movementModule->Initialize(); // PSO »ý¼º
+	movementModule->Initialize(); // PSO ï¿½ï¿½ï¿½ï¿½
 	movementModule->SetEnabled(false);
 
 	auto sizeModule = particleSystem->AddModule<SizeModuleCS>();
-	sizeModule->Initialize(); // PSO »ý¼º
+	sizeModule->Initialize(); // PSO ï¿½ï¿½ï¿½ï¿½
 	sizeModule->SetEnabled(false);
 
 	auto trailModule = particleSystem->AddModule<TrailModuleCS>();
@@ -559,13 +556,13 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	trailGenerateModule->Initialize();
 	trailGenerateModule->SetEnabled(false);
 	
-	// RenderModuleµµ ÃÊ±âÈ­
+	// RenderModuleï¿½ï¿½ ï¿½Ê±ï¿½È­
 	auto billboardModule = particleSystem->AddRenderModule<BillboardModuleGPU>();
-	billboardModule->Initialize(); // PSO »ý¼º
+	billboardModule->Initialize(); // PSO ï¿½ï¿½ï¿½ï¿½
 	billboardModule->SetEnabled(false);
 
 	auto meshModule = particleSystem->AddRenderModule<MeshModuleGPU>();
-	meshModule->Initialize(); // PSO »ý¼º
+	meshModule->Initialize(); // PSO ï¿½ï¿½ï¿½ï¿½
 	meshModule->SetEnabled(false);
 
 	auto trailRenderModule = particleSystem->AddRenderModule<TrailRenderModule>();
@@ -579,13 +576,13 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 void EffectManager::DisableAllModules(EffectBase* effect)
 {
 	for (auto& ps : effect->GetAllParticleSystems()) {
-		// ParticleModuleµé ºñÈ°¼ºÈ­
+		// ParticleModuleï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
 		for (auto it = ps->GetModuleList().begin(); it != ps->GetModuleList().end(); ++it) {
 			ParticleModule& module = *it;
 			module.SetEnabled(false);
 		}
 
-		// RenderModuleµé ºñÈ°¼ºÈ­
+		// RenderModuleï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
 		for (auto* renderModule : ps->GetRenderModules()) {
 			renderModule->SetEnabled(false);
 		}
@@ -596,10 +593,10 @@ void EffectManager::CleanupAllResources()
 {
 	std::cout << "Cleaning up all EffectManager resources..." << std::endl;
 
-	// 1. È°¼º ÀÌÆåÆ®µé Á¤¸®
+	// 1. È°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	activeEffects.clear();
 
-	// 2. Ç® Á¤¸®
+	// 2. Ç® ï¿½ï¿½ï¿½ï¿½
 	{
 		std::lock_guard<std::mutex> lock(poolMutex);
 		while (!universalPool.empty()) {
@@ -607,7 +604,7 @@ void EffectManager::CleanupAllResources()
 		}
 	}
 
-	// 3. Á¤¸® Å¥ Á¤¸®
+	// 3. ï¿½ï¿½ï¿½ï¿½ Å¥ ï¿½ï¿½ï¿½ï¿½
 	{
 		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
 		while (!cleanupQueue.empty()) {
@@ -623,7 +620,7 @@ void EffectManager::ProcessCleanupQueue()
 {
 	std::lock_guard<std::mutex> lock(cleanupQueueMutex);
 
-	// ÇÑ ¹ø¿¡ ÃÖ´ë 5°³¾¿¸¸ Ã³¸® (ÇÁ·¹ÀÓ µå·Ó ¹æÁö)
+	// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ 5ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	int processCount = 0;
 	while (!cleanupQueue.empty() && processCount < 5) {
 		auto effect = std::move(cleanupQueue.front());
@@ -632,7 +629,7 @@ void EffectManager::ProcessCleanupQueue()
 		processCount++;
 	}
 
-	// Á¤¸® Å¥°¡ ³Ê¹« Å©¸é ºñµ¿±â Ã³¸® ½ÃÀÛ
+	// ï¿½ï¿½ï¿½ï¿½ Å¥ï¿½ï¿½ ï¿½Ê¹ï¿½ Å©ï¿½ï¿½ ï¿½ñµ¿±ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (cleanupQueue.size() > 20) {
 		std::cout << "Cleanup queue too large (" << cleanupQueue.size()
 			<< "), starting async cleanup" << std::endl;
@@ -652,20 +649,20 @@ void EffectManager::EmergencyCleanup()
 {
 	std::cout << "EMERGENCY CLEANUP INITIATED!" << std::endl;
 
-	// 1. ¹«ÇÑ ÀÌÆåÆ®¿Í ¿À·¡µÈ ÀÌÆåÆ® ¿ì¼± Á¤¸®
+	// 1. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ì¼± ï¿½ï¿½ï¿½ï¿½
 	auto it = activeEffects.begin();
 	int emergencyCleanedCount = 0;
 
-	// 1´Ü°è: ¹«ÇÑ ÀÌÆåÆ® ÀüÃ¼ Á¤¸®
+	// 1ï¿½Ü°ï¿½: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½
 	while (it != activeEffects.end()) {
 		auto& effect = it->second;
 
-		if (effect->GetDuration() < 0) { // ¹«ÇÑ ÀÌÆåÆ®´Â ¸ðµÎ Á¤¸®
+		if (effect->GetDuration() < 0) { // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			effect->Stop();
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
 
-			// ±ä±Þ»óÈ²ÀÌ¹Ç·Î Ç®¿¡ ¹ÝÈ¯ÇÏÁö ¾Ê°í Áï½Ã ¼Ò¸ê
+			// ï¿½ï¿½Þ»ï¿½È²ï¿½Ì¹Ç·ï¿½ Ç®ï¿½ï¿½ ï¿½ï¿½È¯ï¿½ï¿½ï¿½ï¿½ ï¿½Ê°ï¿½ ï¿½ï¿½ï¿½ ï¿½Ò¸ï¿½
 			totalDestroyedEffects++;
 			emergencyCleanedCount++;
 		}
@@ -674,12 +671,12 @@ void EffectManager::EmergencyCleanup()
 		}
 	}
 
-	// 2´Ü°è: ¿©ÀüÈ÷ ¸¹´Ù¸é ¿À·¡µÈ ÀÏ¹Ý ÀÌÆåÆ®µµ Á¤¸®
+	// 2ï¿½Ü°ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ù¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ï¹ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	it = activeEffects.begin();
 	while (it != activeEffects.end() && emergencyCleanedCount < activeEffects.size() / 2) {
 		auto& effect = it->second;
 
-		if (effect->GetCurrentTime() > 10.0f) { // 10ÃÊ ÀÌ»óµÈ ÀÏ¹Ý ÀÌÆåÆ®
+		if (effect->GetCurrentTime() > 10.0f) { // 10ï¿½ï¿½ ï¿½Ì»ï¿½ï¿½ ï¿½Ï¹ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®
 			effect->Stop();
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
@@ -692,7 +689,7 @@ void EffectManager::EmergencyCleanup()
 		}
 	}
 
-	// 3. Á¤¸® Å¥¸¸ ºñ¿ì±â (Ç®Àº °Çµå¸®Áö ¾ÊÀ½)
+	// 3. ï¿½ï¿½ï¿½ï¿½ Å¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (Ç®ï¿½ï¿½ ï¿½Çµå¸®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	{
 		std::lock_guard<std::mutex> lock(cleanupQueueMutex);
 		int cleanupCount = 0;
@@ -720,17 +717,17 @@ bool EffectManager::ShouldForceCleanup() const
 	if (emergencyNeeded) {
 		Debug->Log("Force Clean Up");
 		const_cast<EffectManager*>(this)->EmergencyCleanup();
-		return false; // ±ä±ÞÁ¤¸® ÇßÀ¸¹Ç·Î ÀÏ¹Ý Á¤¸®´Â ½ºÅµ
+		return false; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½Ï¹ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Åµ
 	}
 	return memoryPressure;
 }
 
 void EffectManager::ProcessCleanupQueueAsync()
 {
-// º°µµ ½º·¹µå¿¡¼­ Á¤¸® ÀÛ¾÷ ¼öÇà
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½å¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Û¾ï¿½ ï¿½ï¿½ï¿½ï¿½
 	std::thread([this]() {
 		if (isCleanupRunning.exchange(true)) {
-			return; // ÀÌ¹Ì Á¤¸® ÁßÀÌ¸é Á¾·á
+			return; // ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½
 		}
 
 		std::cout << "Starting async cleanup..." << std::endl;
@@ -747,10 +744,10 @@ void EffectManager::ProcessCleanupQueueAsync()
 				cleanupQueue.pop();
 			}
 
-			// effect ¼Ò¸ê (½Ã°£ÀÌ °É¸± ¼ö ÀÖ´Â ÀÛ¾÷)
+			// effect ï¿½Ò¸ï¿½ (ï¿½Ã°ï¿½ï¿½ï¿½ ï¿½É¸ï¿½ ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½Û¾ï¿½)
 			if (effect) {
 				totalDestroyedEffects++;
-				std::this_thread::sleep_for(std::chrono::milliseconds(1)); // CPU ¾çº¸
+				std::this_thread::sleep_for(std::chrono::milliseconds(1)); // CPU ï¿½çº¸
 			}
 		}
 
@@ -761,13 +758,13 @@ void EffectManager::ProcessCleanupQueueAsync()
 
 void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJson)
 {
-	// ±âº»°ªÀ¸·Î ÃÊ±âÈ­
+	// ï¿½âº»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
 	particleSystemConfigs.clear();
 	name = "";
 	duration = 1.0f;
 	loop = false;
 
-	// JSON ¿øº» ÀúÀå
+	// JSON ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	originalJson = effectJson;
 
 	try {
@@ -794,7 +791,7 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 			for (const auto& psJson : effectJson["particleSystems"]) {
 				ParticleSystemConfig psConfig;
 
-				// maxParticles, dataType ¼³Á¤
+				// maxParticles, dataType ï¿½ï¿½ï¿½ï¿½
 				if (psJson.contains("maxParticles")) {
 					psConfig.maxParticles = (int)psJson["maxParticles"];
 				}
@@ -802,7 +799,7 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 					psConfig.dataType = static_cast<ParticleDataType>(psJson["particleDataType"]);
 				}
 
-				// ¸ðµâ È°¼ºÈ­ ÇÃ·¡±×¸¸ ¼³Á¤
+				// ï¿½ï¿½ï¿½ È°ï¿½ï¿½È­ ï¿½Ã·ï¿½ï¿½×¸ï¿½ ï¿½ï¿½ï¿½ï¿½
 				if (psJson.contains("modules")) {
 					for (const auto& moduleJson : psJson["modules"]) {
 						if (moduleJson.contains("type")) {
@@ -842,7 +839,7 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 					}
 				}
 
-				// ·»´õ ¸ðµâµµ µ¿ÀÏÇÏ°Ô
+				// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½âµµ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½
 				if (psJson.contains("renderModules")) {
 					for (const auto& renderModuleJson : psJson["renderModules"]) {
 						if (renderModuleJson.contains("type")) {
@@ -872,38 +869,38 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 
 void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig)
 {
-	// EffectSerializer·Î ¿ÏÀüÇÑ ÀÌÆåÆ® ±¸Á¶ »ý¼º
+	// EffectSerializerï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	auto deserializedEffect = EffectSerializer::DeserializeEffect(templateConfig.originalJson);
 	if (deserializedEffect) {
-		// ±âº» ÀÌÆåÆ® ¼³Á¤ º¹»ç
+		// ï¿½âº» ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		effect->SetDuration(deserializedEffect->GetDuration());
 		effect->SetLoop(deserializedEffect->IsLooping());
 		effect->SetName(deserializedEffect->GetName());
 		effect->SetPosition(deserializedEffect->GetPosition());
 		effect->SetTimeScale(deserializedEffect->GetTimeScale());
 
-		// ParticleSystem ±³Ã¼
+		// ParticleSystem ï¿½ï¿½Ã¼
 		effect->ClearParticleSystems();
 		for (size_t i = 0; i < deserializedEffect->GetAllParticleSystems().size(); ++i) {
 			const auto& ps = deserializedEffect->GetAllParticleSystems()[i];
 			effect->AddParticleSystem(ps);
 
-			// µô·¹ÀÌ Á¤º¸ º¹¿ø
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			float delay = deserializedEffect->GetEmitterStartDelay(i);
 			effect->SetEmitterStartDelay(i, delay);
 		}
 	}
 
-	// ¸ðµç ParticleSystem¿¡ ´ëÇØ ¸ðµâ ºñÈ°¼ºÈ­
+	// ï¿½ï¿½ï¿½ ParticleSystemï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
 	DisableAllModules(effect);
 
-	// °¢ ParticleSystemº°·Î °³º° ¼³Á¤ Àû¿ë
+	// ï¿½ï¿½ ParticleSystemï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	auto& particleSystems = effect->GetAllParticleSystems();
 	for (int i = 0; i < particleSystems.size() && i < templateConfig.particleSystemConfigs.size(); ++i) {
 		auto& ps = particleSystems[i];
 		const auto& psConfig = templateConfig.particleSystemConfigs[i];
 
-		// ÇØ´ç ParticleSystemÀÇ ¸ðµâ È°¼ºÈ­
+		// ï¿½Ø´ï¿½ ParticleSystemï¿½ï¿½ ï¿½ï¿½ï¿½ È°ï¿½ï¿½È­
 		if (psConfig.moduleConfig.spawnEnabled) {
 			if (auto* module = ps->GetModule<SpawnModuleCS>()) {
 				module->SetEnabled(true);
@@ -964,7 +961,7 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 			}
 		}
 
-		// RenderModuleµµ µ¿ÀÏÇÏ°Ô
+		// RenderModuleï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½
 		if (psConfig.moduleConfig.billboardEnabled) {
 			if (auto* module = ps->GetRenderModule<BillboardModuleGPU>()) {
 				module->SetEnabled(true);
