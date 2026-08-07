@@ -47,8 +47,30 @@ RE_INCLUDE = re.compile(r'^\s*#include\s*[<"]([^">]+)[">]', re.M)
 # (예: "imgui-node-editor/imgui_node_editor.h" -> "imgui_node_editor.h").
 RE_VENDOR_IMGUI = re.compile(r'^(imgui|imconfig|imstb_|imfilebrowser)', re.I)
 
+# ImGui 심볼. include 없이 이것만 쓰는 파일을 잡기 위한 패턴이다.
+# ed:: 는 imgui-node-editor의 네임스페이스 별칭.
+RE_SYMBOL = re.compile(
+    r'\bImGui::|\bImGuiIO\b|\bImVec[24]\b|\bImDraw\w*|\bImFont\w*|'
+    r'\bImGuiKey\w*|\bImGuiCol\w*|\bImGuiStyle\b|\bImTextureID\b|\bed::'
+)
+
+# 주석 제거용. 주석 처리된 ImGui 호출이 실제로 있어서(SSGIPass 등)
+# 걸러내지 않으면 오탐이 난다.
+RE_BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
+RE_LINE_COMMENT = re.compile(r'//[^\n]*')
+
+# 심볼만 쓰고 include는 하지 않는 파일을 허용 목록에 적을 때 쓰는 표식.
+# 실제 헤더 이름과 충돌하지 않도록 꺾쇠를 쓴다.
+SYMBOL_SENTINEL = '<심볼-직접사용>'
+
 # 빌드 산출물. Unity 빌드가 원본을 합쳐 놓은 것이라 세면 중복이 된다.
 SKIP_PARTS = ('/x64/', '/bin/', '/obj/')
+
+
+def strip_comments(text):
+    """주석을 지운다. 주석 안의 ImGui 호출을 사용으로 세지 않기 위해서다."""
+    text = RE_BLOCK_COMMENT.sub(' ', text)
+    return RE_LINE_COMMENT.sub(' ', text)
 
 
 def is_imgui_header(include_path, helper_headers):
@@ -98,13 +120,24 @@ def scan_violations():
                 # 계층에 있다는 사실은 다른 간선들이 이미 드러낸다.
                 own_header = os.path.splitext(f)[0].lower()
 
+                has_imgui_include = False
                 for inc in RE_INCLUDE.findall(text):
                     if not is_imgui_header(inc, helper_headers):
                         continue
+                    has_imgui_include = True
                     base = os.path.basename(inc.replace('\\', '/'))
                     if os.path.splitext(base)[0].lower() == own_header:
                         continue
                     violations.append((rel, base))
+
+                # include 없이 심볼만 쓰는 파일.
+                #
+                # 이것이 없으면 게이트에 사각지대가 생긴다. 실제로 렌더 패스
+                # 13종은 ImGui:: 를 쓰면서 include는 하지 않고, ReflectionFunction.h가
+                # 리플렉션 매크로를 통해 뿌려 주는 <imgui.h>에 얹혀 컴파일된다.
+                # 간선만 세면 이들이 보이지 않아, 이관 진척도 신규 위반도 놓친다.
+                if not has_imgui_include and RE_SYMBOL.search(strip_comments(text)):
+                    violations.append((rel, SYMBOL_SENTINEL))
     return sorted(set(violations))
 
 
@@ -144,21 +177,32 @@ def main():
     new_edges = sorted(current - allowed)
     stale = sorted(allowed - current)
 
-    print(f'런타임 -> ImGui include 간선: {len(current)}개 '
-          f'(허용 목록 {len(allowed)}개)')
+    n_sym = sum(1 for _rel, base in current if base == SYMBOL_SENTINEL)
+    n_inc = len(current) - n_sym
+    print(f'런타임 -> ImGui 위반: {len(current)}건 '
+          f'(include {n_inc} · 심볼 직접사용 {n_sym}) '
+          f'/ 허용 목록 {len(allowed)}건')
+
     if stale:
-        print(f'\n[정리 가능] 더는 존재하지 않는 허용 항목 {len(stale)}개 - '
+        print(f'\n[정리 가능] 더는 존재하지 않는 허용 항목 {len(stale)}건 - '
               f'--update로 목록을 줄이세요:')
         for rel, base in stale:
             print(f'  {rel} -> {base}')
+
     if new_edges:
-        print(f'\n[실패] 새 include 간선 {len(new_edges)}개 - '
-              f'런타임·플랫폼 계층은 ImGui 헤더를 include할 수 없습니다:')
+        print(f'\n[실패] 새 위반 {len(new_edges)}건:')
         for rel, base in new_edges:
-            print(f'  {rel} -> {base}')
-        print('\n에디터 UI는 EngineGUIWindow/ImGuiHelper 쪽에 두세요.')
+            if base == SYMBOL_SENTINEL:
+                print(f'  {rel} - ImGui 심볼을 쓰지만 include하지 않음')
+            else:
+                print(f'  {rel} -> {base}')
+        print('\n런타임·플랫폼 계층은 ImGui에 의존할 수 없습니다.')
+        print('에디터 UI는 EngineGUIWindow/ImGuiHelper 쪽에 두세요.')
+        print('include 없이 심볼만 쓰는 것도 위반입니다 - 다른 헤더가 전이로 '
+              '뿌려 주고 있을 뿐, 의존은 실재합니다.')
         return 1
-    print('통과: 새 간선 없음')
+
+    print('통과: 새 위반 없음')
     return 0
 
 
