@@ -129,9 +129,6 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
-		// 생명주기 경로는 기본 씬이 만들어지기 전에 정해져야 한다(9-1).
-		ConsoleCommandSystem::ApplyStartupSwitches();
-
 		m_main->Initialize();
 		BootProgress::Step(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);

@@ -2,7 +2,7 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "Canvas.h"
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>

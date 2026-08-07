@@ -4,7 +4,7 @@
 #include "IAIComponent.h"
 #include "BTHeader.h"
 #include "AIManager.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "BehaviorTreeComponent.generated.h"
 
 using namespace BT;

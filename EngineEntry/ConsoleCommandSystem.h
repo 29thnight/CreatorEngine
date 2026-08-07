@@ -26,10 +26,6 @@ class ConsoleCommandSystem
 public:
     static ConsoleCommandSystem& Get();
 
-    // 엔진 초기화보다 먼저 봐야 하는 인자(--lifecycle-registry).
-    // 기본 씬이 만들어지기 전에 불러야 의미가 있다.
-    static void ApplyStartupSwitches();
-
     // 실행 인자를 해석해 --exec / --script / --console 을 처리한다.
     void InitializeFromCommandLine();
 

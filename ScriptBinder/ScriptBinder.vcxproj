@@ -328,7 +328,6 @@
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
-    <ClInclude Include="IRegistableEvent.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="PhysicsManager.h" />

@@ -1,6 +1,6 @@
 #pragma once
 #include "Component.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "../physics/PhysicsCommon.h"

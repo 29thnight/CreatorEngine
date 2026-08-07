@@ -3,7 +3,7 @@
 #include "LightProperty.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Scene.h"

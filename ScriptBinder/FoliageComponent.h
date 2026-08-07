@@ -3,7 +3,7 @@
 #include "FoliageType.h"
 #include "FoliageInstance.h"
 #include "Component.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "FoliageComponent.generated.h"
 
 class Camera;

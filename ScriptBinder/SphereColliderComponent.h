@@ -1,6 +1,6 @@
 #pragma once
 #include "Component.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "SphereColliderComponent.generated.h"

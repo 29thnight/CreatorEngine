@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "Camera.h"
 #include "CameraComponent.generated.h"
 #include "SceneManager.h"

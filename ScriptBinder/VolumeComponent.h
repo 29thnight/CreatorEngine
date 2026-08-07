@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "VolumeProfile.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "VolumeComponent.generated.h"
 
 class VolumeComponent : public Component

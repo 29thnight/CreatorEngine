@@ -127,19 +127,9 @@ void GameObject::AttachComponentLifecycle(const std::shared_ptr<Component>& comp
     Scene* scene = this->GetScene();
     if (nullptr == scene) return;
 
-    if (Scene::UseRegistry())
-    {
-        // 새 경로. 소유자는 아직 안 붙었을 수 있지만(호출부마다 순서가 다르다)
-        // 등록은 typeID만 보므로 무관하다 — 소유자는 Awake를 부를 때 확인한다.
-        scene->RegisterComponent(component.get());
-        return;
-    }
-
-    // 기존 델리게이트 경로. PHASE 9-3에서 이 분기가 사라진다.
-    if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
-    {
-        receiver->RegisterOverriddenEvents(scene);
-    }
+    // 소유자는 아직 안 붙었을 수 있지만(호출부마다 순서가 다르다) 등록은 typeID만
+    // 보므로 무관하다 — 소유자는 Awake를 부를 때 확인한다.
+    scene->RegisterComponent(component.get());
 }
 
 std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)

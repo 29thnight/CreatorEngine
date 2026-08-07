@@ -574,9 +574,6 @@
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
-    <ClInclude Include="IRegistableEvent.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
     </ClInclude>

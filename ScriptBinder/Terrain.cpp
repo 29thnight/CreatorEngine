@@ -1,4 +1,5 @@
 ﻿#include "Transform.h"
+#include "Scene.h"
 #include "Terrain.h"
 #include "SceneManager.h"
 #define STB_IMAGE_IMPLEMENTATION

@@ -1,7 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "UIManager.h"
 #include "UIComponent.h"
 #include "UIButton.generated.h"

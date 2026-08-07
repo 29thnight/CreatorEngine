@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "KeyState.h"
 #include "PlayerInputComponent.generated.h"
 class ActionMap;

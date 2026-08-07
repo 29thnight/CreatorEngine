@@ -12,7 +12,7 @@
 #include "TagManager.h"
 #include "ReflectionRegister.h"
 #include <algorithm>
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "TimeSystem.h"
 #include "PrefabEditor.h"
 #ifndef DYNAMICCPP_EXPORTS
@@ -962,16 +962,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
         {
             if (!comp) continue;
 
-            if (Scene::UseRegistry())
-            {
-                scene->RegisterComponent(comp.get());
-                continue;
-            }
-
-            if (auto reg = dynamic_cast<IRegistableEvent*>(comp.get()))
-            {
-                reg->RegisterOverriddenEvents(scene);
-            }
+            scene->RegisterComponent(comp.get());
         }
     }
 }

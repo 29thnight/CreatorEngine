@@ -91,12 +91,9 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
                 // 도는 경로라 드러나기 어려웠다. 이제 전부 받는다.
                 comp->OnDestroy();
 
-                // 레지스트리 경로에서는 아래 clear로 사라질 것들을 디스패치 리스트에서
-                // 먼저 빼야 한다. 남겨 두면 다음 프레임이 죽은 포인터를 순회한다.
-                if (Scene::UseRegistry())
-                {
-                    if (Scene* scene = obj->GetScene()) scene->UnregisterComponent(comp.get());
-                }
+                // 아래 clear로 사라질 것들을 디스패치 리스트에서 먼저 빼야 한다.
+                // 남겨 두면 다음 프레임이 죽은 포인터를 순회한다.
+                if (Scene* scene = obj->GetScene()) scene->UnregisterComponent(comp.get());
             }
             obj->m_components.clear();
             obj->m_componentIds.clear();

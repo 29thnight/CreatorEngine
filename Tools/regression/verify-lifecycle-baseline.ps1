@@ -28,10 +28,7 @@ param(
     # 왕복에 쓸 두 씬. 구조가 다른 둘을 고르는 것이 요점이다 — 같은 성격의 씬끼리
     # 오가면 컴포넌트 구성이 비슷해 파괴·초기화 순서의 차이가 드러나지 않는다.
     [string]$SceneA = "FT_Material",
-    [string]$SceneB = "UITestScene",
-    # 잔재 스위치. 9-2에서 레지스트리가 유일한 경로가 되어 아무 효과가 없다.
-    # 9-3에서 델리게이트 기계가 철거될 때 함께 지운다.
-    [switch]$Registry
+    [string]$SceneB = "UITestScene"
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -66,12 +63,7 @@ function Resolve-Scene([string]$name) {
 $pathA = Resolve-Scene $SceneA
 $pathB = Resolve-Scene $SceneB
 
-# 경로는 CLI 명령이 아니라 기동 인자로 정한다.
-#
-# CLI는 엔진이 다 선 뒤에 열려서, 기본 씬의 Main Camera·Directional Light가 이미
-# 옛 경로에 등록된 뒤다. 그 상태로 경로를 바꾸면 그 둘만 규약이 달라진다 —
-# A/B 대조가 실제로 그 어긋남을 잡아냈다.
-$registrySetup = "# (경로는 기동 인자로 정한다)"
+$registrySetup = "# (경로는 하나다 — PHASE 9-3에서 델리게이트를 철거했다)"
 
 $scenario = Join-Path $Work "lifecycle_baseline_resolved.txt"
 (Get-Content $template -Raw) `
@@ -80,11 +72,8 @@ $scenario = Join-Path $Work "lifecycle_baseline_resolved.txt"
     -replace '\{\{REGISTRY_SETUP\}\}', $registrySetup |
     Set-Content $scenario -Encoding UTF8
 
-# 인자는 시나리오 경로가 정해진 뒤에 만든다.
 $exeArgs = @("--script", $scenario)
-if ($Registry) { $exeArgs = @("--lifecycle-registry") + $exeArgs }
 
-# 경로는 이제 하나다(9-2). 인자는 남아 있어도 동작을 바꾸지 않는다.
 
 # 기준선은 하나다.
 #

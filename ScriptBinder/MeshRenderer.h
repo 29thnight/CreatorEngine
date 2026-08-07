@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "GameObject.h"
 #include "LightMapping.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
 #include "MeshRenderer.generated.h"
 
 class Mesh;

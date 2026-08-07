@@ -286,31 +286,6 @@ ConsoleCommandSystem& ConsoleCommandSystem::Get()
     return instance;
 }
 
-void ConsoleCommandSystem::ApplyStartupSwitches()
-{
-    // 엔진 초기화보다 **먼저** 처리해야 하는 인자만 여기서 본다(PHASE 9-1).
-    //
-    // InitializeFromCommandLine은 엔진이 다 선 뒤에 열린다 — 그래야 명령이 완성된
-    // 엔진 위에서 돈다. 하지만 생명주기 경로는 그때 정하면 이미 늦다: 기본 씬의
-    // Main Camera·Directional Light가 그 전에 만들어져 옛 경로에 등록되고, 나중에
-    // 경로를 바꾸면 그 둘만 다른 규약을 따르게 된다.
-    // 실제로 A/B 대조가 그 어긋남을 사건 2건의 차이로 잡아냈다.
-    int argc = 0;
-    LPWSTR* argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
-    if (!argv) return;
-
-    for (int i = 1; i < argc; ++i)
-    {
-        if (0 == ::wcscmp(argv[i], L"--lifecycle-registry"))
-        {
-            Scene::SetUseRegistry(true);
-            std::printf("[CLI] 생명주기 경로: 레지스트리 (기동 인자)\n");
-        }
-    }
-
-    ::LocalFree(argv);
-}
-
 void ConsoleCommandSystem::InitializeFromCommandLine()
 {
     int argc = 0;
@@ -2509,65 +2484,18 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
     else if (cmd == "lifecycle.registry")
     {
-        // 전환 스위치(PHASE 9-1). 델리게이트 경로 ↔ 레지스트리 경로.
-        //
-        // 병행으로 둔 이유는 26종을 한 번에 옮기다 중간 상태에서 빌드가 깨지는 기간을
-        // 만들지 않기 위해서다. 같은 실행에서 양쪽을 번갈아 돌려 9-0 기준선과 대조할 수도 있다.
-        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+        // 상태 조회만 남았다(PHASE 9-3에서 델리게이트를 철거해 경로가 하나다).
+        // 진단 가치는 그대로다 — 각 단계 리스트의 크기가 곧 '무엇이 매 프레임 도는가'이고,
+        // 마스크 표 크기는 등록 목록이 실제로 채워졌는지를 알려 준다.
+        Scene* scene = SceneManagers->GetActiveScene();
+        std::printf("[CLI] lifecycle — 마스크 표 %zu종\n", Lifecycle::Registry::Count());
 
-        if (mode == "off")
+        if (nullptr != scene)
         {
-            // 9-2에서 26종이 레지스트리로 옮겨 가며 델리게이트 경로의 구독자가 0이 됐다.
-            // 지금 끄면 아무 단계도 돌지 않는데, 그 모습이 '조용히 멈춘 게임'이라
-            // 원인을 짚기 어렵다. 되돌릴 수 없는 상태라는 것을 말로 알린다.
-            std::printf("[CLI] lifecycle.registry off — 거부. 9-2 이후 델리게이트 경로에는\n"
-                        "      구독자가 없어 끄면 어떤 생명주기도 돌지 않는다.\n");
-            return;
-        }
-
-        if (mode == "on")
-        {
-            const bool enable = true;
-            if (enable == Scene::UseRegistry())
-            {
-                std::printf("[CLI] lifecycle.registry — 이미 켜짐(9-2 이후 기본값)\n");
-                return;
-            }
-
-            Scene::SetUseRegistry(enable);
-
-            // 켤 때는 이미 서 있는 씬의 컴포넌트를 인수한다.
-            //
-            // 기동 직후 기본 씬(Main Camera·Directional Light)은 이 명령보다 먼저
-            // 만들어져 델리게이트 쪽에만 있다. 인수하지 않으면 그것들만 조용히
-            // 어떤 단계도 받지 못하고 사라진다 — A/B 대조가 OnDestroy 2건 유실로 잡아냈다.
-            Scene* scene = SceneManagers->GetActiveScene();
-            if (enable && nullptr != scene)
-            {
-                scene->AdoptExistingComponents();
-                const auto counts = scene->GetRegistryCounts();
-                std::printf("[CLI] lifecycle.registry on — 기존 컴포넌트 인수(update %zu · lateUpdate %zu · fixedUpdate %zu)\n",
-                    counts.update, counts.lateUpdate, counts.fixedUpdate);
-            }
-            else
-            {
-                std::printf("[CLI] lifecycle.registry %s\n", mode.c_str());
-            }
-        }
-        else
-        {
-            Scene* scene = SceneManagers->GetActiveScene();
-            std::printf("[CLI] lifecycle.registry — %s · 마스크 표 %zu종\n",
-                Scene::UseRegistry() ? "레지스트리 경로" : "델리게이트 경로",
-                Lifecycle::Registry::Count());
-
-            if (nullptr != scene && Scene::UseRegistry())
-            {
-                const auto counts = scene->GetRegistryCounts();
-                std::printf("[CLI]   pendingAwake %zu · pendingStart %zu · update %zu · lateUpdate %zu · fixedUpdate %zu\n",
-                    counts.pendingAwake, counts.pendingStart,
-                    counts.update, counts.lateUpdate, counts.fixedUpdate);
-            }
+            const auto counts = scene->GetRegistryCounts();
+            std::printf("[CLI]   pendingAwake %zu · pendingStart %zu · update %zu · lateUpdate %zu · fixedUpdate %zu\n",
+                counts.pendingAwake, counts.pendingStart,
+                counts.update, counts.lateUpdate, counts.fixedUpdate);
         }
     }
     else if (cmd == "lifecycle.dump")

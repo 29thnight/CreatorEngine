@@ -61,21 +61,19 @@ Scene::Scene()
 Scene::~Scene()
 {
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
-    AwakeEvent.Clear();
-    OnEnableEvent.Clear();
-    StartEvent.Clear();
-    FixedUpdateEvent.Clear();
-    InternalPhysicsUpdateEvent.Clear();
-    OnTriggerEnterEvent.Clear();
-    OnTriggerStayEvent.Clear();
-    OnTriggerExitEvent.Clear();
-    OnCollisionEnterEvent.Clear();
-    OnCollisionStayEvent.Clear();
-    OnCollisionExitEvent.Clear();
-    UpdateEvent.Clear();
-    LateUpdateEvent.Clear();
-    OnDisableEvent.Clear();
-    OnDestroyEvent.Clear();
+    // 생명주기 델리게이트 15종의 Clear 연쇄가 여기 있었다(PHASE 9-3에서 철거).
+    //
+    // 종료 행의 자리이기도 했다: Clear가 콜백을 파괴하는데 그 파괴가 같은 델리게이트의
+    // Remove를 다시 부르면 재진입 불가 스핀락에서 영원히 돌았다(커밋 c712011f).
+    // 델리게이트가 없으니 그 연쇄 자체가 성립하지 않는다.
+    //
+    // 리스트는 비우기만 하면 된다 — 원소가 raw 포인터라 소멸자 연쇄가 없다.
+    m_pendingAwake.clear();
+    m_pendingStart.clear();
+    m_updateList.clear();
+    m_lateUpdateList.clear();
+    m_fixedUpdateList.clear();
+    m_destroyWatchList.clear();
 
     m_gameObjectNameSet.clear();
     m_globalDirtySet.clear();
@@ -749,13 +747,6 @@ void Scene::Reset()
 // ─────────────────────────────────────────────────────────────────────────────
 namespace
 {
-    // 기본이 레지스트리다 (PHASE 9-2에서 뒤집었다).
-    //
-    // 9-2가 26종에서 RegistableEvent 상속을 걷어냈으므로 델리게이트 경로에는 이제
-    // 구독자가 하나도 없다 — 끄면 아무것도 안 돈다. 스위치가 남아 있는 것은 9-3이
-    // 델리게이트 기계를 실제로 철거할 때까지의 잔재이고, 그때 이 변수도 사라진다.
-    bool g_useLifecycleRegistry = true;
-
     // swap-and-pop 제거. 순서를 보존하지 않는 것이 의도다 —
     // 보존해야 하는 것은 단계 사이의 순서이지 같은 단계 안의 순서가 아니고,
     // erase로 앞당기면 제거가 O(n)이 되어 씬 전환마다 수천 번 돈다.
@@ -783,9 +774,6 @@ namespace
         return (nullptr != type) ? type->name.c_str() : "?";
     }
 }
-
-bool Scene::UseRegistry() noexcept { return g_useLifecycleRegistry; }
-void Scene::SetUseRegistry(bool use) noexcept { g_useLifecycleRegistry = use; }
 
 void Scene::RegisterComponent(Component* component)
 {
@@ -845,23 +833,6 @@ void Scene::UnregisterComponent(Component* component)
     RemoveFromList(m_lateUpdateList, component);
     RemoveFromList(m_fixedUpdateList, component);
     RemoveFromList(m_destroyWatchList, component);
-}
-
-void Scene::AdoptExistingComponents()
-{
-    // 컴포넌트가 이미 Awake를 받았는지는 RegisterComponent가 상태로 판단하므로,
-    // 여기서는 통째로 넣기만 하면 된다 — 살아 있던 것이 다시 깨어나지 않는다.
-    for (const auto& owned : m_SceneObjects)
-    {
-        GameObject* object = owned.get();
-        if (nullptr == object) continue;
-
-        for (const auto& component : object->m_components)
-        {
-            if (!component) continue;
-            RegisterComponent(component.get());
-        }
-    }
 }
 
 Scene::RegistryCounts Scene::GetRegistryCounts() const
@@ -994,34 +965,20 @@ void Scene::FlushPendingDestroy()
 
 void Scene::Awake()
 {
-    if (UseRegistry())
-    {
-        RegistryDrainAwakeAndStart();
-        return;
-    }
-    AwakeEvent.Broadcast();
+    // Awake 단계가 pendingStart까지 소진한다 — Awake 직후에 Start를 부르는 것이 규약이다.
+    RegistryDrainAwakeAndStart();
 }
 
 void Scene::OnEnable()
 {
-    // 레지스트리 경로에서는 할 일이 없다(PHASE 9-2).
-    //
-    // 활성 전이는 Component::SetEnabled가 그 자리에서 처리한다. 매 프레임 전체를
-    // 훑으며 '바뀐 게 있나' 묻던 스캔이 사라진 것이고, 그 스캔은 이 훅을 구현한
-    // 네이티브 컴포넌트가 0개라 실제로 아무 일도 하지 않고 돌기만 했다.
-    if (UseRegistry()) return;
-
-    OnEnableEvent.Broadcast();
+    // 비어 있다. 활성 전이는 Component::SetEnabled가 그 자리에서 처리한다(9-2).
+    // 매 프레임 전체를 훑으며 '바뀐 게 있나' 묻던 스캔이 사라진 자리다.
 }
 
 void Scene::Start()
 {
-    // 레지스트리 경로에서는 Awake 단계가 pendingStart까지 소진한다.
-    // Awake 직후에 Start를 부르는 것이 규약이라 두 단계를 한 지점에서 처리하고,
+    // 비어 있다. Awake 단계가 pendingStart까지 소진하므로(위 Scene::Awake),
     // 여기서 또 부르면 같은 프레임에 Start가 두 번 돈다.
-    if (UseRegistry()) return;
-
-    StartEvent.Broadcast();
 }
 
 void Scene::FixedUpdate(float deltaSecond)
@@ -1038,11 +995,9 @@ void Scene::FixedUpdate(float deltaSecond)
     SetInternalPhysicData();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("fixedBroadcast");
-    if (UseRegistry()) RegistryTick(m_fixedUpdateList, Lifecycle::Bit_FixedUpdate, deltaSecond);
-    else               FixedUpdateEvent.Broadcast(deltaSecond);
+    RegistryTick(m_fixedUpdateList, Lifecycle::Bit_FixedUpdate, deltaSecond);
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("internalfixedBroadcast");
-    InternalPhysicsUpdateEvent.Broadcast(deltaSecond);
     PROFILE_CPU_END();
     // Internal Physics Update 작성
     PROFILE_CPU_BEGIN("physxUpdate");
@@ -1113,8 +1068,7 @@ void Scene::Update(float deltaSecond)
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("UpdateEvent");
-    if (UseRegistry()) RegistryTick(m_updateList, Lifecycle::Bit_Update, deltaSecond);
-    else               UpdateEvent.Broadcast(deltaSecond);
+    RegistryTick(m_updateList, Lifecycle::Bit_Update, deltaSecond);
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
@@ -1132,8 +1086,7 @@ void Scene::YieldNull()
 
 void Scene::LateUpdate(float deltaSecond)
 {
-    if (UseRegistry()) RegistryTick(m_lateUpdateList, Lifecycle::Bit_LateUpdate, deltaSecond);
-    else               LateUpdateEvent.Broadcast(deltaSecond);
+    RegistryTick(m_lateUpdateList, Lifecycle::Bit_LateUpdate, deltaSecond);
 
     CullMeshData();
 }
@@ -1141,8 +1094,7 @@ void Scene::LateUpdate(float deltaSecond)
 void Scene::OnDisable()
 {
     PROFILE_CPU_BEGIN("OnDisable");
-    // OnEnable과 같은 이유로 레지스트리 경로에서는 비어 있다 — SetEnabled가 처리한다.
-    if (!UseRegistry()) OnDisableEvent.Broadcast();
+    // OnEnable과 같은 이유로 비어 있다 — SetEnabled가 처리한다.
     PROFILE_CPU_END();
 }
 
@@ -1155,8 +1107,7 @@ void Scene::OnDestroy()
     // 레지스트리 경로는 여기서만 파괴가 일어난다는 것을 불변식으로 쓴다: 순회하는
     // 동안에는 리스트에서 아무것도 빠지지 않으므로 '순회 중인 것이 죽는' 상황이
     // 표현 불가능해진다(R1·R2가 여기서 닫힌다).
-    if (UseRegistry()) FlushPendingDestroy();
-    else               OnDestroyEvent.Broadcast();
+    FlushPendingDestroy();
     PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("DestroyLight");
     DestroyLight();

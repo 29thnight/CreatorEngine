@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject.h"
-#include "IRegistableEvent.h"
+#include "Component.h"
+#include "Scene.h"
 
 template<typename T>
 inline T* GameObject::AddComponent()
