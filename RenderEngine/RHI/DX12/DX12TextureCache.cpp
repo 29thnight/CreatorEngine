@@ -342,6 +342,196 @@ bool DX12TextureCache::UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTU
     return true;
 }
 
+// ── CPU 픽셀 직결 업로드 (PHASE 3-1 재정의, T1) ──
+//
+// UploadFromDX11과 뼈대가 같고 소스만 다르다. 거기서는 DX11 스테이징을 만들어
+// CopyResource로 GPU에서 끌어내린 뒤 Map으로 읽었는데, 여기서는 파일을 읽을 때
+// 이미 CPU에 있던 픽셀을 그대로 쓴다 — 스테이징 텍스처·CopyResource·Flush·
+// Map/Unmap이 통째로 사라진다.
+//
+// 두 경로를 합치지 않는 이유: 행을 옮기는 부분만 다르고 나머지가 같아 보이지만,
+// DX11 쪽은 서브리소스마다 Map/Unmap이 짝을 이뤄야 해서 루프 구조가 다르다.
+// 억지로 합치면 콜백이나 분기가 들어가는데, 그 대가로 얻는 것이 적다.
+// UploadFromDX11은 T1이 끝나면(파일 출처 텍스처가 전부 이 경로로 오면) 런타임
+// 생성 텍스처만 남으므로, 그때 어느 쪽이 사라질지가 정해진다.
+bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
+    ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError)
+{
+    auto* device = m_resources->GetDevice();
+    const DirectX::TexMetadata& metadata = image.GetMetadata();
+
+    if (0 == metadata.width || 0 == metadata.height || 0 == metadata.mipLevels)
+    {
+        outError = "CPU 픽셀 메타데이터가 비어 있다";
+        return false;
+    }
+
+    // 3D 텍스처는 이 경로로 오지 않는다(재질·아이콘은 전부 2D나 큐브다).
+    // 조용히 이상한 것을 만드는 대신 거절하고 호출부가 DX11 경로로 물러선다.
+    if (DirectX::TEX_DIMENSION_TEXTURE2D != metadata.dimension)
+    {
+        outError = "2D가 아닌 CPU 이미지는 직결 업로드하지 않는다";
+        return false;
+    }
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = metadata.width;
+    desc.Height = static_cast<UINT>(metadata.height);
+    desc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize);
+    desc.MipLevels = static_cast<UINT16>(metadata.mipLevels);
+    desc.Format = metadata.format;
+    desc.SampleDesc.Count = 1;
+
+    HRESULT hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&outResource));
+    if (FAILED(hr))
+    {
+        outError = "DX12 텍스처 생성 실패 " + TextureCacheHrToString(hr);
+        return false;
+    }
+
+    const uint32_t subresourceCount =
+        static_cast<uint32_t>(metadata.mipLevels * metadata.arraySize);
+
+    std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
+    std::vector<UINT>   rowCounts(subresourceCount);
+    std::vector<UINT64> rowSizes(subresourceCount);
+    UINT64 totalBytes = 0;
+    device->GetCopyableFootprints(&desc, 0, subresourceCount, 0,
+        footprints.data(), rowCounts.data(), rowSizes.data(), &totalBytes);
+
+    // 스테이징 선택은 DX11 경로와 같은 규칙이다 — 링에 들어가면 링,
+    // 넘치면 1회용 업로드 버퍼(4K HDR equirect가 128MB인 실측 사례).
+    DX12UploadRing::Allocation ringAllocation{};
+    ComPtr<ID3D12Resource> dedicatedStaging;
+    uint8_t* destinationBase = nullptr;
+    ID3D12Resource* stagingResource = nullptr;
+    uint64_t stagingBaseOffset = 0;
+
+    if (totalBytes <= m_resources->GetUploadRing().GetBytesPerFrame())
+    {
+        ringAllocation = m_resources->GetUploadRing().Allocate(
+            totalBytes, DX12UploadRing::kTexturePlacementAlignment);
+    }
+
+    if (ringAllocation.IsValid())
+    {
+        destinationBase = static_cast<uint8_t*>(ringAllocation.cpuAddress);
+        stagingResource = ringAllocation.resource;
+        stagingBaseOffset = ringAllocation.offset;
+    }
+    else
+    {
+        D3D12_HEAP_PROPERTIES uploadHeap{};
+        uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC bufferDesc{};
+        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        bufferDesc.Width = totalBytes;
+        bufferDesc.Height = 1;
+        bufferDesc.DepthOrArraySize = 1;
+        bufferDesc.MipLevels = 1;
+        bufferDesc.SampleDesc.Count = 1;
+        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        hr = device->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE,
+            &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+            IID_PPV_ARGS(&dedicatedStaging));
+        if (FAILED(hr))
+        {
+            outError = "대형 텍스처 스테이징 생성 실패 (" + std::to_string(totalBytes)
+                + "바이트) " + TextureCacheHrToString(hr);
+            return false;
+        }
+        dedicatedStaging->SetName(L"DX12TextureCache.DedicatedStaging");
+
+        void* mapped = nullptr;
+        hr = dedicatedStaging->Map(0, nullptr, &mapped);
+        if (FAILED(hr))
+        {
+            outError = "대형 텍스처 스테이징 Map 실패 " + TextureCacheHrToString(hr);
+            return false;
+        }
+        destinationBase = static_cast<uint8_t*>(mapped);
+        stagingResource = dedicatedStaging.Get();
+        stagingBaseOffset = 0;
+    }
+
+    auto* commandList = m_resources->GetCommandList();
+
+    for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
+    {
+        // DX12 서브리소스 번호를 (밉, 배열 슬라이스)로 되돌린다 —
+        // subresource = mip + arraySlice * mipLevels 가 규칙이다.
+        const size_t mip = subresource % metadata.mipLevels;
+        const size_t item = subresource / metadata.mipLevels;
+
+        const DirectX::Image* sourceImage = image.GetImage(mip, item, 0);
+        if (nullptr == sourceImage)
+        {
+            outError = "CPU 이미지에 서브리소스가 없다";
+            return false;
+        }
+
+        const auto& footprint = footprints[subresource];
+        const uint32_t rows = rowCounts[subresource];
+        const uint64_t rowSize = rowSizes[subresource];
+
+        // 행 간격이 다르다. DirectXTex는 자기 rowPitch를, DX12는 256바이트
+        // 정렬을 쓰므로 행 단위로 옮긴다(DX11 경로와 같은 이유).
+        for (uint32_t row = 0; row < rows; ++row)
+        {
+            const uint8_t* sourceRow = sourceImage->pixels
+                + static_cast<size_t>(row) * sourceImage->rowPitch;
+            uint8_t* destinationRow = destinationBase + footprint.Offset
+                + static_cast<size_t>(row) * footprint.Footprint.RowPitch;
+            memcpy(destinationRow, sourceRow, static_cast<size_t>(rowSize));
+        }
+
+        D3D12_TEXTURE_COPY_LOCATION dst{};
+        dst.pResource = outResource.Get();
+        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dst.SubresourceIndex = subresource;
+
+        D3D12_TEXTURE_COPY_LOCATION src{};
+        src.pResource = stagingResource;
+        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        src.PlacedFootprint = footprint;
+        src.PlacedFootprint.Offset += stagingBaseOffset;
+
+        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    }
+
+    if (dedicatedStaging)
+    {
+        dedicatedStaging->Unmap(0, nullptr);
+        m_dedicatedStaging.push_back(std::move(dedicatedStaging));
+    }
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = outResource.Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    commandList->ResourceBarrier(1, &barrier);
+
+    outEntry.resource = outResource.Get();
+    outEntry.format = metadata.format;
+    outEntry.width = static_cast<uint32_t>(metadata.width);
+    outEntry.height = static_cast<uint32_t>(metadata.height);
+    outEntry.mipLevels = static_cast<uint32_t>(metadata.mipLevels);
+    outEntry.arraySize = static_cast<uint32_t>(metadata.arraySize);
+    outEntry.isCube = metadata.IsCubemap();
+
+    m_stats.bytesUploaded += totalBytes;
+    return true;
+}
+
 DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::string& outError)
 {
     if (nullptr == m_resources) return Entry{};
@@ -365,6 +555,37 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     {
         ++m_stats.hits;
         return found->second;
+    }
+
+    // ── 파일에서 읽은 CPU 픽셀이 있으면 그걸로 바로 올린다 (T1) ──
+    //
+    // 로더가 압축까지 끝낸 이미지를 남겨 둔다(Texture::m_cpuPixels). 그것을
+    // 쓰면 DX11을 거치지 않는다 — 예전에는 이 픽셀로 DX11 텍스처를 만들고
+    // 버린 뒤, 여기서 그 DX11 텍스처를 스테이징으로 끌어내려 되읽었다.
+    //
+    // ★ 가져가면서 놓는다(TakeCpuPixels). 성공하든 실패하든 다시 시도하지
+    //   않는다 — 실패하는 이미지는 다음에도 실패하고, 붙들고 있으면 CPU
+    //   메모리만 먹는다. 실패는 아래 DX11 경로가 받는다.
+    if (const auto pixels = texture->TakeCpuPixels())
+    {
+        ComPtr<ID3D12Resource> resource;
+        Entry entry{};
+        std::string uploadError;
+        if (UploadFromCpuPixels(*pixels, resource, entry, uploadError))
+        {
+            const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
+            resource->SetName(wideName.c_str());
+
+            ++m_stats.uploads;
+            ++m_stats.fromCpuPixels;
+            m_entries.emplace(texture, std::move(resource));
+            m_descriptions.emplace(texture, entry);
+            return entry;
+        }
+
+        // 직결이 안 되는 종류(3D 등)는 아래 DX11 경로가 받는다. 오류를
+        // 삼키지 않고 남겨 두되, 폴백이 성공하면 그것이 최종 결과다.
+        outError = uploadError;
     }
 
     // m_pTexture가 비어 있는 텍스처가 있다. DirectXTex의 CreateShaderResourceView로
@@ -424,6 +645,7 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     entry.isCube = 0 != (sourceDesc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE);
 
     ++m_stats.uploads;
+    ++m_stats.fromDX11;
     m_entries.emplace(texture, std::move(resource));
     m_descriptions.emplace(texture, entry);
     return entry;

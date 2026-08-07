@@ -2421,6 +2421,21 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         (state.pipeline && state.pipeline->ssr.IsEnabled()) ? "켜짐" : "꺼짐");
     status += decalLine;
 
+    // ── 텍스처 업로드 출처 (T1) ──
+    //
+    // DX11을 거치지 않고 올린 것과 거쳐서 올린 것의 비다. fromDX11이 0이 되면
+    // 자산 경로에서 DX11 디바이스가 필요 없어진다 — T1의 완료 조건이 이 수다.
+    if (state.pipeline)
+    {
+        const auto texStats = state.pipeline->textureCache.GetStats();
+        char textureLine[160]{};
+        std::snprintf(textureLine, sizeof(textureLine),
+            "\n  텍스처 업로드 %u건 (CPU 직결 %u · DX11 경유 %u) · 히트 %u · 실패 %u",
+            texStats.uploads, texStats.fromCpuPixels, texStats.fromDX11,
+            texStats.hits, texStats.failures);
+        status += textureLine;
+    }
+
     // ── 마지막 프레임의 패스 이름 ──
     //
     // '배선했다'를 콘솔에서 단정할 수 있는 유일한 값이다. 패스가 그래프에

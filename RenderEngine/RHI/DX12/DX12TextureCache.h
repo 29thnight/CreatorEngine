@@ -44,6 +44,14 @@ public:
         uint32_t uploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
+
+        // ── 업로드 출처 (T1) ──
+        //
+        // 파일에서 읽은 CPU 픽셀로 바로 올렸는가, 아니면 DX11 텍스처에서
+        // 되읽었는가. 이 둘의 비가 곧 T1의 진척이다 — fromDX11이 0이 되면
+        // 자산 경로에서 DX11 디바이스가 필요 없어진다.
+        uint32_t fromCpuPixels{ 0 };
+        uint32_t fromDX11{ 0 };
     };
 
     bool Initialize(DX12DeviceResources* resources, ID3D11Device* dx11Device,
@@ -85,6 +93,14 @@ private:
         ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
     bool UploadFromDX11(ID3D11Texture2D* source, const D3D11_TEXTURE2D_DESC& desc,
         ComPtr<ID3D12Resource>& outResource, std::string& outError);
+
+    /// 파일에서 읽어 둔 CPU 픽셀로 바로 올린다(T1).
+    ///
+    /// DX11을 거치지 않는 경로다. 로더가 압축까지 끝낸 이미지를 Texture에
+    /// 남겨 두므로(Texture::m_cpuPixels) 그것을 그대로 업로드 링에 밀어
+    /// 넣는다 — 스테이징 복사와 Map이 통째로 사라진다.
+    bool UploadFromCpuPixels(const DirectX::ScratchImage& image,
+        ComPtr<ID3D12Resource>& outResource, Entry& outEntry, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
     ID3D11Device*        m_dx11Device{ nullptr };

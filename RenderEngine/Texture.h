@@ -7,6 +7,8 @@
 #include "Delegate.h"
 #include "RHI/ScreenSizedResource.h"
 #include <d3d11.h>
+#include <DirectXTex.h>
+#include <memory>
 #include <string_view>
 #include <functional>
 
@@ -188,6 +190,28 @@ public:
 	void ResizeUAV();
 
 	ID3D11RenderTargetView* GetRTV(uint32 index = 0);
+
+	// ── DX12 직결 업로드용 CPU 픽셀 (PHASE 3-1 재정의, T1) ──
+	//
+	// 파일에서 읽어 압축까지 끝낸 최종 이미지다. 예전에는 이것으로 DX11 SRV를
+	// 만든 뒤 그냥 버렸고, DX12가 쓸 때는 그 DX11 텍스처에서 되읽었다
+	// (DX11 스테이징 복사 → Map → 업로드 링). 파일을 읽는 시점에 이미 손에
+	// 있던 픽셀을 GPU까지 갔다가 도로 가져오던 셈이다.
+	//
+	// ★ DX12가 가져가면 즉시 놓는다(TakeCpuPixels). 그래서 이 사본은 첫 DX12
+	//   사용 전까지만 산다 — 재질 텍스처는 프레임 안에서 쓰이므로 사실상
+	//   로딩 직후 사라지고, 아무도 안 쓰는 텍스처(에디터 전용 아이콘 등)만
+	//   남는다. 그 잔량은 DX12TextureCache의 통계로 관찰한다.
+	//
+	// shared_ptr인 이유: Texture가 복사·이동되는 경로가 있어 소유권을 하나로
+	// 묶어야 하고, unique_ptr이면 그 경로들이 전부 깨진다.
+	std::shared_ptr<DirectX::ScratchImage> m_cpuPixels;
+
+	/// DX12가 가져간다. 돌려준 뒤에는 비어 있다 — 두 번 올리지 않는다.
+	std::shared_ptr<DirectX::ScratchImage> TakeCpuPixels()
+	{
+		return std::move(m_cpuPixels);
+	}
 
 	ID3D11Texture2D* m_pTexture{};
 	TextureType m_textureType = TextureType::Unknown;

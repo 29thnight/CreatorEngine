@@ -378,6 +378,9 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(metadata.width),float(metadata.height) };
 	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	// 압축까지 끝난 최종 이미지를 DX12가 가져가도록 남긴다(T1).
+	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
+	texture->m_cpuPixels = std::make_shared<DirectX::ScratchImage>(std::move(image));
 
 	return texture;
 }
@@ -496,6 +499,9 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(image.GetMetadata().width),float(image.GetMetadata().height) };
 	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	// 압축까지 끝난 최종 이미지를 DX12가 가져가도록 남긴다(T1).
+	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
+	texture->m_cpuPixels = std::make_shared<DirectX::ScratchImage>(std::move(image));
 
 	return texture;
 }
@@ -615,6 +621,9 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(metadata.width),float(metadata.height) };
 	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	// 압축까지 끝난 최종 이미지를 DX12가 가져가도록 남긴다(T1).
+	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
+	texture->m_cpuPixels = std::make_shared<DirectX::ScratchImage>(std::move(image));
 
 	return texture;
 }
