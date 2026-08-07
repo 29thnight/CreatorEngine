@@ -1,8 +1,6 @@
 # 런타임·플랫폼 계층 -> ImGui include 허용 목록 (에디터 분리 래칫)
 # 이 목록은 줄이기만 한다 - 새 간선 추가 금지.
 # 재생성: python scripts/check_imgui_boundary.py --update
-EffectSystem/EffectEditor.cpp -> IconsFontAwesome6.h
-EffectSystem/EffectEditor.cpp -> ImGuiRegister.h
 EffectSystem/EffectManager.cpp -> ImGuiRegister.h
 EffectSystem/EffectManager.cpp -> Profiler.h
 EffectSystem/EffectManager.cpp -> imgui_node_editor.h

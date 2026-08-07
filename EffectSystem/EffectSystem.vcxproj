@@ -244,7 +244,6 @@
     <ClCompile Include="BillboardModuleGPU.cpp" />
     <ClCompile Include="ColorModuleCS.cpp" />
     <ClCompile Include="EffectBase.cpp" />
-    <ClCompile Include="EffectEditor.cpp" />
     <ClCompile Include="EffectManager.cpp" />
     <ClCompile Include="EffectProxyController.cpp" />
     <ClCompile Include="EffectSerializer.cpp" />
@@ -271,7 +270,6 @@
     <ClInclude Include="ColorModuleCS.h" />
     <ClInclude Include="EffectBase.h" />
     <ClInclude Include="EffectCommandType.h" />
-    <ClInclude Include="EffectEditor.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectManagerProxy.h" />
     <ClInclude Include="EffectProxyController.h" />
