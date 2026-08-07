@@ -18,7 +18,6 @@
 #include "DeviceState.h"
 #include "ReflectionVectorInvoker.h"
 #include "ComponentFactory.h"
-#include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
 #include "InputActionManager.h"

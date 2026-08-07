@@ -6,7 +6,6 @@ EffectSystem/EffectEditor.cpp -> ImGuiRegister.h
 EffectSystem/EffectManager.cpp -> ImGuiRegister.h
 EffectSystem/EffectManager.cpp -> Profiler.h
 EffectSystem/EffectManager.cpp -> imgui_node_editor.h
-EngineEntry/App.cpp -> imgui_impl_win32.h
 EngineEntry/Dx11Main.cpp -> ImGuiDx12Shell.h
 EngineEntry/Dx11Main.cpp -> ImGuiRegister.h
 EngineEntry/Dx11Main.cpp -> Profiler.h
@@ -52,6 +51,5 @@ ScriptBinder/ComponentFactory.cpp -> NodeEditor.h
 ScriptBinder/PrefabEditor.h -> ImGuiRegister.h
 ScriptBinder/Scene.cpp -> Profiler.h
 ScriptBinder/SceneManager.cpp -> Profiler.h
-Utility_Framework/CoreWindow.h -> imgui_internal.h
 Utility_Framework/GlobalImGuiContext.h -> ImGui.h
 Utility_Framework/ReflectionFunction.h -> imgui.h

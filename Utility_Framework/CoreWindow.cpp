@@ -3,9 +3,11 @@
 
 CoreWindow* CoreWindow::s_instance = nullptr;
 DUMP_TYPE CoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
-#ifndef BUILD_FLAG
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-#endif // !BUILD_FLAG
+
+// ImGui_ImplWin32_WndProcHandler의 extern 선언을 제거했다.
+// 이 파일은 그 함수를 한 번도 부르지 않았다 — 실제 호출처는 Dx11Main.cpp이고
+// 거기에 같은 선언이 따로 있다. 선언만 남아 IMGUI_IMPL_API를 통해 창 클래스가
+// ImGui 헤더에 묶여 있었다.
 LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     CoreWindow* self = nullptr;

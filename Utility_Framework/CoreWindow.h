@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <string>
 #include <directxtk/Keyboard.h>
-#include <imgui_internal.h>
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
 #include "Resource.h"

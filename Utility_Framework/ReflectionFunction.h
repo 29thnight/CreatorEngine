@@ -9,6 +9,15 @@
 #include "LogSystem.h"
 #include "HashingString.h"
 #define IMGUI_DEFINE_MATH_OPERATORS
+// 이 헤더는 ReflectionFunction 자신이 쓰지 않는다. 그런데 지울 수 없다 —
+// ReflectionMecro.h를 통해 리플렉션 타입 거의 전부에 퍼지면서, ImGui를 직접
+// include하지 않은 채 ImGui:: 심볼만 쓰는 파일 18개(렌더 패스 13종 +
+// ReflectionImGuiHelper·imfilebrowser 등)의 전이 경로를 혼자 떠받치고 있다.
+// 지우면 그 18개가 한꺼번에 컴파일 실패한다(실측).
+//
+// 각 파일이 직접 include하도록 정정하거나, 렌더 패스의 ControlPanel 본문을
+// 에디터 쪽으로 옮긴 뒤에야 이 줄을 지울 수 있다.
+// check_imgui_boundary.py는 include 간선만 세므로 이 18개를 보지 못한다.
 #include <imgui.h>
 #include <magic_enum/magic_enum.hpp>
 
