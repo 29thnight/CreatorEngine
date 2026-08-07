@@ -695,11 +695,17 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     m_filtered = graph.CreateTexture(giDesc);
 
     // 합성은 전 해상도다. 라이팅에 간접광을 더한 결과를 뒤 패스가 읽는다.
+    //
+    // RTV도 허용한다. 이 텍스처가 라이브 배선의 '라이팅 결과'이고, 투명
+    // (Forward+)이 그 위에 직접 알파 블렌딩으로 그린다 — UAV 전용으로 두면
+    // RTV를 못 만들어 별도 타깃 + 합성 패스가 필요해진다. 플래그 하나로
+    // 전 화면 패스 하나와 HDR 타깃 하나를 아낀다.
     RGTextureDesc outDesc{};
     outDesc.width = context.width;
     outDesc.height = context.height;
     outDesc.format = kGIFormat;
     outDesc.allowUnorderedAccess = true;
+    outDesc.allowRenderTarget = true;
     outDesc.name = "SSGI.Output";
     m_output = graph.CreateTexture(outDesc);
 

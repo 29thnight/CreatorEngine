@@ -117,11 +117,30 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID,
     }
     GroupMemoryBarrierWithGroupSync();
 
-    // 하늘만 있는 타일 — 아무 광원도 안 받는다.
+    // ★ 타일 깊이 구간을 앞쪽으로 열어 둔다.
+    //
+    //   이 목록을 쓰는 유일한 소비자가 '투명 포워드'인데, 투명 기하는
+    //   GBuffer에 없다. 그래서 불투명 깊이로 구간을 좁히면 투명이 그 구간
+    //   밖에 있을 때 필요한 광원이 잘린다.
+    //
+    //   예전에는 하늘만 있는 타일(emptyTile)에서 광원을 통째로 버렸는데,
+    //   그러면 그 자리의 투명면이 새까맣게 나온다 — 지평선 위는 검고
+    //   아래는 밝은, 물체 음영과 무관한 경계가 생겼다(실측으로 잡았다).
+    //
+    //   앞쪽은 카메라(0)로 연다: 투명은 불투명보다 앞에 있을 수 있다.
+    //   뒤쪽만 불투명 최대 깊이로 자른다 — 그보다 뒤의 광원은 투명에도
+    //   불투명에도 닿지 않으므로 컬링의 이득은 그대로 남는다. 하늘만 있는
+    //   타일은 자를 불투명이 없으니 뒤쪽도 연다.
+    //
+    //   대가: 근거리 컬링이 모든 타일에서 사라지고, 하늘 타일은 옆면
+    //   평면으로만 걸러진다. 광원이 지평선에 몰린 야외 씬에서는 타일당
+    //   목록이 kMaxLightsPerTile(32)에 닿아 조용히 잘릴 수 있다 —
+    //   그 수는 GetLastOverflowTileCount가 알려 준다(늘 0이 아닌지 볼 것).
     const bool emptyTile = (0u == sMaxDepth);
 
-    const float minViewZ = emptyTile ? 0.0f : ViewZFromClip(asfloat(sMinDepth));
-    const float maxViewZ = emptyTile ? 0.0f : ViewZFromClip(asfloat(sMaxDepth));
+    const float minViewZ = 0.0f;
+    const float maxViewZ = emptyTile
+        ? 3.402823466e+38f : ViewZFromClip(asfloat(sMaxDepth));
 
     // ② 타일 옆면 4개. 화면 경계로 자른다 — 가장자리 타일이 화면 밖까지
     //    걸치면 이웃에 없는 광원까지 줍는다.
@@ -157,16 +176,16 @@ void CSMain(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID,
         bool inside;
         if (position.w < 0.5f)
         {
-            // 방향광은 모든 타일에 닿는다.
-            inside = !emptyTile;
+            // 방향광은 모든 타일에 닿는다. 하늘만 있는 타일도 마찬가지다 —
+            // 그 자리에 투명 기하가 있을 수 있다.
+            inside = true;
         }
         else
         {
             const float3 viewPos = mul(float4(position.xyz, 1.0f), gView).xyz;
             const float radius = attenuation.w;
 
-            inside = !emptyTile
-                && (viewPos.z + radius >= minViewZ)
+            inside = (viewPos.z + radius >= minViewZ)
                 && (viewPos.z - radius <= maxViewZ)
                 && (dot(planeLeft, viewPos) >= -radius)
                 && (dot(planeRight, viewPos) >= -radius)
@@ -232,6 +251,9 @@ struct VSOut
     float4 position  : SV_POSITION;
     float3 worldPos  : TEXCOORD0;
     float3 normal    : TEXCOORD1;
+    // 인스턴스마다 상수라 보간하지 않는다. 보간을 켜 두면 값은 같아도
+    // 래스터라이저가 헛일을 한다.
+    nointerpolation float4 baseColor : TEXCOORD2;
 };
 
 struct ShadeInstance
@@ -260,9 +282,10 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     const float4 worldPosition = mul(float4(input.position, 1.0f), instance.world);
 
     VSOut output;
-    output.position = mul(worldPosition, gViewProjection);
-    output.worldPos = worldPosition.xyz;
-    output.normal   = mul(input.normal, (float3x3)instance.world);
+    output.position  = mul(worldPosition, gViewProjection);
+    output.worldPos  = worldPosition.xyz;
+    output.normal    = mul(input.normal, (float3x3)instance.world);
+    output.baseColor = instance.baseColor;
     return output;
 }
 
@@ -271,6 +294,7 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
 {
     const float4 position    = gLights[lightIndex * 4 + 0];
+    const float4 direction   = gLights[lightIndex * 4 + 1];
     const float4 color       = gLights[lightIndex * 4 + 2];
     const float4 attenuation = gLights[lightIndex * 4 + 3];
 
@@ -279,8 +303,14 @@ float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
 
     if (position.w < 0.5f)
     {
-        // 방향광. direction 슬롯은 여기서 안 쓰고 position을 방향으로 본다.
-        toLight = normalize(-position.xyz);
+        // 방향광 — Deferred와 같은 규약으로 direction 슬롯을 읽는다.
+        //
+        // ★ 예전에는 position을 방향으로 봤다("direction 슬롯은 여기서 안
+        //   쓴다"고 적혀 있었다). 그런데 밀봉이 position에는 광원의 위치를,
+        //   direction에는 방향을 따로 싣는다 — 해가 씬 위에 놓여 있으면
+        //   -position이 아래를 가리켜 온 세상이 밑에서만 조명받는다.
+        //   투명을 배선하고 나서야 눈에 보였다(그 전에는 소비자가 없었다).
+        toLight = -normalize(direction.xyz);
     }
     else
     {
@@ -297,6 +327,22 @@ float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
             + attenuation.y * distance
             + attenuation.z * distance * distance;
         falloff = 1.0f / max(denominator, 1e-6f);
+
+        // ★ 반경에서 0으로 잦아드는 테이퍼. Deferred가 쓰는 것과 같은 식이다
+        //   (EnhancedDeferredPass의 광원 루프). 이것이 없으면 반경 경계에서
+        //   딱 끊겨, 같은 광원 아래 불투명면은 부드럽게 어두워지는데 투명면만
+        //   선이 생긴다 — 투명을 합성하기 전에는 안 보이던 어긋남이다.
+        //   반경에서 정확히 0이라 위의 하드 컷과도 어긋나지 않는다.
+        falloff *= saturate(1.0f - distance / max(radius, 1e-4f));
+
+        if (position.w > 1.5f)
+        {
+            // 스포트 — 원뿔 밖을 부드럽게 끈다(Deferred와 같은 식).
+            // 이것이 없으면 투명면에서 스포트가 점광원처럼 사방을 비춘다.
+            const float cosAngle = dot(-toLight, normalize(direction.xyz));
+            const float cutoff = cos(direction.w * 0.5f);
+            falloff *= smoothstep(cutoff, lerp(cutoff, 1.0f, 0.2f), cosAngle);
+        }
     }
 
     const float ndotl = saturate(dot(normal, toLight));
@@ -328,7 +374,16 @@ float4 PSMain(VSOut input) : SV_TARGET
     }
 #endif
 
-    return float4(lighting, 1.0f);
+    // 재질의 확산 알베도를 곱하고 알파를 그대로 낸다.
+    //
+    // ★ 예전에는 float4(lighting, 1.0f)였다. baseColor를 인스턴스 버퍼로
+    //   올려 두고 쓰지 않아, 투명 재질이 색도 투명도도 없는 조명값 덩어리로
+    //   나왔다 — 그 상태로는 합성해도 '불투명한 단색'이라 투명이 성립하지
+    //   않는다. 알파가 여기서 나와야 블렌드가 뜻을 갖는다.
+    //
+    //   텍스처 샘플링은 아직 없다(재질 계수만). 붙이려면 GBuffer의 드로우별
+    //   디스크립터 배선을 여기에도 깔아야 한다.
+    return float4(lighting * input.baseColor.rgb, input.baseColor.a);
 }
 )";
 
@@ -540,6 +595,14 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         // 있으면 가려져야 한다 — 끄면 벽 뒤 물체가 비쳐 보이는데, 그것은
         // 화면을 봐야만 알 수 있고 수치 검증에는 안 잡히는 부류다.
         shadeDesc.depthEnable = true;
+        // ★ 깊이는 보되 쓰지 않는다. 투명이 깊이를 쓰면 뒤에 있는 다른
+        //   투명면이 그 깊이에 가려져 사라진다 — 앞의 유리가 뒤의 유리를
+        //   지워 버리는 그 증상이다. 테스트(LESS)는 유지해 불투명 기하가
+        //   투명을 가리는 것은 그대로 둔다.
+        shadeDesc.depthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        // 알파 블렌딩(SRC_ALPHA/INV_SRC_ALPHA). 이것이 없으면 알파를 내도
+        // 덮어쓰기라 투명이 성립하지 않는다.
+        shadeDesc.blendEnable = true;
         shadeDesc.dsvFormat = kDepthFormat;
         shadeDesc.cullMode = D3D12_CULL_MODE_NONE;
         shadeDesc.numRenderTargets = 1;
@@ -762,18 +825,39 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     //
     // 타일 버퍼를 UAV에서 SRV로 넘긴다. 그래프가 버퍼를 모르므로 배리어를
     // 여기서 직접 건다 — 빼먹으면 셰이딩이 컬링 이전의 값을 읽는다.
-    RGTextureDesc outputDesc{};
-    outputDesc.width = context.width;
-    outputDesc.height = context.height;
-    outputDesc.format = kOutputFormat;
-    outputDesc.allowRenderTarget = true;
-    outputDesc.name = "Forward+.Shade";
-    m_output = graph.CreateTexture(outputDesc);
+    // ── 어디에 그리는가 ──
+    //
+    // lighting이 주어지면 그 위에 직접 그린다. 투명은 배경과 섞여야 하는데,
+    // 별도 타깃에 그려 놓고 나중에 합성하려면 프리멀티플라이드 알파를
+    // 따로 관리해야 하고 겹친 투명면의 누적 알파가 어긋난다 — 실제 배경에
+    // 바로 블렌드하면 그 문제가 통째로 사라진다.
+    //
+    // 주지 않으면 예전처럼 자기 타깃을 만들어 지운다. 자가 검증들이 그
+    // 경로를 쓴다(그쪽은 배경이 없어야 픽셀 대조가 성립한다).
+    const bool drawsOntoLighting = m_inputs.lighting.IsValid();
+    if (drawsOntoLighting)
+    {
+        m_output = m_inputs.lighting;
+    }
+    else
+    {
+        RGTextureDesc outputDesc{};
+        outputDesc.width = context.width;
+        outputDesc.height = context.height;
+        outputDesc.format = kOutputFormat;
+        outputDesc.allowRenderTarget = true;
+        outputDesc.name = "Forward+.Shade";
+        m_output = graph.CreateTexture(outputDesc);
+    }
 
+    // 깊이는 DepthWrite로 선언하되 PSO의 쓰기 마스크가 0이라 실제로는 쓰지
+    // 않는다. DepthRead로 낮추려면 DSV를 READ_ONLY_DEPTH로 만들어야 하는데
+    // (RGResourceState의 계약), 자가 검증까지 함께 바뀌므로 그대로 둔다 —
+    // DEPTH_WRITE는 상위 상태라 읽기만 하는 것에 문제가 없다.
     graph.AddPass("Forward+.Shade",
         { { m_output, RGResourceState::RenderTarget },
           { m_inputs.depth, RGResourceState::DepthWrite } },
-        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        [this, &context, drawsOntoLighting](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
@@ -806,8 +890,13 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             commandList->RSSetScissorRects(1, &scissor);
             commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-            constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
-            commandList->ClearRenderTargetView(rtvHandle, kZero, 0, nullptr);
+            // 라이팅 위에 그릴 때는 지우면 안 된다 — 지우는 순간 배경이
+            // 사라져 투명이 섞일 대상이 없어진다.
+            if (!drawsOntoLighting)
+            {
+                constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
+                commandList->ClearRenderTargetView(rtvHandle, kZero, 0, nullptr);
+            }
 
             const bool drew = RecordShading(commandList, context,
                 m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount);

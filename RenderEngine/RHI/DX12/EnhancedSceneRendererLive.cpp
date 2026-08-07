@@ -40,6 +40,7 @@
 
 #include <d3d11_1.h>
 #include <wrl/client.h>
+#include <algorithm>
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
@@ -875,6 +876,45 @@ namespace
                 }
             }
 
+            // ── 투명은 먼 것부터 ──
+            //
+            // 알파 블렌딩은 순서 의존이라 정렬하지 않으면 겹친 투명면이
+            // 수집 순서에 따라 달라진다(프록시 순회 순서 = 임의). 카메라를
+            // 아는 이 단계에서 정렬하므로 패스는 받은 순서대로 그리기만
+            // 하면 되고, 그래서 패스의 자가 검증이 결정적으로 남는다.
+            //
+            // 기준은 오브젝트 원점의 카메라 전방 거리다. 물체 단위 근사라
+            // 서로 관통하는 투명면은 여전히 어긋날 수 있는데, 그것을 고치려면
+            // 삼각형 단위 정렬이나 OIT가 필요하다 — 여기서 할 일이 아니다.
+            if (forwardDraws.size() > 1)
+            {
+                const Mathf::xVector eye = cameraSnapshot.eyePosition;
+                const Mathf::xVector forward = cameraSnapshot.forward;
+
+                // 월드 행렬의 r[3]이 이동 성분이다(오브젝트 원점).
+                const auto viewDepth = [eye, forward](const EnhancedDrawItem& item)
+                {
+                    const Mathf::xVector delta =
+                        XMVectorSubtract(item.worldMatrix.r[3], eye);
+                    return XMVectorGetX(XMVector3Dot(delta, forward));
+                };
+                // ★ 깊이가 같을 때를 메시 포인터로 가른다.
+                //
+                //   같은 원점을 쓰는 투명면(십자 빌보드, 같은 피벗의 유리
+                //   여러 장)은 깊이가 정확히 같다. 그때 비교자가 false만
+                //   돌려주면 순서가 미정이라, 프록시 스냅샷 순서가 바뀔
+                //   때마다 앞뒤가 뒤집혀 깜빡인다 — 정렬을 넣은 이유가
+                //   '순서를 고정한다'인데 그 자리에서 새는 셈이다.
+                std::stable_sort(forwardDraws.begin(), forwardDraws.end(),
+                    [&viewDepth](const EnhancedDrawItem& a, const EnhancedDrawItem& b)
+                    {
+                        const float depthA = viewDepth(a);
+                        const float depthB = viewDepth(b);
+                        if (depthA != depthB) return depthA > depthB;
+                        return a.mesh < b.mesh;
+                    });
+            }
+
             auto* lightController = renderScene->m_LightController;
             if (nullptr != lightController)
             {
@@ -1064,26 +1104,26 @@ namespace
             }
             view.ssgi.Declare(graph, p.frameContext);
 
+            // ── 투명(Forward+) ──
+            //
+            // 라이팅 결과에 직접 알파 블렌딩으로 얹는다. 별도 타깃에 그려
+            // 두고 나중에 합성하지 않는 이유는 EnhancedForwardPass::Declare의
+            // 주석에 있다(프리멀티플라이드 알파와 겹친 면의 누적 알파).
+            RGHandle litColor = view.ssgi.GetOutput().IsValid()
+                ? view.ssgi.GetOutput() : p.deferred.GetOutput();
             {
                 EnhancedForwardPass::Inputs forwardInputs{};
                 forwardInputs.depth = outputs.depth;
-                forwardInputs.lighting = view.ssgi.GetOutput().IsValid()
-                    ? view.ssgi.GetOutput() : p.deferred.GetOutput();
+                forwardInputs.lighting = litColor;
                 p.forward.SetInputs(forwardInputs);
             }
             p.forward.Declare(graph, p.frameContext);
+            if (p.forward.GetOutput().IsValid()) litColor = p.forward.GetOutput();
 
             // ── 볼류메트릭 포그 ──
             //
             // 라이팅 결과 위에, 톤맵 앞에 얹는다(DX11과 같은 자리).
-            //
-            // ★ 이 색에 forward 결과는 안 들어 있다. forward는 자기 타깃을
-            //   새로 만들어 거기 그리는데(EnhancedForwardPass의 m_output)
-            //   라이브 배선이 그것을 아무도 소비하지 않는다 — 투명이 화면에
-            //   안 나오는 기존 결함이고, 포그와는 별개다. 포그를 forward
-            //   뒤에 두는 것은 그 결함이 고쳐지면 자연히 맞기 위해서다.
-            RGHandle litColor = view.ssgi.GetOutput().IsValid()
-                ? view.ssgi.GetOutput() : p.deferred.GetOutput();
+            // 투명 합성 뒤라 투명에도 포그가 걸린다.
             if (fogEnabled && view.fogReady)
             {
                 EnhancedVolumetricFogPass::Inputs fogInputs{};
