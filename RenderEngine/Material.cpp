@@ -219,10 +219,6 @@ Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
 	return *this;
 }
 
-void Material::ApplyMaterialInfo(ID3D11DeviceContext* context)
-{
-}
-
 void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
 {
     if (pso)
@@ -238,30 +234,15 @@ void Material::SetShaderPSO(std::shared_ptr<ShaderPSO> pso)
             std::memcpy(storage.data(), cb.cpuData.data(), cb.size);
         }
 
-		if (m_pBaseColor)
-		{
-			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 0, m_pBaseColor->m_pSRV);
-		}
-
-		if (m_pNormal)
-		{
-			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 1, m_pNormal->m_pSRV);
-		}
-
-		if (m_pOccRoughMetal)
-		{
-			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 2, m_pOccRoughMetal->m_pSRV);
-		}
-
-		if (m_AOMap)
-		{
-			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 3, m_AOMap->m_pSRV);
-		}
-
-		if (m_pEmissive)
-		{
-			m_shaderPSO->BindShaderResource(ShaderStage::Pixel, 5, m_pEmissive->m_pSRV);
-		}
+        // ── 재질 텍스처의 DX11 SRV 바인딩 다섯을 걷어냈다 (T3) ──
+        //
+        // 여기서 ShaderPSO에 SRV를 꽂아 두면 ShaderPSO::Apply가 그것을
+        // PSSetShaderResources로 흘리는 구조였다. 그 Apply를 부르는 코드가
+        // 지금 하나도 없다 — 구 DX11 렌더러와 함께 사라졌다.
+        //
+        // DX12 경로는 재질 텍스처를 이 캐시가 아니라 패스가 직접 집는다
+        // (GBuffer·Forward의 CreateBindings). 여기 남겨 두면 Texture의
+        // DX11 SRV가 계속 필요한 것처럼 보여 T6을 막는다.
     }
     else
     {

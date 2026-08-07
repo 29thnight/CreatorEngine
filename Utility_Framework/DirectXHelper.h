@@ -100,32 +100,9 @@ namespace DirectX11
         }
     }
 
-   inline ID3D11ShaderResourceView* CreateSRVForArraySlice(
-        ID3D11Device* device,
-        ID3D11Texture2D* textureArray,
-        DXGI_FORMAT format,
-        uint32_t arraySlice)
-    {
-        D3D11_TEXTURE2D_DESC texDesc{};
-        textureArray->GetDesc(&texDesc);
-
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Format = format;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-        srvDesc.Texture2DArray.MostDetailedMip = 0;
-        srvDesc.Texture2DArray.MipLevels = texDesc.MipLevels;
-        srvDesc.Texture2DArray.FirstArraySlice = arraySlice;
-        srvDesc.Texture2DArray.ArraySize = 1;
-
-        ID3D11ShaderResourceView* sliceSRV = nullptr;
-        HRESULT hr = device->CreateShaderResourceView(textureArray, &srvDesc, &sliceSRV);
-        if (FAILED(hr))
-        {
-            return nullptr;
-        }
-
-        return sliceSRV;
-    }
+    // CreateSRVForArraySliceëŠ” T3ì—ì„œ í•¨ê»˜ ì§€ì› ë‹¤. ìœ ì¼í•œ í˜¸ì¶œìžê°€
+    // RenderPassDataì˜ ê·¸ë¦¼ìž ìºìŠ¤ì¼€ì´ë“œ ìŠ¬ë¼ì´ìŠ¤ SRVì˜€ê³ , ê·¸ê²ƒì„ ì½ëŠ”
+    // ì½”ë“œê°€ ì—†ì–´ í†µì§¸ë¡œ ì‚¬ë¼ì¡Œë‹¤.
 
     class SharedMap final
     {
@@ -285,7 +262,7 @@ namespace DirectX
     {
         t->SetPrivateData(WKPDID_D3DDebugObjectName, 0, nullptr);
     };
-    // µð¹ö±ëÀ» Áö¿øÇÏ·Á¸é °³Ã¼¿¡ ÀÌ¸§À» ÇÒ´çÇÏ¼¼¿ä.
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½Ò´ï¿½ï¿½Ï¼ï¿½ï¿½ï¿½.
 #if defined(_DEBUG)
     inline void SetName(DXObjects auto pObject, std::string_view name)
     {

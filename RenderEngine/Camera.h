@@ -80,9 +80,11 @@ public:
 	// 남은 두 UpdateBuffer는 렌더가 소유한 카메라에만 쓴다:
 	//   UpdateBuffer(deferredContext, ...)  RenderPassData::m_shadowCamera
 	//   UpdateBuffer(bool)                  SkyBoxPass의 지역 ortho 카메라
-	// 렌더링 대상 카메라(게임 소유)의 상수 버퍼는 RenderPassData가 들고
-	// BindFrameCameraBuffers로 묶는다. DeferredUpdateBuffer는 그래서 사라졌다
-	// — 게임 소유 카메라의 GPU 버퍼를 렌더 스레드가 갱신하던 유일한 통로였다.
+	// 렌더링 대상 카메라(게임 소유)의 상수 버퍼는 DeferredUpdateBuffer가
+	// 갱신했었다 — 게임 소유 카메라의 GPU 버퍼를 렌더 스레드가 만지던 유일한
+	// 통로라 없앴다. 잠시 RenderPassData가 대신 들었으나(BindFrameCameraBuffers)
+	// DX12 경로가 상수를 업로드 링으로 올리면서 그쪽도 소비자가 0이 되어
+	// T3에서 함께 걷어냈다.
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
 
 	float CalculateLODDistance(const Mathf::Vector3& position) const;

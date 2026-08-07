@@ -52,20 +52,6 @@ RenderPassData::~RenderPassData()
 
 	m_renderTarget.reset();
 	m_depthStencil.reset();
-	for (auto& srv : sliceSRV)
-	{
-		Memory::SafeDelete(srv);
-	}
-
-	for (auto& dsv : m_shadowMapDSVarr)
-	{
-		Memory::SafeDelete(dsv);
-	}
-
-	m_shadowMapTexture.reset();
-	m_SSRPrevTexture.reset();
-	m_ViewBuffer.Reset();
-	m_ProjBuffer.Reset();
 }
 
 void RenderPassData::Initalize(uint32 index)
@@ -96,73 +82,21 @@ void RenderPassData::Initalize(uint32 index)
 	m_cascadeInfo.resize(cascadeCount);
 	m_cascadeEnd.reserve(cascadeCount + 1);
 
-	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
-	auto shadowMapTexture = Texture::CreateManagedArray(
-		desc.m_textureWidth,
-		desc.m_textureHeight,
-		"Shadow Map",
-		DXGI_FORMAT_R32_TYPELESS,
-		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE,
-		cascadeCount
-	);
-	shadowMapTexture->m_textureType = TextureType::ImageTexture;
-
-	auto ssrTexture = TextureHelper::CreateScreenRenderTexture(
-		"prevSSRTexture",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-	m_SSRPrevTexture.swap(ssrTexture);
-
-	for (int i = 0; i < cascadeCount; ++i)
-	{
-		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DirectX11::DeviceStates->g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
-	}
-
-	for (int i = 0; i < cascadeCount; i++)
-	{
-		CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
-		depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
-		depthStencilViewDesc.Texture2DArray.ArraySize = 1;
-		depthStencilViewDesc.Texture2DArray.FirstArraySlice = i;
-
-		DirectX11::ThrowIfFailed(
-			DirectX11::DeviceStates->g_pDevice->CreateDepthStencilView(
-				shadowMapTexture->m_pTexture,
-				&depthStencilViewDesc,
-				&m_shadowMapDSVarr[i]
-			)
-		);
-
-	}
-
-	//안에서 배열은 3으로 고정중 필요하면 수정
-	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
-	shadowMapTexture->m_textureType = TextureType::ImageTexture;
-	m_shadowMapTexture.swap(shadowMapTexture);
-
-	XMMATRIX identity = XMMatrixIdentity();
-
-	std::string viewBufferName = "Camera(" + std::to_string(index) + ")ViewBuffer";
-	std::string projBufferName = "Camera(" + std::to_string(index) + ")ProjBuffer";
-
-	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
-	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
-
+	// ── 여기 있던 DX11 자원 넷을 걷어냈다 (T3) ──
+	//
+	// 카메라마다 그림자 맵(R32_TYPELESS 배열 3장) + 슬라이스 SRV 3 + DSV 3 +
+	// SSR 히스토리(화면 크기 RGBA16F) + 뷰/투영 상수 버퍼 둘을 만들고 있었다.
+	// 만들고 소멸자에서 놓는 것이 전부였다 — **읽는 코드가 하나도 없다.**
+	//
+	// DX12 라이브 렌더러가 자기 그림자 맵을 따로 만들면서 이쪽 소비자가
+	// 사라졌고, SSR 히스토리는 셰이더가 읽는 유일한 줄이 주석 처리돼 있어
+	// 처음부터 닫힌 고리였다(EnhancedSSRPass.h 참고).
+	//
+	// 뷰/투영 버퍼는 BindFrameCameraBuffers 하나만 썼는데 그 함수도 호출자가
+	// 0이었다 — 구 RHI(RHICommandContext)의 마지막 표면이라 함께 지웠다.
 	m_shadowCamera.m_isOrthographic = true;
 
 	m_isInitalized = true;
-}
-
-void RenderPassData::BindFrameCameraBuffers(RHICommandContext& context) const
-{
-	context.UpdateBuffer(m_ViewBuffer.Get(), &GetFrameSnapshot().view);
-	context.UpdateBuffer(m_ProjBuffer.Get(), &GetFrameSnapshot().projection);
-
-	context.SetVertexShaderConstantBuffer(1, m_ViewBuffer.Get());
-	context.SetVertexShaderConstantBuffer(2, m_ProjBuffer.Get());
 }
 
 Mathf::Vector4 RenderPassData::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth) const
@@ -182,12 +116,6 @@ Mathf::Vector4 RenderPassData::ConvertScreenToWorld(Mathf::Vector2 screenPositio
 		XMVector3TransformCoord(screenPositionNDC, GetFrameSnapshot().inverseProjection);
 
 	return XMVector3TransformCoord(viewPosition, GetFrameSnapshot().inverseView);
-}
-
-void RenderPassData::ClearRenderTarget()
-{
-	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
-	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
 void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)

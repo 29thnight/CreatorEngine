@@ -62,8 +62,6 @@ public:
 	Material& SetWindVector(const Mathf::Vector4& windVector);
 	Material& SetUVScroll(const Mathf::Vector2& uvScroll);
 
-	void ApplyMaterialInfo(ID3D11DeviceContext* context);
-
 	void SetShaderPSO(std::shared_ptr<ShaderPSO> pso);
 	std::shared_ptr<ShaderPSO> GetShaderPSO() const;
 	void ClearShaderPSO();

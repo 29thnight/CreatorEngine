@@ -389,9 +389,28 @@ T축 뒤라고 적어 두었는데, 정작 T축이 무엇으로 이루어지는�
 
 - **T2 — 가드 질문 바꾸기.** `texture->m_pSRV` 가드를 백엔드 중립 술어로.
   넷뿐이고 위험이 없다. 이후 슬라이스가 이것에 안 걸린다.
-- **T3 — 죽은 DX11 경로 확인·제거.** `Material::SetShaderPSO`의 바인딩 5건과
-  `RenderPassData` 3건이 구 렌더러와 함께 죽었는지 호출자로 확인한다.
-  (`Material::ApplyMaterialInfo`는 이미 빈 함수다.)
+- **T3 — 죽은 DX11 경로 확인·제거. (2026-08-08, 완료)**
+
+  호출자를 세어 보니 예상보다 넓었다. 지운 것과 근거:
+
+  | 지운 것 | 근거 |
+  |---|---|
+  | `Material::SetShaderPSO`의 SRV 바인딩 5 | `ShaderPSO::Apply`가 소비하는데 그 **Apply를 부르는 코드가 0곳** |
+  | `Material::ApplyMaterialInfo` | 빈 함수, 호출자 0 |
+  | `RenderPassData`의 그림자 맵 일습 | 카메라마다 R32_TYPELESS 3장 + 슬라이스 SRV 3 + DSV 3을 만들고 소멸자에서 놓는 것이 전부 — **읽는 코드 0** |
+  | `RenderPassData::m_SSRPrevTexture` | 화면 크기 RGBA16F. 셰이더가 읽는 유일한 줄이 주석 처리돼 처음부터 닫힌 고리였다 |
+  | `RenderPassData::m_ViewBuffer`·`m_ProjBuffer` + `BindFrameCameraBuffers` | 그 함수 하나만 썼고 함수 호출자가 0. §1.1이 이미 적어 둔 구 RHI의 마지막 표면이다 |
+  | `RenderPassData::ClearRenderTarget` | 호출자 0 |
+  | `DirectX11::CreateSRVForArraySlice` | 유일한 호출자가 위 슬라이스 SRV였다 |
+
+  ★ **남긴 것:** `m_renderTarget`·`m_depthStencil`은 EffectSystem 셋이
+  `OMSetRenderTargets`에 그대로 건다 — PHASE 10과 함께 간다.
+
+  ★ **딸려 나온 발견:** `ShaderPSO`의 DX11 즉시 바인딩 기구
+  (`Apply`·`BindShaderResource`·`BindUnorderedAccess`·`ResolveSrvUavHazards`·
+  `m_shaderResources`·`m_unorderedAccessViews`)가 통째로 소비자를 잃었다.
+  `Apply`를 부르는 코드가 어디에도 없다. Texture의 DX11 표면과는 무관해
+  이 축에서 지우지 않았다 — ShaderSystem 정리로 따로 다룬다.
 - **T4 — DX12TextureCache의 DX11 폴백 제거.** 실측이 0경유이므로 폴백이
   도는 경우를 먼저 로그로 확인하고, 없으면 걷는다.
 - **T5 — 지형.** `TerrainMaterial`이 DX11 디바이스를 직접 쥔다. 가장 크다.
