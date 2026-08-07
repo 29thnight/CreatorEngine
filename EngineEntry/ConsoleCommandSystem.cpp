@@ -59,12 +59,41 @@ namespace
         return s.substr(begin, end - begin + 1);
     }
 
+    /// 공백으로 쪼개되 큰따옴표로 묶은 구간은 한 토큰으로 본다.
+    ///
+    /// 이름에 공백이 들어가는 경우가 실제로 있다 — 기본 씬의 카메라가
+    /// "Main Camera"라서 object.transform이 이 오브젝트를 영영 못 찾았다
+    /// (parts[1]이 `"Main`이 된다). 따옴표를 안 쓰면 동작이 예전과 같으므로
+    /// 기존 스크립트는 그대로 돈다.
     std::vector<std::string> Split(const std::string& line)
     {
         std::vector<std::string> parts;
-        std::istringstream iss(line);
         std::string token;
-        while (iss >> token) parts.push_back(token);
+        bool inQuotes = false;
+        // 빈 따옴표("")도 '값을 비웠다'는 뜻이라 토큰으로 남긴다 —
+        // 길이만 보면 그것을 버리게 된다.
+        bool hasToken = false;
+
+        const auto flush = [&parts, &token, &hasToken]
+        {
+            if (!hasToken) return;
+            parts.push_back(token);
+            token.clear();
+            hasToken = false;
+        };
+
+        for (const char c : line)
+        {
+            if ('"' == c) { inQuotes = !inQuotes; hasToken = true; continue; }
+            if (!inQuotes && (' ' == c || '\t' == c || '\r' == c || '\n' == c))
+            {
+                flush();
+                continue;
+            }
+            token.push_back(c);
+            hasToken = true;
+        }
+        flush();
         return parts;
     }
 
@@ -618,7 +647,8 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         if (parts.size() < 5)
         {
             std::printf("[CLI] 사용법: object.transform <이름> <px> <py> <pz>"
-                " [rx ry rz] [sx sy sz]\n");
+                " [rx ry rz] [sx sy sz]\n"
+                "       이름에 공백이 있으면 따옴표로 묶는다: \"Main Camera\"\n");
             return;
         }
 

@@ -124,10 +124,13 @@ namespace
         DX12TextureCache       textureCache;
         DX12GpuProfiler        profiler;
 
+        // ★ SSGI는 여기 없다 — CameraView가 뷰마다 하나씩 든다.
+        //   시간축 누적을 하는 유일한 라이브 패스라서 그렇다(아래 CameraView
+        //   주석 참조). 나머지 패스는 프레임 안에서 입력→출력이 끝나므로
+        //   카메라가 둘이어도 한 인스턴스로 충분하다.
         EnhancedGBufferPass   gbuffer;
         EnhancedShadowPass    shadow;
         EnhancedDeferredPass  deferred;
-        EnhancedSSGIPass      ssgi;
         EnhancedForwardPass   forward;
         EnhancedSSAOPass      ssao;
         EnhancedSkyBoxPass    skyBox;
@@ -184,6 +187,23 @@ namespace
             DisplaySlot      slots[kSlotsPerView];
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
+
+            // ★ SSGI를 뷰마다 따로 든다 — 라이브 그래프에서 프레임을 넘겨
+            //   상태를 잇는 유일한 패스이기 때문이다(히스토리 텍스처 2장 +
+            //   재투영 행렬 + 슬롯 인덱스).
+            //
+            //   한 인스턴스를 두 카메라가 쓰면 히스토리 슬롯 회전(2칸)이
+            //   프레임당 두 번 돌아 각 카메라가 '상대 카메라의' 히스토리를
+            //   읽고, 재투영 행렬도 직전에 렌더한 다른 카메라의 것이 된다.
+            //   리졸브는 깊이 차이만 보고 히스토리를 받아들이므로(같은 씬을
+            //   보면 대부분 통과한다) 다른 시점의 화면 공간 GI가 최대 32프레임
+            //   지수 평균으로 섞인다 — 씬 뷰의 천이 통째로 얼룩지던 잔상이
+            //   그것이었다(2026-08-07, 세 조건 대조로 확정).
+            //
+            //   PSO는 psoManager가 바이트코드 해시로 공유하므로 인스턴스가
+            //   늘어도 컴파일은 한 번이다. 추가 비용은 히스토리 텍스처뿐 —
+            //   GI가 절반 해상도라 1920x1080 기준 뷰당 약 12MB.
+            EnhancedSSGIPass ssgi;
         };
         static constexpr int kMaxCameraViews =
             static_cast<int>(EnhancedSceneRenderer::kMaxLiveCameraViews);
@@ -392,7 +412,11 @@ namespace
             p.gbuffer.SetKeepAlive(false);
             if (!p.shadow.Initialize(p.frameContext, outError)) return false;
             if (!p.deferred.Initialize(p.frameContext, outError)) return false;
-            if (!p.ssgi.Initialize(p.frameContext, outError)) return false;
+            // SSGI는 뷰마다. 두 번째부터는 PSO 캐시가 받아 컴파일이 없다.
+            for (LivePipeline::CameraView& view : p.views)
+            {
+                if (!view.ssgi.Initialize(p.frameContext, outError)) return false;
+            }
             if (!p.forward.Initialize(p.frameContext, outError)) return false;
             if (!p.ssao.Initialize(p.frameContext, outError)) return false;
             if (!p.skyBox.Initialize(p.frameContext, outError)) return false;
@@ -529,7 +553,7 @@ namespace
             p.skyBox.Shutdown();
             p.ssao.Shutdown();
             p.forward.Shutdown();
-            p.ssgi.Shutdown();
+            for (LivePipeline::CameraView& view : p.views) view.ssgi.Shutdown();
             p.deferred.Shutdown();
             p.shadow.Shutdown();
             p.gbuffer.Shutdown();
@@ -742,7 +766,7 @@ namespace
             if (!p.shadow.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.gbuffer.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.deferred.PrepareFrame(p.frameContext, outError)) return false;
-            if (!p.ssgi.PrepareFrame(p.frameContext, outError)) return false;
+            if (!view.ssgi.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.skyBox.PrepareFrame(p.frameContext, outError)) return false;
@@ -799,23 +823,23 @@ namespace
                 ssgiInputs.lighting = p.skyBox.GetOutput().IsValid()
                     ? p.skyBox.GetOutput() : p.deferred.GetOutput();
                 ssgiInputs.ambientOcclusion = p.ssao.GetOutput();
-                p.ssgi.SetInputs(ssgiInputs);
+                view.ssgi.SetInputs(ssgiInputs);
             }
-            p.ssgi.Declare(graph, p.frameContext);
+            view.ssgi.Declare(graph, p.frameContext);
 
             {
                 EnhancedForwardPass::Inputs forwardInputs{};
                 forwardInputs.depth = outputs.depth;
-                forwardInputs.lighting = p.ssgi.GetOutput().IsValid()
-                    ? p.ssgi.GetOutput() : p.deferred.GetOutput();
+                forwardInputs.lighting = view.ssgi.GetOutput().IsValid()
+                    ? view.ssgi.GetOutput() : p.deferred.GetOutput();
                 p.forward.SetInputs(forwardInputs);
             }
             p.forward.Declare(graph, p.frameContext);
 
             {
                 EnhancedPostChainPass::Inputs postInputs{};
-                postInputs.color = p.ssgi.GetOutput().IsValid()
-                    ? p.ssgi.GetOutput() : p.deferred.GetOutput();
+                postInputs.color = view.ssgi.GetOutput().IsValid()
+                    ? view.ssgi.GetOutput() : p.deferred.GetOutput();
                 p.postChain.SetInputs(postInputs);
             }
             p.postChain.Declare(graph, p.frameContext);
@@ -934,8 +958,11 @@ namespace
                 tuning.filterDepthSigma = pendingTuning.ssao.filterDepthSigma;
                 p.ssao.SetTuning(tuning);
             }
+            // 뷰마다 SSGI 인스턴스가 따로이므로 전부에 적용한다 — 하나만
+            // 고치면 씬 뷰와 게임 뷰의 GI 설정이 갈린다.
+            for (LivePipeline::CameraView& view : p.views)
             {
-                EnhancedSSGIPass::Tuning tuning = p.ssgi.GetTuning();
+                EnhancedSSGIPass::Tuning tuning = view.ssgi.GetTuning();
                 tuning.traceDistance = pendingTuning.ssgi.traceDistance;
                 tuning.traceThickness = pendingTuning.ssgi.traceThickness;
                 tuning.accumDepthTolerance = pendingTuning.ssgi.accumDepthTolerance;
@@ -943,7 +970,7 @@ namespace
                 tuning.filterNormalPower = pendingTuning.ssgi.filterNormalPower;
                 tuning.compositeDepthSigma = pendingTuning.ssgi.compositeDepthSigma;
                 tuning.intensity = pendingTuning.ssgi.intensity;
-                p.ssgi.SetTuning(tuning);
+                view.ssgi.SetTuning(tuning);
             }
             {
                 EnhancedPostChainPass::Tuning tuning = p.postChain.GetTuning();
@@ -983,7 +1010,8 @@ namespace
             tuningMirror.ssao.filterDepthSigma = tuning.filterDepthSigma;
         }
         {
-            const EnhancedSSGIPass::Tuning& tuning = p.ssgi.GetTuning();
+            // 전 뷰가 같은 값이므로 대표로 하나만 되읽는다.
+            const EnhancedSSGIPass::Tuning& tuning = p.views[0].ssgi.GetTuning();
             tuningMirror.ssgi.traceDistance = tuning.traceDistance;
             tuningMirror.ssgi.traceThickness = tuning.traceThickness;
             tuningMirror.ssgi.accumDepthTolerance = tuning.accumDepthTolerance;
