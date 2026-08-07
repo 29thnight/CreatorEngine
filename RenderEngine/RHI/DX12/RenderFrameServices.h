@@ -73,8 +73,15 @@ struct RHIBindingDesc
     Dim             dim{ Dim::Default };
     ID3D12Resource* resource{ nullptr };
 
-    /// UNKNOWN이면 리소스 포맷을 그대로 쓴다. 깊이를 읽을 때만 명시하면 된다.
+    /// UNKNOWN이면 리소스가 스스로 아는 포맷을 쓴다.
     DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
+
+    /// 깊이 리소스를 색 채널로 갈아 본다(D32_FLOAT → R32_FLOAT 따위).
+    /// 매핑은 CreateBindings 한 곳에만 있다 — SrvDepth 참고.
+    bool            depthAsColor{ false };
+
+    /// 리소스가 없어도 그 자리에 유효한 널 디스크립터를 깐다. OrNull() 참고.
+    bool            allowNull{ false };
 
     uint32_t mostDetailedMip{ 0 };
     uint32_t mipLevels{ 1 };
@@ -99,6 +106,22 @@ struct RHIBindingDesc
         RHIBindingDesc d{};
         d.dim = Dim::Texture2D; d.resource = resource; d.format = format;
         d.mostDetailedMip = mostDetailedMip; d.mipLevels = mipLevels;
+        return d;
+    }
+
+    /// 깊이 버퍼를 셰이더로 읽는다.
+    ///
+    /// ★ 이 자리가 R2가 없애려던 조용한 실수의 대표다. 깊이는 D32_FLOAT로
+    ///   만들어지는데 그 포맷으로는 SRV를 만들 수 없어서, 읽는 쪽이 매번
+    ///   R32_FLOAT를 손으로 적어야 했다. 빠뜨리면 뷰 생성이 조용히 실패하고
+    ///   화면에는 'AO가 안 걸린다' 정도로만 나타난다.
+    ///
+    ///   깊이 포맷은 넷뿐이고 대응하는 색 포맷도 정해져 있다. 호출부가 알
+    ///   이유가 없어 CreateBindings로 내렸다 — 여기서는 "깊이를 읽는다"만 적는다.
+    static RHIBindingDesc SrvDepth(ID3D12Resource* resource)
+    {
+        RHIBindingDesc d{};
+        d.dim = Dim::Texture2D; d.resource = resource; d.depthAsColor = true;
         return d;
     }
 
@@ -143,6 +166,20 @@ struct RHIBindingDesc
         d.kind = Kind::UnorderedAccess; d.dim = Dim::Texture3D;
         d.resource = resource; d.format = format; d.sliceCount = sliceCount;
         return d;
+    }
+
+    /// "이 자리는 비어 있어도 된다" — 리소스가 없으면 널 디스크립터를 깐다.
+    ///
+    /// ★ 널 디스크립터는 '안 거는 것'과 다르다. 링에서 잘라 온 자리는
+    ///   초기화되지 않은 쓰레기라, 셰이더가 분기로 안 읽더라도 유효한
+    ///   디스크립터가 있어야 한다 — SSGI에서 쓰레기 디스크립터로 GPU가 죽었다.
+    ///
+    ///   그래서 기본은 '널이면 테이블 전체를 거절'이고(실수 잡기), 비어도
+    ///   되는 자리만 여기에 표시해 예외로 둔다. 표시한 자리는 포맷과 차원을
+    ///   반드시 적어야 한다 — 리소스에게 물어볼 수 없기 때문이다.
+    RHIBindingDesc OrNull() const
+    {
+        RHIBindingDesc d = *this; d.allowNull = true; return d;
     }
 
     static RHIBindingDesc UavBuffer(ID3D12Resource* resource, uint32_t numElements,

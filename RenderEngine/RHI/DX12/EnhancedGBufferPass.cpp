@@ -712,10 +712,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             if (nullptr == context.draws) return;
 
             // 힙 바인딩은 드로우 밖에서 한 번만. 드로우마다 바꾸면 그 자체가 비싸다.
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap(),
-                context.resources->GetSamplerHeap().GetHeap() };
-            commandList->SetDescriptorHeaps(2, heaps);
+            context.resources->BindDescriptorHeaps(commandList, true);
             commandList->SetGraphicsRootDescriptorTable(3, m_sampler);
 
             // ── 본 팔레트 ──
@@ -801,24 +798,25 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 const auto textures = m_drawTextures.find(batch.material);
                 if (textures != m_drawTextures.end())
                 {
-                    const auto srvRange = context.resources->GetDescriptorRing().Allocate(4);
-                    if (!srvRange.IsValid()) break;
+                    const DrawTextures& t = textures->second;
+                    const RHIBindingDesc srvs[] = {
+                        RHIBindingDesc::Srv2D(t.resources[0], t.formats[0], 0, t.mipLevels[0]),
+                        RHIBindingDesc::Srv2D(t.resources[1], t.formats[1], 0, t.mipLevels[1]),
+                        RHIBindingDesc::Srv2D(t.resources[2], t.formats[2], 0, t.mipLevels[2]),
+                        RHIBindingDesc::Srv2D(t.resources[3], t.formats[3], 0, t.mipLevels[3]),
+                    };
+                    const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
 
-                    for (uint32_t i = 0; i < 4; ++i)
-                    {
-                        auto* resource = textures->second.resources[i];
-                        if (nullptr == resource) continue;
+                    // ★ 넷 중 하나라도 없으면 이 배치를 건너뛴다.
+                    //
+                    // 예전에는 널인 슬롯만 건너뛰고 나머지로 테이블을 걸었다.
+                    // 그러면 그 칸에 힙의 이전 내용이 남은 채로 셰이더가 읽는다 —
+                    // 화면에는 '가끔 엉뚱한 텍스처'로만 나타나고 검증 레이어도
+                    // 조용하다. PrepareFrame이 폴백으로 넷을 채우므로 널은
+                    // 업로드 실패뿐이고, 그때는 안 그리는 편이 낫다.
+                    if (!srvTable.IsValid()) continue;
 
-                        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                        srvDesc.Format = textures->second.formats[i];
-                        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                        srvDesc.Texture2D.MipLevels = textures->second.mipLevels[i];
-
-                        device->CreateShaderResourceView(resource, &srvDesc, srvRange.CpuAt(i));
-                    }
-
-                    commandList->SetGraphicsRootDescriptorTable(2, srvRange.gpu);
+                    commandList->SetGraphicsRootDescriptorTable(2, srvTable.gpu);
                 }
 
                 commandList->IASetVertexBuffers(0, 1, &mesh->second.vertexView);

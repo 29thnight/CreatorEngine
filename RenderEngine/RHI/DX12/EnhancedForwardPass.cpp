@@ -1128,7 +1128,6 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
             const uint32_t lightCount =
                 static_cast<uint32_t>(context.lights->size());
@@ -1165,36 +1164,22 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &params, sizeof(params));
 
-            const auto srvTable = context.resources->GetDescriptorRing().Allocate(1);
-            const auto uavTable = context.resources->GetDescriptorRing().Allocate(2);
-            if (!srvTable.IsValid() || !uavTable.IsValid()) return;
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
-            depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            depthSrv.Texture2D.MipLevels = 1;
-            depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            device->CreateShaderResourceView(
-                executeContext.Resolve(m_inputs.depth), &depthSrv, srvTable.CpuAt(0));
-
             const uint32_t tileTotal = m_tileCountX * m_tileCountY;
 
-            D3D12_UNORDERED_ACCESS_VIEW_DESC countUav{};
-            countUav.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-            countUav.Format = DXGI_FORMAT_UNKNOWN;
-            countUav.Buffer.NumElements = tileTotal * 2;
-            countUav.Buffer.StructureByteStride = sizeof(uint32_t);
-            device->CreateUnorderedAccessView(m_tileCountBuffer.Get(), nullptr,
-                &countUav, uavTable.CpuAt(0));
+            const RHIBindingDesc srvs[] = {
+                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+            };
+            const RHIBindingDesc uavs[] = {
+                RHIBindingDesc::UavBuffer(m_tileCountBuffer.Get(),
+                    tileTotal * 2, sizeof(uint32_t)),
+                RHIBindingDesc::UavBuffer(m_tileListBuffer.Get(),
+                    tileTotal * kMaxLightsPerTile, sizeof(uint32_t)),
+            };
+            const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+            const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
+            if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-            D3D12_UNORDERED_ACCESS_VIEW_DESC listUav = countUav;
-            listUav.Buffer.NumElements = tileTotal * kMaxLightsPerTile;
-            device->CreateUnorderedAccessView(m_tileListBuffer.Get(), nullptr,
-                &listUav, uavTable.CpuAt(1));
-
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetComputeRootSignature(m_cullRootSignature);
             commandList->SetPipelineState(m_cullPSO);
@@ -1450,14 +1435,8 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         m_tileListBuffer->GetGPUVirtualAddress());
 
     // 힙과 샘플러는 드로우 밖에서 한 번만 건다.
-    auto* device = context.resources->GetDevice();
-    auto& descriptorRing = context.resources->GetDescriptorRing();
-    {
-        ID3D12DescriptorHeap* heaps[] = {
-            descriptorRing.GetHeap(), context.resources->GetSamplerHeap().GetHeap() };
-        commandList->SetDescriptorHeaps(2, heaps);
-        commandList->SetGraphicsRootDescriptorTable(7, m_sampler);
-    }
+    context.resources->BindDescriptorHeaps(commandList, true);
+    commandList->SetGraphicsRootDescriptorTable(7, m_sampler);
 
     // IBL 셋도 드로우 밖에서 한 번. 재질과 달리 프레임 내내 같다.
     //
@@ -1475,42 +1454,23 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         //   않은 채로 그린다 — 검증 레이어가 잡는 미초기화 루트 인자이고,
         //   실제 하드웨어에서는 쓰레기 디스크립터 주소를 읽는다.
         //   위의 링 할당들(광원·인스턴스·상수)과 같은 처리다.
-        const auto frameRange = descriptorRing.Allocate(4);
-        if (!frameRange.IsValid()) return false;
-        {
-            D3D12_SHADER_RESOURCE_VIEW_DESC cubeSrv{};
-            cubeSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            cubeSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-            cubeSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-            cubeSrv.TextureCube.MipLevels = 1;
-            device->CreateShaderResourceView(
-                hasIbl ? m_iblIrradiance : nullptr, &cubeSrv, frameRange.CpuAt(0));
+        constexpr DXGI_FORMAT kIblFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-            cubeSrv.TextureCube.MipLevels = hasIbl ? m_iblPrefilterMips : 1;
-            device->CreateShaderResourceView(
-                hasIbl ? m_iblPrefiltered : nullptr, &cubeSrv, frameRange.CpuAt(1));
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC lutSrv{};
-            lutSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            lutSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            lutSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-            lutSrv.Texture2D.MipLevels = 1;
-            device->CreateShaderResourceView(
-                hasIbl ? m_iblBrdfLut : nullptr, &lutSrv, frameRange.CpuAt(2));
-
+        const RHIBindingDesc frameSrvs[] = {
+            RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : nullptr,
+                kIblFormat, 1).OrNull(),
+            RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : nullptr,
+                kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
+            RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : nullptr, kIblFormat).OrNull(),
             // 그림자 맵. 깊이 배열이라 포맷과 차원을 둘 다 바꿔 봐야 한다
             // (Deferred가 같은 설명으로 같은 자원을 읽는다).
-            D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrv{};
-            shadowSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            shadowSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-            shadowSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            shadowSrv.Texture2DArray.MipLevels = 1;
-            shadowSrv.Texture2DArray.ArraySize = kShadowCascadeCount;
-            device->CreateShaderResourceView(
-                hasShadow ? shadowResource : nullptr, &shadowSrv, frameRange.CpuAt(3));
+            RHIBindingDesc::SrvArray(hasShadow ? shadowResource : nullptr,
+                DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount).OrNull(),
+        };
+        const RHIBindingTable frameTable = context.resources->CreateBindings(frameSrvs);
+        if (!frameTable.IsValid()) return false;
 
-            commandList->SetGraphicsRootDescriptorTable(6, frameRange.gpu);
-        }
+        commandList->SetGraphicsRootDescriptorTable(6, frameTable.gpu);
     }
 
     bool drewAnything = false;
@@ -1535,34 +1495,28 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         //   (UI·기즈모)가 예산 부족을 겪어 엉뚱한 자리에서 증상이 난다 —
         //   투명이 많아지면 DX12DescriptorRing의 overflows를 볼 것.
         {
-            const auto srvRange = descriptorRing.Allocate(4);
-            if (!srvRange.IsValid()) break;
-
             const MaterialKey key{
                 draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
             const auto found = m_materialTextures.find(key);
 
-            for (uint32_t slot = 0; slot < 4; ++slot)
+            // 없는 슬롯은 널 디스크립터다(OrNull) — 셰이더가 hasXxxMap으로
+            // 안 읽더라도 테이블 칸은 초기화돼 있어야 한다.
+            const auto slotDesc = [&](uint32_t slot)
             {
-                D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-                srvDesc.Texture2D.MipLevels = 1;
+                const bool has = (found != m_materialTextures.end())
+                    && (nullptr != found->second.resources[slot]);
+                return RHIBindingDesc::Srv2D(
+                    has ? found->second.resources[slot] : nullptr,
+                    has ? found->second.formats[slot] : DXGI_FORMAT_R8G8B8A8_UNORM,
+                    0, has ? found->second.mipLevels[slot] : 1).OrNull();
+            };
+            const RHIBindingDesc materialSrvs[] = {
+                slotDesc(0), slotDesc(1), slotDesc(2), slotDesc(3) };
+            const RHIBindingTable srvTable =
+                context.resources->CreateBindings(materialSrvs);
+            if (!srvTable.IsValid()) break;
 
-                ID3D12Resource* resource = nullptr;
-                if (found != m_materialTextures.end()
-                    && nullptr != found->second.resources[slot])
-                {
-                    resource = found->second.resources[slot];
-                    srvDesc.Format = found->second.formats[slot];
-                    srvDesc.Texture2D.MipLevels = found->second.mipLevels[slot];
-                }
-
-                device->CreateShaderResourceView(resource, &srvDesc, srvRange.CpuAt(slot));
-            }
-
-            commandList->SetGraphicsRootDescriptorTable(5, srvRange.gpu);
+            commandList->SetGraphicsRootDescriptorTable(5, srvTable.gpu);
         }
 
         commandList->SetGraphicsRootShaderResourceView(1,

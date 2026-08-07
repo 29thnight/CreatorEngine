@@ -524,50 +524,28 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         RGHandle voxelRead, RGHandle voxelWrite) -> bool
     {
         auto* commandList = executeContext.commandList;
-        auto* device = context.resources->GetDevice();
 
-        const auto srvTable = context.resources->GetDescriptorRing().Allocate(4);
-        const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
+        const RHIBindingDesc srvs[] = {
+            // t0 — 캐스케이드 그림자맵(배열). 깊이 리소스라 포맷을 명시한다.
+            RHIBindingDesc::SrvArray(executeContext.Resolve(m_inputs.shadowMap),
+                DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount),
+            // t1 — 블루 노이즈.
+            RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.blueNoise)),
+            // t2 — 읽을 격자(3D).
+            RHIBindingDesc::Srv3D(executeContext.Resolve(voxelRead), kVoxelFormat),
+            // t3 — 구름 그림자.
+            RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.cloudShadow)),
+        };
+        // u0 — 쓸 격자(3D).
+        const RHIBindingDesc uavs[] = {
+            RHIBindingDesc::Uav3D(executeContext.Resolve(voxelWrite),
+                kVoxelFormat, kVolumeDepth),
+        };
+        const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+        const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
         if (!srvTable.IsValid() || !uavTable.IsValid()) return false;
 
-        // t0 — 캐스케이드 그림자맵(배열). 깊이 리소스라 포맷을 명시한다.
-        D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrv{};
-        shadowSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        shadowSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-        shadowSrv.Format = DXGI_FORMAT_R32_FLOAT;
-        shadowSrv.Texture2DArray.MipLevels = 1;
-        shadowSrv.Texture2DArray.ArraySize = kShadowCascadeCount;
-        device->CreateShaderResourceView(executeContext.Resolve(m_inputs.shadowMap),
-            &shadowSrv, srvTable.CpuAt(0));
-
-        // t1 — 블루 노이즈.
-        device->CreateShaderResourceView(executeContext.Resolve(m_inputs.blueNoise),
-            nullptr, srvTable.CpuAt(1));
-
-        // t2 — 읽을 격자(3D).
-        D3D12_SHADER_RESOURCE_VIEW_DESC voxelSrv{};
-        voxelSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        voxelSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-        voxelSrv.Format = kVoxelFormat;
-        voxelSrv.Texture3D.MipLevels = 1;
-        device->CreateShaderResourceView(executeContext.Resolve(voxelRead),
-            &voxelSrv, srvTable.CpuAt(2));
-
-        // t3 — 구름 그림자.
-        device->CreateShaderResourceView(executeContext.Resolve(m_inputs.cloudShadow),
-            nullptr, srvTable.CpuAt(3));
-
-        // u0 — 쓸 격자(3D).
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-        uavDesc.Format = kVoxelFormat;
-        uavDesc.Texture3D.WSize = kVolumeDepth;
-        device->CreateUnorderedAccessView(executeContext.Resolve(voxelWrite), nullptr,
-            &uavDesc, uavTable.CpuAt(0));
-
-        ID3D12DescriptorHeap* heaps[] = {
-            context.resources->GetDescriptorRing().GetHeap() };
-        commandList->SetDescriptorHeaps(1, heaps);
+        context.resources->BindDescriptorHeaps(commandList);
         commandList->SetComputeRootSignature(m_computeRootSignature);
         commandList->SetComputeRootDescriptorTable(3, srvTable.gpu);
         commandList->SetComputeRootDescriptorTable(4, uavTable.gpu);
@@ -711,27 +689,13 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             commandList->RSSetScissorRects(1, &scissor);
             commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-            const auto srvTable = context.resources->GetDescriptorRing().Allocate(3);
+            const RHIBindingDesc srvs[] = {
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.color)),
+                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+                RHIBindingDesc::Srv3D(executeContext.Resolve(m_finalHandle), kVoxelFormat),
+            };
+            const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             if (!srvTable.IsValid()) return;
-
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.color), nullptr,
-                srvTable.CpuAt(0));
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
-            depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            depthSrv.Texture2D.MipLevels = 1;
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
-                &depthSrv, srvTable.CpuAt(1));
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC voxelSrv{};
-            voxelSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            voxelSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-            voxelSrv.Format = kVoxelFormat;
-            voxelSrv.Texture3D.MipLevels = 1;
-            device->CreateShaderResourceView(executeContext.Resolve(m_finalHandle),
-                &voxelSrv, srvTable.CpuAt(2));
 
             FogCompositeConstants constants{};
             constants.viewProjection = m_viewProjection;
@@ -748,9 +712,7 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetGraphicsRootSignature(m_compositeRootSignature);
             commandList->SetPipelineState(m_compositePSO);

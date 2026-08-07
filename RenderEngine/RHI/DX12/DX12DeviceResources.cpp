@@ -742,6 +742,40 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::GetBackBufferRtv(uint32_t index
 // 패스마다 흩어져 있던 "링에서 자르고 → 뷰를 만들고 → 테이블을 건다"를 여기
 // 한 곳으로 모은다. 세 가지 실수가 여기서만 일어날 수 있게 되는 것이 요점이다:
 // 링 오버런 검사, 리소스 널 검사, ViewDimension·포맷 지정.
+
+namespace
+{
+    /// 깊이 포맷을 셰이더가 읽을 수 있는 색 포맷으로 바꾼다.
+    ///
+    /// 깊이는 D32_FLOAT 같은 포맷으로 만들어지는데 SRV는 그 포맷을 받지 않는다.
+    /// 예전에는 읽는 패스마다 이 대응을 손으로 적었고(대개 D32만 다뤘다),
+    /// 빠뜨리면 뷰 생성이 조용히 실패했다.
+    DXGI_FORMAT DepthToColorFormat(DXGI_FORMAT format)
+    {
+        switch (format)
+        {
+        case DXGI_FORMAT_D32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
+        case DXGI_FORMAT_D16_UNORM:             return DXGI_FORMAT_R16_UNORM;
+        case DXGI_FORMAT_D24_UNORM_S8_UINT:     return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:  return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
+        default:                                return format;  // 이미 색 포맷이다
+        }
+    }
+
+    /// UNKNOWN이면 리소스가 아는 포맷을 쓴다. SRV 설명을 명시하는 경로에서는
+    /// UNKNOWN이 그대로 유효한 값이 아니라서, 여기서 반드시 채워야 한다.
+    DXGI_FORMAT ResolveSrvFormat(const RHIBindingDesc& desc)
+    {
+        // 널 디스크립터는 물어볼 리소스가 없다 — 적어 준 포맷을 그대로 쓴다.
+        if (nullptr == desc.resource) return desc.format;
+
+        const DXGI_FORMAT resourceFormat = desc.resource->GetDesc().Format;
+
+        if (desc.depthAsColor)  return DepthToColorFormat(resourceFormat);
+        if (DXGI_FORMAT_UNKNOWN == desc.format) return resourceFormat;
+        return desc.format;
+    }
+}
 RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
 {
     if (descs.empty()) return {};
@@ -752,9 +786,11 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     //   테이블 안에 빈 칸으로 남았다. 검증 레이어가 그것을 잡지만 메시지가
     //   드로우 시점에 나와서 어느 패스인지 짚기 어려웠다. 여기서 미리 끊으면
     //   호출부가 invalid 하나만 보고 돌아설 수 있다.
+    //   비어도 되는 자리는 OrNull()로 표시해 예외로 둔다 — 거기에는 널
+    //   디스크립터가 깔린다(안 거는 것과 다르다).
     for (const RHIBindingDesc& desc : descs)
     {
-        if (nullptr == desc.resource) return {};
+        if (nullptr == desc.resource && !desc.allowNull) return {};
     }
 
     const auto range = m_descriptorRing.Allocate(static_cast<uint32_t>(descs.size()));
@@ -800,7 +836,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
         srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srv.Format = desc.format;
+        srv.Format = ResolveSrvFormat(desc);
         switch (desc.dim)
         {
         case RHIBindingDesc::Dim::Texture2DArray:

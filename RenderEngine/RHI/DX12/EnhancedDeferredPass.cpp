@@ -496,63 +496,32 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             const auto rtv = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
             device->CreateRenderTargetView(executeContext.Resolve(m_output), nullptr, rtv);
 
-            // SRV 아홉을 디스크립터 링에서 연속으로 자른다 — 테이블은 연속이어야 한다.
-            const auto srvRange = context.resources->GetDescriptorRing().Allocate(9);
-            if (!srvRange.IsValid()) return;
-
-            const RGHandle sources[4] = {
-                m_inputs.diffuse, m_inputs.metalRough, m_inputs.normal, m_inputs.emissive };
-            for (uint32_t i = 0; i < 4; ++i)
-            {
-                device->CreateShaderResourceView(executeContext.Resolve(sources[i]), nullptr,
-                    srvRange.CpuAt(i));
-            }
-
-            // 깊이는 포맷을 바꿔서 봐야 한다. D32_FLOAT로 만든 리소스를 SRV로
-            // 읽으려면 명시적으로 알려 줘야 하고, nullptr 설명으로는 실패한다.
-            D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
-            depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            depthSrv.Texture2D.MipLevels = 1;
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth),
-                &depthSrv, srvRange.CpuAt(4));
-
-            // 그림자 맵도 깊이지만 배열이라 차원까지 바꿔 봐야 한다.
-            D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrv{};
-            shadowSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            shadowSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-            shadowSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            shadowSrv.Texture2DArray.MipLevels = 1;
-            shadowSrv.Texture2DArray.ArraySize = kShadowCascadeCount;
-            device->CreateShaderResourceView(executeContext.Resolve(m_shadowMap),
-                &shadowSrv, srvRange.CpuAt(5));
-
-            // IBL 셋(t6~t8). 없으면 널 디스크립터를 깐다 — 링에서 잘라 온 자리는
-            // 초기화되지 않은 쓰레기라, 셰이더가 분기로 안 읽더라도 유효한
-            // 디스크립터가 있어야 한다(SSGI에서 쓰레기 디스크립터로 GPU가 죽었다).
+            // IBL 셋(t6~t8)은 셋이 다 있을 때만 건다. 하나라도 없으면 널
+            // 디스크립터를 깔고 셰이더가 hasIbl로 분기한다.
             const bool hasIbl = (nullptr != m_iblIrradiance)
                 && (nullptr != m_iblPrefiltered) && (nullptr != m_iblBrdfLut);
 
-            D3D12_SHADER_RESOURCE_VIEW_DESC cubeSrv{};
-            cubeSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            cubeSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-            cubeSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-            cubeSrv.TextureCube.MipLevels = 1;
-            device->CreateShaderResourceView(
-                hasIbl ? m_iblIrradiance : nullptr, &cubeSrv, srvRange.CpuAt(6));
+            constexpr DXGI_FORMAT kIblFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-            cubeSrv.TextureCube.MipLevels = hasIbl ? m_iblPrefilterMips : 1;
-            device->CreateShaderResourceView(
-                hasIbl ? m_iblPrefiltered : nullptr, &cubeSrv, srvRange.CpuAt(7));
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC lutSrv{};
-            lutSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            lutSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            lutSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-            lutSrv.Texture2D.MipLevels = 1;
-            device->CreateShaderResourceView(
-                hasIbl ? m_iblBrdfLut : nullptr, &lutSrv, srvRange.CpuAt(8));
+            // t0~t8을 테이블 하나로 잘라 받는다(R2).
+            const RHIBindingDesc srvs[] = {
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.diffuse)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.metalRough)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.emissive)),
+                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+                // 그림자 맵도 깊이지만 배열이라 차원까지 바꿔 봐야 한다.
+                RHIBindingDesc::SrvArray(executeContext.Resolve(m_shadowMap),
+                    DXGI_FORMAT_R32_FLOAT, kShadowCascadeCount),
+                RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : nullptr,
+                    kIblFormat, 1).OrNull(),
+                RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : nullptr,
+                    kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
+                RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : nullptr,
+                    kIblFormat).OrNull(),
+            };
+            const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+            if (!srvTable.IsValid()) return;
 
             // 광원 상수를 업로드 링에 올린다.
             LightingConstants constants{};
@@ -588,14 +557,11 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             commandList->RSSetScissorRects(1, &scissor);
             commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap(),
-                context.resources->GetSamplerHeap().GetHeap() };
-            commandList->SetDescriptorHeaps(2, heaps);
+            context.resources->BindDescriptorHeaps(commandList, true);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
-            commandList->SetGraphicsRootDescriptorTable(0, srvRange.gpu);
+            commandList->SetGraphicsRootDescriptorTable(0, srvTable.gpu);
             commandList->SetGraphicsRootDescriptorTable(1, m_sampler);
             commandList->SetGraphicsRootConstantBufferView(2, lightConstants.gpuAddress);
 

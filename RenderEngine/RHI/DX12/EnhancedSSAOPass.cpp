@@ -567,7 +567,6 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
             const SSAOParams params = fillParams();
             const auto cb = context.resources->GetUploadRing().Allocate(
@@ -575,35 +574,19 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &params, sizeof(params));
 
-            const auto srvTable = context.resources->GetDescriptorRing().Allocate(2);
-            const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
+            // 테이블 둘을 잘라 받는다(R2) — 루트 파라미터가 SRV·UAV로 나뉘어 있다.
+            const RHIBindingDesc srvs[] = {
+                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_inputs.normal)),
+            };
+            const RHIBindingDesc uavs[] = {
+                RHIBindingDesc::Uav2D(executeContext.Resolve(m_rawOutput), kAOFormat),
+            };
+            const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+            const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-            // 깊이는 D32_FLOAT로 만들어져 SRV에서는 R32_FLOAT로 본다.
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            auto* depthResource = executeContext.Resolve(m_inputs.depth);
-            const auto depthDescription = depthResource->GetDesc();
-            srvDesc.Format = (DXGI_FORMAT_D32_FLOAT == depthDescription.Format)
-                ? DXGI_FORMAT_R32_FLOAT : depthDescription.Format;
-            device->CreateShaderResourceView(depthResource, &srvDesc, srvTable.CpuAt(0));
-
-            auto* normalResource = executeContext.Resolve(m_inputs.normal);
-            srvDesc.Format = normalResource->GetDesc().Format;
-            device->CreateShaderResourceView(normalResource, &srvDesc, srvTable.CpuAt(1));
-
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            uavDesc.Format = kAOFormat;
-            device->CreateUnorderedAccessView(executeContext.Resolve(m_rawOutput),
-                nullptr, &uavDesc, uavTable.CpuAt(0));
-
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetComputeRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_useReferencePath ? m_referencePSO : m_aoPSO);
@@ -621,7 +604,6 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
-            auto* device = context.resources->GetDevice();
 
             const SSAOParams params = fillParams();
             const auto cb = context.resources->GetUploadRing().Allocate(
@@ -635,29 +617,19 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             // 슬롯 수를 바꾸면 레지스터가 밀리는데, SSGI에서 그것으로
             // 누적이 조용히 죽은 적이 있다. 안 쓰는 슬롯도 같은 것으로
             // 채워 두면 디스크립터 힙에 쓰레기가 남지 않는다.
-            const auto srvTable = context.resources->GetDescriptorRing().Allocate(2);
-            const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
+            auto* raw = executeContext.Resolve(m_rawOutput);
+            const RHIBindingDesc srvs[] = {
+                RHIBindingDesc::Srv2D(raw, kAOFormat),
+                RHIBindingDesc::Srv2D(raw, kAOFormat),
+            };
+            const RHIBindingDesc uavs[] = {
+                RHIBindingDesc::Uav2D(executeContext.Resolve(m_output), kAOFormat),
+            };
+            const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+            const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
             if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MipLevels = 1;
-            srvDesc.Format = kAOFormat;
-
-            auto* raw = executeContext.Resolve(m_rawOutput);
-            device->CreateShaderResourceView(raw, &srvDesc, srvTable.CpuAt(0));
-            device->CreateShaderResourceView(raw, &srvDesc, srvTable.CpuAt(1));
-
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            uavDesc.Format = kAOFormat;
-            device->CreateUnorderedAccessView(executeContext.Resolve(m_output),
-                nullptr, &uavDesc, uavTable.CpuAt(0));
-
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetComputeRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_filterPSO);

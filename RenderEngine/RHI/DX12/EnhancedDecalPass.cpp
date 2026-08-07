@@ -618,28 +618,16 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                 sizeof(InstanceData) * m_instances.size());
 
             // GBuffer 사본 넷(깊이 + 확산·노멀·ORM). 프레임에 한 번만 자른다.
-            const auto gbufferSrv = context.resources->GetDescriptorRing().Allocate(4);
+            const RHIBindingDesc gbufferSrvs[] = {
+                RHIBindingDesc::SrvDepth(executeContext.Resolve(m_inputs.depth)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_copiedDiffuse)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_copiedNormal)),
+                RHIBindingDesc::Srv(executeContext.Resolve(m_copiedOrm)),
+            };
+            const RHIBindingTable gbufferSrv = context.resources->CreateBindings(gbufferSrvs);
             if (!gbufferSrv.IsValid()) return;
 
-            // 깊이는 D32_FLOAT 리소스라 SRV 포맷을 명시해야 한다.
-            D3D12_SHADER_RESOURCE_VIEW_DESC depthSrv{};
-            depthSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            depthSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
-            depthSrv.Texture2D.MipLevels = 1;
-            device->CreateShaderResourceView(executeContext.Resolve(m_inputs.depth), &depthSrv,
-                gbufferSrv.CpuAt(0));
-
-            device->CreateShaderResourceView(executeContext.Resolve(m_copiedDiffuse), nullptr,
-                gbufferSrv.CpuAt(1));
-            device->CreateShaderResourceView(executeContext.Resolve(m_copiedNormal), nullptr,
-                gbufferSrv.CpuAt(2));
-            device->CreateShaderResourceView(executeContext.Resolve(m_copiedOrm), nullptr,
-                gbufferSrv.CpuAt(3));
-
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetGraphicsRootConstantBufferView(0, frameCb.gpuAddress);
@@ -651,23 +639,19 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             {
                 if (nullptr == m_pipelines[batch.channel]) continue;
 
-                const auto decalSrv = context.resources->GetDescriptorRing().Allocate(3);
-                if (!decalSrv.IsValid()) break;
-
-                for (uint32_t i = 0; i < 3; ++i)
+                // 없는 슬롯에는 널 디스크립터를 깐다(OrNull). 셰이더가 useFlags로
+                // 읽지 않지만, 테이블에 빈 칸을 두면 검증 레이어가 잡는다.
+                const auto decalSlot = [&batch](uint32_t i)
                 {
-                    // 없는 슬롯에는 null 디스크립터를 만든다. 셰이더가 useFlags로
-                    // 읽지 않지만, 테이블에 빈 칸을 두면 검증 레이어가 잡는다.
-                    D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
-                    srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                    srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                    srv.Format = (nullptr != batch.textures[i])
-                        ? batch.formats[i] : DXGI_FORMAT_R8G8B8A8_UNORM;
-                    srv.Texture2D.MipLevels = (nullptr != batch.textures[i])
-                        ? (std::max)(1u, batch.mipLevels[i]) : 1;
-
-                    device->CreateShaderResourceView(batch.textures[i], &srv, decalSrv.CpuAt(i));
-                }
+                    const bool has = (nullptr != batch.textures[i]);
+                    return RHIBindingDesc::Srv2D(batch.textures[i],
+                        has ? batch.formats[i] : DXGI_FORMAT_R8G8B8A8_UNORM,
+                        0, has ? (std::max)(1u, batch.mipLevels[i]) : 1).OrNull();
+                };
+                const RHIBindingDesc decalSrvs[] = {
+                    decalSlot(0), decalSlot(1), decalSlot(2) };
+                const RHIBindingTable decalSrv = context.resources->CreateBindings(decalSrvs);
+                if (!decalSrv.IsValid()) break;   // 링이 찼다 — 남은 배치도 마찬가지다
 
                 commandList->SetPipelineState(m_pipelines[batch.channel]);
                 commandList->SetGraphicsRootDescriptorTable(3, decalSrv.gpu);

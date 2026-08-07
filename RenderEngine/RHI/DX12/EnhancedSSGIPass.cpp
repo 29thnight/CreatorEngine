@@ -751,35 +751,24 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, &params, sizeof(params));
 
-                // SRV 테이블은 시그니처 크기만큼 잡는다. 안 쓰는 슬롯도
-                // 디스크립터가 있어야 검증 레이어가 조용하다.
-                const auto srvTable = context.resources->GetDescriptorRing()
-                    .Allocate(kMaxHiZMips + 2);
-                const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
-
                 auto* source = (0 == mip)
                     ? executeContext.Resolve(m_inputs.depth)
                     : executeContext.Resolve(m_hiZMips[mip - 1]);
 
-                D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvDesc.Texture2D.MipLevels = 1;
-                // 깊이는 D32_FLOAT라 SRV에서 R32_FLOAT로 본다.
-                srvDesc.Format = (0 == mip) ? DXGI_FORMAT_R32_FLOAT : kHiZFormat;
-
-                for (uint32_t i = 0; i < kMaxHiZMips + 2; ++i)
-                {
-                    device->CreateShaderResourceView(source, &srvDesc, srvTable.CpuAt(i));
-                }
-
-                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                uavDesc.Format = kHiZFormat;
-                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                device->CreateUnorderedAccessView(
-                    executeContext.Resolve(m_hiZMips[mip]), nullptr, &uavDesc,
-                    uavTable.CpuAt(0));
+                // SRV 테이블은 시그니처 크기만큼 잡는다. 안 쓰는 슬롯도
+                // 디스크립터가 있어야 검증 레이어가 조용하다 — 그래서 전부
+                // 같은 것으로 채운다.
+                std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
+                srvs.fill((0 == mip)
+                    ? RHIBindingDesc::SrvDepth(source)
+                    : RHIBindingDesc::Srv2D(source, kHiZFormat));
+                const RHIBindingDesc uavs[] = {
+                    RHIBindingDesc::Uav2D(executeContext.Resolve(m_hiZMips[mip]),
+                        kHiZFormat),
+                };
+                const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+                const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
+                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 // ★ 디스크립터 힙을 먼저 바인딩한다.
                 //
@@ -787,9 +776,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 받은 GPU 핸들은 그 힙이 바인딩돼 있을 때만 뜻이 있다 —
                 // 핸들 자체는 유효해 보이지만 GPU가 다른 힙을 보고 있으면
                 // 엉뚱한 곳을 가리킨다.
-                ID3D12DescriptorHeap* heaps[] = {
-                    context.resources->GetDescriptorRing().GetHeap() };
-                commandList->SetDescriptorHeaps(1, heaps);
+                context.resources->BindDescriptorHeaps(commandList);
 
                 commandList->SetComputeRootSignature(m_rootSignature);
                 commandList->SetPipelineState(m_hiZBuildPSO);
@@ -857,36 +844,6 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, &params, sizeof(params));
 
-                const auto srvTable = context.resources->GetDescriptorRing()
-                    .Allocate(kMaxHiZMips + 2);
-                const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
-
-                D3D12_SHADER_RESOURCE_VIEW_DESC hiZSrv{};
-                hiZSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                hiZSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                hiZSrv.Texture2D.MipLevels = 1;
-                hiZSrv.Format = kHiZFormat;
-
-                for (uint32_t i = 0; i < kMaxHiZMips; ++i)
-                {
-                    // 밉이 모자라면 마지막 것으로 채운다. 셰이더가 gMipCount
-                    // 안에서만 읽으므로 값은 안 쓰이지만, 디스크립터가 비어
-                    // 있으면 검증 레이어가 잡는다.
-                    const uint32_t index = (i < m_hiZMipCount) ? i : (m_hiZMipCount - 1);
-                    device->CreateShaderResourceView(
-                        executeContext.Resolve(m_hiZMips[index]), &hiZSrv,
-                        srvTable.CpuAt(i));
-                }
-
-                D3D12_SHADER_RESOURCE_VIEW_DESC colorSrv = hiZSrv;
-                colorSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-                auto* normal = m_inputs.normal.IsValid()
-                    ? executeContext.Resolve(m_inputs.normal) : nullptr;
-                auto* lighting = m_inputs.lighting.IsValid()
-                    ? executeContext.Resolve(m_inputs.lighting) : nullptr;
-
                 // ★ 없어도 디스크립터는 반드시 만든다.
                 //
                 // 처음에는 nullptr이면 건너뛰었다. 그러자 그 슬롯이 초기화되지
@@ -898,40 +855,35 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 디스크립터이고, 셰이더가 그 값을 쓰더라도 검은 결과가 나올
                 // 뿐 죽지는 않는다.
                 auto* fallback = executeContext.Resolve(m_hiZMips[0]);
+                constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-                D3D12_SHADER_RESOURCE_VIEW_DESC fallbackSrv = hiZSrv;
-
-                if (nullptr != normal)
+                std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
+                for (uint32_t i = 0; i < kMaxHiZMips; ++i)
                 {
-                    device->CreateShaderResourceView(normal, &colorSrv,
-                        srvTable.CpuAt(kMaxHiZMips));
+                    // 밉이 모자라면 마지막 것으로 채운다. 셰이더가 gMipCount
+                    // 안에서만 읽으므로 값은 안 쓰이지만, 디스크립터가 비어
+                    // 있으면 검증 레이어가 잡는다.
+                    const uint32_t index = (i < m_hiZMipCount) ? i : (m_hiZMipCount - 1);
+                    srvs[i] = RHIBindingDesc::Srv2D(
+                        executeContext.Resolve(m_hiZMips[index]), kHiZFormat);
                 }
-                else
-                {
-                    device->CreateShaderResourceView(fallback, &fallbackSrv,
-                        srvTable.CpuAt(kMaxHiZMips));
-                }
+                srvs[kMaxHiZMips] = m_inputs.normal.IsValid()
+                    ? RHIBindingDesc::Srv2D(
+                        executeContext.Resolve(m_inputs.normal), kColorFormat)
+                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
+                srvs[kMaxHiZMips + 1] = m_inputs.lighting.IsValid()
+                    ? RHIBindingDesc::Srv2D(
+                        executeContext.Resolve(m_inputs.lighting), kColorFormat)
+                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
 
-                if (nullptr != lighting)
-                {
-                    device->CreateShaderResourceView(lighting, &colorSrv,
-                        srvTable.CpuAt(kMaxHiZMips + 1));
-                }
-                else
-                {
-                    device->CreateShaderResourceView(fallback, &fallbackSrv,
-                        srvTable.CpuAt(kMaxHiZMips + 1));
-                }
+                const RHIBindingDesc uavs[] = {
+                    RHIBindingDesc::Uav2D(executeContext.Resolve(m_traceResult), kGIFormat),
+                };
+                const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+                const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
+                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                uavDesc.Format = kGIFormat;
-                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                device->CreateUnorderedAccessView(
-                    executeContext.Resolve(m_traceResult), nullptr, &uavDesc, uavTable.CpuAt(0));
-
-                ID3D12DescriptorHeap* heaps[] = {
-                    context.resources->GetDescriptorRing().GetHeap() };
-                commandList->SetDescriptorHeaps(1, heaps);
+                context.resources->BindDescriptorHeaps(commandList);
 
                 commandList->SetComputeRootSignature(m_rootSignature);
                 commandList->SetPipelineState(m_tracePSO);
@@ -971,17 +923,11 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
                 auto* commandList = executeContext.commandList;
-                auto* device = context.resources->GetDevice();
 
                 const auto cb = context.resources->GetUploadRing().Allocate(
                     constantCopy.size(), DX12UploadRing::kConstantBufferAlignment);
                 if (!cb.IsValid()) return;
                 memcpy(cb.cpuAddress, constantCopy.data(), constantCopy.size());
-
-                const auto srvTable = context.resources->GetDescriptorRing()
-                    .Allocate(kMaxHiZMips + 2);
-                const auto uavTable = context.resources->GetDescriptorRing().Allocate(1);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
                 // 그래프 리소스와 외부 리소스를 순서대로 꽂는다.
                 std::vector<ID3D12Resource*> sources;
@@ -1000,37 +946,26 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 ID3D12Resource* fallback = sources.empty()
                     ? executeContext.Resolve(m_hiZMips[0]) : sources.front();
 
+                std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                 for (uint32_t i = 0; i < kMaxHiZMips + 2; ++i)
                 {
                     ID3D12Resource* resource = (i < sources.size() && nullptr != sources[i])
                         ? sources[i] : fallback;
-                    if (nullptr == resource) continue;
-
-                    const D3D12_RESOURCE_DESC desc = resource->GetDesc();
-
-                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                    srvDesc.Texture2D.MipLevels = 1;
-                    // 깊이는 D32_FLOAT로 만들어져 SRV에서는 R32_FLOAT로 본다.
-                    srvDesc.Format = (DXGI_FORMAT_D32_FLOAT == desc.Format)
-                        ? DXGI_FORMAT_R32_FLOAT : desc.Format;
-
-                    device->CreateShaderResourceView(resource, &srvDesc, srvTable.CpuAt(i));
+                    // 깊이면 색 포맷으로 갈아 보고, 아니면 리소스 포맷 그대로다.
+                    srvs[i] = RHIBindingDesc::SrvDepth(resource);
                 }
 
                 auto* targetResource = executeContext.Resolve(target);
-                const D3D12_RESOURCE_DESC targetDesc = targetResource->GetDesc();
+                const RHIBindingDesc uavs[] = {
+                    RHIBindingDesc::Uav2D(targetResource,
+                        (nullptr != targetResource) ? targetResource->GetDesc().Format
+                                                    : DXGI_FORMAT_UNKNOWN),
+                };
+                const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+                const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
+                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
 
-                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                uavDesc.Format = targetDesc.Format;
-                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                device->CreateUnorderedAccessView(targetResource, nullptr, &uavDesc,
-                    uavTable.CpuAt(0));
-
-                ID3D12DescriptorHeap* heaps[] = {
-                    context.resources->GetDescriptorRing().GetHeap() };
-                commandList->SetDescriptorHeaps(1, heaps);
+                context.resources->BindDescriptorHeaps(commandList);
 
                 commandList->SetComputeRootSignature(m_rootSignature);
                 commandList->SetPipelineState(pso);
@@ -1476,26 +1411,17 @@ bool EnhancedSceneRenderer::RunSSGITest(std::string& outLog)
 
             const auto cb = resources.GetUploadRing().Allocate(
                 sizeof(depthCb), DX12UploadRing::kConstantBufferAlignment);
-            const auto uavTable = resources.GetDescriptorRing().Allocate(2);
+            const RHIBindingDesc depthUavs[] = {
+                RHIBindingDesc::Uav2D(depth.Get(), DXGI_FORMAT_R32_FLOAT),
+                RHIBindingDesc::Uav2D(testNormal.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT),
+            };
+            const RHIBindingTable uavTable = resources.CreateBindings(depthUavs);
             if (cb.IsValid() && uavTable.IsValid())
             {
                 memcpy(cb.cpuAddress, &depthCb, sizeof(depthCb));
 
-                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                uavDesc.Format = DXGI_FORMAT_R32_FLOAT;
-                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                resources.GetDevice()->CreateUnorderedAccessView(depth.Get(), nullptr,
-                    &uavDesc, uavTable.CpuAt(0));
-
-                D3D12_UNORDERED_ACCESS_VIEW_DESC normalUav{};
-                normalUav.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-                normalUav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                resources.GetDevice()->CreateUnorderedAccessView(testNormal.Get(), nullptr,
-                    &normalUav, uavTable.CpuAt(1));
-
                 auto* cmd = resources.GetCommandList();
-                ID3D12DescriptorHeap* depthHeaps[] = { resources.GetDescriptorRing().GetHeap() };
-                cmd->SetDescriptorHeaps(1, depthHeaps);
+                resources.BindDescriptorHeaps(cmd);
                 cmd->SetComputeRootSignature(depthRoot.signature);
                 cmd->SetPipelineState(depthPso);
                 cmd->SetComputeRootConstantBufferView(0, cb.gpuAddress);

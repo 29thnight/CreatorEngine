@@ -443,9 +443,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             memcpy(instanceUpload.cpuAddress, m_instances.data(),
                 static_cast<size_t>(instanceBytes));
 
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
@@ -455,9 +453,6 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             for (const Batch& batch : m_batches)
             {
                 // 텍스처. 없으면 1x1 흰색이 묶여 단색 사각형이 된다.
-                const auto textureTable = context.resources->GetDescriptorRing().Allocate(1);
-                if (!textureTable.IsValid()) break;
-
                 ID3D12Resource* resource = nullptr;
                 DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
                 uint32_t mipLevels = 1;
@@ -485,12 +480,14 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
                 // 갈리는 것을 밖에서 볼 수 있게 해 둔다.
                 if (nullptr == resource) continue;
 
-                D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvDesc.Format = format;
-                srvDesc.Texture2D.MipLevels = mipLevels;
-                device->CreateShaderResourceView(resource, &srvDesc, textureTable.CpuAt(0));
+                const RHIBindingDesc texture[] = {
+                    RHIBindingDesc::Srv2D(resource, format, 0, mipLevels),
+                };
+                const RHIBindingTable textureTable =
+                    context.resources->CreateBindings(texture);
+                // 여기서 실패하면 링이 모자란 것이다(리소스 널은 위에서 걸렀다).
+                // 남은 배치도 마찬가지일 테니 멈춘다.
+                if (!textureTable.IsValid()) break;
 
                 commandList->SetGraphicsRootShaderResourceView(1,
                     instanceUpload.gpuAddress

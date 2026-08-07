@@ -326,19 +326,13 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             if (!cb.IsValid()) return;
             memcpy(cb.cpuAddress, &constants, sizeof(constants));
 
-            const auto cubeTable = context.resources->GetDescriptorRing().Allocate(1);
+            const RHIBindingDesc cube[] = {
+                RHIBindingDesc::SrvCube(m_cubeMap, m_cubeMapFormat, m_cubeMapMips),
+            };
+            const RHIBindingTable cubeTable = context.resources->CreateBindings(cube);
             if (!cubeTable.IsValid()) return;
 
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-            srvDesc.Format = m_cubeMapFormat;
-            srvDesc.TextureCube.MipLevels = m_cubeMapMips;
-            device->CreateShaderResourceView(m_cubeMap, &srvDesc, cubeTable.CpuAt(0));
-
-            ID3D12DescriptorHeap* heaps[] = {
-                context.resources->GetDescriptorRing().GetHeap() };
-            commandList->SetDescriptorHeaps(1, heaps);
+            context.resources->BindDescriptorHeaps(commandList);
 
             commandList->SetGraphicsRootSignature(m_rootSignature);
             commandList->SetPipelineState(m_pso);
