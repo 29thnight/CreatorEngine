@@ -15,6 +15,9 @@
 #include "EnhancedSSGIPass.h"
 #include "EnhancedForwardPass.h"
 #include "EnhancedSSAOPass.h"
+#include "EnhancedSSRPass.h"
+#include "EnhancedSSSPass.h"
+#include "EnhancedDecalPass.h"
 #include "EnhancedVolumetricFogPass.h"
 #include "EnhancedSkyBoxPass.h"
 #include "EnhancedIBLGenerator.h"
@@ -132,9 +135,12 @@ namespace
         //   카메라가 둘이어도 한 인스턴스로 충분하다.
         EnhancedGBufferPass   gbuffer;
         EnhancedShadowPass    shadow;
+        EnhancedDecalPass     decal;
         EnhancedDeferredPass  deferred;
         EnhancedForwardPass   forward;
         EnhancedSSAOPass      ssao;
+        EnhancedSSSPass       sss;
+        EnhancedSSRPass       ssr;
         EnhancedSkyBoxPass    skyBox;
         EnhancedIBLGenerator  ibl;
         EnhancedPostChainPass postChain;
@@ -288,6 +294,10 @@ namespace
         std::vector<EnhancedDrawItem> draws;
         std::vector<EnhancedDrawItem> forwardDraws;
         std::vector<EnhancedLight>    lights;
+        // 데칼은 frameContext가 아니라 패스에 직접 건넨다(SetDecals) —
+        // 그리는 패스가 하나뿐이라 컨텍스트에 실을 이유가 없다. 여기 두는
+        // 것은 매 프레임 재할당을 피하기 위해서다.
+        std::vector<EnhancedDecalPass::Item> decals;
         EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
 
         // 묘지 — DisableLive가 즉시 못 놓는 것들(헤더의 수명 규약 참조).
@@ -304,6 +314,10 @@ namespace
 
         uint32_t ssaoFrameIndex{ 0 };
         uint32_t frameCounter{ 0 };
+        // 러너를 켠 뒤의 누적 초. SSR의 광선 잡음 씨앗이다 — DX11은
+        // TimeSystem의 총 경과 초를 넘기는데, 여기서는 TickLive가 받는
+        // 델타를 쌓는다(엔트리 계층에 역의존하지 않는다는 규약 그대로).
+        float    totalSeconds{ 0.f };
         // 카메라 순회 시작점 회전. 총 인플라이트 예산이 1만 남는 틱에서
         // 항상 목록 앞(씬뷰)이 선점하면 게임뷰가 상대적으로 굶는다 —
         // 큐가 FIFO라 완전한 기아는 없지만 편향 자체를 없앤다.
@@ -318,6 +332,8 @@ namespace
 
         uint32_t lastDrawCount{ 0 };    // 이번 프레임 GBuffer 드로우(0이면 빈 화면이다)
         uint32_t lastBatchCount{ 0 };
+        uint32_t lastDecalCount{ 0 };
+        uint32_t lastDecalBatchCount{ 0 };
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         std::string lastError;
@@ -359,6 +375,8 @@ namespace
             debugSnapshot.framesInFlight = framesInFlight;
             debugSnapshot.drawCount = lastDrawCount;
             debugSnapshot.batchCount = lastBatchCount;
+            debugSnapshot.decalCount = lastDecalCount;
+            debugSnapshot.decalBatchCount = lastDecalBatchCount;
             debugSnapshot.cpuMs = lastCpuMs;
             debugSnapshot.gpuMs = lastGpuMs;
             debugSnapshot.graveyardCount = graveyard.size();
@@ -456,6 +474,24 @@ namespace
             if (!p.gbuffer.Initialize(p.frameContext, outError)) return false;
             p.gbuffer.SetKeepAlive(false);
             if (!p.shadow.Initialize(p.frameContext, outError)) return false;
+            // 데칼·SSS·SSR은 여기서 함께 세운다. 포그처럼 미루지 않는 이유는
+            // 붙잡는 것이 PSO뿐이라서다 — 뷰를 넘겨 사는 자원이 없고
+            // (전부 프레임 내 완결), 중간 타깃은 그래프의 transient라 꺼져
+            // 있는 동안에는 잡히지 않는다. 포그를 미룬 이유는 프록셀 격자
+            // 42MB/뷰였고 여기에는 그런 것이 없다.
+            if (!p.decal.Initialize(p.frameContext, outError)) return false;
+            if (!p.sss.Initialize(p.frameContext, outError)) return false;
+            if (!p.ssr.Initialize(p.frameContext, outError)) return false;
+            // 기본은 둘 다 꺼짐(EnhancedLiveTuning의 Sss·Ssr 주석 참조).
+            //
+            // 환경변수로 켤 수 있게 둔 이유는 포스트 체인과 같다 — 창을
+            // 손으로 조작하지 않고 라이브 경로를 단정할 방법이 있어야 한다.
+            // 이 둘은 특히 그렇다: 창에서만 켤 수 있으면 "배선했다"를
+            // 자동화가 확인할 길이 없고, 그 상태가 곧 소비자 없는 패스가
+            // 조용히 죽어 있던 자리다. 미러가 이 값을 되읽으므로 창에도
+            // 그대로 보인다.
+            p.sss.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSS", false));
+            p.ssr.SetEnabled(ReadLivePostFlag("CREATOR_DX12_SSR", false));
             if (!p.deferred.Initialize(p.frameContext, outError)) return false;
             // SSGI는 뷰마다. 두 번째부터는 PSO 캐시가 받아 컴파일이 없다.
             for (LivePipeline::CameraView& view : p.views)
@@ -596,6 +632,8 @@ namespace
             p.postChain.Shutdown();
             p.ibl.Shutdown();
             p.skyBox.Shutdown();
+            p.ssr.Shutdown();
+            p.sss.Shutdown();
             p.ssao.Shutdown();
             p.forward.Shutdown();
             for (LivePipeline::CameraView& view : p.views)
@@ -611,6 +649,7 @@ namespace
             fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
             fogTeardownPending = false;
             p.deferred.Shutdown();
+            p.decal.Shutdown();
             p.shadow.Shutdown();
             p.gbuffer.Shutdown();
 
@@ -816,6 +855,7 @@ namespace
             draws.clear();
             forwardDraws.clear();
             lights.clear();
+            decals.clear();
 
             const auto copyProxy = [](const PrimitiveRenderProxy* proxy,
                 std::vector<EnhancedDrawItem>& out)
@@ -860,10 +900,52 @@ namespace
             // shared_ptr 스냅샷이 이 함수가 재질·메시를 복사하는 동안 프록시를
             // 살려 둔다. 카메라별 큐를 거치지 않으므로 모든 MeshRenderer를
             // 수집하고 재질 모드로 deferred/forward를 직접 분류한다.
+            // 데칼도 같은 순회에서 모은다. 재질·메시가 아니라 텍스처 셋과
+            // 월드 행렬만 드는 별개 종류라 copyProxy가 아니라 따로 받는다.
+            //
+            // ★ 순서를 건드리지 않는다. 데칼 패스는 겹친 데칼의 순서가 곧
+            //   블렌드 결과라 정렬하지 않고 '연속한 같은 묶음'만 배칭한다
+            //   (EnhancedDecalPass 헤더). 여기서 순서를 바꾸면 그 계약이
+            //   깨지므로 프록시 순회 순서를 그대로 넘긴다.
+            const auto copyDecal = [this](const PrimitiveRenderProxy* proxy)
+            {
+                if (nullptr == proxy ||
+                    PrimitiveProxyType::DecalComponent != proxy->m_proxyType)
+                {
+                    return;
+                }
+
+                // 셋 다 없으면 그릴 것이 없다 — DX11 RenderPassData의
+                // 데칼 큐 적재 조건과 같다(RenderPassData.cpp:232).
+                if (nullptr == proxy->m_diffuseTexture &&
+                    nullptr == proxy->m_normalTexture &&
+                    nullptr == proxy->m_occluroughmetalTexture)
+                {
+                    return;
+                }
+
+                EnhancedDecalPass::Item item{};
+                item.worldMatrix = proxy->m_worldMatrix;
+                item.diffuse = proxy->m_diffuseTexture;
+                item.normal = proxy->m_normalTexture;
+                item.occRoughMetal = proxy->m_occluroughmetalTexture;
+                item.sliceX = proxy->m_sliceX;
+                item.sliceY = proxy->m_sliceY;
+                item.sliceNum = proxy->m_sliceNum;
+                decals.push_back(item);
+            };
+
             const RenderScene::ProxySnapshot proxies =
                 renderScene->GetPrimitiveProxySnapshot();
             for (const auto& proxy : proxies)
             {
+                if (nullptr != proxy &&
+                    PrimitiveProxyType::DecalComponent == proxy->m_proxyType)
+                {
+                    copyDecal(proxy.get());
+                    continue;
+                }
+
                 const Material* material = proxy ? proxy->m_Material.get() : nullptr;
                 if (nullptr != material &&
                     MaterialRenderingMode::Transparent == material->m_renderingMode)
@@ -1020,6 +1102,10 @@ namespace
 
             if (!p.shadow.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.gbuffer.PrepareFrame(p.frameContext, outError)) return false;
+            // 데칼은 PrepareFrame이 텍스처를 올리고 배치를 짜므로 그 앞에
+            // 이번 프레임 목록을 넣어야 한다.
+            p.decal.SetDecals(decals);
+            if (!p.decal.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.deferred.PrepareFrame(p.frameContext, outError)) return false;
             if (!view.ssgi.PrepareFrame(p.frameContext, outError)) return false;
 
@@ -1050,10 +1136,14 @@ namespace
 
             if (!p.forward.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.ssao.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.sss.PrepareFrame(p.frameContext, outError)) return false;
+            if (!p.ssr.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.skyBox.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.postChain.PrepareFrame(p.frameContext, outError)) return false;
             lastDrawCount = p.gbuffer.GetLastDrawCount();
             lastBatchCount = p.gbuffer.GetLastBatchCount();
+            lastDecalCount = p.decal.GetLastDecalCount();
+            lastDecalBatchCount = p.decal.GetLastBatchCount();
             if (!p.grid.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.wireframe.PrepareFrame(p.frameContext, outError)) return false;
             if (!p.gizmoIcon.PrepareFrame(p.frameContext, outError)) return false;
@@ -1069,8 +1159,25 @@ namespace
             p.gbuffer.Declare(graph, p.frameContext);
             const auto outputs = p.gbuffer.GetOutputs();
 
+            // ── 데칼 ──
+            //
+            // GBuffer 바로 뒤, SSAO·Deferred 앞이다(DX11과 같은 자리 —
+            // SceneRenderer.cpp의 GBuffer → Decal → SSAO → Deferred).
+            // 새 타깃을 만들지 않고 GBuffer의 확산·노멀·ORM에 덧칠하므로
+            // 뒤 패스는 핸들을 그대로 쓰고, 순서는 그래프가 잡는다.
+            //
+            // 데칼이 하나도 없으면 Declare가 아무것도 선언하지 않는다 —
+            // DX11이 데칼 0개에도 매 프레임 하던 화면 크기 복사 넷이 없다.
+            p.decal.SetInputs(outputs);
+            p.decal.Declare(graph, p.frameContext);
+
             p.deferred.SetInputs(outputs);
             p.deferred.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
+            // 투명(Forward+)에도 같은 그림자를 준다. 한쪽만 받으면 같은 자리에서
+            // 불투명은 그늘인데 투명만 밝은, 물체와 무관한 경계가 생긴다.
+            // 받는 쪽만이다 — 투명은 그림자 맵에 그려지지 않으므로 캐스터가
+            // 아니다(그림자 패스가 context.draws만 래스터한다).
+            p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
 
             {
                 EnhancedSSAOPass::Inputs ssaoInputs{};
@@ -1123,6 +1230,37 @@ namespace
             }
             p.forward.Declare(graph, p.frameContext);
             if (p.forward.GetOutput().IsValid()) litColor = p.forward.GetOutput();
+
+            // ── 서브서피스 스캐터링 ──
+            //
+            // 투명 뒤, SSR 앞이다(DX11과 같은 자리 — Forward → SSS → SSR).
+            // 꺼져 있으면 패스가 입력을 그대로 흘리므로 여기에 분기가 없다.
+            {
+                EnhancedSSSPass::Inputs sssInputs{};
+                sssInputs.color = litColor;
+                sssInputs.depth = outputs.depth;
+                p.sss.SetInputs(sssInputs);
+            }
+            p.sss.Declare(graph, p.frameContext);
+            if (p.sss.GetOutput().IsValid()) litColor = p.sss.GetOutput();
+
+            // ── 스크린 스페이스 반사 ──
+            //
+            // SSS 뒤, 포그 앞이다(DX11과 같은 자리). 반사색을 뜨는 원본이
+            // 곧 반사를 얹을 그림이라 color가 둘 다를 겸한다.
+            {
+                EnhancedSSRPass::Inputs ssrInputs{};
+                ssrInputs.color = litColor;
+                ssrInputs.depth = outputs.depth;
+                ssrInputs.metalRough = outputs.metalRough;
+                ssrInputs.normal = outputs.normal;
+                ssrInputs.bitmask = outputs.bitmask;
+                p.ssr.SetInputs(ssrInputs);
+            }
+            // 광선 잡음의 씨앗. DX11이 총 경과 초를 넘긴다(패스 헤더 참조).
+            p.ssr.SetTime(totalSeconds);
+            p.ssr.Declare(graph, p.frameContext);
+            if (p.ssr.GetOutput().IsValid()) litColor = p.ssr.GetOutput();
 
             // ── 볼류메트릭 포그 ──
             //
@@ -1316,6 +1454,21 @@ namespace
                 view.fog.SetEnabled(fogEnabled);
             }
             {
+                EnhancedSSSPass::Tuning tuning = p.sss.GetTuning();
+                tuning.strength = pendingTuning.sss.strength;
+                tuning.width = pendingTuning.sss.width;
+                p.sss.SetTuning(tuning);
+                p.sss.SetEnabled(pendingTuning.sss.enabled);
+            }
+            {
+                EnhancedSSRPass::Tuning tuning = p.ssr.GetTuning();
+                tuning.stepSize = pendingTuning.ssr.stepSize;
+                tuning.maxThickness = pendingTuning.ssr.maxThickness;
+                tuning.maxRayCount = pendingTuning.ssr.maxRayCount;
+                p.ssr.SetTuning(tuning);
+                p.ssr.SetEnabled(pendingTuning.ssr.enabled);
+            }
+            {
                 EnhancedPostChainPass::Tuning tuning = p.postChain.GetTuning();
                 tuning.bloomEnabled = pendingTuning.postChain.bloomEnabled;
                 tuning.bloomThreshold = pendingTuning.postChain.bloomThreshold;
@@ -1375,6 +1528,19 @@ namespace
             tuningMirror.fog.previousFrameBlendFactor = tuning.previousFrameBlendFactor;
             tuningMirror.fog.customNearPlane = tuning.customNearPlane;
             tuningMirror.fog.customFarPlane = tuning.customFarPlane;
+        }
+        {
+            const EnhancedSSSPass::Tuning& tuning = p.sss.GetTuning();
+            tuningMirror.sss.enabled = p.sss.IsEnabled();
+            tuningMirror.sss.strength = tuning.strength;
+            tuningMirror.sss.width = tuning.width;
+        }
+        {
+            const EnhancedSSRPass::Tuning& tuning = p.ssr.GetTuning();
+            tuningMirror.ssr.enabled = p.ssr.IsEnabled();
+            tuningMirror.ssr.stepSize = tuning.stepSize;
+            tuningMirror.ssr.maxThickness = tuning.maxThickness;
+            tuningMirror.ssr.maxRayCount = tuning.maxRayCount;
         }
         {
             const EnhancedPostChainPass::Tuning& tuning = p.postChain.GetTuning();
@@ -1572,6 +1738,11 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     if (state.fogTeardownPending) state.ReleaseFogResources();
 
     if (!state.enabled) return;
+
+    // SSR의 잡음 씨앗이 읽는다. 카메라 수와 무관하게 틱마다 한 번 쌓아야
+    // 두 뷰가 같은 프레임에서 같은 씨앗을 본다 — 뷰마다 더하면 씬 뷰와
+    // 게임 뷰의 반사 잡음이 갈린다.
+    state.totalSeconds += deltaSeconds;
 
     // ── [프레임당 1회] 씬·프록시 갱신 ──
     //
@@ -1843,6 +2014,30 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         state.graveyard.size());
 
     std::string status = line;
+
+    char decalLine[128]{};
+    std::snprintf(decalLine, sizeof(decalLine), "\n  데칼 %u개(배치 %u) · SSS %s · SSR %s",
+        state.lastDecalCount, state.lastDecalBatchCount,
+        (state.pipeline && state.pipeline->sss.IsEnabled()) ? "켜짐" : "꺼짐",
+        (state.pipeline && state.pipeline->ssr.IsEnabled()) ? "켜짐" : "꺼짐");
+    status += decalLine;
+
+    // ── 마지막 프레임의 패스 이름 ──
+    //
+    // '배선했다'를 콘솔에서 단정할 수 있는 유일한 값이다. 패스가 그래프에
+    // 들어갔는지는 화면만 봐서는 알 수 없고(꺼진 패스는 입력을 그대로
+    // 흘리므로 그림이 같다), 소비자가 없어 컬링당한 패스도 조용히 사라진다
+    // — 이름이 여기 뜨는 것이 곧 그 패스가 실제로 실행됐다는 뜻이다.
+    if (!state.lastPassTimings.empty())
+    {
+        status += "\n  패스: ";
+        for (size_t i = 0; i < state.lastPassTimings.size(); ++i)
+        {
+            if (0 != i) status += " → ";
+            status += state.lastPassTimings[i].name;
+        }
+    }
+
     if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
     return status;
 }

@@ -95,6 +95,7 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetTuning(const Tuning& tuning) { m_tuning = tuning; }
+    const Tuning& GetTuning() const { return m_tuning; }
 
     /// DX11 기본값은 꺼짐이다. 꺼져 있으면 아무것도 선언하지 않고
     /// GetOutput()이 입력을 그대로 돌려준다 — 뒤 패스가 분기 없이 이어진다.

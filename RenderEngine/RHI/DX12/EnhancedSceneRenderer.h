@@ -30,8 +30,12 @@ struct EnhancedLivePassTiming
 /// 그 대가로 스레드 경계가 한 곳(뮤텍스)에 모인다.
 ///
 /// 여기 없는 패스는 조정 파라미터 자체가 없거나(GBuffer·Deferred·Shadow·
-/// SkyBox·Forward·Grid·Gizmo 계열) 아직 라이브 그래프에 배선되지 않은
-/// 것이다(SSR·VolumetricFog·SSS — Tuning은 있으나 LivePipeline이 들지 않는다).
+/// SkyBox·Forward·Grid·Gizmo·Decal 계열) 아직 라이브 그래프에 배선되지 않은
+/// 것이다(UI — Tuning은 있으나 LivePipeline이 들지 않는다).
+///
+/// 데칼이 여기 없는 이유는 조정할 것이 없어서다 — 그릴 데칼은 씬의 프록시가
+/// 정하고, 하나도 없으면 패스가 아무것도 선언하지 않아 비용이 0이다.
+/// 그래서 켬/끔 스위치도 두지 않는다.
 struct EnhancedLiveTuning
 {
     struct Ssao
@@ -70,6 +74,27 @@ struct EnhancedLiveTuning
         float customNearPlane{ 0.5f };
         float customFarPlane{ 1000.f };
     } fog;
+
+    /// 서브서피스 스캐터링. 기본이 꺼짐인 이유는 이 패스가 재질 마스크 없이
+    /// 화면 전체를 번지게 하기 때문이다 — DX11은 기본이 켜짐이었지만 그것은
+    /// 모든 씬의 그림에 블러를 한 겹 얹는다는 뜻이고, 저작이 고르는 것이 맞다
+    /// (포그와 같은 판단). 파라미터 기본값은 DX11 그대로다.
+    struct Sss
+    {
+        bool  enabled{ false };
+        float strength{ 1.35f };
+        float width{ 0.013f };
+    } sss;
+
+    /// 스크린 스페이스 반사. DX11도 기본이 꺼짐이다(isOn = false) —
+    /// 여기서 그 기본값을 그대로 따른다. 파라미터도 DX11 그대로다.
+    struct Ssr
+    {
+        bool  enabled{ false };
+        float stepSize{ 0.114f };
+        float maxThickness{ 0.00416f };
+        int   maxRayCount{ 20 };
+    } ssr;
 
     struct PostChain
     {
@@ -117,6 +142,14 @@ struct EnhancedLiveDebugSnapshot
     uint64_t framesInFlight{ 0 };
     uint32_t drawCount{ 0 };
     uint32_t batchCount{ 0 };
+
+    /// 이번 프레임에 그린 데칼 수와 실제 발행한 드로우 수. 데칼은 씬에
+    /// 프록시가 없으면 패스가 통째로 빠지므로, 0이 고장인지 '데칼이 없는
+    /// 씬'인지는 이 값만으로는 갈리지 않는다 — 갈리는 것은 둘의 관계다.
+    /// 데칼이 있는데 배치가 0이면 텍스처 운반이 실패한 것이고, 둘이 늘
+    /// 같으면 인스턴싱이 죽은 것이다.
+    uint32_t decalCount{ 0 };
+    uint32_t decalBatchCount{ 0 };
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
     size_t   graveyardCount{ 0 };
@@ -221,24 +254,6 @@ public:
     /// 그려 커버리지가 달라지는지 본다 — 상수가 안 닿으면 두 결과가 같다.
     bool RunSceneBindingTest(std::string& outLog);
 
-    /// DX11과의 픽셀 대조 (PHASE 3-6).
-    ///
-    /// ── 무엇을 대조하는가 ──
-    ///
-    /// 색이 아니라 커버리지다. 어느 픽셀이 그려졌는가를 본다.
-    ///
-    /// 색을 맞추려면 셰이더가 같아야 하는데 DX12 GBuffer 셰이더는 새로 썼다.
-    /// 재질 파이프라인도 다르다. 그 상태에서 색을 대조하면 '다르다'는 결과만
-    /// 나오고 그것이 이식 실수인지 의도한 차이인지 구분할 수 없다.
-    ///
-    /// 커버리지는 셰이더와 무관하다. 기하·월드 변환·뷰 투영·컬링·깊이 테스트가
-    /// 정한다 — 이식에서 틀리기 쉬운 것이 정확히 그것들이다. 여기가 어긋나면
-    /// 색은 볼 필요도 없고, 여기가 맞으면 다음 단계로 색을 볼 자격이 생긴다.
-    ///
-    /// 입력은 이미 같다. DX11 GBufferPass와 이 검증 모두 같은 카메라의
-    /// RenderPassData에서 스냅샷과 deferredQueue를 읽는다. 남은 변수는
-    /// 해상도뿐이라, DX11 GBuffer 텍스처 크기에 맞춰 DX12를 그린다.
-    ///
     /// LEGACY DEAD DIAGNOSTIC. SceneRenderer 단독 운용 제거 뒤 호출 지점이
     /// 없으며 콘솔에서도 차단한다. 과거 이관 근거 보존용이다.
     bool RunPixelCompareTest(std::string& outLog);
@@ -428,11 +443,6 @@ public:
     bool RunIBLTest(std::string& outLog);
 
     /// LEGACY DEAD DIAGNOSTIC: 엔진 스카이박스 텍스처의 DX12 운반 검증.
-    ///
-    /// 살아 있는 SceneRenderer의 큐브맵을 텍스처 캐시로 나르고(Entry의
-    /// isCube·arraySize가 이번 확장의 본체), 실물로 3방향을 그리고,
-    /// equirect 원본이 있으면 IBL 생성 체인까지 태웠다. SceneRenderer 제거 뒤
-    /// 호출 지점이 없으며 콘솔에서도 차단한다. 새 경로는 dx12.ibl + PIX로 본다.
     bool RunSkySceneTest(std::string& outLog);
 
     /// IBL 앰비언트 소비 검증 (PHASE 3-6).

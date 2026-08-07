@@ -62,7 +62,18 @@ public:
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetTuning(const Tuning& tuning) { m_tuning = tuning; }
+    const Tuning& GetTuning() const { return m_tuning; }
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
+
+    /// 꺼져 있으면 아무것도 선언하지 않고 GetOutput()이 입력을 그대로
+    /// 돌려준다 — 뒤 패스가 분기 없이 이어진다(SSR과 같은 규약).
+    ///
+    /// 기본이 켜짐인 것은 DX11 기본값(isOn = true)과 자가 검증 때문이다.
+    /// 라이브 배선은 여기 기본값을 쓰지 않고 저작이 고른 값을 넣는다 —
+    /// 이 패스는 재질 마스크 없이 화면 전체를 번지게 하므로 켜고 끄는 것이
+    /// 모든 씬의 그림을 바꾼다(포그와 같은 부류라 같은 처리를 한다).
+    void SetEnabled(bool enabled) { m_enabled = enabled; }
+    bool IsEnabled() const { return m_enabled; }
 
     /// 최종 결과(세로 블러까지 끝난 것).
     RGHandle GetOutput() const { return m_output; }
@@ -80,6 +91,7 @@ private:
     RGHandle m_output;
     RGHandle m_horizontal;
     bool     m_keepAlive{ false };
+    bool     m_enabled{ true };
 
     // 프레임 밀봉 값(3-2). Record가 스냅샷을 다시 읽지 않는다.
     float m_cameraFov{ 0.f };

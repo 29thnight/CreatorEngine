@@ -84,6 +84,15 @@ EnhancedRenderDebugWindow::EnhancedRenderDebugWindow()
 				displayed.drawCount, displayed.batchCount);
 			LabeledValue("GBuffer", buffer, 0u == displayed.drawCount ? kWarnColor : kOkColor);
 
+			// 데칼은 없는 씬이 정상이라 0을 경고로 칠하지 않는다. 볼 것은
+			// 둘의 관계다 — 데칼이 있는데 배치가 0이면 텍스처 운반이 실패한
+			// 것이고, 그건 화면만 봐서는 '데칼이 원래 없나'와 구분되지 않는다.
+			std::snprintf(buffer, sizeof(buffer), "%u decals / %u batches",
+				displayed.decalCount, displayed.decalBatchCount);
+			LabeledValue("Decal", buffer,
+				(0u != displayed.decalCount && 0u == displayed.decalBatchCount)
+					? kWarnColor : kDimColor);
+
 			std::snprintf(buffer, sizeof(buffer), "%llu rendered / %llu idle / %llu in-flight skip",
 				static_cast<unsigned long long>(displayed.framesRendered),
 				static_cast<unsigned long long>(displayed.framesIdle),
@@ -257,6 +266,40 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		changed |= ImGui::SliderFloat("Composite depth sigma##ssgi",
 			&ssgi.compositeDepthSigma, 0.0001f, 1.f, "%.4f");
 		changed |= ImGui::SliderFloat("Intensity##ssgi", &ssgi.intensity, 0.f, 4.f);
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("SSS"))
+	{
+		EnhancedLiveTuning::Sss& sss = m_editing.sss;
+
+		changed |= ImGui::Checkbox("Enabled##sss", &sss.enabled);
+		// 재질 마스크가 없다 — 켜면 화면 전체가 번진다. DX11도 그랬고
+		// 그것이 기본을 꺼짐으로 둔 이유다. 옆에 적어 두지 않으면
+		// "왜 켜니까 전체가 뿌옇지"를 나중에 다시 쫓게 된다.
+		ImGui::SameLine();
+		ImGui::TextColored(kDimColor, "(no material mask: blurs the whole screen)");
+
+		changed |= ImGui::SliderFloat("Strength##sss", &sss.strength, 0.f, 4.f);
+		changed |= ImGui::SliderFloat("Width##sss", &sss.width, 0.f, 0.1f, "%.4f");
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("SSR"))
+	{
+		EnhancedLiveTuning::Ssr& ssr = m_editing.ssr;
+
+		changed |= ImGui::Checkbox("Enabled##ssr", &ssr.enabled);
+		// DX11에서 넘어온 잔물결이다(패스 헤더의 발견 ①~④): 히스토리가
+		// 죽어 있어 프레임마다 반사가 흔들리고, 거칠기와 가장자리 페이드가
+		// 계산만 되고 쓰이지 않는다. 기준선 보존이라 그대로 옮겼다.
+		ImGui::SameLine();
+		ImGui::TextColored(kDimColor, "(DX11 parity: temporal off, roughness ignored)");
+
+		changed |= ImGui::SliderFloat("Step size##ssr", &ssr.stepSize, 0.001f, 1.f, "%.3f");
+		changed |= ImGui::SliderFloat("Max thickness##ssr",
+			&ssr.maxThickness, 0.0001f, 0.1f, "%.5f");
+		changed |= ImGui::SliderInt("Max ray count##ssr", &ssr.maxRayCount, 1, 128);
 		ImGui::TreePop();
 	}
 

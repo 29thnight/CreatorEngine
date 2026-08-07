@@ -268,6 +268,15 @@ bool EnhancedSSSPass::PrepareFrame(const EnhancedFrameContext& context, std::str
 
 void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    // 꺼져 있으면 입력을 그대로 흘린다. 뒤 패스가 '켜졌나'를 따지지 않고
+    // GetOutput()만 이으면 되도록 — SSR과 같은 규약이다.
+    if (!m_enabled)
+    {
+        m_horizontal = RGHandle{};
+        m_output = m_inputs.color;
+        return;
+    }
+
     m_output = RGHandle{};
     m_horizontal = RGHandle{};
 
