@@ -46,6 +46,10 @@ namespace
     // DX12 커맨드 스트림에 원시 이벤트 payload를 쓰지 않는 정식 캡처 경계다.
     Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> g_pixGraphicsAnalysis;
 
+    // camera.editor follow 의 상태. 게임 스레드(App 프레임 경계와 CLI Pump)
+    // 에서만 만지므로 원자성이 필요 없다 — 둘 다 같은 스레드다.
+    bool g_editorCameraFollowsGame = false;
+
     // 앞뒤 공백 제거
     std::string TrimLine(const std::string& s)
     {
@@ -1700,6 +1704,58 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
     }
+    else if (cmd == "camera.editor")
+    {
+        // camera.editor match|follow on|follow off|status
+        //
+        // 씬 뷰와 게임 뷰가 서로 다른 시점이면 두 그림의 차이가 시점 탓인지
+        // 렌더 탓인지 갈리지 않는다. 시점을 통일해 두면 남는 차이가 곧
+        // 렌더 경로의 차이다.
+        const std::string action = (parts.size() >= 2) ? parts[1] : "status";
+
+        if (action == "match")
+        {
+            if (MatchEditorCameraToGameCamera())
+            {
+                std::printf("[CLI] camera.editor match — 게임 카메라 자세로 맞춤\n");
+            }
+            else
+            {
+                std::printf("[CLI] camera.editor match 실패: 게임 카메라가 없다\n");
+            }
+        }
+        else if (action == "follow")
+        {
+            const std::string mode = (parts.size() >= 3) ? parts[2] : "on";
+            g_editorCameraFollowsGame = (mode != "off" && mode != "0");
+            // 켤 때 한 번 맞춰 둔다 — 다음 프레임을 기다리지 않고 바로 보인다.
+            if (g_editorCameraFollowsGame) MatchEditorCameraToGameCamera();
+            std::printf("[CLI] camera.editor follow %s\n",
+                g_editorCameraFollowsGame ? "on" : "off");
+        }
+        else
+        {
+            const Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera();
+            const auto gameCamera = CameraManagement->GetLastCamera();
+
+            const auto describe = [](const char* label, const Camera* camera)
+            {
+                if (nullptr == camera) { std::printf("  %s: 없음\n", label); return; }
+                Mathf::Vector3 eye{}, forward{};
+                XMStoreFloat3(&eye, camera->m_eyePosition);
+                XMStoreFloat3(&forward, camera->m_forward);
+                std::printf("  %s: index %d · pos(%.3f %.3f %.3f)"
+                    " · forward(%.3f %.3f %.3f) · fov %.1f\n",
+                    label, camera->m_cameraIndex, eye.x, eye.y, eye.z,
+                    forward.x, forward.y, forward.z, camera->m_fov);
+            };
+
+            std::printf("[CLI] camera.editor status (follow %s)\n",
+                g_editorCameraFollowsGame ? "on" : "off");
+            describe("에디터", editorCamera);
+            describe("게임  ", gameCamera.get());
+        }
+    }
     else if (cmd == "render.backend")
     {
         const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
@@ -2685,6 +2741,51 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     }
 }
 
+bool ConsoleCommandSystem::IsEditorCameraFollowing() noexcept
+{
+    return g_editorCameraFollowsGame;
+}
+
+bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
+{
+    Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera();
+    const auto gameCamera = CameraManagement->GetLastCamera();
+    if (nullptr == editorCamera || !gameCamera || gameCamera.get() == editorCamera)
+    {
+        return false;
+    }
+
+    editorCamera->m_eyePosition = gameCamera->m_eyePosition;
+    editorCamera->m_forward = gameCamera->m_forward;
+    editorCamera->m_up = gameCamera->m_up;
+    editorCamera->m_right = gameCamera->m_right;
+    editorCamera->m_lookAt = gameCamera->m_lookAt;
+    editorCamera->rotate = gameCamera->rotate;
+
+    // 투영도 맞춘다. 시점만 같고 화각이 다르면 두 그림이 여전히 안 겹쳐
+    // 대조가 성립하지 않는다.
+    editorCamera->m_fov = gameCamera->m_fov;
+    editorCamera->m_nearPlane = gameCamera->m_nearPlane;
+    editorCamera->m_farPlane = gameCamera->m_farPlane;
+    editorCamera->m_isOrthographic = gameCamera->m_isOrthographic;
+
+    // ★ HandleMovement의 누적 각도까지 되돌린다.
+    //
+    //   그러지 않으면 다음에 우클릭하는 순간 카메라가 옛 자세로 튄다 —
+    //   forward는 우클릭 중에만 deltaYaw/deltaPitch에서 다시 만들어지므로
+    //   여기서 넣은 값이 그때 통째로 버려진다.
+    //
+    //   HandleMovement의 조립(qYaw 뒤 그 축의 qPitch)을 역으로 푼 것이다:
+    //     forward = (sin(yaw)cos(pitch), -sin(pitch), cos(yaw)cos(pitch))
+    {
+        Mathf::Vector3 forward{};
+        XMStoreFloat3(&forward, XMVector3Normalize(editorCamera->m_forward));
+        editorCamera->deltaYaw = std::atan2(forward.x, forward.z);
+        editorCamera->deltaPitch = -std::asin(std::clamp(forward.y, -1.f, 1.f));
+    }
+    return true;
+}
+
 void ConsoleCommandSystem::PrintHelp() const
 {
     std::printf(
@@ -2701,6 +2802,7 @@ void ConsoleCommandSystem::PrintHelp() const
         "  object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]  변환을 지정한다(회전은 도)\n"
         "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
+        "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
         "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"

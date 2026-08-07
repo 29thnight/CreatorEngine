@@ -144,6 +144,13 @@ void Core::App::Run()
 		// 재생 여부와 무관하게 에디터·게임 카메라를 둘 다 넘긴다 — 그래야
 		// 재생 전에도 게임뷰가 그려지고, 재생 중에도 씬뷰가 죽지 않는다.
 		// 카메라별 표시 슬롯은 TickLive 쪽이 관리한다(MultiCameraRenderPlan.md).
+		// camera.editor follow on — 두 뷰의 시점을 통일해 두는 대조 실험용.
+		// 카메라 목록을 만들기 전에 적용해야 이번 프레임 밀봉에 반영된다.
+		if (ConsoleCommandSystem::IsEditorCameraFollowing())
+		{
+			ConsoleCommandSystem::MatchEditorCameraToGameCamera();
+		}
+
 		Camera* cameras[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
 		uint32_t cameraCount = 0;
 		if (Camera* editorCamera = EnhancedSceneRenderer::GetEditorCamera())

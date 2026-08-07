@@ -40,6 +40,16 @@ public:
     // 외부에서 명령을 밀어 넣는다(스레드 안전).
     void Enqueue(std::string command);
 
+    /// 에디터 카메라를 게임 카메라와 같은 자세로 맞춘다(camera.editor match).
+    /// 두 뷰의 시점을 통일해야 성립하는 대조 실험이 있어서 명령으로 뺐다 —
+    /// 마우스로 맞추면 근사치라 "차이가 시점 탓인가 렌더 탓인가"를 못 가른다.
+    /// 게임 카메라가 없으면 false.
+    static bool MatchEditorCameraToGameCamera();
+
+    /// camera.editor follow on 이 켜져 있으면 매 프레임 위를 다시 부른다.
+    /// 게임 스레드의 프레임 경계(App)에서만 읽는다.
+    static bool IsEditorCameraFollowing() noexcept;
+
 private:
     ConsoleCommandSystem() = default;
     ~ConsoleCommandSystem() = default;
