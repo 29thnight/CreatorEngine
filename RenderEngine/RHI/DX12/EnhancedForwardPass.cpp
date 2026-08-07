@@ -288,12 +288,20 @@ TextureCube gIrradiance  : register(t8);
 TextureCube gPrefiltered : register(t9);
 Texture2D   gBrdfLut     : register(t10);
 
+// 캐스케이드 그림자 맵. Deferred가 t5로 읽는 것과 같은 자원이다.
+Texture2DArray gShadowMap : register(t11);
+
 // 생성기(EnhancedIBLGenerator::kPrefilterMips)와 같아야 한다.
 #define IBL_PREFILTER_MIPS 6
+
+// EnhancedRenderPass.h의 kShadowCascadeCount와 같아야 한다.
+#define SHADOW_CASCADE_COUNT 3
 
 SamplerState gSampler    : register(s0);
 // IBL용 선형 클램프. 거칠기가 밉 좌표라 포인트로 읽으면 단차가 띠로 보인다.
 SamplerState gIblSampler : register(s1);
+// 그림자 비교 샘플러. 하드웨어가 이웃 텍셀 넷을 비교·평균해 준다(2x2 PCF).
+SamplerComparisonState gShadowSampler : register(s2);
 
 cbuffer ShadeParams : register(b0)
 {
@@ -304,7 +312,68 @@ cbuffer ShadeParams : register(b0)
     float4   gEyePosition;   // xyz — 시선 방향의 기준
     uint     gHasIbl;
     uint3    gPad1;
+
+    // ── 그림자 (Deferred의 LightingConstants와 같은 뜻) ──
+    float4x4 gLightViewProjection[SHADOW_CASCADE_COUNT];
+    float4   gCameraForward;    // 뷰 깊이를 재는 축
+    float4   gCascadeSplits;    // xyz = 각 캐스케이드가 끝나는 뷰 깊이
+    float4   gShadowBias;       // xyz = 캐스케이드별 편향 · w = 경사 계수
+    uint     gHasShadow;
+    float    gCascadeBlendBand; // 경계 블렌딩 폭 · 0이면 하드 스위치
+    uint2    gPad2;
 };
+
+// ── 캐스케이드 그림자 (EnhancedDeferredPass와 같은 식) ──
+//
+// 두 함수 모두 Deferred에서 그대로 가져왔다. GGX 삼총사와 같은 사정이라
+// 같은 주의가 붙는다: 값이 갈리면 같은 자리에서 불투명은 그늘인데 투명만
+// 밝은, 물체와 무관한 경계가 생긴다 — 고칠 때는 두 곳을 함께 고칠 것.
+float SampleShadowCascade(uint cascade, float3 worldPosition, float slopeTan)
+{
+    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection[cascade]);
+    const float3 projected = lightSpace.xyz / lightSpace.w;
+
+    // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
+    // 검은 띠가 생기므로 빛을 받는 것으로 둔다.
+    if (any(abs(projected.xy) > 1.0f) || projected.z > 1.0f) return 1.0f;
+
+    const float2 uv = float2(projected.x * 0.5f + 0.5f, 0.5f - projected.y * 0.5f);
+    const float bias = gShadowBias[cascade] * (1.0f + gShadowBias.w * slopeTan);
+
+    return gShadowMap.SampleCmpLevelZero(gShadowSampler,
+        float3(uv, (float)cascade), projected.z - bias);
+}
+
+// 방향광 캐스케이드 그림자. 반환값 1은 빛을 받음, 0은 가려짐.
+float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
+{
+    if (gHasShadow == 0) return 1.0f;
+
+    const float viewDepth = dot(worldPosition - gEyePosition.xyz, gCameraForward.xyz);
+
+    uint cascade = 0;
+    if (viewDepth > gCascadeSplits.x) cascade = 1;
+    if (viewDepth > gCascadeSplits.y) cascade = 2;
+
+    const float ndotl = saturate(dot(normal, toLight));
+    const float slopeTan = min(sqrt(max(1.0f - ndotl * ndotl, 0.0f)) / max(ndotl, 1e-3f), 8.0f);
+
+    float shadow = SampleShadowCascade(cascade, worldPosition, slopeTan);
+
+    if (gCascadeBlendBand > 0.0f && cascade < SHADOW_CASCADE_COUNT - 1)
+    {
+        const float split = (cascade == 0) ? gCascadeSplits.x : gCascadeSplits.y;
+        const float bandStart = split * (1.0f - gCascadeBlendBand);
+        if (viewDepth > bandStart)
+        {
+            const float blend = saturate((viewDepth - bandStart) / max(split - bandStart, 1e-4f));
+            shadow = lerp(shadow,
+                SampleShadowCascade(cascade + 1, worldPosition, slopeTan), blend);
+        }
+    }
+
+    return shadow;
+}
 
 VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
@@ -391,6 +460,11 @@ float3 Contribute(uint lightIndex, Surface surface)
         //   -position이 아래를 가리켜 온 세상이 밑에서만 조명받는다.
         //   투명을 배선하고 나서야 눈에 보였다(그 전에는 소비자가 없었다).
         toLight = -normalize(direction.xyz);
+
+        // 그림자는 방향광에만 붙는다 — Deferred가 같다(점광·스포트는
+        // 그림자 맵 자체가 없다). gHasShadow가 0이면 1이 나오므로 그림자
+        // 없는 경로(자가 검증)는 이 줄이 있어도 값이 그대로다.
+        falloff = SampleShadow(surface.worldPos, surface.normal, toLight);
     }
     else
     {
@@ -581,10 +655,19 @@ float4 PSMain(VSOut input) : SV_TARGET
         Mathf::Vector4 eyePosition{};
         uint32_t       hasIbl{ 0 };
         uint32_t       pad1[3]{};
+
+        // 그림자. Deferred의 LightingConstants와 같은 값을 같은 뜻으로 싣는다.
+        Mathf::Matrix  lightViewProjection[kShadowCascadeCount]{};
+        Mathf::Vector4 cameraForward{};
+        Mathf::Vector4 cascadeSplits{};
+        Mathf::Vector4 shadowBias{};
+        uint32_t       hasShadow{ 0 };
+        float          cascadeBlendBand{ 0.f };
+        uint32_t       pad2[2]{};
     };
     // ShadeInstance와 같은 이유의 가드. cbuffer는 16바이트 경계·논스트래들
     // 규칙이라 뒤에 필드를 더할 때 이 수도 함께 고쳐야 한다.
-    static_assert(sizeof(ShadeParams) == 112,
+    static_assert(sizeof(ShadeParams) == 368,
         "HLSL ShadeParams와 cbuffer 보폭이 어긋났다");
 
     struct CullParams
@@ -716,14 +799,18 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     materialRange.NumDescriptors = 4;      // baseColor · normal · ORM · emissive
     materialRange.BaseShaderRegister = 4;  // t4~t7
 
-    D3D12_DESCRIPTOR_RANGE iblRange{};
-    iblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    iblRange.NumDescriptors = 3;           // 조도 · 프리필터 · BRDF LUT
-    iblRange.BaseShaderRegister = 8;       // t8~t10
+    // 프레임 내내 같은 텍스처들 — IBL 셋과 그림자 맵. 드로우마다 바뀌는
+    // 재질과 달리 한 번만 걸면 되므로 한 테이블에 묶는다. 차원이 섞여 있지만
+    // (TextureCube · Texture2D · Texture2DArray) SRV 범위는 그것을 가리지
+    // 않는다 — Deferred도 아홉을 한 범위로 묶는다.
+    D3D12_DESCRIPTOR_RANGE frameTextureRange{};
+    frameTextureRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    frameTextureRange.NumDescriptors = 4;  // 조도 · 프리필터 · BRDF LUT · 그림자
+    frameTextureRange.BaseShaderRegister = 8;   // t8~t11
 
     D3D12_DESCRIPTOR_RANGE samplerRange{};
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 2;       // 재질 · IBL
+    samplerRange.NumDescriptors = 3;       // 재질 · IBL · 그림자 비교
 
     D3D12_ROOT_PARAMETER shadeParams[8]{};
     shadeParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -742,7 +829,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     shadeParams[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     shadeParams[6].DescriptorTable.NumDescriptorRanges = 1;
-    shadeParams[6].DescriptorTable.pDescriptorRanges = &iblRange;
+    shadeParams[6].DescriptorTable.pDescriptorRanges = &frameTextureRange;
     shadeParams[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     shadeParams[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -762,7 +849,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다(Deferred와 같은 이유).
     {
-        D3D12_SAMPLER_DESC samplers[2]{};
+        D3D12_SAMPLER_DESC samplers[3]{};
 
         // 재질용. GBuffer와 같은 설정(선형 · WRAP)이라 같은 UV가 같은 텍셀을
         // 집는다 — 다르면 불투명과 투명이 같은 재질에서 갈린다.
@@ -780,7 +867,20 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
         samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
 
-        m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 2);
+        // 그림자 비교 샘플러. Deferred와 같은 설정이라야 같은 자리에서 두
+        // 경로가 같은 그늘을 낸다 — 경계 색 1은 '맵 밖은 빛을 받음'이다.
+        samplers[2].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        samplers[2].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        samplers[2].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        samplers[2].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        samplers[2].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        samplers[2].BorderColor[0] = 1.f;
+        samplers[2].BorderColor[1] = 1.f;
+        samplers[2].BorderColor[2] = 1.f;
+        samplers[2].BorderColor[3] = 1.f;
+        samplers[2].MaxLOD = D3D12_FLOAT32_MAX;
+
+        m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 3);
         if (0 == m_sampler.ptr)
         {
             outError = "Forward+ 샘플러 생성 실패";
@@ -1163,10 +1263,21 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     // 않는다. DepthRead로 낮추려면 DSV를 READ_ONLY_DEPTH로 만들어야 하는데
     // (RGResourceState의 계약), 자가 검증까지 함께 바뀌므로 그대로 둔다 —
     // DEPTH_WRITE는 상위 상태라 읽기만 하는 것에 문제가 없다.
-    graph.AddPass("Forward+.Shade",
-        { { m_output, RGResourceState::RenderTarget },
-          { m_inputs.depth, RGResourceState::DepthWrite } },
-        [this, &context, drawsOntoLighting](const EnhancedRenderGraph::ExecuteContext& executeContext)
+    // 그림자 맵은 있을 때만 선언한다. 없는데 선언하면 그래프가 무효 핸들을
+    // 전이 대상으로 삼고, 자가 검증 경로는 애초에 그림자 패스가 없다.
+    std::vector<EnhancedRenderGraph::RGPassUsage> shadeUsages = {
+        { m_output, RGResourceState::RenderTarget },
+        { m_inputs.depth, RGResourceState::DepthWrite },
+    };
+    const bool hasShadowMap = m_shadowMap.IsValid();
+    if (hasShadowMap)
+    {
+        shadeUsages.push_back({ m_shadowMap, RGResourceState::ShaderResource });
+    }
+
+    graph.AddPass("Forward+.Shade", shadeUsages,
+        [this, &context, drawsOntoLighting, hasShadowMap](
+            const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             auto* commandList = executeContext.commandList;
             auto* device = context.resources->GetDevice();
@@ -1208,7 +1319,8 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             }
 
             const bool drew = RecordShading(commandList, context,
-                m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount);
+                m_useReferencePath ? m_referencePSO : m_shadePSO, lightCount,
+                hasShadowMap ? executeContext.Resolve(m_shadowMap) : nullptr);
             (void)drew;
 
             // UAV로 돌려놓는다. '그래프가 끝나면 타일 버퍼는 UAV'라는 불변을
@@ -1242,7 +1354,8 @@ void EnhancedForwardPass::TransitionTileBuffers(ID3D12GraphicsCommandList* comma
 // 가지려면 PSO 말고는 아무것도 달라선 안 된다. 같은 것을 두 곳에서 따로
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
 bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
-    const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount)
+    const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
+    ID3D12Resource* shadowResource)
 {
     if (nullptr == pso || nullptr == context.forwardDraws ||
         context.forwardDraws->empty()) return false;
@@ -1303,6 +1416,23 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         && (nullptr != m_iblPrefiltered) && (nullptr != m_iblBrdfLut);
     params.hasIbl = hasIbl ? 1u : 0u;
 
+    // 그림자. 자원이 없으면 데이터가 있어도 끈다 — 셰이더가 널 SRV를 읽어
+    // 0을 얻으면 온 세상이 그늘이 된다.
+    const bool hasShadow = m_shadowData.enabled && (nullptr != shadowResource);
+    if (hasShadow)
+    {
+        for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
+        {
+            params.lightViewProjection[i] =
+                XMMatrixTranspose(m_shadowData.lightViewProjection[i]);
+        }
+        params.cameraForward = m_shadowData.cameraForward;
+        params.cascadeSplits = m_shadowData.splitDepths;
+        params.shadowBias = m_shadowData.bias;
+        params.cascadeBlendBand = m_shadowData.cascadeBlendBand;
+    }
+    params.hasShadow = hasShadow ? 1u : 0u;
+
     const auto cb = uploadRing.Allocate(
         sizeof(ShadeParams), DX12UploadRing::kConstantBufferAlignment);
     if (!cb.IsValid()) return false;
@@ -1345,8 +1475,8 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         //   않은 채로 그린다 — 검증 레이어가 잡는 미초기화 루트 인자이고,
         //   실제 하드웨어에서는 쓰레기 디스크립터 주소를 읽는다.
         //   위의 링 할당들(광원·인스턴스·상수)과 같은 처리다.
-        const auto iblRange = descriptorRing.Allocate(3);
-        if (!iblRange.IsValid()) return false;
+        const auto frameRange = descriptorRing.Allocate(4);
+        if (!frameRange.IsValid()) return false;
         {
             D3D12_SHADER_RESOURCE_VIEW_DESC cubeSrv{};
             cubeSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -1354,11 +1484,11 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
             cubeSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
             cubeSrv.TextureCube.MipLevels = 1;
             device->CreateShaderResourceView(
-                hasIbl ? m_iblIrradiance : nullptr, &cubeSrv, iblRange.CpuAt(0));
+                hasIbl ? m_iblIrradiance : nullptr, &cubeSrv, frameRange.CpuAt(0));
 
             cubeSrv.TextureCube.MipLevels = hasIbl ? m_iblPrefilterMips : 1;
             device->CreateShaderResourceView(
-                hasIbl ? m_iblPrefiltered : nullptr, &cubeSrv, iblRange.CpuAt(1));
+                hasIbl ? m_iblPrefiltered : nullptr, &cubeSrv, frameRange.CpuAt(1));
 
             D3D12_SHADER_RESOURCE_VIEW_DESC lutSrv{};
             lutSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -1366,9 +1496,20 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
             lutSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
             lutSrv.Texture2D.MipLevels = 1;
             device->CreateShaderResourceView(
-                hasIbl ? m_iblBrdfLut : nullptr, &lutSrv, iblRange.CpuAt(2));
+                hasIbl ? m_iblBrdfLut : nullptr, &lutSrv, frameRange.CpuAt(2));
 
-            commandList->SetGraphicsRootDescriptorTable(6, iblRange.gpu);
+            // 그림자 맵. 깊이 배열이라 포맷과 차원을 둘 다 바꿔 봐야 한다
+            // (Deferred가 같은 설명으로 같은 자원을 읽는다).
+            D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrv{};
+            shadowSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            shadowSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+            shadowSrv.Format = DXGI_FORMAT_R32_FLOAT;
+            shadowSrv.Texture2DArray.MipLevels = 1;
+            shadowSrv.Texture2DArray.ArraySize = kShadowCascadeCount;
+            device->CreateShaderResourceView(
+                hasShadow ? shadowResource : nullptr, &shadowSrv, frameRange.CpuAt(3));
+
+            commandList->SetGraphicsRootDescriptorTable(6, frameRange.gpu);
         }
     }
 
@@ -1462,6 +1603,9 @@ void EnhancedForwardPass::Shutdown()
     m_iblPrefiltered = nullptr;
     m_iblBrdfLut = nullptr;
     m_iblPrefilterMips = 1;
+
+    m_shadowMap = RGHandle{};
+    m_shadowData = {};
 }
 
 // ── 자가 검증 ──

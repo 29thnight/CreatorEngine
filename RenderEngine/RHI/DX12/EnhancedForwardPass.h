@@ -145,6 +145,20 @@ public:
         m_iblBrdfLut = brdfLut;
     }
 
+    /// 캐스케이드 그림자. Deferred가 받는 것과 같은 자원·같은 구조를 넘겨야
+    /// 한다 — 한쪽만 그림자를 받으면 같은 자리에서 불투명은 그늘인데 투명만
+    /// 밝은, 물체와 무관한 경계가 생긴다. 안 넣으면 그림자 없이 돈다.
+    ///
+    /// ★ 받는 쪽만이다. 투명 기하는 그림자 맵에 그려지지 않으므로(그림자
+    ///   패스가 context.draws만 래스터한다) 자기 그림자도, 남에게 드리우는
+    ///   그림자도 없다. 유리에 필요한 것은 어차피 다른 계산이라 그 자리에
+    ///   불투명 캐스터를 밀어 넣는 것은 답이 아니다.
+    void SetShadow(RGHandle shadowMap, const EnhancedShadowData& data)
+    {
+        m_shadowMap = shadowMap;
+        m_shadowData = data;
+    }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -156,8 +170,12 @@ private:
 
     /// 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가
     /// 뜻을 가지려면 PSO 말고는 아무것도 달라선 안 된다.
+    /// shadowResource는 그래프가 푼 그림자 맵이다. 핸들이 아니라 포인터로
+    /// 받는 이유는 이 함수가 ExecuteContext를 안 보기 때문이다 — 자가 검증도
+    /// 같은 함수를 쓰고, 그쪽에는 그래프가 없다.
     bool RecordShading(ID3D12GraphicsCommandList* commandList,
-        const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount);
+        const EnhancedFrameContext& context, ID3D12PipelineState* pso, uint32_t lightCount,
+        ID3D12Resource* shadowResource);
 
     Inputs   m_inputs{};
     RGHandle m_output;
@@ -228,6 +246,9 @@ private:
     // 해시맵 대신 정렬 맵. 재질 종류는 프레임당 많아야 수십이고, 배열 키에
     // 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다(GBuffer와 같은 판단).
     std::map<MaterialKey, MaterialTextures> m_materialTextures;
+
+    RGHandle           m_shadowMap;
+    EnhancedShadowData m_shadowData{};
 
     // IBL 셋. Deferred와 같은 자원을 받는다 — 앰비언트가 두 경로에서
     // 갈리면 같은 재질이 투명일 때만 어둡게 보인다.
