@@ -9,6 +9,9 @@
 #include "meshoptimizer.h"
 #include "RigidBodyComponent.h"
 #include "MeshCollider.h"
+// Animator의 완전한 정의. DX11 패스들을 거쳐 전이적으로 딸려 오던 것이
+// 그 패스들과 함께 끊겼다 — 쓰는 쪽이 직접 include한다.
+#include "../ScriptBinder/Animator.h"
 
 #include <algorithm>
 #include <execution>

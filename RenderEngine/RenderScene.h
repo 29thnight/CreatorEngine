@@ -72,8 +72,6 @@ public:
 	void SetBuffers(ID3D11Buffer* modelBuffer);
 
 	void Update(float deltaSecond);
-	void ShadowStage(Camera& camera);
-	void CreateShadowCommandList(ID3D11DeviceContext* deferredContext, Camera& camera);
 	void UseModel();
 	void UseModel(ID3D11DeviceContext* deferredContext);
 	void UpdateModel(const Mathf::xMatrix& model);

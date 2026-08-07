@@ -1643,14 +1643,6 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         Debug->LogWarning("[dx12.ibl] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ibl %s\n", verdict.c_str());
     }
-    else if (cmd == "dx12.skyscene")
-    {
-        // 이 테스트는 SceneRenderer의 DX11 SkyBoxPass 결과를 가져오는 이관기
-        // 전용이었다. 메인 런타임에서 SceneRenderer를 제거한 뒤에는 호출 자체가
-        // 잘못된 계약이므로 실행하지 않는다. 독립 생성 체인은 dx12.ibl, 실제
-        // 씬 소비는 LiveSmoke/PIX로 검증한다.
-        std::printf("[CLI] dx12.skyscene — 레거시 이관 테스트라 비활성화됨; dx12.ibl과 PIX를 사용한다\n");
-    }
     else if (cmd == "dx12.sss")
     {
         // SSS 패스 검증(PHASE 3-6, 미구현 패스 이식 1차).
@@ -1837,13 +1829,6 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         std::printf("%s", log.c_str());
         Debug->LogWarning("[dx12.bench11] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.bench11 %s\n", verdict.c_str());
-    }
-    else if (cmd == "dx12.compare")
-    {
-        // SceneRenderer의 GBuffer를 읽는 마이그레이션 비교기는 더 이상 메인
-        // 런타임 계약이 아니다. 파일은 역사적 진단 코드로 남기되 실행 표면에서
-        // 차단해 SceneRenderer가 수동 명령으로 되살아나는 여지를 없앤다.
-        std::printf("[CLI] dx12.compare — 비활성화됨: SceneRenderer는 dead code다\n");
     }
     else if (cmd == "dx12.scene")
     {
@@ -2856,7 +2841,6 @@ void ConsoleCommandSystem::PrintHelp() const
         "  dx12.shadowquality   그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)\n"
         "  dx12.skybox          스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)\n"
         "  dx12.ibl             IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)\n"
-        "  dx12.skyscene        비활성 레거시 명령(SceneRenderer 이관 테스트)\n"
         "  dx12.iblshade        IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)\n"
         "  dx12.skinning        GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)\n"
         "  dx12.sss             SSS 패스 검증(번짐·축 분리·표면 추종·에너지)\n"

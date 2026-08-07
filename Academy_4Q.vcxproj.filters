@@ -71,9 +71,6 @@
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
       <Filter>Window\MenuBarWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineGUIWindow\RenderPassWindow.h">
-      <Filter>Window\RenderPassWindow</Filter>
-    </ClInclude>
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
       <Filter>Window\SceneViewWindow</Filter>
     </ClInclude>
@@ -147,9 +144,6 @@
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
       <Filter>Window\MenuBarWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp">
-      <Filter>Window\RenderPassWindow</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
       <Filter>Window\SceneViewWindow</Filter>

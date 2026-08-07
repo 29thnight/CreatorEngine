@@ -148,8 +148,6 @@ public:
 	ComPtr<ID3D11Buffer>	m_CascadeProjBuffer;
 };
 
-class SceneRenderer;
-class ShadowMapPass;
 class CameraContainer : public DLLCore::Singleton<CameraContainer>
 {
 private:
@@ -248,8 +246,6 @@ public:
 	Core::Delegate<void> m_recreateResourcesEvent{};
 
 private:
-	friend class SceneRenderer;
-	friend class ShadowMapPass;
 	std::vector<std::shared_ptr<Camera>> m_cameras;
 };
 

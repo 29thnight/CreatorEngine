@@ -1,4 +1,8 @@
 #include "UIRenderProxy.h"
+// MaxOreder(원문 오타 그대로)의 extern 선언이 여기 있다. 예전에는 DX11
+// UIPass.h를 거쳐 전이적으로 딸려 왔는데, 그 패스가 사라지면서 끊겼다 —
+// 쓰는 쪽이 직접 include하는 것이 원래 옳다.
+#include "../ScriptBinder/UIComponent.h"
 #include "RenderScene.h"
 #include "Texture.h"
 #include "ShaderSystem.h"

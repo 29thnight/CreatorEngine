@@ -56,24 +56,6 @@ void RenderScene::Update(float deltaSecond)
     m_LightController->m_lightCount = m_currentScene->UpdateLight(m_LightController->m_lightProperties);
 }
 
-void RenderScene::ShadowStage(Camera& camera)
-{
-	// 살아 있는 카메라가 아니라 프레임 밀봉된 위치를 쓴다(PHASE 3-2).
-	// 스냅샷이 아직 없으면(첫 프레임 등) 이 단계는 건너뛴다 — 예전에는
-	// 그 경우에도 카메라를 직접 읽어 게임 스레드와 값이 찢어질 수 있었다.
-	if (!RenderPassData::VaildCheck(&camera)) return;
-	auto renderData = RenderPassData::GetData(&camera);
-
-	m_LightController->SetEyePosition(renderData->GetFrameSnapshot().eyePosition);
-	m_LightController->Update();
-	m_LightController->RenderAnyShadowMap(*this, camera);
-}
-
-void RenderScene::CreateShadowCommandList(ID3D11DeviceContext* deferredContext, Camera& camera)
-{
-	m_LightController->CreateShadowCommandList(deferredContext, *this, camera);
-}
-
 void RenderScene::UseModel()
 {
 	DirectX11::VSSetConstantBuffer(0, 1, &m_ModelBuffer);

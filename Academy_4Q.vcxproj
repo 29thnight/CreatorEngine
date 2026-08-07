@@ -212,7 +212,6 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
-    <ClInclude Include="EngineGUIWindow\RenderPassWindow.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
   </ItemGroup>
@@ -253,7 +252,6 @@ xcopy /Y /D /Q "$(DotNetHostPackDir)nethost.dll" "$(OutDir)" &gt;nul</Command>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -2,13 +2,10 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 
-class RenderPassWindow;
 class RenderScene;
 class Camera;
 class GizmoRenderer
 {
-private:
-	friend class RenderPassWindow;
 public:
 	GizmoRenderer(RenderScene* renderScene, Camera* editorCamera);
 	~GizmoRenderer();

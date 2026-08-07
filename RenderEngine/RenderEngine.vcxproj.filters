@@ -350,92 +350,17 @@
     <ClCompile Include="DeviceState.cpp">
       <Filter>Renderer\DeviceState</Filter>
     </ClCompile>
-    <ClCompile Include="GBufferPass.cpp">
-      <Filter>RenderPass\GBufferPass</Filter>
-    </ClCompile>
-    <ClCompile Include="SSAOPass.cpp">
-      <Filter>RenderPass\SSAOPass</Filter>
-    </ClCompile>
-    <ClCompile Include="ShadowMapPass.cpp">
-      <Filter>RenderPass\ShadowMapPass</Filter>
-    </ClCompile>
-    <ClCompile Include="DeferredPass.cpp">
-      <Filter>RenderPass\DeferredPass</Filter>
-    </ClCompile>
-    <ClCompile Include="ToneMapPass.cpp">
-      <Filter>RenderPass\ToneMapPass</Filter>
-    </ClCompile>
-    <ClCompile Include="SkyBoxPass.cpp">
-      <Filter>RenderPass\SkyBoxPass</Filter>
-    </ClCompile>
-    <ClCompile Include="WireFramePass.cpp">
-      <Filter>RenderPass\WireFramePass</Filter>
-    </ClCompile>
-    <ClCompile Include="SpritePass.cpp">
-      <Filter>RenderPass\SpritePass</Filter>
-    </ClCompile>
-    <ClCompile Include="BlitPass.cpp">
-      <Filter>RenderPass\BlitPass</Filter>
-    </ClCompile>
-    <ClCompile Include="AAPass.cpp">
-      <Filter>RenderPass\AAPass</Filter>
-    </ClCompile>
-    <ClCompile Include="GridPass.cpp">
-      <Filter>RenderPass\GridPass</Filter>
-    </ClCompile>
-    <ClCompile Include="UIPass.cpp">
-      <Filter>RenderPass\UIPass</Filter>
-    </ClCompile>
-    <ClCompile Include="PostProcessingPass.cpp">
-      <Filter>RenderPass\PostProcessingPass</Filter>
-    </ClCompile>
-    <ClCompile Include="LightMap.cpp">
-      <Filter>LightMap\Calculate</Filter>
-    </ClCompile>
-    <ClCompile Include="PositionMapPass.cpp">
-      <Filter>LightMap\Calculate</Filter>
-    </ClCompile>
-    <ClCompile Include="LightMapPass.cpp">
-      <Filter>LightMap\Result</Filter>
-    </ClCompile>
-    <ClCompile Include="ForwardPass.cpp">
-      <Filter>RenderPass\ForwardPass</Filter>
-    </ClCompile>
     <ClCompile Include="ShaderSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="ScreenSpaceReflectionPass.cpp">
-      <Filter>RenderPass\PostProcessingPass\ScreenSpaceReflectionPass</Filter>
-    </ClCompile>
     <ClCompile Include="ImGuiRenderer.cpp">
       <Filter>Renderer\ImGuiRenderer</Filter>
-    </ClCompile>
-    <ClCompile Include="SceneRenderer.cpp">
-      <Filter>Renderer\SceneRenderer</Filter>
     </ClCompile>
     <ClCompile Include="GizmoRenderer.cpp">
       <Filter>Renderer\GizmoRenderer</Filter>
     </ClCompile>
     <ClCompile Include="LightController.cpp">
       <Filter>Resources\LightController</Filter>
-    </ClCompile>
-    <ClCompile Include="GizmoPass.cpp">
-      <Filter>RenderPass\GizmoPass</Filter>
-    </ClCompile>
-    <ClCompile Include="SubsurfaceScatteringPass.cpp">
-      <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
-    </ClCompile>
-    <ClCompile Include="GizmoLinePass.cpp">
-      <Filter>RenderPass\GizmoPass</Filter>
-    </ClCompile>
-    <ClCompile Include="VignettePass.cpp">
-      <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
-    </ClCompile>
-    <ClCompile Include="ColorGradingPass.cpp">
-      <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
-    </ClCompile>
-    <ClCompile Include="VolumetricFogPass.cpp">
-      <Filter>RenderPass\PostProcessingPass\VolumetricFogPass</Filter>
     </ClCompile>
     <ClCompile Include="CullingManager.cpp">
       <Filter>Asset\ManagerSystem</Filter>
@@ -446,17 +371,11 @@
     <ClCompile Include="Animation.cpp">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="SSGIPass.cpp">
-      <Filter>RenderPass\SSGIPass</Filter>
-    </ClCompile>
     <ClCompile Include="AnimationJob.cpp">
       <Filter>Asset\JobSystem\Animation</Filter>
     </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
-    </ClCompile>
-    <ClCompile Include="TerrainGizmoPass.cpp">
-      <Filter>RenderPass\GizmoPass</Filter>
     </ClCompile>
     <ClCompile Include="MeshRendererProxy.cpp">
       <Filter>Objects\MeshRendererProxy</Filter>
@@ -473,14 +392,8 @@
     <ClCompile Include="MeshOptimizer.cpp">
       <Filter>Asset\MeshOptimizer</Filter>
     </ClCompile>
-    <ClCompile Include="BitMaskPass.cpp">
-      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
-    </ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="DecalPass.cpp">
-      <Filter>RenderPass\DecalPass</Filter>
     </ClCompile>
     <ClCompile Include="RenderDebugManager.cpp">
       <Filter>DebugSystem</Filter>
@@ -499,9 +412,6 @@
     </ClCompile>
     <ClCompile Include="UIRenderProxy.cpp">
       <Filter>Objects\UIRenderProxy</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderGraphBuilder.cpp">
-      <Filter>Asset</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -571,56 +481,8 @@
     <ClInclude Include="DeviceState.h">
       <Filter>Renderer\DeviceState</Filter>
     </ClInclude>
-    <ClInclude Include="GBufferPass.h">
-      <Filter>RenderPass\GBufferPass</Filter>
-    </ClInclude>
-    <ClInclude Include="SSAOPass.h">
-      <Filter>RenderPass\SSAOPass</Filter>
-    </ClInclude>
-    <ClInclude Include="DeferredPass.h">
-      <Filter>RenderPass\DeferredPass</Filter>
-    </ClInclude>
-    <ClInclude Include="ShadowMapPass.h">
-      <Filter>RenderPass\ShadowMapPass</Filter>
-    </ClInclude>
-    <ClInclude Include="ForwardPass.h">
-      <Filter>RenderPass\ForwardPass</Filter>
-    </ClInclude>
-    <ClInclude Include="ToneMapPass.h">
-      <Filter>RenderPass\ToneMapPass</Filter>
-    </ClInclude>
-    <ClInclude Include="SkyBoxPass.h">
-      <Filter>RenderPass\SkyBoxPass</Filter>
-    </ClInclude>
-    <ClInclude Include="WireFramePass.h">
-      <Filter>RenderPass\WireFramePass</Filter>
-    </ClInclude>
-    <ClInclude Include="SpritePass.h">
-      <Filter>RenderPass\SpritePass</Filter>
-    </ClInclude>
-    <ClInclude Include="BlitPass.h">
-      <Filter>RenderPass\BlitPass</Filter>
-    </ClInclude>
-    <ClInclude Include="AAPass.h">
-      <Filter>RenderPass\AAPass</Filter>
-    </ClInclude>
-    <ClInclude Include="GridPass.h">
-      <Filter>RenderPass\GridPass</Filter>
-    </ClInclude>
-    <ClInclude Include="PostProcessingPass.h">
-      <Filter>RenderPass\PostProcessingPass</Filter>
-    </ClInclude>
     <ClInclude Include="cbuffers.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
-    </ClInclude>
-    <ClInclude Include="LightMap.h">
-      <Filter>LightMap\Calculate</Filter>
-    </ClInclude>
-    <ClInclude Include="PositionMapPass.h">
-      <Filter>LightMap\Calculate</Filter>
-    </ClInclude>
-    <ClInclude Include="LightMapPass.h">
-      <Filter>LightMap\Result</Filter>
     </ClInclude>
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
@@ -634,14 +496,8 @@
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
-    <ClInclude Include="ScreenSpaceReflectionPass.h">
-      <Filter>RenderPass\PostProcessingPass\ScreenSpaceReflectionPass</Filter>
-    </ClInclude>
     <ClInclude Include="ImGuiRenderer.h">
       <Filter>Renderer\ImGuiRenderer</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneRenderer.h">
-      <Filter>Renderer\SceneRenderer</Filter>
     </ClInclude>
     <ClInclude Include="RenderState.h">
       <Filter>Renderer\RenderState</Filter>
@@ -652,32 +508,14 @@
     <ClInclude Include="LightController.h">
       <Filter>Resources\LightController</Filter>
     </ClInclude>
-    <ClInclude Include="GizmoPass.h">
-      <Filter>RenderPass\GizmoPass</Filter>
-    </ClInclude>
-    <ClInclude Include="SubsurfaceScatteringPass.h">
-      <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
-    </ClInclude>
-    <ClInclude Include="GizmoLinePass.h">
-      <Filter>RenderPass\GizmoPass</Filter>
-    </ClInclude>
     <ClInclude Include="GizmoCbuffer.h">
       <Filter>RenderPass\GizmoPass\cbuffers</Filter>
     </ClInclude>
     <ClInclude Include="ProjectionType.h">
       <Filter>Objects</Filter>
     </ClInclude>
-    <ClInclude Include="VignettePass.h">
-      <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
-    </ClInclude>
-    <ClInclude Include="ColorGradingPass.h">
-      <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
-    </ClInclude>
     <ClInclude Include="Skeleton.h">
       <Filter>Resources\Skeleton</Filter>
-    </ClInclude>
-    <ClInclude Include="VolumetricFogPass.h">
-      <Filter>RenderPass\PostProcessingPass\VolumetricFogPass</Filter>
     </ClInclude>
     <ClInclude Include="CullingManager.h">
       <Filter>Asset\ManagerSystem</Filter>
@@ -691,17 +529,8 @@
     <ClInclude Include="AnimationJob.h">
       <Filter>Asset\JobSystem\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="RenderJob.h">
-      <Filter>Asset\JobSystem\RenderThread</Filter>
-    </ClInclude>
     <ClInclude Include="RenderPassData.h">
       <Filter>Resources\RenderPassData</Filter>
-    </ClInclude>
-    <ClInclude Include="SSGIPass.h">
-      <Filter>RenderPass\SSGIPass</Filter>
-    </ClInclude>
-    <ClInclude Include="TerrainGizmoPass.h">
-      <Filter>RenderPass\GizmoPass</Filter>
     </ClInclude>
     <ClInclude Include="ProxyCommandQueue.h">
       <Filter>ProxyCommandQueue</Filter>
@@ -726,9 +555,6 @@
     </ClInclude>
     <ClInclude Include="Socket.h">
       <Filter>Resources\Skeleton</Filter>
-    </ClInclude>
-    <ClInclude Include="BitMaskPass.h">
-      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
       <Filter>Asset\MeshOptimizer</Filter>
@@ -787,9 +613,6 @@
     <ClInclude Include="SubsurfaceScatteringPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
     </ClInclude>
-    <ClInclude Include="DecalPass.h">
-      <Filter>RenderPass\DecalPass</Filter>
-    </ClInclude>
     <ClInclude Include="RenderDebugManager.h">
       <Filter>DebugSystem</Filter>
     </ClInclude>
@@ -819,9 +642,6 @@
     </ClInclude>
     <ClInclude Include="BitMaskPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderGraphBuilder.h">
-      <Filter>Asset</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1250,9 +1070,6 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="UIPass.h">
-      <Filter>RenderPass\UIPass</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Dynamic_CPP\Assets\Shaders\ACES.hlsli">

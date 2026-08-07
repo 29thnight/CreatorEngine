@@ -254,9 +254,10 @@ public:
     /// 그려 커버리지가 달라지는지 본다 — 상수가 안 닿으면 두 결과가 같다.
     bool RunSceneBindingTest(std::string& outLog);
 
-    /// LEGACY DEAD DIAGNOSTIC. SceneRenderer 단독 운용 제거 뒤 호출 지점이
-    /// 없으며 콘솔에서도 차단한다. 과거 이관 근거 보존용이다.
-    bool RunPixelCompareTest(std::string& outLog);
+    // DX11과의 픽셀 대조(RunPixelCompareTest)는 DX11 SceneRenderer와 함께
+    // 제거했다. 그 검증은 DX11 GBuffer 텍스처를 읽는 것이 본체라 기준이
+    // 사라진 뒤로는 성립하지 않는다 — 이식이 끝났다는 뜻이기도 하다.
+    // 근거는 커밋 이력과 RendererPortingLog.html에 남는다.
 
     /// 크기 추종 검증 (해상도 슬라이스).
     ///
@@ -442,8 +443,9 @@ public:
     /// 원본의 톤 정책(로그 평균·NoL 이중 가중)에 묶여 있기 때문이다.
     bool RunIBLTest(std::string& outLog);
 
-    /// LEGACY DEAD DIAGNOSTIC: 엔진 스카이박스 텍스처의 DX12 운반 검증.
-    bool RunSkySceneTest(std::string& outLog);
+    // 엔진 스카이박스 운반 검증(RunSkySceneTest)도 함께 제거했다. 살아 있는
+    // SceneRenderer의 큐브맵을 가져오는 것이 본체였다. 독립 생성 체인은
+    // RunIBLTest가, 실제 씬 소비는 라이브 러너와 PIX가 본다.
 
     /// IBL 앰비언트 소비 검증 (PHASE 3-6).
     ///

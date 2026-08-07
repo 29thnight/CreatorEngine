@@ -17,7 +17,6 @@ enum class ModelLoadType
 
 class ModelLoader;
 class DataSystem;
-class SceneRenderer;
 class Model : public Managed::HeapObject,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Model>
 {
@@ -63,7 +62,6 @@ public:
 	bool							 m_isMakeMeshCollider{ false };
 
 private:
-	friend class SceneRenderer;
     friend class ModelLoader;
 	friend class DataSystem;
 

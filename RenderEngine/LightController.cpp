@@ -1,7 +1,6 @@
 #include "LightController.h"
 #include "DeviceState.h"
 #include "Camera.h"
-#include "ShadowMapPass.h"
 #include "RHI/DX11RHI.h"
 #include "Texture.h"
 
@@ -11,8 +10,6 @@ LightController::~LightController()
 	Memory::SafeDelete(m_pLightBuffer);
 	Memory::SafeDelete(m_pLightCountBuffer);
 	Memory::SafeDelete(m_shadowMapBuffer);
-
-	m_shadowMapPass.reset();
 }
 
 void LightController::Initialize()
@@ -47,8 +44,6 @@ void LightController::Initialize()
 
     DirectX::SetName(m_pLightCountBuffer, "Light Count Buffer");
 
-
-	m_shadowMapPass = std::make_unique<ShadowMapPass>();
 	hasLightWithShadows = false;
 }
 
@@ -153,48 +148,5 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	m_shadowMapRenderDesc = desc;
 	m_shadowMapBuffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, &m_shadowMapConstant);
 
-	m_shadowMapPass->Initialize(desc.m_textureWidth, desc.m_textureHeight);
 	hasLightWithShadows = true;
 }
-
-void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
-{
-	if (hasLightWithShadows && !camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::ShadowPass))
-	{
-		m_shadowMapPass->Execute(scene, camera);
-	}
-}
-
-void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
-{
-	if (hasLightWithShadows && !camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::ShadowPass))
-	{
-		DX11CommandContext rhiContext(deferredContext); // 백엔드 소유 코드 — 직접 생성이 정당하다(PHASE 3-1, 7차)
-		m_shadowMapPass->CreateRenderCommandList(rhiContext, scene, camera);
-	}
-}
-
-void LightController::UseCloudShadowMap(std::string_view filename)
-{
-	m_shadowMapPass->UseCloudShadowMap(filename);
-}
-
-void LightController::UpdateCloudBuffer(ID3D11DeviceContext* deferredContext)
-{
-	m_shadowMapPass->UpdateCloudBuffer(deferredContext, this);
-}
-
-void LightController::PSBindCloudShadowMap(ID3D11DeviceContext* deferredContext, bool isOn) 
-{
-	m_shadowMapPass->PSBindCloudShadowMap(deferredContext, this, isOn);
-}
-
-void LightController::CSBindCloudShadowMap(ID3D11DeviceContext* deferredContext, bool isOn)
-{
-	m_shadowMapPass->CSBindCloudShadowMap(deferredContext, this, isOn);
-}
-
-//Texture* LightController::GetShadowMapTexture()
-//{
-//	return m_shadowMapPass->m_shadowMapTexture.get();
-//}
