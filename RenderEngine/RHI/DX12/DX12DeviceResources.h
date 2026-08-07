@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "RenderFrameServices.h"
+#include "../IRHIDeviceResources.h"
 #include <cstdint>
 #include <string>
 #include <array>
@@ -24,7 +25,16 @@
 //   - 프레임 인플라이트: 얼로케이터 3개를 펜스로 회전(프레임당 하나, GPU가 그
 //     프레임을 끝냈음을 펜스로 확인한 뒤에만 Reset)
 //   - 리소스 상태: RT ↔ COPY_SOURCE 전이를 배리어로 직접 선언
-class DX12DeviceResources : public IRenderDeviceServices
+// 두 인터페이스를 함께 구현한다. 역할이 다르기 때문이다:
+//
+//   IRHIDeviceResources   앱·셸이 쓰는 디바이스 수명 · 프레임 경계 · 프레젠트.
+//                         백엔드 중립이고, Vulkan 구현이 들어올 자리다(D1).
+//   IRenderDeviceServices 패스가 프레임 안에서 쓰는 서비스(디바이스 핸들 · 링 ·
+//                         바인딩). 아직 DX12 타입을 노출하며 R2·R3에서 중립화된다.
+//
+// 한 클래스가 둘을 겸하는 것은 지금 이 객체가 실제로 둘 다이기 때문이다.
+// 쪼갤 근거가 생기면(예: 서비스만 가짜로 바꿔 패스를 검증할 때) 그때 나눈다.
+class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
 {
 public:
     static constexpr uint32_t kFrameCount = 3;
@@ -51,21 +61,21 @@ public:
     /// '따라가지 않음'으로 둔 것과 같은 이유다.
     bool Initialize(uint32_t width, uint32_t height, std::string& outError,
         LUID matchAdapterLuid = LUID{ 0, 0 }, bool followScreenSize = false);
-    void Shutdown();
+    void Shutdown() override;
 
     /// 창 크기가 바뀌었을 때 크기에 딸린 리소스를 다시 만든다.
     ///
     /// DX11 쪽 Texture와 같은 계약을 따른다(RHI/ScreenSizedResource.h). 교체
     /// 후 DX11 경로가 사라져도 크기 추종은 그대로 남아야 하므로, 버스는
     /// 백엔드 중립이고 이쪽은 그 구독자다.
-    bool Resize(uint32_t width, uint32_t height, std::string& outError);
+    bool Resize(uint32_t width, uint32_t height, std::string& outError) override;
 
-    bool IsInitialized() const { return nullptr != m_device.Get(); }
+    bool IsInitialized() const override { return nullptr != m_device.Get(); }
 
     // 이번 프레임의 얼로케이터를 준비하고(필요 시 펜스 대기) 커맨드 리스트를 연다.
-    bool BeginFrame(std::string& outError);
+    bool BeginFrame(std::string& outError) override;
     // 커맨드 리스트를 닫고 제출한 뒤 펜스 신호를 건다.
-    bool EndFrame(std::string& outError);
+    bool EndFrame(std::string& outError) override;
 
     /// 프레임 중간에 지금까지 기록한 것을 제출하고 리스트를 다시 연다.
     ///
@@ -75,15 +85,15 @@ public:
     ///
     /// 얼로케이터는 되돌리지 않는다 — GPU가 아직 그 메모리를 읽는 중이다.
     /// 리스트만 다시 여는 것은 제출 직후에도 허용된다.
-    bool FlushCommandList(std::string& outError);
+    bool FlushCommandList(std::string& outError) override;
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
-    void WaitForGpu();
+    void WaitForGpu() override;
 
     /// 마지막으로 EndFrame이 서명한 펜스 값. 상시 러너의 비동기 표시가
     /// '이 프레임이 끝났는가'를 논블로킹으로 물을 때 GetCompletedFenceValue와
     /// 짝으로 쓴다 — 완료 확인이 CPU 대기 없이 되므로 WaitForGpu가 필요 없다.
-    uint64_t GetLastSignaledFenceValue() const { return m_nextFenceValue - 1; }
-    uint64_t GetCompletedFenceValue() const
+    uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
+    uint64_t GetCompletedFenceValue() const override
     {
         return m_fence ? m_fence->GetCompletedValue() : 0;
     }
@@ -97,11 +107,12 @@ public:
     //
     // 백버퍼 상태 전이(PRESENT ↔ RENDER_TARGET)는 호출부 책임이다 —
     // 프레임 구조(어디서 그리고 어디서 제출하는가)를 여기가 모른다.
-    bool AttachSwapChain(HWND hwnd, uint32_t width, uint32_t height, std::string& outError);
-    bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError);
-    bool Present(std::string& outError);
-    bool HasSwapChain() const { return nullptr != m_swapChain.Get(); }
-    uint32_t GetBackBufferIndex() const;
+    bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
+        std::string& outError) override;
+    bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError) override;
+    bool Present(std::string& outError) override;
+    bool HasSwapChain() const override { return nullptr != m_swapChain.Get(); }
+    uint32_t GetBackBufferIndex() const override;
     ID3D12Resource* GetBackBuffer(uint32_t index) const
     {
         return (index < kFrameCount) ? m_backBuffers[index].Get() : nullptr;
@@ -114,7 +125,7 @@ public:
     // ("이 이름의 파이프라인이 없음")처럼 정상 경로가 남기는 안내가 여기 들어와서,
     // 전부 세면 캐시 미스라는 당연한 동작이 검증 실패로 둔갑한다(실측).
     // 대신 outMessages에는 등급을 붙여 전부 담는다 — 세지 않는 것과 감추는 것은 다르다.
-    uint32_t DrainDebugMessages(std::string& outMessages);
+    uint32_t DrainDebugMessages(std::string& outMessages) override;
 
     /// 장치 제거가 감지되었을 때 DRED breadcrumb와 page-fault 정보를 붙인다.
     /// operationResult가 일반 실패이고 장치는 살아 있으면 아무것도 추가하지 않는다.
@@ -128,8 +139,8 @@ public:
     ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }
     ID3D12Resource* GetReadbackBuffer() const { return m_readback.Get(); }
-    uint32_t GetWidth() const { return m_width; }
-    uint32_t GetHeight() const { return m_height; }
+    uint32_t GetWidth() const override { return m_width; }
+    uint32_t GetHeight() const override { return m_height; }
     uint32_t GetRowPitch() const { return m_rowPitch; }
 
     // 프레임 업로드 링. BeginFrame이 이 프레임 구간을 되감아 준다.

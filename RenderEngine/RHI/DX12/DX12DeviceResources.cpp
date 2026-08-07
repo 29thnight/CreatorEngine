@@ -599,9 +599,18 @@ void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult,
     outError += report.str();
 }
 
-bool DX12DeviceResources::AttachSwapChain(HWND hwnd, uint32_t width, uint32_t height,
+bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
     std::string& outError)
 {
+    // 인터페이스(IRHIDeviceResources)가 플랫폼 핸들을 void*로 받는다 —
+    // 그 헤더가 Windows.h를 끌어오지 않기 위해서다. Win32에서는 HWND다.
+    HWND hwnd = static_cast<HWND>(windowHandle);
+    if (nullptr == hwnd)
+    {
+        outError = "창 핸들이 없다";
+        return false;
+    }
+
     if (nullptr == m_device.Get() || nullptr == m_queue.Get())
     {
         outError = "스왑체인 부착 전에 Initialize가 필요하다";
