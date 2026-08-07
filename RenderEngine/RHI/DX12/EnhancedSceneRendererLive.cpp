@@ -1001,6 +1001,10 @@ namespace
                 p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
                 p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
                     EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
+                // 투명(Forward+)에도 같은 자원을 준다. 한쪽만 앰비언트를
+                // 받으면 같은 재질이 투명일 때만 어둡게 보인다.
+                p.forward.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
+                    EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
                 p.iblGenerated = true;
                 skyBoxDirty = false;
             }

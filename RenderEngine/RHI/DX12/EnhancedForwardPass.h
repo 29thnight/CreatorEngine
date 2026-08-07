@@ -1,10 +1,11 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
-#include <unordered_map>
+#include <map>
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
+#include "DX12TextureCache.h"
 
 // Forward+ 패스 (PHASE 3-6, 신규 작성).
 //
@@ -132,6 +133,18 @@ public:
     ID3D12PipelineState* GetReferencePSO() const { return m_referencePSO; }
     ID3D12RootSignature* GetShadeRootSignature() const { return m_shadeRootSignature; }
 
+    /// IBL 앰비언트. Deferred가 받는 것과 같은 자원을 넘겨야 한다 —
+    /// 한쪽만 앰비언트를 받으면 같은 재질이 투명일 때만 어둡게 보인다.
+    /// 널을 넘기면 앰비언트가 0이 된다(기존 동작).
+    void SetIBL(ID3D12Resource* irradiance, ID3D12Resource* prefiltered,
+        uint32_t prefilterMips, ID3D12Resource* brdfLut)
+    {
+        m_iblIrradiance = irradiance;
+        m_iblPrefiltered = prefiltered;
+        m_iblPrefilterMips = (0 == prefilterMips) ? 1u : prefilterMips;
+        m_iblBrdfLut = brdfLut;
+    }
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -188,14 +201,40 @@ private:
     // 그래프 실행 중에 부르면 기록 한가운데에 복사가 끼어든다
     // (GBuffer가 같은 이유로 PrepareFrame에서 올린다).
     //
-    // 키는 재질의 Texture* 동일성이다 — GBuffer의 MaterialKey와 같은 근거.
-    struct BaseColorTexture
+    // 키는 재질 텍스처 포인터 넷의 동일성이다 — GBuffer의 MaterialKey와
+    // 같은 근거이고, 메시가 아니라 재질로 키잉해야 같은 메시를 다른 재질로
+    // 두 번 그릴 때 두 번째가 첫 번째의 텍스처로 그려지지 않는다.
+    struct MaterialKey
     {
-        ID3D12Resource* resource{ nullptr };
-        DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
-        uint32_t        mipLevels{ 0 };
+        Texture* textures[4]{};   // baseColor · normal · ORM · emissive
+        Texture* operator[](size_t i) const { return textures[i]; }
+        bool operator<(const MaterialKey& other) const
+        {
+            for (size_t i = 0; i < 4; ++i)
+            {
+                if (textures[i] != other.textures[i]) return textures[i] < other.textures[i];
+            }
+            return false;
+        }
     };
-    std::unordered_map<const void*, BaseColorTexture> m_baseColorTextures;
+
+    struct MaterialTextures
+    {
+        ID3D12Resource* resources[4]{};
+        DXGI_FORMAT     formats[4]{};
+        uint32_t        mipLevels[4]{};
+    };
+
+    // 해시맵 대신 정렬 맵. 재질 종류는 프레임당 많아야 수십이고, 배열 키에
+    // 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다(GBuffer와 같은 판단).
+    std::map<MaterialKey, MaterialTextures> m_materialTextures;
+
+    // IBL 셋. Deferred와 같은 자원을 받는다 — 앰비언트가 두 경로에서
+    // 갈리면 같은 재질이 투명일 때만 어둡게 보인다.
+    ID3D12Resource* m_iblIrradiance{ nullptr };
+    ID3D12Resource* m_iblPrefiltered{ nullptr };
+    ID3D12Resource* m_iblBrdfLut{ nullptr };
+    uint32_t        m_iblPrefilterMips{ 1 };
 };
 
 #endif

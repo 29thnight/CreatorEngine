@@ -252,18 +252,23 @@ struct VSOut
     float3 worldPos  : TEXCOORD0;
     float3 normal    : TEXCOORD1;
     float2 uv        : TEXCOORD2;
+    float3 tangent   : TEXCOORD5;
+    float3 bitangent : TEXCOORD6;
     // 인스턴스마다 상수라 보간하지 않는다. 보간을 켜 두면 값은 같아도
     // 래스터라이저가 헛일을 한다.
     nointerpolation float4 baseColor : TEXCOORD3;
-    nointerpolation uint   hasBaseColorMap : TEXCOORD4;
+    // x 금속성 · y 거칠기 · z 노멀맵 · w 재질 텍스처가 묶였는가
+    nointerpolation float4 material  : TEXCOORD4;
 };
 
 struct ShadeInstance
 {
     float4x4 world;
     float4   baseColor;
-    uint     hasBaseColorMap;
-    uint3    pad;
+    float    metallic;
+    float    roughness;
+    uint     useNormalMap;
+    uint     hasMaterialTextures;
 };
 
 StructuredBuffer<ShadeInstance> gInstances : register(t0);
@@ -271,10 +276,24 @@ StructuredBuffer<float4>        gLights    : register(t1);
 StructuredBuffer<uint>          gTileCount : register(t2);
 StructuredBuffer<uint>          gTileList  : register(t3);
 
-// 재질의 베이스 컬러. 알파도 여기서 나온다 — 유리·잎사귀처럼 알파가
-// 텍스처에 든 재질은 계수만으로는 모양이 안 나온다.
-Texture2D    gBaseColorMap : register(t4);
-SamplerState gSampler      : register(s0);
+// 재질 텍스처 넷. 슬롯 의미와 채널 규약은 GBuffer와 같아야 한다 —
+// 다르면 같은 재질이 불투명과 투명에서 갈린다.
+Texture2D gBaseColorMap    : register(t4);
+Texture2D gNormalMap       : register(t5);
+Texture2D gOccRoughMetal   : register(t6);
+Texture2D gEmissiveMap     : register(t7);
+
+// IBL 셋(Deferred와 같은 split-sum). 없으면 앰비언트가 0이다.
+TextureCube gIrradiance  : register(t8);
+TextureCube gPrefiltered : register(t9);
+Texture2D   gBrdfLut     : register(t10);
+
+// 생성기(EnhancedIBLGenerator::kPrefilterMips)와 같아야 한다.
+#define IBL_PREFILTER_MIPS 6
+
+SamplerState gSampler    : register(s0);
+// IBL용 선형 클램프. 거칠기가 밉 좌표라 포인트로 읽으면 단차가 띠로 보인다.
+SamplerState gIblSampler : register(s1);
 
 cbuffer ShadeParams : register(b0)
 {
@@ -282,6 +301,9 @@ cbuffer ShadeParams : register(b0)
     uint2    gTileGrid;
     uint     gLightCount;
     uint     gPad0;
+    float4   gEyePosition;   // xyz — 시선 방향의 기준
+    uint     gHasIbl;
+    uint3    gPad1;
 };
 
 VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
@@ -291,18 +313,65 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     const float4 worldPosition = mul(float4(input.position, 1.0f), instance.world);
 
     VSOut output;
-    output.position        = mul(worldPosition, gViewProjection);
-    output.worldPos        = worldPosition.xyz;
-    output.normal          = mul(input.normal, (float3x3)instance.world);
-    output.uv              = input.uv;
-    output.baseColor       = instance.baseColor;
-    output.hasBaseColorMap = instance.hasBaseColorMap;
+    output.position  = mul(worldPosition, gViewProjection);
+    output.worldPos  = worldPosition.xyz;
+    output.uv        = input.uv;
+    output.baseColor = instance.baseColor;
+    output.material  = float4(instance.metallic, instance.roughness,
+        (float)instance.useNormalMap, (float)instance.hasMaterialTextures);
+
+    // 법선·탄젠트는 회전만 적용한다(GBuffer와 같은 처리). 비균등 스케일에는
+    // 역전치가 필요한데, 그건 GBuffer가 아직 안 하므로 여기서만 하면 두
+    // 경로가 갈린다.
+    output.normal    = mul(input.normal,    (float3x3)instance.world);
+    output.tangent   = mul(input.tangent,   (float3x3)instance.world);
+    output.bitangent = mul(input.bitangent, (float3x3)instance.world);
     return output;
+}
+
+// ── GGX 정반사 (EnhancedDeferredPass와 같은 식) ──
+//
+// 세 함수 모두 Deferred에서 그대로 가져왔다. 손으로 옮긴 것이라 값이
+// 갈리면 같은 재질이 불투명과 투명에서 다르게 보인다 — 고칠 때는 두 곳을
+// 함께 고칠 것.
+float DistributionGGX(float ndoth, float alpha)
+{
+    const float a2 = alpha * alpha;
+    const float d = ndoth * ndoth * (a2 - 1.0f) + 1.0f;
+    return a2 / max(3.14159265f * d * d, 1e-6f);
+}
+
+float VisibilitySmith(float ndotv, float ndotl, float alpha)
+{
+    // 높이 상관 Smith. 분모의 4*NdotV*NdotL까지 흡수한 형태라 호출부에서
+    // 다시 나누지 않는다.
+    const float a2 = alpha * alpha;
+    const float v = ndotl * sqrt(ndotv * ndotv * (1.0f - a2) + a2);
+    const float l = ndotv * sqrt(ndotl * ndotl * (1.0f - a2) + a2);
+    return 0.5f / max(v + l, 1e-6f);
+}
+
+float3 FresnelSchlick(float3 f0, float vdoth)
+{
+    return f0 + (1.0f - f0) * pow(saturate(1.0f - vdoth), 5.0f);
 }
 
 // 광원 하나의 기여. 컬링 경로와 참조 경로가 같은 코드를 쓴다 —
 // 다른 것은 '어떤 광원을 도는가'뿐이어야 대조가 뜻을 갖는다.
-float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
+// 셰이딩에 필요한 표면 값. 광원마다 같으므로 루프 밖에서 한 번 만든다.
+struct Surface
+{
+    float3 worldPos;
+    float3 normal;
+    float3 viewDirection;
+    float3 diffuseAlbedo;   // albedo / PI
+    float3 f0;
+    float  metallic;
+    float  alpha;           // roughness^2
+    float  ndotv;
+};
+
+float3 Contribute(uint lightIndex, Surface surface)
 {
     const float4 position    = gLights[lightIndex * 4 + 0];
     const float4 direction   = gLights[lightIndex * 4 + 1];
@@ -325,7 +394,7 @@ float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
     }
     else
     {
-        const float3 delta = position.xyz - worldPos;
+        const float3 delta = position.xyz - surface.worldPos;
         const float  distance = length(delta);
         toLight = delta / max(distance, 1e-6f);
 
@@ -356,20 +425,94 @@ float3 Contribute(uint lightIndex, float3 worldPos, float3 normal)
         }
     }
 
-    const float ndotl = saturate(dot(normal, toLight));
-    return color.rgb * color.a * ndotl * falloff;
+    // ── BRDF (Deferred의 광원 루프와 같은 식) ──
+    const float ndotl = saturate(dot(surface.normal, toLight));
+    if (ndotl <= 0.0f || falloff <= 0.0f) return float3(0, 0, 0);
+
+    const float3 halfVector = normalize(toLight + surface.viewDirection);
+    const float  ndoth = saturate(dot(surface.normal, halfVector));
+    const float  vdoth = saturate(dot(surface.viewDirection, halfVector));
+
+    const float3 fresnel = FresnelSchlick(surface.f0, vdoth);
+    const float3 specular = fresnel
+        * DistributionGGX(ndoth, surface.alpha)
+        * VisibilitySmith(surface.ndotv, ndotl, surface.alpha);
+
+    // 에너지 보존: 반사되지 않은 몫만 확산으로 간다. 금속은 확산이 없다.
+    const float3 kd = (1.0f - fresnel) * (1.0f - surface.metallic);
+
+    const float3 radiance = color.rgb * color.a * ndotl * falloff;
+    return (kd * surface.diffuseAlbedo + specular) * radiance;
 }
 
 float4 PSMain(VSOut input) : SV_TARGET
 {
-    const float3 normal = normalize(input.normal);
-    float3 lighting = 0.0f;
+    // ── 재질 ──
+    //
+    // 채널 규약은 GBuffer와 같다: ORM은 glTF대로 G가 거칠기, B가 금속성이고,
+    // 거칠기는 계수를 곱하고 금속성은 더한다(GBuffer의 metalRough 조립과
+    // 같은 식). occlusion(R)은 Deferred가 읽지 않으므로 여기서도 안 쓴다 —
+    // 한쪽만 적용하면 같은 재질이 불투명과 투명에서 갈린다.
+    //
+    // ★ 텍스처는 묶였을 때만 읽는다. 없는 슬롯에 폴백을 물리는 방법도
+    //   있지만(GBuffer가 그렇게 한다), 이 패스는 텍스처 캐시가 없는 자가
+    //   검증에서도 돌아야 한다 — 그때는 만들 폴백조차 없다.
+    const bool hasTextures = (0.0f != input.material.w);
+
+    float4 albedo = input.baseColor;
+    float3 emissive = 0.0f;
+    float  rough = input.material.y;
+    float  metallic = input.material.x;
+
+    if (hasTextures)
+    {
+        albedo *= gBaseColorMap.Sample(gSampler, input.uv);
+        emissive = gEmissiveMap.Sample(gSampler, input.uv).rgb;
+
+        const float3 orm = gOccRoughMetal.Sample(gSampler, input.uv).rgb;
+        rough = orm.g * input.material.y;
+        metallic = orm.b + input.material.x;
+    }
+    rough = saturate(rough);
+    metallic = saturate(metallic);
+
+    // ── 법선 ──
+    float3 normal = normalize(input.normal);
+    if (hasTextures && 0.0f != input.material.z)
+    {
+        // 접선 공간 변환. GBuffer와 같은 그람-슈미트 재직교화 + 저장된
+        // 종법선에서 핸디드니스만 가져오는 처리다 — cross로 다시 만들면
+        // UV가 뒤집힌 메시에서 조명이 반대로 나온다.
+        const float3 n = normal;
+        const float3 t = normalize(input.tangent - n * dot(n, input.tangent));
+        const float  handedness = (dot(cross(n, t), input.bitangent) < 0.0f) ? -1.0f : 1.0f;
+        const float3 b = cross(n, t) * handedness;
+
+        const float3 sampled = gNormalMap.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
+        normal = normalize(sampled.x * t + sampled.y * b + sampled.z * n);
+    }
+
+    // ── 표면 항 (Deferred와 같은 구성) ──
+    Surface surface;
+    surface.worldPos = input.worldPos;
+    surface.normal = normal;
+    surface.viewDirection = normalize(gEyePosition.xyz - input.worldPos);
+    surface.ndotv = saturate(dot(normal, surface.viewDirection)) + 1e-5f;
+    // 유전체의 기본 반사율 0.04는 관행값이고, 금속은 알베도가 곧 반사색이다.
+    surface.f0 = lerp(0.04f, albedo.rgb, metallic);
+    surface.diffuseAlbedo = albedo.rgb / 3.14159265f;
+    surface.metallic = metallic;
+    // 거칠기를 그대로 쓰면 0에서 정반사가 점 하나가 되어 사라진다. 제곱해
+    // 쓰는 것이 관행이고 하한을 두어 완전 거울을 피한다.
+    surface.alpha = max(rough * rough, 1e-3f);
+
+    float3 lit = 0.0f;
 
 #ifdef REFERENCE_PATH
     // 참조: 전 광원을 돈다(옛 포워드 방식).
     for (uint i = 0; i < gLightCount; ++i)
     {
-        lighting += Contribute(i, input.worldPos, normal);
+        lit += Contribute(i, surface);
     }
 #else
     // Forward+: 자기 타일의 목록만 돈다.
@@ -381,28 +524,33 @@ float4 PSMain(VSOut input) : SV_TARGET
     for (uint i = 0; i < count; ++i)
     {
         const uint lightIndex = gTileList[tileIndex * MAX_LIGHTS_PER_TILE + i];
-        lighting += Contribute(lightIndex, input.worldPos, normal);
+        lit += Contribute(lightIndex, surface);
     }
 #endif
 
-    // 재질의 확산 알베도를 곱하고 알파를 그대로 낸다.
+    // ── IBL 앰비언트 (split-sum, Deferred와 같은 식) ──
     //
-    // ★ 예전에는 float4(lighting, 1.0f)였다. baseColor를 인스턴스 버퍼로
-    //   올려 두고 쓰지 않아, 투명 재질이 색도 투명도도 없는 조명값 덩어리로
-    //   나왔다 — 그 상태로는 합성해도 '불투명한 단색'이라 투명이 성립하지
-    //   않는다. 알파가 여기서 나와야 블렌드가 뜻을 갖는다.
-    //
-    // ★ 텍스처는 있을 때만 곱한다. 없는 재질에 흰색 폴백을 물리는 방법도
-    //   있지만(GBuffer가 그렇게 한다), 이 패스는 텍스처 캐시가 없는 자가
-    //   검증에서도 돌아야 한다 — 그때는 만들 흰색조차 없다. 플래그로 가르면
-    //   캐시가 없어도 계수만으로 예전과 같은 값이 나온다.
-    float4 albedo = input.baseColor;
-    if (0 != input.hasBaseColorMap)
+    // 이것이 없으면 투명이 앰비언트 구간에서 불투명보다 어둡게 나온다.
+    float3 ambient = 0.0f;
+    if (0 != gHasIbl)
     {
-        albedo *= gBaseColorMap.Sample(gSampler, input.uv);
+        const float3 irradiance = gIrradiance.SampleLevel(gIblSampler, normal, 0.0f).rgb;
+
+        const float3 reflection = reflect(-surface.viewDirection, normal);
+        const float3 prefiltered = gPrefiltered.SampleLevel(gIblSampler,
+            reflection, rough * (IBL_PREFILTER_MIPS - 1)).rgb;
+        const float2 environmentBrdf = gBrdfLut.SampleLevel(gIblSampler,
+            float2(surface.ndotv, rough), 0.0f).rg;
+
+        const float3 fresnelAmbient = FresnelSchlick(surface.f0, surface.ndotv);
+        const float3 kdAmbient = (1.0f - fresnelAmbient) * (1.0f - metallic);
+
+        ambient = kdAmbient * irradiance * albedo.rgb
+            + prefiltered * (surface.f0 * environmentBrdf.x + environmentBrdf.y);
     }
 
-    return float4(lighting * albedo.rgb, albedo.a);
+    // 알파는 베이스 컬러에서 온다 — 이것이 블렌드를 성립시킨다.
+    return float4(lit + ambient + emissive, albedo.a);
 }
 )";
 
@@ -411,24 +559,33 @@ float4 PSMain(VSOut input) : SV_TARGET
     {
         Mathf::Matrix  world{};
         Mathf::Vector4 baseColor{};
-        uint32_t       hasBaseColorMap{ 0 };
-        uint32_t       pad[3]{};
+        float          metallic{ 0.f };
+        float          roughness{ 1.f };
+        uint32_t       useNormalMap{ 0 };
+        uint32_t       hasMaterialTextures{ 0 };
     };
     // ★ 보폭이 어긋나면 컴파일도 검증도 통과하고 GPU만 엉뚱한 필드를 읽는다.
-    //   pad[3]이 hasBaseColorMap과 함께 16바이트를 채우는 것이 핵심 —
-    //   그래야 구조화 버퍼의 타이트 패킹과 16바이트 논스트래들 규칙이
-    //   같은 답을 낸다. 필드를 더할 때 이 수를 함께 고칠 것.
+    //   마지막 넷이 정확히 16바이트를 채우는 것이 핵심 — 그래야 구조화
+    //   버퍼의 타이트 패킹과 16바이트 논스트래들 규칙이 같은 답을 낸다.
+    //   필드를 더할 때 이 수를 함께 고칠 것.
     static_assert(sizeof(ShadeInstance) == 96,
         "HLSL ShadeInstance와 구조화 버퍼 보폭이 어긋났다");
 
     struct ShadeParams
     {
-        Mathf::Matrix viewProjection{};
-        uint32_t      tileGridX{ 0 };
-        uint32_t      tileGridY{ 0 };
-        uint32_t      lightCount{ 0 };
-        uint32_t      pad0{ 0 };
+        Mathf::Matrix  viewProjection{};
+        uint32_t       tileGridX{ 0 };
+        uint32_t       tileGridY{ 0 };
+        uint32_t       lightCount{ 0 };
+        uint32_t       pad0{ 0 };
+        Mathf::Vector4 eyePosition{};
+        uint32_t       hasIbl{ 0 };
+        uint32_t       pad1[3]{};
     };
+    // ShadeInstance와 같은 이유의 가드. cbuffer는 16바이트 경계·논스트래들
+    // 규칙이라 뒤에 필드를 더할 때 이 수도 함께 고쳐야 한다.
+    static_assert(sizeof(ShadeParams) == 112,
+        "HLSL ShadeParams와 cbuffer 보폭이 어긋났다");
 
     struct CullParams
     {
@@ -556,14 +713,19 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     // 꽂는다 — 루트 SRV는 버퍼 전용이고 Texture2D는 디스크립터를 요구한다.
     D3D12_DESCRIPTOR_RANGE materialRange{};
     materialRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    materialRange.NumDescriptors = 1;      // baseColor
-    materialRange.BaseShaderRegister = 4;  // t4
+    materialRange.NumDescriptors = 4;      // baseColor · normal · ORM · emissive
+    materialRange.BaseShaderRegister = 4;  // t4~t7
+
+    D3D12_DESCRIPTOR_RANGE iblRange{};
+    iblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    iblRange.NumDescriptors = 3;           // 조도 · 프리필터 · BRDF LUT
+    iblRange.BaseShaderRegister = 8;       // t8~t10
 
     D3D12_DESCRIPTOR_RANGE samplerRange{};
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    samplerRange.NumDescriptors = 1;
+    samplerRange.NumDescriptors = 2;       // 재질 · IBL
 
-    D3D12_ROOT_PARAMETER shadeParams[7]{};
+    D3D12_ROOT_PARAMETER shadeParams[8]{};
     shadeParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     shadeParams[0].Descriptor.ShaderRegister = 0;
 
@@ -580,8 +742,13 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     shadeParams[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     shadeParams[6].DescriptorTable.NumDescriptorRanges = 1;
-    shadeParams[6].DescriptorTable.pDescriptorRanges = &samplerRange;
+    shadeParams[6].DescriptorTable.pDescriptorRanges = &iblRange;
     shadeParams[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    shadeParams[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    shadeParams[7].DescriptorTable.NumDescriptorRanges = 1;
+    shadeParams[7].DescriptorTable.pDescriptorRanges = &samplerRange;
+    shadeParams[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_ROOT_SIGNATURE_DESC shadeRootDesc{};
     shadeRootDesc.NumParameters = _countof(shadeParams);
@@ -592,17 +759,28 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     if (!shadeRoot.IsValid()) return false;
     m_shadeRootSignature = shadeRoot.signature;
 
-    // 재질 샘플러. GBuffer와 같은 설정(선형 · WRAP)이라 같은 UV가 같은
-    // 텍셀을 집는다 — 다르면 불투명과 투명이 같은 재질에서 갈린다.
+    // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
+    // 인접을 기대하면 안 된다(Deferred와 같은 이유).
     {
-        D3D12_SAMPLER_DESC sampler{};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        D3D12_SAMPLER_DESC samplers[2]{};
 
-        m_sampler = context.resources->GetSamplerHeap().GetOrCreate(sampler);
+        // 재질용. GBuffer와 같은 설정(선형 · WRAP)이라 같은 UV가 같은 텍셀을
+        // 집는다 — 다르면 불투명과 투명이 같은 재질에서 갈린다.
+        samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+
+        // IBL용 선형 클램프. 거칠기가 프리필터의 밉 좌표라 밉 사이 보간이
+        // 필요하다 — 포인트로 읽으면 거칠기 단차가 띠로 보인다.
+        samplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
+
+        m_sampler = context.resources->GetSamplerHeap().CreateRange(samplers, 2);
         if (0 == m_sampler.ptr)
         {
             outError = "Forward+ 샘플러 생성 실패";
@@ -672,7 +850,18 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         // 덮어쓰기라 투명이 성립하지 않는다.
         shadeDesc.blendEnable = true;
         shadeDesc.dsvFormat = kDepthFormat;
-        shadeDesc.cullMode = D3D12_CULL_MODE_NONE;
+        // ★ 뒷면을 자른다.
+        //
+        //   GBuffer는 CULL_MODE_NONE인데도 멀쩡하다 — 깊이를 쓰기 때문에
+        //   앞면이 깊이 테스트로 뒷면을 막는다. 투명은 깊이를 쓰지 않으므로
+        //   (위의 depthWriteMask=ZERO) 그 보호가 없다: 닫힌 물체의 뒷면이
+        //   앞면 위에 덧그려져 법선이 반대인 어두운 얼룩이 생긴다. 구에서
+        //   먼저 눈에 띄었다.
+        //
+        //   양면 투명(잎사귀·천)은 뒷면→앞면 2패스가 정석이지만, 그건
+        //   재질이 '양면인가'를 알려 줘야 성립한다. 지금 재질에 그 표시가
+        //   없으므로 흔한 기본값(닫힌 물체)을 택한다.
+        shadeDesc.cullMode = D3D12_CULL_MODE_BACK;
         shadeDesc.numRenderTargets = 1;
         shadeDesc.rtvFormats[0] = kOutputFormat;
 
@@ -768,33 +957,51 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     //
     // 기록 중에 올리지 않는다(GBuffer와 같은 규약). 캐시가 없는 자가 검증
     // 경로에서는 통째로 건너뛰고, 그때는 셰이더가 계수만으로 그린다.
-    m_baseColorTextures.clear();
+    m_materialTextures.clear();
     if (nullptr != context.textureCache && nullptr != context.forwardDraws)
     {
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
-            if (nullptr == draw.baseColor) continue;
-            if (m_baseColorTextures.find(draw.baseColor) != m_baseColorTextures.end())
+            const MaterialKey key{
+                draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+            if (m_materialTextures.find(key) != m_materialTextures.end()) continue;
+
+            // 슬롯 의미를 따르는 폴백. 흰색 하나로 전부 때우면 뜻이 뒤집힌다 —
+            // emissive에 흰색이면 텍스처 없는 재질이 전부 자체발광이고,
+            // ORM에 흰색이면 B(금속)가 1이라 확산이 통째로 죽는다.
+            // GBuffer와 같은 규칙이라야 같은 재질이 두 경로에서 같아 보인다.
+            MaterialTextures textures{};
+            bool anyValid = false;
+            for (uint32_t i = 0; i < 4; ++i)
             {
-                continue;
+                // ★ 실패를 IsValid로 거르려 하면 안 된다. GetOrUpload는 복구
+                //   가능한 실패(2D 아님·멀티샘플·업로드 실패)에서 폴백을
+                //   돌려주므로 IsValid는 늘 참이고, 그 자리에서 건너뛰면
+                //   textureError가 통째로 사라진다 — 텍스처가 안 나오는데
+                //   로그도 없는 상태가 된다. GBuffer처럼 무조건 전달한다.
+                std::string textureError;
+                DX12TextureCache::Entry uploaded{};
+                if (nullptr == key[i] && 2 == i)
+                {
+                    uploaded = context.textureCache->GetOrmNeutralTexture(textureError);
+                }
+                else if (nullptr == key[i] && 3 == i)
+                {
+                    uploaded = context.textureCache->GetBlackTexture(textureError);
+                }
+                else
+                {
+                    uploaded = context.textureCache->GetOrUpload(key[i], textureError);
+                }
+                if (!textureError.empty()) outError = textureError;
+
+                textures.resources[i] = uploaded.resource;
+                textures.formats[i] = uploaded.format;
+                textures.mipLevels[i] = uploaded.mipLevels;
+                anyValid = anyValid || uploaded.IsValid();
             }
 
-            // ★ 실패를 IsValid로 거르려 하면 안 된다. GetOrUpload는 복구
-            //   가능한 실패(2D 아님·멀티샘플·업로드 실패)에서 흰색 폴백을
-            //   돌려주므로 IsValid는 늘 참이고, 그 자리에서 continue하면
-            //   textureError가 통째로 사라진다 — 텍스처가 안 나오는데
-            //   로그도 없는 상태가 된다. GBuffer처럼 무조건 전달한다.
-            std::string textureError;
-            const auto uploaded = context.textureCache->GetOrUpload(
-                draw.baseColor, textureError);
-            if (!textureError.empty()) outError = textureError;
-            if (!uploaded.IsValid()) continue;   // 폴백조차 못 만든 파국
-
-            BaseColorTexture entry{};
-            entry.resource = uploaded.resource;
-            entry.format = uploaded.format;
-            entry.mipLevels = uploaded.mipLevels;
-            m_baseColorTextures.emplace(draw.baseColor, entry);
+            if (anyValid) m_materialTextures.emplace(key, textures);
         }
     }
 
@@ -1068,10 +1275,14 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         instances[i].world = XMMatrixTranspose(draw.worldMatrix);
         instances[i].baseColor = Mathf::Vector4{ draw.baseColorFactor.x,
             draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
-        instances[i].hasBaseColorMap =
-            (nullptr != draw.baseColor
-                && m_baseColorTextures.find(draw.baseColor) != m_baseColorTextures.end())
-            ? 1u : 0u;
+        instances[i].metallic = draw.metallic;
+        instances[i].roughness = draw.roughness;
+        instances[i].useNormalMap = draw.useNormalMap;
+
+        const MaterialKey key{
+            draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+        instances[i].hasMaterialTextures =
+            (m_materialTextures.find(key) != m_materialTextures.end()) ? 1u : 0u;
     }
 
     ShadeParams params{};
@@ -1083,6 +1294,14 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
     params.tileGridX = m_tileCountX;
     params.tileGridY = m_tileCountY;
     params.lightCount = lightCount;
+    if (nullptr != context.camera)
+    {
+        XMStoreFloat4(&params.eyePosition, context.camera->eyePosition);
+        params.eyePosition.w = 1.f;
+    }
+    const bool hasIbl = (nullptr != m_iblIrradiance)
+        && (nullptr != m_iblPrefiltered) && (nullptr != m_iblBrdfLut);
+    params.hasIbl = hasIbl ? 1u : 0u;
 
     const auto cb = uploadRing.Allocate(
         sizeof(ShadeParams), DX12UploadRing::kConstantBufferAlignment);
@@ -1107,7 +1326,50 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         ID3D12DescriptorHeap* heaps[] = {
             descriptorRing.GetHeap(), context.resources->GetSamplerHeap().GetHeap() };
         commandList->SetDescriptorHeaps(2, heaps);
-        commandList->SetGraphicsRootDescriptorTable(6, m_sampler);
+        commandList->SetGraphicsRootDescriptorTable(7, m_sampler);
+    }
+
+    // IBL 셋도 드로우 밖에서 한 번. 재질과 달리 프레임 내내 같다.
+    //
+    // 없으면 널 디스크립터를 깐다 — 링에서 잘라 온 자리는 초기화되지 않은
+    // 쓰레기라, 셰이더가 gHasIbl로 안 읽더라도 유효한 디스크립터가 있어야
+    // 한다(Deferred가 같은 이유로 같은 처리를 한다).
+    //
+    // 포맷은 Deferred가 쓰는 것과 같아야 한다 — 생성기가 만든 리소스의
+    // 실제 포맷이라 여기서만 다르게 적으면 어긋난 뷰가 된다.
+    {
+        // ★ 실패하면 그린 뒤가 아니라 여기서 접는다.
+        //
+        //   SetGraphicsRootSignature가 직전에 모든 루트 인자를 무효화했으므로,
+        //   이 테이블을 안 걸고 드로우로 넘어가면 루트 파라미터 6이 바인딩되지
+        //   않은 채로 그린다 — 검증 레이어가 잡는 미초기화 루트 인자이고,
+        //   실제 하드웨어에서는 쓰레기 디스크립터 주소를 읽는다.
+        //   위의 링 할당들(광원·인스턴스·상수)과 같은 처리다.
+        const auto iblRange = descriptorRing.Allocate(3);
+        if (!iblRange.IsValid()) return false;
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC cubeSrv{};
+            cubeSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            cubeSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            cubeSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            cubeSrv.TextureCube.MipLevels = 1;
+            device->CreateShaderResourceView(
+                hasIbl ? m_iblIrradiance : nullptr, &cubeSrv, iblRange.CpuAt(0));
+
+            cubeSrv.TextureCube.MipLevels = hasIbl ? m_iblPrefilterMips : 1;
+            device->CreateShaderResourceView(
+                hasIbl ? m_iblPrefiltered : nullptr, &cubeSrv, iblRange.CpuAt(1));
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC lutSrv{};
+            lutSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            lutSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            lutSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            lutSrv.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(
+                hasIbl ? m_iblBrdfLut : nullptr, &lutSrv, iblRange.CpuAt(2));
+
+            commandList->SetGraphicsRootDescriptorTable(6, iblRange.gpu);
+        }
     }
 
     bool drewAnything = false;
@@ -1132,26 +1394,33 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         //   (UI·기즈모)가 예산 부족을 겪어 엉뚱한 자리에서 증상이 난다 —
         //   투명이 많아지면 DX12DescriptorRing의 overflows를 볼 것.
         {
-            const auto srvRange = descriptorRing.Allocate(1);
+            const auto srvRange = descriptorRing.Allocate(4);
             if (!srvRange.IsValid()) break;
 
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            srvDesc.Texture2D.MipLevels = 1;
+            const MaterialKey key{
+                draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+            const auto found = m_materialTextures.find(key);
 
-            ID3D12Resource* resource = nullptr;
-            const auto found = (nullptr != draw.baseColor)
-                ? m_baseColorTextures.find(draw.baseColor) : m_baseColorTextures.end();
-            if (found != m_baseColorTextures.end())
+            for (uint32_t slot = 0; slot < 4; ++slot)
             {
-                resource = found->second.resource;
-                srvDesc.Format = found->second.format;
-                srvDesc.Texture2D.MipLevels = found->second.mipLevels;
+                D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                srvDesc.Texture2D.MipLevels = 1;
+
+                ID3D12Resource* resource = nullptr;
+                if (found != m_materialTextures.end()
+                    && nullptr != found->second.resources[slot])
+                {
+                    resource = found->second.resources[slot];
+                    srvDesc.Format = found->second.formats[slot];
+                    srvDesc.Texture2D.MipLevels = found->second.mipLevels[slot];
+                }
+
+                device->CreateShaderResourceView(resource, &srvDesc, srvRange.CpuAt(slot));
             }
 
-            device->CreateShaderResourceView(resource, &srvDesc, srvRange.CpuAt(0));
             commandList->SetGraphicsRootDescriptorTable(5, srvRange.gpu);
         }
 
@@ -1186,8 +1455,13 @@ void EnhancedForwardPass::Shutdown()
     m_cullRootSignature = nullptr;
     m_shadeRootSignature = nullptr;
 
-    m_baseColorTextures.clear();
+    m_materialTextures.clear();
     m_sampler = {};
+
+    m_iblIrradiance = nullptr;
+    m_iblPrefiltered = nullptr;
+    m_iblBrdfLut = nullptr;
+    m_iblPrefilterMips = 1;
 }
 
 // ── 자가 검증 ──
