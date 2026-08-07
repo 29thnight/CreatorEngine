@@ -1,6 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include <cstdint>
+#include <unordered_map>
 #include <wrl/client.h>
 
 #include "EnhancedRenderPass.h"
@@ -177,6 +178,24 @@ private:
 
     ID3D12RootSignature* m_cullRootSignature{ nullptr };
     ID3D12RootSignature* m_shadeRootSignature{ nullptr };
+
+    // 재질 텍스처 샘플러. 샘플러 힙이 중복을 걸러 주므로 GBuffer와 같은
+    // 설정이면 같은 핸들이 온다.
+    D3D12_GPU_DESCRIPTOR_HANDLE m_sampler{};
+
+    // 이번 프레임에 올려 둔 베이스 컬러. PrepareFrame이 채우고 기록은
+    // 조회만 한다 — GetOrUpload는 업로드 링과 커맨드 리스트를 쓰므로
+    // 그래프 실행 중에 부르면 기록 한가운데에 복사가 끼어든다
+    // (GBuffer가 같은 이유로 PrepareFrame에서 올린다).
+    //
+    // 키는 재질의 Texture* 동일성이다 — GBuffer의 MaterialKey와 같은 근거.
+    struct BaseColorTexture
+    {
+        ID3D12Resource* resource{ nullptr };
+        DXGI_FORMAT     format{ DXGI_FORMAT_UNKNOWN };
+        uint32_t        mipLevels{ 0 };
+    };
+    std::unordered_map<const void*, BaseColorTexture> m_baseColorTextures;
 };
 
 #endif

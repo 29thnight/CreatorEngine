@@ -251,21 +251,30 @@ struct VSOut
     float4 position  : SV_POSITION;
     float3 worldPos  : TEXCOORD0;
     float3 normal    : TEXCOORD1;
+    float2 uv        : TEXCOORD2;
     // 인스턴스마다 상수라 보간하지 않는다. 보간을 켜 두면 값은 같아도
     // 래스터라이저가 헛일을 한다.
-    nointerpolation float4 baseColor : TEXCOORD2;
+    nointerpolation float4 baseColor : TEXCOORD3;
+    nointerpolation uint   hasBaseColorMap : TEXCOORD4;
 };
 
 struct ShadeInstance
 {
     float4x4 world;
     float4   baseColor;
+    uint     hasBaseColorMap;
+    uint3    pad;
 };
 
 StructuredBuffer<ShadeInstance> gInstances : register(t0);
 StructuredBuffer<float4>        gLights    : register(t1);
 StructuredBuffer<uint>          gTileCount : register(t2);
 StructuredBuffer<uint>          gTileList  : register(t3);
+
+// 재질의 베이스 컬러. 알파도 여기서 나온다 — 유리·잎사귀처럼 알파가
+// 텍스처에 든 재질은 계수만으로는 모양이 안 나온다.
+Texture2D    gBaseColorMap : register(t4);
+SamplerState gSampler      : register(s0);
 
 cbuffer ShadeParams : register(b0)
 {
@@ -282,10 +291,12 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     const float4 worldPosition = mul(float4(input.position, 1.0f), instance.world);
 
     VSOut output;
-    output.position  = mul(worldPosition, gViewProjection);
-    output.worldPos  = worldPosition.xyz;
-    output.normal    = mul(input.normal, (float3x3)instance.world);
-    output.baseColor = instance.baseColor;
+    output.position        = mul(worldPosition, gViewProjection);
+    output.worldPos        = worldPosition.xyz;
+    output.normal          = mul(input.normal, (float3x3)instance.world);
+    output.uv              = input.uv;
+    output.baseColor       = instance.baseColor;
+    output.hasBaseColorMap = instance.hasBaseColorMap;
     return output;
 }
 
@@ -381,17 +392,34 @@ float4 PSMain(VSOut input) : SV_TARGET
     //   나왔다 — 그 상태로는 합성해도 '불투명한 단색'이라 투명이 성립하지
     //   않는다. 알파가 여기서 나와야 블렌드가 뜻을 갖는다.
     //
-    //   텍스처 샘플링은 아직 없다(재질 계수만). 붙이려면 GBuffer의 드로우별
-    //   디스크립터 배선을 여기에도 깔아야 한다.
-    return float4(lighting * input.baseColor.rgb, input.baseColor.a);
+    // ★ 텍스처는 있을 때만 곱한다. 없는 재질에 흰색 폴백을 물리는 방법도
+    //   있지만(GBuffer가 그렇게 한다), 이 패스는 텍스처 캐시가 없는 자가
+    //   검증에서도 돌아야 한다 — 그때는 만들 흰색조차 없다. 플래그로 가르면
+    //   캐시가 없어도 계수만으로 예전과 같은 값이 나온다.
+    float4 albedo = input.baseColor;
+    if (0 != input.hasBaseColorMap)
+    {
+        albedo *= gBaseColorMap.Sample(gSampler, input.uv);
+    }
+
+    return float4(lighting * albedo.rgb, albedo.a);
 }
 )";
 
+    // HLSL의 ShadeInstance와 크기·배치가 같아야 한다(구조화 버퍼 보폭).
     struct ShadeInstance
     {
         Mathf::Matrix  world{};
         Mathf::Vector4 baseColor{};
+        uint32_t       hasBaseColorMap{ 0 };
+        uint32_t       pad[3]{};
     };
+    // ★ 보폭이 어긋나면 컴파일도 검증도 통과하고 GPU만 엉뚱한 필드를 읽는다.
+    //   pad[3]이 hasBaseColorMap과 함께 16바이트를 채우는 것이 핵심 —
+    //   그래야 구조화 버퍼의 타이트 패킹과 16바이트 논스트래들 규칙이
+    //   같은 답을 낸다. 필드를 더할 때 이 수를 함께 고칠 것.
+    static_assert(sizeof(ShadeInstance) == 96,
+        "HLSL ShadeInstance와 구조화 버퍼 보폭이 어긋났다");
 
     struct ShadeParams
     {
@@ -523,7 +551,19 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     // b0 상수 · t0 인스턴스 · t1 광원 · t2 타일 카운트 · t3 타일 목록.
     // 넷 다 구조화 버퍼라 루트 SRV로 꽂는다 — 디스크립터 테이블을 만들 이유가
     // 없고, 드로우마다 인스턴스 버퍼 주소만 바뀌므로 이쪽이 싸다.
-    D3D12_ROOT_PARAMETER shadeParams[5]{};
+    //
+    // t4(재질 텍스처)와 s0(샘플러)만 테이블이다. 텍스처는 루트 SRV로 못
+    // 꽂는다 — 루트 SRV는 버퍼 전용이고 Texture2D는 디스크립터를 요구한다.
+    D3D12_DESCRIPTOR_RANGE materialRange{};
+    materialRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    materialRange.NumDescriptors = 1;      // baseColor
+    materialRange.BaseShaderRegister = 4;  // t4
+
+    D3D12_DESCRIPTOR_RANGE samplerRange{};
+    samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    samplerRange.NumDescriptors = 1;
+
+    D3D12_ROOT_PARAMETER shadeParams[7]{};
     shadeParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     shadeParams[0].Descriptor.ShaderRegister = 0;
 
@@ -533,6 +573,16 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         shadeParams[1 + i].Descriptor.ShaderRegister = i;
     }
 
+    shadeParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    shadeParams[5].DescriptorTable.NumDescriptorRanges = 1;
+    shadeParams[5].DescriptorTable.pDescriptorRanges = &materialRange;
+    shadeParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    shadeParams[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    shadeParams[6].DescriptorTable.NumDescriptorRanges = 1;
+    shadeParams[6].DescriptorTable.pDescriptorRanges = &samplerRange;
+    shadeParams[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
     D3D12_ROOT_SIGNATURE_DESC shadeRootDesc{};
     shadeRootDesc.NumParameters = _countof(shadeParams);
     shadeRootDesc.pParameters = shadeParams;
@@ -541,6 +591,24 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     const auto shadeRoot = context.rootSignatures->GetOrCreate(shadeRootDesc, outError);
     if (!shadeRoot.IsValid()) return false;
     m_shadeRootSignature = shadeRoot.signature;
+
+    // 재질 샘플러. GBuffer와 같은 설정(선형 · WRAP)이라 같은 UV가 같은
+    // 텍셀을 집는다 — 다르면 불투명과 투명이 같은 재질에서 갈린다.
+    {
+        D3D12_SAMPLER_DESC sampler{};
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+
+        m_sampler = context.resources->GetSamplerHeap().GetOrCreate(sampler);
+        if (0 == m_sampler.ptr)
+        {
+            outError = "Forward+ 샘플러 생성 실패";
+            return false;
+        }
+    }
 
     static const D3D12_INPUT_ELEMENT_DESC kInputElements[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -695,6 +763,40 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     // 화면 밖까지 걸치는데, 컬링 셰이더가 화면 경계로 자른다.
     m_tileCountX = (context.width + kTileSize - 1) / kTileSize;
     m_tileCountY = (context.height + kTileSize - 1) / kTileSize;
+
+    // ── 재질 텍스처 운반 ──
+    //
+    // 기록 중에 올리지 않는다(GBuffer와 같은 규약). 캐시가 없는 자가 검증
+    // 경로에서는 통째로 건너뛰고, 그때는 셰이더가 계수만으로 그린다.
+    m_baseColorTextures.clear();
+    if (nullptr != context.textureCache && nullptr != context.forwardDraws)
+    {
+        for (const EnhancedDrawItem& draw : *context.forwardDraws)
+        {
+            if (nullptr == draw.baseColor) continue;
+            if (m_baseColorTextures.find(draw.baseColor) != m_baseColorTextures.end())
+            {
+                continue;
+            }
+
+            // ★ 실패를 IsValid로 거르려 하면 안 된다. GetOrUpload는 복구
+            //   가능한 실패(2D 아님·멀티샘플·업로드 실패)에서 흰색 폴백을
+            //   돌려주므로 IsValid는 늘 참이고, 그 자리에서 continue하면
+            //   textureError가 통째로 사라진다 — 텍스처가 안 나오는데
+            //   로그도 없는 상태가 된다. GBuffer처럼 무조건 전달한다.
+            std::string textureError;
+            const auto uploaded = context.textureCache->GetOrUpload(
+                draw.baseColor, textureError);
+            if (!textureError.empty()) outError = textureError;
+            if (!uploaded.IsValid()) continue;   // 폴백조차 못 만든 파국
+
+            BaseColorTexture entry{};
+            entry.resource = uploaded.resource;
+            entry.format = uploaded.format;
+            entry.mipLevels = uploaded.mipLevels;
+            m_baseColorTextures.emplace(draw.baseColor, entry);
+        }
+    }
 
     return EnsureTileBuffers(context, outError);
 }
@@ -966,6 +1068,10 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         instances[i].world = XMMatrixTranspose(draw.worldMatrix);
         instances[i].baseColor = Mathf::Vector4{ draw.baseColorFactor.x,
             draw.baseColorFactor.y, draw.baseColorFactor.z, draw.baseColorFactor.w };
+        instances[i].hasBaseColorMap =
+            (nullptr != draw.baseColor
+                && m_baseColorTextures.find(draw.baseColor) != m_baseColorTextures.end())
+            ? 1u : 0u;
     }
 
     ShadeParams params{};
@@ -994,6 +1100,16 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
     commandList->SetGraphicsRootShaderResourceView(4,
         m_tileListBuffer->GetGPUVirtualAddress());
 
+    // 힙과 샘플러는 드로우 밖에서 한 번만 건다.
+    auto* device = context.resources->GetDevice();
+    auto& descriptorRing = context.resources->GetDescriptorRing();
+    {
+        ID3D12DescriptorHeap* heaps[] = {
+            descriptorRing.GetHeap(), context.resources->GetSamplerHeap().GetHeap() };
+        commandList->SetDescriptorHeaps(2, heaps);
+        commandList->SetGraphicsRootDescriptorTable(6, m_sampler);
+    }
+
     bool drewAnything = false;
     for (size_t i = 0; i < drawCount; ++i)
     {
@@ -1003,6 +1119,41 @@ bool EnhancedForwardPass::RecordShading(ID3D12GraphicsCommandList* commandList,
         std::string uploadError;
         const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
         if (!entry.IsValid()) continue;
+
+        // ── 재질 텍스처 ──
+        //
+        // 테이블은 드로우마다 건다. 텍스처가 없는 드로우에도 걸어 두는 이유는
+        // 바인딩된 테이블의 디스크립터는 '초기화돼 있어야' 하기 때문이다 —
+        // 셰이더가 안 읽더라도(hasBaseColorMap=0) 비워 두면 규약 위반이다.
+        // 널 리소스 SRV는 유효한 디스크립터이고 읽으면 0을 준다.
+        //
+        // ★ 링은 프레임당 4096개를 전 패스가 나눠 쓴다. 여기서 소진되면
+        //   남은 투명이 조용히 빠지는 데서 끝나지 않고, 뒤에 오는 패스
+        //   (UI·기즈모)가 예산 부족을 겪어 엉뚱한 자리에서 증상이 난다 —
+        //   투명이 많아지면 DX12DescriptorRing의 overflows를 볼 것.
+        {
+            const auto srvRange = descriptorRing.Allocate(1);
+            if (!srvRange.IsValid()) break;
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            srvDesc.Texture2D.MipLevels = 1;
+
+            ID3D12Resource* resource = nullptr;
+            const auto found = (nullptr != draw.baseColor)
+                ? m_baseColorTextures.find(draw.baseColor) : m_baseColorTextures.end();
+            if (found != m_baseColorTextures.end())
+            {
+                resource = found->second.resource;
+                srvDesc.Format = found->second.format;
+                srvDesc.Texture2D.MipLevels = found->second.mipLevels;
+            }
+
+            device->CreateShaderResourceView(resource, &srvDesc, srvRange.CpuAt(0));
+            commandList->SetGraphicsRootDescriptorTable(5, srvRange.gpu);
+        }
 
         commandList->SetGraphicsRootShaderResourceView(1,
             instanceUpload.gpuAddress + static_cast<uint64_t>(i) * sizeof(ShadeInstance));
@@ -1034,6 +1185,9 @@ void EnhancedForwardPass::Shutdown()
     m_referencePSO = nullptr;
     m_cullRootSignature = nullptr;
     m_shadeRootSignature = nullptr;
+
+    m_baseColorTextures.clear();
+    m_sampler = {};
 }
 
 // ── 자가 검증 ──
