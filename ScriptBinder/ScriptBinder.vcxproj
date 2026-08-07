@@ -246,6 +246,9 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnimationEventBridge.cpp" />
+    <ClCompile Include="AnimationJob.cpp" />
+    <ClCompile Include="EnhancedGizmoSceneBinding.cpp" />
     <ClCompile Include="RenderSceneBridge.cpp" />
     <ClCompile Include="UIProxyBridge.cpp" />
     <ClCompile Include="PrimitiveProxyBridge.cpp" />

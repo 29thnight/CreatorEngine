@@ -368,12 +368,6 @@
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="Animation.cpp">
-      <Filter>Resources\Skeleton\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="AnimationJob.cpp">
-      <Filter>Asset\JobSystem\Animation</Filter>
-    </ClCompile>
     <ClCompile Include="RenderPassData.cpp">
       <Filter>Resources\RenderPassData</Filter>
     </ClCompile>

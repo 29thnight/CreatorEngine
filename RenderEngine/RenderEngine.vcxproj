@@ -236,8 +236,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Animation.cpp" />
-    <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="CullingManager.cpp" />
@@ -296,7 +294,6 @@
     <ClCompile Include="RHI\DX12\EnhancedSSRTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSSPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSSSTest.cpp" />
-    <ClCompile Include="EnhancedGizmoSceneBinding.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedPostChainTest.cpp" />
