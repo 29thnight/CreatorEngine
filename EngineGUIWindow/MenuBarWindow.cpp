@@ -1638,7 +1638,6 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 			{
 				ImGui::CloseCurrentPopup();
 			}
-            }
 
             ImGui::EndPopup();
         }
@@ -2422,7 +2421,7 @@ void MenuBarWindow::SHowInputActionMap()
                         // C++ 스크립트 은퇴(9-4): 이름을 직접 입력한다(C# 전달 경로는 후속).
                         static char actionScriptName[128] = "";
                         ImGui::InputText("Script", actionScriptName, sizeof(actionScriptName));
-                        if (ImGui::Button("Set") && actionScriptName[0] != ' ')
+                        if (ImGui::Button("Set") && actionScriptName[0] != '\0')
                         {
                             action->m_scriptName = actionScriptName;
                             ImGui::CloseCurrentPopup();

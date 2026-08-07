@@ -8,6 +8,10 @@ namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
 #include "ReflectionFunction.h"
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
+// GameObject의 완전한 정의. 드래그&드롭 처리에서 GameObject::Index와 멤버 함수를
+// 쓰는데, 예전에는 유니티 블롭의 다른 파일을 거쳐 전이적으로 딸려 왔다.
+// (이 헤더가 코어에 있으면서 ScriptBinder를 참조하는 것 자체는 4-3에서 해소할 부채다)
+#include "GameObject.h"
 #include "TypeTrait.h"
 #include "InputManager.h"
 
