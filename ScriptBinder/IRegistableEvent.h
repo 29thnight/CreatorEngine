@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Scene.h"
+#include "LifecycleTrace.h"
 
 /**
  * @brief Base interface for event-receiving components, compatible with reflection.
@@ -135,6 +136,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark()) return;
 
             this->setFlag(FLAG_AWAKE_CALLED, true);
+            LIFECYCLE_TRACE(Lifecycle::Phase::Awake, Lifecycle::TypeName<T>(),
+                sceneObject->m_name.ToString().c_str(), derived_component->GetInstanceID());
             derived_component->Awake();
         });
 
@@ -160,6 +163,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             if (!derived_component->IsEnabled() || sceneObject->IsDestroyMark()) return;
             if (this->testFlag(FLAG_START_CALLED)) return;
 
+            LIFECYCLE_TRACE(Lifecycle::Phase::Start, Lifecycle::TypeName<T>(),
+                sceneObject->m_name.ToString().c_str(), derived_component->GetInstanceID());
             derived_component->Start();
             this->setFlag(FLAG_START_CALLED, true);
         });
@@ -174,6 +179,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
             else
             {
+                LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::TypeName<T>(),
+                    sceneObject->m_name.ToString().c_str(), derived_component->GetInstanceID());
                 derived_component->Update(dt);
             }
         });
@@ -188,6 +195,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
             else
             {
+                LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, Lifecycle::TypeName<T>(),
+                    sceneObject->m_name.ToString().c_str(), derived_component->GetInstanceID());
                 derived_component->LateUpdate(dt);
             }
         });
@@ -202,6 +211,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
             }
             else
             {
+                LIFECYCLE_TRACE(Lifecycle::Phase::FixedUpdate, Lifecycle::TypeName<T>(),
+                    sceneObject->m_name.ToString().c_str(), derived_component->GetInstanceID());
                 derived_component->FixedUpdate(ts);
             }
         });
@@ -228,6 +239,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
                 const bool curr = derived_component->IsEnabled();
                 const bool prev = this->testFlag(FLAG_PREV_ENABLED);
                 if (!prev && curr) {
+                    LIFECYCLE_TRACE(Lifecycle::Phase::OnEnable, Lifecycle::TypeName<T>(),
+                        so->m_name.ToString().c_str(), derived_component->GetInstanceID());
                     derived_component->OnEnable();
                     this->setFlag(FLAG_PREV_ENABLED, true);
                 }
@@ -256,6 +269,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
                 const bool curr = derived_component->IsEnabled();
                 const bool prev = this->testFlag(FLAG_PREV_ENABLED);
                 if (prev && !curr) {
+                    LIFECYCLE_TRACE(Lifecycle::Phase::OnDisable, Lifecycle::TypeName<T>(),
+                        so->m_name.ToString().c_str(), derived_component->GetInstanceID());
                     derived_component->OnDisable();
                     this->setFlag(FLAG_PREV_ENABLED, false);
                 }
@@ -274,6 +289,8 @@ void RegistableEvent<T>::RegisterOverriddenEvents(Scene* scene)
 
             if (sceneObject->IsDestroyMark() || derived_component->IsDestroyMark())
             {
+                LIFECYCLE_TRACE(Lifecycle::Phase::OnDestroy, Lifecycle::TypeName<T>(),
+                    sceneObject->m_name.ToString().c_str(), derived_component->GetInstanceID());
                 derived_component->OnDestroy();
             }
         });

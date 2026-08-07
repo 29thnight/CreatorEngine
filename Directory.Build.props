@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  솔루션 전체에 자동으로 걸리는 속성 파일이다. MSBuild가 프로젝트 디렉터리에서
+  위로 올라가며 처음 만나는 이 파일을 프로젝트보다 먼저 임포트한다 —
+  vcxproj 여덟 개를 각각 고치지 않아도 되는 유일한 자리다.
+
+  ── EngineAsan ──
+
+  AddressSanitizer 구성을 솔루션 구성(Debug|Release)으로 늘리지 않고 스위치로 뒀다.
+  구성을 늘리면 vcxproj 여덟 개 × ItemDefinitionGroup을 전부 복제해야 하고,
+  그렇게 늘어난 구성은 아무도 갱신하지 않아 곧 실제 빌드와 어긋난다.
+
+    msbuild CreatorEngine.sln /p:Configuration=Debug /p:Platform=x64 /p:EngineAsan=true
+
+  실제 컴파일 옵션은 Directory.Build.targets가 정한다. 여기서 정하면 프로젝트가
+  자기 ItemDefinitionGroup으로 덮어쓰므로(임포트 순서상 프로젝트가 뒤다) 무력화된다.
+-->
+<Project>
+  <PropertyGroup>
+    <EngineAsan Condition="'$(EngineAsan)' == ''">false</EngineAsan>
+  </PropertyGroup>
+</Project>

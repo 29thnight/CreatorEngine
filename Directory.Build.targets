@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  EngineAsan=true 일 때만 AddressSanitizer 옵션을 건다(PHASE 9-0 / 0-5).
+
+  이 파일은 프로젝트 내용보다 **뒤에** 임포트되므로 여기의 ItemDefinitionGroup이
+  각 vcxproj의 설정을 이긴다. props가 아니라 targets에 두는 이유가 그것이다.
+
+  ── ASan이 켜질 때 함께 꺼야 하는 것들 ──
+
+  · /RTC1  : ASan과 동시에 못 쓴다(컴파일러가 거부한다).
+  · /ZI    : 편집하며 계속하기 형식의 디버그 정보를 지원하지 않는다. /Zi로 내린다.
+  · 증분 링크: 지원하지 않는다.
+  · /GL    : 전체 프로그램 최적화와 함께 쓸 수 없다.
+  · 유니티 빌드: 여러 .cpp가 한 번역 단위로 합쳐지면 ASan 보고서의 파일·행이
+    합본 파일을 가리켜 원인 파일을 짚을 수 없다. 진단이 목적인 빌드라 끈다.
+
+  ── 컨테이너 주석(annotation)을 끄는 이유 ──
+
+  MSVC의 std::vector/std::string은 ASan용 경계 주석을 심는데, 이 주석은 프로그램
+  전체가 같은 설정으로 빌드되어야 성립한다. 이 저장소는 vcpkg의 미리 빌드된 정적
+  라이브러리를 여럿 링크하므로(주석 없음) 섞이는 순간 container-overflow 거짓 양성이
+  쏟아진다. 거짓 양성이 섞인 보고서는 아무도 읽지 않게 되므로 아예 끈다.
+
+  ── ASan 런타임 DLL ──
+
+  /MD 계열은 clang_rt.asan_dynamic-x86_64.dll 을 실행 시점에 찾는다.
+  없으면 프로세스가 기동하지 못한다. VS 도구 폴더에 있으므로 개발자 명령 프롬프트에서
+  실행하거나 exe 옆에 복사한다:
+    %VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll
+
+  ── 권장 ASAN_OPTIONS ──
+
+    set ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1:print_stats=1
+  누수 검출은 Windows에서 지원되지 않으므로 끄고, 첫 오류에서 즉시 멈춘다
+  (계속 돌리면 첫 오류가 만든 오염이 뒤의 보고서를 전부 못 믿게 만든다).
+-->
+<Project>
+
+  <PropertyGroup Condition="'$(EngineAsan)' == 'true' and '$(MSBuildProjectExtension)' == '.vcxproj'">
+    <LinkIncremental>false</LinkIncremental>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <!-- VS의 유니티(점보) 빌드. 이 저장소는 Academy_4Q가 켜 두고 있다. -->
+    <EnableUnitySupport>false</EnableUnitySupport>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(EngineAsan)' == 'true' and '$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ClCompile>
+      <EnableASAN>true</EnableASAN>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <!--
+        ENGINE_ASAN: 엔진 할당을 mimalloc에서 CRT로 되돌리는 스위치.
+        MemoryManager.cpp가 이 매크로를 본다. 자세한 이유는 그 파일 주석에 있다 —
+        이것을 켜지 않으면 ASan이 GameObject·Component 할당을 아예 보지 못해
+        이 빌드 구성의 목적 자체가 사라진다.
+      -->
+      <PreprocessorDefinitions>ENGINE_ASAN;_DISABLE_VECTOR_ANNOTATION;_DISABLE_STRING_ANNOTATION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+
+</Project>

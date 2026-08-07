@@ -6,6 +6,7 @@
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"
 #include "ComponentFactory.h"
+#include "LifecycleTrace.h"
 #include "Animator.h"
 #include "ConditionParameter.h"
 #include "UIManager.h"
@@ -421,6 +422,14 @@ void ConsoleCommandSystem::Enqueue(std::string command)
 
 void ConsoleCommandSystem::Pump()
 {
+    // 생명주기 기록기의 프레임 경계(PHASE 9-0).
+    //
+    // 여기에 두는 이유는 이 함수가 이미 "게임 스레드에서 프레임마다 정확히 한 번"이고,
+    // 그 성질을 가진 자리를 새로 만들면 엔진 루프에 진단용 호출이 하나 더 늘기 때문이다.
+    // 아래 조기 반환들보다 앞이어야 한다 — wait 중이거나 씬 로딩 중인 프레임도
+    // 프레임이고, 그 사이에 일어난 Awake/OnDestroy가 어느 프레임 것인지 알아야 한다.
+    Lifecycle::Trace::BeginFrame();
+
     // wait 명령으로 보류 중이면 프레임만 소모한다.
     if (m_waitFrames > 0)
     {
@@ -2437,6 +2446,111 @@ void ConsoleCommandSystem::Execute(const std::string& line)
         SceneManagers->SetGameStart(cmd == "play");
         std::printf("[CLI] %s 요청\n", cmd.c_str());
     }
+    else if (cmd == "lifecycle.trace")
+    {
+        // 생명주기 호출 순서를 받아 적는다(PHASE 9-0).
+        //
+        // PHASE 9는 이 순서를 만들어 내는 기구를 통째로 바꾼다. 지금 순서는 델리게이트의
+        // 우선순위 정렬과 등록 시점이 만드는 창발적 결과라 코드로는 알 수 없다 —
+        // 교체 전에 받아 적어 두어야 교체 후 "동작이 같다"를 주장할 수 있다.
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+
+        if (mode == "on")
+        {
+            // 틱 단계(Update·LateUpdate·FixedUpdate)를 적을 프레임 수.
+            // 한 프레임 안의 순서가 알고 싶은 것이지 반복 횟수가 아니라서 예산을 둔다.
+            const int frames = (parts.size() >= 3) ? std::atoi(parts[2].c_str()) : 3;
+            Lifecycle::Trace::Enable(frames);
+            std::printf("[CLI] lifecycle.trace on — 틱 %d프레임\n", frames);
+        }
+        else if (mode == "off")
+        {
+            Lifecycle::Trace::Disable();
+            std::printf("[CLI] lifecycle.trace off — %zu건 보관\n", Lifecycle::Trace::Count());
+        }
+        else if (mode == "clear")
+        {
+            Lifecycle::Trace::Clear();
+            std::printf("[CLI] lifecycle.trace clear\n");
+        }
+        else
+        {
+            std::printf("[CLI] lifecycle.trace — %s · %zu건 · 틱 잔여 %d프레임\n",
+                Lifecycle::Trace::IsEnabled() ? "기록 중" : "정지",
+                Lifecycle::Trace::Count(),
+                Lifecycle::Trace::RemainingTickFrames());
+        }
+    }
+    else if (cmd == "lifecycle.dump")
+    {
+        const std::string path = (parts.size() >= 2) ? parts[1] : std::string("lifecycle_trace.tsv");
+        const size_t count = Lifecycle::Trace::Count();
+
+        if (0 == count)
+        {
+            // 빈 파일을 성공으로 흘려보내면 "기준선을 떴다"고 착각한 채 다음으로 넘어간다.
+            // 3-6에서 겪은 조용한 통과와 같은 부류라 여기서 실패로 못 박는다.
+            std::printf("[CLI] lifecycle.dump 실패 — 기록 0건 (lifecycle.trace on 을 먼저 부를 것)\n");
+            return;
+        }
+
+        if (Lifecycle::Trace::Dump(path))
+        {
+            std::printf("[CLI] lifecycle.dump %s — %zu건\n", path.c_str(), count);
+        }
+        else
+        {
+            std::printf("[CLI] lifecycle.dump 실패 — 파일을 열 수 없다: %s\n", path.c_str());
+        }
+    }
+    else if (cmd == "lifecycle.stress")
+    {
+        // 파괴·생성을 몰아쳐 수명 경로를 흔든다(PHASE 9-0의 ASan 재현용).
+        //
+        // 지금은 프레임 경계에서 파괴가 일어나는 경로만 흔든다. "순회 도중 파괴"와
+        // "Update 안에서 AddComponent" 같은 재진입 재현은 9-1의 레지스트리가 선
+        // 뒤에 붙인다 — 지금 구조에는 그 지점을 안전하게 잡을 자리가 없다.
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "";
+        const int count = (parts.size() >= 3) ? std::atoi(parts[2].c_str()) : 8;
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        if (mode == "destroy")
+        {
+            int marked = 0;
+            // 루트(0번)는 건드리지 않는다. 씬 구조가 무너지면 이후 명령이 전부 의미를 잃는다.
+            for (size_t i = 1; i < scene->m_SceneObjects.size() && marked < count; ++i)
+            {
+                const auto& owned = scene->m_SceneObjects[i];
+                if (!owned || owned->IsDestroyMark()) continue;
+                scene->DestroyGameObject(owned);
+                ++marked;
+            }
+            std::printf("[CLI] lifecycle.stress destroy — %d개 파괴 표시\n", marked);
+        }
+        else if (mode == "churn")
+        {
+            // 파괴와 생성을 같은 프레임에 섞는다. 인덱스 재사용 경로가 여기서 드러난다.
+            int marked = 0;
+            for (size_t i = 1; i < scene->m_SceneObjects.size() && marked < count; ++i)
+            {
+                const auto& owned = scene->m_SceneObjects[i];
+                if (!owned || owned->IsDestroyMark()) continue;
+                scene->DestroyGameObject(owned);
+                ++marked;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                scene->CreateGameObject("StressChurn_" + std::to_string(i));
+            }
+            std::printf("[CLI] lifecycle.stress churn — 파괴 %d · 생성 %d\n", marked, count);
+        }
+        else
+        {
+            std::printf("[CLI] lifecycle.stress destroy|churn [개수]\n");
+        }
+    }
     else if (cmd == "scene.dump")
     {
         // 활성 씬의 오브젝트 계층을 로그로 남긴다. 재생/정지 전후로 찍어 비교하면
@@ -2817,6 +2931,9 @@ void ConsoleCommandSystem::PrintHelp() const
         "  object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]  변환을 지정한다(회전은 도)\n"
         "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
+        "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"
+        "  lifecycle.dump [파일]  기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)\n"
+        "  lifecycle.stress destroy|churn [개수]  파괴·생성을 몰아쳐 수명 경로를 흔든다\n"
         "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
         "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
         "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"

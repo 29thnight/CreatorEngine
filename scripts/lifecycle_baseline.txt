@@ -1,0 +1,54 @@
+# 생명주기 기준선 시나리오 (PHASE 9-0)
+#
+# 사용법:
+#   Academy_4Q.exe --script ..\..\scripts\lifecycle_baseline.txt
+#   (Tools\regression\verify-lifecycle-baseline.ps1 이 이 파일을 부른다)
+#
+# 목적:
+#   로드 → 재생 → 전환 → 종료 한 바퀴 동안 생명주기가 누구를 어떤 순서로 부르는지
+#   받아 적는다. PHASE 9-1~9-3이 그 기구를 통째로 바꾸므로, 교체 후 같은 시나리오로
+#   다시 받아 두 파일을 비교하는 것이 기능 동등성 판정 방법이다.
+#
+# 왜 왕복(A→B→A)인가:
+#   편도만 재면 "새 씬에서 안 불렸다"와 "이전 씬이 정리되지 않았다"를 구분할 수 없다.
+#   씬 전환의 OnDestroy 대칭성은 왕복에서만 드러난다.
+#
+# 주의:
+#   아래 씬 경로는 실제 프로젝트 경로로 바꿔야 한다(scene_churn_benchmark.txt와 같다).
+#   틱 프레임 예산을 3으로 두는 이유는 한 프레임 안의 순서가 알고 싶은 것이지
+#   반복 횟수가 아니기 때문이다. 늘리면 파일만 커지고 diff가 어려워진다.
+
+# --- 로드 ---
+scene.switch Assets/Scenes/SceneA.scene
+wait 60
+
+# --- 기록 시작: 재생 진입의 Awake/OnEnable/Start 순서가 여기 담긴다 ---
+lifecycle.trace clear
+lifecycle.trace on 3
+play
+wait 120
+lifecycle.trace status
+
+# --- 파괴 경로: OnDestroy 순서와 파괴 중 순회 안전성 ---
+lifecycle.stress destroy 8
+wait 60
+lifecycle.stress churn 8
+wait 60
+
+# --- 전환: 이전 씬의 정리와 새 씬의 초기화가 겹치는 구간 ---
+scene.switch Assets/Scenes/SceneB.scene
+wait 120
+scene.switch Assets/Scenes/SceneA.scene
+wait 120
+
+# --- 정지 ---
+stop
+wait 60
+
+# --- 기록 저장 ---
+lifecycle.trace off
+lifecycle.dump lifecycle_trace.tsv
+scene.dump lifecycle-baseline-final
+gpu.census lifecycle-baseline-final
+log.flush
+quit

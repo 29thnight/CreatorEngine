@@ -1,0 +1,129 @@
+#pragma once
+#ifndef DYNAMICCPP_EXPORTS
+#include <atomic>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <typeinfo>
+
+// 생명주기 호출 순서 기록기 (PHASE 9-0).
+//
+// ── 왜 필요한가 ──
+//
+// PHASE 9는 컴포넌트 생명주기를 델리게이트 구독에서 Scene 소유 단계 리스트로
+// 갈아엎는다. 그 교체가 "동작을 바꾸지 않았다"를 주장하려면 비교 대상이 있어야 하는데,
+// 지금 순서는 어디에도 적혀 있지 않다 — 델리게이트의 우선순위 정렬과 등록 시점이
+// 만들어 내는 창발적 결과라, 코드를 읽어서는 알 수 없고 돌려 봐야만 안다.
+//
+// 그래서 교체 **전에** 한 번 받아 적는다. 교체 후 같은 시나리오로 다시 받아
+// 두 파일을 diff 하는 것이 9-1~9-3의 기능 동등성 판정 방법이다.
+//
+// ── 왜 틱 단계는 프레임 예산을 두는가 ──
+//
+// Awake·Start·OnDestroy는 객체당 한 번이라 전부 적어도 파일이 유한하다.
+// 반면 Update는 프레임마다 컴포넌트 수만큼 나오므로 그대로 적으면 몇 초 만에
+// 수백만 줄이 되고, 그런 파일은 diff가 불가능하다.
+//
+// 알고 싶은 것은 "한 프레임 안에서 누가 어떤 순서로 불리는가"이지 그것이
+// 몇 번 반복되는지가 아니다. 그래서 켤 때 프레임 수를 받아 그동안만 적는다.
+//
+// ── 스레드 ──
+//
+// 게임 스레드 전용을 전제하지 않는다. 현재 브로드캐스트 경로에는 AI future처럼
+// 다른 스레드에서 들어올 여지가 있고, 기록기가 그걸 만나 깨지면 진단 도구가
+// 진단 대상이 되어 버린다. 켜져 있을 때만 락을 잡는다 — 꺼져 있으면
+// 원자 변수 한 번 읽는 것이 전부라 상시 컴파일해 두어도 부담이 없다.
+namespace Lifecycle
+{
+    enum class Phase : uint8_t
+    {
+        Awake,
+        OnEnable,
+        Start,
+        FixedUpdate,
+        Update,
+        LateUpdate,
+        OnDisable,
+        OnDestroy,
+    };
+
+    const char* ToString(Phase phase) noexcept;
+
+    class Trace
+    {
+    public:
+        /// 꺼져 있으면 원자 변수 한 번 읽고 끝난다. 기록 지점은 이것부터 본다.
+        static bool IsEnabled() noexcept
+        {
+            return s_enabled.load(std::memory_order_relaxed);
+        }
+
+        /// tickFrames: Update/LateUpdate/FixedUpdate를 기록할 프레임 수.
+        /// 0이면 수명 단계(Awake·Start·OnEnable·OnDisable·OnDestroy)만 적는다.
+        static void Enable(int tickFrames);
+        static void Disable();
+        static void Clear();
+
+        /// 프레임 경계에서 한 번 부른다(ConsoleCommandSystem::Pump 선두).
+        /// 틱 예산을 깎고 프레임 구분자를 남긴다.
+        static void BeginFrame();
+
+        /// typeName은 정적 문자열이어야 한다(컴파일 타임 타입 이름).
+        /// objectName/instanceId는 같은 타입이 여럿일 때 줄을 가르기 위한 것이다.
+        static void Record(Phase phase, const char* typeName,
+                           const char* objectName, uint64_t instanceId);
+
+        /// 기록을 파일로 쓴다. 성공하면 true.
+        static bool Dump(const std::string& path);
+
+        static size_t Count();
+        static int RemainingTickFrames() noexcept;
+
+    private:
+        static std::atomic<bool> s_enabled;
+    };
+
+    /// 컴파일 타임 타입 이름. MSVC의 typeid().name()은 "class Animator" 형태라
+    /// 접두사를 한 번만 걷어 정적 저장소에 담아 둔다 — 기록 지점마다 문자열을
+    /// 만들면 계측이 측정 대상을 바꾼다. 반환 포인터는 프로그램 수명 내내 유효하다.
+    template<typename T>
+    const char* TypeName()
+    {
+        static const std::string cached = []
+        {
+            std::string name = typeid(T).name();
+            for (const char* prefix : { "class ", "struct " })
+            {
+                const size_t length = std::strlen(prefix);
+                if (name.size() > length && 0 == name.compare(0, length, prefix))
+                {
+                    name.erase(0, length);
+                    break;
+                }
+            }
+            return name;
+        }();
+        return cached.c_str();
+    }
+}
+
+/// 기록 지점에서 쓰는 헬퍼. 꺼져 있을 때 인자 계산조차 하지 않게 한다 —
+/// objectName을 얻으려면 소유자를 역참조해야 하는데, 그 비용을 상시 경로에
+/// 남기면 계측이 측정 대상을 바꾼다.
+#define LIFECYCLE_TRACE(phase, typeName, objectNameExpr, instanceIdExpr)            \
+    do {                                                                            \
+        if (::Lifecycle::Trace::IsEnabled())                                        \
+        {                                                                           \
+            ::Lifecycle::Trace::Record((phase), (typeName),                         \
+                (objectNameExpr), (instanceIdExpr));                                \
+        }                                                                           \
+    } while (false)
+
+#else // DYNAMICCPP_EXPORTS
+
+// C++ 스크립트 모듈(Dynamic_CPP)은 기록기 구현을 링크하지 않는다.
+// 헤더가 딸려 들어와도 컴파일이 깨지지 않도록 빈 매크로를 둔다.
+// PHASE 9-4에서 이 모듈이 은퇴하면 이 분기도 함께 사라진다.
+#define LIFECYCLE_TRACE(phase, typeName, objectNameExpr, instanceIdExpr) ((void)0)
+
+#endif // !DYNAMICCPP_EXPORTS
