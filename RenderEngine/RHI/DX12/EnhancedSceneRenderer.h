@@ -538,7 +538,6 @@ public:
 
     /// 이 카메라의 그림을 DX12가 방금 그렸으면 그 SRV를 돌려준다.
     /// nullptr는 아직 첫 프레임이 준비되지 않았거나 다른 카메라라는 뜻이다.
-    static ID3D11ShaderResourceView* GetLiveDisplaySrv(const Camera* camera);
 
     /// ImGui DX12 셸 모드용 표시 경로. 표시 슬롯의 공유 핸들을 셸 디바이스가
     /// 열어(OpenSharedHandle — DX11이 하던 일을 DX12가 이어받는다) ImTextureID

@@ -433,9 +433,6 @@
     <ClInclude Include="Interfaces\FoliageType.generated.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="IRenderPass.h">
-      <Filter>RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="RenderScene.h">
       <Filter>RenderScene</Filter>
     </ClInclude>

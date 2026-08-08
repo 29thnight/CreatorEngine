@@ -198,10 +198,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		{
 			displayed = (ImTextureID)liveTextureId;   // DX12 셸 — 공유 텍스처 직결
 		}
-		else if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(cam))
-		{
-			displayed = (ImTextureID)liveSrv;         // DX11 백엔드 표시
-		}
 		if (displayed != 0)
 		{
 			ImGui::Image(displayed, ImVec2(x, y));

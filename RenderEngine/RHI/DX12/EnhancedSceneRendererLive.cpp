@@ -28,6 +28,7 @@
 #include "EnhancedGizmoIconPass.h"
 #include "EnhancedGizmoLinePass.h"
 #include "ImGuiDx12Shell.h"
+#include "../ScreenSizedResource.h"
 #include "../../EnhancedGizmoSceneBinding.h"
 #include "../../GizmoRenderer.h"
 
@@ -218,8 +219,6 @@ namespace
         {
             ComPtr<ID3D12Resource>           sharedTexture;
             HANDLE                           sharedHandle{ nullptr };
-            ComPtr<ID3D11Texture2D>          openedTexture;
-            ComPtr<ID3D11ShaderResourceView> openedSrv;
             uint64_t                         fenceValue{ 0 };
 
             // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
@@ -360,8 +359,6 @@ namespace
         {
             ComPtr<ID3D12Resource>           sharedTexture;
             HANDLE                           sharedHandle{ nullptr };
-            ComPtr<ID3D11Texture2D>          openedTexture;
-            ComPtr<ID3D11ShaderResourceView> openedSrv;
         };
         std::vector<Grave> graveyard;
 
@@ -465,34 +462,21 @@ namespace
 
         bool BuildPipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
         {
-            ID3D11Device3* dx11Device = DirectX11::DeviceStates->g_pDevice;
-            if (nullptr == dx11Device)
-            {
-                outError = "DX11 디바이스가 없다";
-                return false;
-            }
-
             pipeline = std::make_unique<LivePipeline>();
             LivePipeline& p = *pipeline;
 
-            // 공유는 같은 물리 어댑터에서만 성립한다 — LUID로 맞춘다
-            // (RunSharedTextureTest와 같은 이유·같은 방법).
-            LUID dx11Luid{};
-            {
-                ComPtr<IDXGIDevice>  dxgiDevice;
-                ComPtr<IDXGIAdapter> adapter;
-                if (FAILED(dx11Device->QueryInterface(IID_PPV_ARGS(&dxgiDevice))) ||
-                    FAILED(dxgiDevice->GetAdapter(&adapter)))
-                {
-                    outError = "DX11 어댑터 조회 실패";
-                    return false;
-                }
-                DXGI_ADAPTER_DESC adapterDesc{};
-                adapter->GetDesc(&adapterDesc);
-                dx11Luid = adapterDesc.AdapterLuid;
-            }
-
-            if (!p.resources.Initialize(newWidth, newHeight, outError, dx11Luid)) return false;
+            // ★ 어댑터를 DX11에 맞추던 것을 걷었다 (D4, 2026-08-08).
+            //
+            //   공유 텍스처가 같은 물리 어댑터를 요구하는 것은 그대로다. 바뀐
+            //   것은 그 상대다 — 예전에는 DX11도 이 텍스처를 열어 SRV로 뷰에
+            //   그렸고(셸이 없던 시절의 표시 경로), 그래서 DX11 어댑터가
+            //   기준이었다. 그 폴백을 아래에서 함께 걷었으므로 지금 공유의
+            //   상대는 ImGui 셸(DX12) 하나다.
+            //
+            //   LUID를 주지 않으면 DX12DeviceResources가 고성능 어댑터 0번을
+            //   고른다. 그 선택이 결정적이라 라이브와 셸이 같은 것을 고르고,
+            //   공유의 전제는 그대로 성립한다.
+            if (!p.resources.Initialize(newWidth, newHeight, outError)) return false;
 
             if (!p.psoManager.Initialize(p.resources.GetDevice(), L"dx12_live.cache", outError) ||
                 !p.rootSignatures.Initialize(p.resources.GetDevice(), outError) ||
@@ -633,21 +617,11 @@ namespace
                     return false;
                 }
 
-                ComPtr<ID3D11Device1> device1;
-                if (FAILED(dx11Device->QueryInterface(IID_PPV_ARGS(&device1))) ||
-                    FAILED(device1->OpenSharedResource1(slot.sharedHandle,
-                        IID_PPV_ARGS(&slot.openedTexture))))
-                {
-                    outError = "DX11에서 공유 텍스처 열기 실패";
-                    return false;
-                }
-
-                if (FAILED(dx11Device->CreateShaderResourceView(slot.openedTexture.Get(),
-                    nullptr, &slot.openedSrv)))
-                {
-                    outError = "DX11 SRV 생성 실패";
-                    return false;
-                }
+                // ★ DX11에서 이 공유 텍스처를 열어 SRV를 만들던 자리를 걷었다 (D4).
+                //   셸이 꺼졌을 때 ImGui DX11 백엔드로 뷰를 그리던 폴백인데,
+                //   셸이 기본으로 켜져 있고 T6에서 같은 성격의 폴백
+                //   (EditorImGuiTexture)을 이미 걷었다. 남겨 두면 DX11 디바이스를
+                //   계속 들어야 해서 D4가 끝나지 않는다.
             }
 
             return true;
@@ -669,12 +643,10 @@ namespace
 
                 for (LivePipeline::DisplaySlot& slot : view.slots)
                 {
-                    if (!slot.sharedTexture && !slot.openedSrv) continue;
+                    if (!slot.sharedTexture) continue;
                     Grave grave;
                     grave.sharedTexture = std::move(slot.sharedTexture);
                     grave.sharedHandle = slot.sharedHandle;
-                    grave.openedTexture = std::move(slot.openedTexture);
-                    grave.openedSrv = std::move(slot.openedSrv);
                     graveyard.push_back(std::move(grave));
                     slot.sharedHandle = nullptr;
                 }
@@ -1465,10 +1437,10 @@ namespace
         {
             if (nullptr == sceneCamera || nullptr == renderScene) return false;
 
-            const uint32_t rtWidth = static_cast<uint32_t>(
-                DirectX11::DeviceStates->g_Viewport.Width);
-            const uint32_t rtHeight = static_cast<uint32_t>(
-                DirectX11::DeviceStates->g_Viewport.Height);
+            // 해상도는 백엔드 중립 버스에서 받는다(D4). 예전에는 DX11 뷰포트를
+            // 읽었는데, 그 뷰포트를 채우던 것이 DeviceResources였다.
+            const uint32_t rtWidth = ScreenResizeBus::Get().GetWidth();
+            const uint32_t rtHeight = ScreenResizeBus::Get().GetHeight();
             if (0 == rtWidth || 0 == rtHeight) return false;
 
             cameraSnapshot.view = sceneCamera->CalculateView();
@@ -2012,12 +1984,6 @@ bool EnhancedSceneRenderer::InitializeRuntime(std::string& outError)
         return true;
     }
 
-    if (nullptr == DirectX11::DeviceStates->g_pDevice)
-    {
-        outError = "DX11 에디터 셸 디바이스 상태가 초기화되지 않았다";
-        return false;
-    }
-
     try
     {
         state.renderScene = std::make_shared<RenderScene>();
@@ -2273,15 +2239,13 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
         return;
     }
 
-    // 해상도는 밀봉이 카메라가 아니라 DeviceStates 뷰포트에서 가져오므로
+    // 해상도는 밀봉이 카메라가 아니라 화면 크기 버스에서 가져오므로
     // 모든 뷰가 공유한다 — 재구축 판정도 프레임당 한 번이면 된다.
     // 크기가 바뀌면 통째로 다시 세운다. 패스들이 화면 크기 리소스를
     // Initialize에서 잡으므로 부분 리사이즈보다 재구축이 단순하고,
     // 에디터 뷰 리사이즈는 드문 사건이라 비용이 문제되지 않는다.
-    const uint32_t rtWidth = static_cast<uint32_t>(
-        DirectX11::DeviceStates->g_Viewport.Width);
-    const uint32_t rtHeight = static_cast<uint32_t>(
-        DirectX11::DeviceStates->g_Viewport.Height);
+    const uint32_t rtWidth = ScreenResizeBus::Get().GetWidth();
+    const uint32_t rtHeight = ScreenResizeBus::Get().GetHeight();
     if (0 == rtWidth || 0 == rtHeight)
     {
         ++state.framesIdle;
@@ -2415,20 +2379,6 @@ void EnhancedSceneRenderer::TickLive(float deltaSeconds, Camera* const* cameras,
     if (renderedAny) state.lastCpuMs = watch.ElapsedMs();
 }
 
-ID3D11ShaderResourceView* EnhancedSceneRenderer::GetLiveDisplaySrv(const Camera* camera)
-{
-    const LiveState& state = GetLiveState();
-    if (!state.enabled || nullptr == state.pipeline) return nullptr;
-    if (nullptr == camera) return nullptr;
-
-    for (const LivePipeline::CameraView& view : state.pipeline->views)
-    {
-        if (view.camera != camera) continue;
-        if (view.displaySlot < 0) return nullptr;
-        return view.slots[view.displaySlot].openedSrv.Get();
-    }
-    return nullptr;
-}
 
 uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(const Camera* camera)
 {
@@ -2610,8 +2560,6 @@ void EnhancedSceneRenderer::ShutdownLive()
 
     for (LiveState::Grave& grave : state.graveyard)
     {
-        grave.openedSrv.Reset();
-        grave.openedTexture.Reset();
         if (nullptr != grave.sharedHandle) ::CloseHandle(grave.sharedHandle);
         grave.sharedTexture.Reset();
     }

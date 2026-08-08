@@ -136,24 +136,12 @@ bool ImGuiDx12Shell::Initialize(HWND hwnd, uint32_t width, uint32_t height,
     Impl& impl = *m_impl;
     if (impl.active) return true;
 
-    // DX11과 같은 어댑터. 라이브의 공유 텍스처를 이 디바이스에서 열려면
-    // (씬 뷰 표시) 같은 물리 어댑터여야 한다 — 공유의 전제 그대로다.
-    LUID dx11Luid{ 0, 0 };
-    if (DirectX11::DeviceStates->g_pDevice)
-    {
-        Microsoft::WRL::ComPtr<IDXGIDevice>  dxgiDevice;
-        Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
-        if (SUCCEEDED(DirectX11::DeviceStates->g_pDevice->QueryInterface(
-                IID_PPV_ARGS(&dxgiDevice))) &&
-            SUCCEEDED(dxgiDevice->GetAdapter(&adapter)))
-        {
-            DXGI_ADAPTER_DESC adapterDesc{};
-            adapter->GetDesc(&adapterDesc);
-            dx11Luid = adapterDesc.AdapterLuid;
-        }
-    }
-
-    if (!impl.resources.Initialize(width, height, outError, dx11Luid)) return false;
+    // ★ 어댑터를 DX11에 맞추던 것을 걷었다 (D4, 2026-08-08).
+    //   라이브의 공유 텍스처를 이 디바이스에서 열려면 같은 물리 어댑터여야
+    //   한다는 전제는 그대로다. 다만 그 짝이 DX11이 아니라 라이브(DX12)이고,
+    //   양쪽이 LUID 없이 초기화하면 둘 다 고성능 어댑터 0번을 고른다 —
+    //   결정적이라 같은 것이 나온다.
+    if (!impl.resources.Initialize(width, height, outError)) return false;
     if (!impl.resources.AttachSwapChain(hwnd, width, height, outError)) return false;
     if (!impl.textureCache.Initialize(&impl.resources, outError))
     {

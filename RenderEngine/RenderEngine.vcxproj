@@ -397,7 +397,6 @@
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeviceState.h" />
     <ClInclude Include="ImGuiRenderer.h" />
-    <ClInclude Include="IRenderPass.h" />
     <ClInclude Include="LightController.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />

@@ -56,10 +56,6 @@ void GameViewWindow::RenderGameViewWindow()
 			{
 				displayed = (ImTextureID)liveTextureId;
 			}
-			else if (auto* liveSrv = EnhancedSceneRenderer::GetLiveDisplaySrv(camera.get()))
-			{
-				displayed = (ImTextureID)liveSrv;
-			}
 			if (displayed != 0)
 			{
 				ImGui::Image(displayed, imageSize);
