@@ -88,7 +88,7 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
 		    file::path path = PathFinder::Relative("SpriteSheets\\") /
                 file::path(data.spriteSheetPath).filename().replace_extension(".txt");
 
-            m_spriteSheet->Load(m_texture->m_pSRV, path.c_str());
+            m_spriteSheet->Load(path.c_str());
         }
         catch (const std::exception& e)
         {

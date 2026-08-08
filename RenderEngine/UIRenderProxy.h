@@ -73,14 +73,12 @@ public:
 	explicit UIRenderProxy(SpriteSheetComponent* sprite) noexcept;
     ~UIRenderProxy();
 
-    void Draw(std::unique_ptr<DirectX::SpriteBatch>& spriteBatch) const;
     void DestroyProxy();
 
 	void SetCustomPixelShader(std::string_view shaderPath);
 	ShaderPtr<PixelShader> GetCustomPixelShader() const { return m_customPixelShader; }
 
 	void SetCustomPixelBuffer(const std::vector<std::byte>& cpuBuffer);
-	ComPtr<ID3D11Buffer> GetCustomPixelBuffer() const { return m_customPixelBuffer; }
 
     int GetCanvasOrder() const {
         return std::visit([](auto&& d) { return d.canvasOrder; }, m_data);
@@ -90,9 +88,7 @@ public:
         return std::visit([](auto&& d) { return d.layerOrder; }, m_data);
     }
 
-	void UpdateShaderBuffer(ID3D11DeviceContext* deferredContext);
-
-	bool isCustomShader() const { return m_customPixelShader != nullptr && m_customPixelBuffer != nullptr; }
+	bool isCustomShader() const { return m_customPixelShader != nullptr && 0 != m_customPixelBufferSize; }
 
     /// 담고 있는 것(이미지·텍스트·스프라이트시트)을 읽기 전용으로 준다.
     ///
@@ -117,7 +113,6 @@ private:
     mutable SpriteSheet::SequenceState                   m_sequenceState{};
     HashedGuid			                                 m_instancedID{};
     ShaderPtr<PixelShader>                               m_customPixelShader{};
-	ComPtr<ID3D11Buffer>                                 m_customPixelBuffer{ nullptr };
 	std::vector<std::byte>                               m_customPixelCPUBuffer{};
     uint32                                               m_customPixelBufferSize{};
 	mutable Mathf::Vector2 								 m_textMeasureSize{ 0.f };

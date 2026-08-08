@@ -3480,16 +3480,13 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
     uint32_t keyedBatchCount = 0;
     if (!draws.empty())
     {
-        auto* keyTextureA = Texture::Create(4, 4, "MatKeyA",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
-        auto* keyTextureB = Texture::Create(4, 4, "MatKeyB",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
+        // ★ 빈 Texture 객체로 만든다 (T6). 재질 키는 포인터라 신원만 갈리면
+        //   되고, 예전에 만들던 4x4 DX11 리소스는 한 번도 읽히지 않았다.
+        auto* keyTextureA = new Texture();
+        auto* keyTextureB = new Texture();
 
         if (nullptr != keyTextureA && nullptr != keyTextureB)
         {
-            keyTextureA->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
-            keyTextureB->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
-
             std::vector<EnhancedDrawItem> sameMeshDraws;
 
             EnhancedDrawItem first = draws.front();
@@ -3703,11 +3700,7 @@ bool EnhancedSceneRenderer::RunSceneBindingTest(std::string& outLog)
         variantTextures.reserve(kMaterialVariants);
         for (uint32_t index = 0; index < kMaterialVariants; ++index)
         {
-            auto* texture = Texture::Create(4, 4, "ScaleMat" + std::to_string(index),
-                DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
-            if (nullptr == texture) break;
-
-            texture->CreateSRV(DXGI_FORMAT_R8G8B8A8_UNORM);
+            auto* texture = new Texture();   // 신원만 필요하다(위 T6 주석 참조)
             variantTextures.push_back(texture);
         }
 
@@ -4146,76 +4139,24 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
 {
     bool passed = true;
 
-    // ── [1/3] DX11 텍스처가 정책대로 따라가는가 ──
+    // ★ [1/3] "DX11 텍스처가 정책대로 따라가는가"를 은퇴시켰다 (T6, 2026-08-08).
     //
-    // 실제 창을 흔들지 않고 크기 통지만 직접 건다. 창을 흔들면 스왑체인
-    // 재생성까지 얽혀 무엇을 재고 있는지 흐려진다.
-    const uint32_t startWidth = (std::max)(1u, ScreenResizeBus::Get().GetWidth());
-    const uint32_t startHeight = (std::max)(1u, ScreenResizeBus::Get().GetHeight());
+    //   그 검사는 Texture::CreateScreenSized가 만든 DX11 텍스처가 ScreenResizeBus
+    //   통지에 맞춰 크기를 바꾸는지를 쟀다. T6이 Texture의 DX11 표면을 걷으면서
+    //   재는 대상 자체가 사라졌다.
+    //
+    //   ★ 버스(ScreenResizeBus)는 그대로 살아 있다 - 백엔드 중립이고 DX12가
+    //     구독한다. 은퇴한 것은 DX11 구독자를 재던 검사 하나뿐이고, 아래
+    //     [1/2]가 DX12 쪽 같은 계약을 잰다.
 
-    {
-        auto* following = Texture::CreateScreenSized("ResizeTest.Following",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
-        auto* half = Texture::CreateScreenSized("ResizeTest.Half",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE, 2, 2);
-        auto* fixed = Texture::Create(2048, 2048, "ResizeTest.Fixed",
-            DXGI_FORMAT_R8G8B8A8_UNORM, D3D11_BIND_SHADER_RESOURCE);
-
-        if (nullptr == following || nullptr == half || nullptr == fixed)
-        {
-            outLog += "[1/3] 검증용 텍스처 생성 실패\n";
-            return false;
-        }
-
-        // 지금 크기와 다른 값으로 흔든다. 같은 값이면 바뀐 것이 없어도 통과한다.
-        const uint32_t newWidth = (1280u == startWidth) ? 1600u : 1280u;
-        const uint32_t newHeight = (720u == startHeight) ? 900u : 720u;
-
-        following->ApplyScreenSize(newWidth, newHeight);
-        half->ApplyScreenSize(newWidth, newHeight);
-        fixed->ApplyScreenSize(newWidth, newHeight);
-
-        char line[256]{};
-        std::snprintf(line, sizeof(line),
-            "[1/3] DX11 %ux%u -> %ux%u · 추종 %.0fx%.0f · 1/2 %.0fx%.0f · 고정 %.0fx%.0f\n",
-            startWidth, startHeight, newWidth, newHeight,
-            following->GetWidth(), following->GetHeight(),
-            half->GetWidth(), half->GetHeight(),
-            fixed->GetWidth(), fixed->GetHeight());
-        outLog += line;
-
-        if (following->GetWidth() != static_cast<float>(newWidth) ||
-            following->GetHeight() != static_cast<float>(newHeight))
-        {
-            passed = false;
-            outLog += "      실패 — 따라가겠다고 선언한 텍스처가 새 크기를 받지 않았다\n";
-        }
-        if (half->GetWidth() != static_cast<float>(newWidth / 2) ||
-            half->GetHeight() != static_cast<float>(newHeight / 2))
-        {
-            passed = false;
-            outLog += "      실패 — 1/2 해상도 버퍼가 나눈 크기로 따라가지 않았다\n";
-        }
-        if (2048.f != fixed->GetWidth() || 2048.f != fixed->GetHeight())
-        {
-            passed = false;
-            outLog += "      실패 — 선언하지 않은 텍스처까지 크기가 바뀌었다"
-                "(그림자 맵·LUT가 창을 따라가는 상태다)\n";
-        }
-
-        Memory::SafeDelete(following);
-        Memory::SafeDelete(half);
-        Memory::SafeDelete(fixed);
-    }
-
-    // ── [2/3] DX12 디바이스가 리사이즈를 받는가 ──
+    // ── [1/2] DX12 디바이스가 리사이즈를 받는가 ──
     DX12DeviceResources resources;
     std::string error;
     constexpr uint32_t kInitialWidth = 256;
     constexpr uint32_t kInitialHeight = 256;
     if (!resources.Initialize(kInitialWidth, kInitialHeight, error))
     {
-        outLog += "[2/3] 디바이스 초기화 실패: " + error + "\n";
+        outLog += "[1/2] 디바이스 초기화 실패: " + error + "\n";
         return false;
     }
 
@@ -4223,7 +4164,7 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
     constexpr uint32_t kResizedHeight = 192;
     if (!resources.Resize(kResizedWidth, kResizedHeight, error))
     {
-        outLog += "[2/3] 리사이즈 실패: " + error + "\n";
+        outLog += "[1/2] 리사이즈 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
@@ -4231,7 +4172,7 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
     {
         char line[192]{};
         std::snprintf(line, sizeof(line),
-            "[2/3] DX12 %ux%u -> %ux%u · 보고 %ux%u · rowPitch %u\n",
+            "[1/2] DX12 %ux%u -> %ux%u · 보고 %ux%u · rowPitch %u\n",
             kInitialWidth, kInitialHeight, kResizedWidth, kResizedHeight,
             resources.GetWidth(), resources.GetHeight(), resources.GetRowPitch());
         outLog += line;
@@ -4260,12 +4201,12 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
         outLog += "      실패 — 리사이즈 뒤 렌더 타깃이 비었다\n";
     }
 
-    // ── [3/3] 리사이즈한 타깃에 실제로 그리고 되읽을 수 있는가 ──
+    // ── [2/2] 리사이즈한 타깃에 실제로 그리고 되읽을 수 있는가 ──
     //
     // 크기만 맞고 뷰가 옛 리소스를 가리키면 여기서 드러난다.
     if (!resources.BeginFrame(error))
     {
-        outLog += "[3/3] BeginFrame 실패: " + error + "\n";
+        outLog += "[2/2] BeginFrame 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
@@ -4305,7 +4246,7 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
 
     if (!resources.EndFrame(error))
     {
-        outLog += "[3/3] EndFrame 실패: " + error + "\n";
+        outLog += "[2/2] EndFrame 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
@@ -4337,7 +4278,7 @@ bool EnhancedSceneRenderer::RunScreenResizeTest(std::string& outLog)
     const uint32_t totalPixels = kResizedWidth * kResizedHeight;
     {
         char line[160]{};
-        std::snprintf(line, sizeof(line), "[3/3] 리사이즈 후 렌더 — 클리어 픽셀 %u/%u\n",
+        std::snprintf(line, sizeof(line), "[2/2] 리사이즈 후 렌더 — 클리어 픽셀 %u/%u\n",
             clearedPixels, totalPixels);
         outLog += line;
     }

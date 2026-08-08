@@ -50,8 +50,6 @@ RenderPassData::~RenderPassData()
 	ClearShadowRenderDataBuffer();
 	m_isInitalized = false;
 
-	m_renderTarget.reset();
-	m_depthStencil.reset();
 }
 
 void RenderPassData::Initalize(uint32 index)
@@ -60,18 +58,10 @@ void RenderPassData::Initalize(uint32 index)
 
 	m_index = index;
 
-	std::string cameraRTVName = "RenderPassData(" + std::to_string(index) + ") RTV";
-
-	auto renderTexture = TextureHelper::CreateScreenRenderTexture(
-		cameraRTVName,
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-	m_renderTarget.swap(renderTexture);
-
-	auto depthStencil = TextureHelper::CreateScreenDepthTexture(
-		"RenderPassData(" + std::to_string(index) + ") DSV"
-	);
-	m_depthStencil.swap(depthStencil);
+	// ★ 카메라 DX11 렌더타깃·깊이 생성을 걷었다 (T6, 2026-08-08).
+	//   T3이 "EffectSystem 셋이 OMSetRenderTargets에 그대로 건다"며 남겨 둔
+	//   것인데, 그 EffectSystem이 PHASE 10-0에서 통째로 사라졌다. 남은
+	//   소비자는 크기를 찍는 진단 하나였고 그것도 함께 걷었다.
 
 	m_deferredQueue.reserve(500);
 	m_forwardQueue.reserve(500);

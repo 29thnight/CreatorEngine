@@ -27,8 +27,6 @@ public:
 	//
 	// 그림자 맵·SSR 히스토리·뷰/투영 상수 버퍼도 여기 있었으나 읽는 곳이
 	// 하나도 없어 T3에서 걷어냈다.
-	Managed::UniquePtr<Texture> m_renderTarget;
-	Managed::UniquePtr<Texture> m_depthStencil;
 	FrameProxyFindInstanceIDs	m_findProxyVec[STORE_FRAME_COUNT];
 	FrameProxyFindInstanceIDs	m_findShadowProxyVec[STORE_FRAME_COUNT];
 	FrameUIProxyIDs				m_findUIProxyVec[STORE_FRAME_COUNT];

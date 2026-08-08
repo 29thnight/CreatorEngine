@@ -1888,27 +1888,11 @@ void ConsoleCommandSystem::Execute(const std::string& line)
             report += line;
         }
 
-        for (auto& camera : CameraManagement->GetCameras())
-        {
-            if (!camera || !RenderPassData::VaildCheck(camera.get())) continue;
-
-            auto* data = RenderPassData::GetData(camera.get());
-            if (nullptr == data) continue;
-
-            char line[224]{};
-            std::snprintf(line, sizeof(line),
-                "  카메라 %u · 렌더타깃 %.0fx%.0f%s · 깊이 %.0fx%.0f%s\n",
-                camera->m_cameraIndex,
-                data->m_renderTarget ? data->m_renderTarget->GetWidth() : 0.f,
-                data->m_renderTarget ? data->m_renderTarget->GetHeight() : 0.f,
-                (data->m_renderTarget && data->m_renderTarget->GetScreenPolicy().follows)
-                    ? "(추종)" : "(고정)",
-                data->m_depthStencil ? data->m_depthStencil->GetWidth() : 0.f,
-                data->m_depthStencil ? data->m_depthStencil->GetHeight() : 0.f,
-                (data->m_depthStencil && data->m_depthStencil->GetScreenPolicy().follows)
-                    ? "(추종)" : "(고정)");
-            report += line;
-        }
+        // ★ 카메라별 DX11 렌더타깃·깊이 크기 리포트를 걷었다 (T6, 2026-08-08).
+        //   RenderPassData가 들던 그 둘의 마지막 소비자가 이 진단이었고,
+        //   실제로 그리는 쪽은 이미 0이었다(EffectSystem이 마지막이었는데
+        //   PHASE 10-0에서 사라졌다). 아래 명부가 화면 추종 텍스처 전부를
+        //   훑으므로 관측이 줄지도 않는다.
 
         // 화면 추종을 선언한 텍스처 전부. 카메라 렌더 타깃만 보면 GBuffer나
         // 포스트 체인이 어긋난 것을 놓친다 — 그것들은 중간 결과라 화면에
