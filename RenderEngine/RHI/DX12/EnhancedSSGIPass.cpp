@@ -4,6 +4,7 @@
 #include "DX12PSOManager.h"
 #include "DX12RootSignatureCache.h"
 #include "EnhancedRenderGraph.h"
+#include "RHIEncoder.h"
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSSGIShaders.h"
 
@@ -769,13 +770,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // 엉뚱한 곳을 가리킨다.
                 context.resources->BindDescriptorHeaps(commandList);
 
-                commandList->SetComputeRootSignature(m_rootSignature);
-                commandList->SetPipelineState(m_hiZBuildPSO);
-                commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-                commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
-                commandList->SetComputeRootDescriptorTable(2, uavTable.gpu);
+                RHIEncoder& encoder = *executeContext.encoder;
+                encoder.SetPipeline(RHIBindPoint::Compute, m_hiZBuildPSO, m_rootSignature);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+                encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
-                commandList->Dispatch((targetWidth + 7) / 8, (targetHeight + 7) / 8, 1);
+                encoder.Dispatch((targetWidth + 7) / 8, (targetHeight + 7) / 8, 1);
             });
     }
 
@@ -876,13 +877,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
                 context.resources->BindDescriptorHeaps(commandList);
 
-                commandList->SetComputeRootSignature(m_rootSignature);
-                commandList->SetPipelineState(m_tracePSO);
-                commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-                commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
-                commandList->SetComputeRootDescriptorTable(2, uavTable.gpu);
+                RHIEncoder& encoder = *executeContext.encoder;
+                encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO, m_rootSignature);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+                encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
-                commandList->Dispatch((m_giWidth + 7) / 8, (m_giHeight + 7) / 8, 1);
+                encoder.Dispatch((m_giWidth + 7) / 8, (m_giHeight + 7) / 8, 1);
             });
     }
 
@@ -958,13 +959,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
                 context.resources->BindDescriptorHeaps(commandList);
 
-                commandList->SetComputeRootSignature(m_rootSignature);
-                commandList->SetPipelineState(pso);
-                commandList->SetComputeRootConstantBufferView(0, cb.gpuAddress);
-                commandList->SetComputeRootDescriptorTable(1, srvTable.gpu);
-                commandList->SetComputeRootDescriptorTable(2, uavTable.gpu);
+                RHIEncoder& encoder = *executeContext.encoder;
+                encoder.SetPipeline(RHIBindPoint::Compute, pso, m_rootSignature);
+                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb.gpuAddress);
+                encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+                encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
-                commandList->Dispatch((dispatchWidth + 7) / 8, (dispatchHeight + 7) / 8, 1);
+                encoder.Dispatch((dispatchWidth + 7) / 8, (dispatchHeight + 7) / 8, 1);
             }, hasSideEffect);
     };
 
@@ -1130,10 +1131,16 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             [this, historyTarget, historyDepthTarget]
             (const EnhancedRenderGraph::ExecuteContext& executeContext)
             {
+                RHIEncoder& encoder = *executeContext.encoder;
                 auto* commandList = executeContext.commandList;
 
                 // 영속 리소스는 그래프가 상태를 모른다. 복사 전후로 손으로
                 // 전이한다 — 그래프에 맡길 수 없는 것은 여기서 책임진다.
+                //
+                // ★ 이 전이는 인코더로 안 간다. 인코더에 전이가 없는 것이
+                //   R3의 계약이고(그래프의 몫), 여기는 그래프가 추적하지 않는
+                //   영속 리소스라 예외가 아니라 계약 밖이다. 포그의 초기화
+                //   배리어와 같은 부류다.
                 D3D12_RESOURCE_BARRIER toCopy[2]{};
                 for (uint32_t i = 0; i < 2; ++i)
                 {
@@ -1146,9 +1153,9 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 }
                 commandList->ResourceBarrier(2, toCopy);
 
-                commandList->CopyResource(historyTarget,
+                encoder.CopyResource(historyTarget,
                     executeContext.Resolve(m_resolved));
-                commandList->CopyResource(historyDepthTarget,
+                encoder.CopyResource(historyDepthTarget,
                     executeContext.Resolve(m_hiZMips[0]));
 
                 D3D12_RESOURCE_BARRIER back[2]{};
