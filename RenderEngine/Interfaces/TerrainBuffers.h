@@ -44,9 +44,6 @@ struct TerrainBrush
         std::vector<uint8_t> m_mask;
         int m_maskWidth{ 0 };
         int m_maskHeight{ 0 };
-
-        ID3D11Texture2D* m_maskTexture{ nullptr }; // 브러시 마스크 텍스쳐
-        ID3D11ShaderResourceView* m_maskSRV{ nullptr }; // 브러시 마스크 SRV
     };
 
     enum class Mode { Raise, Lower, Flatten, PaintLayer, FoliageMode } m_mode;
@@ -79,7 +76,5 @@ struct TerrainLayer
     std::string layerName;
     std::wstring diffuseTexturePath;
     Texture* diffuseTexture{ nullptr };
-    //ID3D11Texture2D* diffuseTexture{ nullptr };
-    //ID3D11ShaderResourceView* diffuseSRV{ nullptr };
     float tilling;
 };

@@ -1,6 +1,5 @@
 #include "ExternUI.h"
 #include "EditorImGuiTexture.h"
-#include "DeviceState.h"
 #include "Terrain.h"
 #include "TableAPIHelper.h"
 #include "FileDialog.h"
@@ -201,7 +200,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					int maskIndex = 0;
 					for (const auto& mask : g_CurrentBrush->m_masks)
 					{
-						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV), ImVec2((float)100.0f, (float)100.0f)))
+						if (ImGui::Button(maskNames[maskIndex], ImVec2((float)100.0f, (float)100.0f)))
 						{
 							if (selectedMaskIndex != maskIndex)
 							{
@@ -217,8 +216,6 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							}
 						}
 						maskIndex++;
-						/*ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV),
-							ImVec2((float)100.0f, (float)100.0f));*/
 					}
 				}
 
@@ -332,7 +329,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					int maskIndex = 0;
 					for (const auto& mask : g_CurrentBrush->m_masks)
 					{
-						if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV), ImVec2((float)100.0f, (float)100.0f)))
+						if (ImGui::Button(maskNames[maskIndex], ImVec2((float)100.0f, (float)100.0f)))
 						{
 							if (selectedMaskIndex != maskIndex)
 							{
@@ -348,8 +345,6 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							}
 						}
 						maskIndex++;
-						/*ImGui::Image((ImTextureID)EditorImGuiTexture::FromRawDx11Srv(mask.m_maskSRV),
-							ImVec2((float)100.0f, (float)100.0f));*/
 					}
 				}
 			}

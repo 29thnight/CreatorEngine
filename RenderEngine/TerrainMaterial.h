@@ -1,12 +1,22 @@
 #pragma once
 #include "TerrainBuffers.h"
-#include "ShaderSystem.h"
 #include <vector>
 
 //-----------------------------------------------------------------------------
-// TerrainMaterial: ÁöÇü ÀçÁú Å¬·¡½º
-// ÁöÇüÀ» ·»´õ¸µ ÇÏ±â À§ÇÑ ÅØ½ºÃ³¿Í ¼ÎÀÌ´õ¸¦ Æ÷ÇÔ
-// todo: ºôµå ½Ã¿¡¸¸ »ç¿ë µÇ´Â ÅØ½ºÃÄÁ¤º¸¸¦ µû·Î °ü¸® ÇÊ¿ä
+// TerrainMaterial: ì§€í˜• ë ˆì´ì–´ì˜ CPU ìë£Œ
+//
+// â˜… DX11 GPU ìì›ì„ ê±·ì–´ë‚¸ ìë¦¬ë‹¤(PHASE 11 ì°©ìˆ˜, 2026-08-08).
+//   ì—¬ê¸° ìˆë˜ ê²ƒ: ìŠ¤í”Œë«ë§µ í…ìŠ¤ì²˜ ë°°ì—´ + SRV, ë ˆì´ì–´ Albedo í…ìŠ¤ì²˜ ë°°ì—´ +
+//   UAV + SRV, ë ˆì´ì–´ ìƒìˆ˜ ë²„í¼ ë‘˜, ê·¸ë¦¬ê³  ë ˆì´ì–´ ë°°ì—´ì„ êµ½ë˜ DX11 ì»´í“¨íŠ¸
+//   ì…°ì´ë”(TerrainTexture.cs).
+//
+//   â˜… ê·¸ ì „ë¶€ì˜ ì†Œë¹„ìê°€ 0ì´ì—ˆë‹¤. DX12ì— ì§€í˜• ë Œë” ê²½ë¡œê°€ ì—†ì–´ì„œ ë§Œë“¤ê¸°ë§Œ
+//   í•˜ê³  ì•„ë¬´ë„ ì½ì§€ ì•Šì•˜ë‹¤(GetSplatMapSRVÂ·GetLayerSRVÂ·GetLayerBufferì˜
+//   í˜¸ì¶œì 0ê³³). ì¦‰ ê±·ì–´ë‚´ë©´ì„œ ìƒì€ ê¸°ëŠ¥ì´ ì—†ë‹¤.
+//
+//   ì´ì œ CPU ìë£Œê°€ ì§„ì‹¤ì´ë‹¤ â€” í¸ì§‘(ì¡°ê°Â·í˜ì¸íŒ…)ì´ ì—¬ê¸°ì— ì“°ê³ , ìƒˆë¡œ ì“¸
+//   ì§€í˜• íŒ¨ìŠ¤ê°€ ì—¬ê¸°ì„œ ì½ì–´ ì˜¬ë¦°ë‹¤. ê·¸ ìˆœì„œê°€ ë’¤ì§‘í˜€ ìˆë˜ ê²ƒì´ T5ì—ì„œ
+//   ë°œê²¬í•œ ê²°í•¨ì´ì—ˆë‹¤(GPU ë²„í¼ë§Œ ê°±ì‹ í•˜ê³  CPU ë°°ì—´ì€ ê·¸ëŒ€ë¡œ ë‘ë˜ ê²ƒ).
 //-----------------------------------------------------------------------------
 
 class Texture;
@@ -16,53 +26,40 @@ public:
 	TerrainMaterial() = default;
 	~TerrainMaterial() = default;
 
-	void Initialize(UINT width, UINT height);
-	void UpdateBuffer();
+	void Initialize(uint32_t width, uint32_t height);
 	void ClearLayers();
 
-	// GPU ¸®¼Ò½º¿Í Á÷Á¢ Åë½ÅÇÏ´Â ÇÔ¼öµé
-	void InitSplatMapTextureArray(UINT width, UINT height, UINT layerCount);
-	void UpdateSplatMapPatch(UINT layerIndex, int offsetX, int offsetY, int patchW, int patchH, std::vector<BYTE>& patchData);
+	/// ë ˆì´ì–´ ìƒìˆ˜(íƒ€ì¼ë§Â·ê°œìˆ˜)ë¥¼ ê°±ì‹ í•œë‹¤.
 	void UpdateBuffer(const TerrainLayerBuffer& layers);
 
-	// CPU µ¥ÀÌÅÍ·ÎºÎÅÍ ¸ğµç GPU ¸®¼Ò½º¸¦ Àç±¸¼ºÇÏ´Â ¸ŞÀÎ ÇÔ¼ö
+	/// ìŠ¤í”Œë« ë§ˆìŠ¤í¬ì˜ í•œ ì¡°ê°ì„ ê°±ì‹ í•œë‹¤ â€” í˜ì¸íŒ…ì´ ë¶€ë¥´ëŠ” ìë¦¬.
+	/// ì¡°ê° ê²½ê³„ëŠ” í˜¸ì¶œë¶€ê°€ ì´ë¯¸ ì˜ì—­ ë‹¨ìœ„ë¡œ ë“¤ê³  ìˆì–´ ê·¸ëŒ€ë¡œ ì“´ë‹¤.
+	void UpdateSplatMapPatch(uint32_t layerIndex, int offsetX, int offsetY,
+	                         int patchW, int patchH, const std::vector<uint8_t>& patchData);
+
+	/// CPU ìë£Œ ì „ì²´ ì¬êµ¬ì„±. í¬ê¸° ë³€ê²½Â·ë ˆì´ì–´ ì¶”ê°€Â·ì‚­ì œê°€ ë¶€ë¥¸ë‹¤.
 	void MateialDataUpdate(
 		int width, int height,
 		std::vector<TerrainLayer>& layers,
 		std::vector<std::vector<float>>& layerHeightMap
 	);
 
-	//---------------------------------------------------------------------------------
-	//ºôµå½Ã : todo °íÁ¤µÈ ÅÍ·¹ÀÎ ÅØ½ºÃÄ¸¦ »ç¿ëÇÏµµ·Ï º¯°æ ·Îµå½Ã¸¸ Àû¿ë ÇÏ°í º¯°æ X
-	void RunTimeInitialize(UINT width, UINT height);		//»çÀÌÁî ¹Ş¾Æ¼­ °íÁ¤ Å©±â ½ºÇÃ·¿¸Ê »ı¼º
-	bool BuildOutMaterial(std::wstring& dir);				//ºôµå ½Ã¿¡¸¸ »ç¿ëµÇ´Â ½ºÇÃ·¿¸Ê ¹× ·¹ÀÌ¾î Á¤º¸ ÀúÀå
-	bool LoadRunTimeMaterial(const std::wstring& filePath); //ÆÄÀÏ ÆĞ½º ¹Ş¾Æ¼­ ½ºÇÃ·¿¸Ê ¹× layer Á¤º¸ ·Îµå
-	//void SetLayerArrayTexture(Texture* srv) { m_layerSRV = srv; } // ·¹ÀÌ¾î ÅØ½ºÃ³ ¹è¿­ SRV ¼³Á¤
-	//----------------------------------------------------------------------------------
-	
-	// --- Getter ÇÔ¼öµé ---
-	ID3D11ShaderResourceView** GetSplatMapSRV() { return m_splatMapSRV.GetAddressOf(); }
-	ID3D11ShaderResourceView** GetLayerSRV() { return &m_layerSRV; }
-	ID3D11Buffer** GetLayerBuffer() { return m_layerBuffer.GetAddressOf(); }
-	
-	// ½ºÇÃ·§¸ÊÀ» ´ÜÀÏ ÅØ½ºÃ³ ¹è¿­·Î °ü¸®
-	ComPtr<ID3D11Texture2D>          m_splatMapTextureArray;
-	ComPtr<ID3D11ShaderResourceView> m_splatMapSRV;
+	/// ë ˆì´ì–´ë³„ ìŠ¤í”Œë« ë§ˆìŠ¤í¬(width Ã— height, 8ë¹„íŠ¸ ê°€ì¤‘ì¹˜).
+	const std::vector<std::vector<uint8_t>>& GetSplatMasks() const { return m_splatMasks; }
 
-	// ·¹ÀÌ¾î Albedo ÅØ½ºÃ³ ¹è¿­ °ü·Ã ¸®¼Ò½º
-	ID3D11Texture2D* m_layerTextureArray = nullptr;
-	ID3D11UnorderedAccessView* p_outTextureUAV = nullptr;
-	ID3D11ShaderResourceView* m_layerSRV = nullptr;
+	/// ìë£Œê°€ ë°”ë€” ë•Œë§ˆë‹¤ ì˜¤ë¥¸ë‹¤. ì§€í˜• íŒ¨ìŠ¤ê°€ "ì˜¬ë¦° ê²ƒì´ ìµœì‹ ì¸ê°€"ë¥¼ ì´ ê°’ìœ¼ë¡œ
+	/// íŒì •í•œë‹¤ â€” ë§ˆìŠ¤í¬ ì „ì²´ë¥¼ ë§¤ í”„ë ˆì„ ë¹„êµí•  ì´ìœ ê°€ ì—†ë‹¤.
+	uint32_t GetRevision() const { return m_revision; }
 
-	// »ó¼ö ¹öÆÛ
+	// ë ˆì´ì–´ ìƒìˆ˜. Terrain ìª½ì´ ì§ì ‘ ì½ê³  ì“´ë‹¤.
 	TerrainLayerBuffer m_layerBufferData;
-	ComPtr<ID3D11Buffer> m_layerBuffer;
-	ComPtr<ID3D11Buffer> m_AddLayerBuffer; // ÄÄÇ»Æ® ¼ÎÀÌ´õ¿ë
-
-	// ¸®»çÀÌÂ¡À» À§ÇÑ ÄÄÇ»Æ® ¼ÎÀÌ´õ
-	ShaderPtr<ComputeShader> m_computeShader;
 
 	int m_width{ 0 };
 	int m_height{ 0 };
-};
 
+private:
+	void ResetLayerConstants();
+
+	std::vector<std::vector<uint8_t>> m_splatMasks;
+	uint32_t m_revision{ 0 };
+};

@@ -1,224 +1,109 @@
 #include "TerrainMaterial.h"
-#include "Texture.h"
-#include <algorithm> // for std::min
+#include <algorithm>
 
-void TerrainMaterial::Initialize(UINT width, UINT height)
+void TerrainMaterial::Initialize(uint32_t width, uint32_t height)
 {
 	m_width = static_cast<int>(width);
 	m_height = static_cast<int>(height);
 
-	m_computeShader = &ShaderSystem->ComputeShaders["TerrainTexture"];
-	m_AddLayerBuffer = DirectX11::CreateBuffer(
-		sizeof(TerrainAddLayerBuffer),
-		D3D11_BIND_CONSTANT_BUFFER,
-		nullptr
-	);
-	m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	ResetLayerConstants();
 
-    m_layerBufferData.useLayer = false;
-    m_layerBufferData.numLayers = 0;
-    for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i) {
-        m_layerBufferData.layerTilling[i] = { 1.0f, 0.f, 0.f, 0.f };
-    }
+	// ì´ˆê¸°ì—ëŠ” ë ˆì´ì–´ í•˜ë‚˜ì§œë¦¬ ë§ˆìŠ¤í¬ë¡œ ì‹œì‘í•œë‹¤(ì˜ˆì „ InitSplatMapTextureArrayê°€
+	// layerCount = 1ë¡œ í…ìŠ¤ì²˜ ë°°ì—´ì„ ë§Œë“¤ë˜ ê²ƒê³¼ ê°™ì€ ìë¦¬ë‹¤).
+	m_splatMasks.assign(1, std::vector<uint8_t>(static_cast<size_t>(m_width) * m_height, 0));
+	++m_revision;
+}
 
-    UpdateBuffer(m_layerBufferData);
-
-	// ÃÊ±â¿¡´Â ½ºÇÃ·§¸Ê 1°³ ·¹ÀÌ¾î¿ëÀ¸·Î »ı¼º
-	InitSplatMapTextureArray(width, height, 1);
-
+void TerrainMaterial::ResetLayerConstants()
+{
+	m_layerBufferData.useLayer = false;
+	m_layerBufferData.numLayers = 0;
+	for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
+	{
+		m_layerBufferData.layerTilling[i] = { 1.0f, 0.f, 0.f, 0.f };
+	}
 }
 
 void TerrainMaterial::ClearLayers()
 {
-    ComPtr<ID3D11Multithread> mt{};
-    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
-    mt->SetMultithreadProtected(TRUE);
-    DirectX::MTGuard lock(mt.Get());
-
-    m_layerBufferData.useLayer = false;
-    m_layerBufferData.numLayers = 0;
-    for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i) { m_layerBufferData.layerTilling[i] = { 1.0f, 0.0f, 0.0f, 0.0f }; }
-    UpdateBuffer(m_layerBufferData);
-
-    // ComPtrÀº Reset()À¸·Î ¾ÈÀüÇÏ°Ô ÇØÁ¦ÇÕ´Ï´Ù.
-    m_splatMapTextureArray.Reset();
-    m_splatMapSRV.Reset();
-
-    // Raw Æ÷ÀÎÅÍ´Â ¼öµ¿À¸·Î ÇØÁ¦ÇÏ°í nullptr·Î ¼³Á¤ÇÕ´Ï´Ù.
-    if (m_layerTextureArray) m_layerTextureArray->Release();
-    if (p_outTextureUAV) p_outTextureUAV->Release();
-    if (m_layerSRV) m_layerSRV->Release();
-    m_layerTextureArray = nullptr;
-    p_outTextureUAV = nullptr;
-    m_layerSRV = nullptr;
+	ResetLayerConstants();
+	m_splatMasks.clear();
+	++m_revision;
 }
 
-
-void TerrainMaterial::InitSplatMapTextureArray(UINT width, UINT height, UINT layerCount)
-{
-	if (layerCount == 0) return;
-
-    ComPtr<ID3D11Multithread> mt{};
-    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
-    mt->SetMultithreadProtected(TRUE);
-    DirectX::MTGuard lock(mt.Get());
-
-	D3D11_TEXTURE2D_DESC desc = {};
-	desc.Width = width;
-	desc.Height = height;
-	desc.MipLevels = 1;
-	desc.ArraySize = layerCount;
-	desc.Format = DXGI_FORMAT_R8_UNORM; // 8-bit ´ÜÀÏ Ã¤³Î (Grayscale)
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_DEFAULT; // UpdateSubresource¸¦ À§ÇØ DEFAULT·Î º¯°æ
-	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	desc.CPUAccessFlags = 0;
-	desc.MiscFlags = 0;
-
-	DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, m_splatMapTextureArray.GetAddressOf());
-	DirectX::SetName(m_splatMapTextureArray.Get(), "SplatMapTextureArray");
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = desc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-	srvDesc.Texture2DArray.MostDetailedMip = 0;
-	srvDesc.Texture2DArray.MipLevels = 1;
-	srvDesc.Texture2DArray.FirstArraySlice = 0;
-	srvDesc.Texture2DArray.ArraySize = layerCount;
-	DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_splatMapTextureArray.Get(), &srvDesc, m_splatMapSRV.GetAddressOf());
-	DirectX::SetName(m_splatMapSRV.Get(), "SplatMapSRV_Array");
-}
-
-void TerrainMaterial::UpdateSplatMapPatch(UINT layerIndex, int offsetX, int offsetY, int patchW, int patchH, std::vector<BYTE>& patchData)
-{
-	if (!m_splatMapTextureArray) return;
-
-    ComPtr<ID3D11Multithread> mt{};
-    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
-    mt->SetMultithreadProtected(TRUE);
-    DirectX::MTGuard lock(mt.Get());
-
-	D3D11_BOX destBox;
-	destBox.left = offsetX;
-	destBox.right = offsetX + patchW;
-	destBox.top = offsetY;
-	destBox.bottom = offsetY + patchH;
-	destBox.front = 0;
-	destBox.back = 1;
-
-	UINT subresourceIndex = D3D11CalcSubresource(0, layerIndex, 1);
-	UINT rowPitch = patchW * 1; // R8_UNORM ÀÌ¹Ç·Î ÇÈ¼¿ ´ç 1¹ÙÀÌÆ®
-	UINT depthPitch = 0; // 2D ÅØ½ºÃ³ÀÌ¹Ç·Î 0
-
-	DirectX11::DeviceStates->g_pDeviceContext->UpdateSubresource(
-		m_splatMapTextureArray.Get(),
-		subresourceIndex,
-		&destBox,
-		patchData.data(),
-		rowPitch,
-		depthPitch
-	);
-}
-
-// »ó¼ö ¹öÆÛ¸¸ ¾÷µ¥ÀÌÆ®ÇÏ´Â °¡º­¿î ÇÔ¼ö
 void TerrainMaterial::UpdateBuffer(const TerrainLayerBuffer& layers)
 {
-    ComPtr<ID3D11Multithread> mt{};
-    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
-    mt->SetMultithreadProtected(TRUE);
-    DirectX::MTGuard lock(mt.Get());
-
 	m_layerBufferData = layers;
-
-    DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
+	++m_revision;
 }
 
-void TerrainMaterial::MateialDataUpdate(int width, int height, std::vector<TerrainLayer>& layers, std::vector<std::vector<float>>& layerHeightMap)
+void TerrainMaterial::UpdateSplatMapPatch(uint32_t layerIndex, int offsetX, int offsetY,
+                                          int patchW, int patchH, const std::vector<uint8_t>& patchData)
 {
-    ComPtr<ID3D11Multithread> mt{};
-    DirectX11::DeviceStates->g_pDeviceContext->QueryInterface(IID_PPV_ARGS(&mt));
-    mt->SetMultithreadProtected(TRUE);
-    DirectX::MTGuard lock(mt.Get());
+	if (layerIndex >= m_splatMasks.size()) return;
+	if (patchW <= 0 || patchH <= 0) return;
 
-    m_width = width;
-    m_height = height;
+	// ì¡°ê°ì´ ì§€í˜• ë°–ìœ¼ë¡œ ë‚˜ê°€ë©´ ê±¸ì¹œ ë¶€ë¶„ë§Œ ì“´ë‹¤. ì˜ˆì „ì—ëŠ” D3D11_BOXê°€
+	// ë²”ìœ„ë¥¼ ë²—ì–´ë‚˜ë©´ UpdateSubresourceê°€ ì¡°ìš©íˆ ì•„ë¬´ ì¼ë„ í•˜ì§€ ì•Šì•˜ë‹¤ â€”
+	// ê°™ì€ ìë¦¬ì—ì„œ ì´ì œëŠ” í´ë¨í”„í•œë‹¤.
+	auto& mask = m_splatMasks[layerIndex];
+	if (mask.size() != static_cast<size_t>(m_width) * m_height) return;
 
-    // 1. ·¹ÀÌ¾î Albedo ÅØ½ºÃ³ ¹è¿­ Àç±¸¼º
-    if (m_layerTextureArray) { m_layerTextureArray->Release(); m_layerTextureArray = nullptr; }
-    if (m_layerSRV) { m_layerSRV->Release(); m_layerSRV = nullptr; }
-    if (p_outTextureUAV) { p_outTextureUAV->Release(); p_outTextureUAV = nullptr; }
+	const int x0 = std::max(0, offsetX);
+	const int y0 = std::max(0, offsetY);
+	const int x1 = std::min(m_width, offsetX + patchW);
+	const int y1 = std::min(m_height, offsetY + patchH);
 
-    if (!layers.empty())
-    {
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Width = 512; desc.Height = 512; desc.MipLevels = 1;
-        desc.ArraySize = std::min((UINT)layers.size(), (UINT)MAX_TERRAIN_LAYERS);
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-        DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, &m_layerTextureArray);
+	for (int y = y0; y < y1; ++y)
+	{
+		const int srcRow = (y - offsetY) * patchW;
+		const int dstRow = y * m_width;
+		for (int x = x0; x < x1; ++x)
+		{
+			const size_t src = static_cast<size_t>(srcRow) + (x - offsetX);
+			if (src >= patchData.size()) continue;
+			mask[static_cast<size_t>(dstRow) + x] = patchData[src];
+		}
+	}
 
-        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        uavDesc.Format = desc.Format; uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
-        uavDesc.Texture2DArray.MipSlice = 0; uavDesc.Texture2DArray.FirstArraySlice = 0;
-        uavDesc.Texture2DArray.ArraySize = desc.ArraySize;
-        DirectX11::DeviceStates->g_pDevice->CreateUnorderedAccessView(m_layerTextureArray, &uavDesc, &p_outTextureUAV);
-    
-        DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
-        ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
-        DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+	++m_revision;
+}
 
-        for (size_t i = 0; i < layers.size() && i < MAX_TERRAIN_LAYERS; ++i)
-        {
-            if (layers[i].diffuseTexture && layers[i].diffuseTexture->m_pSRV)
-            {
-                TerrainAddLayerBuffer addLayerBuffer; addLayerBuffer.slice = i;
-                DirectX11::UpdateBuffer(m_AddLayerBuffer.Get(), &addLayerBuffer);
-                DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
-                ID3D11ShaderResourceView* srvs[] = { layers[i].diffuseTexture->m_pSRV };
-                DirectX11::CSSetShaderResources(0, 1, srvs);
-                uint32 tgX = (uint32)ceilf(512 / 16.0f), tgY = (uint32)ceilf(512 / 16.0f);
-                DirectX11::Dispatch(tgX, tgY, 1);
-            }
-        }
-        ID3D11UnorderedAccessView* nullUAVs[]{ nullptr }; DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
-        ID3D11ShaderResourceView* nullSRVs[]{ nullptr }; DirectX11::CSSetShaderResources(0, 1, nullSRVs);
+void TerrainMaterial::MateialDataUpdate(int width, int height,
+                                        std::vector<TerrainLayer>& layers,
+                                        std::vector<std::vector<float>>& layerHeightMap)
+{
+	m_width = width;
+	m_height = height;
 
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = desc.Format; srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-        srvDesc.Texture2DArray.MipLevels = 1; srvDesc.Texture2DArray.ArraySize = desc.ArraySize;
-        srvDesc.Texture2DArray.FirstArraySlice = 0;
-        DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(m_layerTextureArray, &srvDesc, &m_layerSRV);
-    }
+	const size_t layerCount = std::min<size_t>(layers.size(), MAX_TERRAIN_LAYERS);
+	const size_t pixels = static_cast<size_t>(width) * height;
 
-    // 2. ½ºÇÃ·§¸Ê ÅØ½ºÃ³ ¹è¿­ Àç±¸¼º
-    UINT numLayers = static_cast<UINT>(layers.size());
-    InitSplatMapTextureArray(width, height, std::min(numLayers, (UINT)MAX_TERRAIN_LAYERS));
+	// ë ˆì´ì–´ ê°€ì¤‘ì¹˜(0..1 float)ë¥¼ 8ë¹„íŠ¸ë¡œ êµ³í˜€ ë‘”ë‹¤. ì˜ˆì „ì—ëŠ” ì´ ê°’ì„ ë°”ë¡œ
+	// ìŠ¤í”Œë«ë§µ í…ìŠ¤ì²˜ ë°°ì—´ì— ì˜¬ë¦¬ê³  CPU ìª½ì€ ë‚¨ê¸°ì§€ ì•Šì•˜ë‹¤.
+	m_splatMasks.assign(layerCount, std::vector<uint8_t>(pixels, 0));
+	for (size_t i = 0; i < layerCount; ++i)
+	{
+		if (i >= layerHeightMap.size()) continue;
+		const auto& weights = layerHeightMap[i];
 
-    for (UINT i = 0; i < numLayers && i < MAX_TERRAIN_LAYERS; ++i)
-    {
-        std::vector<BYTE> splatData(width * height, 0);
-        for (int y = 0; y < height; ++y)
-        {
-            for (int x = 0; x < width; ++x)
-            {
-                int pixelIndex = y * width + x;
-                float weight = std::clamp(layerHeightMap[i][pixelIndex], 0.0f, 1.0f);
-                splatData[pixelIndex] = static_cast<BYTE>(weight * 255.0f);
-            }
-        }
-        UpdateSplatMapPatch(i, 0, 0, width, height, splatData);
-    }
+		auto& mask = m_splatMasks[i];
+		const size_t count = std::min(pixels, weights.size());
+		for (size_t p = 0; p < count; ++p)
+		{
+			const float weight = std::clamp(weights[p], 0.0f, 1.0f);
+			mask[p] = static_cast<uint8_t>(weight * 255.0f);
+		}
+	}
 
-    // 3. »ó¼ö ¹öÆÛ ¾÷µ¥ÀÌÆ®
-    m_layerBufferData.useLayer = !layers.empty();
-    m_layerBufferData.numLayers = static_cast<int>(layers.size());
-    for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
-    {
-        if (i < layers.size())
-            m_layerBufferData.layerTilling[i] = { layers[i].tilling, 0.f, 0.f, 0.f };
-        else
-            m_layerBufferData.layerTilling[i] = { 1.0f, 0.f, 0.f, 0.f };
-    }
-    UpdateBuffer(m_layerBufferData);
+	m_layerBufferData.useLayer = !layers.empty();
+	m_layerBufferData.numLayers = static_cast<int>(layers.size());
+	for (int i = 0; i < MAX_TERRAIN_LAYERS; ++i)
+	{
+		m_layerBufferData.layerTilling[i] = (static_cast<size_t>(i) < layers.size())
+			? DirectX::XMFLOAT4{ layers[i].tilling, 0.f, 0.f, 0.f }
+			: DirectX::XMFLOAT4{ 1.0f, 0.f, 0.f, 0.f };
+	}
+
+	++m_revision;
 }

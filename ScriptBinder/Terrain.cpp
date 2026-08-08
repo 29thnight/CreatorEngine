@@ -637,21 +637,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		desc.diffuseTexturePath = diffusePath;
 		desc.tilling = layerData["tilling"].get<float>();
 
-		//diffuseTexture 로드
-		//ID3D11Resource* diffuseResource = nullptr;
-		//ID3D11Texture2D* diffuseTexture = nullptr;
-		//ID3D11ShaderResourceView* diffuseSRV = nullptr;
-		//if (CreateTextureFromFile(DirectX11::DeviceStates->g_pDevice, desc.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK) {
-		//	diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
-		//	TerrainLayer newLayer;
-		//	desc.diffuseTexture = diffuseTexture;
-		//	desc.diffuseSRV = diffuseSRV;
-		//	//m_layerHeightMap.push_back(std::vector<float>(tmpWidth * tmpHeight, 0.0f)); // 레이어별 높이 맵 초기화 => loadLoadEditorSplatMap() 이미 로드
-		//}
-		//else {
-		//	Debug->LogError("Failed to load diffuse texture: " + diffusePath.string());
-		//	continue; // 로드 실패시 해당 레이어는 무시
-		//}
 		file::path path = file::path(desc.diffuseTexturePath);
 		if (file::exists(path))
 		{
@@ -1140,57 +1125,11 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 		return;
 	}
 
-	// 브러쉬 마스크 텍스쳐 생성
-	{
-		D3D11_TEXTURE2D_DESC desc = {};
-		desc.Width = mask.m_maskWidth;
-		desc.Height = mask.m_maskHeight;
-		desc.MipLevels = 1;
-		desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R8_UNORM;
-		desc.SampleDesc.Count = 1;  // ← 여기
-		desc.SampleDesc.Quality = 0;  // ← 여기
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		HRESULT hr = DirectX11::DeviceStates->g_pDevice->CreateTexture2D(&desc, nullptr, &mask.m_maskTexture);
-		if (FAILED(hr)) {
-			// 오류 처리
-			Debug->LogError("Mask Textrue CreateTexture2D Failed");
-			return;
-		}
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = desc.Format;
-		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		hr = DirectX11::DeviceStates->g_pDevice->CreateShaderResourceView(
-			mask.m_maskTexture, &srvDesc, &mask.m_maskSRV
-		);
-
-		if (FAILED(hr)) {
-			// 오류 처리
-			Debug->LogError("Mask Textrue CreateShaderResourceView Failed");
-			return;
-		}
-	}
-
-	D3D11_MAPPED_SUBRESOURCE M;
-	DirectX11::DeviceStates->g_pDeviceContext->Map(
-		mask.m_maskTexture, 0,
-		D3D11_MAP_WRITE_DISCARD,
-		0, &M
-	);
-	for (int y = 0; y < mask.m_maskHeight; ++y)
-	{
-		memcpy(
-			(uint8_t*)M.pData + y * M.RowPitch,
-			mask.m_mask.data() + y * mask.m_maskWidth,
-			mask.m_maskWidth
-		);
-	}
-	DirectX11::DeviceStates->g_pDeviceContext->Unmap(mask.m_maskTexture, 0);
+	// ★ 여기 있던 DX11 마스크 텍스처·SRV 생성과 Map/memcpy를 걷었다
+	//   (PHASE 11 착수, 2026-08-08). 마스크의 진실은 CPU 배열(mask.m_mask)이고
+	//   그것은 위 LoadBrushMaskTexture가 이미 채운다 — GPU 사본은 에디터
+	//   썸네일 하나만 소비하고 있었다. 그 썸네일은 지형 패스와 함께 DX12로
+	//   복원한다.
 
 	brush->m_masks.push_back(mask);
 	std::string maskName = "mask_" + std::to_string(brush->m_masks.size() - 1);
@@ -1342,29 +1281,26 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 		textureNames[i] = std::string(namePtr); // null terminator로 자동 종료됨
 	}
 
-	UINT width = 512;
-	UINT height = 512;
-	DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-
-	auto arrayTex = Texture::CreateArray(
-		width, height, "layerArray", format, D3D11_BIND_SHADER_RESOURCE, 4, nullptr
-	);
-
-	for (UINT slice = 0; slice < header.layers; ++slice)
+	// ★ 여기 있던 DX11 레이어 텍스처 배열 조립을 걷었다(PHASE 11 착수,
+	//   2026-08-08). 512×512 배열을 만들고 CopySubresourceRegion으로 슬라이스를
+	//   채운 뒤 m_pMaterial->m_layerSRV에 꽂던 자리인데, 그 SRV를 읽는 코드가
+	//   0이었다 — DX12에 지형 렌더 경로가 없다.
+	//
+	//   대신 레이어를 CPU 자료로 세운다. 배열을 굽는 것은 새 지형 패스의 몫이고
+	//   그때 필요한 입력이 바로 이 목록이다. 예전에는 m_layers를 비우기만 하고
+	//   채우지 않아, 로드 직후 레이어 정보가 어디에도 남지 않았다.
+	for (uint32_t i = 0; i < header.layers; ++i)
 	{
-		auto layerTex = DataSystems->LoadTexture(textureNames[slice]);
-		ID3D11Texture2D* src = layerTex->m_pTexture;
-		ID3D11Texture2D* dst = arrayTex->m_pTexture;
-
-		UINT dstSub = D3D11CalcSubresource(0, slice, 1);
-		DirectX11::DeviceStates->g_pDeviceContext->CopySubresourceRegion(
-			dst, dstSub, 0, 0, 0,
-			src, 0, nullptr
-		);
+		TerrainLayer layer;
+		layer.m_layerID = m_nextLayerID++;
+		layer.layerName = textureNames[i];
+		layer.diffuseTexturePath = std::wstring(textureNames[i].begin(), textureNames[i].end());
+		layer.diffuseTexture = DataSystems->LoadTexture(textureNames[i]);
+		layer.tilling = 1.0f;
+		m_layers.push_back(layer);
 	}
 
-
-	arrayTex->CreateSRV(format, D3D11_SRV_DIMENSION_TEXTURE2DARRAY, 1);
-
-	m_pMaterial->m_layerSRV = arrayTex->m_pSRV; // 머티리얼에 레이어 배열 텍스처 설정 -> 바꿔야 할듯
+	m_layerHeightMap.resize(m_layers.size(),
+		std::vector<float>(static_cast<size_t>(m_width) * m_height, 0.0f));
+	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
 }

@@ -493,80 +493,85 @@
 
 <!-- ===== PHASE 10 ===== -->
 <section class="phase" id="phase-10">
-  <h2 class="sec"><span class="no">PHASE 10</span>파티클·이펙트 DX12 재설계와 패키지화 <span class="phase-pct" data-phase-pct="10"></span></h2>
-  <div class="phase-meta">예상 공수: 21일 · 선행 조건: PHASE 3 신규 렌더러 안정화(3-9 스위치 도입 이후) · 우선순위: 최후순위 — 다른 모든 페이즈 뒤</div>
-  <div class="phase-goal"><b>목표:</b> 파티클·이펙트 계통을 DX12로 <b>이식이 아니라 재설계</b>하고, 붙였다 뗄 수 있는 패키지로 만든다.
+  <h2 class="sec"><span class="no">PHASE 10</span>파티클·이펙트 백지 재작성 <span class="phase-pct" data-phase-pct="10"></span></h2>
+  <div class="phase-meta">예상 공수: 24일 · 선행 조건: 없음(구 계통 제거 완료) · 우선순위: 최후순위 — 다른 모든 페이즈 뒤</div>
+  <div class="phase-goal"><b>목표:</b> 파티클·이펙트 계통을 <b>백지에서</b> DX12로 쓴다. 처음부터 패키지 밖에서 쓴다.
   <br><br>
-  <b>왜 최후순위인가.</b> 구버전 지원을 <code>legacy/pre-coreclr</code> 브랜치가 맡으므로 신규 버전은 기존 게임 콘텐츠를 재현할 의무가 없다.
-  즉 이 계통은 3-9(렌더러 교체)의 선행 조건이 아니다 — 신규 버전에서 저작한 씬으로 화면 대조가 성립한다.
-  메인 트랙(성능 판정 · 픽셀 대조 잔차 · 힙 앨리어싱 · async compute · DXR · DLSS)은 이 계통에 의존하지 않는다.
+  <b>★ 방향을 바꿨다(2026-08-08, 사용자 판단): 이식이 아니라 백지 재작성.</b>
+  원래 계획은 &quot;DX11 계통을 보면서 DX12로 옮기되 발견한 결함은 고친다&quot;였다.
+  그 전제에서 구 코드는 <b>참고본</b>이었는데, 참고본이 있으면 그 구조를 따라가게 된다 —
+  ping-pong 버퍼 둘, 모듈 아홉 개의 체인, 저작 JSON 스키마가 전부 DX11 즉시 컨텍스트 시절의 형태다.
+  옮길 기준선이 없다는 것(구버전은 <code>legacy/pre-coreclr</code>가 맡는다)은 처음부터 참이었으므로, 참고본을 지우는 쪽이 일관된다.
   <br><br>
-  <b>이식이 아니라 재설계인 이유.</b> 미구현 패스 넷(SSS·Decal·SSR·VolumetricFog)은 &quot;DX11과 같은 그림&quot;이 계약이라
-  결함을 알면서도 그대로 옮겼다(데칼의 알파 제곱, SSR의 죽은 히스토리, 포그의 태양 항 주석). 이 계통은 그 계약에서 풀린다 —
-  보존해야 할 기준선이 없으므로 아래 발견들을 <b>고치면서</b> 옮길 수 있다.
+  <b>★ 구 계통을 들어냈다(2026-08-08 · 10-0 완료 · 빌드 그린).</b>
+  <code>EffectSystem</code> 프로젝트 <b>56파일 19,639줄</b>, 파티클 셰이더 <b>30종</b>,
+  <code>EffectComponent</code>(C++·C#·generated), <code>ClrHost</code>의 스크립트 API <b>20항목</b>, 엔진 배선 6파일이 사라졌다.
+  이제 이 페이즈의 시작점은 <b>진짜 백지</b>다 — <code>EnhancedRenderPass</code> 규약과 이미 검증된 DX12 자산(PSO 캐시·디스크립터 링·인코더) 위에서 쓴다.
   <br><br>
-  <b>착수 전 조사 결과(2026-08-05 실측 · 재조사 불필요).</b>
-  <br>· 규모: 모듈 코드 10,190줄 + 이펙트 기반 약 4,100줄. <code>EffectEditor.cpp</code> 5,370줄은 순수 ImGui라 GPU API 의존 0 — 이식 대상 밖.
-  <br>· 셰이더 27종. 컴퓨트 9종(Spawn/Movement/Color/Size × 빌보드·메시 계보 + Trail), 나머지는 <code>MeshParticle*.ps</code> 변형.
-  <br>· <b>★ append/consume 버퍼·CopyStructureCount·간접 드로우·DispatchIndirect가 저장소 전체에 0건.</b> DX12에서 어려운 구조를 새로 뚫을 일이 없다 — 평범한 StructuredBuffer + Dispatch다.
-  <br>· 시뮬레이션은 GPU, 트레일 생성만 CPU(<code>TrailGenerateModule</code> 872줄). 정렬 없음, 지오메트리 셰이더 없음, 소프트 파티클 없음.
-  <br>· 죽은 컴퓨트 셰이더 2종: <code>TrailMeshGenerate.cs.hlsl</code>(197줄, 원자적 카운터로 GPU 메시 생성), <code>BillBoard.cs.hlsl</code>(91줄). 어느 C++도 디스패치하지 않는다 — 되살릴지 버릴지 결정 필요.
-  <br>· 죽은 C++ 4파일: <code>LifeModule.{h,cpp}</code>·<code>LifeModuleCS.{h,cpp}</code>. 원래 vcxproj에 등재조차 안 돼 한 번도 컴파일된 적이 없고, 넣으면 깨진다(override 불일치·DeviceState 오타).
-  <br>· <b>기존 결함:</b> <code>TrailModuleCS.cpp:86</code>이 그룹 수를 <code>(capacity+255)/256</code>으로 계산하는데 셰이더는 <code>numthreads(1024)</code>다 — 4배 과소 디스패치.
-  <br>· <b>기존 결함:</b> <code>SceneRenderer.cpp:936</code>이 이펙트 패스 직후 매 프레임 <code>Flush()</code>를 부른다 — GPU를 통째로 비워 파이프라인을 끊는다. DX12에 대응물이 없고, 없애는 것이 맞다.
-  <br>· DX12 쪽 기존 코드 0건 — 백지에서 <code>EnhancedRenderPass</code> 규약 위에 쓴다.
+  <b>★ 순서를 뒤집는다 — 패키지 경계가 먼저다(10-1).</b> 지형(PHASE 11)에서 이미 같은 결론에 왔고, 이번에는 근거가 실측이다:
+  EffectSystem은 엔진 안에서 다 만든 뒤 41차 슬라이스에서 54파일을 떼어내야 했고, 그러고도 <b>패키지화가 끝나지 않은 채로 제거됐다.</b>
+  나중에 자르는 것이 처음부터 밖에서 쓰는 것보다 비쌌다는 증거다.
   <br><br>
-  <b>이미 끝난 선행 작업.</b> 41차 슬라이스에서 54개 파일을 <code>EffectSystem</code> 정적 라이브러리로 분리해 경계를 그어 두었다(커밋 d685a95b).
-  의존 방향도 측정해 두었다 — 역방향은 <code>SceneRenderer</code> 둘뿐이고 쓰는 동사가 여섯(Initialize/Update/Execute/Render/PrepareCommandBehavior/AddFrame),
-  정방향은 ShaderSystem·DeviceState·Texture·PSO다(순환이라 프로젝트 참조로는 못 끊는다).</div>
+  <b>사라진 코드에서 건져 둔 사실(재조사 불필요).</b> 코드는 지웠어도 측정값은 남는다 —
+  새로 쓸 때 &quot;무엇이 어려운가&quot;의 답이 이미 있다.
+  <br>· <b>★ append/consume 버퍼·CopyStructureCount·간접 드로우·DispatchIndirect가 저장소 전체에 0건이었다.</b> 어려운 구조를 새로 뚫을 일이 없다 — 평범한 StructuredBuffer + Dispatch로 충분하다.
+  <br>· 시뮬레이션은 GPU, 트레일 생성만 CPU였다(872줄). 정렬 없음, 지오메트리 셰이더 없음, 소프트 파티클 없음.
+  <br>· DX11이 드라이버에 맡기던 UAV↔SRV 해저드를 DX12에서는 배리어로 명시해야 한다. 모듈 체인이 최대 9단이라 <b>여기가 이 페이즈의 핵심 엔지니어링</b>이고, 그것은 백지에서 써도 똑같다.
+  <br>· 구 계통의 결함 둘을 기록해 둔다. 새 코드가 같은 자리를 밟지 않기 위해서다:
+  <code>TrailModuleCS</code>가 그룹 수를 <code>(capacity+255)/256</code>으로 계산하는데 셰이더는 <code>numthreads(1024)</code>였다(4배 과소 디스패치).
+  그리고 이펙트 패스 직후 매 프레임 <code>Flush()</code>를 불러 GPU를 통째로 비웠다 — DX12에 대응물이 없고, 필요한 것은 그 자리의 배리어다.
+  <br>· 저작 형식은 <code>PathFinder::Relative(&quot;Effect\\&quot;)</code> 아래 <code>.json</code>이었고, <b>그 디렉터리는 저장소에 존재하지 않았다</b> — 남은 저작 자산이 애초에 0이다. 새 형식을 자유롭게 정할 수 있다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="10"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
       <li>파티클 시뮬레이션이 DX12 컴퓨트로 돌고, 모듈마다 켬/끔 대조군이 붙은 자가 검증이 통과한다</li>
       <li>빌보드·메시·트레일 세 렌더 모듈이 DX12에서 그려진다</li>
-      <li><code>EffectSystem</code> 프로젝트를 솔루션에서 빼도 나머지가 빌드되고 실행된다(이펙트만 없는 채로 돈다)</li>
-      <li>매 프레임 <code>Flush()</code>가 사라지고, 그 자리에 필요한 동기화가 있다면 근거와 함께 남는다</li>
-      <li>죽은 셰이더 2종·죽은 C++ 4파일의 처분이 결정되고 반영된다</li>
+      <li>체인의 모든 쓰기-읽기 경계에 배리어가 있고, 리드백으로 값이 단정된다(&quot;그려지긴 한다&quot;와 구분)</li>
+      <li>새 <code>Effect</code> 프로젝트를 솔루션에서 빼도 나머지가 빌드되고 실행된다 — <b>10-1 직후부터 계속 참이어야 한다</b></li>
+      <li>엔진 어느 파일도 이펙트 타입을 이름으로 알지 않는다(인터페이스와 등록만)</li>
     </ul>
   </div>
 </section>
 
 <!-- ===== PHASE 11 ===== -->
 <section class="phase" id="phase-11">
-  <h2 class="sec"><span class="no">PHASE 11</span>지형 DX12 재설계와 패키지화 <span class="phase-pct" data-phase-pct="11"></span></h2>
-  <div class="phase-meta">예상 공수: 23일 · 선행 조건: PHASE 3 · 우선순위: 최후순위 — PHASE 10과 같은 자리 · 설계 문서: EnginePackagingPlan.md §4.1</div>
-  <div class="phase-goal"><b>목표:</b> 지형 계통을 DX12로 <b>이식이 아니라 재설계</b>하고, 붙였다 뗄 수 있는 패키지로 만든다.
-  PHASE 10(파티클)과 같은 형태이고 이유도 같다.
+  <h2 class="sec"><span class="no">PHASE 11</span>지형 렌더 경로 신규 작성과 패키지화 <span class="phase-pct" data-phase-pct="11"></span></h2>
+  <div class="phase-meta">예상 공수: 20일 · 선행 조건: 없음(GPU 코드 제거 완료) · 우선순위: 최후순위 — PHASE 10과 같은 자리 · 설계 문서: EnginePackagingPlan.md §4.1</div>
+  <div class="phase-goal"><b>목표:</b> 지형 렌더 경로를 <b>백지에서</b> 쓰고, 붙였다 뗄 수 있는 패키지로 만든다.
   <br><br>
-  <b>왜 별도 페이즈로 세웠나 (2026-08-08).</b> 원래 이 일은 T축(자산의 DX11 잔량)의 T5 한 항목이었다 —
-  &quot;<code>TerrainMaterial</code>이 DX11 디바이스를 직접 쥔다&quot;. T5에 착수하고 나서 그 항목이 두 가지를 섞고 있다는 것이 드러났다.
+  <b>★ 이펙트와 다르게 잘랐다(2026-08-08, 사용자 판단).</b> 이펙트는 계통을 통째로 지웠지만 지형은 <b>GPU 코드만</b> 지웠다.
+  이유는 두 계통의 상태가 달라서다 — 이펙트는 GPU 코드가 곧 계통 전부였지만,
+  지형은 <b>편집 로직(조각·페인팅·레이어 관리 · 1,300여 줄)이 GPU와 무관하게 살아 있고</b> 그것은 다시 쓸 이유가 없다.
   <br><br>
-  <b>★ 실측: DX12에는 지형 렌더 경로가 아예 없다.</b> <code>RHI/DX12/</code> 아래에 <code>TerrainComponent</code> 참조가 0건이고,
-  <code>RenderPassData</code>가 <code>m_terrainQueue</code>에 프록시를 쌓지만 읽는 코드가 없다.
-  즉 <code>TerrainMaterial</code>의 DX11 자원은 <b>렌더가 아니라 편집</b>(스플랫 페인팅 · 레이어 배열 생성 · 레이어 상수)을 위해 살아 있다.
-  그것을 먼저 걷으면 지형 편집 기능이 사라질 뿐 아무것도 얻지 못한다 — 순서가 뒤집혀 있었다.
+  <b>★ GPU 코드를 들어냈다(2026-08-08 · 11-0 완료 · 빌드 그린).</b> 걷어낸 것과 그 근거:
+  <br>· <code>TerrainMaterial</code>의 DX11 일습 — 스플랫맵 텍스처 배열 + SRV, 레이어 Albedo 배열 + UAV + SRV, 상수 버퍼 둘,
+  레이어 배열을 굽던 DX11 컴퓨트 셰이더(<code>TerrainTexture.cs</code>).
+  <b>★ 그 전부의 소비자가 0이었다</b> — <code>GetSplatMapSRV</code>·<code>GetLayerSRV</code>·<code>GetLayerBuffer</code>의 호출자를 전수로 세어 확인했다. 잃은 기능이 없다.
+  <br>· <code>TerrainMesh</code>의 DX11 정점·인덱스 버퍼와 Map/memcpy 경로.
+  <br>· 브러시 마스크의 DX11 텍스처·SRV(<code>TerrainBrush::BrushMask</code>)와 <code>LoadRunTimeTerrain</code>의 레이어 배열 조립.
+  <br>· 셰이더 둘(<code>TerrainTexture.cs</code>·<code>TerrainDebugBrush.ps</code>), 지형·폴리지 저작 에셋.
   <br><br>
-  <b>★ 순서를 뒤집었다(2026-08-08).</b> 패키지화가 원래 맨 뒤(11-4)였는데 맨 앞으로 왔다.
-  EffectSystem이 엔진 안에서 다 만든 뒤 41차 슬라이스에서 54파일을 떼어내느라 10-3(패키지화)이 아직 남아 있다 —
-  나중에 자르는 것이 처음부터 밖에서 쓰는 것보다 비쌌다. 지형은 <b>렌더 경로가 아직 없으므로</b> 그 실수를 반복할 이유가 없다:
-  경계를 먼저 세우고 <code>EnhancedTerrainPass</code>를 그 안에서 쓰면 경계를 넘는 코드가 애초에 생기지 않는다.
+  <b>★ 그러면서 선결 결함이 함께 풀렸다 — 자료의 진실이 CPU로 왔다.</b>
+  <code>TerrainMesh::UpdateVertexBufferPatch</code>가 DX11 버퍼만 Map/memcpy 하고 <code>m_vertices</code>(CPU 배열)는 그대로 두고 있었다.
+  즉 조각(sculpt) 결과가 CPU 자료에 남지 않았고, DX12는 CPU 배열에서 업로드하므로(<code>DX12MeshCache</code>의 규약)
+  그 결과가 화면에 반영될 길이 없었다. 게다가 <b>그 버퍼를 읽는 코드는 이미 0</b>이었다 — 아무도 읽지 않는 버퍼에 계속 쓰고 있었다.
+  이제 갱신은 전부 CPU 배열에 쓰고, <code>m_revision</code>으로 &quot;올린 것이 최신인가&quot;를 판정한다(스플랫 마스크도 같은 형태).
+  <br><br>
+  <b>★ 잃은 것 하나를 명시해 둔다.</b> 브러시 마스크 <b>썸네일</b>이 사라졌다(인스펙터의 마스크 선택이 이미지에서 이름 버튼이 됐다).
+  마스크의 진실인 CPU 배열(<code>m_mask</code>)은 그대로이고 브러시 동작도 그대로다 — 미리보기만 없다. 11-5에서 DX12로 복원한다.
+  <br><br>
+  <b>★ 패키지 경계가 먼저다.</b> 경계를 먼저 세우고 <code>EnhancedTerrainPass</code>를 그 안에서 쓰면 경계를 넘는 코드가 애초에 생기지 않는다.
+  EffectSystem이 그 반대로 가서 치른 값이 근거다(PHASE 10 참조).
   <br><br>
   <b>★ 파일을 옮기기 전에 의존을 역전해야 한다.</b> 지금 옮기면 프로젝트 순환이 닫힌다 —
   <code>Terrain → ScriptBinder</code>(<code>Terrain.cpp</code>가 <code>Scene.h</code>·<code>SceneManager.h</code>를 include)와
   <code>ScriptBinder → Terrain</code>(<code>Scene.h</code>가 <code>std::vector&lt;TerrainComponent*&gt;</code>를 멤버로 든다)이 맞물린다.
   엔진이 지형을 <b>타입으로 아는 자리 열 곳</b>을 세어 두었다(11-1의 내용).
   <br><br>
-  <b>그래서 T5에서 한 것은 죽은 DX11 드로우 경로 제거까지다.</b> <code>PrimitiveRenderProxy</code>의 드로우 셋과 LOD 선택 둘,
-  <code>TerrainMesh::Draw</code> 둘, <code>Mesh</code>의 DX11 드로우 8종 — 전부 호출자 0이었다. 나머지는 이 페이즈로 옮긴다.
-  <br><br>
-  <b>착수 전 조사 결과(2026-08-08 실측).</b>
-  <br>· 규모: <code>ScriptBinder/Terrain.cpp</code> 1,369줄(DX11 접점 12) · <code>RenderEngine/TerrainMaterial.{h,cpp}</code> 292줄 · <code>TerrainMesh.h</code> 헤더 전용.
-  <br>· <code>TerrainMaterial</code>이 드는 DX11: 스플랫맵 텍스처 배열 + SRV, 레이어 텍스처 배열 + UAV + SRV, 레이어 상수 버퍼, 그리고 <b>레이어 배열을 만드는 DX11 컴퓨트 셰이더</b>.
-  <br>· <b>★ 선결 결함:</b> <code>TerrainMesh::UpdateVertexBufferPatch</code>가 DX11 정점 버퍼만 갱신하고 <code>m_vertices</code>(CPU 배열)는 그대로 둔다.
-  DX12는 CPU 배열에서 업로드하므로(<code>DX12MeshCache</code>의 규약) 지금 구조로는 <b>조각(sculpt) 결과가 화면에 반영되지 않는다.</b>
-  게다가 지금은 아무도 읽지 않는 버퍼에 계속 쓰는 상태다.
-  <br>· 구 DX11에서 대응 패스가 사라진 것: <code>TerrainGizmoPass</code>(지형 편집 브러시 표시).
+  <b>남은 조사 결과(2026-08-08 실측).</b>
+  <br>· <code>RHI/DX12/</code> 아래 <code>TerrainComponent</code> 참조 <b>0건</b>. <code>RenderPassData</code>가 <code>m_terrainQueue</code>에 프록시를 쌓지만 읽는 코드가 없다.
+  <br>· 구 DX11에서 대응 패스가 사라진 것: <code>TerrainGizmoPass</code>(편집 브러시 표시).
   <br>· 프록시가 나르는 지형 필드 넷: <code>m_terrainMesh</code>·<code>m_terrainMaterial</code>·<code>m_terrainGizmoBuffer</code>·<code>m_terrainlayerBuffer</code> — 소비자 0.
   <br>· 폴리지(<code>FoliageComponent</code>)도 같은 상태다 — 큐에 쌓이고 읽는 곳이 없다. 지형과 함께 다룬다(레이어 마스크·높이맵을 공유한다).</div>
   <div class="task-wrap"><table class="tasks" data-phase="11"><!-- JS 생성 --></table></div>
@@ -574,11 +579,11 @@
     <div class="vt">페이즈 완료 기준</div>
     <ul>
       <li>지형이 DX12에서 그려지고, 스플랫 레이어 블렌딩이 자가 검증(<code>dx12.terrain</code>)으로 확인된다</li>
-      <li>조각·페인팅 결과가 CPU 자료를 진실로 삼아 반영된다 — 편집 후 다음 프레임에 화면이 바뀐다</li>
+      <li>조각·페인팅 결과가 화면에 반영된다 — CPU 자료가 진실인 것은 11-0에서 이미 참이고, 여기서는 그것을 <b>읽는 쪽</b>이 생긴다</li>
       <li>폴리지가 DX12에서 인스턴싱으로 그려진다</li>
-      <li>지형 편집 기즈모(브러시 표시)가 DX12 기즈모 계열 위에서 돈다</li>
+      <li>지형 편집 기즈모(브러시 표시)와 브러시 마스크 썸네일이 DX12 위에서 돈다</li>
       <li>지형 프로젝트를 솔루션에서 빼도 나머지가 빌드되고 실행된다(지형만 없는 채로 돈다)</li>
-      <li><code>TerrainMaterial</code>·<code>TerrainMesh</code>에 <code>ID3D11</code> 참조 0건 — T6(<code>Texture</code>의 DX11 멤버 제거)의 마지막 전제가 여기서 풀린다</li>
+      <li>지형 계통에 <code>ID3D11</code> 참조 0건 — <b>11-0에서 이미 참이고</b>, 새로 쓰는 코드가 그것을 깨지 않는다. T6(<code>Texture</code>의 DX11 멤버 제거)의 지형 쪽 전제가 여기서 풀린다</li>
     </ul>
   </div>
 </section>
@@ -990,16 +995,32 @@ const TASKS = [
     detail: "GC.GetGCMemoryInfo()·CollectionCount(0/1/2)를 틱당 1회 blittable로 경계 너머로 수출, 리소스 카운터 HUD(0-2)에 gen0/1/2 수집 횟수·관리 힙 크기 표시. 2-9 '메모리 평탄성 검증'의 판정 기준을 '네이티브·관리 힙 모두 기준선 복귀'로 확장.",
     refs: "LifecycleRedesignPlan §07 A-2 · 2-9", priority: "P1", days: 0.25, status: "done", note: "코드 완료 · C# 측 빌드 검증 통과 · 네이티브 빌드는 별도 진행. GcStats(gen0/1/2 수집 횟수·힙 크기·단편화·GC 점유율)를 blittable 구조체로 포인터 하나에 담아 넘긴다 — 물리 이벤트와 같은 규약이다. ★ 배치 불일치는 경고 없이 그럴듯한 쓰레기 값을 만들어 눈으로 알아채기 어려우므로 양쪽에 못을 박았다: C++에 static_assert(sizeof==48), 그리고 실제로 확인했다 — 컴파일된 어셈블리에서 Marshal.SizeOf=48, HeapSizeBytes 오프셋 16(int32 셋 12 + 정렬 패딩 4)으로 C++ 자연 정렬과 정확히 일치. HUD: ResourceCounterWindow에 '관리 힙 (.NET GC)' 섹션 추가. 게임 스레드의 ImGui 패스에서 그려지므로 경계 규약을 지키고, 갱신 주기가 0.5초라 틱마다 넘지도 않는다. 수집 횟수는 단조 증가라 증감의 뜻이 다르다는 점을 표시에 반영했다 — '기준선 이후 몇 번 돌았나'이고, 씬 전환마다 gen2가 정확히 늘어나는지가 9-6의 확인점이다. 벤치 확장: scene_churn_benchmark와 lifecycle_baseline에 gc.delta/gc.stats를 넣어 2-9의 판정 기준을 '네이티브·관리 양쪽 모두 기준선 복귀'로 넓혔다 — 스크립트가 C#으로 간 뒤로 씬이 붙들던 것의 상당수가 관리 힙에 있어, gpu.delta만 보면 평탄성의 절반만 본다. gc.delta는 기준선이 없으면 조용히 0을 찍는 대신 집계로 남기고 기준선을 세운다(0을 '변화 없음'으로 오독하는 것을 막는다). ★ 빌드·회귀 통과(2026-08-07) — 완료." },
 
-  // ---------- PHASE 10: 파티클·이펙트 DX12 재설계와 패키지화 (최후순위) ----------
-  { phase: 10, id: "10-1", title: "파티클 GPU 버퍼 토대와 시뮬레이션 체인",
-    detail: "모듈들이 공유하는 파티클 배열의 DX12 수명·상태 관리부터 세운다. DX11은 ping-pong 구조체 버퍼 둘(A/B)을 두고 모듈마다 입출력을 맞바꾸는데, 드라이버가 해 주던 UAV↔SRV 해저드를 DX12에서는 배리어로 명시해야 한다 — 체인이 최대 9모듈이라 이 지점이 이 페이즈의 핵심 엔지니어링이다. 그다음 빌보드 계보(Spawn→Life→Movement→Size→Color)를 옮긴다. 검증이 픽셀이 아니라 숫자다 — 파티클 버퍼를 리드백해 '생명이 dt만큼 줄었나' '속도×dt만큼 움직였나'를 정확한 값으로 단정하고, 모듈마다 켬/끔 대조군을 붙인다. 완료 기준: 빌보드 시뮬 체인이 DX12에서 돌고 모듈별 A/B가 통과.",
-    refs: "신규 · 3-6에서 이월", priority: "P3", days: 6, status: "todo", note: "" },
-  { phase: 10, id: "10-2", title: "메시 계보와 렌더 모듈 3종",
-    detail: "Mesh{Spawn,Movement,Size,Color} 컴퓨트와 렌더 모듈 셋(BillboardModuleGPU·MeshModuleGPU·TrailRenderModule)을 옮긴다. 렌더 쪽은 전부 평범한 DrawIndexedInstanced/DrawIndexed라 PSO·루트 시그니처 작업이고, 정점 셰이더가 SV_InstanceID로 파티클 SRV를 직접 읽는 구조도 DX12에서 그대로 성립한다. BlendPreset 6종·DepthPreset 6종은 PSO 필드로 옮기면 된다. MeshParticle*.ps 변형 10종은 틀이 서면 기계적. 트레일은 현재 CPU 생성(TrailGenerateModule 872줄)인데, 죽어 있는 TrailMeshGenerate.cs를 되살려 GPU로 옮길지 이 자리에서 판단한다. 완료 기준: 세 렌더 모듈이 화면에 나오고, 트레일 처분이 결정된다.",
-    refs: "신규 · 3-6에서 이월", priority: "P3", days: 8, status: "todo", note: "" },
-  { phase: 10, id: "10-3", title: "패키지화 — 붙였다 뗄 수 있는 모듈로",
-    detail: "유니티 패키지처럼 넣으면 켜지고 빼면 없는 채로 도는 구조로 만든다. 걸림돌이 셋이고 전부 측정해 두었다: ① SceneRenderer.h가 EffectManager.h·EffectEditor.h를 직접 include하고 unique_ptr<EffectEditor>를 멤버로 든다 → RenderEngine에 순수 가상 IEffectSystem(동사 여섯)을 두고 포인터 하나만 들게 역전한다(null이면 이펙트만 없는 채로 돈다). ② 최하층 Utility_Framework/EngineBootstrap.h가 EffectProxyController를 직접 부른다 → 이펙트 전용 3중 버퍼 명령 큐를 범용 프록시 큐로 일반화해 아래층에 남긴다(EffectSystem이 빠져도 큐는 있어야 한다). ③ ScriptBinder/EffectComponent가 EffectSystem 타입에 직접 붙어 있다 → 컴포넌트를 옮기거나 프록시 인터페이스에만 붙게 한다. 마지막에 정적 자기 등록(레지스트리)을 붙이면 프로젝트를 빼는 것만으로 등록자가 링크되지 않아 앱 코드가 한 줄도 안 바뀐다. 완료 기준: 솔루션에서 EffectSystem을 빼도 빌드·실행된다.",
-    refs: "신규 · 41차 슬라이스에서 파일 분리 선행", priority: "P3", days: 7, status: "todo", note: "" },
+  // ---------- PHASE 10: 파티클·이펙트 백지 재작성 (최후순위) ----------
+  //
+  // ★ 2026-08-08(사용자 판단): "이식하며 고친다"에서 "백지에서 새로 쓴다"로
+  //   방향을 바꿨다. 참고본이 있으면 그 구조를 따라가게 되는데, 그 구조가
+  //   DX11 즉시 컨텍스트 시절의 형태다. 옮길 기준선이 없다는 것은 처음부터
+  //   참이었으므로(구버전은 legacy/pre-coreclr가 맡는다) 참고본을 지우는
+  //   쪽이 일관된다. 10-0이 그 제거이고 이미 끝났다.
+  { phase: 10, id: "10-0", title: "구 DX11 이펙트 계통 제거 — 백지 만들기",
+    detail: "EffectSystem 프로젝트 56파일 19,639줄, 파티클 셰이더 30종, EffectComponent(C++·C#·generated), ClrHost의 스크립트 API 20항목, 엔진 배선 6파일을 제거한다. 남는 것은 없다 — 이 페이즈는 진짜 백지에서 시작한다.",
+    refs: "사용자 판단(2026-08-08)", priority: "P3", days: 0.5, status: "done",
+    note: "제거 목록: ① EffectSystem/ 56파일(19,639줄) + vcxproj + sln 등록 + 참조 프로젝트 4곳의 include 경로·ProjectReference. ② 셰이더 30종(BillBoard·MeshParticle 10종·Trail 4종·모듈 CS 8종 등)과 고아 .meta. Gizmo_billboard 셋은 남겼다 — 파티클이 아니라 기즈모용이다. ③ ScriptBinder/EffectComponent.{h,cpp,generated.h}. ④ ClrHost의 API 테이블 필드 20 + 구현 블록 + 대입 20줄(172줄), 그리고 C# 대응(Native.cs 135줄, EffectComponent.cs, Component.cs 팩토리 항목, GameScripts 2파일) — 경계 양쪽을 함께 지워야 테이블 순서가 어긋나지 않는다. ⑤ 엔진 배선: App.cpp·Dx11Main.cpp·EngineBootstrap.h(생성·종료 단계)·LifecycleRegistry.cpp·GameMain.cpp·GameApp.cpp. ★ 저작 자산은 지울 것이 없었다 — EffectManager가 읽던 PathFinder::Relative(\"Effect\\\\\") 디렉터리가 저장소에 존재하지 않는다. ★ 딸려 나온 것(유니티 빌드의 전이 include): ParticleSystem.h가 RenderScene.h·RenderPassData.h·Camera.h를 Scene.cpp·Terrain.cpp·SceneManager.cpp에 전이로 공급하고 있었다. 이 프로젝트에서 다섯 번째로 밟은 같은 함정이라 세 파일에 직접 include를 넣어 닫았다. ★ 빌드 검증: Debug x64 전체 0오류·0경고(2026-08-08). ── 무관한 기존 결함 하나를 발견해 기록한다: Academy_4Q의 PreBuildEvent가 version.txt에서 EngineVersion.h를 생성하는데 for /F 줄이 MSBuild 실행 환경에서만 조용히 실패한다(cmd에서 직접 실행하면 정상). 그 결과 파일이 '#pragma once'만 남아 ENGINE_VERSION이 미정의가 된다. 이번 변경과 무관하며 별건으로 둔다." },
+  { phase: 10, id: "10-1", title: "패키지 경계 먼저 — Effect 프로젝트와 IEffectSystem",
+    detail: "코드를 쓰기 전에 경계를 세운다. ★ 순서를 이렇게 잡은 근거는 실측이다: 구 EffectSystem은 엔진 안에서 다 만든 뒤 41차 슬라이스에서 54파일을 떼어내야 했고, 그러고도 패키지화가 끝나지 않은 채 제거됐다. 내용: RenderEngine에 순수 가상 IEffectSystem(생성·갱신·기록·프레임 경계)을 두고 엔진은 포인터 하나만 든다(null이면 이펙트만 없는 채로 돈다). 프록시 명령 큐는 이펙트 전용이 아니라 범용으로 아래층에 둔다 — 구 구조는 최하층 EngineBootstrap이 EffectProxyController를 이름으로 알고 있었고 그것이 떼어냄을 막았다. 정적 자기 등록을 붙이면 프로젝트를 빼는 것만으로 등록자가 링크되지 않아 앱 코드가 한 줄도 안 바뀐다. 완료 기준: 빈 Effect 프로젝트를 넣었다 뺐다 해도 빌드·실행이 그대로다 — 이 항목 이후 모든 슬라이스에서 계속 참이어야 한다.",
+    refs: "구 10-3의 교훈 · EnginePackagingPlan §4.1", priority: "P3", days: 4, status: "todo", note: "" },
+  { phase: 10, id: "10-2", title: "파티클 GPU 버퍼 토대와 시뮬레이션 체인",
+    detail: "모듈들이 공유하는 파티클 배열의 DX12 수명·상태 관리부터 세운다. 드라이버가 해 주던 UAV↔SRV 해저드를 DX12에서는 배리어로 명시해야 하고, 체인이 최대 9단이라 여기가 이 페이즈의 핵심 엔지니어링이다 — 구 코드를 지웠어도 이 사실은 그대로다. ★ 구조는 구 계통을 따라가지 않는다: ping-pong 버퍼 둘로 모듈마다 입출력을 맞바꾸던 형태는 즉시 컨텍스트 시절의 선택이고, DX12에서는 배리어 계획을 먼저 정하고 버퍼 구성을 거기 맞춘다. 검증이 픽셀이 아니라 숫자다 — 파티클 버퍼를 리드백해 '생명이 dt만큼 줄었나' '속도×dt만큼 움직였나'를 정확한 값으로 단정하고, 모듈마다 켬/끔 대조군을 붙인다. 완료 기준: 기본 시뮬 체인이 돌고 모듈별 A/B가 통과.",
+    refs: "10-1 선행 · 3-6 계승", priority: "P3", days: 7, status: "todo", note: "" },
+  { phase: 10, id: "10-3", title: "렌더 모듈 — 빌보드·메시·트레일",
+    detail: "세 렌더 경로를 EnhancedRenderPass 규약 위에 쓴다. 구 계통에서 확인해 둔 사실: 전부 평범한 DrawIndexedInstanced/DrawIndexed이고, 정점 셰이더가 SV_InstanceID로 파티클 SRV를 직접 읽는 구조는 DX12에서 그대로 성립한다. append/consume·CopyStructureCount·간접 드로우가 저장소 전체에 0건이었으므로 어려운 구조를 새로 뚫을 일이 없다. 블렌드·깊이 프리셋은 PSO 필드로 둔다. 트레일 생성은 CPU/GPU 선택을 이 자리에서 판단한다 — 구 계통은 CPU였고 GPU 버전(TrailMeshGenerate.cs)은 쓰이지 않은 채 죽어 있었다. 완료 기준: 세 렌더 모듈이 화면에 나온다.",
+    refs: "10-2 선행", priority: "P3", days: 8, status: "todo", note: "" },
+  { phase: 10, id: "10-4", title: "저작 형식과 에디터 재작성",
+    detail: "이펙트 정의의 직렬화 형식과 편집 UI를 새로 정한다. ★ 여기서 자유도가 크다: 구 형식(PathFinder::Relative(\"Effect\\\\\") 아래 .json)의 저작 자산이 저장소에 하나도 없었다 — 호환 부담이 0이다. 컴포넌트도 새로 만든다(구 EffectComponent와 그 스크립트 API 20항목은 10-0에서 사라졌다). C# 바인딩은 경계 양쪽을 같은 커밋에서 세운다 — 테이블 순서가 어긋나면 조용히 엉뚱한 함수를 부른다.",
+    refs: "10-3 선행", priority: "P3", days: 5, status: "todo", note: "" },
+  { phase: 10, id: "10-5", title: "떼어냄 검증 — 빼도 도는가",
+    detail: "Effect 프로젝트를 솔루션에서 빼고 나머지가 빌드·실행되는지 본다. 10-1의 역전이 실제로 성립했는지를 재는 유일한 방법이다 — 인터페이스를 만들어 두고 어딘가에 타입 참조가 남아 있으면 여기서 링크가 깨진다. ★ 10-1 이후 계속 참이었어야 하므로, 여기서 처음 실패한다면 그 사이 어느 슬라이스가 경계를 넘은 것이고 그 지점을 찾는 것이 이 항목의 실제 내용이다.",
+    refs: "11-6과 같은 형태", priority: "P3", days: 2, status: "todo", note: "" },
 
   // ---------- PHASE 11: 지형 DX12 재설계와 패키지화 (최후순위) ----------
   //
@@ -1012,21 +1033,25 @@ const TASKS = [
   //   남아 있다. 지형은 렌더 경로가 아직 없으니 그 실수를 반복할 이유가 없다 —
   //   경계를 먼저 세우고 새 코드를 그 안에서 쓰면 경계를 넘는 코드가 애초에
   //   생기지 않는다. 설계: EnginePackagingPlan.md §4.1
+  { phase: 11, id: "11-0", title: "지형 DX11 GPU 자원 제거 — 자료를 CPU 진실로",
+    detail: "지형에서 GPU 코드만 걷어낸다(이펙트와 달리 계통을 통째로 지우지 않는다 — 편집 로직 1,300여 줄이 GPU와 무관하게 살아 있고 다시 쓸 이유가 없다). 그러면서 T5가 남긴 선결 결함, 즉 '조각 결과가 CPU 배열에 남지 않는다'가 함께 풀린다.",
+    refs: "T5에서 이월 · 사용자 판단(2026-08-08)", priority: "P3", days: 0.5, status: "done",
+    note: "걷어낸 것: ① TerrainMaterial의 DX11 일습 — 스플랫맵 텍스처 배열 + SRV, 레이어 Albedo 배열 + UAV + SRV, 상수 버퍼 둘, 레이어 배열을 굽던 DX11 컴퓨트 셰이더. ★ 그 전부의 소비자가 0이었다(GetSplatMapSRV·GetLayerSRV·GetLayerBuffer의 호출자를 전수로 세어 확인). 잃은 기능이 없다. ② TerrainMesh의 DX11 정점·인덱스 버퍼와 Map/memcpy. ③ 브러시 마스크의 DX11 텍스처·SRV(TerrainBrush::BrushMask)와 LoadRunTimeTerrain의 레이어 배열 조립. ④ 셰이더 둘(TerrainTexture.cs·TerrainDebugBrush.ps), 지형·폴리지 저작 에셋. ★ 자료의 진실이 CPU로 왔다: UpdateVertexBufferPatch가 DX11 버퍼만 갱신하고 m_vertices는 그대로 두던 것이 이제 CPU 배열에 쓴다. 스플랫 마스크도 같은 형태로 TerrainMaterial이 vector<vector<uint8_t>>로 든다. 양쪽 다 m_revision을 두어 '올린 것이 최신인가'를 지형 패스가 판정할 수 있게 했다 — 배열 전체를 매 프레임 비교할 이유가 없다. ★ 딸려 나온 개선 둘: 패치 갱신이 격자 밖으로 나가면 클램프한다(예전 DX11 경로는 Map한 버퍼에 범위 검사 없이 memcpy 했다). 그리고 LoadRunTimeTerrain이 m_layers를 비우기만 하고 채우지 않던 것 — 로드 직후 레이어 정보가 어디에도 남지 않았다 — 을 CPU 자료로 세우도록 고쳤다. ★ 잃은 것: 브러시 마스크 썸네일(인스펙터의 마스크 선택이 이미지 버튼에서 이름 버튼이 됐다). CPU 마스크와 브러시 동작은 그대로이고 미리보기만 없다 — 11-5에서 복원한다. ★ 빌드 검증: Debug x64 전체 0오류·0경고(2026-08-08). 지형 계통의 ID3D11·D3D11_ 참조 0건." },
   { phase: 11, id: "11-1", title: "지형 의존 역전 — 엔진이 지형을 타입으로 알지 않게",
     detail: "패키지 경계를 세우기 전에 순환을 끊는다. 지금 옮기면 Terrain → ScriptBinder(Terrain.cpp가 Scene.h·SceneManager.h를 include)와 ScriptBinder → Terrain(Scene.h가 std::vector<TerrainComponent*>를 멤버로 든다)이 맞물려 프로젝트 순환이 닫힌다. 엔진이 지형을 타입으로 아는 자리 열 곳을 세어 두었다: Scene.h(멤버 + 수집 함수 셋) · RenderScene.h(TerrainComponent* 오버로드 넷) · ProxyCommand.h(생성자) · MeshRendererProxy.h(프록시 타입 열거 + 지형 전용 필드 넷) · PhysicsManager.h(콜라이더 등록 둘) · FoliageComponent.h(지형 직접 의존 셋) · EngineSetting.h(TerrainBrush 전역) · PathFinder.h(TerrainSourcePath) · DataSystem.h(FileType::TerrainTexture) · 에디터 배선 둘. 각각 등록·인터페이스로 역전한다 — 이것이 패키지화의 실제 내용이고 프로젝트 파일 만들기가 아니다.",
     refs: "EnginePackagingPlan §4.1", priority: "P3", days: 5, status: "todo", note: "" },
   { phase: 11, id: "11-2", title: "Terrain 프로젝트 신설과 이동",
-    detail: "정적 라이브러리 Terrain을 세우고 네 프로젝트에 흩어져 있는 2,569줄을 옮긴다: Terrain.{h,cpp}·TerrainBrush.h·TerrainCollider.{h,cpp}(ScriptBinder 1,684줄) · TerrainMaterial.{h,cpp}·TerrainMesh.h(RenderEngine 444줄) · TerrainBuffers.h(Interfaces 84줄) · ImGuiDrawHelperTerrainComponent.cpp(EngineGUIWindow 357줄). 셰이더 둘(TerrainTexture.cs·TerrainDebugBrush.ps)도 함께. 리플렉션 어노테이션이 붙은 헤더가 있으므로 MetaGenerator 스캔 경로 확인이 선행 조건이다(PHASE 4 B가 같은 함정을 기록해 두었다).",
+    detail: "정적 라이브러리 Terrain을 세우고 네 프로젝트에 흩어져 있는 코드를 옮긴다: Terrain.{h,cpp}·TerrainBrush.h·TerrainCollider.{h,cpp}(ScriptBinder) · TerrainMaterial.{h,cpp}·TerrainMesh.h(RenderEngine) · TerrainBuffers.h(Interfaces) · ImGuiDrawHelperTerrainComponent.cpp(EngineGUIWindow). ★ 11-0 이후 규모가 줄었다 — TerrainMaterial은 CPU 자료만 남아 292줄에서 크게 줄었고, TerrainMesh는 헤더 하나이며, 옮길 셰이더는 없다(둘 다 11-0에서 삭제). 리플렉션 어노테이션이 붙은 헤더가 있으므로 MetaGenerator 스캔 경로 확인이 선행 조건이다(PHASE 4 B가 같은 함정을 기록해 두었다).",
     refs: "11-1 선행", priority: "P3", days: 3, status: "todo", note: "" },
-  { phase: 11, id: "11-3", title: "지형 자료를 CPU 진실로 — 조각·페인팅 경로 정리",
-    detail: "DX12 렌더를 붙이기 전에 풀어야 하는 선결 결함이다. TerrainMesh::UpdateVertexBufferPatch가 DX11 정점 버퍼만 갱신하고 m_vertices(CPU 배열)는 그대로 둔다. DX12는 CPU 배열에서 업로드하므로(DX12MeshCache의 규약) 지금 구조로는 조각 결과가 화면에 반영되지 않는다. 게다가 지금은 아무도 읽지 않는 DX11 버퍼에 계속 쓰는 상태다. 조각·페인팅이 CPU 자료(정점 배열·스플랫 마스크·높이맵)를 진실로 삼게 하고, GPU 반영은 더티 영역만 올리는 구조로 바꾼다 — 패치 갱신이 이미 영역 단위이므로 그 경계를 그대로 쓴다.",
-    refs: "T5에서 발견", priority: "P3", days: 3, status: "todo", note: "" },
+  { phase: 11, id: "11-3", title: "더티 영역 업로드 — CPU 자료를 GPU로 올리는 쪽",
+    detail: "★ 이 항목의 절반은 11-0에서 이미 끝났다. 원래 내용은 '조각·페인팅이 CPU 자료를 진실로 삼게 한다'였는데, GPU 코드를 걷어내면서 진실이 자동으로 CPU가 됐다 — 쓸 곳이 거기밖에 없다. 남은 절반은 반대 방향이다: 그 자료를 GPU로 올리는 경로. m_revision(정점 배열·스플랫 마스크 양쪽에 있다)으로 '올린 것이 최신인가'를 판정하고, 전체가 아니라 바뀐 영역만 올린다 — 패치 갱신이 이미 영역 단위이므로 그 경계를 그대로 쓴다. 11-4의 패스가 이것을 쓴다.",
+    refs: "11-0에서 절반 해소 · 11-4와 짝", priority: "P3", days: 2, status: "todo", note: "" },
   { phase: 11, id: "11-4", title: "지형 렌더 패스 신규 작성 (EnhancedTerrainPass)",
-    detail: "EnhancedRenderPass 규약 위에 새로 쓴다 — 3-6과 같은 방식이고, 보존해야 할 DX11 기준선이 없으므로(구 렌더러에 지형 전용 패스가 없었다) 발견되는 결함은 고치면서 옮긴다. ★ Terrain 프로젝트 안에서 쓴다 — 그것이 순서를 뒤집은 이유다. 범위: 지형 메시 업로드(DX12MeshCache 공유), 스플랫맵·레이어 텍스처 배열의 DX12 생성, 레이어 상수, GBuffer에 합류하는 셰이딩. 레이어 배열을 만드는 DX11 컴퓨트 셰이더도 DX12 컴퓨트로 옮긴다. 자가 검증 dx12.terrain을 함께 세운다 — 레이어 블렌딩은 켬/끔 대조군이 있어야 그려지긴 한다와 구분된다.",
+    detail: "EnhancedRenderPass 규약 위에 새로 쓴다 — 3-6과 같은 방식이고, 보존해야 할 DX11 기준선이 없다(구 렌더러에 지형 전용 패스가 없었고, 11-0이 남은 GPU 코드마저 걷었다). ★ Terrain 프로젝트 안에서 쓴다 — 그것이 순서를 뒤집은 이유다. 범위: 지형 메시 업로드(DX12MeshCache 공유), CPU 스플랫 마스크에서 텍스처 배열 생성, 레이어 Albedo 배열을 굽는 DX12 컴퓨트(구 DX11 셰이더는 삭제됐으므로 새로 쓴다), 레이어 상수, GBuffer에 합류하는 셰이딩. 입력은 전부 11-3이 올린 것이다. 자가 검증 dx12.terrain을 함께 세운다 — 레이어 블렌딩은 켬/끔 대조군이 있어야 '그려지긴 한다'와 구분된다.",
     refs: "3-6 계승 · 11-2 선행", priority: "P3", days: 6, status: "todo", note: "" },
-  { phase: 11, id: "11-5", title: "폴리지 인스턴싱과 지형 편집 기즈모",
-    detail: "폴리지도 지형과 같은 상태다 — RenderPassData가 m_foliageQueue에 쌓지만 읽는 코드가 없다. 레이어 마스크·높이맵을 지형과 공유하고 FoliageComponent가 TerrainComponent를 직접 참조하므로 같은 패키지에 넣는다. 배치는 GBuffer 인스턴싱과 같은 규칙. 편집 기즈모는 구 DX11의 TerrainGizmoPass가 하던 브러시 표시로, DX12 기즈모 계열 위에 얹는다 — 프록시가 나르는 m_terrainGizmoBuffer가 그 입력이다.",
-    refs: "신규", priority: "P3", days: 4, status: "todo", note: "" },
+  { phase: 11, id: "11-5", title: "폴리지 인스턴싱 · 편집 기즈모 · 마스크 썸네일 복원",
+    detail: "폴리지도 지형과 같은 상태다 — RenderPassData가 m_foliageQueue에 쌓지만 읽는 코드가 없다. 레이어 마스크·높이맵을 지형과 공유하고 FoliageComponent가 TerrainComponent를 직접 참조하므로 같은 패키지에 넣는다. 배치는 GBuffer 인스턴싱과 같은 규칙. 편집 기즈모는 구 DX11의 TerrainGizmoPass가 하던 브러시 표시로, DX12 기즈모 계열 위에 얹는다 — 프록시가 나르는 m_terrainGizmoBuffer가 그 입력이다. ★ 그리고 11-0이 잃은 것 하나를 여기서 갚는다: 브러시 마스크 썸네일. 마스크의 CPU 배열(8비트 grayscale)은 그대로 있으므로 그것을 Texture로 올려 EditorImGuiTexture::From 경로에 태우면 된다 — 지금은 인스펙터가 이름 버튼으로 대신하고 있다.",
+    refs: "신규 · 11-0의 잔여", priority: "P3", days: 4, status: "todo", note: "" },
   { phase: 11, id: "11-6", title: "떼어냄 검증 — 빼도 도는가",
     detail: "Terrain 프로젝트를 솔루션에서 빼고 나머지가 빌드·실행되는지 본다(지형만 없는 채로 돈다). 11-1의 역전이 실제로 성립했는지를 재는 유일한 방법이다 — 인터페이스를 만들어 두고 어딘가에 타입 참조가 남아 있으면 여기서 링크가 깨진다. ★ 이 항목이 통과하면 TerrainMaterial·TerrainMesh에 ID3D11 참조가 0이 되고, T6(Texture의 DX11 멤버 제거)의 마지막 전제가 풀린다.",
     refs: "T6 선행 · 10-3과 같은 형태", priority: "P3", days: 2, status: "todo", note: "" },

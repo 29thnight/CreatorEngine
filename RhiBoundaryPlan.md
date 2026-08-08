@@ -745,15 +745,21 @@ DX11 초기화에서 스왑체인 생성을 건너뛰고(셸 모드일 때), 셸
 잡으면 캐스팅이 늘 뿐이다. `IRHIDeviceResources`는 아직 컴파일러(`override`)
 말고는 소비자가 없다 — 두 번째 백엔드나 R3의 인코더가 붙어야 생긴다.
 
-**D3 — ImGui DX12 셸 기본 켜기.** D2가 풀면 설정 기본값을 뒤집는다.
+**D3 — ImGui DX12 셸 기본 켜기. (완료)**
+`EngineSetting`의 기본값을 켜짐으로 뒤집었다(2026-08-07). 실측: 셸을 켜고
+590프레임 렌더 · 폴백 없음 · 종료 19단계 정상 · 검증 레이어 0건.
 
 **D4 — `Utility_Framework/DeviceResources` 은퇴.**
 스왑체인만이 아니라 DX11 디바이스를 쥐고 있어서, 그 소비자가 먼저 사라져야
-한다. 실측한 잔량: `Texture.cpp` 23건(T축이 절반 해결, SRV 생성이 남음),
-**EffectSystem 약 50건**(파티클 — PHASE 10), `RenderDebugManager`·
-`TerrainMaterial` 11건. 즉 D4는 T축과 PHASE 10 뒤다.
+한다.
 
-순서: `D1 → D2 → D3 → (T축·PHASE 10) → D4`
+★ **잔량이 줄었다(2026-08-08 재측정).** 원래 적어 둔 것은 `Texture.cpp`
+23건 · **EffectSystem 약 50건**(파티클) · `RenderDebugManager`·
+`TerrainMaterial` 11건이었다. 이 중 **EffectSystem과 `TerrainMaterial`이
+통째로 사라졌다**(PHASE 10-0 · 11-0). 남은 것은 `Texture.cpp`의 SRV 생성,
+`RenderDebugManager`, 그리고 UI·PSO·Shader 계통이다.
+
+순서: `D1 ✔ → D2 ✔ → D3 ✔ → (T6 = UI 스프라이트) → D4`
 
 ### 4.3 T축 — 자산의 DX11 잔량 (2026-08-08 추가)
 
@@ -884,8 +890,38 @@ T축 뒤라고 적어 두었는데, 정작 T축이 무엇으로 이루어지는�
 
   **남은 것 = 새 항목:** DX12 지형 렌더 경로 신설(3-6급). 그 뒤에야
   `TerrainMaterial`의 DX11을 옮길 수 있다.
-- **T6 — `Texture`에서 DX11 멤버 제거.** 위가 끝나야 가능하다. 여기까지
-  오면 D4의 전제 절반이 풀린다(나머지 절반은 PHASE 10).
+
+  ★ **2차 완료 — 순서가 다시 뒤집혔다(2026-08-08, 사용자 판단).**
+  위에 "지형 패스가 먼저 있어야 DX11을 걷을 수 있다"고 적었는데, 세어 보니
+  **틀린 전제였다.** `TerrainMaterial`의 GPU 자원을 읽는 코드가 하나도 없다
+  (`GetSplatMapSRV`·`GetLayerSRV`·`GetLayerBuffer`의 호출자 0곳). 편집이
+  그것을 *쓰기만* 하고 아무도 읽지 않았으므로, 걷어내도 잃는 기능이 없다.
+  "편집 기능이 사라진다"는 걱정이 실측 앞에서 사라졌다.
+
+  걷은 것: `TerrainMaterial`의 DX11 일습(스플랫맵 배열·레이어 Albedo 배열·
+  UAV·SRV·상수 버퍼 둘·DX11 컴퓨트 셰이더), `TerrainMesh`의 정점/인덱스
+  버퍼와 Map 경로, 브러시 마스크의 텍스처·SRV, 셰이더 둘, 지형·폴리지 에셋.
+
+  ★ **그러면서 위 선결 결함이 함께 풀렸다.** `UpdateVertexBufferPatch`가
+  이제 CPU 배열에 쓴다 — 쓸 곳이 거기밖에 없어서다. 스플랫 마스크도 같은
+  형태로 CPU가 진실이고, 양쪽에 `m_revision`을 두어 지형 패스가 "올린 것이
+  최신인가"를 판정할 수 있게 했다.
+
+  ★ **잃은 것 하나:** 브러시 마스크 썸네일(인스펙터가 이미지 버튼에서 이름
+  버튼이 됐다). CPU 마스크와 브러시 동작은 그대로다. PHASE 11-5에서 갚는다.
+- **T6 — `Texture`에서 DX11 멤버 제거.**
+
+  ★ **전제가 거의 다 풀렸다(2026-08-08 재측정).** 외부 소비처가
+  **열넷에서 셋으로** 줄었다. 이펙트 계통 통째 제거(PHASE 10-0)가 일곱을,
+  지형 GPU 제거(T5 2차 = PHASE 11-0)가 다섯을 가져갔다.
+
+  | 남은 곳 | 성격 |
+  |---|---|
+  | `UIRenderProxy.cpp` · `UIProxyBridge.cpp` | UI 스프라이트 — DirectXTK `SpriteBatch`(DX11) |
+  | `EditorImGuiTexture.cpp` | 셸 비활성 시 폴백 경로 |
+
+  즉 T6은 이제 **UI 스프라이트 경로 하나**가 전제다. 그것이 DX12로 가면
+  `Texture`의 DX11 멤버를 걷을 수 있다.
 
 **R6(선택) — 기록 검증용 가짜 백엔드.** §2.1 ②. 인코더 호출을 기록만 하는
 구현으로 패스의 명령 순서를 픽셀 없이 단정한다. 여기까지 오면 두 번째
