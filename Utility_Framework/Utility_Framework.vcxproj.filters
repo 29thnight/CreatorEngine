@@ -270,9 +270,6 @@
     <ClInclude Include="Paklib.hpp">
       <Filter>Utility</Filter>
     </ClInclude>
-    <ClInclude Include="GlobalImGuiContext.h">
-      <Filter>EngineBootstrap</Filter>
-    </ClInclude>
     <ClInclude Include="plf_colony.h">
       <Filter>Core.Container\Plf_Colony</Filter>
     </ClInclude>

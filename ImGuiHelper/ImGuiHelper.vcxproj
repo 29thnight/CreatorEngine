@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BlueprintBuilder.h" />
+    <ClInclude Include="GlobalImGuiContext.h" />
     <ClInclude Include="CustomCollapsingHeader.h" />
     <ClInclude Include="drawing.h" />
     <ClInclude Include="fa.h" />

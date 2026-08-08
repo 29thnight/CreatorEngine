@@ -1,4 +1,5 @@
 #include "TextComponent.h"
+#include "DataSystem.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
 #include "SceneManager.h"

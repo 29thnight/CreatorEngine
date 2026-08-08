@@ -1,8 +1,8 @@
 #pragma once
 #include "ReflectionFunction.h"
 #include "ReflectionRegister.h"
-#include "IObject.h"
-#include "DataSystem.h"
+// (ì£½ì€ include ì œê±° ì´ë ¥: IObject.hÂ·DataSystem.h â€” ë³¸ë¬¸ì—ì„œ ì•„ë¬´ê²ƒë„ ì“°ì§€
+//  ì•Šìœ¼ë©´ì„œ ì½”ì–´â†’ìƒìœ„ì¸µ ê°„ì„  2ê°œë¥¼ ë§Œë“¤ê³  ìˆì—ˆë‹¤. L1-2ì—ì„œ ì œê±°.)
 #include <yaml-cpp/yaml.h>
 
 namespace MetaYml = YAML;
@@ -15,7 +15,7 @@ namespace Meta
     // 1) Scalar Property <-> YAML
     // -----------------------------
 
-    // ±âº» ÅÛÇÃ¸´: ±×´ë·Î as<T>, any_cast<T>
+    // ï¿½âº» ï¿½ï¿½ï¿½Ã¸ï¿½: ï¿½×´ï¿½ï¿½ as<T>, any_cast<T>
     template <typename T>
     inline void ToYamlScalar(const Meta::Property& prop, MetaYml::Node& node, std::any& value)
     {
@@ -51,7 +51,7 @@ namespace Meta
     template <>
     inline void FromYamlScalar<HashedGuid>(const Meta::Property& prop, void* instance, const MetaYml::Node& node)
     {
-        // ±âÁ¸ ÄÚµå¿Í µ¿ÀÏÇÏ°Ô uint32_t·Î ¿ªÁ÷·ÄÈ­
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ uint32_tï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È­
         prop.setter(instance, HashedGuid(node[prop.name].as<uint32_t>()));
     }
 
@@ -236,10 +236,10 @@ namespace Meta
 namespace Meta
 {
     // --------------------------------------
-    // 2) Vector<T> <-> YAML sequence ÇïÆÛ
+    // 2) Vector<T> <-> YAML sequence ï¿½ï¿½ï¿½ï¿½
     // --------------------------------------
 
-    // 1) ±âº» ÅÛÇÃ¸´: T ±× ÀÚÃ¼·Î Á÷·ÄÈ­/¿ªÁ÷·ÄÈ­
+    // 1) ï¿½âº» ï¿½ï¿½ï¿½Ã¸ï¿½: T ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È­
     template <typename T>
     inline void VectorElementToYaml(MetaYml::Node& arrayNode, void* elementVoid)
     {
@@ -258,8 +258,8 @@ namespace Meta
     }
 
     // --------------------------------------------------
-    // 2) file::path vector Æ¯¼öÈ­
-    //  - YAML: std::vector<std::string> ·Î ÀúÀå
+    // 2) file::path vector Æ¯ï¿½ï¿½È­
+    //  - YAML: std::vector<std::string> ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     // --------------------------------------------------
     template <>
     inline void VectorElementToYaml<file::path>(MetaYml::Node& arrayNode, void* elementVoid)
@@ -280,8 +280,8 @@ namespace Meta
     }
 
     // --------------------------------------------------
-    // 3) HashingString vector Æ¯¼öÈ­
-    //  - YAML: std::vector<std::string> ·Î ÀúÀå
+    // 3) HashingString vector Æ¯ï¿½ï¿½È­
+    //  - YAML: std::vector<std::string> ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     // --------------------------------------------------
     template <>
     inline void VectorElementToYaml<HashingString>(MetaYml::Node& arrayNode, void* elementVoid)
@@ -302,8 +302,8 @@ namespace Meta
     }
 
     // --------------------------------------------------
-    // 4) HashedGuid vector Æ¯¼öÈ­
-    //  - YAML: std::vector<uint32_t> ·Î ÀúÀå (±âÁ¸ ´ÜÀÏ HashedGuid¿Í µ¿ÀÏ ±ÔÄ¢)
+    // 4) HashedGuid vector Æ¯ï¿½ï¿½È­
+    //  - YAML: std::vector<uint32_t> ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ HashedGuidï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¢)
     // --------------------------------------------------
     template <>
     inline void VectorElementToYaml<HashedGuid>(MetaYml::Node& arrayNode, void* elementVoid)
@@ -324,8 +324,8 @@ namespace Meta
     }
 
     // --------------------------------------------------
-    // 5) FileGuid vector Æ¯¼öÈ­
-    //  - YAML: std::vector<std::string> (ToString()) ·Î ÀúÀå
+    // 5) FileGuid vector Æ¯ï¿½ï¿½È­
+    //  - YAML: std::vector<std::string> (ToString()) ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     // --------------------------------------------------
     template <>
     inline void VectorElementToYaml<FileGuid>(MetaYml::Node& arrayNode, void* elementVoid)
@@ -368,7 +368,7 @@ namespace Meta
 #define type_serializer(T) { type_guid(T), &ToYamlScalar<T>, &FromYamlScalar<T> }
 #define type_vector_serializer(T) { type_guid(T), &VectorElementToYaml<T>, &VectorFromYamlScalar<T> }
 
-    // Å¸ÀÔ ¸®½ºÆ® ÇÑ ¹ø¸¸ Á¤ÀÇ
+    // Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     inline static YamlSerializerEntry g_yamlSerializers[] = {
         type_serializer(int),
         type_serializer(float),
@@ -383,7 +383,7 @@ namespace Meta
         type_serializer(uint64_t),
         type_serializer(double),
         type_serializer(std::string),
-        //Æ¯¼öÈ­µÈ Å¸ÀÔµé
+        //Æ¯ï¿½ï¿½È­ï¿½ï¿½ Å¸ï¿½Ôµï¿½
         type_serializer(file::path),
         type_serializer(HashingString),
         type_serializer(HashedGuid),
@@ -406,7 +406,7 @@ namespace Meta
         return nullptr;
     }
 
-    // vector<T> ¿¡ ´ëÇØ Áö¿øÇÒ Å¸ÀÔµé ÀüºÎ ¿©±â¼­ Á¤ÀÇ
+    // vector<T> ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½Ôµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½â¼­ ï¿½ï¿½ï¿½ï¿½
     static inline YamlVectorEntry g_yamlVectorEntries[] = {
 		type_vector_serializer(int),
 		type_vector_serializer(float),
@@ -421,7 +421,7 @@ namespace Meta
 		type_vector_serializer(uint64_t),
 		type_vector_serializer(double),
 		type_vector_serializer(std::string),
-		//Æ¯¼öÈ­µÈ Å¸ÀÔµé
+		//Æ¯ï¿½ï¿½È­ï¿½ï¿½ Å¸ï¿½Ôµï¿½
 		type_vector_serializer(file::path),
 		type_vector_serializer(HashingString),
 		type_vector_serializer(HashedGuid),

@@ -343,9 +343,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameObjectIndex.h" />
-    <ClInclude Include="IObject.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="IRenderable.h">
       <Filter>Interfaces</Filter>
     </ClInclude>

@@ -1,4 +1,5 @@
 #include "FoliageComponent.h"
+#include "DataSystem.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Terrain.h"
@@ -220,7 +221,7 @@ std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
         return ranges;
 
     unsigned int hwThreads = std::thread::hardware_concurrency();
-    if (hwThreads == 0) hwThreads = 4; // ¾ÈÀü ±âº»°ª (¹Ì°ËÃâ ½Ã)
+    if (hwThreads == 0) hwThreads = 4; // ï¿½ï¿½ï¿½ï¿½ ï¿½âº»ï¿½ï¿½ (ï¿½Ì°ï¿½ï¿½ï¿½ ï¿½ï¿½)
 
     const size_t numSplits = hwThreads * 2 + 1;
     ranges.reserve(numSplits);
@@ -248,7 +249,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
     const size_t count = m_foliageInstances.size();
     if (count == 0) return;
 
-    // ÇÁ·¯½ºÅÒÀº °ª Ä¸Ã³(½º·¹µå ¾ÈÀü)
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Ä¸Ã³(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     const auto frustum = camera->GetFrustum();
 
     auto process_range = [&](size_t begin, size_t end)
@@ -259,7 +260,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
 
             auto& foliage = m_foliageInstances[i];
 
-            // °æ°è Ã¼Å© º¸Á¤: >=
+            // ï¿½ï¿½ï¿½ Ã¼Å© ï¿½ï¿½ï¿½ï¿½: >=
             if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
                 continue;
 
@@ -278,7 +279,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
             Mesh* mesh = foliageType.m_mesh;
             if (!mesh)
             {
-                foliage.m_isCulled = true; // ¾ÈÀü ±âº»°ª
+                foliage.m_isCulled = true; // ï¿½ï¿½ï¿½ï¿½ ï¿½âº»ï¿½ï¿½
                 continue;
             }
 
@@ -307,7 +308,7 @@ void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
         tasks.emplace_back(std::async(std::launch::async, process_range, begin, end));
     }
 
-    // ¿Ï·á ´ë±â
+    // ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½
     for (auto& f : tasks)
     {
         if (f.valid()) f.get();

@@ -1,4 +1,6 @@
 #include "ExternUI.h"
+#include "EngineSetting.h"
+#include "DataSystem.h"
 #include "EditorImGuiTexture.h"
 #include "Terrain.h"
 #include "TableAPIHelper.h"

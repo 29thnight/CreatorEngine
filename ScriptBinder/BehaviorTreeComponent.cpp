@@ -1,4 +1,5 @@
 #include "BehaviorTreeComponent.h"
+#include "DataSystem.h"
 #include "BTGraphFlatten.h"
 #include "ClrHost.h"
 #include "SceneManager.h"
@@ -8,7 +9,7 @@ void BehaviorTreeComponent::Initialize()
 	AIManagers->RegisterAIComponent(GetOwner(), this);
 	if (m_BlackBoardGuid != nullFileGuid)
 	{
-		//TODO: ºí·¢º¸µå ÀÎ½ºÅÏ½º »ý¼º ÁØºñ
+		//TODO: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Î½ï¿½ï¿½Ï½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Øºï¿½
 		m_pBlackboard = new BlackBoard();
 
 		file::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);

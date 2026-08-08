@@ -2,6 +2,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
 #include "EngineResourceCensus.h"
+#include <functional>
 #include <map>
 #include <mutex>
 #include <string>
@@ -88,6 +89,25 @@ namespace DirectX11
 			CreateWindowSizeDependentResources();
 		}
 		D3D_FEATURE_LEVEL GetDeviceFeatureLevel() const { return m_d3dFeatureLevel; }
+
+		// 백버퍼 RTV가 다시 만들어질 때 위층(렌더 전역 상태)에 알리는 콜백.
+		//
+		// 예전에는 이 파일(.cpp)이 RenderEngine/DeviceState.h를 직접 include해
+		// DeviceStates->g_backBufferRTV에 대입했다 — 코어가 렌더를 아는 역방향
+		// 간선이다. 방향을 뒤집는다: 코어는 "바뀌었다"고만 알리고, 무엇을
+		// 갱신할지는 진입점(Dx11Main·GameMain)이 등록한다.
+		//
+		// 등록 시점에 RTV가 이미 서 있으면 즉시 한 번 호출한다 — 구 코드는
+		// 생성 직후 대입이 항상 일어났으므로 그 타이밍 보장을 유지한다.
+		void SetBackBufferPublishCallback(std::function<void(ID3D11RenderTargetView*)> callback)
+		{
+			m_backBufferPublish = std::move(callback);
+			if (m_backBufferPublish && m_d3dRenderTargetView)
+			{
+				m_backBufferPublish(m_d3dRenderTargetView.Get());
+			}
+		}
+
 		ID3D11RenderTargetView1* GetBackBufferRenderTargetView() const { return m_d3dRenderTargetView.Get(); }
 		ID3D11Texture2D1* GetBackBuffer() const { return m_backBuffer.Get(); }
 		ID3D11ShaderResourceView* GetBackBufferSRV() const { return m_backBufferSRV.Get(); }
@@ -157,6 +177,7 @@ namespace DirectX11
 		ComPtr<IDXGIInfoQueue> m_dxgiInfoQueue;
 
 		ComPtr<ID3D11RenderTargetView1>		m_d3dRenderTargetView;
+		std::function<void(ID3D11RenderTargetView*)> m_backBufferPublish;
 		ComPtr<ID3D11Texture2D1>			m_backBuffer;
 		ComPtr<ID3D11ShaderResourceView>	m_backBufferSRV;
 		ComPtr<ID3D11DepthStencilView>		m_d3dDepthStencilView;

@@ -31,13 +31,5 @@ RenderEngine/VolumeProfile.h -> EngineEntry/RenderPassSettings.h
 ScriptBinder/EnhancedGizmoSceneBinding.cpp -> EngineEntry/EngineSetting.h
 ScriptBinder/MSBuildHelper.h -> EngineEntry/ProgressWindow.h
 ScriptBinder/VolumeComponent.cpp -> EngineEntry/EngineSetting.h
-Utility_Framework/DeviceResources.cpp -> RenderEngine/DeviceState.h
 Utility_Framework/DumpHandler.h -> EngineEntry/EngineSetting.h
-Utility_Framework/GlobalImGuiContext.h -> ImGuiHelper/ImGui.h
 Utility_Framework/PakHelper.h -> EngineEntry/EngineSetting.h
-Utility_Framework/ReflectionImGuiHelper.h -> ScriptBinder/GameObject.h
-Utility_Framework/ReflectionImGuiHelper.h -> ScriptBinder/InputManager.h
-Utility_Framework/ReflectionImGuiHelper.h -> ScriptBinder/Scene.h
-Utility_Framework/ReflectionImGuiHelper.h -> ScriptBinder/SceneManager.h
-Utility_Framework/ReflectionYamlTemplete.h -> RenderEngine/DataSystem.h
-Utility_Framework/ReflectionYamlTemplete.h -> ScriptBinder/IObject.h

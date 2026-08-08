@@ -5,7 +5,6 @@
 #include "DirectXMath.h"
 #include "Core.Memory.hpp"
 #include "DirectXColors.h"
-#include "DeviceState.h"
 #include "LogSystem.h"
 
 #include <cctype>
@@ -1007,6 +1006,10 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
     DirectX11::ThrowIfFailed(
         pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
     );
-    DirectX11::DeviceStates->g_backBufferRTV = m_d3dRenderTargetView.Get();
+    // 위층이 등록한 게시 콜백으로 새 RTV를 알린다(구 DeviceStates 직접 대입의 역전).
+    if (m_backBufferPublish)
+    {
+        m_backBufferPublish(m_d3dRenderTargetView.Get());
+    }
 }
 #endif // !DYNAMICCPP_EXPORTS

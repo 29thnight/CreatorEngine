@@ -608,6 +608,15 @@ void DirectX11::Dx11Main::InitializeDeviceState()
     };
 
     refresh();
+
+    // 코어(DeviceResources)가 백버퍼 RTV를 다시 만들 때마다 전역 렌더 상태를
+    // 갱신한다. 예전에는 DeviceResources.cpp가 DeviceStates에 직접 대입했는데
+    // (코어→렌더 역방향), 방향을 뒤집어 여기(최상층)가 배선을 소유한다.
+    m_deviceResources->SetBackBufferPublishCallback([](ID3D11RenderTargetView* rtv)
+    {
+        DirectX11::DeviceStates->g_backBufferRTV = rtv;
+    });
+
     ScreenResizeBus::Get().SetSize(
         static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.width),
         static_cast<uint32_t>(DirectX11::DeviceStates->g_ClientRect.height));

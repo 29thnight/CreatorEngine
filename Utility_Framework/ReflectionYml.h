@@ -1,5 +1,8 @@
 #pragma once
 #include "ReflectionYamlTemplete.h"
+// FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
+// (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
+#include "IObject.h"
 
 namespace Meta
 {

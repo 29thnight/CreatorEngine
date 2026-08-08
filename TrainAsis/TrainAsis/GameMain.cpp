@@ -14,6 +14,7 @@
 #include "UIManager.h"
 #include "InputActionManager.h"
 #include "Profiler.h"
+#include "DeviceState.h"
 #include "WinProcProxy.h"
 #include "AIManager.h"
 #include "TagManager.h"
@@ -37,6 +38,15 @@ DirectX11::GameMain::~GameMain()
 void DirectX11::GameMain::Initialize()
 {
     m_deviceResources->RegisterDeviceNotify(this);
+
+    // 코어(DeviceResources)가 백버퍼 RTV를 다시 만들 때마다 전역 렌더 상태를
+    // 갱신한다. 예전에는 DeviceResources.cpp가 DeviceStates에 직접 대입했는데
+    // (코어→렌더 역방향), 방향을 뒤집어 진입점이 배선을 소유한다.
+    // 등록 시점에 RTV가 이미 있으면 즉시 한 번 호출되므로 초기값도 보장된다.
+    m_deviceResources->SetBackBufferPublishCallback([](ID3D11RenderTargetView* rtv)
+    {
+        DirectX11::DeviceStates->g_backBufferRTV = rtv;
+    });
 
     using namespace Creator::Culling;
     using namespace DirectX;

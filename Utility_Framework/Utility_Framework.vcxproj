@@ -58,7 +58,6 @@
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
-    <ClInclude Include="GlobalImGuiContext.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />
     <ClInclude Include="Paklib.hpp" />
@@ -87,6 +86,7 @@
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
+    <ClInclude Include="IObject.h" />
     <ClInclude Include="TypeDefinition.h" />
     <ClInclude Include="TypeTrait.h" />
     <ClInclude Include="WinProcProxy.h" />
